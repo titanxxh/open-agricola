@@ -200,17 +200,30 @@ describe("A146 command boundaries", () => {
       }
   })
   it("zero one six and seven food piles cannot yield any material", () => {
-    for (const count of [0, 1, 6, 7]) {
-      const s = setup(state => pile(state, 'fishing', 'food', count))
-      const r = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'fishing') : turn(s, 0, 'fishing')
-      assert.deepEqual(res(r), [0, 0, 0, 0])
-      if (count === 0) {
-        assert.equal(r.interaction.stateId, 'idle')
-        assert.equal(r.state.currentPlayerIndex, 0)
+    for (const space of ['fishing', 'traveling-players'])
+      for (const count of [0, 1, 6, 7]) {
+        const s = setup(state => pile(state, space, 'food', count))
+        const r = count === 0 ? assertEmptyAccumulationRejected(s, 0, space) : turn(s, 0, space)
+        assert.deepEqual(res(r), [0, 0, 0, 0])
+        if (count === 0) {
+          assert.equal(r.interaction.stateId, 'idle')
+          assert.equal(r.state.currentPlayerIndex, 0)
+        }
+        assert.equal(r.state.players[0]!.resources.food, 40 + count)
+        for (const actual of [r, s.getState()]) {
+          assert.deepEqual(actual.state.players.map(player => player.resources), [0, 1, 2, 3].map(actor => ({
+            wood: 0, clay: 0, reed: 0, stone: 0, food: actor === 0 ? 40 + count : 40,
+            grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+          })))
+          assert.equal(actual.state.actionSpaces.find(candidate => candidate.id === space)!.resources.food, 0)
+          if (count === 0) {
+            assert.equal(actual.interaction.stateId, 'idle')
+            assert.equal(actual.state.currentPlayerIndex, 0)
+          } else
+            assertTurnFinished(actual, 0)
+        }
+        save(`A146-N2-${space}-${count}`, r)
       }
-      assert.equal(r.state.players[0]!.resources.food, 40 + count)
-      save(`A146-N2-${count}`, r)
-    }
   })
   it("ordinary Day Laborer food and reserve food cannot count as accumulation", () => {
     const r = turn(setup(state => state.players[0]!.resources.food = 3), 0, 'day-laborer')
@@ -219,15 +232,26 @@ describe("A146 command boundaries", () => {
     save('A146-N3', r)
   })
   it("hand and actual opponent accumulation do not reward wrong owner", () => {
-    const hs = setup(state => pile(state, 'fishing', 'food', 2), false)
-    const hand = turn(hs, 0, 'fishing')
-    assert.deepEqual(res(hand), [0, 0, 0, 0])
-    const s = setup(state => pile(state, 'fishing', 'food', 2))
-    turn(s, 0, 'grain-seeds')
-    const other = turn(s, 1, 'fishing')
-    assert.deepEqual(res(other), [0, 0, 0, 0])
-    assert.equal(other.state.players[1]!.resources.stone, 0)
-    save('A146-N4', { hand, other })
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const space of ['fishing', 'traveling-players']) {
+      const hs = setup(state => pile(state, space, 'food', 2), false)
+      const hand = turn(hs, 0, space)
+      assert.deepEqual(res(hand), [0, 0, 0, 0])
+      for (const actual of [hand, hs.getState()]) {
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 42 }, baseline, baseline, baseline])
+        assert.equal(actual.state.actionSpaces.find(candidate => candidate.id === space)!.resources.food, 0)
+      }
+      const s = setup(state => pile(state, space, 'food', 2))
+      turn(s, 0, 'grain-seeds')
+      const other = turn(s, 1, space)
+      assert.deepEqual(res(other), [0, 0, 0, 0])
+      assert.equal(other.state.players[1]!.resources.stone, 0)
+      for (const actual of [other, s.getState()]) {
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, grain: 1 }, { ...baseline, food: 42 }, baseline, baseline])
+        assert.equal(actual.state.actionSpaces.find(candidate => candidate.id === space)!.resources.food, 0)
+      }
+      save(`A146-N4-${space}`, { hand, other })
+    }
   })
   it("occupied input and whole undo cannot duplicate mapped reward", () => {
     const s = setup(state => pile(state, 'fishing', 'food', 2))

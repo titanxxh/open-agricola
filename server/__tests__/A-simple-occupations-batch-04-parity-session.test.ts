@@ -382,6 +382,8 @@ describe("A141 command boundaries", () => {
       assert.equal(r.state.round, 6)
       assert.equal(r.state.players[0]!.resources.vegetable, 1)
       assert.equal(r.state.players[1]!.resources.vegetable, 0)
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources.vegetable), [1, 0, 0])
       save(`A141-N1-${spaces[0]}`, r)
     }
   })
@@ -551,6 +553,14 @@ describe("A157 command boundaries", () => {
         spaces[2] = 'lessons-4'
       const on = play(spaces), off = play(spaces, false)
       assert.equal(on.r.state.players[0]!.resources.food - off.r.state.players[0]!.resources.food, mode === 'both' ? 0 : 1)
+      const expectedOn = mode === 'lessons' ? [61, 61, 60, 61]
+        : mode === 'lessons-4' ? [61, 60, 60, 61] : [60, 61, 59, 61]
+      const expectedOff = mode === 'lessons' ? [60, 61, 60, 61]
+        : mode === 'lessons-4' ? [60, 60, 60, 61] : [60, 61, 59, 61]
+      for (const actual of [on.r, on.s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources.food), expectedOn)
+      for (const actual of [off.r, off.s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources.food), expectedOff)
       save(`A157-N2-${mode}`, { on: on.r, off: off.r })
     }
   })
