@@ -30,7 +30,7 @@ const setup = (
   player.occupationPlayed.push(CARD_ID)
   player.rooms = 2
   player.roomTiles = [{ row: 2, col: 0 }, { row: 1, col: 0 }]
-  player.fields = fieldPositions.map(([row, col]) => ({ row, col, crop: null, remaining: 0 }))
+  player.fields = fieldPositions.map(([row, col]) => ({ row, col, stacks: [] }))
   setActiveWorkerCount(player, 2)
   setWorkersAtHome(state, player, 2)
 

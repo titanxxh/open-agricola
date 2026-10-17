@@ -44,6 +44,7 @@ const setup = (options: { familySize?: number; placements?: number; withCard?: b
   const player = state.players[0]!
   setActiveWorkerCount(player, options.familySize ?? 4)
   player.rooms = 5
+  player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 2 }]
   if (options.withCard ?? true) player.minorPlayed.push(CARD_ID)
   player.resources.food = 0
 

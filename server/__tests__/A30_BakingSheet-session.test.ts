@@ -29,7 +29,7 @@ const setup = ({ grain = 2, fieldGrain = 0, played = true } = {}) => {
   player.resources.grain = grain
   player.resources.food = 0
   player.fields = fieldGrain > 0
-    ? [{ row: 1, col: 0, stacks: [{ kind: 'grain', remaining: fieldGrain }] }]
+    ? [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: fieldGrain }] }]
     : []
   session.loadState(state)
   return session
@@ -37,7 +37,7 @@ const setup = ({ grain = 2, fieldGrain = 0, played = true } = {}) => {
 
 const openMinorPrompt = (session: GameSession) => {
   let response = session.takeAction(0, 'major-improvement')
-  expect(response.ok, response.error).toBe(true)
+  if (!response.ok) return response
   if (response.interaction.stateId !== 'wait') return response
   if (response.interaction.request.options?.some((option) => option.value === CARD_ID)) return response
   const improvement = response.interaction.request.options?.find((option) =>
@@ -100,6 +100,9 @@ describe('A030 Baking Sheet parity', () => {
 
   it('A030 S2: a grain field keeps Baking Sheet unavailable', () => {
     const response = openMinorPrompt(setup({ played: false, fieldGrain: 1 }))
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
 
     expect(response.interaction.stateId === 'wait'
       ? response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false

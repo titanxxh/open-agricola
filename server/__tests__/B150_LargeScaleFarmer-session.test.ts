@@ -41,8 +41,8 @@ const setup = (options?: {
 
   const farmExp = state.actionSpaces.find((s) => s.id === 'farm-expansion')
   const major = state.actionSpaces.find((s) => s.id === 'major-improvement')
-  if (farmExp) farmExp.takenBy = options?.farmExpOccupied ? state.players[1]!.id : null
-  if (major) major.takenBy = options?.majorOccupied ? state.players[1]!.id : null
+  if (farmExp) farmExp.takenBy = options?.farmExpOccupied ? [{ playerId: state.players[1]!.id, workerId: '1' }] : []
+  if (major) major.takenBy = options?.majorOccupied ? [{ playerId: state.players[1]!.id, workerId: '1' }] : []
 
   session.loadState(state)
   return session

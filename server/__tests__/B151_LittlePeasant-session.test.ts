@@ -23,6 +23,8 @@ const setupOccupiedSpaceSession = (options?: {
   setWorkersAtHome(state, player, 2)
   player.houseType = options?.houseType ?? 'wood'
   player.rooms = options?.rooms ?? 2
+  player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 },
+    ...[{ row: 1, col: 1 }].slice(0, player.rooms - 2)]
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push('B151_LittlePeasant')
@@ -32,8 +34,8 @@ const setupOccupiedSpaceSession = (options?: {
   const forest = state.actionSpaces.find((space) => space.id === 'forest')
   const meetingPlace = state.actionSpaces.find((space) => space.id === 'meeting-place')
   if (!forest || !meetingPlace) throw new Error('required action space missing')
-  forest.takenBy = opponentId
-  meetingPlace.takenBy = opponentId
+  forest.takenBy = [{ playerId: opponentId, workerId: '1' }]
+  meetingPlace.takenBy = [{ playerId: opponentId, workerId: '2' }]
 
   session.loadState(state)
   return session

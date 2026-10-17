@@ -22,11 +22,9 @@ const setup = (withSheepRug: boolean) => {
   setWorkersAtHome(state, player, 2)
   setActiveWorkerCount(player, 2)
   player.rooms = 3
-  // Placeholder ids in BOTH players' hands: avoid normalizeState's re-deal
-  // path (fires when any hand is empty) and keep minor-improvement options
-  // empty so the optional minor-improvement node consistently resolves
-  // without surfacing a wait. Placeholder ids resolve to undefined in
-  // `getMinorImprovement` and get filtered out of the buyable list.
+  player.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }]
+  // Fix irrelevant hands so Family Growth finishes its optional improvement
+  // without introducing a purchase choice from the random opening deal.
   player.minorHand = ['__test_placeholder__']
   player.occupationHand = ['__test_placeholder__']
   state.players[1]!.minorHand = ['__test_placeholder__']
@@ -38,7 +36,7 @@ const setup = (withSheepRug: boolean) => {
 
   const wishChildren = state.actionSpaces.find((space) => space.id === 'wish-children')
   if (!wishChildren) throw new Error('wish-children space missing')
-  wishChildren.takenBy = state.players[1]!.id
+  wishChildren.takenBy = [{ playerId: state.players[1]!.id, workerId: '1' }]
 
   session.loadState(state)
   return session

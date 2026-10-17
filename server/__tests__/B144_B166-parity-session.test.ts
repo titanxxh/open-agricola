@@ -419,7 +419,7 @@ describe('B159 Lieutenant General parity', () => {
     })
     setActiveWorkerCount(actor, 2)
     setWorkersAtHome(session.state, actor, 2)
-    if (adjacent) actor.fields = [{ row: 0, col: 2, crop: null, remaining: 0 }]
+    if (adjacent) actor.fields = [{ row: 0, col: 2, stacks: [] }]
     session.state.currentPlayerIndex = 1
     session.loadState(session.state)
     let response = session.takeAction(1, 'farmland')

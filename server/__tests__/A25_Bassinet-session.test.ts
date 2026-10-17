@@ -68,6 +68,7 @@ const baseSetup = () => {
     setActiveWorkerCount(p, 2)
     setWorkersAtHome(state, p, 2)
     p.rooms = 3
+    p.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }]
   }
 
   giveP2Bassinet(state)
@@ -175,6 +176,7 @@ describe('A025_Bassinet session', () => {
     const p1 = state.players[0]!
     // Ensure P1 has room to grow (rooms > familySize)
     p1.rooms = 3
+    p1.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }]
     setActiveWorkerCount(p1, 2)
     setWorkersAtHome(state, p1, 2)
     session.loadState(state)
@@ -207,6 +209,7 @@ describe('A025_Bassinet session', () => {
     const state = session.getState().state
     const p1 = state.players[0]!
     p1.rooms = 3
+    p1.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }]
     setActiveWorkerCount(p1, 2)
     setWorkersAtHome(state, p1, 2)
     p1.resources.food = 5
@@ -371,6 +374,7 @@ describe('A025_Bassinet session', () => {
     firstPlayer.occupationPlayed.push('A092_AdoptiveParents')
     firstPlayer.resources.food = 5
     firstPlayer.rooms = 3
+    firstPlayer.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }, { row: 1, col: 1 }]
     owner.rooms = 2
     session.loadState(state)
 
