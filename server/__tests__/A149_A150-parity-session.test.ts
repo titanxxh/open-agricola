@@ -279,7 +279,23 @@ describe("A149 command boundaries", () => {
   })
   it("whole discounted build undo restores room cost and pile before retry", () => {
     const s = artist(5, 1)
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, {
+          wood: 0, clay: 0, reed: 0, stone: 0, food: 42, grain: 0, vegetable: 0,
+          sheep: 0, boar: 0, cattle: 0, begging: 0,
+        })
+        assert.equal(player.rooms, 3)
+        assert.deepEqual(player.roomTiles.map(tile => `${tile.row}-${tile.col}`).sort(), ['1-0', '1-1', '2-0'])
+        assert.deepEqual(player.stableTiles, [])
+        assert.deepEqual(player.pastures, [])
+        assert.deepEqual(player.fenceSegments, [])
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food, 0)
+      }
+    }
     const first = drive(s, turn(s, 0, 'traveling-players'))
+    assertOutcome(first)
     assert.equal(first.state.players[0]!.rooms, 3)
     assert.ok(first.state.players[0]!.roomTiles.some(tile => tile.row === 1 && tile.col === 1))
     assert.equal(first.state.players[0]!.resources.wood, 0)
@@ -290,6 +306,7 @@ describe("A149 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.wood, 5)
     assert.equal(undone.state.players[0]!.resources.reed, 1)
     const retry = drive(s, turn(s, 0, 'traveling-players'))
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.rooms, 3)
     save('A149-N4', { first, undone, retry })
   })

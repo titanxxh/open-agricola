@@ -93,7 +93,17 @@ it('a real Forest Tallyman purchase makes its private space executable without l
     },
   }
   const before = undoRuleSnapshot(expectedBefore)
+  const assertOutcome = (response: SessionResponse) => {
+    for (const result of [response, session.getState()]) {
+      expect(result.state.players[0]!.resources).toEqual({ wood: 3, clay: 2, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+      expect(result.state.actionSpaces.find(space => space.id === cardId)!.takenBy).toEqual([
+        { playerId: beforeResponse.state.players[0]!.id, workerId: '2' },
+      ])
+      expect(availableWorkers(result.state, result.state.players[0]!)).toEqual([])
+    }
+  }
   const used = take(session, 0, cardId)
+  assertOutcome(used)
   expect(used.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
   expect(used.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toHaveLength(1)
   expect(used.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === cardId)).toBe(true)
@@ -112,6 +122,7 @@ it('a real Forest Tallyman purchase makes its private space executable without l
   expect(undone.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
   expect(undone.state.actionSpaces.find(space => space.id === cardId)?.takenBy).toEqual([])
   const retried = take(session, 0, cardId)
+  assertOutcome(retried)
   expect(retried.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
   expect(retried.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
   expect(retried.state.currentPlayerIndex).toBe(0)

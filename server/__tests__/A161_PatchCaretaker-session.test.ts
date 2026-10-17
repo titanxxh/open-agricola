@@ -245,12 +245,21 @@ describe("A161 command boundaries", () => {
   })
   it("whole second action undo restores vegetable and one retry grants only once", () => {
     const { s, r } = patch('forest', 'grove')
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 2, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 1, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'grove')!.resources.wood, 0)
+      }
+    }
+    assertOutcome(r)
     assert.equal(r.state.players[0]!.resources.vegetable, 1)
     assert.equal(r.state.players[0]!.resources.wood, 2)
     assertRejectedUnchanged(s, () => s.takeAction(0, 'grove'))
     const undone = undo(s)
     assert.equal(undone.state.players[0]!.resources.vegetable, 0)
     const retry = turn(s, 0, 'grove')
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.resources.vegetable, 1)
     const occupied = setup()
     turn(occupied, 0, 'forest')

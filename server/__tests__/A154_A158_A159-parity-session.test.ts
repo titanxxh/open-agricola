@@ -283,6 +283,21 @@ describe("A154 command boundaries", () => {
   function vp(r: SessionResponse) {
     return r.state.players[0]!.cardStates[CARD]?.counters?.bonusVp ?? 0
   }
+  function assertScoreAttribution(s: GameSession, response: SessionResponse, expected: 0 | 1 | 2) {
+    const expectedEntries = expected === 0 ? [[], [], [], []] : [[{
+      category: 'cardBonusVp', cardId: CARD, cardType: 'occupation', score: expected,
+    }], [], [], []]
+    for (const result of [response, s.getState()]) {
+      assert.ok(result.scores)
+      assert.deepEqual(result.scores.map(score => score.playerId), result.state.players.map(player => player.id))
+      assert.deepEqual(result.scores.map(score => score.categories.flatMap(category => category.entries.flatMap(entry =>
+        entry.type === 'bonus' && entry.cardId === CARD
+          ? [{ category: category.key, cardId: entry.cardId, cardType: entry.cardType, score: entry.score }]
+          : [],
+      ))), expectedEntries)
+      assert.deepEqual(result.scores.map(score => score.categories.find(category => category.key === 'cardBonusVp')?.total ?? 0), [expected, 0, 0, 0])
+    }
+  }
   function offer(s: GameSession, space = 'fishing') {
     turn(s, 0, 'day-laborer')
     return turn(s, 1, space)
@@ -302,6 +317,7 @@ describe("A154 command boundaries", () => {
       assert.equal(r.state.players[1]!.resources.grain, 1)
       assert.equal(r.state.players[2]!.resources.grain, 0)
       assert.equal(vp(r), 1)
+      assertScoreAttribution(s, r, 1)
       assert.equal(r.state.players[1]!.resources.food, 42)
       save(`A154-N1-${space}`, { pending, r })
     }
@@ -316,6 +332,7 @@ describe("A154 command boundaries", () => {
       assert.equal(r.state.players[0]!.resources.grain, grain)
       assert.equal(r.state.players[1]!.resources.grain, 0)
       assert.equal(vp(r), 0)
+      assertScoreAttribution(s, r, 0)
       save(`A154-N2-${grain}`, { pending, r })
     }
   })
@@ -323,15 +340,18 @@ describe("A154 command boundaries", () => {
     const ownS = setup()
     const own = turn(ownS, 0, 'fishing')
     assert.equal(vp(own), 0)
+    assertScoreAttribution(ownS, own, 0)
     assert.equal(own.state.players[0]!.resources.grain, 1)
     const us = setup()
     turn(us, 0, 'grain-seeds')
     const unrelated = turn(us, 1, 'day-laborer')
     assert.equal(vp(unrelated), 0)
+    assertScoreAttribution(us, unrelated, 0)
     assert.equal(unrelated.state.players[1]!.resources.grain, 0)
     const hs = setup(1, false)
     const hand = offer(hs)
     assert.equal(vp(hand), 0)
+    assertScoreAttribution(hs, hand, 0)
     assert.equal(hand.state.players[0]!.resources.grain, 1)
     assert.deepEqual(own.state.players.map(player => player.resources.grain), [1, 0, 0, 0])
     assert.deepEqual(unrelated.state.players.map(player => player.resources.grain), [2, 0, 0, 0])
@@ -353,6 +373,7 @@ describe("A154 command boundaries", () => {
       r = ok(s.resolveChoice(r.interaction.request.fromPlayerIndex, 'confirm'))
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
     assert.equal(r.interaction.playerIndex, 0)
+    assertScoreAttribution(s, r, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'transfer-five-grain'))
     const o = getChoiceOptions(r).find(o => !o.disabled && o.sourceCard === CARD && o.value !== '__skip__' && o.value !== '__done__')
     assert.ok(o)
@@ -361,9 +382,11 @@ describe("A154 command boundaries", () => {
     assert.deepEqual(done.state.players.map(player => player.resources), expected)
     assert.deepEqual(s.getState().state.players.map(player => player.resources), expected)
     assert.equal(vp(done), 1)
+    assertScoreAttribution(s, done, 1)
     assert.equal(done.state.players[0]!.resources.grain, 1)
     assert.equal(done.state.players[1]!.resources.grain, 1)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, o.value))
+    assertScoreAttribution(s, s.getState(), 1)
     save('A154-N4', done)
   })
   it("next distinct opponent accumulation awards once more and stops when supply empty", () => {
@@ -379,6 +402,7 @@ describe("A154 command boundaries", () => {
       assert.deepEqual(first.state.players.map(player => player.resources), expectedFirst)
       assert.deepEqual(s.getState().state.players.map(player => player.resources), expectedFirst)
       assert.equal(vp(first), 1)
+      assertScoreAttribution(s, first, 1)
       const expectedSecond = s.getState().state.players.map(player => ({ ...player.resources }))
       const secondPileFood = s.getState().state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food ?? 0
       expectedSecond[0]!.grain -= secondGrain
@@ -390,6 +414,7 @@ describe("A154 command boundaries", () => {
       assert.deepEqual(second.state.players.map(player => player.resources), expectedSecond)
       assert.deepEqual(s.getState().state.players.map(player => player.resources), expectedSecond)
       assert.equal(vp(second), finalPoints)
+      assertScoreAttribution(s, second, finalPoints)
       assert.equal(second.state.players[0]!.resources.grain, 0)
       assert.equal(second.state.players[1]!.resources.grain, 1)
       assert.equal(second.state.players[2]!.resources.grain, secondGrain)

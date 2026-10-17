@@ -218,35 +218,57 @@ describe("A153 command boundaries", () => {
   function points(r: SessionResponse) {
     return r.state.players[0]!.cardStates[PIG]?.counters?.bonusVp ?? 0
   }
+  function assertScoreAttribution(s: GameSession, response: SessionResponse, expected: 0 | 3) {
+    const expectedEntries = expected === 0 ? [[], [], [], []] : [[{
+      category: 'cardBonusVp', cardId: PIG, cardType: 'occupation', score: expected,
+    }], [], [], []]
+    for (const result of [response, s.getState()]) {
+      assert.ok(result.scores)
+      assert.deepEqual(result.scores.map(score => score.playerId), result.state.players.map(player => player.id))
+      assert.deepEqual(result.scores.map(score => score.categories.flatMap(category => category.entries.flatMap(entry =>
+        entry.type === 'bonus' && entry.cardId === PIG
+          ? [{ category: category.key, cardId: entry.cardId, cardType: entry.cardType, score: entry.score }]
+          : [],
+      ))), expectedEntries)
+      assert.deepEqual(result.scores.map(score => score.categories.find(category => category.key === 'cardBonusVp')?.total ?? 0), [expected, 0, 0, 0])
+    }
+  }
   it("four farm pigs never unlock the three point reward", () => {
     const s = pig(4), r = finish(s, turn(s, 0, 'day-laborer'))
     assert.ok(!r.interaction.anytimeActions.some(a => a.id === ANY))
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY))
     assert.equal(points(r), 0)
+    assertScoreAttribution(s, r, 0)
     save('A153-N1', r)
   })
   it("five pigs across finite stable pasture and house award owner three points once", () => {
     const s = pig(5)
     const entered = finish(s, turn(s, 0, 'day-laborer'))
     assert.ok(entered.interaction.anytimeActions.some(a => a.id === ANY))
+    assertScoreAttribution(s, entered, 0)
     const r = finish(s, ok(s.takeAnytimeAction(0, ANY)))
     assert.equal(points(r), 3)
+    assertScoreAttribution(s, r, 3)
     assert.equal(isCardFlagged(r.state.players[0]!, PIG), true)
     assert.equal(r.state.players[0]!.resources.boar, 5)
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, ANY))
     assert.equal(points(s.getState()), 3)
+    assertScoreAttribution(s, s.getState(), 3)
     save('A153-N2', { entered, r })
   })
   it("hand and actual wrong actor cannot claim five pig owner reward", () => {
     const hs = pig(5, false), hand = finish(hs, turn(hs, 0, 'day-laborer'))
     assert.ok(!hand.interaction.anytimeActions.some(a => a.id === ANY))
     assert.equal(points(hand), 0)
+    assertScoreAttribution(hs, hand, 0)
     assert.equal(isCardFlagged(hand.state.players[0]!, PIG), false)
     const s = pig(5)
     finish(s, turn(s, 0, 'day-laborer'))
     assertRejectedUnchanged(s, () => s.takeAnytimeAction(1, ANY))
+    assertScoreAttribution(s, s.getState(), 0)
     const r = finish(s, ok(s.takeAnytimeAction(0, ANY)))
     assert.equal(points(r), 3)
+    assertScoreAttribution(s, r, 3)
     save('A153-N3', { hand, r })
   })
 })

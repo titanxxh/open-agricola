@@ -231,7 +231,15 @@ describe("A146 command boundaries", () => {
   })
   it("occupied input and whole undo cannot duplicate mapped reward", () => {
     const s = setup(state => pile(state, 'fishing', 'food', 2))
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 0, clay: 0, reed: 0, stone: 1, food: 42, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'fishing')!.resources.food, 0)
+      }
+    }
     const first = turn(s, 0, 'fishing')
+    assertOutcome(first)
     assert.deepEqual(res(first), [1, 0, 0, 0])
     assert.equal(first.state.players[0]!.resources.food, 42)
     assert.equal(first.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 0)
@@ -241,6 +249,7 @@ describe("A146 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.food, 40)
     assert.equal(undone.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 2)
     const retry = turn(s, 0, 'fishing')
+    assertOutcome(retry)
     assert.deepEqual(res(retry), [1, 0, 0, 0])
     const occupied = setup(state => pile(state, 'fishing', 'food', 2))
     turn(occupied, 0, 'fishing')

@@ -250,9 +250,37 @@ describe('A142 command boundaries', () => {
     complete(response, 0)
     assertRejectedUnchanged(session, () => session.resolveChoice(1, 'vegetable'))
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'unpaid-vegetable'))
+    const activeSession = setup({ food: 2 })
+    const pending = enterCordmakerChoice(activeSession, turn(activeSession, 0, 'reed-bank'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.sourceCard, CARD_ID)
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.state.currentPlayerIndex, 0)
+    const vegetable = getChoiceOptions(pending).find(option => !option.disabled && [option.effectPreview, ...descriptionEffects(option.descriptionPreview)].some(effect => effect?.kind === 'resourceExchange' && effect.resourcesGained?.vegetable === 1))
+    assert.ok(vegetable)
+    assert.equal(pending.state.players[0]!.resources.food, 2)
+    assertRejectedUnchanged(activeSession, () => activeSession.resolveChoice(0, 'unpaid-vegetable'))
+    assertRejectedUnchanged(activeSession, () => activeSession.resolveChoice(1, vegetable.value))
+    assert.deepEqual(activeSession.getState().interaction, pending.interaction)
+    const legal = chooseReward(activeSession, activeSession.getState(), 'grain')
+    complete(legal, 0)
+    assert.deepEqual(legal.state.players[0]!.resources, {
+      wood: 0, clay: 0, reed: 2, stone: 0, food: 2, grain: 1, vegetable: 0,
+      sheep: 0, boar: 0, cattle: 0, begging: 0,
+    })
   })
   it('whole own action undo restores payment crop and Reed Bank before retry', () => {
     const session = setup({ food: 2 })
+    const assertOutcome = (response: SessionResponse, crop: 'grain' | 'vegetable') => {
+      for (const result of [response, session.getState()]) {
+        assert.deepEqual(result.state.players[0]!.resources, {
+          wood: 0, clay: 0, reed: 2, stone: 0, food: crop === 'grain' ? 2 : 0,
+          grain: crop === 'grain' ? 1 : 0, vegetable: crop === 'vegetable' ? 1 : 0,
+          sheep: 0, boar: 0, cattle: 0, begging: 0,
+        })
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'reed-bank')!.resources.reed, 0)
+      }
+    }
     const beforeInteraction = JSON.stringify(session.getState().interaction)
     const before = undoRuleSnapshot(session.getState())
     const pending = enterCordmakerChoice(session, turn(session, 0, 'reed-bank'))
@@ -263,6 +291,7 @@ describe('A142 command boundaries', () => {
     assert.ok(vegetable)
     const first = chooseReward(session, pending, 'vegetable')
     complete(first, 0)
+    assertOutcome(first, 'vegetable')
     expect(first.state.players[0]!.resources).toMatchObject({ food: 0, reed: 2, vegetable: 1 })
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'vegetable'))
     assertStaleRejected(session, () => session.resolveChoice(0, vegetable.value))
@@ -275,6 +304,7 @@ describe('A142 command boundaries', () => {
     assert.equal(undone.state.currentPlayerIndex, 0)
     const retry = chooseReward(session, turn(session, 0, 'reed-bank'), 'grain')
     complete(retry, 0)
+    assertOutcome(retry, 'grain')
     expect(retry.state.players[0]!.resources).toMatchObject({ food: 2, reed: 2, grain: 1, vegetable: 0 })
     const rich = setup({ food: 4 })
     const richPending = enterCordmakerChoice(rich, turn(rich, 0, 'reed-bank'))

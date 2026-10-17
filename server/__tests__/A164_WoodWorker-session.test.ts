@@ -320,6 +320,14 @@ describe("A164 command boundaries", () => {
   })
   it("illegal wrong actor stale and whole undo cannot duplicate exchange", () => {
     const s = setup({ wood: 0 }, true, state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 3)
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 2, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 1, boar: 0, cattle: 0, begging: 0 })
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood, 1)
+      }
+      assertAnimalPlacement(s, response, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+    }
     const pending = turn(s, 0, 'forest')
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'return-zero'))
     assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
@@ -329,6 +337,7 @@ describe("A164 command boundaries", () => {
     assert.ok(exchange)
     assertRejectedUnchanged(s, () => s.resolveChoice(1, exchange.value))
     const r = finish(s, pending)
+    assertOutcome(r)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'exchange-again'))
     assertStaleRejected(s, () => s.resolveChoice(0, exchange.value))
     assert.equal(material(r).wood, 2)
@@ -340,6 +349,7 @@ describe("A164 command boundaries", () => {
     assert.equal(material(undone).sheep, 0)
     assert.equal(undone.state.actionSpaces.find(a => a.id === 'forest')!.resources.wood, 3)
     const retry = finish(s, turn(s, 0, 'forest'))
+    assertOutcome(retry)
     assert.equal(material(retry).wood, 2)
     assert.equal(material(retry).sheep, 1)
     assertAnimalPlacement(s, retry, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
