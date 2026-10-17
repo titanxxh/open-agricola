@@ -42,6 +42,46 @@ function proofFixture() {
 }
 
 describe('delivery source and interrupted-merge recovery', () => {
+  it.each(['accepted', 'main-advances', 'guard-missing'])('uses server-enforced ordinary rebase when the merge is %s', async race => {
+    const f = proofFixture()
+    const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
+    execFileSync(realGit, ['update-ref', 'refs/remotes/origin/main', f.head], { cwd: f.root })
+    const stateFile = path.join(f.directory, 'server.json')
+    const log = path.join(f.directory, 'merge-calls.jsonl')
+    json(stateFile, { merged: false, race: race === 'main-advances' })
+    const repository = 'titanxxh/open-agricola'
+    const pull = { number: 1272, head: { sha: f.head, repo: { full_name: repository } }, state: 'open', draft: false, base: { ref: 'main', repo: { full_name: repository } } }
+    const machine = { commit_sha: f.head, status: 'completed', has_any_findings: false, has_unresolved_findings: false }
+    const body = `<!-- codex-pull-request-review-summary -->\n**Code Review** Completed \`${f.head}\` <time datetime="2026-10-17T01:00:00Z">done</time>\n**Security Review** Completed \`${f.head}\` <time datetime="2026-10-17T01:01:00Z">done</time>\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: machine, security_review: machine })} -->\n<!-- codex-security-review:v1 ${JSON.stringify({ headSha: f.head, status: 'completed' })} -->`
+    fs.writeFileSync(path.join(f.bin, 'gh'), `#!/usr/bin/env node
+const fs=require('node:fs'),a=process.argv.slice(2),file=${JSON.stringify(stateFile)},s=JSON.parse(fs.readFileSync(file,'utf8'));fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(a)+'\\n');let r;
+if(a[0]==='pr'&&a[1]==='merge'){if(s.race&&!a.includes('--admin')){s.rejected=true;fs.writeFileSync(file,JSON.stringify(s));process.stderr.write('HTTP 405: Base branch advanced; strict up-to-date check failed');process.exit(1)}s.merged=true;fs.writeFileSync(file,JSON.stringify(s));process.exit(0)}
+const e=a[1];if(e.endsWith('/pulls/1272'))r={...${JSON.stringify(pull)},state:s.merged?'closed':'open',merged:s.merged,merge_commit_sha:s.merged?${JSON.stringify(f.head)}:null};
+else if(e.endsWith('/branches/main'))r={commit:{sha:${JSON.stringify(f.head)}}};
+else if(e.endsWith('/branches/main/protection'))r={required_status_checks:{strict:${race !== 'guard-missing'},checks:[{context:'verify',app_id:15368}],contexts:['verify']},enforce_admins:{enabled:true},required_pull_request_reviews:{bypass_pull_request_allowances:{users:[],teams:[],apps:[]}}};
+else if(e.includes('/rules/branches/main'))r=[];
+else if(e.includes('/comments?'))r=[{id:1,user:{login:'chatgpt-codex-connector[bot]'},body:${JSON.stringify(body)},updated_at:'2026-10-17T01:01:00Z',html_url:'https://example.invalid/summary'}];
+else if(e.includes('/reactions?'))r=[{id:2,user:{login:'chatgpt-codex-connector[bot]'},content:'+1',created_at:'2026-10-17T01:02:00Z'}];
+else if(e==='graphql')r=a.some(x=>x.includes('mergeQueue'))?{data:{repository:{nameWithOwner:${JSON.stringify(repository)},mergeQueue:null}}}:{data:{repository:{pullRequest:{reviewThreads:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}}}};
+else process.exit(91);process.stdout.write(JSON.stringify(r));
+`, { mode: 0o755 })
+    fs.writeFileSync(path.join(f.bin, 'git'), `#!/usr/bin/env node
+const cp=require('node:child_process'),a=process.argv.slice(2);if(a[0]==='fetch')process.exit(0);const r=cp.spawnSync(${JSON.stringify(realGit)},a,{cwd:process.cwd(),env:process.env,encoding:'utf8'});process.stdout.write(r.stdout||'');process.stderr.write(r.stderr||'');process.exit(r.status??1);
+`, { mode: 0o755 })
+    await applyControl({ root: f.root, workspace: f.workspace, request: { kind: 'pause', authority: 'fixture exact target', finishOnly: [{ issue: 1222, pr: 1272, head: f.head }] } })
+    await applyControl({ root: f.root, workspace: f.workspace, request: { kind: 'remote-ci-policy', authority: 'fixture local CI only, server protection remains required', id: 'local-only', issue: 1222, pr: 1272, head: f.head } })
+    const granted = await applyControl({ root: f.root, workspace: f.workspace, request: { kind: 'grant', authority: 'fixture ordinary merge', assignment: { id: 'merge', worker: 'merger', issue: 1222, pr: 1272, head: f.head, operations: ['delivery:merge'] } } })
+    if (!('file' in granted)) throw new Error('expected fixture claim')
+    const result = deliver({ root: f.root, workspace: f.workspace, request: { ...f.request, assignment: granted.file, merge: true } })
+    if (race === 'main-advances' || race === 'guard-missing') {
+      await expect(result).rejects.toThrow(race === 'main-advances' ? /strict up-to-date|Base branch advanced/ : /server merge protection/)
+      expect(JSON.parse(fs.readFileSync(stateFile, 'utf8'))).toMatchObject(race === 'main-advances' ? { merged: false, rejected: true } : { merged: false })
+      expect(JSON.parse(fs.readFileSync(path.join(f.workspace, 'results/merger/merge/delivery-merge.json'), 'utf8'))).toMatchObject({ status: 'unknown' })
+    } else await expect(result).resolves.toMatchObject({ phase: 'complete', head: f.head })
+    const attempts = fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)).filter(args => args[0] === 'pr')
+    expect(attempts).toEqual(race === 'guard-missing' ? [] : [['pr', 'merge', '1272', '--repo', repository, '--rebase', '--match-head-commit', f.head]])
+  })
+
   it('retains strict RAW, current prepush and complete exact source byte inventory gates', () => {
     const fixture = proofFixture()
     expect(localProof(fixture.request)).toMatchObject({ head: fixture.head, tree: fixture.tree, rawCandidateFiles: 2 })
@@ -63,11 +103,16 @@ describe('delivery source and interrupted-merge recovery', () => {
     fs.writeFileSync(path.join(bin, 'gh'), `#!/usr/bin/env node
 const fs=require('node:fs');const args=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(args)+'\\n');const endpoint=args[1];let response;
 if(endpoint.endsWith('/pulls/1272'))response=${JSON.stringify(pull)};
+else if(endpoint==='repos/titanxxh/open-agricola')response={full_name:'titanxxh/open-agricola',default_branch:'main'};
+else if(endpoint.includes('/contents/.github/workflows/'))response={type:'file',path:endpoint.split('/contents/')[1].split('?')[0],sha:'cccccccccccccccccccccccccccccccccccccccc'};
+else if(endpoint.includes('/actions/workflows/')){const paths=['ci.yml','ci-full.yml','e2e.yml'],file=endpoint.split('/').at(-1);response={id:paths.indexOf(file)+11,path:'.github/workflows/'+file,state:'active'}}
+else if(endpoint.endsWith('/branches/main/protection'))response={required_status_checks:{strict:true,checks:[{context:'verify'}]},enforce_admins:{enabled:true},required_pull_request_reviews:{bypass_pull_request_allowances:{users:[],teams:[],apps:[]}}};
+else if(endpoint.includes('/rules/branches/main'))response=[];
 else if(endpoint.includes('/git/commits/'))response={tree:{sha:${JSON.stringify(tree)}}};
 else if(endpoint.includes('/comments?'))response=[{id:1,user:{login:'chatgpt-codex-connector[bot]'},body:${JSON.stringify(body)},updated_at:'2026-10-17T01:01:00Z',html_url:'https://example.invalid/summary'}];
 else if(endpoint.includes('/reactions?'))response=[{id:2,user:{login:'chatgpt-codex-connector[bot]'},content:'+1',created_at:'2026-10-17T01:02:00Z'}];
-else if(endpoint.includes('/actions/runs?'))response={workflow_runs:['CI','CI Full','E2E'].map((name,index)=>({id:index+1,name,head_sha:${JSON.stringify(mergeCommit)},event:'push',status:'completed',conclusion:'success',html_url:'https://example.invalid/run'}))};
-else if(endpoint==='graphql')response={data:{repository:{pullRequest:{reviewThreads:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}}}};
+else if(endpoint.includes('/actions/runs?'))response={workflow_runs:['CI','CI Full','E2E'].map((name,index)=>({id:index+1,workflow_id:index+11,path:'.github/workflows/'+['ci.yml','ci-full.yml','e2e.yml'][index],repository:{full_name:'titanxxh/open-agricola'},name,head_sha:${JSON.stringify(mergeCommit)},event:'push',status:'completed',conclusion:'success',html_url:'https://example.invalid/run'}))};
+else if(endpoint==='graphql')response=args.some(x=>x.includes('mergeQueue'))?{data:{repository:{nameWithOwner:'titanxxh/open-agricola',mergeQueue:null}}}:{data:{repository:{pullRequest:{reviewThreads:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}}}};
 else process.exit(91);process.stdout.write(JSON.stringify(response));
 `, { mode: 0o755 })
     expect(reconcileDelivery({ root, workspace, request: { ...fixture.request, reconcile: true } })).toMatchObject({ phase: 'complete', head, mergeCommit, remoteWrites: false })

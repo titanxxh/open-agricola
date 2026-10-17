@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { parseEnv } from 'node:util'
 import { afterEach, expect, it, vi } from 'vitest'
 import { runValidation } from '../audit-migration/run.mjs'
 import { applyControl } from '../audit-migration/control.mjs'
@@ -30,9 +31,11 @@ async function fixture(fault = '') {
   fs.writeFileSync(path.join(root, 'scripts/audit-migration.mjs'), `
 import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto'; import {execFileSync} from 'node:child_process';
 const root=process.cwd(); const args=process.argv.slice(2); const action=args[0]; const out=args[args.indexOf('--output')+1];
+const fault=${JSON.stringify(fault)}; const fixtureDirectory=path.dirname(root);
 const json=(f,v)=>{fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(v))};
 const git=(...a)=>execFileSync('git',a,{encoding:'utf8'}).trim(); const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
-fs.appendFileSync(process.env.AUDIT_FAKE_EVENTS,action+'\\n');
+fs.appendFileSync(path.join(fixtureDirectory,'events.log'),action+'\\n');
+fs.appendFileSync(path.join(fixtureDirectory,'environment.jsonl'),JSON.stringify({command:action,keys:Object.keys(process.env),values:Object.fromEntries(['PATH','HOME','TEST_DATABASE_URL','TEST_S3_ENDPOINT','TEST_S3_BUCKET','TEST_S3_ACCESS_KEY_ID','TEST_S3_SECRET_ACCESS_KEY','LOCAL_SERVICES_DIR','SHARED_DATA_DIR','DOCKER_CONTEXT','COMPOSE_PROJECT_NAME'].map(key=>[key,process.env[key]]))})+'\\n');
 if(action==='check-native') console.log(JSON.stringify({typesExit:0,fileInventoryExit:0,missingTypeRoots:[]}));
 if(action==='prepare'){
  fs.mkdirSync(path.join(out,'candidate/server/__tests__'),{recursive:true});
@@ -43,9 +46,9 @@ if(action==='prepare'){
 if(action==='verify'){
  const target=path.join(out,'candidate/server/__tests__/primary.test.ts');
  json(path.join(out,'summary.json'),{rawMode:'strict-expected',typesExit:0,fileInventoryExit:0,behaviorExit:0,failed:0,pending:0,todo:0,unresolvedSourceCases:0,missingTypeRoots:[],coveredSourceCases:1,tests:2,passed:2,includedTypeRoots:2});
- json(path.join(out,'behavior.json'),{testResults:[{name:target,assertionResults:[{fullName:process.env.AUDIT_FAKE_FAULT==='wrong-raw-title'?'wrong title':'rejects payment',status:'passed'}]}]});
+ json(path.join(out,'behavior.json'),{testResults:[{name:target,assertionResults:[{fullName:fault==='wrong-raw-title'?'wrong title':'rejects payment',status:'passed'}]}]});
  fs.writeFileSync(path.join(out,'included-files.log'),target+'\\n');
- if(process.env.AUDIT_FAKE_FAULT==='raw-byte-drift')fs.appendFileSync(target,'drift');
+ if(fault==='raw-byte-drift')fs.appendFileSync(target,'drift');
 }
 `)
   git(root, 'add', '.')
@@ -56,23 +59,26 @@ if(action==='verify'){
   const grant = await applyControl({ root, workspace, request: { kind: 'grant', authority: 'fixture local stages only', assignment: { kind: 'tooling', head, id: 'fake-run', worker: 'fixture', operations: stages.map(stage => `local-validation:${stage}`) } } })
   if (!('file' in grant) || typeof grant.file !== 'string') throw new Error('fixture grant did not produce a file')
   const database = path.join(directory, 'database.env')
-  fs.writeFileSync(database, 'TEST_DATABASE_URL=postgres://fixture:private@localhost:1/unused\n')
+  fs.writeFileSync(database, 'TEST_DATABASE_URL=postgres://agricola:fixture-test-pass@127.0.0.1:55432/agricola_test\n')
+  const localServices = path.join(directory, 'local-services.env')
+  fs.writeFileSync(localServices, 'LOCAL_POSTGRES_PASSWORD=fixture-test-pass\nLOCAL_POSTGRES_PORT=55432\nLOCAL_S3_ACCESS_KEY=fixture-test-key\nLOCAL_S3_SECRET_KEY=fixture-test-secret\nLOCAL_S3_PORT=59000\nGH_TOKEN=ignored-file-secret\nS3_SECRET_ACCESS_KEY=ignored-prod-secret\n')
   const output = path.join(directory, 'run')
   const config = path.join(directory, 'config.json')
-  write(config, { head, batch: 'M01', output, workspace, assignment: grant.file, services: { databaseEnv: database } })
+  write(config, { head, batch: 'M01', output, workspace, assignment: grant.file, services: { databaseEnv: database, localServicesEnv: localServices, projectName: 'oa-audit-fixture' } })
   const bin = path.join(directory, 'bin')
   fs.mkdirSync(bin)
   fs.writeFileSync(path.join(bin, 'pnpm'), `#!/usr/bin/env node
 import fs from 'node:fs'; import path from 'node:path'; import {execFileSync} from 'node:child_process';
-const a=process.argv.slice(2); const root=process.cwd(); const json=(f,v)=>{fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(v))}; const fault=process.env.AUDIT_FAKE_FAULT;
-fs.appendFileSync(process.env.AUDIT_FAKE_EVENTS,a.join(' ')+'\\n');
+const a=process.argv.slice(2); const root=process.cwd(); const fixtureDirectory=path.dirname(root); const json=(f,v)=>{fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(v))}; const fault=${JSON.stringify(fault)};
+fs.appendFileSync(path.join(fixtureDirectory,'events.log'),a.join(' ')+'\\n');
+fs.appendFileSync(path.join(fixtureDirectory,'environment.jsonl'),JSON.stringify({command:a.join(' '),keys:Object.keys(process.env),values:Object.fromEntries(['PATH','HOME','TEST_DATABASE_URL','TEST_S3_ENDPOINT','TEST_S3_BUCKET','TEST_S3_ACCESS_KEY_ID','TEST_S3_SECRET_ACCESS_KEY','LOCAL_SERVICES_DIR','SHARED_DATA_DIR','DOCKER_CONTEXT','COMPOSE_PROJECT_NAME'].map(key=>[key,process.env[key]]))})+'\\n');
 if(a[0]==='exec'&&a[1]==='vitest'){
  const targets=a.slice(3).filter(f=>f.endsWith('.test.ts')); const output=a.find(f=>f.startsWith('--outputFile=')).slice(13);
  const suites=targets.map(f=>({name:path.join(root,f),assertionResults:[{fullName:f.includes('primary')?'rejects payment':'related case',status:'passed'}]}));
  if(fault==='wrong-bystander')suites[1].assertionResults[0].status='failed';
  if(fault==='missing-file')suites.pop();
  json(output,{numTotalTests:targets.length,numPassedTests:targets.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,testResults:suites});
- if(fault==='pause-after-native'){ const {applyControl}=await import(process.env.AUDIT_CONTROL_MODULE); await applyControl({workspace:process.env.AUDIT_FAKE_WORKSPACE,request:{kind:'pause',authority:'pause while local command was admitted',finishOnly:[]}}); }
+ if(fault==='pause-after-native'){ const {applyControl}=await import(${JSON.stringify(fileURLToPath(new URL('../audit-migration/control.mjs', import.meta.url)))}); await applyControl({workspace:path.join(fixtureDirectory,'control'),request:{kind:'pause',authority:'pause while local command was admitted',finishOnly:[]}}); }
 }
 if(a[0]==='exec'&&a[1]==='tsc'){
  const config=JSON.parse(fs.readFileSync(a[a.indexOf('--project')+1],'utf8'));const files=fault==='missing-root'?config.files.slice(0,1):config.files; for(const f of files)console.log(f);
@@ -85,12 +91,86 @@ if(a[0]==='verify'&&a[1]==='status')console.log(fault==='stale-prepush'?'[verify
 `)
   fs.chmodSync(path.join(bin, 'pnpm'), 0o755)
   vi.stubEnv('PATH', `${bin}${path.delimiter}${process.env.PATH ?? ''}`)
-  vi.stubEnv('AUDIT_FAKE_EVENTS', path.join(directory, 'events.log'))
-  vi.stubEnv('AUDIT_FAKE_FAULT', fault)
-  vi.stubEnv('AUDIT_FAKE_WORKSPACE', workspace)
-  vi.stubEnv('AUDIT_CONTROL_MODULE', fileURLToPath(new URL('../audit-migration/control.mjs', import.meta.url)))
-  return { directory, root, head, workspace, output, config, events: path.join(directory, 'events.log') }
+  return { directory, root, head, workspace, output, config, database, localServices, events: path.join(directory, 'events.log') }
 }
+
+it('keeps host credentials out of every candidate command while using explicit local test credentials', async () => {
+  const f = await fixture()
+  const inherited = ['GH_TOKEN', 'GITHUB_TOKEN', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'DATABASE_URL', 'S3_ENDPOINT', 'S3_SECRET_ACCESS_KEY', 'NPM_TOKEN', 'DOCKER_HOST', 'DOCKER_CONFIG', 'NODE_OPTIONS', 'HTTP_PROXY', 'UNDECLARED_CANDIDATE_SETTING']
+  for (const key of inherited) vi.stubEnv(key, 'fixture-host-secret')
+  vi.stubEnv('COMPOSE_PROJECT_NAME', 'open-agricola-local')
+  vi.stubEnv('DOCKER_CONTEXT', 'production-context')
+  vi.stubEnv('TEST_S3_ENDPOINT', 'https://production.invalid')
+  vi.stubEnv('TEST_S3_ACCESS_KEY_ID', 'host-prod-object-key')
+  vi.stubEnv('TEST_S3_SECRET_ACCESS_KEY', 'host-prod-object-secret')
+  vi.stubEnv('LOCAL_SERVICES_DIR', path.join(f.directory, 'host-services'))
+  vi.stubEnv('TEST_DATABASE_URL', 'postgres://production:secret@remote.invalid/production')
+  const result = await runValidation(f.root, new Map([['config', f.config]]))
+  const observations = fs.readFileSync(path.join(f.directory, 'environment.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
+
+  expect(result.status).toBe('passed')
+  expect(observations).toHaveLength(7)
+  for (const observation of observations) {
+    for (const key of inherited) expect(observation.keys, key).not.toContain(key)
+    expect(observation.values).toMatchObject({
+      PATH: process.env.PATH, HOME: process.env.HOME,
+      TEST_DATABASE_URL: 'postgres://agricola:fixture-test-pass@127.0.0.1:55432/agricola_test',
+      TEST_S3_ENDPOINT: 'http://127.0.0.1:59000', TEST_S3_BUCKET: 'agricola-test',
+      TEST_S3_ACCESS_KEY_ID: 'fixture-test-key', TEST_S3_SECRET_ACCESS_KEY: 'fixture-test-secret',
+      LOCAL_SERVICES_DIR: path.join(f.output, 'services-config'), SHARED_DATA_DIR: path.join(f.output, 'services-data'), DOCKER_CONTEXT: 'default', COMPOSE_PROJECT_NAME: 'oa-audit-fixture',
+    })
+  }
+  const localConfig = fs.readFileSync(path.join(f.output, 'services-config/local-services.env'), 'utf8')
+  expect(localConfig).toContain('LOCAL_POSTGRES_PASSWORD=')
+  expect(localConfig).not.toMatch(/GH_TOKEN|S3_SECRET_ACCESS_KEY|OBSERVABILITY_METRICS_TOKEN/)
+  expect(fs.statSync(path.join(f.output, 'services-config/local-services.env')).mode & 0o777).toBe(0o600)
+})
+
+it.each(['open-agricola-local', 'observability', 'oa-audit-Invalid', 'oa-audit-../escape', ''])('rejects an unsafe Compose project %s before launching commands', async projectName => {
+  const f = await fixture()
+  const config = JSON.parse(fs.readFileSync(f.config, 'utf8'))
+  config.services.projectName = projectName
+  write(f.config, config)
+
+  await expect(runValidation(f.root, new Map([['config', f.config]]))).rejects.toThrow('private oa-audit- Compose project')
+  expect(fs.existsSync(f.events)).toBe(false)
+  expect(fs.existsSync(f.output)).toBe(false)
+})
+
+it('preserves explicit local secret bytes when writing the private Compose environment file', async () => {
+  const f = await fixture()
+  const config = fs.readFileSync(f.localServices, 'utf8').replace('LOCAL_S3_SECRET_KEY=fixture-test-secret', 'LOCAL_S3_SECRET_KEY="fixture\\s3#secret"')
+  fs.writeFileSync(f.localServices, config)
+  await runValidation(f.root, new Map([['config', f.config]]))
+
+  const local = parseEnv(fs.readFileSync(path.join(f.output, 'services-config/local-services.env'), 'utf8'))
+  expect(local.LOCAL_S3_SECRET_KEY).toBe('fixture\\s3#secret')
+})
+
+it.each([
+  'postgres://agricola:fixture-test-pass@remote.invalid:55432/agricola_test',
+  'postgres://agricola:fixture-test-pass@127.0.0.1:55432/agricola',
+  'postgres://agricola:dummy-password@127.0.0.1:55432/agricola_test',
+  'postgres://agricola:fixture-test-pass@127.0.0.1:5432/agricola_test',
+])('rejects a database outside the explicit disposable service', async database => {
+  const f = await fixture()
+  fs.writeFileSync(f.database, `TEST_DATABASE_URL=${database}\n`)
+
+  await expect(runValidation(f.root, new Map([['config', f.config]]))).rejects.toThrow('explicit local agricola_test service')
+  expect(fs.existsSync(f.events)).toBe(false)
+  expect(fs.existsSync(f.output)).toBe(false)
+})
+
+it('requires explicit local service configuration instead of falling back to host credentials', async () => {
+  const f = await fixture()
+  const config = JSON.parse(fs.readFileSync(f.config, 'utf8'))
+  delete config.services.localServicesEnv
+  write(f.config, config)
+
+  await expect(runValidation(f.root, new Map([['config', f.config]]))).rejects.toThrow('services.localServicesEnv')
+  expect(fs.existsSync(f.events)).toBe(false)
+  expect(fs.existsSync(f.output)).toBe(false)
+})
 
 it('runs all frozen local stages against fake tools and proves complete target, strict, RAW and prepush evidence', async () => {
   const f = await fixture()

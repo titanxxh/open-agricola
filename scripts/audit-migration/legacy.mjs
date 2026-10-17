@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { atomicJson, readControl, withControlLock, workflowDirectory } from './control.mjs'
+import { atomicJson, readControl, readJson, withControlLock, workflowDirectory } from './control.mjs'
 
 const names = ['watch-published-batch.py', 'deliver-pr.py', 'publish-validated-batch.py', 'review-status.py', 'run-frozen-batch-final.py', 'run-expanded-batch-proof.py', 'refresh-validated-prefix.py', 'finalize-current-issue-pause.py']
 const marker = '# Open Agricola workflow delegate v1'
@@ -39,7 +39,12 @@ if validation:
     config = json.loads(pathlib.Path(a.config).read_text()) if kind == 'run-frozen-batch-final.py' else {key:getattr(a,key) for key in ['worktree','head','batch','output']}
     config['workspace'] = c['workspace']
     config['assignment'] = os.environ.get('OA_AUDIT_ASSIGNMENT', config.get('assignment'))
-    config['services'] = {'databaseEnv': config.get('databaseEnv') or os.environ.get('OA_AUDIT_DATABASE_ENV')}
+    services = config.get('services') or {}
+    config['services'] = {
+        'databaseEnv': services.get('databaseEnv') or config.get('databaseEnv') or os.environ.get('OA_AUDIT_DATABASE_ENV'),
+        'localServicesEnv': services.get('localServicesEnv') or os.environ.get('OA_AUDIT_LOCAL_SERVICES_ENV'),
+        'projectName': services.get('projectName') or os.environ.get('OA_AUDIT_PROJECT_NAME'),
+    }
     if kind == 'run-expanded-batch-proof.py':
         config['extraTargets'] = a.extra_target
     with tempfile.TemporaryDirectory(prefix='oa-workflow-validation-') as temporary:
@@ -91,30 +96,51 @@ export async function adoptLegacy({ root, workspace, request }) {
   if (!fs.statSync(directory).isDirectory()) throw new Error('legacy directory is missing')
   return withControlLock(workspace, () => {
     if (readControl(workspace).mode !== 'paused') throw new Error('legacy adoption requires paused admission')
+    const receiptFile = path.join(workspace, 'legacy-adoption.json')
+    const previous = fs.existsSync(receiptFile) ? readJson(receiptFile) : null
+    if (previous && (previous.version !== 1 || previous.root !== root || previous.workspace !== workspace || previous.directory !== directory
+      || !Array.isArray(previous.entries) || previous.entries.length !== names.length || new Set(previous.entries.map(entry => entry.file)).size !== names.length)) throw new Error('previous legacy adoption receipt has a different binding or invalid entry inventory')
     const plans = names.map(name => {
       const file = path.join(directory, name)
       if (!fs.statSync(file).isFile() || fs.lstatSync(file).isSymbolicLink()) throw new Error(`unsupported legacy entry: ${file}`)
       const before = fs.readFileSync(file)
       const after = delegate(root, workspace, name)
-      if (before.toString().includes(marker) && before.toString() !== after) throw new Error('delegate is already bound to a different workflow location')
-      return { name, file, before, after, sha256: digest(before), alreadyAdopted: before.toString() === after }
+      const sha256 = digest(before)
+      const prior = previous?.entries.find(entry => entry.file === file)
+      if (previous && (!prior || prior.delegateSha256 !== sha256)) throw new Error('delegate digest or file differs from the previous adoption receipt')
+      if (before.toString().includes(marker) && before.toString() !== after && !prior) throw new Error('delegate upgrade requires a matching previous adoption receipt binding')
+      return { name, file, before, after, sha256, prior, alreadyAdopted: before.toString() === after,
+        backup: path.join(directory, '.workflow-retired', `${name}.${sha256}.txt`) }
     })
+    if (previous && plans.every(plan => plan.alreadyAdopted)) return { ...previous, entries: previous.entries.map(entry => ({ ...entry, alreadyAdopted: true })) }
+    const preserve = (file, bytes) => {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      if (fs.realpathSync(path.dirname(file)) !== path.dirname(file)) throw new Error('legacy backup parent must not traverse a symlink')
+      if (fs.existsSync(file)) {
+        if (fs.lstatSync(file).isSymbolicLink() || !fs.statSync(file).isFile() || digest(fs.readFileSync(file)) !== digest(bytes)) throw new Error('legacy backup digest differs')
+      } else fs.writeFileSync(file, bytes, { flag: 'wx', mode: 0o600 })
+    }
+    let previousReceipt = null
+    if (previous) {
+      const bytes = fs.readFileSync(receiptFile)
+      previousReceipt = path.join(workspace, 'legacy-adoption-history', `${digest(bytes)}.json`)
+      preserve(previousReceipt, bytes)
+    }
+    for (const plan of plans) if (!plan.alreadyAdopted) preserve(plan.backup, plan.before)
     const entries = []
     for (const plan of plans) {
-      const backup = path.join(directory, '.workflow-retired', `${plan.name}.${plan.sha256}.txt`)
       if (!plan.alreadyAdopted) {
-        fs.mkdirSync(path.dirname(backup), { recursive: true })
-        if (fs.existsSync(backup)) {
-          if (digest(fs.readFileSync(backup)) !== plan.sha256) throw new Error('legacy backup digest differs')
-        } else fs.writeFileSync(backup, plan.before, { flag: 'wx', mode: 0o600 })
         const temporary = `${plan.file}.${crypto.randomUUID()}.tmp`
         fs.writeFileSync(temporary, plan.after, { flag: 'wx', mode: fs.statSync(plan.file).mode & 0o777 })
         fs.renameSync(temporary, plan.file)
       }
-      entries.push({ file: plan.file, originalSha256: plan.sha256, delegateSha256: digest(plan.after), backup: plan.alreadyAdopted ? null : backup, alreadyAdopted: plan.alreadyAdopted })
+      const priorBackups = plan.prior?.backups ?? (plan.prior?.backup ? [plan.prior.backup] : [])
+      const backup = plan.prior?.backup ?? (plan.alreadyAdopted ? null : plan.backup)
+      entries.push({ file: plan.file, originalSha256: plan.prior?.originalSha256 ?? plan.sha256, delegateSha256: digest(plan.after), backup,
+        backups: [...new Set([...priorBackups, ...(plan.alreadyAdopted ? [] : [plan.backup])])], alreadyAdopted: plan.alreadyAdopted })
     }
-    const receipt = { version: 1, directory, root, workspace, entries, adoptedAt: new Date().toISOString() }
-    atomicJson(path.join(workspace, 'legacy-adoption.json'), receipt)
+    const receipt = { version: 1, directory, root, workspace, entries, previousReceipt, adoptedAt: new Date().toISOString() }
+    atomicJson(receiptFile, receipt)
     return receipt
   })
 }

@@ -112,11 +112,11 @@ function inputFile(workspace, claim, kind, payload) {
   return file
 }
 
-function existingReviewRequest(root, number, marker) {
+function existingReviewRequest(root, number, body, actor) {
   for (let page = 1; page <= 100; page++) {
     const comments = github(root, ['api', `repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`])
     if (!Array.isArray(comments)) fail('incomplete review-request observation')
-    if (comments.some(comment => typeof comment.body === 'string' && comment.body.includes(marker))) return true
+    if (comments.some(comment => comment.body === body && comment.user?.id === actor.id && comment.user?.login === actor.login)) return true
     if (comments.length < 100) return false
   }
   fail('review-request pagination is incomplete')
@@ -166,11 +166,14 @@ export async function publishExisting({ root, workspace, request }) {
     const gate = review === 'code' ? observed.codeReview : observed.securityReview
     if (gate?.state === 'pass') return { operation: 'request-review', state: 'already-passed', kind: review }
     const marker = `<!-- oa-audit-review-request:${review}:${config.head} -->`
-    if (existingReviewRequest(root, number, marker)) return { operation: 'request-review', state: 'already-requested', kind: review }
     const body = `${review === 'security' ? '@codex security review' : '@codex review'}\n\n${marker}`
+    const actor = github(root, ['api', 'user'])
+    if (!Number.isSafeInteger(actor.id) || actor.id < 1 || typeof actor.login !== 'string' || !actor.login.trim()) fail('authenticated review-request author is unknown')
+    if (existingReviewRequest(root, number, body, actor)) return { operation: 'request-review', state: 'already-requested', kind: review }
     const file = inputFile(workspace, claim, 'review-request', { body })
     const posted = github(root, ['api', '-X', 'POST', `repos/${repository}/issues/${number}/comments`, '--input', file])
-    return { operation: 'request-review', state: 'requested', kind: review, url: posted.html_url }
+    if (!Number.isSafeInteger(posted.id) || posted.id < 1 || posted.body !== body || posted.user?.id !== actor.id || posted.user?.login !== actor.login) fail('posted review request author/body is unknown; reconcile before retry')
+    return { operation: 'request-review', state: 'requested', kind: review, commentId: posted.id, url: posted.html_url }
   }))
   return { mode: 'publication', head: config.head, results, reviewsWaived: false }
 }

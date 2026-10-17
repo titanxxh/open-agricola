@@ -15,7 +15,8 @@ const fullSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(valu
 const within = (base, file) => { const relative = path.relative(base, file); return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative)) }
 const safeMember = value => typeof value === 'string' && value.length > 0 && !value.includes('\\') && !value.includes('\0') && !path.isAbsolute(value) && path.posix.normalize(value) === value && !value.split('/').includes('..')
 const privateNames = new Set(['.ssh', 'node_modules', 'services-data', 'service-data', 'dumps', 'credentials', 'private',
-  'dependencies.local', 'dependencies.compose.env', 'local-services.env', 'test.env', 'prometheus.local.yml'])
+  'dependencies.local', 'dependencies.compose.env', 'local-services.env', 'test.env', 'prometheus.local.yml',
+  '.npmrc', '.netrc', '_netrc', '.aws', '.azure', '.docker', '.kube', '.pypirc', '.git-credentials', '.gitcookies', '.pgpass', '.s3cfg', '.boto', '.curlrc'])
 const forbidden = file => file.split('/').some(part => (part.toLowerCase().startsWith('.env') && part !== '.env.example')
   || privateNames.has(part.toLowerCase())) || /(?:^|\/)(?:[^/]*\.(?:dump|sqlite|sqlite3|db|pem|key)|(?:database|backup)[^/]*\.sql)$/i.test(file)
 const sensitive = value => {
@@ -23,6 +24,78 @@ const sensitive = value => {
   if (Array.isArray(value)) return value.some(sensitive)
   if (value && typeof value === 'object') return Object.entries(value).some(([key, item]) => /^(?:password|secret|token|gh_token|database_url|test_database_url|privateKey|accessKeyId|secretAccessKey)$/i.test(key) || sensitive(item))
   return false
+}
+
+const placeholderWords = new Set(['your', 'here', 'example', 'fixture', 'test', 'dummy', 'fake', 'placeholder', 'redacted', 'unused',
+  'replace', 'change', 'me', 'not', 'a', 'real', 'this', 'is', 'only', 'old', 'new', 'must', 'never', 'be', 'copied', 'value',
+  'token', 'key', 'api', 'github', 'gitlab', 's3', 'access', 'auth', 'bearer', 'credential', 'secret', 'private', 'password', 'pass', 'user', 'username', 'database', 'db'])
+function placeholder(value) {
+  const text = value.trim().replace(/^Bearer\s+/i, '')
+  if (!text || text.includes('${') || /^\$[A-Z_][A-Z0-9_]*$/i.test(text) || /^<[^<>]+>$/.test(text)
+    || /^(?:true|false|null|undefined|none|changeme|replaceme|yourtoken|yourpassword)$/i.test(text)
+    || /^[x*._-]{3,}$/i.test(text) || /^(?:test|fixture|example|dummy)\d*$/i.test(text)
+    || text === 'AKIAIOSFODNN7EXAMPLE' || text === 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY') return true
+  const suffix = text.replace(/^(?:gh[pousr]_|github_pat_|sk-(?:proj-|test_|live_)?|xox[baprs]-)/, '')
+  if (suffix !== text && (placeholder(suffix) || /^(.)\1{15,}$/.test(suffix))) return true
+  return text.toLowerCase().split(/[-_\s]+/).every(word => placeholderWords.has(word))
+}
+
+function credentialField(name) {
+  const normalized = name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[.-]/g, '_').toLowerCase()
+  return /(?:^|_)(?:password|passwd|secret|secret_key|token|api_key|authorization|private_key|access_key|access_key_id|encryption_keys?|signing_keys?|credentials?)$/.test(normalized)
+}
+
+function credentialText(text) {
+  for (const match of text.matchAll(/-----BEGIN ((?:[A-Z0-9]+ )?PRIVATE KEY)-----((?:(?:\\[rn])|[\r\nA-Za-z0-9+/= \t])+?)-----END \1-----/g)) {
+    if (match[2].replace(/\\[rn]|\s/g, '').length >= 64) return true
+  }
+  for (const match of text.matchAll(/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,}|sk-(?:proj-|test_|live_)?[A-Za-z0-9_-]{32,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{20,})\b/g)) {
+    const suffix = match[0].replace(/^(?:gh[pousr]_|github_pat_|sk-(?:proj-|test_|live_)?|xox[baprs]-)/, '')
+    if (!placeholder(match[0]) && !placeholder(suffix) && !/^(.)\1{15,}$/.test(suffix)) return true
+  }
+  for (const match of text.matchAll(/\b(?:https?|postgres(?:ql)?|mysql|mongodb(?:\+srv)?|rediss?|amqps?|ssh):\/\/[^\s"'`<>\\]+/gi)) {
+    if (match[0].includes('${')) continue
+    let url
+    try { url = new URL(match[0]) } catch { continue }
+    let username, password
+    try { username = decodeURIComponent(url.username); password = decodeURIComponent(url.password) } catch { return true }
+    if (password ? !placeholder(password) : username && !placeholder(username)) return true
+    for (const [key, value] of url.searchParams) if (credentialField(key) && !placeholder(value)) return true
+  }
+  const inspectJson = value => {
+    if (!value || typeof value !== 'object') return false
+    return Object.entries(value).some(([key, item]) => (credentialField(key) && typeof item === 'string' && !placeholder(item)) || inspectJson(item))
+  }
+  try { if (inspectJson(JSON.parse(text))) return true } catch { /* Most source blobs are not JSON configuration. */ }
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(?:(?:export|const|let|var)\s+)*["']?(?:\/\/[^\s"'=]+:)?([A-Za-z_][A-Za-z0-9_.-]*)["']?\s*[:=]\s*(.*?)\s*$/.exec(line)
+    if (!match || !credentialField(match[1])) continue
+    let value = match[2].replace(/\s+#.*$/, '').replace(/[;,]$/, '').trim()
+    if (/^["'`]/.test(value)) {
+      if (value.at(-1) !== value[0] || value.slice(1, -1).includes(value[0])) continue
+      value = value.slice(1, -1)
+    } else if (/^(?:[({[]|new\s|[A-Za-z_$][\w$]*(?:\.|\(|\?))/.test(value)) continue
+    if (!placeholder(value)) return true
+  }
+  return false
+}
+
+function inspectBlobs(root, blobs) {
+  if (!blobs.length) return
+  const result = spawnSync('git', ['cat-file', '--batch'], { cwd: root, input: `${blobs.join('\n')}\n`, maxBuffer: 132 * 1024 * 1024 })
+  if (result.error || result.status !== 0) fail('cannot inspect required Git blob contents')
+  let offset = 0
+  for (const id of blobs) {
+    const end = result.stdout.indexOf(10, offset)
+    const header = /^([a-f0-9]{40}) blob (\d+)$/.exec(result.stdout.subarray(offset, end).toString('ascii'))
+    if (end < 0 || !header || header[1] !== id) fail('invalid required Git blob response')
+    const size = Number(header[2])
+    offset = end + 1
+    if (size > 16 * 1024 * 1024 || offset + size >= result.stdout.length || result.stdout[offset + size] !== 10) fail('invalid required Git blob size')
+    if (credentialText(result.stdout.subarray(offset, offset + size).toString('utf8'))) fail(`required Git blob ${id} contains credentials`)
+    offset += size + 1
+  }
+  if (offset !== result.stdout.length) fail('unexpected trailing required Git blob data')
 }
 
 function discover(input) {
@@ -90,11 +163,13 @@ function objectBudget(root, head, source, base) {
   const output = execFileSync('git', ['cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'], { cwd: root, input: objects.join('\n'), encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }).trim()
   let totalBytes = 0
   const commits = []
+  const blobs = []
   for (const line of output.split('\n').filter(Boolean)) {
     const match = /^([a-f0-9]{40}) (blob|tree|commit|tag) (\d+)$/.exec(line)
     if (!match || Number(match[3]) > 16 * 1024 * 1024) fail('transfer contains an unavailable or oversized Git object')
     totalBytes += Number(match[3])
     if (match[2] === 'commit') commits.push(match[1])
+    if (match[2] === 'blob') blobs.push(match[1])
   }
   if (totalBytes > 128 * 1024 * 1024) fail('transfer exceeds the 128 MiB object budget')
   if (commits.length) {
@@ -104,6 +179,7 @@ function objectBudget(root, head, source, base) {
     }).split('\0').filter(Boolean)
     if (changedPaths.some(forbidden)) fail('required Git commits contain a forbidden private/service path')
   }
+  inspectBlobs(root, blobs)
   return { objects: objects.length, totalBytes, maxObjectBytes: 16 * 1024 * 1024, maxTotalBytes: 128 * 1024 * 1024 }
 }
 

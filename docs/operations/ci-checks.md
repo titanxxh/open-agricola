@@ -88,9 +88,9 @@ pnpm audit:migration status --run /external/workspace --issue <issue> --pr <pr> 
 
 `status` 只读取远端，不请求 review、不重试、不合入。它分别报告精确 HEAD 的 Code、Security、真实 bot `+1`、未解决 threads、PR 身份、本地证据、远端 CI，以及授权状态。机器标记与文字结论矛盾是 `conflict`；缺失或不完整观察是 `unknown`。审查状态字段仅描述事实；`mergePermitted` 始终为 false，执行许可还须在真正写入时核对 claim。可通过 `--request` 提供 issue/pr/head/worktree/raw/prepush，读取对应的本地证明。
 
-`publish --run ... --request ...` 仅更新 claim 指定的既有本仓库 PR，校验当前 main、分支和本地证据；push 使用精确远端 SHA 的 lease。请求包含 `assignment`、`head`、`worktree`、`raw`、`prepush`、`branch`、绝对路径 `bodyFile`，以及可选 `title`、`review`（`code` / `security`）；它不创建后续票。review 请求带 HEAD 标记，重试前读取已有请求，避免重复发送。旧发布 config 可通过 `{"config":"/external/config.json","assignment":"/external/claim.json"}` 接入同一入口。
+`publish --run ... --request ...` 仅更新 claim 指定的既有本仓库 PR，校验当前 main、分支和本地证据；push 使用精确远端 SHA 的 lease。请求包含 `assignment`、`head`、`worktree`、`raw`、`prepush`、`branch`、绝对路径 `bodyFile`，以及可选 `title`、`review`（`code` / `security`）；它不创建后续票。review 请求带 HEAD 标记，只认可当前认证用户发布且正文完全一致的已有请求，避免伪造标记抑制实际请求。旧发布 config 可通过 `{"config":"/external/config.json","assignment":"/external/claim.json"}` 接入同一入口。
 
-`delivery --run ... --request ...` 同样要求精确 claim、pr/head/worktree/raw/prepush；`merge:true` 才会执行管理员 rebase merge，随后核对合入 tree。`reconcile:true` 则只读检查已合入结果，不重试 merge、不改控制记录。默认仍要求本地门禁、Code、Security、真实大拇指、threads 和 PR/main CI；仅当用户明确免除远端 CI 时，可记录精确 issue/pr/head 的 `{"kind":"remote-ci-policy","id":"unique-policy-id","authority":"用户原话引用",...}`。这不会免除 Code、Security 或大拇指，也不会把实际 CI 状态改写成 passed。
+`delivery --run ... --request ...` 同样要求精确 claim、pr/head/worktree/raw/prepush；`merge:true` 只在服务器能强制保护最新 base 时执行普通 rebase merge，随后核对合入 tree。自动入口不使用 `--admin`：必须只读确认 strict up-to-date、非空 required checks、无 bypass 和无 merge queue；未知或权限不足均拒绝，不靠合入后 tree 比较弥补竞态。当前实现保守支持 classic protection 的 enforce-admins 及无绕过的 active ruleset，不自动修改仓库保护。当前 owner bypass 与自动门禁的后续配置取舍单独跟踪于 [#1276](https://github.com/titanxxh/open-agricola/issues/1276)。`reconcile:true` 则只读检查已合入结果，不重试 merge、不改控制记录。默认仍要求本地门禁、Code、Security、真实大拇指、threads 和 PR/main CI；仅当用户明确免除远端 CI 时，可记录精确 issue/pr/head 的 `{"kind":"remote-ci-policy","id":"unique-policy-id","authority":"用户原话引用",...}`。这不会免除 Code、Security、大拇指或服务器 base 保护，也不会把实际 CI 状态改写成 passed。CI 证据按可信默认分支的固定 workflow path/ID、仓库、事件及 HEAD 绑定，不能用可变 display name 认定成功。
 
 旧 Git 外 Python 入口须显式接入，不能保留另一套执行逻辑：
 
@@ -98,7 +98,7 @@ pnpm audit:migration status --run /external/workspace --issue <issue> --pr <pr> 
 pnpm audit:migration adopt-legacy --run /external/workspace --request /external/adopt.json
 ```
 
-`adopt.json` 为 `{"directory":"/absolute/old-artifact-directory"}`。安装器仅在暂停状态工作，把受支持的八个活跃执行入口保存为带摘要的不可执行文本备份，替换成薄代理并生成收据。代理从 `OA_AUDIT_ASSIGNMENT` 读取 claim；缺少 claim 会在执行/远端写入前失败。归档和既有证据保留为历史，不作为可执行入口。
+`adopt.json` 为 `{"directory":"/absolute/old-artifact-directory"}`。安装器仅在暂停状态工作，把受支持的八个活跃执行入口保存为带摘要的不可执行文本备份，替换成薄代理并生成收据。代理从 `OA_AUDIT_ASSIGNMENT` 读取 claim；缺少 claim 会在执行/远端写入前失败。验证服务优先读取 config.services，也可显式提供 `OA_AUDIT_DATABASE_ENV`、`OA_AUDIT_LOCAL_SERVICES_ENV`、`OA_AUDIT_PROJECT_NAME`，不能回退到宿主生产环境。归档和既有证据保留为历史，不作为可执行入口。
 
 ### 冻结验收与跨机器恢复
 
@@ -109,20 +109,26 @@ pnpm audit:migration preflight --database-env /private/test-database.env
 pnpm audit:migration run --config /external/run.json
 ```
 
-preflight 只核对本机配置、依赖可解析性及源提交可用性，不启动或连接服务；原生 ABI 和实际服务由验收检查。先按既有入口准备本地测试服务，私密文件只提供 `TEST_DATABASE_URL=...`。`run.json` 示例：
+preflight 只核对本机配置、依赖可解析性及源提交可用性，不启动或连接服务；原生 ABI 和实际服务由验收检查。run 使用环境白名单，显式读取 `databaseEnv` 的测试连接及 `localServicesEnv` 的五个 LOCAL_POSTGRES/S3 配置字段。数据库必须是匹配该私有服务的 loopback/agricola/agricola_test；S3 固定为本机测试桶。使用独立的 `oa-audit-*` Compose project、端口和一次性凭据，不能复用应用服务配置。先用相同 project 和私有配置准备测试服务，再运行验收：
+
+```bash
+COMPOSE_PROJECT_NAME=oa-audit-example LOCAL_SERVICES_DIR=/private/services SHARED_DATA_DIR=/external/service-bootstrap node scripts/local-services.mjs --test
+```
+
+`/private/services/local-services.env` 包含 `LOCAL_POSTGRES_PASSWORD`、`LOCAL_POSTGRES_PORT`、`LOCAL_S3_ACCESS_KEY`、`LOCAL_S3_SECRET_KEY`、`LOCAL_S3_PORT`；权限设为 0600。`databaseEnv` 只需对应的 `TEST_DATABASE_URL=...`。run 在首次获准阶段写入净化配置到独立 output/services-config，再由 prepush 复用同一私有 project，避免重配共享应用容器。它保留 HOME 和宿主文件系统/Docker 访问，**仅隔离环境继承，不是沙盒**。`run.json` 示例：
 
 ```json
 {
   "head":"<full-sha>","batch":"M01",
   "workspace":"/external/workspace","assignment":"/external/workspace/claims/unique-run-id.json",
   "output":"/external/new-run-directory",
-  "services":{"databaseEnv":"/private/test-database.env"}
+  "services":{"databaseEnv":"/private/test-database.env","localServicesEnv":"/private/services/local-services.env","projectName":"oa-audit-example"}
 }
 ```
 
 批次必须已完整承接；目标包含该批次的完整原生文件、清单全部 `nativeScope` 和可选 `extraTargets`。成功 RAW 必须覆盖清单全部 3,252 个原始职责，不能有失败、skip/todo、缺少类型根或成功原生测试产生的全状态证据。`final.json` 保留每阶段结果；它直接核对 HEAD 中的 tracked blob 与文件模式，不能仅凭 Git status 的“干净”推断字节一致；任何源码或 HEAD 变化都要求新输出、新 claim 和重跑。测试断言的字段及参与者选择仍须人工审查，参见 `docs/CARD_TEST_TEMPLATE.md` §5.2、§9.1。
 
-跨机器导出只打包候选提交、未公开的精简源提交及显式选择的小型 JSON 收据，不递归打包整个 artifacts，也不带环境文件、服务数据或依赖：
+跨机器导出只打包候选提交、未公开的精简源提交及显式选择的小型 JSON 收据，不递归打包整个 artifacts，也不带环境文件、服务数据或依赖。导出和导入检查所有本次 bundle 增量 blob，包括历史版本，拒绝认证配置、私钥、高置信凭据和带凭据 URL；明确占位示例可用，`.env.example` 不能用于豁免真实凭据。扫描不输出 blob 内容，不扫描由 bundle prerequisite 已提供的历史对象：
 
 ```bash
 pnpm audit:migration export --base <available-main-ancestor> --output /external/new-transfer-directory

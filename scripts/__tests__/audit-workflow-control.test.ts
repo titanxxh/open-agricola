@@ -1,12 +1,13 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyControl, readControl, withOwnedOperation, workflowDirectory } from '../audit-migration/control.mjs'
 import { adoptLegacy } from '../audit-migration/legacy.mjs'
-import { deriveReview, inspectReviews } from '../audit-migration/review.mjs'
+import { deriveReview, inspectCi, inspectMergeProtection, inspectReviews } from '../audit-migration/review.mjs'
 
 const directories: string[] = []
 afterEach(() => { vi.unstubAllEnvs(); directories.splice(0).forEach(directory => fs.rmSync(directory, { recursive: true, force: true })) })
@@ -31,6 +32,27 @@ async function claim(workspace: string, id: string, operations = [local]) {
 }
 
 describe('persisted workflow admission', () => {
+  it('rejects state inside an external linked worktree without writing a control file', async () => {
+    const { directory, root } = fixture()
+    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'fixture'], { cwd: root })
+    const linked = path.join(directory, 'external-linked')
+    execFileSync('git', ['worktree', 'add', '--quiet', '--detach', linked], { cwd: root })
+    const workspace = path.join(linked, 'workflow-state')
+    expect(() => workflowDirectory(root, workspace)).toThrow(/outside/)
+    await expect(applyControl({ root, workspace, request: { kind: 'pause', authority: 'fixture scope' } })).rejects.toThrow(/outside/)
+    expect(fs.existsSync(workspace)).toBe(false)
+  })
+
+  it('rejects state inside an unrelated Git checkout or bare repository', () => {
+    const { directory, root } = fixture()
+    for (const bare of [false, true]) {
+      const other = path.join(directory, bare ? 'other-bare' : 'other-checkout')
+      execFileSync('git', ['init', '--quiet', ...(bare ? ['--bare'] : []), other])
+      expect(() => workflowDirectory(root, path.join(other, 'workflow-state'))).toThrow(/outside/)
+      expect(fs.existsSync(path.join(other, 'workflow-state'))).toBe(false)
+    }
+  })
+
   it('denies absent authority and unrelated targets, then rejects claims after a pause epoch change', async () => {
     const { root, workspace } = fixture()
     expect(readControl(workspace).mode).toBe('paused')
@@ -105,6 +127,55 @@ describe('persisted workflow admission', () => {
   })
 })
 
+describe('trusted CI workflow identities', () => {
+  it.each(['failed-legitimate', 'missing-legitimate', 'trusted-renamed', 'missing-default-workflow'])('checks default-branch path and workflow id for %s', fault => {
+    const { directory, root } = fixture()
+    const bin = path.join(directory, 'bin')
+    fs.mkdirSync(bin)
+    const log = path.join(directory, 'ci-calls.jsonl')
+    const trusted = { id: 10, workflow_id: 11, name: fault === 'trusted-renamed' ? 'Display name changed' : 'CI', path: '.github/workflows/ci.yml', repository: { full_name: 'titanxxh/open-agricola' }, head_sha: head, event: 'pull_request', status: 'completed', conclusion: fault === 'failed-legitimate' ? 'failure' : 'success', html_url: 'https://example.invalid/trusted-run' }
+    const spoof = { ...trusted, id: 100, workflow_id: 99, name: 'CI', path: '.github/workflows/imposter.yml', conclusion: 'success', html_url: 'https://example.invalid/spoof-run' }
+    const runs = fault === 'missing-legitimate' ? [spoof] : [trusted, ...(fault === 'trusted-renamed' ? [] : [spoof])]
+    fs.writeFileSync(path.join(bin, 'gh'), `#!/usr/bin/env node
+const fs=require('node:fs'),a=process.argv.slice(2),e=a[1];fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(a)+'\\n');let r;
+if(e==='repos/titanxxh/open-agricola')r={full_name:'titanxxh/open-agricola',default_branch:'main'};
+else if(e.includes('/contents/.github/workflows/ci.yml?ref=main'))r=${fault === 'missing-default-workflow' ? "{message:'Not Found'}" : "{type:'file',path:'.github/workflows/ci.yml',sha:'cccccccccccccccccccccccccccccccccccccccc'}"};
+else if(e.endsWith('/actions/workflows/ci.yml'))r={id:11,path:'.github/workflows/ci.yml',state:'active'};
+else if(e.includes('/actions/runs?'))r={workflow_runs:${JSON.stringify(runs)}};
+else process.exit(91);process.stdout.write(JSON.stringify(r));
+`, { mode: 0o755 })
+    vi.stubEnv('PATH', `${bin}${path.delimiter}${process.env.PATH}`)
+    expect(inspectCi({ root, head, event: 'pull_request', names: ['CI'] })).toMatchObject({ state: fault === 'failed-legitimate' ? 'fail' : fault === 'trusted-renamed' ? 'pass' : 'unknown' })
+    expect(fs.readFileSync(log, 'utf8')).not.toMatch(/"-X"|"POST"|"PATCH"/)
+  })
+})
+
+describe('server-enforced base protection', () => {
+  it.each(['classic', 'ruleset', 'queue', 'unknown-queue', 'bypass', 'missing-bypass', 'no-required-checks', 'loose', 'classic-admin-bypass', 'classic-review-bypass', 'classic-api-error', 'rules-api-error', 'missing-classic-fields', 'queue-rule'])('projects %s protection without modifying repository settings', fault => {
+    const { directory, root } = fixture()
+    const bin = path.join(directory, 'bin')
+    fs.mkdirSync(bin)
+    const log = path.join(directory, 'protection-calls.jsonl')
+    const classic = { required_status_checks: { strict: true, checks: [{ context: 'verify', app_id: 15368 }] }, enforce_admins: { enabled: fault !== 'classic-admin-bypass' }, required_pull_request_reviews: { bypass_pull_request_allowances: { users: fault === 'classic-review-bypass' ? [{ login: 'owner' }] : [], teams: [], apps: [] } } }
+    const parameters = { strict_required_status_checks_policy: fault !== 'loose', required_status_checks: fault === 'no-required-checks' ? [] : [{ context: 'verify', integration_id: 15368 }] }
+    const rule = { type: fault === 'queue-rule' ? 'merge_queue' : 'required_status_checks', ruleset_id: 7, parameters }
+    const details = { id: 7, enforcement: 'active', target: 'branch', bypass_actors: fault === 'missing-bypass' ? undefined : fault === 'bypass' ? [{ actor_type: 'RepositoryRole', actor_id: 5, bypass_mode: 'always' }] : [], rules: [rule] }
+    const hasClassic = ['classic', 'classic-admin-bypass', 'classic-review-bypass', 'missing-classic-fields', 'classic-api-error'].includes(fault)
+    fs.writeFileSync(path.join(bin, 'gh'), `#!/usr/bin/env node
+const fs=require('node:fs'),a=process.argv.slice(2),e=a[1];fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(a)+'\\n');let r;
+if(e==='graphql')r={data:{repository:{nameWithOwner:'titanxxh/open-agricola',${fault === 'unknown-queue' ? '' : `mergeQueue:${fault === 'queue' ? "{id:'queue'}" : 'null'}`}}}};
+else if(e.includes('/rules/branches/main')){${fault === 'rules-api-error' ? 'process.exit(92);' : ''}r=${JSON.stringify(hasClassic ? [] : [rule])};}
+else if(e.includes('/rulesets/7?'))r=${JSON.stringify(details)};
+else if(e.endsWith('/branches/main/protection')){${fault === 'classic-api-error' ? "process.stderr.write('gh: Server error (HTTP 500)');process.exit(1);" : hasClassic ? `r=${JSON.stringify(fault === 'missing-classic-fields' ? {} : classic)};` : "process.stderr.write('gh: Branch not protected (HTTP 404)');process.exit(1);"}}
+else process.exit(91);process.stdout.write(JSON.stringify(r));
+`, { mode: 0o755 })
+    vi.stubEnv('PATH', `${bin}${path.delimiter}${process.env.PATH}`)
+    const unknown = ['unknown-queue', 'missing-bypass', 'classic-api-error', 'rules-api-error', 'missing-classic-fields'].includes(fault)
+    expect(inspectMergeProtection({ root })).toMatchObject({ state: ['classic', 'ruleset'].includes(fault) ? 'pass' : unknown ? 'unknown' : 'fail' })
+    expect(fs.readFileSync(log, 'utf8')).not.toMatch(/"-X"|"POST"|"PATCH"|"PUT"|"DELETE"/)
+  })
+})
+
 describe('independent exact-head review facts', () => {
   function observations(findings = false) {
     const machine = { commit_sha: head, status: 'completed', has_any_findings: findings, has_unresolved_findings: findings }
@@ -150,6 +221,56 @@ else if(endpoint==='graphql'){
 })
 
 describe('legacy mutation retirement', () => {
+  it('upgrades a trusted earlier delegate in place and preserves both inert backup generations', async () => {
+    const { directory, root, workspace } = fixture()
+    const legacy = path.join(directory, 'legacy')
+    fs.mkdirSync(legacy)
+    const names = ['watch-published-batch.py', 'deliver-pr.py', 'publish-validated-batch.py', 'review-status.py', 'run-frozen-batch-final.py', 'run-expanded-batch-proof.py', 'refresh-validated-prefix.py', 'finalize-current-issue-pause.py']
+    for (const name of names) fs.writeFileSync(path.join(legacy, name), '# Original legacy fixture\n')
+    await applyControl({ workspace, request: { kind: 'pause', authority: 'upgrade paused delegates' } })
+    const installed = await adoptLegacy({ root, workspace, request: { directory: legacy } })
+    const entry = installed.entries[0]
+    if (!entry.backup) throw new Error('original backup missing')
+    const current = fs.readFileSync(entry.file, 'utf8')
+    const old = current.replace('# Open Agricola workflow delegate v1\n', '# Open Agricola workflow delegate v1\n# Trusted earlier template fixture\n')
+    fs.writeFileSync(entry.file, old)
+    const previous = { ...installed, entries: installed.entries.map(item => item.file === entry.file ? { ...item, delegateSha256: crypto.createHash('sha256').update(old).digest('hex') } : item) }
+    fs.writeFileSync(path.join(workspace, 'legacy-adoption.json'), JSON.stringify(previous))
+    const upgraded = await adoptLegacy({ root, workspace, request: { directory: legacy } })
+    expect(fs.readFileSync(entry.file, 'utf8')).toBe(current)
+    expect(fs.readFileSync(entry.backup, 'utf8')).toBe('# Original legacy fixture\n')
+    const oldBackup = path.join(legacy, '.workflow-retired', `${names[0]}.${previous.entries[0].delegateSha256}.txt`)
+    expect(fs.readFileSync(oldBackup, 'utf8')).toBe(old)
+    expect(upgraded.entries[0]).toMatchObject({ originalSha256: entry.originalSha256, delegateSha256: entry.delegateSha256, backup: entry.backup, alreadyAdopted: false })
+    const saved = JSON.parse(fs.readFileSync(path.join(workspace, 'legacy-adoption.json'), 'utf8'))
+    expect(JSON.parse(fs.readFileSync(saved.previousReceipt, 'utf8'))).toEqual(previous)
+    expect(saved.entries[0].backups).toEqual(expect.arrayContaining([entry.backup, oldBackup]))
+    expect((await adoptLegacy({ root, workspace, request: { directory: legacy } })).entries.every(item => item.alreadyAdopted)).toBe(true)
+  })
+
+  it.each(['digest-mismatch', 'removed-marker', 'other-root', 'other-workspace', 'other-file'])('rejects delegate upgrades with %s before replacing any wrapper', async fault => {
+    const { directory, root, workspace } = fixture()
+    const legacy = path.join(directory, 'legacy')
+    fs.mkdirSync(legacy)
+    const names = ['watch-published-batch.py', 'deliver-pr.py', 'publish-validated-batch.py', 'review-status.py', 'run-frozen-batch-final.py', 'run-expanded-batch-proof.py', 'refresh-validated-prefix.py', 'finalize-current-issue-pause.py']
+    for (const name of names) fs.writeFileSync(path.join(legacy, name), '# Original legacy fixture\n')
+    await applyControl({ workspace, request: { kind: 'pause', authority: 'paused fixture' } })
+    const installed = await adoptLegacy({ root, workspace, request: { directory: legacy } })
+    const entry = installed.entries[0]
+    const untouched = fs.readFileSync(installed.entries[1].file)
+    const current = fs.readFileSync(entry.file, 'utf8')
+    const old = fault === 'removed-marker' ? '# Manually replaced delegate\n' : `${current}\n# Older template fixture\n`
+    fs.writeFileSync(entry.file, old)
+    const prior = JSON.parse(fs.readFileSync(path.join(workspace, 'legacy-adoption.json'), 'utf8'))
+    if (fault === 'other-root') prior.root = path.join(directory, 'other-root')
+    if (fault === 'other-workspace') prior.workspace = path.join(directory, 'other-workspace')
+    if (fault === 'other-file') prior.entries[0].file = path.join(directory, 'other-file.py')
+    fs.writeFileSync(path.join(workspace, 'legacy-adoption.json'), JSON.stringify(prior))
+    await expect(adoptLegacy({ root, workspace, request: { directory: legacy } })).rejects.toThrow(/receipt|digest|binding|location/i)
+    expect(fs.readFileSync(entry.file, 'utf8')).toBe(old)
+    expect(fs.readFileSync(installed.entries[1].file)).toEqual(untouched)
+  })
+
   it('runs the original watcher/delivery/publish invocations against paused authority with zero gh or remote git calls', async () => {
     const { directory, root, workspace } = fixture()
     const legacy = path.join(directory, 'legacy')

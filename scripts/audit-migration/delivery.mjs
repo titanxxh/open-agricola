@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { applyControl, readControl, readJson, withOwnedOperation, workflowDirectory } from './control.mjs'
-import { github, inspectCi, inspectReviews, pullIdentity } from './review.mjs'
+import { github, inspectCi, inspectMergeProtection, inspectReviews, pullIdentity } from './review.mjs'
 import { adoptLegacy } from './legacy.mjs'
 import { localProof } from './local-proof.mjs'
 export { localProof } from './local-proof.mjs'
@@ -28,6 +28,7 @@ export function workflowStatus(root, workspace, request) {
   }
   const waiver = control.waivers.find(item => item.issue === request.issue && item.pr === request.pr && item.head === request.head && item.gates.includes('remoteCi'))
   const remoteCi = inspectCi({ root, repository, head: request.head, event: 'pull_request', names: ['CI', 'CI Full'] })
+  const mergeProtection = inspectMergeProtection({ root, repository })
   const running = []
   const results = path.join(workspace, 'results')
   const walk = directory => {
@@ -44,7 +45,8 @@ export function workflowStatus(root, workspace, request) {
   for (const name of ['identity', 'codeReview', 'securityReview', 'physicalThumb', 'threads']) if (review[name]?.state !== 'pass') blockers.push(`${name}: ${review[name]?.state ?? 'unknown'}`)
   if (source.state !== 'pass') blockers.push(`source/localPrepush/raw: ${source.state}`)
   if (!waiver && remoteCi.state !== 'pass') blockers.push(`remoteCi: ${remoteCi.state}`)
-  return { ...review, mergePermitted: false, blockers, control, permission, runtime: { admissionPaused: control.mode === 'paused', alreadyAdmittedLocalOperations: running.filter(item => item.operation.startsWith('local-validation:')), alreadyAdmittedRemoteOperations: running.filter(item => !item.operation.startsWith('local-validation:')), processStopConfirmed: false }, source, localPrepush: source, raw: source, remoteCi, remoteCiRequirement: waiver ? { state: 'not-required', permission: waiver.id, authority: waiver.authority, observation: remoteCi } : { state: 'required' } }
+  if (mergeProtection.state !== 'pass') blockers.push(`mergeProtection: ${mergeProtection.state}`)
+  return { ...review, mergePermitted: false, blockers, control, permission, runtime: { admissionPaused: control.mode === 'paused', alreadyAdmittedLocalOperations: running.filter(item => item.operation.startsWith('local-validation:')), alreadyAdmittedRemoteOperations: running.filter(item => !item.operation.startsWith('local-validation:')), processStopConfirmed: false }, source, localPrepush: source, raw: source, remoteCi, mergeProtection, remoteCiRequirement: waiver ? { state: 'not-required', permission: waiver.id, authority: waiver.authority, observation: remoteCi } : { state: 'required' } }
 }
 
 export async function deliver({ root, workspace, request }) {
@@ -76,14 +78,16 @@ export async function deliver({ root, workspace, request }) {
     const finalPr = github(root, ['api', `repos/${repository}/pulls/${request.pr}`])
     const finalMain = github(root, ['api', `repos/${repository}/branches/main`]).commit.sha
     if (pullIdentity({ pull: finalPr, pr: request.pr, head: request.head, repository }).state !== 'pass' || finalMain !== main) fail('remote identity changed during delivery checks')
-    if (request.merge !== true) return { phase: 'ready', head: request.head, proof, review, remoteCiRequired: !waiver }
-    command(request.worktree, 'gh', ['pr', 'merge', String(request.pr), '--repo', repository, '--admin', '--rebase', '--match-head-commit', request.head])
+    const mergeProtection = inspectMergeProtection({ root, repository })
+    if (mergeProtection.state !== 'pass') fail(`server merge protection is not passed: ${mergeProtection.reasons.join('; ')}`)
+    if (request.merge !== true) return { phase: 'ready', head: request.head, proof, review, mergeProtection, remoteCiRequired: !waiver }
+    command(request.worktree, 'gh', ['pr', 'merge', String(request.pr), '--repo', repository, '--rebase', '--match-head-commit', request.head])
     const merged = github(root, ['api', `repos/${repository}/pulls/${request.pr}`])
     if (pullIdentity({ pull: merged, pr: request.pr, head: request.head, repository, merged: true }).state !== 'pass') fail('merge result is unknown; reconcile exact PR/head before another claim')
     command(request.worktree, 'git', ['fetch', 'origin', 'main'])
     if (git(request.worktree, 'rev-parse', `${merged.merge_commit_sha}^{tree}`) !== proof.tree) fail('merged tree differs from locally reviewed source')
     const mergedCi = waiver ? { state: 'not-required', permission: waiver.id } : inspectCi({ root, repository, head: merged.merge_commit_sha, event: 'push', names: ['CI', 'CI Full', 'E2E'] })
-    return { phase: mergedCi.state === 'pass' || waiver ? 'complete' : 'merged-awaiting-ci', head: request.head, mergeCommit: merged.merge_commit_sha, proof, review, mergedCi }
+    return { phase: mergedCi.state === 'pass' || waiver ? 'complete' : 'merged-awaiting-ci', head: request.head, mergeCommit: merged.merge_commit_sha, proof, review, mergeProtection, mergedCi }
   })
 }
 

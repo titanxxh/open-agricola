@@ -57,7 +57,7 @@ async function fixture(options: FixtureOptions = {}) {
   const log = path.join(directory, 'calls.jsonl')
   const stateFile = path.join(directory, 'github.json')
   const repository = 'titanxxh/open-agricola'
-  const state = { main: base, head, divergent, root, raw, prepush, comments: [], ...options, pr: { number: 1272, state: 'open', draft: false, head: { sha: base, ref: branch, repo: { full_name: repository } }, base: { ref: 'main', repo: { full_name: repository } }, body: 'old body', title: 'old title' } }
+  const state = { main: base, head, divergent, root, raw, prepush, actor: { id: 17, login: 'workflow-owner' }, comments: [], ...options, pr: { number: 1272, state: 'open', draft: false, head: { sha: base, ref: branch, repo: { full_name: repository } }, base: { ref: 'main', repo: { full_name: repository } }, body: 'old body', title: 'old title' } }
   json(stateFile, state)
   const programPrelude = `const fs=require('node:fs'),cp=require('node:child_process');const a=process.argv.slice(2);const file=${JSON.stringify(stateFile)},log=${JSON.stringify(log)},realGit=${JSON.stringify(realGit)};const s=JSON.parse(fs.readFileSync(file,'utf8'));const save=()=>fs.writeFileSync(file,JSON.stringify(s));const record=(tool,mutation,payload)=>fs.appendFileSync(log,JSON.stringify({tool,argv:a,mutation,payload})+'\\n');const interrupt=kind=>{if(s.interrupted===kind&&!s.interruptionConsumed){s.interruptionConsumed=true;save();process.exit(88)}};`
   fs.writeFileSync(path.join(bin, 'git'), `#!/usr/bin/env node
@@ -72,12 +72,13 @@ if(a[0]==='push'){
   fs.writeFileSync(path.join(bin, 'gh'), `#!/usr/bin/env node
 ${programPrelude}
 const endpoint=a.find(x=>x.startsWith('repos/'))||a[1];const method=a.includes('-X')?a[a.indexOf('-X')+1]:'GET';const payload=a.includes('--input')?JSON.parse(fs.readFileSync(a[a.indexOf('--input')+1],'utf8')):undefined;record('gh',method!=='GET',payload);let result;
-if(endpoint.endsWith('/branches/main'))result={commit:{sha:s.main}};
+if(endpoint==='user')result=s.actor;
+else if(endpoint.endsWith('/branches/main'))result={commit:{sha:s.main}};
 else if(endpoint.endsWith('/pulls/1272')){
  if(method==='PATCH'){Object.assign(s.pr,payload);if(s.afterPatch==='invalidate-prepush'){const p=s.root+'/output/verification/prepush.json';const pre=JSON.parse(fs.readFileSync(p,'utf8'));pre.fingerprint='changed';fs.writeFileSync(p,JSON.stringify(pre));}if(s.afterPatch==='advance-main'){s.main=s.divergent;cp.execFileSync(realGit,['update-ref','refs/remotes/origin/main',s.main],{cwd:s.root});}save();interrupt('update-pr');}
  result=s.pr;
 }else if(endpoint.includes('/issues/1272/comments')){
- if(method==='POST'){const c={id:s.comments.length+1,body:payload.body,html_url:'https://example.invalid/comment/'+(s.comments.length+1)};s.comments.push(c);save();interrupt('request-review');result=c;}else result=s.comments;
+ if(method==='POST'){const c={id:s.comments.length+1,user:s.actor,body:payload.body,html_url:'https://example.invalid/comment/'+(s.comments.length+1)};s.comments.push(c);save();interrupt('request-review');result=c;}else result=s.comments;
 }else if(endpoint.includes('/issues/1272/reactions'))result=[];
 else if(endpoint==='graphql')result={data:{repository:{pullRequest:{reviewThreads:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}}}};
 else{process.stderr.write('Unexpected fake GitHub endpoint '+endpoint);process.exit(91);}
@@ -176,6 +177,16 @@ it.each(['complete', 'push', 'update-pr', 'request-review'])('a new claim after 
   expect(writes.filter(call => call.tool === 'git')).toHaveLength(1)
   expect(writes.filter(call => call.tool === 'gh' && call.argv.includes('PATCH'))).toHaveLength(1)
   expect(writes.filter(call => call.tool === 'gh' && call.argv.includes('POST'))).toHaveLength(1)
+})
+
+it.each(['other-author-exact-body', 'authenticated-author-quoted-body'])('does not trust a spoofed marker from %s', async fault => {
+  const f = await fixture()
+  const body = `@codex review\n\n<!-- oa-audit-review-request:code:${f.head} -->`
+  const comment = { id: 1, user: fault === 'other-author-exact-body' ? { id: 99, login: 'contributor' } : f.state.actor, body: fault === 'other-author-exact-body' ? body : `Quoted earlier request:\n${body}`, html_url: 'https://example.invalid/untrusted-marker' }
+  json(f.stateFile, { ...f.state, comments: [comment] })
+  const result = await publishExisting({ root: f.root, workspace: f.workspace, request: { ...f.request, review: 'code' } })
+  expect(result.results.at(-1)).toMatchObject({ state: 'requested', kind: 'code' })
+  expect(f.calls().filter(call => call.tool === 'gh' && call.argv.includes('POST'))).toHaveLength(1)
 })
 
 function frozenReceipt(f: Awaited<ReturnType<typeof fixture>>) {

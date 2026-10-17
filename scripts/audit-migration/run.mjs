@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { withOwnedOperation } from './control.mjs'
 import { assertCommittedSource } from './committed-source.mjs'
+import { validationEnvironment } from './validation-environment.mjs'
 
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'))
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex')
@@ -95,15 +96,7 @@ export async function runValidation(root, options) {
   if (!Array.isArray(extra) || extra.some(file => !safeTarget(file))) fail('extraTargets must contain canonical server test paths')
   const targets = [...new Set([...cases.map(item => item.targetFile), ...(manifest.nativeScope ?? []).map(item => item.file), ...extra])].sort()
   for (const file of targets) if (!safeTarget(file) || !fs.existsSync(path.join(worktree, file)) || !inside(worktree, fs.realpathSync(path.join(worktree, file)))) fail(`invalid or missing native target: ${file}`)
-  const environment = { ...process.env }
-  for (const key of ['NODE_OPTIONS', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) delete environment[key]
-  const databaseFile = config.services?.databaseEnv
-  if (typeof databaseFile !== 'string' || !path.isAbsolute(databaseFile)) fail('services.databaseEnv must name the local TEST_DATABASE_URL file')
-  const database = fs.readFileSync(databaseFile, 'utf8').split(/\r?\n/).find(line => /^(?:export\s+)?TEST_DATABASE_URL=/.test(line))?.replace(/^(?:export\s+)?TEST_DATABASE_URL=/, '').replace(/^(['"])(.*)\1$/, '$2')
-  try { const url = new URL(database ?? ''); if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || url.pathname.length <= 1) fail('invalid database configuration') } catch { fail('local TEST_DATABASE_URL configuration is missing or invalid') }
-  environment.TEST_DATABASE_URL = database
-  environment.SHARED_DATA_DIR = path.join(output, 'services-data')
-  environment.AGRICOLA_TEST_EVIDENCE_DIR = path.join(output, 'native-evidence')
+  const { environment, localServicesContents } = validationEnvironment({ services: config.services, output })
   const raw = path.join(output, 'raw')
   const receipt = { version: 1, head: config.head, tree: git(worktree, 'rev-parse', 'HEAD^{tree}'), batch: config.batch, targets, steps: [], status: 'running' }
   const command = (stage, executable, args) => {
@@ -116,6 +109,10 @@ export async function runValidation(root, options) {
     if (claim.head !== config.head) fail('assignment head differs from the frozen validation head')
     unchanged()
     fs.mkdirSync(output, { recursive: true })
+    if (!fs.existsSync(environment.LOCAL_SERVICES_DIR)) {
+      fs.mkdirSync(environment.LOCAL_SERVICES_DIR, { recursive: true, mode: 0o700 })
+      fs.writeFileSync(path.join(environment.LOCAL_SERVICES_DIR, 'local-services.env'), localServicesContents, { flag: 'wx', mode: 0o600 })
+    }
     const result = await callback()
     unchanged()
     const step = { name, status: 'passed', result }

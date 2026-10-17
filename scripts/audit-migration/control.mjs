@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import os from 'node:os'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 
 const stages = new Set(['frozen-native', 'frozen-strict', 'frozen-check-native', 'raw-prepare', 'raw-verify', 'prepush', 'local-proof'])
 const remoteOperations = new Set(['delivery:merge', 'publication:push', 'publication:update-pr', 'publication:request-review'])
@@ -54,8 +54,11 @@ export function workflowDirectory(root, workspace) {
   const repo = fs.realpathSync(root)
   const common = fs.realpathSync(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repo, encoding: 'utf8' }).trim())
   const repository = path.basename(common) === '.git' ? path.dirname(common) : common
-  if ([repo, repository].some(directory => actual === directory || actual.startsWith(`${directory}${path.sep}`))) fail('workflow workspace must be outside the checkout and common repository')
+  const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], { cwd: repo, encoding: 'utf8' }).split('\0')
+    .filter(line => line.startsWith('worktree ')).map(line => fs.realpathSync(line.slice(9)))
+  if ([repo, repository, common, ...worktrees].some(directory => actual === directory || actual.startsWith(`${directory}${path.sep}`))) fail('workflow workspace must be outside every checkout and the common repository')
   if (actual !== resolved) fail('workflow workspace must not traverse symlinks')
+  if (!fs.statSync(ancestor).isDirectory() || spawnSync('git', ['rev-parse', '--git-dir'], { cwd: ancestor, stdio: 'ignore' }).status === 0) fail('workflow workspace must be outside Git repositories')
   return resolved
 }
 

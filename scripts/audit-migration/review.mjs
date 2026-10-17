@@ -130,10 +130,59 @@ export function inspectReviews({ root, repository = 'titanxxh/open-agricola', pr
 
 export function inspectCi({ root, repository = 'titanxxh/open-agricola', head, event, names }) {
   try {
+    const paths = { CI: 'ci.yml', 'CI Full': 'ci-full.yml', E2E: 'e2e.yml' }
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !sha.test(head) || !Array.isArray(names) || !names.length || names.some(name => !Object.hasOwn(paths, name))) throw new Error('CI observation requires known workflow policies and an exact repository/head')
+    const repo = github(root, ['api', `repos/${repository}`])
+    if (repo.full_name !== repository || typeof repo.default_branch !== 'string' || !repo.default_branch.trim()) throw new Error('trusted default branch is unavailable')
+    const workflows = names.map(name => {
+      const expectedPath = `.github/workflows/${paths[name]}`
+      const file = github(root, ['api', `repos/${repository}/contents/${expectedPath}?ref=${encodeURIComponent(repo.default_branch)}`])
+      const workflow = github(root, ['api', `repos/${repository}/actions/workflows/${paths[name]}`])
+      if (file.type !== 'file' || file.path !== expectedPath || !sha.test(file.sha) || !Number.isSafeInteger(workflow.id) || workflow.id < 1 || workflow.path !== expectedPath || workflow.state !== 'active') throw new Error(`trusted default-branch workflow is unavailable: ${name}`)
+      return workflow
+    })
     const runs = pages(root, `repos/${repository}/actions/runs?head_sha=${head}&event=${event}`, 'workflow_runs')
-    const latest = names.map(name => runs.filter(run => run.head_sha === head && run.name === name && run.event === event).sort((a, b) => b.id - a.id)[0])
+    const latest = workflows.map(workflow => runs.filter(run => run.head_sha === head && run.event === event && run.workflow_id === workflow.id
+      && run.path === workflow.path && run.repository?.full_name === repository).sort((a, b) => b.id - a.id)[0])
     if (latest.some(run => !run)) return gate('unknown', ['a required exact-head workflow run is absent'])
     if (latest.some(run => run.status === 'completed' && run.conclusion !== 'success')) return gate('fail', ['a required workflow failed'], latest.map(run => run.html_url))
     return gate(latest.every(run => run.status === 'completed' && run.conclusion === 'success') ? 'pass' : 'unknown', [], latest.map(run => run.html_url))
+  } catch (error) { return gate('unknown', [error.message]) }
+}
+
+/** A CI waiver never replaces the server's atomic up-to-date merge check. */
+export function inspectMergeProtection({ root, repository = 'titanxxh/open-agricola', branch = 'main' }) {
+  try {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || branch !== 'main') throw new Error('merge protection requires the exact repository/main branch')
+    const [owner, name] = repository.split('/')
+    const observed = graphql(root, 'query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){nameWithOwner mergeQueue(branch:$branch){id}}}', { owner, name, branch }).repository
+    if (observed?.nameWithOwner !== repository || !Object.hasOwn(observed, 'mergeQueue')) throw new Error('merge-queue protection is unknown')
+    if (observed.mergeQueue !== null) return gate('fail', ['merge queues are not supported by the rebase-only delivery recipe'])
+    const rules = pages(root, `repos/${repository}/rules/branches/${branch}`)
+    if (rules.some(rule => rule.type === 'merge_queue')) return gate('fail', ['merge queue is required'])
+    if (rules.some(rule => !Number.isSafeInteger(rule.ruleset_id) || rule.ruleset_id < 1)) throw new Error('active ruleset identity is incomplete')
+    const details = [...new Set(rules.map(rule => rule.ruleset_id))].map(id => {
+      const result = github(root, ['api', `repos/${repository}/rulesets/${id}?includes_parents=true`])
+      if (result.id !== id || result.enforcement !== 'active' || result.target !== 'branch' || !Array.isArray(result.bypass_actors) || !Array.isArray(result.rules)) throw new Error('active ruleset enforcement or bypass information is incomplete')
+      return result
+    })
+    if (details.some(rule => rule.bypass_actors.length)) return gate('fail', ['an active ruleset permits bypass'])
+    if (details.some(rule => rule.rules.some(item => item.type === 'merge_queue'))) return gate('fail', ['merge queue is required by an active ruleset'])
+    let classic = null
+    try { classic = github(root, ['api', `repos/${repository}/branches/${branch}/protection`]) } catch (error) {
+      if (!/\(HTTP 404\)/.test(String(error.stderr ?? ''))) throw new Error('classic branch protection could not be observed')
+    }
+    if (classic && (typeof classic.enforce_admins?.enabled !== 'boolean' || !Object.hasOwn(classic, 'required_status_checks'))) throw new Error('classic protection fields are incomplete')
+    const allowances = classic?.required_pull_request_reviews?.bypass_pull_request_allowances
+    if (classic?.required_pull_request_reviews && (!allowances || ['users', 'teams', 'apps'].some(key => !Array.isArray(allowances[key])))) throw new Error('classic review bypass information is incomplete')
+    if (allowances && ['users', 'teams', 'apps'].some(key => allowances[key].length)) return gate('fail', ['classic branch protection permits review bypass'])
+    const checks = value => Array.isArray(value) && value.length > 0 && value.every(item => typeof item.context === 'string' && item.context.trim())
+    const strict = rule => rule.type === 'required_status_checks' && rule.parameters?.strict_required_status_checks_policy === true && checks(rule.parameters.required_status_checks)
+    const classicChecks = classic?.required_status_checks
+    const classicStrict = classic?.enforce_admins.enabled === true && classicChecks?.strict === true
+      && (checks(classicChecks.checks) || (Array.isArray(classicChecks.contexts) && classicChecks.contexts.length > 0 && classicChecks.contexts.every(context => typeof context === 'string' && context.trim())))
+    const rulesetStrict = rules.some(rule => strict(rule) && details.some(detail => detail.id === rule.ruleset_id && detail.rules.some(strict)))
+    if (!classicStrict && !rulesetStrict) return gate('fail', ['server-enforced strict up-to-date checks without bypass are required'])
+    return gate('pass', [], [{ policy: classicStrict ? 'classic-strict-no-bypass' : 'ruleset-strict-no-bypass', branch, rulesets: details.map(detail => detail.id), mergeQueue: false }])
   } catch (error) { return gate('unknown', [error.message]) }
 }

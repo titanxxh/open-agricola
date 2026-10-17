@@ -6,3 +6,4 @@ export function pullIdentity(input: { pull: PullRequestIdentity; pr: number; hea
 export function deriveReview(input: { pr: PullRequestIdentity; expectedHead: string; expectedPr?: number; repository?: string; merged?: boolean; comments: Array<{ id: number; user: { login: string }; body: string; updated_at: string; html_url: string }>; reactions: Array<{ id: number; user: { login: string }; content: string; created_at: string; url?: string }>; threads: Array<{ id: string; isResolved: boolean }> }): ReviewStatus
 export function inspectReviews(input: { root: string; repository?: string; pr: number; head: string; merged?: boolean }): ReviewStatus
 export function inspectCi(input: { root: string; repository?: string; head: string; event: string; names: string[] }): Gate
+export function inspectMergeProtection(input: { root: string; repository?: string; branch?: string }): Gate

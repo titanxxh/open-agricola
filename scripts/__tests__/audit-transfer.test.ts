@@ -10,7 +10,7 @@ afterEach(() => temporary.splice(0).forEach(directory => fs.rmSync(directory, { 
 const git = (root: string, ...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim()
 const write = (file: string, value: unknown) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(value)) }
 
-function fixture() {
+function fixture(baseFiles: Record<string, string> = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-transfer-test-'))
   temporary.push(directory)
   const root = path.join(directory, 'sender')
@@ -19,6 +19,7 @@ function fixture() {
   git(root, 'config', 'user.name', 'Audit fixture')
   git(root, 'config', 'user.email', 'audit@example.invalid')
   fs.writeFileSync(path.join(root, 'base.txt'), 'base')
+  for (const [file, contents] of Object.entries(baseFiles)) fs.writeFileSync(path.join(root, file), contents)
   git(root, 'add', '.')
   git(root, 'commit', '--quiet', '-m', 'base')
   const base = git(root, 'rev-parse', 'HEAD')
@@ -178,6 +179,89 @@ it('keeps the explicit public environment example transferable', async () => {
   const result = await transferCommand(f.root, 'export', f.exportOptions())
   expect(result).toMatchObject({ state: 'paused', candidate: { head: git(f.root, 'rev-parse', 'HEAD') } })
   expect(fs.existsSync(path.join(f.archive, 'transfer.json'))).toBe(true)
+})
+
+it.each(['.npmrc', '.netrc', '_netrc', '.aws/credentials', '.aws/config', '.docker/config.json', '.git-credentials'])('rejects standard authentication file %s', async file => {
+  const f = fixture()
+  const target = path.join(f.root, file)
+  fs.mkdirSync(path.dirname(target), { recursive: true })
+  fs.writeFileSync(target, 'authentication configuration\n')
+  git(f.root, 'add', '--force', file)
+  git(f.root, 'commit', '--quiet', '-m', 'authentication file fixture')
+
+  await expect(transferCommand(f.root, 'export', f.exportOptions())).rejects.toThrow(/forbidden/)
+  expect(fs.existsSync(f.archive)).toBe(false)
+})
+
+const credential = ['ghp_', 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'].join('')
+it.each(['LOCAL_S3_SECRET_KEY', 'STRIPE_SECRET_KEY', '//registry.example/:_authToken', '//registry.example/team/:_authToken'])('rejects unprefixed credentials assigned to %s in an allowed example file', async key => {
+  const f = fixture()
+  const value = ['9f02c7a814d6e3b55a19c04e82f761bd', '6ce90842ab751d0f3948e6c2a50bd173'].join('')
+  fs.writeFileSync(path.join(f.root, '.env.example'), `${key}=${value}\n`)
+  git(f.root, 'add', '.env.example')
+  git(f.root, 'commit', '--quiet', '-m', 'unprefixed credential fixture')
+
+  await expect(transferCommand(f.root, 'export', f.exportOptions())).rejects.toThrow(/credential/)
+  expect(fs.existsSync(f.archive)).toBe(false)
+})
+
+it.each([
+  ['.env.example', `GITHUB_TOKEN=${credential}\n`],
+  ['settings.json', JSON.stringify({ apiKey: credential })],
+  ['settings.ini', '[service]\npassword=z9X3r7Q1w5E8t2Y6u4I0\n'],
+  ['.gitmodules', `[submodule "private"]\npath = vendor\nurl = https://oauth2:${credential}@github.com/org/repo.git\n`],
+  ['.gitmodules', `[submodule "private"]\npath = vendor\nurl = https://${credential}@github.com/org/repo.git\n`],
+  ['.gitmodules', ['[submodule "private"]\npath = vendor\nurl = https://github.com/org/repo.git?access_token=', 'z9X3r7Q1w5E8t2Y6u4I0\n'].join('')],
+  ['database.conf', ['DATABASE_URL=postgresql://agricola:', 'z9X3r7Q1w5E8t2Y6u4I0', '@db.example.com/game\n'].join('')],
+  ['signing.txt', ['-----BEGIN PRIVATE KEY-----', 'MIIBVwIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEAu2JhO8EgDJ9tXKf8', '-----END PRIVATE KEY-----'].join('\n')],
+])('rejects credential contents in allowed file %s before creating an archive', async (file, contents) => {
+  const f = fixture()
+  fs.writeFileSync(path.join(f.root, file), contents)
+  git(f.root, 'add', file)
+  git(f.root, 'commit', '--quiet', '-m', 'credential content fixture')
+
+  await expect(transferCommand(f.root, 'export', f.exportOptions())).rejects.toThrow(/credential/)
+  expect(fs.existsSync(f.archive)).toBe(false)
+})
+
+it.each(['candidate-history', 'immutable-source'])('inspects credential blobs in %s even when absent from the candidate tree', async scope => {
+  const f = fixture()
+  if (scope === 'immutable-source') git(f.root, 'switch', '--quiet', '--detach', f.source)
+  fs.writeFileSync(path.join(f.root, 'settings.ini'), `GITHUB_TOKEN=${credential}\n`)
+  git(f.root, 'add', '.')
+  git(f.root, 'commit', '--quiet', '-m', 'historical credential fixture')
+  if (scope === 'candidate-history') {
+    git(f.root, 'rm', '--quiet', 'settings.ini')
+    git(f.root, 'commit', '--quiet', '-m', 'remove historical credential fixture')
+  } else {
+    const source = git(f.root, 'rev-parse', 'HEAD')
+    git(f.root, 'switch', '--quiet', '--detach', f.head)
+    write(path.join(f.root, 'scripts/audit-migration/origin.json'), { commit: source })
+    write(path.join(f.root, 'scripts/audit-migration/cases.json'), { source: { commit: source, cases: 1 }, files: [] })
+    git(f.root, 'add', '.')
+    git(f.root, 'commit', '--quiet', '-m', 'bind immutable credential source fixture')
+  }
+  expect(fs.existsSync(path.join(f.root, 'settings.ini'))).toBe(false)
+
+  await expect(transferCommand(f.root, 'export', f.exportOptions())).rejects.toThrow(/credential/)
+  expect(fs.existsSync(f.archive)).toBe(false)
+})
+
+it('permits explicit placeholders, test literals and ordinary submodule URLs', async () => {
+  const f = fixture()
+  fs.writeFileSync(path.join(f.root, '.env.example'), 'GITHUB_TOKEN=YOUR_GITHUB_TOKEN\nDATABASE_URL=postgresql://user:password@localhost/example\nAPI_KEY=${API_KEY}\nLOCAL_S3_SECRET_KEY=YOUR_SECRET_KEY\nSTRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}\n//registry.example/:_authToken=${NPM_TOKEN}\n')
+  fs.writeFileSync(path.join(f.root, '.gitmodules'), '[submodule "public"]\npath = vendor\nurl = https://github.com/org/repo.git\n')
+  fs.writeFileSync(path.join(f.root, 'negative.test.ts'), ["const rejected = 'postgres://fixture:private@localhost/unused'\nconst fakeToken = '", 'ghp_', 'x'.repeat(36), "'\n"].join(''))
+  git(f.root, 'add', '.')
+  git(f.root, 'commit', '--quiet', '-m', 'public placeholders fixture')
+
+  await expect(transferCommand(f.root, 'export', f.exportOptions())).resolves.toMatchObject({ state: 'paused' })
+})
+
+it('does not inspect prerequisite blobs that the incremental bundle excludes', async () => {
+  const f = fixture({ 'historical-config.txt': `GITHUB_TOKEN=${credential}\n` })
+
+  await expect(transferCommand(f.root, 'export', f.exportOptions())).resolves.toMatchObject({ state: 'paused', base: f.base })
 })
 
 it('rejects dirty candidate sources rather than claiming the bundle contains them', async () => {
