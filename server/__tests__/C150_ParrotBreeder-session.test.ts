@@ -7,6 +7,9 @@ import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { findActionSpaceById } from '../../shared/domain/space'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/register-all'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext as confirmNext__audit1 } from './_helpers/negative-rule-audit'
+import * as auditC150 from './_helpers/audit/ae-negative-C150'
 
 const CARD_ID = 'C150_ParrotBreeder'
 const ANYTIME_ID = 'C150-parrot-breeder-anytime'
@@ -268,5 +271,95 @@ describe('C150 Parrot Breeder authoritative copy', () => {
     expect(findActionSpaceById(response.state, 'grain-seeds')!.takenBy).toEqual([])
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
     expect(response.state.players[0]!.resources.grain).toBe(1)
+  })
+})
+
+describe('ae-negative-C150', () => {
+  const { CARD, ANYTIME, sessions, setup } = auditC150
+  const confirmNext = confirmNext__audit1
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('C150 negative audit: actual right-neighbour turn', () => {
+    it('N1 binds payment to the sole target and rejects another placement while confirming the turn', () => {
+      const session = setup()
+      const copied = session.takeAnytimeAction(0, ANYTIME)
+      assert.equal(copied.ok, true, copied.error)
+      assert.deepEqual({ grain: copied.state.players[0]!.resources.grain, food: copied.state.players[0]!.resources.food },
+        { grain: 0, food: 2 })
+      assert.equal(workersAvailable(copied.state, copied.state.players[0]!), 1)
+      assert.equal(findActionSpaceById(copied.state, 'day-laborer')!.takenBy.length, 2)
+      assert.equal(copied.state.events.filter(event => event.type === 'resource.paid' && event.resources.grain === 1).length, 1)
+      assertRejectedUnchanged(session, () => session.takeAction(0, 'grain-seeds'))
+      assertRejectedUnchanged(session, () => session.takeAction(0, '__missing__'))
+      assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, ANYTIME))
+      const next = confirmNext(session, copied)
+      assert.equal(next.state.currentPlayerIndex, 1)
+      assert.equal(readCardExtraData(next.state.players[0]!, CARD, 'right'), null)
+      assert.equal(next.scores?.length, 4)
+    })
+
+    it.each([
+      { name: 'N2 no grain', grain: 0, target: 'day-laborer' },
+      { name: 'N3 Meeting Place', grain: 1, target: 'meeting-place' },
+      { name: 'N4 exhausted accumulation', grain: 1, target: 'forest' },
+    ])('$name rejects copying without spending resources or a worker', ({ grain, target }) => {
+      const session = setup({ grain, target })
+      assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, ANYTIME))
+      const normal = session.takeAction(0, 'grain-seeds')
+      assert.equal(normal.ok, true, normal.error)
+      assert.equal(normal.state.players[0]!.resources.grain, grain + 1)
+      assert.equal(workersAvailable(normal.state, normal.state.players[0]!), 1)
+    })
+
+    it('N5 undo restores the real right-neighbour opportunity, and retry pays exactly once', () => {
+      const session = setup()
+      assert.equal(session.takeAnytimeAction(0, ANYTIME).ok, true)
+      const undone = session.undoAction()
+      assert.equal(undone.ok, true, undone.error)
+      assert.equal(undone.state.players[0]!.resources.grain, 1)
+      assert.equal(undone.state.players[0]!.resources.food, 0)
+      assert.equal(workersAvailable(undone.state, undone.state.players[0]!), 2)
+      assert.equal(findActionSpaceById(undone.state, 'day-laborer')!.takenBy.length, 1)
+      const retry = session.takeAnytimeAction(0, ANYTIME)
+      assert.equal(retry.ok, true, retry.error)
+      assert.equal(retry.state.players[0]!.resources.food, 2)
+      assert.equal(retry.state.events.filter(event => event.type === 'resource.paid' && event.resources.grain === 1).length, 1)
+    })
+
+    it.each([1, 2])('N6 reserves the copying grain before admitting a real right-neighbour Sow (grain=$0)', grain => {
+      const session = createWorkSession({ seed: 150, options: { playerCount: 4 }, configure: state => {
+        state.round = 14
+        state.currentPlayerIndex = 3
+        state.players[0]!.occupationPlayed = [CARD]
+        state.players[0]!.resources.grain = grain
+        state.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }]
+        state.players[3]!.resources.grain = 1
+        state.players[3]!.fields = [{ row: 0, col: 2, stacks: [] }]
+      } })
+      sessions.push(session)
+      let r = session.takeAction(3, 'grain-utilization')
+      assert.equal(r.ok, true, r.error)
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+        const option = r.interaction.request.options.find(o => o.value === 'sow' || o.labelParams?.actionNameKey === 'actions.sow.name')
+        assert.ok(option)
+        r = session.resolveChoice(3, option.value)
+        assert.equal(r.ok, true, r.error)
+      }
+      r = session.commitSelectionChoice(3, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+      assert.equal(r.ok, true, r.error)
+      confirmNext(session, r)
+      if (grain === 1) {
+        assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, ANYTIME))
+        assert.equal(session.getState().state.players[0]!.resources.grain, 1)
+      } else {
+        r = session.takeAnytimeAction(0, ANYTIME)
+        assert.equal(r.ok, true, r.error)
+        assert.equal(r.state.players[0]!.resources.grain, 1)
+        r = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+        assert.equal(r.ok, true, r.error)
+        assert.equal(r.state.players[0]!.resources.grain, 0)
+        assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+        assert.equal(r.state.events.filter(event => event.type === 'resource.paid' && event.resources.grain === 1).length, 1)
+      }
+    })
   })
 })

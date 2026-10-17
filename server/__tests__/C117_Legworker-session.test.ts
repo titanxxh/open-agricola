@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -8,6 +8,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C117_Legworker'
 import { hasAdjacentWorker } from '../../shared/cards/C/C117_Legworker'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit49Work from './_helpers/audit/ae-negative-49-work'
 
 
 const CARD_ID = 'C117_Legworker'
@@ -244,4 +246,12 @@ describe('C117_Legworker session', () => {
     expect(response.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toEqual([])
   })
 
+})
+
+describe('ae-negative-49-work', () => {
+  const { LEG, sessions, save, ok, make, lesson, action, rooms, wood } = audit49Work
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C117 N1 actual Lessons grants no immediate wood and a real second owner action orthogonally adjacent to its first gives one',()=>{const bought=lesson(make(LEG,false),LEG);assert.equal(wood(bought),0);const s=make(LEG),first=action(s,0,'forest');assert.equal(wood(first),3);action(s,1,'day-laborer');const r=action(s,0,'clay-pit');assert.equal(wood(r),4);assert.equal(r.state.players[0]!.resources.clay,1);save('C117-N1',{bought,first,r})})
+  it('C117 N2 nonadjacent owned worker opposite owner adjacency and a card in hand never grant extra wood',()=>{for(const mode of['nonadjacent','opponent','hand']){const s=make(LEG,mode!=='hand');action(s,0,mode==='hand'?'forest':'grain-seeds');action(s,1,mode==='opponent'?'forest':'day-laborer');const r=action(s,0,'clay-pit');assert.equal(wood(r),mode==='hand'?3:0);save(`C117-N2-${mode}`,r)}})
+  it('C117 N3 two adjacent owned neighbours still grant only one wood and whole last action undo permits only one replay',()=>{const s=make(LEG,true,state=>rooms(state,3));action(s,0,'forest');action(s,1,'grain-seeds');action(s,0,'reed-bank');action(s,1,'day-laborer');const a=action(s,0,'clay-pit');assert.equal(wood(a),4);const u=ok(s.undoAction());assert.equal(wood(u),3);const r=action(s,0,'clay-pit');assert.equal(wood(r),4);save('C117-N3',{a,u,r})})
 })

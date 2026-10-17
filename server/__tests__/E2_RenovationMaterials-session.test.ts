@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E002_RenovationMaterials'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit23Renovation from './_helpers/audit/ae-negative-23-renovation'
 
 const CARD_ID = 'E002_RenovationMaterials'
 const FIXED_HANDS = [
@@ -99,4 +102,11 @@ describe('E002 Renovation Materials session', () => {
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[1]!.minorHand).not.toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-23-renovation', () => {
+  const { MATERIALS, sessions, save, ok, finish, menu, buy, make } = audit23Renovation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E002 N1 actual four wooden room purchase pays only three clay one reed and keeps real room animal assignment through free renovation',()=>{const s=make(MATERIALS,'wood',4,0,3,1,100,true);const{pending,r}=buy(s,MATERIALS);assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.rooms,4);assert.equal(r.state.players[0]!.roomTiles.length,4);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.reed,0);assert.deepEqual(r.state.players[0]!.houseAnimals,{'1-0':'sheep'});const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.houseType,'wood');assert.equal(undone.state.players[0]!.resources.clay,3);assert.equal(undone.state.players[0]!.resources.reed,1);assert.ok(undone.state.players[0]!.minorHand.includes(MATERIALS));const retry=buy(s,MATERIALS).r;assert.equal(retry.state.players[0]!.houseType,'clay');save('E002-N1',{pending,r,undone,retry})})
+  it('E002 N2 missing each printed resource or nonwood house rejects before free alternative with no upgrade or passing',()=>{for(const mode of['clay','reed','clay-house','stone-house']){const house=mode==='clay-house'?'clay':mode==='stone-house'?'stone':'wood',s=make(MATERIALS,house,2,0,mode==='clay'?2:3,mode==='reed'?0:1),pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,MATERIALS)),legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.houseType,house);assert.ok(legal.state.players[0]!.minorHand.includes(MATERIALS));assert.ok(!legal.state.players[1]!.minorHand.includes(MATERIALS));save(`E002-N2-${mode}`,{pending,rejected,legal})}})
 })

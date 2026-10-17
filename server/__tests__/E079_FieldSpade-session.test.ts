@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E079_FieldSpade'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Fields from './_helpers/audit/ae-negative-42-fields'
 
 const CARD_ID = 'E079_FieldSpade'
 const FILLER = '__test_placeholder__'
@@ -157,4 +160,12 @@ describe('E079 Field Spade parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.stone).toBe(1)
   })
+})
+
+describe('ae-negative-42-fields', () => {
+  const { sessions, ok, save, setup, finish, play, next, enterSow, sow, field } = audit42Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E079 N1 actual wood paid purchase followed by one or two paid field sowings gives only one stone total',()=>{for(const count of [1,2]){const s=setup('E079_FieldSpade',st=>{field(st);if(count===2)field(st,0,0,2);Object.assign(st.players[0]!.resources,{wood:1,grain:count})},false,5),bought=play(s,'E079_FieldSpade');assert.equal(bought.state.players[0]!.resources.wood,0);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const p=enterSow(s,ok(s.takeAction(0,'grain-utilization'))),r=finish(s,sow(s,p,[{row:0,col:1,crop:'grain'},...(count===2?[{row:0,col:2,crop:'grain' as const}]:[])]),true);assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.grain,0);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),Array(count).fill(3));const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.stone,0);assert.equal(u.state.players[0]!.resources.grain,count);save(`E079-N1-${count}`,{bought,p,r,u})}})
+  it('E079 N2 empty sow submission rejects before a real legal field sowing and cannot mint extra stone',()=>{const s=setup('E079_FieldSpade',st=>{field(st);st.players[0]!.resources.grain=1}),p=enterSow(s,ok(s.takeAction(0,'grain-utilization'))),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[]})),r=finish(s,sow(s,p,[{row:0,col:1,crop:'grain'}]),true);assert.equal(r.state.players[0]!.resources.stone,1);save('E079-N2',{p,bad,r})})
+  it('E079 N3 held Spade and opponent paid sowing grant no owner stone',()=>{for(const mode of ['hand','other']){const actor=mode==='other'?1:0,s=setup('E079_FieldSpade',st=>{st.currentPlayerIndex=actor;field(st,0,actor);st.players[actor]!.resources.grain=1},mode!=='hand'),p=enterSow(s,ok(s.takeAction(actor,'grain-utilization'))),r=finish(s,sow(s,p,[{row:0,col:1,crop:'grain'}]),true,'E079_FieldSpade');assert.equal(r.state.players[0]!.resources.stone,0);save(`E079-N3-${mode}`,r)}})
 })

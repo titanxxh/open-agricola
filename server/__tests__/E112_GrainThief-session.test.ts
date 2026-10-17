@@ -1,7 +1,7 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -9,6 +9,9 @@ import type { ActionChoiceOption, ActionFlow, FarmTilePosition, Field, PlayerSta
 
 import '../../shared/cards/E/E112_GrainThief'
 import '../../shared/cards/B/B113_PatchCaregiver'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'E112_GrainThief'
 
@@ -266,5 +269,90 @@ describe('E112_GrainThief harvest timing', () => {
     expect(fieldCountsOf(player)).toEqual([2, 1, 2])
     expect(player.resources.grain).toBe(0)
     expect(player.cardStates[CARD_ID]).toBeUndefined()
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, save, setup, choose, source, finish, completeRound, grainField } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E112 N1 real grain reap preserves chosen fields gives one supply grain each and may decline', () => {
+    for (const count of [0, 1, 2]) {
+      const s = setup('E112_GrainThief', 4, state => { grainField(state, 2); grainField(state, 1, 1); })
+      let r = completeRound(s)
+      if (count) {
+        r = source(s, r, 'E112_GrainThief')
+        if (!(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'))
+          r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+        assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 2, col: 4 }] }))
+        r = ok(s.commitSelectionChoice(0, { positions: r.interaction.request.selection!.kind === 'farm-position' ? r.interaction.request.selection.selectablePositions.slice(0, count) : [] }))
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.grain, 2)
+      assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining ?? 0), count === 0 ? [1, 0] : count === 1 ? [2, 0] : [2, 1])
+      save(`E112-N1-${count}`, r)
+    }
+  })
+  it('E112 N2 logical card field also replaces reap while vegetable-only fields cannot trigger', () => {
+    for (const mode of ['card', 'vegetable']) {
+      const s = setup('E112_GrainThief', 4, state => {
+        if (mode === 'card') {
+          state.players[0]!.minorPlayed.push('E070_CropRotationField')
+          state.players[0]!.cardStates.E070_CropRotationField = { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] } }
+        }
+        else
+          state.players[0]!.fields.push({ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] })
+      })
+      let r = completeRound(s)
+      if (mode === 'card') {
+        r = source(s, r, 'E112_GrainThief')
+        if (!(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'))
+          r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+        r = ok(s.commitSelectionChoice(0, { positions: r.interaction.request.selection!.kind === 'farm-position' ? r.interaction.request.selection.selectablePositions.slice(0, 1) : [] }))
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'card' ? 1 : 0)
+      assert.equal(r.state.players[0]!.resources.vegetable, mode === 'card' ? 0 : 1)
+      if (mode === 'card')
+        assert.deepEqual(r.state.players[0]!.cardStates.E070_CropRotationField?.extraData?.cardFieldStacks, [{ crop: 'grain', remaining: 2 }])
+      save(`E112-N2-${mode}`, r)
+    }
+  })
+  it('E112 N3 Scythe full reap overrides same field but different fields allow both sources in either order', () => {
+    for (const first of ['E112_GrainThief', 'E073_Scythe'])
+      for (const same of [true, false]) {
+        const s = setup('E112_GrainThief', 4, state => { state.players[0]!.minorPlayed.push('E073_Scythe'); grainField(state, 3); grainField(state, 2, 1); })
+        let r = completeRound(s)
+        for (const card of [first, first === 'E112_GrainThief' ? 'E073_Scythe' : 'E112_GrainThief']) {
+          r = source(s, r, card)
+          if (card === 'E112_GrainThief') {
+            if (!(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'))
+              r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+            assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+            r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: same ? 0 : 1 }] }))
+          }
+          else
+            r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value) && o.target?.kind === 'logical-field' && o.target.fieldId === 'farmyard:0:0')
+        }
+        r = finish(s, r)
+        assert.equal(r.state.players[0]!.resources.grain, 4)
+        assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining ?? 0), same ? [0, 1] : [0, 2])
+        save(`E112-N3-${first}-${same}`, r)
+      }
+  })
+  it('E112 N4 invalid vegetable target cannot receive grain replacement and legal grain target remains usable', () => {
+    const s = setup('E112_GrainThief', 4, state => { grainField(state, 2); state.players[0]!.fields.push({ row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 2 }] }); })
+    let r = source(s, completeRound(s), 'E112_GrainThief')
+    if (!(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'))
+      r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+    save('E112-N4-invalid', r)
+    r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }] }))
+    r = finish(s, r)
+    assert.equal(r.state.players[0]!.resources.grain, 1)
+    assert.equal(r.state.players[0]!.resources.vegetable, 1)
+    assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining ?? 0), [2, 1])
+    save('E112-N4', r)
   })
 })

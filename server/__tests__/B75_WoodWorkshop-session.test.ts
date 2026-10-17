@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { InteractionState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B075_WoodWorkshop'
 import '../../shared/cards/A/A048_ShavingHorse'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit22Workshop from './_helpers/audit/ae-negative-22-workshop'
 
 const B75 = 'B075_WoodWorkshop'
 const A48 = 'A048_ShavingHorse'
@@ -121,4 +124,13 @@ describe('B075_WoodWorkshop session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.actionSpaces.find((space) => space.id === 'major-improvement')?.takenBy).toHaveLength(0)
   })
+})
+
+describe('ae-negative-22-workshop', () => {
+  const { CARD, sessions, save, ok, ready, finish, menu, buy, TARGET, make, owner, chooseMajor } = audit22Workshop
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B075 N1 actual clay and occupation purchase gives no wood for itself and whole undo restores the payment',()=>{const s=make(),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.wood,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,1);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const retry=buy(s,CARD).r;assert.equal(retry.state.players[0]!.resources.wood,0);save('B075-N1',{pending,r,undone,retry})})
+  it('B075 N2 before reward affords a real one wood minor from zero stock and successful purchase undo removes the reward',()=>{const s=make();buy(s,CARD);const before=owner(s);let r=ok(s.takeAction(0,'major-improvement'));if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'){const o=r.interaction.request.options.find(o=>o.value.startsWith('action-improvement-'));if(o)r=ok(s.resolveChoice(0,o.value))}const pending=r;assert.equal(r.state.players[0]!.resources.wood,1);r=finish(s,ok(s.resolveChoice(0,TARGET)));assert.ok(r.state.players[0]!.minorPlayed.includes(TARGET));assert.equal(r.state.players[0]!.resources.wood,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,before.state.players[0]!.resources.wood);assert.ok(undone.state.players[0]!.minorHand.includes(TARGET));const retry=chooseMajor(s,TARGET);assert.equal(retry.r.state.players[0]!.resources.wood,0);save('B075-N2',{before,pending,r,undone,retry})})
+  it('B075 N3 real major construction and passing minor each grant one before reward while occupation and opponent give none',()=>{const s=make(3);buy(s,CARD);const major=chooseMajor(s,'Major_Fireplace1');assert.equal(major.r.state.players[0]!.resources.clay,0);assert.equal(major.r.state.players[0]!.resources.wood,1);assert.ok(major.r.state.players[0]!.improvements.includes('Major_Fireplace1'));save('B075-N3-major',major);const passing=make();buy(passing,CARD);const a=chooseMajor(passing,'B004_WoodPile');assert.equal(a.r.state.players[0]!.resources.wood,1);assert.ok(a.r.state.players[1]!.minorHand.includes('B004_WoodPile'));save('B075-N3-passing',a);const foreign=make();buy(foreign,CARD);ready(foreign);let pending=ok(foreign.takeAction(1,'major-improvement'));if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice'){const o=pending.interaction.request.options.find(o=>o.value.startsWith('action-improvement-'));if(o)pending=ok(foreign.resolveChoice(1,o.value))}const opponent=finish(foreign,ok(foreign.resolveChoice(1,'Major_Fireplace1')));assert.equal(opponent.state.players[0]!.resources.wood,0);owner(foreign);const lesson=finish(foreign,ok(foreign.takeAction(0,'lessons')));assert.ok(lesson.state.players[0]!.occupationPlayed.includes('A114_SeasonalWorker'));assert.equal(lesson.state.players[0]!.resources.wood,0);save('B075-N3-exclusions',{opponent,lesson})})
+  it('B075 N4 absent clay or occupation refuses the actual initial purchase and creates no workshop wood',()=>{for(const mode of['clay','occupation']){const s=make(mode==='clay'?0:1,mode!=='occupation'),pending=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD));const legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.wood,0);assert.ok(!legal.state.players[0]!.minorPlayed.includes(CARD));save(`B075-N4-${mode}`,{pending,legal})}})
 })

@@ -2,11 +2,14 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { E001_PoleBarns } from '../../shared/cards/E/E001_PoleBarns'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { FenceSegment } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit13Minor from './_helpers/audit/ae-negative-13-minor'
 
 describe('E001_PoleBarns prerequisite', () => {
   it('blocks when player has fewer than 15 fence segments on board', () => {
@@ -185,5 +188,34 @@ describe('E001 Pole Barns parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.stableTiles).toHaveLength(4)
+  })
+})
+
+describe('ae-negative-13-minor', () => {
+  const { POLE, sessions, save, ok, setup, enterMinor, buy, optional, pole } = audit13Minor
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E001 N1 fifteen own fences and two wood allow up to three free stables and passing', () => {
+    const session = setup(POLE, 2, state => pole(state)); let pending = buy(session, POLE)
+    if (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice') pending = optional(session, pending, true)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select')
+    const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }] })); assert.equal(r.state.players[0]!.stableTiles.length, 3); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.fenceSegments.length, 15); assert(r.state.players[1]!.minorHand.includes(POLE)); save('E001-N1', r)
+  })
+  it('E001 N2 fourteen fences opponent fences and insufficient card wood cannot buy', () => {
+    for (const [count, actor, wood] of [[14, 0, 2], [15, 1, 2], [15, 0, 1]]) {
+      const session = setup(POLE, wood!, state => pole(state, count, actor)); const r = enterMinor(session); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction)); assert(!r.interaction.request.options.some(o => o.value === POLE && !o.disabled))
+      assertRejectedUnchanged(session, () => session.resolveChoice(0, POLE)); const legal = ok(session.resolveChoice(0, 'A030_BakingSheet')); assert.equal(legal.state.players[0]!.resources.wood, wood); assert.equal(legal.state.players[0]!.stableTiles.length, 0); save(`E001-N2-${count}-${actor}-${wood}`, legal)
+    }
+  })
+  it('E001 N3 illegal four targets bad tiles and stock overflow reject before remaining legal stable', () => {
+    const session = setup(POLE, 2, state => { pole(state); state.players[0]!.stableTiles = [{ row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 }] }); let pending = buy(session, POLE)
+    if (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice') pending = optional(session, pending, true)
+    for (const stables of [[{ row: 0, col: 1 }, { row: 0, col: 2 }], [{ row: 1, col: 0 }], [{ row: 99, col: 99 }], [{ row: 2, col: 1 }]]) assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables }))
+    const r = ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] })); assert.equal(r.state.players[0]!.stableTiles.length, 4); assert.equal(r.state.players[0]!.resources.wood, 0); save('E001-N3', r)
+  })
+  it('E001 N4 decline and whole undo preserve fences and restore stable cost and passing', () => {
+    const session = setup(POLE, 2, state => pole(state)); const pending = buy(session, POLE)
+    const r = pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice' ? optional(session, pending, false) : ok(session.commitSelectionChoice(0, { cancel: true }))
+    assert.equal(r.state.players[0]!.stableTiles.length, 0); assert.equal(r.state.players[0]!.resources.wood, 0)
+    const undone = ok(session.undoAction()); assert.equal(undone.state.players[0]!.resources.wood, 2); assert.equal(undone.state.players[0]!.fenceSegments.length, 15); assert(undone.state.players[0]!.minorHand.includes(POLE)); assert(!undone.state.players[1]!.minorHand.includes(POLE)); save('E001-N4', { r, undone })
   })
 })

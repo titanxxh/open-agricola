@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Immediate from './_helpers/audit/ae-negative-19-immediate'
+
+describe('ae-negative-19-immediate', () => {
+  const { BOTTLES, sessions, save, ok, setup, turn, menu, buy, score, denied, family } = audit19Immediate
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B036 N1 two through five finite people each pay one clay and one food for four printed points',()=>{for(const n of[2,3,4,5]){const s=setup(BOTTLES,state=>{family(state,n);Object.assign(state.players[0]!.resources,{clay:n,food:n})}),{pending,r}=buy(s,BOTTLES);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(score(r,BOTTLES),4);assert.equal(r.state.players[0]!.workers.filter(w=>w.isActive).length,n);assert.equal(r.state.players[1]!.resources.food,20);save(`B036-N1-${n}`,{pending,r})}})
+  it('B036 N2 one clay or food shortfall rejects before a free legal alternative',()=>{for(const[clay,food]of[[1,2],[2,1]]){const s=setup(BOTTLES,state=>Object.assign(state.players[0]!.resources,{clay,food})),{pending,r}=denied(s,BOTTLES);assert.equal(r.state.players[0]!.resources.clay,clay);assert.equal(r.state.players[0]!.resources.food,food);assert.equal(score(r,BOTTLES),0);save(`B036-N2-${clay}-${food}`,{pending,r})}})
+  it('B036 N3 placed owner people still count but inactive supply and opponents do not',()=>{const s=setup(BOTTLES,state=>{family(state,3);Object.assign(state.players[0]!.resources,{clay:3,food:3});family({...state,players:[state.players[1]!,state.players[0]!]},5)});turn(s,0,'grain-seeds');turn(s,1,'day-laborer');const{pending,r}=buy(s,BOTTLES);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(score(r,BOTTLES),4);save('B036-N3',{pending,r})})
+  it('B036 N4 illegal actor stale purchase and whole undo cannot duplicate cost or four points',()=>{const s=setup(BOTTLES,state=>Object.assign(state.players[0]!.resources,{clay:2,food:2})),pending=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(1,BOTTLES));const r=ok(s.resolveChoice(0,BOTTLES));assertRejectedUnchanged(s,()=>s.resolveChoice(0,BOTTLES));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,2);assert.equal(undone.state.players[0]!.resources.food,2);assert.equal(score(undone,BOTTLES),0);const retry=buy(s,BOTTLES).r;assert.equal(score(retry,BOTTLES),4);assert.equal(retry.state.players[0]!.resources.clay,0);save('B036-N4',{pending,r,undone,retry})})
+})

@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type { PlayerState } from '../../shared/contract/types'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B132_EstateMaster'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Saturation from './_helpers/audit/ae-negative-28-saturation'
 
 const CARD_ID = 'B132_EstateMaster'
 
@@ -302,4 +305,14 @@ describe('B132_EstateMaster session', () => {
     expect(reaped(resp, 'vegetable')).toBe(2)
     expectEstateBonus(resp, 2)
   })
+})
+
+describe('ae-negative-28-saturation', () => {
+  const { CARD, sessions, save, ok, make, finish, build, end, points } = audit28Saturation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B132 N1 actual last plow room stable or paid fence saturates a legal farm before the natural final harvest grants one vegetable bonus point',()=>{for(const kind of['plow','room','stable','fence']as const){const{s,free}=make(kind),before=ok(s.getState()),a=build(s,kind,free),r=end(s,true);assert.equal(before.state.players[0]!.fields.length,12);assert.equal(a.r.state.players[0]!.cardStates[CARD]?.extraData?.saturated,true);assert.equal(points(r),1);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.equal(r.state.players[0]!.workers.length,5);save(`B132-N1-${kind}`,{before,a,r})}})
+  it('B132 N2 a naturally harvested vegetable while one unused space remains grants no card point',()=>{const{s}=make(),r=end(s);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.equal(points(r),0);save('B132-N2',r)})
+  it('B132 N3 a saturated farm harvesting grain and the Estate Master card still in hand never grant a vegetable bonus point',()=>{for(const mode of['grain','hand']){const{s,free}=make('plow',mode!=='hand',mode==='grain'?'grain':'vegetable'),a=build(s,'plow',free),r=end(s,true);assert.equal(points(r),0);assert.equal(r.state.players[0]!.resources[mode==='grain'?'grain':'vegetable'],1);save(`B132-N3-${mode}`,{a,r})}})
+  it('B132 N4 filling only one of two unused spaces keeps the saturation condition false at the actual final harvest',()=>{const{s,free}=make('plow',true,'vegetable',2),a=build(s,'plow',free),r=end(s,true);assert.notEqual(a.r.state.players[0]!.cardStates[CARD]?.extraData?.saturated,true);assert.equal(points(r),0);save('B132-N4',{a,r})})
+  it('B132 N5 wrong actor and illegal last field reject before legal saturation while whole action undo removes its flag and permits one replay',()=>{const{s,free}=make(),before=ok(s.getState()),pending=ok(s.takeAction(0,'farmland')),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{tile:{row:0,col:4}})),wrong=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{tile:free})),r=finish(s,ok(s.commitSelectionChoice(0,{tile:free}))),undone=ok(s.undoAction());assert.equal(r.state.players[0]!.cardStates[CARD]?.extraData?.saturated,true);assert.notEqual(undone.state.players[0]!.cardStates[CARD]?.extraData?.saturated,true);assert.deepEqual(undone.state.players[0]!.fields,before.state.players[0]!.fields);assert.deepEqual(undone.state.players[0]!.workers,before.state.players[0]!.workers);const replay=build(s,'plow',free),final=end(s,true);assert.equal(points(final),1);save('B132-N5',{before,pending,bad,wrong,r,undone,replay,final})})
 })

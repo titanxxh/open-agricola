@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -12,6 +12,7 @@ import {
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/B/B161_Weakling'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B161_Weakling'
 const SWAGMAN_ID = 'A129_Swagman'
@@ -143,4 +144,24 @@ describe('B161_Weakling session', () => {
 
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, take, finish, play, undo, pile, res, weak } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B161 N1 real purchase and avoiding a five-good pile gains one vegetable', () => { const b = make('B161_Weakling', st => weak(st, 0), false), bought = finish(b, play(b, 'B161_Weakling')), u = undo(b); res(bought, { vegetable: 0 }); const s = make('B161_Weakling', st => weak(st, 5)), r = finish(s, take(s, 0, 'day-laborer')); res(r, { vegetable: 1, food: 102 }); save('B161-N1', { bought, u, r }); });
+  it('B161 N2 four five six and collected qualifying piles enforce exact threshold', () => { for (const [n, use] of [[4, false], [5, false], [6, false], [5, true], [6, true]] satisfies Array<[
+      number,
+      boolean
+  ]>) {
+      const s = make('B161_Weakling', st => weak(st, n)), r = finish(s, take(s, 0, use ? 'forest' : 'day-laborer'));
+      res(r, { vegetable: !use && n >= 5 ? 1 : 0 });
+      save(`B161-N2-${n}-${use}`, r);
+  } });
+  it('B161 N3 held card foreign turn and nonaccumulating fixed goods do not pay', () => { for (const mode of ['hand', 'opponent', 'fixed']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('B161_Weakling', st => { weak(st, mode === 'fixed' ? 0 : 5); st.currentPlayerIndex = a; if (mode === 'fixed')
+          pile(st, 'grain-seeds', 'grain', 5); }, mode !== 'hand'), r = finish(s, take(s, a, 'day-laborer'));
+      res(r, { vegetable: 0 });
+      save(`B161-N3-${mode}`, r);
+  } });
 })

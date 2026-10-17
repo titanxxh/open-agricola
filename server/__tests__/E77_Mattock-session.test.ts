@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Resources from './_helpers/audit/ae-negative-42-resources'
 
 const CARD_ID = 'E077_Mattock'
 const sessions: GameSession[] = []
@@ -88,4 +91,12 @@ describe('E077 Mattock resource-market placement', () => {
     expect(cardLogs(response, 'log.cardTriggered')).toEqual([])
     expect(response.scores).toEqual(scoresBefore)
   })
+})
+
+describe('ae-negative-42-resources', () => {
+  const { sessions, ok, save, setup, finish, select, play, next } = audit42Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E077 N1 actual wood paid Mattock then Reed Bank or Western Quarry grants one clay once',()=>{for(const [space,resource]of [['reed-bank','reed'],['western-quarry','stone']]as const){const s=setup('E077_Mattock',st=>{st.players[0]!.resources.wood=1;st.actionSpaces.find(a=>a.id===space)!.resources[resource]=1},false,14),bought=play(s,'E077_Mattock');assert.equal(bought.state.players[0]!.resources.wood,0);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'grain-seeds'))));const r=finish(s,ok(s.takeAction(0,space)),true);save(`E077-N1-early-${resource}`,{bought,r});assert.equal(r.state.players[0]!.resources.clay,1);assert.equal(r.state.players[0]!.resources[resource],1);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.clay,0);save(`E077-N1-${resource}`,{bought,r,u})}})
+  it('E077 N2 wood clay food accumulation held card and foreign reed do not grant owner clay',()=>{for(const mode of ['forest','fishing','hand','other']){const actor=mode==='other'?1:0,s=setup('E077_Mattock',st=>{st.currentPlayerIndex=actor},mode!=='hand'),r=finish(s,ok(s.takeAction(actor,['hand','other'].includes(mode)?'reed-bank':mode)),true,'E077_Mattock');assert.equal(r.state.players[0]!.resources.clay,0);save(`E077-N2-${mode}`,r)}})
+  it('E077 N3 no wood purchase denies Mattock before a legal free alternative',()=>{const s=setup('E077_Mattock',st=>{st.players[0]!.minorHand.push('E080_RockGarden','C071_Slurry')},false,5),p=select(s,ok(s.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'E077_Mattock')),r=finish(s,select(s,p,o=>o.value==='E080_RockGarden'));assert.ok(r.state.players[0]!.minorHand.includes('E077_Mattock'));assert.equal(r.state.players[0]!.resources.clay,0);save('E077-N3',{p,bad,r})})
 })

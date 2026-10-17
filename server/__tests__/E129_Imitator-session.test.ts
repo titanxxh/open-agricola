@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E129_Imitator'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'E129_Imitator'
 const FILLER = '__test_placeholder__'
@@ -181,5 +184,28 @@ describe('E129 Imitator parity', () => {
 
     expect(response.ok).toBe(false)
     expect(response.state).toEqual(before)
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, save, setup, finish, next, take, move } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E129 N1 own real Day Laborer permits occupied early nonaccumulating Vegetable Seeds', () => { const s = setup('E129_Imitator'); move(s, 'day-laborer'); next(s); finish(s, take(s, 'vegetable-seeds')); next(s); finish(s, take(s, 'forest')); next(s); const r = finish(s, take(s, 'vegetable-seeds')); assert.equal(r.state.players[0]!.resources.vegetable, 1); assert.equal(r.state.players[0]!.resources.food, 22); assert.equal(r.state.actionSpaces.find(a => a.id === 'vegetable-seeds')!.takenBy.length, 2); save('E129-N1', r); })
+  it('E129 N2 missing Day Laborer accumulating space and late nonaccumulating space are excluded', () => {
+    for (const mode of ['missing', 'accumulating', 'late']) {
+      const s = setup('E129_Imitator')
+      move(s, mode === 'missing' ? 'grain-seeds' : 'day-laborer')
+      next(s)
+      const target = mode === 'accumulating' ? 'forest' : mode === 'late' ? 'cultivation' : 'vegetable-seeds'
+      finish(s, take(s, target))
+      next(s)
+      finish(s, take(s, 'clay-pit'))
+      next(s)
+      assertRejectedUnchanged(s, () => s.takeAction(0, target))
+      const r = finish(s, take(s, 'reed-bank'))
+      assert.equal(r.state.players[0]!.resources.vegetable, 0)
+      assert.equal(r.state.players[0]!.fields.length, 0)
+      save(`E129-N2-${mode}`, r)
+    }
   })
 })

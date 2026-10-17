@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B156_StorehouseKeeper'
 import type { ActionChoiceOption } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B156_StorehouseKeeper'
 
@@ -66,4 +68,16 @@ describe('B156_StorehouseKeeper session', () => {
     expect(after.resources.clay).toBe(clayBefore)
     expect(after.resources.grain).toBe(grainBefore)
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, take, finish, play, undo, res } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B156 N1 real purchase and Resource Market choose exactly one clay', () => { const b = make('B156_StorehouseKeeper', undefined, false), bought = finish(b, play(b, 'B156_StorehouseKeeper')), u = undo(b), s = make('B156_StorehouseKeeper'), r = finish(s, take(s, 0, 'resource-market-4'), true, ['"clay"']); res(r, { reed: 1, stone: 1, food: 101, clay: 1, grain: 0 }); save('B156-N1', { bought, u, r }); });
+  it('B156 N2 grain alternative rejects an invented option before a legal choice', () => { const s = make('B156_StorehouseKeeper'), p = take(s, 0, 'resource-market-4'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'invented-b156')), r = finish(s, p, true, ['"grain"']); res(r, { grain: 1, clay: 0, reed: 1, stone: 1, food: 101 }); save('B156-N2', { p, bad, r }); });
+  it('B156 N3 hand opponent and unrelated work have no Storehouse choice', () => { for (const mode of ['hand', 'opponent', 'unrelated']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('B156_StorehouseKeeper', st => { st.currentPlayerIndex = a; }, mode !== 'hand'), p = take(s, a, mode === 'unrelated' ? 'grain-seeds' : 'resource-market-4'), r = finish(s, p, true, [], 'B156_StorehouseKeeper');
+      res(r, { grain: mode === 'unrelated' ? 1 : 0, clay: 0 });
+      save(`B156-N3-${mode}`, { p, r });
+  } });
 })

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit22Exchange from './_helpers/audit/ae-negative-22-exchange'
+
+describe('ae-negative-22-exchange', () => {
+  const { CARD, sessions, save, ok, setup, finish, menu, buy, loaded, pending, trade } = audit22Exchange
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B080 N1 actual one clay purchase grants no stone and whole undo restores clay card before one replay',()=>{const s=setup(CARD,5,state=>state.players[0]!.resources.clay=1),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.stone,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,1);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const retry=buy(s,CARD).r;assert.equal(retry.state.players[0]!.resources.clay,0);save('B080-N1',{pending,r,undone,retry})})
+  it('B080 N2 public anytime two three four clay trades yield exactly one two three stone and no opponent resource',()=>{for(const clay of[2,3,4]){const s=loaded(clay),a=trade(s,clay);assert.equal(a.r.state.players[0]!.resources.clay,0);assert.equal(a.r.state.players[0]!.resources.stone,clay-1);assert.equal(a.r.state.players[1]!.resources.stone,0);save(`B080-N2-${clay}`,a)}})
+  it('B080 N3 affordable repeated exchanges consume each batch once and do not duplicate resources',()=>{const s=loaded(10),a=trade(s,2,3),b=trade(s,4);assert.equal(a.r.state.players[0]!.resources.clay,4);assert.equal(a.r.state.players[0]!.resources.stone,3);assert.equal(b.r.state.players[0]!.resources.clay,0);assert.equal(b.r.state.players[0]!.resources.stone,6);save('B080-N3',{a,b})})
+  it('B080 N4 no clay or card in hand cannot expose its exchange and missing purchase clay rejects',()=>{for(const mode of['poor','hand']){const s=loaded(mode==='poor'?1:4,mode!=='hand'),r=s.getState();assert.ok(!r.interaction.anytimeActions.some(a=>a.id==='exchange'));save(`B080-N4-${mode}`,{r})}const s=setup(CARD),p=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD));const r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(r.state.players[0]!.resources.stone,0);save('B080-N4-purchase',{p,r})})
+  it('B080 N5 negative quantity invalid exchange and wrong actor reject before a legal one batch exchange',()=>{const s=loaded(2),p=pending(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'bulk:9999=1'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'bulk:0=-1'));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'bulk:0=1'));const r=ok(s.resolveChoice(0,'cancel'));const legal=trade(s,2);assert.equal(legal.r.state.players[0]!.resources.stone,1);assert.equal(legal.r.state.players[0]!.resources.clay,0);save('B080-N5',{p,r,legal})})
+})

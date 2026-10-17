@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { A016_RammedClay } from '../../shared/cards/A/A016_RammedClay'
+import '../../shared/cards/A/A017_ReclamationPlow'
+import '../../shared/cards/A/A019_Handplow'
+import '../../shared/cards/A/A009_YoungAnimalMarket'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit05Fields from './_helpers/audit/ae-negative-05-fields'
 
 const CARD_ID = 'A016_RammedClay'
 const FILLER = '__test_placeholder__'
@@ -99,5 +105,68 @@ describe('A016 Rammed Clay parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+  })
+})
+
+describe('ae-negative-05-fields', () => {
+  const { RAMMED, ONE, sessions, setup, ok, choices, enter, buy, fence } = audit05Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A016 N1 actual free purchase gains exactly one clay once with reversible ownership', () => {
+    const s = setup(RAMMED, { played: false })
+    const before = undoRuleSnapshot(s.getState())
+    const offer = enter(s)
+    assert.equal(offer.state.players[0]!.resources.clay, 0)
+    const r = buy(s, offer, RAMMED)
+    assert.equal(r.state.players[0]!.resources.clay, 1)
+    assert.equal(r.state.players[0]!.minorPlayed.includes(RAMMED), true)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, RAMMED))
+    assertUndoRestored(before, s.undoAction())
+    assert.equal(buy(s, enter(s), RAMMED).state.players[0]!.resources.clay, 1)
+  })
+  it('A016 N2 pure clay mixed and original wood each pay exactly four units for four fences', () => {
+    for (const [wood, clay] of [[0,4],[2,2],[4,0]]) {
+      const s = setup(RAMMED, { resources: { wood, clay } })
+      const r = fence(s, wood, clay)
+      assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.clay], [0,0])
+    }
+  })
+  it('A016 N3 three total building units cannot forge four fences before a legal action retry', () => {
+    const s = setup(RAMMED, { resources: { wood: 1, clay: 2 } })
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'fencing'))
+    const r = ok(s.takeAction(0, 'grain-seeds'))
+    assert.deepEqual([r.state.players[0]!.fenceSegments.length,r.state.players[0]!.resources.wood,r.state.players[0]!.resources.clay,r.state.players[0]!.resources.grain], [0,1,2,1])
+  })
+  it('A016 N4 invalid fence geometry rejects before clay payment and a legal enclosed retry', () => {
+    const s = setup(RAMMED, { resources: { clay: 4 } })
+    const r = ok(s.takeAction(0, 'fencing'))
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ONE.slice(0,3), palisadeEdges: [], extraWood: 0 }))
+    const built = ok(s.commitSelectionChoice(0, { edges: ONE, palisadeEdges: [], extraWood: 0 }))
+    assert.equal(built.state.players[0]!.fenceSegments.length, 4)
+    assert.equal(built.state.players[0]!.resources.clay, 0)
+  })
+  it('A016 N5 opponents card and non fencing costs cannot consume clay as wood', () => {
+    const foreign = setup(RAMMED, { resources: { clay: 4 }, configure(state) { state.players[0]!.minorPlayed=[]; state.players[1]!.minorPlayed=[RAMMED] } })
+    assertRejectedUnchanged(foreign, () => foreign.takeAction(0, 'fencing'))
+    assert.equal(ok(foreign.takeAction(0, 'grain-seeds')).state.players[0]!.resources.clay, 4)
+    const s = setup(RAMMED, { resources: { clay: 4, stone: 1 }, configure(state) { state.players[0]!.minorHand.push('E047_SyrupTap') } })
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'farm-expansion'))
+    const r = enter(s)
+    assert.equal(choices(r).some(o => o.value === 'E047_SyrupTap' && !('disabled' in o && o.disabled)), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E047_SyrupTap'))
+    const retry = buy(s, r, 'A054_Credit')
+    assert.deepEqual([retry.state.players[0]!.resources.clay,retry.state.players[0]!.resources.stone], [4,1])
+  })
+  it('A016 N6 undo restores clay wood finite fences and worker before legal fencing retry', () => {
+    const s = setup(RAMMED, { resources: { wood: 2, clay: 2 } })
+    const before = undoRuleSnapshot(s.getState())
+    fence(s, 2, 2)
+    assertUndoRestored(before, s.undoAction())
+    assert.deepEqual([fence(s,2,2).state.players[0]!.fenceSegments.length,s.getState().state.players[0]!.resources.clay], [4,0])
+  })
+  it('A016 N7 multiple legal payment choices reject forged underpayment before exact mixed retry', () => {
+    const s=setup(RAMMED,{resources:{wood:4,clay:4}})
+    const r=fence(s,2,2)
+    assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.clay],[2,2])
   })
 })

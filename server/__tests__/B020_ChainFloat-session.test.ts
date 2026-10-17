@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Future from './_helpers/audit/ae-negative-19-future'
+
+describe('ae-negative-19-future', () => {
+  const { CARD, sessions, save, ok, setup, menu, buy, schedule, reach } = audit19Future
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B020 N1 actual three wood purchase queues exactly valid future rounds without clamping to fourteen',()=>{for(const round of[5,6,7,8,14]){const s=setup(round),{pending,r}=buy(s);assert.deepEqual(schedule(r),[7,8,9].map(offset=>round+offset).filter(n=>n<=14).map(round=>({round,resources:{field:1}})));assert.equal(r.state.players[0]!.fields.length,0);assert.equal(r.state.players[1]!.fields.length,0);save(`B020-N1-${round}`,{pending,r})}})
+  it('B020 N2 natural round twelve and thirteen each grant one free plow only to owner',()=>{const s=setup();buy(s);const eleven=JSON.parse(JSON.stringify(reach(s,11))),twelve=JSON.parse(JSON.stringify(reach(s,12))),thirteen=reach(s,13);assert.equal(eleven.state.players[0].fields.length,0);assert.equal(twelve.state.players[0].fields.length,1);assert.equal(thirteen.state.players[0]!.fields.length,2);assert.equal(thirteen.state.players[1]!.fields.length,0);assert.deepEqual(schedule(thirteen),[{round:14,resources:{field:1}}]);save('B020-N2',{eleven,twelve,thirteen})})
+  it('B020 N3 decline due field consumes token and full legal farm never gains overlapping field',()=>{const s=setup();buy(s);const twelve=reach(s,12,false);assert.equal(twelve.state.players[0]!.fields.length,0);assert.deepEqual(schedule(twelve).map(e=>e.round),[13,14]);const full=setup(7,3,state=>{const p=state.players[0]!;p.fields=Array.from({length:3},(_,row)=>Array.from({length:5},(_,col)=>({row,col,stacks:[]}))).flat().filter(t=>!p.roomTiles.some(r=>r.row===t.row&&r.col===t.col))});buy(full);const r=reach(full,14);assert.equal(r.state.players[0]!.fields.length,13);assert.equal(schedule(r).length,0);save('B020-N3',{twelve,r})})
+  it('B020 N4 insufficient wood and purchase undo leave no future field and retry queues exactly once',()=>{const poor=setup(5,2),pending=menu(poor);assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,CARD));const legal=ok(poor.resolveChoice(0,'A030_BakingSheet'));assert.equal(legal.state.players[0]!.resources.wood,2);assert.equal(schedule(legal).length,0);const s=setup(),r=buy(s).r,undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,3);assert.equal(schedule(undone).length,0);const retry=buy(s).r;assert.equal(schedule(retry).length,3);save('B020-N4',{pending,legal,r,undone,retry})})
+})

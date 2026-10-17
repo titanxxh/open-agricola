@@ -1,11 +1,13 @@
 import { type SessionResponse } from '../game/authoritative-session'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D166_StableMilker'
+import assert from 'node:assert/strict'
+import * as audit57Livestock from './_helpers/audit/ae-negative-57-livestock'
 
 describe('D166_StableMilker session', () => {
   const setup = () => {
@@ -151,5 +153,36 @@ describe('D166 Stable Milker parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.stableTiles).toHaveLength(3)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, cattle: 1 })
+  })
+})
+
+describe('ae-negative-57-livestock', () => {
+  const { sessions, ok, save, make, finish, choose, count } = audit57Livestock
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D166 N1 paid one two or three stables on one turn award zero one or one cattle and never one per stable', () => {
+    for (const number of [1, 2, 3]) {
+      const session = make('D166_StableMilker', state => { state.players[0]!.resources.wood = number * 2 }, true, 14)
+      let pending = ok(session.takeAction(0, 'farm-expansion'))
+      if (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice') pending = choose(session, pending, option => option.labelKey === 'actions.stables.name')
+      const response = finish(session, ok(session.commitSelectionChoice(0, { stables: [1, 2, 3].slice(0, number).map(col => ({ row: 0, col })) })))
+      assert.deepEqual(count(response), [0, 0, number >= 2 ? 1 : 0]); assert.equal(response.state.players[0]!.resources.wood, 0); assert.equal(response.state.players[0]!.stableTiles.length, number)
+      save(`D166-N1-${number}`, { pending, response })
+    }
+  })
+  it('D166 N2 earlier stables and card in hand do not reward a single new stable while whole batch undo removes cattle', () => {
+    for (const played of [true, false]) {
+      const session = make('D166_StableMilker', state => { state.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }]; state.players[0]!.resources.wood = 2 }, played, 14)
+      let pending = ok(session.takeAction(0, 'farm-expansion'))
+      if (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice') pending = choose(session, pending, option => option.labelKey === 'actions.stables.name')
+      const response = finish(session, ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })))
+      assert.deepEqual(count(response), [0, 0, 0]); assert.equal(response.state.players[0]!.stableTiles.length, 3)
+      save(`D166-N2-${played}`, response)
+    }
+    const session = make('D166_StableMilker', state => { state.players[0]!.resources.wood = 4 }, true, 14)
+    let pending = ok(session.takeAction(0, 'farm-expansion'))
+    if (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice') pending = choose(session, pending, option => option.labelKey === 'actions.stables.name')
+    const response = finish(session, ok(session.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }, { row: 0, col: 2 }] }))), undone = ok(session.undoAction())
+    assert.deepEqual(count(response), [0, 0, 1]); assert.deepEqual(count(undone), [0, 0, 0]); assert.equal(undone.state.players[0]!.resources.wood, 4); assert.equal(undone.state.players[0]!.stableTiles.length, 0)
+    save('D166-N2-undo', { response, undone })
   })
 })

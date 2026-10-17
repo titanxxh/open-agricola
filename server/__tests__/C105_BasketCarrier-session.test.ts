@@ -1,6 +1,6 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/domain/player'
@@ -8,6 +8,9 @@ import { C105_BasketCarrier } from '../../shared/cards/C/C105_BasketCarrier'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'C105_BasketCarrier'
 const HOME_BREWER = 'C110_HomeBrewer'
@@ -380,4 +383,12 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
       begging: 0,
     })
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, feedMenu, harvestTrade, workTrade } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C105 N1 real harvest buys one wood reed grain for exactly two food and a duplicate purchase rejects before legal retry', () => { const s = make('C105_BasketCarrier', undefined, true, 4), p = feedMenu(s), rejected = assertRejectedUnchanged(s, () => harvestTrade(s, 'C105_BasketCarrier', 2)), r = finish(s, harvestTrade(s, 'C105_BasketCarrier', 1), false); assert.equal(r.state.players[0]!.resources.food, 94); assert.equal(r.state.players[0]!.resources.wood, 1); assert.equal(r.state.players[0]!.resources.reed, 1); assert.equal(r.state.players[0]!.resources.grain, 1); save('C105-N1', { p, rejected, r }) })
+  it('C105 N2 harvest decline and insufficient food cannot buy goods while work phase has no eligible trade', () => { const s = make('C105_BasketCarrier', undefined, true, 4), p = feedMenu(s), r = finish(s, ok(s.resolveChoice(0, 'confirm', { selections: [] })), false); assert.equal(r.state.players[0]!.resources.food, 96); assert.equal(r.state.players[0]!.resources.wood, 0); const c = make('C105_BasketCarrier', st => { st.players[0]!.resources.food = 1 }, true, 4), cp = feedMenu(c), rejected = assertRejectedUnchanged(c, () => harvestTrade(c, 'C105_BasketCarrier', 1)), cr = finish(c, ok(c.resolveChoice(0, 'confirm', { selections: [] })), false); assert.equal(cr.state.players[0]!.resources.wood, 0); assert.equal(cr.state.players[0]!.resources.food, 0); const w = make('C105_BasketCarrier'), wr = finish(w, ok(w.takeAction(0, 'grain-seeds')), false); assert.equal(wr.state.players[0]!.resources.wood, 0); assert.equal(wr.state.players[0]!.resources.food, 100); save('C105-N2', { p, r, cp, rejected, cr, wr }) })
+  it('C105 N3 actual work exchange excludes Basket Carrier while legal Fireplace vegetable conversion remains available', () => { const s = make('C105_BasketCarrier', st => { st.players[0]!.resources.vegetable = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }), a = workTrade(s, 'C105_BasketCarrier', 'vegetable'); assert.equal(a.r.state.players[0]!.resources.wood, 0); assert.equal(a.r.state.players[0]!.resources.reed, 0); save('C105-N3', a) })
 })

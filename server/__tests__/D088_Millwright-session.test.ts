@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D088_Millwright'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 const CARD_ID = 'D088_Millwright'
 const ONE_CELL_FENCES = ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2']
@@ -234,4 +237,12 @@ describe('D088 Millwright session', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, grain: 3 })
     expect(response.state.actionSpaces.find((space) => space.id === 'fencing')?.takenBy).toEqual([])
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, ONE, fence, build } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D088 N1 actual Lessons grants exactly one grain without building', () => { const s = make('D088_Millwright', undefined, false), r = finish(s, lesson(s, 'D088_Millwright'), false); assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.rooms, 2); save('D088-N1', r) })
+  it('D088 N2 two grain replace exactly two wood for four fences and a third cannot replace three missing wood', () => { const s = make('D088_Millwright', st => Object.assign(st.players[0]!.resources, { wood: 2, grain: 2 })), r = fence(s, ONE, false); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.fenceSegments.length, 4); const c = make('D088_Millwright', st => Object.assign(st.players[0]!.resources, { wood: 1, grain: 3 })), rejected = assertRejectedUnchanged(c, () => c.takeAction(0, 'fencing')); const retry = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); assert.equal(retry.state.players[0]!.resources.grain, 4); save('D088-N2', { r, rejected, retry }) })
+  it('D088 N3 room stable and renovation each exchange one grain for one building resource', () => { const a = make('D088_Millwright', st => Object.assign(st.players[0]!.resources, { wood: 4, reed: 2, grain: 1 })), room = build(a, 'room'); assert.equal(room.state.players[0]!.rooms, 3); assert.equal(room.state.players[0]!.resources.grain, 0); const b = make('D088_Millwright', st => Object.assign(st.players[0]!.resources, { wood: 1, grain: 1 })), stable = build(b, 'stable'); assert.equal(stable.state.players[0]!.stableTiles.length, 1); assert.equal(stable.state.players[0]!.resources.grain, 0); const c = make('D088_Millwright', st => Object.assign(st.players[0]!.resources, { clay: 1, reed: 1, grain: 1 })), renovation = finish(c, ok(c.takeAction(0, 'house-redevelopment')), false); assert.equal(renovation.state.players[0]!.houseType, 'clay'); assert.equal(renovation.state.players[0]!.resources.grain, 0); save('D088-N3', { room, stable, renovation }) })
 })

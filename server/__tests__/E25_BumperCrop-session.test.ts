@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/E/E025_BumperCrop'
 import '../../shared/cards/B/B113_PatchCaregiver'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Crops from './_helpers/audit/ae-negative-32-crops'
 
 const CARD_ID = 'E025_BumperCrop'
 
@@ -117,4 +120,12 @@ describe('E025 Bumper Crop parity', () => {
     expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
   })
+})
+
+describe('ae-negative-32-crops', () => {
+  const { sessions, save, ok, finish, action, buy, bumper } = audit32Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E025 N1 actual two grain field purchase reaps one owner crop per field and leaves the opponent field untouched', () => { const s = bumper(), r = finish(s, buy(s, 'E025_BumperCrop')); assert.equal(r.state.players[0]!.resources.grain, 2); assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 2 }], []]); assert.deepEqual(r.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 2 }]); assert.equal(r.state.players[1]!.resources.grain, 0); save('E025-N1', r); });
+  it('E025 N2 a private field phase neither feeds nor breeds nor increments the ordinary completed harvest count', () => { const s = bumper(), before = ok(s.getState()), r = finish(s, buy(s, 'E025_BumperCrop')); assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.sheep, r.state.completedFeedingPhases], [100, 2, before.state.completedFeedingPhases]); assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 2); assert.equal(r.state.round, 14); assert.equal(r.state.roundPhase, 'work'); save('E025-N2', { before, r }); });
+  it('E025 N3 one grain plus a vegetable field fails the prerequisite and a held card does not reap during an ordinary action', () => { const s = bumper(false, 1), poor = buy(s, 'E025_BumperCrop'); assert.ok(poor.state.players[0]!.minorHand.includes('E025_BumperCrop')); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E025_BumperCrop')); const t = bumper(), r = action(t, 0, 'reed-bank'); assert.equal(r.state.players[0]!.resources.grain, 0); assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 3 }], [{ kind: 'grain', remaining: 1 }]]); save('E025-N3', { poor, r }); });
 })

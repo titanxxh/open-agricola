@@ -1,4 +1,4 @@
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it, onTestFinished, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { Resource } from '../../shared/contract/types'
 import { getStoredResource, setStoredResource } from '../../shared/cards/helpers/card-storage'
@@ -10,6 +10,9 @@ import { playMinor } from './_helpers/batch07-card-play'
 import { resourceOptions } from './_helpers/batch07-resource-ownership'
 
 import '../../shared/cards/E/E052_Cubbyhole'
+import assert from 'node:assert/strict'
+import { assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'E052_Cubbyhole'
 
@@ -134,4 +137,50 @@ describe('E052 Cubbyhole through Session', () => {
     expect(second.state.players[0]!.resources.food).toBe(3)
     expect(getStoredResource(second.state.players[0]!, 'E052_Cubbyhole', 'food')).toBe(3)
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, actor, save, setup, finish, next, completeRound, move, hand, buy, printed, enterMinor, completeRemaining, buildRooms } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E052 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => {
+      const card = 'E052_Cubbyhole';
+      const reeds: number[] = [];
+      for (const material of ['wood', 'clay'] as const) {
+          const s = setup(card, 14, st => { hand(st, card); st.players[0]!.resources[material] = 1; st.players[0]!.resources.reed = 1; });
+          const r = buy(s, card);
+          assert.ok(r.state.players[0]!.minorPlayed.includes(card));
+          assert.equal(printed(r, card), 1);
+          assert.equal(r.state.players[0]!.resources[material], 0);
+          reeds.push(r.state.players[0]!.resources.reed);
+          save(`E052-N1-${material}`, r);
+      }
+      assertRuleOutcome(reeds, [0, 0]);
+  });
+  it('E052 N4 printed reed shortage must refuse either alternate purchase material', () => {
+      const card = 'E052_Cubbyhole', outcomes: unknown[] = [];
+      for (const material of ['wood', 'clay'] as const) {
+          const s = setup(card, 14, st => { hand(st, card); st.players[0]!.resources[material] = 1; });
+          const pending = enterMinor(s);
+          const r = pending.state.players[0]!.minorPlayed.includes(card) ? pending : s.resolveChoice(actor(pending), card);
+          outcomes.push({ ok: r.ok, played: r.state.players[0]!.minorPlayed.includes(card), material: r.state.players[0]!.resources[material], reed: r.state.players[0]!.resources.reed });
+          save(`E052-N4-${material}`, r);
+      }
+      assertRuleOutcome(outcomes, [{ ok: false, played: false, material: 1, reed: 0 }, { ok: false, played: false, material: 1, reed: 0 }]);
+  });
+  it('E052 N2 real new rooms store two food which is copied at two natural feedings and retained on the card', () => { const card = 'E052_Cubbyhole', s = setup(card, 6, st => { hand(st, card); Object.assign(st.players[0]!.resources, { wood: 11, reed: 5, food: 4 }); }); finish(s, buy(s, card)); move(s, 'grain-seeds'); next(s); let r = finish(s, buildRooms(s, 2)); assert.equal(getStoredResource(r.state.players[0]!, card, 'food'), 2); assert.equal(r.state.players[0]!.resources.food, 4); r = finish(s, completeRemaining(s)); assert.equal(r.state.round, 7); r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']), true); assert.equal(r.state.round, 8); assert.equal(r.state.players[0]!.resources.food, 2); assert.equal(getStoredResource(r.state.players[0]!, card, 'food'), 2); save('E052-N2-first', r); r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']), true); assert.equal(r.state.round, 9); assert.equal(r.state.players[0]!.resources.food, 2); r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']), true); assert.equal(r.state.round, 10); assert.equal(r.state.players[0]!.resources.food, 0); assert.equal(r.state.players[0]!.resources.begging, 0); assert.equal(getStoredResource(r.state.players[0]!, card, 'food'), 2); save('E052-N2-second', r); });
+  it('E052 N3 hand only and opponent rooms cannot create owner card stock or feeding food', () => {
+      for (const mode of ['hand', 'opponent']) {
+          const card = 'E052_Cubbyhole', s = setup(card, 14, st => {
+              if (mode === 'hand')
+                  hand(st, card);
+              else
+                  st.currentPlayerIndex = 1;
+              Object.assign(st.players[mode === 'opponent' ? 1 : 0]!.resources, { wood: 5, reed: 2 });
+          });
+          const r = finish(s, buildRooms(s), true);
+          assert.equal(getStoredResource(r.state.players[0]!, card, 'food'), 0);
+          assert.equal(r.state.players[0]!.resources.food, 40);
+          save(`E052-N3-${mode}`, r);
+      }
+  });
 })

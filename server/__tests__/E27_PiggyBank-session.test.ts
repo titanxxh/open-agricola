@@ -1,6 +1,6 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
@@ -9,6 +9,9 @@ import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared
 
 import '../../shared/cards/E/E027_PiggyBank'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'E027_PiggyBank'
 
@@ -209,4 +212,33 @@ describe('E027_PiggyBank session', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener!, context))
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, ok, save, make, take, finish, end, purchase, resource, occupied, major, stored } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("E027 N1 real free purchase permits exactly one irreversible food deposit only at work-phase end", () => { const s = make('E027_PiggyBank', undefined, false), bought = purchase(s, 'E027_PiggyBank'); assert.equal(stored(bought), 0); const r = end(s, true); resource(r, { food: 99 }); assert.equal(stored(r), 1); save('E027-N1', { bought, r }); });
+  it("E027 N2 five six and seven legally reachable stored food enforce six-food free-major payment without removing a person", () => { for (const n of [5, 6, 7]) {
+      const s = make('E027_PiggyBank', st => { st.players[0]!.cardStates.E027_PiggyBank = { counters: { food: n } }; st.players[0]!.resources.food = 10; }, true, n === 7 ? 8 : 7), p = take(s, 0, 'farmland');
+      assert.equal(p.interaction.anytimeActions.some(a => a.id === 'E27-piggy-bank-anytime'), n >= 6);
+      if (n < 6) {
+          const bad = assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'E27-piggy-bank-anytime'));
+          save(`E027-N2-${n}`, { p, bad });
+          continue;
+      }
+      const offered = ok(s.takeAnytimeAction(0, 'E27-piggy-bank-anytime')), r = finish(s, offered, true, ['Major_Joinery']);
+      resource(r, { wood: 0, stone: 0, food: 10 });
+      assert.equal(stored(r), n - 6);
+      assert.ok(r.state.players[0]!.improvements.includes('Major_Joinery'));
+      assert.equal(occupied(r).length, 1);
+      assert.equal(r.interaction.anytimeActions.some(a => a.id === 'E27-piggy-bank-anytime'), false);
+      save(`E027-N2-${n}`, { p, offered, r });
+  } });
+  it("E027 N3 decline empty personal food held card and ordinary major purchase cannot store or leak a free discount", () => { for (const mode of ['decline', 'food', 'hand']) {
+      const s = make('E027_PiggyBank', st => { if (mode === 'food')
+          st.players[0]!.resources.food = 0; }, mode !== 'hand', 5), r = end(s, mode !== 'decline', [], mode === 'decline' ? undefined : 'E027_PiggyBank');
+      resource(r, { food: mode === 'food' ? 0 : 100 });
+      assert.equal(stored(r), 0);
+      save(`E027-N3-${mode}`, r);
+  } const s = make('E027_PiggyBank', st => { st.players[0]!.resources.clay = 2; }), r = finish(s, major(s, 'Major_Fireplace1')); resource(r, { clay: 0 }); assert.equal(stored(r), 0); save('E027-N3-major', r); });
 })

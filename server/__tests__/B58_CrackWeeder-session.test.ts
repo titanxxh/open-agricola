@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
@@ -7,6 +7,10 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import '../../shared/cards/B/B058_CrackWeeder'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import type { GameState } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit21Harvest from './_helpers/audit/ae-negative-21-harvest'
 
 const CARD_ID = 'B058_CrackWeeder'
 
@@ -120,4 +124,12 @@ describe('B058_CrackWeeder session', () => {
     const p = resp.state.players[0]!
     expect(p.resources.food).toBe(10 + 1 - 2)
   })
+})
+
+describe('ae-negative-21-harvest', () => {
+  const { WEED, sessions, save, ok, setup, menu, buy, end, fields } = audit21Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B058 N1 actual one wood purchase immediately gives one food and missing cost rejects before undo replay',()=>{const s=setup(WEED,state=>state.players[0]!.resources.wood=1),{pending,r}=buy(s,WEED);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,101);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.minorHand.includes(WEED));const retry=buy(s,WEED).r;assert.equal(retry.state.players[0]!.resources.food,101);const poor=setup(WEED),denied=menu(poor);assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,WEED));const legal=ok(poor.resolveChoice(0,'B004_WoodPile'));assert.equal(legal.state.players[0]!.resources.food,100);save('B058-N1',{pending,r,undone,retry,denied,legal})})
+  it('B058 N2 natural harvest vegetable collection rewards zero through three food and excludes grain or empty field',()=>{for(const n of[0,1,2,3]){const configure=(state:GameState)=>fields(state,[...Array.from({length:n},()=>'vegetable' as const),'grain',null]),on=end(setup(WEED,configure,true)),off=end(setup(WEED,configure,false));assert.equal(on.r.state.players[0]!.resources.food-off.r.state.players[0]!.resources.food,n);assert.equal(on.r.state.players[0]!.resources.vegetable,n);assert.equal(on.r.state.players[0]!.resources.grain,2);assert.equal(on.r.state.players[1]!.resources.food,off.r.state.players[1]!.resources.food);assert.equal(on.r.state.round,5);save(`B058-N2-${n}`,{on,off})}})
+  it('B058 N3 nonharvest hand and opponent vegetables never grant Crack Weeder income',()=>{const configure=(state:GameState)=>fields(state,['vegetable','vegetable']),on=end(setup(WEED,configure,true,3)),off=end(setup(WEED,configure,false,3));assert.equal(on.r.state.players[0]!.resources.food,off.r.state.players[0]!.resources.food);const other=(state:GameState)=>fields(state,['vegetable','vegetable'],1),a=end(setup(WEED,other,true)),b=end(setup(WEED,other,false));assert.equal(a.r.state.players[0]!.resources.food,b.r.state.players[0]!.resources.food);assert.equal(a.r.state.players[1]!.resources.vegetable,2);save('B058-N3',{on,off,a,b})})
 })

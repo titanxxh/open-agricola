@@ -18,6 +18,8 @@ import '../../shared/cards/E/E118_KindlingGatherer'
 import '../../shared/cards/C/C042_RavenousHunger'
 import '../../shared/cards/C/C039_StudioBoat'
 import '../../shared/cards/D/D051_Archway'
+import assert from 'node:assert/strict'
+import * as audit49Cards from './_helpers/audit/ae-negative-49-cards'
 
 const CARD_ID = 'E118_KindlingGatherer'
 const LISTENER_ID = 'E118-kindling-gatherer-after-action-space-food'
@@ -293,4 +295,12 @@ describe('E118_KindlingGatherer action-space provenance', () => {
       [currentWood],
     )).toBeUndefined()
   })
+})
+
+describe('ae-negative-49-cards', () => {
+  const { KINDLING, sessions, save, ok, make, ready, lesson } = audit49Cards
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E118 N1 actual purchase has no immediate wood and real Day Laborer or Fishing food gives only one extra wood per use',()=>{const bought=lesson(make(KINDLING,false),KINDLING);assert.equal(bought.state.players[0]!.resources.wood,0);for(const[space,food]of[['day-laborer',2],['fishing',1],['fishing',3]] as const){const s=make(KINDLING,true,state=>state.actionSpaces.find(a=>a.id==='fishing')!.resources.food=food),r=ok(s.takeAction(0,space));assert.equal(r.state.players[0]!.resources.food,30+food);assert.equal(r.state.players[0]!.resources.wood,1);save(`E118-N1-${space}-${food}`,{bought,r})}})
+  it('E118 N2 clay grains card sourced food and an actual opponent food space do not grant owner wood',()=>{const s=make(KINDLING),clay=ok(s.takeAction(0,'clay-pit'));assert.equal(clay.state.players[0]!.resources.wood,0);const t=make(KINDLING,true,state=>state.players[0]!.occupationHand=['E116_FirCutter','A110_Roughcaster']),cardFood=lesson(t,'E116_FirCutter');assert.equal(cardFood.state.players[0]!.resources.food,30);assert.equal(cardFood.state.players[0]!.resources.wood,0);const q=make(KINDLING);ok(q.takeAction(0,'grain-seeds'));ready(q);const opponent=ok(q.takeAction(1,'day-laborer'));assert.equal(opponent.state.players[0]!.resources.wood,0);const v=make(KINDLING,false),hand=ok(v.takeAction(0,'day-laborer'));assert.equal(hand.state.players[0]!.resources.wood,0);save('E118-N2',{clay,cardFood,opponent,hand})})
+  it('E118 N3 whole food space undo restores both food and extra wood before one legal replay',()=>{const s=make(KINDLING),a=ok(s.takeAction(0,'day-laborer')),u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.food,30);assert.equal(u.state.players[0]!.resources.wood,0);const r=ok(s.takeAction(0,'day-laborer'));assert.equal(r.state.players[0]!.resources.food,32);assert.equal(r.state.players[0]!.resources.wood,1);save('E118-N3',{a,u,r})})
 })

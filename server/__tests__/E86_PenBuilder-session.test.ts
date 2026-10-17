@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -9,6 +9,9 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import '../../shared/cards/E/E086_PenBuilder'
 import type { AnytimeAction } from '../../shared/contract/types';
 import type { AnimalZone } from '../../shared/domain/animal-zones'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 describe('E086_PenBuilder session', () => {
   const setup = () => {
@@ -225,4 +228,12 @@ describe('E086 Pen Builder parity', () => {
     expect(retry.ok, retry.error).toBe(true)
     expect(retry.state.players[0]!.resources.sheep).toBe(2)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, anytime } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E086 N1 two real anytime wood discards cost exactly two wood and create capacity four then entry becomes unavailable', () => { const s = make('E086_PenBuilder', st => { st.players[0]!.resources.wood = 2 }); const a = finish(s, anytime(s, 'E086_PenBuilder')), b = finish(s, anytime(s, 'E086_PenBuilder')); assert.equal(a.state.players[0]!.resources.wood, 1); assert.equal(b.state.players[0]!.resources.wood, 0); assert.equal(b.state.players[0]!.cardStates.E086_PenBuilder?.counters?.discards, 2); assert.equal(b.interaction.anytimeActions.some(a => JSON.stringify(a).includes('E086_PenBuilder')), false); save('E086-N1', { a, b }) })
+  it('E086 N2 zero wood cannot expand and one paid discard holds two sheep with overflow rejected then legal retry', () => { const c = make('E086_PenBuilder'); assert.equal(c.getState().interaction.anytimeActions.some(a => JSON.stringify(a).includes('E086_PenBuilder')), false); const control = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); assert.equal(control.state.players[0]!.resources.grain, 1); const s = make('E086_PenBuilder', st => { st.players[0]!.resources.wood = 1; st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 3 }); finish(s, anytime(s, 'E086_PenBuilder')); const p = ok(s.takeAction(0, 'sheep-market')); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'animal-reorg'); const zone = p.interaction.request.zones.find(z => z.cardId === 'E086_PenBuilder'); assert.ok(zone); assert.equal(zone.capacity, 2); const all = p.interaction.request.zones.map(z => ({ ...z, animalType: null, animalCount: 0 })); const over = all.map(z => z.id === zone.id ? { ...z, animalType: 'sheep', animalCount: 3 } : z); const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: over })); const legal = p.interaction.request.zones, r = ok(s.resolveChoice(0, 'confirm', { zones: legal })); assert.equal(r.state.players[0]!.resources.sheep, 3); assert.equal(r.state.players[0]!.resources.wood, 0); save('E086-N2', { control, p, rejected, r }) })
+  it('E086 N3 paid capacity two can hold mixed sheep and boar while extra boar occupies the one household holder', () => { const s = make('E086_PenBuilder', st => { const p = st.players[0]!; p.resources.wood = 1; p.resources.sheep = 1; const t = p.roomTiles[0]!; p.houseAnimals = { [`${t.row}-${t.col}`]: 'sheep' }; st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = 2 }); finish(s, anytime(s, 'E086_PenBuilder')); const p = ok(s.takeAction(0, 'pig-market')); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'animal-reorg'); const zone = p.interaction.request.zones.find(z => z.cardId === 'E086_PenBuilder'), house = p.interaction.request.zones.find(z => z.zoneType === 'house'); assert.ok(zone && house); const r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...zone, animalType: null, animalCount: 2, animalCounts: { sheep: 1, boar: 1 } }, { ...house, animalType: 'boar', animalCount: 1 }] })); assert.equal(r.state.players[0]!.resources.sheep, 1); assert.equal(r.state.players[0]!.resources.boar, 2); assert.equal(r.state.players[0]!.resources.wood, 0); save('E086-N3', { p, r }) })
 })

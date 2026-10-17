@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { reap } from '../../shared/actions/effects/reap'
@@ -9,6 +9,9 @@ import { reap } from '../../shared/actions/effects/reap'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/C/C070_LettucePatch'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'C070_LettucePatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -473,4 +476,47 @@ describe('C070 Lettuce Patch parity', () => {
     expect(fields).toMatchObject({ quantity: 0, total: -1 })
     expect(cards?.entries).toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, ok, options, save, setup, finish, completeRound, offer, take, prerequisites, hand, buy, accept, printed, fields, denyMinor, completeRemaining, cardStacks, tileFor, fieldSession, enterCardSow, sowCard, finishToRound } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C070 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'C070_LettucePatch'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, {}); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.ok(r.scores);assert.equal(r.scores[0]!.categories.find(c=>c.key==='fields')?.quantity,0);save("C070-N1-legal", r); const excluded = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, {}); prerequisites(st, 2); }); denyMinor(excluded, card); save("C070-N1-prerequisite", excluded.getState()); });
+  it('C070 N3 invalid grain target rejects before a real legal card field sow retry', () => { for (const bad of ['grain'] as const) {
+      const card = 'C070_LettucePatch', s = fieldSession(card);
+      let r = enterCardSow(s);
+      save(`C070-N3-before-${bad}`, r);
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ ...tileFor(card), crop: bad }] }));
+      assert.deepEqual(cardStacks(s.getState(), card), []);
+      r = ok(s.commitSelectionChoice(0, { crops: [{ ...tileFor(card), crop: 'vegetable' }] }));
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'vegetable', remaining: 2 }]);
+      assert.equal(r.state.players[0]!.resources.grain, 1);
+      save(`C070-N3-retry-${bad}`, r);
+  } });
+  it('C070 N2 newly harvested card vegetables can feed the family for four food each while decline retains them', () => { for (const use of [false, true]) {
+      const card = 'C070_LettucePatch', s = fieldSession(card, use ? 0 : 40);
+      let r = sowCard(s, card, 'vegetable');
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'vegetable', remaining: 2 }]);
+      for (const target of [12, 14]) {
+          r = finishToRound(s, target, use);
+          assert.equal(r.state.players[0]!.resources.food, use ? 0 : target === 12 ? 36 : 32);
+          assert.equal(r.state.players[0]!.resources.vegetable, use ? 0 : target === 12 ? 1 : 2);
+          assert.equal(r.state.players[0]!.resources.begging, 0);
+          save(`C070-N2-${target}-${use}`, r);
+      }
+      assert.deepEqual(cardStacks(r, card), []);
+  } });
+  it('C070 N4 conversion spends only the newly harvested card vegetable and excludes ordinary fields or a hand card', () => { const card = 'C070_LettucePatch', s = fieldSession(card, 40, false, 5); let r = sowCard(s, card, 'vegetable'); assert.equal(r.state.players[0]!.resources.vegetable, 5);r=finish(s,completeRemaining(s));assert.equal(r.state.round,11);r=offer(s,completeRound(s,['clay-pit','forest','reed-bank','fishing']),card);assert.equal(options(r).filter(o=>!['__skip__','__pass__','__done__'].includes(o.value)).length,1);save('C070-N4-conversion-menu',r);r=finish(s,accept(s,r,card),true);assert.equal(r.state.round,12); assert.equal(r.state.players[0]!.resources.vegetable, 5); assert.equal(r.state.players[0]!.resources.food, 40); assert.deepEqual(cardStacks(r, card), [{ kind: 'vegetable', remaining: 1 }]); save('C070-N4-old-supply', r); for (const handOnly of [false, true]) {
+      const t = setup(card, 10, st => { fields(st, 1); st.players[0]!.resources.vegetable = 1; if (handOnly)
+          hand(st, card); });
+      let q = take(t, 'grain-utilization');
+      assert.ok(q.interaction.stateId === 'wait' && q.interaction.request.kind === 'farm-select');
+      q = ok(t.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'vegetable' }] }));
+      assert.deepEqual(q.state.players[0]!.fields[0]!.stacks,[{kind:'vegetable',remaining:2}]);
+      q = finishToRound(t, 12, true);
+      assert.equal(q.state.players[0]!.resources.vegetable, 1);
+      assert.equal(q.state.players[0]!.resources.food, 36);
+      assert.deepEqual(cardStacks(q, card), []);
+      save(`C070-N4-ordinary-${handOnly}`, q);
+  } });
 })

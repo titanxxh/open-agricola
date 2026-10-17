@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/domain/scoring'
@@ -7,6 +7,8 @@ import { expectSharedBonuses, setupSharedScoring } from './_helpers/batch07-shar
 import '../../shared/cards/C/C135_Constable'
 import '../../shared/cards/B/B040_BreweryPond'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit52Competition from './_helpers/audit/ae-negative-52-competition'
 
 // The reference map (key = 14 - turn = remaining complete rounds left after this one):
 //   0→0, 1→1, 2→1, 3→2, 4→2, 5→2, 6→3, 7→3, 8→3,
@@ -187,4 +189,12 @@ describe('C135_Constable — shared scoring', () => {
       .find((entry) => entry.type === 'bonus' && entry.cardId === 'C135_Constable')
     expect(constableBonus).toBeUndefined()
   })
+})
+
+describe('ae-negative-52-competition', () => {
+  const { sessions, save, ok, make, lesson, progress, bonus, geometry } = audit52Competition
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C135 N1 actual Lessons purchase at all printed boundaries gives exact wood once and whole undo restores the purchase',()=>{for(const[round,wood]of [[5,4],[8,3],[11,2],[12,1],[13,1],[14,0]] as const){const s=make('C135_Constable',false,state=>state.round=round),r=lesson(s,'C135_Constable');assert.equal(r.state.players[0]!.resources.wood,wood);assert.ok(r.state.players[0]!.occupationPlayed.includes('C135_Constable'));if(round===5){const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,0);assert.equal(u.state.players[0]!.occupationPlayed.includes('C135_Constable'),false);const replay=lesson(s,'C135_Constable');assert.equal(replay.state.players[0]!.resources.wood,4);save('C135-N1-undo',{u,replay})}save(`C135-N1-${round}`,r)}})
+  it('C135 N2 natural final harvest scores a unique nonowner winner and each tied eligible player against the actual final geometry',()=>{for(const mode of['unique','tie']){const s=make('C135_Constable',true,state=>geometry(state,'C135_Constable',mode)),r=progress(s,15);assert.equal(r.state.gameOver,true);assert.deepEqual([0,1,2].map(p=>bonus(r,'C135_Constable',p)),[0,3,mode==='tie'?3:0]);save(`C135-N2-${mode}`,r)}})
+  it('C135 N3 zero comparison and a hand card cannot invent a unique winner or a purchase reward',()=>{for(const held of[false,true]){const s=make('C135_Constable',!held),r=progress(s,15);assert.equal(r.state.gameOver,true);assert.deepEqual([0,1,2].map(p=>bonus(r,'C135_Constable',p)),held?[0,0,0]:[0, 0, 0]);assert.equal(r.state.players[0]!.resources.wood,0);save(`C135-N3-${held}`,r)}})
 })

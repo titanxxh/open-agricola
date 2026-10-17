@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/E/E133_ChampionBreeder'
+import assert from 'node:assert/strict'
+import * as audit52Animals from './_helpers/audit/ae-negative-52-animals'
 
 const CARD_ID = 'E133_ChampionBreeder'
 const FILLER = '__test_placeholder__'
@@ -189,4 +191,12 @@ describe('E133 Champion Breeder parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 4, cattle: 2 })
     expect(bonusVp(response)).toBe(1)
   })
+})
+
+describe('ae-negative-52-animals', () => {
+  const { sessions, save, make, lesson, progress, pasture, CHAMP, breed, champ } = audit52Animals
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E133 N1 actual purchase has no early VP and one two or three real housed newborn species give zero one or two VP at natural harvest',()=>{const bought=lesson(breed(CHAMP,0,false),CHAMP);assert.equal(champ(bought),0);for(const[count,score]of[[1,0],[2,1],[3,2]] as const){const s=breed(CHAMP,count),r=progress(s,8);assert.equal(champ(r),score);for(const type of(['sheep','boar','cattle'] as const).slice(0,count)){assert.equal(r.state.players[0]!.resources[type],3);assert.equal(r.state.players[0]!.pastures.find(p=>p.animalType===type)?.animalCount,3)}save(`E133-N1-${count}`,{bought,r})}})
+  it('E133 N2 a full pasture and an occupied ordinary house pet holder prevent one newborn from counting toward the two newborn threshold',()=>{const s=breed(CHAMP,2,true,7,true),r=progress(s,8);assert.equal(r.state.players[0]!.resources.sheep,3);save('E133-N2',r);assert.equal(r.state.players[0]!.resources.boar,2);assert.equal(champ(r),0)})
+  it('E133 N3 a held card nonharvest and opponent breeding give no owner VP while each distinct qualifying harvest adds one',()=>{const s=breed(CHAMP,2,false),hand=progress(s,8);assert.equal(champ(hand),0);const t=breed(CHAMP,2,true,8),nine=progress(t,9);assert.equal(champ(nine),0);assert.equal(nine.state.players[0]!.resources.sheep,2);const q=breed(CHAMP,2),eight=progress(q,8),ten=progress(q,10);assert.equal(champ(eight),1);assert.equal(champ(ten),2);const v=make(CHAMP,true,state=>{state.round=7;pasture(state.players[1]!,2,1,true,'sheep',2);pasture(state.players[1]!,3,1,true,'boar',2)}),opponent=progress(v,8);assert.equal(champ(opponent),0);save('E133-N3',{hand,nine,eight,ten,opponent})})
 })

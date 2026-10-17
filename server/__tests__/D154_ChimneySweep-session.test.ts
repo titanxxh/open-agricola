@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,10 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D154_ChimneySweep'
 import '../../shared/cards/A/A087_Conservator'
 import { D154_ChimneySweep } from '../../shared/cards/D/D154_ChimneySweep'
+import assert from 'node:assert/strict'
+import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit55Renovation from './_helpers/audit/ae-negative-55-renovation'
 
 const CARD_ID = 'D154_ChimneySweep'
 
@@ -174,4 +178,17 @@ describe('D154_ChimneySweep bonus scoring', () => {
     expect(score).toBe(0)
   })
 
+})
+
+describe('ae-negative-55-phase', () => {
+  const { sessions, save, make, finish, score, end } = audit55Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D154 N3 real authoritative scoring counts zero through three other stone houses and always excludes owner own stone house',()=>{for(const count of[0,1,2,3]){const s=make('D154_ChimneySweep',st=>{st.players[0]!.houseType='stone';st.players.slice(1).forEach((p,i)=>p.houseType=i<count?'stone':'clay')},true,14),r=finish(s,end(s));assert.equal(r.state.gameOver,true);assert.equal(score(r,'D154_ChimneySweep'),count);save(`D154-N3-${count}`,r)}})
+})
+
+describe('ae-negative-55-renovation', () => {
+  const { sessions, ok, save, make, finish, renovate } = audit55Renovation
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D154 N1 two and three room stone renovation discount exactly two stone once and whole undo restores payment',()=>{for(const rooms of[2,3]){const s=make('D154_ChimneySweep',st=>{const p=st.players[0]!;p.houseType='clay';if(rooms===3){p.rooms=3;p.roomTiles.push({row:1,col:1});}p.resources.stone=rooms-2;p.resources.reed=1;},true,14),r=renovate(s,0,false),u=ok(s.undoAction());assert.equal(r.state.players[0]!.houseType,'stone');assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(u.state.players[0]!.houseType,'clay');assert.equal(u.state.players[0]!.resources.stone,rooms-2);assert.equal(u.state.players[0]!.resources.reed,1);save(`D154-N1-${rooms}`,{r,u})}})
+  it('D154 N2 wood to clay remains full price while missing reed stone renovation rejects before legal Grain Seeds',()=>{const s=make('D154_ChimneySweep',st=>{Object.assign(st.players[0]!.resources,{clay:2,reed:1});},true,14),r=renovate(s,0,false);assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.resources.clay,0);const c=make('D154_ChimneySweep',st=>{st.players[0]!.houseType='clay'},true,14),rejected=assertRejectedUnchanged(c,()=>c.takeAction(0,'house-redevelopment')),control=finish(c,ok(c.takeAction(0,'grain-seeds')));assert.equal(control.state.players[0]!.houseType,'clay');save('D154-N2',{r,rejected,control})})
 })

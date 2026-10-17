@@ -2,7 +2,7 @@ import type { GameSession as SessionRuleOwner } from '../game/authoritative-sess
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
   getRegisteredCardListeners,
@@ -13,6 +13,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B163_Pastor'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
+import assert from 'node:assert/strict'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B163_Pastor'
 
@@ -140,4 +142,25 @@ describe('B163_Pastor after-construct listener (regression)', () => {
     expect(result?.flow).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, finish, ready, play, rooms, res, expansion } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B163 N1 real purchase as the only two-room household gains the bundle', () => { const s = make('B163_Pastor', st => st.players.slice(1).forEach(p => rooms(p, 3)), false), r = finish(s, play(s, 'B163_Pastor')); res(r, { wood: 3, clay: 2, reed: 1, stone: 1 }); save('B163-N1', r); });
+  it('B163 N2 actual last tied opponent room construction triggers the delayed bundle', () => { const s = make('B163_Pastor', st => { st.players.slice(2).forEach(p => rooms(p, 3)); Object.assign(st.players[1]!.resources, { wood: 5, reed: 2 }); }, false), bought = finish(s, play(s, 'B163_Pastor')); res(bought, { wood: 0, clay: 0, reed: 0, stone: 0 }); ready(s); const r = finish(s, expansion(s, 1, true)); res(r, { wood: 3, clay: 2, reed: 1, stone: 1 }); assert.equal(r.state.players[1]!.rooms, 3); save('B163-N2', { bought, r }); });
+  it('B163 N3 ties three-room owner held card and a second construction exclude repeat rewards', () => { for (const mode of ['tie', 'three', 'hand', 'repeat']) {
+      const s = make('B163_Pastor', st => { if (mode === 'three')
+          rooms(st.players[0]!, 3); if (mode === 'repeat')
+          st.players.slice(1).forEach(p => rooms(p, 3)); if (mode === 'hand')
+          st.players.slice(2).forEach(p => rooms(p, 3)); Object.assign(st.players[1]!.resources, { wood: 5, reed: 2 }); if (mode === 'hand')
+          st.currentPlayerIndex = 1; }, false);
+      let r = mode === 'hand' ? finish(s, expansion(s, 1, true)) : finish(s, play(s, 'B163_Pastor'));
+      if (mode === 'repeat') {
+          ready(s);
+          r = finish(s, expansion(s, 1, true));
+      }
+      res(r, mode === 'repeat' ? { wood: 3, clay: 2, reed: 1, stone: 1 } : { wood: 0, clay: 0, reed: 0, stone: 0 });
+      save(`B163-N3-${mode}`, r);
+  } });
 })

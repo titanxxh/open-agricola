@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, resources, ownerTurn, workRecipe } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C139 N1 actual Lessons grants one reed food and real anytime conversion can exchange each reed repeatedly', () => { const s = make('C139_BasketmakersWife', undefined, false), p = finish(s, lesson(s, 'C139_BasketmakersWife'), false); resources(p, { reed: 1, food: 101 }); ownerTurn(s); const r = workRecipe(s, 'reed', 'C139_BasketmakersWife'); resources(r, { reed: 0, food: 103 }); const c = make('C139_BasketmakersWife', st => { st.players[0]!.resources.reed = 2 }), a = workRecipe(c, 'reed', 'C139_BasketmakersWife'), cr = workRecipe(c, 'reed', 'C139_BasketmakersWife'); resources(cr, { reed: 0, food: 104 }); save('C139-N1', { p, r, a, cr }) })
+  it('C139 N2 zero reed cannot convert while unplayed card excludes recipe and legal Fireplace vegetable conversion remains', () => { const s = make('C139_BasketmakersWife'), rejected = assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'exchange')), r = finish(s, ok(s.takeAction(0, 'grain-seeds')), false); resources(r, { reed: 0, food: 100 }); const c = make('C139_BasketmakersWife', st => { Object.assign(st.players[0]!.resources, { reed: 1, vegetable: 1 }); st.players[0]!.improvements = ['Major_Fireplace1'] }, false), p = ok(c.takeAnytimeAction(0, 'exchange')); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice'); assert.equal(p.interaction.request.options.some(o => o.sourceCard === 'C139_BasketmakersWife'), false); const o = p.interaction.request.options.find(o => o.sourceCard === 'Major_Fireplace1' && o.effectPreview && 'resourcesPaid' in o.effectPreview && o.effectPreview.resourcesPaid?.vegetable === 1); assert.ok(o); const cr = finish(c, ok(c.resolveChoice(0, o.value)), false); resources(cr, { reed: 1, vegetable: 0, food: 102 }); save('C139-N2', { rejected, r, p, cr }) })
+})

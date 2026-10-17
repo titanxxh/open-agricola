@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C125_Nightworker'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import { workersAtHome } from '../../shared/domain/player'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'C125_Nightworker'
 
@@ -115,4 +119,11 @@ describe('C125_Nightworker session — place-farmer flow', () => {
     const flow = ruleSession.withCtx(() => ruleSession.withCtx(() => getCardEffect(CARD_ID))!.onBeforeWork!(state, player))
     expect(flow).toBeUndefined()
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, reach, resources, extraPlace } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C125 N1 natural before-work placement collects missing wood with one regular person', () => { const s = make('C125_Nightworker', undefined, true, 5); const p = reach(s, 6), r = finish(s, extraPlace(s, p, 'C125_Nightworker', 'forest'), false); assert.equal(r.state.round, 6); resources(r, { wood: 3 }); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 1); assert.equal(r.state.currentPlayerIndex, 0); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.takenBy.length, 1); save('C125-N1', { p, r }) })
+  it('C125 N2 decline or owning all building resources suppresses extra placement while illegal nonaccumulation target rejects', () => { const c = make('C125_Nightworker', undefined, true, 5), cr = finish(c, reach(c, 6), false); resources(cr, { wood: 0 }); assert.equal(workersAtHome(cr.state, cr.state.players[0]!).length, 2); const a = make('C125_Nightworker', st => Object.assign(st.players[0]!.resources, { wood: 1, clay: 1, reed: 1, stone: 1 }), true, 5), ar = finish(a, reach(a, 6), false); assert.equal(workersAtHome(ar.state, ar.state.players[0]!).length, 2); const s = make('C125_Nightworker', undefined, true, 5); let p = reach(s, 6); while (p.interaction.stateId === 'wait' && p.interaction.promptKey !== 'ui.interactionPlaceFarmerExtra') { const i = p.interaction; assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger'); const o = i.request.options.find(o => o.sourceCard === 'C125_Nightworker' && o.value !== '__skip__' && o.value !== '__pass__'); assert.ok(o); p = ok(s.resolveChoice(i.playerIndex, o.value)) } const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer')), r = finish(s, extraPlace(s, p, 'C125_Nightworker', 'forest'), false); resources(r, { wood: 3 }); save('C125-N2', { cr, ar, p, rejected, r }) })
 })

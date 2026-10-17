@@ -1,17 +1,20 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../shared/contract/types'
 import { isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { createTriggerSnapshot } from '../../shared/cards/helpers/trigger-snapshot'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C023_JobContract'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Placement from './_helpers/audit/ae-negative-32-placement'
 
 const CARD_ID = 'C023_JobContract'
 const OCCUPY_ACTION_ID = 'card_C023_JobContract_occupyLessons'
@@ -357,4 +360,14 @@ describe('C023_JobContract session flow', () => {
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-32-placement', () => {
+  const { sessions, save, ok, choose, pendingCard, trigger, finish, ready, action, progress, buy, accept, job } = audit32Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C023 N1 actual zero occupation purchase and Day Laborer then Lessons use one person and block both spaces until the natural next round', () => { const s = job(false), bought = finish(s, buy(s, 'C023_JobContract')); assert.ok(bought.state.players[0]!.minorPlayed.includes('C023_JobContract')); const t = job(), p = accept(t, ok(t.takeAction(0, 'day-laborer')), 'C023_JobContract'); let r = p; if (!r.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'))
+      r = ok(t.resolveChoice(0, 'A110_Roughcaster')); r = finish(t, r); assert.equal(r.state.players[0]!.resources.food, 102); assert.equal(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy.length, 1); assert.equal(r.state.actionSpaces.find(a => a.id === 'lessons')!.takenBy.length, 1); assert.equal(workersAvailable(r.state, r.state.players[0]!), 1); const next = progress(t, 6); assert.equal(next.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy.length, 0); assert.equal(next.state.actionSpaces.find(a => a.id === 'lessons')!.takenBy.length, 0); save('C023-N1', { bought, p, r, next }); });
+  it('C023 N2 decline leaves Lessons unoccupied and an actual opponent occupying Lessons prevents a second Lessons use', () => { const s = job(), p = trigger(s, ok(s.takeAction(0, 'day-laborer')), 'C023_JobContract'), decline = finish(s, choose(s, p, o => o.value === '__skip__')); assert.ok(decline.state.players[0]!.occupationHand.includes('A110_Roughcaster')); assert.equal(decline.state.actionSpaces.find(a => a.id === 'lessons')!.takenBy.length, 0); const t = job(), first = action(t, 0, 'forest'); ready(t); let opponent = ok(t.takeAction(1, 'lessons')); if (!opponent.state.players[1]!.occupationPlayed.includes('A116_WoodCutter'))
+      opponent = ok(t.resolveChoice(1, 'A116_WoodCutter')); finish(t, opponent); const r = action(t, 0, 'day-laborer'); assert.equal(pendingCard(r, 'C023_JobContract'), false); assert.equal(r.state.players[0]!.occupationPlayed.length, 0); save('C023-N2', { p, decline, first, opponent, r }); });
+  it('C023 N3 an occupation blocks purchase and a held card cannot teach an occupation from Day Laborer', () => { const s = job(false, 1), poor = buy(s, 'C023_JobContract'); assert.ok(poor.state.players[0]!.minorHand.includes('C023_JobContract')); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'C023_JobContract')); const t = job(false), hand = action(t, 0, 'day-laborer'); assert.ok(hand.state.players[0]!.occupationHand.includes('A110_Roughcaster')); assert.equal(hand.state.actionSpaces.find(a => a.id === 'lessons')!.takenBy.length, 0); assert.equal(hand.state.players[0]!.resources.food, 102); save('C023-N3', { poor, hand }); });
 })

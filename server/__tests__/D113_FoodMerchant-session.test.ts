@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { PlayerState, Resource } from '../../shared/contract/types'
@@ -6,6 +6,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 import '../../shared/cards/D/D113_FoodMerchant'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'D113_FoodMerchant'
 const FILLER = '__test_placeholder__'
@@ -187,4 +189,30 @@ describe('D113 Food Merchant parity', () => {
     expect(sawMerchant).toBe(false)
     expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 1, food: 3 })
   })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, gains, save, setup, choose, source, finish, completeRound, grainField } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D113 N1 actual reap charges three food normally or two on depletion and offers cumulative cheapest purchases', () => {
+    for (const mode of ['normal', 'last', 'both', 'one', 'decline', 'short']) {
+      const s = setup('D113_FoodMerchant', 4, state => {
+        state.players[0]!.resources.food = mode === 'short' ? 0 : 20
+        grainField(state, mode === 'last' ? 1 : 2)
+        if (['both', 'one'].includes(mode))
+          grainField(state, 1, 1)
+      })
+      let r = completeRound(s)
+      r = source(s, r, 'D113_FoodMerchant')
+      const count = mode === 'both' ? 2 : 1, cost = mode === 'both' ? 5 : ['last', 'one'].includes(mode) ? 2 : 3
+      if (!['decline', 'short'].includes(mode))
+        r = choose(s, r, o => gains(o, 'vegetable') === count)
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.vegetable, ['decline', 'short'].includes(mode) ? 0 : count)
+      assert.equal(r.state.players[0]!.resources.food, mode === 'short' ? 0 : 17 - (['decline'].includes(mode) ? 0 : cost))
+      assert.equal(r.state.players[0]!.resources.grain, ['both', 'one'].includes(mode) ? 2 : 1)
+      save(`D113-N1-${mode}`, r)
+    }
+  })
+  it('D113 N2 vegetable reap and unrelated real work do not offer grain-based purchase', () => { const s = setup('D113_FoodMerchant', 4, state => state.players[0]!.fields.push({ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] })); let r = ok(s.takeAction(0, 'clay-pit')); assert.equal(r.state.players[0]!.resources.vegetable, 0); finish(s, r); r = finish(s, completeRound(s, ['forest', 'fishing', 'reed-bank'])); assert.equal(r.state.players[0]!.resources.vegetable, 1); assert.equal(r.state.players[0]!.resources.food, 17); save('D113-N2', r); })
 })

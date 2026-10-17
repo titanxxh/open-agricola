@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D026_CarpentersYard'
+import assert from 'node:assert/strict'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'D026_CarpentersYard'
 const FILLER = '__test_placeholder__'
@@ -145,4 +147,28 @@ describe("D026 Carpenter's Yard parity", () => {
     expect(response.state.players[1]!.improvements).toContain('Major_Joinery')
     expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, choose, finish, minor, purchase, resource, occupied, major, ownMajor } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D026 N1 real purchase and true minor actions build either named major without building both", () => { const b = make('D026_CarpentersYard', st => Object.assign(st.players[0]!.resources, { wood: 1, reed: 1 }), false), bought = purchase(b, 'D026_CarpentersYard'); resource(bought, { wood: 0, reed: 0 }); for (const id of ['Major_Well', 'Major_Joinery']) {
+      const s = make('D026_CarpentersYard', st => Object.assign(st.players[0]!.resources, { wood: 3, stone: 5 })), p = minor(s), r = finish(s, choose(s, 0, id), true);
+      assert.deepEqual(r.state.players[0]!.improvements, [id]);
+      resource(r, { wood: id === 'Major_Well' ? 2 : 1, stone: id === 'Major_Well' ? 2 : 3 });
+      save(`D026-N1-${id}`, { bought, p, r });
+  } });
+  it("D026 N2 one real major action builds both named improvements at their full costs with one person", () => { for (const first of ['Major_Well', 'Major_Joinery']) {
+      const s = make('D026_CarpentersYard', st => Object.assign(st.players[0]!.resources, { wood: 3, stone: 5 })), p = major(s, first), r = finish(s, p, true);
+      resource(r, { wood: 0, stone: 0 });
+      assert.deepEqual([...r.state.players[0]!.improvements].sort(), ['Major_Joinery', 'Major_Well']);
+      assert.equal(occupied(r).length, 1);
+      save(`D026-N2-${first}`, { p, r });
+  } const s = make('D026_CarpentersYard', st => Object.assign(st.players[0]!.resources, { wood: 3, stone: 5 })), p = major(s, 'Major_Well'), r = finish(s, p, false); resource(r, { wood: 2, stone: 2 }); assert.deepEqual(r.state.players[0]!.improvements, ['Major_Well']); save('D026-N2-decline', { p, r }); });
+  it("D026 N3 hand opponent unrelated purchase unavailable or unpayable second target cannot build both", () => { for (const mode of ['hand', 'opponent', 'unrelated', 'owned', 'food']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('D026_CarpentersYard', st => { st.currentPlayerIndex = a; Object.assign(st.players[a]!.resources, { wood: mode === 'food' ? 1 : 3, stone: mode === 'food' ? 3 : 5, clay: 2 }); if (mode === 'owned')
+          ownMajor(st, 'Major_Joinery', 1); }, mode !== 'hand'), p = major(s, mode === 'unrelated' ? 'Major_Fireplace1' : 'Major_Well', a), r = finish(s, p, true, [], 'D026_CarpentersYard');
+      assert.equal(r.state.players[0]!.improvements.includes('Major_Joinery'), false);
+      save(`D026-N3-${mode}`, { p, r });
+  } });
 })

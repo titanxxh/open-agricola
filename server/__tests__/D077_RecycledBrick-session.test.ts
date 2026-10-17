@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D077_RecycledBrick'
+import assert from 'node:assert/strict'
+import * as audit42Purchase from './_helpers/audit/ae-negative-42-purchase'
 
 const CARD_ID = 'D077_RecycledBrick'
 
@@ -126,4 +128,12 @@ describe('D077 Recycled Brick parity', () => {
       houseType: 'clay', rooms: 2, resources: { clay: 0 },
     })
   })
+})
+
+describe('ae-negative-42-purchase', () => {
+  const { sessions, ok, save, setup, play, occupations, renovate } = audit42Purchase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D077 N1 real self or opponent two room clay to stone renovation gives owner two clay after ordinary stone reed payment',()=>{for(const actor of [0,1]){const s=setup('D077_RecycledBrick',st=>{st.currentPlayerIndex=actor;st.players[actor]!.houseType='clay';Object.assign(st.players[actor]!.resources,{stone:2,reed:1})}),r=renovate(s,actor);assert.equal(r.state.players[actor]!.houseType,'stone');assert.equal(r.state.players[actor]!.resources.stone,0);assert.equal(r.state.players[actor]!.resources.reed,0);save(`D077-N1-early-${actor}`,r);assert.equal(r.state.players[0]!.resources.clay,2);assert.deepEqual(r.state.players[actor]!.improvements,[]);const u=ok(s.undoAction());assert.equal(u.state.players[actor]!.houseType,'clay');assert.equal(u.state.players[0]!.resources.clay,0);save(`D077-N1-${actor}`,{r,u})}})
+  it('D077 N2 wood to clay renovation and held card cannot grant owner clay',()=>{for(const mode of ['wood','hand']){const s=setup('D077_RecycledBrick',st=>{st.players[0]!.houseType=mode==='wood'?'wood':'clay';Object.assign(st.players[0]!.resources,{clay:mode==='wood'?2:0,stone:mode==='hand'?2:0,reed:1})},mode!=='hand'),r=renovate(s);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.houseType,mode==='wood'?'clay':'stone');save(`D077-N2-${mode}`,r)}})
+  it('D077 N3 actual three occupation card purchase pays one food without an immediate clay bonus',()=>{const s=setup('D077_RecycledBrick',st=>occupations(st),false,5),r=play(s,'D077_RecycledBrick');assert.equal(r.state.players[0]!.resources.food,99);assert.equal(r.state.players[0]!.resources.clay,0);save('D077-N3',r)})
 })

@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E109_BraidMaker'
 import '../../shared/cards/A/A143_Stonecutter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'E109_BraidMaker'
 const BASKET = 'Major_Basket'
@@ -158,5 +161,57 @@ describe('E109 Braid Maker parity', () => {
     expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('exchange')
     expect(session.takeAnytimeAction(0, 'exchange').ok).toBe(false)
     expect(response.state.players[0]!.resources).toMatchObject({ reed: 1, food: 0 })
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, options, save, setup, choose, finish, completeRound, improvement } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E109 N1 real minor and major action purchases pay one reed one stone and additional Stonecutter discount preserves other resources', () => {
+    for (const [space, stonecutter] of [['meeting-place', false], ['major-improvement', false], ['major-improvement', true]] as const) {
+      const s = setup('E109_BraidMaker', 14, state => {
+        Object.assign(state.players[0]!.resources, { reed: 2, stone: 2 })
+        state.players[0]!.minorHand = ['B007_Wage']
+        if (stonecutter)
+          state.players[0]!.occupationPlayed.push('A143_Stonecutter')
+      })
+      const r = improvement(s, ok(s.takeAction(0, space)), 'Major_Basket')
+      assert.equal(r.state.players[0]!.resources.reed, 1)
+      assert.equal(r.state.players[0]!.resources.stone, stonecutter ? 2 : 1)
+      save(`E109-N1-${space}-${stonecutter}`, r)
+    }
+  })
+  it('E109 N2 card in hand cannot put Basket in minor menu and outside harvest cannot use reed exchange', () => {
+    const s = setup('E109_BraidMaker', 14, state => { state.players[0]!.occupationPlayed = []; state.players[0]!.occupationHand = ['E109_BraidMaker']; state.players[0]!.minorHand = ['B007_Wage', 'C069_LandConsolidation']; Object.assign(state.players[0]!.resources, { reed: 2, stone: 2 }); })
+    let r = ok(s.takeAction(0, 'meeting-place'))
+    if (!options(r).some(o => o.value === 'B007_Wage'))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    assert.ok(!options(r).some(o => o.value === 'Major_Basket'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Basket'))
+    r = choose(s, r, o => o.value === 'B007_Wage')
+    assert.ok(!r.state.players[0]!.improvements.includes('Major_Basket'))
+    save('E109-N2-hand', r)
+    const ss = setup('E109_BraidMaker', 14, state => state.players[0]!.resources.reed = 1), pending = ok(ss.takeAction(0, 'farmland'))
+    assert.ok(!pending.interaction.anytimeActions.some(a => a.id === 'exchange'))
+    assertRejectedUnchanged(ss, () => ss.takeAnytimeAction(0, 'exchange'))
+    save('E109-N2-outside', pending)
+  })
+  it('E109 N3 actual harvest feed permits one reed for two food and rejects repeat count two', () => {
+    const s = setup('E109_BraidMaker', 4, state => Object.assign(state.players[0]!.resources, { food: 1, reed: 2 }))
+    let r = completeRound(s)
+    for (let n = 0; n < 12 && !(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed'); n++) {
+      const i = r.interaction
+      assert.ok(i.stateId === 'wait')
+      r = ok(s.resolveChoice(i.playerIndex, 'confirm'))
+    }
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed')
+    const payload = (count: number) => ({ selections: [{ sourceId: 'E109_BraidMaker', exchangeIndex: 0, count, sourceName: 'Braid Maker' }] })
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', payload(2)))
+    r = ok(s.resolveChoice(0, 'confirm', payload(1)))
+    r = finish(s, r)
+    assert.equal(r.state.players[0]!.resources.reed, 1)
+    assert.equal(r.state.players[0]!.resources.food, 0)
+    assert.equal(r.state.players[0]!.resources.begging, 0)
+    save('E109-N3', r)
   })
 })

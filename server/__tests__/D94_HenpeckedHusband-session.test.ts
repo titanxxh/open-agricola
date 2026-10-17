@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { addWorkerRef } from '../../shared/domain/space'
 import { getRoundPersonPlacementDetails, recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
@@ -9,6 +9,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D094_HenpeckedHusband'
 import '../../shared/cards/D/D127_HardworkingMan'
 import '../../shared/cards/E/E014_WoodSaw'
+import assert from 'node:assert/strict'
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit02Placement from './_helpers/audit/ae-negative-02-placement'
 
 const CARD_ID = 'D094_HenpeckedHusband'
 const HARDWORKING_MAN = 'D127_HardworkingMan'
@@ -268,5 +271,62 @@ describe('D094 Henpecked Husband parity', () => {
     expect(response.state.players[0]!.rooms).toBe(3)
     expect(workerOn(response, 'forest', firstId)).toBe(true)
     expect(triggerCount(response)).toBe(0)
+  })
+})
+
+describe('ae-negative-02-placement', () => {
+  const { sessions, D094, turn, occupants, husbandSetup, husbandFirst, finishFarm, firstAt } = audit02Placement
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('Henpecked Husband negative audit', () => {
+    it('D094 N1 second room build recalls first and rejects invalid room before undo and retry', () => {
+      const s = husbandSetup()
+      const first = husbandFirst(s)
+      const before = undoRuleSnapshot(s.getState())
+      const r = finishFarm(s, 'room', 'farm-expansion', true)
+      assert.equal(r.state.players[0]!.rooms, 3)
+      assert.equal(firstAt(r, 'forest', first), false)
+      assert.equal(workersAvailable(r.state, r.state.players[0]!), 1)
+      assert.equal(r.state.players[0]!.resources.reed, 8)
+      assert.equal(occupants(r, 'farm-expansion').length, 1)
+      assert.equal(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === D094).length, 1)
+      assertUndoRestored(before, s.undoAction())
+      const retried = finishFarm(s, 'room')
+      assert.equal(retried.state.players[0]!.rooms, 3)
+      assert.equal(firstAt(retried, 'forest', first), false)
+    })
+    it('D094 N2 second room build never recalls Meeting Place first person', () => {
+      const s = husbandSetup()
+      const first = husbandFirst(s, 'meeting-place')
+      const r = finishFarm(s, 'room')
+      assert.equal(r.state.players[0]!.rooms, 3)
+      assert.equal(firstAt(r, 'meeting-place', first), true)
+      assert.equal(workersAvailable(r.state, r.state.players[0]!), 0)
+      assert.equal(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === D094).length, 0)
+    })
+    it('D094 N3 second stable build never recalls first person', () => {
+      const s = husbandSetup()
+      const first = husbandFirst(s)
+      const r = finishFarm(s, 'stable')
+      assert.equal(r.state.players[0]!.rooms, 2)
+      assert.equal(r.state.players[0]!.stableTiles.length, 1)
+      assert.equal(firstAt(r, 'forest', first), true)
+      assert.equal(workersAvailable(r.state, r.state.players[0]!), 0)
+    })
+    it('D094 N4 recalled first person building on third placement is not recalled again', () => {
+      const s = husbandSetup(true)
+      const first = husbandFirst(s)
+      const recall = finishFarm(s, 'room')
+      assert.equal(firstAt(recall, 'forest', first), false)
+      turn(s, 1, 'grain-seeds')
+      turn(s, 2, 'fishing')
+      const r = finishFarm(s, 'room', 'D127_HardworkingMan')
+      assert.equal(r.state.players[0]!.rooms, 4)
+      assert.equal(firstAt(r, 'D127_HardworkingMan', first), true)
+      assert.equal(workersAvailable(r.state, r.state.players[0]!), 0)
+      assert.equal(getRoundPersonPlacementDetails(r.state.players[0]!).length, 3)
+      assert.equal(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === D094).length, 1)
+      assert.ok(r.scores)
+      assert.equal(r.scores.length, 3)
+    })
   })
 })

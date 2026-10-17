@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged, readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B124_Trimmer'
+import assert from 'node:assert/strict'
+import * as audit27Trimmer from './_helpers/audit/ae-negative-27-trimmer'
 
 const CARD_ID = 'B124_Trimmer'
 const FILLER = '__test_placeholder__'
@@ -118,4 +120,13 @@ describe('B124 Trimmer parity', () => {
     expect(response.state.players[0]!.pastures.flatMap((entry) => entry.tiles)).toHaveLength(2)
     expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'pastureArea')).toBe(2)
   })
+})
+
+describe('ae-negative-27-trimmer', () => {
+  const { CARD, sessions, save, ok, finish, ONE, make, fence, area } = audit27Trimmer
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B124 N1 actual first Lessons records existing one cell pasture without rewarding old enclosure',()=>{const s=make(false,1,0),pending=ok(s.takeAction(0,'lessons'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');const r=finish(s,ok(s.resolveChoice(0,CARD)),false);assert.ok(r.state.players[0]!.occupationPlayed.includes(CARD));assert.equal(r.state.players[0]!.cardStates[CARD]!.extraData!.pastureArea,1);assert.equal(r.state.players[0]!.resources.stone,0);save('B124-N1',{pending,r})})
+  it('B124 N2 real new one cell enclosure pays four wood and awards exactly two stone without consuming fence identities',()=>{const s=make(),before=ok(s.getState()),a=fence(s,ONE);assert.equal(a.r.state.players[0]!.resources.wood,0);assert.equal(a.r.state.players[0]!.resources.stone,2);assert.equal(area(a.r),1);assert.equal(a.r.state.players[0]!.fenceSegments.length,4);assert.equal(a.r.state.players[1]!.resources.stone,0);save('B124-N2',{before,a})})
+  it('B124 N3 subdivision of an existing two cell pasture pays one wood but gives no new enclosure stone',()=>{const s=make(true,2,1),a=fence(s,['V-0-2']);assert.equal(a.r.state.players[0]!.resources.wood,0);assert.equal(a.r.state.players[0]!.resources.stone,0);assert.equal(area(a.r),2);assert.equal(a.r.state.players[0]!.pastures.length,2);save('B124-N3',a)})
+  it('B124 N4 card only in hand cannot reward real fencing and whole qualifying fence undo restores payment board and state before one replay',()=>{const hand=fence(make(false),ONE);assert.equal(hand.r.state.players[0]!.resources.stone,0);const s=make(),before=ok(s.getState()),a=fence(s,ONE),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.deepEqual(undone.state.players[0]!.pastures,before.state.players[0]!.pastures);assert.deepEqual(undone.state.players[0]!.cardStates,before.state.players[0]!.cardStates);const retry=fence(s,ONE);assert.equal(retry.r.state.players[0]!.resources.stone,2);save('B124-N4',{hand,before,a,undone,retry})})
 })

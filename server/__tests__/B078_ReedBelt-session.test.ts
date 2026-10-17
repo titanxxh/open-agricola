@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit22Future from './_helpers/audit/ae-negative-22-future'
+
+describe('ae-negative-22-future', () => {
+  const { REED, sessions, save, ok, setup, finish, menu, buy, schedule, reach } = audit22Future
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B078 N1 actual two food purchase targets only future five eight ten twelve including equality and late round exclusions',()=>{for(const round of[4,5,8,10,12,14]){const s=setup(REED,round),{pending,r}=buy(s,REED);assert.equal(r.state.players[0]!.resources.food,98);assert.equal(r.state.players[0]!.resources.reed,0);assert.deepEqual(schedule(r,REED),[5,8,10,12].filter(n=>n>round).map(round=>({round,resources:{reed:1}})));save(`B078-N1-${round}`,{pending,r})}})
+  it('B078 N2 one food refuses and whole real purchase undo restores payment card and empty future queue',()=>{const p=setup(REED,4,state=>state.players[0]!.resources.food=1),denied=menu(p);assertRejectedUnchanged(p,()=>p.resolveChoice(0,REED));const legal=finish(p,ok(p.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.food,1);assert.deepEqual(schedule(legal,REED),[]);const s=setup(REED,4),r=buy(s,REED).r,undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.minorHand.includes(REED));assert.deepEqual(schedule(undone,REED),[]);const retry=buy(s,REED).r;assert.equal(retry.state.players[0]!.resources.food,98);assert.equal(schedule(retry,REED).length,4);save('B078-N2',{denied,legal,r,undone,retry})})
+  it('B078 N3 natural first two target starts deliver reed once and other rounds hand or opponent cannot reward owner',()=>{const s=setup(REED,4),c=setup(REED,4);buy(s,REED);buy(c,'B004_WoodPile');const five=reach(s,5),cfive=reach(c,5),seven=reach(s,7),cseven=reach(c,7),eight=reach(s,8),ceight=reach(c,8);assert.equal(five.state.players[0]!.resources.reed,cfive.state.players[0]!.resources.reed+1);assert.equal(seven.state.players[0]!.resources.reed,cseven.state.players[0]!.resources.reed+1);assert.equal(eight.state.players[0]!.resources.reed,ceight.state.players[0]!.resources.reed+2);assert.equal(eight.state.players[1]!.resources.reed,ceight.state.players[1]!.resources.reed);assert.deepEqual(schedule(eight,REED).map(x=>x.round),[10,12]);save('B078-N3',{five,cfive,seven,cseven,eight,ceight})})
+})

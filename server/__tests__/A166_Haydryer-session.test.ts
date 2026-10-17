@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A166_Haydryer'
+import assert from 'node:assert/strict'
+import * as audit17AnimalPhases from './_helpers/audit/ae-negative-17-animal-phases'
 
 const CARD_ID = 'A166_Haydryer'
 const FILLER = '__test_placeholder__'
@@ -142,4 +144,12 @@ describe('A166 Haydryer parity', () => {
     expect(response.state.players[0]!.resources.cattle).toBe(0)
     expect(response.state.round).toBe(4)
   })
+})
+
+describe('ae-negative-17-animal-phases', () => {
+  const { HAY, sessions, save, material, phaseSetup, end } = audit17AnimalPhases
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A166 N1 natural harvest charges four minus pasture count food for one cattle',()=>{for(const count of[0,1,3]){const s=phaseSetup(HAY,4,count);const {pending,r}=end(s);assert.equal(r.state.round,5);assert.equal(material(r).cattle,1);const control=end(phaseSetup(HAY,4,count,0,false)).r;assert.equal(material(r).food-material(control).food,-(4-count));save(`A166-N1-${count}`,{pending,r,control})}})
+  it('A166 N2 decline unaffordable hand and nonharvest cannot grant cattle',()=>{const declined=end(phaseSetup(HAY,4,1),false).r;assert.equal(material(declined).cattle,0);const poor=end(phaseSetup(HAY,4,1,0,true,0),false).r;assert.equal(material(poor).cattle,0);const hand=end(phaseSetup(HAY,4,1,0,false)).r;assert.equal(material(hand).cattle,0);const ordinary=end(phaseSetup(HAY,3,1)).r;assert.equal(material(ordinary).cattle,0);save('A166-N2',{declined,poor,hand,ordinary})})
+  it('A166 N3 four pastures clamp free cattle cost without creating food',()=>{const on=end(phaseSetup(HAY,4,4)).r,off=end(phaseSetup(HAY,4,4,0,false)).r;assert.equal(material(on).cattle,1);assert.equal(material(on).food,material(off).food);save('A166-N3',{on,off,limitation:'Runtime free grant is automatic; printed optionality remains unadjudicated here'})})
 })

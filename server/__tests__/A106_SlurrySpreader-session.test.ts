@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -6,6 +6,8 @@ import type { PlayerState } from '../../shared/contract/types'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A106_SlurrySpreader'
+import assert from 'node:assert/strict'
+import * as audit13Harvest from './_helpers/audit/ae-negative-13-harvest'
 
 const CARD_ID = 'A106_SlurrySpreader'
 
@@ -266,5 +268,30 @@ describe('A106 parity batch-02 characterization', () => {
     expect(resp.state.players[0]!.resources.grain).toBe(2)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.resources.food).toBe(9)
+  })
+})
+
+describe('ae-negative-13-harvest', () => {
+  const { sessions, save, setup, finish } = audit13Harvest
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A106 N1 real harvest awards two per emptied grain and one per emptied vegetable field', () => {
+    const session = setup([{ kind: 'grain', remaining: 1 }, { kind: 'vegetable', remaining: 1 }, { kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 2 }])
+    const response = finish(session); assert.equal(response.state.round, 5); const owner = response.state.players[0]!
+    assert.equal(owner.resources.food, 41); assert.equal(owner.resources.grain, 3); assert.equal(owner.resources.vegetable, 2)
+    assert.deepEqual(owner.fields.map(f => f.stacks), [[], [], [{ kind: 'grain', remaining: 1 }], [{ kind: 'vegetable', remaining: 1 }]]); save('A106-N1', response)
+  })
+  it('A106 N2 empty fields inventory crops and nonharvest cannot award depletion food', () => {
+    const session = setup([], state => { state.players[0]!.fields = [{ row: 0, col: 1, stacks: [] }]; state.players[0]!.resources.grain = 4; state.players[0]!.resources.vegetable = 3 })
+    const empty = finish(session); assert.equal(empty.state.players[0]!.resources.food, 38); assert.equal(empty.state.players[0]!.resources.grain, 5); assert.equal(empty.state.players[0]!.resources.vegetable, 3)
+    const nonharvest = finish(setup([{ kind: 'grain', remaining: 1 }], undefined, true, 5)); assert.equal(nonharvest.state.round, 6); assert.equal(nonharvest.state.players[0]!.resources.food, 42); assert.equal(nonharvest.state.players[0]!.fields[0]!.stacks[0]!.remaining, 1); save('A106-N2', { empty, nonharvest })
+  })
+  it('A106 N3 card in hand and opponent depletion cannot reward owner', () => {
+    const unplayed = finish(setup([{ kind: 'grain', remaining: 1 }], undefined, false)); assert.equal(unplayed.state.players[0]!.resources.food, 38)
+    const response = finish(setup([], state => state.players[1]!.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }])); assert.equal(response.state.players[0]!.resources.food, 38); assert.equal(response.state.players[1]!.resources.food, 36); assert.equal(response.state.players[1]!.resources.grain, 1); save('A106-N3', { response, unplayed })
+  })
+  it('A106 N4 later harvest rewards newly depleted fields once and repeated reads do not mutate', () => {
+    const session = setup([{ kind: 'grain', remaining: 2 }]); const first = finish(session); assert.equal(first.state.players[0]!.resources.food, 38)
+    finish(session); finish(session); const later = finish(session); assert.equal(later.state.round, 8); assert.equal(later.state.players[0]!.resources.food, 42); assert.deepEqual(later.state.players[0]!.fields[0]!.stacks, [])
+    assert.deepEqual(session.getState().state, later.state); const next = finish(session); assert.equal(next.state.players[0]!.resources.food, 44); save('A106-N4', { first, later, next })
   })
 })

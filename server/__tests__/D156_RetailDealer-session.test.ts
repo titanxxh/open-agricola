@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -6,6 +6,8 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/D/D156_RetailDealer'
+import assert from 'node:assert/strict'
+import * as audit56Purchase from './_helpers/audit/ae-negative-56-purchase'
 
 describe('D156_RetailDealer session', () => {
   /**
@@ -154,4 +156,11 @@ describe('D156_RetailDealer session', () => {
     // Counter unchanged
     expect(remaining).toBe(3)
   })
+})
+
+describe('ae-negative-56-purchase', () => {
+  const { sessions, ok, save, make, finish, play, transition, cycle } = audit56Purchase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D156 N1 real purchase creates three finite grain-food pairs and four actual market visits consume exactly three rewards then only base goods',()=>{const s=make('D156_RetailDealer',undefined,false,5),purchased=finish(s,play(s,'D156_RetailDealer'));assert.equal(purchased.state.players[0]!.resources.grain,0);assert.equal(purchased.state.players[0]!.cardStates.D156_RetailDealer?.extraData?.remaining,3);cycle(s);for(const[index,round]of[[0,5],[1,6],[2,7],[3,8]]){if(index!>0)transition(s,round!);const before=ok(s.getState()),r=finish(s,ok(s.takeAction(0,'resource-market-4')));assert.equal(r.state.players[0]!.resources.grain-before.state.players[0]!.resources.grain,index!<3?1:0);assert.equal(r.state.players[0]!.resources.food-before.state.players[0]!.resources.food,index!<3?2:1);assert.equal(r.state.players[0]!.cardStates.D156_RetailDealer?.extraData?.remaining,Math.max(0,2-index!));save(`D156-N1-${index}`,{purchased,before,r})}})
+  it('D156 N2 card-only-in-hand unrelated owner action and actual opponent market cannot grant an owner pair',()=>{for(const mode of['hand','unrelated','opponent']){const actor=mode==='opponent'?1:0,s=make('D156_RetailDealer',st=>{st.currentPlayerIndex=actor;st.players[0]!.cardStates.D156_RetailDealer={extraData:{remaining:3}}},mode!=='hand',14),r=finish(s,ok(s.takeAction(actor,mode==='unrelated'?'grain-seeds':'resource-market-4')));assert.equal(r.state.players[0]!.resources.grain,mode==='unrelated'?1:0);assert.equal(r.state.players[0]!.cardStates.D156_RetailDealer?.extraData?.remaining,3);save(`D156-N2-${mode}`,r)}})
 })

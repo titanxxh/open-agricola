@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
@@ -7,6 +7,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A085_Homekeeper'
 import '../../shared/cards/E/E167_DairyCrier'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit58Livestock from './_helpers/audit/ae-negative-58-livestock'
 
 const CARD_ID = 'E167_DairyCrier'
 const FILLER = 'A085_Homekeeper'
@@ -203,4 +206,54 @@ describe('E167 Dairy Crier parity', () => {
     expect(response.state.players[0]!.resources.cattle).toBe(1)
   })
 
+})
+
+describe('ae-negative-58-livestock', () => {
+  const { sessions, gainOf, save, play, dairy, resolveDairy } = audit58Livestock
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E167 N1 real purchase gives four independent mixed rewards then exactly one owner cattle after every decision', () => {
+    const session = dairy(), pending = play(session, 'E167_DairyCrier')
+    assert.equal(pending.state.players[0]!.resources.cattle, 0)
+    const { response, visited } = resolveDairy(session, pending, ['food', 'sheep', 'pass', 'food'])
+    assert.deepEqual(visited, [0, 1, 2, 3])
+    assert.deepEqual(response.state.players.map(player => ({ food: player.resources.food, sheep: player.resources.sheep, cattle: player.resources.cattle })), [{ food: 2, sheep: 0, cattle: 1 }, { food: 0, sheep: 2, cattle: 0 }, { food: 0, sheep: 0, cattle: 0 }, { food: 2, sheep: 0, cattle: 0 }])
+    const gains = response.state.events.flatMap(event => event.type === 'resource.moved' && event.sourceCardId === 'E167_DairyCrier' && event.to.kind === 'player' ? [{ resources: event.resources, to: event.to }] : [])
+    assert.deepEqual(gains, [{ resources: { food: 2 }, to: { kind: 'player', playerId: response.state.players[0]!.id } }, { resources: { sheep: 2 }, to: { kind: 'player', playerId: response.state.players[1]!.id } }, { resources: { food: 2 }, to: { kind: 'player', playerId: response.state.players[3]!.id } }, { resources: { cattle: 1 }, to: { kind: 'player', playerId: response.state.players[0]!.id } }])
+    save('E167-N1', { pending, response, visited })
+  })
+  it('E167 N2 all food all sheep and all declines preserve independent choice while owner always gets one cattle', () => {
+    for (const reward of ['food', 'sheep', 'pass'] as const) {
+      const session = dairy(), pending = play(session, 'E167_DairyCrier'), { response, visited } = resolveDairy(session, pending, [reward, reward, reward, reward])
+      assert.deepEqual(visited, [0, 1, 2, 3])
+      assert.deepEqual(response.state.players.map(player => player.resources.food), Array(4).fill(reward === 'food' ? 2 : 0))
+      assert.deepEqual(response.state.players.map(player => player.resources.sheep), Array(4).fill(reward === 'sheep' ? 2 : 0))
+      assert.deepEqual(response.state.players.map(player => player.resources.cattle), [1, 0, 0, 0])
+      save(`E167-N2-${reward}`, { pending, response })
+    }
+  })
+  it('E167 N3 wrong player and unknown reward reject without altering pending before one valid four-player reward sequence', () => {
+    const session = dairy(), pending = play(session, 'E167_DairyCrier')
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    const option = pending.interaction.request.options.find(option => gainOf(option)?.food === 2)
+    assert.ok(option)
+    const wrongActor = assertRejectedUnchanged(session, () => session.resolveChoice(1, option.value))
+    const wrongChoice = assertRejectedUnchanged(session, () => session.resolveChoice(0, '__invalid_reward__'))
+    const { response, visited } = resolveDairy(session, pending, ['food', 'food', 'food', 'food'])
+    assert.deepEqual(visited, [0, 1, 2, 3])
+    assert.deepEqual(response.state.players.map(player => player.resources.food), [2, 2, 2, 2])
+    assert.deepEqual(response.state.players.map(player => player.resources.cattle), [1, 0, 0, 0])
+    save('E167-N3', { pending, wrongActor, wrongChoice, response })
+  })
+  it('E167 N4 restoring the actual pending purchase resumes four rewards once and retains the final cattle order', () => {
+    const session = dairy(), pending = play(session, 'E167_DairyCrier')
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    sessions.push(restored)
+    const { response, visited } = resolveDairy(restored, restored.getState(), ['food', 'sheep', 'pass', 'food'])
+    assert.deepEqual(visited, [0, 1, 2, 3])
+    assert.deepEqual(response.state.players.map(player => player.resources.food), [2, 0, 0, 2])
+    assert.deepEqual(response.state.players.map(player => player.resources.sheep), [0, 2, 0, 0])
+    assert.deepEqual(response.state.players.map(player => player.resources.cattle), [1, 0, 0, 0])
+    save('E167-N4', { pending, snapshot, response })
+  })
 })

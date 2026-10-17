@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A004_Baseboards'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit09Immediate from './_helpers/audit/ae-negative-09-immediate'
 
 const CARD_ID = 'A004_Baseboards'
 
@@ -122,5 +125,35 @@ describe('A004_Baseboards session — altCosts', () => {
     if (resp.interaction.stateId !== 'wait') return
     const a4Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
     expect(a4Option).toBeUndefined()
+  })
+})
+
+describe('ae-negative-09-immediate', () => {
+  const { BASE, sessions, setup, buy, passed, deny, rooms, goods } = audit09Immediate
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A004 N1 printed payment shortage rejects before a legal companion retry', () => {
+    for (const food of [0, 1]) { const s = setup(BASE, { food }); deny(s, BASE); assert.equal(s.getState().state.players[0]!.resources.wood, 0) }
+  })
+  it('A004 N2 food and grain alternatives each pay once for two rooms', () => {
+    for (const resources of [{ food: 2, grain: 0 }, { food: 0, grain: 1 }]) { const r = buy(setup(BASE, resources), BASE); assert.deepEqual(goods(r), { food: 0, wood: 2, clay: 0, grain: 0 }); passed(r, BASE) }
+  })
+  it('A004 N3 three rooms and two actual people give one additional wood', () => {
+    const r = buy(setup(BASE, { food: 2 }, state => rooms(state.players[0]!, 3)), BASE)
+    assert.equal(r.state.players[0]!.rooms, 3); assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+    assert.deepEqual(goods(r), { food: 0, wood: 4, clay: 0, grain: 0 }); passed(r, BASE)
+  })
+  it('A004 N4 three rooms and three actual people give no additional wood', () => {
+    const r = buy(setup(BASE, { food: 2 }, state => rooms(state.players[0]!, 3, 3)), BASE)
+    assert.equal(r.state.players[0]!.workers.length, 5); assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 3)
+    assert.deepEqual(goods(r), { food: 0, wood: 3, clay: 0, grain: 0 }); passed(r, BASE)
+  })
+  it('A004 N5 only buyer rooms and people determine the immediate reward', () => {
+    const s = setup(BASE, { food: 2 }, state => rooms(state.players[1]!, 3)); const r = buy(s, BASE)
+    assert.deepEqual(goods(r), { food: 0, wood: 2, clay: 0, grain: 0 }); assert.deepEqual(goods(r, 1), { food: 40, wood: 0, clay: 0, grain: 0 }); passed(r, BASE)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, BASE))
+  })
+  it('A004 N6 actual passing purchase undo restores payment both hands and reward', () => {
+    const s = setup(BASE, { food: 2 }); const before = undoRuleSnapshot(s.getState()); passed(buy(s, BASE), BASE)
+    assertUndoRestored(before, s.undoAction()); const r = buy(s, BASE); assert.deepEqual(goods(r), { food: 0, wood: 2, clay: 0, grain: 0 }); passed(r, BASE)
   })
 })

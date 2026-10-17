@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -13,6 +13,9 @@ import '../../shared/cards/C/C055_Studio'
 import '../../shared/cards/D/D108_StoneCarver'
 import '../../shared/cards/D/D155_Ebonist'
 import '../../shared/cards/E/E109_BraidMaker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'E144_WaresSalesman'
 const FILLER = '__test_placeholder__'
@@ -255,5 +258,74 @@ describe('E144 Wares Salesman parity', () => {
     for (const [cardId, gains] of Object.entries(CONVERSION_REWARDS)) {
       expect(getCardDefinitionById(cardId)?.waresSalesmanGains, cardId).toEqual(gains)
     }
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, options, gains, save, setup, choose, source, finish, next, lesson, improvement, take, move } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E144 N1 actual paid craft majors reward correct building resource and reed to owner', () => {
+    for (const [card, key] of [['Major_Joinery', 'wood'], ['Major_Pottery', 'clay'], ['Major_Basket', 'reed']] as const) {
+      const s = setup('E144_WaresSalesman', 14, state => Object.assign(state.players[0]!.resources, { [key]: 2, stone: 2 }))
+      const r = finish(s, improvement(s, take(s, 'major-improvement'), card))
+      assert.equal(r.state.players[0]!.resources.stone, 0)
+      for (const k of ['wood', 'clay', 'reed'] as const)
+        assert.equal(r.state.players[0]!.resources[k], (k === key ? 1 : 0) + (k === 'reed' ? 1 : 0))
+      save(`E144-N1-${key}`, r)
+    }
+  })
+  it('E144 N2 opponent paid Joinery rewards owner while paid nonconverting Fireplace is excluded', () => {
+    for (const mode of ['opponent', 'fireplace', 'hand']) {
+      const s = setup('E144_WaresSalesman', 14, state => {
+        Object.assign(state.players[mode === 'opponent' ? 1 : 0]!.resources, mode === 'fireplace' ? { clay: 2 } : { wood: 2, stone: 2 })
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['E144_WaresSalesman']
+        }
+      })
+      let r
+      if (mode === 'opponent') {
+        move(s, 'forest')
+        next(s)
+        r = ok(s.takeAction(1, 'major-improvement'))
+        for (let n = 0; n < 8 && !r.state.players[1]!.improvements.includes('Major_Joinery'); n++)
+          r = choose(s, r, o => o.value === 'Major_Joinery' || o.value.startsWith('action-improvement-'))
+        r = finish(s, r)
+      }
+      else
+        r = finish(s, improvement(s, take(s, 'major-improvement'), mode === 'fireplace' ? 'Major_Fireplace1' : 'Major_Joinery'))
+      assert.equal(r.state.players[0]!.resources.reed, mode === 'opponent' ? 1 : 0)
+      assert.equal(r.state.players[0]!.resources.wood, mode === 'opponent' ? 4 : 0)
+      save(`E144-N2-${mode}`, r)
+    }
+  })
+  it('E144 N3 real multi-converter occupation offers exactly one corresponding resource choice', () => {
+    for (const key of ['wood', 'clay', 'reed', 'stone'] as const) {
+      const s = setup('E144_WaresSalesman', 14, state => state.players[0]!.occupationHand = ['E106_EmergencySeller'])
+      let r = lesson(s, 'E106_EmergencySeller')
+      if (r.interaction.stateId === 'wait' && r.interaction.sourceCard === 'E106_EmergencySeller')
+        r = choose(s, r, o => o.value === '__skip__')
+      r = source(s, r, 'E144_WaresSalesman')
+      save(`E144-N3-before-${key}`, r)
+      r = choose(s, r, o => gains(o, key) === (key === 'reed' ? 2 : 1) && (key !== 'reed' || !gains(o, 'wood') && !gains(o, 'clay') && !gains(o, 'stone')))
+      assert.equal(r.state.players[0]!.resources.food, 19)
+      for (const k of ['wood', 'clay', 'reed', 'stone'] as const)
+        assert.equal(r.state.players[0]!.resources[k], (k === key ? 1 : 0) + (k === 'reed' ? 1 : 0))
+      save(`E144-N3-${key}`, r)
+    }
+  })
+  it('E144 N4 forced unaffordable Joinery purchase rejects before a legal full-price Fireplace control', () => {
+    const s = setup('E144_WaresSalesman', 14, state => Object.assign(state.players[0]!.resources, { wood: 2, stone: 1, clay: 3 }))
+    let r = take(s, 'major-improvement')
+    if (!options(r).some(o => o.value === 'Major_Fireplace1'))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    assert.ok(!options(r).some(o => o.value === 'Major_Joinery'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Joinery'))
+    r = improvement(s, r, 'Major_Fireplace1')
+    assert.equal(r.state.players[0]!.resources.wood, 2)
+    assert.equal(r.state.players[0]!.resources.stone, 1)
+    assert.equal(r.state.players[0]!.resources.clay, 1)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    save('E144-N4', r)
   })
 })

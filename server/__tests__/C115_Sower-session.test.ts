@@ -4,6 +4,9 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C115_Sower'
 import type { AnytimeAction, ChoiceDescriptionPreview } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit03Crops from './_helpers/audit/ae-negative-03-crops'
 
 const collectDescriptionLabelKeys = (
   preview: ChoiceDescriptionPreview | undefined,
@@ -404,5 +407,82 @@ describe('C115_Sower session', () => {
     // Anytime should no longer be available
     const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C115-sower-anytime')
+  })
+})
+
+describe('ae-negative-03-crops', () => {
+  const { S, setup, playImprovement, wait, choice, finish, place, stack } = audit03Crops
+  describe('03 crops negative Session audit', () => {
+    it('C115 N1 only a successfully built own major adds one reed and failed payment adds none', () => {
+            const s = setup(S, state => { state.players[0]!.resources.clay = 2; });
+            const r = playImprovement(s, 'Major_Fireplace1', 'major-improvement');
+            assert.deepEqual(stack(r), ['reed']);
+            assert.equal(r.state.players[0]!.resources.clay, 0);
+            s.dispose();
+            const fail = setup(S, state => { state.players[0]!.resources.clay = 1; state.availableMajorImprovements = ['Major_Fireplace1']; });
+            assertRejectedUnchanged(fail, () => fail.takeAction(0, 'major-improvement'));
+            assert.deepEqual(stack(fail.getState()), []);
+            fail.dispose();
+        });
+    it('C115 N2 actual own minor and real opponent major grant no reed to Sower', () => {
+            const minor = setup(S, state => { state.players[0]!.minorHand = ['A030_BakingSheet']; state.players[0]!.resources.wood = 1; });
+            const r = playImprovement(minor, 'A030_BakingSheet', 'meeting-place');
+            assert.deepEqual(stack(r), []);
+            minor.dispose();
+            const other = setup(S, state => { state.players[1]!.resources.clay = 2; });
+            finish(other, place(other, 0, 'grain-seeds'));
+            const result = playImprovement(other, 'Major_Fireplace1', 'major-improvement', 1);
+            assert.deepEqual(stack(result), []);
+            other.dispose();
+        });
+    it('C115 N3 empty stack rejects anytime and taking one of two reeds cannot reenter its own pending', () => {
+            const empty = setup(S);
+            assertRejectedUnchanged(empty, () => empty.takeAnytimeAction(0, 'C115-sower-anytime'));
+            empty.dispose();
+            const s = setup(S, state => { state.players[0]!.cardStates[S] = { stack: ['reed', 'reed'] }; });
+            place(s, 0, 'farmland');
+            let r = s.takeAnytimeAction(0, 'C115-sower-anytime');
+            wait(r);
+            assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C115-sower-anytime'));
+            r = s.resolveChoice(0, choice(r));
+            assert.equal(r.ok, true, r.error);
+            assert.deepEqual(stack(r), ['reed']);
+            assert.equal(r.state.players[0]!.resources.reed, 1);
+            const undone = s.undoAction();
+            assert.equal(undone.ok, true, undone.error);
+            assert.deepEqual(stack(undone), ['reed', 'reed']);
+            assert.equal(undone.state.players[0]!.resources.reed, 0);
+            s.dispose();
+        });
+    it('C115 N4 sow consumes only the card reed and illegal crop or room leaves a legal retry', () => {
+            const s = setup(S, state => { const p = state.players[0]!; p.resources.grain = 1; p.resources.reed = 4; p.fields = [{ row: 0, col: 2, stacks: [] }]; p.cardStates[S] = { stack: ['reed'] }; });
+            let r = s.takeAnytimeAction(0, 'C115-sower-anytime');
+            r = s.resolveChoice(0, choice(r, 1));
+            r = s.resolveChoice(0, choice(r));
+            const i = wait(r);
+            assert.ok(i.request.kind === 'farm-select' && i.request.farm.farmType === 'sow');
+            assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 0, crop: 'grain' }] }));
+            assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'vegetable' }] }));
+            r = s.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] });
+            assert.equal(r.ok, true, r.error);
+            assert.equal(r.state.players[0]!.resources.grain, 0);
+            assert.equal(r.state.players[0]!.resources.reed, 4);
+            assert.deepEqual(stack(r), []);
+            assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }]);
+            assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C115-sower-anytime'));
+            s.dispose();
+        });
+    it('C115 N5 exchanging the last card reed with no legal sow target consumes no inventory reed or crop', () => {
+            const s = setup(S, state => { state.players[0]!.resources.reed = 4; state.players[0]!.resources.grain = 1; state.players[0]!.cardStates[S] = { stack: ['reed'] }; });
+            let r = s.takeAnytimeAction(0, 'C115-sower-anytime');
+            r = s.resolveChoice(0, choice(r, 1));
+            assert.equal(r.ok, true, r.error);
+            assert.deepEqual(stack(r), []);
+            assert.equal(r.state.players[0]!.resources.reed, 4);
+            assert.equal(r.state.players[0]!.resources.grain, 1);
+            assert.deepEqual(r.state.players[0]!.fields, []);
+            assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C115-sower-anytime'));
+            s.dispose();
+        });
   })
 })

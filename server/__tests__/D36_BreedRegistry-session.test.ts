@@ -4,7 +4,7 @@ import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D084_FeedPellets'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener } from '../../shared/cards/card-listeners'
 import { readCardExtraData, readCardInfobox } from '../../shared/cards/helpers/card-state'
@@ -17,6 +17,9 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionExecutionResult, ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D036_BreedRegistry'
+import assert from 'node:assert/strict'
+import { positionKey } from '../../shared/domain/farm'
+import * as audit34Scoring from './_helpers/audit/ae-negative-34-scoring'
 
 const CARD_ID = 'D036_BreedRegistry'
 const AFTER_SHEEP_GAIN = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-sheep-gain')!
@@ -452,4 +455,80 @@ describe('D036 Breed Registry parity', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.sheepConvertedToFood).toBe(true)
     expect(bonusScore(response)).toBe(0)
   })
+})
+
+describe('ae-negative-34-scoring', () => {
+  const { sessions, ok, options, save, setup, finish, next, completeRound, lesson, take, move, prerequisites, hand, buy, accept, pasture, animalKeep, bonus, printed, ownMajor, house, denyMinor, setPeople, completeRemaining, sheepKeep, otherActors } = audit34Scoring
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D036 N1 real printed purchase pays exact cost and excludes insufficient resources or prerequisite', () => { const card = 'D036_BreedRegistry', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { food: 40 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); save('D036-N1-legal', r); const denied = setup(card, 14, st => { hand(st, card); st.players[0]!.resources.sheep = 1; st.players[0]!.houseAnimals[positionKey(st.players[0]!.roomTiles[0]!)] = 'sheep'; }); denyMinor(denied, card); });
+  it('D036 N2 two ordinary sheep retain three bonus points after real breeding while three ordinary sheep exceed the limit', () => { const card = 'D036_BreedRegistry'; for (const n of [2, 3]) {
+      const s = setup(card, 5, st => { if (n === 2)
+          hand(st, card); pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }]); st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = n; });
+      if (n === 2) {
+          finish(s, buy(s, card));
+          move(s, 'grain-seeds');
+          next(s);
+      }
+      let r = sheepKeep(s, ok(s.takeAction(0, 'sheep-market')));
+      assert.equal(r.state.players[0]!.resources.sheep, n);
+      assert.equal(bonus(r, card), n === 2 ? 3 : 0);
+      assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.boardSheep, n);
+      save(`D036-N2-gain-${n}`, r);
+      if (n === 2) {
+          r = completeRemaining(s);
+          assert.equal(r.state.round, 6);
+          r = finish(s, completeRound(s));
+          assert.equal(r.state.round, 7);
+          r = sheepKeep(s, completeRound(s));
+          r = finish(s, r);
+          assert.equal(r.state.round, 8);
+          assert.equal(r.state.players[0]!.resources.sheep, 3);
+          assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.boardSheep, 2);
+          assert.equal(bonus(r, card), 3);
+          save('D036-N2-breed', r);
+      }
+  } });
+  it('D036 N3 actual sheep conversion before purchase disqualifies food conversion but preserves nonfood conversion', () => { const card = 'D036_BreedRegistry'; for (const food of [true, false]) {
+      const s = setup(card, 5, st => { hand(st, card); pasture(st, [{ row: 0, col: 3 }]); st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 1; if (food)
+          ownMajor(st, 'Major_Fireplace1');
+      else
+          st.players[0]!.occupationPlayed.push('B104_SheepWalker'); });
+      let r = ok(s.takeAction(0, 'sheep-market'));
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg');
+      finish(s, sheepKeep(s, r));
+      move(s, 'grain-seeds');
+      next(s);
+      r = ok(s.takeAnytimeAction(0, 'exchange'));
+      save(`D036-N3-catalog-${food}`, r);
+      const opt = options(r).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 1 && (food ? o.effectPreview?.resourcesGained?.food === 2 : o.effectPreview?.resourcesGained?.vegetable === 1));
+      assert.ok(opt, JSON.stringify(r.interaction));
+      r = ok(s.resolveChoice(0, opt.value));
+      r = finish(s, r);
+      assert.equal(r.state.players[0]!.resources.sheep, 0);
+      assert.equal(food ? r.state.players[0]!.resources.food : r.state.players[0]!.resources.vegetable, food ? 42 : 1);
+      r = buy(s, card);
+      assert.equal(bonus(r, card), food ? 0 : 3);
+      assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.sheepConvertedToFood ?? false, food);
+      save(`D036-N3-${food}`, r);
+  } });
+  it('D036 N4 real Consultant and Wood Worker gains cross the three sheep card-source threshold in four players', () => { const card = 'D036_BreedRegistry', s = setup(card, 10, st => { hand(st, card); house(st, 3, 'wood'); setPeople(st, 3); pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }]); st.players[0]!.occupationPlayed = ['A164_WoodWorker']; st.players[0]!.occupationHand = ['B102_Consultant']; }, 4); finish(s, buy(s, card)); otherActors(s); let r = sheepKeep(s, lesson(s, 'B102_Consultant')); r = finish(s, r); assert.equal(r.state.players[0]!.resources.sheep, 2); assert.equal(bonus(r, card), 3); save('D036-N4-two', r); otherActors(s); r = accept(s, ok(s.takeAction(0, 'forest')), 'A164_WoodWorker'); r = sheepKeep(s, r); r = finish(s, r); assert.equal(r.state.players[0]!.resources.sheep, 3); assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.cardSheep, 3); assert.equal(bonus(r, card), 0); save('D036-N4-three', r); });
+  it('D036 N5 real harvest shortage sheep food conversion before purchase removes the scoring bonus', () => { const card = 'D036_BreedRegistry', s = setup(card, 7, st => { hand(st, card); pasture(st, [{ row: 0, col: 3 }], 'sheep', 1); ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.food = 2; }); let r = completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']); if (r.interaction.stateId === 'wait' && r.interaction.spaceId === '__subflow:post-reap-anytime')
+      r = ok(s.resolveChoice(0, '__skip__')); save('D036-N5-feed', r); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed'); assert.equal(r.interaction.request.remaining, 2); const recipe = r.interaction.request.exchangeCatalog?.find(e => e.from.sheep === 1 && e.to.food === 2); assert.ok(recipe); r = ok(s.resolveChoice(0, 'confirm', { selections: [{ sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count: 1 }] })); r = finish(s, r); assert.equal(r.state.round, 8); assert.equal(r.state.players[0]!.resources.sheep, 0); assert.equal(r.state.players[0]!.resources.food, 0); assert.equal(r.state.players[0]!.resources.begging, 0); r = buy(s, card); assert.equal(bonus(r, card), 0); assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.sheepConvertedToFood, true); save('D036-N5-final', r); });
+  it('D036 N6 opponent sheep and unplayed card exclude the owner scoring effect', () => { for (const mode of ['opponent', 'hand']) {
+      const card = 'D036_BreedRegistry', s = setup(card, 14, st => { if (mode === 'hand')
+          hand(st, card);
+      else
+          st.currentPlayerIndex = 1; st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 1; });
+      let r = take(s, 'sheep-market');
+      r = animalKeep(s, r, req => { for (const z of req.zones) {
+          const house = req.zones.find(a => a.zoneType === 'house')?.id;
+          z.animalType = z.id === house ? 'sheep' : null;
+          z.animalCount = z.id === house ? 1 : 0;
+      } });
+      r = finish(s, r, true);
+      assert.equal(r.state.players[mode === 'opponent' ? 1 : 0]!.resources.sheep, 1);
+      assert.equal(bonus(r, card), mode === 'opponent' ? 3 : 0);
+      assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.boardSheep ?? 0, mode === 'opponent' ? 0 : 1);
+      save(`D036-N6-${mode}`, r);
+  } });
 })

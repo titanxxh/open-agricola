@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { D157_PartyOrganizer_impl } from '../../shared/cards/D/D157_PartyOrganizer'
 import {
@@ -15,6 +15,8 @@ import type {
 } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit56Family from './_helpers/audit/ae-negative-56-family'
 
 const CARD_ID = 'D157_PartyOrganizer'
 
@@ -162,3 +164,11 @@ describe('D157 Party Organizer — listener', () => {
 // Silence unused import warnings (kept for consistency / future tests)
 void buildOpponentLikePlayer
 void setWorkersAtHome
+
+describe('ae-negative-56-family', () => {
+  const { sessions, ok, save, make, finish, play, end, ready, people, bonus } = audit56Family
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D157 N1 actual next opponent fourth-to-fifth growth grants eight owner food exactly once across two different opponents',()=>{const s=make('D157_PartyOrganizer',st=>{st.currentPlayerIndex=1;people(st.players[1]!,4);people(st.players[2]!,5);setActiveWorkerCount(st.players[2]!,4)},true,14),first=finish(s,ok(s.takeAction(1,'urgent-wish-children')),true);assert.equal(familySize(first.state.players[1]!),5);assert.equal(first.state.players[0]!.resources.food,108);assert.equal(ready(s).state.currentPlayerIndex,2);const second=finish(s,ok(s.takeAction(2,'wish-children')),true);assert.equal(familySize(second.state.players[2]!),5);assert.equal(second.state.players[0]!.resources.food,108);save('D157-N1',{first,second})})
+  it('D157 N2 own fifth opponent fourth previously existing fifth and card only in hand do not grant eight food',()=>{for(const mode of['self','fourth','retro','hand']){const actor=mode==='self'||mode==='retro'?0:1,s=make('D157_PartyOrganizer',st=>{st.currentPlayerIndex=actor;people(st.players[actor]!,mode==='fourth'?3:4);if(mode==='retro')people(st.players[1]!,5)},mode!=='hand'&&mode!=='retro',14),r=mode==='retro'?finish(s,play(s,'D157_PartyOrganizer')):finish(s,ok(s.takeAction(actor,'urgent-wish-children')),true);assert.equal(r.state.players[0]!.resources.food,100);save(`D157-N2-${mode}`,r)}})
+  it('D157 N3 actual final scoring awards three bonus points only for unique owner family of five',()=>{for(const[owner,other]of[[4,2],[5,2],[5,5]]){const s=make('D157_PartyOrganizer',st=>{people(st.players[0]!,owner!);people(st.players[1]!,other!)},true,14),r=finish(s,end(s));assert.equal(r.state.gameOver,true);assert.equal(bonus(r,'D157_PartyOrganizer'),owner===5&&other<5?3:0);save(`D157-N3-${owner}-${other}`,r)}})
+})

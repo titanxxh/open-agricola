@@ -1,11 +1,15 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach, afterAll } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A076_Cob'
+import assert from 'node:assert/strict'
+import { writeFileSync } from './_helpers/audit-evidence-fs'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit10Timing from './_helpers/audit/ae-negative-10-timing'
 
 const CARD_ID = 'A076_Cob'
 const FILLER = '__test_placeholder__'
@@ -106,4 +110,20 @@ describe('A076 Cob parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, grain: 0, food: 20 })
     expect(response.state.roundPhase).toBe('work')
   })
+})
+
+describe('ae-negative-10-timing', () => {
+  const { COB, sessions, directory, evidence, record, setup, options, buy, deny, turn, complete, resources, exchange } = audit10Timing
+  afterAll(() => writeFileSync(`${directory}/native-responses.json`, JSON.stringify(evidence, null, 2)))
+  afterEach(context => sessions.splice(0).forEach(s => { record(`test-final:${context.task.name}`, s.getState()); s.dispose() }))
+  it('A076 N1 one food purchase has no immediate exchange and zero food rejects', () => { deny(setup(COB, { resources: { food: 0, clay: 1, grain: 2 } }), COB); const r = buy(setup(COB, { resources: { food: 1, clay: 1, grain: 2 } }), COB); assert.deepEqual(resources(r), { clay: 1, grain: 2, food: 0 }) })
+  it('A076 N2 natural work phase accepts exactly one grain and cannot repeat in same phase', () => { const s = setup(COB, { played: true, resources: { clay: 1, grain: 2 } }); const offer = complete(s); const acceptedValue = options(offer).find(o => o.value !== '__skip__' && !('disabled' in o && o.disabled))?.value; assert.ok(acceptedValue); let r = exchange(s, offer); assert.equal(r.state.round, 6); assert.deepEqual(resources(r), { clay: 3, grain: 1, food: 43 }); const beforeResources = resources(r); record('stale-cob', assertRejectedUnchanged(s, () => s.resolveChoice(0, acceptedValue))); r = turn(s, 0, 'reed-bank'); assert.deepEqual(resources(r), beforeResources) })
+  it('A076 N3 decline preserves crops and clay and next phase offers once again', () => { const s = setup(COB, { played: true, resources: { clay: 1, grain: 2 } }); let r = exchange(s, complete(s), false); assert.deepEqual(resources(r), { clay: 1, grain: 2, food: 42 }); r = exchange(s, complete(s)); assert.equal(r.state.round, 7); assert.deepEqual(resources(r), { clay: 3, grain: 1, food: 45 }) })
+  it('A076 N4 zero clay cannot exchange despite grain and opponent clay', () => { const s = setup(COB, { played: true, resources: { clay: 0, grain: 1 } }, state => { state.players[1]!.resources.clay = 3 }); const r = complete(s); assert.equal(r.interaction.stateId, 'idle'); assert.deepEqual(resources(r), { clay: 0, grain: 1, food: 42 }); record('no-clay', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'pay-gain'))) })
+  it('A076 N5 zero grain cannot exchange despite clay and opponent grain', () => { const s = setup(COB, { played: true, resources: { clay: 1, grain: 0 } }, state => { state.players[1]!.resources.grain = 3 }); const r = complete(s); assert.equal(r.interaction.stateId, 'idle'); assert.deepEqual(resources(r), { clay: 1, grain: 0, food: 42 }); record('no-grain', assertRejectedUnchanged(s, () => s.resolveChoice(0, 'pay-gain'))) })
+  it('A076 N6 exact last grain exchange leaves no grain and never spends prerequisite clay', () => { const s = setup(COB, { played: true, resources: { clay: 1, grain: 1 } }); const r = exchange(s, complete(s)); assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 }) })
+  it('A076 N7 unplayed card never exchanges during a natural work phase', () => { const s = setup(COB, { resources: { clay: 1, grain: 1 } }); const r = complete(s); assert.equal(r.interaction.stateId, 'idle'); assert.deepEqual(resources(r), { clay: 1, grain: 1, food: 42 }) })
+  it('A076 N8 gaining clay during work waits until the next natural work phase', () => { const s = setup(COB, { played: true, resources: { grain: 1 } }); let r = turn(s, 0, 'clay-pit'); assert.equal(r.state.players[0]!.resources.clay, 1); assert.equal(r.state.players[0]!.resources.grain, 1); turn(s, 1, 'forest'); turn(s, 0, 'day-laborer'); r = record('midwork-clay-confirm', confirmNext(s, turn(s, 1, 'reed-bank'))); r = exchange(s, r); assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 }) })
+  it('A076 N9 whole purchase undo restores food hand and exchange resources before retry', () => { const s = setup(COB, { resources: { clay: 1, grain: 1 } }); const before = undoRuleSnapshot(s.getState()); buy(s, COB); assertUndoRestored(before, record('undo-cob-buy', s.undoAction())); const r = buy(s, COB); assert.deepEqual(resources(r), { clay: 1, grain: 1, food: 39 }) })
+  it('A076 N10 actual work phase exchange undo records exposed eligibility before any retry', () => { const s = setup(COB, { played: true, resources: { clay: 1, grain: 1 } }); const offer = complete(s); const before = undoRuleSnapshot(offer); let r = exchange(s, offer); assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 }); const undone = record('undo-cob-phase', s.undoStep()); if (!undone.ok) { assert.equal(undone.error, 'no history to undo'); assert.deepEqual(resources(undone), { clay: 3, grain: 0, food: 43 }); return } assert.deepEqual(JSON.parse(undoRuleSnapshot(undone)), JSON.parse(before)); r = exchange(s, undone); assert.deepEqual(resources(r), { clay: 3, grain: 0, food: 43 }) })
 })

@@ -1,5 +1,5 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -7,6 +7,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import type { Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C103_GreenGrocer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit46Preparation from './_helpers/audit/ae-negative-46-preparation'
 
 const CARD_ID = 'C103_GreenGrocer'
 const FILLER = '__test_placeholder__'
@@ -166,4 +169,12 @@ describe('C103 Green Grocer parity', () => {
       food: 0, grain: 0, vegetable: 0, sheep: 0, cattle: 0,
     })
   })
+})
+
+describe('ae-negative-46-preparation', () => {
+  const { GREEN, sessions, save, ok, finish, lesson, bonus, isCardPending, boundary, prepMake, garden, exchange } = audit46Preparation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C103 N1 actual Lessons grants no immediate exchange and all six native next round recipes pay and gain exactly once',()=>{const a=lesson(prepMake(GREEN,()=>{},false),GREEN);assert.equal(bonus(a,GREEN),0);for(const[costKey,cost,gainKey,gain]of[['cattle',1,'vegetable',1],['vegetable',1,'cattle',1],['sheep',2,'vegetable',1],['vegetable',1,'sheep',2],['food',2,'grain',1],['grain',1,'food',2]] as const){const s=prepMake(GREEN,state=>{const p=state.players[0]!;Object.assign(p.resources,{food:0,grain:0,vegetable:0});garden(state,costKey==='sheep'?2:0,costKey==='cattle'?1:0);p.resources[costKey]=cost}),pending=boundary(s,GREEN),r=exchange(s,pending,GREEN,{[costKey]:cost},{[gainKey]:gain});assert.equal(r.state.players[0]!.resources[costKey],0);assert.equal(r.state.players[0]!.resources[gainKey],gain);assert.ok(!isCardPending(r,GREEN));assert.equal(r.state.round,9);assert.equal(r.state.players[1]!.resources[gainKey],pending.state.players[1]!.resources[gainKey]);save(`C103-N1-${costKey}-${gainKey}`,{a,pending,r})}})
+  it('C103 N2 decline zero stock and card only in hand never exchange and a forged recipe leaves the live choice before legal retry',()=>{const s=prepMake(GREEN,state=>{Object.assign(state.players[0]!.resources,{food:0,grain:1})}),pending=boundary(s,GREEN),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__invalid_green_recipe__')),declined=finish(s,pending,false);assert.equal(declined.state.players[0]!.resources.grain,1);assert.equal(declined.state.players[0]!.resources.food,0);for(const mode of['stock','hand']){const t=prepMake(GREEN,state=>Object.assign(state.players[0]!.resources,{food:0,grain:mode==='stock'?0:1}),mode!=='hand'),r=boundary(t,GREEN);assert.ok(!isCardPending(r,GREEN));assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.resources.grain,mode==='stock'?0:1);save(`C103-N2-${mode}`,r)}save('C103-N2',{pending,bad,declined})})
+  it('C103 N3 a trade cannot trigger a second reciprocal trade or repeat during ordinary work in that round',()=>{const s=prepMake(GREEN,state=>Object.assign(state.players[0]!.resources,{food:2,grain:0})),pending=boundary(s,GREEN),r=exchange(s,pending,GREEN,{food:2},{grain:1});assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,0);const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__old_green_recipe__')),mid=ok(s.takeAction(0,'meeting-place'));assert.equal(mid.state.players[0]!.resources.grain,1);assert.equal(mid.state.players[0]!.resources.food,0);save('C103-N3',{pending,r,bad,mid})})
 })

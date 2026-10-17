@@ -1,13 +1,16 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A156_Buyer'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit17Trade from './_helpers/audit/ae-negative-17-trade'
 
 describe('A156_Buyer session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -279,4 +282,13 @@ describe('A156 Buyer parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, stone: 1 })
     expect(response.state.players[1]!.resources).toMatchObject({ food: 1, stone: 2 })
   })
+})
+
+describe('ae-negative-17-trade', () => {
+  const { BUYER, sessions, save, ok, setup, turn, finish, offer, material, prepareHousing, pile } = audit17Trade
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A156 N1 actual opponent reed stone sheep and pig accumulation transfers one food for one matching good',()=>{for(const [space,type] of [['reed-bank','reed'],['western-quarry','stone'],['eastern-quarry','stone'],['sheep-market','sheep'],['pig-market','boar']]as const){const s=setup(BUYER,{food:1},true,state=>{prepareHousing(state);pile(state,space,type,1)});const pending=offer(s,space),r=finish(s,pending);assert.equal(material(r).food,2);assert.equal(material(r,1).food,21);assert.equal(material(r)[type],1);assert.equal(material(r,2)[type],0);save(`A156-N1-${space}`,{pending,r})}})
+  it('A156 N2 decline zero food hand own and unrelated spaces cannot pay or gain',()=>{const ds=setup(BUYER,{food:1});const declined=finish(ds,offer(ds,'reed-bank'),false);assert.equal(material(declined).reed,0);assert.equal(material(declined).food,3);const poor=setup(BUYER,{food:0});turn(poor,0,'grain-seeds');const denied=finish(poor,turn(poor,1,'reed-bank'),false);assert.equal(material(denied).food,0);assert.equal(material(denied).reed,0);for(const played of[false,true]){const s=setup(BUYER,{food:1},played);const r=played?turn(s,0,'reed-bank'):finish(s,offer(s,'reed-bank'));assert.equal(material(r).food,played?1:3);assert.equal(material(r,1).food,20);save(`A156-N2-${played}`,r)}save('A156-N2',{declined,denied})})
+  it('A156 N3 empty opponent pile rejects without a food transfer or general supply good',()=>{const s=setup(BUYER,{food:1},true,state=>pile(state,'reed-bank','reed',0));finish(s,turn(s,0,'day-laborer'));const r=assertEmptyAccumulationRejected(s,1,'reed-bank');assert.equal(material(r).reed,0);assert.equal(material(r).food,3);assert.equal(material(r,1).reed,0);assert.equal(material(r,1).food,20);save('A156-N3',r)})
+  it('A156 N4 invalid wrong actor and stale commands cannot transfer food twice',()=>{const s=setup(BUYER,{food:1});let pending=offer(s,'reed-bank');while(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='confirm-player-switch')pending=ok(s.resolveChoice(pending.interaction.request.fromPlayerIndex,'confirm'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'buy-five'));const c=pending.interaction.request.options.find(o=>o.value!=='__skip__');assert.ok(c);assertRejectedUnchanged(s,()=>s.resolveChoice(1,c.value));const r=finish(s,pending);assertRejectedUnchanged(s,()=>s.resolveChoice(0,c.value));assert.equal(material(r).reed,1);assert.equal(material(r,1).food,21);save('A156-N4',r)})
 })

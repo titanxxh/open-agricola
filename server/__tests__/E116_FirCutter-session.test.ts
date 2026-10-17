@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import {
@@ -8,6 +8,8 @@ import {
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E116_FirCutter'
+import assert from 'node:assert/strict'
+import * as audit49Work from './_helpers/audit/ae-negative-49-work'
 
 const CARD_ID = 'E116_FirCutter'
 const FILLER = '__test_placeholder__'
@@ -161,4 +163,12 @@ describe('E116 Fir Cutter parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[1]!.resources.wood).toBe(0)
   })
+})
+
+describe('ae-negative-49-work', () => {
+  const { FIR, sessions, save, ok, make, lesson, ready, action, rooms, wood } = audit49Work
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E116 N1 real Fir Cutter purchase grants only one food and whole undo removes it before one replay',()=>{const s=make(FIR,false),a=lesson(s,FIR);assert.equal(a.state.players[0]!.resources.food,101);assert.equal(wood(a),0);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.food,100);const r=lesson(s,FIR);assert.equal(r.state.players[0]!.resources.food,101);save('E116-N1',{a,u,r})})
+  it('E116 N2 five existing people use real first through fifth owner placements and an actual sheep market gives the literal one one two two three wood schedule',()=>{for(const[ordinal,expected]of[[1,1],[2,1],[3,2],[4,2],[5,3]] as const){const s=make(FIR,true,state=>{rooms(state,5);state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1}),before=[];for(let n=0;n<ordinal-1;n++){before.push(action(s,0,['grain-seeds','day-laborer','reed-bank','fishing'][n]!));const r=ready(s);if(r.state.currentPlayerIndex===1)before.push(action(s,1,n===0?'meeting-place':'farmland'))}const r=action(s,0,'sheep-market');assert.equal(wood(r),expected);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(Object.values(r.state.players[0]!.houseAnimals).filter(a=>a==='sheep').length,1);assert.equal(wood(r,1),0);save(`E116-N2-${ordinal}`,{before,r})}})
+  it('E116 N3 ordinary clay and an actual opponent animal market or a card only in hand never grant owner wood',()=>{const clay=action(make(FIR,true,state=>state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1),0,'clay-pit');assert.equal(wood(clay),0);const s=make(FIR,true,state=>state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1);action(s,0,'grain-seeds');const opponent=action(s,1,'sheep-market');assert.equal(wood(opponent),0);const t=make(FIR,false,state=>state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1),hand=action(t,0,'sheep-market');assert.equal(wood(hand),0);save('E116-N3',{clay,opponent,hand})})
 })

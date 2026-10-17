@@ -1,5 +1,5 @@
 import { descriptionEffects } from './_helpers/choice-description'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -8,6 +8,8 @@ import '../../shared/cards/E/E103_Wolf'
 import '../../shared/cards/B/B040_BreweryPond'
 import '../../shared/cards/C/C102_TreeGuard'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import assert from 'node:assert/strict'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'E103_Wolf'
 const BREWERY_POND = 'B040_BreweryPond'
@@ -208,4 +210,12 @@ describe('E103 Wolf parity', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual(['clay', 'wood'])
   })
 
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, ready, lesson, wolfFarm, ownerTurn } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E103 N1 actual Lessons builds clay wood grain stack and successive matching gains consume each top once and grant three legally housed pigs', () => { const s = make('E103_Wolf', wolfFarm, false, 8), played = finish(s, lesson(s, 'E103_Wolf'), false); assert.deepEqual(played.state.players[0]!.cardStates.E103_Wolf?.stack, ['clay', 'wood', 'grain']); ownerTurn(s); const grain = finish(s, ok(s.takeAction(0, 'grain-seeds'))); assert.equal(grain.state.players[0]!.resources.grain, 2); assert.equal(grain.state.players[0]!.resources.boar, 1); assert.deepEqual(grain.state.players[0]!.cardStates.E103_Wolf?.stack, ['clay', 'wood']); ownerTurn(s); const wood = finish(s, ok(s.takeAction(0, 'forest'))); assert.equal(wood.state.players[0]!.resources.wood, 7); assert.equal(wood.state.players[0]!.resources.boar, 2); assert.deepEqual(wood.state.players[0]!.cardStates.E103_Wolf?.stack, ['clay']); ownerTurn(s); const clay = finish(s, ok(s.takeAction(0, 'clay-pit'))); assert.equal(clay.state.players[0]!.resources.clay, 5); assert.equal(clay.state.players[0]!.resources.boar, 3); assert.deepEqual(clay.state.players[0]!.cardStates.E103_Wolf?.stack, []); save('E103-N1', { played, grain, wood, clay }) })
+  it('E103 N2 nonmatching clay gain cannot claim lower stack item and declined matching grain leaves all three goods intact', () => { const s = make('E103_Wolf', wolfFarm, false), played = finish(s, lesson(s, 'E103_Wolf'), false); ownerTurn(s); const r = finish(s, ok(s.takeAction(0, 'clay-pit'))); assert.equal(r.state.players[0]!.resources.boar, 0); assert.deepEqual(r.state.players[0]!.cardStates.E103_Wolf?.stack, ['clay', 'wood', 'grain']); const c = make('E103_Wolf', wolfFarm, false), cp = finish(c, lesson(c, 'E103_Wolf'), false); ownerTurn(c); const cr = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); assert.equal(cr.state.players[0]!.resources.grain, 1); assert.equal(cr.state.players[0]!.resources.boar, 0); assert.deepEqual(cr.state.players[0]!.cardStates.E103_Wolf?.stack, ['clay', 'wood', 'grain']); save('E103-N2', { played, r, cp, cr }) })
+  it('E103 N3 real opponent Grain Seeds cannot claim owners top grain and hand-only Wolf grants no pig', () => { const s = make('E103_Wolf', wolfFarm, false), played = finish(s, lesson(s, 'E103_Wolf'), false); ready(s); const r = finish(s, ok(s.takeAction(1, 'grain-seeds'))); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.boar, 0); assert.deepEqual(r.state.players[0]!.cardStates.E103_Wolf?.stack, ['clay', 'wood', 'grain']); const c = make('E103_Wolf', wolfFarm, false), cr = finish(c, ok(c.takeAction(0, 'grain-seeds'))); assert.equal(cr.state.players[0]!.resources.grain, 1); assert.equal(cr.state.players[0]!.resources.boar, 0); save('E103-N3', { played, r, cr }) })
 })

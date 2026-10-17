@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C168_AnimalCatcher'
+import assert from 'node:assert/strict'
+import { assertRuleOutcome, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as auditC168 from './_helpers/audit/ae-negative-C168'
 
 const CARD_ID = 'C168_AnimalCatcher'
 const ANIMALS = ['sheep', 'boar', 'cattle'] as const
@@ -109,5 +112,56 @@ describe('C168 Animal Catcher committed replacement', () => {
     const response = setup().takeAction(0, 'grain-seeds')
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 10, sheep: 0, boar: 0, cattle: 0 })
     expect(response.interaction.request.kind).toBe('confirm-next-player')
+  })
+})
+
+describe('ae-negative-C168', () => {
+  const { CARD, sessions, setup, choose, houseAnimals, totals } = auditC168
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('C168 negative audit: only Day Laborer base food is replaceable', () => {
+    it('N1 replacing E059 extra food loses the wrong reward', () => {
+      const session = setup()
+      assert.equal(session.takeAction(0, 'day-laborer').ok, true)
+      const replaced = choose(session, true)
+      if (replaced.interaction.stateId === 'wait' && replaced.interaction.request.kind === 'choice') choose(session, false)
+      const result = houseAnimals(session)
+      assertRuleOutcome(totals(result), { food: 5, sheep: 1, boar: 1, cattle: 1 })
+    })
+    it('N2 one Day Laborer use must not offer a second animal replacement', () => {
+      const session = setup()
+      assert.equal(session.takeAction(0, 'day-laborer').ok, true)
+      const r = choose(session, true)
+      const secondOffer = r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.request.options.some(o => o.sourceCard === CARD)
+      assertRuleOutcome(secondOffer, false)
+    })
+    it('N3 replacing the base reward preserves the independent extra food and charges once', () => {
+      const session = setup()
+      assert.equal(session.takeAction(0, 'day-laborer').ok, true)
+      choose(session, true)
+      const result = houseAnimals(session)
+      assert.deepEqual(totals(result), { food: 5, sheep: 1, boar: 1, cattle: 1 })
+      assert.equal(result.scores?.length, 4)
+      assert.equal(result.state.events.filter(event => event.type === 'resource.paid' && event.resources.food === 6).length, 1)
+    })
+    it('N4 declining replacements preserves both ordinary food rewards', () => {
+      const session = setup()
+      session.takeAction(0, 'day-laborer')
+      const r = choose(session, false)
+      assert.deepEqual(totals(r), { food: 13, sheep: 0, boar: 0, cattle: 0 })
+    })
+    it('N5 insufficient food follows the accepted blocked path, with full undo and legal retry', () => {
+      const session = setup(5, false)
+      const baseline = undoRuleSnapshot(session.getState())
+      session.takeAction(0, 'day-laborer')
+      const blocked = choose(session, true)
+      assert.ok(blocked.interaction.stateId === 'wait' && blocked.interaction.request.kind === 'engine-blocked')
+      assert.equal(blocked.state.players[0]!.resources.food, 5)
+      const undone = session.undoAction()
+      assert.equal(undone.ok, true, undone.error)
+      assertUndoRestored(baseline, undone)
+      session.takeAction(0, 'day-laborer')
+      const retry = choose(session, false)
+      assert.deepEqual(totals(retry), { food: 7, sheep: 0, boar: 0, cattle: 0 })
+    })
   })
 })

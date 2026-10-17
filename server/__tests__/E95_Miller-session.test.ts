@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -6,6 +6,23 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E095_Miller'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import '../../shared/cards/A/A116_WoodCutter'
+import '../../shared/cards/B/B081_Handcart'
+import '../../shared/cards/E/E092_FieldDoctor'
+import '../../shared/cards/E/E093_Motivator'
+import '../../shared/cards/E/E094_Prophet'
+import '../../shared/cards/E/E097_Beneficiary'
+import '../../shared/cards/E/E130_Overachiever'
+import '../../shared/cards/E/E132_VeggieLover'
+import '../../shared/cards/E/E135_Pickler'
+import '../../shared/cards/E/E147_AnimalDriver'
+import '../../shared/cards/E/E164_MountainPlowman'
+import '../../shared/cards/E/E165_MasterHuntsman'
+import '../../shared/cards/E/E166_Roastmaster'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit45Miller from './_helpers/audit/ae-negative-45-miller'
+import assert from 'node:assert/strict'
+import * as audit45Placement from './_helpers/audit/ae-negative-45-placement'
 
 describe('E095_Miller session', () => {
   /**
@@ -257,4 +274,85 @@ describe('E095_Miller session', () => {
     expect(resp.state.players[0]!.occupationPlayed).toContain('E095_Miller')
     expect(resp.state.players[0]!.improvements).toContain('Major_Fireplace1')
   })
+})
+
+describe('ae-negative-45-miller', () => {
+  const { setupOccupation, playOccupation, chooseNonSkip, chooseSkip, sessions, it, optionsOf, requestOf } = audit45Miller
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('E095 Miller parity', () => {
+    const available = () => {
+      const session = setupOccupation('E095_Miller', { resources: { clay: 2 } })
+      session.state.availableMajorImprovements = ['Major_Fireplace1']
+      session.loadState(session.state)
+      return session
+    }
+    it('E095 S1: playing may immediately build a paid Fireplace', () => {
+      const session = available()
+      let response = chooseNonSkip(session, playOccupation(session, 'E095_Miller'), 'E095_Miller')
+      if (response.interaction.stateId === 'wait') {
+        const fireplace = optionsOf(response)?.find((option) => option.value === 'Major_Fireplace1')
+        if (fireplace)
+          response = session.resolveChoice(0, fireplace.value)
+      }
+      expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    })
+    it('E095 S2: the immediate baking improvement may be declined', () => {
+      const session = available()
+      const response = chooseSkip(session, playOccupation(session, 'E095_Miller'), 'E095_Miller')
+      expect(response.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
+    })
+    it('E095 S3: another player using Grain Seeds offers the owner Bake Bread', () => {
+      const session = setupOccupation('E095_Miller', { played: true, resources: { grain: 1 } })
+      session.state.players[0]!.improvements = ['Major_Fireplace1']
+      session.state.availableMajorImprovements = session.state.availableMajorImprovements.filter((id) => id !== 'Major_Fireplace1')
+      session.state.currentPlayerIndex = 1
+      session.loadState(session.state)
+      let response = session.takeAction(1, 'grain-seeds')
+      expect(response.interaction.stateId === 'wait' ? requestOf(response).kind : undefined).toBe('confirm-player-switch')
+      response = confirmPlayerSwitch(session)
+      expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).toBe('E095_Miller')
+    })
+    it('E095 N4 non baking affordable Well is excluded before a legal paid Fireplace control', () => {
+      const session = available()
+      session.state.availableMajorImprovements = ['Major_Fireplace1', 'Major_Well']
+      Object.assign(session.state.players[0]!.resources, { wood: 2, stone: 3 })
+      session.loadState(session.state)
+      let r = chooseNonSkip(session, playOccupation(session, 'E095_Miller'), 'E095_Miller')
+      expect(optionsOf(r).some(o => o.value === 'Major_Well')).toBe(false)
+      assertRejectedUnchanged(session, () => session.resolveChoice(0, 'Major_Well'))
+      if (!r.state.players[0]!.improvements.includes('Major_Fireplace1'))
+        r = session.resolveChoice(0, 'Major_Fireplace1')
+      expect(r.ok, r.error).toBe(true)
+      expect(r.state.players[0]!.improvements).toContain('Major_Fireplace1')
+      expect(r.state.players[0]!.improvements).not.toContain('Major_Well')
+      expect(r.state.players[0]!.resources).toMatchObject({ clay: 0, wood: 2, stone: 3 })
+    })
+  })
+})
+
+describe('ae-negative-45-placement', () => {
+  const { sessions, save, ok, setup, choice, finish, next, actorOf } = audit45Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E095 N1 actual opponent Grain Seeds allows owner to bake one grain exactly two food while optional decline retains grain', () => { for (const accept of [true, false]) {
+    const s = setup('E095_Miller', state => { state.players[0]!.improvements = ['Major_Fireplace1']; state.availableMajorImprovements = state.availableMajorImprovements.filter(c => c !== 'Major_Fireplace1'); state.players[0]!.resources.grain = 1; })
+    finish(s, ok(s.takeAction(0, 'forest')))
+    next(s)
+    let r = ok(s.takeAction(1, 'grain-seeds'))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+      r = ok(s.resolveChoice(actorOf(r), 'confirm', { zones: r.interaction.request.zones }))
+    else if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch')
+      r = ok(s.resolveChoice(1, 'confirm'))
+    if (accept) {
+      r = choice(s, r, o => o.value !== '__skip__')
+      if (r.state.players[0]!.resources.grain === 1)
+        r = choice(s, r, o => o.value === 'Major_Fireplace1')
+    }
+    else
+      r = finish(s, r)
+    assert.equal(r.state.players[0]!.resources.grain, accept ? 0 : 1)
+    assert.equal(r.state.players[0]!.resources.food, accept ? 4 : 2)
+    assert.equal(r.state.players[1]!.resources.grain, 1)
+    save(`E095-N1-${accept}`, r)
+  } })
+  it('E095 N2 owner Grain Seeds and unrelated opponent action cannot bake for owner', () => { const s = setup('E095_Miller', state => { state.players[0]!.improvements = ['Major_Fireplace1']; state.availableMajorImprovements = state.availableMajorImprovements.filter(c => c !== 'Major_Fireplace1'); state.players[0]!.resources.grain = 1; }); let r = finish(s, ok(s.takeAction(0, 'grain-seeds'))); assert.equal(r.state.players[0]!.resources.grain, 2); next(s); r = finish(s, ok(s.takeAction(1, 'forest'))); assert.equal(r.state.players[0]!.resources.grain, 2); assert.equal(r.state.players[0]!.resources.food, 2); save('E095-N2', r); })
 })

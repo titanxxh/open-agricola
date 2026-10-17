@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D114_SeedTrader'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'D114_SeedTrader'
 const ANYTIME_ID = 'D114-seed-trader-anytime'
@@ -130,5 +133,38 @@ describe('D114 Seed Trader parity', () => {
 
     expect(anytimeIds(pending)).not.toContain(ANYTIME_ID)
     expect(session.takeAnytimeAction(0, ANYTIME_ID).ok).toBe(false)
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, save, seedBuy, seedSetup } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D114 N1 real play creates two of each stock and four paid anytime purchases resume same real plow then reject fifth', () => {
+    const { s } = seedSetup(10)
+    for (const kind of ['grain', 'vegetable', 'grain', 'vegetable'] as const)
+      seedBuy(s, kind)
+    const r = s.getState()
+    assert.equal(r.state.players[0]!.resources.food, 0)
+    assert.equal(r.state.players[0]!.resources.grain, 2)
+    assert.equal(r.state.players[0]!.resources.vegetable, 2)
+    assert.deepEqual(r.state.players[0]!.cardStates.D114_SeedTrader?.counters, { grain: 0, vegetable: 0 })
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'D114-seed-trader-anytime'))
+    save('D114-N1', r)
+  })
+  it('D114 N2 shortage excludes both with one food and vegetable alone after two affordable grain purchases', () => {
+    for (const food of [1, 6]) {
+      const { s } = seedSetup(food)
+      if (food === 6) {
+        seedBuy(s, 'grain')
+        seedBuy(s, 'grain')
+      }
+      assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'D114-seed-trader-anytime'))
+      const r = s.getState()
+      assert.equal(r.state.players[0]!.resources.food, food === 1 ? 1 : 2)
+      assert.equal(r.state.players[0]!.resources.grain, food === 1 ? 0 : 2)
+      assert.equal(r.state.players[0]!.resources.vegetable, 0)
+      assert.deepEqual(r.state.players[0]!.cardStates.D114_SeedTrader?.counters, { grain: food === 1 ? 2 : 0, vegetable: 2 })
+      save(`D114-N2-${food}`, r)
+    }
   })
 })

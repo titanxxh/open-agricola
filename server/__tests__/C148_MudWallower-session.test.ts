@@ -1,7 +1,7 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -16,6 +16,9 @@ import {
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C148_MudWallower'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'C148_MudWallower'
 
@@ -450,5 +453,84 @@ describe('C148 Mud Wallower public session', () => {
       houseAnimals: { '1-0': 'boar' },
     })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(2)
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, finish, next, play, take, move, farm, wallow, wallowRound } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C148 N1 real onBuy eight accumulation placements create two held pigs and natural breeding houses newborn elsewhere', () => {
+    const s = setup('C148_MudWallower', 5, state => farm(state, 0))
+    let r = wallow(s, play(s, 'C148_MudWallower'))
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.counter, 0)
+    r = wallowRound(s, ['forest', 'reed-bank', 'day-laborer', 'clay-pit', 'grain-seeds', 'fishing', 'copse'])
+    assert.equal(r.state.round, 6)
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.counter, 1)
+    r = wallowRound(s, ['forest', 'clay-pit', 'reed-bank', 'day-laborer', 'fishing', 'grain-seeds', 'copse', 'hollow-4'])
+    assert.equal(r.state.round, 7)
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.counter, 3)
+    r = wallow(s, take(s, 'reed-bank'))
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.counter, 0)
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 1)
+    assert.equal(r.state.players[0]!.resources.boar, 1)
+    save('C148-N1-fourth', r)
+    r = wallowRound(s, ['clay-pit', 'copse', 'day-laborer', 'forest', 'grain-seeds', 'fishing', 'hollow-4'])
+    assert.equal(r.state.round, 8)
+    r = wallowRound(s, ['forest', 'clay-pit', 'reed-bank', 'day-laborer', 'fishing', 'grain-seeds', 'copse', 'hollow-4'])
+    assert.equal(r.state.round, 9)
+    r = wallow(s, take(s, 'reed-bank'))
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 2)
+    assert.equal(r.state.players[0]!.resources.boar, 2)
+    save('C148-N1-eighth', r)
+    r = wallowRound(s, ['clay-pit', 'copse', 'day-laborer', 'forest', 'grain-seeds', 'fishing', 'hollow-4'])
+    assert.equal(r.state.round, 10)
+    assert.equal(r.state.players[0]!.resources.boar, 3)
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 2)
+    assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 1)
+    save('C148-N1-bred', r)
+  })
+  it('C148 N2 real nonaccumulation and opponent placements do not advance owned accumulation counter', () => {
+    const s = setup('C148_MudWallower', 5)
+    finish(s, play(s, 'C148_MudWallower'))
+    move(s, 'forest')
+    move(s, 'reed-bank')
+    move(s, 'grain-seeds')
+    const r = move(s, 'day-laborer')
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.counter, 0)
+    assert.equal(r.state.players[0]!.resources.boar, 0)
+    save('C148-N2', r)
+  })
+  it('C148 N3 moving a newly created held pig permanently removes capacity and ordinary pig cannot refill card', () => {
+    const s = setup('C148_MudWallower', 9, state => { farm(state, 0); state.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = 1; })
+    wallow(s, play(s, 'C148_MudWallower'))
+    wallowRound(s, ['forest', 'reed-bank', 'day-laborer', 'clay-pit', 'grain-seeds', 'fishing', 'copse'])
+    wallowRound(s, ['forest', 'clay-pit', 'reed-bank', 'day-laborer', 'fishing', 'grain-seeds', 'copse', 'hollow-4'])
+    let r = take(s, 'reed-bank')
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 1)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+    const p = r.interaction.request.zones.find(z => z.zoneType === 'pasture')!
+    r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...p, animalType: 'boar', animalCount: 1, animalCounts: { boar: 1 } }] }))
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 0)
+    move(s, 'forest')
+    move(s, 'clay-pit')
+    move(s, 'grain-seeds')
+    next(s)
+    assert.equal(s.state.round, 11)
+    const market = s.state.actionSpaces.find(a => a.id === 'pig-market')!
+    const reveal = s.state.roundActionOrder.indexOf('pig-market') + 1
+    assert.ok(reveal >= 8 && reveal <= 9)
+    save('C148-N3-before-market', s.getState())
+    assert.equal(market.resources.boar, 3)
+    r = take(s, 'pig-market')
+    save('C148-N3-pig-arrival', r)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+    assert.ok(!r.interaction.request.zones.some(z => z.id === 'card:C148_MudWallower'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ id: 'card:C148_MudWallower', zoneType: 'card', animalType: 'boar', animalCount: 4 }] }))
+    const pasture = r.interaction.request.zones.find(z => z.zoneType === 'pasture')!
+    r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...pasture, animalType: 'boar', animalCount: 4, animalCounts: { boar: 4 } }] }))
+    save('C148-N3-legal', r)
+    assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 0)
+    assert.equal(r.state.players[0]!.resources.boar, 4)
+    save('C148-N3', r)
   })
 })

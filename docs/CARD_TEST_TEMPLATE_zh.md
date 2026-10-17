@@ -198,6 +198,8 @@ const opening = createOpeningSession({
 
 恢复、容纳区及输入拒绝回归（ADR 0028/0029、#1257）选择 Session 测试：先通过真实购卡把职业或小改手牌打空，再撤销后续行动；returned/live 快照必须保留空手牌及原始可选字段表示，普通新局发牌和非空手牌对照单独验证。输入拒绝在每步前后比较完整 state、interaction、scores 和可执行 undo 元数据，并连续拒绝后再合法重试，检查历史或效果是否累积。已接受强制续行的阻塞、需要持久化记忆的 guard violation 分别作对照，失败响应本身不证明输入拒绝。扩容动物区必须确认真实布局，通过公开分区查询回读持久数量，并完成正常交接；只检查 capacity 或资源总数不足以证明安置正确。支付、容量变化及快照恢复继续保留逐容纳区数量。
 
+许多单卡 Session 文件末尾有 `describe('ae-negative-…')` 块：它们是 A–E 负向规则审计的场景，按原文搬入所测卡牌的测试文件。共享准备代码位于 `server/__tests__/_helpers/audit/<源文件>.ts` 和 `server/__tests__/_helpers/negative-rule-audit.ts`。它们是普通回归测试；规则改动改变其断言的行为时，同步修改这些场景。探针文件仅在 `AGRICOLA_TEST_DIAGNOSTIC=1` 时写出。带记录观测值的 `assertRuleOutcome` 表示暂缓的规则问题，目前只有 C131 N3 使用：它断言当前蔬菜结果 `0`，此前的期望值 `1` 仍在 [#1175](https://github.com/titanxxh/open-agricola/issues/1175)、[#1181](https://github.com/titanxxh/open-agricola/issues/1181) 中讨论。`AGRICOLA_NEGATIVE_RAW=1` 改为断言规则期望值。
+
 不要假设存在 `POST /api/game/dev/*`。当前可用的状态预设方式有：
 
 - **`GameSession.loadState(state)`** —— 加载一份 `SerializedGameState`（`shared/session/serialization.ts`）

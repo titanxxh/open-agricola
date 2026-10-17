@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { D095_SiteManager } from '../../shared/cards/D/D095_SiteManager'
 import '../../shared/cards/A/A085_Homekeeper'
 import { occupations } from '../../shared/cards/_lookup'
+import * as audit45Site from './_helpers/audit/ae-negative-45-site'
 
 const CARD_ID = 'D095_SiteManager'
 const OTHER_OCCUPATION = 'A085_Homekeeper'
@@ -216,5 +217,80 @@ describe('D095 Site Manager parity', () => {
     expect(JSON.stringify(response.interaction)).not.toContain('Major_Fireplace1')
     expect(response.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 1 })
+  })
+})
+
+describe('ae-negative-45-site', () => {
+  const { CARD_ID, OTHER_OCCUPATION, setup, playSiteManager, selectMajor, choosePayment, sessions, it, optionsOf, actorOf } = audit45Site
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('D095 Site Manager parity', () => {
+    it('D095 S1: playing Site Manager immediately offers an optional major improvement', () => {
+      const response = playSiteManager(setup({ clay: 2 }))
+      expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait')
+        return
+      expect(optionsOf(response)?.some((option) => option.value === '__skip__')).toBe(true)
+      expect(JSON.stringify(response.interaction)).toContain(CARD_ID)
+    })
+    it('D095 S2: the immediate major improvement can be declined', () => {
+      const session = setup({ clay: 2 })
+      const offered = playSiteManager(session)
+      expect(offered.interaction.stateId).toBe('wait')
+      if (offered.interaction.stateId !== 'wait')
+        return
+      const response = session.resolveChoice(actorOf(offered), '__skip__')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+      expect(response.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
+      expect(response.state.players[0]!.resources.clay).toBe(2)
+    })
+    it('D095 S3: one food replaces one clay in the immediate Fireplace cost', () => {
+      const session = setup({ clay: 1, food: 1 })
+      const response = selectMajor(session, playSiteManager(session), 'Major_Fireplace1')
+      expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 0 })
+    })
+    it('D095 S4: the printed major-improvement cost remains selectable', () => {
+      const session = setup({ clay: 2, food: 1 })
+      let response = selectMajor(session, playSiteManager(session), 'Major_Fireplace1')
+      response = choosePayment(session, response, { wood: 0, clay: 2, reed: 0, stone: 0, food: 0 })
+      expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 1 })
+    })
+    it('D095 S5: one food per building-resource type can replace both wood and stone', () => {
+      const session = setup({ wood: 1, stone: 1, food: 2 }, ['Major_Fireplace1', 'Major_Joinery'])
+      const response = selectMajor(session, playSiteManager(session), 'Major_Joinery')
+      expect(response.state.players[0]!.improvements).toContain('Major_Joinery')
+      expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, stone: 0, food: 0 })
+    })
+    it('D095 S6: with all resources available the player can replace only wood', () => {
+      const session = setup({ wood: 2, stone: 2, food: 2 }, ['Major_Fireplace1', 'Major_Joinery'])
+      let response = selectMajor(session, playSiteManager(session), 'Major_Joinery')
+      response = choosePayment(session, response, { wood: 1, clay: 0, reed: 0, stone: 2, food: 1 })
+      expect(response.state.players[0]!.improvements).toContain('Major_Joinery')
+      expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, stone: 0, food: 1 })
+    })
+    it('D095 S7: two food cannot replace two clay of the same type', () => {
+      const response = playSiteManager(setup({ clay: 0, food: 2 }))
+      expect(response.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
+      expect(JSON.stringify(response.interaction)).not.toContain('Major_Fireplace1')
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 2 })
+    })
+    it('D095 S8: the replacement expires after the immediate improvement window', () => {
+      const session = setup({ clay: 1, food: 1 })
+      const state = session.getState().state
+      const owner = state.players[0]!
+      owner.occupationHand = [OTHER_OCCUPATION]
+      owner.occupationPlayed = [CARD_ID]
+      state.round = 14
+      session.loadState(state)
+      const response = session.takeAction(0, 'major-improvement')
+      expect(response.ok).toBe(false)
+      expect(response.error).toBe('space unavailable')
+      expect(JSON.stringify(response.interaction)).not.toContain('Major_Fireplace1')
+      expect(response.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 1 })
+    })
   })
 })

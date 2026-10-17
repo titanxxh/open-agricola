@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -12,6 +12,9 @@ import '../../shared/cards/E/E053_BoarSpear'
 import '../../shared/cards/E/E085_MasterTanner'
 import '../../shared/cards/C/C148_MudWallower'
 import '../../shared/cards/B/B137_Wholesaler'
+import assert from 'node:assert/strict'
+import { assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'E053_BoarSpear'
 const E085_ID = 'E085_MasterTanner'
@@ -400,4 +403,71 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     // its push-food behaviour requires the player to spend 1 food, leaving >=3.
     expect(resp.state.players[0]!.resources.food).toBeGreaterThanOrEqual(3)
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, ok, options, save, setup, source, finish, next, completeRound, take, move, prerequisites, hand, buy, accept, pasture, animalKeep, printed, denyMinor, convertBoar } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E053 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'E053_BoarSpear', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 1, "stone": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.stone, 0); save('E053-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 0, "stone": 1 }); }); denyMinor(t, card); save('E053-N1-short', t.getState()); });
+  it('E053 N2 only newly obtained pigs may be converted and excessive quantities preserve older housed pigs', () => {
+      for (const n of [1, 2]) {
+          const card = 'E053_BoarSpear', s = setup(card, 14, st => { pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }], 'boar', 2); st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = n; });
+          const r = convertBoar(s, take(s, 'pig-market'), n, `E053-N2-${n}`);
+          assert.equal(r.state.players[0]!.resources.food, 40 + 4 * n);
+          assert.equal(r.state.players[0]!.resources.boar, 2);
+          assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 2);
+          save(`E053-N2-${n}`, r);
+      }
+      const outcomes: unknown[] = [];
+      for (const n of [1, 2]) {
+          const s = setup('E053_BoarSpear', 14, st => { pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }], 'boar', 2); st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = n; });
+          let r = take(s, 'pig-market');
+          for (let guard = 0; guard < 16; guard++) {
+              if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
+                  r = animalKeep(s, r, req => {
+                      for (const z of req.zones) {
+                          z.animalType = z.zoneType === 'pasture' ? 'boar' : null;
+                          z.animalCount = z.zoneType === 'pasture' ? r.state.players[0]!.resources.boar : 0;
+                      }
+                  });
+                  continue;
+              }
+              r = source(s, r, 'E053_BoarSpear');
+              const trade = options(r).find(o => o.value.startsWith('trade:'));
+              if (trade) {
+                  save(`E053-N2-force-before-${n}`, r);
+                  const result = s.resolveChoice(0, `bulk:${trade.value.split(':')[1]}=${n + 1}`);
+                  outcomes.push({ ok: result.ok, food: result.state.players[0]!.resources.food, pig: result.state.players[0]!.resources.boar });
+                  save(`E053-N2-force-after-${n}`, result);
+                  break;
+              }
+              r = accept(s, r, 'E053_BoarSpear');
+          }
+          assert.equal(outcomes.length, n);
+      }
+      assert.deepEqual(outcomes, [{ ok: true, food: 44, pig: 2 }, { ok: true, food: 48, pig: 2 }]);
+  });
+  it('E053 N3 decline hand opponent unrelated and real breeding cannot convert existing pigs for four food', () => {
+      for (const mode of ['decline', 'hand', 'opponent', 'unrelated']) {
+          const card = 'E053_BoarSpear', s = setup(card, 14, st => {
+              pasture(st, [{ row: 0, col: 3 }]);
+              st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = 1;
+              if (mode === 'hand')
+                  hand(st, card);
+              if (mode === 'opponent')
+                  st.currentPlayerIndex = 1;
+          });
+          const r = finish(s, take(s, mode === 'unrelated' ? 'forest' : 'pig-market'), mode !== 'decline');
+          assert.equal(r.state.players[0]!.resources.food, 40);
+          assert.equal(r.state.players[mode === 'opponent' ? 1 : 0]!.resources.boar, mode === 'unrelated' ? 0 : 1);
+          save(`E053-N3-${mode}`, r);
+      }
+      const card = 'E053_BoarSpear', s = setup(card, 9, st => pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }], 'boar', 2));
+      const r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']), true);
+      assert.equal(r.state.round, 10);
+      assert.equal(r.state.players[0]!.resources.boar, 3);
+      assert.equal(r.state.players[0]!.resources.food, 36);
+      save('E053-N3-breeding', r);
+  });
+  it('E053 N4 pigs gained by a real nonfood sheep exchange can immediately convert without spending the older pig', () => { const card = 'E053_BoarSpear', s = setup(card, 14, st => { pasture(st, [{ row: 0, col: 3 }], 'boar', 1, false, 'p1'); pasture(st, [{ row: 0, col: 4 }], 'sheep', 1, false, 'p2'); st.players[0]!.occupationPlayed = ['B104_SheepWalker']; hand(st, card); Object.assign(st.players[0]!.resources, { wood: 1, stone: 1 }); }); finish(s, buy(s, card)); move(s, 'forest'); next(s); save('E053-N4-real-purchase-history', s.getState()); let r = ok(s.takeAnytimeAction(0, 'exchange')); const opt = options(r).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 1 && o.effectPreview.resourcesGained?.boar === 1); assert.ok(opt); r = ok(s.resolveChoice(0, opt.value)); save('E053-N4-after-sheep-exchange', r); r = convertBoar(s, r, 1, 'E053-N4'); save('E053-N4', r); assert.equal(r.state.players[0]!.resources.sheep, 0); assertRuleOutcome({ food: r.state.players[0]!.resources.food, pig: r.state.players[0]!.resources.boar }, { food: 44, pig: 1 }); });
 })

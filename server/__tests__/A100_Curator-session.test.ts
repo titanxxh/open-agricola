@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A100_Curator'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit12ReturnStack from './_helpers/audit/ae-negative-12-return-stack'
 
 const CARD_ID = 'A100_Curator'
 const FILLER = '__test_placeholder__'
@@ -140,5 +143,31 @@ describe('A100 Curator parity', () => {
     expect(response.interaction.stateId === 'wait'
       ? (response.interaction.request.options?.some((option) => option.sourceCard === CARD_ID) ?? false)
       : false).toBe(false)
+  })
+})
+
+describe('ae-negative-12-return-stack', () => {
+  const { sessions, save, choices, curator, finishCurator, curatorChoice, bonus } = audit12ReturnStack
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A100 N1 three actual returning people from emptied accumulation spaces may pay one food for one point', () => {
+    const session = curator(); const pending = finishCurator(session)
+    assert.ok(pending.interaction.stateId === 'wait'); const response = curatorChoice(session, pending, true)
+    assert.equal(response.state.players[0]!.resources.food, 19); assert.equal(bonus(response), 1); assert.equal(response.state.round, 4); save('A100-N1', response)
+  })
+  it('A100 N2 declining preserves the food and gives no point', () => {
+    const session = curator(); const response = curatorChoice(session, finishCurator(session), false)
+    assert.equal(response.state.players[0]!.resources.food, 20); assert.equal(bonus(response), 0); assert.equal(response.state.round, 4); save('A100-N2', response)
+  })
+  it('A100 N3 two accumulation workers plus a nonaccumulation worker cannot qualify', () => {
+    const session = curator(); const response = finishCurator(session, 'farmland')
+    assert.equal(response.state.players[0]!.resources.food, 20); assert.equal(bonus(response), 0); assert.equal(response.state.round, 4); save('A100-N3', response)
+  })
+  it('A100 N4 no food and card in hand cannot buy a free return home point', () => {
+    for (const config of [{ food: 0 }, { played: false }]) { const session = curator(config); const response = finishCurator(session); assert.equal(bonus(response), 0); assert.equal(response.state.round, 4); assert.equal(response.state.players[0]!.resources.food, config.food ?? 20); save(`A100-N4-${config.food ?? 'hand'}`, response) }
+  })
+  it('A100 N5 wrong actor and stale accepted response cannot duplicate food payment or score', () => {
+    const session = curator(); const pending = finishCurator(session); const option = choices(pending).find(o => o.value !== '__skip__' && !o.disabled); assert.ok(option)
+    assertRejectedUnchanged(session, () => session.resolveChoice(1, option.value)); const response = curatorChoice(session, pending, true)
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, option.value)); assert.equal(bonus(response), 1); assert.equal(response.state.players[0]!.resources.food, 19); save('A100-N5', response)
   })
 })

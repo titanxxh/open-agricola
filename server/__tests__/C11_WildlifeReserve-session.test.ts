@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C011_WildlifeReserve'
 import '../../shared/cards/C/C067_MineralFeeder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Animals from './_helpers/audit/ae-negative-26-animals'
 
 const CARD_ID = 'C011_WildlifeReserve'
 const FILLER = '__test_placeholder__'
@@ -177,4 +180,13 @@ describe('C011 Wildlife Reserve parity', () => {
       .toEqual({ sheep: 1 })
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-26-animals', () => {
+  const { RESERVE, sessions, save, ok, finish, menu, makeReserve, vp, assignment } = audit26Animals
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C011 N1 actual two wood two occupation purchase gives one printed point and no pasture or immediate animals',()=>{const s=makeReserve(),pending=menu(s),r=finish(s,ok(s.resolveChoice(0,RESERVE)),false);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(vp(r,RESERVE),1);assert.equal(r.state.players[0]!.pastures.length,0);assert.equal(r.state.players[0]!.resources.sheep+r.state.players[0]!.resources.boar+r.state.players[0]!.resources.cattle,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,2);assert.ok(undone.state.players[0]!.minorHand.includes(RESERVE));save('C011-N1',{pending,r,undone})})
+  it('C011 N2 missing wood or second occupation rejects before a real free alternative',()=>{for(const mode of['wood','occupation']){const s=makeReserve(mode==='wood'?1:2,mode==='occupation'?1:2),pending=menu(s),error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,RESERVE)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')),false);assert.ok(r.state.players[0]!.minorHand.includes(RESERVE));assert.equal(r.state.players[0]!.pastures.length,0);save(`C011-N2-${mode}`,{pending,error,r})}})
+  it('C011 N3 actual mixed reorganization accepts exactly one sheep pig and cattle and never counts a pasture',()=>{const s=makeReserve(2,2,true),pending=ok(s.takeAction(0,'cattle-market'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');const wrong=assertRejectedUnchanged(s,()=>s.resolveChoice(1,'confirm',{zones:[assignment(pending,{sheep:1,boar:1,cattle:1})]})),r=finish(s,ok(s.resolveChoice(0,'confirm',{zones:[assignment(pending,{sheep:1,boar:1,cattle:1})]})),false);assert.deepEqual(['sheep','boar','cattle'].map(k=>r.state.players[0]!.resources[k as 'sheep']),[1,1,1]);assert.equal(r.state.players[0]!.pastures.length,0);assert.equal(r.scores![0]!.categories.find(c=>c.key==='pastures')!.total,-1);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.cattle,0);assert.deepEqual(undone.state.players[0]!.houseAnimals,{'1-0':'sheep'});save('C011-N3',{pending,wrong,r,undone})})
+  it('C011 N4 duplicate species and fourth animal reject before legal mixed assignment with extra sheep outside card',()=>{const s=makeReserve(2,2,true,true),pending=ok(s.takeAction(0,'cattle-market'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assignment(pending,{sheep:2,boar:1,cattle:1})]})),dup=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assignment(pending,{sheep:2,boar:1})]}));const house=pending.interaction.request.zones.find(z=>z.zoneType==='house');assert.ok(house);const r=finish(s,ok(s.resolveChoice(0,'confirm',{zones:[assignment(pending,{sheep:1,boar:1,cattle:1}),{...house,animalType:'sheep',animalCount:1}]})),false);assert.equal(r.state.players[0]!.resources.sheep,2);save('C011-N4',{pending,bad,dup,r})})
 })

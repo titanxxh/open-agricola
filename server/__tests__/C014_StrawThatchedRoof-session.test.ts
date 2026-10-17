@@ -1,7 +1,7 @@
 import '../../shared/cards/B/B113_PatchCaregiver'
 import '../../shared/cards/B/B141_FieldCaretaker'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { C014_StrawThatchedRoof } from '../../shared/cards/C/C014_StrawThatchedRoof'
 import { D015_ClaySupports } from '../../shared/cards/D/D015_ClaySupports'
@@ -9,6 +9,9 @@ import { canRenovate } from '../../shared/actions/effects/renovation'
 import { PaymentSolver } from '../../shared/actions/payment'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Roof from './_helpers/audit/ae-negative-28-roof'
 
 const CARD_ID = 'C014_StrawThatchedRoof'
 
@@ -276,4 +279,14 @@ describe('C014 Straw-Thatched Roof parity', () => {
     expect(response.state.players).toHaveLength(3)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-28-roof', () => {
+  const { CARD, sessions, save, ok, finish, build, make, menu, vp, renovate } = audit28Roof
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C014 N1 actual free purchase requires three own planted grain fields awards one point and whole undo restores hand',()=>{const s=make(false),before=ok(s.getState()),pending=menu(s),r=finish(s,ok(s.resolveChoice(0,CARD)),false),undone=ok(s.undoAction());assert.ok(r.state.players[0]!.minorPlayed.includes(CARD));assert.equal(vp(r),1);assert.deepEqual(r.state.players[0]!.resources,before.state.players[0]!.resources);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));assert.equal(vp(undone),0);save('C014-N1',{before,pending,r,undone})})
+  it('C014 N2 two grain fields plus vegetable or empty third field and opponents grain fields cannot satisfy purchase before a free legal alternative',()=>{for(const third of['vegetable','empty']as const){const s=make(false,2,third),pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')),false);assert.ok(r.state.players[0]!.minorHand.includes(CARD));assert.equal(vp(r),0);save(`C014-N2-${third}`,{pending,rejected,r})}})
+  it('C014 N3 real two room construction needs ten wood no reed and whole undo restores both rooms and payments',()=>{const s=make(true,3,'grain','wood',{wood:10,reed:0}),before=ok(s.getState()),a=build(s,2,{wood:10}),undone=ok(s.undoAction());assert.equal(a.r.state.players[0]!.resources.reed,0);assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.deepEqual(undone.state.players[0]!.roomTiles,before.state.players[0]!.roomTiles);save('C014-N3',{before,a,undone})})
+  it('C014 N4 actual wood to clay or clay to stone renovation removes only reed and pays both matching materials',()=>{for(const[house,target]of[['wood','clay'],['clay','stone']]as const){const s=make(true,3,'grain',house,{wood:0,[target]:2,reed:0}),before=ok(s.getState()),r=renovate(s,target);assert.equal(r.state.players[0]!.resources[target],0);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources.food,100);save(`C014-N4-${target}`,{before,r})}})
+  it('C014 N5 card only in hand retains ordinary construction and renovation reed costs',()=>{const s=make(false,3,'grain','wood',{wood:5,reed:2}),a=build(s,1,{wood:5,reed:2});assert.equal(a.r.state.players[0]!.resources.reed,0);const ss=make(false,3,'grain','clay',{wood:0,stone:2,reed:1}),r=renovate(ss,'stone');assert.equal(r.state.players[0]!.resources.reed,0);assert.ok(r.state.players[0]!.minorHand.includes(CARD));save('C014-N5',{a,r})})
 })

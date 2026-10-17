@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D083_Pigswill'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Renovation from './_helpers/audit/ae-negative-43-renovation'
 
 const CARD_ID = 'D083_Pigswill'
 
@@ -125,4 +128,12 @@ describe('D083 Pigswill parity trigger', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(0)
   })
+})
+
+describe('ae-negative-43-renovation', () => {
+  const { SWILL, sessions, save, ok, make, choose, finish, menu, purchase, renovation } = audit43Renovation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D083 N1 two food or one grain purchase pays only selected complete fee and incomplete fee refuses',()=>{for(const grain of[0,1]){const s=make(SWILL,false,state=>Object.assign(state.players[0]!.resources,{food:grain?0:2,grain})),a=purchase(s,SWILL);assert.equal(a.r.state.players[0]!.resources.food,0);assert.equal(a.r.state.players[0]!.resources.grain,0);save(`D083-N1-${grain}`,a)}const t=make(SWILL,false,state=>state.players[0]!.resources.food=1),pending=menu(t),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,SWILL)),legal=ok(t.resolveChoice(0,'B004_WoodPile'));assert.equal(legal.state.players[0]!.resources.food,1);save('D083-N1-poor',{pending,bad,legal})})
+  it('D083 N2 Fencing grants one boar before real four fences and unrelated action grants none',()=>{const s=make(SWILL,true,state=>state.players[0]!.resources.wood=4),pending=ok(s.takeAction(0,'fencing'));assert.equal(pending.state.players[0]!.resources.boar,1);if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg')finish(s,pending);const built=ok(s.commitSelectionChoice(0,{edges:['H-0-0','H-1-0','V-0-0','V-0-1'],extraWood:0}));assert.equal(built.state.players[0]!.resources.boar,1);assert.equal(built.state.players[0]!.fenceSegments.length,4);assert.equal(built.state.players[0]!.resources.wood,0);const t=make(SWILL),other=ok(t.takeAction(0,'day-laborer'));assert.equal(other.state.players[0]!.resources.boar,0);save('D083-N2',{pending,built,other})})
+  it('D083 N3 Farm Redevelopment builds fences after renovation without granting the Fencing space boar',()=>{const s=make(SWILL,true,state=>{state.players[0]!.houseType='clay';Object.assign(state.players[0]!.resources,{stone:2,reed:1,wood:4})});let pending=renovation(s,'farm-redevelopment');if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice')pending=choose(s,pending,o=>o.labelKey==='actions.fencing.name');const r=ok(s.commitSelectionChoice(0,{edges:['H-0-0','H-1-0','V-0-0','V-0-1'],extraWood:0}));assert.equal(r.state.players[0]!.resources.boar,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.resources.wood,0);save('D083-N3',{pending,r})})
 })

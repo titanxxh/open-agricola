@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/E/E089_Stallwright'
+import assert from 'node:assert/strict'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 const CARD_ID = 'E089_Stallwright'
 
@@ -140,4 +142,12 @@ describe('E089 Stallwright parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.stableTiles).toHaveLength(0)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, make, finish, lesson, PRIORS } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E089 N1 playing Stallwright itself as second occupation builds one free stable while first gives none', () => { const s = make('E089_Stallwright', st => { st.players[0]!.occupationPlayed = ['A116_WoodCutter'] }, false), r = finish(s, lesson(s, 'E089_Stallwright')); assert.equal(r.state.players[0]!.stableTiles.length, 1); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.food, 99); const c = make('E089_Stallwright', undefined, false), cr = finish(c, lesson(c, 'E089_Stallwright')); assert.equal(cr.state.players[0]!.stableTiles.length, 0); save('E089-N1', { r, cr }) })
+  it('E089 N2 real later occupations grant one stable only at third fifth seventh and fourth sixth grant none', () => { for (const count of [3, 4, 5, 6, 7]) { const s = make('E089_Stallwright', st => { const p = st.players[0]!; p.occupationPlayed.push(...PRIORS.slice(0, count - 2)); p.occupationHand = ['A116_WoodCutter'] }), r = finish(s, lesson(s, 'A116_WoodCutter')); assert.equal(r.state.players[0]!.stableTiles.length, [3, 5, 7].includes(count) ? 1 : 0); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.food, 99); save(`E089-N2-${count}`, r) } })
+  it('E089 N3 decline and exhausted stable supply preserve wood and do not create extra components', () => { const s = make('E089_Stallwright', st => { st.players[0]!.occupationPlayed.push('B121_Geologist'); st.players[0]!.occupationHand = ['A116_WoodCutter'] }), r = finish(s, lesson(s, 'A116_WoodCutter'), false); assert.equal(r.state.players[0]!.stableTiles.length, 0); const c = make('E089_Stallwright', st => { st.players[0]!.occupationPlayed.push('B121_Geologist'); st.players[0]!.occupationHand = ['A116_WoodCutter']; st.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }] }), cr = finish(c, lesson(c, 'A116_WoodCutter'), false); assert.equal(cr.state.players[0]!.stableTiles.length, 4); assert.equal(cr.state.players[0]!.resources.wood, 0); save('E089-N3', { r, cr }) })
 })

@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
   executeCardListener,
@@ -21,6 +21,9 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/B/B029_CookeryLesson'
 import '../../shared/cards/B/B032_Kettle'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Cooking from './_helpers/audit/ae-negative-19-cooking'
 
 const CARD_ID = 'B029_CookeryLesson'
 const OCCUPATION_ID = 'A123_FrameBuilder'
@@ -435,4 +438,13 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(result).toBeUndefined()
     expect(readCardExtraData<number>(player, CARD_ID, 'lessonsActionToken')).toBe(-1)
   })
+})
+
+describe('ae-negative-19-cooking', () => {
+  const { CARD, OCC, sessions, save, ok, setup, turn, points, exchange, cook, occupation } = audit19Cooking
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B029 N1 actual two food purchase has no immediate bonus and one food cannot buy',()=>{const s=setup(false);let pending=turn(s,0,'meeting-place');if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice'){const o=pending.interaction.request.options.find(o=>o.value.startsWith('action-improvement-'));if(o)pending=ok(s.resolveChoice(0,o.value))}const r=ok(s.resolveChoice(0,CARD));assert.equal(r.state.players[0]!.resources.food,18);assert.equal(points(r),0);const poor=setup(false,state=>state.players[0]!.resources.food=1);let denied=turn(poor,0,'meeting-place');if(denied.interaction.stateId==='wait'&&denied.interaction.request.kind==='choice'){const o=denied.interaction.request.options.find(o=>o.value.startsWith('action-improvement-'));if(o)denied=ok(poor.resolveChoice(0,o.value))}assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,CARD));const legal=ok(poor.resolveChoice(0,'A030_BakingSheet'));assert.equal(legal.state.players[0]!.resources.food,1);assert.equal(points(legal),0);save('B029-N1',{pending,r,denied,legal})})
+  it('B029 N2 actual Lessons pending with vegetable cooking twice awards one bonus for the whole turn',()=>{const s=setup(),lesson=turn(s,0,'lessons'),first=cook(s),second=cook(s),r=occupation(s);assert.equal(r.state.players[0]!.resources.vegetable,0);assert.equal(r.state.players[0]!.resources.food,24);assert.equal(points(r),1);assert.ok(r.state.players[0]!.occupationPlayed.includes(OCC));assert.ok(r.state.events.some(e=>e.type==='resource.exchanged'&&e.exchangeSource==='Major_Fireplace1'));save('B029-N2',{lesson,first,second,r})})
+  it('B029 N3 Kettle grain conversion during actual Lessons and cooking during unrelated action cannot award bonus',()=>{const kettle=setup(true,state=>{state.players[0]!.minorPlayed.push('B032_Kettle');state.players[0]!.improvements=[];state.players[0]!.resources.grain=1}),lesson=turn(kettle,0,'lessons'),traded=exchange(kettle,0),r=occupation(kettle);assert.equal(r.state.players[0]!.resources.food,23);assert.equal(points(r),0);const unrelated=setup(),pending=turn(unrelated,0,'major-improvement'),cooked=cook(unrelated);ok(unrelated.resolveChoice(0,'A030_BakingSheet'));assert.equal(points(cooked.r),0);save('B029-N3',{lesson,traded,r,pending,cooked})})
+  it('B029 N4 hand Lessons cooking gives no bonus and undo actual Lessons plus cooking restores food crop score and occupation',()=>{const hand=setup(false);turn(hand,0,'lessons');cook(hand);const h=occupation(hand);assert.equal(points(h),0);const s=setup();turn(s,0,'lessons');cook(s);const r=occupation(s),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,20);assert.equal(undone.state.players[0]!.resources.vegetable,2);assert.equal(points(undone),0);assert.ok(undone.state.players[0]!.occupationHand.includes(OCC));turn(s,0,'lessons');cook(s);const retry=occupation(s);assert.equal(points(retry),1);assert.equal(retry.state.players[0]!.resources.vegetable,1);save('B029-N4',{h,r,undone,retry})})
 })

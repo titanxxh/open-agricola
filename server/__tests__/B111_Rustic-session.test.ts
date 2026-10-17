@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B111_Rustic'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Rustic from './_helpers/audit/ae-negative-26-rustic'
 
 const CARD_ID = 'B111_Rustic'
 
@@ -131,4 +134,13 @@ describe('B111 Rustic parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(bonusVp(response)).toBe(0)
   })
+})
+
+describe('ae-negative-26-rustic', () => {
+  const { sessions, save, ok, finish, make, bonus, enter, build } = audit26Rustic
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B111 N1 actual one or two clay rooms pay normal clay reed and award two food one point per room',()=>{for(const count of[1,2]){const s=make('clay',count),a=build(s,count);assert.equal(a.r.state.players[0]!.rooms,2+count);assert.equal(a.r.state.players[0]!.resources.clay,0);assert.equal(a.r.state.players[0]!.resources.reed,0);assert.equal(a.r.state.players[0]!.resources.food,100+2*count);assert.equal(bonus(a.r),count);assert.equal(a.r.state.players[1]!.resources.food,100);assert.ok(a.r.scores);save(`B111-N1-${count}`,a)}})
+  it('B111 N2 real wood stone or card still in hand clay room builds receive no food or bonus point',()=>{for(const mode of['wood','stone','hand']){const s=make(mode==='hand'?'clay':mode as 'wood'|'stone',1,mode!=='hand'),a=build(s);assert.equal(a.r.state.players[0]!.rooms,3);assert.equal(a.r.state.players[0]!.resources.food,100);assert.equal(bonus(a.r),0);save(`B111-N2-${mode}`,a)}})
+  it('B111 N3 real wood to clay renovation creates no built room award',()=>{const s=make('wood'),before=ok(s.getState()),pending=ok(s.takeAction(0,'house-redevelopment')),r=finish(s,pending,false);assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.rooms,2);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(bonus(r),0);assert.equal(r.state.players[0]!.resources.clay,3);assert.equal(r.state.players[0]!.resources.reed,1);save('B111-N3',{before,pending,r})})
+  it('B111 N4 illegal and wrong actor room targets reject before legal room and whole build undo restores payment food point and board',()=>{const s=make(),before=ok(s.getState()),pending=enter(s),invalid=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:99,col:99}]})),wrong=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{rooms:[{row:1,col:1}]})),r=finish(s,ok(s.commitSelectionChoice(0,{rooms:[{row:1,col:1}]})),false),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.rooms,2);assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.equal(bonus(undone),0);assert.deepEqual(undone.state.players[0]!.roomTiles,before.state.players[0]!.roomTiles);const retry=build(s);assert.equal(retry.r.state.players[0]!.resources.food,102);assert.equal(bonus(retry.r),1);save('B111-N4',{before,pending,invalid,wrong,r,undone,retry})})
 })

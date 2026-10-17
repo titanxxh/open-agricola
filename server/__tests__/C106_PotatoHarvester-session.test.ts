@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -7,6 +7,8 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import '../../shared/cards/C/C106_PotatoHarvester'
 import type { ActionFlow } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import assert from 'node:assert/strict'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'C106_PotatoHarvester'
 
@@ -130,4 +132,11 @@ describe('C106_PotatoHarvester session', () => {
     // Only grain harvested, no bonus food from card. -2 for feeding.
     expect(player.resources.food).toBe(foodBefore - 2)
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, end, fields } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C106 N1 actual first Lessons immediately grants exactly three food', () => { const s = make('C106_PotatoHarvester', undefined, false), r = finish(s, lesson(s, 'C106_PotatoHarvester'), false); assert.equal(r.state.players[0]!.resources.food, 103); assert.equal(r.state.players[1]!.resources.food, 100); save('C106-N1', r) })
+  it('C106 N2 harvesting two vegetable fields grants exactly two additional food while grain fields and Vegetable Seeds do not', () => { const s = make('C106_PotatoHarvester', st => fields(st, 2, 'vegetable'), true, 4), r = finish(s, end(s), false); assert.equal(r.state.players[0]!.resources.vegetable, 2); assert.equal(r.state.players[0]!.resources.food, 98); const c = make('C106_PotatoHarvester', st => fields(st, 2, 'grain'), true, 4), cr = finish(c, end(c), false); assert.equal(cr.state.players[0]!.resources.grain, 2); assert.equal(cr.state.players[0]!.resources.food, 96); const w = make('C106_PotatoHarvester', undefined, true, 14), wr = finish(w, ok(w.takeAction(0, 'vegetable-seeds')), false); assert.equal(wr.state.players[0]!.resources.vegetable, 1); assert.equal(wr.state.players[0]!.resources.food, 100); save('C106-N2', { r, cr, wr }) })
 })

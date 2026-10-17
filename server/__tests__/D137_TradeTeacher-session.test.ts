@@ -1,12 +1,15 @@
 import { descriptionEffects } from './_helpers/choice-description'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D137_TradeTeacher'
 import '../../shared/cards/A/A099_FellowGrazer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'D137_TradeTeacher'
 const OTHER_OCCUPATION = 'A099_FellowGrazer'
@@ -218,4 +221,13 @@ describe('D137 Trade Teacher parity', () => {
     expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 0 })
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, lesson, resources, reward } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D137 N1 actual first Lessons permits exactly one of each six goods at the printed one or two food price', () => { for (const [good, cost] of [['grain', 1], ['stone', 1], ['sheep', 1], ['boar', 1], ['cattle', 2], ['vegetable', 2]] as const) { const s = make('D137_TradeTeacher', undefined, false), p = lesson(s, 'D137_TradeTeacher'), r = reward(s, p, 'D137_TradeTeacher', { [good]: 1 }); resources(r, { [good]: 1, food: 100 - cost }); save(`D137-N1-${good}`, { p, r }) } })
+  it('D137 N2 every actual purchase choice has at most two different goods and invalid branch rejects before legal grain vegetable purchase', () => { const s = make('D137_TradeTeacher', undefined, false); let p = lesson(s, 'D137_TradeTeacher'); while (p.interaction.stateId === 'wait' && p.interaction.request.kind === 'select-trigger') { const o = p.interaction.request.options.find(o => o.sourceCard === 'D137_TradeTeacher' && o.value !== '__pass__'); assert.ok(o); p = ok(s.resolveChoice(0, o.value)) } assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice'); const gains = p.interaction.request.options.flatMap(o => o.effectPreview && 'resourcesGained' in o.effectPreview ? [o.effectPreview.resourcesGained] : []); assert.ok(gains.length > 0); for (const g of gains) { assert.ok(Object.values(g ?? {}).filter(v => v > 0).length <= 2); assert.ok(Object.values(g ?? {}).every(v => v <= 1)) } const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'buy-three-grain')), r = reward(s, p, 'D137_TradeTeacher', { grain: 1, vegetable: 1 }); resources(r, { grain: 1, vegetable: 1, food: 97 }); save('D137-N2', { p, rejected, r }) })
+  it('D137 N3 zero food or decline cannot grant free goods and nonLessons owner actual opponent Lessons cannot trigger owner purchase', () => { for (const food of [0, 100]) { const s = make('D137_TradeTeacher', st => { st.players[0]!.resources.food = food }, false), r = finish(s, lesson(s, 'D137_TradeTeacher'), food === 0); resources(r, { food, grain: 0, stone: 0 }); save(`D137-N3-${food}`, r) } const c = make('D137_TradeTeacher', st => { st.players[1]!.occupationHand = ['A099_FellowGrazer'] }); finish(c, ok(c.takeAction(0, 'day-laborer')), false, 'D137_TradeTeacher'); ready(c); const r = finish(c, ok(c.takeAction(1, 'lessons')), false, 'D137_TradeTeacher'); resources(r, { food: 102, stone: 0, grain: 0 }); save('D137-N3-opponent', r) })
+  it('D137 N4 native goods whitelist excludes food and rejects illegal choice before independent legal grain purchase', () => { const s = make('D137_TradeTeacher', undefined, false); let p = lesson(s, 'D137_TradeTeacher'); while (p.interaction.stateId === 'wait' && p.interaction.request.kind === 'select-trigger') { const o = p.interaction.request.options.find(o => o.sourceCard === 'D137_TradeTeacher' && o.value !== '__pass__'); assert.ok(o); p = ok(s.resolveChoice(0, o.value)) } assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice'); const allowed = ['grain', 'stone', 'sheep', 'boar', 'cattle', 'vegetable']; const keys = p.interaction.request.options.flatMap(o => o.effectPreview && 'resourcesGained' in o.effectPreview ? Object.entries(o.effectPreview.resourcesGained ?? {}).filter(([, n]) => n > 0).map(([k]) => k) : []); assert.ok(keys.length > 0); assert.equal(keys.includes('food'), false); assert.equal(keys.every(k => allowed.includes(k)), true); const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'food')), r = reward(s, p, 'D137_TradeTeacher', { grain: 1 }); resources(r, { food: 99, grain: 1 }); save('D137-N4', { p, rejected, r }) })
 })

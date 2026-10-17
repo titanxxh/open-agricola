@@ -4,11 +4,14 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C024_BedintheGrainField'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { familySize, markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Family from './_helpers/audit/ae-negative-32-family'
 
 const CARD_ID = 'C024_BedintheGrainField'
 
@@ -218,4 +221,14 @@ describe('C024 Bed in the Grain Field parity', () => {
     expect(familySize(response.state.players[0]!)).toBe(3)
     expect(response.state.players[0]!.resources.food).toBe(15)
   })
+})
+
+describe('ae-negative-32-family', () => {
+  const { sessions, save, ok, choose, pendingCard, trigger, finish, progress, buy, accept, bed } = audit32Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C024 N1 actual grain field purchase gives growth only at the next natural harvest feeds one newborn food and never repeats at a later harvest', () => { const s = bed(), bought = finish(s, buy(s, 'C024_BedintheGrainField')); assert.equal(familySize(bought.state.players[0]!), 2); const p = progress(s, 8, 'C024_BedintheGrainField'), grown = accept(s, p, 'C024_BedintheGrainField'), r = finish(s, grown); assert.deepEqual([familySize(r.state.players[0]!), r.state.players[0]!.resources.food], [3, 95]); const later = progress(s, 10, 'C024_BedintheGrainField'); assert.equal(pendingCard(later, 'C024_BedintheGrainField'), false); assert.equal(familySize(later.state.players[0]!), 3); save('C024-N1', { bought, p, grown, r, later }); });
+  it('C024 N2 decline and no room consume the next harvest opportunity even when a room is built before the following harvest', () => { const s = bed(), bought = finish(s, buy(s, 'C024_BedintheGrainField')), p = trigger(s, progress(s, 8, 'C024_BedintheGrainField'), 'C024_BedintheGrainField'), decline = finish(s, choose(s, p, o => o.value === '__skip__')), later = progress(s, 10, 'C024_BedintheGrainField'); assert.equal(pendingCard(later, 'C024_BedintheGrainField'), false); assert.equal(familySize(later.state.players[0]!), 2); const t = bed(2), purchase = finish(t, buy(t, 'C024_BedintheGrainField')), empty = progress(t, 8); assert.equal(familySize(empty.state.players[0]!), 2); let build = ok(t.takeAction(0, 'farm-expansion')); if (build.interaction.stateId === 'wait' && build.interaction.request.kind === 'choice')
+      build = choose(t, build, o => o.labelKey === 'actions.construct.name'); const roomBuilt = finish(t, ok(t.commitSelectionChoice(0, { rooms: [{ row: 1, col: 1 }] }))), after = progress(t, 10, 'C024_BedintheGrainField'); assert.equal(pendingCard(after, 'C024_BedintheGrainField'), false); assert.equal(familySize(after.state.players[0]!), 2); assert.equal(after.state.players[0]!.rooms, 3); save('C024-N2', { bought, p, decline, later, purchase, empty, build, roomBuilt, after }); });
+  it('C024 N3 a vegetable field fails the grain prerequisite and a held card cannot grow the family at harvest', () => { const s = bed(4, false), poor = buy(s, 'C024_BedintheGrainField'); assert.ok(poor.state.players[0]!.minorHand.includes('C024_BedintheGrainField')); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'C024_BedintheGrainField')); const t = bed(), hand = progress(t, 8, 'C024_BedintheGrainField'); assert.equal(pendingCard(hand, 'C024_BedintheGrainField'), false); assert.equal(familySize(hand.state.players[0]!), 2); save('C024-N3', { poor, hand }); });
+  it('C024 N4 four available food leave one food of actual newborn feeding demand which a catalogued grain conversion satisfies', () => { const s = bed(4, true, 4), bought = finish(s, buy(s, 'C024_BedintheGrainField')), p = progress(s, 8, 'C024_BedintheGrainField'), grown = accept(s, p, 'C024_BedintheGrainField'), feed = finish(s, grown, '__feed__'); save('C024-N4-feed', feed); assert.ok(feed.interaction.stateId === 'wait' && feed.interaction.request.kind === 'feed'); assert.deepEqual([feed.interaction.request.foodUsed, feed.interaction.request.remaining], [4, 1]); const conversion = feed.interaction.request.exchangeCatalog?.find(e => e.from.grain === 1 && e.to.food === 1); assert.ok(conversion); const r = finish(s, ok(s.resolveChoice(0, 'confirm', { selections: [{ sourceId: conversion.sourceId, exchangeIndex: conversion.exchangeIndex, count: 1, sourceName: conversion.sourceId }] }))); assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.grain, r.state.players[0]!.resources.begging], [0, 0, 0]); save('C024-N4', { bought, p, grown, feed, r }); });
 })

@@ -1,11 +1,14 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { B033_Mantlepiece } from '../../shared/cards/B/B033_Mantlepiece'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit19Immediate from './_helpers/audit/ae-negative-19-immediate'
 
 const CARD_ID = 'B033_Mantlepiece'
 
@@ -179,4 +182,12 @@ describe('B033 Mantlepiece parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(score(response)).toEqual({ printed: -3, bonus: 0 })
   })
+})
+
+describe('ae-negative-19-immediate', () => {
+  const { MANTLE, sessions, save, ok, setup, turn, buy, score, denied } = audit19Immediate
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B033 N1 actual clay or stone purchase pays one stone and only complete later rounds score with minus three printed points',()=>{for(const type of['clay','stone']as const)for(const round of[1,13,14]){const s=setup(MANTLE,state=>{state.round=round;state.players[0]!.houseType=type;state.players[0]!.resources.stone=1}),{pending,r}=buy(s,MANTLE);assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(score(r,MANTLE),-3);assert.equal(score(r,MANTLE,'cardBonusVp'),14-round);save(`B033-N1-${type}-${round}`,{pending,r})}})
+  it('B033 N2 wooden house or missing stone refuses before a free legal alternative',()=>{for(const[type,stone]of[['wood',1],['clay',0]]as const){const s=setup(MANTLE,state=>{state.players[0]!.houseType=type;state.players[0]!.resources.stone=stone}),{pending,r}=denied(s,MANTLE);assert.equal(r.state.players[0]!.resources.stone,stone);assert.equal(score(r,MANTLE,'cardBonusVp'),0);save(`B033-N2-${type}-${stone}`,{pending,r})}})
+  it('B033 N3 real purchase prevents both renovations and whole undo restores availability before one retry',()=>{const s=setup(MANTLE,state=>{const p=state.players[0]!;p.houseType='clay';p.resources.stone=3;p.resources.reed=1});const{r}=buy(s,MANTLE);turn(s,1,'grain-seeds');confirmNext(s,s.getState());for(const space of['house-redevelopment','farm-redevelopment'])assertRejectedUnchanged(s,()=>s.takeAction(0,space));const control=setup(MANTLE,state=>{const p=state.players[0]!;p.houseType='clay';p.resources.stone=3;p.resources.reed=1});const bought=buy(control,MANTLE).r,undone=ok(control.undoAction());assert.equal(undone.state.players[0]!.resources.stone,3);assert.equal(score(undone,MANTLE),0);assert.equal(control.getActionAvailability(0)['house-redevelopment'],true);const retry=buy(control,MANTLE).r;assert.equal(retry.state.players[0]!.resources.stone,2);assert.equal(score(retry,MANTLE),-3);save('B033-N3',{r,bought,undone,retry})})
 })

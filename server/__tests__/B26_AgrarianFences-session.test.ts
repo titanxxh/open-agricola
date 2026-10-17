@@ -4,6 +4,9 @@ import { createWorkSession } from './_helpers/session-fixtures'
 
 import '../../shared/cards/A/A094_LazySowman'
 import '../../shared/cards/B/B026_AgrarianFences'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as auditB026 from './_helpers/audit/ae-negative-B026'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
@@ -137,5 +140,57 @@ describe('B026_AgrarianFences session', () => {
     const optionValues = choices(resp).map((o) => o.value)
     const hasFenceOption = optionValues.some((v) => v.includes('fence'))
     expect(hasFenceOption).toBe(false)
+  })
+})
+
+describe('ae-negative-B026', () => {
+  const { CARD, EDGES, sessions, setup, choose, offered, fenceThenSow, totals } = auditB026
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('B026 negative audit: one replacement per space use', () => {
+    it('N1 cannot perform a third action after fencing and sowing', () => {
+      const session = setup()
+      fenceThenSow(session)
+      if (offered(session, 'actions.bake-bread.name')) choose(session, 'actions.bake-bread.name')
+      if (offered(session, 'ui.interactionDoNotReplace')) choose(session, 'ui.interactionDoNotReplace')
+      if (offered(session, 'Major_Fireplace1')) assert.equal(session.resolveChoice(0, 'Major_Fireplace1').ok, true)
+      const baked = session.getState()
+      assert.equal(baked.scores?.length, 2)
+      const actions = Number(baked.state.players[0]!.fenceSegments.length > 0)
+        + Number(baked.state.players[0]!.fields[0]!.stacks.length > 0) + Number(baked.state.players[0]!.resources.food > 0)
+      if (actions > 2) assert.deepEqual(totals(baked), { wood: 4, grain: 0, food: 2, fences: 4 })
+      assertRuleOutcome(actions > 2, false)
+    })
+    it('N2 cannot replace both original sub-actions with fencing', () => {
+      const session = setup()
+      fenceThenSow(session)
+      if (offered(session, 'actions.bake-bread.name')) choose(session, 'actions.bake-bread.name')
+      if (offered(session, CARD)) {
+        const replacement = choose(session, CARD)
+        if (replacement.interaction.stateId !== 'wait' || replacement.interaction.request.kind !== 'farm-select'
+          || replacement.interaction.request.farm.farmType !== 'fence') choose(session, 'actions.fencing.name')
+        const second = session.commitSelectionChoice(0, { edges: ['H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [], extraWood: 0 })
+        assert.equal(second.ok, true, second.error)
+      }
+      const second = session.getState()
+      if (second.state.players[0]!.fenceSegments.length > 4) assert.deepEqual(totals(second), { wood: 1, grain: 1, food: 0, fences: 7 })
+      assertRuleOutcome(second.state.players[0]!.fenceSegments.length > 4, false)
+    })
+    it('N3 insufficient wood rejects a seven-edge fence and permits a legal sow retry', () => {
+      const session = setup(4)
+      assert.equal(session.takeAction(0, 'grain-utilization').ok, true)
+      choose(session, CARD)
+      choose(session, 'ui.interactionAgrarianFencesSowAndFence')
+      choose(session, 'actions.fencing.name')
+      assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { edges: [...EDGES, 'H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [], extraWood: 0 }))
+      const undo = session.undoAction()
+      assert.equal(undo.ok, true, undo.error)
+      assert.deepEqual(totals(undo), { wood: 4, grain: 2, food: 0, fences: 0 })
+      assert.equal(session.takeAction(0, 'grain-utilization').ok, true)
+      choose(session, 'ui.interactionDoNotReplace')
+      choose(session, 'actions.sow.name')
+      const sown = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+      assert.equal(sown.ok, true, sown.error)
+      assert.deepEqual(totals(sown), { wood: 4, grain: 1, food: 0, fences: 0 })
+    })
   })
 })

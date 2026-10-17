@@ -17,7 +17,7 @@
  * onBuy has an observable side effect (wood gain per improvement in play).
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { authoritativeCommandKey } from '../../shared/contract/authoritative-command'
 import { setWorkersAtHome, setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
@@ -29,6 +29,9 @@ import '../../shared/cards/B/B003_Moonshine'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/B/B149_OpenAirFarmer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18Random from './_helpers/audit/ae-negative-18-random'
 
 const CARD_ID = 'B003_Moonshine'
 const OCC_A = 'A116_WoodCutter'
@@ -517,4 +520,14 @@ describe('B003_Moonshine session', () => {
     // A117 must be in occupationPlayed
     expect(p0After.occupationPlayed).toContain(OCC_B)
   })
+})
+
+describe('ae-negative-18-random', () => {
+  const { CARD, A, B, sessions, save, ok, setup, buy, pick } = audit18Random
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B003 N1 real purchase reveals exactly one member and only that occupation plays for two food',()=>{const s=setup(),pending=buy(s),selected=pick(pending);assert.ok([A,B].includes(selected));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'play-another'));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'play'));const r=ok(s.resolveChoice(0,'play'));assert.ok(r.state.players[0]!.occupationPlayed.includes(selected));assert.equal(r.state.players[0]!.occupationPlayed.length,1);assert.equal(r.state.players[0]!.resources.food,0);assert.ok(!r.state.players[0]!.occupationHand.includes(selected));assert.ok(r.state.players[1]!.minorHand.includes(CARD));assert.ok(!r.state.players[1]!.occupationHand.includes(selected));save('B003-N1',{pending,r,selected})})
+  it('B003 N2 zero or one food disables play but passes chosen occupation only to left without payment',()=>{for(const food of[0,1]){const s=setup(food),pending=buy(s),selected=pick(pending);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');assert.equal(pending.interaction.request.options.find(o=>o.value==='play')!.disabled,true);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'play'));const r=ok(s.resolveChoice(0,'pass'));assert.equal(r.state.players[0]!.resources.food,food);assert.ok(!r.state.players[0]!.occupationHand.includes(selected));assert.ok(r.state.players[1]!.occupationHand.includes(selected));for(const actor of[2,3])assert.ok(!r.state.players[actor]!.occupationHand.includes(selected));save(`B003-N2-${food}`,{pending,r,selected})}})
+  it('B003 N3 declined play with sufficient food passes without applying occupation effect',()=>{const s=setup(2,[B],state=>state.players[0]!.minorPlayed=['A030_BakingSheet']),pending=buy(s),r=ok(s.resolveChoice(0,'pass'));assert.equal(r.state.players[0]!.resources.food,2);assert.equal(r.state.players[0]!.resources.wood,0);assert.ok(r.state.players[1]!.occupationHand.includes(B));assert.ok(!r.state.players[0]!.occupationPlayed.includes(B));save('B003-N3',{pending,r})})
+  it('B003 N4 chosen Wood Carrier onBuy applies once after two food occupation payment',()=>{const s=setup(2,[B],state=>state.players[0]!.minorPlayed=['A030_BakingSheet']),pending=buy(s),r=ok(s.resolveChoice(0,'play'));assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.resources.wood,1);assert.ok(r.state.players[0]!.occupationPlayed.includes(B));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'play'));save('B003-N4',{pending,r})})
+  it('B003 N5 reveal boundary prevents undo reroll and rejected commands preserve exact cached occupation',()=>{const s=setup(),pending=buy(s),selected=pick(pending);assertRejectedUnchanged(s,()=>s.undoStep());assertRejectedUnchanged(s,()=>s.undoAction());assert.equal(pick(s.getState()),selected);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'reroll'));assert.equal(pick(s.getState()),selected);const r=ok(s.resolveChoice(0,'pass'));save('B003-N5',{pending,r,selected})})
 })

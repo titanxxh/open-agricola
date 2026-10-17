@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { familySize, inactiveWorkersInSupply, setActiveWorkerCount, workersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
+import assert from 'node:assert/strict'
+import * as audit45Phase from './_helpers/audit/ae-negative-45-phase'
 
 const CARD_ID = 'E093_Motivator'
 
@@ -117,4 +119,12 @@ describe('E093 Motivator normal rotation', () => {
     expect(secondTurn.state.currentPlayerIndex).toBe(0)
     expect(secondTurn.interaction.stateId).toBe('idle')
   })
+})
+
+describe('ae-negative-45-phase', () => {
+  const { sessions, save, ok, setup, finish, completeRound } = audit45Phase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E093 N1 natural next round full farm supply person performs Day Laborer without activating a family member', () => { const s = setup('E093_Motivator', 5, state => { const p = state.players[0]!; p.cardStates.E093_Motivator = { flagged: true }; const occupied = new Set(p.roomTiles.map(t => `${t.row},${t.col}`)); p.fields = Array.from({ length: 3 }, (_, row) => Array.from({ length: 5 }, (_, col) => ({ row, col, stacks: [] }))).flat().filter(t => !occupied.has(`${t.row},${t.col}`)); }); completeRound(s); chooseSupplyWorkerTurn(s, 'E093_Motivator'); const r = ok(s.resolveChoice(0, 'day-laborer')); assert.equal(familySize(r.state.players[0]!), 2); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 2); assert.equal(r.state.players[0]!.resources.food, 22); assert.deepEqual(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy, [{ playerId: r.state.players[0]!.id, workerId: '3' }]); save('E093-N1', r); })
+  it('E093 N2 one unused farm cell prevents supply placement on actual first turn', () => { const s = setup('E093_Motivator', 5); const r = finish(s, completeRound(s)); assert.equal(r.interaction.stateId, 'idle'); assert.equal(familySize(r.state.players[0]!), 2); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 2); assert.equal(r.state.players[0]!.resources.food, 20); save('E093-N2', r); })
+  it('E093 N3 declining supply turn places an ordinary active person and expires the opportunity', () => { const s = setup('E093_Motivator', 5, state => { const p = state.players[0]!; p.cardStates.E093_Motivator = { flagged: true }; const occupied = new Set(p.roomTiles.map(t => `${t.row},${t.col}`)); p.fields = Array.from({ length: 3 }, (_, row) => Array.from({ length: 5 }, (_, col) => ({ row, col, stacks: [] }))).flat().filter(t => !occupied.has(`${t.row},${t.col}`)); }); completeRound(s); const r = ok(takeNormalWorkerTurn(s, 'day-laborer')); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 1); assert.equal(familySize(r.state.players[0]!), 2); assert.equal(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy[0]!.workerId, '1'); save('E093-N3', r); })
 })

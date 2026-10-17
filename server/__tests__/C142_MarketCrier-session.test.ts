@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C142_MarketCrier'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'C142_MarketCrier'
 
@@ -104,4 +105,11 @@ describe('C142 Market Crier parity', () => {
     expect(response.state.players[0]!.resources.grain).toBe(0)
     expect(response.state.players[2]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, resources } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C142 N1 accepting Grain Seeds gives owner two grain vegetable and BOTH opponents one grain while decline gives only base grain', () => { for (const accept of [true, false]) { const s = make('C142_MarketCrier'), r = finish(s, ok(s.takeAction(0, 'grain-seeds')), accept); resources(r, { grain: accept ? 2 : 1, vegetable: accept ? 1 : 0 }); for (const owner of [1, 2]) resources(r, { grain: accept ? 1 : 0 }, owner); save(`C142-N1-${accept}`, r) } })
+  it('C142 N2 nonmatching owner actual opponent Grain Seeds and hand-only Market Crier cannot reward others', () => { const s = make('C142_MarketCrier'); finish(s, ok(s.takeAction(0, 'day-laborer')), false, 'C142_MarketCrier'); ready(s); const r = finish(s, ok(s.takeAction(1, 'grain-seeds')), false, 'C142_MarketCrier'); resources(r, { grain: 0, vegetable: 0 }); resources(r, { grain: 1, vegetable: 0 }, 1); resources(r, { grain: 0 }, 2); const c = make('C142_MarketCrier', undefined, false), cr = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); resources(cr, { grain: 1, vegetable: 0 }); resources(cr, { grain: 0 }, 1); save('C142-N2', { r, cr }) })
 })

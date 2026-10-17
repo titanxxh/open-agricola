@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C047_GardenClaw'
 import '../../shared/cards/B/B068_Beanfield'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'C047_GardenClaw'
 const FILLER = '__test_placeholder__'
@@ -114,4 +116,36 @@ describe('C047 Garden Claw parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(21)
     expect(futureRounds(response)).toEqual([7, 8])
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, end, final, purchase, rejectBuy, undo, resource, future } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C047 N1 real purchase counts planted fields rather than crop tokens and receives naturally due food", () => { const s = make('C047_GardenClaw', st => { const p = st.players[0]!; p.resources.wood = 1; p.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] }, { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 2 }] }, { row: 0, col: 3, stacks: [] }]; }, false), r = purchase(s, 'C047_GardenClaw'); resource(r, { wood: 0 }); assert.deepEqual(future(r, 'C047_GardenClaw'), [6, 7, 8, 9, 10, 11]); const due = end(s); resource(due, { food: 101 }); save('C047-N1', { r, due }); });
+  it("C047 N2 empty or absent fields permit no food while held card and absent wood exclude purchase or scheduling", () => { for (const mode of ['empty', 'none', 'wood', 'hand']) {
+      const s = make('C047_GardenClaw', st => { const p = st.players[0]!; p.resources.wood = mode === 'wood' ? 0 : 1; if (mode !== 'none')
+          p.fields = [{ row: 0, col: 1, stacks: mode === 'empty' ? [] : [{ kind: 'grain', remaining: 1 }] }]; }, false);
+      if (mode === 'wood') {
+          save('C047-N2-wood', rejectBuy(s, 'C047_GardenClaw'));
+          continue;
+      }
+      const r = mode === 'hand' ? s.getState() : purchase(s, 'C047_GardenClaw');
+      assert.deepEqual(future(r, 'C047_GardenClaw'), []);
+      const due = end(s, true, [], mode === 'hand' ? 'C047_GardenClaw' : undefined);
+      resource(due, { food: 100 });
+      save(`C047-N2-${mode}`, { r, due });
+  } });
+  it("C047 N3 late planted-field purchases truncate and undo removes the original crop-based schedule", () => { for (const round of [13, 14]) {
+      const s = make('C047_GardenClaw', st => { st.players[0]!.resources.wood = 1; st.players[0]!.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]; }, false, round), r = purchase(s, 'C047_GardenClaw'), u = undo(s);
+      resource(u, { wood: 1 });
+      assert.deepEqual(future(u, 'C047_GardenClaw'), []);
+      purchase(s, 'C047_GardenClaw');
+      assert.deepEqual(future(r, 'C047_GardenClaw'), round === 13 ? [14] : []);
+      const due = round === 13 ? end(s) : final(s);
+      if (round === 13) {
+          resource(due, { food: 97, grain: 1 });
+          assert.deepEqual(due.state.players[0]!.fields[0]!.stacks, []);
+      }
+      save(`C047-N3-${round}`, { r, u, due });
+  } });
 })

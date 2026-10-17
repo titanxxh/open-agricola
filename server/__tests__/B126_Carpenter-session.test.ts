@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B126_Carpenter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Construct from './_helpers/audit/ae-negative-28-construct'
 
 const CARD_ID = 'B126_Carpenter'
 
@@ -123,4 +126,14 @@ describe('B126 Carpenter parity', () => {
     expect(response.state.players[0]!.rooms).toBe(4)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
   })
+})
+
+describe('ae-negative-28-construct', () => {
+  const { CARP, sessions, save, ok, make, tiles, open, payment, build } = audit28Construct
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B126 N1 real single room construction in each house type pays exactly three matching materials and two reed',()=>{for(const[house,key]of[['wood','wood'],['clay','clay'],['stone','stone']]as const){const a=build(make(CARP,house,{[key]:3,reed:2}),1,{[key]:3,reed:2});save(`B126-N1-${house}`,a)}})
+  it('B126 N2 real two room construction applies the discount per room and pays six wood four reed',()=>{save('B126-N2',build(make(CARP,'wood',{wood:6,reed:4}),2,{wood:6,reed:4}))})
+  it('B126 N3 unaffordable two room target rejects before a legal one room construction and charges only that one room',()=>{const s=make(CARP,'wood',{wood:3,reed:2}),pending=open(s),rejected=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:tiles})),r=payment(s,ok(s.commitSelectionChoice(0,{rooms:tiles.slice(0,1)})),{wood:3,reed:2});assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources.wood,0);save('B126-N3',{pending,rejected,r})})
+  it('B126 N4 card still in hand keeps the ordinary five wood two reed room cost',()=>{save('B126-N4',build(make(CARP,'wood',{wood:5,reed:2},false),1,{wood:5,reed:2}))})
+  it('B126 N5 whole construction undo restores room coordinates resources workers and occupancy before one paid replay',()=>{const s=make(CARP,'wood',{wood:6,reed:4}),before=ok(s.getState()),a=build(s,2,{wood:6,reed:4}),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.deepEqual(undone.state.players[0]!.roomTiles,before.state.players[0]!.roomTiles);assert.deepEqual(undone.state.players[0]!.workers,before.state.players[0]!.workers);assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);save('B126-N5',{before,a,undone,retry:build(s,2,{wood:6,reed:4})})})
 })

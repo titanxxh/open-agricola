@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -9,6 +9,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A095_Angler'
 import '../../shared/cards/A/A031_DebtSecurity'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit12Replacement from './_helpers/audit/ae-negative-12-replacement'
 
 const CARD_ID = 'A095_Angler'
 const TEST_MINOR = 'A006_StorageBarn'
@@ -192,5 +195,28 @@ describe('A095_Angler listener provenance guard', () => {
     const result = runListener([fishingFood(2)], { food: 2 }, [])
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('ae-negative-12-replacement', () => {
+  const { DEBT, sessions, save, ok, turn, accept, angler } = audit12Replacement
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A095 N1 original one and two food allow minor with ordinary two food cost', () => {
+    for (const amount of [1, 2]) {
+      const session = angler(amount); let response = accept(session, turn(session, 0, 'fishing'))
+      if (!response.state.players[0]!.minorPlayed.includes(DEBT)) response = ok(session.resolveChoice(0, DEBT))
+      assert.ok(response.state.players[0]!.minorPlayed.includes(DEBT)); assert.equal(response.state.players[0]!.resources.food, amount); assert.equal(response.state.actionSpaces.find(s => s.id === 'fishing')!.resources.food, 0); save(`A095-N1-${amount}`, response)
+    }
+  })
+  it('A095 N2 decline preserves food and hand and insufficient payment cannot buy debt', () => {
+    const session = angler(); turn(session, 0, 'fishing'); const response = ok(session.resolveChoice(0, '__skip__'))
+    assert.equal(response.state.players[0]!.resources.food, 4); assert.ok(response.state.players[0]!.minorHand.includes(DEBT)); save('A095-N2-decline', response)
+    const poor = angler(1, 0); const denied = turn(poor, 0, 'fishing'); assert.equal(denied.state.players[0]!.resources.food, 1); assert.ok(!denied.state.players[0]!.minorPlayed.includes(DEBT)); assertRejectedUnchanged(poor, () => poor.resolveChoice(0, DEBT)); save('A095-N2-poor', denied)
+  })
+  it('A095 N3 three food nonFishing unplayed and actual opponent cannot trigger owner', () => {
+    for (const [session, space] of [[angler(3), 'fishing'], [angler(), 'day-laborer'], [angler(2, 2, false), 'fishing']] as const) {
+      const response = turn(session, 0, space); assert.equal(response.interaction.stateId === 'wait' ? response.interaction.request.kind : '', 'confirm-next-player'); assert.ok(response.state.players[0]!.minorHand.includes(DEBT)); save(`A095-N3-${space}-${response.state.players[0]!.resources.food}`, response)
+    }
+    const session = angler(); turn(session, 0, 'grain-seeds'); const response = turn(session, 1, 'fishing'); assert.ok(response.state.players[0]!.minorHand.includes(DEBT)); assert.equal(response.state.players[1]!.resources.food, 42); save('A095-N3-opponent', response)
   })
 })

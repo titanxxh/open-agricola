@@ -11,6 +11,16 @@ import {
 import '../../shared/cards/C/C094_StableCleaner'
 import '../../shared/cards/C/C088_CarpentersApprentice'
 import type { ActionFlow } from '../../shared/contract/types'
+import '../../shared/cards/B/B157_Salter'
+import '../../shared/cards/A/A143_Stonecutter'
+import '../../shared/cards/E/E146_Reseller'
+import '../../shared/cards/E/E047_SyrupTap'
+import '../../shared/cards/E/E030_ChildsToy'
+import '../../shared/cards/B/B007_Wage'
+import '../../shared/cards/C/C054_MarketBooth'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit02Payments from './_helpers/audit/ae-negative-02-payments'
 
 const CARD_ID = 'C094_StableCleaner'
 const LISTENER_ID = 'C94-stable-cleaner-anytime'
@@ -214,5 +224,76 @@ describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {
     expect(built.state.players[0]!.resources.wood).toBe(0)
     expect(built.state.players[0]!.resources.food).toBe(0)
     expect(built.state.players[0]!.stableTiles).toHaveLength(3)
+  })
+})
+
+describe('ae-negative-02-payments', () => {
+  const { cleaner, cleanerObserved, enterCleaner } = audit02Payments
+  describe('C094 negative payment and target rules', () => {
+    it('C094 N1 OA builds in two completed activations for one wood and food each without a person', () => {
+      const s = cleaner()
+      try {
+        enterCleaner(s)
+        assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime'))
+        let r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+        enterCleaner(s)
+        r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(cleanerObserved(r), { wood: 0, food: 0, stables: 2, workers: 0 })
+        assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime'))
+      } finally { s.dispose() }
+    })
+    it('C094 N2 OA missing payment unplayed card and exhausted supply cannot activate', () => {
+      for (const settings of [{ wood: 0 }, { food: 0 }, { played: false }, { supply: 0 }]) {
+        const s = cleaner(settings)
+        try { assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')) } finally { s.dispose() }
+      }
+    })
+    it('C094 N3 OA illegal stable targets reject before a legal retry', () => {
+      const s = cleaner()
+      try {
+        enterCleaner(s)
+        for (const stables of [[s.state.players[0]!.roomTiles[0]!], [{ row: 99, col: 99 }]]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables }))
+        const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+      } finally { s.dispose() }
+    })
+    it('C094 N4 OA an unaffordable two-stable plan rejects before paying for one', () => {
+      const s = cleaner({ wood: 1, food: 1 })
+      try {
+        enterCleaner(s)
+        assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }, { row: 0, col: 3 }] }))
+        const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(cleanerObserved(r), { wood: 0, food: 0, stables: 1, workers: 0 })
+      } finally { s.dispose() }
+    })
+    it('C094 N5 OA undo restores stable payment and permits a different legal target', () => {
+      const s = cleaner()
+      try {
+        enterCleaner(s)
+        assert.equal(s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] }).ok, true)
+        const undone = s.undoStep()
+        assert.equal(undone.ok, true, undone.error)
+        assert.deepEqual(cleanerObserved(undone), { wood: 2, food: 2, stables: 0, workers: 0 })
+        const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 3 }] })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(cleanerObserved(r), { wood: 1, food: 1, stables: 1, workers: 0 })
+      } finally { s.dispose() }
+    })
+  })
+  describe('C094 duplicate position boundary', () => {
+    it('C094 N6 OA duplicate stable positions must reject without paying or consuming supply', () => {
+      const s = cleaner()
+      try {
+        enterCleaner(s)
+        const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }, { row: 0, col: 2 }] })
+        const actual = { ok: r.ok, ...cleanerObserved(r), uniquePositions: new Set(r.state.players[0]!.stableTiles.map(t => `${t.row},${t.col}`)).size }
+        assertRuleOutcome(actual, { ok: false, wood: 2, food: 2, stables: 0, workers: 0, uniquePositions: 0 })
+      } finally { s.dispose() }
+    })
   })
 })

@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D047_Churchyard'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'D047_Churchyard'
 const FILLER = '__test_placeholder__'
@@ -122,4 +124,26 @@ describe('D047 Churchyard parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(22)
     expect(futureRounds(response)).toEqual([14, 14])
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, end, final, purchase, rejectBuy, resource, future, points, front } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D047 N1 ten real eligible cards permit purchase and two foods are naturally received per remaining round", () => { const s = make('D047_Churchyard', st => { front(st, 10); Object.assign(st.players[0]!.resources, { stone: 1, reed: 1 }); }, false, 11), r = purchase(s, 'D047_Churchyard'); resource(r, { stone: 0, reed: 0, food: 100 }); assert.deepEqual(future(r, 'D047_Churchyard'), [12, 12, 13, 13, 14, 14]); const due = end(s); resource(due, { food: 98 }); assert.deepEqual(future(due, 'D047_Churchyard'), [13, 13, 14, 14]); save('D047-N1', { r, due }); });
+  it("D047 N2 nine cards hand cards foreign cards or missing cost cannot satisfy Churchyard", () => { for (const mode of ['nine', 'handCard', 'foreign', 'stone', 'reed']) {
+      const s = make('D047_Churchyard', st => { front(st, ['stone', 'reed'].includes(mode) ? 10 : 9); Object.assign(st.players[0]!.resources, { stone: mode === 'stone' ? 0 : 1, reed: mode === 'reed' ? 0 : 1 }); if (mode === 'handCard')
+          st.players[0]!.minorHand.push('A010_WoodenShed'); if (mode === 'foreign')
+          st.players[1]!.occupationPlayed = ['A101_CookeryOutfitter']; }, false, 11);
+      save(`D047-N2-${mode}`, rejectBuy(s, 'D047_Churchyard'));
+  } const s = make('D047_Churchyard', st => { front(st, 10); Object.assign(st.players[0]!.resources, { stone: 1, reed: 1 }); }, false, 11), r = end(s, true, [], 'D047_Churchyard'); resource(r, { food: 96 }); assert.deepEqual(future(r, 'D047_Churchyard'), []); save('D047-N2-held', r); });
+  it("D047 N3 round thirteen and fourteen Churchyard builds truncate and score one printed point", () => { for (const round of [13, 14]) {
+      const s = make('D047_Churchyard', st => { front(st, 10); Object.assign(st.players[0]!.resources, { stone: 1, reed: 1 }); }, false, round), r = purchase(s, 'D047_Churchyard');
+      assert.deepEqual(future(r, 'D047_Churchyard'), round === 13 ? [14, 14] : []);
+      const due = round === 13 ? end(s) : final(s);
+      if (round === 13)
+          resource(due, { food: 98 });
+      else
+          assert.equal(points(due, 'D047_Churchyard'), 1);
+      save(`D047-N3-${round}`, { r, due });
+  } });
 })

@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C159_FishermansFriend'
+import assert from 'node:assert/strict'
+import * as audit56Phase from './_helpers/audit/ae-negative-56-phase'
 
 const CARD_ID = 'C159_FishermansFriend'
 const FILLER = '__test_placeholder__'
@@ -116,4 +118,11 @@ describe("C159 Fisherman's Friend parity", () => {
     expect(second.state.round).toBe(7)
     expect(ownerFood(second)).toBe(foodBefore + 5)
   })
+})
+
+describe('ae-negative-56-phase', () => {
+  const { sessions, ok, save, make, finish, end } = audit56Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C159 N1 natural preparation compares both food piles and receives only their positive difference from general supply',()=>{for(const[tp,fish]of[[1,2],[3,3],[2,1],[5,2]]){const s=make('C159_FishermansFriend',st=>{st.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food=tp!;st.actionSpaces.find(a=>a.id==='fishing')!.resources.food=fish!;},true,5),r=finish(s,end(s));assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.food,100+Math.max(0,tp!-fish!));assert.equal(r.state.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food,tp!+1);assert.equal(r.state.actionSpaces.find(a=>a.id==='fishing')!.resources.food,fish!+1);save(`C159-N1-${tp}-${fish}`,r)}})
+  it('C159 N2 midround unrelated placement and card only in hand cannot award difference food early',()=>{for(const hand of[true,false]){const s=make('C159_FishermansFriend',st=>{st.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food=5;st.actionSpaces.find(a=>a.id==='fishing')!.resources.food=2},!hand,5),r=hand?finish(s,end(s)):finish(s,ok(s.takeAction(0,'grain-seeds')));assert.equal(r.state.players[0]!.resources.food,100);save(`C159-N2-${hand}`,r)}})
 })

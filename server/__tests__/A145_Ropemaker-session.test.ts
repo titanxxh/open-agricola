@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 import '../../shared/cards/A/A145_Ropemaker'
+import assert from 'node:assert/strict'
+import * as audit16Phases from './_helpers/audit/ae-negative-16-phases'
 
 const CARD_ID = 'A145_Ropemaker'
 
@@ -78,4 +80,11 @@ describe('A145 Ropemaker parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.reed).toBe(2)
   })
+})
+
+describe('ae-negative-16-phases', () => {
+  const { ROPE, sessions, save, setup, end, ROPE_SIX } = audit16Phases
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A145 N1 first natural harvest adds one reed only after feeding while ordinary return home adds none',()=>{const harvest=end(setup(ROPE,4),ROPE_SIX).r;assert.equal(harvest.state.round,5);assert.equal(harvest.state.players[0]!.resources.reed,1);const ordinary=end(setup(ROPE,3),ROPE_SIX).r;assert.equal(ordinary.state.round,4);assert.equal(ordinary.state.players[0]!.resources.reed,0);save('A145-N1',{harvest,ordinary})})
+  it('A145 N2 repeated natural harvest grants once each and hand cannot grant reed',()=>{const s=setup(ROPE,7);const first=end(s,ROPE_SIX).r;assert.equal(first.state.players[0]!.resources.reed,1);assert.equal(s.getState().state.players[0]!.resources.reed,1);const hand=end(setup(ROPE,4,undefined,false),ROPE_SIX).r;assert.equal(hand.state.players[0]!.resources.reed,0);save('A145-N2',{first,hand})})
 })

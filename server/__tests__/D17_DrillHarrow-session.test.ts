@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/D/D017_DrillHarrow'
 import '../../shared/cards/D/D003_Furrows'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit31Plows from './_helpers/audit/ae-negative-31-plows'
 
 const CARD_ID = 'D017_DrillHarrow'
 
@@ -174,5 +177,88 @@ describe('D017 Drill Harrow parity', () => {
     expect(response.state).toEqual(before.state)
     expect(response.state.players[0]!.resources.food).toBe(2)
     expect(response.state.players[0]!.fields).toEqual([])
+  })
+})
+
+describe('ae-negative-31-plows', () => {
+  const { sessions, ok, options, actor, save, setup, choose, offer, take, hand, buy, noSource, plow, accept, sow, minorSetup } = audit31Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D017 N1 real purchase pays printed cost and enforces missing resource or occupation', () => {
+    const card = 'D017_DrillHarrow', s = minorSetup(card, 1, 0, 20)
+    s.state.players[0]!.resources.reed = 0
+    s.loadState(s.state)
+    const r = buy(s, card)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    save('D017-N1-legal', r)
+    {
+      const t = minorSetup(card, 0, 0, 20, 14)
+      t.state.players[0]!.resources.reed = 0
+      t.loadState(t.state)
+      let q = take(t, 'meeting-place')
+      const branch = options(q).find(o => o.value.startsWith('action-improvement-'))
+      if (branch)
+        q = ok(t.resolveChoice(actor(q), branch.value))
+      assert.ok(!options(q).some(o => o.value === card && !o.disabled), JSON.stringify(q.interaction))
+      if (q.interaction.stateId === 'wait' && q.interaction.request.kind === 'choice')
+        assertRejectedUnchanged(t, () => t.resolveChoice(actor(q), card))
+      assert.ok(q.state.players[0]!.minorHand.includes(card))
+      save('D017-N1-resource', q)
+    }
+  })
+  it('D017 N2 before unconditional Sow exact food payment creates a field and normal grain stack', () => {
+    const card = 'D017_DrillHarrow', s = setup(card, 14, st => Object.assign(st.players[0]!.resources, { food: 3, grain: 1 }))
+    let r = take(s, 'grain-utilization')
+    if (options(r).some(o => o.labelKey === 'actions.sow.name' || o.value === 'sow'))
+      r = choose(s, r, o => o.labelKey === 'actions.sow.name' || o.value === 'sow')
+    r = plow(s, accept(s, r, card))
+    const f = r.state.players[0]!.fields[0]!
+    r = sow(s, r, [{ ...f, crop: 'grain' }])
+    assert.equal(r.state.players[0]!.resources.food, 0)
+    assert.equal(r.state.players[0]!.resources.grain, 0)
+    assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+    save('D017-N2', r)
+  })
+  it('D017 N3 insufficient food force attempt and declined paid plow retain normal Sow', () => {
+    for (const food of [2, 3]) {
+      const card = 'D017_DrillHarrow', s = setup(card, 14, st => { st.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }]; Object.assign(st.players[0]!.resources, { food, grain: 1 }); })
+      let r = take(s, 'grain-utilization')
+      if (options(r).some(o => o.labelKey === 'actions.sow.name' || o.value === 'sow'))
+        r = choose(s, r, o => o.labelKey === 'actions.sow.name' || o.value === 'sow')
+      r = offer(s, r, card)
+      if (food === 2) {
+        noSource(r, card)
+        assertRejectedUnchanged(s, () => s.resolveChoice(actor(r), 'flow-8'))
+      }
+      else
+        r = choose(s, r, o => o.value === '__skip__')
+      r = sow(s, r, [{ row: 0, col: 2, crop: 'grain' }])
+      assert.equal(r.state.players[0]!.resources.food, food)
+      assert.equal(r.state.players[0]!.fields.length, 1)
+      assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+      save(`D017-N3-${food}`, r)
+    }
+  })
+  it('D017 N4 conditional Furrows Sow and hand-only card cannot charge Drill Harrow food', () => {
+    const card = 'D017_DrillHarrow', s = setup(card, 14, st => { st.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }]; st.players[0]!.resources.grain = 1; st.players[0]!.minorHand = ['D003_Furrows']; })
+    let r = take(s, 'major-improvement')
+    if (r.state.players[0]!.minorHand.includes('D003_Furrows')) {
+      if (!options(r).some(o => o.value === 'D003_Furrows'))
+        r = choose(s, r, o => o.value.startsWith('action-improvement-') || o.labelKey === 'actions.improvement.name')
+      r = choose(s, r, o => o.value === 'D003_Furrows')
+    }
+    noSource(r, card)
+    r = sow(s, r, [{ row: 0, col: 2, crop: 'grain' }])
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(r.state.players[0]!.fields.length, 1)
+    assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+    save('D017-N4-furrows', r)
+    const t = setup(card, 14, st => { hand(st, card); st.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }]; st.players[0]!.resources.grain = 1; })
+    r = take(t, 'grain-utilization')
+    noSource(r, card)
+    r = sow(t, r, [{ row: 0, col: 2, crop: 'grain' }])
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    save('D017-N4-hand', r)
   })
 })

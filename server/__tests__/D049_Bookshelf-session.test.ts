@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D049_Bookshelf'
 import '../../shared/cards/A/A116_WoodCutter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'D049_Bookshelf'
 const OCCUPATION_ID = 'A116_WoodCutter'
@@ -159,4 +162,40 @@ describe('D049 Bookshelf session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(2)
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, choose, finish, lesson, take, prerequisites, hand, buy, printed, denyMinor } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D049 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'D049_Bookshelf', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 3); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.wood, 0); save('D049-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 3); Object.assign(st.players[0]!.resources, { "wood": 0 }); }); denyMinor(t, card); save('D049-N1-short', t.getState()); const excluded = setup(card, 14, st => { hand(st, card); prerequisites(st, 2); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); denyMinor(excluded, card); save('D049-N1-prerequisite', excluded.getState()); });
+  it('D049 N2 three food precede the actual occupation fee and can fund a zero food owner', () => { const card = 'D049_Bookshelf', s = setup(card, 5, st => { st.players[0]!.occupationHand = ['A098_StableArchitect']; st.players[0]!.resources.food = 0; }); const r = finish(s, lesson(s, 'A098_StableArchitect')); assert.equal(r.state.players[0]!.resources.food, 2); assert.equal(r.state.players[0]!.occupationPlayed.length, 4); save('D049-N2', r); });
+  it('D049 N3 hand opponent and unrelated actions cannot create owner food', () => {
+      for (const mode of ['hand', 'opponent', 'unrelated']) {
+          const card = 'D049_Bookshelf', s = setup(card, 14, st => {
+              if (mode === 'hand')
+                  hand(st, card);
+              st.players[0]!.resources.food = 0;
+              st.players[0]!.occupationHand = mode === 'empty' ? ['__test_placeholder__'] : ['A098_StableArchitect'];
+              if (mode === 'opponent') {
+                  st.currentPlayerIndex = 1;
+                  st.players[1]!.occupationPlayed = ['A125_Priest'];
+                  st.players[1]!.occupationHand = ['A098_StableArchitect'];
+                  st.players[1]!.resources.food = 1;
+              }
+          });
+          let r = s.getState();
+          if (mode === 'hand' || mode === 'empty')
+              assertRejectedUnchanged(s, () => s.takeAction(0, 'lessons'));
+          else if (mode === 'unrelated')
+              r = finish(s, take(s, 'grain-seeds'), true);
+          else {
+              r = take(s, 'lessons');
+              if (r.state.players[1]!.occupationHand.includes('A098_StableArchitect'))
+                  r = choose(s, r, o => o.value === 'A098_StableArchitect');
+              r = finish(s, r, true);
+          }
+          assert.equal(r.state.players[0]!.resources.food, 0);
+          save(`D049-N3-${mode}`, r);
+      }
+  });
 })

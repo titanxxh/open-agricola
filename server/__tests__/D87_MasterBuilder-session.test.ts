@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D087_MasterBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 const CARD_ID = 'D087_MasterBuilder'
 const ANYTIME_ID = 'D87-master-builder-anytime'
@@ -146,4 +149,11 @@ describe('D087 Master Builder parity', () => {
     expect(response.state.players[0]!).toMatchObject({ rooms: 6, houseType: 'clay' })
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0 })
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, rooms, anytime } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D087 N1 five wood rooms receive exactly one free sixth room and occupied target rejection permits legal retry', () => { const s = make('D087_MasterBuilder', st => rooms(st.players[0]!, 5, 'wood')), p = anytime(s, 'D087_MasterBuilder'); const rejected = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'farm-select' && p.interaction.request.farm.farmType === 'room'); const r = ok(s.commitSelectionChoice(0, { rooms: [p.interaction.request.farm.selectableTiles[0]!] })); assert.equal(r.state.players[0]!.rooms, 6); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(r.interaction.anytimeActions.some(a => JSON.stringify(a).includes('D087_MasterBuilder')), false); save('D087-N1', { p, rejected, r }) })
+  it('D087 N2 four rooms cannot receive free room while unrelated legal action works', () => { const s = make('D087_MasterBuilder', st => rooms(st.players[0]!, 4, 'stone')); assert.equal(s.getState().interaction.anytimeActions.some(a => JSON.stringify(a).includes('D087_MasterBuilder')), false); const r = finish(s, ok(s.takeAction(0, 'grain-seeds')), false); assert.equal(r.state.players[0]!.rooms, 4); assert.equal(r.state.players[0]!.resources.grain, 1); save('D087-N2', r) })
 })

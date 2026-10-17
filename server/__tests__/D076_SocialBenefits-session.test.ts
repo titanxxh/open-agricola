@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Purchase from './_helpers/audit/ae-negative-42-purchase'
+
+describe('ae-negative-42-purchase', () => {
+  const { sessions, ok, save, setup, finish, select, play, complete, occupations } = audit42Purchase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D076 N1 real feeding consumes four food to zero then Social Benefits gives wood and clay once while one leftover food excludes',()=>{for(const food of [4,5]){const s=setup('D076_SocialBenefits',st=>{st.players[0]!.resources.food=food},true,4),r=complete(s,['grain-seeds','clay-pit','reed-bank','forest']);assert.equal(r.state.round,5);assert.equal(r.state.players[0]!.resources.food,food-4);assert.equal(r.state.players[0]!.resources.begging,0);assert.equal(r.state.players[0]!.resources.wood,food===4?1:0);assert.equal(r.state.players[0]!.resources.clay,food===4?1:0);save(`D076-N1-${food}`,r)}})
+  it('D076 N2 zero food in work phase and held card during real feeding provide no immediate benefits',()=>{const s=setup('D076_SocialBenefits',st=>{st.players[0]!.resources.food=0}),r=finish(s,ok(s.takeAction(0,'grain-seeds')),true,'D076_SocialBenefits');assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.clay,0);const t=setup('D076_SocialBenefits',st=>{st.players[0]!.resources.food=4},false,4),held=complete(t,['grain-seeds','clay-pit','reed-bank','forest']);assert.equal(held.state.players[0]!.resources.food,0);assert.equal(held.state.players[0]!.resources.wood,0);assert.equal(held.state.players[0]!.resources.clay,0);save('D076-N2',{r,held})})
+  it('D076 N3 real reed purchase is allowed at one occupation but two occupations reject before legal alternative',()=>{const s=setup('D076_SocialBenefits',st=>{occupations(st,1);st.players[0]!.resources.reed=1},false,5),r=play(s,'D076_SocialBenefits');assert.equal(r.state.players[0]!.resources.reed,0);const t=setup('D076_SocialBenefits',st=>{occupations(st,2);st.players[0]!.resources.reed=1;st.players[0]!.minorHand.push('E080_RockGarden','C071_Slurry')},false,5),p=select(t,ok(t.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,'D076_SocialBenefits')),legal=finish(t,select(t,p,o=>o.value==='E080_RockGarden'));assert.equal(legal.state.players[0]!.resources.reed,1);save('D076-N3',{r,p,bad,legal})})
+})

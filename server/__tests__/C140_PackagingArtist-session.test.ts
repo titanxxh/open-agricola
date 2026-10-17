@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -7,6 +7,8 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C140_PackagingArtist'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'C140_PackagingArtist'
 
@@ -371,4 +373,12 @@ describe('C140_PackagingArtist session', () => {
     expect(p1.resources.reed).toBe(0)
     expect(p1.resources.stone).toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, resources, improvement, bake } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C140 N1 actual first Lessons grants exactly one grain', () => { const s = make('C140_PackagingArtist', undefined, false), r = finish(s, lesson(s, 'C140_PackagingArtist'), false); resources(r, { grain: 1, food: 100 }); save('C140-N1', r) })
+  it('C140 N2 Meeting Place and Major Improvement can replace improvement with a real one-grain Fireplace bake', () => { for (const space of ['meeting-place', 'major-improvement']) { const s = make('C140_PackagingArtist', st => { st.players[0]!.resources.grain = 1; st.players[0]!.improvements = ['Major_Fireplace1']; st.availableMajorImprovements = [] }), p = ok(s.takeAction(0, space)), r = bake(s, p); resources(r, { grain: 0, food: 102 }); assert.deepEqual(r.state.players[0]!.minorPlayed, []); save(`C140-N2-${space}`, { p, r }) } })
+  it('C140 N3 original paid minor branch remains usable and nonimprovement or unplayed card cannot bake', () => { const s = make('C140_PackagingArtist', st => { st.players[0]!.resources.clay = 1; st.players[0]!.minorHand = ['A050_MilkJug'] }), r = finish(s, improvement(s, 'A050_MilkJug'), false); resources(r, { clay: 0, grain: 0, food: 100 }); assert.ok(r.state.players[0]!.minorPlayed.includes('A050_MilkJug')); const c = make('C140_PackagingArtist'), cr = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); resources(cr, { grain: 1, food: 100 }); const a = make('C140_PackagingArtist', st => { st.players[0]!.resources.grain = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }, false), ar = finish(a, ok(a.takeAction(0, 'meeting-place')), false); resources(ar, { grain: 1, food: 100 }); save('C140-N3', { r, cr, ar }) })
 })

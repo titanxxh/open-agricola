@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict'
+import { familySize } from '../../shared/domain/player'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Growth from './_helpers/audit/ae-negative-28-growth'
+
+describe('ae-negative-28-growth', () => {
+  const { CARD, sessions, save, ok, finish, make, lesson } = audit28Growth
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B127 N1 real round five Lessons pays one stone grain vegetable and legally housed sheep for one newborn even with no room',()=>{const a=lesson(make());assert.equal(a.before.state.players[0]!.rooms,2);assert.equal(familySize(a.r.state.players[0]!),3);for(const k of['stone','grain','vegetable','sheep']as const)assert.equal(a.r.state.players[0]!.resources[k],0);assert.deepEqual(a.r.state.players[0]!.workers.map(w=>w.id),a.before.state.players[0]!.workers.map(w=>w.id));assert.equal(a.r.state.players[1]!.resources.food,100);save('B127-N1',a)})
+  it('B127 N2 real round four purchase cannot grow or pay goods and each missing good prevents the round five bonus',()=>{for(const[round,missing]of[[4,''],[5,'stone'],[5,'grain'],[5,'vegetable'],[5,'sheep']]as const){const a=lesson(make(round,missing),true);assert.equal(familySize(a.r.state.players[0]!),2);for(const k of['stone','grain','vegetable','sheep']as const)assert.equal(a.r.state.players[0]!.resources[k],a.before.state.players[0]!.resources[k]);save(`B127-N2-${round}-${missing}`,a)}})
+  it('B127 N3 optional real purchase decline preserves every required good and the two person family',()=>{const a=lesson(make(),false);assert.equal(familySize(a.r.state.players[0]!),2);for(const k of['stone','grain','vegetable','sheep']as const)assert.equal(a.r.state.players[0]!.resources[k],1);save('B127-N3',a)})
+  it('B127 N4 full five worker supply cannot add a sixth worker or consume the growth payment',()=>{const a=lesson(make(5,'',5),false);assert.equal(familySize(a.r.state.players[0]!),5);assert.equal(a.r.state.players[0]!.workers.length,5);for(const k of['stone','grain','vegetable','sheep']as const)assert.equal(a.r.state.players[0]!.resources[k],1);save('B127-N4',a)})
+  it('B127 N5 whole real growth purchase undo restores all four goods original sheep holder and hand before a single replay',()=>{const s=make(),a=lesson(s),undone=ok(s.undoAction());assert.equal(familySize(undone.state.players[0]!),2);assert.ok(undone.state.players[0]!.occupationHand.includes(CARD));assert.deepEqual(undone.state.players[0]!.resources,a.before.state.players[0]!.resources);assert.deepEqual(undone.state.players[0]!.houseAnimals,a.before.state.players[0]!.houseAnimals);const retry=lesson(s);assert.equal(familySize(retry.r.state.players[0]!),3);save('B127-N5',{a,undone,retry})})
+  it('B127 N6 unknown occupation rejects without changing the actual Lessons request before one legal Seducer purchase',()=>{const s=make(),pending=ok(s.takeAction(0,'lessons')),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'missing-occupation'));let r=ok(s.resolveChoice(0,CARD));r=finish(s,r,true);assert.equal(familySize(r.state.players[0]!),3);save('B127-N6',{pending,rejected,r})})
+})

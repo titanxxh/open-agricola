@@ -1,13 +1,16 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C018_RollOverPlow'
 import '../../shared/cards/B/B113_PatchCaregiver'
 import type { AnytimeAction } from '../../shared/contract/types';
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit31Plows from './_helpers/audit/ae-negative-31-plows'
 
 const CARD_ID = 'C018_RollOverPlow'
 
@@ -283,5 +286,51 @@ describe('C018 Roll-Over Plow parity', () => {
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
     expect(response.state.players[0]!.fields.find((field) =>
       field.row === 0 && field.col === 2)?.stacks).toEqual([])
+  })
+})
+
+describe('ae-negative-31-plows', () => {
+  const { sessions, ok, options, actor, save, setup, finish, take, hand, buy, plow, planted, minorSetup } = audit31Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C018 N1 real purchase pays printed cost and enforces missing resource or occupation', () => {
+    const card = 'C018_RollOverPlow', s = minorSetup(card, 2, 0, 20)
+    s.state.players[0]!.resources.reed = 0
+    s.loadState(s.state)
+    const r = buy(s, card)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    save('C018-N1-legal', r)
+    {
+      const t = minorSetup(card, 1, 0, 20, 14)
+      t.state.players[0]!.resources.reed = 0
+      t.loadState(t.state)
+      let q = take(t, 'meeting-place')
+      const branch = options(q).find(o => o.value.startsWith('action-improvement-'))
+      if (branch)
+        q = ok(t.resolveChoice(actor(q), branch.value))
+      assert.ok(!options(q).some(o => o.value === card && !o.disabled), JSON.stringify(q.interaction))
+      if (q.interaction.stateId === 'wait' && q.interaction.request.kind === 'choice')
+        assertRejectedUnchanged(t, () => t.resolveChoice(actor(q), card))
+      assert.ok(q.state.players[0]!.minorHand.includes(card))
+      save('C018-N1-resource', q)
+    }
+  })
+  it('C018 N2 nested anytime discards exactly one entire planted field and resumes parent plow', () => { const card = 'C018_RollOverPlow', s = setup(card, 14, st => planted(st)); let r = take(s, 'farmland'); assert.ok(r.interaction.anytimeActions.some(a => a.id === 'C18-roll-over-plow-anytime')); ok(s.takeAnytimeAction(0, 'C18-roll-over-plow-anytime')); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 1, col: 4 }] })); assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 2 }] })); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }, { row: 0, col: 3 }] })); r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })); assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks.map(a => a.remaining)), [[], [2], [3]]); r = finish(s, plow(s, r), true); assert.equal(r.state.players[0]!.fields.length, 5); save('C018-N2', r); })
+  it('C018 N3 two planted fields and hand-only card cannot invoke anytime effect', () => {
+    for (const mode of ['two', 'hand']) {
+      const card = 'C018_RollOverPlow', s = setup(card, 14, st => {
+        planted(st, mode === 'two' ? 2 : 3)
+        if (mode === 'hand')
+          hand(st, card)
+      })
+      let r = take(s, 'farmland')
+      assert.ok(!r.interaction.anytimeActions.some(a => a.id === 'C18-roll-over-plow-anytime'))
+      assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C18-roll-over-plow-anytime'))
+      r = finish(s, r, true)
+      assert.equal(r.state.players[0]!.fields.length, mode === 'two' ? 3 : 4)
+      assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+      save(`C018-N3-${mode}`, r)
+    }
   })
 })

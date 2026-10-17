@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Capacity from './_helpers/audit/ae-negative-43-capacity'
+
+describe('ae-negative-43-capacity', () => {
+  const { AGENT, sessions, save, ok, make, lesson, ownerReady, reorg, assign, houseZone } = audit43Capacity
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D086 N1 actual Lessons counts Sheep Agent itself and allows one sheep while wrong cattle is rejected',()=>{const s=make(AGENT,false),bought=lesson(s,AGENT);ownerReady(s);const pending=reorg(s);const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assign(pending,AGENT,{cattle:1})]}));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');assert.equal(pending.interaction.request.zones.find(z=>z.cardId===AGENT)?.capacity,1);const r=ok(s.resolveChoice(0,'confirm',{zones:[assign(pending,AGENT,{sheep:1})]}));assert.equal(r.state.players[0]!.resources.sheep,1);save('D086-N1',{bought,pending,bad,r})})
+  it('D086 N2 other animal-holding occupations are excluded and capacity plus one rejects before legal sheep housing',()=>{const s=make(AGENT,true,state=>{state.players[0]!.occupationPlayed=[AGENT,'A110_Roughcaster','C086_LivestockFeeder'];state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=3}),pending=reorg(s);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');assert.equal(pending.interaction.request.zones.find(z=>z.cardId===AGENT)?.capacity,2);const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assign(pending,AGENT,{sheep:3})]})),r=ok(s.resolveChoice(0,'confirm',{zones:[assign(pending,AGENT,{sheep:2}),houseZone(pending,'sheep')]}));assert.equal(r.state.players[0]!.resources.sheep,3);save('D086-N2',{pending,bad,r})})
+  it('D086 N3 cattle cannot occupy the sheep holder and a real room remains a legal cattle alternative',()=>{const s=make(AGENT,true,state=>state.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle=1),pending=reorg(s,'cattle-market'),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assign(pending,AGENT,{cattle:1})]})),r=ok(s.resolveChoice(0,'confirm',{zones:[houseZone(pending,'cattle')]}));assert.equal(r.state.players[0]!.resources.cattle,1);save('D086-N3',{pending,bad,r})})
+})

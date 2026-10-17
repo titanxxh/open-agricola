@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C130_OutskirtsDirector'
+import assert from 'node:assert/strict'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'C130_OutskirtsDirector'
 const FILLER = '__test_placeholder__'
@@ -166,5 +168,30 @@ describe('C130 Outskirts Director parity', () => {
     expect(resourceOn(response, 'hollow', 'reed')).toBe(0)
     expect(workersOn(response, 'grove')).toBe(1)
     expect(workersOn(response, 'hollow')).toBe(1)
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, ok, save, setup, choose, finish, next, offer, take } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C130 N1 genuine Grove Hollow chain repeats deposit and extra placement with no person left after second use', () => { const s = setup('C130_OutskirtsDirector'); let r = offer(s, take(s, 'grove'), 'C130_OutskirtsDirector'); r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value)); assert.equal(r.state.actionSpaces.find(a => a.id === 'hollow')!.resources.reed, 2); r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value)); r = ok(s.resolveChoice(0, 'hollow')); r = offer(s, r, 'C130_OutskirtsDirector'); r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value)); r = finish(s, r); assert.equal(r.state.players[0]!.resources.wood, 3); assert.equal(r.state.players[0]!.resources.clay, 2); assert.equal(r.state.players[0]!.resources.reed, 2); assert.equal(r.state.actionSpaces.find(a => a.id === 'grove')!.resources.reed, 2); assert.equal(r.state.actionSpaces.find(a => a.id === 'hollow')!.resources.reed, 0); assert.equal(r.state.actionSpaces.flatMap(a => a.takenBy).filter(w => w.playerId === r.state.players[0]!.id).length, 2); save('C130-N1', r); })
+  it('C130 N2 decline reverse-space extra decline unrelated and real opponent use cannot chain owner placements', () => {
+    for (const mode of ['decline', 'reverse', 'unrelated', 'opponent']) {
+      const s = setup('C130_OutskirtsDirector')
+      let r = take(s, mode === 'decline' ? 'grove' : mode === 'reverse' ? 'hollow' : 'forest')
+      if (mode === 'reverse') {
+        r = offer(s, r, 'C130_OutskirtsDirector')
+        r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+      }
+      r = finish(s, r)
+      if (mode === 'opponent') {
+        next(s)
+        r = finish(s, take(s, 'grove'))
+      }
+      assert.equal(r.state.actionSpaces.find(a => a.id === 'grove')!.resources.reed, mode === 'reverse' ? 2 : 0)
+      assert.equal(r.state.actionSpaces.find(a => a.id === 'hollow')!.resources.reed, 0)
+      assert.equal(r.state.actionSpaces.flatMap(a => a.takenBy).filter(w => w.playerId === r.state.players[0]!.id).length, 1)
+      save(`C130-N2-${mode}`, r)
+    }
   })
 })

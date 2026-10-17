@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D057_WholesaleMarket'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Timing from './_helpers/audit/ae-negative-38-timing'
 
 const CARD_ID = 'D057_WholesaleMarket'
 const FILLER = '__test_placeholder__'
@@ -107,4 +110,31 @@ describe('D057 Wholesale Market parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(21)
     expect(futureRounds(response)).toEqual([14])
   })
+})
+
+describe('ae-negative-38-timing', () => {
+  const { sessions, save, pendingCard, finish, progress, buy, printed, NOFOOD, wholesale, future } = audit38Timing
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D057 N1 actual two wood two vegetables purchase schedules every later round and natural next two rounds deliver food without an immediate gain', () => { const s = wholesale(), bought = finish(s, buy(s, 'D057_WholesaleMarket')); assert.deepEqual([bought.state.players[0]!.resources.wood, bought.state.players[0]!.resources.vegetable, bought.state.players[0]!.resources.food, printed(bought, 'D057_WholesaleMarket')], [0, 0, 100, 3]); assert.deepEqual(future(bought), [6, 7, 8, 9, 10, 11, 12, 13, 14].map(round => ({ round, food: 1 }))); const six = progress(s, 6, '', NOFOOD), seven = progress(s, 7, '', NOFOOD); assert.deepEqual([six.state.players[0]!.resources.food, seven.state.players[0]!.resources.food], [101, 102]); save('D057-N1', { bought, six, seven }); });
+  it('D057 N2 late round twelve thirteen fourteen purchases truncate the queue after the current round', () => {
+      const rows = [];
+      for (const [round, rs] of [[12, [13, 14]], [13, [14]], [14, []]] as const) {
+          const s = wholesale(round), r = finish(s, buy(s, 'D057_WholesaleMarket'));
+          assert.deepEqual(future(r), rs.map(round => ({ round, food: 1 })));
+          rows.push(r);
+      }
+      save('D057-N2', rows);
+  });
+  it('D057 N3 missing either cost cannot purchase or queue food and the held card never delivers at a real work boundary', () => {
+      const rows = [];
+      for (const [wood, veg] of [[1, 2], [2, 1]] as const) {
+          const s = wholesale(5, wood, veg), p = buy(s, 'D057_WholesaleMarket'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D057_WholesaleMarket'));
+          assert.deepEqual(future(p), []);
+          rows.push({ p, bad });
+      }
+      const q = wholesale(), hand = progress(q, 6, 'D057_WholesaleMarket', NOFOOD);
+      assert.equal(pendingCard(hand, 'D057_WholesaleMarket'), false);
+      assert.equal(hand.state.players[0]!.resources.food, 100);
+      save('D057-N3', { rows, hand });
+  });
 })

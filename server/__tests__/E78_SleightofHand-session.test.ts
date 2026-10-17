@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/E/E078_SleightofHand'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Purchase from './_helpers/audit/ae-negative-42-purchase'
 
 const CARD_ID = 'E078_SleightofHand'
 const FILLER = '__test_placeholder__'
@@ -205,4 +208,15 @@ describe('E078 Sleight of Hand parity', () => {
     expect(resources(response)).toEqual({ wood: 0, clay: 0, reed: 0, stone: 0, food: 0 })
     expect(isBatchPrompt(response)).toBe(false)
   })
+})
+
+describe('ae-negative-42-purchase', () => {
+  const { sessions, ok, save, setup, finish, select, play, occupations, pendingBuy, batch } = audit42Purchase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E078 N1 actual three occupation purchase exchanges three resources equally and zero exchanges preserve stock',()=>{for(const zero of [false,true]){const s=setup('E078_SleightofHand',st=>{occupations(st);Object.assign(st.players[0]!.resources,{wood:2,clay:1})},false,5),p=pendingBuy(s,'E078_SleightofHand'),r=finish(s,ok(batch(s,zero?{}:{wood:2,clay:1},zero?{}:{wood:1,stone:2})));assert.equal(r.state.players[0]!.resources.wood,zero?2:1);assert.equal(r.state.players[0]!.resources.clay,zero?1:0);assert.equal(r.state.players[0]!.resources.stone,zero?0:2);save(`E078-N1-${zero}`,{p,r})}})
+  it('E078 N2 unequal receive total rejects before a legal four resource exchange',()=>{const s=setup('E078_SleightofHand',st=>{occupations(st);st.players[0]!.resources.wood=4},false,5),p=pendingBuy(s,'E078_SleightofHand'),bad=assertRejectedUnchanged(s,()=>batch(s,{wood:1},{stone:2})),r=finish(s,ok(batch(s,{wood:4},{stone:2,clay:2})));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.stone,2);assert.equal(r.state.players[0]!.resources.clay,2);save('E078-N2',{p,bad,r})})
+  it('E078 N3 five resource exchange rejects before legal equal four resource exchange',()=>{const s=setup('E078_SleightofHand',st=>{occupations(st);st.players[0]!.resources.wood=5},false,5),p=pendingBuy(s,'E078_SleightofHand'),bad=assertRejectedUnchanged(s,()=>batch(s,{wood:5},{stone:5})),r=finish(s,ok(batch(s,{wood:4},{stone:4})));assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.stone,4);save('E078-N3',{p,bad,r})})
+  it('E078 N4 a nonbuilding grain resource rejects before legal wood exchange and grain remains untouched',()=>{const s=setup('E078_SleightofHand',st=>{occupations(st);Object.assign(st.players[0]!.resources,{wood:1,grain:1})},false,5),p=pendingBuy(s,'E078_SleightofHand'),bad=assertRejectedUnchanged(s,()=>batch(s,{grain:1},{stone:1})),r=finish(s,ok(batch(s,{wood:1},{stone:1})));assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.stone,1);save('E078-N4',{p,bad,r})})
+  it('E078 N5 overstock negative and fractional payments reject unchanged before a legal exchange',()=>{const s=setup('E078_SleightofHand',st=>{occupations(st);st.players[0]!.resources.wood=2},false,5),p=pendingBuy(s,'E078_SleightofHand'),bad=assertRejectedUnchanged(s,()=>batch(s,{wood:3},{stone:3})),negative=assertRejectedUnchanged(s,()=>batch(s,{wood:-1},{stone:-1})),fraction=assertRejectedUnchanged(s,()=>batch(s,{wood:1.5},{stone:1.5})),r=finish(s,ok(batch(s,{wood:2},{stone:2})));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.stone,2);save('E078-N5',{p,bad,negative,fraction,r})})
+  it('E078 N6 two occupations reject card before a free legal alternative and zero stock card grants no resources',()=>{const s=setup('E078_SleightofHand',st=>{occupations(st,2);st.players[0]!.minorHand.push('E080_RockGarden','C071_Slurry')},false,5),p=select(s,ok(s.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'E078_SleightofHand')),r=finish(s,select(s,p,o=>o.value==='E080_RockGarden'));assert.equal(r.state.players[0]!.resources.stone,0);const t=setup('E078_SleightofHand',st=>occupations(st),false,5),empty=play(t,'E078_SleightofHand');assert.ok(empty.state.players[0]!.minorPlayed.includes('E078_SleightofHand'));assert.equal(empty.state.players[0]!.resources.stone,0);save('E078-N6',{p,bad,r,empty})})
 })

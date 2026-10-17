@@ -1,14 +1,16 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/domain/scoring'
 import type { ActionChoiceOption,  GameState, PlayerState, Resource } from '../../shared/contract/types'
 
-import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, familySize } from '../../shared/domain/player'
 import '../../shared/cards/E/E159_OldMiser'
+import assert from 'node:assert/strict'
+import * as audit56Family from './_helpers/audit/ae-negative-56-family'
 
 const CARD_ID = 'E159_OldMiser'
 
@@ -241,4 +243,12 @@ describe('E159_OldMiser session', () => {
       expect(postScoreCat).toBeUndefined()
     })
   })
+})
+
+describe('ae-negative-56-family', () => {
+  const { sessions, ok, save, make, finish, end, people, bonus } = audit56Family
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E159 N1 real harvest charges one food per adult for two three and five people while a held card grants no reduction',()=>{for(const[n,held]of[[2,false],[3,false],[5,false],[2,true]]as const){const s=make('E159_OldMiser',st=>people(st.players[0]!,n),!held,4),r=finish(s,end(s));assert.equal(r.state.players[0]!.resources.food,100-n*(held?2:1));assert.equal(r.state.players[0]!.resources.begging,0);save(`E159-N1-${n}-${held}`,r)}})
+  it('E159 N2 genuine round-seven newborn requires zero food and nonharvest round never feeds family',()=>{const s=make('E159_OldMiser',st=>{people(st.players[0]!,3);setActiveWorkerCount(st.players[0]!,2)},true,7),grown=finish(s,ok(s.takeAction(0,'wish-children')),true),r=finish(s,end(s));assert.equal(familySize(grown.state.players[0]!),3);assert.equal(r.state.players[0]!.resources.food,98);const n=make('E159_OldMiser',undefined,true,5),nr=finish(n,end(n));assert.equal(nr.state.players[0]!.resources.food,100);save('E159-N2',{grown,r,nr})})
+  it('E159 N3 actual final scoring retains ordinary three-point farmer category and subtracts one per person for net two',()=>{for(const n of[2,3,5]){const s=make('E159_OldMiser',st=>people(st.players[0]!,n),true,14),r=finish(s,end(s));assert.equal(r.state.gameOver,true);assert.equal(r.scores?.[0]?.categories.find(c=>c.key==='farmers')?.total,3*n);assert.equal(bonus(r,'E159_OldMiser'),-n);save(`E159-N3-${n}`,r)}})
 })

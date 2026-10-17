@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D013_Trowel'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Anytime from './_helpers/audit/ae-negative-28-anytime'
 
 const CARD_ID = 'D013_Trowel'
 
@@ -131,4 +134,13 @@ describe('D013 Trowel parity', () => {
     expect(anytimeIds(response)).not.toContain('D13-trowel-anytime')
     expect(response.state.players[0]!.houseType).toBe('stone')
   })
+})
+
+describe('ae-negative-28-anytime', () => {
+  const { TROWEL, sessions, save, ok, finish, make, id, offered, use } = audit28Anytime
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D013 N1 actual anytime wood house to stone pays one stone reed and food per room without placing a worker',()=>{const a=use(make(TROWEL),TROWEL);assert.equal(a.r.state.players[0]!.resources.stone,0);assert.equal(a.r.state.players[0]!.resources.reed,0);assert.equal(a.r.state.players[0]!.resources.food,0);save('D013-N1',a)})
+  it('D013 N2 actual anytime clay house to stone pays only two stone and preserves reed and food',()=>{const a=use(make(TROWEL,'clay',2,3,3),TROWEL);assert.equal(a.r.state.players[0]!.resources.stone,0);assert.equal(a.r.state.players[0]!.resources.reed,3);assert.equal(a.r.state.players[0]!.resources.food,3);save('D013-N2',a)})
+  it('D013 N3 each missing wooden renovation resource or stone house and card in hand excludes the public anytime entry',()=>{for(const[house,stone,reed,food,played]of[['wood',1,2,2,true],['wood',2,1,2,true],['wood',2,2,1,true],['stone',2,2,2,true],['wood',2,2,2,false]]as const){const s=make(TROWEL,house,stone,reed,food,played),before=ok(s.getState());assert.ok(!offered(s,TROWEL));const rejected=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,id(TROWEL))),r=finish(s,ok(s.takeAction(0,'grain-seeds')),false);assert.equal(r.state.players[0]!.houseType,house);save(`D013-N3-${house}-${stone}-${reed}-${food}-${played}`,{before,rejected,r})}})
+  it('D013 N4 ordinary house redevelopment retains two clay and one reed cost instead of the Trowel anytime formula',()=>{const s=make(TROWEL,'wood',2,1,2,true,2);const before=ok(s.getState()),r=finish(s,ok(s.takeAction(0,'house-redevelopment')),false);assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources.stone,2);assert.equal(r.state.players[0]!.resources.food,2);save('D013-N4',{before,r})})
 })

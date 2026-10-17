@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { bonusScore, choose, playImprovement, playOccupation, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit25Clutterer from './_helpers/audit/ae-negative-25-clutterer'
 
 const CARD_ID = 'B100_Clutterer'
 const MATCHING = 'A116_WoodCutter'
@@ -108,4 +111,15 @@ describe('B100 Clutterer through Session', () => {
     expect(response.state.log).toEqual(before.state.log)
     expect(response.state.events).toEqual(before.state.events)
   })
+})
+
+describe('ae-negative-25-clutterer', () => {
+  const { CARD, sessions, save, ok, ready, finish, make, bonus, lesson, other, buy, nextRound } = audit25Clutterer
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B100 N1 actual Lessons plays Clutterer without counting itself or earlier accumulation cards',()=>{for(const earlier of[false,true]){const s=make(earlier),a=lesson(s,CARD);assert.equal(bonus(a.r),0);assert.ok(a.r.state.players[0]!.occupationPlayed.includes(CARD));save(`B100-N1-${earlier}`,a)}})
+  it('B100 N2 actual later Basket purchase with accumulation wording grants exactly one bonus point to owner',()=>{const s=make(),first=lesson(s,CARD);other(s);const a=buy(s,'A056_Basket');assert.equal(a.r.state.players[0]!.resources.reed,1);assert.equal(bonus(a.r),1);assert.equal(bonus(ok(s.getState())),1);save('B100-N2',{first,a})})
+  it('B100 N3 actual later Wood Harvester occupation grants one bonus while unrelated Roughcaster grants none',()=>{for(const card of['A104_WoodHarvester','A110_Roughcaster']){const s=make(),first=lesson(s,CARD);other(s);nextRound(s);const a=lesson(s,card);assert.equal(bonus(a.r),card==='A104_WoodHarvester'?1:0);save(`B100-N3-${card}`,{first,a})}})
+  it('B100 N4 hand only and actual opponent accumulation occupation never grant owner points',()=>{const s=make(false,true);ready(s);const first=finish(s,ok(s.takeAction(0,'reed-bank')),false),second=lesson(s,'A104_WoodHarvester');assert.equal(bonus(second.r),0);ready(s);const a=buy(s,'A056_Basket');assert.equal(bonus(a.r),0);save('B100-N4-hand',{first,second,a});const ss=make(false,true),played=lesson(ss,CARD);other(ss);nextRound(ss);ready(ss);finish(ss,ok(ss.takeAction(0,'grain-seeds')),false);const opponent=lesson(ss,'A104_WoodHarvester');assert.equal(bonus(opponent.r),0);save('B100-N4-opponent',{played,opponent})})
+  it('B100 N5 rejected unknown card cannot award a point before actual legal Basket purchase',()=>{const s=make(),first=lesson(s,CARD);other(s);ready(s);const pending=ok(s.takeAction(0,'major-improvement'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');const missing=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'missing-card'));assert.equal(bonus(ok(s.getState())),0);const r=finish(s,ok(s.resolveChoice(0,'A056_Basket')),false);assert.equal(bonus(r),1);save('B100-N5',{first,pending,missing,r})})
+  it('B100 N6 whole later Basket purchase undo restores payment and bonus before one replay',()=>{const s=make(),first=lesson(s,CARD);other(s);const a=buy(s,'A056_Basket'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.reed,2);assert.ok(undone.state.players[0]!.minorHand.includes('A056_Basket'));assert.equal(bonus(undone),0);const retry=buy(s,'A056_Basket');assert.equal(bonus(retry.r),1);save('B100-N6',{first,a,undone,retry})})
 })

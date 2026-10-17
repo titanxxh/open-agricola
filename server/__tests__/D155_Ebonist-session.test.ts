@@ -4,12 +4,15 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { D155_Ebonist as DisplayD155 } from '../../shared/cards/D/D155_Ebonist'
 import { D155_Ebonist as RuntimeD155 } from '../../shared/cards/D/D155_Ebonist'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState } from '../../shared/contract/types'
 import { BASIC_CONVERSION_SOURCE_ID } from '../../shared/cards/basic-conversion'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit56Phase from './_helpers/audit/ae-negative-56-phase'
 
 const CARD_ID = 'D155_Ebonist'
 
@@ -176,4 +179,11 @@ describe('D155 Ebonist parity', () => {
       wood: 0, grain: 0, food: 0, begging: 0,
     })
   })
+})
+
+describe('ae-negative-56-phase', () => {
+  const { sessions, ok, save, make, finish, end, feed, trade } = audit56Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D155 N1 actual harvest exchanges one wood for one grain food and rejects repeat count two before legal retry',()=>{const s=make('D155_Ebonist',st=>{st.players[0]!.resources.wood=2},true,4),p=feed(s),rejected=assertRejectedUnchanged(s,()=>trade(s,2)),r=finish(s,ok(trade(s,1)));assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,97);save('D155-N1',{p,rejected,r})})
+  it('D155 N2 decline zero wood hand-only and a nonharvest round cannot exchange wood into grain or food',()=>{for(const mode of['decline','wood','hand','round']){const s=make('D155_Ebonist',st=>{st.players[0]!.resources.wood=mode==='wood'?0:1},mode!=='hand',mode==='round'?5:4),r=finish(s,end(s));assert.equal(r.state.players[0]!.resources.wood,mode==='wood'?0:1);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.food,mode==='round'?100:96);save(`D155-N2-${mode}`,r)}})
 })

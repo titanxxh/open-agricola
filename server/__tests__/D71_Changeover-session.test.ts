@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import {
   markAllWorkersUsed,
@@ -16,6 +16,9 @@ import '../../shared/cards/D/D071_Changeover'
 import '../../shared/cards/D/D075_WoodField'
 import '../../shared/cards/E/E070_CropRotationField'
 import '../../shared/cards/E/E112_GrainThief'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit41Future from './_helpers/audit/ae-negative-41-future'
 
 const CARD_ID = 'D071_Changeover'
 const ANYTIME_ID = 'D71-changeover-anytime'
@@ -320,5 +323,19 @@ describe('D071 Changeover session', () => {
       expect.objectContaining({ key: 'log.sow' }),
     ]))
     expectHarvestFinished(response, 4)
+  })
+})
+
+describe('ae-negative-41-future', () => {
+  const { sessions, ok, save, setup, finish, complete, sow, field, change } = audit41Future
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D071 N1 real harvest leaves exactly one crop then public anytime discards it without gain and sows only that field',()=>{
+   const s=setup('D071_Changeover',st=>{field(st,2);field(st,0,0,2);st.players[0]!.resources.vegetable=1},true,4),harvest=complete(s,['day-laborer','clay-pit','reed-bank','forest']),p=change(s);assert.equal(harvest.state.players[0]!.fields[0]!.stacks[0]!.remaining,1);assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='selection');const q=ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]}));assert.equal(q.state.players[0]!.resources.grain,1);assert.equal(q.state.players[0]!.fields[0]!.stacks.length,0);const bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{row:0,col:2,crop:'vegetable'}]})),r=finish(s,sow(s,q,[{row:0,col:1,crop:'vegetable'}]),true,'C073_SeaweedFertilizer');assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.vegetable,0);assert.deepEqual(r.state.players[0]!.fields.slice(0,2).map(f=>f.stacks),[[{kind:'vegetable',remaining:2}],[]]);save('D071-N1',{harvest,p,q,bad,r})
+  })
+  it('D071 N2 exact one without harvest provenance two remaining after harvest and a held card never offer Changeover',()=>{
+   for(const mode of ['unharvested','two','hand']){const s=setup('D071_Changeover',st=>field(st,mode==='unharvested'?1:mode==='two'?3:2),mode!=='hand',4),before=mode==='unharvested'?ok(s.getState()):complete(s),r=ok(s.takeAction(0,'farmland'));assert.ok(!r.interaction.anytimeActions.some(a=>a.sourceCard==='D071_Changeover'));assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,mode==='two'?2:1);save(`D071-N2-${mode}`,{before,r})}
+  })
+  it('D071 N3 two eligible harvested fields reject multi selection and declining limited Sow does not give the discarded crop',()=>{
+   const s=setup('D071_Changeover',st=>{field(st,2);field(st,2,0,2)},true,4),harvest=complete(s,['day-laborer','clay-pit','reed-bank','forest']),p=change(s),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2}]})),q=ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})),r=finish(s,q);assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.fields[0]!.stacks.length,0);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,1);save('D071-N3',{harvest,p,bad,q,r})
   })
 })

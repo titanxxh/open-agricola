@@ -1,11 +1,15 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { describe, expect, it, afterEach } from 'vitest'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { PlayerState } from '../../shared/contract/types'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B031_PotteryYard'
 import '../../shared/cards/D/D060_LargePottery'
+import assert from 'node:assert/strict'
+import type { FarmTilePosition } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Scoring from './_helpers/audit/ae-negative-19-scoring'
 
 const CARD_ID = 'B031_PotteryYard'
 
@@ -119,4 +123,12 @@ describe('B031_PotteryYard session', () => {
       entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
     )).toBe(false)
   })
+})
+
+describe('ae-negative-19-scoring', () => {
+  const { POTTERY, sessions, save, ok, setup, turn, menu, bonus, farm } = audit19Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B031 N1 actual purchase accepts own pottery or upgrade and rejects absent or only opponent pottery',()=>{for(const own of['major','upgrade','none','opponent']){const s=setup(POTTERY,state=>{if(own==='major')state.players[0]!.improvements=['Major_Pottery'];if(own==='upgrade')state.players[0]!.minorPlayed=['D060_LargePottery'];if(own==='opponent')state.players[1]!.improvements=['Major_Pottery']});const pending=menu(s);let r:SessionResponse;if(own==='major'||own==='upgrade'){r=ok(s.resolveChoice(0,POTTERY));assert.ok(r.state.players[0]!.minorPlayed.includes(POTTERY));assert.equal(r.scores![0]!.categories.find(c=>c.key==='cards')!.entries.find(e=>'cardId'in e&&e.cardId===POTTERY)?.score,1);assert.equal(bonus(r,POTTERY),2)}else{assertRejectedUnchanged(s,()=>s.resolveChoice(0,POTTERY));r=ok(s.resolveChoice(0,'B004_WoodPile'));assert.equal(bonus(r,POTTERY),0)}save(`B031-N1-${own}`,{pending,r})}})
+  it('B031 N2 only orthogonally adjacent unused spaces grant two points once and keep every unused penalty',()=>{const cases:[FarmTilePosition[],number][]=[[[],0],[[{row:2,col:4}],0],[[{row:0,col:3},{row:2,col:3}],0],[[{row:1,col:3},{row:2,col:4}],0],[[{row:2,col:3},{row:2,col:4}],2],[[{row:0,col:3},{row:0,col:4},{row:2,col:3},{row:2,col:4}],2]];for(const[free,expected]of cases){const s=setup(POTTERY,state=>farm(state,free),true),r=s.getState();assert.equal(bonus(r,POTTERY),expected);assert.equal(r.scores![0]!.categories.find(c=>c.key==='empty')!.total,free.length?-free.length:0);assert.equal(bonus(s.getState(),POTTERY),expected);save(`B031-N2-${free.length}-${expected}-${free[0]?.row??'none'}`,r)}})
+  it('B031 N3 real plow consumes one last adjacent unused tile and undo restores two point bonus',()=>{const s=setup(POTTERY,state=>farm(state,[{row:2,col:3},{row:2,col:4}]),true);assert.equal(bonus(s.getState(),POTTERY),2);const pending=turn(s,0,'farmland'),r=ok(s.commitSelectionChoice(0,{tile:{row:2,col:3}}));assert.equal(bonus(r,POTTERY),0);assert.equal(r.scores![0]!.categories.find(c=>c.key==='empty')!.total,-1);const undone=ok(s.undoAction());assert.equal(bonus(undone,POTTERY),2);assert.equal(undone.scores![0]!.categories.find(c=>c.key==='empty')!.total,-2);save('B031-N3',{pending,r,undone})})
 })

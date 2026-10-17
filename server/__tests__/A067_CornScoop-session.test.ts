@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A067_CornScoop'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit09Sources from './_helpers/audit/ae-negative-09-sources'
 
 const CARD_ID = 'A067_CornScoop'
 const FILLER = '__test_placeholder__'
@@ -75,4 +78,15 @@ describe('A067 Corn Scoop parity', () => {
     expect(response.state.players[0]!.resources.grain).toBe(0)
     expect(response.state.players[1]!.resources.grain).toBe(1)
   })
+})
+
+describe('ae-negative-09-sources', () => {
+  const { SCOOP, sessions, save, setup, buy, deny, ready, turn, market, collect } = audit09Sources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A067 N1 actual one wood purchase awards no grain', () => { deny(setup(SCOOP, { played: false }), SCOOP); const r = buy(setup(SCOOP, { played: false, resources: { wood: 1 } }), SCOOP); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.grain, 0) })
+  it('A067 N2 Grain Seeds gives exactly its base grain plus one extra', () => { const s = setup(SCOOP, { played: false, resources: { wood: 1 } }); buy(s, SCOOP); turn(s, 1, 'forest'); const r = turn(s, 0, 'grain-seeds'); assert.equal(r.state.players[0]!.resources.grain, 2); assert.equal(r.state.log.filter(e => e.key === 'log.cardTriggered' && e.params?.cardId === SCOOP).length, 1) })
+  it('A067 N3 grain granted by Feeding Dish is not Grain Seeds', () => { const s = market('sheep', 1, 1, true, state => state.players[0]!.minorPlayed.push(SCOOP)); const r = collect(s, 'sheep'); assert.equal(r.state.players[0]!.resources.sheep, 2); assert.equal(r.state.players[0]!.resources.grain, 1) })
+  it('A067 N4 unplayed owner and opponent Grain Seeds have no extra owner grain', () => { let r = turn(setup(SCOOP, { played: false }), 0, 'grain-seeds'); assert.equal(r.state.players[0]!.resources.grain, 1); const s = setup(SCOOP); turn(s, 0, 'forest'); r = turn(s, 1, 'grain-seeds'); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[1]!.resources.grain, 1) })
+  it('A067 N5 repeated occupied Grain Seeds request cannot repeat the bonus', () => { const s = setup(SCOOP); turn(s, 0, 'grain-seeds'); turn(s, 1, 'clay-pit'); ready(s, 0); assertRejectedUnchanged(s, () => s.takeAction(1, 'forest')); assertRejectedUnchanged(s, () => s.takeAction(0, 'grain-seeds')); assert.equal(turn(s, 0, 'forest').state.players[0]!.resources.grain, 2) })
+  it('A067 N6 actual Grain Seeds undo and retry do not duplicate the extra grain', () => { const s = setup(SCOOP), before = undoRuleSnapshot(s.getState()); turn(s, 0, 'grain-seeds'); assertUndoRestored(before, s.undoAction()); assert.equal(turn(s, 0, 'grain-seeds').state.players[0]!.resources.grain, 2); save('A067-N6-undo-retry', s.getState()) })
 })

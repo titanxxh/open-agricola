@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C147_Cowherd'
+import assert from 'node:assert/strict'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'C147_Cowherd'
 
@@ -85,5 +87,45 @@ describe('C147 Cowherd parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.cattle).toBe(0)
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, finish, next, take, move, farm } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C147 N1 actual owner Cattle Market adds one cattle and retains all animals in a legal farm', () => {
+    const s = setup('C147_Cowherd', 14, state => { farm(state, 1); state.actionSpaces.find(a => a.id === 'cattle-market')!.resources.cattle = 2; })
+    let r = take(s, 'cattle-market')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+    for (let n = 0; n < 4 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg'; n++) {
+      const z = r.interaction.request.zones.find(z => z.zoneType === 'pasture')!
+      const count = r.state.players[0]!.resources.cattle
+      r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'cattle', animalCount: count, animalCounts: { cattle: count } }] }))
+    }
+    assert.equal(r.state.players[0]!.resources.cattle, 3)
+    assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 3)
+    save('C147-N1', r)
+  })
+  it('C147 N2 opponent Cattle Market unrelated owner action and hand-only card exclude bonus', () => {
+    for (const mode of ['opponent', 'unrelated', 'hand']) {
+      const s = setup('C147_Cowherd', 14, state => {
+        farm(state, 1)
+        state.actionSpaces.find(a => a.id === 'cattle-market')!.resources.cattle = 1
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['C147_Cowherd']
+        }
+      })
+      let r
+      if (mode === 'opponent') {
+        move(s, 'forest')
+        next(s)
+        r = finish(s, ok(s.takeAction(1, 'cattle-market')))
+      }
+      else
+        r = finish(s, take(s, mode === 'unrelated' ? 'forest' : 'cattle-market'))
+      assert.equal(r.state.players[0]!.resources.cattle, mode === 'hand' ? 1 : 0)
+      save(`C147-N2-${mode}`, r)
+    }
   })
 })

@@ -2,13 +2,18 @@ import type { GameSession as SessionRuleOwner } from '../game/authoritative-sess
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/A/A087_Conservator'
+import '../../shared/cards/A/A088_HedgeKeeper'
+import '../../shared/cards/A/A090_PlowDriver'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit11FarmFuture from './_helpers/audit/ae-negative-11-farm-future'
 
 const CARD_ID = 'A087_Conservator'
 
@@ -382,4 +387,25 @@ describe('A087 Conservator parity', () => {
     expect(response.state.players[0]!.houseType).toBe('stone')
     expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, reed: 0 })
   })
+})
+
+describe('ae-negative-11-farm-future', () => {
+  const { CONS, sessions, scenario, setup, res, ready, turn, complete, lessons, renoEntry, renoFinish, renovate, denyHost, fields } = audit11FarmFuture
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  scenario('A087 N1 real first and later Lessons pay zero and one food without an immediate ability',()=>{for(const prior of[0,1]){const s=setup(CONS,{played:false,occupations:prior,resources:{food:prior},house:'stone'});const r=lessons(s,CONS);assert.equal(res(r).food,0);assert.equal(fields(r),0);assert.equal(r.state.players[0]!.fenceSegments.length,0)}return{firstFee:0,laterFee:1,immediateFields:0,immediateFences:0}})
+  scenario('A087 N2 missing the later Lessons food rejects a real forged entry before a legal action',()=>{return denyHost(setup(CONS,{played:false,occupations:1}),'lessons')})
+  scenario('A087 N3 direct stone renovation pays two stone and one roof reed with wood 0',()=>{const r=renovate(setup(CONS,{resources:{stone:2,reed:1,wood:0}}));assert.equal(res(r).stone,0);assert.equal(res(r).reed,0);assert.equal(res(r).wood,0);return{house:'stone',stonePaid:2,reedPaid:1,wood:0}})
+  scenario('A087 N4 direct stone renovation pays two stone and one roof reed with wood 1',()=>{const r=renovate(setup(CONS,{resources:{stone:2,reed:1,wood:1}}));assert.equal(res(r).stone,0);assert.equal(res(r).reed,0);assert.equal(res(r).wood,1);return{house:'stone',stonePaid:2,reedPaid:1,wood:1}})
+  scenario('A087 N5 missing stone cannot substitute wood for the direct stone fee',()=>{return denyHost(setup(CONS,{resources:{"stone": 1, "reed": 1, "wood": 10}}),'house-redevelopment')})
+  scenario('A087 N6 missing reed cannot substitute wood for the direct stone fee',()=>{return denyHost(setup(CONS,{resources:{"stone": 2, "reed": 0, "wood": 10}}),'house-redevelopment')})
+  scenario('A087 N7 a real renovation menu rejects an invalid wood target and a foreign OA actor before legal clay',()=>{const s=setup(CONS,{resources:{clay:2,stone:2,reed:1}});const r=renoEntry(s);assertRejectedUnchanged(s,()=>s.resolveChoice(1,'clay'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'wood'));const end=renoFinish(s,r,'clay');assert.equal(res(end).clay,0);assert.equal(res(end).stone,2);assert.equal(res(end).reed,0);return{invalidTargetRejected:true,house:'clay',stone:2,clay:0,reed:0}})
+  scenario('A087 N8 both affordable paths permit choosing stone while preserving the other material',()=>{const r=renovate(setup(CONS,{resources:{clay:2,stone:2,reed:1}}),'stone');assert.equal(res(r).stone,0);assert.equal(res(r).clay,2);assert.equal(res(r).reed,0);return{house:'stone',paidMaterial:2,reedPaid:1,otherMaterial:2}})
+  scenario('A087 N9 both affordable paths permit choosing clay while preserving the other material',()=>{const r=renovate(setup(CONS,{resources:{clay:2,stone:2,reed:1}}),'clay');assert.equal(res(r).clay,0);assert.equal(res(r).stone,2);assert.equal(res(r).reed,0);return{house:'clay',paidMaterial:2,reedPaid:1,otherMaterial:2}})
+  scenario('A087 N10 Conservator in hand cannot enable direct stone renovation',()=>{return denyHost(setup(CONS,{played:false,resources:{stone:2,reed:1}}),'house-redevelopment')})
+  scenario('A087 N11 only the opponent Conservator cannot enable direct stone renovation',()=>{return denyHost(setup(CONS,{opponent:true,resources:{stone:2,reed:1}}),'house-redevelopment')})
+  scenario('A087 N12 a clay house uses ordinary stone renovation with one roof reed',()=>{const r=renovate(setup(CONS,{house:'clay',resources:{stone:2,reed:1}}));assert.equal(res(r).stone,0);assert.equal(res(r).reed,0);return{house:'stone',stonePaid:2,reedPaid:1}})
+  scenario('A087 N13 an already stone house rejects renovation before a legal action',()=>{return denyHost(setup(CONS,{house:'stone',resources:{stone:3,reed:1}}),'house-redevelopment')})
+  scenario('A087 N14 three connected rooms pay three stone and one flat roof reed',()=>{const r=renovate(setup(CONS,{rooms:3,resources:{stone:3,reed:1}}));assert.equal(res(r).stone,0);assert.equal(res(r).reed,0);assert.equal(r.state.players[0]!.rooms,3);return{rooms:3,house:'stone',stonePaid:3,reedPaid:1}})
+  scenario('A087 N15 actual renovation undo probes full restoration before a real retry',()=>{const s=setup(CONS,{resources:{stone:2,reed:1}});const before=undoRuleSnapshot(s.getState());renovate(s);assertUndoRestored(before,s.undoAction());const r=renovate(s);assert.equal(res(r).stone,0);assert.equal(res(r).reed,0);return{restored:true,retryHouse:'stone',retryStone:0,retryReed:0}})
+  scenario('A087 N16 the opponent actual renovation cannot use the owner Conservator',()=>{const s=setup(CONS,{configure(state){Object.assign(state.players[1]!.resources,{stone:2,reed:1})}});complete(turn(s,0,'day-laborer'));ready(s,1);assertRejectedUnchanged(s,()=>s.takeAction(1,'house-redevelopment'));const r=complete(turn(s,1,'grain-seeds'));assert.equal(r.state.players[1]!.houseType,'wood');assert.equal(res(r,1).stone,2);assert.equal(res(r,1).reed,1);return{opponentHouse:'wood',opponentStone:2,opponentReed:1,foreignAbility:false,legalRetryCompleted:true}})
 })

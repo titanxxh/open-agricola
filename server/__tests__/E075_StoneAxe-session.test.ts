@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E075_StoneAxe'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit41Resources from './_helpers/audit/ae-negative-41-resources'
 
 const CARD_ID = 'E075_StoneAxe'
 const FILLER = '__test_placeholder__'
@@ -208,5 +211,26 @@ describe('E075 Stone Axe parity', () => {
 
     expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
+  })
+})
+
+describe('ae-negative-41-resources', () => {
+  const { sessions, ok, save, setup, finish, play, next } = audit41Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E075 N1 actual purchase pays wood clay and later Forest exchange pays one stone for exactly three extra wood once', () => {
+    const card = 'E075_StoneAxe', s = setup(card, st => { const p=st.players[0]!;p.occupationPlayed=['A100_Curator','A110_Roughcaster'];Object.assign(p.resources,{wood:1,clay:1,stone:2});st.actionSpaces.find(a=>a.id==='forest')!.resources.wood=3 },false,5)
+    const bought=play(s,card);assert.equal(bought.state.players[0]!.resources.wood,0);assert.equal(bought.state.players[0]!.resources.clay,0)
+    next(s,bought); const other=finish(s,ok(s.takeAction(1,'reed-bank')));next(s,other)
+    const r=finish(s,ok(s.takeAction(0,'forest')),true);assert.equal(r.state.players[0]!.resources.wood,6);assert.equal(r.state.players[0]!.resources.stone,1)
+    const bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'E75-stone-axe-anytime'));assert.equal(s.state.players[0]!.resources.wood,6);save('E075-N1',{bought,r,bad})
+  })
+  it('E075 N2 zero stone and explicit decline keep ordinary wood without an extra gain',()=>{
+   for(const mode of ['stone','decline']){const s=setup('E075_StoneAxe',st=>{st.players[0]!.resources.stone=mode==='stone'?0:1;st.actionSpaces.find(a=>a.id==='forest')!.resources.wood=3}),r=finish(s,ok(s.takeAction(0,'forest')),mode==='stone');assert.equal(r.state.players[0]!.resources.wood,3);assert.equal(r.state.players[0]!.resources.stone,mode==='stone'?0:1);save(`E075-N2-${mode}`,r)}
+  })
+  it('E075 N3 card in hand foreign Forest and a nonwood space cannot consume owner stone or give extra wood',()=>{
+   for(const mode of ['hand','other','nonwood']){const actor=mode==='other'?1:0,s=setup('E075_StoneAxe',st=>{st.currentPlayerIndex=actor;st.players[0]!.resources.stone=1;st.actionSpaces.find(a=>a.id==='forest')!.resources.wood=3},mode!=='hand'),r=finish(s,ok(s.takeAction(actor,mode==='nonwood'?'reed-bank':'forest')),true,'E075_StoneAxe');assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.wood,mode==='hand'?3:0);save(`E075-N3-${mode}`,r)}
+  })
+  it('E075 N4 whole action undo restores paid stone and original wood pile before exactly one successful retry',()=>{
+   const s=setup('E075_StoneAxe',st=>{st.players[0]!.resources.stone=1;st.actionSpaces.find(a=>a.id==='forest')!.resources.wood=3}),r=finish(s,ok(s.takeAction(0,'forest')),true),u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.stone,1);assert.equal(u.state.players[0]!.resources.wood,0);assert.equal(u.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);const retry=finish(s,ok(s.takeAction(0,'forest')),true);assert.equal(retry.state.players[0]!.resources.wood,6);assert.equal(retry.state.players[0]!.resources.stone,0);save('E075-N4',{r,u,retry})
   })
 })

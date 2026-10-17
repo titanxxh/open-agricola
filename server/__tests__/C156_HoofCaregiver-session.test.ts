@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C156_HoofCaregiver'
+import assert from 'node:assert/strict'
+import * as audit56Purchase from './_helpers/audit/ae-negative-56-purchase'
 
 const CARD_ID = 'C156_HoofCaregiver'
 
@@ -71,4 +73,12 @@ describe('C156_HoofCaregiver session', () => {
     expect(flow).toBeUndefined()
     expect(cattleMarket.resources.cattle).toBe(2)
   })
+})
+
+describe('ae-negative-56-purchase', () => {
+  const { sessions, ok, save, make, finish, play } = audit56Purchase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C156 N1 real purchase adds one cattle to its physical revealed pile then gives one grain and food per resulting cattle',()=>{for(const count of[0,1,3]){const s=make('C156_HoofCaregiver',st=>{st.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle=count},false,14),r=finish(s,play(s,'C156_HoofCaregiver'));assert.equal(r.state.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle,count+1);assert.equal(r.state.players[0]!.resources.grain,count+1);assert.equal(r.state.players[0]!.resources.food,101+count);assert.equal(r.state.players[1]!.resources.grain,0);save(`C156-N1-${count}`,r)}})
+  it('C156 N2 whole purchase undo restores original pile food grain and hand before exactly one replay',()=>{const s=make('C156_HoofCaregiver',st=>{st.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle=1},false,14),r=finish(s,play(s,'C156_HoofCaregiver')),u=ok(s.undoAction()),retry=finish(s,play(s,'C156_HoofCaregiver'));assert.equal(u.state.players[0]!.resources.grain,0);assert.equal(u.state.players[0]!.resources.food,100);assert.equal(u.state.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle,1);assert.ok(u.state.players[0]!.occupationHand.includes('C156_HoofCaregiver'));assert.equal(retry.state.players[0]!.resources.grain,2);assert.equal(retry.state.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle,2);save('C156-N2',{r,u,retry})})
+  it('C156 N3 card only in hand and unrelated work cannot add cattle or receive its immediate reward',()=>{const s=make('C156_HoofCaregiver',st=>{st.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle=2},false,14),r=finish(s,ok(s.takeAction(0,'grain-seeds')));assert.equal(r.state.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle,2);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,100);save('C156-N3',r)})
 })

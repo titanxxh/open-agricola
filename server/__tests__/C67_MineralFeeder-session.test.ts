@@ -1,10 +1,12 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { computeScores } from '../../shared/domain/scoring'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C067_MineralFeeder'
+import assert from 'node:assert/strict'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'C067_MineralFeeder'
 const FILLER = '__test_placeholder__'
@@ -185,4 +187,41 @@ describe('C067_MineralFeeder session', () => {
     const resp = session.performRoundEnd()
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, save, setup, finish, offer, hand, buy, noSource, accept, pasture, animalKeep, printed, denyMinor, advance } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C067 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'C067_MineralFeeder'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "reed": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.reed, 0); save("C067-N1-legal", r); const t = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "reed": 0 }); }); denyMinor(t, card); save("C067-N1-short", t.getState()); });
+  it('C067 N2 natural nonharvest round rewards a sheep in pasture and excludes harvest round hand or no sheep', () => { for (const mode of ['pasture', 'harvest', 'hand', 'empty']) {
+      const card = 'C067_MineralFeeder', s = setup(card, mode === 'harvest' ? 6 : 5, st => { pasture(st, [{ row: 0, col: 3 }], mode === 'empty' ? null : 'sheep', mode === 'empty' ? 0 : 1); if (mode === 'hand')
+          hand(st, card); });
+      let r = advance(s);
+      r = finish(s, r);
+      assert.equal(r.state.round, mode === 'harvest' ? 7 : 6);
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'pasture' ? 1 : 0);
+      noSource(r, card);
+      save(`C067-N2-${mode}`, r);
+  } });
+  it('C067 N3 real round start reorganization can move a house sheep into pasture or decline without grain', () => { for (const use of [false, true]) {
+      const card = 'C067_MineralFeeder', s = setup(card, 5, st => { pasture(st, [{ row: 0, col: 3 }]); st.players[0]!.resources.sheep = 1; st.players[0]!.houseAnimals = { '2-0': 'sheep' }; });
+      let r = advance(s);
+      save(`C067-N3-offer-${use}`, r);
+      r = offer(s, r, card);
+      if (use) {
+          r = accept(s, r, card);
+          assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg', JSON.stringify(r.interaction));
+          r = animalKeep(s, r, req => { for (const z of req.zones) {
+              z.animalType = z.zoneType === 'pasture' ? 'sheep' : null;
+              z.animalCount = z.zoneType === 'pasture' ? 1 : 0;
+          } });
+          r = finish(s, r);
+      }
+      else
+          r = finish(s, r);
+      assert.equal(r.state.players[0]!.resources.grain, use ? 1 : 0);
+      assert.equal(r.state.players[0]!.pastures[0]!.animalCount, use ? 1 : 0);
+      assert.equal(r.state.players[0]!.resources.sheep, 1);
+      save(`C067-N3-${use}`, r);
+  } });
 })

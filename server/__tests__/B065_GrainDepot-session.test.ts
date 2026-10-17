@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B065_GrainDepot'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit21FutureGrain from './_helpers/audit/ae-negative-21-future-grain'
 
 const CARD_ID = 'B065_GrainDepot'
 const FILLER = '__test_placeholder__'
@@ -114,4 +117,13 @@ describe('B065 Grain Depot parity', () => {
     expect(response.state.players[0]!.resources.grain).toBe(1)
     expect(futureRounds(response)).toEqual([7])
   })
+})
+
+describe('ae-negative-21-future-grain', () => {
+  const { DEPOT, sessions, save, ok, setup, finish, menu, buy, schedule, reach } = audit21FutureGrain
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B065 N1 real two wood clay or stone payment schedules the corresponding next two three or four grain',()=>{for(const[type,count]of[['wood',2],['clay',3],['stone',4]]as const){const s=setup(DEPOT,5,state=>state.players[0]!.resources[type]=2),{pending,r}=buy(s,DEPOT);assert.equal(r.state.players[0]!.resources[type],0);assert.equal(r.state.players[0]!.resources.grain,0);assert.deepEqual(schedule(r,DEPOT),Array.from({length:count},(_,n)=>({round:6+n,resources:{grain:1}})));save(`B065-N1-${type}`,{pending,r})}})
+  it('B065 N2 late paid path truncates exact future targets and missing every alternative refuses before legal fallback',()=>{for(const round of[12,13,14]){const s=setup(DEPOT,round,state=>state.players[0]!.resources.stone=2),r=buy(s,DEPOT).r;assert.deepEqual(schedule(r,DEPOT),[1,2,3,4].map(n=>({round:round+n,resources:{grain:1}})).filter(x=>x.round<=14));save(`B065-N2-${round}`,r)}const s=setup(DEPOT,5,state=>Object.assign(state.players[0]!.resources,{wood:1,clay:1,stone:1})),pending=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,DEPOT));const legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(schedule(legal,DEPOT).length,0);save('B065-N2',{pending,legal})})
+  it('B065 N3 natural next rounds deliver only the chosen payment grain and no early owner or opponent goods',()=>{const s=setup(DEPOT,5,state=>state.players[0]!.resources.wood=2),control=setup(DEPOT,5);buy(s,DEPOT);buy(control,'B004_WoodPile');const six=reach(s,6),csix=reach(control,6),seven=reach(s,7),cseven=reach(control,7),eight=reach(s,8),ceight=reach(control,8);assert.equal(six.state.players[0]!.resources.grain,csix.state.players[0]!.resources.grain+1);assert.equal(seven.state.players[0]!.resources.grain,cseven.state.players[0]!.resources.grain+2);assert.equal(eight.state.players[0]!.resources.grain,ceight.state.players[0]!.resources.grain+2);assert.equal(eight.state.players[1]!.resources.grain,ceight.state.players[1]!.resources.grain);assert.equal(schedule(eight,DEPOT).length,0);save('B065-N3',{six,csix,seven,cseven,eight,ceight})})
+  it('B065 N4 whole actual purchase undo restores selected cost card and empty queue before one legal replay',()=>{const s=setup(DEPOT,5,state=>state.players[0]!.resources.clay=2),r=buy(s,DEPOT).r,undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,2);assert.ok(undone.state.players[0]!.minorHand.includes(DEPOT));assert.equal(schedule(undone,DEPOT).length,0);const retry=buy(s,DEPOT).r;assert.equal(retry.state.players[0]!.resources.clay,0);assert.equal(schedule(retry,DEPOT).length,3);save('B065-N4',{r,undone,retry})})
 })

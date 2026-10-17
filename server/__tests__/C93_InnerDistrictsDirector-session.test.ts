@@ -1,17 +1,19 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import { GameSession } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/C/C093_InnerDistrictsDirector'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit45Placement from './_helpers/audit/ae-negative-45-placement'
 
 const CARD_ID = 'C093_InnerDistrictsDirector'
 
@@ -372,4 +374,12 @@ describe('C093_InnerDistrictsDirector', () => {
     expect(playerWorkersOn(response, 'forest')).toBe(1)
     expect(playerWorkersOn(response, 'clay-pit')).toBe(1)
   })
+})
+
+describe('ae-negative-45-placement', () => {
+  const { sessions, save, ok, setup, choice, finish, next, optionsOf } = audit45Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C093 N1 Forest and immediate Clay Pit deposit opposite stone twice and collect exactly one deposited stone', () => { const s = setup('C093_InnerDistrictsDirector'); let r = ok(s.takeAction(0, 'forest')); r = choice(s, r, o => o.value !== '__skip__'); if (!optionsOf(r)?.some(o => o.value === 'clay-pit'))
+    r = choice(s, r, o => o.value !== '__skip__'); r = choice(s, r, o => o.value === 'clay-pit'); r = finish(s, r, true); assert.equal(r.state.players[0]!.resources.wood, 3); assert.equal(r.state.players[0]!.resources.clay, 2); assert.equal(r.state.players[0]!.resources.stone, 1); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.stone, 1); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 0); save('C093-N1', r); })
+  it('C093 N2 decline deposits nothing and unrelated or opponent placements do not deposit for owner', () => { const s = setup('C093_InnerDistrictsDirector'); let r = finish(s, ok(s.takeAction(0, 'forest'))); assert.equal(r.state.actionSpaces.find(a => a.id === 'clay-pit')!.resources.stone ?? 0, 0); assert.equal(r.state.players[0]!.resources.wood, 3); next(s); r = finish(s, ok(s.takeAction(1, 'clay-pit'))); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.stone ?? 0, 0); save('C093-N2', r); const ss = setup('C093_InnerDistrictsDirector'); const unrelated = finish(ss, ok(ss.takeAction(0, 'grain-seeds'))); assert.equal(unrelated.state.players[0]!.resources.grain, 1); assert.equal(unrelated.state.actionSpaces.find(a => a.id === 'forest')!.resources.stone ?? 0, 0); save('C093-N2-unrelated', unrelated); })
 })

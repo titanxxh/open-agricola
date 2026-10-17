@@ -1,13 +1,16 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C145_ForestReviewer'
 import type { ActionFlow } from '../../shared/contract/types'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'C145_ForestReviewer'
 
@@ -230,5 +233,49 @@ describe('C145_ForestReviewer', () => {
     } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, finish, next, move } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C145 N1 real unoccupied second wood space rewards owner in both orders including owner use', () => {
+    for (const ownerSecond of [false, true]) {
+      const s = setup('C145_ForestReviewer')
+      let r
+      if (ownerSecond) {
+        move(s, 'day-laborer')
+        move(s, 'grove')
+        move(s, 'clay-pit')
+        r = move(s, 'forest')
+      }
+      else {
+        r = move(s, 'forest')
+        assert.equal(r.state.players[0]!.resources.reed, 0)
+        r = move(s, 'grove')
+      }
+      assert.equal(r.state.players[0]!.resources.reed, 1)
+      save(`C145-N1-${ownerSecond}`, r)
+    }
+  })
+  it('C145 N2 unrelated wood first hand-only and occupied ordinary attempt exclude reward', () => {
+    for (const mode of ['first', 'unrelated', 'hand', 'occupied']) {
+      const s = setup('C145_ForestReviewer', 14, state => {
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['C145_ForestReviewer']
+        }
+      })
+      let r = move(s, mode === 'unrelated' ? 'clay-pit' : 'forest')
+      if (mode === 'hand')
+        r = move(s, 'grove')
+      if (mode === 'occupied') {
+        next(s)
+        assertRejectedUnchanged(s, () => s.takeAction(1, 'forest'))
+        r = finish(s, ok(s.takeAction(1, 'clay-pit')))
+      }
+      assert.equal(r.state.players[0]!.resources.reed, 0)
+      save(`C145-N2-${mode}`, r)
+    }
   })
 })

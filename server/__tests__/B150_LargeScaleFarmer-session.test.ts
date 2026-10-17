@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
 import type { ActionFlow } from '../../shared/contract/types'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import assert from 'node:assert/strict'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 
 const CARD_ID = 'B150_LargeScaleFarmer'
@@ -247,4 +249,28 @@ describe('B150_LargeScaleFarmer session', () => {
       targetSpaceId: 'farm-expansion',
     })
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, finish, play, undo, ownerTurn, at, res, expansion, buyMajor } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B150 N1 real purchase and Farm Expansion jump buy a major with the same person', () => { const b = make('B150_LargeScaleFarmer', undefined, false), bought = finish(b, play(b, 'B150_LargeScaleFarmer')), undone = undo(b), s = make('B150_LargeScaleFarmer', st => { Object.assign(st.players[0]!.resources, { wood: 2, clay: 2 }); }), p = expansion(s), worker = at(p, 'farm-expansion')[0]!.workerId, r = finish(s, p, true, ['Major_Fireplace1']); res(r, { wood: 0, clay: 0, food: 99 }); assert.ok(r.state.players[0]!.improvements.includes('Major_Fireplace1')); assert.equal(at(r, 'major-improvement')[0]?.workerId, worker); assert.equal(at(r, 'farm-expansion').length, 0); assert.equal(workersAvailable(r.state, r.state.players[0]!), 1); save('B150-N1', { bought, undone, p, r }); });
+  it('B150 N2 reverse major purchase jumps to Farm Expansion exactly once', () => { const s = make('B150_LargeScaleFarmer', st => { Object.assign(st.players[0]!.resources, { wood: 2, clay: 2 }); }), p = buyMajor(s), worker = at(p, 'major-improvement')[0]!.workerId, r = finish(s, p, true, ['actions.stables.name']); res(r, { wood: 0, clay: 0, food: 99 }); assert.equal(at(r, 'farm-expansion')[0]?.workerId, worker); assert.equal(at(r, 'major-improvement').length, 0); assert.equal(r.state.players[0]!.stableTiles.length, 1); assert.equal(workersAvailable(r.state, r.state.players[0]!), 1); save('B150-N2', { p, r }); });
+  it('B150 N3 occupied target no food held card opponent and genuine decline prevent a jump', () => { for (const mode of ['occupied', 'food', 'hand', 'opponent', 'decline']) {
+      const actor = mode === 'opponent' ? 1 : 0, s = make('B150_LargeScaleFarmer', st => { st.players[actor]!.resources.wood = 2; st.players[actor]!.resources.clay = 2; if (mode === 'food')
+          st.players[0]!.resources.food = 0; if (mode === 'opponent')
+          st.currentPlayerIndex = 1; if (mode === 'occupied') {
+          st.currentPlayerIndex = 1;
+          st.players[1]!.resources.clay = 2;
+      } }, mode !== 'hand');
+      if (mode === 'occupied') {
+          finish(s, buyMajor(s, 1), false);
+          ownerTurn(s);
+      }
+      const p = expansion(s, actor), r = finish(s, p, mode !== 'decline', [], mode === 'decline' ? undefined : 'B150_LargeScaleFarmer');
+      res(r, { food: mode === 'food' ? 0 : 100 }); if (mode === 'opponent') res(r, { food: 100 }, actor);
+      assert.equal(at(r, 'farm-expansion', actor).length, 1);
+      assert.equal(at(r, 'major-improvement', actor).length, 0);
+      save(`B150-N3-${mode}`, { p, r });
+  } });
 })

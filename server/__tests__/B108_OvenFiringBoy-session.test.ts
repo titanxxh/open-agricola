@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B108_OvenFiringBoy'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Baking from './_helpers/audit/ae-negative-26-baking'
 
 const CARD_ID = 'B108_OvenFiringBoy'
 const FILLER = '__test_placeholder__'
@@ -141,4 +144,13 @@ describe('B108 Oven Firing Boy parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
     expect(response.state.players[1]!.resources.wood).toBe(3)
   })
+})
+
+describe('ae-negative-26-baking', () => {
+  const { OVEN, sessions, save, ok, ready, finish, make, entry } = audit26Baking
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B108 N1 actual Forest gives three wood and optional one grain baking gives exactly five food',()=>{const s=make(),a=entry(s),r=finish(s,a.menu.interaction.stateId==='wait'&&a.menu.interaction.request.kind==='choice'?ok(s.resolveChoice(0,OVEN)):a.menu,false);assert.equal(r.state.players[0]!.resources.wood,3);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,105);assert.equal(r.state.players[1]!.resources.food,100);assert.ok(r.state.log.some(e=>e.key==='log.bakeBread'));save('B108-N1',{a,r})})
+  it('B108 N2 actual Forest optional decline keeps grain and food while no grain or oven cannot bake',()=>{for(const mode of['decline','grain','oven']){const s=make(true,mode==='grain'?0:2,mode!=='oven'),pending=ok(s.takeAction(0,'forest')),r=finish(s,pending,false);assert.equal(r.state.players[0]!.resources.wood,3);assert.equal(r.state.players[0]!.resources.grain,mode==='grain'?0:2);assert.equal(r.state.players[0]!.resources.food,100);save(`B108-N2-${mode}`,{pending,r})}})
+  it('B108 N3 hand only unrelated Clay Pit and actual opponent Forest do not bake for owner',()=>{const s=make(false),first=finish(s,ok(s.takeAction(0,'clay-pit')),false);ready(s);const r=finish(s,ok(s.takeAction(1,'forest')),false);assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.food,100);save('B108-N3-hand',{first,r});const ss=make(),unrelated=finish(ss,ok(ss.takeAction(0,'clay-pit')),false);assert.equal(unrelated.state.players[0]!.resources.grain,2);assert.equal(unrelated.state.players[0]!.resources.food,100);save('B108-N3-unrelated',unrelated)})
+  it('B108 N4 over oven limit and unknown provider reject before legal bake and whole Forest undo restores wood grain food',()=>{const s=make(true,2,true,true),a=entry(s),two=assertRejectedUnchanged(s,()=>s.resolveChoice(0,`count-${OVEN}-2`)),missing=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'missing-oven')),r=finish(s,a.menu.interaction.stateId==='wait'&&a.menu.interaction.request.kind==='choice'?ok(s.resolveChoice(0,OVEN)):a.menu,false),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.equal(undone.state.players[0]!.resources.grain,2);assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);const replay=entry(s),retry=finish(s,replay.menu.interaction.stateId==='wait'&&replay.menu.interaction.request.kind==='choice'?ok(s.resolveChoice(0,OVEN)):replay.menu,false);assert.equal(retry.state.players[0]!.resources.food,105);save('B108-N4',{a,two,missing,r,undone,replay,retry})})
 })

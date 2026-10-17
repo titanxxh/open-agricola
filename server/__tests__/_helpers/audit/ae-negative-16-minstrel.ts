@@ -1,0 +1,18 @@
+// Helpers of ae-negative-16-minstrel-session.test.ts from the negative audit snapshot fafd4f51b.
+import assert from 'node:assert/strict'
+import fs from '../audit-evidence-fs'
+import type { GameSession, SessionResponse } from '../../../game/authoritative-session'
+import type { GameState } from '../../../../shared/contract/types'
+import { createWorkSession } from '../session-fixtures'
+import { confirmNext } from '../negative-rule-audit'
+
+export const CARD='A151_Minstrel'
+export const sessions:GameSession[]=[]
+export const output=process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR??'output/ae-negative/16-minstrel-probes'
+export function save(id:string,value:unknown){fs.mkdirSync(output,{recursive:true});fs.writeFileSync(`${output}/${id}.json`,JSON.stringify(value,null,2))}
+export function ok(r:SessionResponse){assert.equal(r.ok,true,r.error);return r}
+export function setup(played=true,configure:(state:GameState)=>void=()=>{}){const s=createWorkSession({seed:4242,options:{playerCount:4},configure(state){state.round=5;state.roundActionOrder.splice(0,4,'sheep-market','grain-utilization','fencing','major-improvement');state.availableMajorImprovements=['Major_Fireplace1'];for(const p of state.players){Object.assign(p.resources,{food:60,wood:4,clay:2,reed:0,stone:0,grain:1,vegetable:0,sheep:0,boar:0,cattle:0});p.fields=[{row:0,col:4,stacks:[]}]}const p=state.players[0]!;p.occupationPlayed=played?[CARD]:[];p.occupationHand=played?['__test_placeholder__']:[CARD,'A110_Roughcaster'];p.stableTiles=[{row:0,col:1}];state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1;configure(state)}});sessions.push(s);return s}
+export function turn(s:GameSession,actor:number,space:string){let r=s.getState();if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-next-player')r=confirmNext(s,r);assert.equal(r.interaction.stateId,'idle');assert.equal(r.state.currentPlayerIndex,actor);return ok(s.takeAction(actor,space))}
+export function drive(s:GameSession,r:SessionResponse,acceptCard=false){for(let n=0;n<24&&r.interaction.stateId==='wait'&&r.interaction.request.kind!=='confirm-next-player';n++){const i=r.interaction;if(i.request.kind==='animal-reorg')r=ok(s.resolveChoice(i.playerIndex,'confirm',{zones:i.request.zones}));else if(i.request.kind==='confirm-player-switch')r=ok(s.resolveChoice(i.request.fromPlayerIndex,'confirm'));else if(i.request.kind==='farm-select'){if(i.request.farm.farmType==='fence')r=ok(s.commitSelectionChoice(i.playerIndex,{edges:['H-0-2','H-1-2','V-0-2','V-0-3'],extraWood:0}));else if(i.request.farm.farmType==='sow')r=ok(s.commitSelectionChoice(i.playerIndex,{crops:[{row:0,col:4,crop:'grain'}]}));else assert.fail(JSON.stringify(i))}else if(i.request.kind==='choice'||i.request.kind==='select-trigger'){const o=i.request.options.find(o=>o.value==='Major_Fireplace1'||o.value==='major:Major_Fireplace1'||('labelKey'in o&&o.labelKey==='actions.sow.name'))??i.request.options.find(o=>i.sourceCard===CARD&&!acceptCard?o.value==='__skip__'||o.value==='__done__':o.value!=='__skip__'&&o.value!=='__done__');assert.ok(o,JSON.stringify(i));r=ok(s.resolveChoice(i.playerIndex,o.value))}else assert.fail(JSON.stringify(i))}return r}
+export function end(s:GameSession,spaces:string[],acceptCard=false){let r=s.getState();for(const[n,space]of spaces.entries())r=drive(s,turn(s,n%4,space));assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-next-player');const pending=confirmNext(s,r);const done=drive(s,pending,acceptCard);return {pending,r:done}}
+export const EIGHT=['day-laborer','fencing','major-improvement','grain-utilization','forest','reed-bank','clay-pit','fishing']

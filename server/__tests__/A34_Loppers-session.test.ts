@@ -5,7 +5,7 @@ import { descriptionEffects } from './_helpers/choice-description'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -15,6 +15,10 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A034_Loppers'
 import '../../shared/cards/E/E074_AshTrees'
+import assert from 'node:assert/strict'
+import { getOwnOrdinaryFenceReserveCount } from '../../shared/domain/supply-tokens'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Future from './_helpers/audit/ae-negative-06-future'
 
 const CARD_ID = 'A034_Loppers'
 
@@ -487,5 +491,41 @@ describe('A034 Loppers parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
     expect(response.state.players[0]!.supplyTokensConsumed?.fence).toBeUndefined()
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
+  })
+})
+
+describe('ae-negative-06-future', () => {
+  const { LOPPERS, sessions, setup, buy, deny, score, vp, turn, nearFenceLimit, oneCell, fence, exchange } = audit06Future
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A034 N1 actual purchase enforces two occupations and one wood', () => {
+    deny(setup(LOPPERS, { occupations: 1, resources: { wood: 1 } }), LOPPERS); deny(setup(LOPPERS, { resources: { wood: 0 } }), LOPPERS)
+    const r = buy(setup(LOPPERS, { resources: { wood: 1 } }), LOPPERS); assert.ok(r.state.players[0]!.minorPlayed.includes(LOPPERS)); assert.equal(r.state.players[0]!.resources.wood, 0)
+  })
+  it('A034 N2 exact one reserve fence is paid after real subdivision without removing built fences', () => {
+    const s = setup(LOPPERS, { played: true, resources: { wood: 2 } }, state => nearFenceLimit(state, 13))
+    const pending = fence(s, ['V-0-2']); assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(pending.state.players[0]!)), 1)
+    const { r } = exchange(s, pending, true); const p = r.state.players[0]!
+    assert.equal(p.fenceSegments.length, 14); assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(p)), 0); assert.equal(p.supplyTokensConsumed?.fence, 1)
+    assert.deepEqual([p.resources.wood, p.resources.food, vp(r, LOPPERS), score(r, LOPPERS)], [0, 42, 1, 1])
+  })
+  it('A034 N3 four fences give one exchange and whole action undo permits one reward retry', () => {
+    const s = setup(LOPPERS, { played: true, resources: { wood: 5 } }); const before = undoRuleSnapshot(s.getState())
+    const result = exchange(s, fence(s), true); const p = result.r.state.players[0]!
+    assert.equal(p.fenceSegments.length, 4); assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(p)), 10); assert.deepEqual([p.resources.wood, p.resources.food, vp(result.r, LOPPERS)], [0, 42, 1])
+    const stale = result.values.at(-1); assert.ok(stale); assertRejectedUnchanged(s, () => s.resolveChoice(0, stale)); assertUndoRestored(before, s.undoAction())
+    const retry = exchange(s, fence(s), true).r; assert.equal(vp(retry, LOPPERS), 1); assert.equal(retry.state.players[0]!.resources.food, 42)
+  })
+  it('A034 N4 no spare wood or reserve fence prevents exchange while decline preserves both', () => {
+    const noWood = setup(LOPPERS, { played: true, resources: { wood: 4 } }); const rw = exchange(noWood, fence(noWood), false).r
+    assert.equal(rw.state.players[0]!.resources.wood, 0); assert.equal(noWood.withCtx(() => getOwnOrdinaryFenceReserveCount(rw.state.players[0]!)), 11); assert.equal(vp(rw, LOPPERS), 0); assert.equal(rw.state.players[0]!.resources.food, 40); assertRejectedUnchanged(noWood, () => noWood.resolveChoice(0, LOPPERS))
+    const noFence = setup(LOPPERS, { played: true, resources: { wood: 2 } }, state => nearFenceLimit(state, 14)); const rf = exchange(noFence, fence(noFence, ['V-0-2']), false).r
+    assert.equal(noFence.withCtx(() => getOwnOrdinaryFenceReserveCount(rf.state.players[0]!)), 0); assert.equal(rf.state.players[0]!.resources.wood, 1); assert.equal(vp(rf, LOPPERS), 0); assert.equal(rf.state.players[0]!.resources.food, 40); assertRejectedUnchanged(noFence, () => noFence.resolveChoice(0, LOPPERS))
+    const decline = setup(LOPPERS, { played: true, resources: { wood: 5 } }); const r = exchange(decline, fence(decline), false).r
+    assert.equal(r.state.players[0]!.resources.wood, 1); assert.equal(decline.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)), 11); assert.equal(vp(r, LOPPERS), 0); assert.equal(r.state.players[0]!.resources.food, 40)
+  })
+  it('A034 N5 real opponent fencing and own unrelated action grant no owner exchange', () => {
+    const s = setup(LOPPERS, { played: true }, state => { state.players[1]!.resources.wood = 4 })
+    const own = turn(s, 0, 'forest'); assert.equal(vp(own, LOPPERS), 0)
+    const r = fence(s, oneCell, 1); assert.equal(r.state.players[1]!.fenceSegments.length, 4); assert.equal(vp(r, LOPPERS), 0); assert.equal(r.state.players[0]!.resources.food, 40); assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)), 15)
   })
 })

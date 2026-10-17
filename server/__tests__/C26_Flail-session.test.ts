@@ -4,13 +4,16 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C026_Flail'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Baking from './_helpers/audit/ae-negative-32-baking'
 
 const CARD_ID = 'C026_Flail'
 
@@ -246,4 +249,17 @@ describe('C026 Flail parity', () => {
       .not.toBe(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 2 })
   })
+})
+
+describe('ae-negative-32-baking', () => {
+  const { sessions, save, ok, make, choose, pendingCard, trigger, finish, action, buy, accept, baker, bake } = audit32Baking
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C026 N1 actual one wood purchase gains two food and actual Farmland and late Cultivation each allow one paid grain bake', () => { const s = baker('C026_Flail', false), bought = finish(s, buy(s, 'C026_Flail')); assert.deepEqual([bought.state.players[0]!.resources.wood, bought.state.players[0]!.resources.food], [0, 102]); const rows = []; for (const space of ['farmland', 'cultivation']) {
+      const t = baker('C026_Flail'), p = finish(t, ok(t.takeAction(0, space)), 'C026_Flail'), r = bake(t, p, 'C026_Flail');
+      assert.deepEqual([r.state.players[0]!.resources.grain, r.state.players[0]!.resources.food], [0, 102]);
+      assert.equal(r.state.players[0]!.fields.length, 1);
+      rows.push({ p, r });
+  } save('C026-N1', { bought, rows }); });
+  it('C026 N2 the optional bake may decline after a real plow and a held card or actual opponent Farmland cannot consume owner grain', () => { const s = baker('C026_Flail'), p = trigger(s, finish(s, ok(s.takeAction(0, 'farmland')), 'C026_Flail'), 'C026_Flail'), decline = finish(s, choose(s, p, o => o.value === '__skip__')); assert.deepEqual([decline.state.players[0]!.resources.grain, decline.state.players[0]!.resources.food], [1, 100]); const t = baker('C026_Flail', false), hand = action(t, 0, 'farmland'); assert.deepEqual([hand.state.players[0]!.resources.grain, hand.state.players[0]!.resources.food], [1, 100]); const q = baker('C026_Flail'), first = action(q, 0, 'reed-bank'), opponent = action(q, 1, 'farmland'); assert.equal(opponent.state.players[0]!.resources.grain, 1); assert.equal(opponent.state.players[0]!.resources.food, 100); save('C026-N2', { p, decline, hand, first, opponent }); });
+  it('C026 N3 unrelated action missing oven and unaffordable purchase never create baked food', () => { const s = baker('C026_Flail'), other = action(s, 0, 'reed-bank'); assert.equal(other.state.players[0]!.resources.food, 100); const t = baker('C026_Flail', true, 1, false), p = finish(t, ok(t.takeAction(0, 'farmland')), 'C026_Flail'), r = finish(t, pendingCard(p, 'C026_Flail') ? accept(t, p, 'C026_Flail') : p); assert.equal(r.state.players[0]!.resources.food, 100); const q = make('C026_Flail', false), poor = buy(q, 'C026_Flail'); assert.ok(poor.state.players[0]!.minorHand.includes('C026_Flail')); assertRejectedUnchanged(q, () => q.resolveChoice(0, 'C026_Flail')); save('C026-N3', { other, p, r, poor }); });
 })

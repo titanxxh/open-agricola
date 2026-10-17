@@ -1,6 +1,6 @@
 import { type SessionResponse } from '../game/authoritative-session'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -9,6 +9,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B048_ForestStone'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit20Collect from './_helpers/audit/ae-negative-20-collect'
 
 const CARD_ID = 'B048_ForestStone'
 
@@ -248,4 +251,14 @@ describe('B048 Forest Stone parity', () => {
     expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
     expect(response.state.players[0]!.resources.wood).toBe(2)
   })
+})
+
+describe('ae-negative-20-collect', () => {
+  const { STONE, sessions, save, ok, setup, turn, purchaseMenu, buy, score, owner, reach, stored } = audit20Collect
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B048 N1 real alternative purchase stores two food on the card rather than in supply and missing occupation refuses',()=>{for(const resource of['wood','stone']as const){const s=setup(STONE,state=>state.players[0]!.resources[resource]=resource==='wood'?2:1),{pending,r}=buy(s,STONE);assert.equal(r.state.players[0]!.resources[resource],0);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(stored(r),2);assert.equal(score(r,STONE),1);save(`B048-N1-${resource}`,{pending,r})}for(const mode of['cost','occupation']){const s=setup(STONE,state=>{if(mode==='occupation'){state.players[0]!.resources.wood=2;state.players[0]!.occupationPlayed=[]}}),pending=purchaseMenu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,STONE));const r=ok(s.resolveChoice(0,'B004_WoodPile'));assert.equal(stored(r),0);save(`B048-N1-${mode}`,{pending,r})}})
+  it('B048 N2 three real Forest uses release one one zero food without invented stored history',()=>{const s=setup(STONE,state=>state.players[0]!.resources.wood=2,5);buy(s,STONE);const results:SessionResponse[]=[];for(const round of[5,6,7]){if(round>5)reach(s,round);const before=owner(s),r=turn(s,0,'forest');assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+(round<7?1:0));assert.equal(stored(r),Math.max(0,6-round));results.push(r)}save('B048-N2',results)})
+  it('B048 N3 actual quarry refills two stored food and later wood collection releases only one',()=>{const s=setup(STONE,state=>{state.players[0]!.resources.wood=2;state.actionSpaces.find(a=>a.id==='western-quarry')!.resources.stone=1});buy(s,STONE);const before=owner(s),quarry=turn(s,0,'western-quarry');assert.equal(stored(quarry),4);assert.equal(quarry.state.players[0]!.resources.food,before.state.players[0]!.resources.food);reach(s,9);const pre=owner(s),wood=turn(s,0,'forest');assert.equal(stored(wood),3);assert.equal(wood.state.players[0]!.resources.food,pre.state.players[0]!.resources.food+1);save('B048-N3',{before,quarry,pre,wood})})
+  it('B048 N4 opponent unrelated collection and hand cannot change stored food and whole purchase undo retries once',()=>{const hand=turn(setup(STONE,state=>state.players[0]!.resources.wood=2),0,'forest');assert.equal(stored(hand),0);assert.equal(hand.state.players[0]!.resources.food,100);const s=setup(STONE,state=>state.players[0]!.resources.wood=2),r=buy(s,STONE).r,undone=ok(s.undoAction());assert.equal(stored(undone),0);assert.equal(undone.state.players[0]!.resources.wood,2);const retry=buy(s,STONE).r,other=turn(s,1,'forest'),unrelated=turn(s,0,'reed-bank');assert.equal(stored(retry),2);assert.equal(stored(other),2);assert.equal(stored(unrelated),2);assert.equal(unrelated.state.players[0]!.resources.food,100);save('B048-N4',{hand,r,undone,retry,other,unrelated})})
+  it('B048 N5 actual wood collection undo restores one stored food and retry releases exactly once',()=>{const s=setup(STONE,state=>state.players[0]!.resources.wood=2);buy(s,STONE);const before=owner(s),r=turn(s,0,'forest'),undone=ok(s.undoAction());assert.equal(stored(undone),2);assert.equal(undone.state.players[0]!.resources.food,before.state.players[0]!.resources.food);const retry=turn(s,0,'forest');assert.equal(stored(retry),1);assert.equal(retry.state.players[0]!.resources.food,before.state.players[0]!.resources.food+1);save('B048-N5',{before,r,undone,retry})})
 })

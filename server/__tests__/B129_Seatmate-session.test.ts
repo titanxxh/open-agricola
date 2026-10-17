@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/B/B129_Seatmate'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Seatmate from './_helpers/audit/ae-negative-28-seatmate'
 
 const CARD_ID = 'B129_Seatmate'
 const FIXED_HANDS = [
@@ -216,4 +219,14 @@ describe('B129_Seatmate session', () => {
     // r13 不应被 forest 改动污染
     expect(session.getActionAvailability(0)[r13Id]).toBe(true)
   })
+})
+
+describe('ae-negative-28-seatmate', () => {
+  const { sessions, save, ok, ready, make, turn, target, occupied, neighbors } = audit28Seatmate
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B129 N1 actual left or right neighbor placement on revealed round thirteen lets owner enter with one original worker in three or four players',()=>{for(const players of[3,4]as const)for(const neighbor of[1,players-1]){const s=make(players),t=neighbors(s,neighbor),before=ok(s.getState()),refs=occupied(s,t);assert.equal(refs.length,1);assert.equal(refs[0]!.playerId,s.state.players[neighbor]!.id);assert.ok(s.getActionAvailability(0)[t]);const r=turn(s,0,t);assert.equal(occupied(s,t).length,2);assert.equal(occupied(s,t).filter(w=>w.playerId===s.state.players[0]!.id).length,1);assert.ok(occupied(s,t).every(w=>r.state.players.some(p=>p.id===w.playerId&&p.workers.some(x=>x.id===w.workerId))));assert.deepEqual(r.state.players[0]!.workers.map(w=>w.id),before.state.players[0]!.workers.map(w=>w.id));save(`B129-N1-${players}-${neighbor}`,{before,r})}})
+  it('B129 N2 actual four player opposite occupant blocks owner entry while retaining the neighbors completed action',()=>{const s=make(4),t=neighbors(s,2),before=ok(s.getState());assert.ok(!s.getActionAvailability(0)[t]);const error=assertRejectedUnchanged(s,()=>s.takeAction(0,t));assert.deepEqual(occupied(s,t),before.state.actionSpaces.find(a=>a.id===t)!.takenBy);save('B129-N2',{before,error,r:turn(s,0,'grain-seeds')})})
+  it('B129 N3 owners actual prior round thirteen placement blocks a second entry even while another original worker is available',()=>{const s=make(),t=target(s);turn(s,0,t);turn(s,1,'forest');turn(s,2,'reed-bank');ready(s);assert.ok(!s.getActionAvailability(0)[t]);const before=ok(s.getState()),error=assertRejectedUnchanged(s,()=>s.takeAction(0,t));assert.equal(occupied(s,t).length,1);save('B129-N3',{before,error,r:turn(s,0,'grain-seeds')})})
+  it('B129 N4 real occupied non round thirteen space and card in hand remain unavailable to the owner',()=>{for(const mode of['other','hand']){const s=make(3,mode!=='hand'),t=mode==='other'?'forest':target(s);turn(s,0,'day-laborer');turn(s,1,t);turn(s,2,'reed-bank');ready(s);const before=ok(s.getState());assert.ok(!s.getActionAvailability(0)[t]);const error=assertRejectedUnchanged(s,()=>s.takeAction(0,t));save(`B129-N4-${mode}`,{before,error,r:turn(s,0,'grain-seeds')})}})
+  it('B129 N5 whole owners occupied space action undo keeps neighbors real worker and restores original own worker before one replay',()=>{const s=make(),t=neighbors(s,1),before=ok(s.getState()),r=turn(s,0,t),undone=ok(s.undoAction());assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);assert.deepEqual(undone.state.players[0]!.workers,before.state.players[0]!.workers);assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.equal(occupied(s,t).length,1);const retry=turn(s,0,t);assert.equal(occupied(s,t).length,2);save('B129-N5',{before,r,undone,retry})})
 })

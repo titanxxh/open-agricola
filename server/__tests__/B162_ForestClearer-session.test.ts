@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -8,6 +8,7 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B162_ForestClearer'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B162_ForestClearer'
 const LISTENER = B162_ForestClearer_impl.listeners[0]!
@@ -168,4 +169,26 @@ describe('B162_ForestClearer session', () => {
 
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, take, finish, play, undo, pile, res } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B162 N1 real purchase and exactly two three four accumulated wood give printed bonuses', () => { const b = make('B162_ForestClearer', undefined, false), bought = finish(b, play(b, 'B162_ForestClearer')), u = undo(b); for (const n of [2, 3, 4]) {
+      const s = make('B162_ForestClearer', st => pile(st, 'forest', 'wood', n)), r = finish(s, take(s, 0, 'forest'));
+      res(r, { wood: n + 1, food: n === 3 ? 100 : 101 });
+      save(`B162-N1-${n}`, { bought, u, r });
+  } });
+  it('B162 N2 one and five accumulated wood give no reward', () => { for (const n of [1, 5]) {
+      const s = make('B162_ForestClearer', st => pile(st, 'forest', 'wood', n)), r = finish(s, take(s, 0, 'forest'));
+      res(r, { wood: n, food: 100 });
+      save(`B162-N2-${n}`, r);
+  } });
+  it('B162 N3 held card opponent collection and unrelated resource exclude bonus', () => { for (const mode of ['hand', 'opponent', 'unrelated']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('B162_ForestClearer', st => { st.currentPlayerIndex = a; pile(st, 'forest', 'wood', 2); }, mode !== 'hand'), r = finish(s, take(s, a, mode === 'unrelated' ? 'reed-bank' : 'forest'), true, [], 'B162_ForestClearer');
+      res(r, { wood: mode === 'hand' ? 2 : 0, food: 100 });
+      if (mode === 'opponent')
+          res(r, { wood: 2 }, 1);
+      save(`B162-N3-${mode}`, r);
+  } });
 })

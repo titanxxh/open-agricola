@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getStableCountForCards } from '../../shared/domain/stables'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B085_FarmHand'
 import '../../shared/cards/E/E114_ShedBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit49Farm from './_helpers/audit/ae-negative-49-farm'
 
 const CARD_ID = 'E114_ShedBuilder'
 const FARM_HAND_ID = 'B085_FarmHand'
@@ -162,4 +165,12 @@ describe('E114 Shed Builder parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
     expect(response.state.players[1]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
   })
+})
+
+describe('ae-negative-49-farm', () => {
+  const { SHED, sessions, save, ok, make, finish, lesson, ready, action, STABLES, shed, stablePending, buildStable } = audit49Farm
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E114 N1 actual purchase never rewards already built stables and the four real stable ordinals give exactly grain grain vegetable vegetable',()=>{const bought=lesson(shed(2,false),SHED);assert.equal(bought.state.players[0]!.resources.grain,0);assert.equal(bought.state.players[0]!.resources.vegetable,0);for(const[prior,grain,vegetable]of[[0,1,0],[1,1,0],[2,0,1],[3,0,1]] as const){const r=buildStable(shed(prior));assert.equal(r.state.players[0]!.resources.grain,grain);assert.equal(r.state.players[0]!.resources.vegetable,vegetable);assert.equal(r.state.players[0]!.stableTiles.length,prior+1);assert.equal(r.state.players[0]!.resources.wood,6);save(`E114-N1-${prior}`,{bought,r})}})
+  it('E114 N2 combined construction pays for every real stable and crosses the second and third ordinal exactly once',()=>{for(const[prior,count,grain,vegetable]of[[0,4,2,2],[1,2,1,1]] as const){const r=buildStable(shed(prior),count);assert.equal(r.state.players[0]!.resources.grain,grain);assert.equal(r.state.players[0]!.resources.vegetable,vegetable);assert.equal(r.state.players[0]!.resources.wood,prior===0?0:4);assert.equal(r.state.players[0]!.stableTiles.length,prior+count);save(`E114-N2-${prior}`,r)}})
+  it('E114 N3 occupied farm tile insufficient wood finite fifth stable hand card and actual opponent construction never grant phantom crops',()=>{const s=shed(),pending=stablePending(s),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{stables:[{row:1,col:0}]})),r=finish(s,ok(s.commitSelectionChoice(0,{stables:[STABLES[0]!]})));assert.equal(r.state.players[0]!.resources.grain,1);for(const[prior,wood]of[[0,1],[4,8]]){const t=shed(prior,true,wood),rejected=assertRejectedUnchanged(t,()=>t.takeAction(0,'farm-expansion')),legal=ok(t.takeAction(0,'grain-seeds'));assert.equal(legal.state.players[0]!.resources.vegetable,0);assert.equal(legal.state.players[0]!.stableTiles.length,prior);save(`E114-N3-${prior}-${wood}`,{rejected,legal})}const hand=buildStable(shed(0,false));assert.equal(hand.state.players[0]!.resources.grain,0);const q=make(SHED,true,state=>state.players[1]!.resources.wood=2);action(q,0,'day-laborer');ready(q);const opponent=buildStable(q,1,1);assert.equal(opponent.state.players[0]!.resources.grain,0);assert.equal(opponent.state.players[1]!.resources.grain,0);save('E114-N3',{pending,bad,r,hand,opponent})})
 })

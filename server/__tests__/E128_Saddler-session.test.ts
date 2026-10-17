@@ -5,6 +5,8 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { choose, playImprovement, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import type { ActionRegistry } from '../../shared/engine/registry'
+import assert from 'node:assert/strict'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'E128_Saddler'
 const MAJOR_ID = 'Major_Fireplace1'
@@ -193,4 +195,43 @@ describe('E128 Saddler session', () => {
     expect(response.state.players[0]!.fields).toHaveLength(1)
     expect(snapshotResponse(restored.undoAction())).toEqual(before)
   })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, save, setup, choose, finish, next, improvement, plow, offer, take, move } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E128 N1 actual paid major purchase permits one paid field or optional decline', () => {
+    for (const accept of [true, false]) {
+      const s = setup('E128_Saddler', 14, state => state.players[0]!.resources.clay = 2)
+      let r = improvement(s, take(s, 'major-improvement'), 'Major_Fireplace1')
+      r = accept ? plow(s, offer(s, r, 'E128_Saddler')) : finish(s, r)
+      assert.equal(r.state.players[0]!.resources.food, accept ? 19 : 20)
+      assert.equal(r.state.players[0]!.resources.clay, 0)
+      assert.equal(r.state.players[0]!.fields.length, accept ? 1 : 0)
+      save(`E128-N1-${accept}`, r)
+    }
+  })
+  it('E128 N2 minor purchase shortage and real opponent major never grant free owner plow', () => {
+    for (const mode of ['minor', 'short', 'opponent']) {
+      const s = setup('E128_Saddler', 14, state => {
+        state.players[0]!.minorHand = ['B007_Wage']
+        state.players[0]!.resources.clay = 2
+        if (mode === 'short')
+          state.players[0]!.resources.food = 0
+        state.players[1]!.resources.clay = 2
+      })
+      let r = mode === 'minor' ? finish(s, take(s, 'meeting-place'), true) : mode === 'opponent' ? move(s, 'forest') : finish(s, improvement(s, take(s, 'major-improvement'), 'Major_Fireplace1'))
+      if (mode === 'opponent') {
+        next(s)
+        r = take(s, 'major-improvement')
+        if (!r.state.players[1]!.improvements.includes('Major_Fireplace1'))
+          r = choose(s, r, o => o.value === 'Major_Fireplace1')
+        r = finish(s, r)
+        assert.ok(r.state.players[1]!.improvements.includes('Major_Fireplace1'))
+      }
+      assert.equal(r.state.players[0]!.fields.length, 0)
+      save(`E128-N2-${mode}`, r)
+    }
+  })
+  it('E128 N3 major built on Minor Improvement action through Craftsmanship Promoter still permits paid plow', () => { const s = setup('E128_Saddler', 14, state => { state.players[0]!.occupationPlayed.push('D131_CraftsmanshipPromoter'); Object.assign(state.players[0]!.resources, { clay: 2, stone: 2 }); }); let r = improvement(s, take(s, 'meeting-place'), 'Major_Pottery'); r = plow(s, offer(s, r, 'E128_Saddler')); assert.equal(r.state.players[0]!.resources.food, 19); assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.resources.stone, 0); assert.equal(r.state.players[0]!.fields.length, 1); save('E128-N3', r); })
 })

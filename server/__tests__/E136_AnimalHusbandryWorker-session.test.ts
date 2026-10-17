@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E136_AnimalHusbandryWorker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit52Competition from './_helpers/audit/ae-negative-52-competition'
 
 const CARD_ID = 'E136_AnimalHusbandryWorker'
 const FILLER = '__test_placeholder__'
@@ -144,4 +147,13 @@ describe('E136 Animal Husbandry Worker parity', () => {
 
     expect([0, 1, 2].map((index) => cardBonusScore(response, index))).toEqual([2, 2, 2])
   })
+})
+
+describe('ae-negative-52-competition', () => {
+  const { sessions, save, ok, make, choose, finish, lesson, progress, bonus, geometry } = audit52Competition
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E136 N1 actual Lessons purchase at all printed boundaries gives exact wood once and whole undo restores the purchase',()=>{for(const[round,wood]of [[5,4],[8,3],[11,2],[12,0],[13,0],[14,0]] as const){const s=make('E136_AnimalHusbandryWorker',false,state=>state.round=round),r=lesson(s,'E136_AnimalHusbandryWorker');assert.equal(r.state.players[0]!.resources.wood,wood);assert.ok(r.state.players[0]!.occupationPlayed.includes('E136_AnimalHusbandryWorker'));if(round===5){const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,0);assert.equal(u.state.players[0]!.occupationPlayed.includes('E136_AnimalHusbandryWorker'),false);const replay=lesson(s,'E136_AnimalHusbandryWorker');assert.equal(replay.state.players[0]!.resources.wood,4);save('E136-N1-undo',{u,replay})}save(`E136-N1-${round}`,r)}})
+  it('E136 N2 natural final harvest scores a unique nonowner winner and each tied eligible player against the actual final geometry',()=>{for(const mode of['unique','tie']){const s=make('E136_AnimalHusbandryWorker',true,state=>geometry(state,'E136_AnimalHusbandryWorker',mode)),r=progress(s,15);assert.equal(r.state.gameOver,true);assert.equal(r.state.players[1]!.pastures.length,2);assert.equal(r.state.players[1]!.fenceSegments.length,7);assert.deepEqual([0,1,2].map(p=>bonus(r,'E136_AnimalHusbandryWorker',p)),[0,2,mode==='tie'?2:0]);save(`E136-N2-${mode}`,r)}})
+  it('E136 N3 zero comparison and a hand card cannot invent a unique winner or a purchase reward',()=>{for(const held of[false,true]){const s=make('E136_AnimalHusbandryWorker',!held),r=progress(s,15);assert.equal(r.state.gameOver,true);assert.deepEqual([0,1,2].map(p=>bonus(r,'E136_AnimalHusbandryWorker',p)),held?[0,0,0]:[2, 2, 2]);assert.equal(r.state.players[0]!.resources.wood,0);save(`E136-N3-${held}`,r)}})
+  it('E136 N4 the actual granted fence action uses its new wood at normal cost and an occupied room fence attempt rejects before one legal pasture',()=>{const card='E136_AnimalHusbandryWorker',s=make(card,false,state=>{state.round=11;state.players[0]!.resources.wood=2}),pending=lesson(s,card,card);let r=pending;if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice')r=choose(s,r,o=>o.value!=='__skip__');assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='farm-select');const bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:['H-1-0','H-2-0','V-1-0','V-1-1'],extraWood:0}));r=finish(s,ok(s.commitSelectionChoice(0,{edges:['H-0-2','H-1-2','V-0-2','V-0-3'],extraWood:0})));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.pastures.length,1);save('E136-N4',{pending,bad,r})})
 })

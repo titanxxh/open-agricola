@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
@@ -8,6 +8,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/C/C143_StoneBuyer'
 import type { AnytimeAction } from '../../shared/contract/types';
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 describe('C143_StoneBuyer session', () => {
   const setup = () => {
@@ -150,5 +153,46 @@ describe('C143_StoneBuyer session', () => {
     const resp = enterActiveInteraction(session)
     const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C143-stone-buyer-anytime')
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, finish, completeRound, play } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C143 N1 real immediate purchase and two natural resets enforce one later purchase per round', () => {
+    const s = setup('C143_StoneBuyer', 5, state => state.players[0]!.resources.food = 10)
+    let r = finish(s, play(s, 'C143_StoneBuyer'), true)
+    assert.equal(r.state.players[0]!.resources.food, 9)
+    assert.equal(r.state.players[0]!.resources.stone, 2)
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C143-stone-buyer-anytime'))
+    r = finish(s, completeRound(s, ['forest', 'reed-bank', 'fishing', 'grain-seeds', 'day-laborer']))
+    assert.equal(r.state.round, 6)
+    assert.equal(r.state.players[0]!.resources.food, 10)
+    r = finish(s, ok(s.takeAnytimeAction(0, 'C143-stone-buyer-anytime')), true)
+    assert.equal(r.state.players[0]!.resources.food, 8)
+    assert.equal(r.state.players[0]!.resources.stone, 3)
+    assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C143-stone-buyer-anytime'))
+    r = finish(s, completeRound(s, ['forest', 'clay-pit', 'reed-bank', 'grove', 'fishing', 'grain-seeds']))
+    assert.equal(r.state.round, 7)
+    r = finish(s, ok(s.takeAnytimeAction(0, 'C143-stone-buyer-anytime')), true)
+    assert.equal(r.state.players[0]!.resources.food, 6)
+    assert.equal(r.state.players[0]!.resources.stone, 4)
+    save('C143-N1', r)
+  })
+  it('C143 N2 immediate decline and forced one-food later attempt preserve resources', () => {
+    for (const mode of ['decline', 'short']) {
+      const s = setup('C143_StoneBuyer', 5, state => state.players[0]!.resources.food = mode === 'decline' ? 10 : 0)
+      let r = finish(s, play(s, 'C143_StoneBuyer'))
+      assert.equal(r.state.players[0]!.resources.stone, 0)
+      assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C143-stone-buyer-anytime'))
+      if (mode === 'short') {
+        r = finish(s, completeRound(s, ['forest', 'reed-bank', 'fishing', 'grain-seeds', 'day-laborer']))
+        assert.equal(r.state.round, 6)
+        assert.equal(r.state.players[0]!.resources.food, 1)
+        assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C143-stone-buyer-anytime'))
+        assert.equal(s.state.players[0]!.resources.stone, 0)
+      }
+      save(`C143-N2-${mode}`, s.getState())
+    }
   })
 })

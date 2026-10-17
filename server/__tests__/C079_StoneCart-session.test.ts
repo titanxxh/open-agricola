@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C079_StoneCart'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Future from './_helpers/audit/ae-negative-42-future'
 
 const CARD_ID = 'C079_StoneCart'
 const FILLER = '__test_placeholder__'
@@ -102,4 +105,12 @@ describe('C079 Stone Cart parity', () => {
     expect(response.state.players[0]!.resources.stone).toBe(1)
     expect(futureRounds(response)).toEqual([8, 10, 12, 14])
   })
+})
+
+describe('ae-negative-42-future', () => {
+  const { sessions, ok, save, setup, finish, select, play, complete, occupations, future } = audit42Future
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C079 N1 actual wood and occupations purchase queues future even stone and natural six delivers once',()=>{const s=setup('C079_StoneCart',st=>{occupations(st,2);st.players[0]!.resources.wood=2},false,5),bought=play(s,'C079_StoneCart');assert.equal(bought.state.players[0]!.resources.wood,0);assert.equal(bought.state.players[0]!.resources.stone,0);assert.deepEqual(future(bought,'C079_StoneCart'),[6,8,10,12,14].map(round=>({round,resources:{stone:1}})));const r=complete(s,['clay-pit','grain-seeds','fishing']);assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.stone,1);save('C079-N1',{bought,r})})
+  it('C079 N2 current even and last round are excluded while undo restores cost and future supply',()=>{for(const round of [6,14]){const s=setup('C079_StoneCart',st=>{occupations(st,2);st.players[0]!.resources.wood=2},false,round),r=play(s,'C079_StoneCart');assert.deepEqual(future(r,'C079_StoneCart'),(round===6?[8,10,12,14]:[]).map(round=>({round,resources:{stone:1}})));const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,2);assert.deepEqual(future(u,'C079_StoneCart'),[]);save(`C079-N2-${round}`,{r,u})}})
+  it('C079 N3 missing occupation denies purchase before legal alternative and no stone is queued',()=>{const s=setup('C079_StoneCart',st=>{occupations(st,1);st.players[0]!.resources.wood=2;st.players[0]!.minorHand.push('A057_MilkingParlor','E080_RockGarden')},false,5),p=select(s,ok(s.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'C079_StoneCart')),r=finish(s,select(s,p,o=>o.value==='A057_MilkingParlor'));assert.deepEqual(future(r,'C079_StoneCart'),[]);assert.equal(r.state.players[0]!.resources.stone,0);save('C079-N3',{p,bad,r})})
 })

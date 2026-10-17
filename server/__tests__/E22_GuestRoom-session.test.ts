@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
-import { familySize, inactiveWorkersInSupply, setActiveWorkerCount, workersAtHome } from '../../shared/domain/player'
+import { familySize, inactiveWorkersInSupply, setActiveWorkerCount, workersAtHome, workersAvailable } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Supply from './_helpers/audit/ae-negative-32-supply'
 
 const CARD_ID = 'E022_GuestRoom'
 
@@ -141,4 +144,13 @@ describe('E022 Guest Room supply placements', () => {
     session.loadState(state)
     expect(session.getState().interaction.stateId).toBe('idle')
   })
+})
+
+describe('ae-negative-32-supply', () => {
+  const { sessions, save, ok, pendingCard, finish, progress, buy, supplyMenu, supplyPlace, guest, deposit } = audit32Supply
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E022 N1 actual four wood one reed purchase bounds food storage and one stored food pays for one finite supply placement without family growth', () => { const s = guest(), p = buy(s, 'E022_GuestRoom'); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'resource-quantity-select'); const over = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { resourceCounts: { food: 3 } })), negative = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { resourceCounts: { food: -1 } })), other = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { resourceCounts: { food: 1, grain: 1 } })), stored = finish(s, ok(s.commitSelectionChoice(0, { resourceCounts: { food: 2 } }))); assert.deepEqual([stored.state.players[0]!.resources.wood, stored.state.players[0]!.resources.reed, stored.state.players[0]!.resources.food, getCardStack(stored.state.players[0]!, 'E022_GuestRoom').length], [0, 0, 0, 2]); const due = progress(s, 6, 'E022_GuestRoom'), steps = supplyPlace(s, 'E022_GuestRoom'); assert.deepEqual([getCardStack(steps.r.state.players[0]!, 'E022_GuestRoom').length, familySize(steps.r.state.players[0]!), workersAvailable(steps.r.state, steps.r.state.players[0]!)], [1, 2, 2]); assert.equal(steps.r.state.players[0]!.workers.length, 5); save('E022-N1', { p, over, negative, other, stored, due, steps }); });
+  it('E022 N2 no second same round payment and a natural next round permits exactly the second stored food use', () => { const s = guest(), stored = deposit(s), due = progress(s, 6, 'E022_GuestRoom'), before = supplyMenu(s); assert.ok(before.interaction.stateId === 'wait' && before.interaction.request.kind === 'choice'); const value = before.interaction.request.options.find(o => o.sourceCard === 'E022_GuestRoom')?.value; assert.ok(value); const steps = supplyPlace(s, 'E022_GuestRoom'), repeat = assertRejectedUnchanged(s, () => s.resolveChoice(0, value)); assert.equal(getCardStack(repeat.state.players[0]!, 'E022_GuestRoom').length, 1); const next = progress(s, 7, 'E022_GuestRoom'), second = supplyPlace(s, 'E022_GuestRoom'); assert.equal(getCardStack(second.r.state.players[0]!, 'E022_GuestRoom').length, 0); assert.equal(familySize(second.r.state.players[0]!), 2); save('E022-N2', { stored, due, before, steps, repeat, next, second }); });
+  it('E022 N3 zero storage and insufficient building resources cannot grant a free supply person', () => { const s = guest(), stored = deposit(s, 0), next = progress(s, 6, 'E022_GuestRoom'); assert.equal(pendingCard(next, 'E022_GuestRoom'), false); assert.equal(getCardStack(next.state.players[0]!, 'E022_GuestRoom').length, 0); assert.equal(familySize(next.state.players[0]!), 2); const t = guest(2, 2, 5, 3), poor = buy(t, 'E022_GuestRoom'); assert.ok(poor.state.players[0]!.minorHand.includes('E022_GuestRoom')); const bad = assertRejectedUnchanged(t, () => t.resolveChoice(0, 'E022_GuestRoom')); save('E022-N3', { stored, next, poor, bad }); });
+  it('E022 N4 declining the extra turn preserves stored food and all five active family identities leave no supply person to hire', () => { const s = guest(), stored = deposit(s), due = progress(s, 6, 'E022_GuestRoom'); supplyMenu(s); const ordinary = finish(s, ok(takeNormalWorkerTurn(s, 'forest'))); assert.equal(getCardStack(ordinary.state.players[0]!, 'E022_GuestRoom').length, 2); assert.equal(pendingCard(ordinary, 'E022_GuestRoom'), false); const t = guest(100, 5, 12), all = deposit(t), next = progress(t, 13, 'E022_GuestRoom'); assert.equal(pendingCard(next, 'E022_GuestRoom'), false); assert.equal(familySize(next.state.players[0]!), 5); assert.equal(getCardStack(next.state.players[0]!, 'E022_GuestRoom').length, 2); assert.equal(next.state.players[0]!.workers.length, 5); save('E022-N4', { stored, due, ordinary, all, next }); });
 })

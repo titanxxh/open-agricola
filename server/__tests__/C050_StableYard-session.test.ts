@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C050_StableYard'
+import assert from 'node:assert/strict'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'C050_StableYard'
 const FILLER = '__test_placeholder__'
@@ -144,4 +146,56 @@ describe('C050 Stable Yard parity', () => {
       expect(response.state.players[0]!.resources).toMatchObject({ sheep, boar, cattle: 0 })
     })
   }
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, ok, options, save, setup, finish, next, move, prerequisites, hand, buy, pasture, printed, denyMinor } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C050 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => {
+      const card = 'C050_StableYard', s = setup(card, 5, st => {
+          hand(st, card);
+          prerequisites(st, 0);
+          for (let i = 0; i < 3; i++)
+              pasture(st, [{ row: 0, col: i + 2 }], null, 0, true, `p${i}`);
+          Object.assign(st.players[0]!.resources, {});
+      });
+      const r = buy(s, card);
+      assert.ok(r.state.players[0]!.minorPlayed.includes(card));
+      assert.equal(printed(r, card), 1);
+      assert.equal(r.state.players[0]!.resources.food, 49);
+      save('C050-N1-legal', r);
+      const separate = setup(card, 5, st => {
+          hand(st, card);
+          for (let i = 0; i < 3; i++)
+              pasture(st, [{ row: 0, col: i + 2 }], null, 0, false, `p${i}`);
+          st.players[0]!.stableTiles = [{ row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 }];
+      });
+      const separateResult = buy(separate, card);
+      assert.equal(separateResult.state.players[0]!.resources.food, 49);
+      assert.equal(printed(separateResult, card), 1);
+      save('C050-N1-unfenced-stables', separateResult);
+  });
+  it('C050 N3 three stables and three pastures are independent actual purchase requirements', () => {
+      const card = 'C050_StableYard';
+      for (const mode of ['stables', 'pastures']) {
+          const s = setup(card, 5, st => {
+              hand(st, card);
+              for (let i = 0; i < (mode === 'pastures' ? 2 : 3); i++)
+                  pasture(st, [{ row: 0, col: i + 2 }], null, 0, i < (mode === 'stables' ? 2 : 3), `p${i}`);
+              if (mode === 'pastures')
+                  st.players[0]!.stableTiles.push({ row: 1, col: 2 });
+          });
+          denyMinor(s, card);
+          save(`C050-N3-${mode}`, s.getState());
+      }
+      const s = setup(card, 14, st => {
+          hand(st, card);
+          for (let i = 0; i < 3; i++)
+              pasture(st, [{ row: 0, col: i + 2 }], null, 0, true, `p${i}`);
+      });
+      const r = buy(s, card);
+      assert.equal(r.state.players[0]!.resources.food, 40);
+      save('C050-N3-finalround', r);
+  });
+  it('C050 N2 a real anytime exchange consumes the accommodated sheep and pig and keeps the new cattle legal', () => { const card = 'C050_StableYard', s = setup(card, 14, st => { hand(st, card); pasture(st, [{ row: 0, col: 2 }], 'sheep', 1, true, 'p1'); pasture(st, [{ row: 0, col: 3 }], 'boar', 1, true, 'p2'); pasture(st, [{ row: 0, col: 4 }], null, 0, true, 'p3'); }); finish(s, buy(s, card)); move(s, 'forest'); next(s); let r = ok(s.takeAnytimeAction(0, 'exchange')); const opt = options(r).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 1 && o.effectPreview.resourcesPaid?.boar === 1 && o.effectPreview.resourcesGained?.cattle === 1); assert.ok(opt); r = finish(s, ok(s.resolveChoice(0, opt.value)), true); assert.equal(r.state.players[0]!.resources.sheep, 0); assert.equal(r.state.players[0]!.resources.boar, 0); assert.equal(r.state.players[0]!.resources.cattle, 1); assert.equal(r.state.players[0]!.pastures.reduce((n, p) => n + p.animalCount, 0), 1); assert.equal(r.state.players[0]!.resources.food, 40); save('C050-N2', r); });
 })

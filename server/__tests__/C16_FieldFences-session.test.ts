@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -7,6 +7,9 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C016_FieldFences'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit29Farm from './_helpers/audit/ae-negative-29-farm'
 
 const CARD_ID = 'C016_FieldFences'
 
@@ -179,4 +182,12 @@ describe('C16 FieldFences session', () => {
     const flag = after.cardStates?.[CARD_ID]?.extraData?.c16Active
     expect(flag).toBeFalsy()
   })
+})
+
+describe('ae-negative-29-farm', () => {
+  const { sessions, save, ok, finish, ready, action, choose, buy, accept, fences, fieldfence } = audit29Farm
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C016 N1 actual two food purchase discounts only the adjacent field edge and builds a legal four fence pasture for three wood', () => { const s = fieldfence(), purchase = buy(s, 'C016_FieldFences'), p = accept(s, purchase); assert.equal(p.state.players[0]!.resources.food, 0); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'farm-select'); const r = finish(s, fences(s)); assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.fenceSegments.length, r.state.players[0]!.pastures.length], [0, 4, 1]); save('C016-N1', { purchase, p, r }); });
+  it('C016 N2 optional decline leaves wood and later ordinary fencing receives no persistent field edge discount', () => { const s = fieldfence(2, 4), purchase = buy(s, 'C016_FieldFences'), decline = finish(s, choose(s, purchase, o => o.value === '__skip__')); assert.deepEqual([decline.state.players[0]!.resources.food, decline.state.players[0]!.resources.wood, decline.state.players[0]!.fenceSegments.length], [0, 4, 0]); action(s, 1, 'grain-seeds'); ready(s); const p = ok(s.takeAction(0, 'fencing')), r = finish(s, fences(s)); assert.equal(r.state.players[0]!.resources.wood, 0); save('C016-N2', { purchase, decline, p, r }); });
+  it('C016 N3 lacking the printed food cannot buy and fences without a neighboring field cost all four wood', () => { const s = fieldfence(1, 4), poor = buy(s, 'C016_FieldFences'); assert.ok(poor.state.players[0]!.minorHand.includes('C016_FieldFences')); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'C016_FieldFences')); const t = fieldfence(2, 4, false), purchase = buy(t, 'C016_FieldFences'), p = accept(t, purchase), r = finish(t, fences(t)); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.fenceSegments.length, 4); save('C016-N3', { poor, bad, purchase, p, r }); });
 })

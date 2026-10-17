@@ -3,7 +3,7 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
@@ -12,6 +12,8 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D122_ClayCarrier'
 import type { AnytimeAction } from '../../shared/contract/types';
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 describe('D122_ClayCarrier session', () => {
   const setup = () => {
@@ -221,4 +223,12 @@ describe('D122 Clay Carrier parity', () => {
     const response = session.takeAnytimeAction(0, ANYTIME_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, clay: 4 })
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, anytime, reach, resources, ownerTurn } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D122 N1 actual Lessons grants two clay and anytime purchase pays two food for exactly two more', () => { const s = make('D122_ClayCarrier', undefined, false), p = finish(s, lesson(s, 'D122_ClayCarrier'), false); resources(p, { clay: 2 }); const r = finish(s, anytime(s, 'D122_ClayCarrier'), false); resources(r, { clay: 4, food: 98 }); assert.equal(r.interaction.anytimeActions.some(a => a.sourceCard === 'D122_ClayCarrier'), false); save('D122-N1', { p, r }) })
+  it('D122 N2 same round remains used after actual opponent turn and natural next round renews exactly one purchase', () => { const s = make('D122_ClayCarrier', undefined, true, 5), a = finish(s, anytime(s, 'D122_ClayCarrier'), false); finish(s, ok(s.takeAction(0, 'grain-seeds')), false); ownerTurn(s); const p = ok(s.getState()); assert.equal(p.interaction.anytimeActions.some(a => a.sourceCard === 'D122_ClayCarrier'), false); const next = finish(s, reach(s, 6), false), r = finish(s, anytime(s, 'D122_ClayCarrier'), false); resources(r, { clay: 4, food: 97 }); save('D122-N2', { a, p, next, r }) })
+  it('D122 N3 insufficient food or card in hand cannot exchange while ordinary Day Laborer remains legal', () => { for (const played of [true, false]) { const s = make('D122_ClayCarrier', st => { st.players[0]!.resources.food = 1 }, played); assert.equal(s.getState().interaction.anytimeActions.some(a => a.sourceCard === 'D122_ClayCarrier'), false); const r = finish(s, ok(s.takeAction(0, 'day-laborer')), false); resources(r, { food: 3, clay: 0 }); save(`D122-N3-${played}`, r) } })
 })

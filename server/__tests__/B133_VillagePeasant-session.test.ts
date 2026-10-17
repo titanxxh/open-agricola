@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B133_VillagePeasant'
 import '../../shared/cards/D/D060_LargePottery'
+import assert from 'node:assert/strict'
+import * as audit28Endgame from './_helpers/audit/ae-negative-28-endgame'
 
 const CARD_ID = 'B133_VillagePeasant'
 const FILLER = '__test_placeholder__'
@@ -137,4 +139,14 @@ describe('B133 Village Peasant parity', () => {
     expect(response.state.players[0]!.resources.vegetable).toBe(expected)
   })
 
+})
+
+describe('ae-negative-28-endgame', () => {
+  const { CARD, sessions, save, ok, MAJORS, MINORS, OCCS, DUALS, make, end } = audit28Endgame
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B133 N1 actual six final round placements and final harvest grant the smallest own card category count including Village Peasant',()=>{for(const[major,minor,occ]of[[1,2,3],[2,1,3],[2,3,1],[2,2,3]]){const s=make(MAJORS.slice(0,major),MINORS.slice(0,minor),[CARD,...OCCS.slice(0,occ!-1)]),a=end(s);assert.equal(a.before.state.players[0]!.resources.vegetable,0);assert.equal(a.r.state.players[0]!.resources.vegetable,Math.min(major!,minor!,occ!));assert.equal(a.r.state.players[1]!.resources.vegetable,0);save(`B133-N1-${major}-${minor}-${occ}`,a)}})
+  it('B133 N2 a zero own major minor or occupation category and the card in hand never grant scoring vegetables',()=>{for(const mode of['major','minor','occupation','hand']){const s=make(mode==='major'?[]:MAJORS.slice(0,1),mode==='minor'?[]:MINORS.slice(0,1),mode==='occupation'?[]:[CARD],mode!=='hand'),a=end(s);assert.equal(a.r.state.players[0]!.resources.vegetable,0);save(`B133-N2-${mode}`,a)}})
+  it('B133 N3 real scoring allocates each dual minor major card only once to maximize the smallest distinct category',()=>{for(const[majors,minors,n]of[[[],[DUALS[0]!],0],[[],[DUALS[0]!,MINORS[0]!],1],[[],DUALS,1],[MAJORS.slice(0,1),DUALS,2]]as const){const s=make([...majors],[...minors],[CARD,...OCCS]),a=end(s);assert.equal(a.r.state.players[0]!.resources.vegetable,n);save(`B133-N3-${majors.length}-${minors.length}`,a)}})
+  it('B133 N4 opponents played cards and owners hand cards do not fill missing own scoring categories',()=>{const s=make([],[],[CARD]);const a=end(s);assert.equal(a.r.state.players[0]!.resources.vegetable,0);assert.ok(a.r.state.players[0]!.minorHand.includes('A006_StorageBarn'));save('B133-N4',a)})
+  it('B133 N5 repeated final score and state reads after actual final harvest never grant the scoring vegetables twice',()=>{const s=make(MAJORS.slice(0,2),MINORS.slice(0,2),[CARD,...OCCS]),a=end(s);assert.equal(a.r.state.players[0]!.resources.vegetable,2);for(let n=0;n<3;n++){const read=ok(s.getState());assert.equal(read.state.players[0]!.resources.vegetable,2);assert.deepEqual(read.scores,a.r.scores)}save('B133-N5',a)})
 })

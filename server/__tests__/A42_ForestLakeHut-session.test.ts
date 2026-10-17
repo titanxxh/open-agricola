@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A042_ForestLakeHut'
+import '../../shared/cards/A/A043_FarmyardManure'
+import '../../shared/cards/A/A046_ClawKnife'
+import '../../shared/cards/A/A089_StablePlanner'
+import '../../shared/cards/A/A006_StorageBarn'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit07Triggers from './_helpers/audit/ae-negative-07-triggers'
 
 const CARD_ID = 'A042_ForestLakeHut'
 const FILLER = '__test_placeholder__'
@@ -133,5 +140,39 @@ describe('A042_ForestLakeHut session', () => {
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
     expect(p.resources.wood).toBe(woodBefore)
+  })
+})
+
+describe('ae-negative-07-triggers', () => {
+  const { HUT, sessions, setup, stock, ok, ready, turn, enter, offered, buy, printedPoint, hutReward } = audit07Triggers
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A042 N1 actual purchase pays two clay and earns one printed point', () => {
+    const s=setup(HUT,{played:false,resources:{clay:2}});const r=buy(s,enter(s),HUT);assert.equal(r.state.players[0]!.resources.clay,0);printedPoint(r,HUT)
+  })
+  it('A042 N2 one clay cannot forge purchase before a legal free card retry', () => {
+    const s=setup(HUT,{played:false,resources:{clay:1}});const r=enter(s);assert.equal(offered(r,HUT),false);assertRejectedUnchanged(s,()=>s.resolveChoice(0,HUT));const done=buy(s,r,'A054_Credit');assert.equal(done.state.players[0]!.resources.clay,1);assert.equal(done.state.players[0]!.minorHand.includes(HUT),true)
+  })
+  it('A042 N3 using stocked Forest gains exactly one additional food', () => {
+    const s=setup(HUT,{resources:{food:0},configure(state){stock(state,'forest','wood',3)}});const r=turn(s,0,'forest');assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.food],[3,1]);hutReward(r,{food:1})
+  })
+  it('A042 N4 using stocked Fishing gains exactly one additional wood', () => {
+    const s=setup(HUT,{resources:{food:0},configure(state){stock(state,'fishing','food',2)}});const r=turn(s,0,'fishing');assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.food],[1,2]);hutReward(r,{wood:1})
+  })
+  it('A042 N5 ordinary food or wood gains outside Fishing and Forest grant no bonus', () => {
+    const a=setup(HUT,{resources:{food:0}});const day=turn(a,0,'day-laborer');assert.deepEqual([day.state.players[0]!.resources.wood,day.state.players[0]!.resources.food],[0,2]);const b=setup(HUT,{resources:{food:0},configure(state){state.players[0]!.minorHand.push('A006_StorageBarn');state.players[0]!.improvements.push('Major_Joinery');state.availableMajorImprovements=state.availableMajorImprovements.filter(id=>id!=='Major_Joinery')}});const offer=enter(b);assert.equal(offered(offer,'A006_StorageBarn'),true);const barn=ok(b.resolveChoice(0,'A006_StorageBarn'));assert.deepEqual([barn.state.players[0]!.resources.wood,barn.state.players[0]!.resources.food],[1,0]);assert.equal(barn.state.players[1]!.minorHand.includes('A006_StorageBarn'),true)
+  })
+  it('A042 N6 an opponent action and an owner card still in hand grant no owner bonus', () => {
+    const a=setup(HUT,{resources:{food:0},configure(state){stock(state,'fishing','food',2)}});turn(a,0,'grain-seeds');const other=turn(a,1,'fishing');assert.equal(other.state.players[0]!.resources.wood,0);assert.equal(other.state.players[1]!.resources.wood,0);assert.equal(other.state.players[1]!.resources.food,22);const b=setup(HUT,{played:false,resources:{food:0},configure(state){stock(state,'fishing','food',2)}});const hand=turn(b,0,'fishing');assert.deepEqual([hand.state.players[0]!.resources.wood,hand.state.players[0]!.resources.food],[0,2])
+  })
+  it('A042 N7 empty Forest and Fishing reject atomically without a Fishing Hut bonus', () => {
+    for (const space of ['forest', 'fishing']) {
+      const s = setup(HUT, { resources: { food: 0 }, configure(state) { stock(state, space, space === 'forest' ? 'wood' : 'food', 0) } })
+      const r = assertEmptyAccumulationRejected(s, 0, space)
+      assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food], [0, 0])
+      assert.equal(r.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === HUT).length, 0)
+    }
+  })
+  it('A042 N8 occupied Forest rejects a second use before a legal action retry', () => {
+    const s=setup(HUT,{resources:{food:0},configure(state){stock(state,'forest','wood',3)}});turn(s,0,'forest');turn(s,1,'grain-seeds');ready(s,0);assertRejectedUnchanged(s,()=>s.takeAction(0,'forest'));const r=turn(s,0,'clay-pit');assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.food],[3,1])
   })
 })

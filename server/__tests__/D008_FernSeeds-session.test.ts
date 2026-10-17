@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D008_FernSeeds'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit25Crop from './_helpers/audit/ae-negative-25-crop'
 
 const CARD_ID = 'D008_FernSeeds'
 
@@ -102,4 +105,13 @@ describe('D008 Fern Seeds parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields.filter((field) => field.stacks.length > 0)).toHaveLength(3)
   })
+})
+
+describe('ae-negative-25-crop', () => {
+  const { FERN, sessions, save, ok, setup, finish, menu, FIRST, SECOND, THIRD, FOURTH, make, fern, sow, fernWithSupply } = audit25Crop
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D008 N1 actual valid passing purchase gains two food and one grain then sows exactly that grain in one empty field',()=>{const s=make(FERN),a=fern(s),r=sow(s);assert.equal(r.state.players[0]!.resources.food,102);assert.equal(r.state.players[0]!.resources.grain,0);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[{kind:'grain',remaining:3}]);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,2);assert.ok(r.state.players[1]!.minorHand.includes(FERN));save('D008-N1',{a,r})})
+  it('D008 N2 missing empty or second planted field rejects before a real free alternative',()=>{for(const mode of['empty','planted']){const s=make(FERN,mode),pending=menu(s),error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,FERN)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')),false);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(r.state.players[0]!.resources.grain,0);assert.ok(r.state.players[0]!.minorHand.includes(FERN));save(`D008-N2-${mode}`,{pending,error,r})}})
+  it('D008 N3 mandatory sow rejects skip vegetable occupied and two targets before legal single grain',()=>{const s=setup(FERN,8,state=>{const p=state.players[0]!;p.fields=[{...FIRST,stacks:[]},{...SECOND,stacks:[{kind:'grain',remaining:2}]},{...THIRD,stacks:[{kind:'vegetable',remaining:2}]},{...FOURTH,stacks:[]}];p.resources.grain=2;p.resources.vegetable=1}),a=fernWithSupply(s),skip=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__skip__')),vegetable=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{...FIRST,crop:'vegetable'}]})),occupied=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{...SECOND,crop:'grain'}]})),two=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{...FIRST,crop:'grain'},{...FOURTH,crop:'grain'}]})),r=sow(s);assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.deepEqual(r.state.players[0]!.fields[3]!.stacks,[]);save('D008-N3',{a,skip,vegetable,occupied,two,r})})
+  it('D008 N4 whole purchase and mandatory sow undo restores original fields food grain and passing hand',()=>{const s=make(FERN),before=ok(s.getState()),a=fern(s),r=sow(s),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.fields,before.state.players[0]!.fields);assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.players[0]!.resources.grain,0);assert.ok(undone.state.players[0]!.minorHand.includes(FERN));fern(s);const retry=sow(s);assert.equal(retry.state.players[0]!.resources.food,102);save('D008-N4',{before,a,r,undone,retry})})
 })

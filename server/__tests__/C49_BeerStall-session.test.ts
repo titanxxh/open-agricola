@@ -2,12 +2,14 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C049_BeerStall'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'C049_BeerStall'
 
@@ -357,4 +359,44 @@ describe('C049 Beer Stall parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 16 })
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, finish, completeRound, prerequisites, hand, buy, pasture, printed, denyMinor, unfenced, harvestChoice } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C049 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'C049_BeerStall', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.resources.wood, 0); save('C049-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 0 }); }); denyMinor(t, card); save('C049-N1-short', t.getState()); });
+  it('C049 N2 real feeding exchange scales to empty unfenced stables and supplies the food shortage', () => {
+      for (const n of [1, 2, 3]) {
+          const card = 'C049_BeerStall', s = setup(card, 4, st => { unfenced(st, n); st.players[0]!.resources.grain = n; st.players[0]!.resources.food = 0; });
+          let r = completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']);
+          r = harvestChoice(s, r, card, n);
+          r = finish(s, r, true);
+          assert.equal(r.state.round, 5);
+          assert.equal(r.state.players[0]!.resources.grain, 0);
+          assert.equal(r.state.players[0]!.resources.food, 5 * n - 4);
+          assert.equal(r.state.players[0]!.resources.begging, 0);
+          save(`C049-N2-${n}`, r);
+      }
+  });
+  it('C049 N3 declined missing grain occupied fenced and hand only stables exclude the exchange', () => {
+      for (const mode of ['decline', 'zero', 'occupied', 'fenced', 'hand']) {
+          const card = 'C049_BeerStall', s = setup(card, 4, st => {
+              unfenced(st, 1);
+              st.players[0]!.resources.grain = mode === 'zero' ? 0 : 1;
+              st.players[0]!.resources.food = 4;
+              if (mode === 'occupied') {
+                  st.players[0]!.stableAnimals['0-2'] = { animalType: 'sheep', animalCount: 1 };
+                  st.players[0]!.resources.sheep = 1;
+              }
+              if (mode === 'fenced')
+                  pasture(st, [{ row: 0, col: 2 }]);
+              if (mode === 'hand')
+                  hand(st, card);
+          });
+          const r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']), mode !== 'decline');
+          assert.equal(r.state.players[0]!.resources.food, 0);
+          assert.equal(r.state.players[0]!.resources.grain, mode === 'zero' ? 0 : 1);
+          save(`C049-N3-${mode}`, r);
+      }
+  });
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -6,6 +6,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A150_Stagehand'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit16Build from './_helpers/audit/ae-negative-16-build'
 
 describe('A150_Stagehand session', () => {
   const setup = (playerCount = 4, spaceId = 'traveling-players') => {
@@ -140,4 +143,12 @@ describe('A150_Stagehand session', () => {
     // No player switch should happen for a different space
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
+})
+
+describe('ae-negative-16-build', () => {
+  const { sessions, save, turn, drive, stage, offer } = audit16Build
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A150 N1 actual opponent Traveling Players permits one ordinary fence stable or room action',()=>{for(const kind of['fence','stable','room'] as const){const s=stage();const pending=offer(s);const r=drive(s,pending,kind);assert.equal(r.state.players[0]!.pastures.length,kind==='fence'?1:0);assert.equal(r.state.players[0]!.stableTiles.length,kind==='stable'?1:0);assert.equal(r.state.players[0]!.rooms,kind==='room'?3:2);assert.equal(r.state.players[0]!.resources.wood,kind==='fence'?6:kind==='stable'?8:5);assert.equal(r.state.players[1]!.rooms,2);save(`A150-N1-${kind}`,{pending,r})}})
+  it('A150 N2 decline own space unrelated opponent and hand do not grant construction',()=>{const s=stage();const decline=drive(s,offer(s),null);assert.equal(decline.state.players[0]!.rooms,2);assert.equal(decline.state.players[0]!.resources.wood,10);const own=turn(stage(),0,'traveling-players');assert.equal(own.state.players[0]!.rooms,2);const hs=stage(10,false);const hand=offer(hs);assert.equal(hand.state.players[0]!.rooms,2);const us=stage();turn(us,0,'day-laborer');const unrelated=turn(us,1,'fishing');assert.equal(unrelated.state.players[0]!.rooms,2);save('A150-N2',{decline,own,hand,unrelated})})
+  it('A150 N3 poor owner cannot select unpaid construction and stale choice cannot repeat',()=>{const ps=stage(0);const poor=drive(ps,offer(ps),null);assert.equal(poor.state.players[0]!.rooms,2);assert.equal(poor.state.players[0]!.stableTiles.length,0);const s=stage(2);const pending=offer(s);const r=drive(s,pending,'stable');assert.equal(r.state.players[0]!.resources.wood,0);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'build-another-stable'));save('A150-N3',{poor,pending,r})})
 })

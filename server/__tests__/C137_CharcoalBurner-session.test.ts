@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C137_CharcoalBurner'
 import '../../shared/cards/D/D064_BakingCourse'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit52Actions from './_helpers/audit/ae-negative-52-actions'
 
 const CARD_ID = 'C137_CharcoalBurner'
 const BAKING_MINOR_ID = 'D064_BakingCourse'
@@ -169,4 +172,12 @@ describe('C137 Charcoal Burner parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
     expect(response.state.players[1]!.resources).toMatchObject({ wood: 1, food: 1 })
   })
+})
+
+describe('ae-negative-52-actions', () => {
+  const { sessions, save, ok, make, action, lesson, BURNER, burner, build } = audit52Actions
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C137 N1 actual purchase gives no immediate reward and owner Fireplace purchase pays clay then rewards once through whole undo and replay',()=>{const bought=lesson(burner(false),BURNER);assert.deepEqual([bought.state.players[0]!.resources.wood,bought.state.players[0]!.resources.food],[1,100]);const s=burner(),r=build(s,0,'Major_Fireplace1');assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.food,r.state.players[0]!.resources.clay],[2,101,0]);const u=ok(s.undoAction());assert.deepEqual([u.state.players[0]!.resources.wood,u.state.players[0]!.resources.food,u.state.players[0]!.resources.clay],[1,100,2]);const replay=build(s,0,'Major_Fireplace1');assert.equal(replay.state.players[0]!.resources.wood,2);save('C137-N1',{bought,r,u,replay})})
+  it('C137 N2 a real opponent Fireplace and a prerequisite legal baking minor reward only the owner once',()=>{const s=burner(),first=action(s,0,'grain-seeds'),opponent=build(s,1,'Major_Fireplace1');assert.deepEqual([opponent.state.players[0]!.resources.wood,opponent.state.players[0]!.resources.food],[2,101]);assert.deepEqual([opponent.state.players[1]!.resources.wood,opponent.state.players[1]!.resources.food],[1,100]);const t=burner(),minor=build(t,0,'D064_BakingCourse');assert.deepEqual([minor.state.players[0]!.resources.wood,minor.state.players[0]!.resources.food],[2,101]);assert.ok(minor.state.players[0]!.minorPlayed.includes('D064_BakingCourse'));save('C137-N2',{first,opponent,minor})})
+  it('C137 N3 nonbaking Well unavailable clay a held card and ordinary action never earn a bake reward',()=>{const s=burner(),well=build(s,0,'Major_Well');assert.deepEqual([well.state.players[0]!.resources.wood,well.state.players[0]!.resources.food,well.state.players[0]!.resources.stone],[0,100,0]);const t=make(BURNER,true,state=>state.availableMajorImprovements=['Major_Fireplace1']),bad=assertRejectedUnchanged(t,()=>t.takeAction(0,'major-improvement')),pending=bad;assert.equal(bad.state.players[0]!.resources.wood,0);const q=burner(false),hand=build(q,0,'Major_Fireplace1');assert.deepEqual([hand.state.players[0]!.resources.wood,hand.state.players[0]!.resources.food],[1,100]);const v=burner(),other=action(v,0,'grain-seeds');assert.equal(other.state.players[0]!.resources.wood,1);save('C137-N3',{well,pending,bad,hand,other})})
 })

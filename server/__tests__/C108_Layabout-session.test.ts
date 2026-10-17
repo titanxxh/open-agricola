@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 import '../../shared/cards/C/C108_Layabout'
+import assert from 'node:assert/strict'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'C108_Layabout'
 
@@ -89,4 +91,11 @@ describe('C108_Layabout session', () => {
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(1)
     expect(player.resources).toMatchObject({ food: 3, grain: 1, sheep: 3, begging: 0 })
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, make, finish, lesson, end, reach, sheepFarm } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C108 N1 actual Lessons skips exactly next harvest crop feeding breeding for owner while opponent harvests normally', () => { const s = make('C108_Layabout', st => { sheepFarm(st); sheepFarm(st, 1) }, false, 4), played = finish(s, lesson(s, 'C108_Layabout'), false), r = finish(s, end(s), false); assert.equal(r.state.players[0]!.resources.food, 100); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.sheep, 2); assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining, 2); assert.equal(r.state.players[1]!.resources.food, 96); assert.equal(r.state.players[1]!.resources.grain, 1); assert.equal(r.state.players[1]!.resources.sheep, 3); save('C108-N1', { played, r }) })
+  it('C108 N2 next natural harvest is processed normally and hand-only Layabout never skips harvest', () => { const s = make('C108_Layabout', st => sheepFarm(st), false, 4); finish(s, lesson(s, 'C108_Layabout'), false); finish(s, end(s), false); const p = reach(s, 7), beforeGrain = p.state.players[0]!.resources.grain, beforeFood = p.state.players[0]!.resources.food, r = finish(s, end(s), false); assert.equal(r.state.players[0]!.resources.grain, beforeGrain + 1); assert.equal(r.state.players[0]!.resources.food, beforeFood - 4); assert.equal(r.state.players[0]!.resources.sheep, 3); const c = make('C108_Layabout', st => sheepFarm(st), false, 4), cr = finish(c, end(c), false); assert.equal(cr.state.players[0]!.resources.grain, 1); assert.equal(cr.state.players[0]!.resources.food, 96); assert.equal(cr.state.players[0]!.resources.sheep, 3); save('C108-N2', { p, r, cr }) })
 })

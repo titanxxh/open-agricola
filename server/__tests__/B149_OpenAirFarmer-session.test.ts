@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { stablesAction } from '../../shared/actions/effects/stables'
@@ -14,6 +14,9 @@ import type {
 
 import '../../shared/cards/B/B149_OpenAirFarmer'
 import '../../shared/cards/B/B030_WoodPalisades'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B149_OpenAirFarmer'
 
@@ -542,4 +545,24 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.fenceSegments).toHaveLength(0)
     expect(updated.pastures).toHaveLength(0)
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, twoCell, commands, ok, save, make, select, play, undo, at, res } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B149 N1 real purchase removes three finite stables and fences exactly two cells for two wood', () => { const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = 2; }, false), p = play(s, 'B149_OpenAirFarmer'); assert.equal(s.withCtx(() => getAvailableStableSupplyCount(p.state, p.state.players[0]!)), 1); res(p, { wood: 2 }); const r = select(s, 0, { edges: twoCell, palisadeEdges: [], extraWood: 0 }); res(r, { wood: 0 }); assert.equal(r.state.players[0]!.pastures.length, 1); assert.equal(r.state.players[0]!.pastures[0]!.tiles.length, 2); assert.equal(r.state.players[0]!.fenceSegments.length, 6); save('B149-N1', { p, r }); });
+  it('B149 N2 wrong pasture size and cancellation reject before the legal fence plan', () => { const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = 2; }, false), p = play(s, 'B149_OpenAirFarmer'); const bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], palisadeEdges: [], extraWood: 0 })), large = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4'], palisadeEdges: [], extraWood: 0 })), cancel = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { cancel: true })), r = select(s, 0, { edges: twoCell, palisadeEdges: [], extraWood: 0 }); res(r, { wood: 0 }); save('B149-N2', { p, bad, large, cancel, r }); });
+  it('B149 N3 stable or wood shortage blocks the mandatory continuation and public undo restores the action', () => { for (const mode of ['stable', 'wood']) {
+      const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = mode === 'wood' ? 1 : 2; if (mode === 'stable')
+          st.players[0]!.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]; }, false), before = ok(s.getState()), p = play(s, 'B149_OpenAirFarmer');
+      assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'engine-blocked');
+      const u = undo(s);
+      assert.deepEqual(u.state.players[0]!.resources, before.state.players[0]!.resources);
+      assert.deepEqual(u.state.players[0]!.stableTiles, before.state.players[0]!.stableTiles);
+      assert.ok(u.state.players[0]!.occupationHand.includes('B149_OpenAirFarmer'));
+      assert.equal(workersAvailable(u.state, u.state.players[0]!), 2);
+      assert.equal(at(u, 'lessons').length, 0);
+      assert.equal(u.state.players[0]!.supplyTokensConsumed?.stable ?? 0, 0);
+      save(`B149-N3-${mode}`, { before, p, u });
+  } });
 })

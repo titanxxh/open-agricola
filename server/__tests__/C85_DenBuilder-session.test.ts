@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { type GameSession } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { playOccupation } from './_helpers/card-regression-session'
@@ -6,6 +6,9 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C085_DenBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit43Capacity from './_helpers/audit/ae-negative-43-capacity'
 
 describe('C085_DenBuilder session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; grain?: number; food?: number }) => {
@@ -123,4 +126,11 @@ describe('C085_DenBuilder session', () => {
     expect(anytimeIds).not.toContain('C85-den-builder-anytime')
     rejectAnytime(session)
   })
+})
+
+describe('ae-negative-43-capacity', () => {
+  const { DEN, sessions, save, ok, make, finish, ready, lesson, ownerReady, family, grow, anytime } = audit43Capacity
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C085 N1 real Lessons then clay or stone payment gives exactly one persistent family space and no repeat payment',()=>{for(const house of['clay','stone'] as const){const s=make(DEN,false,state=>{state.round=8;state.players[0]!.houseType=house;Object.assign(state.players[0]!.resources,{food:4,grain:2})}),bought=lesson(s,DEN);ownerReady(s);const active=ok(s.takeAction(0,'farmland')),used=finish(s,anytime(s,DEN),true);assert.equal(used.state.players[0]!.resources.grain,1);assert.equal(used.state.players[0]!.resources.food,2);save(`C085-debug-${house}`,used);const rejected=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C85-den-builder-anytime'));ready(s);finish(s,ok(s.takeAction(1,'day-laborer')));ready(s);const grown=ok(s.takeAction(0,'wish-children'));assert.equal(family(grown),3);const actual={rooms:grown.state.players[0]!.rooms,tiles:grown.state.players[0]!.roomTiles.length,fields:grown.state.players[0]!.fields.length,family:family(grown)};save(`C085-N1-${house}`,{bought,active,used,rejected,grown,actual});assertRuleOutcome(actual,{rooms:2,tiles:2,fields:1,family:3})}})
+  it('C085 N2 wooden house or incomplete grain food never creates family capacity before legal ordinary action',()=>{for(const mode of['wood','grain','food']){const s=make(DEN,true,state=>{state.players[0]!.houseType=mode==='wood'?'wood':'clay';Object.assign(state.players[0]!.resources,{grain:mode==='grain'?0:1,food:mode==='food'?1:2})}),bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C85-den-builder-anytime')),noRoom=grow(s,false),legal=ok(s.takeAction(0,'grain-seeds'));assert.equal(family(legal),2);save(`C085-N2-${mode}`,{bad,noRoom,legal})}})
 })

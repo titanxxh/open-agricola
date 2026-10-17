@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/A/A138_Harpooner'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit15Spaces from './_helpers/audit/ae-negative-15-spaces'
 
 const CARD_ID = 'A138_Harpooner'
 
@@ -118,4 +121,14 @@ describe('A138 Harpooner parity', () => {
     expect(nonTarget.interaction.stateId === 'wait' ? nonTarget.interaction.sourceCard : undefined)
       .not.toBe(CARD_ID)
   })
+})
+
+describe('ae-negative-15-spaces', () => {
+  const { HARPOON, sessions, save, ok, setup, turn, finishOptional, piles } = audit15Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A138 N1 Fishing pays one wood for one food per ordinary person and one reed',()=>{const s=setup(HARPOON,state=>{state.players[0]!.resources.wood=1;piles(state,'fishing','food',3)});const pending=turn(s,0,'fishing');const r=finishOptional(s,pending,true);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,45);assert.equal(r.state.players[0]!.resources.reed,1);assert.equal(r.state.actionSpaces.find(a=>a.id==='fishing')!.resources.food,0);save('A138-N1',{pending,r})})
+  it('A138 N2 decline keeps wood and zero wood cannot award free harpoon bonus',()=>{for(const wood of [0,1]){const s=setup(HARPOON,state=>{state.players[0]!.resources.wood=wood;piles(state,'fishing','food',3)});const r=finishOptional(s,turn(s,0,'fishing'),false);assert.equal(r.state.players[0]!.resources.wood,wood);assert.equal(r.state.players[0]!.resources.food,43);assert.equal(r.state.players[0]!.resources.reed,0);save(`A138-N2-${wood}`,r)}})
+  it('A138 N3 hand unrelated and opponent Fishing cannot reward owner',()=>{const hs=setup(HARPOON,state=>state.players[0]!.resources.wood=1,false);const hand=finishOptional(hs,turn(hs,0,'fishing'),false);assert.equal(hand.state.players[0]!.resources.reed,0);const s=setup(HARPOON,state=>state.players[0]!.resources.wood=1);const unrelated=turn(s,0,'day-laborer');const other=turn(s,1,'fishing');assert.equal(other.state.players[0]!.resources.wood,1);assert.equal(other.state.players[0]!.resources.reed,0);save('A138-N3',{hand,unrelated,other})})
+  it('A138 N4 wrong actor invalid and stale choice cannot pay or gain twice',()=>{const s=setup(HARPOON,state=>state.players[0]!.resources.wood=1);const pending=turn(s,0,'fishing');assertRejectedUnchanged(s,()=>s.resolveChoice(1,'accept'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'free'));const r=finishOptional(s,pending,true);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'accept'));assert.equal(r.state.players[0]!.resources.reed,1);save('A138-N4',r)})
+  it('A138 N5 whole action undo restores cost reward and pile before one retry',()=>{const s=setup(HARPOON,state=>{state.players[0]!.resources.wood=1;piles(state,'fishing','food',3)});const first=finishOptional(s,turn(s,0,'fishing'),true);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.resources.food,40);assert.equal(undone.state.players[0]!.resources.reed,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='fishing')!.resources.food,3);const retry=finishOptional(s,turn(s,0,'fishing'),true);assert.equal(retry.state.players[0]!.resources.food,45);save('A138-N5',{first,undone,retry})})
 })

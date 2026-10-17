@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,8 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C100_Butler'
+import assert from 'node:assert/strict'
+import * as audit46Scoring from './_helpers/audit/ae-negative-46-scoring'
 
 const CARD_ID = 'C100_Butler'
 const FILLER = '__test_placeholder__'
@@ -106,4 +108,12 @@ describe('C100 Butler timing and scoring', () => {
     expect(JSON.stringify(response.state.players[0])).toBe(before)
     expect(response.state.players[0]!.occupationHand).toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-46-scoring', () => {
+  const { BUTLER, sessions, save, ok, make, finish, lesson, bonus, rooms, ownerReady } = audit46Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C100 N1 actual round eleven Butler purchase requires strictly more real rooms than family while round twelve is too late',()=>{for(const[round,count,expected]of[[11,2,0],[11,3,4],[12,3,0]] as const){const s=make(BUTLER,false,state=>{state.round=round;rooms(state,count)}),r=lesson(s,BUTLER);assert.equal(bonus(r,BUTLER),expected);assert.equal(r.state.players[0]!.cardStates[BUTLER]?.extraData?.playedRound,round);assert.equal(bonus(r,BUTLER,1),0);save(`C100-N1-${round}-${count}`,r)}})
+  it('C100 N2 real later family growth removes the eligible four points without changing the recorded purchase round',()=>{const s=make(BUTLER,false,state=>{state.round=11;rooms(state,3)}),bought=lesson(s,BUTLER);ownerReady(s);const grown=finish(s,ok(s.takeAction(0,'wish-children')));assert.equal(bonus(bought,BUTLER),4);assert.equal(bonus(grown,BUTLER),0);assert.equal(grown.state.players[0]!.workers.filter(w=>w.isActive).length,3);assert.equal(grown.state.players[0]!.cardStates[BUTLER]?.extraData?.playedRound,11);save('C100-N2',{bought,grown})})
+  it('C100 N3 holding Butler and whole real Lessons undo yield zero before exactly one legal replay',()=>{const s=make(BUTLER,false,state=>{state.round=11;rooms(state,3)}),hand=ok(s.getState());assert.equal(bonus(hand,BUTLER),0);const a=lesson(s,BUTLER),u=ok(s.undoAction());assert.equal(bonus(u,BUTLER),0);assert.ok(u.state.players[0]!.occupationHand.includes(BUTLER));const r=lesson(s,BUTLER);assert.equal(bonus(r,BUTLER),4);save('C100-N3',{hand,a,u,r})})
 })

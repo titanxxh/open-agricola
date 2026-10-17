@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A116_WoodCutter'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit14Spaces from './_helpers/audit/ae-negative-14-spaces'
 
 describe('A116_WoodCutter session', () => {
   const setup = () => {
@@ -107,4 +110,12 @@ describe('A116_WoodCutter session', () => {
     // Opponent gets 3 accumulated wood but no bonus
     expect(after.players[1]!.resources.wood).toBe(3)
   })
+})
+
+describe('ae-negative-14-spaces', () => {
+  const { CUTTER, sessions, save, ok, setup, turn } = audit14Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A116 N1 empty Forest rejects while three and six wood piles add exactly one owner wood',()=>{for(const amount of[0,3,6]){const s=setup(CUTTER,state=>state.actionSpaces.find(a=>a.id==='forest')!.resources.wood=amount);const r=amount===0?assertEmptyAccumulationRejected(s,0,'forest'):turn(s,0,'forest');assert.equal(r.state.players[0]!.resources.wood,amount===0?0:amount+1);assert.equal(r.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,0);save(`A116-N1-${amount}`,r)}})
+  it('A116 N2 nonwood accumulation DayLaborer hand and opponent give no additional wood',()=>{for(const[space,played]of[['clay-pit',true],['day-laborer',true],['forest',false]] as const){const s=setup(CUTTER,undefined,played);const r=turn(s,0,space);assert.equal(r.state.players[0]!.resources.wood,space==='forest'?3:0);save(`A116-N2-${space}`,r)}const s=setup(CUTTER);turn(s,0,'grain-seeds');const r=turn(s,1,'forest');assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[1]!.resources.wood,3);save('A116-N2-opponent',r)})
+  it('A116 N3 occupied source and invalid actor cannot gain and undo restores source once',()=>{const s=setup(CUTTER);const first=turn(s,0,'forest');assertRejectedUnchanged(s,()=>s.takeAction(0,'forest'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);assertRejectedUnchanged(s,()=>s.takeAction(1,'forest'));const retry=turn(s,0,'forest');assert.equal(retry.state.players[0]!.resources.wood,4);save('A116-N3',{first,undone,retry})})
 })

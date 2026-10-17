@@ -1,5 +1,5 @@
 import { descriptionEffects } from './_helpers/choice-description'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
@@ -8,6 +8,9 @@ import type { Resource } from '../../shared/contract/types'
 import { expectPublicCardGoods } from './_helpers/card-public-presentation'
 
 import '../../shared/cards/D/D124_Emissary'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const ANYTIME = 'D124-emissary-anytime'
 
@@ -238,4 +241,12 @@ describe('D124_Emissary session', () => {
     expect(resp.state.gameOver).toBe(true)
     expect(resp.scores[0]?.categories.find((category) => category.key === 'sheeps')).toMatchObject({ quantity: 0, total: -1 })
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, anytime, resources, emissary } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D124 N1 successive distinct wood food and stone payments each give one stone and forbid repeated wood', () => { const s = make('D124_Emissary', st => { st.players[0]!.resources.wood = 2 }), a = emissary(s, 'wood'), b = emissary(s, 'food'), r = emissary(s, 'stone'); resources(r, { wood: 1, food: 99, stone: 2 }); assert.deepEqual(r.state.players[0]!.cardStates.D124_Emissary?.stack, ['wood', 'food', 'stone']); const p = ok(s.getState()); assert.equal(p.interaction.anytimeActions.some(a => a.sourceCard === 'D124_Emissary'), false); save('D124-N1', { a, b, r, p }) })
+  it('D124 N2 invalid repeated good choice rejects before legal food payment and hand-only card cannot exchange', () => { const s = make('D124_Emissary', st => { st.players[0]!.resources.wood = 1 }), a = emissary(s, 'wood'), p = anytime(s, 'D124_Emissary'), rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'wood-again')); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice'); const o = p.interaction.request.options.find(o => o.effectPreview && 'resourcesPaid' in o.effectPreview && o.effectPreview.resourcesPaid?.food === 1); assert.ok(o); const r = ok(s.resolveChoice(0, o.value)); resources(r, { stone: 2, food: 99, wood: 0 }); const c = make('D124_Emissary', undefined, false); assert.equal(c.getState().interaction.anytimeActions.some(a => a.sourceCard === 'D124_Emissary'), false); const cr = finish(c, ok(c.takeAction(0, 'day-laborer')), false); resources(cr, { food: 102, stone: 0 }); save('D124-N2', { a, p, rejected, r, cr }) })
+  it('D124 N3 an independently room-housed sheep can be placed on card for one stone', () => { const s = make('D124_Emissary', st => { const p = st.players[0]!; p.resources.sheep = 1; const t = p.roomTiles[0]!; p.houseAnimals = { [`${t.row}-${t.col}`]: 'sheep' } }), r = emissary(s, 'sheep'); resources(r, { sheep: 0, stone: 1 }); assert.deepEqual(r.state.players[0]!.cardStates.D124_Emissary?.stack, ['sheep']); assert.deepEqual(r.state.players[0]!.houseAnimals, {}); save('D124-N3', r) })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { canRenovate } from '../../shared/actions/effects/renovation'
@@ -7,6 +7,8 @@ import type { BonusModifier } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A087_Conservator'
 import '../../shared/cards/C/C013_WoodSlideHammer'
+import assert from 'node:assert/strict'
+import * as audit27Hammer from './_helpers/audit/ae-negative-27-hammer'
 
 const CARD_ID = 'C013_WoodSlideHammer'
 const CONSERVATOR_ID = 'A087_Conservator'
@@ -211,4 +213,14 @@ describe('C013_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E fol
     expect(resp.state.players[0]!.resources.stone).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
   })
+})
+
+describe('ae-negative-27-hammer', () => {
+  const { CARD, sessions, save, ok, finish, make, menu, renovate } = audit27Hammer
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C013 N1 real minor purchase pays one wood and whole undo restores card hand and wood',()=>{const s=make(2,'wood',false,0,0,0,1),before=ok(s.getState()),pending=menu(s),r=finish(s,ok(s.resolveChoice(0,CARD)),false),undone=ok(s.undoAction());assert.ok(r.state.players[0]!.minorPlayed.includes(CARD));assert.equal(r.state.players[0]!.resources.wood,0);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));assert.equal(undone.state.players[0]!.resources.wood,1);save('C013-N1',{before,pending,r,undone})})
+  it('C013 N2 real five wood room direct stone renovation pays exactly three stone and one reed with no clay',()=>{const s=make(),a=renovate(s,'stone');assert.equal(a.r.state.players[0]!.rooms,5);assert.equal(a.r.state.players[0]!.resources.stone,0);assert.equal(a.r.state.players[0]!.resources.reed,0);assert.equal(a.r.state.players[0]!.resources.clay,0);save('C013-N2',a)})
+  it('C013 N3 four wood rooms cannot use the discount or direct stone target before an ordinary paid clay renovation',()=>{const s=make(4,'wood',true,3,1,4),a=renovate(s,'clay');assert.equal(a.r.state.players[0]!.resources.stone,3);assert.equal(a.r.state.players[0]!.resources.clay,0);assert.equal(a.r.state.players[0]!.resources.reed,0);save('C013-N3',a)})
+  it('C013 N4 five clay rooms receive no discount and pay all five stone while card in hand cannot permit the direct wood shortcut',()=>{const s=make(5,'clay',true,5),a=renovate(s,'stone');assert.equal(a.r.state.players[0]!.resources.stone,0);assert.equal(a.r.state.players[0]!.resources.reed,0);const other=make(5,'wood',false,3,1,5),b=renovate(other,'clay');assert.equal(b.r.state.players[0]!.resources.stone,3);assert.equal(b.r.state.players[0]!.resources.clay,0);save('C013-N4',{a,b})})
+  it('C013 N5 whole direct renovation undo restores wood house exact resources and room coordinates before one replay',()=>{const s=make(),before=ok(s.getState()),a=renovate(s,'stone'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.houseType,'wood');assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.deepEqual(undone.state.players[0]!.roomTiles,before.state.players[0]!.roomTiles);const retry=renovate(s,'stone');assert.equal(retry.r.state.players[0]!.resources.stone,0);save('C013-N5',{before,a,undone,retry})})
 })

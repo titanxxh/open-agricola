@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { A028_ForestSchool as A28Card } from '../../shared/cards/A/A028_ForestSchool'
@@ -6,6 +6,12 @@ import { A028_ForestSchool as A28Card } from '../../shared/cards/A/A028_ForestSc
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/A/A028_ForestSchool'
 import '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards/A/A027_OvenSite'
+import '../../shared/cards/A/A029_AleBenches'
+import '../../shared/cards/A/A060_OrientalFireplace'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit06Improvements from './_helpers/audit/ae-negative-06-improvements'
 
 const CARD_ID = 'A028_ForestSchool'
 
@@ -170,4 +176,17 @@ describe('A028_ForestSchool session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(1)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
   })
+})
+
+describe('ae-negative-06-improvements', () => {
+  const { SCHOOL, sessions, setup, enter, buy, ready, turn, offered, occupation, occupiedSchool } = audit06Improvements
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A028 N1 actual purchase pays one wood and one clay and earns the printed point',()=>{const s=setup(SCHOOL,{resources:{wood:1,clay:1}});const r=buy(s,enter(s),SCHOOL);assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.clay],[0,0]);assert.ok(r.scores);assert.equal(r.scores[0]!.categories.find(c=>c.key==='cards')?.entries?.find(e=>e.type==='card'&&e.cardId===SCHOOL)?.score,1)})
+  it('A028 N2 missing either printed resource rejects Forest School before legal retry',()=>{for(const resources of[{wood:0,clay:1},{wood:1,clay:0}]){const s=setup(SCHOOL,{resources});const r=enter(s);assert.equal(offered(r,SCHOOL),false);assertRejectedUnchanged(s,()=>s.resolveChoice(0,SCHOOL));const done=buy(s,r,'A054_Credit');assert.deepEqual([done.state.players[0]!.resources.wood,done.state.players[0]!.resources.clay],[resources.wood,resources.clay])}})
+  it('A028 N3 real occupied Lessons allows the owner to pay one wood for a second occupation',()=>{const s=occupiedSchool();const before=structuredClone(s.getState().state.actionSpaces.find(a=>a.id==='lessons')!.takenBy);const r=occupation(s,turn(s,0,'lessons'),0,{wood:1,food:0});assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,0);assert.ok(before);assert.notDeepEqual(r.state.actionSpaces.find(a=>a.id==='lessons')!.takenBy,before);assert.deepEqual(r.state.actionSpaces.find(a=>a.id==='lessons')!.takenBy,[{playerId:r.state.players[1]!.id,workerId:'1'},{playerId:r.state.players[0]!.id,workerId:'2'}])})
+  it('A028 N4 without owner Forest School occupied Lessons rejects before legal retry',()=>{for(const other of[false,true]){const s=occupiedSchool({played:false,other});assertRejectedUnchanged(s,()=>s.takeAction(0,'lessons'));const r=turn(s,0,'forest');assert.equal(r.state.players[0]!.occupationPlayed.includes('A123_FrameBuilder'),false)}})
+  it('A028 N5 Forest School cannot enter an occupied non Lessons space',()=>{const s=setup(SCHOOL,{played:true,round:5,occupations:1,resources:{wood:1,food:0}});turn(s,0,'grain-seeds');turn(s,1,'forest');ready(s,0);assertRejectedUnchanged(s,()=>s.takeAction(0,'forest'));occupation(s,turn(s,0,'lessons'),0,{wood:1,food:0})})
+  it('A028 N6 occupied three player Lessons preserves pure food mixed and pure wood two unit payments',()=>{for(const paid of[{food:2,wood:0},{food:1,wood:1},{food:0,wood:2}]){const s=occupiedSchool({players:3,resources:{food:2,wood:2},space:'lessons-3'});const r=occupation(s,turn(s,0,'lessons-3'),0,paid);assert.deepEqual([r.state.players[0]!.resources.food,r.state.players[0]!.resources.wood],[2-paid.food,2-paid.wood])}})
+  it('A028 N7 insufficient combined food and wood rejects an occupation before legal retry',()=>{const s=occupiedSchool({players:3,resources:{food:0,wood:1},space:'lessons-3'});assertRejectedUnchanged(s,()=>s.takeAction(0,'lessons-3'));const r=turn(s,0,'clay-pit');assert.equal(r.state.players[0]!.occupationPlayed.includes('A123_FrameBuilder'),false);assert.equal(r.state.players[0]!.resources.wood,1)})
+  it('A028 N8 the first ordinary Lessons occupation remains free',()=>{const s=setup(SCHOOL,{played:true,round:5,resources:{wood:1,food:0}});const r=occupation(s,turn(s,0,'lessons'),0,{wood:0,food:0});assert.equal(r.state.players[0]!.resources.wood,1)})
 })

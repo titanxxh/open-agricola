@@ -3,7 +3,7 @@ import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-en
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { descriptionEffects } from './_helpers/choice-description'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -11,6 +11,9 @@ import type { GameState, PlayerState, Resource } from '../../shared/contract/typ
 import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/E/E134_Omnifarmer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit52Animals from './_helpers/audit/ae-negative-52-animals'
 
 const CARD_ID = 'E134_Omnifarmer'
 
@@ -253,4 +256,12 @@ describe('E134 Omnifarmer parity', () => {
     expect(storedGoods(response)).toEqual([])
     expect(response.state.players[0]!.resources.sheep).toBe(1)
   })
+})
+
+describe('ae-negative-52-animals', () => {
+  const { sessions, save, make, options, pendingCard, trigger, finish, lesson, SAFE, progress, bonus, OMNI, stored, deposit, omni } = audit52Animals
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E134 N1 actual purchase stores nothing and one real harvested grain may be deposited irretrievably once or declined',()=>{const bought=lesson(omni(false),OMNI);assert.deepEqual(stored(bought),[]);for(const accept of[true,false]){const s=omni(),pending=progress(s,8,OMNI,SAFE.filter(s=>s!=='grain-seeds')),r=accept?deposit(s,pending,'grain'):finish(s,pending);assert.deepEqual(stored(r),accept?['grain']:[]);assert.equal(r.state.players[0]!.resources.grain,accept?0:1);assert.equal(bonus(r,OMNI),0);save(`E134-N1-${accept}`,{bought,pending,r})}})
+  it('E134 N2 five distinct actual harvested or newborn goods stored over natural harvests score zero three five seven nine once and never allow duplicate storage',()=>{const s=omni(true,4,true),rows=[];for(const[target,type,score]of[[5,'grain',0],[8,'vegetable',3],[10,'sheep',5],[12,'boar',7],[14,'cattle',9]] as const){const pending=trigger(s,progress(s,target,OMNI,SAFE.filter(id=>id!=='western-quarry')),OMNI);for(const good of stored(pending))assert.equal(options(pending).some(o=>!o.disabled&&descriptionEffects(o.effectPreview?.kind==='rule'?o.effectPreview.description:o.descriptionPreview).some(e=>e.kind==='payment'&&e.resourcesPaid?.[good]===1)),false);const r=deposit(s,pending,type);save(`E134-N2-step-${target}`,{pending,r});assert.equal(stored(r).length,rows.length+1);assert.equal(bonus(r,OMNI),score);rows.push({pending,r})}const end=progress(s,15,OMNI,SAFE.filter(id=>id!=='western-quarry'));assert.equal(pendingCard(end,OMNI),false);assert.equal(stored(end).length,5);assert.equal(bonus(end,OMNI),9);assert.equal(end.state.gameOver,true);save('E134-N2',{rows,end})})
+  it('E134 N3 an unharvested supply crop no actual newborn and a held card cannot deposit while a forged good rejects before a legal harvest deposit',()=>{for(const played of[true,false]){const s=make(OMNI,played,state=>{state.round=7;state.players[0]!.resources.grain=3;state.players[0]!.resources.sheep=1;const t=state.players[0]!.roomTiles[0]!;state.players[0]!.houseAnimals={[`${t.row}-${t.col}`]:'sheep'}}),r=progress(s,8);assert.deepEqual(stored(r),[]);assert.equal(r.state.players[0]!.resources.grain,4);save(`E134-N3-${played}`,r)}const s=omni(),pending=trigger(s,progress(s,8,OMNI,SAFE.filter(s=>s!=='grain-seeds')),OMNI),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__cattle_not_born__')),r=deposit(s,pending,'vegetable');assert.deepEqual(stored(r),['vegetable']);assert.equal(r.state.players[0]!.resources.vegetable,0);save('E134-N3-retry',{pending,bad,r})})
 })

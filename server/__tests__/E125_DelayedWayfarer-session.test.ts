@@ -2,7 +2,7 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import type { GameState } from '../../shared/contract/types'
 import { chooseSupplyWorkerTurn } from './_helpers/supply-worker-turn'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import {
@@ -15,6 +15,9 @@ import {
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E125_DelayedWayfarer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'E125_DelayedWayfarer'
 const FILLER = '__test_placeholder__'
@@ -250,4 +253,12 @@ describe('E125 Delayed Wayfarer parity', () => {
     expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
   })
 
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, reach, resources, gainChoice, extraPlace, wayfarerEnd } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E125 N1 actual Lessons offers all four building goods and grants only selected one before normal people finish', () => { for (const resource of ['wood', 'clay', 'reed', 'stone'] as const) { const s = make('E125_DelayedWayfarer', undefined, false, 5), r = gainChoice(s, lesson(s, 'E125_DelayedWayfarer'), 'E125_DelayedWayfarer', resource); resources(r, { [resource]: 1 }); assert.equal((['wood', 'clay', 'reed', 'stone'] as const).filter(k => r.state.players[0]!.resources[k] > 0).length, 1); assert.equal(r.state.players[0]!.cardStates.E125_DelayedWayfarer?.extraData?.playedRound, 5); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 1); assert.equal(r.interaction.stateId, 'wait'); if (r.interaction.stateId === 'wait') assert.equal(r.interaction.request.kind, 'confirm-next-player'); save(`E125-N1-${resource}`, r) } })
+  it('E125 N2 after genuine alternating placements occupied target rejects and legal supply Day Laborer returns temporary person', () => { const s = make('E125_DelayedWayfarer', undefined, false, 5), played = gainChoice(s, lesson(s, 'E125_DelayedWayfarer'), 'E125_DelayedWayfarer', 'stone'); let p = wayfarerEnd(s); while (p.interaction.stateId === 'wait' && p.interaction.promptKey !== 'ui.interactionPlaceFarmerExtra') { const i = p.interaction; assert.ok(i.request.kind === 'choice' || i.request.kind === 'select-trigger'); const o = i.request.options.find(o => o.sourceCard === 'E125_DelayedWayfarer' && !['__skip__', '__pass__'].includes(o.value)); assert.ok(o); p = ok(s.resolveChoice(0, o.value)) } const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'grain-seeds')), r = finish(s, extraPlace(s, p, 'E125_DelayedWayfarer', 'day-laborer'), false); resources(r, { food: 102, stone: 1 }); assert.equal(r.state.round, 6); assert.equal(familySize(r.state.players[0]!), 2); assert.equal(inactiveWorkersInSupply(r.state.players[0]!).length, 3); assert.ok(r.state.events.some(e => e.type === 'worker.placed' && e.spaceId === 'day-laborer' && e.viaCardId === 'E125_DelayedWayfarer')); save('E125-N2', { played, p, rejected, r }) })
+  it('E125 N3 naturally exhausted people may decline supply placement and later round cannot offer it again', () => { const s = make('E125_DelayedWayfarer', undefined, false, 5), played = gainChoice(s, lesson(s, 'E125_DelayedWayfarer'), 'E125_DelayedWayfarer', 'stone'), p = wayfarerEnd(s), r = finish(s, p, false); resources(r, { food: 100, stone: 1 }); assert.equal(r.state.round, 6); assert.equal(inactiveWorkersInSupply(r.state.players[0]!).length, 3); const later = finish(s, reach(s, 7), false); assert.equal(JSON.stringify(later.interaction).includes('E125_DelayedWayfarer'), false); assert.equal(later.state.events.filter(e => e.type === 'worker.placed' && e.viaCardId === 'E125_DelayedWayfarer').length, 0); save('E125-N3', { played, p, r, later }) })
 })

@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, familySize } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A031_DebtSecurity'
 import '../../shared/cards/D/D021_Recruitment'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Family from './_helpers/audit/ae-negative-32-family'
 
 const CARD_ID = 'D021_Recruitment'
 const NORMAL_MINOR_ID = 'A031_DebtSecurity'
@@ -159,4 +162,29 @@ describe('D021 Recruitment parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(NORMAL_MINOR_ID)
     expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(2)
   })
+})
+
+describe('ae-negative-32-family', () => {
+  const { sessions, save, ok, make, choose, pendingCard, finish, ready, action, buy, room, recruit, replacement } = audit32Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D021 N1 actual no people left prerequisite rejects early purchase and last ordinary placement buys for one food without self growth', () => { const s = recruit(false), early = buy(s, 'D021_Recruitment'); assert.ok(early.state.players[0]!.minorHand.includes('D021_Recruitment')); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D021_Recruitment')); const t = recruit(false), first = action(t, 0, 'forest'), opponent = action(t, 1, 'grain-seeds'); ready(t); const bought = finish(t, buy(t, 'D021_Recruitment')); assert.deepEqual([bought.state.players[0]!.resources.food, familySize(bought.state.players[0]!)], [99, 2]); assert.ok(bought.state.players[0]!.minorPlayed.includes('D021_Recruitment')); save('D021-N1', { early, first, opponent, bought }); });
+  it('D021 N2 from round five a true Minor Improvement can be replaced by room limited Family Growth', () => { const s = recruit(), p = ok(s.takeAction(0, 'meeting-place')); let request = p; if (request.interaction.stateId === 'wait' && request.interaction.request.kind === 'choice' && request.interaction.request.options.some(o => o.value.startsWith('action-improvement-')))
+      request = choose(s, request, o => o.value.startsWith('action-improvement-')); const r = finish(s, replacement(s, request)); assert.equal(familySize(r.state.players[0]!), 3); assert.deepEqual(r.state.players[0]!.minorPlayed, ['D021_Recruitment']); assert.equal(r.state.players[0]!.resources.food, 100); save('D021-N2', { p, request, r }); });
+  it('D021 N3 before round five no room and a held card exclude replacement while the normal minor remains playable', () => { const rows = []; for (const [played, rooms, round] of [[true, 3, 4], [true, 2, 5], [false, 3, 5]] as const) {
+      const s = recruit(played, rooms, round), p = ok(s.takeAction(0, 'meeting-place'));
+      assert.equal(pendingCard(p, 'D021_Recruitment'), false);
+      let r = p;
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.request.options.some(o => o.value.startsWith('action-improvement-')))
+          r = choose(s, r, o => o.value.startsWith('action-improvement-'));
+      if (!r.state.players[0]!.minorPlayed.includes('C016_FieldFences'))
+          r = ok(s.resolveChoice(0, 'C016_FieldFences'));
+      r = finish(s, r);
+      assert.equal(familySize(r.state.players[0]!), 2);
+      assert.ok(r.state.players[0]!.minorPlayed.includes('C016_FieldFences'));
+      rows.push({ p, r });
+  } save('D021-N3', rows); });
+  it('D021 N4 a replacement can decline in favor of paying for the normal minor and no payable improvements still permit the replacement', () => { const s = recruit(), p = ok(s.takeAction(0, 'meeting-place')); let choice = p; if (choice.interaction.stateId === 'wait' && choice.interaction.request.kind === 'choice' && choice.interaction.request.options.some(o => o.value.startsWith('action-improvement-')))
+      choice = choose(s, choice, o => o.value.startsWith('action-improvement-')); choice = choose(s, choice, o => o.sourceCard !== 'D021_Recruitment'); let normal = choice; if (normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'choice' && normal.interaction.request.options.some(o => o.value.startsWith('flow-')))
+      normal = choose(s, normal, o => o.value !== '__skip__'); if (!normal.state.players[0]!.minorPlayed.includes('C016_FieldFences'))
+      normal = ok(s.resolveChoice(0, 'C016_FieldFences')); normal = finish(s, normal); assert.deepEqual([normal.state.players[0]!.resources.food, familySize(normal.state.players[0]!)], [98, 2]); const t = make('D021_Recruitment', true, state => { state.round = 14; room(state, 3); state.availableMajorImprovements = []; }), offered = ok(t.takeAction(0, 'major-improvement')), r = finish(t, replacement(t, offered)); assert.equal(familySize(r.state.players[0]!), 3); save('D021-N4', { p, choice, normal, offered, r }); });
 })

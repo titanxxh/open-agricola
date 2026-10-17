@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -6,6 +6,8 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 
 import '../../shared/cards/E/E058_LunchtimeBeer'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit38Harvest from './_helpers/audit/ae-negative-38-harvest'
 
 const CARD_ID = 'E058_LunchtimeBeer'
 
@@ -237,4 +239,24 @@ describe('E058_LunchtimeBeer harvest-phase skip integration', () => {
     // P2 reap fired — gained at least 1 grain.
     expect(resp.state.players[1]!.resources.grain).toBeGreaterThanOrEqual(1)
   })
+})
+
+describe('ae-negative-38-harvest', () => {
+  const { sessions, save, ok, pendingCard, finish, progress, buy, QUIET, beer, beerAccept } = audit38Harvest
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E058 N1 actual free purchase and accepting the real harvest skips only owner field and breeding phases while feeding and opponent normal harvest still occur', () => { const b = beer(false), bought = finish(b, buy(b, 'E058_LunchtimeBeer')); assert.ok(bought.state.players[0]!.minorPlayed.includes('E058_LunchtimeBeer')); const s = beer(), p = progress(s, 12, 'E058_LunchtimeBeer', QUIET), r = finish(s, beerAccept(s, p)); assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.grain, r.state.players[0]!.fields[0]!.stacks[0]!.remaining, r.state.players[0]!.resources.cattle, r.state.players[0]!.pastures[0]!.animalCount], [97, 0, 3, 2, 2]); assert.deepEqual([r.state.players[1]!.resources.grain, r.state.players[1]!.fields[0]!.stacks[0]!.remaining, r.state.players[1]!.resources.cattle], [2, 2, 3]); save('E058-N1', { bought, p, r }); });
+  it('E058 N2 declining or holding the beer preserves normal harvest and accepting one harvest cannot suppress the later harvest when it is declined', () => {
+      const rows = [];
+      for (const played of [true, false] as const) {
+          const s = beer(played), p = progress(s, 12, 'E058_LunchtimeBeer', QUIET), r = finish(s, p);
+          assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.fields[0]!.stacks[0]!.remaining, r.state.players[0]!.resources.cattle], [96, 2, 3]);
+          if (!played)
+              assert.equal(pendingCard(p, 'E058_LunchtimeBeer'), false);
+          rows.push({ p, r });
+      }
+      const t = beer(), q = progress(t, 12, 'E058_LunchtimeBeer', QUIET), first = finish(t, beerAccept(t, q)), p2 = progress(t, 14, 'E058_LunchtimeBeer', QUIET), r2 = finish(t, p2);
+      assert.deepEqual([r2.state.players[0]!.resources.food, r2.state.players[0]!.fields[0]!.stacks[0]!.remaining, r2.state.players[0]!.resources.cattle], [93, 2, 3]);
+      save('E058-N2', { rows, q, first, p2, r2 });
+  });
+  it('E058 N3 skip does not skip a real feeding shortage and no nonharvest boundary can offer beer', () => { const s = beer(true, 2, 1), p = progress(s, 12, 'E058_LunchtimeBeer', QUIET), feed = finish(s, beerAccept(s, p), '__feed__'); assert.ok(feed.interaction.stateId === 'wait' && feed.interaction.request.kind === 'feed'); assert.deepEqual([feed.interaction.request.foodUsed, feed.interaction.request.remaining], [3, 1]); const recipe = feed.interaction.request.exchangeCatalog?.find(e => e.from.grain === 1 && e.to.food === 1); assert.ok(recipe); const r = finish(s, ok(s.resolveChoice(0, 'confirm', { selections: [{ sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count: 1, sourceName: recipe.sourceId }] }))); assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.grain, r.state.players[0]!.resources.begging, r.state.players[0]!.resources.cattle], [0, 0, 0, 2]); const t = beer(true, 100, 0, 12), next = progress(t, 13, 'E058_LunchtimeBeer', QUIET); assert.equal(pendingCard(next, 'E058_LunchtimeBeer'), false); assert.equal(next.state.players[0]!.resources.food, 100); save('E058-N3', { p, feed, r, next }); });
 })

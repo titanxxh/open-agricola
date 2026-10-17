@@ -3,11 +3,14 @@ import { positionKey } from '../../shared/domain/farm'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A033_BigCountry } from '../../shared/cards/A/A033_BigCountry'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getAllTilePositions } from '../../shared/domain/farm'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Future from './_helpers/audit/ae-negative-06-future'
 
 describe('A033_BigCountry prerequisite', () => {
   it('blocks when there is at least one free farmyard space', () => {
@@ -110,5 +113,27 @@ describe('A033 Big Country parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
+  })
+})
+
+describe('ae-negative-06-future', () => {
+  const { BIG, sessions, setup, buy, deny, score, vp, fullFarm } = audit06Future
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A033 N1 one unused farm space rejects forged purchase before full farm control', () => {
+    deny(setup(BIG, { round: 10 }, state => fullFarm(state, 1)), BIG)
+    const r = buy(setup(BIG, { round: 10 }, state => fullFarm(state)), BIG)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(BIG)); assert.equal(r.state.players[0]!.resources.food, 48); assert.equal(vp(r, BIG), 4)
+  })
+  it('A033 N2 immediate points and food survive stale rejection and whole purchase undo retry', () => {
+    const s = setup(BIG, { round: 10 }, state => fullFarm(state)); const before = undoRuleSnapshot(s.getState())
+    let r = buy(s, BIG); assert.equal(r.state.players[0]!.resources.food, 48); assert.equal(vp(r, BIG), 4); assert.equal(score(r, BIG), 4)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, BIG)); assertUndoRestored(before, s.undoAction())
+    r = buy(s, BIG); assert.equal(vp(r, BIG), 4); assert.equal(score(r, BIG), 4); assert.equal(r.state.players[0]!.resources.food, 48)
+  })
+  it('A033 N3 complete rounds exclude current round and finite unfenced stable uses last tile', () => {
+    for (const { round, bonus, food } of [{ round: 13, bonus: 1, food: 42 }, { round: 14, bonus: 0, food: 40 }]) {
+      const r = buy(setup(BIG, { round }, state => fullFarm(state, 0, true)), BIG)
+      assert.ok(r.state.players[0]!.minorPlayed.includes(BIG)); assert.equal(vp(r, BIG), bonus); assert.equal(score(r, BIG), bonus); assert.equal(r.state.players[0]!.resources.food, food)
+    }
   })
 })

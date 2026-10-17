@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
@@ -11,6 +11,9 @@ import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import type { InitialStateOptions } from '../../shared/session/state-constants'
 
 import '../../shared/cards/D/D131_CraftsmanshipPromoter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'D131_CraftsmanshipPromoter'
 const LISTENER_ID = 'D131-craftsmanship-promoter-compute-choice-candidates'
@@ -290,5 +293,45 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
       expect(v).not.toBe('Major_ClayOven')
       expect(v).not.toBe('Major_StoneOven')
     }
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, options, save, setup, choose, play, improvement, take } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D131 N1 real play gains one stone and minor action buys bottom-row Pottery at full price', () => { const s = setup('D131_CraftsmanshipPromoter'), p = play(s, 'D131_CraftsmanshipPromoter'); assert.equal(p.state.players[0]!.resources.stone, 1); save('D131-N1-play', p); const ss = setup('D131_CraftsmanshipPromoter', 14, state => Object.assign(state.players[0]!.resources, { clay: 2, stone: 2 })); const r = improvement(ss, take(ss, 'meeting-place'), 'Major_Pottery'); assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.resources.stone, 0); save('D131-N1', r); })
+  it('D131 N2 top-row Fireplace is excluded from minor action and hand-only card cannot add bottom-row majors', () => {
+    for (const played of [true, false]) {
+      const s = setup('D131_CraftsmanshipPromoter', 14, state => {
+        Object.assign(state.players[0]!.resources, { clay: 2, stone: 2 })
+        state.players[0]!.minorHand = ['B007_Wage', 'C069_LandConsolidation']
+        if (!played) {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['D131_CraftsmanshipPromoter']
+        }
+      })
+      let r = take(s, 'meeting-place')
+      if (!options(r).some(o => o.value === 'B007_Wage'))
+        r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+      assert.ok(!options(r).some(o => o.value === 'Major_Fireplace1'))
+      if (!played)
+        assert.ok(!options(r).some(o => o.value === 'Major_Pottery'))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, played ? 'Major_Fireplace1' : 'Major_Pottery'))
+      r = choose(s, r, o => o.value === 'B007_Wage')
+      assert.equal(r.state.players[0]!.resources.clay, 2)
+      assert.equal(r.state.players[0]!.resources.stone, 2)
+      save(`D131-N2-${played}`, r)
+    }
+  })
+  it('D131 N3 minor menu admits exactly five bottom-row major families and excludes Well despite affordability', () => {
+    const s = setup('D131_CraftsmanshipPromoter', 14, state => Object.assign(state.players[0]!.resources, { wood: 4, clay: 3, reed: 2, stone: 3 }))
+    let r = take(s, 'meeting-place')
+    if (!options(r).some(o => o.value === 'Major_Pottery'))
+      r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+    assert.deepEqual(options(r).filter(o => o.value.startsWith('Major_')).map(o => o.value).sort(), ['Major_Basket', 'Major_ClayOven', 'Major_Joinery', 'Major_Pottery', 'Major_StoneOven'])
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Well'))
+    r = choose(s, r, o => o.value === 'Major_Pottery')
+    assert.ok(r.state.players[0]!.improvements.includes('Major_Pottery'))
+    save('D131-N3', r)
   })
 })

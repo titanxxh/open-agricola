@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -8,6 +8,9 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 import '../../shared/cards/E/E132_VeggieLover'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit52Harvest from './_helpers/audit/ae-negative-52-harvest'
 
 const CARD_ID = 'E132_VeggieLover'
 const CHOICE_PREFIX = `${CARD_ID}:pairs:`
@@ -177,4 +180,12 @@ describe('E132_VeggieLover session', () => {
     expect(repeated.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
     expect(repeated.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(4)
   })
+})
+
+describe('ae-negative-52-harvest', () => {
+  const { sessions, save, ok, options, choose, pendingCard, trigger, finish, lesson, progress, bonus, VEGGIE, NONCROP, harvest, accept } = audit52Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E132 N1 actual purchase gives no free crop exchange and natural harvest can use exactly one pair for six food or decline',()=>{const bought=lesson(harvest(VEGGIE,false),VEGGIE);assert.deepEqual([bought.state.players[0]!.resources.grain,bought.state.players[0]!.resources.vegetable,bought.state.players[0]!.resources.food],[2,2,100]);for(const take of[true,false]){const s=harvest(VEGGIE),pending=progress(s,8,VEGGIE,NONCROP),r=take?accept(s,pending,VEGGIE):finish(s,pending);assert.deepEqual([r.state.players[0]!.resources.grain,r.state.players[0]!.resources.vegetable,r.state.players[0]!.resources.food,bonus(r,VEGGIE)],take?[1,1,102,0]:[2,2,96,0]);save(`E132-N1-${take}`,{bought,pending,r})}})
+  it('E132 N2 a missing crop half card in hand and ordinary nonharvest cannot give six food or bonus points',()=>{for(const[mode,played,round,grain,veg]of[['grain',true,7,0,2],['vegetable',true,7,2,0],['hand',false,7,2,2],['nonharvest',true,8,2,2]] as const){const s=harvest(VEGGIE,played,round,grain,veg),pending=progress(s,round+1,VEGGIE,NONCROP);if(mode==='hand'||mode==='nonharvest')assert.equal(pendingCard(pending,VEGGIE),false,JSON.stringify(pending.interaction));const r=finish(s,pending);assert.equal(r.state.players[0]!.resources.grain,grain);assert.equal(r.state.players[0]!.resources.vegetable,veg);assert.equal(bonus(r,VEGGIE),0);assert.equal(r.state.players[0]!.resources.food,round===7?96:100);save(`E132-N2-${mode}`,r)}})
+  it('E132 N3 natural scoring pays one two or three pairs for two four six points and cannot score the exchanged crops again',()=>{for(const n of[0,1,2,3]){const s=harvest(VEGGIE,true,14,4,4);let pending=progress(s,15,VEGGIE,NONCROP);pending=trigger(s,pending,VEGGIE);choose(s,pending,o=>o.value==='__skip__');pending=trigger(s,progress(s,15,VEGGIE,NONCROP),VEGGIE);assert.ok(options(pending).some(o=>o.value===`${VEGGIE}:pairs:3`));const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${VEGGIE}:pairs:4`)),r=finish(s,ok(s.resolveChoice(0,`${VEGGIE}:pairs:${n}`)));assert.equal(r.state.gameOver,true);assert.equal(r.state.players[0]!.resources.grain,4-n);assert.equal(r.state.players[0]!.resources.vegetable,4-n);assert.equal(bonus(r,VEGGIE),n*2);assert.ok(r.scores);assert.deepEqual(r.scores[0]!.categories.filter(c=>c.key==='grains'||c.key==='vegetables').map(c=>({key:c.key,quantity:c.quantity,total:c.total})),[{key:'grains',quantity:4-n,total:n===0?2:1},{key:'vegetables',quantity:4-n,total:4-n}]);assert.equal(bonus(r,VEGGIE,1),0);save(`E132-N3-${n}`,{pending,bad,r})}})
 })

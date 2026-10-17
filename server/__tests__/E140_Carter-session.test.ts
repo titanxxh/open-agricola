@@ -4,6 +4,8 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import type { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/E/E140_Carter'
+import assert from 'node:assert/strict'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'E140_Carter'
 const sessions: GameSession[] = []
@@ -70,4 +72,11 @@ describe('E140 actual next-round collection window', () => {
     expect(opponent.ok, opponent.error).toBe(true)
     expect(opponent.state.players[0]!.resources.food).toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, lesson, reach, resources, ownerTurn } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E140 N1 actual Lessons marks next round and genuine progression yields one food per actual Forest resource then', () => { const s = make('E140_Carter', undefined, false, 5), played = finish(s, lesson(s, 'E140_Carter'), false); assert.equal(played.state.players[0]!.cardStates.E140_Carter?.extraData?.triggerRound, 6); const next = finish(s, reach(s, 6), false); resources(next, { food: 100 }); const p = ok(s.takeAction(0, 'forest')), r = finish(s, p, false); resources(r, { wood: 3, food: 103 }); save('E140-N1', { played, next, p, r }) })
+  it('E140 N2 actual current and later round collections or next-round opponent collection cannot grant owner Carter food', () => { const s = make('E140_Carter', undefined, false, 5), played = finish(s, lesson(s, 'E140_Carter'), false); ownerTurn(s); const current = finish(s, ok(s.takeAction(0, 'forest')), false); resources(current, { food: 100 }); const late = finish(s, reach(s, 7), false), beforeFood = late.state.players[0]!.resources.food, r = finish(s, ok(s.takeAction(0, 'forest')), false); resources(r, { food: beforeFood }); const c = make('E140_Carter', undefined, false, 5); finish(c, lesson(c, 'E140_Carter'), false); finish(c, reach(c, 6), false); finish(c, ok(c.takeAction(0, 'grain-seeds')), false); ready(c); const cr = finish(c, ok(c.takeAction(1, 'forest')), false); resources(cr, { food: 100 }); resources(cr, { food: 100 }, 1); save('E140-N2', { played, current, late, r, cr }) })
 })

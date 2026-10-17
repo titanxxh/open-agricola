@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { computeScores } from '../../shared/domain/scoring'
@@ -6,6 +6,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E086_PenBuilder'
 import '../../shared/cards/E/E124_MayorCandidate'
+import assert from 'node:assert/strict'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'E124_MayorCandidate'
 const FILLER = '__test_placeholder__'
@@ -107,4 +109,12 @@ describe('E124 Mayor Candidate parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.cardStates.E086_PenBuilder?.counters?.discards).toBe(1)
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, make, finish, lesson, end, resources, build, mayorBonus } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E124 N1 actual first Lessons grants exactly two wood and two stone', () => { const s = make('E124_MayorCandidate', undefined, false), r = finish(s, lesson(s, 'E124_MayorCandidate')); resources(r, { wood: 2, stone: 2 }); assert.equal(mayorBonus(r), -4); save('E124-N1', r) })
+  it('E124 N2 actual final harvest scores minus five for three wood two stone and zero with neither regardless of clay reed', () => { for (const count of [0, 1]) { const s = make('E124_MayorCandidate', st => Object.assign(st.players[0]!.resources, { wood: count * 3, stone: count * 2, clay: 3, reed: 4 }), true, 14), r = finish(s, end(s), false); assert.equal(r.state.gameOver, true); assert.equal(mayorBonus(r), count ? -5 : 0); resources(r, { clay: 3, reed: 4 }); save(`E124-N2-${count}`, r) } })
+  it('E124 N3 ordinary room payment consumes wood and hand-only card gives no final penalty', () => { const s = make('E124_MayorCandidate', st => Object.assign(st.players[0]!.resources, { wood: 5, reed: 2 })), r = build(s); resources(r, { wood: 0, reed: 0 }); assert.equal(mayorBonus(r), 0); const c = make('E124_MayorCandidate', st => Object.assign(st.players[0]!.resources, { wood: 3, stone: 2 }), false, 14), cr = finish(c, end(c), false); assert.equal(cr.state.gameOver, true); assert.equal(mayorBonus(cr), 0); save('E124-N3', { r, cr }) })
 })

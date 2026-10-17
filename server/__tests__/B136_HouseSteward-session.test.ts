@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -7,6 +7,8 @@ import { computeScores } from '../../shared/domain/scoring'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B136_HouseSteward'
+import assert from 'node:assert/strict'
+import * as audit29Timing from './_helpers/audit/ae-negative-29-timing'
 
 const CARD_ID = 'B136_HouseSteward'
 
@@ -105,4 +107,23 @@ describe('B136_HouseSteward session', () => {
         (entry.categories.find((c) => c.key === 'cardBonusVp')?.total ?? 0) > 0),
     ).toBe(false)
   })
+})
+
+describe('ae-negative-29-timing', () => {
+  const { sessions, save, ok, make, lesson, bonus } = audit29Timing
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B136 N1 actual first occupation in five legal rounds uses complete rounds left and gives zero in round fourteen', () => { const results = []; for (const [round, wood] of [[5, 4], [8, 3], [11, 2], [13, 1], [14, 0]] as const) {
+      const s = make('B136_HouseSteward', false, state => state.round = round), r = lesson(s, 'B136_HouseSteward');
+      assert.equal(r.state.players[0]!.resources.wood, wood);
+      assert.ok(r.state.players[0]!.occupationPlayed.includes('B136_HouseSteward'));
+      results.push(r);
+  } save('B136-N1', results); });
+  it('B136 N2 shared scoring awards all opponents tied for most rooms excludes the owner and is absent while held', () => { const rows = []; for (const [played, owners] of [[true, [0]], [true, [1, 2]], [false, [1, 2]]] as const) {
+      const s = make('B136_HouseSteward', played, state => { for (const i of owners) {
+          state.players[i]!.roomTiles.push({ row: 1, col: 1 });
+          state.players[i]!.rooms = 3;
+      } }), r = ok(s.getState()), scores = [0, 1, 2].map(i => bonus(r, 'B136_HouseSteward', i));
+      assert.deepEqual(scores, played ? owners.length === 1 ? [3, 0, 0] : [0, 3, 3] : [0, 0, 0]);
+      rows.push(r);
+  } save('B136-N2', rows); });
 })

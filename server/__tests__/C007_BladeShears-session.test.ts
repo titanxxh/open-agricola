@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit24Minors from './_helpers/audit/ae-negative-24-minors'
+
+describe('ae-negative-24-minors', () => {
+  const { SHEARS, sessions, save, ok, setup, finish, menu, habitat, shears } = audit24Minors
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C007 N1 actual one wood purchase chooses three or all four sheep food and keeps every sheep before passing',()=>{for(const amount of[3,4]){const s=setup(SHEARS,8,state=>{state.players[0]!.resources.wood=1;habitat(state,4)}),a=shears(s,amount);assert.equal(a.r.state.players[0]!.resources.food,100+amount);assert.equal(a.r.state.players[0]!.resources.wood,0);assert.equal(a.r.state.players[0]!.resources.sheep,4);assert.equal(a.r.state.players[0]!.pastures[0]!.animalCount,4);assert.ok(a.r.state.players[1]!.minorHand.includes(SHEARS));save(`C007-N1-${amount}`,a)}})
+  it('C007 N2 empty pasture permits the fixed three food while missing pasture or wood rejects before a free alternative',()=>{const s=setup(SHEARS,8,state=>{state.players[0]!.resources.wood=1;habitat(state,0)}),a=shears(s,3);assert.equal(a.r.state.players[0]!.resources.food,103);assert.equal(a.r.state.players[0]!.resources.sheep,0);save('C007-N2-empty',a);for(const mode of['pasture','wood']){const ss=setup(SHEARS,8,state=>{state.players[0]!.resources.wood=mode==='wood'?0:1;if(mode!=='pasture')habitat(state,4)}),pending=menu(ss),error=assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,SHEARS)),r=finish(ss,ok(ss.resolveChoice(0,'B004_WoodPile')));assert.equal(r.state.players[0]!.resources.food,100);assert.ok(r.state.players[0]!.minorHand.includes(SHEARS));save(`C007-N2-${mode}`,{pending,error,r})}})
+  it('C007 N3 whole purchase undo restores wood food and passing hand and replay awards only one selected branch',()=>{const s=setup(SHEARS,8,state=>{state.players[0]!.resources.wood=1;habitat(state,4)}),a=shears(s,4),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.players[0]!.resources.sheep,4);assert.ok(undone.state.players[0]!.minorHand.includes(SHEARS));const retry=shears(s,3);assert.equal(retry.r.state.players[0]!.resources.food,103);save('C007-N3',{a,undone,retry})})
+})

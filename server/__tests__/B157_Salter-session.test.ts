@@ -6,6 +6,16 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/B/B157_Salter'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import '../../shared/cards/A/A143_Stonecutter'
+import '../../shared/cards/C/C094_StableCleaner'
+import '../../shared/cards/E/E146_Reseller'
+import '../../shared/cards/E/E047_SyrupTap'
+import '../../shared/cards/E/E030_ChildsToy'
+import '../../shared/cards/B/B007_Wage'
+import '../../shared/cards/C/C054_MarketBooth'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit02Payments from './_helpers/audit/ae-negative-02-payments'
 
 const CARD_ID = 'B157_Salter'
 const placeholder = ['__test_placeholder__']
@@ -421,5 +431,86 @@ describe('B157 Salter parity', () => {
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources.food).toBe(21)
     expect(expandedFutureFoodRounds(response)).toEqual([7, 8])
+  })
+})
+
+describe('ae-negative-02-payments', () => {
+  const { salter, wait, salterChoice, future, salterObserved } = audit02Payments
+  describe('A–E negative batch 02 payment rules', () => {
+    it('B157 N1 OA rejects zero negative fractional and excess counts then salts one farm sheep', () => {
+      const s = salter()
+      try {
+        salterChoice(s)
+        for (const sheep of [0, -1, 1.5, 3]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { resourceCounts: { sheep } }))
+        const r = s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(salterObserved(r), { sheep: 1, food: 20, farmSheep: 1, rounds: [6, 7, 8] })
+        assert.ok(r.state.log.some(log => log.key === 'log.salterFutureFood'))
+      } finally { s.dispose() }
+    })
+    it('B157 N2 OA repeated salting consumes only remaining sheep and never pays early', () => {
+      const s = salter()
+      try {
+        salterChoice(s)
+        assert.equal(s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } }).ok, true)
+        const r = s.takeAnytimeAction(0, 'B157-salter-anytime')
+        assert.deepEqual(salterObserved(r), { sheep: 0, food: 20, farmSheep: 0, rounds: [6, 6, 7, 7, 8, 8] })
+        assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'B157-salter-anytime'))
+      } finally { s.dispose() }
+    })
+    it('B157 N3 OA undo restores farm animals and schedule before a legal retry', () => {
+      const s = salter()
+      try {
+        salterChoice(s)
+        assert.equal(s.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } }).ok, true)
+        const r = s.undoStep()
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(salterObserved(r), { sheep: 2, food: 20, farmSheep: 2, rounds: [] })
+        assert.equal(wait(r).request.kind, 'resource-quantity-select')
+        const retry = s.commitSelectionChoice(0, { resourceCounts: { sheep: 2 } })
+        assert.deepEqual(salterObserved(retry), { sheep: 0, food: 20, farmSheep: 0, rounds: [6, 6, 7, 7, 8, 8] })
+      } finally { s.dispose() }
+    })
+    it('B157 N4 OA round thirteen trims a sheep schedule to the remaining round', () => {
+      const s = salter({ round: 13, sheep: 1 })
+      try { assert.deepEqual(salterObserved(s.takeAnytimeAction(0, 'B157-salter-anytime')), { sheep: 0, food: 20, farmSheep: 0, rounds: [14] }) } finally { s.dispose() }
+    })
+    it('B157 N5 OA unplayed no-farm pending-reserve and final-round abilities are unavailable', () => {
+      for (const settings of [{ played: false }, { sheep: 0 }, { reserveBoar: 1 }, { round: 14 }]) {
+        const s = salter(settings)
+        try {
+          assert.equal(s.getState().interaction.anytimeActions.some(a => a.id === 'B157-salter-anytime'), false)
+          assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'B157-salter-anytime'))
+          assert.deepEqual(future(s.getState()), [])
+        } finally { s.dispose() }
+      }
+    })
+  })
+  describe('B157 animal-specific future prefix', () => {
+    it('B157 N6 OA each salted animal type retains its own three five or seven round duration', () => {
+      const s = salter({ farmBoar: 1, farmCattle: 1 })
+      try {
+        salterChoice(s)
+        const r = s.commitSelectionChoice(0, { resourceCounts: { sheep: 2, boar: 1, cattle: 1 } })
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual([r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.boar, r.state.players[0]!.resources.cattle], [0, 0, 0])
+        assert.equal(r.state.players[0]!.resources.food, 20)
+        assert.deepEqual(future(r), [6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 10, 11, 12])
+      } finally { s.dispose() }
+    })
+  })
+  describe('Printed cost and delayed receipt controls', () => {
+    it('B157 N7 OA future food is received once at the next round start', () => {
+        const s = salter({ allWorkersUsed: true })
+        try {
+          salterChoice(s)
+          assert.equal(s.commitSelectionChoice(0, { resourceCounts: { sheep: 2 } }).ok, true)
+          const r = s.performRoundEnd()
+          assert.equal(r.ok, true, r.error)
+          assert.equal(r.state.round, 6)
+          assert.equal(r.state.players[0]!.resources.food, 22)
+          assert.deepEqual(future(r), [7, 7, 8, 8])
+        } finally { s.dispose() }
+      })
   })
 })

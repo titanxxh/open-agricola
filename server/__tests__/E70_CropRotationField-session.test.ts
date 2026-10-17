@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
@@ -9,6 +9,9 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E070_CropRotationField'
 import '../../shared/cards/E/E069_MelonPatch'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as auditE070 from './_helpers/audit/ae-negative-E070'
 
 const CARD_ID = 'E070_CropRotationField'
 const OTHER_EXTRA_CARD_ID = 'E069_MelonPatch'
@@ -408,6 +411,78 @@ describe('E070_CropRotationField session', () => {
 
       expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
       expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
+    })
+  })
+})
+
+describe('ae-negative-E070', () => {
+  const { CARD, sessions, setup, accept, crops } = auditE070
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('E070 negative audit: last crop, opposite crop, and the same card field', () => {
+    it('N1 rejects fabricated sow payloads and a duplicate acceptance; the sole legal target auto-sows', () => {
+      const session = setup()
+      const waiting = session.performRoundEnd()
+      assert.equal(waiting.ok, true, waiting.error)
+      assert.equal(waiting.state.players[0]!.resources.grain, 1)
+      assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { crops: [{ row: -1, col: 5070, crop: 'grain' }] }))
+      assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'vegetable' }] }))
+      assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { crops: [{ row: -1, col: 5069, crop: 'vegetable' }] }))
+      const { result, value } = accept(session, session.getState())
+      assert.deepEqual(crops(result), [{ crop: 'vegetable', remaining: 2 }])
+      assert.equal(result.state.players[0]!.resources.vegetable, 0)
+      assert.deepEqual(result.state.players[0]!.fields[0]!.stacks, [])
+      assertRejectedUnchanged(session, () => session.resolveChoice(0, value))
+      assert.equal(result.scores?.length, 2)
+    })
+    it.each([false, true])('N2 non-last card crop does not rotate, even if another field empties (otherLast=$0)', otherLast => {
+      const session = setup({ count: 2, otherLast })
+      const r = session.performRoundEnd()
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual(crops(r), [{ crop: 'grain', remaining: 1 }])
+      assert.equal(r.state.players[0]!.resources.vegetable, 1)
+      assert.equal(r.state.players[0]!.resources.grain, otherLast ? 2 : 1)
+      assert.equal(r.interaction.stateId === 'wait' && r.interaction.sourceCard === CARD, false)
+    })
+    it('N3 may decline without paying a seed or sowing elsewhere', () => {
+      const session = setup()
+      session.performRoundEnd()
+      const r = session.resolveChoice(0, '__skip__')
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual(crops(r), [])
+      assert.equal(r.state.players[0]!.resources.vegetable, 1)
+      assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [])
+    })
+    it('N4 no opposite seed follows the accepted prompt omission without gaining a crop', () => {
+      const session = setup({ vegetable: 0 })
+      const r = session.performRoundEnd()
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual(crops(r), [])
+      assert.equal(r.state.players[0]!.resources.grain, 1)
+      assert.equal(r.state.players[0]!.resources.vegetable, 0)
+    })
+    it('N5 Thunderbolt removal outside Harvest still rotates only the card that lost its last grain', () => {
+      const session = setup({ thunder: true })
+      let r = session.takeAction(0, 'meeting-place')
+      for (let step = 0; step < 6 && r.interaction.stateId === 'wait' && r.interaction.request.kind !== 'selection'; step++) {
+        assert.equal(r.interaction.request.kind, 'choice')
+        assert.ok(r.interaction.request.kind === 'choice')
+        const options = r.interaction.request.options
+        const option = options?.find(o => o.value === 'E004_Thunderbolt')
+          ?? options?.find(o => o.value.startsWith('action-improvement-'))
+          ?? options?.find(o => o.value.startsWith('flow-'))
+        assert.ok(option)
+        r = session.resolveChoice(0, option.value)
+        assert.equal(r.ok, true, r.error)
+      }
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+      r = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 5070 }] })
+      assert.equal(r.ok, true, r.error)
+      assert.equal(r.state.players[0]!.resources.wood, 2)
+      assert.equal(r.state.roundPhase, 'work')
+      r = accept(session, r).result
+      assert.deepEqual(crops(r), [{ crop: 'vegetable', remaining: 2 }])
+      assert.equal(r.state.players[0]!.resources.vegetable, 0)
+      assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [])
     })
   })
 })

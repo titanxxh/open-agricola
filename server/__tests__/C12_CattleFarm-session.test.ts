@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C012_CattleFarm'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit27Holders from './_helpers/audit/ae-negative-27-holders'
 
 const CARD_ID = 'C012_CattleFarm'
 const FILLER = '__test_placeholder__'
@@ -242,4 +245,13 @@ describe('C012_CattleFarm session', () => {
       request: beforeInteraction.request,
     })
   })
+})
+
+describe('ae-negative-27-holders', () => {
+  const { CATTLE, sessions, save, ok, make, purchase, reorg, cardAssignment } = audit27Holders
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C012 N1 actual one wood purchase keeps farm pastures and creates no cattle or bonus pasture',()=>{const s=make(CATTLE,1,false),before=ok(s.getState()),a=purchase(s,CATTLE);assert.equal(a.r.state.players[0]!.resources.wood,0);assert.equal(a.r.state.players[0]!.resources.cattle,0);assert.deepEqual(a.r.state.players[0]!.pastures,before.state.players[0]!.pastures);save('C012-N1',{before,a})})
+  it('C012 N2 actual cattle reorganization holds one cattle per distinct pasture and rejects capacity plus one before legal retry',()=>{for(const pastures of[1,2]){const s=make(CATTLE,pastures),pending=reorg(s,'cattle-market'),tooMany=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[cardAssignment(pending,CATTLE,{cattle:pastures+1})]}));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');const house=pending.interaction.request.zones.find(z=>z.zoneType==='house');assert.ok(house);const r=ok(s.resolveChoice(0,'confirm',{zones:[cardAssignment(pending,CATTLE,{cattle:pastures}),{...house,animalType:'cattle',animalCount:1}]}));assert.equal(r.state.players[0]!.resources.cattle,pastures+1);assert.equal(r.state.players[0]!.pastures.length,pastures);save(`C012-N2-${pastures}`,{pending,tooMany,r})}})
+  it('C012 N3 no pasture or card in hand exposes no card holder and sheep cannot enter a cattle-only holder',()=>{for(const mode of['pasture','hand']){const s=make(CATTLE,mode==='pasture'?0:1,mode!=='hand'),pending=reorg(s,'sheep-market');assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');assert.ok(!pending.interaction.request.zones.some(z=>z.cardId===CATTLE));save(`C012-N3-${mode}`,pending)}const s=make(CATTLE),pending=reorg(s,'sheep-market'),wrong=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[cardAssignment(pending,CATTLE,{sheep:2})]}));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');const pasture=pending.interaction.request.zones.find(z=>z.zoneType==='pasture');assert.ok(pasture);const r=ok(s.resolveChoice(0,'confirm',{zones:[{...pasture,animalType:'sheep',animalCount:2}]}));assert.equal(r.state.players[0]!.resources.sheep,2);save('C012-N3-sheep',{pending,wrong,r})})
+  it('C012 N4 whole paid purchase undo restores wood and hand while preserving actual pasture geometry',()=>{const s=make(CATTLE,2,false),before=ok(s.getState()),a=purchase(s,CATTLE),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.ok(undone.state.players[0]!.minorHand.includes(CATTLE));assert.deepEqual(undone.state.players[0]!.pastures,before.state.players[0]!.pastures);const retry=purchase(s,CATTLE);assert.equal(retry.r.state.players[0]!.resources.wood,0);save('C012-N4',{before,a,undone,retry})})
 })

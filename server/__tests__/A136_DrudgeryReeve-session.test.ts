@@ -2,7 +2,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A136_DrudgeryReeve'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
@@ -10,6 +10,9 @@ import type { PlayerState, Resource } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit15Reserve from './_helpers/audit/ae-negative-15-reserve'
 
 const CARD_ID = 'A136_DrudgeryReeve'
 const RESERVE_FIRST_CARD = 'TEST_A136ReserveFirst'
@@ -290,4 +293,15 @@ describe('A136 Drudgery Reeve parity', () => {
       expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
       expect(response.state.players[0]!.resources.wood).toBe(wood)
     })
+})
+
+describe('ae-negative-15-reserve', () => {
+  const { CARD, sessions, save, ok, setup, turn, start, menu, choose, bonus } = audit15Reserve
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A136 N1 real final harvest offers each target one two or three sets without spending reserves',()=>{const s=setup([1,2,3]);let r=start(s);const outputs=[];for(const[owner,count,expected]of [[0,1,1],[1,2,3],[2,3,5]]){menu(r,owner!,count!);const before=r.state.players[owner!]!.resources;const snapshot={wood:before.wood,clay:before.clay,reed:before.reed,stone:before.stone};r=choose(s,r,count!);assert.equal(bonus(r,owner!),expected);const p=r.state.players[owner!]!;assert.deepEqual({wood:p.resources.wood,clay:p.resources.clay,reed:p.resources.reed,stone:p.resources.stone},snapshot);outputs.push(r)}assert.equal(r.interaction.stateId,'gameover');save('A136-N1',outputs)})
+  it('A136 N2 missing any one building resource suppresses sets and zero choice gives no bonus',()=>{for(const missing of ['wood','clay','reed','stone'] as const){const s=setup([2,0,0],state=>state.players[0]!.resources[missing]=0);let r=start(s);if(r.interaction.stateId==='wait'&&r.interaction.promptKey==='ui.cards.A136_DrudgeryReeve.prompt')r=choose(s,r,0);assert.equal(bonus(r,0),0);save(`A136-N2-${missing}`,r)}const s=setup([2,0,0]);let r=start(s);menu(r,0,2);r=choose(s,r,0);assert.equal(bonus(r,0),0);assert.equal(r.state.players[0]!.cardStates[CARD]?.extraData?.scoringReserveBonus,undefined);save('A136-N2-zero',r)})
+  it('A136 N3 negative excessive unknown and wrong actor choices reject before a legal selection',()=>{const s=setup([1,0,0]);let r=start(s);menu(r,0,1);for(const value of [`${CARD}:sets:-1`,`${CARD}:sets:2`,`${CARD}:sets:99`,'unknown'])assertRejectedUnchanged(s,()=>s.resolveChoice(0,value));assertRejectedUnchanged(s,()=>s.resolveChoice(1,`${CARD}:sets:1`));r=choose(s,r,1);assert.equal(bonus(r,0),1);assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${CARD}:sets:1`));save('A136-N3',r)})
+  it('A136 N4 another scoring reservation reduces max and cannot double count resource sets',()=>{const s=setup([3,0,0],state=>{const p=state.players[0]!;p.cardStates['__test_previous_scoring_reservation__']={extraData:{scoringReserveBonus:{reserved:{wood:2},score:1,cardType:'occupation'}}}});let r=start(s);menu(r,0,1);assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${CARD}:sets:2`));r=choose(s,r,1);assert.equal(bonus(r,0),1);save('A136-N4',r)})
+  it('A136 N5 unplayed card never offers shared scoring even with reserve sets',()=>{const s=setup([1,2,3],undefined,false);const r=start(s);assert.equal(r.interaction.stateId,'gameover');for(const i of [0,1,2])assert.equal(bonus(r,i),0);save('A136-N5',r)})
+  it('A136 N6 real play at remaining round thresholds gains exact wood once and undo permits retry',()=>{for(const[left,wood]of [[0,0],[1,1],[2,1],[3,2],[5,2],[6,3],[8,3],[9,4]]){const s=setup([0,0,0],undefined,false,14-left!);function play(){let r=turn(s,0,'lessons');if(!r.state.players[0]!.occupationPlayed.includes(CARD))r=ok(s.resolveChoice(0,CARD));return r}const first=play();assert.equal(first.state.players[0]!.resources.wood,wood);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);const retry=play();assert.equal(retry.state.players[0]!.resources.wood,wood);save(`A136-N6-${left}`,{first,undone,retry})}})
 })

@@ -1,5 +1,5 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
@@ -10,6 +10,9 @@ import '../../shared/cards/D/D098_Transactor'
 import '../../shared/cards/D/D146_Porter'
 import '../../shared/cards/B/B162_ForestClearer'
 import '../../shared/cards/A/A142_Cordmaker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit46Final from './_helpers/audit/ae-negative-46-final'
 
 const CARD_ID = 'D098_Transactor'
 const FOLLOW_UP_CARD = 'TEST_D098FollowUp'
@@ -226,4 +229,11 @@ describe('D098 Transactor final-harvest choice', () => {
     expect(['select-trigger', 'choice']).toContain(undone.interaction.request.kind)
     expect(undone.interaction.request.options.some(option => option.value !== '__skip__')).toBe(true)
   })
+})
+
+describe('ae-negative-46-final', () => {
+  const { TRANSACTOR, sessions, save, ok, choose, finish, lesson, bonus, progress, trigger, piles, transactor } = audit46Final
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D098 N1 actual purchase grants no early goods and final before harvest acceptance drains all four building piles while food and sheep remain',()=>{const s=transactor(14,false),bought=lesson(s,TRANSACTOR);assert.deepEqual(Object.fromEntries((['wood','clay','reed','stone'] as const).map(k=>[k,bought.state.players[0]!.resources[k]])),{wood:0,clay:0,reed:0,stone:0});const pending=trigger(s,progress(s,15,TRANSACTOR,['grain-seeds','day-laborer','meeting-place','farmland']),TRANSACTOR);const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__invalid_transactor__')),r=choose(s,pending,o=>o.value!=='__skip__');assert.deepEqual(Object.fromEntries((['wood','clay','reed','stone'] as const).map(k=>[k,r.state.players[0]!.resources[k]])),{wood:2,clay:3,reed:1,stone:4});for(const[id,good]of[['forest','wood'],['clay-pit','clay'],['reed-bank','reed'],['western-quarry','stone']] as const)assert.equal(piles(r)[id]![good],0);assert.equal(piles(r).fishing!.food,3);assert.equal(piles(r)['sheep-market']!.sheep,2);assert.equal(r.state.players[1]!.resources.wood,0);const end=finish(s,r,false);assert.equal(end.state.gameOver,true);save('D098-N1',{bought,pending,bad,r,end})})
+  it('D098 N2 decline leaves all building piles and round thirteen harvest or a card in hand does not collect them',()=>{const s=transactor(),pending=trigger(s,progress(s,15,TRANSACTOR,['grain-seeds','day-laborer','meeting-place','farmland']),TRANSACTOR),r=finish(s,ok(s.resolveChoice(0,'__skip__')));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(piles(r).forest!.wood,2);assert.equal(piles(r)['clay-pit']!.clay,3);for(const mode of['early','hand']){const t=transactor(mode==='early'?13:14,mode!=='hand'),end=progress(t,mode==='early'?14:15,'',['grain-seeds','day-laborer','meeting-place','farmland']);assert.equal(end.state.players[0]!.resources.wood,0);assert.equal(bonus(end,TRANSACTOR),0);save(`D098-N2-${mode}`,end)}save('D098-N2',{pending,r})})
 })

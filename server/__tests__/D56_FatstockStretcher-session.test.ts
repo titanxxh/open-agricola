@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/D/D056_FatstockStretcher'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Cooking from './_helpers/audit/ae-negative-38-cooking'
 
 describe('D056_FatstockStretcher session', () => {
   const setup = () => {
@@ -158,4 +161,32 @@ describe('D056_FatstockStretcher session', () => {
     // Total = 5 + 1 = 6
     expect(player.resources.food).toBe(6)
   })
+})
+
+describe('ae-negative-38-cooking', () => {
+  const { sessions, save, make, finish, buy, animal, cooked, cook } = audit38Cooking
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D056 N1 actual one wood purchase and public cooking two sheep or one pig gain exactly one additional food per animal', () => {
+      const b = cooked('D056_FatstockStretcher', false), bought = finish(b, buy(b, 'D056_FatstockStretcher'));
+      assert.equal(bought.state.players[0]!.resources.wood, 0);
+      const rows = [];
+      for (const [type, n, food] of [['sheep', 2, 106], ['boar', 1, 103]] as const) {
+          const s = cooked('D056_FatstockStretcher', true, type, n), r = cook(s, type, n);
+          assert.deepEqual([r.state.players[0]!.resources[type], r.state.players[0]!.resources.food], [0, food]);
+          rows.push(r);
+      }
+      save('D056-N1', { bought, rows });
+  });
+  it('D056 N2 cattle vegetables and a noncooking Sheep Walker exchange exclude the additional food', () => {
+      const rows = [];
+      for (const [type, food] of [['cattle', 103], ['vegetable', 102]] as const) {
+          const s = cooked('D056_FatstockStretcher', true, type), r = cook(s, type);
+          assert.equal(r.state.players[0]!.resources.food, food);
+          rows.push(r);
+      }
+      const s = make('D056_FatstockStretcher', true, state => { state.players[0]!.occupationPlayed = ['B104_SheepWalker']; animal(state, 'sheep'); }), r = cook(s, 'sheep', 1, 'B104_SheepWalker');
+      assert.deepEqual([r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.food, r.state.players[0]!.resources.stone], [0, 100, 1]);
+      save('D056-N2', { rows, r });
+  });
+  it('D056 N3 held Stretcher and unavailable purchase wood cannot create additional food and a no animal exchange cannot pay twice', () => { const s = cooked('D056_FatstockStretcher', false), hand = cook(s, 'sheep'); assert.equal(hand.state.players[0]!.resources.food, 102); const t = make('D056_FatstockStretcher', false), p = buy(t, 'D056_FatstockStretcher'), bad = assertRejectedUnchanged(t, () => t.resolveChoice(0, 'D056_FatstockStretcher')); const q = cooked('D056_FatstockStretcher'), once = cook(q, 'sheep'), twice = q.takeAnytimeAction(0, 'exchange'); assert.equal(twice.ok, false); assert.equal(twice.state.players[0]!.resources.food, 103); save('D056-N3', { hand, p, bad, once, twice }); });
 })

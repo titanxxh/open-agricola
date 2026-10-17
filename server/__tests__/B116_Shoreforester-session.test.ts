@@ -1,11 +1,13 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B116_Shoreforester'
 import '../../shared/cards/C/C125_Nightworker'
+import assert from 'node:assert/strict'
+import * as audit27Endphase from './_helpers/audit/ae-negative-27-endphase'
 
 const CARD_ID = 'B116_Shoreforester'
 
@@ -224,4 +226,13 @@ describe('B116_Shoreforester session', () => {
     expect(collected!.seq).toBeLessThan(workStarted!.seq)
     expect(resp.scores.map((score) => score.total)).toEqual(beforeScoreTotals)
   })
+})
+
+describe('ae-negative-27-endphase', () => {
+  const { SHORE, sessions, save, ok, finish, make, transition, lesson } = audit27Endphase
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B116 N1 real first Lessons grants exactly one immediate wood without waiting for preparation',()=>{const s=make(SHORE,false),a=lesson(s,SHORE);assert.equal(a.r.state.players[0]!.resources.wood,1);assert.equal(a.r.state.players[1]!.resources.wood,0);assert.equal(a.r.state.round,8);save('B116-N1',a)})
+  it('B116 N2 natural preparation adds one wood only when the original Reed Bank pile was empty',()=>{for(const reed of[0,1,3]){const s=make(SHORE,true,reed),c=make(SHORE,false,reed),r=transition(s),control=transition(c);assert.equal(r.state.players[0]!.resources.wood,control.state.players[0]!.resources.wood+(reed===0?1:0));assert.equal(r.state.actionSpaces.find(a=>a.id==='reed-bank')!.resources.reed,reed+1);save(`B116-N2-${reed}`,{r,control})}})
+  it('B116 N3 card in hand and midround empty Reed Bank do not grant preparation wood',()=>{const s=make(SHORE,false),r=transition(s),c=transition(make(SHORE,false));assert.equal(r.state.players[0]!.resources.wood,c.state.players[0]!.resources.wood);const other=make(SHORE),before=ok(other.getState()),after=finish(other,ok(other.takeAction(0,'grain-seeds')),false);assert.equal(after.state.players[0]!.resources.wood,before.state.players[0]!.resources.wood);save('B116-N3',{r,c,before,after})})
+  it('B116 N4 whole real occupation undo restores the immediate wood and hand before exactly one replay',()=>{const s=make(SHORE,false),a=lesson(s,SHORE),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.ok(undone.state.players[0]!.occupationHand.includes(SHORE));const retry=lesson(s,SHORE);assert.equal(retry.r.state.players[0]!.resources.wood,1);save('B116-N4',{a,undone,retry})})
 })

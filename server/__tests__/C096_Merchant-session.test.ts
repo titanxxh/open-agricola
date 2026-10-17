@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C096_Merchant'
 import '../../shared/cards/C/C069_LandConsolidation'
 import '../../shared/cards/A/A068_AsparagusGift'
+import * as audit45Merchant from './_helpers/audit/ae-negative-45-merchant'
 
 const CARD_ID = 'C096_Merchant'
 
@@ -141,5 +142,54 @@ describe('C096 Merchant parity', () => {
     expect(response.state.players[0]!.improvements).toContain(MAJOR_ID)
     expect(response.state.players[0]!.minorPlayed).not.toContain(FIRST_MINOR)
     expect(response.state.players[0]!.resources.food).toBe(1)
+  })
+})
+
+describe('ae-negative-45-merchant', () => {
+  const { CARD_ID, FIRST_MINOR, SECOND_MINOR, MAJOR_ID, options, setup, playOccupation, chooseImprovement, acceptMerchant, sessions, it, actorOf } = audit45Merchant
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('C096 Merchant parity', () => {
+    it('C096 S1: Merchant is played as the first occupation', () => {
+      const response = playOccupation(setup({ played: false, food: 0 }))
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    })
+    it('C096 S2: after a Major or Minor Improvement action one food buys a second improvement action', () => {
+      const session = setup({ minors: [FIRST_MINOR] })
+      let response = chooseImprovement(session, session.takeAction(0, 'major-improvement'), MAJOR_ID)
+      response = chooseImprovement(session, acceptMerchant(session, response), FIRST_MINOR)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.improvements).toContain(MAJOR_ID)
+      expect(response.state.players[0]!.minorPlayed).toContain(FIRST_MINOR)
+      expect(response.state.players[0]!.resources.food).toBe(0)
+    })
+    it('C096 S3: after a Minor Improvement action the second action remains minor-only', () => {
+      const session = setup({ minors: [FIRST_MINOR, SECOND_MINOR], field: true })
+      let response = chooseImprovement(session, session.takeAction(0, 'meeting-place'), FIRST_MINOR)
+      response = acceptMerchant(session, response)
+      expect(options(response).map((option) => option.value)).not.toContain(MAJOR_ID)
+      response = chooseImprovement(session, response, SECOND_MINOR)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.minorPlayed).toEqual(expect.arrayContaining([
+        FIRST_MINOR, SECOND_MINOR,
+      ]))
+      expect(response.state.players[0]!.improvements).not.toContain(MAJOR_ID)
+      expect(response.state.players[0]!.resources.food).toBe(0)
+    })
+    it('C096 S4: declining Merchant keeps the food and builds only the first improvement', () => {
+      const session = setup({ minors: [FIRST_MINOR] })
+      let response = chooseImprovement(session, session.takeAction(0, 'major-improvement'), MAJOR_ID)
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId === 'wait') {
+        expect(options(response).map((option) => option.value)).toContain('__skip__')
+        response = session.resolveChoice(actorOf(response), '__skip__')
+      }
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.improvements).toContain(MAJOR_ID)
+      expect(response.state.players[0]!.minorPlayed).not.toContain(FIRST_MINOR)
+      expect(response.state.players[0]!.resources.food).toBe(1)
+    })
+    it('C096 N5 zero food builds only the first improvement and preserves the second card', () => { const session = setup({ food: 0, minors: [FIRST_MINOR] }); const r = chooseImprovement(session, session.takeAction(0, 'major-improvement'), MAJOR_ID); expect(r.ok, r.error).toBe(true); expect(r.state.players[0]!.improvements).toContain(MAJOR_ID); expect(r.state.players[0]!.minorHand).toContain(FIRST_MINOR); expect(r.state.players[0]!.resources.food).toBe(0); expect(r.interaction.stateId === 'wait' ? r.interaction.sourceCard : undefined).not.toBe(CARD_ID); })
+    it('C096 N6 ample food still allows only one repeat with a third affordable card left in hand', () => { const session = setup({ food: 2, minors: [FIRST_MINOR, SECOND_MINOR], field: true }); let r = chooseImprovement(session, session.takeAction(0, 'major-improvement'), MAJOR_ID); r = chooseImprovement(session, acceptMerchant(session, r), FIRST_MINOR); expect(r.ok, r.error).toBe(true); expect(r.state.players[0]!.improvements).toContain(MAJOR_ID); expect(r.state.players[0]!.minorPlayed).toContain(FIRST_MINOR); expect(r.state.players[0]!.minorHand).toContain(SECOND_MINOR); expect(r.state.players[0]!.resources.food).toBe(1); expect(r.interaction.stateId === 'wait' ? r.interaction.sourceCard : undefined).not.toBe(CARD_ID); })
   })
 })

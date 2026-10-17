@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/E/E066_BarnShed'
+import assert from 'node:assert/strict'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'E066_BarnShed'
 const FILLER = '__test_placeholder__'
@@ -171,4 +173,27 @@ describe('E066 Barn Shed parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, ok, save, setup, finish, take, prerequisites, hand, buy, noSource, printed, denyMinor } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E066 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'E066_BarnShed'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "wood": 2 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.resources.wood, 0); save("E066-N1-legal", r); const t = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); denyMinor(t, card); save("E066-N1-short", t.getState()); const excluded = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "wood": 2 }); prerequisites(st, 2); }); denyMinor(excluded, card); save("E066-N1-prerequisite", excluded.getState()); });
+  it('E066 N2 actual opponent Forest grants one grain per use regardless pile size', () => { for (const n of [1, 3]) {
+      const card = 'E066_BarnShed', s = setup(card, 14, st => { st.currentPlayerIndex = 1; st.actionSpaces.find(a => a.id === 'forest')!.resources.wood = n; });
+      const r = finish(s, ok(s.takeAction(1, 'forest')));
+      assert.equal(r.state.players[0]!.resources.grain, 1);
+      assert.equal(r.state.players[1]!.resources.wood, n);
+      save(`E066-N2-${n}`, r);
+  } });
+  it('E066 N3 own Forest hand and another actual resource space cannot trigger owner grain', () => { for (const mode of ['own', 'hand', 'other']) {
+      const card = 'E066_BarnShed', s = setup(card, 14, st => { if (mode === 'hand')
+          hand(st, card); if (mode !== 'own')
+          st.currentPlayerIndex = 1; });
+      const r = finish(s, ok(s.takeAction(mode === 'own' ? 0 : 1, mode === 'other' ? 'reed-bank' : 'forest')));
+      assert.equal(r.state.players[0]!.resources.grain, 0);
+      noSource(r, card);
+      save(`E066-N3-${mode}`, r);
+  } });
+  it('E066 N4 printed solo exception grants grain for the owners actual Forest action', () => { const card = 'E066_BarnShed', s = setup(card, 14, () => { }, 1); const r = finish(s, take(s, 'forest')); assert.equal(r.state.players.length, 1); assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.resources.wood, 3); save('E066-N4', r); });
 })

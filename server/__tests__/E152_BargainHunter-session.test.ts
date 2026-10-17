@@ -1,11 +1,13 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E047_SyrupTap'
 import '../../shared/cards/E/E152_BargainHunter'
+import assert from 'node:assert/strict'
+import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
 
 const CARD_ID = 'E152_BargainHunter'
 const MINOR_ID = 'E047_SyrupTap'
@@ -142,4 +144,11 @@ describe('E152 Bargain Hunter parity', () => {
     expect(undone.state.players[0]!.resources.food).toBe(1)
     expect(travelingFood(undone)).toBe(3)
   })
+})
+
+describe('ae-negative-55-phase', () => {
+  const { sessions, save, make, finish, enter, choose, end } = audit55Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E152 N1 natural round start puts one food on Traveling Players then buys Milk Jug by paying one clay before anyone works',()=>{const s=make('E152_BargainHunter',st=>{st.players[0]!.resources.clay=1;st.players[0]!.minorHand=['A050_MilkJug','B004_WoodPile'];st.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food=2;},true,5);let p=end(s);p=enter(s,p,o=>o.value==='A050_MilkJug');const r=finish(s,choose(s,p,o=>o.value==='A050_MilkJug'));assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.food,99);assert.equal(r.state.players[0]!.resources.clay,0);assert.ok(r.state.players[0]!.minorPlayed.includes('A050_MilkJug'));assert.equal(r.state.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food,4);assert.equal(r.state.actionSpaces.find(a=>a.id==='traveling-players')!.takenBy.length,0);save('E152-N1',{p,r})})
+  it('E152 N2 natural round-start decline no food and card only in hand keep minor unplayed and transfer no food to Traveling Players',()=>{for(const mode of['decline','food','hand']){const s=make('E152_BargainHunter',st=>{st.players[0]!.resources.food=mode==='food'?0:100;st.players[0]!.resources.clay=1;st.players[0]!.minorHand=['A050_MilkJug','B004_WoodPile'];st.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food=2;},mode!=='hand',5),r=finish(s,end(s),mode!=='decline');assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.food,mode==='food'?0:100);assert.equal(r.state.players[0]!.resources.clay,1);assert.ok(r.state.players[0]!.minorHand.includes('A050_MilkJug'));assert.equal(r.state.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food,3);save(`E152-N2-${mode}`,r)}})
 })

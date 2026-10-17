@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/E/E163_Patroness'
 import '../../shared/cards/A/A123_FrameBuilder'
+import assert from 'node:assert/strict'
+import * as audit57Resources from './_helpers/audit/ae-negative-57-resources'
 
 const CARD_ID = 'E163_Patroness'
 
@@ -119,5 +121,29 @@ describe('E163 Patroness parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({
       wood: 0, clay: 0, reed: 0, stone: 0,
     })
+  })
+})
+
+describe('ae-negative-57-resources', () => {
+  const { sessions, ok, gainOf, save, make, finish, play, choose, buildings } = audit57Resources
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E163 N1 actual Patroness purchase grants no resource and a later paid occupation grants exactly one chosen building resource', () => {
+    for (const resource of ['wood', 'clay', 'reed', 'stone'] as const) {
+      const first = make('E163_Patroness', undefined, false), played = finish(first, play(first, 'E163_Patroness'))
+      assert.deepEqual(buildings(played), { wood: 0, clay: 0, reed: 0, stone: 0 })
+      const session = make('E163_Patroness', state => { state.players[0]!.occupationHand = ['A110_Roughcaster', 'A125_Priest'] }), pending = play(session, 'A110_Roughcaster'), response = finish(session, choose(session, pending, option => gainOf(option)?.[resource] === 1))
+      assert.deepEqual(buildings(response), { wood: resource === 'wood' ? 1 : 0, clay: resource === 'clay' ? 1 : 0, reed: resource === 'reed' ? 1 : 0, stone: resource === 'stone' ? 1 : 0 })
+      assert.equal(response.state.players[0]!.resources.food, 99)
+      save(`E163-N1-${resource}`, { played, pending, response })
+    }
+  })
+  it('E163 N2 opponent occupation unrelated grain collection and card only in hand cannot grant owner building resources', () => {
+    for (const mode of ['opponent', 'unrelated', 'hand']) {
+      const session = make('E163_Patroness', state => { if (mode === 'opponent') { state.currentPlayerIndex = 1; state.players[1]!.occupationHand = ['A110_Roughcaster'] } }, mode !== 'hand')
+      if (mode === 'hand') assert.ok(session.getState().state.players[0]!.occupationHand.includes('E163_Patroness'))
+      const response = mode === 'opponent' ? finish(session, ok(session.takeAction(1, 'lessons')), true) : mode === 'hand' ? finish(session, play(session, 'A110_Roughcaster'), true) : finish(session, ok(session.takeAction(0, 'grain-seeds')), true)
+      assert.deepEqual(buildings(response), { wood: 0, clay: 0, reed: 0, stone: 0 })
+      save(`E163-N2-${mode}`, response)
+    }
   })
 })

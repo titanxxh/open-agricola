@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D052_RollingPin'
+import assert from 'node:assert/strict'
+import { confirmNext } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'D052_RollingPin'
 const FILLER = '__test_placeholder__'
@@ -124,4 +127,45 @@ describe('D052 Rolling Pin parity', () => {
       expect(response.state.players[0]!.resources.food).toBe(20)
     },
   )
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, finish, completeRound, take, move, prerequisites, hand, buy, noSource, printed, denyMinor } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D052 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'D052_RollingPin', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 1); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.resources.wood, 0); save('D052-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 1); Object.assign(st.players[0]!.resources, { "wood": 0 }); }); denyMinor(t, card); save('D052-N1-short', t.getState()); const excluded = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); denyMinor(excluded, card); save('D052-N1-prerequisite', excluded.getState()); });
+  it('D052 N2 strict supply clay majority grants one food at each real return home and never in midround', () => {
+      for (const [clay, wood] of [[1, 0], [4, 4], [3, 4]]) {
+          const card = 'D052_RollingPin', s = setup(card, 5, st => Object.assign(st.players[0]!.resources, { clay, wood }));
+          let r = finish(s, completeRound(s, ['grain-seeds', 'forest', 'reed-bank', 'clay-pit']));
+          assert.equal(r.state.round, 6);
+          assert.equal(r.state.players[0]!.resources.food, clay > wood ? 41 : 40);
+          save(`D052-N2-${clay}-${wood}`, r);
+          r = finish(s, completeRound(s, ['grain-seeds', 'forest', 'reed-bank', 'clay-pit']));
+          assert.equal(r.state.round, 7);
+          assert.equal(r.state.players[0]!.resources.food, clay > wood ? 42 : 40);
+          save(`D052-N2-repeat-${clay}-${wood}`, r);
+      }
+  });
+  it('D052 N3 a hand card or equal supply cannot gain food from a clay board pile', () => {
+      for (const mode of ['hand', 'board']) {
+          const card = 'D052_RollingPin', s = setup(card, 5, st => {
+              if (mode === 'hand') {
+                  hand(st, card);
+                  st.players[0]!.resources.clay = 5;
+              }
+              st.actionSpaces.find(a => a.id === 'clay-pit')!.resources.clay = 9;
+          });
+          let r = take(s, 'grain-seeds');
+          noSource(r, card);
+          assert.equal(r.state.players[0]!.resources.food, 40);
+          finish(s, r);
+          move(s, 'forest');
+          move(s, 'reed-bank');
+          move(s, 'clay-pit');
+          r = finish(s, confirmNext(s, s.getState()));
+          assert.equal(r.state.round, 6);
+          assert.equal(r.state.players[0]!.resources.food, 40);
+          save(`D052-N3-${mode}`, r);
+      }
+  });
 })

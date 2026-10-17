@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E007_Pumpernickel'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit25Immediate from './_helpers/audit/ae-negative-25-immediate'
 
 const CARD_ID = 'E007_Pumpernickel'
 
@@ -66,4 +69,12 @@ describe('E007 Pumpernickel native session', () => {
     }))
     expect(response.scores[0]!.total).toBe(scoreBefore - 2)
   })
+})
+
+describe('ae-negative-25-immediate', () => {
+  const { BREAD, sessions, save, ok, ready, finish, menu, buy, make } = audit25Immediate
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E007 N1 actual passing purchase pays one grain and gains exactly four food without changing opponent',()=>{const s=make(BREAD,2),a=buy(s,BREAD);assert.equal(a.r.state.players[0]!.resources.grain,1);assert.equal(a.r.state.players[0]!.resources.food,104);assert.equal(a.r.state.players[1]!.resources.food,100);save('E007-N1',a)})
+  it('E007 N2 zero grain rejects before a free alternative and unrelated action with card in hand gives no food',()=>{const s=make(BREAD,0),pending=menu(s),error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,BREAD)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(r.state.players[0]!.resources.food,100);assert.ok(r.state.players[0]!.minorHand.includes(BREAD));save('E007-N2-reject',{pending,error,r});const ss=make(BREAD,1);ready(ss);const other=finish(ss,ok(ss.takeAction(0,'reed-bank')),false);assert.equal(other.state.players[0]!.resources.food,100);assert.equal(other.state.players[0]!.resources.grain,1);save('E007-N2-hand',other)})
+  it('E007 N3 whole purchase undo restores grain food and original hand and replay grants exactly once',()=>{const s=make(BREAD,1),a=buy(s,BREAD),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,1);assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.minorHand.includes(BREAD));const retry=buy(s,BREAD);assert.equal(retry.r.state.players[0]!.resources.grain,0);assert.equal(retry.r.state.players[0]!.resources.food,104);save('E007-N3',{a,undone,retry})})
 })

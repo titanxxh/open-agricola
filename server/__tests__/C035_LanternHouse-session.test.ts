@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C035_LanternHouse'
 import '../../shared/cards/B/B146_Illusionist'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit34Scoring from './_helpers/audit/ae-negative-34-scoring'
 
 const CARD_ID = 'C035_LanternHouse'
 
@@ -147,4 +150,30 @@ describe('C035 Lantern House parity', () => {
     expect(response.state.players[0]!.minorHand).toEqual([FILLER])
     expect(options(response).some((option) => option.sourceCard === 'B146_Illusionist')).toBe(false)
   })
+})
+
+describe('ae-negative-34-scoring', () => {
+  const { sessions, actor, save, setup, choose, finish, next, lesson, take, move, prerequisites, hand, buy, noSource, accept, bonus, printed, finishGame, denyMinor, completeRemaining } = audit34Scoring
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C035 N1 real printed purchase pays exact cost and excludes insufficient resources or prerequisite', () => { const card = 'C035_LanternHouse', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { food: 40, wood: 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 7); assert.equal(r.state.players[0]!.resources.wood, 0); save('C035-N1-legal', r); {
+      const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); st.players[0]!.houseType = 'wood'; Object.assign(st.players[0]!.resources, { food: 40, wood: 0 }); });
+      const q = denyMinor(t, card);
+      assert.equal(printed(q, card), 0);
+      save('C035-N1-resource', q);
+  } {
+      const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 1); st.players[0]!.houseType = 'wood'; Object.assign(st.players[0]!.resources, { food: 40, wood: 1 }); });
+      const q = denyMinor(t, card);
+      assert.equal(printed(q, card), 0);
+      save('C035-N1-occupation', q);
+  } });
+  it('C035 N2 real final scoring subtracts exactly every remaining hand card from seven printed points', () => { for (const n of [2, 3, 5]) {
+      const card = 'C035_LanternHouse', s = setup(card, 14, st => { st.players[0]!.minorHand = ['E050_WildGreens', 'B004_WoodPile', 'E032_Nave', 'E034_LandRegister'].slice(0, n - 1); st.players[0]!.occupationHand = ['A125_Priest']; });
+      const r = finishGame(s);
+      assert.equal(printed(r, card), 7);
+      assert.equal(bonus(r, card), -n);
+      assert.equal(r.state.players[0]!.minorHand.length + r.state.players[0]!.occupationHand.length, n);
+      save(`C035-N2-${n}`, r);
+  } });
+  it('C035 N3 real Illusionist discard is accepted without Lantern and prevented after actual Lantern purchase', () => { const card = 'C035_LanternHouse', control = setup(card, 14, st => { hand(st, card); st.players[0]!.minorHand.push('E050_WildGreens'); st.players[0]!.occupationPlayed = ['B146_Illusionist']; }); let r = take(control, 'forest'); r = accept(control, r, 'B146_Illusionist'); r = choose(control, r, o => o.value === 'min:E050_WildGreens'); r = finish(control, r, true); assert.equal(r.state.players[0]!.resources.wood, 4); assert.ok(!r.state.players[0]!.minorHand.includes('E050_WildGreens')); save('C035-N3-legal-discard', r); const s = setup(card, 5, st => { hand(st, card); st.players[0]!.minorHand.push('E050_WildGreens'); st.players[0]!.occupationHand = ['B146_Illusionist']; st.players[0]!.resources.wood = 1; }); r = finish(s, buy(s, card)); move(s, 'grain-seeds'); move(s, 'day-laborer'); next(s); r = finish(s, lesson(s, 'B146_Illusionist')); r = finish(s, completeRemaining(s)); assert.equal(r.state.round, 6); r = take(s, 'forest'); noSource(r, 'B146_Illusionist'); assertRejectedUnchanged(s, () => s.resolveChoice(actor(r), 'min:E050_WildGreens')); r = finish(s, r, true); assert.ok(r.state.players[0]!.minorHand.includes('E050_WildGreens')); assert.equal(r.state.players[0]!.resources.wood, 3); save('C035-N3-blocked', r); });
+  it('C035 N4 actual play consumes the last minor and occupation so empty hand has no penalty', () => { const card = 'C035_LanternHouse', s = setup(card, 14, st => { hand(st, card); st.players[0]!.occupationHand = ['A125_Priest']; st.players[0]!.resources.wood = 1; }); finish(s, buy(s, card)); move(s, 'forest'); move(s, 'clay-pit'); next(s); let r = finish(s, lesson(s, 'A125_Priest')); assert.deepEqual(r.state.players[0]!.minorHand, []); assert.deepEqual(r.state.players[0]!.occupationHand, []); r = finish(s, completeRemaining(s), true); assert.ok(r.state.gameOver); assert.equal(printed(r, card), 7); assert.equal(bonus(r, card), 0); save('C035-N4', r); });
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -7,6 +7,9 @@ import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from
 import '../../shared/cards/A/A023_StoneCompany'
 import '../../shared/cards/A/A057_MilkingParlor'
 import '../../shared/cards/E/E047_SyrupTap'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Actions from './_helpers/audit/ae-negative-06-actions'
 
 const CARD_ID = 'A023_StoneCompany'
 const STONE_MINOR = 'E047_SyrupTap'
@@ -207,5 +210,47 @@ describe('A023 Stone Company parity', () => {
       response.state.players[0]!.minorPlayed.includes(STONE_FREE_MINOR)
       || optionValues(response).includes(STONE_FREE_MINOR),
     ).toBe(false)
+  })
+})
+
+describe('ae-negative-06-actions', () => {
+  const { A023, TAP, PARLOR, FREE, sessions, setup, ok, opts, choose, turn, buy, denied, quarry, improvement } = audit06Actions
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A023 N1 clay or reed fee shortage rejects forged purchase before exact-cost control', () => {
+    for (const resources of [{ clay: 1, reed: 1 }, { clay: 2, reed: 0 }]) denied(setup({ played: false, resources }), A023)
+    const s = setup({ played: false, resources: { clay: 2, reed: 1 } }); const r = buy(s, A023)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(A023)); assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.resources.reed, 0)
+  })
+  it('A023 N2 Stonecutter purchase must still actually spend one stone at Quarry', () => {
+    const s = setup({ players: 3, hand: [TAP], occupations: ['A143_Stonecutter'], resources: { wood: 2 } })
+    const r = improvement(s, quarry(s)); assert.ok(r.state.players[0]!.minorPlayed.includes(TAP)); assert.equal(r.state.players[0]!.resources.wood, 1); assert.equal(r.state.players[0]!.resources.stone, 0)
+  })
+  it('A023 N3 stone-free card is absent and forged native purchase rejects before legal retry', () => {
+    const s = setup({ hand: [TAP, PARLOR, FREE], resources: { wood: 3 } })
+    const r = choose(s, quarry(s), o => o.value !== '__skip__')
+    assert.equal(opts(r).some(o => o.value === FREE && !o.disabled), false)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, FREE))
+    const done = choose(s, s.getState(), o => o.value === TAP)
+    assert.equal(done.state.players[0]!.resources.wood, 2); assert.equal(done.state.players[0]!.resources.stone, 0); assert.ok(done.state.players[0]!.minorHand.includes(FREE))
+  })
+  it('A023 N4 no affordable stone-paying improvement leaves no accepting branch', () => {
+    const s = setup({ hand: [TAP] }); const r = quarry(s)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player', JSON.stringify(r.interaction))
+    assert.equal(r.state.players[0]!.resources.stone, 1); assert.ok(r.state.players[0]!.minorHand.includes(TAP))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TAP))
+  })
+  it('A023 N5 decline undo and stale purchase cannot duplicate Quarry improvement', () => {
+    const s = setup({ hand: [TAP], resources: { wood: 2 } }); const before = undoRuleSnapshot(s.getState())
+    quarry(s); ok(s.resolveChoice(0, '__skip__')); assert.equal(s.getState().state.players[0]!.resources.stone, 1); assert.ok(s.getState().state.players[0]!.minorHand.includes(TAP))
+    assertUndoRestored(before, s.undoAction()); const r = improvement(s, quarry(s))
+    assert.equal(r.state.players[0]!.resources.stone, 0); assert.equal(r.state.players[0]!.resources.wood, 1)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TAP)); assert.equal(r.scores?.length, 2)
+  })
+  it('A023 N6 nonquarry stone and opponent Quarry do not grant owner improvement', () => {
+    const market = setup({ players: 4, hand: [TAP], resources: { wood: 2 } }); const non = turn(market, 0, 'resource-market-4')
+    assert.equal(non.state.players[0]!.resources.stone, 1); assert.ok(non.state.players[0]!.minorHand.includes(TAP)); assert.equal(non.state.players[0]!.minorPlayed.includes(TAP), false)
+    const s = setup({ hand: [TAP], opponentHand: [PARLOR], resources: { wood: 2 }, opponent: { wood: 2 } }); turn(s, 0, 'forest'); const r = turn(s, 1, 'western-quarry')
+    assert.ok(r.state.players[0]!.minorHand.includes(TAP)); assert.ok(r.state.players[1]!.minorHand.includes(PARLOR)); assert.equal(r.state.players[1]!.resources.stone, 1)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
   })
 })

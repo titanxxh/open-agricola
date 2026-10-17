@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,9 @@ import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 import '../../shared/cards/E/E084_DollysMother'
 import '../../shared/cards/A/A084_Silage'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Harvest from './_helpers/audit/ae-negative-43-harvest'
 
 const CARD_ID = 'E084_DollysMother'
 const FILLER = '__test_placeholder__'
@@ -198,4 +201,13 @@ describe("E084 Dolly's Mother parity", () => {
     expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
   })
+})
+
+describe('ae-negative-43-harvest', () => {
+  const { RYE, DOLLY, sessions, save, ok, make, menu, purchase, yard, nextRound } = audit43Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E084 N1 sheep prerequisite permits real one point purchase and no sheep refuses before legal alternative',()=>{const s=make(DOLLY,false,state=>yard(state)),a=purchase(s,DOLLY);assert.equal(a.r.state.players[0]!.resources.sheep,1);assert.equal(a.r.scores![0]!.categories.find(c=>c.key==='cards')?.entries.find(e=>'cardId'in e&&e.cardId===DOLLY)?.score,1);const t=make(DOLLY,false),pending=menu(t),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,DOLLY)),legal=ok(t.resolveChoice(0,'B004_WoodPile'));assert.ok(legal.state.players[0]!.minorHand.includes(DOLLY));save('E084-N1',{a,pending,bad,legal})})
+  it('E084 N2 actual animal reorganization rejects two sheep or boar on one sheep card before legal card and room housing',()=>{for(const type of['sheep','boar'] as const){const s=make(DOLLY,true,state=>{yard(state,1);state.actionSpaces.find(a=>a.id===(type==='sheep'?'sheep-market':'pig-market'))!.resources[type]=1}),pending=ok(s.takeAction(0,type==='sheep'?'sheep-market':'pig-market'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');const card=pending.interaction.request.zones.find(z=>z.cardId===DOLLY),house=pending.interaction.request.zones.find(z=>z.zoneType==='house');assert.ok(card&&house);const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[{...card,animalType:type,animalCount:type==='sheep'?2:1}]})),r=ok(s.resolveChoice(0,'confirm',{zones:[{...card,animalType:'sheep',animalCount:1},{...house,animalType:type,animalCount:1}]}));assert.equal(r.state.players[0]!.resources.sheep,type==='sheep'?2:1);assert.equal(r.state.players[0]!.resources.boar,type==='boar'?1:0);save(`E084-N2-${type}`,{pending,bad,r})}})
+  it('E084 N3 natural harvest breeds from one sheep only while no sheep remains zero and owner does not affect opponent',()=>{for(const sheep of[0,1]){const s=make(DOLLY,true,state=>yard(state,sheep)),r=nextRound(s,8,false);assert.equal(r.state.players[0]!.resources.sheep,sheep?2:0);assert.equal(r.state.players[1]!.resources.sheep,0);save(`E084-N3-${sheep}`,r)}})
+  it('E084 N4 one sheep cannot breed from Perennial Rye outside the harvest breeding phase',()=>{const s=make(DOLLY,true,state=>{state.round=2;yard(state);state.players[0]!.minorPlayed.push(RYE);state.players[0]!.resources.grain=1}),bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C84-perennial-rye-anytime')),legal=ok(s.takeAction(0,'reed-bank'));assert.equal(legal.state.players[0]!.resources.sheep,1);assert.equal(legal.state.players[0]!.resources.grain,1);save('E084-N4',{bad,legal})})
 })

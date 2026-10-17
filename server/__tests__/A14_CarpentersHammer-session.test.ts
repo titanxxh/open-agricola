@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import assert from 'node:assert/strict'
+import { mkdirSync, writeFileSync } from './_helpers/audit-evidence-fs'
+import type { PlayerState } from '../../shared/contract/types'
+import { assertRejectedUnchanged, assertRuleOutcome, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit05Building from './_helpers/audit/ae-negative-05-building'
 
 const CARD_ID = 'A014_CarpentersHammer'
 
@@ -122,5 +127,67 @@ describe("A014 Carpenter's Hammer parity", () => {
     expect(response.state.players[0]).toMatchObject({
       houseType: 'wood', rooms: 3, resources: { wood: 0, reed: 0 },
     })
+  })
+})
+
+describe('ae-negative-05-building', () => {
+  const { A014, sessions, pair, setup, ok, opts, turn, buy, deniedCard, farm, build, finish } = audit05Building
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A014 N1 zero wood forged purchase rejects and one wood installs discount', () => {
+    deniedCard(setup({ card: A014 }), A014)
+    const s = setup({ card: A014, resources: { wood: 1 } }); const r = buy(s, A014)
+    assert.ok(r.state.players[0]!.minorPlayed.includes(A014)); assert.equal(r.state.players[0]!.resources.wood, 0)
+  })
+  it('A014 N2 three rooms get one total wood clay or stone discount', () => {
+    for (const [house, resource, amount] of [['wood', 'wood', 13], ['clay', 'clay', 12], ['stone', 'stone', 11]] satisfies [PlayerState['houseType'], 'wood' | 'clay' | 'stone', number][]) {
+      const s = setup({ card: A014, played: true, house, resources: { [resource]: amount, reed: 4 } })
+      const r = build(s, [...pair, { row: 0, col: 1 }])
+      assert.equal(r.state.players[0]!.rooms, 5); assert.equal(r.state.players[0]!.resources[resource], 0); assert.equal(r.state.players[0]!.resources.reed, 0)
+      assert.equal(r.scores?.length, 2)
+    }
+  })
+  it('A014 N3 two-room material shortage rejects then one full-price room succeeds', () => {
+    const s = setup({ card: A014, played: true, resources: { wood: 7, reed: 2 } }); farm(s)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: pair }))
+    const r = ok(s.commitSelectionChoice(0, { rooms: [pair[0]!] }))
+    assert.equal(r.state.players[0]!.rooms, 3); assert.equal(r.state.players[0]!.resources.wood, 2); assert.equal(r.state.players[0]!.resources.reed, 0)
+  })
+  it('A014 N4 two-room reed shortage rejects without borrowing total discount twice', () => {
+    const s = setup({ card: A014, played: true, resources: { wood: 8, reed: 1 } })
+    const r = s.takeAction(0, 'farm-expansion'); ok(r)
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'room') assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: pair }))
+    else { assert.equal(opts(r).some(o => o.labelKey === 'actions.construct.name' && !('disabled' in o && o.disabled)), false); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'construct')) }
+    assert.equal(s.getState().state.players[0]!.rooms, 2); assert.equal(s.getState().state.players[0]!.resources.reed, 1)
+    s.undoAction(); farm(s, 0, 'stable'); const done = ok(s.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] })); assert.equal(done.state.players[0]!.resources.wood, 6)
+  })
+  it('A014 N5 occupied disconnected and duplicate room plans reject before legal pair', () => {
+    const s = setup({ card: A014, played: true, resources: { wood: 8, reed: 2 } }); farm(s)
+    for (const rooms of [[{ row: 1, col: 0 }, pair[0]!], [{ row: 0, col: 4 }, { row: 1, col: 4 }]]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms }))
+    const r = ok(s.commitSelectionChoice(0, { rooms: pair })); assert.equal(r.state.players[0]!.rooms, 4); assert.equal(r.state.players[0]!.resources.wood, 0)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: pair }))
+    const duplicate = setup({ card: A014, played: true, resources: { wood: 8, reed: 2 } }); const undoBefore = undoRuleSnapshot(duplicate.getState()); farm(duplicate)
+    const before = undoRuleSnapshot(duplicate.getState())
+    const payload = { rooms: [pair[0]!, pair[0]!] }
+    const actual = duplicate.commitSelectionChoice(0, payload)
+    mkdirSync('output/ae-negative/building-oa-artifacts', { recursive: true })
+    writeFileSync('output/ae-negative/building-oa-artifacts/A014-N5-duplicate.json', JSON.stringify({ command: 'commitSelectionChoice', actor: 0, payload, response: actual }, null, 2))
+    const outcome = { accepted: actual.ok, rooms: actual.state.players[0]!.rooms, uniqueRooms: new Set(actual.state.players[0]!.roomTiles.map(t => `${t.row}_${t.col}`)).size, wood: actual.state.players[0]!.resources.wood, reed: actual.state.players[0]!.resources.reed }
+    if (!actual.ok) assert.equal(undoRuleSnapshot(actual), before)
+    assertUndoRestored(undoBefore, duplicate.undoAction())
+    assertRuleOutcome(outcome, { accepted: false, rooms: 2, uniqueRooms: 2, wood: 8, reed: 2 })
+  })
+  it('A014 N6 stable alone and opponent rooms receive no hammer discount', () => {
+    const stable = setup({ card: A014, played: true, resources: { wood: 2 } }); farm(stable, 0, 'stable')
+    const stableResult = finish(stable, ok(stable.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] })))
+    assert.equal(stableResult.state.players[0]!.resources.wood, 0); assert.equal(stableResult.state.players[0]!.stableTiles.length, 1)
+    const s = setup({ card: A014, played: true, opponent: { wood: 10, reed: 4 } }); turn(s, 0, 'grain-seeds')
+    const r = build(s, pair, 1)
+    assert.equal(r.state.players[0]!.rooms, 2)
+    assert.equal(r.state.players[1]!.resources.wood, 0); assert.equal(r.state.players[1]!.resources.reed, 0); assert.equal(r.state.players[1]!.rooms, 4)
+  })
+  it('A014 N7 undo removes rooms and restores discount resources before legal replay', () => {
+    const s = setup({ card: A014, played: true, resources: { wood: 8, reed: 2 } }); const before = undoRuleSnapshot(s.getState())
+    build(s); assertUndoRestored(before, s.undoAction()); const r = build(s)
+    assert.equal(r.state.players[0]!.rooms, 4); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.reed, 0)
   })
 })

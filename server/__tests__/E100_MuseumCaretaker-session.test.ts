@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/E/E100_MuseumCaretaker'
+import assert from 'node:assert/strict'
+import * as audit46Preparation from './_helpers/audit/ae-negative-46-preparation'
 
 const CARD_ID = 'E100_MuseumCaretaker'
 
@@ -105,4 +107,11 @@ describe('E100 Museum Caretaker parity', () => {
     expect(response.state.round).toBe(7)
     expect(bonusVp(response)).toBe(2)
   })
+})
+
+describe('ae-negative-46-preparation', () => {
+  const { MUSEUM, sessions, save, ok, lesson, bonus, boundary, prepMake, GOODS } = audit46Preparation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E100 N1 actual purchase grants no early point and every missing supply good prevents the next work phase point',()=>{const a=lesson(prepMake(MUSEUM,()=>{},false),MUSEUM);assert.equal(bonus(a,MUSEUM),0);for(const missing of['none',...GOODS]){const s=prepMake(MUSEUM,state=>{for(const good of GOODS)state.players[0]!.resources[good]=good===missing?0:1}),r=boundary(s,MUSEUM);assert.equal(bonus(r,MUSEUM),missing==='none'?1:0);for(const good of GOODS)assert.equal(r.state.players[0]!.resources[good],good===missing?0:1);assert.equal(bonus(r,MUSEUM,1),0);save(`E100-N1-${missing}`,{a,r})}})
+  it('E100 N2 card in hand and midround full stock give no point while two distinct work phase starts grant exactly two',()=>{const t=prepMake(MUSEUM,state=>{for(const good of GOODS)state.players[0]!.resources[good]=1},false),hand=boundary(t,MUSEUM);assert.equal(bonus(hand,MUSEUM),0);const s=prepMake(MUSEUM,state=>{for(const good of GOODS)state.players[0]!.resources[good]=1}),mid=ok(s.takeAction(0,'meeting-place'));assert.equal(bonus(mid,MUSEUM),0);const nine=boundary(s,MUSEUM),ten=boundary(s,MUSEUM,10);assert.equal(bonus(nine,MUSEUM),1);assert.equal(bonus(ten,MUSEUM),2);save('E100-N2',{hand,mid,nine,ten})})
 })

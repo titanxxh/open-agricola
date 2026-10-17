@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D152_Patron'
 import '../../shared/cards/A/A123_FrameBuilder'
+import assert from 'node:assert/strict'
+import * as audit55Placement from './_helpers/audit/ae-negative-55-placement'
 
 const CARD_ID = 'D152_Patron'
 
@@ -95,4 +97,11 @@ describe('D152 Patron parity', () => {
     expect(response.state.players[1]!.resources.food).toBe(0)
     expect(response.state.players[0]!.resources.food).toBe(20)
   })
+})
+
+describe('ae-negative-55-placement', () => {
+  const { sessions, ok, save, make, finish, play, choose } = audit55Placement
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D152 N1 actual Patron purchase has no self bonus and later occupation receives two food before paying its one-food fee',()=>{const fresh=make('D152_Patron',st=>{st.players[0]!.resources.food=0;},false,14),purchased=finish(fresh,play(fresh,'D152_Patron'));assert.equal(purchased.state.players[0]!.resources.food,0);const s=make('D152_Patron',st=>{st.players[0]!.resources.food=0;st.players[0]!.occupationHand=['A125_Priest','A133_Braggart'];},true,14),p=ok(s.takeAction(0,'lessons')),r=finish(s,choose(s,p,o=>o.value==='A125_Priest'));assert.equal(r.state.players[0]!.resources.food,1);assert.equal(r.state.players[0]!.occupationPlayed.length,2);assert.ok(r.state.players[0]!.occupationPlayed.includes('A125_Priest'));save('D152-N1',{purchased,p,r})})
+  it('D152 N2 opponent occupation unrelated owner placement and card only in hand cannot award Patron food',()=>{for(const mode of['opponent','unrelated','hand']){const actor=mode==='opponent'?1:0,s=make('D152_Patron',st=>{st.currentPlayerIndex=actor;st.players[actor]!.occupationHand=mode==='hand'?['D152_Patron','A125_Priest','A133_Braggart']:['A125_Priest','A133_Braggart'];},mode!=='hand',14);if(mode==='hand')assert.ok(s.getState().state.players[0]!.occupationHand.includes('D152_Patron'));let p=ok(s.takeAction(actor,mode==='unrelated'?'grain-seeds':'lessons'));if(mode!=='unrelated')p=choose(s,p,o=>o.value==='A125_Priest');const r=finish(s,p,true);assert.equal(r.state.players[0]!.resources.food,100);save(`D152-N2-${mode}`,r)}})
 })

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { B023_FinalScenario } from '../../shared/cards/B/B023_FinalScenario'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Placement from './_helpers/audit/ae-negative-19-placement'
 
 describe('B023_FinalScenario prerequisite', () => {
   it('blocks when round == 14', () => {
@@ -100,4 +103,13 @@ describe('B023_FinalScenario prerequisite', () => {
       event.roundSlot === 14)
     expect(revealEvents).toHaveLength(1)
   })
+})
+
+describe('ae-negative-19-placement', () => {
+  const { FINAL, sessions, save, ok, setup, ready, turn, finish, menu, buy, reach } = audit19Placement
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B023 N1 real round thirteen purchase reveals actual hidden round fourteen card exclusively and rejects opponent use',()=>{const s=setup(FINAL,13),last=s.state.roundActionOrder[13]!,before=s.getState();assert.equal(s.getActionAvailability(0)[last],false);const{pending,r}=buy(s,FINAL),space=r.state.actionSpaces.find(a=>a.id===last)!;assert.ok(r.state.events.some(e=>e.type==='action.revealed'&&e.actionId===last&&e.roundSlot===14));assert.deepEqual(space.exclusiveUse,{playerId:r.state.players[0]!.id,sourceCardId:FINAL,untilRound:14});assert.equal(s.getActionAvailability(1)[last],false);ready(s);assertRejectedUnchanged(s,()=>s.takeAction(1,last));const other=turn(s,1,'grain-seeds'),owner=finish(s,turn(s,0,last));assert.ok(owner.state.actionSpaces.find(a=>a.id===last)!.takenBy.some(w=>w.playerId===owner.state.players[0]!.id));save('B023-N1',{before,pending,r,other,owner})})
+  it('B023 N2 natural round fourteen removes exclusivity so either player can use the revealed action',()=>{const s=setup(FINAL,13),last=s.state.roundActionOrder[13]!;buy(s,FINAL);const r=reach(s,14);assert.equal(r.state.actionSpaces.find(a=>a.id===last)!.exclusiveUse,undefined);assert.equal(s.getActionAvailability(0)[last],true);assert.equal(s.getActionAvailability(1)[last],true);assert.ok(r.state.events.some(e=>e.type==='action.exclusiveUseCleared'&&e.actionId===last));save('B023-N2',r)})
+  it('B023 N3 round fourteen cannot purchase and card in hand never reveals or unlocks future action',()=>{const late=setup(FINAL,14),denied=menu(late);assertRejectedUnchanged(late,()=>late.resolveChoice(0,FINAL));const legal=ok(late.resolveChoice(0,'A030_BakingSheet'));const hand=setup(FINAL,13),last=hand.state.roundActionOrder[13]!;assert.equal(hand.getActionAvailability(0)[last],false);assert.equal(hand.getActionAvailability(1)[last],false);const control=turn(hand,0,'grain-seeds');assert.ok(!control.state.events.some(e=>e.type==='action.revealed'&&e.actionId===last));save('B023-N3',{denied,legal,control})})
+  it('B023 N4 whole actual purchase undo hides only revealed future action and retry restores exact exclusivity',()=>{const s=setup(FINAL,13),last=s.state.roundActionOrder[13]!,r=buy(s,FINAL).r,undone=ok(s.undoAction());assert.equal(s.getActionAvailability(0)[last],false);assert.equal(undone.state.actionSpaces.find(a=>a.id===last)!.exclusiveUse,undefined);assert.ok(undone.state.players[0]!.minorHand.includes(FINAL));const retry=buy(s,FINAL).r;assert.equal(retry.state.actionSpaces.find(a=>a.id===last)!.exclusiveUse?.playerId,retry.state.players[0]!.id);save('B023-N4',{r,undone,retry})})
 })

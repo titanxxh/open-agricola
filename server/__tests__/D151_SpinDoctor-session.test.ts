@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D024_BrotherlyLove'
 import '../../shared/cards/D/D151_SpinDoctor'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit55Placement from './_helpers/audit/ae-negative-55-placement'
 
 const CARD_ID = 'D151_SpinDoctor'
 const BROTHERLY_LOVE_ID = 'D024_BrotherlyLove'
@@ -352,4 +355,12 @@ describe('D151 Spin Doctor native session', () => {
     expect(response.scores[0]!.total).toBe(before.score)
     finishTurn(session, response)
   })
+})
+
+describe('ae-negative-55-placement', () => {
+  const { sessions, ok, save, make, finish, enter, choose, occupiedStart } = audit55Placement
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D151 N1 real Traveling Players immediately spends another worker on truly opponent-occupied Grain Seeds and preserves both occupants',()=>{const s=occupiedStart('D151_SpinDoctor','grain-seeds'),p=ok(s.takeAction(0,'traveling-players')),r=finish(s,choose(s,p,o=>o.value==='allow-occupied:grain-seeds'));assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[1]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,102);assert.equal(r.state.actionSpaces.find(a=>a.id==='grain-seeds')!.takenBy.length,2);assert.equal(workersAvailable(r.state,r.state.players[0]!),0);save('D151-N1',{p,r})})
+  it('D151 N2 occupied Meeting Place is rejected before legal Grain Seeds alternative while declining extra placement spends no second worker',()=>{const s=occupiedStart('D151_SpinDoctor','meeting-place'),p=enter(s,ok(s.takeAction(0,'traveling-players')),o=>o.value==='grain-seeds'),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'allow-occupied:meeting-place')),r=finish(s,choose(s,p,o=>o.value==='grain-seeds'));assert.equal(r.state.actionSpaces.find(a=>a.id==='meeting-place')!.takenBy.length,1);assert.equal(r.state.players[0]!.resources.grain,1);const c=make('D151_SpinDoctor',undefined,true,14),declined=finish(c,ok(c.takeAction(0,'traveling-players')),false);assert.equal(workersAvailable(declined.state,declined.state.players[0]!),1);save('D151-N2',{p,rejected,r,declined})})
+  it('D151 N3 card in hand cannot add an immediate second placement after real Traveling Players',()=>{const s=make('D151_SpinDoctor',undefined,false,14),r=finish(s,ok(s.takeAction(0,'traveling-players')),true);assert.equal(workersAvailable(r.state,r.state.players[0]!),1);assert.equal(r.state.players[0]!.resources.grain,0);save('D151-N3',r)})
 })

@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C128_WoodenHutExtender'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'C128_WoodenHutExtender'
 
@@ -119,6 +122,54 @@ describe('C128 Wooden Hut Extender parity', () => {
       expect(response.state.players[0]!.resources).toMatchObject(resources)
       expect(response.interaction.stateId === 'wait'
         && response.interaction.request.farm?.farmType === 'room').toBe(false)
+    }
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, ok, options, save, setup, choose, build, take } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C128 N1 actual wood room purchases cover round five six seven eight costs and two-room multiplication', () => {
+    for (const [round, count, wood] of [[5, 1, 5], [6, 1, 4], [7, 1, 4], [8, 1, 3], [8, 2, 6]]) {
+      const s = setup('C128_WoodenHutExtender', round, state => Object.assign(state.players[0]!.resources, { wood, reed: count }))
+      const r = build(s, take(s, 'farm-expansion'), count)
+      assert.equal(r.state.players[0]!.rooms, 2 + count)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.resources.reed, 0)
+      save(`C128-N1-${round}-${count}`, r)
+    }
+  })
+  it('C128 N2 shortage excludes discount build and clay rooms plus stables retain usual costs', () => {
+    for (const mode of ['wood-short', 'reed-short', 'clay', 'stable']) {
+      const s = setup('C128_WoodenHutExtender', 8, state => {
+        const p = state.players[0]!
+        Object.assign(p.resources, { wood: mode === 'wood-short' || mode === 'stable' ? 2 : 3, reed: mode === 'reed-short' ? 0 : mode === 'clay' ? 2 : 1, clay: mode === 'clay' ? 5 : 0 })
+        if (mode === 'clay')
+          p.houseType = 'clay'
+      })
+      let r = take(s, 'farm-expansion')
+      if (mode === 'clay')
+        r = build(s, r)
+      else if (mode === 'stable') {
+        if (!(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select'))
+          r = choose(s, r, o => o.labelKey === 'actions.stables.name')
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+        r = ok(s.commitSelectionChoice(0, { stables: [r.interaction.request.farm.selectableTiles[0]!] }))
+      }
+      else {
+        assert.ok(!options(r).some(o => o.labelKey === 'actions.construct.name'))
+        assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] }))
+      }
+      assert.equal(r.state.players[0]!.rooms, mode === 'clay' ? 3 : 2)
+      if (mode === 'clay') {
+        assert.equal(r.state.players[0]!.resources.clay, 0)
+        assert.equal(r.state.players[0]!.resources.reed, 0)
+      }
+      if (mode === 'stable') {
+        assert.equal(r.state.players[0]!.resources.wood, 0)
+        assert.equal(r.state.players[0]!.stableTiles.length, 1)
+      }
+      save(`C128-N2-${mode}`, r)
     }
   })
 })

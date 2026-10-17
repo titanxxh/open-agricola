@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B130_FullPeasant'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Jump from './_helpers/audit/ae-negative-28-jump'
 
 const CARD_ID = 'B130_FullPeasant'
 
@@ -164,4 +167,14 @@ describe('B130_FullPeasant session', () => {
     // we rely on flow-level tests for this branch.
     expect(resp.ok).toBe(true)
   })
+})
+
+describe('ae-negative-28-jump', () => {
+  const { sessions, save, ok, ready, finish, make, drive, refs } = audit28Jump
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B130 N1 real Grain Utilization and Fencing in either order pay one food and use the same original person exactly once',()=>{for(const from of['grain-utilization','fencing']){const s=make(),before=ok(s.getState()),pending=ok(s.takeAction(0,from)),worker=refs(pending,from)[0],r=drive(s,pending),target=from==='fencing'?'grain-utilization':'fencing';assert.ok(worker);assert.deepEqual(refs(r,from),[]);assert.deepEqual(refs(r,target),[worker]);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[{kind:'grain',remaining:3}]);assert.deepEqual(r.state.players[0]!.workers.map(w=>w.id),before.state.players[0]!.workers.map(w=>w.id));save(`B130-N1-${from}`,{before,pending,r})}})
+  it('B130 N2 optional decline zero food and card in hand do not move the person or charge the second action',()=>{for(const mode of['decline','food','hand']){const s=make(mode!=='hand',mode==='food'?0:1),pending=ok(s.takeAction(0,'grain-utilization')),r=drive(s,pending,false);assert.equal(refs(r,'grain-utilization').length,1);assert.deepEqual(refs(r,'fencing'),[]);assert.equal(r.state.players[0]!.resources.food,mode==='food'?0:1);assert.equal(r.state.players[0]!.resources.wood,4);save(`B130-N2-${mode}`,{pending,r})}})
+  it('B130 N3 an actual opponent Fencing placement makes the destination occupied and prevents a jump',()=>{const s=make(true,0);let r=ok(s.takeAction(0,'day-laborer'));ready(s);r=ok(s.takeAction(1,'fencing'));assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='farm-select');r=ok(s.commitSelectionChoice(1,{edges:['H-0-1','H-1-1','V-0-1','V-0-2'],palisadeEdges:[],extraWood:0}));ready(s);finish(s,ok(s.takeAction(2,'reed-bank')),false);ready(s);const pending=ok(s.takeAction(0,'grain-utilization'));r=drive(s,pending);assert.equal(refs(r,'grain-utilization').length,1);assert.deepEqual(refs(r,'fencing'),[]);assert.equal(r.state.players[0]!.resources.food,2);save('B130-N3',{pending,r})})
+  it('B130 N4 wrong actor and illegal first sow selection reject before one legal paid jump',()=>{const s=make();let pending=ok(s.takeAction(0,'grain-utilization'));for(let n=0;n<8&&!(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select');n++){assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');const o=pending.interaction.request.options.find(o=>!o.disabled&&!['__skip__','__done__'].includes(o.value));assert.ok(o);pending=ok(s.resolveChoice(0,o.value))}assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select');const bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{row:99,col:99,crop:'grain'}]})),wrong=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{crops:[{row:0,col:1,crop:'grain'}]})),r=drive(s,pending);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);save('B130-N4',{pending,bad,wrong,r})})
+  it('B130 N5 whole two action jump undo restores both spaces original worker crops fences and paid resources before one replay',()=>{const s=make(),before=ok(s.getState()),r=drive(s,ok(s.takeAction(0,'grain-utilization'))),undone=ok(s.undoAction());assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);assert.deepEqual(undone.state.players[0]!.workers,before.state.players[0]!.workers);assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.equal(undone.state.players[0]!.fenceSegments.length,0);assert.deepEqual(undone.state.players[0]!.fields[0]!.stacks,[]);const retry=drive(s,ok(s.takeAction(0,'grain-utilization')));assert.equal(retry.state.players[0]!.resources.food,0);save('B130-N5',{before,r,undone,retry})})
 })

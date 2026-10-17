@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A137_RiverineShepherd'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit15Spaces from './_helpers/audit/ae-negative-15-spaces'
 
 const CARD_ID = 'A137_RiverineShepherd'
 const FILLER = '__test_placeholder__'
@@ -167,4 +170,14 @@ describe('A137 Riverine Shepherd parity', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(3)
     expect(response.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep).toBe(2)
   })
+})
+
+describe('ae-negative-15-spaces', () => {
+  const { sessions, save, ok, turn, finishOptional, shepherd } = audit15Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A137 N1 Sheep Market takes exactly one reed from nonempty other pile',()=>{for(const amount of [1,4]){const s=shepherd(amount);const pending=turn(s,0,'sheep-market');const r=finishOptional(s,pending,true);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[0]!.resources.reed,1);assert.equal(r.state.actionSpaces.find(a=>a.id==='reed-bank')!.resources.reed,amount-1);assert.equal(r.state.actionSpaces.find(a=>a.id==='reed-bank')!.takenBy.length,0);save(`A137-N1-${amount}`,{pending,r})}})
+  it('A137 N2 Reed Bank can take one sheep without collecting or occupying other space',()=>{const s=shepherd(2);const r=finishOptional(s,turn(s,0,'reed-bank'),true);assert.equal(r.state.players[0]!.resources.reed,2);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep,0);assert.equal(r.state.actionSpaces.find(a=>a.id==='sheep-market')!.takenBy.length,0);save('A137-N2',r)})
+  it('A137 N3 empty other pile and decline cannot create reserve reed',()=>{const zeroS=shepherd(0);const zero=finishOptional(zeroS,turn(zeroS,0,'sheep-market'),false);assert.equal(zero.state.players[0]!.resources.reed,0);const s=shepherd(4);const declined=finishOptional(s,turn(s,0,'sheep-market'),false);assert.equal(declined.state.players[0]!.resources.reed,0);assert.equal(declined.state.actionSpaces.find(a=>a.id==='reed-bank')!.resources.reed,4);save('A137-N3',{zero,declined})})
+  it('A137 N4 hand unrelated and actual opponent cannot collect owner other pile',()=>{const hs=shepherd(4,false);const hand=finishOptional(hs,turn(hs,0,'sheep-market'),false);assert.equal(hand.state.players[0]!.resources.reed,0);const s=shepherd(4);const unrelated=turn(s,0,'day-laborer');const other=turn(s,1,'sheep-market');assert.equal(other.state.players[0]!.resources.reed,0);assert.equal(other.state.players[1]!.resources.reed,0);save('A137-N4',{hand,unrelated,other})})
+  it('A137 N5 invalid choice rejects and whole undo returns source and animals before retry',()=>{const s=shepherd(4);const pending=turn(s,0,'sheep-market');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'take-five'));const first=finishOptional(s,pending,true);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.sheep,0);assert.equal(undone.state.players[0]!.resources.reed,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='reed-bank')!.resources.reed,4);const retry=finishOptional(s,turn(s,0,'sheep-market'),true);assert.equal(retry.state.players[0]!.resources.reed,1);save('A137-N5',{first,undone,retry})})
 })

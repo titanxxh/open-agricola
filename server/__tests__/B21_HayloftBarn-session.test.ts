@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { describe, expect, it, afterEach } from 'vitest'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -7,8 +7,11 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import { createEventQuery } from '../../shared/events/query'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, familySize } from '../../shared/domain/player'
 import { B021_HayloftBarn_impl } from '../../shared/cards/B/B021_HayloftBarn'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Family from './_helpers/audit/ae-negative-19-family'
 
 const CARD_ID = 'B021_HayloftBarn'
 
@@ -340,4 +343,13 @@ describe('B021_HayloftBarn session', () => {
     // No new family member
     expect(updated.workers.filter((w) => w.isActive).length).toBe(familyBefore)
   })
+})
+
+describe('ae-negative-19-family', () => {
+  const { CARD, sessions, save, ok, setup, stored, turn, finish, menu, buy, next } = audit19Family
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B021 N1 actual paid purchase stores four food without granting food and prerequisite or cost shortfall rejects',()=>{const s=setup(),{pending,r}=buy(s);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(familySize(r.state.players[0]!),2);save('B021-N1',{pending,r});for(const[wood,occupation]of[[2,true],[3,false]]as const){const denied=setup(wood,occupation),p=menu(denied);assertRejectedUnchanged(denied,()=>denied.resolveChoice(0,CARD));const legal=ok(denied.resolveChoice(0,'A030_BakingSheet'));assert.equal(legal.state.players[0]!.resources.wood,wood);assert.equal(stored(legal),0);save(`B021-N1-${wood}-${occupation}`,{p,legal})}})
+  it('B021 N2 opponent grain cannot consume owners stored food and owners actual grain releases exactly one food',()=>{const s=setup();buy(s);const other=finish(s,turn(s,1,'grain-seeds'));assert.equal(stored(other),4);assert.equal(other.state.players[0]!.resources.food,100);assert.equal(other.state.players[1]!.resources.food,100);next(s,4);const before=JSON.parse(JSON.stringify(s.getState())) as SessionResponse,r=finish(s,turn(s,0,'grain-seeds'));assert.equal(stored(r),3);assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+1);assert.equal(r.state.players[0]!.resources.grain,1);save('B021-N2',{other,before,r})})
+  it('B021 N3 four genuine grain acquisitions empty card and grow one newborn without room exactly once',()=>{const s=setup();buy(s);turn(s,1,'day-laborer');const steps:SessionResponse[]=[];for(const round of[3,4,5,6]){if(round>3)next(s,round);const before=JSON.parse(JSON.stringify(s.getState())) as SessionResponse,r=finish(s,turn(s,0,'grain-seeds'));assert.equal(stored(r),6-round);assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+1);assert.equal(familySize(r.state.players[0]!),round===6?3:2);assert.equal(r.state.players[0]!.rooms,2);steps.push(JSON.parse(JSON.stringify(r)))}const r=s.getState();assert.equal(r.state.players[0]!.workers.filter(w=>w.isActive&&w.isNewborn).length,1);assert.equal(r.state.players[0]!.workers.length,5);save('B021-N3',{steps,r})})
+  it('B021 N4 unrelated resource cannot consume food and real grain acquisition undo restores card count before one retry',()=>{const s=setup();buy(s);turn(s,1,'day-laborer');const unrelated=turn(s,0,'forest');assert.equal(stored(unrelated),4);next(s,4);const r=finish(s,turn(s,0,'grain-seeds')),undone=ok(s.undoAction());assert.equal(stored(undone),4);assert.equal(undone.state.players[0]!.resources.grain,0);const retry=finish(s,turn(s,0,'grain-seeds'));assert.equal(stored(retry),3);assert.equal(retry.state.players[0]!.resources.food,undone.state.players[0]!.resources.food+1);save('B021-N4',{unrelated,r,undone,retry})})
 })

@@ -2,7 +2,7 @@ import type { GameSession as SessionRuleOwner } from '../game/authoritative-sess
 import { type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
   executeCardListener,
@@ -17,6 +17,9 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C081_MaterialHub'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Resources from './_helpers/audit/ae-negative-42-resources'
 
 const CARD_ID = 'C081_MaterialHub'
 
@@ -366,4 +369,12 @@ describe('C081 Material Hub parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(5)
     expect(storedCount(response, 'wood')).toBe(0)
   })
+})
+
+describe('ae-negative-42-resources', () => {
+  const { sessions, ok, save, setup, finish, select, play, next, reserve } = audit42Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C081 N1 real purchase pays wood clay retains reed stone prerequisite and stores exactly two of each resource',()=>{const s=setup('C081_MaterialHub',st=>Object.assign(st.players[0]!.resources,{wood:1,clay:1,reed:1,stone:1}),false,5),r=play(s,'C081_MaterialHub');assert.deepEqual(reserve(r),{wood:0,clay:0,reed:1,stone:1});assert.deepEqual(r.state.players[0]!.cardStates.C081_MaterialHub?.counters,{wood:2,clay:2,reed:2,stone:2});const u=ok(s.undoAction());assert.deepEqual(reserve(u),{wood:1,clay:1,reed:1,stone:1});assert.equal(u.state.players[0]!.cardStates.C081_MaterialHub,undefined);save('C081-N1',{r,u})})
+  it('C081 N2 exact threshold accumulation from either player takes one matching resource from finite card stock',()=>{for(const [resource,space,threshold]of [['wood','forest',5],['clay','clay-pit',4],['reed','reed-bank',3],['stone','western-quarry',3]]as const){for(const actor of [0,1]){const s=setup('C081_MaterialHub',st=>{Object.assign(st.players[0]!.resources,{wood:1,clay:1,reed:1,stone:1});st.actionSpaces.find(a=>a.id===space)!.resources[resource]=threshold},false,14),bought=play(s,'C081_MaterialHub');next(s,bought);if(actor===0)next(s,finish(s,ok(s.takeAction(1,'grain-seeds'))));const r=finish(s,ok(s.takeAction(actor,space)),true);assert.equal(r.state.players[0]!.cardStates.C081_MaterialHub?.counters?.[resource],1);assert.equal(r.state.players[0]!.resources[resource],(resource==='reed'||resource==='stone'?1:0)+1+(actor===0?threshold:0));if(actor===1)assert.equal(r.state.players[1]!.resources[resource],threshold);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.cardStates.C081_MaterialHub?.counters?.[resource],2);save(`C081-N2-${resource}-${actor}`,{bought,r,u})}}})
+  it('C081 N3 below threshold and held card exclude reward while missing reed or stone rejects before a legal alternative',()=>{for(const missing of ['reed','stone']as const){const s=setup('C081_MaterialHub',st=>{Object.assign(st.players[0]!.resources,{wood:2,clay:1,reed:1,stone:1});st.players[0]!.resources[missing]=0;st.players[0]!.minorHand.push('A057_MilkingParlor','E080_RockGarden')},false,5),p=select(s,ok(s.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'C081_MaterialHub')),r=finish(s,select(s,p,o=>o.value==='A057_MilkingParlor'));assert.equal(r.state.players[0]!.cardStates.C081_MaterialHub,undefined);save(`C081-N3-${missing}`,{p,bad,r})}const s=setup('C081_MaterialHub',st=>Object.assign(st.players[0]!.resources,{wood:1,clay:1,reed:1,stone:1}),false,5),bought=play(s,'C081_MaterialHub');next(s,bought);const below=finish(s,ok(s.takeAction(1,'forest')),true,'C081_MaterialHub');assert.equal(below.state.players[0]!.cardStates.C081_MaterialHub?.counters?.wood,2);const t=setup('C081_MaterialHub',st=>{st.actionSpaces.find(a=>a.id==='forest')!.resources.wood=5},false),held=finish(t,ok(t.takeAction(0,'forest')),true,'C081_MaterialHub');assert.equal(held.state.players[0]!.resources.wood,5);assert.equal(held.state.players[0]!.cardStates.C081_MaterialHub,undefined);save('C081-N3-controls',{below,held})})
 })

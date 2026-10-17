@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
@@ -6,6 +6,9 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C099_GardenDesigner'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit46Final from './_helpers/audit/ae-negative-46-final'
 
 const CARD_ID = 'C099_GardenDesigner'
 const FILLER = '__test_placeholder__'
@@ -214,4 +217,12 @@ describe('C099 Garden Designer scoring choices', () => {
     expect(response.state.players[0]!.resources.food).toBe(1)
     expect(gardenDesignerBonus(response)).toBe(3)
   })
+})
+
+describe('ae-negative-46-final', () => {
+  const { GARDEN, sessions, save, ok, finish, lesson, bonus, progress, trigger, garden, invest } = audit46Final
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C099 N1 actual purchase has no early score and one empty field supports exactly one four or seven food investments at scoring',()=>{for(const[food,score]of[[1,1],[4,2],[7,3]]){const s=garden(food,1,false),bought=lesson(s,GARDEN);assert.equal(bonus(bought,GARDEN),0);const r=invest(s,food!,score!);assert.equal(r.state.gameOver,true);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(bonus(r,GARDEN),score);assert.equal(bonus(r,GARDEN,1),0);const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${GARDEN}:food:${food}:score:${score}`));save(`C099-N1-${food}`,{bought,r,bad})}})
+  it('C099 N2 forged payment score and overfield bundle are rejected before one legal investment and two empty fields permit the seven plus one bundle',()=>{const s=garden(14),pending=trigger(s,progress(s,15,GARDEN,['grain-seeds','reed-bank','meeting-place','forest']),GARDEN),bad1=assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${GARDEN}:food:1:score:3`)),bad2=assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${GARDEN}:food:14:score:6`)),r=finish(s,ok(s.resolveChoice(0,`${GARDEN}:food:7:score:3`)));assert.equal(r.state.players[0]!.resources.food,7);assert.equal(bonus(r,GARDEN),3);const t=garden(8,2),two=invest(t,8,4);assert.equal(two.state.players[0]!.resources.food,0);assert.equal(bonus(two,GARDEN),4);save('C099-N2',{pending,bad1,bad2,r,two})})
+  it('C099 N3 zero investment no empty field a still planted field zero food and a hand card cannot create scoring food or points',()=>{const s=garden(7),zero=invest(s,0,0);assert.equal(zero.state.players[0]!.resources.food,7);assert.equal(bonus(zero,GARDEN),0);for(const[mode,count,food,played,planted]of[['none',0,7,true,false],['planted',1,7,true,true],['food',1,0,true,false],['hand',1,7,false,false]] as const){const t=garden(food,count,played,planted),r=progress(t,15);assert.equal(r.state.gameOver,true);assert.equal(bonus(r,GARDEN),0);assert.equal(r.state.players[0]!.resources.food,food);if(planted)assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,1);save(`C099-N3-${mode}`,r)}save('C099-N3-zero',zero)})
 })

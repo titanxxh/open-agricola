@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,9 @@ import type { GameEvent } from '../../shared/contract/events'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/register-all'
 import '../../shared/cards/B/B155_ArtTeacher'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B155_ArtTeacher'
 const TRAVELING_PLAYERS = 'traveling-players'
@@ -211,4 +214,37 @@ describe('B155 ArtTeacher computeCosts (TP food payment resource)', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(tpFoodAfter(resp)).toBe(3)
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, take, finish, play, undo, pile, res } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B155 N1 real first purchase gains wood and reed without draining Traveling Players', () => { const s = make('B155_ArtTeacher', st => pile(st, 'traveling-players', 'food', 3), false), r = finish(s, play(s, 'B155_ArtTeacher')), u = undo(s); res(r, { wood: 1, reed: 1, food: 100 }); assert.equal(r.state.actionSpaces.find(x => x.id === 'traveling-players')!.resources.food, 3); res(u, { wood: 0, reed: 0 }); save('B155-N1', { r, u }); });
+  it('B155 N2 later occupation fees can use Traveling Players or personal food by actual selection', () => { for (const mode of ['onlyTP', 'TP', 'own']) {
+      const s = make('B155_ArtTeacher', st => { st.players[0]!.resources.food = mode === 'onlyTP' ? 0 : 2; pile(st, 'traveling-players', 'food', 3); });
+      const p = take(s, 0, 'lessons');
+      const r = finish(s, p, true, [mode === 'own' ? '"food":1' : '"B155_ArtTeacher:traveling-players-food":1', 'A125_Priest']);
+      res(r, { food: mode === 'onlyTP' ? 0 : mode === 'own' ? 1 : 2 });
+      assert.equal(r.state.actionSpaces.find(x => x.id === 'traveling-players')!.resources.food, mode === 'own' ? 3 : 2);
+      assert.ok(r.state.players[0]!.occupationPlayed.includes('A125_Priest'));
+      save(`B155-N2-${mode}`, { p, r });
+  } });
+  it('B155 N3 empty pile held card and foreign actor cannot supply a card payment', () => { for (const mode of ['empty', 'none', 'hand', 'opponent']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('B155_ArtTeacher', st => { pile(st, 'traveling-players', 'food', mode === 'empty' || mode === 'none' ? 0 : 3); st.players[a]!.resources.food = mode === 'none' ? 0 : 1; if (mode === 'hand')
+          st.players[0]!.occupationPlayed = ['A110_Roughcaster']; if (mode === 'opponent') {
+          st.currentPlayerIndex = 1;
+          st.players[1]!.occupationPlayed = ['A110_Roughcaster'];
+          st.players[1]!.occupationHand = ['A123_FrameBuilder', 'A133_Braggart'];
+      } }, mode !== 'hand');
+      if (mode === 'none') {
+          const r = assertRejectedUnchanged(s, () => s.takeAction(0, 'lessons'));
+          save(`B155-N3-${mode}`, r);
+      }
+      else {
+          const r = finish(s, take(s, a, 'lessons'), true, ['A125_Priest', 'A123_FrameBuilder']);
+          res(r, { food: 0 }, a);
+          assert.equal(r.state.actionSpaces.find(x => x.id === 'traveling-players')!.resources.food, mode === 'empty' ? 0 : 3);
+          save(`B155-N3-${mode}`, r);
+      }
+  } });
 })

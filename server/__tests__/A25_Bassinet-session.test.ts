@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
@@ -7,6 +7,7 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
   newbornCount,
+  familySize,
 } from '../../shared/domain/player'
 import { addWorkerRef } from '../../shared/domain/space'
 import type { GameState, PlayerState } from '../../shared/contract/types'
@@ -16,6 +17,9 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/A/A025_Bassinet'
 import '../../shared/cards/A/A092_AdoptiveParents'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Actions from './_helpers/audit/ae-negative-06-actions'
 
 const CARD_ID = 'A025_Bassinet'
 
@@ -539,5 +543,47 @@ describe('A025_Bassinet session', () => {
       params: expect.objectContaining({ action: 'actions.day-laborer.name' }),
     }))
     expect(followed.scores).toHaveLength(4)
+  })
+})
+
+describe('ae-negative-06-actions', () => {
+  const { A025, sessions, setup, ready, turn, buy, denied, skipRemaining, bassinet, people } = audit06Actions
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A025 N1 wood or reed shortage rejects forged purchase before exact fee control', () => {
+    for (const resources of [{ wood: 0, reed: 1 }, { wood: 1, reed: 0 }]) denied(setup({ card: A025, played: false, resources }), A025)
+    const r = buy(setup({ card: A025, played: false, resources: { wood: 1, reed: 1 } }), A025); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.reed, 0); assert.ok(r.state.players[0]!.minorPlayed.includes(A025))
+  })
+  it('A025 N2 only global first nonaccumulating space survives earlier accumulation and later spaces', () => {
+    const s = bassinet(); turn(s, 0, 'forest'); turn(s, 1, 'day-laborer'); turn(s, 0, 'grain-seeds'); ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'grain-seeds')); const r = turn(s, 1, 'day-laborer')
+    assert.equal(people(r, 'day-laborer'), 2); assert.equal(r.state.players[1]!.resources.food, 44)
+  })
+  it('A025 N3 nonowner cannot reuse first space while owner may join exactly once', () => {
+    const s = bassinet(); turn(s, 0, 'day-laborer'); turn(s, 1, 'grain-seeds'); ready(s, 0)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'day-laborer')); turn(s, 0, 'clay-pit'); const r = turn(s, 1, 'day-laborer')
+    assert.equal(people(r, 'day-laborer'), 2); assert.equal(r.state.players[1]!.resources.food, 42)
+  })
+  it('A025 N4 first Meeting Place excludes itself and all later nonaccumulating spaces', () => {
+    const s = bassinet(); skipRemaining(s, turn(s, 0, 'meeting-place')); turn(s, 1, 'grain-seeds'); turn(s, 0, 'forest'); ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'meeting-place')); assertRejectedUnchanged(s, () => s.takeAction(1, 'grain-seeds')); const r = turn(s, 1, 'clay-pit'); assert.equal(people(r, 'meeting-place'), 1)
+  })
+  it('A025 N5 real Family Growth parent plus newborn prevents occupied reentry', () => {
+    const control = bassinet({ round: 14, rooms: 3 }); turn(control, 0, 'forest'); const grew = skipRemaining(control, turn(control, 1, 'wish-children')); assert.equal(newbornCount(grew.state.players[1]!), 1); assert.equal(people(grew, 'wish-children'), 2)
+    const s = bassinet({ round: 14, rooms: 3 }); const born = skipRemaining(s, turn(s, 0, 'wish-children'))
+    assert.equal(people(born, 'wish-children'), 2); assert.equal(newbornCount(born.state.players[0]!), 1); ready(s, 1)
+    assert.equal(s.getState().state.players[1]!.rooms, 3); assert.equal(familySize(s.getState().state.players[1]!), 2)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'wish-children')); turn(s, 1, 'grain-seeds')
+  })
+  it('A025 N6 two actual occupants forbid a third person and undo restores single-target eligibility', () => {
+    const s = bassinet(); turn(s, 0, 'day-laborer'); turn(s, 1, 'day-laborer'); turn(s, 0, 'grain-seeds'); ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'day-laborer')); turn(s, 1, 'clay-pit')
+    const undo = bassinet(); turn(undo, 0, 'day-laborer'); ready(undo, 1); const before = undoRuleSnapshot(undo.getState()); const first = turn(undo, 1, 'day-laborer'); assert.equal(people(first, 'day-laborer'), 2)
+    assertUndoRestored(before, undo.undoAction()); const replay = turn(undo, 1, 'day-laborer'); assert.equal(people(replay, 'day-laborer'), 2)
+  })
+  it('A025 N7 natural next work phase resets first-space target without synthetic placement history', () => {
+    const s = bassinet(); turn(s, 0, 'day-laborer'); turn(s, 1, 'forest'); turn(s, 0, 'clay-pit'); const last = turn(s, 1, 'grain-seeds')
+    const next = confirmNext(s, last); assert.equal(next.state.round, 2); assert.equal(next.state.roundPhase, 'work')
+    turn(s, 0, 'grain-seeds'); turn(s, 1, 'day-laborer'); turn(s, 0, 'forest'); ready(s, 1)
+    assertRejectedUnchanged(s, () => s.takeAction(1, 'day-laborer')); const r = turn(s, 1, 'grain-seeds'); assert.equal(people(r, 'grain-seeds'), 2); assert.equal(r.scores?.length, 2)
   })
 })

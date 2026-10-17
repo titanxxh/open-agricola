@@ -1,12 +1,15 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { C109_SchnappsDistiller } from '../../shared/cards/C/C109_SchnappsDistiller'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'C109_SchnappsDistiller'
 
@@ -225,4 +228,12 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
     const trades = withActiveRegistry(ruleRegistry, () => getExchangesInWindow(player, 'anytime'))
     expect(trades).toHaveLength(0)
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, feedMenu, harvestTrade, workTrade } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C109 N1 harvest exchanges exactly one vegetable for five food and rejects two before legal retry', () => { const s = make('C109_SchnappsDistiller', st => { st.players[0]!.resources.vegetable = 2 }, true, 4), p = feedMenu(s), rejected = assertRejectedUnchanged(s, () => harvestTrade(s, 'C109_SchnappsDistiller', 2)), r = finish(s, harvestTrade(s, 'C109_SchnappsDistiller', 1), false); assert.equal(r.state.players[0]!.resources.vegetable, 1); assert.equal(r.state.players[0]!.resources.food, 101); assert.ok(r.state.events.some(e => e.type === 'harvest.feedConverted' && e.source === 'C109_SchnappsDistiller'));  save('C109-N1', { p, rejected, r }) })
+  it('C109 N2 declining harvest conversion and work phase action keep vegetables while zero supply cannot convert', () => { const s = make('C109_SchnappsDistiller', st => { st.players[0]!.resources.vegetable = 2 }, true, 4), p = feedMenu(s), r = finish(s, ok(s.resolveChoice(0, 'confirm', { selections: [] })), false); assert.equal(r.state.players[0]!.resources.vegetable, 2); assert.equal(r.state.players[0]!.resources.food, 96); const w = make('C109_SchnappsDistiller', st => { st.players[0]!.resources.vegetable = 2 }), wr = finish(w, ok(w.takeAction(0, 'grain-seeds')), false); assert.equal(wr.state.players[0]!.resources.vegetable, 2); assert.equal(wr.state.players[0]!.resources.food, 100); const c = make('C109_SchnappsDistiller', st => { st.players[0]!.resources.food = 0 }, true, 4), cp = feedMenu(c), rejected = assertRejectedUnchanged(c, () => harvestTrade(c, 'C109_SchnappsDistiller', 1)), cr = finish(c, ok(c.resolveChoice(0, 'confirm', { selections: [] })), false); assert.equal(cr.state.players[0]!.resources.food, 0); save('C109-N2', { p, r, wr, cp, rejected, cr }) })
+  it('C109 N3 actual work exchange permits Fireplace two-food vegetable conversion and excludes five-food distillation', () => { const s = make('C109_SchnappsDistiller', st => { st.players[0]!.resources.vegetable = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }), a = workTrade(s, 'C109_SchnappsDistiller', 'vegetable'); save('C109-N3', a) })
 })

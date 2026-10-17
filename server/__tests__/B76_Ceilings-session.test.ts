@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B076_Ceilings'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit22Ceilings from './_helpers/audit/ae-negative-22-ceilings'
 
 const CARD_ID = 'B076_Ceilings'
 const FILLER = '__test_placeholder__'
@@ -129,4 +132,14 @@ describe('B076 Ceilings parity', () => {
     expect(futureRounds(response)).toEqual([])
     expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(true)
   })
+})
+
+describe('ae-negative-22-ceilings', () => {
+  const { CARD, sessions, save, ok, ready, finish, menu, buy, reach, OTHER, make, schedule, owner, renovation } = audit22Ceilings
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B076 N1 actual one clay and one occupation purchase queues five future wood with whole undo and no immediate wood',()=>{const s=make(),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.clay,2);assert.equal(r.state.players[0]!.resources.wood,0);assert.deepEqual(schedule(r),[6,7,8,9,10].map(round=>({round,resources:{wood:1}})));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,3);assert.deepEqual(schedule(undone),[]);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const retry=buy(s,CARD).r;assert.equal(schedule(retry).length,5);save('B076-N1',{pending,r,undone,retry})})
+  it('B076 N2 missing clay or occupation refuses and late purchase keeps only reachable contiguous future promises',()=>{for(const mode of['clay','occupation']){const s=make(5,mode==='clay'?0:1,mode!=='occupation'),pending=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD));const legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.deepEqual(schedule(legal),[]);save(`B076-N2-${mode}`,{pending,legal})}for(const round of[11,13,14]){const s=make(round),{pending,r}=buy(s,CARD);assert.deepEqual(schedule(r),[1,2,3,4,5].map(n=>round+n).filter(n=>n<=14).map(round=>({round,resources:{wood:1}})));save(`B076-N2-${round}`,{pending,r})}})
+  it('B076 N3 natural first and second due rounds deliver one wood each without paying the next promise early',()=>{const s=make(),c=make();buy(s,CARD);buy(c,'B004_WoodPile');const six=reach(s,6),csix=reach(c,6),seven=reach(s,7),cseven=reach(c,7);assert.equal(six.state.players[0]!.resources.wood,csix.state.players[0]!.resources.wood+1);assert.equal(seven.state.players[0]!.resources.wood,cseven.state.players[0]!.resources.wood+2);assert.deepEqual(schedule(seven).map(e=>e.round),[8,9,10]);assert.equal(seven.state.players[1]!.resources.wood,cseven.state.players[1]!.resources.wood);save('B076-N3',{six,csix,seven,cseven})})
+  it('B076 N4 actual renovation removes only ceilings future wood and whole undo restores both card promises and house cost',()=>{const s=make();buy(s,CARD);reach(s,6);owner(s);buy(s,OTHER);reach(s,7);const before=owner(s),own=schedule(before),other=schedule(before,OTHER),r=renovation(s);assert.equal(r.state.players[0]!.houseType,'clay');assert.deepEqual(schedule(r),[]);assert.deepEqual(schedule(r,OTHER),other);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.houseType,'wood');assert.equal(undone.state.players[0]!.resources.clay,before.state.players[0]!.resources.clay);assert.equal(undone.state.players[0]!.resources.reed,before.state.players[0]!.resources.reed);assert.deepEqual(schedule(undone),own);assert.deepEqual(schedule(undone,OTHER),other);const retry=renovation(s);assert.deepEqual(schedule(retry),[]);assert.deepEqual(schedule(retry,OTHER),other);save('B076-N4',{before,r,undone,retry})})
+  it('B076 N5 unaffordable renovation or an opponent renovation cannot remove owner promises',()=>{for(const mode of['poor','opponent']){const s=make(5,mode==='poor'?1:3);buy(s,CARD);let before=ready(s);if(mode==='opponent'){const r=finish(s,ok(s.takeAction(1,'house-redevelopment')));assert.deepEqual(schedule(r),schedule(before));save(`B076-N5-${mode}`,{before,r});continue}before=owner(s);assert.ok(!s.getActionAvailability(0)['house-redevelopment']);assertRejectedUnchanged(s,()=>s.takeAction(0,'house-redevelopment'));assert.deepEqual(schedule(s.getState()),schedule(before));save(`B076-N5-${mode}`,{before,r:s.getState()})}})
 })

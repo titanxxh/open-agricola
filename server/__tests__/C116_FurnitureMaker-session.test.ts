@@ -9,6 +9,9 @@ import '../../shared/cards/register-all'
 import '../../shared/cards/C/C116_FurnitureMaker'
 import '../../shared/cards/B/B109_PaperMaker'
 import '../../shared/cards/A/A123_FrameBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit49Cards from './_helpers/audit/ae-negative-49-cards'
 
 const CARD_ID = 'C116_FurnitureMaker'
 
@@ -201,4 +204,12 @@ describe('C116 Furniture Maker after occupation commitment', () => {
     expect(snapshotResponse(restored.undoAction())).toEqual(before)
   })
 
+})
+
+describe('ae-negative-49-cards', () => {
+  const { FURNITURE, sessions, save, ok, make, ready, lesson, minor } = audit49Cards
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C116 N1 actual Furniture Maker purchase gains exactly one wood even when its own occupation costs food and whole undo permits one replay',()=>{for(const prior of[false,true]){const s=make(FURNITURE,false,state=>{if(prior)state.players[0]!.occupationPlayed=['A116_WoodCutter']}),a=lesson(s,FURNITURE);assert.equal(a.state.players[0]!.resources.wood,1);assert.equal(a.state.players[0]!.resources.food,prior?29:30);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,0);const r=lesson(s,FURNITURE);assert.equal(r.state.players[0]!.resources.wood,1);save(`C116-N1-${prior}`,{a,u,r})}})
+  it('C116 N2 a later real paid occupation gives one wood for one food after commitment but a major improvement fee gives none',()=>{const s=make(FURNITURE),a=lesson(s,'A110_Roughcaster');assert.equal(a.state.players[0]!.resources.food,29);assert.equal(a.state.players[0]!.resources.wood,1);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.food,30);assert.equal(u.state.players[0]!.resources.wood,0);const r=lesson(s,'A110_Roughcaster');assert.equal(r.state.players[0]!.resources.wood,1);const t=make(FURNITURE,true,state=>{state.availableMajorImprovements=['Major_Well'];Object.assign(state.players[0]!.resources,{wood:1,stone:3})}),major=minor(t,'Major_Well');assert.equal(major.state.players[0]!.resources.wood,0);assert.equal(major.state.players[0]!.resources.stone,0);save('C116-N2',{a,u,r,major})})
+  it('C116 N3 unaffordable occupation card in hand unrelated minor and actual opponent occupation cannot reward the Furniture Maker owner',()=>{const s=make(FURNITURE,true,state=>state.players[0]!.resources.food=0),bad=assertRejectedUnchanged(s,()=>s.takeAction(0,'lessons')),legal=ok(s.takeAction(0,'grain-seeds'));assert.equal(legal.state.players[0]!.resources.wood,0);const t=make(FURNITURE,false),hand=lesson(t,'A110_Roughcaster');assert.equal(hand.state.players[0]!.resources.wood,0);const v=make(FURNITURE),small=minor(v);assert.equal(small.state.players[0]!.resources.wood,0);const q=make(FURNITURE,true,state=>state.players[1]!.occupationHand=['A110_Roughcaster']);ok(q.takeAction(0,'grain-seeds'));ready(q);let opponent=ok(q.takeAction(1,'lessons'));if(!opponent.state.players[1]!.occupationPlayed.includes('A110_Roughcaster'))opponent=ok(q.resolveChoice(1,'A110_Roughcaster'));assert.equal(opponent.state.players[0]!.resources.wood,0);save('C116-N3',{bad,legal,hand,small,opponent})})
 })

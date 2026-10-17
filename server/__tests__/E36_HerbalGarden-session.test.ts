@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -8,6 +8,9 @@ import '../../shared/cards/A/A165_PigBreeder'
 import '../../shared/cards/D/D167_PureBreeder'
 import '../../shared/cards/E/E033_BeaverColony'
 import '../../shared/cards/E/E036_HerbalGarden'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit34Scoring from './_helpers/audit/ae-negative-34-scoring'
 
 const CARD_ID = 'E036_HerbalGarden'
 
@@ -300,4 +303,33 @@ describe('E036_HerbalGarden session', () => {
     expect(response.interaction.stateId).toBe('idle')
     expect(response.state.round).toBe(2)
   })
+})
+
+describe('ae-negative-34-scoring', () => {
+  const { sessions, actor, save, setup, finish, next, take, move, hand, buy, noSource, pasture, animalKeep, printed, denyMinor } = audit34Scoring
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E036 N1 actual purchase needs a pasture and wood and scores two printed points', () => { const card = 'E036_HerbalGarden', s = setup(card, 14, st => { hand(st, card); pasture(st, [{ row: 0, col: 3 }]); st.players[0]!.resources.wood = 1; }); const r = buy(s, card); assert.equal(printed(r, card), 2); assert.equal(r.state.players[0]!.resources.wood, 0); save('E036-N1-legal', r); for (const mode of ['pasture', 'wood']) {
+      const t = setup(card, 14, st => { hand(st, card); if (mode !== 'pasture')
+          pasture(st, [{ row: 0, col: 3 }]); st.players[0]!.resources.wood = mode === 'wood' ? 0 : 1; });
+      const q = denyMinor(t, card);
+      assert.equal(printed(q, card), 0);
+      save(`E036-N1-${mode}`, q);
+  } });
+  it('E036 N2 mandatory native reorganization rejects every pasture occupied and permits either empty pasture', () => { const card = 'E036_HerbalGarden', s = setup(card, 14, st => { hand(st, card); pasture(st, [{ row: 0, col: 3 }], 'sheep', 1, false, 'p1'); pasture(st, [{ row: 0, col: 4 }], 'sheep', 1, false, 'p2'); st.players[0]!.resources.wood = 1; st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 1; }); let r = buy(s, card); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg'); const zones = structuredClone(r.interaction.request.zones); const occupied = zones.map(z => ['p1', 'p2'].includes(z.id) ? { ...z, animalType: 'sheep' as const, animalCount: 1 } : { ...z, animalType: null, animalCount: 0 }); assertRejectedUnchanged(s, () => s.resolveChoice(actor(r), 'confirm', { zones: occupied })); r = animalKeep(s, r, req => { for (const z of req.zones) {
+      z.animalType = z.id === 'p1' ? 'sheep' : null;
+      z.animalCount = z.id === 'p1' ? 2 : 0;
+  } }); assert.deepEqual(r.state.players[0]!.pastures.map(p => p.animalCount), [2, 0]); assert.equal(r.state.players[0]!.resources.sheep, 2); save('E036-N2-p1', r); next(s); move(s, 'grain-seeds'); next(s); r = take(s, 'sheep-market'); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg'); r = animalKeep(s, r, req => { for (const z of req.zones) {
+      const chosenHouse = req.zones.find(a => a.zoneType === 'house')?.id;
+      z.animalType = z.id === 'p2' || z.id === chosenHouse ? 'sheep' : null;
+      z.animalCount = z.id === 'p2' ? 2 : z.id === chosenHouse ? 1 : 0;
+  } }); assert.deepEqual(r.state.players[0]!.pastures.map(p => p.animalCount), [0, 2]); assert.equal(r.state.players[0]!.resources.sheep, 3); save('E036-N2-p2', r); });
+  it('E036 N3 hand-only pasture occupation stays legal while an already empty pasture does not force reorganization', () => { for (const mode of ['hand', 'empty']) {
+      const card = 'E036_HerbalGarden', s = setup(card, 14, st => { hand(st, card); pasture(st, [{ row: 0, col: 3 }], 'sheep', 1, false, 'p1'); pasture(st, [{ row: 0, col: 4 }], mode === 'hand' ? 'sheep' : null, mode === 'hand' ? 1 : 0, false, 'p2'); st.players[0]!.resources.wood = 1; });
+      const r = mode === 'hand' ? finish(s, take(s, 'grain-seeds'), true) : buy(s, card);
+      if (mode === 'hand')
+          noSource(r, card);
+      assert.ok(!(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg'));
+      assert.deepEqual(r.state.players[0]!.pastures.map(p => p.animalCount), mode === 'hand' ? [1, 1] : [1, 0]);
+      save(`E036-N3-${mode}`, r);
+  } });
 })

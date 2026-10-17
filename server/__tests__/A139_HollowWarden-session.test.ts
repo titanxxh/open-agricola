@@ -1,12 +1,15 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A139_HollowWarden'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit15Craft from './_helpers/audit/ae-negative-15-craft'
 
 const CARD_ID = 'A139_HollowWarden'
 
@@ -234,4 +237,13 @@ describe('A139 Hollow Warden parity', () => {
     expect(response.state.players[0]!.improvements).not.toContain('Major_Well')
     expect(response.state.players[0]!.resources.clay).toBe(0)
   })
+})
+
+describe('ae-negative-15-craft', () => {
+  const { WARDEN, sessions, save, ok, setup, playWarden, fireplace } = audit15Craft
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A139 N1 real Lessons grants only one Fireplace purchase at its ordinary clay cost',()=>{for(const [card,cost]of [['Major_Fireplace1',2],['Major_Fireplace2',3]] as const){const s=setup(WARDEN,state=>state.players[0]!.resources.clay=cost,false);const pending=playWarden(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_Joinery'));const r=fireplace(s,pending,card);assert.ok(r.state.players[0]!.improvements.includes(card));assert.equal(r.state.players[0]!.resources.clay,0);assert.ok(!r.state.players[0]!.improvements.includes('Major_Joinery'));save(`A139-N1-${card}`,{pending,r})}})
+  it('A139 N2 declining or lacking payment cannot grant a free Fireplace',()=>{const s=setup(WARDEN,undefined,false);const declined=fireplace(s,playWarden(s),null);assert.deepEqual(declined.state.players[0]!.improvements,[]);assert.equal(declined.state.players[0]!.resources.clay,10);const poor=setup(WARDEN,state=>state.players[0]!.resources.clay=0,false);const denied=playWarden(poor);assert.deepEqual(denied.state.players[0]!.improvements,[]);assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,'Major_Fireplace1'));save('A139-N2',{declined,denied})})
+  it('A139 N3 own Hollow grants one food while Clay Pit and hand do not',()=>{for(const[space,played,food]of [['hollow',true,41],['clay-pit',true,40],['hollow',false,40]] as const){const s=setup(WARDEN,undefined,played);const r=ok(s.takeAction(0,space));assert.equal(r.state.players[0]!.resources.food,food);save(`A139-N3-${space}-${played}`,r)}})
+  it('A139 N4 whole purchase undo restores occupation and clay before one fireplace retry',()=>{const s=setup(WARDEN,state=>state.players[0]!.resources.clay=2,false);const first=fireplace(s,playWarden(s),'Major_Fireplace1');const undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.improvements,[]);assert.ok(undone.state.players[0]!.occupationHand.includes(WARDEN));assert.equal(undone.state.players[0]!.resources.clay,2);const retry=fireplace(s,playWarden(s),'Major_Fireplace1');assert.equal(retry.state.players[0]!.resources.clay,0);save('A139-N4',{first,undone,retry})})
 })

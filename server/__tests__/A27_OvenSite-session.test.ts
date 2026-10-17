@@ -2,13 +2,19 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A060_OrientalFireplace'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { A027_OvenSite } from '../../shared/cards/A/A027_OvenSite'
 import { minorImprovements } from '../../shared/cards/_lookup'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import '../../shared/cards/A/A028_ForestSchool'
+import '../../shared/cards/A/A029_AleBenches'
+import '../../shared/cards/A/A123_FrameBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Improvements from './_helpers/audit/ae-negative-06-improvements'
 
 const CARD_ID = 'A027_OvenSite'
 
@@ -291,4 +297,21 @@ describe('A027 Oven Site parity', () => {
     expect(response.state.players[0]!.improvements).toContain('Major_StoneOven')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 0, wood: 2 })
   })
+})
+
+describe('ae-negative-06-improvements', () => {
+  const { OVEN, sessions, major, oven, ok, enter, buy, ovenCompleted, skip, accept, ready, turn, offered, ovenPurchase } = audit06Improvements
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A027 N1 actual free purchase gains two wood and declining leaves both ovens available',()=>{const s=oven({resources:{clay:1,stone:1}});const r=skip(s,buy(s,enter(s),OVEN));assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.clay,r.state.players[0]!.resources.stone],[2,1,1]);assert.ok(r.state.availableMajorImprovements.includes('Major_ClayOven'));assert.ok(r.state.availableMajorImprovements.includes('Major_StoneOven'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,OVEN))})
+  it('A027 N2 missing or opponent Fireplace rejects purchase before legal retry',()=>{for(const opponent of[false,true]){const s=oven({fireplace:false,configure(state){if(opponent)major(state,1,'Major_Fireplace1')}});const r=enter(s);assert.equal(offered(r,OVEN),false);assertRejectedUnchanged(s,()=>s.resolveChoice(0,OVEN));const done=buy(s,r,'A054_Credit');assert.equal(done.state.players[0]!.resources.wood,0);assert.equal(done.state.players[0]!.minorHand.includes(OVEN),true)}})
+  it('A027 N3 missing or opponent Cooking Hearth rejects purchase before legal retry',()=>{for(const opponent of[false,true]){const s=oven({hearth:false,configure(state){if(opponent)major(state,1,'Major_CookingHearth1')}});const r=enter(s);assert.equal(offered(r,OVEN),false);assertRejectedUnchanged(s,()=>s.resolveChoice(0,OVEN));const done=buy(s,r,'A054_Credit');assert.equal(done.state.players[0]!.resources.wood,0);assert.equal(done.state.players[0]!.minorHand.includes(OVEN),true)}})
+  it('A027 N4 Oriental Fireplace satisfies the Fireplace prerequisite',()=>{const s=oven({oriental:true});const r=buy(s,enter(s),OVEN);assert.equal(r.state.players[0]!.resources.wood,2);assert.equal(r.state.players[0]!.improvements.includes('Major_Fireplace1'),false)})
+  it('A027 N5 immediate Clay Oven pays exactly one clay and one stone',()=>{ovenPurchase(oven({resources:{clay:1,stone:1}}),'Major_ClayOven')})
+  it('A027 N6 immediate Stone Oven pays exactly one clay and one stone',()=>{ovenPurchase(oven({resources:{clay:1,stone:1}}),'Major_StoneOven')})
+  it('A027 N7 missing either fee resource cannot forge an immediate oven purchase',()=>{for(const resources of[{clay:0,stone:1},{clay:1,stone:0}]){const s=oven({resources});const r=buy(s,enter(s),OVEN);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_ClayOven'));assert.equal(r.state.players[0]!.improvements.includes('Major_ClayOven'),false);assert.deepEqual([r.state.players[0]!.resources.clay,r.state.players[0]!.resources.stone],[resources.clay,resources.stone]);turn(s,1,'forest')}})
+  it('A027 N8 an oven owned by another player is unavailable while the remaining oven is legal',()=>{const s=oven({resources:{clay:1,stone:1},configure(state){major(state,1,'Major_ClayOven')}});let r=buy(s,enter(s),OVEN);assert.equal(offered(r,'Major_ClayOven'),false);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_ClayOven'));r=accept(s,r);ovenCompleted(r);assert.equal(r.state.players[1]!.improvements.includes('Major_ClayOven'),true);assert.equal(r.state.players[0]!.improvements.includes('Major_StoneOven'),true)})
+  it('A027 N9 an unrelated major cannot be bought through Oven Site',()=>{const s=oven({resources:{clay:2,stone:1}});let r=accept(s,buy(s,enter(s),OVEN));assert.equal(offered(r,'Major_Fireplace2'),false);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_Fireplace2'));r=ok(s.resolveChoice(0,'Major_ClayOven'));assert.deepEqual([r.state.players[0]!.resources.clay,r.state.players[0]!.resources.stone],[1,0])})
+  it('A027 N10 after declining the immediate opportunity a later oven retains its printed price',()=>{const s=oven({resources:{clay:3,stone:1}});skip(s,buy(s,enter(s),OVEN));turn(s,1,'forest');ready(s,0);let r=enter(s,'major-improvement');assert.ok(offered(r,'Major_ClayOven'));r=ok(s.resolveChoice(0,'Major_ClayOven'));assert.deepEqual([r.state.players[0]!.resources.clay,r.state.players[0]!.resources.stone,r.state.players[0]!.resources.wood],[0,0,2])})
+  it('A027 N11 undo at the immediate optional opportunity uses only exposed public history',()=>{const s=oven({resources:{clay:1,stone:1}});const before=undoRuleSnapshot(s.getState());const r=buy(s,enter(s),OVEN);assert.equal(r.state.players[0]!.resources.wood,2);assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice');assertUndoRestored(before,s.undoAction())})
+  it('A027 N12 when both ovens are already owned the free card still gains two wood without another purchase',()=>{const s=oven({resources:{clay:1,stone:1},configure(state){major(state,1,'Major_ClayOven');major(state,1,'Major_StoneOven')}});const r=buy(s,enter(s),OVEN);assert.equal(r.state.players[0]!.resources.wood,2);assert.deepEqual([r.state.players[0]!.resources.clay,r.state.players[0]!.resources.stone],[1,1]);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_ClayOven'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_StoneOven'));ovenCompleted(r);turn(s,1,'forest')})
 })

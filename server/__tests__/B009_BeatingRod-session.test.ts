@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { descriptionEffects } from './_helpers/choice-description'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18Choice from './_helpers/audit/ae-negative-18-choice'
+
+describe('ae-negative-18-choice', () => {
+  const { CARD, sessions, save, ok, setup, buy, choose } = audit18Choice
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B009 N1 immediate reed choice adds exactly one and cannot then exchange it for cattle',()=>{for(const reed of[0,1]){const s=setup(reed),pending=buy(s),r=choose(s,pending,'reed');assert.equal(r.state.players[0]!.resources.reed,reed+1);assert.equal(r.state.players[0]!.resources.cattle,0);assert.ok(r.state.players[1]!.minorHand.includes(CARD));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'cattle'));save(`B009-N1-${reed}`,{pending,r})}})
+  it('B009 N2 existing reed pays exactly one for one housed cattle without first granting reed',()=>{const s=setup(1),pending=buy(s),r=choose(s,pending,'cattle');assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources.cattle,1);assert.equal(r.state.players[0]!.resources.food,20);assert.equal(r.state.players[1]!.resources.cattle,0);assert.ok(r.state.players[1]!.minorHand.includes(CARD));save('B009-N2',{pending,r})})
+  it('B009 N3 no reed wrong actor and invalid choice reject before one legal reed option',()=>{const s=setup(),pending=buy(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'both'));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'reed'));if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice'){const cattle=pending.interaction.request.options.find(o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='resourceExchange'&&e.resourcesGained?.cattle===1));if(cattle)assertRejectedUnchanged(s,()=>s.resolveChoice(0,cattle.value))}else{assert.ok(pending.state.players[1]!.minorHand.includes(CARD));assert.equal(pending.state.players[0]!.resources.reed,1);assert.equal(pending.state.players[0]!.resources.cattle,0)}const r=choose(s,pending,'reed');assert.equal(r.state.players[0]!.resources.reed,1);assert.equal(r.state.players[0]!.resources.cattle,0);save('B009-N3',{pending,r})})
+  it('B009 N4 whole choice undo restores payment livestock and both card hands then one retry',()=>{const s=setup(1),r=choose(s,buy(s),'cattle'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.reed,1);assert.equal(undone.state.players[0]!.resources.cattle,0);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));assert.ok(!undone.state.players[1]!.minorHand.includes(CARD));const retry=choose(s,buy(s),'cattle');assert.equal(retry.state.players[0]!.resources.cattle,1);assert.equal(retry.state.players[0]!.resources.reed,0);save('B009-N4',{r,undone,retry})})
+})

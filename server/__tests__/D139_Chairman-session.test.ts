@@ -1,11 +1,13 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/D/D139_Chairman'
+import assert from 'node:assert/strict'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 describe('D139_Chairman session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -101,4 +103,11 @@ describe('D139 Chairman parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1 })
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, choose, resources } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D139 N1 owner receives one food before minor payment while actual opponent Meeting Place rewards only actor and owner', () => { const s = make('D139_Chairman', st => { st.players[0]!.minorHand = ['A050_MilkJug']; st.players[0]!.resources.clay = 1 }), p = ok(s.takeAction(0, 'meeting-place')); resources(p, { food: 101, clay: 1 }); const r = finish(s, choose(s, p, 'actions.improvement.name')); assert.ok(r.state.players[0]!.minorPlayed.includes('A050_MilkJug')); const c = make('D139_Chairman'); finish(c, ok(c.takeAction(0, 'grain-seeds')), false); ready(c); const cr = finish(c, ok(c.takeAction(1, 'meeting-place')), false); resources(cr, { food: 101 }); resources(cr, { food: 101 }, 1); resources(cr, { food: 100 }, 2); save('D139-N1', { p, r, cr }) })
+  it('D139 N2 nonmatching actions and hand-only Chairman cannot grant its food', () => { const s = make('D139_Chairman'); finish(s, ok(s.takeAction(0, 'grain-seeds')), false); ready(s); const r = finish(s, ok(s.takeAction(1, 'day-laborer')), false); resources(r, { food: 100 }); resources(r, { food: 102 }, 1); const c = make('D139_Chairman', undefined, false), cr = finish(c, ok(c.takeAction(0, 'meeting-place')), false); resources(cr, { food: 100 }); save('D139-N2', { r, cr }) })
 })

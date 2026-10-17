@@ -8,6 +8,8 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/E/E165_MasterHuntsman'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
+import assert from 'node:assert/strict'
+import * as audit57Livestock from './_helpers/audit/ae-negative-57-livestock'
 
 const CARD_ID = 'E165_MasterHuntsman'
 
@@ -95,4 +97,25 @@ describe('E165_MasterHuntsman session', () => {
     expect(result).toBeUndefined()
   })
 
+})
+
+describe('ae-negative-57-livestock', () => {
+  const { sessions, ok, save, make, finish, play, choose, count } = audit57Livestock
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E165 N1 actual first Lessons grants exactly one boar and whole purchase undo restores hand and animals', () => {
+    const session = make('E165_MasterHuntsman', undefined, false), response = finish(session, play(session, 'E165_MasterHuntsman')), undone = ok(session.undoAction())
+    assert.deepEqual(count(response), [0, 1, 0]); assert.deepEqual(count(undone), [0, 0, 0]); assert.ok(undone.state.players[0]!.occupationHand.includes('E165_MasterHuntsman'))
+    save('E165-N1', { response, undone })
+  })
+  it('E165 N2 actual major improvement pays its cost and grants one boar while paid minor and opponent major grant no owner boar', () => {
+    for (const mode of ['major', 'minor', 'opponent']) {
+      const actor = mode === 'opponent' ? 1 : 0
+      const session = make('E165_MasterHuntsman', state => { state.currentPlayerIndex = actor; state.players[actor]!.resources.clay = 2; state.players[actor]!.minorHand = ['B004_WoodPile', 'A006_StorageBarn'] }, true, 14)
+      let pending = ok(session.takeAction(actor, 'major-improvement'))
+      if (pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice' && !pending.interaction.request.options.some(option => option.value === 'Major_Fireplace1')) pending = choose(session, pending, option => option.value.startsWith('action-improvement-') || option.labelKey === 'actions.improvement.name')
+      const response = finish(session, choose(session, pending, option => option.value === (mode === 'minor' ? 'B004_WoodPile' : 'Major_Fireplace1')))
+      assert.deepEqual(count(response), [0, mode === 'major' ? 1 : 0, 0]); assert.equal(response.state.players[actor]!.resources.clay, mode === 'minor' ? 2 : 0)
+      save(`E165-N2-${mode}`, { pending, response })
+    }
+  })
 })

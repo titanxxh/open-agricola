@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -6,6 +6,9 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
 import '../../shared/cards/B/B115_TinsmithMaster'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit27Tinsmith from './_helpers/audit/ae-negative-27-tinsmith'
 
 const CARD_ID = 'B115_TinsmithMaster'
 const FILLER = '__test_placeholder__'
@@ -407,4 +410,14 @@ describe('B115_TinsmithMaster session', () => {
       expect(f1?.stacks[0]?.remaining ?? 0).toBe(3)
     })
   })
+})
+
+describe('ae-negative-27-tinsmith', () => {
+  const { CARD, sessions, save, ok, finish, make, sow, selection, stacks, capacityCase } = audit27Tinsmith
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B115 N1 actual grain and vegetable sow adds one optional matching crop only to selected freshly sown fields',()=>{const s=make(),a=sow(s),pending=selection(s,a.r),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:0},{row:0,col:1}]})),false);assert.deepEqual(stacks(r),[{row:0,col:0,stacks:[{kind:'grain',remaining:4}]},{row:0,col:1,stacks:[{kind:'vegetable',remaining:3}]},{row:0,col:2,stacks:[{kind:'grain',remaining:2}]}]);save('B115-N1',{a,pending,r})})
+  it('B115 N2 rejecting a previously planted unselected field preserves the bonus request before choosing just the new grain field',()=>{const s=make(),a=sow(s),pending=selection(s,a.r),invalid=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:0,col:2}]})),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:0}]})),false);assert.deepEqual(stacks(r),[{row:0,col:0,stacks:[{kind:'grain',remaining:4}]},{row:0,col:1,stacks:[{kind:'vegetable',remaining:2}]},{row:0,col:2,stacks:[{kind:'grain',remaining:2}]}]);save('B115-N2',{a,pending,invalid,r})})
+  it('B115 N3 declining the real optional sow bonus and card only in hand both retain ordinary three grain and two vegetable',()=>{const s=make(),a=sow(s),r=finish(s,a.r,false),other=make(false),b=sow(other),hand=finish(other,b.r,false);assert.deepEqual(stacks(r),stacks(hand));assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,3);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,2);save('B115-N3',{a,r,b,hand})})
+  it('B115 N4 whole actual sow and selected bonus undo restores both seeds and preexisting crop without replay duplication',()=>{const s=make(),before=ok(s.getState()),a=sow(s),pending=selection(s,a.r),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:0}]})),false),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.resources,before.state.players[0]!.resources);assert.deepEqual(stacks(undone),stacks(before));const b=sow(s);selection(s,b.r);const retry=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:0}]})),false);assert.deepEqual(stacks(retry),stacks(r));save('B115-N4',{before,a,pending,r,undone,b,retry})})
+  it('B115 N5 real animal reorganization permits three sheep in an unstabled pasture and four with a stable while rejecting the next sheep',()=>{for(const[stable,cap]of[[false,3],[true,4]]as const)capacityCase(CARD,1,stable,cap,`B115-N5-${stable}`)})
 })

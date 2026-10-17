@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardListeners } from '../../shared/cards/card-listeners'
@@ -11,6 +11,8 @@ import { getActiveCardRegistry, setActiveCardRegistry } from '../../shared/cards
 import { CardRegistry } from '../../shared/cards/registry'
 
 import '../../shared/cards/C/C053_GypsysCrock'
+import assert from 'node:assert/strict'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 describe('C053_GypsysCrock session', () => {
   const executeSpecialEffectLeaves = (ruleOwner: GameSession,
@@ -323,4 +325,35 @@ describe("C053 Gypsy's Crock parity", () => {
 
     expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 0, food: 4 })
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, ok, save, setup, finish, prerequisites, hand, buy, printed, ownMajor, denyMinor, exchangeVegetables } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C053 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'C053_GypsysCrock', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "clay": 2 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.clay, 0); save('C053-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "clay": 1 }); }); denyMinor(t, card); save('C053-N1-short', t.getState()); });
+  it('C053 N2 cooking one to four goods in one real batch awards one food per pair', () => {
+      for (const n of [1, 2, 3, 4]) {
+          const card = 'C053_GypsysCrock', s = setup(card, 14, st => { ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.vegetable = n; });
+          const r = exchangeVegetables(s, n);
+          assert.equal(r.state.players[0]!.resources.vegetable, 0);
+          assert.equal(r.state.players[0]!.resources.food, [42, 45, 47, 50][n - 1]);
+          save(`C053-N2-${n}`, r);
+      }
+  });
+  it('C053 N3 separate single good batches hand only and cancelled cooking cannot award a pair bonus', () => {
+      for (const mode of ['split', 'hand', 'cancel']) {
+          const card = 'C053_GypsysCrock', s = setup(card, 14, st => {
+              ownMajor(st, 'Major_Fireplace1');
+              st.players[0]!.resources.vegetable = 2;
+              if (mode === 'hand')
+                  hand(st, card);
+          });
+          let r = mode === 'cancel' ? finish(s, ok(s.takeAnytimeAction(0, 'exchange'))) : exchangeVegetables(s, mode === 'hand' ? 2 : 1);
+          if (mode === 'split')
+              r = exchangeVegetables(s, 1);
+          assert.equal(r.state.players[0]!.resources.food, mode === 'cancel' ? 40 : 44);
+          assert.equal(r.state.players[0]!.resources.vegetable, mode === 'cancel' ? 2 : 0);
+          save(`C053-N3-${mode}`, r);
+      }
+  });
 })

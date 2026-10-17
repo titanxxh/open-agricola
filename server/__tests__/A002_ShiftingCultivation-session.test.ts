@@ -4,6 +4,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A002_ShiftingCultivation'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit02Immediate from './_helpers/audit/ae-negative-02-immediate'
 
 const CARD_ID = 'A002_ShiftingCultivation'
 
@@ -102,5 +105,29 @@ describe('A002 Shifting Cultivation parity', () => {
     expect(response.state.players[0]!.fields).toHaveLength(0)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[1]!.minorHand).not.toContain(CARD_ID)
+  })
+})
+
+describe('ae-negative-02-immediate', () => {
+  const { setup, requireWait, play, accept } = audit02Immediate
+  describe('negative audit 02 immediate effects', () => {
+    it('A002 N1: Shifting Cultivation rejects an occupied field then refunds one-field play on undo', () => {
+        const session = setup('A002_ShiftingCultivation', state => { state.players[0]!.resources.food = 2 })
+        const before = undoRuleSnapshot(session.getState())
+        let response = accept(session, play(session, 'A002_ShiftingCultivation'))
+        const interaction = requireWait(response)
+        assert(interaction.request.kind === 'farm-select')
+        assert(interaction.request.farm.farmType === 'plow')
+        const tile = interaction.request.farm.selectableTiles[0]!
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { tile: response.state.players[0]!.roomTiles[0]! }))
+        response = session.commitSelectionChoice(0, { tile })
+        assert.equal(response.ok, true, response.error)
+        assert.deepEqual(response.state.players[0]!.fields, [{ ...tile, stacks: [] }])
+        assert.equal(response.state.players[0]!.resources.food, 0)
+        assert(response.state.players[1]!.minorHand.includes('A002_ShiftingCultivation'))
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { tile }))
+        assertUndoRestored(before, session.undoAction())
+        session.dispose()
+      })
   })
 })

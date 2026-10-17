@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterAll, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -6,6 +6,10 @@ import '../../shared/cards/A/A071_ClearingSpade'
 import '../../shared/cards/B/B068_Beanfield'
 import '../../shared/cards/C/C070_LettucePatch'
 import type { AnytimeAction } from '../../shared/contract/types';
+import assert from 'node:assert/strict'
+import fs from './_helpers/audit-evidence-fs'
+import { assertRejectedUnchanged, assertRuleOutcome, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit10FieldSource from './_helpers/audit/ae-negative-10-field-source'
 
 describe('A071_ClearingSpade session', () => {
   const setup = (fields?: { row: number; col: number; crop: string | null; remaining: number }[]) => {
@@ -173,5 +177,37 @@ describe('A071_ClearingSpade session', () => {
     expect(resp.state.players[0]!.cardStates.C070_LettucePatch?.extraData?.cardFieldStacks).toEqual([
       { crop: 'vegetable', remaining: 1 },
     ])
+  })
+})
+
+describe('ae-negative-10-field-source', () => {
+  const { SPADE, root, sessions, saved, save, setup, buy, deny, turn, fields, board, selection, SPADE_ACTION, spade, openSpade, move, cropSupply } = audit10FieldSource
+  afterAll(() => { fs.mkdirSync(root, { recursive: true }); fs.writeFileSync(`${root}/manifest.json`, JSON.stringify({ raw: process.env.AGRICOLA_NEGATIVE_RAW === '1', files: saved }, null, 2)) })
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A071 N1 actual one wood purchase permits grain and vegetable transfers without spending supply', () => {
+   deny(setup(SPADE, { played: false }), SPADE)
+   for (const kind of ['grain', 'vegetable'] satisfies Array<'grain' | 'vegetable'>) { const s = setup(SPADE, { played: false, resources: { wood: 1 } }, state => fields(state, [{ kind, remaining: 2 }, null])); buy(s, SPADE); const r = move(s); assert.equal(r.state.players[0]!.resources.wood, 0); assert.deepEqual(board(r), [1, 1]); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 }); save(`A071-N1-${kind}`, r) }
+  })
+  it('A071 N2 source below two and absence of an empty target leave no legal transfer', () => {
+   for (const count of [0, 1]) { const s = spade('grain', count); assert.ok(!s.getState().interaction.anytimeActions.some(a => a.id === SPADE_ACTION)); assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, SPADE_ACTION)) }
+   const s = setup(SPADE, {}, state => fields(state, [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 1 }])); assert.ok(!s.getState().interaction.anytimeActions.some(a => a.id === SPADE_ACTION)); assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, SPADE_ACTION))
+  })
+  it('A071 N2T genuine source and target selectors reject planted same foreign multi and wrong actor targets', () => {
+   const s = spade('grain', 2, true, state => fields(state, [{ kind: 'grain', remaining: 2 }], 1, 4)); let r = openSpade(s)
+   for (const positions of [[{ row: 0, col: 2 }], [{ row: 0, col: 4 }], [{ row: 0, col: 1 }, { row: 0, col: 2 }]]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions }))
+   r = selection(s, r); assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 2 }] })); for (const col of [1, 4]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col }] })); r = selection(s, r, { row: 0, col: 2 }); assert.deepEqual(board(r), [1, 1, 0]); assert.deepEqual(board(r, 1), [2]); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 })
+  })
+  it('A071 N3 two separate legal anytime transfers stop only when the source falls below two', () => { const s = spade('grain', 3); move(s); const r = move(s, { row: 0, col: 1 }, { row: 0, col: 3 }); assert.deepEqual(board(r), [1, 1, 1]); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 }); assert.ok(!r.interaction.anytimeActions.some(a => a.id === SPADE_ACTION)); save('A071-N3-two-transfers', r) })
+  it('A071 N4 wood in Wood Field is not a crop eligible for Clearing Spade', () => {
+   const s = spade('grain', 2, true, state => { const p = state.players[0]!; p.minorPlayed.push('D075_WoodField'); p.occupationPlayed = ['A125_Priest']; p.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, null] } } })
+   const r = openSpade(s); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'); const selector = r.interaction.request.selection; assert.ok(selector?.kind === 'farm-position'); const positions = selector.selectablePositions; save('A071-N4-source-request', r)
+   const wood = positions.find(p => p.row === -1 && p.col === 4075)
+   if (wood) { const moved = selection(s, selection(s, r, wood), { row: 0, col: 2 }); save('A071-N4-wood-completed', moved) }
+   else { selection(s, selection(s, r), { row: 0, col: 2 }) }
+   const p = s.getState().state.players[0]!; const actual = { woodSourceOffered: Boolean(wood), farmWood: p.fields.flatMap(f => f.stacks).filter(v => v.kind === 'wood').reduce((n, v) => n + v.remaining, 0), woodCardStacks: p.cardStates.D075_WoodField?.extraData?.cardFieldStacks, woodSupply: p.resources.wood }; save('A071-N4-outcome', actual); assertRuleOutcome(actual, { woodSourceOffered: false, farmWood: 0, woodCardStacks: [{ crop: 'wood', remaining: 2 }, null], woodSupply: 0 })
+  })
+  it('A071 N5 moving a vegetable is not sowing and does not trigger Garden Hoe', () => { const s = spade('vegetable', 2, true, state => state.players[0]!.minorPlayed.push('A079_GardenHoe')); const r = move(s); assert.deepEqual(board(r), [1, 1, 0]); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 }); assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.resources.stone, 0) })
+  it('A071 N6 actual completed transfer undo observes native capability and retries without duplicating crops', () => {
+   const s = spade(); const before = undoRuleSnapshot(s.getState()); turn(s, 0, 'farmland'); move(s); const undone = s.undoAction(); save('A071-N6-undo', { before: JSON.parse(before), response: undone }); if (undone.ok) { assertUndoRestored(before, undone); turn(s, 0, 'farmland'); const r = move(s); assert.deepEqual(board(r), [1, 1, 0]); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 }); save('A071-N6-retry', r) } else { assert.deepEqual(board(undone), [1, 1, 0]); assert.deepEqual(cropSupply(undone), { grain: 0, vegetable: 0 }) }
   })
 })

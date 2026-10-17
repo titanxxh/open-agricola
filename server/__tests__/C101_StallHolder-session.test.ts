@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C101_StallHolder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit46Harvest from './_helpers/audit/ae-negative-46-harvest'
 
 describe('C101_StallHolder session', () => {
   const setup = (opts?: { stableCount?: number }) => {
@@ -125,4 +128,12 @@ describe('C101_StallHolder session', () => {
     const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C101-stall-holder-anytime')
   })
+})
+
+describe('ae-negative-46-harvest', () => {
+  const { STALL, sessions, save, ok, make, nextRound, lesson, bonus, stables, stall } = audit46Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C101 N1 real Lessons grants no point and zero through four unfenced stables yield the exact one through five food schedule',()=>{const a=lesson(make(STALL,false),STALL);assert.equal(bonus(a,STALL),0);for(const n of[0,1,2,3,4]){const s=make(STALL,true,state=>{state.round=8;Object.assign(state.players[0]!.resources,{grain:4,food:20});stables(state,n)}),r=stall(s);assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.food,21+n);assert.equal(bonus(r,STALL),1);save(`C101-N1-${n}`,{a,r})}})
+  it('C101 N2 fenced stables do not increase food and repeat use in the same round is rejected before the natural reset',()=>{const s=make(STALL,true,state=>{state.round=8;Object.assign(state.players[0]!.resources,{grain:4,food:20});stables(state,1,true)}),r=stall(s),bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C101-stall-holder-anytime'));assert.equal(r.state.players[0]!.resources.food,22);assert.equal(r.state.players[0]!.resources.grain,2);const nine=nextRound(s,9,false),again=stall(s,'meeting-place');assert.equal(again.state.players[0]!.resources.grain,0);assert.equal(bonus(again,STALL),2);assert.equal(again.state.players[0]!.resources.food,nine.state.players[0]!.resources.food+2);save('C101-N2',{r,bad,nine,again})})
+  it('C101 N3 grain below two and card only in hand never grant food or a point before a legal ordinary action',()=>{for(const mode of['grain','hand']){const s=make(STALL,mode!=='hand',state=>{state.round=8;state.players[0]!.resources.grain=mode==='grain'?1:2}),bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C101-stall-holder-anytime')),legal=ok(s.takeAction(0,'reed-bank'));assert.equal(bonus(legal,STALL),0);assert.equal(legal.state.players[0]!.resources.food,100);assert.equal(legal.state.players[0]!.resources.grain,mode==='grain'?1:2);save(`C101-N3-${mode}`,{bad,legal})}})
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach, afterAll } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
@@ -6,6 +6,10 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A084_Silage'
+import assert from 'node:assert/strict'
+import { writeFileSync } from './_helpers/audit-evidence-fs'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit11AnimalHousing from './_helpers/audit/ae-negative-11-animal-housing'
 
 const CARD_ID = 'A084_Silage'
 const FILLER = '__test_placeholder__'
@@ -257,4 +261,18 @@ describe('A084 Silage parity', () => {
       .toEqual([source === 'farmyard:2:2' ? 1 : 2, source === 'farmyard:2:3' ? 1 : 2])
     expect(response.state.players[0]!.resources.sheep).toBe(3)
   })
+})
+
+describe('ae-negative-11-animal-housing', () => {
+  const { SILAGE, sessions, silageAccepted, directory, evidence, ok, record, options, choose, buy, deny, settle, complete, silage, silageBreed, next } = audit11AnimalHousing
+  afterAll(() => writeFileSync(`${directory}/native-responses.json`, JSON.stringify(evidence, null, 2)))
+  afterEach(context => sessions.splice(0).forEach(s => { record(`test-final:${context.task.name}`, s.getState()); s.dispose() }))
+  it('A084 N1 one field forged purchase rejects and two fields free purchase succeeds',()=>{deny(silage({played:false,fields:1}),SILAGE);const r=buy(silage({played:false}),SILAGE);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.sheep,2);assert.ok(r.state.players[0]!.minorPlayed.includes(SILAGE));});
+  it('A084 N2 reserve grain exact payment and decline at natural return home',()=>{let s=silage();let r=silageBreed(s,complete(s));assert.equal(r.state.players[0]!.resources.sheep,3);assert.equal(r.state.players[0]!.resources.grain,0);s=silage();complete(s);r=record('Silage-decline',ok(s.resolveChoice(0,'__skip__')));assert.equal(r.state.players[0]!.resources.sheep,2);assert.equal(r.state.players[0]!.resources.grain,1);});
+  it('A084 N3 own field grain payment rejects invalid source and removes exactly one',()=>{const s=silage({resources:{grain:0},fieldGrain:3,fields:3},state=>{state.players[0]!.fields[1]!.stacks=[{kind:'grain',remaining:3}];state.players[0]!.fields[2]!.stacks=[{kind:'vegetable',remaining:2}];state.players[1]!.fields=[{row:2,col:1,stacks:[{kind:'grain',remaining:1}]}];});let r=complete(s);r=choose(s,r,o=>o.value!=='__skip__');const field=options(r).find(o=>o.value!=='reserve'&&o.value!=='__skip__');assert.ok(field);record('Silage-invalid-field',assertRejectedUnchanged(s,()=>s.resolveChoice(0,'field:99')));record('Silage-vegetable-field',assertRejectedUnchanged(s,()=>s.resolveChoice(0,'farmyard:2:3')));record('Silage-invalid-reserve',assertRejectedUnchanged(s,()=>s.resolveChoice(0,'reserve')));record('Silage-other-actor',assertRejectedUnchanged(s,()=>s.resolveChoice(1,field.value)));r=settle(s,record('Silage-field-pay',ok(s.resolveChoice(0,field.value))));assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,2);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,3);assert.equal(r.state.players[1]!.fields[0]!.stacks[0]!.remaining,1);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.sheep,3);});
+  it('A084 N4 two eligible species breed only selected species once',()=>{const s=silage({pigs:2,resources:{grain:2}});const r=silageBreed(s,complete(s));assert.deepEqual({grain:r.state.players[0]!.resources.grain,sheep:r.state.players[0]!.resources.sheep,boar:r.state.players[0]!.resources.boar},{grain:1,sheep:3,boar:2});const accepted=silageAccepted.get(r);assert.ok(accepted);record('Silage-closed-payment',assertRejectedUnchanged(s,()=>s.resolveChoice(0,accepted)));});
+  it('A084 N5 no owner grain one animal and unplayed exclude extra breeding',()=>{for(const config of[{resources:{grain:0}},{sheep:1},{played:false}]){const s=silage(config,state=>{state.players[1]!.resources.grain=3;});const r=complete(s);assert.equal(r.state.players[0]!.resources.sheep,config.sheep??2);assert.equal(r.state.players[0]!.resources.grain,config.resources?.grain??1);assert.equal(r.state.round,6);}});
+  it('A084 N6 real harvest has only ordinary breeding and no Silage grain payment',()=>{const s=silage({round:4});let r=complete(s);r=next(s,settle(s,r));assert.equal(r.state.round,5);assert.equal(r.state.players[0]!.resources.sheep,3);assert.equal(r.state.players[0]!.resources.grain,1);});
+  it('A084 N7 natural next nonharvest return allows one recurrence',()=>{const s=silage({resources:{grain:2}});let r=next(s,silageBreed(s,complete(s)));assert.equal(r.state.round,6);r=next(s,silageBreed(s,complete(s)));assert.equal(r.state.round,7);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.sheep,4);});
+  it('A084 N8 purchase undo retry and actual return phase undo eligibility',()=>{let s=silage({played:false});const before=undoRuleSnapshot(s.getState());buy(s,SILAGE);assertUndoRestored(before,record('Silage-buy-undo',s.undoAction()));buy(s,SILAGE);s=silage();const offer=complete(s),snap=undoRuleSnapshot(offer);let r=silageBreed(s,offer);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.sheep,3);const undo=record('Silage-phase-undo',s.undoStep());if(!undo.ok){assert.equal(undo.error,'no history to undo');assert.equal(undo.state.players[0]!.resources.grain,0);assert.equal(undo.state.players[0]!.resources.sheep,3);return;}assert.deepEqual(JSON.parse(undoRuleSnapshot(undo)),JSON.parse(snap));r=silageBreed(s,undo);assert.equal(r.state.players[0]!.resources.sheep,3);});
 })

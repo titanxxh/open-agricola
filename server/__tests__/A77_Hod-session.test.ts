@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -7,6 +7,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A077_Hod'
 import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit10Accumulation from './_helpers/audit/ae-negative-10-accumulation'
 
 describe('A077_Hod session', () => {
   const setup = (currentPlayerIndex = 0) => {
@@ -182,4 +185,14 @@ describe('A077_Hod session', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1 })
   })
+})
+
+describe('ae-negative-10-accumulation', () => {
+  const { HOD, sessions, save, setup, ready, turn, buy, deny, gainCount, market, purchaseUndo } = audit10Accumulation
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A077 N1 live purchase shortage rejects before exact fee control', () => { deny(setup({ played: false }), HOD); const s = setup({ played: false, resources: { wood: 1 } }); const r = buy(s, HOD); assertRejectedUnchanged(s, () => s.resolveChoice(0, HOD)); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.clay, 1); assert.equal(gainCount(r, HOD), 1) })
+  it('A077 N2 actual own and opponent Pig Market use rewards only holder', () => { for (const actor of [0, 1]) { const s = setup({ played: false, resources: { wood: 1 } }); buy(s, HOD); if (actor === 0) turn(s, 1, 'forest'); const r = market(s, actor); assert.equal(r.state.players[0]!.resources.clay, 3); assert.equal(r.state.players[1]!.resources.clay, 0); assert.equal(r.state.players[actor]!.resources.boar, 1); assert.equal(r.state.players[actor]!.pastures[0]!.animalCount, 1); assert.equal(gainCount(r, HOD), 2) } })
+  it('A077 N3 multiple pigs other markets and in hand distinguish source', () => { const s = setup({ pig: 3 }); const r = market(s); assert.equal(r.state.players[0]!.resources.clay, 2); assert.equal(r.state.players[0]!.resources.boar, 3); assert.equal(gainCount(r, HOD), 1); for (const [space, animal] of [['sheep-market', 'sheep'], ['cattle-market', 'cattle']] satisfies Array<[string, 'sheep' | 'cattle']>) { const c = market(setup(), 0, space, animal); assert.equal(c.state.players[0]!.resources.clay, 0); assert.equal(c.state.players[0]!.resources[animal], 1) } const hand = market(setup({ played: false })); assert.equal(hand.state.players[0]!.resources.clay, 0); assert.equal(hand.state.players[0]!.resources.boar, 1) })
+  it('A077 N4 occupied repeat rejects before legal remaining worker control', () => { const s = setup(); market(s); turn(s, 1, 'forest'); ready(s, 0); assertRejectedUnchanged(s, () => s.takeAction(0, 'pig-market')); const r = turn(s, 0, 'day-laborer'); assert.equal(r.state.players[0]!.resources.clay, 2); assert.equal(r.state.players[0]!.resources.boar, 1); assert.equal(r.state.players[0]!.resources.food, 42); assert.equal(gainCount(r, HOD), 1) })
+  it('A077 N5 actual purchase and both recipient undo restore before replay', () => { const purchase = setup({ played: false, resources: { wood: 1 } }); const purchaseBefore = undoRuleSnapshot(purchase.getState()); buy(purchase, HOD); purchaseUndo(purchase, purchaseBefore); assert.equal(buy(purchase, HOD).state.players[0]!.resources.clay, 1); for (const actor of [0, 1]) { const s = setup({ resources: { clay: 1 } }); if (actor === 1) turn(s, 0, 'forest'); const before = undoRuleSnapshot(ready(s, actor)); market(s, actor); assertUndoRestored(before, s.undoAction()); const r = market(s, actor); assert.equal(r.state.players[0]!.resources.clay, 3); assert.equal(r.state.players[actor]!.resources.boar, 1); assert.equal(gainCount(r, HOD), 1); save('Hod-actual-whole-use-undo-replay', r) } })
 })

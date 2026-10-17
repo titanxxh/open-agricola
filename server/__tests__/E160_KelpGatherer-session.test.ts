@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/E/E160_KelpGatherer'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected } from './_helpers/negative-rule-audit'
+import * as audit56Purchase from './_helpers/audit/ae-negative-56-purchase'
 
 const FIXED_HANDS = [
   { occupation: '__test_occupation_p1__', minor: '__test_minor_p1__' },
@@ -97,4 +100,11 @@ describe('E160_KelpGatherer session', () => {
     expect(after.players[2]!.resources.vegetable).toBe(0)
     expect(after.players[3]!.resources.vegetable).toBe(0)
   })
+})
+
+describe('ae-negative-56-purchase', () => {
+  const { sessions, ok, save, make, finish } = audit56Purchase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E160 N1 real opponent Fishing gives that collector one additional food and gives only owner one vegetable while an empty pile rejects without either reward',()=>{for(const pile of[0,2]){const s=make('E160_KelpGatherer',st=>{st.currentPlayerIndex=1;st.actionSpaces.find(a=>a.id==='fishing')!.resources.food=pile},true,14),r=pile===0?assertEmptyAccumulationRejected(s,1,'fishing'):finish(s,ok(s.takeAction(1,'fishing')));assert.equal(r.state.players[1]!.resources.food,pile===0?100:101+pile);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(r.state.players[0]!.resources.vegetable,pile===0?0:1);assert.equal(r.state.players[1]!.resources.vegetable,0);assert.equal(r.state.actionSpaces.find(a=>a.id==='fishing')!.resources.food,0);save(`E160-N1-${pile}`,r)}})
+  it('E160 N2 owner Fishing unrelated opponent food space and hand-only card cannot give vegetable or extra collector food',()=>{for(const mode of['self','unrelated','hand']){const actor=mode==='self'?0:1,s=make('E160_KelpGatherer',st=>{st.currentPlayerIndex=actor;st.actionSpaces.find(a=>a.id==='fishing')!.resources.food=2;st.actionSpaces.find(a=>a.id==='traveling-players')!.resources.food=2},mode!=='hand',14),r=finish(s,ok(s.takeAction(actor,mode==='unrelated'?'traveling-players':'fishing')));assert.equal(r.state.players[0]!.resources.vegetable,0);assert.equal(r.state.players[actor]!.resources.food,102);save(`E160-N2-${mode}`,r)}})
 })

@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
@@ -9,6 +9,9 @@ import { reap } from '../../shared/actions/effects/reap'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E072_ArtichokeField'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit41Private from './_helpers/audit/ae-negative-41-private'
 
 const CARD_ID = 'E072_ArtichokeField'
 const ROW = -1
@@ -391,5 +394,19 @@ describe('E072 Artichoke Field parity', () => {
 
     expect(response.scores[0]!.categories.find((category) => category.key === 'fields'))
       .toMatchObject({ quantity: 1, total: -1 })
+  })
+})
+
+describe('ae-negative-41-private', () => {
+  const { sessions, ok, save, setup, finish, play, next, complete, enterSow, cardSow, slots, occupations } = audit41Private
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E072 N1 actual wood paid purchase and a paid vegetable sow reap one vegetable plus exactly one food on natural harvest',()=>{
+   const s=setup('E072_ArtichokeField',st=>{occupations(st);Object.assign(st.players[0]!.resources,{wood:1,vegetable:1})},false,4),bought=play(s,'E072_ArtichokeField');assert.equal(bought.state.players[0]!.resources.wood,0);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const planted=finish(s,cardSow(s,ok(s.takeAction(0,'grain-utilization')),'vegetable'));assert.equal(planted.state.players[0]!.resources.vegetable,0);assert.deepEqual(slots(planted,'E072_ArtichokeField'),[{crop:'vegetable',remaining:2}]);const r=complete(s,['clay-pit']);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.equal(r.state.players[0]!.resources.food,97);assert.deepEqual(slots(r,'E072_ArtichokeField'),[{crop:'vegetable',remaining:1}]);save('E072-N1',{bought,planted,r})
+  })
+  it('E072 N2 invalid wood sow rejects before legal grain seed and an empty card gives no harvest food',()=>{
+   const s=setup('E072_ArtichokeField',st=>Object.assign(st.players[0]!.resources,{wood:1,grain:1}),true,4),p=enterSow(s,ok(s.takeAction(0,'grain-utilization')));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='sow');const f=p.interaction.request.farm.selectableFields.find(f=>f.tile.row<0);assert.ok(f);const bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{...f.tile,crop:'wood'}]})),r=finish(s,cardSow(s,p,'grain'));assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.wood,1);const t=setup('E072_ArtichokeField',()=>{},true,4),empty=complete(t,['clay-pit','forest','reed-bank','fishing']);assert.equal(empty.state.players[0]!.resources.food,96);assert.equal(empty.state.players[0]!.resources.vegetable,0);save('E072-N2',{p,bad,r,empty})
+  })
+  it('E072 N3 a real Festival Planning private reap takes one card crop and gives no harvest-only food',()=>{
+   const s=setup('E072_ArtichokeField',st=>{occupations(st);st.players[0]!.resources.grain=1;st.players[0]!.minorHand=['C072_FestivalPlanning']},true,5),planted=finish(s,cardSow(s,ok(s.takeAction(0,'grain-utilization')),'grain'));next(s,planted);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const r=play(s,'C072_FestivalPlanning');assert.equal(r.state.round,5);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,99);assert.deepEqual(slots(r,'E072_ArtichokeField'),[{crop:'grain',remaining:2}]);assert.equal(r.state.players[0]!.resources.begging,0);save('E072-N3',{planted,r})
   })
 })

@@ -3,12 +3,15 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/E/E005_NightLoot'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionSpace, Resource } from '../../shared/contract/types'
 
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit24Minors from './_helpers/audit/ae-negative-24-minors'
 
 const CARD_ID = 'E005_NightLoot'
 
@@ -339,4 +342,12 @@ describe('E005 Night Loot parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1 })
   })
+})
+
+describe('ae-negative-24-minors', () => {
+  const { LOOT, sessions, save, ok, setup, finish, menu, buy, piles, totals } = audit24Minors
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E005 N1 actual two food purchase removes exactly one each of two distinct building types without placing a person on sources',()=>{const s=setup(LOOT,8,state=>piles(state,['wood','clay','reed'])),pending=menu(s),chosen=ok(s.resolveChoice(0,LOOT));assert.ok(chosen.interaction.stateId==='wait'&&chosen.interaction.request.kind==='choice',JSON.stringify(chosen.interaction));const error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'invalid-night-loot')),r=finish(s,chosen);assert.equal(r.state.players[0]!.resources.food,98);const delta=totals(r);assert.equal(delta.reduce((a,b)=>a+b,0),2);assert.equal(delta.filter(n=>n===1).length,2);assert.ok(r.state.players[1]!.minorHand.includes(LOOT));assert.equal(r.state.actionSpaces.filter(a=>['forest','clay-pit','reed-bank'].includes(a.id)).flatMap(a=>a.takenBy).length,0);save('E005-N1',{pending,chosen,error,r})})
+  it('E005 N2 a single available building type removes one total and empty building piles remove none',()=>{for(const types of[['wood'],[]]){const s=setup(LOOT,8,state=>piles(state,types)),a=buy(s,LOOT);assert.equal(a.r.state.players[0]!.resources.food,98);assert.deepEqual(totals(a.r),[types.length?1:0,0,0,0]);assert.equal(a.r.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood??0,types.length?2:0);save(`E005-N2-${types.length}`,a)}})
+  it('E005 N3 insufficient food rejects before alternative and whole undo restores pile quantities food and passing ownership',()=>{const ss=setup(LOOT,8,state=>{state.players[0]!.resources.food=1;piles(state,['wood','clay'])}),pending=menu(ss),error=assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,LOOT)),r=finish(ss,ok(ss.resolveChoice(0,'B004_WoodPile')));assert.equal(r.state.players[0]!.resources.food,1);assert.equal(r.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);save('E005-N3-food',{pending,error,r});const s=setup(LOOT,8,state=>piles(state,['wood','clay'])),before=ok(s.getState()),a=buy(s,LOOT),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.deepEqual(totals(undone),[0,0,0,0]);assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);assert.ok(undone.state.players[0]!.minorHand.includes(LOOT));const retry=buy(s,LOOT);assert.deepEqual(totals(retry.r),[1,1,0,0]);save('E005-N3-undo',{before,a,undone,retry})})
 })

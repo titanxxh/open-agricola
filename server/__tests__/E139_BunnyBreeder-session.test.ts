@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { E139_BunnyBreeder_impl } from '../../shared/cards/E/E139_BunnyBreeder'
 import { GameSession } from '../game/authoritative-session'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'E139_BunnyBreeder'
 
@@ -84,4 +87,12 @@ describe('E139 Bunny Breeder — onBuy XOR optional + futureMeeples', () => {
     expect(req.entries[0]!.round).toBe(14)
     expect(req.entries[0]!.resources.food).toBe(1)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, make, finish, lesson, reach, resources, future, schedule } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E139 N1 actual round five Lessons schedules one food in six and real person placements naturally release it', () => { const s = make('E139_BunnyBreeder', undefined, false, 5), p = schedule(s, lesson(s, 'E139_BunnyBreeder'), 6, 1); assert.deepEqual(future(p, 'E139_BunnyBreeder'), [{ round: 6, resources: { food: 1 } }]); const r = finish(s, reach(s, 6), false); resources(r, { food: 101 }); assert.deepEqual(future(r, 'E139_BunnyBreeder'), []); save('E139-N1', { p, r }) })
+  it('E139 N2 current-round target rejects before legal future eight schedule and natural seven gives no early food', () => { const s = make('E139_BunnyBreeder', undefined, false, 5), p = lesson(s, 'E139_BunnyBreeder'); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice'); assert.deepEqual(p.interaction.request.options.flatMap(o => o.effectPreview?.kind === 'futureSchedule' ? o.effectPreview.entries.map(e => [e.round, e.resources.food]) : []), [[6, 1], [7, 2], [8, 3], [9, 4], [10, 5], [11, 6], [12, 7], [13, 8], [14, 9]]); const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'round-5')), scheduled = schedule(s, p, 8, 3), early = finish(s, reach(s, 7), false); resources(early, { food: 100 }); assert.deepEqual(future(early, 'E139_BunnyBreeder'), [{ round: 8, resources: { food: 3 } }]); const r = finish(s, reach(s, 8), false); resources(r, { food: 99 }); assert.deepEqual(future(r, 'E139_BunnyBreeder'), []); save('E139-N2', { p, rejected, scheduled, early, r }) })
+  it('E139 N3 round thirteen offers only fourteen with one food while round fourteen creates no future grant', () => { const s = make('E139_BunnyBreeder', undefined, false, 13), p = schedule(s, lesson(s, 'E139_BunnyBreeder'), 14, 1); assert.deepEqual(future(p, 'E139_BunnyBreeder'), [{ round: 14, resources: { food: 1 } }]); const c = make('E139_BunnyBreeder', undefined, false, 14), cr = finish(c, lesson(c, 'E139_BunnyBreeder'), false); assert.deepEqual(future(cr, 'E139_BunnyBreeder'), []); save('E139-N3', { p, cr }) })
 })

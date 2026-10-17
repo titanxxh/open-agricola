@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E143_Hewer'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'E143_Hewer'
 
@@ -79,5 +81,36 @@ describe('E143_Hewer session', () => {
 
     const flow = session.withCtx(() => runCardEffectHook(updatedState, updatedPlayer, CARD_ID, 'onBeforeReturnHome'))
     expect(flow).toBeNull()
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, save, setup, finish, completeRound } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E143 N1 natural work end beginning round three requires every clay accumulation unoccupied', () => {
+    for (const [round, clay] of [[2, 'none'], [3, 'none'], [3, 'clay-pit'], [3, 'hollow']] as const) {
+      const s = setup('E143_Hewer', round)
+      assert.equal(s.state.players[0]!.resources.stone, 0)
+      const r = finish(s, completeRound(s, ['forest', clay === 'none' ? 'grove' : clay, 'reed-bank', 'fishing', 'grain-seeds', 'day-laborer']))
+      assert.equal(r.state.round, round + 1)
+      assert.equal(r.state.players[0]!.resources.stone, round === 3 && clay === 'none' ? 1 : 0)
+      assert.equal(r.state.players[0]!.resources.food, round === 3 && clay === 'none' ? 22 : 21)
+      save(`E143-N1-${round}-${clay}`, r)
+    }
+  })
+  it('E143 N2 hand-only card and owner clay occupancy suppress natural end-work reward', () => {
+    for (const mode of ['hand', 'own']) {
+      const s = setup('E143_Hewer', 3, state => {
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['E143_Hewer']
+        }
+      })
+      const r = finish(s, completeRound(s, [mode === 'own' ? 'clay-pit' : 'forest', 'grove', 'reed-bank', 'fishing', 'grain-seeds', 'day-laborer']))
+      assert.equal(r.state.round, 4)
+      assert.equal(r.state.players[0]!.resources.stone, 0)
+      assert.equal(r.state.players[0]!.resources.food, 21)
+      save(`E143-N2-${mode}`, r)
+    }
   })
 })

@@ -1,11 +1,14 @@
 import { descriptionEffects } from './_helpers/choice-description'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E085_MasterTanner'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Capacity from './_helpers/audit/ae-negative-43-capacity'
 
 const CARD_ID = 'E085_MasterTanner'
 const FILLER = '__test_placeholder__'
@@ -167,4 +170,12 @@ describe('E085 Master Tanner parity', () => {
     expect(response.error).toBe('space unavailable')
     expect(familyCount(response)).toBe(2)
   })
+})
+
+describe('ae-negative-43-capacity', () => {
+  const { TANNER, sessions, save, ok, finish, ready, lesson, grow, tanner, cook, foodOnCard, storeFood } = audit43Capacity
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E085 N1 real occupation purchase and boar or cattle cooking place only one food per converted animal with optional decline',()=>{const a=lesson(tanner(0,'cattle',false),TANNER);assert.ok(a.state.players[0]!.occupationPlayed.includes(TANNER));for(const[type,index,yieldFood]of[['boar',1,2],['cattle',2,3]] as const){for(const count of[0,1]){const s=tanner(1,type),pending=cook(s,index,1),r=storeFood(s,pending,count);assert.equal(foodOnCard(r),count);assert.equal(r.state.players[0]!.resources.food,yieldFood-count);assert.equal(r.state.players[0]!.resources[type],0);save(`E085-N1-${type}-${count}`,{pending,r})}}save('E085-N1-buy',a)})
+  it('E085 N2 sheep cooking cannot place food and illegal storage choice does not mutate before exact legal retry',()=>{const s=tanner(1,'sheep'),r=cook(s,0,1);assert.equal(foodOnCard(r),0);assert.equal(r.state.players[0]!.resources.food,2);const t=tanner(),pending=cook(t,2,1),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,'__invalid_three_food__')),legal=storeFood(t,pending,1);assert.equal(foodOnCard(legal),1);save('E085-N2',{r,pending,bad,legal})})
+  it('E085 N3 real cooked food stack gives room only at equality and never below or above two physical rooms',()=>{for(const count of[1,2,3]){const s=tanner(count),pending=cook(s,2,count),stored=finish(s,storeFood(s,pending,count));ready(s);finish(s,ok(s.takeAction(1,'grain-seeds')));ready(s);const grown=grow(s,count===2);assert.equal(foodOnCard(stored),count);assert.equal(grown.state.players[0]!.rooms,2);save(`E085-N3-${count}`,{pending,stored,grown})}})
 })

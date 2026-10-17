@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A126_MasterWorkman'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit15Spaces from './_helpers/audit/ae-negative-15-spaces'
 
 const CARD_ID = 'A126_MasterWorkman'
 const OTHER_OCCUPATION = 'A093_BedMaker'
@@ -146,4 +149,14 @@ describe('A126 Master Workman parity', () => {
       wood: 0, clay: 0, reed: 0, stone: 0,
     })
   })
+})
+
+describe('ae-negative-15-spaces', () => {
+  const { MASTER, sessions, save, ok, setup, turn, finishOptional, piles, mapped } = audit15Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A126 N1 round assignment one through four gives wood clay reed stone before ordinary body',()=>{for(const[index,space]of ['sheep-market','grain-seeds','western-quarry','vegetable-seeds'].entries()){const s=setup(MASTER,state=>{mapped(state);piles(state,'sheep-market','sheep',1);piles(state,'western-quarry','stone',1)});const r=finishOptional(s,turn(s,0,space),false);const res=r.state.players[0]!.resources;assert.equal(res.wood,index===0?1:0);assert.equal(res.clay,index===1?1:0);assert.equal(res.reed,index===2?1:0);assert.equal(res.stone,(index===3?1:0)+(space==='western-quarry'?1:0));assert.equal(res.grain,space==='grain-seeds'?1:0);assert.equal(res.vegetable,space==='vegetable-seeds'?1:0);save(`A126-N1-${index}`,r)}})
+  it('A126 N2 basic and fifth round assignments cannot award mapped resources',()=>{for(const space of ['day-laborer','vegetable-seeds']){const s=setup(MASTER,state=>{mapped(state);state.roundActionOrder[3]=null;state.roundActionOrder[4]='vegetable-seeds'});const r=turn(s,0,space);assert.deepEqual((['wood','clay','reed','stone'] as const).map(k=>r.state.players[0]!.resources[k]),[0,0,0,0]);save(`A126-N2-${space}`,r)}})
+  it('A126 N3 hand and actual opponent mapped use cannot reward owner',()=>{const hand=turn(setup(MASTER,mapped,false),0,'grain-seeds');assert.equal(hand.state.players[0]!.resources.clay,0);const s=setup(MASTER,mapped);turn(s,0,'day-laborer');const other=turn(s,1,'grain-seeds');assert.equal(other.state.players[0]!.resources.clay,0);assert.equal(other.state.players[1]!.resources.clay,0);save('A126-N3',{hand,other})})
+  it('A126 N4 invalid actor and occupied action cannot duplicate before reward',()=>{const s=setup(MASTER,mapped);assertRejectedUnchanged(s,()=>s.takeAction(1,'grain-seeds'));const first=turn(s,0,'grain-seeds');assertRejectedUnchanged(s,()=>s.takeAction(0,'grain-seeds'));assert.equal(first.state.players[0]!.resources.clay,1);save('A126-N4',first)})
+  it('A126 N5 whole action undo restores mapped resource and source before exactly one retry',()=>{const s=setup(MASTER,mapped);const first=turn(s,0,'grain-seeds');const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,0);assert.equal(undone.state.players[0]!.resources.grain,0);const retry=turn(s,0,'grain-seeds');assert.equal(retry.state.players[0]!.resources.clay,1);assert.equal(retry.state.players[0]!.resources.grain,1);save('A126-N5',{first,undone,retry})})
 })

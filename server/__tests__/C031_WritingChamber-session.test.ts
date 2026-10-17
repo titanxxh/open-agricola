@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -8,6 +8,8 @@ import '../../shared/cards/C/C035_LanternHouse'
 import '../../shared/cards/A/A032_Manger'
 import '../../shared/cards/B/B033_Mantlepiece'
 import '../../shared/cards/C/C135_Constable'
+import assert from 'node:assert/strict'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'C031_WritingChamber'
 const FILLER = '__test_placeholder__'
@@ -154,4 +156,22 @@ describe('C031 Writing Chamber parity', () => {
     expect(bonus(response)).toBe(completeFarm ? 0 : 7)
   })
 
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, final, purchase, rejectBuy, undo, resource, bonus, ownMajor, complete } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C031 N1 real purchase spends two wood and missing wood rejects while public undo restores it", () => { const b = make('C031_WritingChamber', st => { st.players[0]!.resources.wood = 1; }, false); save('C031-N1-short', rejectBuy(b, 'C031_WritingChamber')); const s = make('C031_WritingChamber', st => { st.players[0]!.resources.wood = 2; }, false), r = purchase(s, 'C031_WritingChamber'), u = undo(s); resource(r, { wood: 0 }); resource(u, { wood: 2 }); save('C031-N1', { r, u }); });
+  it("C031 N2 legal complete farms count zero three six or nine negative points with a seven-point cap at final scoring", () => { for (const [b, expected] of [[0, 0], [1, 3], [2, 6], [3, 7]]) {
+      const s = make('C031_WritingChamber', st => complete(st.players[0]!, b), true, 14), r = final(s);
+      assert.equal(bonus(r, 'C031_WritingChamber'), expected);
+      assert.equal(r.state.players[0]!.resources.begging, b);
+      save(`C031-N2-${b}`, r);
+  } });
+  it("C031 N3 negative printed entries count despite a positive category total but held Writing Chamber contributes none", () => { for (const held of [false, true]) {
+      const s = make('C031_WritingChamber', st => { complete(st.players[0]!); st.players[0]!.houseType = 'clay'; st.players[0]!.minorPlayed.push('B033_Mantlepiece'); ownMajor(st, 'Major_Well'); }, !held, 14), r = final(s);
+      assert.equal(r.scores?.[0]?.categories.find(c => c.key === 'cards')?.total, 1);
+      assert.equal(bonus(r, 'C031_WritingChamber'), held ? 0 : 3);
+      save(`C031-N3-${held}`, r);
+  } });
 })

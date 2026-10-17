@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { Resource } from '../../shared/contract/types'
@@ -7,6 +7,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B087_Cottager'
 import '../../shared/cards/D/D119_WoodBarterer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit49Farm from './_helpers/audit/ae-negative-49-farm'
 
 const CARD_ID = 'D119_WoodBarterer'
 const COTTAGER = 'B087_Cottager'
@@ -321,4 +324,13 @@ describe('D119 Wood Barterer session', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food: 2 })
     expect(woodBartererTriggers(response)).toBe(0)
   })
+})
+
+describe('ae-negative-49-farm', () => {
+  const { BARTER, sessions, save, ok, make, choose, finish, lesson, ready, action, barter, fence, room } = audit49Farm
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D119 N1 real Lessons gives no immediate wood and the before Fencing two wood branch makes four actual fences affordable',()=>{const bought=lesson(make(BARTER,false),BARTER);assert.equal(bought.state.players[0]!.resources.wood,0);const s=make(BARTER,true,state=>state.players[0]!.resources.wood=2),pending=ok(s.takeAction(0,'fencing')),a=barter(s,pending),r=fence(s,a);assert.equal(a.state.players[0]!.resources.wood,4);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);save('D119-N1',{bought,pending,a,r})})
+  it('D119 N2 one or two actual wood trades fund the missing room reed before constructing exactly one real room',()=>{for(const[cost,wood,reed]of[[1,6,1],[2,7,0]] as const){const s=make(BARTER,true,state=>Object.assign(state.players[0]!.resources,{wood,reed})),pending=ok(s.takeAction(0,'farm-expansion')),a=barter(s,pending,cost,cost),r=room(s,a);assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.reed,0);save(`D119-N2-${cost}`,{pending,a,r})}})
+  it('D119 N3 forged trade is rejected before a legal gain and optional decline leaves only the ordinary fence payment',()=>{const s=make(BARTER,true,state=>state.players[0]!.resources.wood=2),pending=ok(s.takeAction(0,'fencing')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__invalid_trade_three_wood__')),r=fence(s,barter(s,pending));assert.equal(r.state.players[0]!.resources.wood,0);const t=make(BARTER,true,state=>state.players[0]!.resources.wood=4),offered=ok(t.takeAction(0,'fencing'));let decline=offered;if(decline.interaction.stateId==='wait'&&decline.interaction.request.kind==='select-trigger')decline=ok(t.resolveChoice(0,BARTER));decline=choose(t,decline,o=>['__skip__','__pass__'].includes(o.value));const declined=fence(t,decline);assert.equal(declined.state.players[0]!.resources.wood,0);assert.equal(declined.state.players[0]!.resources.reed,0);const unrelated=action(make(BARTER),0,'day-laborer');assert.equal(unrelated.state.players[0]!.resources.wood,0);save('D119-N3',{pending,bad,r,offered,declined,unrelated})})
+  it('D119 N4 real Farm Redevelopment receives its before space branch then pays renovation and fences while hand and opponent controls get no bundle',()=>{const s=make(BARTER,true,state=>Object.assign(state.players[0]!.resources,{wood:4,clay:2,reed:1})),pending=ok(s.takeAction(0,'farm-redevelopment'));let a=barter(s,pending);if(a.interaction.stateId==='wait'&&a.interaction.request.kind==='choice'&&a.interaction.promptKey==='ui.interactionChooseRenovationTarget')a=choose(s,a,o=>o.value==='clay');const r=fence(s,a);assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.resources.wood,2);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);const t=make(BARTER,false,state=>state.players[0]!.resources.wood=4),hand=fence(t,ok(t.takeAction(0,'fencing')));assert.equal(hand.state.players[0]!.resources.wood,0);const q=make(BARTER,true,state=>state.players[1]!.resources.wood=4);action(q,0,'grain-seeds');ready(q);const before=ok(q.takeAction(1,'fencing')),opponent=finish(q,ok(q.commitSelectionChoice(1,{edges:['H-0-2','H-1-2','V-0-2','V-0-3'],extraWood:0})));assert.equal(opponent.state.players[0]!.resources.wood,0);assert.equal(opponent.state.players[1]!.resources.wood,0);save('D119-N4',{pending,a,r,hand,before,opponent})})
 })

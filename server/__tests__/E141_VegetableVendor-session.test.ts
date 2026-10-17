@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A031_DebtSecurity'
 import '../../shared/cards/E/E141_VegetableVendor'
+import assert from 'node:assert/strict'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'E141_VegetableVendor'
 const MINOR_ID = 'A031_DebtSecurity'
@@ -172,4 +174,12 @@ describe('E141 Vegetable Vendor parity', () => {
     expect(response.state.players[1]!.resources.vegetable).toBe(1)
     expect(response.state.players[1]!.minorHand).toContain(MINOR_ID)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, resources, improvement } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E141 N1 physical Major Improvement pays Fireplace cost and grants exactly one vegetable', () => { const s = make('E141_VegetableVendor', st => { st.players[0]!.resources.clay = 2; st.availableMajorImprovements = ['Major_Fireplace1'] }), r = finish(s, improvement(s), false); resources(r, { vegetable: 1, clay: 0 }); assert.ok(r.state.players[0]!.improvements.includes('Major_Fireplace1')); save('E141-N1', r) })
+  it('E141 N2 Vegetable Seeds offers real paid major or minor improvement and decline preserves its base vegetable', () => { for (const card of ['Major_Fireplace1', 'A050_MilkJug', 'decline']) { const s = make('E141_VegetableVendor', st => { st.players[0]!.resources.clay = card === 'A050_MilkJug' ? 1 : 2; st.availableMajorImprovements = ['Major_Fireplace1']; st.players[0]!.minorHand = ['A050_MilkJug'] }, true, 14); let p = ok(s.takeAction(0, 'vegetable-seeds')); if (card !== 'decline') { for (let n = 0; n < 12 && !p.state.players[0]!.improvements.includes(card) && !p.state.players[0]!.minorPlayed.includes(card); n++) { const i = p.interaction; assert.ok(i.stateId === 'wait' && (i.request.kind === 'choice' || i.request.kind === 'select-trigger')); const o = i.request.options.find(o => o.value === card) ?? i.request.options.find(o => o.sourceCard === 'E141_VegetableVendor' && !['__skip__', '__pass__'].includes(o.value)) ?? i.request.options.find(o => !['__skip__', '__pass__'].includes(o.value)); assert.ok(o); p = ok(s.resolveChoice(0, o.value)) } } const r = finish(s, p, false); resources(r, { vegetable: 1, clay: card === 'decline' ? 2 : 0 }); if (card !== 'decline') assert.ok([...r.state.players[0]!.improvements, ...r.state.players[0]!.minorPlayed].includes(card)); save(`E141-N2-${card}`, r) } })
+  it('E141 N3 nonmatching owner actual opponent Vegetable Seeds and insufficient optional-improvement payment cannot trigger bonus purchase', () => { const s = make('E141_VegetableVendor', undefined, true, 14); finish(s, ok(s.takeAction(0, 'grain-seeds')), false); ready(s); const r = finish(s, ok(s.takeAction(1, 'vegetable-seeds')), false); resources(r, { vegetable: 0 }); resources(r, { vegetable: 1 }, 1); const c = make('E141_VegetableVendor', st => { st.players[0]!.resources.clay = 1; st.availableMajorImprovements = ['Major_Fireplace1'] }, true, 14), cr = finish(c, ok(c.takeAction(0, 'vegetable-seeds')), true); resources(cr, { vegetable: 1, clay: 1 }); assert.equal(cr.state.players[0]!.improvements.includes('Major_Fireplace1'), false); save('E141-N3', { r, cr }) })
 })

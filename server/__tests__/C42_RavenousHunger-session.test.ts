@@ -2,7 +2,7 @@ import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { ActionHookRegistry } from '../../shared/actions/hooks'
-import { beforeEach as beforeEachActionHooks } from 'vitest'
+import { beforeEach as beforeEachActionHooks, afterEach } from 'vitest'
 
 let actionHooks: ActionHookRegistry
 beforeEachActionHooks(() => { actionHooks = new ActionHookRegistry() })
@@ -12,7 +12,7 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace, Resource } from '../../shared/contract/types'
 
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C042_RavenousHunger'
 import '../../shared/cards/C/C076_WoodCart'
@@ -21,6 +21,9 @@ import '../../shared/cards/D/D138_PetLover'
 import { applyRoundGrowth } from '../../shared/session/state-constants'
 import type { ActionFlow } from '../../shared/contract/types'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit35Placement from './_helpers/audit/ae-negative-35-placement'
 
 const CARD_ID = 'C042_RavenousHunger'
 const WOOD_CART_ID = 'C076_WoodCart'
@@ -543,4 +546,12 @@ describe('C042_RavenousHunger', () => {
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
       .not.toBe('choice')
   })
+})
+
+describe('ae-negative-35-placement', () => {
+  const { sessions, save, ok, make, choose, pendingCard, trigger, finish, ready, action, buy, accept, room, hunger } = audit35Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C042 N1 actual grain purchase and real Vegetable Seeds permit an immediate extra accumulation placement with one additional wood after non accumulation rejection', () => { const s = hunger(false), bought = finish(s, buy(s, 'C042_RavenousHunger')); assert.equal(bought.state.players[0]!.resources.grain, 0); const t = hunger(), p = finish(t, ok(t.takeAction(0, 'vegetable-seeds')), 'C042_RavenousHunger'), a = accept(t, p, 'C042_RavenousHunger'); assert.ok(a.interaction.stateId === 'wait' && a.interaction.request.kind === 'choice'); const bad = assertRejectedUnchanged(t, () => t.resolveChoice(0, 'day-laborer')), r = finish(t, ok(t.resolveChoice(0, 'forest'))); assert.deepEqual([r.state.players[0]!.resources.vegetable, r.state.players[0]!.resources.wood], [1, 4]); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.takenBy.length, 1); save('C042-N1', { bought, p, a, bad, r }); });
+  it('C042 N2 optional decline preserves the other person and actual occupied accumulation target rejects before a different legal pile', () => { const s = hunger(), p = trigger(s, finish(s, ok(s.takeAction(0, 'vegetable-seeds')), 'C042_RavenousHunger'), 'C042_RavenousHunger'), decline = finish(s, choose(s, p, o => o.value === '__skip__')); assert.equal(decline.state.players[0]!.resources.wood, 0); const t = hunger(), first = action(t, 0, 'grain-seeds'), opponent = action(t, 1, 'forest'); ready(t); const last = finish(t, ok(t.takeAction(0, 'vegetable-seeds')), 'C042_RavenousHunger'); assert.equal(pendingCard(last, 'C042_RavenousHunger'), false); const u = make('C042_RavenousHunger', true, state => { room(state, 3); setActiveWorkerCount(state.players[0]!, 3); }); action(u, 0, 'grain-seeds'); action(u, 1, 'forest'); ready(u); const q = finish(u, ok(u.takeAction(0, 'vegetable-seeds')), 'C042_RavenousHunger'), a = accept(u, q, 'C042_RavenousHunger'), bad = assertRejectedUnchanged(u, () => u.resolveChoice(0, 'forest')), r = finish(u, ok(u.resolveChoice(0, 'reed-bank'))); assert.equal(r.state.players[0]!.resources.reed, 2); assert.equal(r.state.players[0]!.resources.wood, 0); save('C042-N2', { p, decline, first, opponent, last, q, a, bad, r }); });
+  it('C042 N3 missing grain purchase held card unrelated space and real opponent Vegetable Seeds cannot place an extra owner person or good', () => { const s = hunger(false, 0), poor = buy(s, 'C042_RavenousHunger'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'C042_RavenousHunger')); const t = hunger(false), held = finish(t, ok(t.takeAction(0, 'vegetable-seeds')), 'C042_RavenousHunger'); assert.equal(pendingCard(held, 'C042_RavenousHunger'), false); const u = hunger(), other = action(u, 0, 'reed-bank'); ready(u); const opponent = finish(u, ok(u.takeAction(1, 'vegetable-seeds')), 'C042_RavenousHunger'); assert.equal(pendingCard(opponent, 'C042_RavenousHunger'), false); assert.equal(opponent.state.players[0]!.resources.wood, 0); assert.equal(opponent.state.players[0]!.resources.vegetable, 0); save('C042-N3', { poor, bad, held, other, opponent }); });
 })

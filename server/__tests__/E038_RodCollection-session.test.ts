@@ -1,4 +1,4 @@
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it, onTestFinished, afterEach } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -8,6 +8,9 @@ import { bonusScore, playImprovement } from './_helpers/card-play-lifecycle'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/E/E038_RodCollection'
+import assert from 'node:assert/strict'
+import { assertRuleOutcome, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit35Education from './_helpers/audit/ae-negative-35-education'
 
 const CARD_ID = 'E038_RodCollection'
 
@@ -135,4 +138,43 @@ describe('E038 Rod Collection through Session', () => {
       }))
     }
   })
+})
+
+describe('ae-negative-35-education', () => {
+  const { sessions, save, ok, choose, pendingCard, trigger, finish, ready, action, buy, accept, bonus, printed, advanceRod, rod, putWood, rodWood } = audit35Education
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E038 N1 actual three occupation purchase and Fishing store two wood irretrievably after rejecting a third wood payment', () => { const s = rod(), bought = finish(s, buy(s, 'E038_RodCollection')), opponent = action(s, 1, 'forest'); ready(s); const p = finish(s, ok(s.takeAction(0, 'fishing')), 'E038_RodCollection'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'three-wood')), r = putWood(s, p, 2); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(rodWood(r), 2); assert.equal(bonus(r, 'E038_RodCollection'), 1); assert.equal(printed(r, 'E038_RodCollection'), 1); const t = rod(false, 2, 2), poor = buy(t, 'E038_RodCollection'); assertRejectedUnchanged(t, () => t.resolveChoice(0, 'E038_RodCollection')); assert.ok(poor.state.players[0]!.minorHand.includes('E038_RodCollection')); save('E038-N1', { bought, opponent, p, bad, r, poor }); });
+  it('E038 N2 optional decline no wood held card and real opponent Fishing cannot store owner wood or create bonus points', () => {
+      const s = rod(true), p = trigger(s, finish(s, ok(s.takeAction(0, 'fishing')), 'E038_RodCollection'), 'E038_RodCollection'), decline = finish(s, choose(s, p, o => o.value === '__skip__'));
+      assert.deepEqual([decline.state.players[0]!.resources.wood, rodWood(decline), bonus(decline, 'E038_RodCollection')], [2, 0, 0]);
+      const rows = [];
+      for (const [played, wood] of [[true, 0], [false, 2]] as const) {
+          const t = rod(played, wood), q = finish(t, ok(t.takeAction(0, 'fishing')), 'E038_RodCollection'), r = finish(t, pendingCard(q, 'E038_RodCollection') ? accept(t, q, 'E038_RodCollection') : q);
+          assert.equal(rodWood(r), 0);
+          assert.equal(bonus(r, 'E038_RodCollection'), 0);
+          rows.push({ q, r });
+      }
+      const u = rod(true), first = action(u, 0, 'reed-bank'), opponent = action(u, 1, 'fishing');
+      assert.equal(rodWood(opponent), 0);
+      assert.equal(opponent.state.players[0]!.resources.wood, 2);
+      save('E038-N2', { p, decline, rows, first, opponent });
+  });
+  it('E038 N3 seven real Fishing uses store thirteen wood and only printed positions one four seven ten lose their bonus point', () => {
+      const s = rod(false, 13), bought = finish(s, buy(s, 'E038_RodCollection')), opponent = action(s, 1, 'reed-bank');
+      ready(s);
+      const rows = [];
+      for (const [round, n, expectedWood, expectedBonus] of [[5, 2, 2, 1], [6, 2, 4, 2], [7, 2, 6, 4], [8, 2, 8, 5], [9, 2, 10, 6], [10, 2, 12, 8], [11, 1, 13, 9]] as const) {
+          if (round > 5)
+              advanceRod(s, round);
+          const p = finish(s, ok(s.takeAction(0, 'fishing')), 'E038_RodCollection'), r = putWood(s, p, n);
+          assert.equal(rodWood(r), expectedWood);
+          save('E038-N3-step-' + round, { p, r });
+          rows.push({ p, r });
+          if (round < 11)
+              assert.equal(bonus(r, 'E038_RodCollection'), expectedBonus);
+      }
+      const last = rows[rows.length - 1]!.r;
+      save('E038-N3', { bought, opponent, rows });
+      assertRuleOutcome({ stored: rodWood(last), bonus: bonus(last, 'E038_RodCollection') }, { stored: 13, bonus: 9 });
+  });
 })

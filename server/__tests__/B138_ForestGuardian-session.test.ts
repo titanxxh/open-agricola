@@ -2,7 +2,7 @@ import type { GameSession as SessionRuleOwner } from '../game/authoritative-sess
 import { type SessionResponse } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
@@ -17,6 +17,8 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/B/B138_ForestGuardian'
+import assert from 'node:assert/strict'
+import * as audit29Resources from './_helpers/audit/ae-negative-29-resources'
 
 const CARD_ID = 'B138_ForestGuardian'
 
@@ -316,4 +318,17 @@ describe('B138 Forest Guardian parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(response.state.players[1]!.resources).toMatchObject({ food: 1, reed: 5 })
   })
+})
+
+describe('ae-negative-29-resources', () => {
+  const { sessions, save, ok, make, ready, action, lesson, forest } = audit29Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B138 N1 actual first occupation gains two wood and a real opponent pays before collecting five wood', () => { const bought = lesson(make('B138_ForestGuardian', false), 'B138_ForestGuardian'); assert.equal(bought.state.players[0]!.resources.wood, 2); const s = forest(), first = action(s, 0, 'grain-seeds'), r = action(s, 1, 'forest'); assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[1]!.resources.food, r.state.players[1]!.resources.wood], [1, 0, 5]); assert.ok(r.state.log.some(l => JSON.stringify(l.params).includes('B138_ForestGuardian'))); save('B138-N1', { bought, first, r }); });
+  it('B138 N2 four wood own five wood and five reed never transfer food', () => { const s = forest(true, 4), first = action(s, 0, 'grain-seeds'), four = action(s, 1, 'forest'); assert.deepEqual([four.state.players[0]!.resources.food, four.state.players[1]!.resources.food, four.state.players[1]!.resources.wood], [0, 1, 4]); const t = forest(), own = action(t, 0, 'forest'); assert.deepEqual([own.state.players[0]!.resources.food, own.state.players[0]!.resources.wood], [0, 5]); const q = forest(), start = action(q, 0, 'grain-seeds'), reed = action(q, 1, 'reed-bank'); assert.deepEqual([reed.state.players[0]!.resources.food, reed.state.players[1]!.resources.food, reed.state.players[1]!.resources.reed], [0, 1, 5]); save('B138-N2', { first, four, own, start, reed }); });
+  it('B138 N3 a held card cannot charge an opponent and no food cannot pay for five wood', () => { const s = forest(false), first = action(s, 0, 'grain-seeds'), hand = action(s, 1, 'forest'); assert.deepEqual([hand.state.players[0]!.resources.food, hand.state.players[1]!.resources.food, hand.state.players[1]!.resources.wood], [0, 1, 5]); const t = forest(true, 5, 0), start = action(t, 0, 'grain-seeds'); ready(t); const before = ok(t.getState()), r = t.takeAction(1, 'forest'); assert.equal(r.state.players[1]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.food, 0); save('B138-N3', { first, hand, start, before, r }); if (r.ok) {
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'engine-blocked');
+      ok(t.undoAction());
+  }
+  else
+      assert.equal(r.ok, false); const retry = action(t, 1, 'reed-bank'); assert.equal(retry.state.players[1]!.resources.reed, 5); save('B138-N3-retry', retry); });
 })

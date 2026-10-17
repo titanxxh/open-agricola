@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { computeScores } from '../../shared/domain/scoring'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B040_BreweryPond'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit20Collect from './_helpers/audit/ae-negative-20-collect'
 
 const CARD_ID = 'B040_BreweryPond'
 const FILLER = '__test_placeholder__'
@@ -124,4 +127,13 @@ describe('B040 Brewery Pond parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, wood: 0 })
     expect(response.state.players[1]!.resources.food).toBe(22)
   })
+})
+
+describe('ae-negative-20-collect', () => {
+  const { POND, OCCS, sessions, save, ok, setup, turn, purchaseMenu, buy, score, owner } = audit20Collect
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B040 N1 actual free purchase needs two occupations and keeps printed minus one point',()=>{const s=setup(POND),{pending,r}=buy(s,POND);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(score(r,POND),-1);save('B040-N1',{pending,r});for(const n of[0,1]){const ss=setup(POND,state=>state.players[0]!.occupationPlayed=OCCS.slice(0,n)),denied=purchaseMenu(ss);assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,POND));const legal=ok(ss.resolveChoice(0,'B004_WoodPile'));assert.equal(score(legal,POND),0);assert.equal(legal.state.players[0]!.resources.grain,0);save(`B040-N1-${n}`,{denied,legal})}})
+  it('B040 N2 actual Fishing and Reed Bank add one grain and one wood once to the owner',()=>{for(const space of['fishing','reed-bank']){const s=setup(POND);buy(s,POND);const before=owner(s),pile={...before.state.actionSpaces.find(a=>a.id===space)!.resources},r=turn(s,0,space);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+(space==='fishing'?pile.food??0:0));assert.equal(r.state.players[0]!.resources.reed,space==='reed-bank'?pile.reed:0);assert.equal(r.state.players[1]!.resources.grain,0);save(`B040-N2-${space}`,{before,r})}})
+  it('B040 N3 other action opponent use and card in hand give no Brewery Pond grain or wood',()=>{const hand=turn(setup(POND),0,'fishing');assert.equal(hand.state.players[0]!.resources.grain,0);assert.equal(hand.state.players[0]!.resources.wood,0);const s=setup(POND);buy(s,POND);const other=turn(s,1,'fishing');assert.equal(other.state.players[0]!.resources.grain,0);assert.equal(other.state.players[1]!.resources.grain,0);const unrelated=turn(s,0,'clay-pit');assert.equal(unrelated.state.players[0]!.resources.grain,0);assert.equal(unrelated.state.players[0]!.resources.wood,0);save('B040-N3',{hand,other,unrelated})})
+  it('B040 N4 real collection undo restores both extra goods and original accumulation before one retry',()=>{const s=setup(POND);buy(s,POND);owner(s);const r=turn(s,0,'reed-bank'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,0);assert.equal(undone.state.players[0]!.resources.wood,0);const retry=turn(s,0,'reed-bank');assert.equal(retry.state.players[0]!.resources.grain,1);assert.equal(retry.state.players[0]!.resources.wood,1);assert.equal(retry.state.players[0]!.resources.reed,r.state.players[0]!.resources.reed);save('B040-N4',{r,undone,retry})})
 })

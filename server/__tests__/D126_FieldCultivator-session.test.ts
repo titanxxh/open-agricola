@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
@@ -11,6 +11,8 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import '../../shared/cards/D/D126_FieldCultivator'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import '../../shared/cards/B/B068_Beanfield'
+import assert from 'node:assert/strict'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'D126_FieldCultivator'
 
@@ -277,5 +279,51 @@ describe('D126 Field Cultivator parity', () => {
 
     expect(response.state.players[0]!.resources.stone).toBe(1)
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual([])
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, save, setup, finish, completeRound, lesson, play, grainField } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D126 N1 real play creates ordered seven-good pile then natural reap rewards physical field tiles up to finite exhaustion', () => {
+    for (const count of [1, 2, 8]) {
+      const tiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 }]
+      const s = setup('D126_FieldCultivator', 4, state => state.players[0]!.fields = tiles.slice(0, count).map(tile => ({ ...tile, stacks: [{ kind: 'grain', remaining: 1 }] })))
+      let r = play(s, 'D126_FieldCultivator')
+      assert.deepEqual(r.state.players[0]!.cardStates.D126_FieldCultivator?.stack, ['wood', 'clay', 'reed', 'stone', 'reed', 'clay', 'wood'])
+      finish(s, r)
+      r = finish(s, completeRound(s, ['forest', 'fishing', 'clay-pit']))
+      assert.equal(r.state.players[0]!.resources.grain, count)
+      assert.equal(r.state.players[0]!.resources.wood, count === 8 ? 2 : 1)
+      assert.equal(r.state.players[0]!.resources.clay, count === 1 ? 0 : count === 2 ? 1 : 2)
+      assert.equal(r.state.players[0]!.resources.reed, count === 8 ? 2 : 0)
+      assert.equal(r.state.players[0]!.resources.stone, count === 8 ? 1 : 0)
+      assert.equal(r.state.players[0]!.cardStates.D126_FieldCultivator?.stack?.length, 7 - Math.min(count, 7))
+      save(`D126-N1-${count}`, r)
+    }
+  })
+  it('D126 N2 empty physical field and grain-bearing logical card field do not consume top good', () => {
+    for (const mode of ['empty', 'card']) {
+      const s = setup('D126_FieldCultivator', 4, state => {
+        const p = state.players[0]!
+        p.occupationPlayed = mode === 'card' ? ['A143_Stonecutter'] : []
+        p.occupationHand = ['D126_FieldCultivator']
+        if (mode === 'empty')
+          grainField(state, 0)
+        else {
+          p.minorPlayed = ['E070_CropRotationField']
+          p.cardStates.E070_CropRotationField = { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] } }
+        }
+      })
+      let r = lesson(s, 'D126_FieldCultivator')
+      assert.equal(r.state.players[0]!.cardStates.D126_FieldCultivator?.stack?.length, 7)
+      finish(s, r)
+      r = finish(s, completeRound(s, ['forest', 'fishing', 'clay-pit']))
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.resources.clay, 0)
+      assert.equal(r.state.players[0]!.cardStates.D126_FieldCultivator?.stack?.length, 7)
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'card' ? 1 : 0)
+      save(`D126-N2-${mode}`, r)
+    }
   })
 })

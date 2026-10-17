@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D109_SowingMaster'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'D109_SowingMaster'
 
@@ -100,4 +102,31 @@ describe('D109 Sowing Master parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(2)
   })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, save, setup, finish, next, play, grainField, sow } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D109 N1 actual free first occupation gives exactly one wood', () => { const s = setup('D109_SowingMaster'); const r = play(s, 'D109_SowingMaster'); assert.equal(r.state.players[0]!.resources.wood, 1); assert.equal(r.state.players[0]!.resources.food, 20); save('D109-N1', r); })
+  it('D109 N2 real sow on Grain Utilization and real Cultivation each grant exactly two food', () => {
+    for (const space of ['grain-utilization', 'cultivation']) {
+      const s = setup('D109_SowingMaster', 14, state => {
+        if (space === 'grain-utilization') {
+          state.players[0]!.resources.grain = 1
+          grainField(state, 0)
+        }
+      })
+      let r = ok(s.takeAction(0, space))
+      r = space === 'grain-utilization' ? sow(s, r) : finish(s, r)
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.food, 22)
+      assert.equal(r.state.players[0]!.fields.length, 1)
+      if (space === 'grain-utilization') {
+        assert.equal(r.state.players[0]!.resources.grain, 0)
+        assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining, 3)
+      }
+      save(`D109-N2-${space}`, r)
+    }
+  })
+  it('D109 N3 unrelated Forest and actual opponent Cultivation never grant owner two food', () => { const s = setup('D109_SowingMaster'); let r = finish(s, ok(s.takeAction(0, 'forest'))); assert.equal(r.state.players[0]!.resources.food, 20); next(s); r = finish(s, ok(s.takeAction(1, 'cultivation'))); assert.equal(r.state.players[0]!.resources.food, 20); assert.equal(r.state.players[1]!.resources.food, 20); save('D109-N3', r); })
 })

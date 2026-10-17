@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C107_Baker'
+import assert from 'node:assert/strict'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'C107_Baker'
 const FIREPLACE = 'Major_Fireplace1'
@@ -169,4 +171,11 @@ describe('C107 Baker parity', () => {
     expect(response.state.round).toBe(5)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 0 })
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, make, finish, lesson, end } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C107 N1 actual Lessons offers one grain Fireplace bake for two food and immediate decline or missing oven grants no bake', () => { const s = make('C107_Baker', st => { st.players[0]!.resources.grain = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }, false), r = finish(s, lesson(s, 'C107_Baker')); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.food, 102); const c = make('C107_Baker', st => { st.players[0]!.resources.grain = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }, false), cr = finish(c, lesson(c, 'C107_Baker'), false); assert.equal(cr.state.players[0]!.resources.grain, 1); assert.equal(cr.state.players[0]!.resources.food, 100); const w = make('C107_Baker', st => { st.players[0]!.resources.grain = 1 }, false), wr = finish(w, lesson(w, 'C107_Baker'), false); assert.equal(wr.state.players[0]!.resources.grain, 1); assert.equal(wr.state.players[0]!.resources.food, 100); save('C107-N1', { r, cr, wr }) })
+  it('C107 N2 real harvest can bake before feeding while decline and zero grain preserve ordinary feeding outcome', () => { const s = make('C107_Baker', st => { st.players[0]!.resources.grain = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }, true, 4), r = finish(s, end(s)); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.food, 98); const c = make('C107_Baker', st => { st.players[0]!.resources.grain = 1; st.players[0]!.improvements = ['Major_Fireplace1'] }, true, 4), cr = finish(c, end(c), false); assert.equal(cr.state.players[0]!.resources.grain, 1); assert.equal(cr.state.players[0]!.resources.food, 96); const z = make('C107_Baker', st => { st.players[0]!.improvements = ['Major_Fireplace1'] }, true, 4), zr = finish(z, end(z), false); assert.equal(zr.state.players[0]!.resources.grain, 0); assert.equal(zr.state.players[0]!.resources.food, 96); save('C107-N2', { r, cr, zr }) })
 })

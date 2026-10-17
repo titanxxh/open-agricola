@@ -2,11 +2,13 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E087_MasterRenovator'
+import assert from 'node:assert/strict'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 describe('E087 Master Renovator parity', () => {
   const CARD_ID = 'E087_MasterRenovator'
@@ -177,4 +179,11 @@ describe('E087 Master Renovator parity', () => {
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).not.toBe(CARD_ID)
     expect(response.state.events.some(event => event.type === 'resource.paid' && event.sourceCardId === CARD_ID)).toBe(false)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, make, finish, end } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E087 N1 round seven clay or reed discount and round nine stone discount each renovate without placing person', () => { for (const [round, house, resources] of [[7, 'wood', { clay: 1, reed: 1 }], [7, 'wood', { clay: 2, reed: 0 }], [9, 'clay', { stone: 1, reed: 1 }]] as const) { const s = make('E087_MasterRenovator', st => { st.players[0]!.houseType = house; Object.assign(st.players[0]!.resources, resources) }, true, round), p = end(s), workers = JSON.stringify(p.state.players[0]!.workers), r = finish(s, p); assert.equal(r.state.players[0]!.houseType, house === 'wood' ? 'clay' : 'stone'); assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.resources.stone, 0); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(JSON.stringify(r.state.players[0]!.workers), workers); save(`E087-N1-${round}-${resources.clay ?? 'stone'}`, { p, r }) } })
+  it('E087 N2 round eight stone house and declined round seven each leave house and payment unchanged', () => { for (const [round, house, accept] of [[8, 'wood', true], [7, 'stone', true], [7, 'wood', false]] as const) { const s = make('E087_MasterRenovator', st => { st.players[0]!.houseType = house; Object.assign(st.players[0]!.resources, { clay: 2, reed: 1, stone: 2 }) }, true, round), p = end(s), r = finish(s, p, accept); assert.equal(r.state.players[0]!.houseType, house); assert.equal(r.state.players[0]!.resources.clay, 2); assert.equal(r.state.players[0]!.resources.stone, 2); assert.equal(r.state.players[0]!.resources.reed, 1); save(`E087-N2-${round}-${house}`, { p, r }) } })
 })

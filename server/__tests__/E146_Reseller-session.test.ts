@@ -10,6 +10,12 @@ import '../../shared/cards/E/E030_ChildsToy'
 import '../../shared/cards/B/B036_Bottles'
 import '../../shared/cards/B/B007_Wage'
 import '../../shared/cards/C/C054_MarketBooth'
+import '../../shared/cards/B/B157_Salter'
+import '../../shared/cards/A/A143_Stonecutter'
+import '../../shared/cards/C/C094_StableCleaner'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit02Payments from './_helpers/audit/ae-negative-02-payments'
 
 const CARD_ID = 'E146_Reseller'
 const FILLER = '__test_placeholder__'
@@ -244,5 +250,95 @@ describe('E146 Reseller parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, stone: 0 })
     expect(resellerOffered(response)).toBe(false)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+  })
+})
+
+describe('ae-negative-02-payments', () => {
+  const { wait, reseller, options, playMinor, acceptRefund, resellerObserved, rotateToOwner } = audit02Payments
+  describe('E146 negative printed refund and use rules', () => {
+    it('E146 N1 OA real first refund cannot repeat or refund a second purchase', () => {
+      const s = reseller()
+      try {
+        const built = playMinor(s, 'E047_SyrupTap')
+        assert.deepEqual(resellerObserved(built), { wood: 0, stone: 0, clay: 1, used: false })
+        const accepted = acceptRefund(s, built)
+        assert.deepEqual(resellerObserved(accepted.r), { wood: 1, stone: 1, clay: 1, used: true })
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, accepted.value))
+        rotateToOwner(s, s.getState())
+        const second = playMinor(s, 'E030_ChildsToy', 'major-improvement')
+        assert.deepEqual(resellerObserved(second), { wood: 1, stone: 1, clay: 0, used: true })
+        assert.equal(wait(second).request.kind, 'confirm-next-player')
+      } finally { s.dispose() }
+    })
+    it('E146 N2 OA declining the first printed refund preserves a later real purchase refund', () => {
+      const s = reseller()
+      try {
+        let r = playMinor(s, 'E047_SyrupTap')
+        assert.ok(options(r).some(o => o.value === '__skip__'))
+        r = s.resolveChoice(0, '__skip__')
+        assert.deepEqual(resellerObserved(r), { wood: 0, stone: 0, clay: 1, used: false })
+        rotateToOwner(s, r)
+        r = playMinor(s, 'E030_ChildsToy', 'major-improvement')
+        const accepted = acceptRefund(s, r).r
+        const wood = options(accepted).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesGained?.wood === 1)
+        assert.ok(wood)
+        r = s.resolveChoice(0, wood.value)
+        assert.deepEqual(resellerObserved(r), { wood: 1, stone: 0, clay: 0, used: true })
+      } finally { s.dispose() }
+    })
+    it('E146 N3 OA free and excluded component costs preserve the later refund opportunity', () => {
+      for (const first of ['B007_Wage', 'C054_MarketBooth']) {
+        const s = reseller()
+        try {
+          const r = playMinor(s, first)
+          assert.equal(resellerObserved(r).used, false)
+          assert.equal(wait(r).request.kind, 'confirm-next-player')
+          rotateToOwner(s, r)
+          const accepted = acceptRefund(s, playMinor(s, 'E047_SyrupTap', 'major-improvement')).r
+          assert.deepEqual(resellerObserved(accepted), { wood: 1, stone: 1, clay: 1, used: true })
+        } finally { s.dispose() }
+      }
+    })
+    it('E146 N4 OA undoing the refund restores the use and permits a legal acceptance retry', () => {
+      const s = reseller()
+      try {
+        const built = playMinor(s, 'E047_SyrupTap')
+        const before = resellerObserved(built)
+        acceptRefund(s, built)
+        const r = s.undoStep()
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(resellerObserved(r), before)
+        assert.ok(r.state.players[0]!.minorPlayed.includes('E047_SyrupTap'))
+        assert.deepEqual(resellerObserved(acceptRefund(s, r).r), { wood: 1, stone: 1, clay: 1, used: true })
+      } finally { s.dispose() }
+    })
+  })
+  describe('E146 affordability boundary', () => {
+    it('E146 N5 OA an unpaid improvement cannot create a refund and a free legal retry preserves the use', () => {
+      const s = reseller({ stone: 0 })
+      try {
+        let r = s.takeAction(0, 'meeting-place')
+        const branch = options(r).find(o => o.value.startsWith('action-improvement-'))
+        if (branch) r = s.resolveChoice(0, branch.value)
+        assert.equal(r.ok, true, r.error)
+        assert.equal(options(r).some(o => o.value === 'E047_SyrupTap'), false)
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E047_SyrupTap'))
+        r = s.resolveChoice(0, 'B007_Wage')
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual(resellerObserved(r), { wood: 1, stone: 0, clay: 1, used: false })
+        assert.equal(r.state.players[0]!.resources.food, 2)
+        assert.equal(wait(r).request.kind, 'confirm-next-player')
+      } finally { s.dispose() }
+    })
+  })
+  describe('Printed cost and delayed receipt controls', () => {
+    it('E146 N6 OA returns the printed stone even when Stonecutter waived its actual payment', () => {
+        const s = reseller({ stone: 0, discounted: true })
+        try {
+          const built = playMinor(s, 'E047_SyrupTap')
+          assert.deepEqual(resellerObserved(built), { wood: 0, stone: 0, clay: 1, used: false })
+          assert.deepEqual(resellerObserved(acceptRefund(s, built).r), { wood: 1, stone: 1, clay: 1, used: true })
+        } finally { s.dispose() }
+      })
   })
 })

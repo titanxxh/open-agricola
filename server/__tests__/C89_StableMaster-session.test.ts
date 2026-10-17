@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -10,6 +10,8 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C089_StableMaster'
 import '../../shared/cards/C/C088_CarpentersApprentice'
+import assert from 'node:assert/strict'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 describe('C089_StableMaster session', () => {
   const setup = () => {
@@ -343,4 +345,11 @@ describe('C089 Stable Master parity', () => {
     expect(zones.filter((zone) => zone.zoneType === 'stable').map((zone) => zone.capacity)).toEqual([3])
     expect(zones.find((zone) => zone.zoneType === 'pasture')?.capacity).toBe(4)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, lesson } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C089 N1 real Lessons optional stable costs one wood and decline preserves wood', () => { const s = make('C089_StableMaster', st => { st.players[0]!.resources.wood = 1 }, false), r = finish(s, lesson(s, 'C089_StableMaster')); assert.equal(r.state.players[0]!.stableTiles.length, 1); assert.equal(r.state.players[0]!.resources.wood, 0); const c = make('C089_StableMaster', st => { st.players[0]!.resources.wood = 1 }, false), cr = finish(c, lesson(c, 'C089_StableMaster'), false); assert.equal(cr.state.players[0]!.stableTiles.length, 0); assert.equal(cr.state.players[0]!.resources.wood, 1); save('C089-N1', { r, cr }) })
+  it('C089 N2 exactly one unfenced stable has capacity three and a second has capacity one during real animal collection', () => { const s = make('C089_StableMaster', st => { st.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }]; st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 3 }), p = ok(s.takeAction(0, 'sheep-market')); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'animal-reorg'); const zs = p.interaction.request.zones.filter(z => z.zoneType === 'stable'); assert.deepEqual(zs.map(z => z.capacity).sort(), [1, 3]); const r = finish(s, p, false); assert.equal(r.state.players[0]!.resources.sheep, 3); save('C089-N2', { p, r }) })
 })

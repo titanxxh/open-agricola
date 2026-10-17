@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -10,6 +10,9 @@ import {
   implementedMinorImprovementCards,
 } from '../../shared/cards/catalog'
 import '../../shared/cards/E/E080_RockGarden'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Fields from './_helpers/audit/ae-negative-42-fields'
 
 const CARD_ID = 'E080_RockGarden'
 const ROW = -1
@@ -173,4 +176,12 @@ describe('E080_RockGarden session', () => {
     expect(total).toBe(6)
     expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([null, null, null])
   })
+})
+
+describe('ae-negative-42-fields', () => {
+  const { sessions, ok, save, setup, finish, play, next, complete, enterSow, sow, field, cardSow, slots } = audit42Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E080 N1 actual free Rock Garden purchase pays three stone seeds into three two stone stacks and real harvest takes one from each',()=>{const s=setup('E080_RockGarden',st=>{st.players[0]!.resources.stone=3},false,4),bought=play(s,'E080_RockGarden');assert.equal(bought.state.players[0]!.resources.stone,3);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const planted=finish(s,cardSow(s,ok(s.takeAction(0,'grain-utilization')),'stone',3));assert.equal(planted.state.players[0]!.resources.stone,0);assert.deepEqual(slots(planted,'E080_RockGarden'),Array(3).fill({crop:'stone',remaining:2}));const r=complete(s,['clay-pit']);assert.equal(r.state.round,5);assert.equal(r.state.players[0]!.resources.stone,3);assert.deepEqual(slots(r,'E080_RockGarden'),Array(3).fill({crop:'stone',remaining:1}));assert.equal(r.state.players[0]!.fields.length,0);save('E080-N1',{bought,planted,r})})
+  it('E080 N2 nonstone and a nonexistent fourth card slot reject before legal three seed sowing',()=>{const s=setup('E080_RockGarden',st=>Object.assign(st.players[0]!.resources,{wood:1,stone:4})),p=enterSow(s,ok(s.takeAction(0,'grain-utilization')));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='sow');const targets=p.interaction.request.farm.selectableFields.filter(f=>f.tile.row<0);assert.equal(targets.length,3);const bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{...targets[0]!.tile,crop:'wood'}]})),fourth=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[...targets.map(f=>({...f.tile,crop:'stone' as const})),{row:-1,col:9999,crop:'stone'}]})),r=finish(s,cardSow(s,p,'stone',3));assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.wood,1);assert.deepEqual(slots(r,'E080_RockGarden'),Array(3).fill({crop:'stone',remaining:2}));save('E080-N2',{p,bad,fourth,r})})
+  it('E080 N3 held Rock Garden has no card slots and an ordinary grain sow leaves stone untouched',()=>{const s=setup('E080_RockGarden',st=>{field(st);Object.assign(st.players[0]!.resources,{grain:1,stone:3})},false),p=enterSow(s,ok(s.takeAction(0,'grain-utilization')));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='sow');assert.ok(!p.interaction.request.farm.selectableFields.some(f=>f.tile.row<0));const r=finish(s,sow(s,p,[{row:0,col:1,crop:'grain'}]));assert.equal(r.state.players[0]!.resources.stone,3);assert.equal(slots(r,'E080_RockGarden'),undefined);save('E080-N3',{p,r})})
 })

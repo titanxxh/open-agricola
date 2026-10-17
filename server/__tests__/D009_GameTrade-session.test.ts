@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 
 import '../../shared/cards/D/D009_GameTrade'
 
 import { GameSession } from '../game/authoritative-session'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Animals from './_helpers/audit/ae-negative-26-animals'
 
 const CARD_ID = 'D009_GameTrade'
 
@@ -98,4 +101,13 @@ describe('D009_GameTrade session', () => {
     }))
     expect(response.scores[0]!.total).toBe(scoreBefore + 2)
   })
+})
+
+describe('ae-negative-26-animals', () => {
+  const { TRADE, sessions, save, ok, finish, menu, makeTrade, buyTrade, housing } = audit26Animals
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D009 N1 actual passing purchase pays two farmyard sheep for one pig and one cattle in separate legal pastures',()=>{const s=makeTrade(),a=buyTrade(s),r=housing(s,a.chosen);assert.deepEqual(['sheep','boar','cattle'].map(k=>r.state.players[0]!.resources[k as 'sheep']),[0,1,1]);assert.equal(r.state.players[0]!.resources.food,100);assert.ok(r.state.players[1]!.minorHand.includes(TRADE));assert.equal(r.state.players[1]!.resources.boar,0);save('D009-N1',{a,r})})
+  it('D009 N2 one or zero farmyard sheep refuses before a real free alternative and retains card',()=>{for(const sheep of[0,1]){const s=makeTrade(sheep),pending=menu(s),error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,TRADE)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')),false);assert.equal(r.state.players[0]!.resources.sheep,sheep);assert.equal(r.state.players[0]!.resources.boar,0);assert.ok(r.state.players[0]!.minorHand.includes(TRADE));save(`D009-N2-${sheep}`,{pending,error,r})}})
+  it('D009 N3 invalid mixed pasture and wrong actor reorganization reject before two legal animal zones',()=>{const s=makeTrade(),a=buyTrade(s);assert.ok(a.chosen.interaction.stateId==='wait'&&a.chosen.interaction.request.kind==='animal-reorg');const z=a.chosen.interaction.request.zones.find(z=>z.zoneType==='pasture');assert.ok(z);const mixed=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[{...z,animalType:null,animalCount:2,animalCounts:{boar:1,cattle:1}}]})),wrong=assertRejectedUnchanged(s,()=>s.resolveChoice(1,'confirm',{zones:[]})),r=housing(s,a.chosen);assert.equal(r.state.players[0]!.resources.boar,1);assert.equal(r.state.players[0]!.resources.cattle,1);save('D009-N3',{a,mixed,wrong,r})})
+  it('D009 N4 whole paid animal purchase undo restores two sheep and original passing hand before one replay',()=>{const s=makeTrade(),before=ok(s.getState()),a=buyTrade(s),r=housing(s,a.chosen),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.pastures,before.state.players[0]!.pastures);assert.deepEqual(['sheep','boar','cattle'].map(k=>undone.state.players[0]!.resources[k as 'sheep']),[2,0,0]);assert.ok(undone.state.players[0]!.minorHand.includes(TRADE));const second=buyTrade(s),retry=housing(s,second.chosen);assert.equal(retry.state.players[0]!.resources.sheep,0);save('D009-N4',{before,a,r,undone,second,retry})})
 })

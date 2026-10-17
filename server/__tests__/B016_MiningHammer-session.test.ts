@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B016_MiningHammer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18Construction from './_helpers/audit/ae-negative-18-construction'
 
 const CARD_ID = 'B016_MiningHammer'
 
@@ -136,4 +139,13 @@ describe('B016 Mining Hammer parity', () => {
     expect(options(response).some((option) => option.sourceCard === CARD_ID)).toBe(false)
     expect(response.interaction.sourceCard).not.toBe(CARD_ID)
   })
+})
+
+describe('ae-negative-18-construction', () => {
+  const { HAMMER, sessions, save, ok, setup, turn, choose, renovation, stable } = audit18Construction
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B016 N1 real one wood purchase gains one food only once with no stable',()=>{const s=setup(HAMMER,state=>state.players[0]!.resources.wood=1,false);let pending=turn(s,0,'meeting-place');if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice'){const o=pending.interaction.request.options.find(o=>o.value.startsWith('action-improvement-'));if(o)pending=ok(s.resolveChoice(0,o.value))}const r=ok(s.resolveChoice(0,HAMMER));assert.ok(r.state.players[0]!.minorPlayed.includes(HAMMER));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,21);assert.equal(r.state.players[0]!.stableTiles.length,0);assertRejectedUnchanged(s,()=>s.resolveChoice(0,HAMMER));save('B016-N1',{pending,r})})
+  it('B016 N2 either real renovation pays normal fee then exactly one stable costs zero wood',()=>{for(const type of['wood','clay']as const){const s=renovation(type),pending=turn(s,0,'house-redevelopment'),r=stable(s,pending);assert.equal(r.state.players[0]!.houseType,type==='wood'?'clay':'stone');assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources[type==='wood'?'clay':'stone'],0);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.stableTiles.length,1);save(`B016-N2-${type}`,{pending,r})}})
+  it('B016 N3 decline hand and full farm produce no additional stable after real renovation',()=>{for(const mode of['decline','hand','full']as const){const s=renovation('wood',mode!=='hand',state=>{if(mode==='full'){const p=state.players[0]!;p.fields=Array.from({length:3},(_,row)=>Array.from({length:5},(_,col)=>({row,col,stacks:[]}))).flat().filter(t=>!p.roomTiles.some(r=>r.row===t.row&&r.col===t.col))}});const pending=turn(s,0,'house-redevelopment'),r=choose(s,pending,undefined,false);assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.stableTiles.length,0);assert.equal(r.state.players[0]!.resources.wood,0);save(`B016-N3-${mode}`,{pending,r})}})
+  it('B016 N4 two stables illegal tile and wrong actor reject then one stable succeeds with undo',()=>{const s=renovation(),pending=choose(s,turn(s,0,'house-redevelopment'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select');for(const tiles of[[{row:0,col:1},{row:0,col:2}],[{row:99,col:99}]])assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{stables:tiles}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{stables:[{row:0,col:1}]}));const r=stable(s,pending),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.houseType,'wood');assert.equal(undone.state.players[0]!.resources.clay,2);assert.equal(undone.state.players[0]!.resources.reed,1);assert.equal(undone.state.players[0]!.stableTiles.length,0);const retry=stable(s,turn(s,0,'house-redevelopment'));assert.equal(retry.state.players[0]!.stableTiles.length,1);save('B016-N4',{pending,r,undone,retry})})
 })

@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/C/C112_Thresher'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -171,5 +173,39 @@ describe('C112_Thresher session', () => {
 
     expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
     expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, save, setup, choose, source, finish, next, grainField, sow } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C112 N1 actual Grain Utilization buys grain before sow and only one food is paid', () => { const s = setup('C112_Thresher', 14, state => { state.players[0]!.resources.food = 1; grainField(state, 0); }); let r = source(s, ok(s.takeAction(0, 'grain-utilization')), 'C112_Thresher'); r = choose(s, r, o => o.value !== '__skip__'); assert.equal(r.state.players[0]!.resources.food, 0); assert.equal(r.state.players[0]!.resources.grain, 1); r = sow(s, r); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining, 3); save('C112-N1', r); })
+  it('C112 N2 Farmland and Cultivation purchase is optional and exact one grain arrives before plowing', () => {
+    for (const space of ['farmland', 'cultivation'])
+      for (const accept of [true, false]) {
+        const s = setup('C112_Thresher', 14, state => state.players[0]!.resources.food = 1)
+        let r = source(s, ok(s.takeAction(0, space)), 'C112_Thresher')
+        r = choose(s, r, o => accept ? o.value !== '__skip__' : o.value === '__skip__')
+        assert.equal(r.state.players[0]!.resources.food, accept ? 0 : 1)
+        assert.equal(r.state.players[0]!.resources.grain, accept ? 1 : 0)
+        r = finish(s, r)
+        assert.equal(r.state.players[0]!.fields.length, 1)
+        save(`C112-N2-${space}-${accept}`, r)
+      }
+  })
+  it('C112 N3 zero food unrelated Forest and actual opponent Farmland cannot create owner grain', () => {
+    for (const mode of ['food', 'space', 'opponent']) {
+      const s = setup('C112_Thresher', 14, state => {
+        if (mode === 'food')
+          state.players[0]!.resources.food = 0
+      })
+      let r = finish(s, ok(s.takeAction(0, mode === 'food' ? 'farmland' : 'forest')))
+      if (mode === 'opponent') {
+        next(s)
+        r = finish(s, ok(s.takeAction(1, 'farmland')))
+      }
+      assert.equal(r.state.players[0]!.resources.grain, 0)
+      save(`C112-N3-${mode}`, r)
+    }
   })
 })

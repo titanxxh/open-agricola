@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D037_Sculpture'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit35Resources from './_helpers/audit/ae-negative-35-resources'
 
 const CARD_ID = 'D037_Sculpture'
 
@@ -81,4 +84,21 @@ describe('D037 Sculpture parity', () => {
     expect(option).toBeUndefined()
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-35-resources', () => {
+  const { sessions, save, finish, action, buy, printed, sculpture } = audit35Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D037 N1 two complete rounds left and one unused connected farm space permit actual purchase for one stone and two printed points', () => { const s = sculpture(), r = finish(s, buy(s, 'D037_Sculpture')); assert.ok(r.state.players[0]!.minorPlayed.includes('D037_Sculpture')); assert.equal(r.state.players[0]!.resources.stone, 0); assert.equal(printed(r, 'D037_Sculpture'), 2); save('D037-N1', r); });
+  it('D037 N2 equal or more unused spaces and zero complete rounds with even a full farm cannot satisfy strict more rounds left', () => {
+      const rows = [];
+      for (const [unused, round] of [[2, 12], [3, 12], [0, 14]] as const) {
+          const s = sculpture(unused, round), p = buy(s, 'D037_Sculpture'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D037_Sculpture'));
+          assert.ok(p.state.players[0]!.minorHand.includes('D037_Sculpture'));
+          assert.equal(p.state.players[0]!.resources.stone, 1);
+          rows.push({ p, bad });
+      }
+      save('D037-N2', rows);
+  });
+  it('D037 N3 otherwise eligible but no stone cannot build and a held card gives no printed points', () => { const s = sculpture(1, 12, 0), p = buy(s, 'D037_Sculpture'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D037_Sculpture')); assert.equal(printed(p, 'D037_Sculpture'), 0); const t = sculpture(), hand = action(t, 0, 'reed-bank'); assert.equal(printed(hand, 'D037_Sculpture'), 0); save('D037-N3', { p, bad, hand }); });
 })

@@ -3,10 +3,14 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B167_StableSergeant'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { positionKey } from '../../shared/domain/farm'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit31Plows from './_helpers/audit/ae-negative-31-plows'
 
 const CARD_ID = 'B167_StableSergeant'
 
@@ -198,4 +202,46 @@ describe('B167 Stable Sergeant parity', () => {
       food: 2, sheep: 0, boar: 0, cattle: 0,
     })
   })
+})
+
+describe('ae-negative-31-plows', () => {
+  const { sessions, actor, save, setup, finish, lesson, take, noSource, accept, pasture, animalKeep, sergeant } = audit31Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('B167 N1 real occupation purchase pays two food and preserves all three species in independent holders', () => {
+    const card = 'B167_StableSergeant', s = setup(card, 14, st => sergeant(st, 2))
+    let r = accept(s, lesson(s, card), card)
+    r = animalKeep(s, r, req => {
+      for (const z of req.zones) {
+        z.animalType = null
+        z.animalCount = 0
+      }
+      const p = req.zones.find(z => z.id === 'p1')!, stable = req.zones.find(z => z.zoneType === 'stable')!, house = req.zones.find(z => z.zoneType === 'house')!
+      p.animalType = 'sheep'
+      p.animalCount = 1
+      stable.animalType = 'boar'
+      stable.animalCount = 1
+      house.animalType = 'cattle'
+      house.animalCount = 1
+    })
+    r = finish(s, r)
+    assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.boar, r.state.players[0]!.resources.cattle], [0, 1, 1, 1])
+    assert.equal(r.state.players[0]!.pastures[0]!.animalType, 'sheep')
+    assert.deepEqual(r.state.players[0]!.stableAnimals[positionKey({ row: 1, col: 3 })], { animalType: 'boar', animalCount: 1 })
+    save('B167-N1', r)
+  })
+  it('B167 N2 decline insufficient food and insufficient distinct holders give no animal or extra fee', () => {
+    for (const mode of ['decline', 'food', 'capacity']) {
+      const card = 'B167_StableSergeant', s = setup(card, 14, st => sergeant(st, mode === 'food' ? 1 : 2, mode !== 'capacity'))
+      let r = lesson(s, card)
+      if (mode === 'capacity' || mode === 'food')
+        noSource(r, card)
+      if (mode === 'food')
+        assertRejectedUnchanged(s, () => s.resolveChoice(actor(r), 'flow-7'))
+      r = finish(s, r, mode !== 'decline')
+      assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.boar, r.state.players[0]!.resources.cattle], [mode === 'food' ? 1 : 2, 0, 0, 0])
+      assert.ok(r.state.players[0]!.occupationPlayed.includes(card))
+      save(`B167-N2-${mode}`, r)
+    }
+  })
+  it('B167 N3 already played Sergeant does not sell animals again on ordinary Grain Seeds', () => { const card = 'B167_StableSergeant', s = setup(card, 14, st => { pasture(st, [{ row: 0, col: 3 }]); st.players[0]!.stableTiles = [{ row: 1, col: 3 }]; st.players[0]!.resources.food = 2; }); let r = take(s, 'grain-seeds'); noSource(r, card); r = finish(s, r, true); assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.sheep, r.state.players[0]!.resources.boar, r.state.players[0]!.resources.cattle], [2, 0, 0, 0]); save('B167-N3', r); })
 })

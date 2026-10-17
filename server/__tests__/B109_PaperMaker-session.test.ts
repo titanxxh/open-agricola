@@ -6,6 +6,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A123_FrameBuilder'
 import '../../shared/cards/B/B109_PaperMaker'
+import assert from 'node:assert/strict'
+import { assertRuleOutcome, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Paper from './_helpers/audit/ae-negative-26-paper'
 
 const CARD_ID = 'B109_PaperMaker'
 const TARGET = 'A123_FrameBuilder'
@@ -320,4 +323,39 @@ describe('B109 Paper Maker parity', () => {
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toHaveLength(1)
   })
 
+})
+
+describe('ae-negative-26-paper', () => {
+  const { CARD, TARGET, sessions, save, ok, finish, make, lesson } = audit26Paper
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B109 N1 actual later Lessons trades exactly one wood for prior occupation count excluding newly played target',()=>{const observations=[1,2,3].map(n=>{const s=make(n),a=lesson(s);save(`B109-N1-${n}`,a);return{n,a}});for(const{n,a}of observations){const actual={wood:a.r.state.players[0]!.resources.wood,food:a.r.state.players[0]!.resources.food};assertRuleOutcome(actual,{wood:0,food:20+n-1});assert.equal(a.r.state.players[0]!.occupationPlayed.length,n+1);assert.equal(a.r.state.players[1]!.resources.food,100);save(`B109-N1-${n}`,a)}})
+  it('B109 N2 one wood funds a later one food Lessons from zero food and no wood rejects without allowing a free occupation',()=>{const s=make(1,0),a=lesson(s);assert.equal(a.r.state.players[0]!.resources.food,0);assert.equal(a.r.state.players[0]!.resources.wood,0);save('B109-N2-funded',a);const empty=make(1,0,0),error=assertRejectedUnchanged(empty,()=>empty.takeAction(0,'lessons'));assert.ok(!empty.state.players[0]!.occupationPlayed.includes(TARGET));save('B109-N2-empty',{error,state:empty.getState()})})
+  it('B109 N3 declining trade or keeping Paper Maker in hand pays only one food and preserves wood',()=>{for(const mode of['decline','hand','wood']){const s=make(1,20,mode==='wood'?0:1,mode!=='hand'),a=lesson(s,false);assert.equal(a.r.state.players[0]!.resources.food,19);assert.equal(a.r.state.players[0]!.resources.wood,mode==='wood'?0:1);save(`B109-N3-${mode}`,a)}})
+  it('B109 N4 unknown payment rejects before legal trade and entire Lessons undo restores food wood hand and original count', () => {
+    const s = make(1), before = ok(s.getState()), pending = ok(s.takeAction(0, 'lessons'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.sourceCard, CARD)
+    const trade = pending.interaction.request.options.find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.wood === 1)
+    assert.ok(trade, JSON.stringify(pending.interaction))
+    const error = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'unknown-paper-payment'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, trade.value))
+    const chosen = ok(s.resolveChoice(0, trade.value))
+    assert.equal(chosen.state.players[0]!.resources.wood, 0)
+    assert.equal(chosen.state.players[0]!.resources.food, 21)
+    assert.ok(chosen.interaction.stateId === 'wait' && chosen.interaction.request.kind === 'choice')
+    assert.ok(chosen.interaction.request.options.some(o => o.value === TARGET))
+    const r = finish(s, ok(s.resolveChoice(0, TARGET)), false), undone = ok(s.undoAction())
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.ok(r.state.players[0]!.occupationPlayed.includes(TARGET))
+    assert.equal(undone.state.players[0]!.resources.food, 20)
+    assert.equal(undone.state.players[0]!.resources.wood, 1)
+    assert.equal(undone.state.players[0]!.occupationPlayed.length, 1)
+    assert.ok(undone.state.players[0]!.occupationHand.includes(TARGET))
+    assert.deepEqual(undone.state.actionSpaces, before.state.actionSpaces)
+    const retry = lesson(s)
+    assert.equal(retry.r.state.players[0]!.resources.food, 20)
+    assert.equal(retry.r.state.players[0]!.resources.wood, 0)
+    save('B109-N4', { before, pending, error, chosen, r, undone, retry })
+  })
 })

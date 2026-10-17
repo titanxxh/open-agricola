@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/domain/player'
 import { E021_SheepRug } from '../../shared/cards/E/E021_SheepRug'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Family from './_helpers/audit/ae-negative-32-family'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -108,4 +111,16 @@ describe('E021_SheepRug session', () => {
       expect(session.withCtx(() => meetsCardPrerequisites(player, E021_SheepRug, state.round, state))).toBe(true)
     })
   })
+})
+
+describe('ae-negative-32-family', () => {
+  const { sessions, save, finish, action, buy, rug, opposingWish } = audit32Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E021 N1 actual four housed sheep purchase pays one and a real opponent adult plus newborn do not prevent occupied normal growth', () => { const s = rug(false), bought = finish(s, buy(s, 'E021_SheepRug')); assert.deepEqual([bought.state.players[0]!.resources.sheep, bought.state.players[0]!.pastures[0]!.animalCount], [3, 3]); const t = rug(), steps = opposingWish(t), r = action(t, 0, 'wish-children'); assert.equal(familySize(r.state.players[0]!), 3); assert.equal(familySize(r.state.players[1]!), 3); assert.equal(r.state.actionSpaces.find(a => a.id === 'wish-children')!.takenBy.length, 4); save('E021-N1', { bought, steps, r }); });
+  it('E021 N2 the occupied urgent growth action can be used without an empty room', () => { const s = rug(true, 4, 2), steps = opposingWish(s, 'urgent-wish-children'), r = action(s, 0, 'urgent-wish-children'); assert.equal(familySize(r.state.players[0]!), 3); assert.equal(r.state.players[0]!.rooms, 2); assert.equal(r.state.actionSpaces.find(a => a.id === 'urgent-wish-children')!.takenBy.length, 4); save('E021-N2', { steps, r }); });
+  it('E021 N3 three housed sheep fail purchase and a held card or no room for normal growth cannot bypass occupied space admission', () => { const s = rug(false, 3), poor = buy(s, 'E021_SheepRug'); assert.ok(poor.state.players[0]!.minorHand.includes('E021_SheepRug')); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E021_SheepRug')); const rows = []; for (const [played, rooms] of [[false, 3], [true, 2]] as const) {
+      const t = rug(played, 4, rooms), steps = opposingWish(t), bad = assertRejectedUnchanged(t, () => t.takeAction(0, 'wish-children')), r = action(t, 0, 'reed-bank');
+      assert.equal(familySize(r.state.players[0]!), 2);
+      rows.push({ steps, bad, r });
+  } save('E021-N3', { poor, rows }); });
 })

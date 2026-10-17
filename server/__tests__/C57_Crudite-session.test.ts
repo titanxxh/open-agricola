@@ -1,6 +1,6 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed } from '../../shared/domain/player'
@@ -9,6 +9,9 @@ import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from
 
 import '../../shared/cards/C/C057_Crudite'
 import '../../shared/cards/B/B068_Beanfield'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Fields from './_helpers/audit/ae-negative-38-fields'
 
 const CARD_ID = 'C057_Crudite'
 const ANYTIME_ID = 'C57-crudite-anytime'
@@ -333,4 +336,42 @@ describe('C057_Crudite', () => {
     const actionResp = anytimeSession.takeAnytimeAction(0, ANYTIME_ID)
     expect(actionResp.ok).toBe(false)
   })
+})
+
+describe('ae-negative-38-fields', () => {
+  const { sessions, save, ok, finish, buy, paid, crudite } = audit38Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C057 N1 real free purchase may pay exactly three food for one vegetable or decline without receiving it', () => {
+      const rows = [];
+      for (const accept of [true, false] as const) {
+          const s = crudite(false, [], 'vegetable', 3), p = buy(s, 'C057_Crudite'), r = finish(s, accept ? paid(s, p, 'C057_Crudite', 'food') : p);
+          assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.vegetable], accept ? [0, 1] : [3, 0]);
+          rows.push({ p, r });
+      }
+      const q = crudite(false, [], 'vegetable', 2), poor = finish(q, buy(q, 'C057_Crudite'));
+      assert.deepEqual([poor.state.players[0]!.resources.food, poor.state.players[0]!.resources.vegetable], [2, 0]);
+      save('C057-N1', { rows, poor });
+  });
+  it('C057 N2 actual anytime checks empty duplicate and unavailable field before selecting one or both distinct top vegetables', () => {
+      const rows = [];
+      for (const count of [1, 2] as const) {
+          const s = crudite(), p = ok(s.takeAnytimeAction(0, 'C57-crudite-anytime')), empty = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [] })), duplicate = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 1 }] })), bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 1, col: 0 }] })), r = finish(s, ok(s.commitSelectionChoice(0, { positions: Array.from({ length: count }, (_, i) => ({ row: 0, col: i + 1 })) })));
+          assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining), count === 1 ? [1, 2] : [1, 1]);
+          assert.deepEqual([r.state.players[0]!.resources.food, r.state.players[0]!.resources.vegetable], [100 + 4 * count, 0]);
+          rows.push({ p, empty, duplicate, bad, r });
+      }
+      save('C057-N2', rows);
+  });
+  it('C057 N3 one vegetable grain and a held card cannot discard crops while a single eligible two vegetable field removes only its top', () => {
+      const rows = [];
+      for (const [played, counts, kind] of [[true, [1], 'vegetable'], [true, [2], 'grain'], [false, [2], 'vegetable']] as const) {
+          const s = crudite(played, [...counts], kind), bad = s.takeAnytimeAction(0, 'C57-crudite-anytime');
+          assert.equal(bad.ok, false);
+          assert.equal(bad.state.players[0]!.resources.food, 100);
+          rows.push(bad);
+      }
+      const q = crudite(true, [2]), single = finish(q, ok(q.takeAnytimeAction(0, 'C57-crudite-anytime')));
+      assert.deepEqual([single.state.players[0]!.fields[0]!.stacks[0]!.remaining, single.state.players[0]!.resources.food], [1, 104]);
+      save('C057-N3', { rows, single });
+  });
 })

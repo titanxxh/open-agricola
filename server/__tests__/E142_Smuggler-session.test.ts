@@ -1,12 +1,15 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 import '../../shared/cards/B/B021_HayloftBarn'
 import '../../shared/cards/E/E142_Smuggler'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit03MultiStep from './_helpers/audit/ae-negative-03-multi-step'
 
 const CARD_ID = 'E142_Smuggler'
 const HAYLOFT_BARN = 'B021_HayloftBarn'
@@ -174,5 +177,68 @@ describe('E142 Smuggler parity', () => {
     const response = setup().performRoundEnd()
 
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 0, stone: 0 })
+  })
+})
+
+describe('ae-negative-03-multi-step', () => {
+  const { sessions, SMUGGLER, setup, ok, wait, options, harvest, trade, stocks } = audit03MultiStep
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('Smuggler feeding limits', () => {
+    it('E142 N1 unaffordable first branch and wrong actor are rejected before a legal wood-to-stone chain', () => {
+      const control = harvest(0, 1)
+      const unavailable = trade(control.r, { grain: 1 }, { stone: 1 })
+      const { s, r } = harvest(1, 0)
+      assert(!options(r).some(o => o.value === unavailable))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, unavailable))
+      const first = trade(r, { wood: 1 }, { grain: 1 })
+      assertRejectedUnchanged(s, () => s.resolveChoice(1, first))
+      const step = ok(s.resolveChoice(0, first))
+      assert.deepEqual(stocks(step), { wood: 0, grain: 1, stone: 0, exchanges: 1 })
+      const final = ok(s.resolveChoice(0, trade(step, { grain: 1 }, { stone: 1 })))
+      assert.deepEqual(stocks(final), { wood: 0, grain: 0, stone: 1, exchanges: 2 })
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
+    })
+    it('E142 N2 two identical exchanges consume two goods and a stale third request cannot spend another', () => {
+      const { s, r } = harvest(3, 0)
+      const first = trade(r, { wood: 1 }, { grain: 1 })
+      const second = ok(s.resolveChoice(0, first))
+      const final = ok(s.resolveChoice(0, trade(second, { wood: 1 }, { grain: 1 })))
+      assert.deepEqual(stocks(final), { wood: 1, grain: 2, stone: 0, exchanges: 2 })
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, first))
+    })
+    it('E142 N3 declining one or both stages never invents a good or expands the remaining quota', () => {
+      for (const exchangeSecond of [false, true]) {
+        const { s, r } = harvest(1, 0)
+        assert.equal(wait(r).sourceCard, SMUGGLER)
+        const second = ok(s.resolveChoice(0, '__skip__'))
+        const final = ok(s.resolveChoice(0, exchangeSecond ? trade(second, { wood: 1 }, { grain: 1 }) : '__skip__'))
+        assert.deepEqual(stocks(final), { wood: exchangeSecond ? 0 : 1, grain: exchangeSecond ? 1 : 0, stone: 0, exchanges: exchangeSecond ? 1 : 0 })
+      }
+    })
+    it('E142 N4 exchanges cannot be requested from the ordinary work phase', () => {
+      const s = setup(SMUGGLER, state => { state.players[0]!.resources.wood = 1 })
+      const control = harvest(1, 0)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, trade(control.r, { wood: 1 }, { grain: 1 })))
+      assert.deepEqual(stocks(s.getState()), { wood: 1, grain: 0, stone: 0, exchanges: 0 })
+      ok(s.takeAction(0, 'grain-seeds'))
+      assert.equal(s.state.players[0]!.resources.grain, 1)
+    })
+    it('E142 N5 a later controlled harvest restores exactly two exchanges', () => {
+      const { s, r } = harvest(4, 0)
+      let next = ok(s.resolveChoice(0, trade(r, { wood: 1 }, { grain: 1 })))
+      next = ok(s.resolveChoice(0, trade(next, { wood: 1 }, { grain: 1 })))
+      assert.deepEqual(stocks(next), { wood: 2, grain: 2, stone: 0, exchanges: 2 })
+      assert.equal(next.state.round, 5)
+      for (const round of [5, 6, 7]) {
+        assert.equal(s.state.round, round)
+        for (const p of s.state.players) markAllWorkersUsed(s.state, p)
+        next = ok(s.performRoundEnd())
+      }
+      next = ok(s.resolveChoice(0, trade(next, { wood: 1 }, { grain: 1 })))
+      const second = trade(next, { wood: 1 }, { grain: 1 })
+      next = ok(s.resolveChoice(0, second))
+      assert.deepEqual(stocks(next), { wood: 0, grain: 4, stone: 0, exchanges: 4 })
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, second))
+    })
   })
 })

@@ -1,12 +1,14 @@
 import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D099_EarthenwarePotter'
 import '../../shared/cards/A/A099_FellowGrazer'
+import assert from 'node:assert/strict'
+import * as audit46Final from './_helpers/audit/ae-negative-46-final'
 
 const CARD_ID = 'D099_EarthenwarePotter'
 const OTHER_OCCUPATION = 'A099_FellowGrazer'
@@ -175,4 +177,11 @@ describe('D099 Earthenware Potter parity', () => {
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).not.toBe(CARD_ID)
     session.dispose()
   })
+})
+
+describe('ae-negative-46-final', () => {
+  const { POTTER, sessions, save, ok, make, lesson, bonus, progress } = audit46Final
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D099 N1 actual round four purchase preserves the deadline through every natural later round and pays only the family capped final clay amount',()=>{for(const[clay,left,points]of[[0,0,0],[1,0,1],[2,0,2],[3,1,2]] as const){const s=make(POTTER,false,state=>{state.round=4;state.players[0]!.resources.clay=clay}),bought=lesson(s,POTTER);assert.equal(bonus(bought,POTTER),0);assert.equal(bought.state.players[0]!.cardStates[POTTER]?.extraData?.purchaseRound,4);const five=progress(s,5);assert.equal(bonus(five,POTTER),0);assert.equal(five.state.players[0]!.resources.clay,clay);const r=progress(s,15);assert.equal(r.state.gameOver,true);assert.equal(r.state.players[0]!.resources.clay,left);assert.equal(bonus(r,POTTER),points);assert.equal(bonus(r,POTTER,1),0);save(`D099-N1-${clay}`,{bought,five,r})}})
+  it('D099 N2 actual round five purchase remains too late at the final harvest and a held card never pays clay or grants points',()=>{for(const played of[true,false]){const s=make(POTTER,false,state=>{state.round=5;state.players[0]!.resources.clay=3}),bought=played?lesson(s,POTTER):ok(s.getState()),r=progress(s,15);assert.equal(r.state.gameOver,true);assert.equal(r.state.players[0]!.resources.clay,3);assert.equal(bonus(r,POTTER),0);save(`D099-N2-${played}`,{bought,r})}})
 })

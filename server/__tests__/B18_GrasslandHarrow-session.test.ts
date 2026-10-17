@@ -3,6 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { choose, playImprovement, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit03Crops from './_helpers/audit/ae-negative-03-crops'
 
 const CARD_ID = 'B018_GrasslandHarrow'
 const sessions: GameSession[] = []
@@ -115,5 +118,98 @@ describe('B018 Grassland Harrow activation', () => {
     expect(response.state.players[0]!.fields).toHaveLength(decline ? 0 : 1)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1 })
     expect(response.state.futureMeeples).toEqual([])
+  })
+})
+
+describe('ae-negative-03-crops', () => {
+  const { B, setup, playImprovement, wait, choice, finish, place } = audit03Crops
+  describe('03 crops negative Session audit', () => {
+    it('B018 N1 payment shortage occupation shortage and empty post-payment reserve cannot play; legal reserve can', () => {
+            for (const config of ['fee', 'occupation', 'reserve']) {
+                const s = setup(B, state => { const p = state.players[0]!; if (config === 'fee')
+                    p.resources.wood = 1; if (config === 'occupation')
+                    p.occupationPlayed = ['A125_Priest']; if (config === 'reserve')
+                    p.resources.clay = 0; state.availableMajorImprovements = []; });
+                const before = JSON.stringify(s.getState().state.players[0]!.resources);
+                let r = place(s, 0, 'meeting-place');
+                if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+                    const branch = r.interaction.request.options.find(o => o.value.startsWith('action-improvement-') && !('disabled' in o && o.disabled));
+                    if (branch) { r = s.resolveChoice(0, branch.value); assert.equal(r.ok, true, r.error); }
+                }
+                const enabledCard = r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice'
+                    && r.interaction.request.options.some(o => o.value === B && !('disabled' in o && o.disabled));
+                assert.equal(enabledCard, false, `${config}: B018 must not be enabled`);
+                assertRejectedUnchanged(s, () => s.resolveChoice(0, B));
+                assert.equal(r.state.players[0]!.minorPlayed.includes(B), false);
+                assert.equal(JSON.stringify(r.state.players[0]!.resources), before);
+                assert.deepEqual(r.state.futureMeeples, []);
+                s.dispose();
+            }
+            const s = setup(B);
+            const r = playImprovement(s, B, 'meeting-place');
+            assert.equal(r.state.players[0]!.resources.wood, 0);
+            assert.equal(r.state.players[0]!.resources.clay, 1);
+            assert.deepEqual(r.state.futureMeeples.map(x => ({ round: x.round, resources: x.resources })), [{ round: 4, resources: { field: 1 } }]);
+            s.dispose();
+        });
+    it('B018 N2 future target counts only four building goods after actual payment and respects round fourteen', () => {
+            for (const [round, wood, clay, reed, stone, target] of [[3, 3, 1, 1, 1, 7], [13, 2, 1, 0, 0, 14], [13, 4, 0, 0, 0, 0]]) {
+                const s = setup(B, state => { Object.assign(state.players[0]!.resources, { wood, clay, reed, stone, grain: 8, food: 20 }); }, round);
+                const r = playImprovement(s, B, 'meeting-place');
+                assert.equal(r.state.players[0]!.resources.wood, wood - 2);
+                assert.deepEqual(r.state.futureMeeples.filter(x => x.cardId === B).map(x => x.round), target ? [target] : []);
+                s.dispose();
+            }
+        });
+    it('B018 N3 natural next-round due field rejects room then plows exactly once with a legal retry', () => {
+            const s = setup(B, () => { }, 1);
+            finish(s, playImprovement(s, B, 'meeting-place'));
+            finish(s, place(s, 1, 'grain-seeds'));
+            finish(s, place(s, 0, 'clay-pit'));
+            let r = place(s, 1, 'reed-bank');
+            if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+                r = confirmNext(s, r);
+            assert.equal(r.state.round, 2);
+            r = s.resolveChoice(0, choice(r));
+            const i = wait(r);
+            assert.ok(i.request.kind === 'farm-select' && i.request.farm.farmType === 'plow');
+            assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } }));
+            r = s.commitSelectionChoice(0, { tile: i.request.farm.selectableTiles[0]! });
+            assert.equal(r.ok, true, r.error);
+            assert.equal(r.state.players[0]!.fields.length, 1);
+            assert.deepEqual(r.state.futureMeeples, []);
+            assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } }));
+            s.dispose();
+        });
+    it('B018 N4 actual card undo restores both wood cost and the single future field', () => {
+            const s = setup(B);
+            const before = JSON.stringify(s.getState().state.players[0]!.resources);
+            const score = JSON.stringify(s.getState().scores);
+            playImprovement(s, B, 'meeting-place');
+            const r = s.undoAction();
+            assert.equal(r.ok, true, r.error);
+            assert.equal(JSON.stringify(r.state.players[0]!.resources), before);
+            assert.equal(JSON.stringify(r.scores), score);
+            assert.deepEqual(r.state.futureMeeples, []);
+            assert.equal(r.state.players[0]!.minorHand.includes(B), true);
+            s.dispose();
+        });
+    it('B018 N5 natural due optional field can be declined without plowing or delaying a token', () => {
+            const s = setup(B, () => { }, 1);
+            finish(s, playImprovement(s, B, 'meeting-place'));
+            finish(s, place(s, 1, 'grain-seeds'));
+            finish(s, place(s, 0, 'clay-pit'));
+            let r = place(s, 1, 'reed-bank');
+            if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+                r = confirmNext(s, r);
+            const i = wait(r);
+            assert.ok(i.request.kind === 'select-trigger' && i.request.options.some(o => o.value === '__pass__' && !('disabled' in o && o.disabled)));
+            r = s.resolveChoice(0, '__pass__');
+            assert.equal(r.ok, true, r.error);
+            assert.equal(r.state.round, 2);
+            assert.equal(r.state.players[0]!.fields.length, 0);
+            assert.deepEqual(r.state.futureMeeples, []);
+            s.dispose();
+        });
   })
 })

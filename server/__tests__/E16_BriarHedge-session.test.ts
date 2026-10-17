@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
@@ -8,6 +8,10 @@ import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fe
 import '../../shared/cards/E/E016_BriarHedge'
 import { E016_BriarHedge } from '../../shared/cards/E/E016_BriarHedge'
 import '../../shared/cards/B/B030_WoodPalisades'
+import assert from 'node:assert/strict'
+import { positionKey } from '../../shared/domain/farm'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit31Plows from './_helpers/audit/ae-negative-31-plows'
 
 describe('E016_BriarHedge session', () => {
   const setup = () => {
@@ -176,4 +180,44 @@ describe('E16 BriarHedge — border-fence discount', () => {
     expect(getFenceCount(p)).toBe(3)
     expect(getPalisadeCount(p)).toBe(1)
   })
+})
+
+describe('ae-negative-31-plows', () => {
+  const { sessions, options, actor, save, setup, choose, take, hand, buy, boundary, fence } = audit31Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E016 N1 real animal prerequisite accepts all three assigned species and rejects missing cattle', () => {
+    for (const all of [true, false]) {
+      const card = 'E016_BriarHedge', s = setup(card, 14, st => { hand(st, card); const p = st.players[0]!; p.stableTiles = [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }]; p.stableAnimals = { [positionKey({ row: 0, col: 2 })]: { animalType: 'sheep', animalCount: 1 }, [positionKey({ row: 0, col: 3 })]: { animalType: 'boar', animalCount: 1 }, ...(all ? { [positionKey({ row: 0, col: 4 })]: { animalType: 'cattle' as const, animalCount: 1 } } : {}) }; Object.assign(p.resources, { sheep: 1, boar: 1, cattle: all ? 1 : 0 }); })
+      if (all) {
+        const r = buy(s, card)
+        assert.ok(r.state.players[0]!.minorPlayed.includes(card))
+        save('E016-N1-legal', r)
+      }
+      else {
+        let r = take(s, 'meeting-place')
+        if (options(r).some(o => o.value.startsWith('action-improvement-')))
+          r = choose(s, r, o => o.value.startsWith('action-improvement-'))
+        assert.ok(!options(r).some(o => o.value === card && !o.disabled))
+        assertRejectedUnchanged(s, () => s.resolveChoice(actor(r), card))
+        assert.ok(r.state.players[0]!.minorHand.includes(card))
+        save('E016-N1-missing', r)
+      }
+    }
+  })
+  it('E016 N2 border fences discount only board edges while interior and hand-only fences pay full', () => {
+    for (const mode of ['border', 'interior', 'hand']) {
+      const card = 'E016_BriarHedge', wood = mode === 'border' ? 2 : 4, s = setup(card, 14, st => {
+        st.players[0]!.resources.wood = wood
+        if (mode === 'hand')
+          hand(st, card)
+      })
+      const tiles = mode === 'interior' ? [{ row: 1, col: 2 }] : [{ row: 2, col: 4 }]
+      const r = fence(s, take(s, 'fencing'), boundary(tiles))
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.fenceSegments.length, 4)
+      assert.equal(r.state.players[0]!.pastures.length, 1)
+      save(`E016-N2-${mode}`, r)
+    }
+  })
+  it('E016 N3 one wood cannot pay two internal edges and finite original fences remain unchanged', () => { const card = 'E016_BriarHedge', s = setup(card, 14, st => st.players[0]!.resources.wood = 1); const r = take(s, 'fencing'); assertRejectedUnchanged(s, () => s.commitSelectionChoice(actor(r), { edges: boundary([{ row: 2, col: 4 }]), palisadeEdges: [], extraWood: 0 })); assert.equal(s.state.players[0]!.resources.wood, 1); assert.equal(s.state.players[0]!.fenceSegments.length, 0); save('E016-N3', s.getState()); })
 })

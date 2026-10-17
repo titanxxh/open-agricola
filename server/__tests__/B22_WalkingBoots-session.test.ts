@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 import type { GameState } from '../../shared/contract/types'
@@ -8,9 +8,13 @@ import {
   inactiveWorkersInSupply,
   getFamilyTokenLimit,
   setActiveWorkerCount,
+  familySize,
 } from '../../shared/domain/player'
 
 import '../../shared/cards/B/B022_WalkingBoots'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Placement from './_helpers/audit/ae-negative-19-placement'
 
 const CARD_ID = 'B022_WalkingBoots'
 const FILLER = '__test_placeholder__'
@@ -197,4 +201,13 @@ describe('B022 Walking Boots parity', () => {
     expect(undone.state.players[0]!.workers.find((worker) => worker.id === '5')?.supplyUse?.status).toBe('reserved')
   })
 
+})
+
+describe('ae-negative-19-placement', () => {
+  const { BOOTS, sessions, save, ok, setup, menu, buy, reach } = audit19Placement
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B022 N1 actual free purchase gains two food and places one finite supply person without growing family',()=>{for(const people of[2,4]){const s=setup(BOOTS,3,people),{pending,r}=buy(s,BOOTS);assert.equal(r.state.players[0]!.resources.food,102);assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice');const supply=r.state.players[0]!.workers.find(w=>w.supplyUse?.sourceCard===BOOTS)!;assert.ok(supply);const placed=ok(s.resolveChoice(0,'forest'));assert.equal(familySize(placed.state.players[0]!),people);assert.equal(placed.state.players[0]!.workers.length,5);assert.ok(placed.state.actionSpaces.find(a=>a.id==='forest')!.takenBy.some(w=>w.workerId===supply.id));save(`B022-N1-${people}`,{pending,r,placed})}})
+  it('B022 N2 natural next returning home removes the same supply token permanently and keeps family score',()=>{const s=setup(BOOTS);buy(s,BOOTS);const placed=ok(s.resolveChoice(0,'forest')),id=placed.state.players[0]!.workers.find(w=>w.supplyUse?.sourceCard===BOOTS)!.id,r=reach(s,4);assert.equal(familySize(r.state.players[0]!),2);assert.equal(getFamilyTokenLimit(r.state.players[0]!),4);assert.equal(r.state.players[0]!.workers.find(w=>w.id===id)!.removedFromSupply,true);assert.ok(r.state.actionSpaces.every(a=>a.takenBy.every(w=>w.workerId!==id||w.playerId!==r.state.players[0]!.id)));assert.equal(r.scores![0]!.categories.find(c=>c.key==='farmers')!.total,6);save('B022-N2',{placed,r})})
+  it('B022 N3 five active people reject purchase without food and illegal occupied or wrong actor placement rejects before legal supply action',()=>{const five=setup(BOOTS,3,5),denied=menu(five);assertRejectedUnchanged(five,()=>five.resolveChoice(0,BOOTS));const legal=ok(five.resolveChoice(0,'A030_BakingSheet'));assert.equal(legal.state.players[0]!.resources.food,100);const s=setup(BOOTS),{r}=buy(s,BOOTS);assertRejectedUnchanged(s,()=>s.resolveChoice(1,'forest'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'meeting-place'));const placed=ok(s.resolveChoice(0,'grain-seeds'));assert.equal(placed.state.players[0]!.resources.grain,1);assert.equal(familySize(placed.state.players[0]!),2);save('B022-N3',{denied,legal,r,placed})})
+  it('B022 N4 whole purchase and temporary placement undo restores supply food and hand for one retry',()=>{const s=setup(BOOTS);buy(s,BOOTS);const placed=ok(s.resolveChoice(0,'grain-seeds')),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.players[0]!.resources.grain,0);assert.equal(getFamilyTokenLimit(undone.state.players[0]!),5);assert.ok(undone.state.players[0]!.workers.every(w=>!w.supplyUse));assert.ok(undone.state.players[0]!.minorHand.includes(BOOTS));buy(s,BOOTS);const retry=ok(s.resolveChoice(0,'grain-seeds'));assert.equal(retry.state.players[0]!.resources.food,102);assert.equal(retry.state.players[0]!.resources.grain,1);save('B022-N4',{placed,undone,retry})})
 })

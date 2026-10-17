@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { plowAction } from '../../shared/actions/effects/plow'
@@ -7,6 +7,9 @@ import type { ActionFlow, ActionSpace } from '../../shared/contract/types'
 
 import { D001_ZigzagHarrow } from '../../shared/cards/D/D001_ZigzagHarrow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit13Minor from './_helpers/audit/ae-negative-13-minor'
 
 describe('D001_ZigzagHarrow session', () => {
   const setupZigzagState = (withStable = false) => {
@@ -124,5 +127,33 @@ describe('D001_ZigzagHarrow session', () => {
       player.stableTiles = [{ row: 1, col: 4 }]
       expect(session.withCtx(() => meetsCardPrerequisites(player, D001_ZigzagHarrow, state.round, state))).toBe(true)
     })
+  })
+})
+
+describe('ae-negative-13-minor', () => {
+  const { ZIG, sessions, save, ok, setup, enterMinor, buy, optional, zigzag } = audit13Minor
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D001 N1 one wood L shaped farm plows exactly one zigzag completion and passes', () => {
+    const session = setup(ZIG, 1, zigzag); const pending = optional(session, buy(session, ZIG), true)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select' && pending.interaction.request.farm.farmType === 'plow')
+    const tiles = pending.interaction.request.farm.selectableTiles; assert(tiles.length)
+    const r = ok(session.commitSelectionChoice(0, { tile: tiles[0] })); assert.equal(r.state.players[0]!.fields.length, 4); assert.equal(r.state.players[0]!.resources.wood, 0); assert(r.state.players[1]!.minorHand.includes(ZIG)); save('D001-N1', r)
+  })
+  it('D001 N2 straight fewer and missing L shaped fields cannot pay or plow', () => {
+    for (const fields of [[], [{ row: 0, col: 2, stacks: [] }], [{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }, { row: 0, col: 3, stacks: [] }]]) {
+      const session = setup(ZIG, 1, state => state.players[0]!.fields = fields); const r = enterMinor(session)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice', JSON.stringify(r.interaction)); assert(!r.interaction.request.options.some(o => o.value === ZIG && !o.disabled)); assertRejectedUnchanged(session, () => session.resolveChoice(0, ZIG)); const legal = ok(session.resolveChoice(0, 'A030_BakingSheet')); assert.equal(legal.state.players[0]!.fields.length, fields.length); assert.equal(legal.state.players[0]!.resources.wood, 1); save(`D001-N2-${fields.length}`, legal)
+    }
+  })
+  it('D001 N3 wrong target room outside farm and actor reject before exact legal retry', () => {
+    const session = setup(ZIG, 1, zigzag); const r = optional(session, buy(session, ZIG), true)
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow'); const tiles = r.interaction.request.farm.selectableTiles
+    for (const tile of [{ row: 1, col: 0 }, { row: 99, col: 99 }, { row: 2, col: 4 }]) assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { tile }))
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(1, { tile: tiles[0] })); const legal = ok(session.commitSelectionChoice(0, { tile: tiles[0] })); assert.equal(legal.state.players[0]!.fields.length, 4); save('D001-N3', legal)
+  })
+  it('D001 N4 optional decline plows none and whole undo restores field wood and passing', () => {
+    const declinedSession = setup(ZIG, 1, zigzag); const declined = optional(declinedSession, buy(declinedSession, ZIG), false); assert.equal(declined.state.players[0]!.fields.length, 3); assert.equal(declined.state.players[0]!.resources.wood, 0)
+    const session = setup(ZIG, 1, zigzag); const pending = optional(session, buy(session, ZIG), true); assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select' && pending.interaction.request.farm.farmType === 'plow'); const r = ok(session.commitSelectionChoice(0, { tile: pending.interaction.request.farm.selectableTiles[0] }))
+    const undone = ok(session.undoAction()); assert.equal(undone.state.players[0]!.fields.length, 3); assert.equal(undone.state.players[0]!.resources.wood, 1); assert(undone.state.players[0]!.minorHand.includes(ZIG)); assert(!undone.state.players[1]!.minorHand.includes(ZIG)); save('D001-N4', { r, undone, declined })
   })
 })

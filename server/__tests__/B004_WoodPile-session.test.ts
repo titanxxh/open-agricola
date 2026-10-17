@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B004_WoodPile'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18Placement from './_helpers/audit/ae-negative-18-placement'
 
 const CARD_ID = 'B004_WoodPile'
 
@@ -66,4 +69,12 @@ describe('B004 Wood Pile parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-18-placement', () => {
+  const { CARD, sessions, save, ok, setup, turn, prepare, buy } = audit18Placement
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B004 N1 zero through three real own accumulation placements determine immediate wood count',()=>{for(const n of[0,1,2,3]){const s=setup(n),before=JSON.parse(JSON.stringify(prepare(s,n))),r=buy(s);assert.equal(r.state.players[0]!.resources.wood-before.state.players[0].resources.wood,n);assert.equal(r.state.players[1]!.resources.wood,before.state.players[1].resources.wood);assert.ok(r.state.players[1]!.minorHand.includes(CARD));save(`B004-N1-${n}`,{before,r})}})
+  it('B004 N2 own nonaccumulation and opponent accumulation people do not count',()=>{const s=setup(1);turn(s,0,'grain-seeds');turn(s,1,'forest');const before=JSON.parse(JSON.stringify(s.getState())),r=buy(s);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[1]!.resources.wood,before.state.players[1].resources.wood);save('B004-N2',{before,r})})
+  it('B004 N3 whole purchase undo restores wood and card hands with a single retry reward',()=>{const s=setup(1);prepare(s,1);const before=JSON.parse(JSON.stringify(s.getState())),r=buy(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,before.state.players[0].resources.wood);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));assert.ok(!undone.state.players[1]!.minorHand.includes(CARD));const retry=buy(s);assert.equal(retry.state.players[0]!.resources.wood,before.state.players[0].resources.wood+1);save('B004-N3',{before,r,undone,retry})})
 })

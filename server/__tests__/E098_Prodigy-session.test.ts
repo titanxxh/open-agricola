@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E098_Prodigy'
+import assert from 'node:assert/strict'
+import * as audit46Scoring from './_helpers/audit/ae-negative-46-scoring'
 
 const CARD_ID = 'E098_Prodigy'
 const FILLER = '__test_placeholder__'
@@ -90,4 +92,12 @@ describe('E098 Prodigy parity', () => {
 
     expect(bonusVp(response)).toBe(1)
   })
+})
+
+describe('ae-negative-46-scoring', () => {
+  const { PRODIGY, sessions, save, ok, make, choose, lesson, bonus, ownerReady } = audit46Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E098 N1 first occupation Prodigy snapshots every existing major and minor but a second occupation gives zero',()=>{for(const[improvements,prior,expected]of[[0,false,0],[1,false,1],[2,false,2],[2,true,0]] as const){const s=make(PRODIGY,false,state=>{const p=state.players[0]!;p.improvements=improvements?['Major_Fireplace1']:[];p.minorPlayed=improvements===2?['B004_WoodPile']:[];if(prior)p.occupationPlayed=['A116_WoodCutter']}),r=lesson(s,PRODIGY);assert.equal(bonus(r,PRODIGY),expected);save(`E098-N1-${improvements}-${prior}`,r)}})
+  it('E098 N2 a real improvement played after Prodigy never increases its snapshotted point count',()=>{const s=make(PRODIGY,false,state=>state.players[0]!.improvements=['Major_Fireplace1']),bought=lesson(s,PRODIGY);ownerReady(s);let r=ok(s.takeAction(0,'meeting-place'));if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'&&r.interaction.request.options.some(o=>o.value.startsWith('action-improvement-')))choose(s,r,o=>o.value.startsWith('action-improvement-'));r=ok(s.resolveChoice(0,'E082_Profiteering'));assert.ok(r.state.players[0]!.minorPlayed.includes('E082_Profiteering'));assert.equal(bonus(bought,PRODIGY),1);assert.equal(bonus(r,PRODIGY),1);save('E098-N2',{bought,r})})
+  it('E098 N3 real Lessons undo removes Prodigy points and legal replay grants the same snapshot once',()=>{const s=make(PRODIGY,false,state=>{state.players[0]!.improvements=['Major_Fireplace1'];state.players[0]!.minorPlayed=['B004_WoodPile']}),a=lesson(s,PRODIGY),u=ok(s.undoAction());assert.equal(bonus(u,PRODIGY),0);const r=lesson(s,PRODIGY);assert.equal(bonus(a,PRODIGY),2);assert.equal(bonus(r,PRODIGY),2);save('E098-N3',{a,u,r})})
 })

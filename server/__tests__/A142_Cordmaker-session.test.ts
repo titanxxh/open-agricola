@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,10 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A142_Cordmaker'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import { descriptionEffects } from './_helpers/choice-description'
+import * as audit16Spaces from './_helpers/audit/ae-negative-16-spaces'
 
 const CARD_ID = 'A142_Cordmaker'
 const FILLER = '__test_placeholder__'
@@ -141,4 +145,14 @@ describe('A142 Cordmaker parity', () => {
       .not.toBe(CARD_ID)
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-16-spaces', () => {
+  const { sessions, save, ok, turn, crops, cord } = audit16Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A142 N1 own Reed Bank two or three gives one grain or paid vegetable exactly once',()=>{for(const count of[2,3])for(const crop of['grain','vegetable'] as const){const s=cord(count,2);const pending=turn(s,0,'reed-bank');const r=crops(s,pending,crop);assert.equal(r.state.players[0]!.resources.reed,count);assert.equal(r.state.players[0]!.resources.grain,crop==='grain'?1:0);assert.equal(r.state.players[0]!.resources.vegetable,crop==='vegetable'?1:0);assert.equal(r.state.players[0]!.resources.food,crop==='vegetable'?0:2);save(`A142-N1-${count}-${crop}`,{pending,r})}})
+  it('A142 N2 Reed Bank zero or one and hand cannot trigger crop reward',()=>{for(const count of[0,1]){const s=cord(count);const r=count===0?assertEmptyAccumulationRejected(s,0,'reed-bank'):turn(s,0,'reed-bank');assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.vegetable,0);save(`A142-N2-${count}`,r)}const hand=turn(cord(3,40,false),0,'reed-bank');assert.equal(hand.state.players[0]!.resources.grain,0);save('A142-N2-hand',hand)})
+  it('A142 N3 actual opponent Reed Bank rewards only owner and decline keeps crops',()=>{for(const crop of['grain','vegetable',null] as const){const s=cord(2,2);turn(s,0,'day-laborer');const pending=turn(s,1,'reed-bank');const r=crops(s,pending,crop);assert.equal(r.state.players[1]!.resources.reed,2);assert.equal(r.state.players[1]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.grain,crop==='grain'?1:0);assert.equal(r.state.players[0]!.resources.vegetable,crop==='vegetable'?1:0);assert.equal(r.state.players[0]!.resources.food,crop==='vegetable'?2:4);save(`A142-N3-${crop}`,{pending,r})}})
+  it('A142 N4 one food cannot buy vegetable and invalid actor or crop cannot produce free reward',()=>{const s=cord(2,1);const pending=turn(s,0,'reed-bank');if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice')assert.ok(!pending.interaction.request.options.some(o=>!o.disabled&&JSON.stringify(descriptionEffects(o.descriptionPreview)).includes('"vegetable":1')));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'vegetable'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'unpaid-vegetable'));const r=crops(s,pending,'grain');assert.equal(r.state.players[0]!.resources.vegetable,0);assert.equal(r.state.players[0]!.resources.food,1);assert.equal(r.state.players[0]!.resources.grain,1);save('A142-N4',{pending,r})})
+  it('A142 N5 whole own action undo restores payment crop and Reed Bank before retry',()=>{const s=cord(2,2);const first=crops(s,turn(s,0,'reed-bank'),'vegetable');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'vegetable'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.reed,0);assert.equal(undone.state.players[0]!.resources.food,2);assert.equal(undone.state.players[0]!.resources.vegetable,0);const retry=crops(s,turn(s,0,'reed-bank'),'grain');assert.equal(retry.state.players[0]!.resources.grain,1);assert.equal(retry.state.players[0]!.resources.food,2);save('A142-N5',{first,undone,retry})})
 })

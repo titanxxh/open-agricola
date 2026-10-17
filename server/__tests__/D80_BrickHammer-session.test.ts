@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D080_BrickHammer'
 import '../../shared/cards/E/E040_BeeStatue'
 import '../../shared/cards/C/C122_Bricklayer'
+import assert from 'node:assert/strict'
+import * as audit42Resources from './_helpers/audit/ae-negative-42-resources'
 
 const CARD_ID = 'D080_BrickHammer'
 const BEE_STATUE = 'E040_BeeStatue'
@@ -147,4 +149,12 @@ describe('D080 Brick Hammer parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 1 })
   })
 
+})
+
+describe('ae-negative-42-resources', () => {
+  const { sessions, ok, save, setup, play, major } = audit42Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D080 N1 real clay two Fireplace purchase costs ordinary clay and gives exactly one stone afterward',()=>{const s=setup('D080_BrickHammer',st=>{st.players[0]!.resources.clay=2}),r=major(s,'Major_Fireplace1');assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.stone,1);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.clay,2);assert.equal(u.state.players[0]!.resources.stone,0);save('D080-N1',{r,u})})
+  it('D080 N2 a printed one clay minor held Hammer and opponent major exclude owner stone',()=>{const s=setup('D080_BrickHammer',st=>{st.players[0]!.resources.clay=1;st.players[0]!.minorHand=['A053_Claypipe']}),r=play(s,'A053_Claypipe');assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.stone,0);save('D080-N2-minor',r);for(const mode of ['hand','other']){const actor=mode==='other'?1:0,t=setup('D080_BrickHammer',st=>{st.currentPlayerIndex=actor;st.players[actor]!.resources.clay=2},mode!=='hand'),q=major(t,'Major_Fireplace1',actor);assert.equal(q.state.players[0]!.resources.stone,0);save(`D080-N2-${mode}`,q)}})
+  it('D080 N3 own Hammer purchase accepts wood or food alternative and grants no self stone',()=>{for(const mode of ['wood','food']as const){const s=setup('D080_BrickHammer',st=>{st.players[0]!.resources.food=mode==='food'?1:0;st.players[0]!.resources.wood=mode==='wood'?1:0},false,5),r=play(s,'D080_BrickHammer');assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.stone,0);save(`D080-N3-${mode}`,r)}})
 })

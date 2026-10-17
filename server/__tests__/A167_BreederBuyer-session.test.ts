@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A167_BreederBuyer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit17Build from './_helpers/audit/ae-negative-17-build'
 
 const CARD_ID = 'A167_BreederBuyer'
 
@@ -134,4 +137,14 @@ describe('A167 Breeder Buyer parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(1)
   })
+})
+
+describe('ae-negative-17-build', () => {
+  const { sessions, save, ok, turn, build, farm } = audit17Build
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A167 N1 one actual room and stable together give one matching house material animal in either order',()=>{for(const[type,animal]of[['wood','sheep'],['clay','boar'],['stone','cattle']]as const)for(const first of['room','stable']as const){const s=farm(type);const pending=turn(s,0,'farm-expansion'),r=build(s,pending,first);assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.stableTiles.length,1);assert.equal(r.state.players[0]!.resources[animal],1);for(const other of['sheep','boar','cattle']as const)if(other!==animal)assert.equal(r.state.players[0]!.resources[other],0);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources[type],0);assert.equal(r.state.players[0]!.resources.reed,0);save(`A167-N1-${type}-${first}`,{pending,r})}})
+  it('A167 N2 room only stable only and unplayed hand cannot give livestock',()=>{for(const counts of[{room:1,stable:0},{room:0,stable:1},{room:1,stable:1}]){const played=counts.room+counts.stable<2;const s=farm('wood',played,counts);const r=build(s,turn(s,0,'farm-expansion'),counts.room?'room':'stable',counts);assert.equal(r.state.players[0]!.resources.sheep,0);assert.equal(r.state.players[0]!.resources.boar,0);assert.equal(r.state.players[0]!.resources.cattle,0);save(`A167-N2-${counts.room}-${counts.stable}`,r)}})
+  it('A167 N3 multiple real rooms and stables in one action grant only one livestock',()=>{const counts={room:2,stable:2};const s=farm('wood',true,counts);const r=build(s,turn(s,0,'farm-expansion'),'room',counts);assert.equal(r.state.players[0]!.rooms,4);assert.equal(r.state.players[0]!.stableTiles.length,2);assert.equal(r.state.players[0]!.resources.sheep,1);save('A167-N3',r)})
+  it('A167 N4 wrong actor illegal room and stale requests cannot grant free or duplicate livestock',()=>{const s=farm('wood');let r=turn(s,0,'farm-expansion');if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'){const o=r.interaction.request.options.find(o=>o.labelKey==='actions.construct.name');assert.ok(o);r=ok(s.resolveChoice(0,o.value))}assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{rooms:[{row:1,col:1}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:99,col:99}]}));const done=build(s,r,'room');assert.equal(done.state.players[0]!.resources.sheep,1);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'build-again'));save('A167-N4',{r,done})})
+  it('A167 N5 whole construction undo restores animal payment and finite structures before retry',()=>{const s=farm('wood');const r=build(s,turn(s,0,'farm-expansion'),'room');const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.rooms,2);assert.equal(undone.state.players[0]!.stableTiles.length,0);assert.equal(undone.state.players[0]!.resources.sheep,0);assert.equal(undone.state.players[0]!.resources.wood,7);assert.equal(undone.state.players[0]!.resources.reed,2);const retry=build(s,turn(s,0,'farm-expansion'),'stable');assert.equal(retry.state.players[0]!.resources.sheep,1);save('A167-N5',{r,undone,retry})})
 })

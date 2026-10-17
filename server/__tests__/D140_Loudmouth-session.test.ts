@@ -2,7 +2,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { AnimalType } from '../../shared/contract/types'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { D140_Loudmouth_impl } from '../../shared/cards/D/D140_Loudmouth'
@@ -10,6 +10,7 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import type { Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D140_Loudmouth'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'D140_Loudmouth'
 const LISTENER = D140_Loudmouth_impl.listeners[0]!
@@ -222,4 +223,11 @@ describe('D140 Loudmouth parity', () => {
     expect(response.state.players[1]!.resources).toMatchObject({ wood: 4, food: 0 })
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, resources, pool, farm } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D140 N1 taking exactly four building resources or four legally accommodated animals adds exactly one food', () => { for (const [space, good] of [['forest', 'wood'], ['sheep-market', 'sheep']] as const) { const s = make('D140_Loudmouth', st => { farm(st); pool(st, space, good, 4) }), r = finish(s, ok(s.takeAction(0, space)), false); resources(r, { [good]: 4, food: 101 }); save(`D140-N1-${good}`, r) } })
+  it('D140 N2 taking three despite old stock four and actual opponent taking four cannot grant Loudmouth food', () => { const s = make('D140_Loudmouth', st => { st.players[0]!.resources.wood = 4; pool(st, 'forest', 'wood', 3) }), r = finish(s, ok(s.takeAction(0, 'forest')), false); resources(r, { wood: 7, food: 100 }); const c = make('D140_Loudmouth', st => pool(st, 'forest', 'wood', 4)); finish(c, ok(c.takeAction(0, 'grain-seeds')), false); ready(c); const cr = finish(c, ok(c.takeAction(1, 'forest')), false); resources(cr, { food: 100 }); resources(cr, { wood: 4, food: 100 }, 1); save('D140-N2', { r, cr }) })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -9,6 +9,9 @@ import '../../shared/cards/B/B103_FieldMerchant'
 import '../../shared/cards/A/A096_TaskArtisan'
 import '../../shared/cards/A/A030_BakingSheet'
 import '../../shared/cards/A/A067_CornScoop'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Baking from './_helpers/audit/ae-negative-32-baking'
 
 const AMBITION = 'E024_Ambition'
 const FIELD_MERCHANT = 'B103_FieldMerchant'
@@ -188,4 +191,40 @@ describe('E024 Ambition parity', () => {
     expect(choices).toContain(MINOR)
     expect(choices.some((choice) => choice.startsWith('Major_'))).toBe(false)
   })
+})
+
+describe('ae-negative-32-baking', () => {
+  const { sessions, save, ok, make, choose, finish, buy, OCC, ambition, major } = audit32Baking
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E024 N1 actual prerequisite purchase and Meeting Place substitution build one major at its full clay cost while retaining the source action space', () => { const s = ambition(false), bought = finish(s, buy(s, 'E024_Ambition')); assert.ok(bought.state.players[0]!.minorPlayed.includes('E024_Ambition')); const t = ambition(), r = major(t); assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.improvements.includes('Major_Fireplace1')], [0, true]); assert.equal(r.state.actionSpaces.find(a => a.id === 'meeting-place')!.takenBy.length, 1); assert.equal(r.state.actionSpaces.find(a => a.id === 'major-improvement')!.takenBy.length, 0); save('E024-N1', { bought, r }); });
+  it('E024 N2 real Family Growth minor followup can substitute one major without also playing a minor', () => { const s = ambition(true, 2, 2, true), r = major(s, 'wish-children'); assert.equal(r.state.players[0]!.improvements.includes('Major_Fireplace1'), true); assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 3); assert.deepEqual(r.state.players[0]!.minorPlayed, ['E024_Ambition']); save('E024-N2', r); });
+  it('E024 N3 one occupation cannot buy while a held Ambition and insufficient clay cannot build a free major', () => { const s = ambition(false, 1), poor = buy(s, 'E024_Ambition'); assert.ok(poor.state.players[0]!.minorHand.includes('E024_Ambition')); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E024_Ambition')); const rows = []; for (const [played, clay] of [[false, 2], [true, 1]] as const) {
+      const t = ambition(played, 2, clay);
+      let p = ok(t.takeAction(0, 'meeting-place'));
+      if (p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice' && p.interaction.request.options.some(o => o.value.startsWith('action-improvement-')))
+          p = choose(t, p, o => o.value.startsWith('action-improvement-'));
+      assert.equal(p.state.players[0]!.minorPlayed.includes('E024_Ambition'), played);
+      const bad = assertRejectedUnchanged(t, () => t.resolveChoice(0, 'Major_Fireplace1'));
+      assert.equal(bad.state.players[0]!.improvements.includes('Major_Fireplace1'), false);
+      assert.equal(bad.state.players[0]!.resources.clay, clay);
+      rows.push({ p, bad });
+  } save('E024-N3', { poor, rows }); });
+  it('E024 N4 Ambition preserves the normal minor option and wrong actor cannot buy the major before legal retry', () => { const s = ambition(), p = ok(s.takeAction(0, 'meeting-place')); let selection = p; if (selection.interaction.stateId === 'wait' && selection.interaction.request.kind === 'choice' && selection.interaction.request.options.some(o => o.value.startsWith('action-improvement-')))
+      selection = choose(s, selection, o => o.value.startsWith('action-improvement-')); const wrong = assertRejectedUnchanged(s, () => s.resolveChoice(1, 'Major_Fireplace1')), r = finish(s, ok(s.resolveChoice(0, 'Major_Fireplace1'))); assert.equal(r.state.players[0]!.resources.clay, 0); const t = make('E024_Ambition', true, state => { state.players[0]!.occupationPlayed = OCC.slice(0, 2); state.players[0]!.minorHand = ['C016_FieldFences']; state.players[0]!.resources.food = 2; }), minor = finish(t, buy(t, 'C016_FieldFences')); assert.ok(minor.state.players[0]!.minorPlayed.includes('C016_FieldFences')); save('E024-N4', { p, selection, wrong, r, minor }); });
+  it('E024 N5 an otherwise unplayable minor must not hide an affordable major substituted on Meeting Place', () => {
+      const s = make('E024_Ambition', true, state => {
+          state.availableMajorImprovements = ['Major_Fireplace1'];
+          state.players[0]!.occupationPlayed = OCC.slice(0, 2);
+          state.players[0]!.resources.clay = 2;
+          state.players[0]!.minorHand = ['C017_NewlyPlowedField'];
+      });
+      const p = ok(s.takeAction(0, 'meeting-place'));
+      const menu = choose(s, p, o => o.value.startsWith('action-improvement-'));
+      const hasMajor = menu.interaction.stateId === 'wait' && menu.interaction.request.kind === 'choice'
+          && menu.interaction.request.options.some(o => o.value === 'Major_Fireplace1' && !('disabled' in o && o.disabled));
+      const r = hasMajor ? finish(s, ok(s.resolveChoice(0, 'Major_Fireplace1'))) : menu;
+      assert.deepEqual(r.state.players[0]!.minorHand, ['C017_NewlyPlowedField']);
+      save('E024-N5', { p, menu, r });
+      assert.deepEqual([r.state.players[0]!.improvements.includes('Major_Fireplace1'), r.state.players[0]!.resources.clay], [true, 0]);
+  });
 })

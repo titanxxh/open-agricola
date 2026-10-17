@@ -1,5 +1,5 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
@@ -10,6 +10,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/A/A096_TaskArtisan'
 import '../../shared/cards/A/A030_BakingSheet'
 import '../../shared/cards/A/A067_CornScoop'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome, passPreparationExchanges } from './_helpers/negative-rule-audit'
+import * as audit12Replacement from './_helpers/audit/ae-negative-12-replacement'
 
 const CARD_ID = 'A096_TaskArtisan'
 const MINOR_ID = 'A030_BakingSheet'
@@ -467,5 +470,45 @@ describe('A096 Task Artisan parity', () => {
     } finally {
       session.dispose()
     }
+  })
+})
+
+describe('ae-negative-12-replacement', () => {
+  const { ARTISAN, MINOR, sessions, save, ok, turn, options, accept, reveal, artisan, buyMinor } = audit12Replacement
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A096 N1 real occupation play grants exactly one wood with accepted or declined minor', () => {
+    for (const decline of [false, true]) {
+      const session = artisan(false); let response = turn(session, 0, 'lessons')
+      if (response.state.players[0]!.occupationHand.includes(ARTISAN)) response = ok(session.resolveChoice(0, ARTISAN))
+      assert.equal(response.state.players[0]!.resources.wood, 1)
+      response = decline ? ok(session.resolveChoice(0, '__skip__')) : buyMinor(session, response)
+      assert.equal(response.state.players[0]!.resources.wood, 1); assert.ok(response.state.players[0]!.occupationPlayed.includes(ARTISAN)); assert.equal(response.state.players[0]!.minorPlayed.includes(MINOR), !decline); save(`A096-N1-${decline}`, response)
+    }
+  })
+  it('A096 N2 natural Western Quarry reveal accepting minor cannot repeat wood or offer', () => {
+    const session = artisan(); let response = reveal(session)
+    assert.equal(response.state.round, 7); assert.equal(response.state.players[0]!.resources.wood, 1)
+    response = buyMinor(session, response); save('A096-N2-after-minor', response)
+    assertRuleOutcome({ wood: response.state.players[0]!.resources.wood, repeatedOffer: response.interaction.stateId === 'wait' && response.interaction.sourceCard === ARTISAN }, { wood: 1, repeatedOffer: false })
+    response = passPreparationExchanges(session, response)
+    assert.equal(response.interaction.stateId, 'idle'); assert.ok(response.state.players[0]!.minorPlayed.includes(MINOR)); assert.equal(response.state.players[1]!.resources.wood, 0); save('A096-N2', response)
+  })
+  it('A096 N3 natural Eastern Quarry decline retains one wood and minor in hand', () => {
+    const session = artisan(true, 12, 'eastern-quarry'); let response = reveal(session)
+    assert.equal(response.state.round, 13); response = ok(session.resolveChoice(0, '__skip__'))
+    assert.equal(response.state.players[0]!.resources.wood, 1); assert.ok(response.state.players[0]!.minorHand.includes(MINOR)); response = passPreparationExchanges(session, response); assert.equal(response.interaction.stateId, 'idle'); assert.equal(response.state.players[1]!.resources.wood, 0); save('A096-N3', response)
+  })
+  it('A096 N4 nonquarry reveal unplayed card and ordinary quarry collection cannot trigger', () => {
+    for (const session of [artisan(true, 5, 'vegetable-seeds'), artisan(false)]) {
+      const response = reveal(session); assert.equal(response.state.players[0]!.resources.wood, 0); assert.equal(response.interaction.stateId, 'idle'); save(`A096-N4-${response.state.round}`, response)
+    }
+    const response = turn(artisan(true, 7, 'western-quarry', 1), 0, 'western-quarry'); assert.equal(response.state.players[0]!.resources.wood, 0); assert.ok(response.state.players[0]!.minorHand.includes(MINOR)); save('A096-N4-collect', response)
+  })
+  it('A096 N5 major and wrong actor are rejected and legal minor remains possible', () => {
+    const session = artisan(false); let response = turn(session, 0, 'lessons')
+    if (response.state.players[0]!.occupationHand.includes(ARTISAN)) response = ok(session.resolveChoice(0, ARTISAN))
+    response = accept(session, response); assert.ok(options(response).every(o => !o.value.startsWith('Major_')))
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, 'Major_Fireplace1')); assertRejectedUnchanged(session, () => session.resolveChoice(1, MINOR))
+    response = ok(session.resolveChoice(0, MINOR)); assert.equal(response.state.players[0]!.resources.wood, 1); save('A096-N5', response)
   })
 })

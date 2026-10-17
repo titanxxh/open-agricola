@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount } from '../../shared/domain/player'
 import {
@@ -8,6 +8,9 @@ import {
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C119_SkillfulRenovator'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit49Farm from './_helpers/audit/ae-negative-49-farm'
 
 const CARD_ID = 'C119_SkillfulRenovator'
 const FILLER = '__test_placeholder__'
@@ -129,4 +132,12 @@ describe('C119 Skillful Renovator parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(2)
     expect(getRoundPersonPlacementDetails(response.state.players[0]!)).toHaveLength(2)
   })
+})
+
+describe('ae-negative-49-farm', () => {
+  const { RENOVATOR, sessions, save, ok, make, lesson, action, rooms, supply } = audit49Farm
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C119 N1 real Skillful Renovator purchase grants one wood and one clay only once through whole undo and replay',()=>{const s=make(RENOVATOR,false),a=lesson(s,RENOVATOR);assert.deepEqual(supply(a),{wood:1,clay:1,reed:0,grain:0,vegetable:0});const u=ok(s.undoAction());assert.deepEqual(supply(u),{wood:0,clay:0,reed:0,grain:0,vegetable:0});const r=lesson(s,RENOVATOR);assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.clay,1);save('C119-N1',{a,u,r})})
+  it('C119 N2 actual first and third placed people renovate real rooms and receive exactly one or three wood after paying all fees',()=>{for(const[count,expected]of[[2,1],[3,3]] as const){const s=make(RENOVATOR,true,state=>{rooms(state,count);Object.assign(state.players[0]!.resources,{clay:count,reed:1})}),prior=[];if(count===3){prior.push(action(s,0,'grain-seeds'));action(s,1,'reed-bank');prior.push(action(s,0,'day-laborer'));action(s,1,'fishing')}const r=action(s,0,'house-redevelopment');assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.resources.wood,expected);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.reed,0);save(`C119-N2-${count}`,{prior,r})}})
+  it('C119 N3 a real newborn is excluded from renovation placement count and unavailable payment hand card or unrelated action gives no reward',()=>{const s=make(RENOVATOR,true,state=>{rooms(state,3,2);Object.assign(state.players[0]!.resources,{clay:3,reed:1})}),birth=action(s,0,'wish-children');assert.equal(birth.state.players[0]!.workers.filter(w=>w.isActive).length,3);action(s,1,'reed-bank');const r=action(s,0,'house-redevelopment');assert.equal(r.state.players[0]!.resources.wood,2);const t=make(RENOVATOR,true,state=>Object.assign(state.players[0]!.resources,{clay:1,reed:1})),bad=assertRejectedUnchanged(t,()=>t.takeAction(0,'house-redevelopment')),legal=ok(t.takeAction(0,'grain-seeds'));assert.equal(legal.state.players[0]!.resources.wood,0);const v=make(RENOVATOR,false,state=>Object.assign(state.players[0]!.resources,{clay:2,reed:1})),hand=action(v,0,'house-redevelopment');assert.equal(hand.state.players[0]!.resources.wood,0);const unrelated=action(make(RENOVATOR),0,'grain-seeds');assert.equal(unrelated.state.players[0]!.resources.wood,0);save('C119-N3',{birth,r,bad,legal,hand,unrelated})})
 })

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import * as audit29Resources from './_helpers/audit/ae-negative-29-resources'
+
+describe('ae-negative-29-resources', () => {
+  const { sessions, save, make, action, lesson, resource } = audit29Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B144 N1 actual purchase then Clay Pit grants one wood and one reed and three player Hollow grants only wood', () => { const bought = lesson(make('B144_Collier', false), 'B144_Collier'); assert.equal(bought.state.players[0]!.resources.wood, 0); const s = make('B144_Collier', true, 3, s => s.actionSpaces.find(a => a.id === 'clay-pit')!.resources.clay = 3), pit = action(s, 0, 'clay-pit'); assert.deepEqual([pit.state.players[0]!.resources.clay, pit.state.players[0]!.resources.wood, pit.state.players[0]!.resources.reed], [3, 1, 1]); const t = make('B144_Collier', true, 3, s => s.actionSpaces.find(a => a.id === 'hollow')!.resources.clay = 3), hollow = action(t, 0, 'hollow'); assert.deepEqual([hollow.state.players[0]!.resources.clay, hollow.state.players[0]!.resources.wood, hollow.state.players[0]!.resources.reed], [3, 1, 0]); save('B144-N1', { bought, pit, hollow }); });
+  it('B144 N2 four player Hollow grants its clay plus one wood without a reed bonus', () => { const s = make('B144_Collier', true, 4, s => s.actionSpaces.find(a => a.id === 'hollow-4')!.resources.clay = 3), r = action(s, 0, 'hollow-4'); save('B144-N2', r); assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.wood, r.state.players[0]!.resources.reed], [3, 1, 0]); });
+  it('B144 N3 an actual opponent Clay Pit a held Collier and unrelated Grain Seeds never grant owner goods', () => { const s = make('B144_Collier'), first = action(s, 0, 'grain-seeds'), r = action(s, 1, 'clay-pit'); assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.reed], [0, 0]); const t = make('B144_Collier', false, 3, s => s.actionSpaces.find(a => a.id === 'clay-pit')!.resources.clay = 3), hand = action(t, 0, 'clay-pit'); assert.deepEqual(resource(hand, 0), { food: 10, wood: 0, clay: 3, reed: 0, grain: 0, vegetable: 0 }); save('B144-N3', { first, r, hand }); });
+})

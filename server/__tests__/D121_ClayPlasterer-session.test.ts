@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D121_ClayPlasterer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'D121_ClayPlasterer'
 
@@ -155,4 +158,12 @@ describe('D121 Clay Plasterer session', () => {
       houseType: 'wood', rooms: 3, resources: { wood: 0, reed: 0 },
     })
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, resources, rooms, build } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D121 N1 exactly one clay one reed renovates all three physical wood rooms', () => { const s = make('D121_ClayPlasterer', st => { rooms(st, 3, 'wood'); Object.assign(st.players[0]!.resources, { clay: 1, reed: 1 }) }, true, 14), r = finish(s, ok(s.takeAction(0, 'house-redevelopment')), false); resources(r, { clay: 0, reed: 0 }); assert.equal(r.state.players[0]!.houseType, 'clay'); assert.equal(r.state.players[0]!.roomTiles.length, 3); save('D121-N1', r) })
+  it('D121 N2 one or two clay rooms pay exactly three clay two reed per room while wood keeps normal cost', () => { for (const [house, count] of [['clay', 1], ['clay', 2], ['wood', 1]] as const) { const s = make('D121_ClayPlasterer', st => { rooms(st, 2, house); Object.assign(st.players[0]!.resources, { [house]: (house === 'wood' ? 5 : 3) * count, reed: 2 * count }) }), r = build(s, count); resources(r, { [house]: 0, reed: 0 }); assert.equal(r.state.players[0]!.rooms, 2 + count); save(`D121-N2-${house}-${count}`, r) } })
+  it('D121 N3 unplayed card cannot admit cheap renovation and stone renovation retains normal three stone cost', () => { const s = make('D121_ClayPlasterer', st => { rooms(st, 3, 'wood'); Object.assign(st.players[0]!.resources, { clay: 1, reed: 1 }) }, false, 14), rejected = assertRejectedUnchanged(s, () => s.takeAction(0, 'house-redevelopment')), r = finish(s, ok(s.takeAction(0, 'grain-seeds'))); assert.equal(r.state.players[0]!.houseType, 'wood'); const c = make('D121_ClayPlasterer', st => { rooms(st, 3, 'clay'); Object.assign(st.players[0]!.resources, { stone: 3, reed: 1 }) }, true, 14), cr = finish(c, ok(c.takeAction(0, 'house-redevelopment')), false); resources(cr, { stone: 0, reed: 0 }); assert.equal(cr.state.players[0]!.houseType, 'stone'); save('D121-N3', { rejected, r, cr }) })
 })

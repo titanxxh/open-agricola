@@ -1,0 +1,22 @@
+// Helpers of ae-negative-18-animal-holders-session.test.ts from the negative audit snapshot fafd4f51b.
+import assert from 'node:assert/strict'
+import fs from '../audit-evidence-fs'
+import type { GameSession, SessionResponse } from '../../../game/authoritative-session'
+import type { GameState } from '../../../../shared/contract/types'
+import { createWorkSession } from '../session-fixtures'
+import { confirmNext } from '../negative-rule-audit'
+
+export const FEED='B011_Feedyard',STOCK='B012_Stockyard'
+export const sessions:GameSession[]=[]
+export const output=process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR??'output/ae-negative/18-animal-holders-probes'
+export function save(id:string,value:unknown){fs.mkdirSync(output,{recursive:true});fs.writeFileSync(`${output}/${id}.json`,JSON.stringify(value,null,2))}
+export function ok(r:SessionResponse){assert.equal(r.ok,true,r.error);return r}
+export function pastures(state:GameState,count:number){const p=state.players[0]!,edges=new Set<string>();for(let col=1;col<=count;col++)for(const edge of[`H-0-${col}`,`H-1-${col}`,`V-0-${col}`,`V-0-${col+1}`])edges.add(edge);assert.ok(edges.size<=15);p.fenceSegments=[...edges].map(edge=>({edge,type:'fence' as const,source:{kind:'own' as const,ownerPlayerId:p.id}}));p.pastures=Array.from({length:count},(_,n)=>({id:'p'+n,tiles:[{row:0,col:n+1}],animalType:null,animalCount:0}))}
+export function setup(card:string,configure:(state:GameState)=>void=()=>{},played=true){const s=createWorkSession({seed:4242,options:{playerCount:2},configure(state){state.round=4;for(const p of state.players)Object.assign(p.resources,{food:40,wood:0,clay:0,reed:0,stone:0,grain:0,vegetable:0,sheep:0,boar:0,cattle:0});const p=state.players[0]!;p.minorPlayed=played?[card]:[];p.minorHand=played?['A030_BakingSheet']:[card,'A030_BakingSheet','A006_StorageBarn'];configure(state)}});sessions.push(s);return s}
+export function turn(s:GameSession,actor:number,space:string){let r=s.getState();if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-next-player')r=confirmNext(s,r);assert.equal(r.interaction.stateId,'idle');assert.equal(r.state.currentPlayerIndex,actor);return ok(s.takeAction(actor,space))}
+export function finish(s:GameSession,r:SessionResponse){for(let n=0;n<24&&r.interaction.stateId==='wait'&&r.interaction.request.kind!=='confirm-next-player';n++){const i=r.interaction;if(i.request.kind==='confirm-player-switch')r=ok(s.resolveChoice(i.request.fromPlayerIndex,'confirm'));else if(i.request.kind==='feed')r=ok(s.resolveChoice(i.playerIndex,'confirm',{selections:[]}));else if(i.request.kind==='animal-reorg')r=ok(s.resolveChoice(i.playerIndex,'confirm',{zones:i.request.zones}));else {assert.ok(i.request.kind==='choice'||i.request.kind==='select-trigger',JSON.stringify(i));const o=i.request.options.find(o=>o.value==='__skip__'||o.value==='__done__')??i.request.options[0];assert.ok(o);r=ok(s.resolveChoice(i.playerIndex,o.value))}}return r}
+export function end(s:GameSession){let r=s.getState();for(const[n,space]of ['grain-seeds','day-laborer','forest','clay-pit'].entries())r=finish(s,turn(s,n%2,space));if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-next-player')r=confirmNext(s,r);return finish(s,r)}
+export function reorg(s:GameSession,space:string){const r=turn(s,0,space);assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='animal-reorg');return r}
+export function assignment(r:SessionResponse,card:string,counts:Partial<Record<'sheep'|'boar'|'cattle',number>>){assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='animal-reorg');const zone=r.interaction.request.zones.find(z=>z.id===`card:${card}`);assert.ok(zone);const entries=Object.entries(counts).filter(([,n])=>n>0);return {...zone,animalType:entries.length===1?entries[0]![0]:null,animalCount:entries.reduce((n,[,count])=>n+count,0),animalCounts:counts}}
+export function buy(s:GameSession,card:string){let pending=turn(s,0,'meeting-place');if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice'){const o=pending.interaction.request.options.find(o=>o.value.startsWith('action-improvement-'));if(o)pending=ok(s.resolveChoice(0,o.value))}const r=ok(s.resolveChoice(0,card));assert.ok(r.state.players[0]!.minorPlayed.includes(card));return{pending,r}}
+export function vp(r:SessionResponse,card:string){assert.ok(r.scores);return r.scores[0]!.categories.find(c=>c.key==='cards')!.entries.find(e=>'cardId'in e&&e.cardId===card)?.score}

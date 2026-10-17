@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D075_WoodField'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit41Private from './_helpers/audit/ae-negative-41-private'
 
 const CARD_ID = 'D075_WoodField'
 const FILLER = '__test_placeholder__'
@@ -233,5 +236,19 @@ describe('D075 Wood Field parity', () => {
       'cardId' in entry && entry.cardId === 'Major_Joinery')
 
     expect(joinery).toMatchObject({ score: 1 })
+  })
+})
+
+describe('ae-negative-41-private', () => {
+  const { sessions, ok, save, setup, finish, play, next, complete, enterSow, sow, field, cardSow, slots, occupations } = audit41Private
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D075 N1 real purchase pays food and two paid wood seeds become two stacks with one wood harvested from each on natural harvest',()=>{
+   const s=setup('D075_WoodField',st=>{occupations(st,1);st.players[0]!.resources.wood=2},false,4),bought=play(s,'D075_WoodField');assert.equal(bought.state.players[0]!.resources.food,99);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const planted=finish(s,cardSow(s,ok(s.takeAction(0,'grain-utilization')),'wood',2));assert.deepEqual(slots(planted,'D075_WoodField'),[{crop:'wood',remaining:3},{crop:'wood',remaining:3}]);assert.equal(planted.state.players[0]!.resources.wood,0);const r=complete(s,['clay-pit']);assert.equal(r.state.round,5);assert.equal(r.state.players[0]!.resources.wood,2);assert.deepEqual(slots(r,'D075_WoodField'),[{crop:'wood',remaining:2},{crop:'wood',remaining:2}]);assert.equal(r.state.players[0]!.fields.length,0);save('D075-N1',{bought,planted,r})
+  })
+  it('D075 N2 nonwood and nonexistent third card slot submissions reject before a legal two seed sow',()=>{
+   const s=setup('D075_WoodField',st=>Object.assign(st.players[0]!.resources,{wood:3,grain:1}),true,4),p=enterSow(s,ok(s.takeAction(0,'grain-utilization')));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='sow');const targets=p.interaction.request.farm.selectableFields.filter(f=>f.tile.row<0);assert.equal(targets.length,2);const wrong=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{...targets[0]!.tile,crop:'grain'}]})),third=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[...targets.map(f=>({...f.tile,crop:'wood' as const})),{row:-1,col:4077,crop:'wood'}]})),r=finish(s,cardSow(s,p,'wood',2));assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.grain,1);assert.deepEqual(slots(r,'D075_WoodField'),[{crop:'wood',remaining:3},{crop:'wood',remaining:3}]);save('D075-N2',{p,wrong,third,r})
+  })
+  it('D075 N3 a held Wood Field grants no card slots and an ordinary paid grain sow leaves owner wood untouched',()=>{
+   const s=setup('D075_WoodField',st=>{field(st);Object.assign(st.players[0]!.resources,{wood:2,grain:1})},false,4),p=enterSow(s,ok(s.takeAction(0,'grain-utilization')));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='sow');assert.ok(!p.interaction.request.farm.selectableFields.some(f=>f.tile.row<0));const r=finish(s,sow(s,p,[{row:0,col:1,crop:'grain'}]));assert.equal(r.state.players[0]!.resources.wood,2);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(slots(r,'D075_WoodField'),undefined);save('D075-N3',{p,r})
   })
 })

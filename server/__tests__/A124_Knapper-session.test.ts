@@ -1,10 +1,13 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A124_Knapper'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit14Spaces from './_helpers/audit/ae-negative-14-spaces'
 
 const CARD_ID = 'A124_Knapper'
 
@@ -186,4 +189,14 @@ describe('A124 Knapper parity', () => {
     expect(basic.ok, basic.error).toBe(true)
     expect(basic.state.players[0]!.resources.stone).toBe(0)
   })
+})
+
+describe('ae-negative-14-spaces', () => {
+  const { sessions, save, ok, turn, knapper } = audit14Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A124 N1 assigned round five and seven empty accumulation rejects before any stone bonus',()=>{for(const space of['pig-market','western-quarry']){const s=knapper();const r=assertEmptyAccumulationRejected(s,0,space);assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(r.state.players[0]!.resources.boar,0);save(`A124-N1-${space}`,r)}})
+  it('A124 N2 round six vegetable gives stone once and later current round remains eligible',()=>{const s=knapper();const r=turn(s,0,'vegetable-seeds');assert.equal(r.state.round,14);assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.vegetable,1);save('A124-N2',r)})
+  it('A124 N3 basic and round eight assigned action cannot grant stone',()=>{for(const space of['day-laborer','cattle-market']){const r=turn(knapper(),0,space);assert.equal(r.state.players[0]!.resources.stone,0);save(`A124-N3-${space}`,r)}})
+  it('A124 N4 unplayed empty source and actual opponent cannot use owner stone bonus',()=>{const hand=knapper(false);const handUse=assertEmptyAccumulationRejected(hand,0,'western-quarry');assert.equal(handUse.state.players[0]!.resources.stone,0);save('A124-N4-empty-use',{handUse,emptyEntryRejected:true});const s=knapper();turn(s,0,'grain-seeds');const r=turn(s,1,'vegetable-seeds');assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(r.state.players[1]!.resources.stone,0);assert.equal(r.state.players[1]!.resources.vegetable,1);save('A124-N4',r)})
+  it('A124 N5 whole action undo and stale occupied source cannot duplicate stone',()=>{const s=knapper(true,1);const first=turn(s,0,'western-quarry');assertRejectedUnchanged(s,()=>s.takeAction(0,'western-quarry'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.stone,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='western-quarry')!.resources.stone,1);const retry=turn(s,0,'western-quarry');assert.equal(retry.state.players[0]!.resources.stone,2);save('A124-N5',{first,undone,retry})})
 })

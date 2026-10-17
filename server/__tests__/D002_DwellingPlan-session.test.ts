@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D002_DwellingPlan'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit23Renovation from './_helpers/audit/ae-negative-23-renovation'
 
 const CARD_ID = 'D002_DwellingPlan'
 const FILLER = '__test_placeholder__'
@@ -149,4 +152,12 @@ describe('D002 Dwelling Plan parity', () => {
       resources: { food: 0, clay: 2, reed: 1 },
     })
   })
+})
+
+describe('ae-negative-23-renovation', () => {
+  const { DWELLING, sessions, save, ok, finish, menu, buy, make } = audit23Renovation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D002 N1 actual one food passing purchase optional renovation pays normal two clay one reed and whole undo restores it',()=>{const s=make(DWELLING,'wood',2,0,2,1),{pending,r}=buy(s,DWELLING);assert.equal(r.state.players[0]!.houseType,'clay');assert.deepEqual(['food','clay','reed'].map(t=>r.state.players[0]!.resources[t as 'food'|'clay'|'reed']),[99,0,0]);assert.equal(r.state.players[0]!.rooms,2);assert.equal(r.state.players[0]!.fenceSegments.length,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.houseType,'wood');assert.deepEqual(['food','clay','reed'].map(t=>undone.state.players[0]!.resources[t as 'food'|'clay'|'reed']),[100,2,1]);const retry=buy(s,DWELLING).r;assert.equal(retry.state.players[0]!.houseType,'clay');save('D002-N1',{pending,r,undone,retry})})
+  it('D002 N2 declining renovation still pays card food and passes while missing renovation resources and stone house create no free upgrade',()=>{for(const mode of['decline','clay','reed','stone']){const s=make(DWELLING,mode==='stone'?'stone':'wood',2,0,mode==='clay'?1:2,mode==='reed'?0:1),pending=menu(s),chosen=ok(s.resolveChoice(0,DWELLING)),r=finish(s,chosen,false);assert.equal(r.state.players[0]!.houseType,mode==='stone'?'stone':'wood');assert.equal(r.state.players[0]!.resources.food,99);assert.equal(r.state.players[0]!.resources.clay,mode==='clay'?1:2);assert.equal(r.state.players[0]!.resources.reed,mode==='reed'?0:1);assert.ok(r.state.players[1]!.minorHand.includes(DWELLING));save(`D002-N2-${mode}`,{pending,chosen,r})}})
+  it('D002 N3 zero card food rejects purchase before a real free alternative and cannot renovate',()=>{const s=make(DWELLING,'wood',2,0,2,1,0),pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,DWELLING)),legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.houseType,'wood');assert.equal(legal.state.players[0]!.resources.clay,2);save('D002-N3',{pending,rejected,legal})})
 })

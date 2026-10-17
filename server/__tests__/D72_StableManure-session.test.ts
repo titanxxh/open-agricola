@@ -2,7 +2,7 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -15,6 +15,9 @@ import '../../shared/cards/E/E080_RockGarden'
 import '../../shared/cards/E/E112_GrainThief'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit41Harvest from './_helpers/audit/ae-negative-41-harvest'
 
 describe('D072_StableManure session', () => {
   const chooseStableManureSelection = (session: GameSession) => {
@@ -461,5 +464,19 @@ describe('D072 Stable Manure parity', () => {
     response = autoAdvanceRoundEnd(session, { initialResponse: response })
     expect(response.state.players[0]!.resources.grain).toBe(1)
     expect(fieldRemaining(response, 2)).toBe(0)
+  })
+})
+
+describe('ae-negative-41-harvest', () => {
+  const { sessions, ok, save, setup, finish, field, vegetable, end, source } = audit41Harvest
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D072 N1 one unfenced stable permits exactly one extra crop on selected field and harvest end clears the selection',()=>{
+   const s=setup('D072_StableManure',st=>{field(st,3);vegetable(st,2,3);st.players[0]!.stableTiles=[{row:0,col:3}]},true,4),p=source(s,end(s),'D072_StableManure','selection'),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[1,2]);assert.equal(r.state.players[0]!.cardStates.D072_StableManure?.extraData?.selectedPositions,undefined);save('D072-N1',{p,r})
+  })
+  it('D072 N2 two selected fields exceed one unfenced stable and reject before legal one field reap',()=>{
+   const s=setup('D072_StableManure',st=>{field(st,3);vegetable(st,2,3);st.players[0]!.stableTiles=[{row:0,col:3}]},true,4),p=source(s,end(s),'D072_StableManure','selection'),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2}]})),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.equal(r.state.players[0]!.resources.grain,2);assert.equal(r.state.players[0]!.resources.vegetable,1);save('D072-N2',{p,bad,r})
+  })
+  it('D072 N3 fenced stable single remaining crop held card and decline give no extra harvest',()=>{
+   for(const mode of ['fenced','single','hand','decline']){const s=setup('D072_StableManure',st=>{field(st,mode==='single'?1:3);st.players[0]!.stableTiles=[{row:0,col:3}];if(mode==='fenced'){st.players[0]!.pastures=[{id:'fenced',tiles:[{row:0,col:3}],animalType:null,animalCount:0}];st.players[0]!.fenceSegments=['H-0-3','H-1-3','V-0-3','V-0-4'].map(edge=>({edge,type:'fence',source:{kind:'own',ownerPlayerId:st.players[0]!.id}}))}},mode!=='hand',4),r=finish(s,end(s),false,mode==='decline'?undefined:'D072_StableManure');assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.fields[0]!.stacks[0]?.remaining??0,mode==='single'?0:2);save(`D072-N3-${mode}`,r)}
   })
 })

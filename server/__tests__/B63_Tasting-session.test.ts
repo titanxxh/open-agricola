@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -7,6 +7,9 @@ import '../../shared/cards/B/B063_Tasting'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit21Tasting from './_helpers/audit/ae-negative-21-tasting'
 
 const CARD_ID = 'B063_Tasting'
 
@@ -152,4 +155,13 @@ describe('B063_Tasting session', () => {
     // day-laborer never offers Tasting, grain unchanged
     expect(after.resources.grain).toBe(grainBefore)
   })
+})
+
+describe('ae-negative-21-tasting', () => {
+  const { CARD, OCC, sessions, save, ok, setup, finish, menu, buy, loaded, occupation } = audit21Tasting
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B063 N1 actual two wood purchase gives one printed point and no exchange until Lessons',()=>{const s=setup(CARD,5,state=>state.players[0]!.resources.wood=2),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(r.scores![0]!.categories.find(c=>c.key==='cards')!.entries.find(e=>'cardId'in e&&e.cardId===CARD)!.score,1);const poor=setup(CARD,5,state=>state.players[0]!.resources.wood=1),denied=menu(poor);assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,CARD));const legal=finish(poor,ok(poor.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.food,100);save('B063-N1',{pending,r,denied,legal})})
+  it('B063 N2 actual paid Lessons with zero food exchanges grain before occupation cost and pays using new food',()=>{const s=loaded(),{pending,r}=occupation(s);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.food,3);assert.equal(r.state.players[1]!.resources.food,100);save('B063-N2',{pending,r})})
+  it('B063 N3 declining grain exchange no grain and hand card preserve one grain or zero and pay ordinary occupation fee',()=>{for(const mode of['decline','missing','hand']){const s=loaded(mode==='missing'?0:1,1,mode!=='hand'),{pending,r}=occupation(s,mode!=='decline');assert.equal(r.state.players[0]!.resources.grain,mode==='missing'?0:1);assert.equal(r.state.players[0]!.resources.food,0);save(`B063-N3-${mode}`,{pending,r})}})
+  it('B063 N4 whole exchange and occupation undo restores seed food and hand before one replay',()=>{const s=loaded(),{pending,r}=occupation(s),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,1);assert.equal(undone.state.players[0]!.resources.food,0);assert.ok(undone.state.players[0]!.occupationHand.includes(OCC));assert.ok(!undone.state.players[0]!.occupationPlayed.includes(OCC));const retry=occupation(s).r;assert.equal(retry.state.players[0]!.resources.grain,0);assert.equal(retry.state.players[0]!.resources.food,3);save('B063-N4',{pending,r,undone,retry})})
 })

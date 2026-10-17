@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B056_Brook'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit21Brook from './_helpers/audit/ae-negative-21-brook'
 
 const setup = ({
   playerCount = 3, roundOne = 'grain-utilization', secondRound = 'sheep-market',
@@ -77,4 +80,13 @@ describe('B056 Brook through Session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
+})
+
+describe('ae-negative-21-brook', () => {
+  const { CARD, sessions, save, ok, setup, finish, menu, buy, reach, use, person } = audit21Brook
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B056 N1 actual own person on Fishing permits free purchase and remains on Fishing through whole undo',()=>{const s=setup(CARD);person(s);const{pending,r}=buy(s,CARD);assert.ok(r.state.players[0]!.minorPlayed.includes(CARD));assert.equal(r.state.actionSpaces.find(a=>a.id==='fishing')!.takenBy[0]!.playerId,r.state.players[0]!.id);const undone=ok(s.undoAction());assert.ok(undone.state.players[0]!.minorHand.includes(CARD));assert.equal(undone.state.actionSpaces.find(a=>a.id==='fishing')!.takenBy[0]!.playerId,undone.state.players[0]!.id);const retry=buy(s,CARD).r;assert.ok(retry.state.players[0]!.minorPlayed.includes(CARD));save('B056-N1',{pending,r,undone,retry})})
+  it('B056 N2 none or only opponent person on Fishing cannot satisfy the purchase prerequisite',()=>{for(const mode of['none','opponent']){const s=setup(CARD);if(mode==='opponent'){use(s,0,'clay-pit');use(s,1,'fishing')}const pending=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD));const legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.ok(legal.state.players[0]!.minorHand.includes(CARD));assert.ok(!legal.state.players[0]!.minorPlayed.includes(CARD));save(`B056-N2-${mode}`,{pending,legal})}})
+  it('B056 N3 natural next round Forest Clay Pit and Reed Bank each grant exactly one extra food',()=>{for(const space of['forest','clay-pit','reed-bank']){const s=setup(CARD),c=setup(CARD);person(s);person(c);buy(s,CARD);buy(c,'B004_WoodPile');reach(s,6);reach(c,6);const a=use(s,0,space),b=use(c,0,space);assert.equal(a.r.state.players[0]!.resources.food,b.r.state.players[0]!.resources.food+1);assert.equal(a.r.state.players[1]!.resources.food,b.r.state.players[1]!.resources.food);save(`B056-N3-${space}`,{a,b})}})
+  it('B056 N4 actual first revealed round action grants one food while Fishing and later round action do not',()=>{for(const kind of['first','fishing','later']){const s=setup(CARD),c=setup(CARD);person(s);person(c);buy(s,CARD);buy(c,'B004_WoodPile');const a=reach(s,6),b=reach(c,6),id=kind==='first'?a.state.roundActionOrder[0]!:kind==='later'?a.state.roundActionOrder[1]!:'fishing';assert.equal(a.state.roundActionOrder[0],b.state.roundActionOrder[0]);const x=use(s,0,id),y=use(c,0,id);assert.equal(x.r.state.players[0]!.resources.food,y.r.state.players[0]!.resources.food+(kind==='first'?1:0));save(`B056-N4-${kind}`,{a,b,id,x,y})}})
 })

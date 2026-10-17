@@ -1,6 +1,6 @@
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
@@ -11,6 +11,9 @@ import { createWorkSession } from './_helpers/session-fixtures'
 
 import '../../shared/cards/C/C135_Constable'
 import '../../shared/cards/D/D132_HideFarmer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit52Scoring from './_helpers/audit/ae-negative-52-scoring'
 
 const CARD_ID = 'D132_HideFarmer'
 const CONSTABLE_ID = 'C135_Constable'
@@ -500,4 +503,12 @@ describe('D132 Hide Farmer parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(emptyScore(response)).toMatchObject({ quantity: 2, total: -2 })
   })
+})
+
+describe('ae-negative-52-scoring', () => {
+  const { sessions, save, lesson, progress, HIDE, hide, hidePending, hidePay, emptyScore } = audit52Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D132 N1 actual purchase has no early reduction and natural scoring pays two food for two of three unused spaces',()=>{const bought=lesson(hide(2,3,false),HIDE);assert.equal(bought.state.players[0]!.cardStates[HIDE]?.extraData?.hiddenSpaces??0,0);const s=hide(),pending=hidePending(s),r=hidePay(s,2);assert.equal(r.state.gameOver,true);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.cardStates[HIDE]?.extraData?.hiddenSpaces,2);assert.equal(emptyScore(r),-1);save('D132-N1',{bought,pending,r})})
+  it('D132 N2 food availability caps hiding and overmaximum or nonfood payloads reject before one legal payment while zero preserves penalties',()=>{const s=hide(1),pending=hidePending(s),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{resourceCounts:{food:2}})),bad2=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{resourceCounts:{food:1,wood:1}})),r=hidePay(s,1);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(emptyScore(r),-2);const t=hide(),p=hidePending(t),zero=hidePay(t,0);assert.equal(zero.state.players[0]!.resources.food,2);assert.equal(emptyScore(zero),-3);save('D132-N2',{pending,bad,bad2,r,p,zero})})
+  it('D132 N3 decline a full farm zero food and a held card keep exact unused space penalties with no opponent reduction',()=>{for(const[mode,food,unused,played]of[['decline',2,3,true],['full',2,0,true],['food',0,3,true],['hand',2,3,false]] as const){const s=hide(food,unused,played),r=progress(s,15);assert.equal(r.state.gameOver,true);assert.equal(r.state.players[0]!.resources.food,food);assert.equal(emptyScore(r),unused===0?0:-unused);assert.equal(r.state.players[0]!.cardStates[HIDE]?.extraData?.hiddenSpaces??0,0);assert.ok(r.scores);assert.equal(r.scores[1]!.categories.find(c=>c.key==='empty')?.total,-13);save(`D132-N3-${mode}`,r)}})
 })

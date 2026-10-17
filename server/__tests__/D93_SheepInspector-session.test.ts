@@ -2,12 +2,12 @@ import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import type {
   ActionSpace,
   GameState,
@@ -18,6 +18,9 @@ import '../../shared/cards/D/D093_SheepInspector'
 import type { ActionChoiceOption , ActionFlow } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit45Placement from './_helpers/audit/ae-negative-45-placement'
 
 const CARD_ID = 'D093_SheepInspector'
 
@@ -325,5 +328,46 @@ describe('D093_SheepInspector end-to-end via GameSession', () => {
     const forestAfter = resp.state.actionSpaces.find((s) => s.id === 'forest')
     expect(forestAfter?.takenBy.some((t) => t.playerId === after.id)).toBe(true)
     expect(isCardFlagged(after, CARD_ID)).toBe(false)
+  })
+})
+
+describe('ae-negative-45-placement', () => {
+  const { sessions, save, ok, setup, choice, finish, next, inspector, optionsOf, requestOf } = audit45Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D093 N1 real second placement pays one sheep two food recalls prior Forest and excludes the just placed person', () => { const { s } = inspector(); let r = ok(s.takeAction(0, 'day-laborer')); r = choice(s, r, o => o.value !== '__skip__'); if (requestOf(r).kind === 'select-trigger')
+    r = choice(s, r, o => o.value === 'D093_SheepInspector'); if (optionsOf(r)?.some(o => o.value === '__accept__'))
+    r = choice(s, r, o => o.value === '__accept__'); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer')); if (optionsOf(r)?.some(o => o.value === 'forest'))
+    r = choice(s, r, o => o.value === 'forest'); assert.equal(r.state.players[0]!.resources.sheep, 0); assert.equal(r.state.players[0]!.resources.food, 2); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.takenBy.length, 0); assert.equal(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy.length, 1); assert.equal(workersAtHome(r.state, r.state.players[0]!).length, 1); save('D093-N1', r); })
+  it('D093 N2 declining leaves sheep food and prior worker while Meeting Place and no sheep prevent recall', () => { for (const mode of ['decline', 'meeting', 'sheep']) {
+    const { s } = inspector(mode === 'meeting' ? 'meeting-place' : 'forest', mode !== 'sheep')
+    const r = finish(s, ok(s.takeAction(0, 'day-laborer')))
+    assert.equal(r.state.players[0]!.resources.sheep, mode === 'sheep' ? 0 : 1)
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    assert.equal(r.state.actionSpaces.find(a => a.id === (mode === 'meeting' ? 'meeting-place' : 'forest'))!.takenBy.length, 1)
+    save(`D093-N2-${mode}`, r)
+  } })
+  it('D093 N3 enough remaining sheep and food cannot recall twice and natural new work phase resets usage', () => {
+    const s = setup('D093_SheepInspector', state => { const p = state.players[0]!; p.resources.food = 4; p.resources.sheep = 2; p.pastures = [{ id: 'inspector-pen', tiles: [{ row: 0, col: 2 }], animalType: 'sheep', animalCount: 2 }]; p.fenceSegments = ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } })); })
+    finish(s, ok(s.takeAction(0, 'forest')))
+    next(s)
+    finish(s, ok(s.takeAction(1, 'grain-seeds')))
+    next(s)
+    let r = finish(s, ok(s.takeAction(0, 'day-laborer')), true)
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    assert.equal(r.state.players[0]!.cardStates.D093_SheepInspector?.flagged, true)
+    next(s)
+    finish(s, ok(s.takeAction(1, 'clay-pit')))
+    next(s)
+    r = ok(s.takeAction(0, 'reed-bank'))
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    assert.equal(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy.length, 1)
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      r = confirmNext(s, r)
+    r = finish(s, r)
+    assert.equal(r.state.round, 9)
+    assert.equal(r.state.players[0]!.cardStates.D093_SheepInspector?.flagged, false)
+    save('D093-N3', r)
   })
 })

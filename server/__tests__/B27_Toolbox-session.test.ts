@@ -1,7 +1,7 @@
 import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -13,6 +13,9 @@ import '../../shared/cards/B/B150_LargeScaleFarmer'
 import '../../shared/cards/C/C094_StableCleaner'
 import '../../shared/cards/E/E052_Cubbyhole'
 import { B027_Toolbox_impl } from '../../shared/cards/B/B027_Toolbox'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, passPreparationExchanges, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit03Stables from './_helpers/audit/ae-negative-03-stables'
 
 const CARD_ID = 'B027_Toolbox'
 const POTTERS_YARD_ID = 'A040_PottersYard'
@@ -578,5 +581,83 @@ describe('B027 Toolbox parity', () => {
     expect(new Set(options(response).map((option) => option.value)))
       .toEqual(new Set(TOOLBOX_MAJORS))
     expect(options(response).map((option) => option.value)).not.toContain('Major_Well')
+  })
+})
+
+describe('ae-negative-03-stables', () => {
+  const { B027, sessions, ok, setup, turn, reachDue, buildFarm, finishExpansion, toolboxMajors } = audit03Stables
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  describe('Toolbox negative audit', () => {
+    it('B027 N1 stable turn restricts majors and pays normally with undo and retry', () => {
+      const s = setup({ card: B027, round: 5, resources: { wood: 4, reed: 2, clay: 2, stone: 3 } })
+      const before = undoRuleSnapshot(s.getState())
+      toolboxMajors(s, buildFarm(s, 'stable'))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Well'))
+      const r = ok(s.resolveChoice(0, 'Major_Basket'))
+      assert.ok(r.state.players[0]!.improvements.includes('Major_Basket'))
+      assert.deepEqual({ wood: r.state.players[0]!.resources.wood, reed: r.state.players[0]!.resources.reed, stone: r.state.players[0]!.resources.stone }, { wood: 2, reed: 0, stone: 1 })
+      assert.equal(r.state.players[0]!.stableTiles.length, 1)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
+      assertUndoRestored(before, s.undoAction())
+      toolboxMajors(s, buildFarm(s, 'stable'))
+      const retry = ok(s.resolveChoice(0, 'Major_Basket'))
+      assert.equal(retry.state.players[0]!.stableTiles.length, 1)
+      assert.deepEqual(retry.state.players[0]!.improvements, ['Major_Basket'])
+    })
+    it('B027 N2 room and stable in one real turn offer only one major purchase', () => {
+      const s = setup({ card: B027, round: 5, resources: { wood: 9, reed: 4, clay: 2, stone: 4 } })
+      let r = buildFarm(s, 'room')
+      r = buildFarm(s, 'stable', r)
+      toolboxMajors(s, r)
+      r = ok(s.resolveChoice(0, 'Major_Joinery'))
+      assert.equal(r.state.players[0]!.rooms, 3)
+      assert.equal(r.state.players[0]!.stableTiles.length, 1)
+      assert.deepEqual(r.state.players[0]!.improvements, ['Major_Joinery'])
+      assert.equal(r.state.players[0]!.resources.stone, 2)
+      assert.equal(r.state.players[0]!.resources.clay, 2)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
+      turn(s, 1, 'forest')
+      const normal = turn(s, 0, 'grain-seeds')
+      assert.ok(normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'confirm-next-player')
+      assert.deepEqual(normal.state.players[0]!.improvements, ['Major_Joinery'])
+    })
+    it('B027 N3 insufficient resources never grants a free major or stale window', () => {
+      const s = setup({ card: B027, round: 5, resources: { wood: 2 } })
+      const r = finishExpansion(s, buildFarm(s, 'stable'))
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.stableTiles.length, 1)
+      assert.deepEqual(r.state.players[0]!.improvements, [])
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      turn(s, 1, 'forest')
+      const normal = turn(s, 0, 'grain-seeds')
+      assert.deepEqual(normal.state.players[0]!.improvements, [])
+      assert.ok(normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'confirm-next-player')
+    })
+    it('B027 N4 Stable Planner offturn stable never creates a Toolbox purchase', () => {
+      const s = setup({ toolbox: true, resources: { reed: 2, stone: 2 } })
+      const r = reachDue(s)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+      const built = ok(s.commitSelectionChoice(0, { stables: [r.interaction.request.farm.selectableTiles[0]!] }))
+      assert.equal(built.state.round, 4)
+      assert.equal(built.state.players[0]!.stableTiles.length, 1)
+      assert.deepEqual(built.state.players[0]!.improvements, [])
+      assert.ok(passPreparationExchanges(s, built).interaction.stateId === 'idle', JSON.stringify(s.getState().interaction))
+    })
+    it('B027 N5 own nonbuilding turn and opponents stable never grants owner a purchase', () => {
+      const s = setup({ card: B027, round: 5, resources: { reed: 2, stone: 2 } })
+      s.state.players[1]!.resources.wood = 2
+      const own = turn(s, 0, 'grain-seeds')
+      assert.ok(own.interaction.stateId === 'wait' && own.interaction.request.kind === 'confirm-next-player')
+      let r = turn(s, 1, 'farm-expansion')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+      r = ok(s.commitSelectionChoice(1, { stables: [r.interaction.request.farm.selectableTiles[0]!] }))
+      assert.equal(r.state.players[1]!.stableTiles.length, 1)
+      assert.deepEqual(r.state.players[0]!.improvements, [])
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+      const next = turn(s, 0, 'day-laborer')
+      assert.deepEqual(next.state.players[0]!.improvements, [])
+    })
   })
 })

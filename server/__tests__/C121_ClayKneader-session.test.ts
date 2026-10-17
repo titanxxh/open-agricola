@@ -1,6 +1,6 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -8,6 +8,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import '../../shared/cards/C/C121_ClayKneader'
 import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'C121_ClayKneader'
 
@@ -154,4 +155,12 @@ describe('C121 Clay Kneader parity', () => {
     expect(response.state.players[0]!.resources.clay).toBe(0)
     expect(response.state.players[1]!.resources).toMatchObject({ grain: 1, clay: 0 })
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, ready, lesson, resources } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C121 N1 actual first Lessons grants exactly one wood two clay without charging occupation food', () => { const s = make('C121_ClayKneader', undefined, false), r = finish(s, lesson(s, 'C121_ClayKneader')); resources(r, { wood: 1, clay: 2, food: 100 }); resources(r, { wood: 0, clay: 0 }, 1); save('C121-N1', r) })
+  it('C121 N2 Grain Seeds and Vegetable Seeds each grant exactly one additional clay', () => { for (const [space, crop] of [['grain-seeds', 'grain'], ['vegetable-seeds', 'vegetable']] as const) { const s = make('C121_ClayKneader', undefined, true, 14), r = finish(s, ok(s.takeAction(0, space))); resources(r, { [crop]: 1, clay: 1, wood: 0 }); save(`C121-N2-${crop}`, r) } })
+  it('C121 N3 nonseed owner action actual opponent seed and card in hand cannot grant clay', () => { const s = make('C121_ClayKneader'), a = finish(s, ok(s.takeAction(0, 'day-laborer'))); ready(s); const r = finish(s, ok(s.takeAction(1, 'grain-seeds'))); resources(r, { food: 102, clay: 0 }); resources(r, { grain: 1, clay: 0 }, 1); const c = make('C121_ClayKneader', undefined, false), cr = finish(c, ok(c.takeAction(0, 'grain-seeds'))); resources(cr, { grain: 1, clay: 0 }); save('C121-N3', { a, r, cr }) })
 })

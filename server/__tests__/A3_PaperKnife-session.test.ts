@@ -46,6 +46,9 @@ import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/A/A118_Treegardener'
 import '../../shared/cards/A/A119_FirewoodCollector'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit02Immediate from './_helpers/audit/ae-negative-02-immediate'
 
 const CARD_ID = 'A003_PaperKnife'
 
@@ -570,5 +573,48 @@ describe('A003_PaperKnife session-tier: flow', () => {
     // If a future "additionalCost" concept is added to occupations (independent of
     // exactCost), this test should be re-enabled and a suitable occupation used.
     // Until then, the scenario is untestable without modifying the type system.
+  })
+})
+
+describe('ae-negative-02-immediate', () => {
+  const { occupations, setup, play, accept } = audit02Immediate
+  describe('negative audit 02 immediate effects', () => {
+    it('A003 N1: Paper Knife must reject four occupations and legally play one selected card without food', () => {
+        const session = setup('A003_PaperKnife', state => { state.players[0]!.resources.wood = 1 })
+        play(session, 'A003_PaperKnife')
+        const selected = occupations.slice(0, 3)
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: occupations }))
+        const selectedResponse = session.commitSelectionChoice(0, { cardIds: selected })
+        const response = accept(session, selectedResponse)
+        assert.equal(response.ok, true, response.error)
+        const player = response.state.players[0]!
+        assert.equal(player.occupationPlayed.length, 1)
+        assert(selected.includes(player.occupationPlayed[0]!))
+        assert(player.occupationHand.includes(occupations[3]!))
+        assert.equal(player.occupationHand.length, 3)
+        assert.equal(player.resources.food, 0)
+        assert.equal(player.resources.wood, 0)
+        assert(response.state.players[1]!.minorHand.includes('A003_PaperKnife'))
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: selected }))
+        session.dispose()
+      })
+    it('A003 N2: Paper Knife must reject selecting the same occupation three times', () => {
+        const session = setup('A003_PaperKnife', state => { state.players[0]!.resources.wood = 1 })
+        play(session, 'A003_PaperKnife')
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: [occupations[0]!, occupations[0]!, occupations[0]!] }))
+        assert.equal(session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) }).ok, true)
+        session.dispose()
+      })
+    it('A003 N3: Paper Knife must reject three occupations belonging to the other player', () => {
+        const foreign = ['A117_WoodCarrier', 'B116_Shoreforester', 'C109_SchnappsDistiller']
+        const session = setup('A003_PaperKnife', state => {
+          state.players[0]!.resources.wood = 1
+          state.players[1]!.occupationHand = [...foreign]
+        })
+        play(session, 'A003_PaperKnife')
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { cardIds: foreign }))
+        assert.equal(session.commitSelectionChoice(0, { cardIds: occupations.slice(0, 3) }).ok, true)
+        session.dispose()
+      })
   })
 })

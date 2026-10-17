@@ -1,10 +1,15 @@
-import { describe, it, expect } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { describe, it, expect, afterEach } from 'vitest'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C062_CookeryExtension'
+import assert from 'node:assert/strict'
+import fs from './_helpers/audit-evidence-fs'
+import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext, passPreparationExchanges } from './_helpers/negative-rule-audit'
 
 const C62 = 'C062_CookeryExtension'
 const FIREPLACE1 = 'Major_Fireplace1'
@@ -263,4 +268,155 @@ describe('C62 + harvest feed integration', () => {
     expect(accepted.ok, accepted.error).toBe(true)
     expect(accepted.state.players[0]!.resources.vegetable).toBe(0)
   })
+})
+
+describe('ae-negative-39-native', () => {
+  const sessions: GameSession[] = [];
+  let pause: ((r: SessionResponse) => boolean) | undefined;
+  const output = process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR ?? 'output/ae-negative/39/oa-probes';
+  const traces: unknown[] = [];
+  const order = ['sheep-market', 'fencing', 'major-improvement', 'grain-utilization', 'wish-children', 'house-redevelopment', 'western-quarry', 'pig-market', 'vegetable-seeds', 'cattle-market', 'eastern-quarry', 'cultivation', 'urgent-wish-children', 'farm-redevelopment'];
+  const prerequisites: Record<string, number> = { D064_BakingCourse: 1, E062_SourDough: 3 };
+  function ok(r: SessionResponse): SessionResponse { assert.equal(r.ok, true, `${r.error} ${JSON.stringify(r.interaction)}`); return JSON.parse(JSON.stringify(r)); }
+  function save(id: string, value: unknown) { fs.mkdirSync(output, { recursive: true }); fs.writeFileSync(`${output}/${id}.json`, JSON.stringify({ commands: traces, value }, null, 2)); }
+  function make(card: string, configure: (st: GameState) => void = () => { }, played = true, round = 5) {
+      const s = createWorkSession({ seed: 4239, options: { playerCount: 2 }, configure(st) {
+              st.round = round;
+              st.roundActionOrder = [...order];
+              for (const [p, i] of st.players.map((p, i): [
+                  PlayerState,
+                  number
+              ] => [p, i])) {
+                  p.occupationHand = i === 0 ? ['A125_Priest', 'A102_Grocer'] : ['A116_WoodCutter', 'A123_FrameBuilder'];
+                  p.minorHand = i === 0 ? ['B004_WoodPile', 'A006_StorageBarn'] : ['__test_placeholder__'];
+                  p.occupationPlayed = [];
+                  p.minorPlayed = [];
+                  p.improvements = [];
+                  p.cardStates = {};
+                  Object.assign(p.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 100, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 });
+              }
+              const p = st.players[0]!;
+              if (played) {
+                  p.minorPlayed = [card];
+                  occupations(p, prerequisites[card] ?? 0);
+              }
+              else
+                  p.minorHand.unshift(card);
+              configure(st);
+              for (const owner of st.players)
+                  for (const id of [...owner.minorHand, ...owner.minorPlayed, ...owner.occupationHand, ...owner.occupationPlayed])
+                      if (id !== '__test_placeholder__')
+                          { const path=new URL(`../../shared/cards/${id[0]}/${id}.ts`, import.meta.url);assert.ok(fs.existsSync(path), `Unknown fixture card ${id}`);const min=/players:\s*['"](\d+)\+/.exec(fs.readFileSync(path,'utf8'));if(min)assert.ok(Number(min[1])<=2,`Fixture card ${id} exceeds 2p`);}
+              if (!played)
+                  assert.ok(p.minorHand.includes(card));
+          } });
+      sessions.push(s);
+      return s;
+  }
+  function take(s: GameSession, a: number, space: string) { const n = order.indexOf(space) + 1; assert.ok(!n || n <= s.state.round); traces.push({ command: 'takeAction', actor: a, space, round: s.state.round }); return ok(s.takeAction(a, space)); }
+  function choose(s: GameSession, a: number, value: string, payload?: Parameters<GameSession['resolveChoice']>[2]) { traces.push({ command: 'resolveChoice', actor: a, value, payload }); return ok(s.resolveChoice(a, value, payload)); }
+  function select(s: GameSession, a: number, payload: Parameters<GameSession['commitSelectionChoice']>[1]) { traces.push({ command: 'commitSelectionChoice', actor: a, payload }); return ok(s.commitSelectionChoice(a, payload)); }
+  function opts(r: SessionResponse) { return r.interaction.stateId === 'wait' && 'options' in r.interaction.request ? r.interaction.request.options ?? [] : []; }
+  function finish(s: GameSession, first: SessionResponse, accept = true, markers: string[] = [], forbidden?: string) {
+      let r = ok(first);
+      for (let n = 0; n < 120 && r.interaction.stateId === 'wait'; n++) {
+          if (forbidden)
+              assert.equal(JSON.stringify(r.interaction).includes(forbidden), false, JSON.stringify(r.interaction));
+          
+          if (pause?.(r))
+              return r;
+          r = passPreparationExchanges(s, r);
+          const i = r.interaction;
+          if (i.stateId !== 'wait' || i.request.kind === 'confirm-next-player')
+              return ok(r);
+          const q = i.request;
+          if (q.kind === 'confirm-player-switch')
+              r = choose(s, q.fromPlayerIndex, 'confirm');
+          else if (q.kind === 'choice' || q.kind === 'select-trigger') {
+              const active = q.options.filter(o => !('disabled' in o && o.disabled)), preferred = markers.flatMap(m => active.filter(o => JSON.stringify(o).includes(m))).find(o => !['__pass__', '__skip__', '__done__'].includes(o.value));
+              const picked = (markers.includes('skipOvenBake') && ['Major_ClayOven', 'Major_StoneOven'].includes(i.sourceCard ?? '') && i.promptKey === 'ui.interactionOptionalAction' ? active.find(o => o.value === '__skip__') : undefined) ?? (accept ? preferred ?? active.find(o => !['__pass__', '__skip__', '__done__'].includes(o.value) && o.labelKey !== 'actions.exchange.name') : undefined) ?? active.find(o => ['__pass__', '__skip__', '__done__'].includes(o.value)) ?? active[0];
+              assert.ok(picked, JSON.stringify(i));
+              r = choose(s, i.playerIndex, picked.value);
+          }
+          else if (q.kind === 'farm-select' && q.farm.farmType === 'plow')
+              r = select(s, i.playerIndex, { tile: q.farm.selectableTiles[0]! });
+          else if (q.kind === 'selection' && q.selection.kind === 'farm-position')
+              r = select(s, i.playerIndex, { positions: [q.selection.selectablePositions[0]!] });
+          else if (q.kind === 'animal-reorg')
+              r = choose(s, i.playerIndex, 'confirm', { zones: q.zones });
+          else if (q.kind === 'feed')
+              r = choose(s, i.playerIndex, 'confirm', { selections: [] });
+          else
+              assert.fail(JSON.stringify(i));
+      }
+      assert.notEqual(r.interaction.stateId, 'wait');
+      return ok(r);
+  }
+  function ready(s: GameSession, accept = true, markers: string[] = [], forbidden?: string) {
+      let r = s.getState();
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player') {
+          traces.push({ command: 'resolveChoice', actor: r.interaction.request.nextPlayerIndex, value: 'confirm' });
+          r = confirmNext(s, r);
+      }
+      return finish(s, r, accept, markers, forbidden);
+  }
+  function fill(s: GameSession, accept = true, markers: string[] = [], forbidden?: string) {
+      const r = ready(s, accept, markers, forbidden);
+      if (r.state.gameOver || r.interaction.stateId === 'wait')
+          return r;
+      const a = r.state.currentPlayerIndex, av = s.getActionAvailability(a), space = ['clay-pit', 'reed-bank', 'forest', 'fishing', 'grain-seeds', 'day-laborer'].find(id => av[id]);
+      assert.ok(space, JSON.stringify(av));
+      return finish(s, take(s, a, space), accept, markers, forbidden);
+  }
+  function reach(s: GameSession, target: number, accept = true, markers: string[] = [], forbidden?: string) {
+      for (let n = 0; n < 120; n++) {
+          const r = ready(s, accept, markers, forbidden);
+          if (r.state.round === target || r.state.gameOver || r.interaction.stateId === 'wait')
+              return r;
+          assert.ok(r.state.round < target);
+          fill(s, accept, markers, forbidden);
+      }
+      assert.fail('Natural phase not reached');
+  }
+  function end(s: GameSession, accept = true, markers: string[] = [], forbidden?: string) { return reach(s, s.state.round + 1, accept, markers, forbidden); }
+  function minor(s: GameSession, a = 0) {
+      let r = take(s, a, 'meeting-place');
+      for (let n = 0; n < 10; n++) {
+          assert.ok(r.interaction.stateId === 'wait', JSON.stringify(r.interaction));
+          if (opts(r).some(o => o.value === 'B004_WoodPile' || o.value === 'A006_StorageBarn' || o.value.startsWith('Major_')))
+              return r;
+          const o = opts(r).find(o => o.value.startsWith('action-improvement-'));
+          assert.ok(o);
+          r = choose(s, a, o.value);
+      }
+      assert.fail('Minor menu not reached');
+  }
+  function purchase(s: GameSession, id: string, markers: string[] = []) { const p = minor(s), o = opts(p).find(o => o.value === id || o.value === `minor:${id}`); assert.ok(o, JSON.stringify(p.interaction)); return finish(s, choose(s, 0, o.value), true, markers); }
+  function resource(r: SessionResponse, expected: Partial<Resource>, p = 0) {
+      for (const [k, v] of Object.entries(expected))
+          assert.equal(Object.entries(r.state.players[p]!.resources).find(([key]) => key === k)?.[1], v, k);
+  }
+  function ownMajor(st: GameState, id: string, a = 0) { assert.ok(st.availableMajorImprovements.includes(id), `Unavailable fixture major ${id}`); st.players[a]!.improvements.push(id); st.availableMajorImprovements = st.availableMajorImprovements.filter(x => x !== id); }
+  function occupations(p: PlayerState, n: number) { p.occupationPlayed = ['A110_Roughcaster', 'A100_Curator', 'A099_FellowGrazer'].slice(0, n); }
+  function anytime(s: GameSession, id: string) { traces.push({ command: 'takeAnytimeAction', actor: 0, id }); return ok(s.takeAnytimeAction(0, id)); }
+  function harvest(s: GameSession, accept = true, forbidden?: string) { pause = r => r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed' && r.interaction.playerIndex === 0; const r = end(s, accept, [], forbidden); pause = undefined; assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed', JSON.stringify(r.interaction)); return r; }
+  function catalog(r: SessionResponse) { assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed'); return r.interaction.request.exchangeCatalog ?? []; }
+  function feed(s: GameSession, rows: {
+      sourceId: string;
+      exchangeIndex: number;
+      count: number;
+  }[]) { return finish(s, choose(s, 0, 'confirm', { selections: rows })); }
+  function row(e: ReturnType<typeof catalog>[number], count = 1) { return { sourceId: e.sourceId, exchangeIndex: e.exchangeIndex, count }; }
+  function cook(s: GameSession) { const r = anytime(s, 'exchange'); assert.ok(r.interaction.stateId === 'wait'); return r; }
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); pause = undefined; });
+  it("C062 N1 real purchase and harvest vegetable exchange double each cookery once", () => { const s = make('C062_CookeryExtension', st => { ownMajor(st, 'Major_Fireplace1'); ownMajor(st, 'Major_Fireplace2'); Object.assign(st.players[0]!.resources, { clay: 2, vegetable: 2 }); }, false, 4), b = purchase(s, 'C062_CookeryExtension'), p = harvest(s), es = catalog(p).filter(e => e.sourceId.startsWith('C062_CookeryExtension::') && e.from.vegetable === 1); assert.equal(es.length, 2); assert.ok(es.every(e => e.to.food === 4 && e.max === 1)); const r = feed(s, es.map(e => row(e))); resource(r, { food: 104, vegetable: 0, begging: 0 }); save('C062-N1', { b, p, r }); });
+  it("C062 N2 one cookery cannot double two recipes while legal single retry feeds the family", () => { const s = make('C062_CookeryExtension', st => { ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.vegetable = 2; }, true, 4), p = harvest(s), e = catalog(p).find(e => e.sourceId === 'C062_CookeryExtension::Major_Fireplace1' && e.from.vegetable === 1); assert.ok(e); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { selections: [row(e), row(e)] })), r = feed(s, [row(e)]); resource(r, { food: 100, vegetable: 1, begging: 0 }); assert.deepEqual(r.state.players[0]!.cardStates.C062_CookeryExtension?.extraData?.usedCookeryIds, ['Major_Fireplace1']); save('C062-N2', { p, bad, r }); });
+  it("C062 N3 held card no cookery grain and nonharvest windows exclude doubled recipes", () => { for (const mode of ['hand', 'cookery', 'grain']) {
+      const s = make('C062_CookeryExtension', st => { if (mode !== 'cookery')
+          ownMajor(st, 'Major_Fireplace1'); Object.assign(st.players[0]!.resources, { food: 0, vegetable: mode === 'grain' ? 0 : 1, grain: mode === 'grain' ? 1 : 0 }); }, mode !== 'hand', 4), p = harvest(s);
+      assert.equal(catalog(p).some(e => e.sourceId.startsWith('C062_CookeryExtension') && (mode !== 'grain' || e.from.grain)), false);
+      const r = feed(s, []);
+      resource(r, { food: 0, begging: 4 });
+      save(`C062-N3-${mode}`, { p, r });
+  } const s = make('C062_CookeryExtension', st => { ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.vegetable = 1; }), p = cook(s); assert.equal(JSON.stringify(p.interaction).includes('C062_CookeryExtension::'), false); save('C062-N3-nonharvest', p); });
 })

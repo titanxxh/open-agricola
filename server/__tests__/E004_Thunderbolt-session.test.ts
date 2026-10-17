@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E004_Thunderbolt'
 import '../../shared/cards/E/E070_CropRotationField'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit23Crop from './_helpers/audit/ae-negative-23-crop'
 
 const CARD_ID = 'E004_Thunderbolt'
 const CROP_ROTATION_FIELD = 'E070_CropRotationField'
@@ -298,4 +301,13 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
     expect(response.scores).toEqual(scoresBefore)
   })
+})
+
+describe('ae-negative-23-crop', () => {
+  const { THUNDER, ROTATION, sessions, save, ok, setup, finish, menu, FIRST, SECOND, THIRD, make, cropMenu } = audit23Crop
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E004 N1 actual purchase removes all grain from one field for twice as much wood and preserves other crop stacks',()=>{const s=make(THUNDER,0,0,true,true);const a=cropMenu(s,THUNDER,'selection');for(const positions of[[FIRST,SECOND],[THIRD],[{row:99,col:99}]])assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{positions:[FIRST]}));const r=finish(s,ok(s.commitSelectionChoice(0,{positions:[FIRST]})),false);assert.equal(r.state.players[0]!.resources.wood,6);assert.equal(r.state.players[0]!.resources.grain,0);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks),[[],[{kind:'grain',remaining:1}],[{kind:'vegetable',remaining:2}]]);assert.ok(r.state.log.some(e=>e.key==='log.farmCropRemoved'));assert.ok(r.state.players[1]!.minorHand.includes(THUNDER));save('E004-N1',{a,r})})
+  it('E004 N2 no grain field refuses purchase while decline preserves entire grain stack and wood',()=>{const s=make(THUNDER,0,1),pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,THUNDER)),legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.ok(legal.state.players[0]!.minorHand.includes(THUNDER));const d=make(THUNDER,0,0,true),m=menu(d),chosen=ok(d.resolveChoice(0,THUNDER)),r=finish(d,chosen,false);assert.equal(r.state.players[0]!.resources.wood,0);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[{kind:'grain',remaining:3}]);save('E004-N2',{pending,rejected,legal,m,chosen,r})})
+  it('E004 N3 whole purchase undo restores removed crop stack wood and passing hands before one replay',()=>{const s=make(THUNDER,0,0,true),a=cropMenu(s,THUNDER,'selection'),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[FIRST]})),false),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.deepEqual(undone.state.players[0]!.fields[0]!.stacks,[{kind:'grain',remaining:3}]);assert.ok(undone.state.players[0]!.minorHand.includes(THUNDER));const b=cropMenu(s,THUNDER,'selection'),retry=finish(s,ok(s.commitSelectionChoice(0,{positions:[FIRST]})),false);assert.equal(retry.state.players[0]!.resources.wood,6);save('E004-N3',{a,r,undone,b,retry})})
+  it('E004 N4 actual card field grain removal enables opposite crop only on the emptied Crop Rotation Field',()=>{const s=setup(THUNDER,8,state=>{const p=state.players[0]!;p.fields=[{...FIRST,stacks:[]}];p.minorPlayed=[ROTATION];p.occupationPlayed=['A110_Roughcaster'];p.cardStates[ROTATION]={extraData:{cardFieldStacks:[{crop:'grain',remaining:2}]}};p.resources.vegetable=1}),a=cropMenu(s,THUNDER,'selection');assert.ok(a.r.interaction.stateId==='wait'&&a.r.interaction.request.kind==='selection');assert.equal(a.r.interaction.request.selection.kind,'farm-position');assert.ok(a.r.interaction.request.selection.kind==='farm-position');const position=a.r.interaction.request.selection.selectablePositions[0]!;let r=ok(s.commitSelectionChoice(0,{positions:[position]}));assert.equal(r.state.players[0]!.resources.wood,4);const rotationPending=r;r=finish(s,r,true);assert.equal(r.state.players[0]!.resources.vegetable,0);assert.deepEqual(r.state.players[0]!.cardStates[ROTATION]!.extraData!.cardFieldStacks,[{crop:'vegetable',remaining:2}]);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[]);save('E004-N4',{a,rotationPending,r,limitation:'Sole opposite crop target auto-sows after accepting Crop Rotation Field; no separate farm-selection request exists'})})
 })

@@ -1,5 +1,5 @@
 import { descriptionEffects } from './_helpers/choice-description'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -8,6 +8,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 import '../../shared/cards/E/E162_Entrepreneur'
+import assert from 'node:assert/strict'
+import * as audit57Phase from './_helpers/audit/ae-negative-57-phase'
 
 const CARD_ID = 'E162_Entrepreneur'
 const FILLER = '__test_placeholder__'
@@ -269,6 +271,44 @@ describe('E162 Entrepreneur parity', () => {
       expect(response.interaction.stateId).toBe('idle')
     } finally {
       session.dispose()
+    }
+  })
+})
+
+describe('ae-negative-57-phase', () => {
+  const { sessions, ok, save, make, finish, transition } = audit57Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E162 N1 actual successive round starts store one food and gain exactly one currently missing building resource each time', () => {
+    const session = make('E162_Entrepreneur')
+    const first = transition(session, 6, true)
+    assert.equal(first.state.players[0]!.resources.wood, 1); assert.equal(first.state.players[0]!.cardStates.E162_Entrepreneur?.stack?.length, 1)
+    const next = transition(session, 7, true)
+    assert.equal(next.state.players[0]!.cardStates.E162_Entrepreneur?.stack?.length, 2)
+    assert.equal(next.state.players[0]!.resources.reed, 1)
+    save('E162-N1', { first, next })
+  })
+  it('E162 N3 stored food is actually discarded at next round start to gain one missing wood without paying supply food', () => {
+    const session = make('E162_Entrepreneur', state => { state.players[0]!.resources.food = 0; state.players[0]!.cardStates.E162_Entrepreneur = { stack: ['food'] } })
+    const response = transition(session, 6, true)
+    assert.equal(response.state.players[0]!.cardStates.E162_Entrepreneur?.stack?.length, 0)
+    assert.equal(response.state.players[0]!.resources.food, 0)
+    assert.equal(response.state.players[0]!.resources.wood, 1)
+    save('E162-N3', response)
+  })
+  it('E162 N4 actual unrelated midround placement and card only in hand never store discard or gain building resources early', () => {
+    const session = make('E162_Entrepreneur', state => { state.players[0]!.cardStates.E162_Entrepreneur = { stack: ['food'] } }), response = finish(session, ok(session.takeAction(0, 'grain-seeds')))
+    assert.equal(response.state.players[0]!.cardStates.E162_Entrepreneur?.stack?.length, 1); assert.equal(response.state.players[0]!.resources.wood, 0); assert.equal(response.state.players[0]!.resources.food, 100)
+    const hand = make('E162_Entrepreneur', undefined, false), next = transition(hand, 6, true)
+    assert.equal(next.state.players[0]!.cardStates.E162_Entrepreneur?.stack?.length ?? 0, 0); assert.equal(next.state.players[0]!.resources.wood, 0)
+    save('E162-N4', { response, next })
+  })
+  it('E162 N2 all building types already owned no payment available and optional decline each produce no new building resource', () => {
+    for (const mode of ['all', 'food', 'decline']) {
+      const session = make('E162_Entrepreneur', state => { if (mode === 'all') Object.assign(state.players[0]!.resources, { wood: 1, clay: 1, reed: 1, stone: 1 }); if (mode === 'food') state.players[0]!.resources.food = 0 })
+      const response = transition(session, 6, mode !== 'decline')
+      assert.equal(response.state.players[0]!.cardStates.E162_Entrepreneur?.stack?.length ?? 0, 0)
+      assert.equal(response.state.players[0]!.resources.stone, mode === 'all' ? 1 : 0)
+      save(`E162-N2-${mode}`, response)
     }
   })
 })

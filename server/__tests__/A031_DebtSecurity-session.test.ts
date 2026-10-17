@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
@@ -8,6 +8,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A031_DebtSecurity'
 import '../../shared/cards/A/A060_OrientalFireplace'
 import '../../shared/cards/D/D075_WoodField'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Scoring from './_helpers/audit/ae-negative-06-scoring'
 
 const CARD_ID = 'A031_DebtSecurity'
 const FILLER = '__test_placeholder__'
@@ -163,5 +166,42 @@ describe('A031 Debt Security parity', () => {
 
   it('A031 S7: a played minor that also counts as a major contributes one bonus point', () => {
     expect(debtSecurityBonus(scoringSession({ unused: 5, dualTypeMajor: true }))).toBe(1)
+  })
+})
+
+describe('ae-negative-06-scoring', () => {
+  const { DEBT, MAJORS, sessions, ok, setup, options, buy, denied, bonus, pastures, debt } = audit06Scoring
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A031 N1 one food rejects forged purchase and exact two food purchase cannot be replayed', () => {
+    denied(setup(DEBT, { played: false, resources: { food: 1 } }), DEBT)
+    const s = setup(DEBT, { played: false, resources: { food: 2 } }); const r = buy(s, DEBT); assert.equal(r.state.players[0]!.resources.food, 0); assert.equal(bonus(r, DEBT), 0); assertRejectedUnchanged(s, () => s.resolveChoice(0, DEBT))
+  })
+  it('A031 N2 zero inputs and both cap boundaries use distinct unused farmyard spaces without repeat scoring', () => {
+    for (const [majors, spaces, expected] of [[0, 3, 0], [2, 0, 0], [2, 3, 2], [3, 2, 2], [2, 2, 2]]) {
+      const s = debt(majors, spaces); assert.equal(bonus(s.getState(), DEBT), expected); assert.equal(bonus(s.getState(), DEBT), expected)
+    }
+  })
+  it('A031 N3 an unplayed card opponents majors and ordinary minors do not score owner debt', () => {
+    const hand = setup(DEBT, { played: false }, state => { state.players[0]!.improvements = MAJORS.slice(0, 2) }); assert.equal(bonus(hand.getState(), DEBT), 0)
+    const other = debt(0, 3, state => { state.players[1]!.improvements = MAJORS.slice(0, 2); state.players[0]!.minorPlayed.push('B007_Wage') }); assert.equal(bonus(other.getState(), DEBT), 0)
+  })
+  it('A031 N4 fenced stable shares one tile and planted card field consumes no farmyard space', () => {
+    const s = debt(2, 1, state => {
+      pastures(state, [[{ row: 0, col: 1 }]], 0, true); state.players[0]!.minorPlayed.push('D075_WoodField'); state.players[0]!.occupationPlayed = ['A125_Priest']
+      state.players[0]!.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, null] } }
+    }); const projection = s.getState(); assert(projection.scores); assert.equal(bonus(projection, DEBT), 1); assert.equal(projection.scores[0]!.categories.find(c => c.key === 'empty')?.quantity, 1)
+    const dual = debt(0, 3, state => state.players[0]!.minorPlayed.push('A060_OrientalFireplace')); assert.equal(bonus(dual.getState(), DEBT), 1)
+  })
+  it('A031 N5 actual major purchase changes bonus once and full undo restores the original major count', () => {
+    const s = debt(1, 2, state => { state.players[0]!.improvements = ['Major_Fireplace2']; state.players[0]!.resources.clay = 2; state.players[1]!.improvements = state.availableMajorImprovements.filter(id => !['Major_Fireplace1', 'Major_Fireplace2'].includes(id)); state.availableMajorImprovements = ['Major_Fireplace1'] })
+    const before = undoRuleSnapshot(s.getState()); assert.equal(bonus(s.getState(), DEBT), 1); const r = buy(s, 'Major_Fireplace1', 'major-improvement')
+    assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(bonus(r, DEBT), 2); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Fireplace1')); assertUndoRestored(before, s.undoAction()); assert.equal(bonus(buy(s, 'Major_Fireplace1', 'major-improvement'), DEBT), 2)
+  })
+  it('A031 N6 actual loose stable consumes one previously unused tile and full undo restores cap', () => {
+    const s = debt(2, 2, state => { state.players[0]!.resources.wood = 2 }); const before = undoRuleSnapshot(s.getState()); assert.equal(bonus(s.getState(), DEBT), 2)
+    let r = ok(s.takeAction(0, 'farm-expansion'))
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') { const stable = options(r).find(o => o.labelKey === 'actions.stables.name'); assert(stable); r = ok(s.resolveChoice(0, stable.value)) }
+    assert(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select', JSON.stringify(r.interaction))
+    r = ok(s.commitSelectionChoice(0, { rooms: [], stables: [{ row: 2, col: 4 }] })); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(bonus(r, DEBT), 1); assertUndoRestored(before, s.undoAction())
   })
 })

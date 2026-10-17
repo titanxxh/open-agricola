@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { familySize, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A026_SleepingCorner'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit05Population from './_helpers/audit/ae-negative-05-population'
 
 const CARD_ID = 'A026_SleepingCorner'
 const FILLER = '__test_placeholder__'
@@ -154,5 +157,46 @@ describe('A026 Sleeping Corner through Session', () => {
       expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
         .toEqual(occupantsBefore)
     }
+  })
+})
+
+describe('ae-negative-05-population', () => {
+  const { CORNER, sessions, ok, setRooms, setup, denied, buy } = audit05Population
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A026 N1 missing cost or second grain field rejects forged purchase before legal retry', () => {
+    denied(setup(CORNER, { played: false, resources: { wood: 0 } }), CORNER)
+    denied(setup(CORNER, { played: false, grainFields: 1, resources: { wood: 1 } }), CORNER)
+    denied(setup(CORNER, { played: false, resources: { wood: 1 } }, state => { state.players[0]!.fields.forEach(f => { f.stacks = [{ kind: 'vegetable', remaining: 2 }] }) }), CORNER)
+    const s = setup(CORNER, { played: false, resources: { wood: 1 } }); const r = buy(s, CORNER)
+    assert(r.state.players[0]!.minorPlayed.includes(CORNER)); assert.equal(r.state.players[0]!.resources.wood, 0)
+  })
+  it('A026 N2 own prior adult occupancy cannot be reused after real opponent turn', () => {
+    const s = setup(CORNER, { rooms: 4 })
+    let r = confirmNext(s, ok(s.takeAction(0, 'wish-children')))
+    assert.equal(familySize(r.state.players[0]!), 3)
+    r = confirmNext(s, ok(s.takeAction(1, 'grain-seeds')))
+    assert.equal(r.state.currentPlayerIndex, 0); assert.equal(s.getActionAvailability(0)['wish-children'], false)
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'wish-children'))
+    const legal = ok(s.takeAction(0, 'day-laborer')); assert.equal(legal.state.players[0]!.resources.food, 22)
+  })
+  it('A026 N3 real opponent adult beside newborn allows one owner growth and full undo', () => {
+    const s = setup(CORNER, {}, state => { setRooms(state, 3, 1) })
+    confirmNext(s, ok(s.takeAction(0, 'grain-seeds')))
+    confirmNext(s, ok(s.takeAction(1, 'wish-children')))
+    const before = undoRuleSnapshot(s.getState())
+    assert.equal(s.getActionAvailability(0)['wish-children'], true)
+    const r = ok(s.takeAction(0, 'wish-children'))
+    assert.equal(familySize(r.state.players[0]!), 3); assert.equal(familySize(r.state.players[1]!), 3)
+    const occupied = r.state.actionSpaces.find(space => space.id === 'wish-children'); assert(occupied)
+    assert.equal(occupied.takenBy.filter(ref => ref.playerId === r.state.players[1]!.id).length, 2)
+    assertUndoRestored(before, s.undoAction())
+    assert.equal(familySize(ok(s.takeAction(0, 'wish-children')).state.players[0]!), 3)
+  })
+  it('A026 N4 permission does not bypass free-room requirement or unrelated occupied spaces', () => {
+    const s = setup(CORNER, { rooms: 2 }, state => { setRooms(state, 3, 1) })
+    confirmNext(s, ok(s.takeAction(0, 'grain-seeds'))); confirmNext(s, ok(s.takeAction(1, 'wish-children')))
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'wish-children'))
+    assertRejectedUnchanged(s, () => s.takeAction(0, 'grain-seeds'))
+    assert.equal(familySize(s.state.players[0]!), 2)
   })
 })

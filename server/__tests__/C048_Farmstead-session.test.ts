@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C048_Farmstead'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'C048_Farmstead'
 
@@ -187,4 +190,16 @@ describe('C048 Farmstead parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(2)
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, take, select, finish, ready, fill, purchase, rejectBuy, undo, resource, occupied, occupations, stables, square, enclose, plow, fence, expansion } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C048 N1 real free purchase and real plow fencing or room plus stable turns pay exactly one food", () => { const s = make('C048_Farmstead', st => occupations(st.players[0]!, 1), false), bought = purchase(s, 'C048_Farmstead'); resource(bought, { food: 100 }); fill(s); ready(s); const p = plow(s), r = finish(s, select(s, 0, { tile: { row: 0, col: 1 } })); resource(r, { food: 101 }); save('C048-N1-plow', { bought, p, r }); const f = make('C048_Farmstead', st => { st.players[0]!.resources.wood = 4; }), fenced = fence(f); resource(fenced, { food: 101, wood: 0 }); assert.equal(fenced.state.players[0]!.pastures.length, 1); save('C048-N1-fence', fenced); const b = make('C048_Farmstead', st => Object.assign(st.players[0]!.resources, { wood: 7, reed: 2 })), built = expansion(b, true); resource(built, { food: 101, wood: 0, reed: 0 }); assert.equal(built.state.players[0]!.rooms, 3); assert.equal(built.state.players[0]!.stableTiles.length, 1); assert.equal(occupied(built).length, 1); save('C048-N1-build', built); });
+  it("C048 N2 already used pasture or stable foreign plow held card and unrelated work cannot earn Farmstead food", () => { const s = make('C048_Farmstead', st => { stables(st.players[0]!, 1); st.players[0]!.resources.wood = 4; }), fenced = fence(s); resource(fenced, { food: 100 }); save('C048-N2-usedStable', fenced); const t = make('C048_Farmstead', st => { const p = st.players[0]!; p.resources.wood = 2; p.pastures = [{ id: 'empty', tiles: [{ row: 0, col: 1 }], animalType: null, animalCount: 0 }]; enclose(p, square); }), built = expansion(t, false); resource(built, { wood: 0, food: 100 }); save('C048-N2-usedPasture', built); for (const mode of ['hand', 'opponent', 'unrelated']) {
+      const a = mode === 'opponent' ? 1 : 0, b = make('C048_Farmstead', st => { st.currentPlayerIndex = a; occupations(st.players[0]!, 1); }, mode !== 'hand'), r = mode === 'unrelated' ? finish(b, take(b, 0, 'day-laborer')) : finish(b, plow(b, a, 'C048_Farmstead'), true, [], 'C048_Farmstead');
+      resource(r, { food: mode === 'unrelated' ? 102 : 100 });
+      save(`C048-N2-${mode}`, r);
+  } });
+  it("C048 N3 missing occupation and an illegal plow target reject before legal plow and public whole-action undo", () => { save('C048-N3-prerequisite', rejectBuy(make('C048_Farmstead', undefined, false), 'C048_Farmstead')); const s = make('C048_Farmstead'), p = plow(s), bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } })), r = finish(s, select(s, 0, { tile: { row: 0, col: 1 } })); resource(r, { food: 101 }); assert.equal(r.state.players[0]!.fields.length, 1); const u = undo(s); resource(u, { food: 100 }); assert.equal(u.state.players[0]!.fields.length, 0); assert.equal(occupied(u).length, 0); save('C048-N3', { p, bad, r, u }); });
 })

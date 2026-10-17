@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C157_ResourceAnalyzer'
+import assert from 'node:assert/strict'
+import * as audit56Phase from './_helpers/audit/ae-negative-56-phase'
 
 const CARD_ID = 'C157_ResourceAnalyzer'
 const FILLER = '__test_placeholder__'
@@ -141,4 +143,11 @@ describe('C157 Resource Analyzer parity', () => {
     expect(second.state.round).toBe(7)
     expect(ownerFood(second)).toBe(foodBefore + 2)
   })
+})
+
+describe('ae-negative-56-phase', () => {
+  const { sessions, ok, save, make, finish, end } = audit56Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C157 N1 actual next round preparation awards one food only for strictly leading at least two building resource types',()=>{for(const types of[0,1,2,4]){const keys=['wood','clay','reed','stone']as const,s=make('C157_ResourceAnalyzer',st=>{keys.slice(0,types).forEach(key=>st.players[0]!.resources[key]=2);st.players.slice(1).forEach(p=>keys.forEach(key=>p.resources[key]=1));},true,5),r=finish(s,end(s));assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.food,types>=2?101:100);assert.deepEqual(r.state.players.slice(1).map(p=>p.resources.food),[100,100,100]);save(`C157-N1-${types}`,r)}})
+  it('C157 N2 a tie with even one opponent disqualifies that type while midround and hand-only card cannot award food',()=>{const s=make('C157_ResourceAnalyzer',st=>{Object.assign(st.players[0]!.resources,{wood:2,clay:2});st.players[2]!.resources.wood=2},true,5),r=finish(s,end(s));assert.equal(r.state.players[0]!.resources.food,100);const h=make('C157_ResourceAnalyzer',st=>{Object.assign(st.players[0]!.resources,{wood:2,clay:2})},false,5),hr=finish(h,end(h));assert.equal(hr.state.players[0]!.resources.food,100);const w=make('C157_ResourceAnalyzer',st=>{Object.assign(st.players[0]!.resources,{wood:2,clay:2})},true,5),wr=finish(w,ok(w.takeAction(0,'grain-seeds')));assert.equal(wr.state.players[0]!.resources.food,100);save('C157-N2',{r,hr,wr})})
 })

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, workersAvailable, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B024_Lasso'
+import assert from 'node:assert/strict'
+import type { InteractionAnimalReorgZone } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit04Animals from './_helpers/audit/ae-negative-04-animals'
 
 const CARD_ID = 'B024_Lasso'
 const FILLER = '__test_placeholder__'
@@ -178,5 +182,112 @@ describe('B024 Lasso parity', () => {
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice'
       ? response.interaction.request.options?.map((option) => option.value)
       : []).not.toContain('__skip__')
+  })
+})
+
+describe('ae-negative-04-animals', () => {
+  const { L, setup, wait, options, place, choose, confirm, buy, placed, settleLassoAnimals, lassoPlace } = audit04Animals
+  describe('04 animals negative Session audit', () => {
+    it('B024 N1 reed shortage excludes enabled card and rejects a forged choice while legal payment plays Lasso', () => {
+            const bad = setup(L, () => { }, false);
+            let r = place(bad, 0, 'meeting-place');
+            if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
+                const b = r.interaction.request.options.find(o => o.value.startsWith('action-improvement-') && !o.disabled);
+                if (b)
+                    r = bad.resolveChoice(0, b.value);
+            }
+            assert.equal(r.state.players[0]!.minorPlayed.includes(L), false);
+            assert.equal(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.request.options.some(o => o.value === L && !o.disabled), false);
+            assertRejectedUnchanged(bad, () => bad.resolveChoice(0, L));
+            bad.dispose();
+            const good = setup(L, s => { s.players[0]!.resources.reed = 1; }, false);
+            const played = buy(good, L);
+            assert.equal(played.state.players[0]!.resources.reed, 0);
+            assert.equal(played.state.players[0]!.minorPlayed.includes(L), true);
+            good.dispose();
+        });
+    it('B024 N2 second person must use a free animal market and cannot create an immediate third placement', () => {
+            const s = setup(L, state => { const p = state.players[1]!; state.actionSpaces.find(x => x.id === 'pig-market')!.takenBy = [{ playerId: p.id, workerId: p.workers.find(w => w.isActive)!.id }]; });
+            let r = place(s, 0, 'forest');
+            r = choose(s, r);
+            assert.deepEqual(options(r).map(o => o.value), ['sheep-market', 'cattle-market']);
+            assertRejectedUnchanged(s, () => s.resolveChoice(0, 'clay-pit'));
+            assertRejectedUnchanged(s, () => s.resolveChoice(0, 'pig-market'));
+            assertRejectedUnchanged(s, () => s.resolveChoice(1, 'sheep-market'));
+            r = s.resolveChoice(0, 'sheep-market');
+            assert.equal(r.ok, true, r.error);
+            r = settleLassoAnimals(s, r);
+            assert.deepEqual(placed(r), ['forest', 'sheep-market']);
+            assert.equal(workersAvailable(r.state, r.state.players[0]!), 1);
+            assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player');
+            assertRejectedUnchanged(s, () => s.takeAction(0, 'cattle-market'));
+            r = confirm(s, r);
+            assert.equal(r.state.currentPlayerIndex, 1);
+            r = place(s, 1, 'grain-seeds');
+            assert.deepEqual(placed(r, 1), ['grain-seeds', 'pig-market']);
+            s.dispose();
+        });
+    it('B024 N3 market first permits a legal nonmarket while decline and the last worker grant no second person', () => {
+            const first = setup(L);
+            let r = lassoPlace(first, place(first, 0, 'sheep-market'), 'forest');
+            assert.deepEqual(placed(r), ['forest', 'sheep-market']);
+            assert.equal(r.state.players[0]!.resources.wood, 3);
+            first.dispose();
+            const declined = setup(L);
+            r = place(declined, 0, 'forest');
+            assert.equal(wait(r).sourceCard, L);
+            r = declined.resolveChoice(0, '__skip__');
+            assert.equal(r.ok, true, r.error);
+            assert.deepEqual(placed(r), ['forest']);
+            assert.equal(workersAvailable(r.state, r.state.players[0]!), 2);
+            declined.dispose();
+            const last = setup(L, state => setWorkersAtHome(state, state.players[0]!, 1));
+            r = settleLassoAnimals(last, place(last, 0, 'sheep-market'));
+            assert.equal(workersAvailable(r.state, r.state.players[0]!), 0);
+            assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player');
+            last.dispose();
+        });
+    it('B024 N4 all three occupied markets suppress Lasso in the specifically accepted PHP empty-placement case', () => {
+            const s = setup(L, state => { const p = state.players[1]!; setActiveWorkerCount(p, 4); p.rooms = 4; p.roomTiles.push({ row: 0, col: 0 }, { row: 0, col: 1 }); const ws = p.workers.filter(w => w.isActive); for (const [i, id] of ['sheep-market', 'pig-market', 'cattle-market'].entries())
+                state.actionSpaces.find(x => x.id === id)!.takenBy = [{ playerId: p.id, workerId: ws[i]!.id }]; });
+            const r = place(s, 0, 'forest');
+            assert.deepEqual(placed(r), ['forest']);
+            assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player');
+            s.dispose();
+        });
+    it('B024 N5 undo of the actual two-person sequence restores workers goods and a replayable Lasso choice', () => {
+            const s = setup(L);
+            let r = lassoPlace(s, place(s, 0, 'forest'), 'sheep-market');
+            assert.deepEqual(placed(r), ['forest', 'sheep-market']);
+            const undone = s.undoAction();
+            assert.equal(undone.ok, true, undone.error);
+            assert.deepEqual(placed(undone), []);
+            assert.equal(undone.state.players[0]!.resources.wood, 0);
+            assert.equal(workersAvailable(undone.state, undone.state.players[0]!), 3);
+            r = lassoPlace(s, place(s, 0, 'forest'), 'cattle-market');
+            assert.deepEqual(placed(r), ['cattle-market', 'forest']);
+            s.dispose();
+        });
+    it('B024 N6 a real one-sheep market supply is collected once before a legal second placement', () => {
+            const s = setup(L, state => { state.actionSpaces.find(x => x.id === 'sheep-market')!.resources.sheep = 1; });
+            let r = place(s, 0, 'sheep-market');
+            if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') {
+                const i = r.interaction;
+                assert.ok(i.request.kind === 'animal-reorg');
+                const illegal = i.request.zones.map<InteractionAnimalReorgZone>(z => z.zoneType === 'house' ? { ...z, animalType: 'sheep', animalCount: 2 } : z);
+                assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: illegal }));
+                r = s.resolveChoice(0, 'confirm', { zones: i.request.zones });
+                assert.equal(r.ok, true, r.error);
+            }
+            assert.equal(r.state.players[0]!.resources.sheep, 1);
+            r = lassoPlace(s, r, 'forest');
+            assert.equal(r.state.players[0]!.resources.sheep, 1);
+            assert.equal(r.state.players[0]!.resources.wood, 3);
+            assert.deepEqual(placed(r), ['forest', 'sheep-market']);
+            assert.equal(workersAvailable(r.state, r.state.players[0]!), 1);
+            assert.ok(r.scores);
+            assert.equal(r.scores[0]!.categories.find(c => c.key === 'sheeps')!.total, 1);
+            s.dispose();
+        });
   })
 })

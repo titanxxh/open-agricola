@@ -4,7 +4,7 @@ import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-en
 import { type SessionResponse } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -13,6 +13,8 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import type { GameState, PlayerState, ActionSpace, ActionChoiceOption } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D027_Retraining'
+import assert from 'node:assert/strict'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'D027_Retraining'
 
@@ -438,4 +440,27 @@ describe('D027 Retraining parity', () => {
     expect(response.state.players[1]!.improvements).toContain('Major_Pottery')
     expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, take, finish, ready, fill, purchase, rejectBuy, resource, ownMajor, occupations, renovation } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D027 N1 real purchase and actual renovation exchange each workshop at that person-turn end without a new cost", () => { const b = make('D027_Retraining', st => occupations(st.players[0]!, 1), false), bought = purchase(b, 'D027_Retraining'); resource(bought, { food: 99 }); for (const [id, target] of [['Major_Joinery', 'Major_Pottery'], ['Major_Pottery', 'Major_Basket']]) {
+      const s = make('D027_Retraining', st => { occupations(st.players[0]!, 1); Object.assign(st.players[0]!.resources, { clay: 2, reed: 1 }); ownMajor(st, id!); }, true, 6), r = renovation(s);
+      assert.deepEqual(r.state.players[0]!.improvements, [target]);
+      assert.ok(r.state.availableMajorImprovements.includes(id!));
+      resource(r, { clay: 0, reed: 0, wood: 0, stone: 0, food: 100 });
+      save(`D027-N1-${id}`, { bought, r });
+  } });
+  it("D027 N2 declining the renovation swap cannot defer it to a later ordinary placement", () => { const s = make('D027_Retraining', st => { Object.assign(st.players[0]!.resources, { clay: 2, reed: 1 }); ownMajor(st, 'Major_Joinery'); }, true, 6), first = renovation(s, 0, false); assert.deepEqual(first.state.players[0]!.improvements, ['Major_Joinery']); fill(s); assert.equal(ready(s).state.currentPlayerIndex, 0); const r = finish(s, take(s, 0, 'grain-seeds'), true, [], 'D027_Retraining'); assert.deepEqual(r.state.players[0]!.improvements, ['Major_Joinery']); save('D027-N2', { first, r }); });
+  it("D027 N3 purchase gates hand wrong actor missing source and unavailable target prevent an exchange", () => { for (const mode of ['occupation', 'food']) {
+      const s = make('D027_Retraining', st => { occupations(st.players[0]!, mode === 'occupation' ? 0 : 1); st.players[0]!.resources.food = mode === 'food' ? 0 : 100; }, false);
+      save(`D027-N3-buy-${mode}`, rejectBuy(s, 'D027_Retraining'));
+  } for (const mode of ['hand', 'opponent', 'empty', 'owned']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('D027_Retraining', st => { st.currentPlayerIndex = a; occupations(st.players[0]!,1); Object.assign(st.players[a]!.resources, { clay: 2, reed: 1 }); if (mode !== 'empty')
+          ownMajor(st, 'Major_Joinery'); if (mode === 'owned')
+          ownMajor(st, 'Major_Pottery', 1); }, mode !== 'hand', 6), r = renovation(s, a, true, 'D027_Retraining');
+      assert.equal(r.state.players[0]!.improvements.includes('Major_Pottery'), false);
+      save(`D027-N3-${mode}`, r);
+  } });
 })

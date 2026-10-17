@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -7,6 +7,8 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/B/B117_Informant'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit27Endphase from './_helpers/audit/ae-negative-27-endphase'
 
 const CARD_ID = 'B117_Informant'
 
@@ -165,4 +167,13 @@ describe('B117_Informant session', () => {
     // After round end, Informant should have given 1 wood during return home phase
     expect(resp.state.players[0]!.resources.wood).toBe(3 + 1)
   })
+})
+
+describe('ae-negative-27-endphase', () => {
+  const { INFO, sessions, save, ok, finish, make, transition, lesson } = audit27Endphase
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B117 N1 real first Lessons gives one immediate wood regardless of equal zero stone and clay',()=>{const s=make(INFO,false,0,0,0),a=lesson(s,INFO);assert.equal(a.r.state.players[0]!.resources.wood,1);assert.equal(a.r.state.players[1]!.resources.wood,0);save('B117-N1',a)})
+  it('B117 N2 natural end of work requires strictly more owned stone than clay before granting one wood',()=>{for(const[stone,clay]of[[2,1],[1,1],[0,1]]){const s=make(INFO,true,0,stone,clay),c=make(INFO,false,0,stone,clay),r=transition(s),control=transition(c);assert.equal(r.state.players[0]!.resources.wood,control.state.players[0]!.resources.wood+(stone>clay?1:0));assert.equal(r.state.players[0]!.resources.stone,stone);assert.equal(r.state.players[0]!.resources.clay,clay);save(`B117-N2-${stone}-${clay}`,{r,control})}})
+  it('B117 N3 actual midround action and card in hand never award the end of work wood',()=>{const s=make(INFO),before=ok(s.getState()),r=finish(s,ok(s.takeAction(0,'grain-seeds')),false);assert.equal(r.state.players[0]!.resources.wood,before.state.players[0]!.resources.wood);const hand=transition(make(INFO,false)),c=transition(make(INFO,false));assert.equal(hand.state.players[0]!.resources.wood,c.state.players[0]!.resources.wood);save('B117-N3',{before,r,hand,c})})
+  it('B117 N4 whole occupation undo removes immediate wood and restores hand before replay once',()=>{const s=make(INFO,false),a=lesson(s,INFO),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.ok(undone.state.players[0]!.occupationHand.includes(INFO));const retry=lesson(s,INFO);assert.equal(retry.r.state.players[0]!.resources.wood,1);save('B117-N4',{a,undone,retry})})
 })

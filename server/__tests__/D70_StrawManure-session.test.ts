@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -10,6 +10,9 @@ import '../../shared/cards/D/D070_StrawManure'
 import '../../shared/cards/B/B068_Beanfield'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit41Harvest from './_helpers/audit/ae-negative-41-harvest'
 
 const CARD_ID = 'D070_StrawManure'
 
@@ -298,5 +301,25 @@ describe('D070 Straw Manure parity', () => {
     expect(fieldRemaining(response, 2)).toBe(1)
     expect(response.state.players[0]!.cardStates[CARD_FIELD]?.extraData?.cardFieldStacks)
       .toEqual([{ crop: 'vegetable', remaining: 2 }])
+  })
+})
+
+describe('ae-negative-41-harvest', () => {
+  const { sessions, ok, save, setup, finish, select, play, vegetable, end, source } = audit41Harvest
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D070 N1 actual preharvest one grain payment grows exactly one vegetable on each selected field before ordinary reap',()=>{
+   const s=setup('D070_StrawManure',st=>{vegetable(st,1);vegetable(st,2);st.players[0]!.resources.grain=1},true,4),p=source(s,end(s),'D070_StrawManure','selection'),q=ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2}]})),r=finish(s,q);assert.equal(p.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.vegetable,2);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[2,2]);save('D070-N1',{p,q,r})
+  })
+  it('D070 N2 three distinct vegetable targets reject before a legal two field payment result',()=>{
+   const s=setup('D070_StrawManure',st=>{for(const col of [1,2,3])vegetable(st,col);st.players[0]!.resources.grain=1},true,4),p=source(s,end(s),'D070_StrawManure','selection'),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2},{row:0,col:3}]})),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2}]})));assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.vegetable,3);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[2,2,1]);save('D070-N2',{p,bad,r})
+  })
+  it('D070 N3 missing supply grain held card or decline cannot grow extra vegetables or spend grain',()=>{
+   for(const mode of ['grain','hand','decline']){const s=setup('D070_StrawManure',st=>{vegetable(st,1);vegetable(st,2);st.players[0]!.resources.grain=mode==='grain'?0:1},mode!=='hand',4),r=finish(s,end(s),false,mode==='decline'?undefined:'D070_StrawManure');assert.equal(r.state.players[0]!.resources.grain,mode==='grain'?0:1);assert.equal(r.state.players[0]!.resources.vegetable,2);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[1,1]);save(`D070-N3-${mode}`,r)}
+  })
+  it('D070 N4 printed two field prerequisite must reject one field while a real two field purchase succeeds',()=>{
+   const s=setup('D070_StrawManure',st=>{vegetable(st,1);st.players[0]!.minorHand.push('A057_MilkingParlor');st.players[0]!.resources.wood=2},false,5),p=select(s,ok(s.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'D070_StrawManure')),t=setup('D070_StrawManure',st=>{vegetable(st,1);vegetable(st,2)},false,5),control=play(t,'D070_StrawManure');assert.ok(control.state.players[0]!.minorPlayed.includes('D070_StrawManure'));save('D070-N4',{p,bad,control});assertRuleOutcome({ok:bad.ok,played:bad.state.players[0]!.minorPlayed.includes('D070_StrawManure')},{ok:false,played:false})
+  })
+  it('D070 N5 duplicating the same vegetable field cannot receive two extra goods and a distinct two field control remains legal',()=>{
+   const s=setup('D070_StrawManure',st=>{vegetable(st,1);vegetable(st,2);st.players[0]!.resources.grain=1},true,4),p=source(s,end(s),'D070_StrawManure','selection'),before=JSON.stringify({state:p.state,interaction:p.interaction}),attempt=s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:1}]});if(!attempt.ok)assert.equal(JSON.stringify({state:attempt.state,interaction:attempt.interaction}),before);const bad=finish(s,attempt.ok?attempt:ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.ok(bad.state.players[0]!.fields[0]!.stacks[0]!.remaining<=2);const t=setup('D070_StrawManure',st=>{vegetable(st,1);vegetable(st,2);st.players[0]!.resources.grain=1},true,4),q=source(t,end(t),'D070_StrawManure','selection'),control=finish(t,ok(t.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:0,col:2}]})));assert.deepEqual(control.state.players[0]!.fields.map(f=>f.stacks[0]!.remaining),[2,2]);save('D070-N5',{p,attempt,bad,q,control})
   })
 })

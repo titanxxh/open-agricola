@@ -1,11 +1,14 @@
 import { descriptionEffects } from './_helpers/choice-description'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D082_HuntingTrophy'
 import '../../shared/cards/D/D056_FatstockStretcher'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Renovation from './_helpers/audit/ae-negative-43-renovation'
 
 const CARD_ID = 'D082_HuntingTrophy'
 const TARGET_MINOR = 'D056_FatstockStretcher'
@@ -254,4 +257,13 @@ describe('D082 Hunting Trophy parity', () => {
     expect(response.state).toEqual(before.state)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
   })
+})
+
+describe('ae-negative-43-renovation', () => {
+  const { TROPHY, sessions, save, ok, make, choose, finish, menu, purchase, buildings, oneBoar, renovation } = audit43Renovation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D082 N1 real purchase returns exactly one boar and zero boar refuses before legal alternative',()=>{const s=make(TROPHY,false,oneBoar),a=purchase(s,TROPHY);assert.equal(a.r.state.players[0]!.resources.boar,0);assert.equal(a.r.state.players[0]!.resources.food,0);const t=make(TROPHY,false),pending=menu(t),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,TROPHY)),legal=ok(t.resolveChoice(0,'B004_WoodPile'));assert.ok(legal.state.players[0]!.minorHand.includes(TROPHY));save('D082-N1',{a,pending,bad,legal})})
+  it('D082 N2 real purchase cooking branch converts one boar into exactly two Fireplace food',()=>{const s=make(TROPHY,false,state=>{oneBoar(state);state.players[0]!.improvements=['Major_Fireplace1']}),pending=menu(s),branch=ok(s.resolveChoice(0,TROPHY)),r=finish(s,choose(s,branch,o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='resourceExchange'&&e.resourcesGained?.food===2)),true);assert.equal(r.state.players[0]!.resources.boar,0);assert.equal(r.state.players[0]!.resources.food,2);save('D082-N2',{pending,branch,r})})
+  it('D082 N3 House Redevelopment discounts improvement once while renovation still needs full resources',()=>{const s=make(TROPHY,true,state=>{state.players[0]!.minorHand=['D056_FatstockStretcher','B007_Wage'];Object.assign(state.players[0]!.resources,{clay:2,reed:1})}),pending=renovation(s,'house-redevelopment');let r=pending;for(let n=0;n<8&&!r.state.players[0]!.minorPlayed.includes('D056_FatstockStretcher');n++){r=choose(s,r,o=>o.value==='D056_FatstockStretcher'||o.value.startsWith('action-improvement-')||o.value.startsWith('pay:'))}r=finish(s,r);assert.equal(r.state.players[0]!.houseType,'clay');assert.deepEqual(buildings(r),{food:0,wood:0,clay:0,reed:0,stone:0});const t=make(TROPHY,true,state=>Object.assign(state.players[0]!.resources,{clay:1,reed:1})),bad=assertRejectedUnchanged(t,()=>t.takeAction(0,'house-redevelopment')),legal=ok(t.takeAction(0,'grain-seeds'));assert.equal(legal.state.players[0]!.houseType,'wood');save('D082-N3',{pending,r,bad,legal})})
+  it('D082 N4 Farm Redevelopment four fences cost one wood and ordinary fencing gets no discount',()=>{const s=make(TROPHY,true,state=>{state.players[0]!.houseType='clay';Object.assign(state.players[0]!.resources,{stone:2,reed:1,wood:1})});let pending=renovation(s,'farm-redevelopment');if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice')pending=choose(s,pending,o=>o.labelKey==='actions.fencing.name');assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select');const r=ok(s.commitSelectionChoice(0,{edges:['H-0-0','H-1-0','V-0-0','V-0-1'],palisadeEdges:[],extraWood:0}));assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.deepEqual(buildings(r),{food:0,wood:0,clay:0,reed:0,stone:0});const t=make(TROPHY,true,state=>state.players[0]!.resources.wood=1),bad=assertRejectedUnchanged(t,()=>t.takeAction(0,'fencing')),legal=ok(t.takeAction(0,'grain-seeds'));assert.equal(legal.state.players[0]!.fenceSegments.length,0);save('D082-N4',{pending,r,bad,legal})})
 })

@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E056_RomanPot'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Timing from './_helpers/audit/ae-negative-38-timing'
 
 const CARD_ID = 'E056_RomanPot'
 const FILLER = '__test_placeholder__'
@@ -143,4 +146,20 @@ describe('E056 Roman Pot parity', () => {
 
     expect(cardEntry?.score).toBe(1)
   })
+})
+
+describe('ae-negative-38-timing', () => {
+  const { sessions, save, pendingCard, finish, progress, buy, printed, NOFOOD, roman, stock, lastOwner } = audit38Timing
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E056 N1 actual clay purchase stores four general supply food and being first next round receives none before real opponent Meeting Place makes owner last', () => { const s = roman(), bought = finish(s, buy(s, 'E056_RomanPot')); assert.deepEqual([bought.state.players[0]!.resources.clay, bought.state.players[0]!.resources.food, stock(bought), printed(bought, 'E056_RomanPot')], [0, 100, 4, 1]); const six = progress(s, 6, '', NOFOOD), seven = lastOwner(s, 7); assert.deepEqual([six.state.players[0]!.resources.food, stock(six), seven.state.players[0]!.resources.food, stock(seven)], [100, 4, 101, 3]); assert.equal(seven.state.currentPlayerIndex, 1); save('E056-N1', { bought, six, seven }); });
+  it('E056 N2 four real eligible starts empty the stored food and a fifth last player start cannot create another food after two actual feedings', () => {
+      const s = roman(), bought = finish(s, buy(s, 'E056_RomanPot')), six = progress(s, 6, '', NOFOOD), rows = [];
+      for (const [round, food, count] of [[7, 101, 3], [8, 98, 2], [9, 99, 1], [10, 96, 0], [11, 96, 0]] as const) {
+          const r = lastOwner(s, round);
+          assert.deepEqual([r.state.players[0]!.resources.food, stock(r)], [food, count]);
+          rows.push(r);
+      }
+      save('E056-N2', { bought, six, rows });
+  });
+  it('E056 N3 no clay cannot purchase and a held card cannot pay food even after real opponent Meeting Place sets the owner last', () => { const s = roman(0), p = buy(s, 'E056_RomanPot'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E056_RomanPot')); const t = roman(), hand = lastOwner(t, 6); assert.deepEqual([hand.state.players[0]!.resources.food, stock(hand)], [100, 0]); assert.equal(pendingCard(hand, 'E056_RomanPot'), false); save('E056-N3', { p, bad, hand }); });
 })

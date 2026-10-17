@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -12,6 +12,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B015_CarpentersBench'
 import '../../shared/cards/E/E016_BriarHedge'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18WoodActions from './_helpers/audit/ae-negative-18-wood-actions'
 
 const CARD_ID = 'B015_CarpentersBench'
 const LISTENER = B015_CarpentersBench_impl.listeners[0]!
@@ -317,4 +320,14 @@ describe('B015 Carpenter\'s Bench parity', () => {
     expect(response.state.players[0]!.pastures).toHaveLength(2)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(9)
   })
+})
+
+describe('ae-negative-18-wood-actions', () => {
+  const { BENCH, sessions, save, ok, setup, turn, choose, FIRST, fence } = audit18WoodActions
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B015 N1 actual taken three wood funds one free fence and one pasture without spending old supply',()=>{for(const old of[0,7]){const s=setup(BENCH,old,3),pending=choose(s,turn(s,0,'forest'));assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select');const r=fence(s);assert.equal(r.state.players[0]!.resources.wood,old);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.pastures.length,1);save(`B015-N1-${old}`,{pending,r})}})
+  it('B015 N2 taken two wood with ten old wood cannot pay four fences then declining restores bonus',()=>{const s=setup(BENCH,10,2),start=turn(s,0,'forest'),pending=choose(s,start);if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select'){assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:FIRST,palisadeEdges:[],extraWood:0}));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,10);const decline=choose(s,turn(s,0,'forest'),false);assert.equal(decline.state.players[0]!.resources.wood,12);assert.equal(decline.state.players[0]!.fenceSegments.length,0);save('B015-N2',{pending,undone,decline})}else{assert.equal(pending.state.players[0]!.resources.wood,12);assert.equal(pending.state.players[0]!.fenceSegments.length,0);save('B015-N2',{pending,limitation:'Unaffordable fence offer absent rather than rejected'})}})
+  it('B015 N3 two separate new pastures invalid and owner retry builds only one',()=>{const s=setup(BENCH,0,10),pending=choose(s,turn(s,0,'forest'));const two=[...FIRST,'H-2-3','H-3-3','V-2-3','V-2-4'];assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:two,palisadeEdges:[],extraWood:0}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{edges:FIRST,palisadeEdges:[],extraWood:0}));const r=fence(s);assert.equal(r.state.players[0]!.resources.wood,7);assert.equal(r.state.players[0]!.pastures.length,1);save('B015-N3',{pending,r})})
+  it('B015 N4 decline hand unrelated and opponent accumulation cannot grant owner free fences',()=>{const s=setup(BENCH,0,3),decline=choose(s,turn(s,0,'forest'),false);assert.equal(decline.state.players[0]!.resources.wood,3);assert.equal(decline.state.players[0]!.fenceSegments.length,0);const hs=setup(BENCH,0,3,false),hand=turn(hs,0,'forest');assert.equal(hand.state.players[0]!.fenceSegments.length,0);const os=setup(BENCH,0,3);turn(os,0,'grain-seeds');const other=turn(os,1,'forest');assert.equal(other.state.players[0]!.fenceSegments.length,0);const us=setup(BENCH,0,3),unrelated=turn(us,0,'clay-pit');assert.equal(unrelated.state.players[0]!.fenceSegments.length,0);save('B015-N4',{decline,hand,other,unrelated})})
+  it('B015 N5 whole accumulation and pasture undo restores pile wood farm and retry charges once',()=>{const s=setup(BENCH,1,3);choose(s,turn(s,0,'forest'));const r=fence(s),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.fenceSegments.length,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);choose(s,turn(s,0,'forest'));const retry=fence(s);assert.equal(retry.state.players[0]!.resources.wood,1);assert.equal(retry.state.players[0]!.pastures.length,1);save('B015-N5',{r,undone,retry})})
 })

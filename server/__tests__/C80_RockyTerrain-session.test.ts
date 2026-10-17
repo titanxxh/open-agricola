@@ -1,7 +1,7 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -16,6 +16,8 @@ import '../../shared/cards/D/D075_WoodField'
 import '../../shared/cards/C/C057_Crudite'
 import '../../shared/cards/E/E054_Contraband'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit42Fields from './_helpers/audit/ae-negative-42-fields'
 
 const CARD_ID = 'C080_RockyTerrain'
 
@@ -423,4 +425,12 @@ describe('C080_RockyTerrain', () => {
       expect(result).toBeUndefined()
     })
   })
+})
+
+describe('ae-negative-42-fields', () => {
+  const { sessions, ok, save, setup, finish, play, next, buyPending, plow } = audit42Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C080 N1 actual paid Rocky Terrain enables one stone for one food after a real single field plow and undo restores both',()=>{const s=setup('C080_RockyTerrain',()=>{},false,5),bought=play(s,'C080_RockyTerrain');assert.equal(bought.state.players[0]!.resources.food,99);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const r=plow(s);assert.equal(r.state.players[0]!.fields.length,1);assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.food,98);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.fields.length,0);assert.equal(u.state.players[0]!.resources.food,99);assert.equal(u.state.players[0]!.resources.stone,0);save('C080-N1',{bought,r,u})})
+  it('C080 N2 decline zero food held card and foreign plow do not grant owner stone',()=>{for(const mode of ['decline','zero','hand','other']){const actor=mode==='other'?1:0,s=setup('C080_RockyTerrain',st=>{st.currentPlayerIndex=actor;if(mode==='zero')st.players[0]!.resources.food=0},mode!=='hand'),r=plow(s,actor,mode!=='decline');assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(r.state.players[0]!.resources.food,mode==='zero'?0:100);assert.equal(r.state.players[actor]!.fields.length,1);save(`C080-N2-${mode}`,r)}})
+  it('C080 N3 a real field card purchase counts as one plow but ordinary nonfield minor purchase does not',()=>{for(const fieldCard of [true,false]){const target=fieldCard?'E080_RockGarden':'A057_MilkingParlor',s=setup('C080_RockyTerrain',st=>{st.players[0]!.resources.wood=2;st.players[0]!.minorHand=[target]}),p=buyPending(s,target),r=finish(s,p,true);assert.equal(r.state.players[0]!.resources.stone,fieldCard?1:0);assert.equal(r.state.players[0]!.resources.food,fieldCard?99:100);assert.equal(r.state.players[0]!.fields.length,0);save(`C080-N3-${fieldCard}`,{p,r})}})
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -8,6 +8,9 @@ import '../../shared/cards/A/A040_PottersYard'
 import '../../shared/cards/C/C037_DwellingMound'
 import '../../shared/cards/C/C158_ForestCampaigner'
 import '../../shared/cards/D/D090_PlowMaker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit34Scoring from './_helpers/audit/ae-negative-34-scoring'
 
 const CARD_ID = 'C037_DwellingMound'
 const FOREST_CAMPAIGNER_ID = 'C158_ForestCampaigner'
@@ -263,4 +266,40 @@ describe('C37 Dwelling Mound session', () => {
     expect(readCardResourceStats(response.state.players[0]!, POTTERS_YARD_ID)?.gained)
       .toEqual({ clay: 2, food: 2 })
   })
+})
+
+describe('ae-negative-34-scoring', () => {
+  const { sessions, save, setup, finish, take, prerequisites, hand, buy, printed, denyMinor } = audit34Scoring
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C037 N1 real printed purchase pays exact cost and excludes insufficient resources or prerequisite', () => { const card = 'C037_DwellingMound', s = setup(card, 3, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { food: 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 3); assert.equal(r.state.players[0]!.resources.food, 0); save('C037-N1-legal', r); {
+      const t = setup(card, 3, st => { hand(st, card); prerequisites(st, 0); st.players[0]!.houseType = 'wood'; Object.assign(st.players[0]!.resources, { food: 0 }); });
+      const q = denyMinor(t, card);
+      assert.equal(printed(q, card), 0);
+      save('C037-N1-resource', q);
+  } {
+      const t = setup(card, 4, st => { hand(st, card); prerequisites(st, 0); st.players[0]!.houseType = 'wood'; Object.assign(st.players[0]!.resources, { food: 1 }); });
+      const q = denyMinor(t, card);
+      assert.equal(printed(q, card), 0);
+      save('C037-N1-late', q);
+  } });
+  it('C037 N2 each normal or card granted plow pays exactly one food per new field', () => { for (const extra of [false, true]) {
+      const card = 'C037_DwellingMound', s = setup(card, 14, st => { st.players[0]!.resources.food = extra ? 2 : 1; if (extra)
+          st.players[0]!.minorPlayed.push('C020_MolePlow'); });
+      const r = finish(s, take(s, 'farmland'), true);
+      assert.equal(r.state.players[0]!.fields.length, extra ? 2 : 1);
+      assert.equal(r.state.players[0]!.resources.food, 0);
+      save(`C037-N2-${extra}`, r);
+  } });
+  it('C037 N3 zero food force attempt refuses a field while hand-only and opponent plow remain free', () => { const card = 'C037_DwellingMound', s = setup(card, 14, st => st.players[0]!.resources.food = 0); assertRejectedUnchanged(s, () => s.takeAction(0, 'farmland')); assert.equal(s.state.players[0]!.fields.length, 0); save('C037-N3-short', s.getState()); for (const mode of ['hand', 'opponent']) {
+      const t = setup(card, 14, st => { st.players[0]!.resources.food = 0; if (mode === 'hand')
+          hand(st, card);
+      else {
+          st.currentPlayerIndex = 1;
+          st.players[1]!.resources.food = 0;
+      } });
+      const r = finish(t, take(t, 'farmland'), true);
+      assert.equal(r.state.players[mode === 'opponent' ? 1 : 0]!.fields.length, 1);
+      assert.equal(r.state.players[0]!.resources.food, 0);
+      save(`C037-N3-${mode}`, r);
+  } });
 })

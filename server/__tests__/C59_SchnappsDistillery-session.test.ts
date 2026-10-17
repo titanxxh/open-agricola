@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/C/C059_SchnappsDistillery'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Harvest from './_helpers/audit/ae-negative-38-harvest'
 
 describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => {
   const setup = () => {
@@ -108,4 +111,43 @@ describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => 
     expect(resp.state).toEqual(before.state)
     expect(resp.interaction).toEqual(before.interaction)
   })
+})
+
+describe('ae-negative-38-harvest', () => {
+  const { sessions, save, ok, pendingCard, finish, progress, buy, bonus, QUIET, printed, distill } = audit38Harvest
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C059 N1 actual stone vegetable purchase and a real feeding catalog exchange permit exactly one vegetable for five food after an illegal two use retry', () => { const b = distill(false, 1, 100), bought = finish(b, buy(b, 'C059_SchnappsDistillery')); assert.deepEqual([bought.state.players[0]!.resources.vegetable, bought.state.players[0]!.resources.stone, printed(bought, 'C059_SchnappsDistillery')], [0, 0, 2]); const s = distill(), feed = progress(s, 12, '__feed__', QUIET); save('C059-N1-feed', feed); assert.ok(feed.interaction.stateId === 'wait' && feed.interaction.request.kind === 'feed'); const recipe = feed.interaction.request.exchangeCatalog?.find(e => e.sourceId === 'C059_SchnappsDistillery'); assert.ok(recipe); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { selections: [{ sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count: 2, sourceName: recipe.sourceId }] })), r = finish(s, ok(s.resolveChoice(0, 'confirm', { selections: [{ sourceId: recipe.sourceId, exchangeIndex: recipe.exchangeIndex, count: 1, sourceName: recipe.sourceId }] }))); assert.deepEqual([r.state.players[0]!.resources.vegetable, r.state.players[0]!.resources.food, r.state.players[0]!.resources.begging], [1, 1, 0]); save('C059-N1', { bought, feed, bad, r }); });
+  it('C059 N2 fifth sixth and later vegetables count remaining reserve plus growing field crops with no score above the two bonus cap', () => {
+      const rows = [];
+      for (const [veg, score] of [[4, 0], [5, 1], [6, 2], [7, 2]] as const) {
+          const s = distill(true, veg - 2, 100, 14);
+          const state = s.getState().state;
+          state.players[0]!.fields = [{ row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 2 }] }];
+          s.loadState(state);
+          const r = ok(s.getState());
+          assert.equal(bonus(r, 'C059_SchnappsDistillery'), score);
+          rows.push(r);
+      }
+      const t = distill(false, 6, 100, 14), hand = ok(t.getState());
+      assert.equal(bonus(hand, 'C059_SchnappsDistillery'), 0);
+      save('C059-N2', { rows, hand });
+  });
+  it('C059 N3 missing printed resources reject and a held or nonharvest card cannot offer its five food recipe while actual decline retains vegetables', () => {
+      const rows = [];
+      for (const [veg, stone] of [[0, 2], [1, 1]] as const) {
+          const s = distill(false, veg, 100, 14, stone), p = buy(s, 'C059_SchnappsDistillery'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'C059_SchnappsDistillery'));
+          rows.push({ p, bad });
+      }
+      const q = distill(true, 2, 100), decline = progress(q, 12, '', QUIET);
+      assert.deepEqual([decline.state.players[0]!.resources.vegetable, decline.state.players[0]!.resources.food], [2, 96]);
+      const t = distill(false, 2, 0), feed = progress(t, 12, '__feed__', QUIET);
+      assert.ok(feed.interaction.stateId === 'wait' && feed.interaction.request.kind === 'feed');
+      assert.equal(feed.interaction.request.exchangeCatalog?.some(e => e.sourceId === 'C059_SchnappsDistillery'), false);
+      const u = distill(true, 2, 100, 12), p = u.takeAnytimeAction(0, 'exchange');
+      assert.equal(p.ok, false);
+      assert.equal(p.state.players[0]!.resources.food, 100);
+      assert.equal(p.interaction.stateId, 'idle');
+      assert.equal(pendingCard(p, 'C059_SchnappsDistillery'), false);
+      save('C059-N3', { rows, decline, feed, p });
+  });
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -9,6 +9,9 @@ import '../../shared/cards/A/A125_Priest'
 import '../../shared/cards/A/A097_Freshman'
 import '../../shared/cards/B/B012_Stockyard'
 import '../../shared/cards/M/M033_NightPasture'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B154_SheepKeeper'
 const ANYTIME_ID = 'B154-sheep-keeper-anytime'
@@ -205,4 +208,25 @@ describe('B154 Sheep Keeper parity', () => {
     },
   )
 
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, ok, save, make, take, choice, opts, finish, play, pasture, pile, res, bonus } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B154 N1 real purchase below seven then seventh placed sheep grants food and points once', () => { const b = make('B154_SheepKeeper', st => pasture(st.players[0]!, 6), false), bought = finish(b, play(b, 'B154_SheepKeeper')), s = make('B154_SheepKeeper', st => { pasture(st.players[0]!, 6); pile(st, 'sheep-market', 'sheep', 1); }), p = take(s, 0, 'sheep-market'); assert.equal(p.interaction.anytimeActions.some(a => a.id === 'B154-sheep-keeper-anytime'), false); const placed = finish(s, p); assert.ok(placed.interaction.anytimeActions.some(a => a.id === 'B154-sheep-keeper-anytime')); const r = ok(s.takeAnytimeAction(0, 'B154-sheep-keeper-anytime')); res(r, { food: 102, sheep: 7 }); assert.equal(bonus(r, 'B154_SheepKeeper'), 3); assert.equal(r.interaction.anytimeActions.some(a => a.id === 'B154-sheep-keeper-anytime'), false); const rejected = assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'B154-sheep-keeper-anytime')); save('B154-N1', { bought, p, placed, r, rejected }); });
+  it('B154 N2 seven or eight placed sheep reject occupation purchase', () => { for (const n of [7, 8]) {
+      const s = make('B154_SheepKeeper', st => { pasture(st.players[0]!, n); st.players[0]!.occupationHand = ['B154_SheepKeeper', 'A125_Priest', 'A133_Braggart']; }, false), p = take(s, 0, 'lessons');
+      assert.equal(opts(p).some(o => o.value === 'B154_SheepKeeper' && !('disabled' in o && o.disabled)), false);
+      const rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'B154_SheepKeeper')), r = finish(s, choice(s, 0, 'A125_Priest'));
+      assert.ok(r.state.players[0]!.occupationHand.includes('B154_SheepKeeper'));
+      assert.ok(r.state.players[0]!.occupationPlayed.includes('A125_Priest'));
+      save(`B154-N2-${n}`, { p, rejected, r });
+  } });
+  it('B154 N3 six sheep or a held card cannot grant the seven-sheep reward', () => { for (const held of [false, true]) {
+      const s = make('B154_SheepKeeper', st => pasture(st.players[0]!, held ? 7 : 6), !held), r = finish(s, take(s, 0, 'grain-seeds'), true);
+      res(r, { food: 100 });
+      assert.equal(bonus(r, 'B154_SheepKeeper'), 0);
+      assert.equal(r.interaction.anytimeActions.some(a => a.id === 'B154-sheep-keeper-anytime'), false);
+      save(`B154-N3-${held}`, r);
+  } });
 })

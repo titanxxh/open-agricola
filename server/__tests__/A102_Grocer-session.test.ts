@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
@@ -7,6 +7,9 @@ import { expectPublicCardGoods } from './_helpers/card-public-presentation'
 import '../../shared/cards/A/A102_Grocer'
 import type { AnytimeAction } from '../../shared/contract/types';
 import type { SessionResponse } from '../../shared/session/session-core'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit12ReturnStack from './_helpers/audit/ae-negative-12-return-stack'
 
 describe('A102_Grocer session', () => {
   const setup = () => {
@@ -162,5 +165,36 @@ describe('A102_Grocer session', () => {
     // Verify anytime is no longer available after stack is drained
     const anytimeIds = lastResp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('A102-grocer-anytime')
+  })
+})
+
+describe('ae-negative-12-return-stack', () => {
+  const { GROCER, sessions, save, ok, turn, grocer, buyGrocer, enterGrocer, take } = audit12ReturnStack
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A102 N1 real Lessons purchase initializes the eight goods in printed order', () => {
+    const session = grocer(); const response = buyGrocer(session)
+    assert.deepEqual(getCardStack(response.state.players[0]!, GROCER), ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood']); assert.equal(response.state.players[0]!.resources.food, 8); save('A102-N1', response)
+  })
+  it('A102 N2 eight actual top purchases each pay one food and drain in the printed order', () => {
+    const session = grocer(); enterGrocer(session)
+    const order = ['wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable'] as const
+    for (const [i, resource] of order.entries()) {
+      const before = session.getState().state.players[0]!.resources[resource]; const response = take(session)
+      assert.equal(response.state.players[0]!.resources[resource], before + 1); assert.equal(response.state.players[0]!.resources.food, 7 - i); assert.equal(getCardStack(response.state.players[0]!, GROCER).length, 7 - i); save(`A102-N2-${i}`, response)
+    }
+    assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'A102-grocer-anytime'))
+  })
+  it('A102 N3 zero food blocks and exactly one food buys only the top wood', () => {
+    const zero = grocer(0); enterGrocer(zero); assertRejectedUnchanged(zero, () => zero.takeAnytimeAction(0, 'A102-grocer-anytime')); assert.equal(getCardStack(zero.getState().state.players[0]!, GROCER).length, 8)
+    const session = grocer(1); enterGrocer(session); const response = take(session); assert.equal(response.state.players[0]!.resources.wood, 1); assert.equal(response.state.players[0]!.resources.food, 0); assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'A102-grocer-anytime')); save('A102-N3', response)
+  })
+  it('A102 N4 wrong player and nonexistent purchase cannot spend or take stack goods', () => {
+    const session = grocer(); enterGrocer(session); assertRejectedUnchanged(session, () => session.takeAnytimeAction(1, 'A102-grocer-anytime')); assertRejectedUnchanged(session, () => session.resolveChoice(0, 'take-bottom-vegetable'))
+    const response = take(session); assert.equal(response.state.players[0]!.resources.vegetable, 0); assert.equal(response.state.players[0]!.resources.wood, 1); save('A102-N4', response)
+  })
+  it('A102 N5 whole action undo restores purchased stack top and food before one retry', () => {
+    const session = grocer(); const pending = enterGrocer(session); take(session); take(session)
+    const undone = ok(session.undoAction()); assert.equal(undone.state.players[0]!.resources.food, 8); assert.equal(getCardStack(undone.state.players[0]!, GROCER).length, 8); assert.equal(undone.state.players[0]!.resources.wood, 0); assert.equal(undone.state.players[0]!.resources.grain, 0)
+    turn(session, 0, 'farmland'); const response = take(session); assert.equal(response.state.players[0]!.resources.food, 7); assert.equal(response.state.players[0]!.resources.wood, 1); save('A102-N5', { pending, undone, response })
   })
 })

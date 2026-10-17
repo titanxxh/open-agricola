@@ -2,13 +2,17 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B089_Groom'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit23Groom from './_helpers/audit/ae-negative-23-groom'
 
 describe('B089_Groom session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone' }) => {
@@ -245,4 +249,12 @@ describe('B089 Groom parity', () => {
     expect(good.state.players[0]!.stableTiles).toHaveLength(1)
     expect(good.state.players[0]!.resources.wood).toBe(1)
   })
+})
+
+describe('ae-negative-23-groom', () => {
+  const { GROOM, sessions, save, ok, finish, make, nextRound, stableMenu } = audit23Groom
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B089 N1 actual first Lessons grants exactly one wood and no immediate wooden house stable',()=>{const s=make('wood',0,false),before=ok(s.getState()),chosen=ok(s.takeAction(0,'lessons')),r=finish(s,chosen,false);assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.stableTiles.length,0);assert.equal(r.state.players[0]!.resources.food,100);assert.ok(r.state.players[0]!.occupationPlayed.includes(GROOM));assert.ok(r.state.log.length>before.state.log.length);save('B089-N1',{before,chosen,r})})
+  it('B089 N2 real round five to six stone house offers only one stable for one wood',()=>{const s=make(),round=nextRound(s),pending=stableMenu(s,round);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select'&&pending.interaction.request.farm.farmType==='stable');const tiles=pending.interaction.request.farm.selectableTiles;assert.ok(tiles.length>1);assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{stables:tiles.slice(0,2)}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{stables:[tiles[0]!]}));const r=finish(s,ok(s.commitSelectionChoice(0,{stables:[tiles[0]!]})),false);assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.stableTiles.length,1);assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state,r.state.players[0]!)),3);save('B089-N2',{round,pending,r})})
+  it('B089 N3 decline hand wooden clay poor and exhausted stable supply create no free stable',()=>{for(const mode of['decline','hand','wood','clay','poor','exhausted']){const s=make(mode==='wood'?'wood':mode==='clay'?'clay':'stone',mode==='poor'?0:2,mode!=='hand',mode==='exhausted'),round=nextRound(s),r=finish(s,round,false);assert.equal(r.state.players[0]!.stableTiles.length,mode==='exhausted'?4:0);assert.equal(r.state.players[0]!.resources.wood,mode==='poor'?0:2);save(`B089-N3-${mode}`,{round,r})}})
 })

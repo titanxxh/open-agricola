@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { D092_ChildOmbudsman_impl } from '../../shared/cards/D/D092_ChildOmbudsman'
 import {
   setActiveWorkerCount,
   setNewbornCount,
+  familySize,
 } from '../../shared/domain/player'
 import {
   readCardExtraData,
@@ -11,6 +12,8 @@ import {
 } from '../../shared/cards/helpers/card-state'
 import type { ActionHookPhase, ActionHookResult } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import assert from 'node:assert/strict'
+import * as audit45Placement from './_helpers/audit/ae-negative-45-placement'
 
 const CARD_ID = 'D092_ChildOmbudsman'
 
@@ -113,4 +116,28 @@ describe('D92 Child Ombudsman — listener', () => {
     const compute = D092_ChildOmbudsman_impl.effect.computeBonusScore!
     expect(Math.abs(ruleSession.withCtx(() => compute(state, player)))).toBe(0)
   })
+})
+
+describe('ae-negative-45-placement', () => {
+  const { sessions, save, ok, setup, finish } = audit45Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D092 N1 round five successful free growth records exactly negative two authoritative card points while decline records zero', () => { for (const accept of [true, false]) {
+    const s = setup('D092_ChildOmbudsman', state => { state.players[0]!.rooms = 3; state.players[0]!.roomTiles.push({ row: 0, col: 0 }); }, 5)
+    const r = finish(s, ok(s.takeAction(0, 'day-laborer')), accept)
+    assert.equal(familySize(r.state.players[0]!), accept ? 3 : 2)
+    const score = r.scores![0]!.categories.find(c => c.key === 'cardBonusVp')?.entries.find(e => 'cardId' in e && e.cardId === 'D092_ChildOmbudsman')?.score ?? 0
+    assert.equal(score, accept ? -2 : 0)
+    assert.equal(r.state.players[0]!.resources.food, 4)
+    save(`D092-N1-${accept}`, r)
+  } })
+  it('D092 N2 before round five and house without free room cannot grow after real person action', () => { for (const mode of ['round', 'room']) {
+    const s = setup('D092_ChildOmbudsman', state => { if (mode === 'round') {
+      state.players[0]!.rooms = 3
+      state.players[0]!.roomTiles.push({ row: 0, col: 0 })
+    } }, mode === 'round' ? 4 : 5)
+    const r = finish(s, ok(s.takeAction(0, 'day-laborer')))
+    assert.equal(familySize(r.state.players[0]!), 2)
+    assert.equal(r.state.players[0]!.cardStates.D092_ChildOmbudsman?.extraData?.negativeScore ?? 0, 0)
+    save(`D092-N2-${mode}`, r)
+  } })
 })

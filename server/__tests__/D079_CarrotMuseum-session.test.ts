@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Purchase from './_helpers/audit/ae-negative-42-purchase'
+
+describe('ae-negative-42-purchase', () => {
+  const { sessions, ok, save, setup, finish, select, play, complete, cropField } = audit42Purchase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D079 N1 actual end eight ten and twelve uses vegetable field count and unchanged nonharvest reserve vegetables for stone and wood',()=>{for(const round of [8,10,12]){const s=setup('D079_CarrotMuseum',st=>{cropField(st,'vegetable',3);cropField(st,'grain',3,2);st.players[0]!.resources.vegetable=2},true,round),r=complete(s,['reed-bank','clay-pit','day-laborer','forest']);assert.equal(r.state.round,round+1);assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.wood,2);assert.equal(r.state.players[0]!.resources.vegetable,2);assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,3);save(`D079-N1-${round}`,r)}})
+  it('D079 N2 other round empty quantities and held Museum cannot grant end round building resources',()=>{for(const mode of ['seven','empty','hand']){const s=setup('D079_CarrotMuseum',st=>{if(mode!=='empty'){cropField(st,'vegetable',3);st.players[0]!.resources.vegetable=2}},mode!=='hand',mode==='seven'?7:8),r=complete(s,['reed-bank','clay-pit','day-laborer','forest']);assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(r.state.players[0]!.resources.wood,0);save(`D079-N2-${mode}`,r)}})
+  it('D079 N3 real round eight purchase pays one wood two clay while nine rejects before legal alternative',()=>{const s=setup('D079_CarrotMuseum',st=>Object.assign(st.players[0]!.resources,{wood:1,clay:2}),false,8),r=play(s,'D079_CarrotMuseum');assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.clay,0);const t=setup('D079_CarrotMuseum',st=>{Object.assign(st.players[0]!.resources,{wood:2,clay:2});st.players[0]!.minorHand.push('A057_MilkingParlor','E080_RockGarden')},false,9),p=select(t,ok(t.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,'D079_CarrotMuseum')),legal=finish(t,select(t,p,o=>o.value==='A057_MilkingParlor'));assert.equal(legal.state.players[0]!.resources.clay,2);assert.equal(legal.state.players[0]!.resources.wood,0);save('D079-N3',{r,p,bad,legal})})
+})

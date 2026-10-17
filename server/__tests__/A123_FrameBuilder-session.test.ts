@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A123_FrameBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit14Build from './_helpers/audit/ae-negative-14-build'
 
 const CARD_ID = 'A123_FrameBuilder'
 
@@ -128,4 +131,14 @@ describe('A123 Frame Builder parity', () => {
     expect(response.state.players[0]!.houseType).toBe('clay')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, wood: 1, reed: 0 })
   })
+})
+
+describe('ae-negative-14-build', () => {
+  const { FRAME, sessions, save, ok, setup, optional, renovation, startBuild, build } = audit14Build
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A123 N1 each of one and two clay or stone rooms substitutes at most once per room',()=>{for(const material of['clay','stone'] as const)for(const count of[1,2]){const s=setup(FRAME,state=>{const p=state.players[0]!;p.houseType=material;Object.assign(p.resources,{wood:count,clay:0,stone:0,reed:2*count});p.resources[material]=3*count});const r=build(s,count);assert.equal(r.state.players[0]!.rooms,2+count);assert.equal(r.state.players[0]!.resources[material],0);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.reed,0);save(`A123-N1-${material}-${count}`,r)}})
+  it('A123 N2 extra wood cannot replace a second pair in one room and legal retry keeps cost exact',()=>{const s=setup(FRAME,state=>{const p=state.players[0]!;p.houseType='clay';Object.assign(p.resources,{wood:2,clay:4,reed:2})});startBuild(s);assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:1,col:1},{row:2,col:1}]}));const r=optional(s,ok(s.commitSelectionChoice(0,{rooms:[{row:1,col:1}]})));assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources.clay,1);assert.equal(r.state.players[0]!.resources.wood,1);save('A123-N2',r)})
+  it('A123 N3 wood room and unplayed card use ordinary room costs without substitution',()=>{const wood=build(setup(FRAME,state=>Object.assign(state.players[0]!.resources,{wood:5,reed:2})),1);assert.equal(wood.state.players[0]!.resources.wood,0);const hand=build(setup(FRAME,state=>{state.players[0]!.houseType='clay';Object.assign(state.players[0]!.resources,{clay:5,wood:1,reed:2})},false),1);assert.equal(hand.state.players[0]!.resources.clay,0);assert.equal(hand.state.players[0]!.resources.wood,1);save('A123-N3',{wood,hand})})
+  it('A123 N4 actual two room renovation trades exactly two material for one wood once',()=>{for(const material of['wood','clay'] as const){const s=setup(FRAME,state=>{const p=state.players[0]!;p.houseType=material;Object.assign(p.resources,{wood:1,clay:0,stone:0,reed:1})},true,14);const r=renovation(s);assert.equal(r.state.players[0]!.houseType,material==='wood'?'clay':'stone');assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.reed,0);save(`A123-N4-${material}`,r)}})
+  it('A123 N5 rejected room actor target and whole undo cannot retain paid replacement or room',()=>{const s=setup(FRAME,state=>{state.players[0]!.houseType='clay';Object.assign(state.players[0]!.resources,{wood:1,clay:3,reed:2})});startBuild(s);assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{rooms:[{row:1,col:1}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:99,col:99}]}));const first=optional(s,ok(s.commitSelectionChoice(0,{rooms:[{row:1,col:1}]})));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.rooms,2);assert.equal(undone.state.players[0]!.resources.clay,3);assert.equal(undone.state.players[0]!.resources.wood,1);const retry=build(s,1);assert.equal(retry.state.players[0]!.resources.wood,0);save('A123-N5',{first,undone,retry})})
 })

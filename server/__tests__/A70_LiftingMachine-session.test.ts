@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterAll, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import '../../shared/cards/A/A070_LiftingMachine'
 import '../../shared/cards/B/B068_Beanfield'
+import assert from 'node:assert/strict'
+import fs from './_helpers/audit-evidence-fs'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit10FieldSource from './_helpers/audit/ae-negative-10-field-source'
 
 const CARD_ID = 'A070_LiftingMachine'
 
@@ -206,4 +210,35 @@ describe('A070 Lifting Machine parity', () => {
     ])
     expect(response.state.players[0]!.resources.vegetable).toBe(1)
   })
+})
+
+describe('ae-negative-10-field-source', () => {
+  const { LIFT, root, sessions, saved, save, setup, buy, deny, end, flow, fields, board, lift, selection, result } = audit10FieldSource
+  afterAll(() => { fs.mkdirSync(root, { recursive: true }); fs.writeFileSync(`${root}/manifest.json`, JSON.stringify({ raw: process.env.AGRICOLA_NEGATIVE_RAW === '1', files: saved }, null, 2)) })
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A070 N1 actual purchase requires one wood and three own fields', () => {
+   deny(lift({ played: false }), LIFT)
+   const low = setup(LIFT, { played: false, resources: { wood: 1 } }, state => fields(state, [null, null])); deny(low, LIFT)
+   const r = buy(lift({ played: false, resources: { wood: 1 } }), LIFT); assert.equal(r.state.players[0]!.resources.wood, 0); assert.ok(r.state.players[0]!.minorPlayed.includes(LIFT)); assert.equal(r.state.players[0]!.resources.vegetable, 0)
+  })
+  it('A070 N2 natural nonharvest return home may move one vegetable or decline', () => {
+   for (const accept of [true, false]) { const s = lift(); let r = flow(s, end(s), LIFT, accept); if (accept) r = selection(s, r); assert.deepEqual(result(r), { own: [accept ? 1 : 2, 2, 0], opponent: [2], vegetable: Number(accept), grain: 1 }); assert.equal(r.state.round, 6); assert.equal(r.state.players[0]!.resources.food, 40); save(`A070-N2-${accept}`, r) }
+  })
+  it('A070 N3 actual harvest round and absent own vegetables or unplayed card give no lifting move', () => {
+   const harvest = lift({ round: 4 }); const r = end(harvest); assert.deepEqual(result(r), { own: [1, 1, 0], opponent: [1], vegetable: 1, grain: 2 }); assert.equal(r.state.players[0]!.resources.food, 36)
+   const noVeg = setup(LIFT, {}, state => { fields(state, [{ kind: 'grain', remaining: 2 }, null, null]); fields(state, [{ kind: 'vegetable', remaining: 2 }], 1) }); const n = end(noVeg); assert.equal(n.state.players[0]!.resources.vegetable, 0); assert.deepEqual(board(n), [2, 0, 0]); assert.deepEqual(board(n, 1), [2]); assert.equal(end(lift({ played: false })).state.players[0]!.resources.vegetable, 0)
+  })
+  it('A070 N4 multiple vegetable choice rejects empty multi target wrong actor and stale requests', () => {
+   const s = lift({ multi: true }); const r = flow(s, end(s), LIFT); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection')
+   for (const positions of [[{ row: 0, col: 4 }], [{ row: 0, col: 1 }, { row: 0, col: 2 }]]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions }))
+   assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { positions: [{ row: 0, col: 2 }] }))
+   const legal = selection(s, r, { row: 0, col: 2 }); assert.deepEqual(result(legal), { own: [2, 0, 2, 0], opponent: [2], vegetable: 1, grain: 1 }); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })); save('A070-N4-legal', legal)
+  })
+  it('A070 N4G forged own grain source is rejected at a genuine multiple vegetable choice', () => {
+   const s = lift({ multi: true }); const r = flow(s, end(s), LIFT); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 3 }] })); const legal = selection(s, r, { row: 0, col: 2 }); assert.deepEqual(result(legal), { own: [2, 0, 2, 0], opponent: [2], vegetable: 1, grain: 1 })
+  })
+  it('A070 N4O forged opponent vegetable source is rejected at a genuine multiple vegetable choice', () => {
+   const s = lift({ multi: true }); const r = flow(s, end(s), LIFT); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] })); const legal = selection(s, r, { row: 0, col: 2 }); assert.deepEqual(result(legal), { own: [2, 0, 2, 0], opponent: [2], vegetable: 1, grain: 1 })
+  })
+  it('A070 N5 actual purchase undo restores full rule snapshot and allows legal retry', () => { const s = lift({ played: false, resources: { wood: 1 } }), before = undoRuleSnapshot(s.getState()); buy(s, LIFT); const undone = s.undoAction(); save('A070-N5-undo', { before: JSON.parse(before), response: undone }); assertUndoRestored(before, undone); const retry = buy(s, LIFT); assert.equal(retry.state.players[0]!.resources.wood, 0); assert.ok(retry.state.players[0]!.minorPlayed.includes(LIFT)) })
 })

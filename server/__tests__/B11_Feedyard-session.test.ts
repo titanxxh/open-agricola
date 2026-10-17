@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { computeScores } from '../../shared/domain/scoring'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B011_Feedyard'
+import assert from 'node:assert/strict'
+import type { GameState } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18AnimalHolders from './_helpers/audit/ae-negative-18-animal-holders'
 
 const CARD_ID = 'B011_Feedyard'
 const FILLER = '__test_placeholder__'
@@ -156,4 +160,13 @@ describe('B011 Feedyard parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(16)
   })
+})
+
+describe('ae-negative-18-animal-holders', () => {
+  const { FEED, sessions, save, ok, pastures, setup, end, reorg, assignment, buy, vp } = audit18AnimalHolders
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B011 N1 actual one clay one grain purchase gives one printed point without immediate food',()=>{const s=setup(FEED,state=>Object.assign(state.players[0]!.resources,{clay:1,grain:1}),false),{pending,r}=buy(s,FEED);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.food,40);assert.equal(vp(r,FEED),1);save('B011-N1',{pending,r})})
+  it('B011 N2 two finite pastures hold mixed species up to two total then reject excess and wrong actor',()=>{const s=setup(FEED,state=>{state.round=14;pastures(state,2);const p=state.players[0]!;Object.assign(p.resources,{sheep:1,boar:1});p.houseAnimals = { '2-0': 'sheep' };p.pastures[0]!.animalType='boar';p.pastures[0]!.animalCount=1;state.actionSpaces.find(a=>a.id==='cattle-market')!.resources.cattle=1});const pending=reorg(s,'cattle-market');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assignment(pending,FEED,{sheep:1,boar:1,cattle:1})]}));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'confirm',{zones:[assignment(pending,FEED,{sheep:1,boar:1})]}));const r=ok(s.resolveChoice(0,'confirm',{zones:[assignment(pending,FEED,{sheep:1,boar:1})]}));assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[0]!.resources.boar,1);assert.equal(r.state.players[0]!.resources.cattle,0);assert.equal(r.state.players[0]!.pastures.length,2);save('B011-N2',{pending,r})})
+  it('B011 N3 natural harvest pays one food per empty card spot after breeding not for farm animals',()=>{for(const held of[0,1,2]){const configure=(state:GameState)=>{pastures(state,2);const p=state.players[0]!;if(held){p.resources.sheep=1;p.resources.boar=held===2?1:0;p.cardStates[FEED]={extraData:{animalCounts:{sheep:1,...(held===2?{boar:1}:{})}}}}};const s=setup(FEED,configure),r=end(s),control=end(setup(FEED,state=>pastures(state,2),false));assert.equal(r.state.round,5);assert.equal(r.state.players[0]!.resources.food-control.state.players[0]!.resources.food,2-held);assert.equal(r.state.players[0]!.resources.sheep,held?1:0);assert.equal(r.state.players[0]!.resources.boar,held===2?1:0);save(`B011-N3-${held}`,{r,control})}})
+  it('B011 N4 zero pastures and unplayed hand grant no harvest food or card storage',()=>{const on=end(setup(FEED)),off=end(setup(FEED,()=>{},false));assert.equal(on.state.players[0]!.resources.food,off.state.players[0]!.resources.food);assert.equal(on.state.players[0]!.pastures.length,0);save('B011-N4',{on,off})})
 })

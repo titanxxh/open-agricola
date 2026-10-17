@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -6,6 +6,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D141_SeedSeller'
 import type { ActionFlow } from '../../shared/contract/types'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 describe('D141_SeedSeller session', () => {
   const setup = () => {
@@ -79,4 +80,11 @@ describe('D141_SeedSeller session', () => {
     // Owner should not get bonus grain — scope is 'player' only
     expect(after.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, lesson, resources } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D141 N1 real Lessons gives one grain and using Grain Seeds adds exactly one extra grain', () => { const s = make('D141_SeedSeller', undefined, false), p = finish(s, lesson(s, 'D141_SeedSeller'), false); resources(p, { grain: 1 }); const c = make('D141_SeedSeller'), r = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); resources(r, { grain: 2 }); save('D141-N1', { p, r }) })
+  it('D141 N2 Vegetable Seeds actual opponent Grain Seeds and card in hand cannot add seller grain', () => { const s = make('D141_SeedSeller', undefined, true, 14); finish(s, ok(s.takeAction(0, 'vegetable-seeds')), false); ready(s); const r = finish(s, ok(s.takeAction(1, 'grain-seeds')), false); resources(r, { grain: 0, vegetable: 1 }); resources(r, { grain: 1 }, 1); const c = make('D141_SeedSeller', undefined, false), cr = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); resources(cr, { grain: 1 }); save('D141-N2', { r, cr }) })
 })

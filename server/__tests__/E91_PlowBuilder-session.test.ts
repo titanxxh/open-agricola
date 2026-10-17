@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
@@ -19,6 +19,9 @@ import type { InitialStateOptions } from '../../shared/session/state-constants'
 import '../../shared/cards/E/E091_PlowBuilder'
 import '../../shared/cards/D/D131_CraftsmanshipPromoter'
 import type { AnytimeAction } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 const CARD_ID = 'E091_PlowBuilder'
 
@@ -426,4 +429,11 @@ describe('E091 Plow Builder parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(5)
     expect(response.state.players[0]!.fields).toHaveLength(0)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, choose, anytime, end, joineryMenu } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E091 N1 actual Minor Improvement buys Joinery for two wood two stone while card in hand cannot unlock it', () => { const s = make('E091_PlowBuilder', st => { st.players[0]!.minorHand = ['B007_Wage', 'B004_WoodPile']; Object.assign(st.players[0]!.resources, { wood: 2, stone: 2 }) }), p = joineryMenu(s), r = finish(s, choose(s, p, 'Major_Joinery'), false); assert.ok(r.state.players[0]!.improvements.includes('Major_Joinery')); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.stone, 0); const c = make('E091_PlowBuilder', st => { st.players[0]!.minorHand = ['B007_Wage', 'B004_WoodPile']; Object.assign(st.players[0]!.resources, { wood: 2, stone: 2 }) }, false), cp = joineryMenu(c); assert.ok(cp.interaction.stateId === 'wait' && cp.interaction.request.kind === 'choice'); assert.equal(cp.interaction.request.options.some(o => o.value === 'Major_Joinery'), false); const rejected = assertRejectedUnchanged(c, () => c.resolveChoice(0, 'Major_Joinery')), cr = finish(c, choose(c, cp, 'B007_Wage'), false); assert.ok(cr.state.players[1]!.minorHand.includes('B007_Wage')); assert.equal(cr.state.players[0]!.resources.food, 102); save('E091-N1', { p, r, cp, rejected, cr }) })
+  it('E091 N2 real harvest Joinery exchange unlocks exactly one one-food plow and resets after harvest', () => { const s = make('E091_PlowBuilder', st => { st.players[0]!.improvements = ['Major_Joinery']; st.players[0]!.resources.wood = 1; st.players[0]!.resources.food = 5 }, true, 4); let p = end(s); for (let n = 0; n < 12 && p.state.players[0]!.resources.wood === 1; n++) { const i = p.interaction; assert.ok(i.stateId === 'wait' && (i.request.kind === 'choice' || i.request.kind === 'select-trigger'), JSON.stringify(i)); const o = i.request.options.find(o => o.value !== '__skip__' && o.value !== '__pass__'); assert.ok(o); p = ok(s.resolveChoice(i.playerIndex, o.value)) } assert.equal(p.state.roundPhase, 'harvest'); assert.equal(p.state.players[0]!.resources.wood, 0); assert.equal(p.state.players[0]!.resources.food, 7); const a = anytime(s, 'E091_PlowBuilder'); assert.ok(a.interaction.stateId === 'wait' && a.interaction.request.kind === 'farm-select' && a.interaction.request.farm.farmType === 'plow'); const r = ok(s.commitSelectionChoice(0, { tile: a.interaction.request.farm.selectableTiles[0]! })); assert.equal(a.state.players[0]!.resources.food, 6); assert.equal(r.state.players[0]!.resources.food, 2); assert.equal(r.state.players[0]!.fields.length, 1); assert.equal(r.interaction.anytimeActions.some(a => JSON.stringify(a).includes('E091_PlowBuilder')), false); const settled = finish(s, r, false); assert.equal(settled.state.players[0]!.cardStates.E091_PlowBuilder?.extraData?.usedJoinery, false); save('E091-N2', { p, a, r, settled }) })
 })

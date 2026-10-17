@@ -1,5 +1,5 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getOwnOrdinaryFenceCount } from '../../shared/domain/fence-segments'
@@ -12,6 +12,9 @@ import type { ActionChoiceOption, FenceSegment, PlayerState, SessionResponse } f
 
 import '../../shared/cards/register-all'
 import '../../shared/cards/B/B030_WoodPalisades'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
 
 const CARD_ID = 'E149_MidnightFencer'
 const B030_ID = 'B030_WoodPalisades'
@@ -267,4 +270,11 @@ describe('E149 Midnight Fencer', () => {
     expect(owner.fenceSegments).toHaveLength(17)
     expect(resp.state.players[1]!.supplyTokensConsumed?.fence).toBe(2)
   })
+})
+
+describe('ae-negative-55-phase', () => {
+  const { sessions, ok, save, make, finish, choose, end } = audit55Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E149 N1 last harvest accepts four free fences borrowed at most two from each donor and rejects overlimit donor assignment before retry',()=>{const s=make('E149_MidnightFencer',undefined,true,14);let p=end(s);p=choose(s,p,o=>o.value!=='__skip__');assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='fence');const edges=['H-0-0','H-1-0','V-0-0','V-0-1'],p2=p.state.players[1]!.id,p3=p.state.players[2]!.id,badSources=Object.fromEntries(edges.map(edge=>[edge,p2])),rejected=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges,palisadeEdges:[],extraWood:0,fenceSources:badSources})),sources=Object.fromEntries(edges.map((edge,i)=>[edge,i<2?p2:p3])),r=finish(s,ok(s.commitSelectionChoice(0,{edges,palisadeEdges:[],extraWood:0,fenceSources:sources})));assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.pastures.length,1);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[1]!)),13);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[2]!)),13);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[3]!)),15);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),15);save('E149-N1',{p,rejected,r})})
+  it('E149 N2 last-harvest decline round thirteen and a hand-only card create no borrowed fence or donor consumption',()=>{for(const mode of['decline','round','hand']){const s=make('E149_MidnightFencer',undefined,mode!=='hand',mode==='round'?13:14),r=finish(s,end(s),false,mode==='decline'?undefined:'E149_MidnightFencer');assert.equal(r.state.players[0]!.fenceSegments.length,0);assert.deepEqual(r.state.players.slice(1).map(p=>s.withCtx(() => getOwnOrdinaryFenceReserveCount(p))),[15,15,15]);save(`E149-N2-${mode}`,r)}})
 })

@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D030_ArtisanDistrict'
+import assert from 'node:assert/strict'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'D030_ArtisanDistrict'
 const FILLER = '__test_placeholder__'
@@ -118,4 +120,23 @@ describe('D030 Artisan District parity', () => {
 
     expect(artisanDistrictBonus(response)).toBe(0)
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, final, purchase, rejectBuy, undo, resource, bonus, points, ownMajor, occupations } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D030 N1 real purchase requires three occupations and one stone and pays its printed base point", () => { for (const mode of ['occupation', 'stone']) {
+      const s = make('D030_ArtisanDistrict', st => { occupations(st.players[0]!, mode === 'occupation' ? 2 : 3); st.players[0]!.resources.stone = mode === 'stone' ? 0 : 1; }, false);
+      save(`D030-N1-${mode}`, rejectBuy(s, 'D030_ArtisanDistrict'));
+  } const s = make('D030_ArtisanDistrict', st => { occupations(st.players[0]!, 3); st.players[0]!.resources.stone = 1; }, false, 14), r = purchase(s, 'D030_ArtisanDistrict'), u = undo(s), scored = (purchase(s, 'D030_ArtisanDistrict'), final(s)); resource(r, { stone: 0 }); assert.equal(points(scored, 'D030_ArtisanDistrict'), 1); resource(u, { stone: 1 }); save('D030-N1', { r, u, scored }); });
+  it("D030 N2 actual final scoring counts only the five printed bottom-row majors against all thresholds", () => { const bottom = ['Major_ClayOven', 'Major_StoneOven', 'Major_Joinery', 'Major_Pottery', 'Major_Basket']; for (const [n, expected] of [[0, 0], [2, 0], [3, 2], [4, 5], [5, 8]]) {
+      const s = make('D030_ArtisanDistrict', st => bottom.slice(0, n).forEach(id => ownMajor(st, id)), true, 14), r = final(s);
+      assert.equal(bonus(r, 'D030_ArtisanDistrict'), expected);
+      save(`D030-N2-${n}`, r);
+  } const s = make('D030_ArtisanDistrict', st => [...bottom.slice(0, 2), 'Major_Fireplace1', 'Major_Fireplace2', 'Major_Well'].forEach(id => ownMajor(st, id)), true, 14), r = final(s); assert.equal(bonus(r, 'D030_ArtisanDistrict'), 0); save('D030-N2-top', r); });
+  it("D030 N3 held card and opponent bottom-row workshops do not provide owner bonus", () => { const majors = ['Major_ClayOven', 'Major_StoneOven', 'Major_Joinery', 'Major_Pottery', 'Major_Basket']; for (const held of [false, true]) {
+      const s = make('D030_ArtisanDistrict', st => majors.forEach(id => ownMajor(st, id, held ? 0 : 1)), !held, 14), r = final(s);
+      assert.equal(bonus(r, 'D030_ArtisanDistrict'), 0);
+      save(`D030-N3-${held}`, r);
+  } });
 })

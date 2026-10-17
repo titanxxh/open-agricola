@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B131_Equipper'
 import '../../shared/cards/B/B004_WoodPile'
 import '../../shared/cards/C/C027_Blueprint'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Equipper from './_helpers/audit/ae-negative-28-equipper'
 
 const CARD_ID = 'B131_Equipper'
 
@@ -157,4 +160,14 @@ describe('B131 Equipper parity', () => {
     expect(response.state.players[0]!.improvements).not.toContain('Major_Joinery')
     expect(response.state.availableMajorImprovements).toContain('Major_Joinery')
   })
+})
+
+describe('ae-negative-28-equipper', () => {
+  const { TARGET, sessions, save, ok, ready, finish, make, window, buy } = audit28Equipper
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B131 N1 actual Forest collects three wood before paying one received wood for a minor with the same person',()=>{save('B131-N1',buy(make()))})
+  it('B131 N2 actual optional minor decline keeps all three collected wood and original hand',()=>{const s=make(),pending=ok(s.takeAction(0,'forest')),selected=pending,r=finish(s,ok(s.resolveChoice(0,'__skip__')),false);assert.equal(r.state.players[0]!.resources.wood,3);assert.ok(r.state.players[0]!.minorHand.includes(TARGET));save('B131-N2',{pending,selected,r})})
+  it('B131 N3 nonwood collection hand only and actual opponent Forest placement cannot trigger an owner minor purchase',()=>{for(const mode of['reed','hand','opponent']){const s=make(mode!=='hand');let actor=0;if(mode==='opponent'){finish(s,ok(s.takeAction(0,'grain-seeds')),false);ready(s);actor=1}const pending=ok(s.takeAction(actor,mode==='reed'?'reed-bank':'forest')),r=finish(s,pending,false);assert.ok(r.state.players[0]!.minorHand.includes(TARGET));assert.ok(!r.state.players[0]!.minorPlayed.includes(TARGET));assert.equal(r.state.players[0]!.resources.wood,mode==='hand'?3:0);save(`B131-N3-${mode}`,{pending,r})}})
+  it('B131 N4 actual Equipper minor window excludes affordable Joinery despite Blueprint before accepting a legal minor',()=>{const s=make(true,true),pending=ok(s.takeAction(0,'forest')),selected=window(s,pending);assert.ok(selected.interaction.stateId==='wait'&&selected.interaction.request.kind==='choice');assert.ok(!selected.interaction.request.options.some(o=>o.value.includes('Major_Joinery')));const rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_Joinery')),r=finish(s,ok(s.resolveChoice(0,TARGET)),false);assert.ok(r.state.availableMajorImprovements.includes('Major_Joinery'));assert.ok(!r.state.players[0]!.improvements.includes('Major_Joinery'));save('B131-N4',{pending,selected,rejected,r})})
+  it('B131 N5 whole Forest collect and minor purchase undo restores pile wood hand and worker before one replay',()=>{const s=make(),a=buy(s),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.resources,a.before.state.players[0]!.resources);assert.deepEqual(undone.state.actionSpaces,a.before.state.actionSpaces);assert.ok(undone.state.players[0]!.minorHand.includes(TARGET));assert.deepEqual(undone.state.players[0]!.workers,a.before.state.players[0]!.workers);save('B131-N5',{a,undone,retry:buy(s)})})
 })

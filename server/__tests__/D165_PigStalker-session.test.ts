@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { AnimalType } from '../../shared/contract/types'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D165_PigStalker'
+import assert from 'node:assert/strict'
+import * as audit57Livestock from './_helpers/audit/ae-negative-57-livestock'
 
 const CARD_ID = 'D165_PigStalker'
 const FILLER = '__test_placeholder__'
@@ -204,5 +206,27 @@ describe('D165 Pig Stalker parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, boar: 0 })
+  })
+})
+
+describe('ae-negative-57-livestock', () => {
+  const { sessions, save, make, pasture, count, priorThenPig } = audit57Livestock
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D165 N1 a real own Vegetable Seeds neighbor before Pig Market grants exactly one additional boar', () => {
+    const session = make('D165_PigStalker', state => { pasture(state.players[0]!, null, 0, true); state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1 }, true, 14)
+    const index = session.state.roundActionOrder.indexOf('pig-market'), neighbor = session.state.roundActionOrder.indexOf('vegetable-seeds')
+    assert.equal(Math.abs(index - neighbor), 1)
+    const response = priorThenPig(session, 0, 'vegetable-seeds')
+    assert.deepEqual(count(response), [0, 2, 0])
+    assert.equal(response.state.actionSpaces.find(space => space.id === 'vegetable-seeds')!.takenBy[0]!.playerId, response.state.players[0]!.id)
+    save('D165-N1', response)
+  })
+  it('D165 N2 a base space or opponent occupied round neighbor and card only in hand cannot grant an additional boar', () => {
+    for (const mode of ['base', 'opponent', 'hand']) {
+      const actor = mode === 'opponent' ? 1 : 0
+      const session = make('D165_PigStalker', state => { state.currentPlayerIndex = actor; pasture(state.players[0]!, null, 0, true); state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1 }, mode !== 'hand', 14), response = priorThenPig(session, actor, mode === 'base' ? 'grain-seeds' : 'vegetable-seeds')
+      assert.deepEqual(count(response), [0, 1, 0])
+      save(`D165-N2-${mode}`, response)
+    }
   })
 })

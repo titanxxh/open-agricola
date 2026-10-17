@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { A020_DoubleTurnPlow } from '../../shared/cards/A/A020_DoubleTurnPlow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit04Plows from './_helpers/audit/ae-negative-04-plows'
 
 const CARD_ID = 'A020_DoubleTurnPlow'
 const FILLER = '__test_placeholder__'
@@ -119,5 +122,51 @@ describe('A020 Double-Turn Plow parity', () => {
     const late = playMinor(setup({ round: 6 }))
     expect(late.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(late.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+  })
+})
+
+describe('ae-negative-04-plows', () => {
+  const { DOUBLE, sessions, setup, play, farm, plow, skip, fields, finished, invalidBonus, blockedPurchase } = audit04Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  describe('Double Turn Plow negative audit', () => {
+    it('A020 N1 actual purchases at controlled round three four five pay exact dynamic costs', () => {
+      for (const round of [3, 4, 5]) {
+        const s = setup({ card: DOUBLE, played: false, round, resources: { grain: 1, food: round > 3 ? 1 : 0 } })
+        let r = play(s, DOUBLE); r = plow(s, r); r = plow(s, r)
+        assert.equal(fields(r), 2); assert.deepEqual({ grain: r.state.players[0]!.resources.grain, food: r.state.players[0]!.resources.food }, { grain: 0, food: 0 }); finished(r)
+      }
+    })
+    it('A020 N2 missing grain or conditional food cannot bypass purchase payment', () => {
+      blockedPurchase(DOUBLE, { round: 3, resources: { grain: 0, food: 0 } })
+      blockedPurchase(DOUBLE, { round: 4, resources: { grain: 1, food: 0 } })
+      const s = setup({ card: DOUBLE, played: false, round: 4, resources: { grain: 1, food: 1 } })
+      const r = skip(s, play(s, DOUBLE)); assert.ok(r.state.players[0]!.minorPlayed.includes(DOUBLE)); assert.equal(fields(r), 0)
+    })
+    it('A020 N3 controlled round six rejects actual purchase and round five allows it', () => {
+      blockedPurchase(DOUBLE, { round: 6, resources: { grain: 1, food: 1 } })
+      const s = setup({ card: DOUBLE, played: false, round: 5, resources: { grain: 1, food: 1 } })
+      assert.ok(skip(s, play(s, DOUBLE)).state.players[0]!.minorPlayed.includes(DOUBLE))
+    })
+    it('A020 N4 immediate field geometry and payment survive undo and legal retry', () => {
+      const s = setup({ card: DOUBLE, played: false, round: 3, resources: { grain: 1, food: 0 } }); const before = undoRuleSnapshot(s.getState())
+      let r = farm(s, play(s, DOUBLE))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } }))
+      r = plow(s, r, { row: 0, col: 1 }); farm(s, r); invalidBonus(s)
+      r = plow(s, s.getState(), { row: 0, col: 2 }); assert.equal(fields(r), 2); finished(r)
+      assertUndoRestored(before, s.undoAction())
+      r = play(s, DOUBLE); r = plow(s, r); r = plow(s, r); assert.equal(fields(r), 2)
+    })
+    it('A020 N5 one free plot caps immediate effect at one field', () => {
+      const s = setup({ card: DOUBLE, played: false, round: 3, lastPlot: true, resources: { grain: 1, food: 0 } })
+      const r = plow(s, play(s, DOUBLE), { row: 0, col: 4 }); assert.equal(fields(r), 13); assert.ok(r.state.players[0]!.minorPlayed.includes(DOUBLE)); finished(r)
+    })
+    it('A020 N6 declining all or only the second plow keeps the paid card', () => {
+      for (const count of [0, 1]) {
+        const s = setup({ card: DOUBLE, played: false, round: 4, resources: { grain: 1, food: 1 } })
+        let r = play(s, DOUBLE); if (count === 1) r = plow(s, r)
+        r = skip(s, r); assert.equal(fields(r), count)
+        assert.deepEqual({ grain: r.state.players[0]!.resources.grain, food: r.state.players[0]!.resources.food }, { grain: 0, food: 0 }); finished(r)
+      }
+    })
   })
 })

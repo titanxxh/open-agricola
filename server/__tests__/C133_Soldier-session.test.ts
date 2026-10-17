@@ -2,11 +2,14 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C133_Soldier'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit52Scoring from './_helpers/audit/ae-negative-52-scoring'
 
 const CARD_ID = 'C133_Soldier'
 const A136_ID = 'A136_DrudgeryReeve'
@@ -317,4 +320,12 @@ describe('C133 Soldier parity', () => {
     expect(response.interaction.stateId).toBe('gameover')
     expect(cardBonusEntries(session, response).some((entry) => entry.cardId === CARD_ID)).toBe(false)
   })
+})
+
+describe('ae-negative-52-scoring', () => {
+  const { sessions, save, ok, trigger, finish, lesson, progress, bonus, SOLDIER, soldier, pairs } = audit52Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C133 N1 actual purchase has no early points and natural final scoring reserves one or two pairs without spending either good',()=>{const bought=lesson(soldier(4,2,false),SOLDIER);assert.equal(bonus(bought,SOLDIER),0);for(const n of[1,2]){const s=soldier(),r=pairs(s,n);assert.equal(r.state.gameOver,true);assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.stone,bonus(r,SOLDIER)],[4,2,n]);assert.equal(bonus(r,SOLDIER,1),0);save(`C133-N1-${n}`,{bought,r})}})
+  it('C133 N2 an overmaximum pair submission rejects before zero and incomplete pairs or a held card cannot score',()=>{const s=soldier(),pending=trigger(s,progress(s,15,SOLDIER),SOLDIER),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,`${SOLDIER}:pairs:3`)),r=finish(s,ok(s.resolveChoice(0,`${SOLDIER}:pairs:0`)));assert.equal(bonus(r,SOLDIER),0);assert.equal(r.state.players[0]!.resources.wood,4);for(const[wood,stone,played]of[[0,2,true],[3,0,true],[4,2,false]] as const){const t=soldier(wood,stone,played),no=progress(t,15);assert.equal(bonus(no,SOLDIER),0);save(`C133-N2-${wood}-${stone}-${played}`,no)}save('C133-N2',{pending,bad,r})})
+  it('C133 N3 wood reserved by three actual Soldier pairs cannot also score as all six Joinery wood',()=>{const s=soldier(6,3,true,true),r=pairs(s,3);assert.equal(r.state.players[0]!.resources.wood,6);assert.equal(r.state.players[0]!.resources.stone,3);assert.equal(bonus(r,SOLDIER),3);assert.equal(bonus(r,'Major_Joinery'),1);save('C133-N3',r)})
 })

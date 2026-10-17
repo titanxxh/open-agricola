@@ -1,11 +1,13 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D144_WaterWorker'
+import assert from 'node:assert/strict'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'D144_WaterWorker'
 
@@ -140,5 +142,60 @@ describe('D144 Water Worker parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, reed: 0 })
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, finish, next, take, move } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D144 N1 actual Fishing Reed Bank and Day Laborer each add exactly one reed', () => {
+    for (const [space, reed, food] of [['fishing', 1, 21], ['reed-bank', 3, 20], ['day-laborer', 1, 22]] as const) {
+      const s = setup('D144_WaterWorker')
+      const r = finish(s, take(s, space))
+      assert.equal(r.state.players[0]!.resources.reed, reed)
+      assert.equal(r.state.players[0]!.resources.food, food)
+      save(`D144-N1-${space}`, r)
+    }
+  })
+  it('D144 N2 unrelated owner action opponent Fishing and hand-only card exclude reward', () => {
+    for (const mode of ['unrelated', 'opponent', 'hand']) {
+      const s = setup('D144_WaterWorker', 14, state => {
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['D144_WaterWorker']
+        }
+      })
+      let r
+      if (mode === 'opponent') {
+        move(s, 'forest')
+        next(s)
+        r = finish(s, ok(s.takeAction(1, 'fishing')))
+      }
+      else
+        r = finish(s, take(s, mode === 'unrelated' ? 'forest' : 'fishing'))
+      assert.equal(r.state.players[0]!.resources.reed, 0)
+      save(`D144-N2-${mode}`, r)
+    }
+  })
+  it('D144 N3 legal fourth round Sheep Market identity is exercised with modeled PHP mapping limitation', () => {
+    const s = setup('D144_WaterWorker', 5, state => {
+      const i = state.roundActionOrder.indexOf('sheep-market')
+      assert.ok(i >= 0 && i < 4)
+      const old = state.roundActionOrder[3]!
+      state.roundActionOrder[3] = 'sheep-market'
+      state.roundActionOrder[i] = old
+      for (const a of state.actionSpaces) {
+        if (a.id === 'sheep-market') {
+          a.roundAvailable = 4
+          a.resources.sheep = 1
+        }
+        else if (a.id === old)
+          a.roundAvailable = i + 1
+      }
+    })
+    const r = finish(s, take(s, 'sheep-market'))
+    assert.equal(r.state.players[0]!.resources.sheep, 1)
+    assert.equal(r.state.players[0]!.resources.reed, 1)
+    save('D144-N3-legal-stage1-round4', r)
   })
 })

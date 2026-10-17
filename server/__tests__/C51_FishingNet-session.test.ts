@@ -6,6 +6,9 @@ import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/C/C051_FishingNet'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -239,4 +242,48 @@ describe('C051_FishingNet session', () => {
     // No extra 2 food because no deposit was activated.
     expect(afterFishing.resources.food).toBe(1)
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, finish, take, move, prerequisites, hand, buy, printed, denyMinor } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C051 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'C051_FishingNet', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "reed": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.reed, 0); save('C051-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "reed": 0 }); }); denyMinor(t, card); save('C051-N1-short', t.getState()); });
+  it('C051 N2 opponent prepays one food and each natural return home deposits exactly two on Fishing', () => {
+      const card = 'C051_FishingNet', s = setup(card, 5, st => { st.players[1]!.resources.food = 1; st.actionSpaces.find(a => a.id === 'fishing')!.resources.food = 3; });
+      for (const round of [5, 6]) {
+          move(s, 'grain-seeds');
+          let r = move(s, 'fishing');
+          assert.equal(r.state.players[0]!.resources.food, round === 5 ? 41 : 42);
+          assert.equal(r.state.players[1]!.resources.food, round === 5 ? 3 : 5);
+          assert.equal(r.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 0);
+          save(`C051-N2-transfer-${round}`, r);
+          move(s, 'clay-pit');
+          move(s, 'reed-bank');
+          r = finish(s, confirmNext(s, s.getState()));
+          assert.equal(r.state.round, round + 1);
+          assert.equal(r.state.actionSpaces.find(a => a.id === 'fishing')!.resources.food, 3);
+          save(`C051-N2-deposit-${round}`, r);
+      }
+  });
+  it('C051 N3 no initial food cannot be borrowed from Fishing while owner hand and unrelated controls stay legal', () => {
+      const card = 'C051_FishingNet', blocked = setup(card, 14, st => { st.currentPlayerIndex = 1; st.players[1]!.resources.food = 0; st.actionSpaces.find(a => a.id === 'fishing')!.resources.food = 3; });
+      assertRejectedUnchanged(blocked, () => blocked.takeAction(1, 'fishing'));
+      assert.equal(blocked.state.players[1]!.resources.food, 0);
+      save('C051-N3-blocked', blocked.getState());
+      for (const mode of ['owner', 'hand', 'unrelated']) {
+          const s = setup(card, 14, st => {
+              st.players[0]!.resources.food = 0;
+              st.players[1]!.resources.food = 0;
+              st.actionSpaces.find(a => a.id === 'fishing')!.resources.food = 3;
+              if (mode !== 'owner')
+                  st.currentPlayerIndex = 1;
+              if (mode === 'hand')
+                  hand(st, card);
+          });
+          const r = finish(s, take(s, mode === 'unrelated' ? 'forest' : 'fishing'), true);
+          assert.equal(r.state.players[0]!.resources.food, mode === 'owner' ? 3 : 0);
+          assert.equal(r.state.players[1]!.resources.food, mode === 'hand' ? 3 : 0);
+          save(`C051-N3-${mode}`, r);
+      }
+  });
 })

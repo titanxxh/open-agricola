@@ -2,7 +2,7 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
@@ -11,6 +11,9 @@ import { reap } from '../../shared/actions/effects/reap'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E069_MelonPatch'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'E069_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -373,4 +376,37 @@ describe('E069 Melon Patch parity', () => {
     expect(response.scores[0]!.categories.find((category) => category.key === 'fields'))
       .toMatchObject({ quantity: 1, total: -1 })
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, ok, save, setup, prerequisites, hand, buy, printed, denyMinor, cardStacks, tileFor, fieldSession, enterCardSow, sowCard, finishToRound } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E069 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'E069_MelonPatch'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, {}); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.ok(r.scores);assert.equal(r.scores[0]!.categories.find(c=>c.key==='fields')?.quantity,0);save("E069-N1-legal", r); const excluded = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, {}); prerequisites(st, 1); }); denyMinor(excluded, card); save("E069-N1-prerequisite", excluded.getState()); });
+  it('E069 N3 invalid grain target rejects before a real legal card field sow retry', () => { for (const bad of ['grain'] as const) {
+      const card = 'E069_MelonPatch', s = fieldSession(card);
+      let r = enterCardSow(s);
+      save(`E069-N3-before-${bad}`, r);
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ ...tileFor(card), crop: bad }] }));
+      assert.deepEqual(cardStacks(s.getState(), card), []);
+      r = ok(s.commitSelectionChoice(0, { crops: [{ ...tileFor(card), crop: 'vegetable' }] }));
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'vegetable', remaining: 2 }]);
+      assert.equal(r.state.players[0]!.resources.grain, 1);
+      save(`E069-N3-retry-${bad}`, r);
+  } });
+  it('E069 N2 last naturally harvested vegetable may plow once and the real optional plow can be declined', () => { for (const use of [false, true]) {
+      const card = 'E069_MelonPatch', s = fieldSession(card);
+      let r = sowCard(s, card, 'vegetable');
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'vegetable', remaining: 2 }]);
+      r = finishToRound(s, 12, use);
+      assert.equal(r.state.players[0]!.fields.length, 0);
+      assert.equal(r.state.players[0]!.resources.vegetable, 1);
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'vegetable', remaining: 1 }]);
+      save(`E069-N2-nonlast-${use}`, r);
+      r = finishToRound(s, 14, use);
+      assert.equal(r.state.players[0]!.fields.length, use ? 1 : 0);
+      assert.equal(r.state.players[0]!.resources.vegetable, 2);
+      assert.deepEqual(cardStacks(r, card), []);
+      save(`E069-N2-last-${use}`, r);
+  } });
+  it('E069 N4 a full legal farm cannot add a field over an existing room after the last vegetable', () => { const card = 'E069_MelonPatch', s = fieldSession(card, 40, true); let r = sowCard(s, card, 'vegetable'); assert.deepEqual(cardStacks(r,card),[{kind:'vegetable',remaining:2}]); r = finishToRound(s, 14); assert.equal(r.state.players[0]!.fields.length, 13); assert.equal(r.state.players[0]!.roomTiles.length, 2); assert.equal(new Set([...r.state.players[0]!.fields, ...r.state.players[0]!.roomTiles].map(t => `${t.row},${t.col}`)).size, 15); assert.deepEqual(cardStacks(r, card), []); assert.equal(r.state.players[0]!.resources.vegetable, 2); save('E069-N4', r); });
 })

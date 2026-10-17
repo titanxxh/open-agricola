@@ -4,6 +4,8 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/E/E028_Bookmark'
 import '../../shared/cards/A/A097_Freshman'
+import assert from 'node:assert/strict'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'E028_Bookmark'
 const sessions: ReturnType<typeof createWorkSession>[] = []
@@ -85,4 +87,19 @@ describe('Bookmark uses its executable timed rule', () => {
     expect(session.buildSyncPayload(session.getState(), null).state.players[0]!.scheduledEffects).toEqual([])
     expect(mature(session, 13).state.players[0]!.occupationPlayed).toEqual([])
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, fill, reach, end, final, purchase, rejectBuy, resource, occupations } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("E028 N1 real purchase marks plus three and natural due preparation plays one occupation for no fee", () => { const s = make('E028_Bookmark', st => { st.players[0]!.resources.wood = 1; st.players[0]!.resources.food = 20; occupations(st.players[0]!, 1); }, false, 2), bought = purchase(s, 'E028_Bookmark'); assert.equal(bought.state.players[0]!.cardStates.E028_Bookmark?.extraData?.triggerRound, 5); resource(bought, { wood: 0 }); const three = reach(s, 3), four = reach(s, 4); assert.equal(three.state.players[0]!.occupationPlayed.includes('A125_Priest'), false); assert.equal(four.state.players[0]!.occupationPlayed.includes('A125_Priest'), false); const due = reach(s, 5, true, ['A125_Priest']); assert.ok(due.state.players[0]!.occupationPlayed.includes('A125_Priest')); assert.ok(due.state.players[0]!.occupationHand.includes('A103_Portmonger')); resource(due, { food: 16 }); save('E028-N1', { bought, three, four, due }); });
+  it("E028 N2 due decline no playable occupation and out-of-range late purchase cannot play free occupations", () => { for (const empty of [false, true]) {
+      const s = make('E028_Bookmark', st => { st.players[0]!.resources.wood = 1; if (empty)
+          st.players[0]!.occupationHand = ['__test_placeholder__']; }, false, 2), bought = purchase(s, 'E028_Bookmark'), due = reach(s, 5, empty);
+      assert.equal(due.state.players[0]!.occupationPlayed.length, 0);
+      const next = reach(s, 6, true);
+      assert.equal(next.state.players[0]!.occupationPlayed.length, 0);
+      save(`E028-N2-${empty}`, { bought, due, next });
+  } const s = make('E028_Bookmark', st => { st.players[0]!.resources.wood = 1; }, false, 13), bought = purchase(s, 'E028_Bookmark'), r = final(s); assert.equal(bought.state.players[0]!.cardStates.E028_Bookmark?.extraData?.triggerRound, 16); assert.equal(r.state.players[0]!.occupationPlayed.length, 0); save('E028-N2-late', { bought, r }); });
+  it("E028 N3 missing wood actual rejection hand-only round preparation and ordinary midround work do not grant an early play", () => { const b = make('E028_Bookmark', undefined, false); save('E028-N3-short', rejectBuy(b, 'E028_Bookmark')); const h = make('E028_Bookmark', undefined, false, 4), held = end(h, true, [], 'E028_Bookmark'); assert.equal(held.state.players[0]!.occupationPlayed.length, 0); const s = make('E028_Bookmark', st => { st.players[0]!.resources.wood = 1; }, false, 2), bought = purchase(s, 'E028_Bookmark'); fill(s); const mid = fill(s); assert.equal(mid.state.players[0]!.occupationPlayed.length, 0); save('E028-N3', { held, bought, mid }); });
 })

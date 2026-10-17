@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import {
@@ -7,6 +7,8 @@ import {
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C087_Mason'
+import assert from 'node:assert/strict'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 const CARD_ID = 'C087_Mason'
 const ANYTIME_ID = 'C87-mason-anytime'
@@ -131,4 +133,11 @@ describe('C087 Mason parity', () => {
 
     expect(anytimeIds(response)).not.toContain(ANYTIME_ID)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, rooms, anytime } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C087 N1 real Lessons creates held room and zero-resource four-stone-room house adds exactly one free room once', () => { const s = make('C087_Mason', st => rooms(st.players[0]!, 4, 'stone'), false); const played = finish(s, lesson(s, 'C087_Mason'), false); assert.equal(played.state.players[0]!.cardStates.C087_Mason?.extraData?.hasRoom, true); const p = anytime(s, 'C087_Mason'); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'farm-select' && p.interaction.request.farm.farmType === 'room'); const r = ok(s.commitSelectionChoice(0, { rooms: [p.interaction.request.farm.selectableTiles[0]!] })); assert.equal(r.state.players[0]!.rooms, 5); assert.equal(r.state.players[0]!.resources.stone, 0); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(r.interaction.anytimeActions.some(a => JSON.stringify(a).includes('C087_Mason')), false); save('C087-N1', { played, p, r }) })
+  it('C087 N2 wood clay and three stone rooms exclude while legal Grain Seeds still gains grain', () => { for (const [n, house] of [[4, 'wood'], [4, 'clay'], [3, 'stone']] as const) { const s = make('C087_Mason', st => { rooms(st.players[0]!, n, house); st.players[0]!.cardStates.C087_Mason = { extraData: { hasRoom: true } } }); assert.equal(s.getState().interaction.anytimeActions.some(a => JSON.stringify(a).includes('C087_Mason')), false); const r = finish(s, ok(s.takeAction(0, 'grain-seeds')), false); assert.equal(r.state.players[0]!.rooms, n); assert.equal(r.state.players[0]!.resources.grain, 1); save(`C087-N2-${house}`, r) } })
 })

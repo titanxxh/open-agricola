@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPersonPlacementOrder, recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import type { ActionFlow } from '../../shared/contract/types'
-import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../shared/domain/player'
 import { addWorkerRef, removeWorkerRef } from '../../shared/domain/space'
 import { appendImmediateEvents } from '../../shared/events/append'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -13,6 +13,9 @@ import '../../shared/cards/C/C037_DwellingMound'
 import '../../shared/cards/C/C158_ForestCampaigner'
 import '../../shared/cards/D/D024_BrotherlyLove'
 import '../../shared/cards/D/D103_CanalBoatman'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Placement from './_helpers/audit/ae-negative-32-placement'
 
 const CARD_ID = 'D024_BrotherlyLove'
 
@@ -374,4 +377,17 @@ describe('D024 Brotherly Love session', () => {
 
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-32-placement', () => {
+  const { sessions, save, ok, choose, pendingCard, trigger, finish, action, progress, buy, accept, brothers, third } = audit32Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D024 N1 actual food payment and real third and fourth placements may immediately use the third action space twice', () => { const b = brothers(4, false), bought = finish(b, buy(b, 'D024_BrotherlyLove')); assert.equal(bought.state.players[0]!.resources.food, 99); const s = brothers(), steps = third(s), p = accept(s, steps.p, 'D024_BrotherlyLove'); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice'); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'allow-occupied:forest')), r = finish(s, ok(s.resolveChoice(0, 'allow-occupied:day-laborer'))); assert.equal(r.state.players[0]!.resources.food, 104); assert.equal(familySize(r.state.players[0]!), 4); assert.equal(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy.length, 2); const end = progress(s, 6); assert.equal(end.state.round, 6); save('D024-N1', { bought, steps, p, bad, r, end }); });
+  it('D024 N2 the immediate fourth may choose another unoccupied action or decline and later place normally', () => { const s = brothers(), steps = third(s), p = accept(s, steps.p, 'D024_BrotherlyLove'), r = finish(s, ok(s.resolveChoice(0, 'fishing'))); assert.equal(familySize(r.state.players[0]!), 4); const t = brothers(), a = third(t), decline = finish(t, choose(t, trigger(t, a.p, 'D024_BrotherlyLove'), o => o.value === '__skip__')); assert.equal(decline.state.players[0]!.resources.food, 102); assert.equal(workersAvailable(decline.state, decline.state.players[0]!), 1); const ordinary = action(t, 0, 'fishing'); assert.equal(workersAvailable(ordinary.state, ordinary.state.players[0]!), 0); const end = progress(t, 6); assert.equal(end.state.round, 6); save('D024-N2', { steps, p, r, a, decline, ordinary }); });
+  it('D024 N3 three or five people and a held card cannot place an immediate fourth person after the real third', () => { const rows = []; for (const [n, played] of [[3, true], [5, true], [4, false]] as const) {
+      const s = brothers(n, played), steps = third(s);
+      assert.equal(pendingCard(steps.p, 'D024_BrotherlyLove'), false);
+      assert.equal(familySize(steps.p.state.players[0]!), n);
+      rows.push(steps);
+  } save('D024-N3', rows); });
 })

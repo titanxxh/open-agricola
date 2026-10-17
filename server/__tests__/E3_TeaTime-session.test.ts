@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { workersAvailable } from '../../shared/domain/player'
 import { E003_TeaTime } from '../../shared/cards/E/E003_TeaTime'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit23Placement from './_helpers/audit/ae-negative-23-placement'
 
 const CARD_ID = 'E003_TeaTime'
 
@@ -90,4 +93,12 @@ describe('E003_TeaTime session', () => {
       expect(session.withCtx(() => meetsCardPrerequisites(player, E003_TeaTime, state.round, state))).toBe(true)
     })
   })
+})
+
+describe('ae-negative-23-placement', () => {
+  const { TEA, sessions, save, ok, setup, ready, finish, menu, buy, turn, grainUse, occupied } = audit23Placement
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E003 N1 actual Grain Utilization then paid passing purchase recalls that same person for a later real placement',()=>{const s=setup(TEA,8),util=grainUse(s,0),worker=occupied(util,'grain-utilization')[0]!.workerId;finish(s,turn(s,1,'clay-pit'));const {pending,r}=buy(s,TEA);assert.equal(r.state.players[0]!.resources.food,99);assert.equal(occupied(r,'grain-utilization').length,0);assert.equal(workersAvailable(r.state,r.state.players[0]!),1);assert.ok(r.state.players[1]!.minorHand.includes(TEA));finish(s,turn(s,1,'reed-bank'));const replay=finish(s,turn(s,0,'grain-seeds'),false);assert.equal(occupied(replay,'grain-seeds')[0]!.workerId,worker);assert.equal(replay.state.players[0]!.resources.grain,1);assert.equal(workersAvailable(replay.state,replay.state.players[0]!),0);save('E003-N1',{util,worker,pending,r,replay})})
+  it('E003 N2 absent own occupancy opponent occupancy and no card food reject without recalling a person',()=>{for(const mode of['absent','opponent','food']){const s=setup(TEA,8,state=>{if(mode==='food')state.players[0]!.resources.food=0});if(mode==='opponent'){finish(s,turn(s,0,'forest'));grainUse(s,1)}else if(mode==='food'){grainUse(s,0);finish(s,turn(s,1,'clay-pit'))}const pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,TEA)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')),false);assert.ok(r.state.players[0]!.minorHand.includes(TEA));assert.equal(occupied(r,'grain-utilization').length,mode==='food'?1:0);save(`E003-N2-${mode}`,{pending,rejected,r})}})
+  it('E003 N3 whole purchase undo restores exact Grain Utilization occupant and food before one recall replay',()=>{const s=setup(TEA,8),util=grainUse(s,0);finish(s,turn(s,1,'clay-pit'));const before=ready(s),a=buy(s,TEA),undone=ok(s.undoAction());assert.deepEqual(occupied(undone,'grain-utilization'),occupied(util,'grain-utilization'));assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.minorHand.includes(TEA));assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);const r=buy(s,TEA).r;assert.equal(workersAvailable(r.state,r.state.players[0]!),1);assert.equal(r.state.players[0]!.resources.food,99);save('E003-N3',{util,before,a,undone,r})})
 })

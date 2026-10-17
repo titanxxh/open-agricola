@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -10,6 +10,9 @@ import '../../shared/cards/B/B115_TinsmithMaster'
 import '../../shared/cards/B/B113_PatchCaregiver'
 import '../../shared/cards/E/E071_CowPatty'
 import '../../shared/cards/C/C057_Crudite'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'C069_LandConsolidation'
 const ANYTIME_ID = 'C69-land-consolidation-anytime'
@@ -284,4 +287,19 @@ describe('C069_LandConsolidation session', () => {
       { crop: 'vegetable', remaining: 1 },
     ])
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, ok, save, setup, finish, next, take, move, hand, buy, printed, fields } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C069 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'C069_LandConsolidation'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, {}); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); save("C069-N1-legal", r); });
+  it('C069 N2 actual anytime exchange replaces only the selected exact three grain field', () => { const card = 'C069_LandConsolidation', s = setup(card, 14, st => { hand(st, card); fields(st, 2, [{ kind: 'grain', remaining: 3 }, { kind: 'grain', remaining: 3 }]); }); finish(s, buy(s, card)); move(s, 'forest'); next(s); let r = s.getState(); const action = r.interaction.anytimeActions.find(a => a.sourceCard === card); assert.ok(action); r = ok(s.takeAnytimeAction(0, action.id)); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'selection'); r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })); assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 3 }], [{ kind: 'vegetable', remaining: 1 }]]); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.vegetable, 0); save('C069-N2', r);r=finish(s,take(s,'reed-bank'));assert.equal(r.state.players[0]!.resources.reed,2);assert.equal(r.state.actionSpaces.flatMap(a=>a.takenBy).filter(t=>t.playerId===r.state.players[0]!.id).length,2);save('C069-N2-remaining-worker',r); });
+  it('C069 N3 hand wrong grain counts and invalid multiple targets exclude conversion before a legal retry', () => { for (const [grain, handOnly] of [[2, false], [4, false], [3, true]] as const) {
+      const card = 'C069_LandConsolidation', s = setup(card, 14, st => { fields(st, 1, [{ kind: 'grain', remaining: grain }]); if (handOnly)
+          hand(st, card); });
+      const r = s.getState();
+      assert.ok(!r.interaction.anytimeActions.some(a => a.sourceCard === card));
+      assert.deepEqual(r.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: grain }]);
+      save(`C069-N3-count-${grain}-${handOnly}`, r);
+  } const card = 'C069_LandConsolidation', s = setup(card, 14, st => fields(st, 2, [{ kind: 'grain', remaining: 3 }, { kind: 'grain', remaining: 3 }])); const action = s.getState().interaction.anytimeActions.find(a => a.sourceCard === card); assert.ok(action); let r = ok(s.takeAnytimeAction(0, action.id)); assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='selection');save('C069-N3-before',r); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 2 }] })); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 1, col: 0 }] })); r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] })); assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'vegetable', remaining: 1 }], [{ kind: 'grain', remaining: 3 }]]); save('C069-N3-retry', r); });
 })

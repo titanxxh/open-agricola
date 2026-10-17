@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -8,6 +8,8 @@ import { D146_Porter_impl } from '../../shared/cards/D/D146_Porter'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/D/D146_Porter'
+import assert from 'node:assert/strict'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'D146_Porter'
 const LISTENER = D146_Porter_impl.listeners[0]!
@@ -188,5 +190,44 @@ describe('D146_Porter session', () => {
     const result = ruleSession2.withCtx(() => executeCardListener(LISTENER, ctx))
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, finish, next, take, move } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D146 N1 actual accumulation thresholds distinguish same goods and wood food exclusions', () => {
+    for (const key of ['wood', 'clay', 'reed', 'stone', 'food'] as const)
+      for (const n of [3, 4, 5]) {
+        const space = {wood:'forest',clay:'clay-pit',reed:'reed-bank',stone:'western-quarry',food:'fishing'}[key]
+        const s = setup('D146_Porter', 14, state => { const a = state.actionSpaces.find(a => a.id === space)!; a.resources = { ...a.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, [key]: n }; })
+        const r = finish(s, take(s, space))
+        const p = r.state.players[0]!
+        const qualifies = key !== 'food' && n >= 4
+        for (const k of ['wood', 'clay', 'reed', 'stone', 'food'] as const)
+          assert.equal(p.resources[k], (k === 'food' ? 20 : 0) + (k === key ? n : 0) + (qualifies ? (k === key || k === 'food' ? 1 : 0) : 0))
+        save(`D146-N1-${key}-${n}`, r)
+      }
+  })
+  it('D146 N2 mixed short goods opponent collection and hand-only card exclude bonus', () => {
+    for (const mode of ['mixed', 'opponent', 'hand']) {
+      const space = mode==='mixed'?'forest':'clay-pit'
+      const s = setup('D146_Porter', 14, state => {
+        const a = state.actionSpaces.find(a => a.id === space)!
+        a.resources = { ...a.resources, wood: 0, clay: mode === 'mixed' ? 2 : 4, reed: mode === 'mixed' ? 1 : 0, stone: 0, food: 0 }
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['D146_Porter']
+        }
+      })
+      if (mode === 'opponent') {
+        move(s, 'grain-seeds')
+        next(s)
+      }
+      const r = finish(s, ok(s.takeAction(mode === 'opponent' ? 1 : 0, space)))
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.resources.food, 20)
+      save(`D146-N2-${mode}`, r)
+    }
   })
 })

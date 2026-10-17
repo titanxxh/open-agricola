@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B142_Greengrocer'
+import assert from 'node:assert/strict'
+import * as audit29Resources from './_helpers/audit/ae-negative-29-resources'
 
 const CARD_ID = 'B142_Greengrocer'
 
@@ -63,4 +65,11 @@ describe('B142 Greengrocer parity', () => {
     expect(response.state.players[0]!.resources.vegetable).toBe(0)
     expect(response.state.players[1]!.resources).toMatchObject({ grain: 1, vegetable: 0 })
   })
+})
+
+describe('ae-negative-29-resources', () => {
+  const { sessions, save, make, action, lesson } = audit29Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B142 N1 actual purchase and Grain Seeds grant exactly one grain and one vegetable', () => { const bought = lesson(make('B142_Greengrocer', false), 'B142_Greengrocer'); assert.equal(bought.state.players[0]!.resources.vegetable, 0); const s = make('B142_Greengrocer'), r = action(s, 0, 'grain-seeds'); assert.deepEqual([r.state.players[0]!.resources.grain, r.state.players[0]!.resources.vegetable], [1, 1]); save('B142-N1', { bought, r }); });
+  it('B142 N2 an actual opponent Grain Seeds held card and unrelated action give the owner no vegetable', () => { const s = make('B142_Greengrocer'), first = action(s, 0, 'reed-bank'), r = action(s, 1, 'grain-seeds'); assert.equal(r.state.players[0]!.resources.vegetable, 0); assert.equal(r.state.players[1]!.resources.vegetable, 0); const t = make('B142_Greengrocer', false), hand = action(t, 0, 'grain-seeds'); assert.deepEqual([hand.state.players[0]!.resources.grain, hand.state.players[0]!.resources.vegetable], [1, 0]); save('B142-N2', { first, r, hand }); });
 })

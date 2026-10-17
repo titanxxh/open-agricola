@@ -5,13 +5,17 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C132_TimberShingleMaker'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import { descriptionEffects } from './_helpers/choice-description'
+import * as audit52Scoring from './_helpers/audit/ae-negative-52-scoring'
 
 const CARD_ID = 'C132_TimberShingleMaker'
 
@@ -289,4 +293,12 @@ describe('C132 Timber Shingle Maker parity', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.woodPlaced ?? 0).toBe(0)
     expect(bonusForCard(response)).toBe(0)
   })
+})
+
+describe('ae-negative-52-scoring', () => {
+  const { sessions, save, ok, options, finish, action, lesson, bonus, TIMBER, timber, renovation, putWood } = audit52Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C132 N1 actual purchase has no early points and a real two room stone renovation places two wood once through whole undo and replay',()=>{const bought=lesson(timber(3,false),TIMBER);assert.equal(bonus(bought,TIMBER),0);const s=timber(),pending=renovation(s),r=putWood(s,pending,2);assert.equal(r.state.players[0]!.houseType,'stone');assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.stone,r.state.players[0]!.resources.reed,bonus(r,TIMBER)],[1,0,0,2]);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.houseType,'clay');assert.equal(u.state.players[0]!.resources.wood,3);assert.equal(bonus(u,TIMBER),0);const replay=putWood(s,renovation(s),2);assert.equal(bonus(replay,TIMBER),2);save('C132-N1',{bought,pending,r,u,replay})})
+  it('C132 N2 supply wood and room count cap exact payments and illegal choice rejects before legal one wood while decline retains all wood',()=>{const s=timber(1),pending=renovation(s),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__three_wood__')),r=putWood(s,pending,1);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(bonus(r,TIMBER),1);const q=timber(),limit=renovation(q);assert.equal(options(limit).some(o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='payment'&&e.resourcesPaid?.wood===3)),false);const declined=finish(q,limit);assert.equal(declined.state.players[0]!.resources.wood,3);assert.equal(bonus(declined,TIMBER),0);save('C132-N2',{pending,bad,r,limit,declined})})
+  it('C132 N3 wood to clay zero wood a held card and actual opponent stone renovation never pay owner wood or grant its bonus',()=>{for(const mode of['clay','zero','hand']){const s=timber(mode==='zero'?0:3,mode!=='hand',mode!=='clay'),r=finish(s,renovation(s));assert.equal(bonus(r,TIMBER),0);assert.equal(r.state.players[0]!.resources.wood,mode==='zero'?0:3);save(`C132-N3-${mode}`,r)}const s=timber(),first=action(s,0,'grain-seeds'),r=action(s,1,'house-redevelopment');assert.equal(r.state.players[1]!.houseType,'stone');assert.equal(bonus(r,TIMBER),0);assert.equal(r.state.players[0]!.resources.wood,3);save('C132-N3-opponent',{first,r})})
 })

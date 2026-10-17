@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -8,6 +8,9 @@ import '../../shared/cards/A/A121_ClayPuncher'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit14Spaces from './_helpers/audit/ae-negative-14-spaces'
 
 describe('A121_ClayPuncher session', () => {
   const setup = (playerCount: number = 2) => {
@@ -130,4 +133,13 @@ describe('A121_ClayPuncher session', () => {
     const after = session.getState().state
     expect(after.players[0]!.resources.clay).toBe(clayBefore)
   })
+})
+
+describe('ae-negative-14-spaces', () => {
+  const { PUNCH, sessions, save, ok, setup, turn } = audit14Spaces
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A121 N1 real first Lessons purchase grants onBuy and completed Lessons clay separately',()=>{const s=setup(PUNCH,undefined,false);const pending=turn(s,0,'lessons');assert.equal(pending.state.players[0]!.resources.clay,0);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');const r=ok(s.resolveChoice(0,PUNCH));assert.equal(r.state.players[0]!.resources.clay,2);assert.equal(r.state.players[0]!.resources.food,40);save('A121-N1',{pending,r})})
+  it('A121 N2 Clay Pit plus one bonus and later Lessons plus one bonus',()=>{const s=setup(PUNCH);const clay=turn(s,0,'clay-pit');assert.equal(clay.state.players[0]!.resources.clay,2);turn(s,1,'grain-seeds');let r=turn(s,0,'lessons');if(!r.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'))r=ok(s.resolveChoice(0,'A110_Roughcaster'));assert.equal(r.state.players[0]!.resources.clay,3);assert.equal(r.state.players[0]!.resources.food,39);save('A121-N2',{clay,r})})
+  it('A121 N3 unrelated hand and opponent use cannot grant owner clay',()=>{const basic=turn(setup(PUNCH),0,'day-laborer');assert.equal(basic.state.players[0]!.resources.clay,0);const hand=turn(setup(PUNCH,undefined,false),0,'clay-pit');assert.equal(hand.state.players[0]!.resources.clay,1);const s=setup(PUNCH);turn(s,0,'grain-seeds');const other=turn(s,1,'clay-pit');assert.equal(other.state.players[0]!.resources.clay,0);assert.equal(other.state.players[1]!.resources.clay,1);save('A121-N3',{basic,hand,other})})
+  it('A121 N4 occupied source wrong actor and undo cannot duplicate clay bonus',()=>{const s=setup(PUNCH);const first=turn(s,0,'clay-pit');assertRejectedUnchanged(s,()=>s.takeAction(0,'clay-pit'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='clay-pit')!.resources.clay,1);const retry=turn(s,0,'clay-pit');assert.equal(retry.state.players[0]!.resources.clay,2);save('A121-N4',{first,undone,retry})})
 })

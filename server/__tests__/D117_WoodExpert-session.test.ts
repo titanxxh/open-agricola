@@ -4,6 +4,17 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D117_WoodExpert'
 import '../../shared/cards/B/B081_Handcart'
 import '../../shared/cards/B/B043_Chophouse'
+import '../../shared/cards/D/D033_SummerHouse'
+import '../../shared/cards/B/B007_Wage'
+import '../../shared/cards/E/E047_SyrupTap'
+import '../../shared/cards/E/E030_ChildsToy'
+import '../../shared/cards/E/E156_ClaypitOwner'
+import '../../shared/cards/C/C041_FarmStore'
+import '../../shared/cards/C/C122_Bricklayer'
+import '../../shared/cards/C/C054_MarketBooth'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit03Costs from './_helpers/audit/ae-negative-03-costs'
 
 const CARD_ID = 'D117_WoodExpert'
 
@@ -154,5 +165,108 @@ describe('D117_WoodExpert session — card-purchase cost candidates', () => {
     })
     expect(woodBase).toBeDefined()
     expect(woodTrade).toBeDefined()
+  })
+})
+
+describe('ae-negative-03-costs', () => {
+  const { options, enterImprovement, chooseCard, woodExpert, costObserved } = audit03Costs
+  it('D117 N1 OA first Lessons grants exactly two wood only on actual play', () => {
+    const s = woodExpert({}, false)
+    try {
+      let r = s.takeAction(0, 'lessons')
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'missing-occupation'))
+      r = chooseCard(s, r, 'D117_WoodExpert')
+      assert.equal(r.ok, true, r.error)
+      assert.equal(r.state.players[0]!.resources.wood, 2)
+      assert.deepEqual(r.state.players[0]!.occupationPlayed, ['D117_WoodExpert'])
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D117_WoodExpert'))
+    } finally { s.dispose() }
+  })
+  it('D117 N2 OA one food replaces exactly two of three wood and preserves stone payment', () => {
+    const s = woodExpert({ wood: 1, food: 1, stone: 1 })
+    try {
+      const r = chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual(costObserved(r), { wood: 0, stone: 0, food: 0, built: true })
+    } finally { s.dispose() }
+  })
+  it('D117 N3 OA discount cap rejects zero wood for a three wood card before free retry', () => {
+    const s = woodExpert({ food: 1, stone: 1 })
+    try {
+      const r = enterImprovement(s)
+      assert.equal(options(r).some(o => o.value === 'D033_SummerHouse'), false)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D033_SummerHouse'))
+      const retry = chooseCard(s, r, 'B007_Wage')
+      assert.deepEqual(costObserved(retry), { wood: 0, stone: 1, food: 3, built: false })
+    } finally { s.dispose() }
+  })
+  it('D117 N4 OA missing stone cannot be replaced by food before a legal free retry', () => {
+    const s = woodExpert({ food: 1 })
+    try {
+      const r = enterImprovement(s)
+      assert.equal(options(r).some(o => o.value === 'E047_SyrupTap'), false)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E047_SyrupTap'))
+      const retry = chooseCard(s, r, 'B007_Wage')
+      assert.equal(retry.state.players[0]!.resources.food, 3)
+      assert.equal(retry.state.players[0]!.resources.stone, 0)
+      assert.equal(retry.state.players[0]!.minorPlayed.includes('E047_SyrupTap'), false)
+    } finally { s.dispose() }
+  })
+  it('D117 N5 OA original wood payment and smaller optional food payment both remain legal', () => {
+    for (const resources of [{ wood: 1 }, { food: 1 }]) {
+      const s = woodExpert(resources)
+      try {
+        const r = chooseCard(s, enterImprovement(s), 'B081_Handcart')
+        assert.equal(r.ok, true, r.error)
+        assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food], [0, 0])
+        assert.ok(r.state.players[0]!.minorPlayed.includes('B081_Handcart'))
+      } finally { s.dispose() }
+    }
+  })
+  it('D117 N6 OA clay only Fireplace never adds a food fee', () => {
+    const s = woodExpert({ clay: 2, food: 1 })
+    try {
+      const r = chooseCard(s, enterImprovement(s, 0, 'major-improvement'), 'Major_Fireplace1')
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.food], [0, 1])
+    } finally { s.dispose() }
+  })
+  it('D117 N7 OA undo restores all discounted cost components before legal retry', () => {
+    const s = woodExpert({ wood: 1, food: 1, stone: 1 })
+    try {
+      chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
+      const undone = s.undoAction()
+      assert.equal(undone.ok, true, undone.error)
+      assert.deepEqual(costObserved(undone), { wood: 1, stone: 1, food: 1, built: false })
+      assert.equal(undone.state.actionSpaces.flatMap(space => space.takenBy).filter(worker => worker.playerId === undone.state.players[0]!.id).length, 0)
+      const retry = chooseCard(s, enterImprovement(s), 'D033_SummerHouse')
+      assert.deepEqual(costObserved(retry), { wood: 0, stone: 0, food: 0, built: true })
+    } finally { s.dispose() }
+  })
+  it('D117 N8 OA stable construction still costs two wood and cannot use the food replacement', () => {
+    for (const wood of [1, 2]) {
+      const s = woodExpert({ wood, food: 1 })
+      try {
+        if (wood === 1) {
+          assertRejectedUnchanged(s, () => s.takeAction(0, 'farm-expansion'))
+          assert.equal(s.getState().state.players[0]!.resources.food, 1)
+        } else {
+          const entered = s.takeAction(0, 'farm-expansion')
+          assert.equal(entered.ok, true, entered.error)
+          const r = s.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+          assert.equal(r.ok, true, r.error)
+          assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food, r.state.players[0]!.stableTiles.length], [0, 1, 1])
+        }
+      } finally { s.dispose() }
+    }
+  })
+  it('D117 N9 OA major Joinery wood cost is fully replaced while its stone cost remains', () => {
+    const s = woodExpert({ food: 1, stone: 2 })
+    try {
+      const r = chooseCard(s, enterImprovement(s, 0, 'major-improvement'), 'Major_Joinery')
+      assert.equal(r.ok, true, r.error)
+      assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food, r.state.players[0]!.resources.stone], [0, 0, 0])
+      assert.ok(r.state.players[0]!.improvements.includes('Major_Joinery'))
+    } finally { s.dispose() }
   })
 })

@@ -5,6 +5,9 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/D/D051_Archway'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit02Reservations from './_helpers/audit/ae-negative-02-reservations'
 
 const CARD_ID = 'D051_Archway'
 
@@ -189,5 +192,58 @@ describe('D051 Archway parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(17)
     expect(response.state.players[0]!.resources.grain).toBe(1)
     expect(response.state.actionSpaces.find((space) => space.id === CARD_ID)?.takenBy).toEqual([])
+  })
+})
+
+describe('ae-negative-02-reservations', () => {
+  const { D, setup, wait, option, finish, place, endWork, buyMinor } = audit02Reservations
+  describe('02 reservations negative Session audit', () => {
+    it('D051 N1 insufficient clay or an occupation cannot bypass printing; legal payment grants four points', () => {
+        for (const occupation of [false, true]) {
+          const s = setup(D, 3, state => { state.players[0]!.resources.clay = occupation ? 2 : 1; if (occupation) state.players[0]!.occupationPlayed.push('A116_WoodCutter') }, false)
+          const r = buyMinor(s, D); assert.equal(r.state.players[0]!.minorPlayed.includes(D), false)
+          assert.equal(r.state.players[0]!.resources.clay, occupation ? 2 : 1); s.dispose()
+        }
+        const s = setup(D, 3, state => { state.players[0]!.resources.clay = 2 }, false)
+        const scores = s.getState().scores; assert.ok(scores); const before = scores[0]!.total; const r = buyMinor(s, D); assert.ok(r.scores)
+        assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.scores[0]!.total, before + 4)
+        assert.ok(r.state.actionSpaces.some(x => x.id === D)); s.dispose()
+      })
+    it('D051 N2 opponent use grants only that opponent food and occupied repeat is atomic', () => {
+        const s = setup(D); finish(s, place(s, 0, 'grain-seeds')); let r = place(s, 1, D)
+        assert.equal(r.state.players[0]!.resources.food, 20); assert.equal(r.state.players[1]!.resources.food, 21)
+        r = finish(s, r); assert.equal(r.state.currentPlayerIndex, 0)
+        assertRejectedUnchanged(s, () => s.takeAction(0, D)); s.dispose()
+      })
+    it('D051 N3 actual round end moves the same worker once and stale request cannot pay twice', () => {
+        const s = setup(D); let r = endWork(s, D)
+        const enter = option(r, o => o.value !== '__skip__'); r = s.resolveChoice(0, enter)
+        const i = wait(r); assert.equal(i.promptKey, 'ui.interactionMoveFarmerToSpace')
+        const source = r.state.actionSpaces.find(x => x.id === D)!.takenBy[0]!; const events = r.state.events.filter(x => x.type === 'worker.placed').length
+        assertRejectedUnchanged(s, () => s.resolveChoice(1, 'day-laborer'))
+        r = s.resolveChoice(0, 'day-laborer'); assert.equal(r.ok, true, r.error)
+        assert.equal(r.state.players[0]!.resources.food, 23); assert.equal(r.state.round, 4)
+        assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+        assert.ok(r.state.events.some(x => x.type === 'worker.placed' && x.workerId === source.workerId && x.spaceId === 'day-laborer'))
+        assert.equal(r.state.events.filter(x => x.type === 'worker.placed').length, events + 1)
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer')); s.dispose()
+      })
+    it('D051 N4 occupied ordinary target is omitted and a legal retry still moves its worker', () => {
+        const s = setup(D); let r = endWork(s, D, 'day-laborer')
+        r = s.resolveChoice(0, option(r, o => o.value !== '__skip__'))
+        const move = wait(r); assert.ok(move.request.kind === 'choice'); assert.equal(move.request.options?.some(o => o.value === 'day-laborer'), false)
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer'))
+        r = s.resolveChoice(0, 'grain-seeds'); assert.equal(r.ok, true, r.error)
+        assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.resources.food, 21)
+        assert.equal(r.state.round, 4); s.dispose()
+      })
+    it('D051 N5 undo of actual paid card restores clay card score and placement', () => {
+        const s = setup(D, 3, state => { state.players[0]!.resources.clay = 2 }, false)
+        const before = s.getState(); const resources = JSON.stringify(before.state.players[0]!.resources); const scores = JSON.stringify(before.scores); const log = JSON.stringify(before.state.log)
+        buyMinor(s, D); const r = s.undoAction(); assert.equal(r.ok, true, r.error)
+        assert.equal(JSON.stringify(r.state.players[0]!.resources), resources); assert.equal(JSON.stringify(r.scores), scores); assert.equal(JSON.stringify(r.state.log), log)
+        assert.equal(r.state.players[0]!.minorHand.includes(D), true); assert.equal(r.state.players[0]!.minorPlayed.includes(D), false)
+        assert.equal(r.state.actionSpaces.some(x => x.id === D), false); assert.deepEqual(r.state.actionSpaces.find(x => x.id === 'meeting-place')!.takenBy, []); s.dispose()
+      })
   })
 })

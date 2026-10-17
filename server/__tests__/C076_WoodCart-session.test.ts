@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C076_WoodCart'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Resources from './_helpers/audit/ae-negative-42-resources'
 
 const CARD_ID = 'C076_WoodCart'
 const FILLER = '__test_placeholder__'
@@ -105,4 +108,12 @@ describe('C076 Wood Cart parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[1]!.resources.wood).toBe(3)
   })
+})
+
+describe('ae-negative-42-resources', () => {
+  const { sessions, ok, save, setup, finish, select, play, next, occupations } = audit42Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C076 N1 actual purchase costs three wood with three occupations then Forest gives exactly five wood and whole action undo restores the pile',()=>{const s=setup('C076_WoodCart',st=>{occupations(st);st.players[0]!.resources.wood=3},false,5),bought=play(s,'C076_WoodCart');assert.equal(bought.state.players[0]!.resources.wood,0);next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const r=finish(s,ok(s.takeAction(0,'forest')),true);assert.equal(r.state.players[0]!.resources.wood,5);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,0);assert.equal(u.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);save('C076-N1',{bought,r,u})})
+  it('C076 N2 clay nonwood owner actions held card and opponent Forest grant no extra owner wood',()=>{for(const mode of ['clay','hand','other']){const actor=mode==='other'?1:0,s=setup('C076_WoodCart',st=>{st.currentPlayerIndex=actor},mode!=='hand'),r=finish(s,ok(s.takeAction(actor,mode==='clay'?'clay-pit':'forest')),true,'C076_WoodCart');assert.equal(r.state.players[0]!.resources.wood,mode==='hand'?3:0);if(actor===1)assert.equal(r.state.players[1]!.resources.wood,3);save(`C076-N2-${mode}`,r)}})
+  it('C076 N3 two occupations deny Wood Cart before another legal minor',()=>{const s=setup('C076_WoodCart',st=>{occupations(st,2);st.players[0]!.resources.wood=3;st.players[0]!.minorHand.push('A057_MilkingParlor','E080_RockGarden')},false,5),p=select(s,ok(s.takeAction(0,'meeting-place')),o=>o.value.startsWith('action-improvement-')),bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'C076_WoodCart')),r=finish(s,select(s,p,o=>o.value==='A057_MilkingParlor'));assert.equal(r.state.players[0]!.resources.wood,1);assert.ok(r.state.players[0]!.minorHand.includes('C076_WoodCart'));save('C076-N3',{p,bad,r})})
 })

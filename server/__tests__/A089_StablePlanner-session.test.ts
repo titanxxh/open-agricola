@@ -1,9 +1,13 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A089_StablePlanner'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import * as audit03Stables from './_helpers/audit/ae-negative-03-stables'
 
 const CARD_ID = 'A089_StablePlanner'
 
@@ -136,5 +140,78 @@ describe('A089 Stable Planner parity', () => {
     expect(response.state.players[0]!.stableTiles).toHaveLength(1)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(scheduledRounds(response)).toEqual([])
+  })
+})
+
+describe('ae-negative-03-stables', () => {
+  const { sessions, ok, setup, playPlanner, schedule, futureRounds, reachDue } = audit03Stables
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  describe('Stable Planner negative audit', () => {
+    it('A089 N1 reservation respects finite supply and undo restores scheduled tokens', () => {
+      const s = setup({ stableCount: 2 })
+      const before = undoRuleSnapshot(s.getState())
+      const offer = playPlanner(s)
+      assert.ok(offer.interaction.stateId === 'wait' && offer.interaction.request.kind === 'choice')
+      assert.equal(offer.interaction.request.options.filter(o => o.value !== '__skip__').length, 2)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, '__A089_forbidden_three__'))
+      const r = schedule(s, s.getState(), 2)
+      assert.deepEqual(futureRounds(r), [4, 7])
+      assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 0)
+      assert.equal(r.state.players[0]!.stableTiles.length, 2)
+      assertUndoRestored(before, s.undoAction())
+      const retry = schedule(s, playPlanner(s), 2)
+      assert.deepEqual(futureRounds(retry), [4, 7])
+      assert.ok(retry.scores && retry.scores.length === 2)
+    })
+    it('A089 N2 round eleven preserves only real round fourteen target', () => {
+      const s = setup({ round: 11 })
+      const offer = playPlanner(s)
+      assert.ok(offer.interaction.stateId === 'wait' && offer.interaction.request.kind === 'choice')
+      assert.equal(offer.interaction.request.options.filter(o => o.value !== '__skip__').length, 1)
+      const r = schedule(s, offer, 1)
+      assert.deepEqual(futureRounds(r), [14])
+      assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 3)
+    })
+    it('A089 N3 round twelve invents no future stable and preserves all supply', () => {
+      const s = setup({ round: 12 })
+      const r = playPlanner(s)
+      assert.deepEqual(futureRounds(r), [])
+      assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 4)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player')
+    })
+    it('A089 N4 actual due round builds free after rejecting occupied room tile', () => {
+      const s = setup()
+      const r = reachDue(s)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+      const tile = r.interaction.request.farm.selectableTiles[0]!
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [{ row: 1, col: 0 }] }))
+      const built = ok(s.commitSelectionChoice(0, { stables: [tile] }))
+      assert.equal(built.state.players[0]!.stableTiles.length, 1)
+      assert.equal(built.state.players[0]!.resources.wood, 0)
+      assert.deepEqual(futureRounds(built), [])
+      assert.equal(s.withCtx(() => getAvailableStableSupplyCount(built.state, built.state.players[0]!)), 3)
+      assert.ok(built.state.log.some(l => l.key === 'log.cardTriggered' || l.key === 'log.cardEffectGain' || l.key === 'log.actionDetail'))
+    })
+    it('A089 N5 duplicate due stable coordinate cannot create two pieces', () => {
+      const s = setup()
+      const r = reachDue(s)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+      const tile = r.interaction.request.farm.selectableTiles[0]!
+      const before = undoRuleSnapshot(s.getState())
+      const duplicate = s.commitSelectionChoice(0, { stables: [tile, tile] })
+      const outcome = { accepted: duplicate.ok, pieces: duplicate.state.players[0]!.stableTiles.length }
+      if (!duplicate.ok) {
+        assert.equal(undoRuleSnapshot(duplicate), before)
+        assert.equal(ok(s.commitSelectionChoice(0, { stables: [tile] })).state.players[0]!.stableTiles.length, 1)
+      }
+      assertRuleOutcome(outcome, { accepted: false, pieces: 0 })
+    })
+  })
+  it('A089 N6 full reserve schedules all three exact targets without duplicate tokens', () => {
+    const s = setup()
+    const r = schedule(s, playPlanner(s), 3)
+    assert.deepEqual(futureRounds(r), [4, 7, 10])
+    assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state, r.state.players[0]!)), 1)
+    assert.equal(r.state.players[0]!.stableTiles.length, 0)
   })
 })

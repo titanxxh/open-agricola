@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 
 import '../../shared/cards/E/E083_ShepherdsWhistle'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit43Harvest from './_helpers/audit/ae-negative-43-harvest'
 
 const CARD_ID = 'E083_ShepherdsWhistle'
 
@@ -115,4 +117,11 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
 
     expect(result.type).toBe('ok')
   })
+})
+
+describe('ae-negative-43-harvest', () => {
+  const { WHISTLE, sessions, save, ok, make, purchase, yard, nextRound } = audit43Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E083 N1 actual wood purchase then natural harvest with several empty unfenced stables grants only one sheep',()=>{const s=make(WHISTLE,false,state=>state.players[0]!.resources.wood=1),a=purchase(s,WHISTLE);assert.equal(a.r.state.players[0]!.resources.wood,0);const t=make(WHISTLE,true,state=>state.players[0]!.stableTiles=[{row:0,col:1},{row:0,col:2}]),mid=ok(t.takeAction(0,'reed-bank')),r=nextRound(t,8);assert.equal(mid.state.players[0]!.resources.sheep,0);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[1]!.resources.sheep,0);save('E083-N1',{a,mid,r})})
+  it('E083 N2 no unfenced stable fenced stable and hand card never grant sheep',()=>{for(const mode of['none','fenced','hand']){const s=make(WHISTLE,mode!=='hand',state=>{const p=state.players[0]!;if(mode==='fenced')yard(state,1);if(mode==='hand')p.stableTiles=[{row:0,col:1}]}),r=nextRound(s,8,false);assert.equal(r.state.players[0]!.resources.sheep,mode==='fenced'?1:0);save(`E083-N2-${mode}`,r)}})
 })

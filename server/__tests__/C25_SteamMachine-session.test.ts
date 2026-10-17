@@ -1,7 +1,7 @@
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createWorkSession } from './_helpers/session-fixtures'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { GameSession } from '../game/authoritative-session'
@@ -11,6 +11,8 @@ import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import '../../shared/cards/C/C025_SteamMachine'
 import '../../shared/cards/A/A092_AdoptiveParents'
+import assert from 'node:assert/strict'
+import * as audit32Baking from './_helpers/audit/ae-negative-32-baking'
 
 const CARD_ID = 'C025_SteamMachine'
 const A92 = 'A092_AdoptiveParents'
@@ -291,4 +293,16 @@ describe('C025 Steam Machine parity', () => {
       : undefined).not.toBe(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 2 })
   })
+})
+
+describe('ae-negative-32-baking', () => {
+  const { sessions, save, choose, pendingCard, trigger, finish, action, buy, accept, baker, bake, last } = audit32Baking
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C025 N1 actual two wood purchase has no immediate food and a real last accumulation placement can bake one grain', () => { const s = baker('C025_SteamMachine', false), bought = finish(s, buy(s, 'C025_SteamMachine')); assert.equal(bought.state.players[0]!.resources.wood, 0); assert.equal(bought.state.players[0]!.resources.food, 100); const t = baker('C025_SteamMachine'), steps = last(t), r = bake(t, steps.p, 'C025_SteamMachine'); assert.deepEqual([r.state.players[0]!.resources.grain, r.state.players[0]!.resources.food], [1, 102]); save('C025-N1', { bought, steps, r }); });
+  it('C025 N2 first accumulation with another worker at home and last nonaccumulation do not offer baking while a last accumulation may decline', () => { const s = baker('C025_SteamMachine'), first = action(s, 0, 'reed-bank'); assert.equal(pendingCard(first, 'C025_SteamMachine'), false); assert.equal(first.state.players[0]!.resources.food, 100); action(s, 1, 'forest'); const no = action(s, 0, 'grain-seeds'); assert.equal(no.state.players[0]!.resources.food, 100); assert.equal(no.state.players[0]!.resources.grain, 2); const t = baker('C025_SteamMachine'), steps = last(t), p = trigger(t, steps.p, 'C025_SteamMachine'), decline = finish(t, choose(t, p, o => o.value === '__skip__')); assert.deepEqual([decline.state.players[0]!.resources.grain, decline.state.players[0]!.resources.food], [2, 100]); save('C025-N2', { first, no, steps, p, decline }); });
+  it('C025 N3 a held card no grain and no oven cannot bake after the last wood accumulation', () => { const rows = []; for (const [played, grain, oven] of [[false, 1, true], [true, 0, true], [true, 1, false]] as const) {
+      const s = baker('C025_SteamMachine', played, grain, oven), steps = last(s, 'reed-bank', 'forest'), p = pendingCard(steps.p, 'C025_SteamMachine') ? accept(s, steps.p, 'C025_SteamMachine') : steps.p, r = finish(s, p);
+      assert.deepEqual([r.state.players[0]!.resources.grain, r.state.players[0]!.resources.food], [grain, 100]);
+      rows.push({ steps, r });
+  } save('C025-N3', rows); });
 })

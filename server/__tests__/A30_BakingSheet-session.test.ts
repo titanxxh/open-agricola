@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A030_BakingSheet'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Scoring from './_helpers/audit/ae-negative-06-scoring'
 
 const CARD_ID = 'A030_BakingSheet'
 const FILLER = '__test_placeholder__'
@@ -136,5 +139,58 @@ describe('A030 Baking Sheet parity', () => {
 
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 2 })
     expect(bonusVp(session)).toBe(0)
+  })
+})
+
+describe('ae-negative-06-scoring', () => {
+  const { SHEET, sessions, ok, options, buy, denied, bonus, sheet, bake, sheetMenu, acceptSheet } = audit06Scoring
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A030 N1 planted grain forbids purchase while empty and vegetable fields allow a neutral free purchase', () => {
+    denied(sheet({ played: false }, state => { state.players[0]!.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }] }), SHEET)
+    for (const vegetable of [false, true]) {
+      const s = sheet({ played: false }, state => { state.players[0]!.fields = [{ row: 0, col: 1, stacks: vegetable ? [{ kind: 'vegetable', remaining: 1 }] : [] }] })
+      const r = buy(s, SHEET); assert.equal(r.state.players[0]!.resources.grain, 2); assert.equal(r.state.players[0]!.resources.food, 20); assert.equal(bonus(r, SHEET), 0)
+    }
+  })
+  it('A030 N2 no facility and forged zero normal bake cannot grant the exchange before a real bake control', () => {
+    const none = sheet({ facility: false }); const before = undoRuleSnapshot(none.getState()); const r = none.takeAction(0, 'grain-utilization')
+    if (!r.ok) assert.equal(undoRuleSnapshot(r), before)
+    else {
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') assert(!r.interaction.request.options.some(o => o.sourceCard === SHEET && !o.disabled))
+    }
+    assertRejectedUnchanged(none, () => none.resolveChoice(0, SHEET)); assert.equal(none.state.players[0]!.resources.grain, 2); assert.equal(bonus(none.getState(), SHEET), 0)
+    const retry = sheet(); const menu = ok(retry.takeAction(0, 'grain-utilization'))
+    assert.equal(menu.interaction.stateId === 'wait' && menu.interaction.promptKey, 'ui.interactionBakeBreadCount')
+    assertRejectedUnchanged(retry, () => retry.resolveChoice(0, 'count-Major_Fireplace1-0'))
+    assertRejectedUnchanged(retry, () => retry.resolveChoice(0, 'bulk:'))
+    assert.equal(retry.state.players[0]!.resources.grain, 2); assert.equal(bonus(retry.getState(), SHEET), 0)
+    const got = acceptSheet(retry, ok(retry.resolveChoice(0, 'count-Major_Fireplace1-1')))
+    assert.equal(got.state.players[0]!.resources.food, 24); assert.equal(bonus(got, SHEET), 1)
+  })
+  it('A030 N3 spending the last grain on normal baking gives no extra exchange or point', () => {
+    const s = sheet({ grain: 1 }); const r = bake(s); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.food, 22); assert.equal(bonus(r, SHEET), 0)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, SHEET))
+  })
+  it('A030 N4 one exact grain exchange rejects wrong actor and stale requests then whole action undo retries once', () => {
+    const s = sheet({ grain: 3 }); const before = undoRuleSnapshot(s.getState()); const r = sheetMenu(s, bake(s)); const take = options(r).find(o => o.value !== '__skip__'); assert(take)
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, take.value)); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'exchange-two-grain'))
+    const after = ok(s.resolveChoice(0, take.value)); assert.equal(after.state.players[0]!.resources.grain, 1); assert.equal(after.state.players[0]!.resources.food, 24); assert.equal(bonus(after, SHEET), 1)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, take.value)); assertUndoRestored(before, s.undoAction())
+    assert.equal(bonus(acceptSheet(s, bake(s)), SHEET), 1)
+  })
+  it('A030 N5 declining its exchange preserves remaining grain and grants no bonus', () => {
+    const s = sheet(); const r = sheetMenu(s, bake(s)); const decline = options(r).find(o => o.value === '__skip__'); assert(decline)
+    const after = ok(s.resolveChoice(0, decline.value)); assert.equal(after.state.players[0]!.resources.grain, 1); assert.equal(after.state.players[0]!.resources.food, 22); assert.equal(bonus(after, SHEET), 0)
+  })
+  it('A030 N6 a real opponent bake with its own grain and fireplace gives no owner reward', () => {
+    const s = sheet({}, state => { state.players[1]!.improvements = ['Major_Fireplace2']; state.players[1]!.resources.grain = 2 })
+    confirmNext(s, ok(s.takeAction(0, 'day-laborer'))); const r = bake(s, 1, 'Major_Fireplace2')
+    assert.equal(r.state.players[1]!.resources.grain, 1); assert.equal(r.state.players[1]!.resources.food, 22)
+    assert.equal(r.state.players[0]!.resources.grain, 2); assert.equal(r.state.players[0]!.resources.food, 22); assert.equal(bonus(r, SHEET), 0)
+  })
+  it('A030 N7 a real anytime vegetable conversion is not normal grain baking', () => {
+    const s = sheet({}, state => { state.players[0]!.resources.vegetable = 1 }); const r = ok(s.takeAnytimeAction(0, 'exchange'))
+    const cook = options(r).find(o => o.effectPreview?.kind === 'resourceExchange' && (o.effectPreview.resourcesPaid?.vegetable ?? 0) === 1); assert(cook); assert(cook.value.startsWith('trade:'))
+    const after = ok(s.resolveChoice(0, `bulk:${cook.value.split(':')[1]}=1`)); assert.equal(after.state.players[0]!.resources.vegetable, 0); assert.equal(after.state.players[0]!.resources.food, 22); assert.equal(after.state.players[0]!.resources.grain, 2); assert.equal(bonus(after, SHEET), 0)
   })
 })

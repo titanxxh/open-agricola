@@ -10,6 +10,9 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import type { ActionChoiceOption, ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/E/E148_Lazybones'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit02Reservations from './_helpers/audit/ae-negative-02-reservations'
 
 const CARD_ID = 'E148_Lazybones'
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
@@ -406,5 +409,50 @@ describe('E148_Lazybones session', () => {
     const accepted = session.commitSelectionChoice(0, { stables: [tile] })
     expect(accepted.ok, accepted.error).toBe(true)
     expect(accepted.state.players[0]!.stableTiles).toContainEqual(tile)
+  })
+})
+
+describe('ae-negative-02-reservations', () => {
+  const { L, setup, wait, finish, place } = audit02Reservations
+  describe('02 reservations negative Session audit', () => {
+    it('E148 N1 invalid duplicate or excessive reservation is atomic and legal subset reserves stable quota', () => {
+        const s = setup(L, 3, state => { state.players[0]!.stableTiles = [{row:0,col:1},{row:1,col:1},{row:2,col:1}] }, false)
+        let r = s.takeAction(0, 'lessons'); assert.equal(r.ok, true, r.error)
+        if (!r.state.players[0]!.occupationPlayed.includes(L)) r = s.resolveChoice(0,L)
+        const reservation = wait(r); assert.ok(reservation.request.kind === 'choice'); assert.equal(reservation.request.multiSelect?.maxSelections, 1)
+        for (const value of ['lazybones:grain-seeds,farmland','lazybones:grain-seeds,grain-seeds','lazybones:forest']) assertRejectedUnchanged(s, () => s.resolveChoice(0,value))
+        r = s.resolveChoice(0,'lazybones:grain-seeds'); assert.equal(r.ok,true,r.error)
+        assert.deepEqual(r.state.players[0]!.cardStates[L]?.extraData?.reservedActionSpaces,['grain-seeds'])
+        assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state,r.state.players[0]!)),0); s.dispose()
+      })
+    it('E148 N2 owner use leaves its reservation intact and grants no stable', () => {
+        const s = setup(L, 3, state => {state.players[0]!.cardStates[L]={extraData:{reservedActionSpaces:['grain-seeds']}}})
+        const r = place(s,0,'grain-seeds'); assert.equal(r.state.players[0]!.resources.grain,1)
+        assert.deepEqual(r.state.players[0]!.cardStates[L]?.extraData?.reservedActionSpaces,['grain-seeds'])
+        assert.deepEqual(r.state.players[0]!.stableTiles,[]); s.dispose()
+      })
+    it('E148 N3 opponent target consumes only its token and exact free stable cannot be doubled or submitted by opponent', () => {
+        const s = setup(L,3,state=>{state.players[0]!.cardStates[L]={extraData:{reservedActionSpaces:['grain-seeds','farmland','day-laborer','farm-expansion']}}})
+        finish(s,place(s,0,'reed-bank')); let r=place(s,1,'grain-seeds')
+        while(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-player-switch') {r=s.resolveChoice(r.interaction.playerIndex,'confirm'); assert.equal(r.ok,true,r.error)}
+        const i=wait(r); assert.equal(i.playerIndex,0); assert.equal(i.request.kind,'farm-select'); assert.ok(i.request.kind==='farm-select'&&i.request.farm.farmType==='stable')
+        const tiles=i.request.farm.selectableTiles; assert.ok(tiles.length>1)
+        assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{stables:[tiles[0]!]}))
+        const before = s.getState(); const beforeState = JSON.stringify(before.state); const beforeScores = JSON.stringify(before.scores); const rejected = s.commitSelectionChoice(0,{stables:[tiles[0]!,tiles[1]!]}); assert.equal(rejected.ok,false); assert.equal(JSON.stringify(rejected.state),beforeState); assert.equal(JSON.stringify(rejected.scores),beforeScores); assert.deepEqual(wait(s.getState()).request,i.request)
+        r=s.commitSelectionChoice(0,{stables:[tiles[0]!]}); assert.equal(r.ok,true,r.error)
+        assert.equal(r.state.players[0]!.stableTiles.length,1); assert.equal(r.state.players[0]!.resources.wood,0)
+        assert.deepEqual(r.state.players[0]!.cardStates[L]?.extraData?.reservedActionSpaces,['farmland','day-laborer','farm-expansion'])
+        assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state,r.state.players[0]!)),0); s.dispose()
+      })
+    it('E148 N4 unavailable farm tile returns only the consumed reservation to supply', () => {
+        const s = setup(L, 3, state => {
+          const p = state.players[0]!; p.cardStates[L] = { extraData: { reservedActionSpaces: ['grain-seeds', 'day-laborer'] } }
+          for(let row=0;row<3;row++) for(let col=0;col<5;col++) if(!p.roomTiles.some(t=>t.row===row&&t.col===col)) p.fields.push({row,col,stacks:[]})
+        })
+        finish(s, place(s, 0, 'reed-bank')); let r = place(s, 1, 'grain-seeds')
+        while(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') { r = s.resolveChoice(r.interaction.playerIndex, 'confirm'); assert.equal(r.ok,true,r.error) }
+        assert.deepEqual(r.state.players[0]!.stableTiles,[]); assert.deepEqual(r.state.players[0]!.cardStates[L]?.extraData?.reservedActionSpaces,['day-laborer'])
+        assert.equal(s.withCtx(() => getAvailableStableSupplyCount(r.state,r.state.players[0]!)),3); assert.notEqual(r.interaction.stateId === 'wait' ? r.interaction.sourceCard : undefined,L); s.dispose()
+      })
   })
 })

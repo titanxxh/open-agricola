@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E015_NailBasket'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit31Plows from './_helpers/audit/ae-negative-31-plows'
 
 const CARD_ID = 'E015_NailBasket'
 const FILLER = '__test_placeholder__'
@@ -207,5 +210,74 @@ describe('E015 Nail Basket parity', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'copse')!.resources.stone).toBe(1)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+  })
+})
+
+describe('ae-negative-31-plows', () => {
+  const { sessions, ok, options, actor, save, setup, finish, take, hand, buy, noSource, accept, minorSetup, boundary, fence } = audit31Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E015 N1 real purchase pays printed cost and enforces missing resource or occupation', () => {
+    const card = 'E015_NailBasket', s = minorSetup(card, 0, 0, 20)
+    s.state.players[0]!.resources.reed = 1
+    s.loadState(s.state)
+    const r = buy(s, card)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.resources.reed, 0)
+    assert.equal(r.state.players[0]!.resources.food, 20)
+    assert.equal(r.scores![0]!.categories.find(c => c.key === 'cards')?.entries?.find(e => 'cardId' in e && e.cardId === card)?.score, 1)
+    save('E015-N1-legal', r)
+    {
+      const t = minorSetup(card, 0, 0, 20, 14)
+      t.state.players[0]!.resources.reed = 0
+      t.loadState(t.state)
+      let q = take(t, 'meeting-place')
+      const branch = options(q).find(o => o.value.startsWith('action-improvement-'))
+      if (branch)
+        q = ok(t.resolveChoice(actor(q), branch.value))
+      assert.ok(!options(q).some(o => o.value === card && !o.disabled), JSON.stringify(q.interaction))
+      if (q.interaction.stateId === 'wait' && q.interaction.request.kind === 'choice')
+        assertRejectedUnchanged(t, () => t.resolveChoice(actor(q), card))
+      assert.ok(q.state.players[0]!.minorHand.includes(card))
+      save('E015-N1-resource', q)
+    }
+  })
+  it('E015 N2 wood collection returns stone onto its physical source and builds ordinary paid fences', () => { const card = 'E015_NailBasket', s = setup(card, 14, st => Object.assign(st.players[0]!.resources, { wood: 1, stone: 1 })); let r = take(s, 'forest'); r = fence(s, accept(s, r, card), boundary([{ row: 0, col: 3 }])); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.stone, 0); assert.equal(r.state.players[0]!.fenceSegments.length, 4); assert.equal(r.state.players[0]!.pastures.length, 1); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.resources.stone, 1); save('E015-N2', r); })
+  it('E015 N3 decline insufficient stone unrelated opponent and hand-only cannot build card fences', () => {
+    for (const mode of ['decline', 'stone', 'unrelated', 'opponent', 'hand']) {
+      const card = 'E015_NailBasket', s = setup(card, 14, st => {
+        Object.assign(st.players[0]!.resources, { wood: 4, stone: mode === 'stone' ? 0 : 1 })
+        if (mode === 'opponent')
+          st.currentPlayerIndex = 1
+        if (mode === 'hand')
+          hand(st, card)
+      })
+      let r = take(s, mode === 'unrelated' ? 'clay-pit' : 'forest')
+      if (mode !== 'decline')
+        noSource(r, card)
+      if (mode === 'stone')
+        assertRejectedUnchanged(s, () => s.resolveChoice(actor(r), 'flow-7'))
+      r = finish(s, r, mode !== 'decline')
+      assert.equal(r.state.players[0]!.fenceSegments.length, 0)
+      assert.equal(r.state.players[0]!.resources.stone, mode === 'stone' ? 0 : 1)
+      save(`E015-N3-${mode}`, r)
+    }
+  })
+  it('E015 N4 empty wood entry rejects with stone and a legal nonempty entry still rejects an unaffordable four-fence plan', () => {
+    const card = 'E015_NailBasket'
+    for (const wood of [4, 3]) {
+      const s = setup(card, 14, st => { Object.assign(st.players[0]!.resources, { wood, stone: 1 }); st.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 0 })
+      const r = assertEmptyAccumulationRejected(s, 0, 'forest')
+      assert.equal(r.state.players[0]!.resources.wood, wood)
+      assert.equal(r.state.players[0]!.resources.stone, 1)
+      assert.equal(r.state.players[0]!.fenceSegments.length, 0)
+      save(`E015-N4-empty-${wood}`, r)
+    }
+    const t = setup(card, 14, st => { Object.assign(st.players[0]!.resources, { wood: 2, stone: 1 }); st.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 1 })
+    const r = accept(t, take(t, 'forest'), card)
+    assert.equal(r.state.players[0]!.resources.wood, 3)
+    assert.equal(r.state.players[0]!.resources.stone, 0)
+    assertRejectedUnchanged(t, () => t.commitSelectionChoice(actor(r), { edges: boundary([{ row: 0, col: 3 }]), extraWood: 0 }))
+    assert.equal(t.state.players[0]!.fenceSegments.length, 0)
+    save('E015-N4-short', t.getState())
   })
 })

@@ -4,6 +4,8 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { GameSession } from '../game/authoritative-session'
 import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import '../../shared/cards/C/C155_FoodDistributor'
+import assert from 'node:assert/strict'
+import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
 
 const CARD_ID = 'C155_FoodDistributor'
 const sessions: GameSession[] = []
@@ -53,4 +55,11 @@ describe('C155 authoritative timed reward', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(30)
   })
+})
+
+describe('ae-negative-55-phase', () => {
+  const { sessions, ok, save, make, finish, play, ready, transition } = audit55Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C155 N1 real purchase gives one grain and this returning home pays one food for each of three actually occupied round spaces',()=>{const s=make('C155_FoodDistributor',st=>{st.actionSpaces.find(a=>a.id==='western-quarry')!.resources.stone=1},false,13),purchased=finish(s,play(s,'C155_FoodDistributor'));assert.equal(purchased.state.players[0]!.resources.grain,1);assert.equal(purchased.state.players[0]!.resources.food,100);for(const[actor,space]of[[1,'sheep-market'],[2,'western-quarry'],[3,'vegetable-seeds'],[0,'grain-seeds'],[1,'day-laborer'],[2,'forest'],[3,'clay-pit']]as const){assert.equal(ready(s).state.currentPlayerIndex,actor);finish(s,ok(s.takeAction(actor,space)));}const before=s.getState();assert.equal(before.state.actionSpaces.filter(a=>before.state.roundActionOrder.includes(a.id)&&a.takenBy.length>0).length,3);const returned=transition(s,14);assert.equal(returned.state.players[0]!.resources.food,99);assert.equal(returned.state.players[0]!.resources.grain,2);save('C155-N1',{purchased,before,returned})})
+  it('C155 N2 subsequent returning home and card only in hand cannot pay another occupied-round reward while real purchase undo restores grain and round fact',()=>{const s=make('C155_FoodDistributor',undefined,false,5),purchased=finish(s,play(s,'C155_FoodDistributor')),u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.grain,0);assert.equal(u.state.players[0]!.cardStates.C155_FoodDistributor?.extraData?.purchaseRound,undefined);const hand=make('C155_FoodDistributor',undefined,false,5),handNext=transition(hand,6);assert.equal(handNext.state.players[0]!.cardStates.C155_FoodDistributor?.extraData?.purchaseRound,undefined);const later=make('C155_FoodDistributor',st=>{st.players[0]!.cardStates.C155_FoodDistributor={extraData:{purchaseRound:4}}},true,5),next=transition(later,6);assert.equal(next.state.players[0]!.resources.food,100);save('C155-N2',{purchased,u,handNext,next})})
 })

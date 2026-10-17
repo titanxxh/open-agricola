@@ -4,12 +4,14 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B030_WoodPalisades'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/D/D089_Stablehand'
+import assert from 'node:assert/strict'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 const CARD_ID = 'D089_Stablehand'
 
@@ -220,4 +222,11 @@ describe('D089 Stablehand parity', () => {
     expect(options(response).some((option) => option.sourceCard === CARD_ID)).toBe(false)
     expect(response.interaction.sourceCard).not.toBe(CARD_ID)
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, make, ONE, fence } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D089 N1 four paid fences allow exactly one free stable and optional decline gives none', () => { const s = make('D089_Stablehand', st => { st.players[0]!.resources.wood = 4 }), r = fence(s); assert.equal(r.state.players[0]!.fenceSegments.length, 4); assert.equal(r.state.players[0]!.stableTiles.length, 1); assert.equal(r.state.players[0]!.resources.wood, 0); const c = make('D089_Stablehand', st => { st.players[0]!.resources.wood = 4 }), cr = fence(c, ONE, false); assert.equal(cr.state.players[0]!.stableTiles.length, 0); assert.equal(cr.state.players[0]!.resources.wood, 0); save('D089-N1', { r, cr }) })
+  it('D089 N2 card in hand and exhausted four stable supply cannot add a stable after legal fencing', () => { const s = make('D089_Stablehand', st => { st.players[0]!.resources.wood = 4 }, false), r = fence(s, ONE, false); assert.equal(r.state.players[0]!.stableTiles.length, 0); const c = make('D089_Stablehand', st => { st.players[0]!.resources.wood = 4; st.players[0]!.stableTiles = [{ row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 }, { row: 1, col: 4 }] }), cr = fence(c, ONE, false); assert.equal(cr.state.players[0]!.stableTiles.length, 4); assert.equal(cr.state.players[0]!.resources.wood, 0); save('D089-N2', { r, cr }) })
 })

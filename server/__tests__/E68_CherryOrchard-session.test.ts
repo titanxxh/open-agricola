@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E068_CherryOrchard'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'E068_CherryOrchard'
 const FILLER = '__test_placeholder__'
@@ -188,4 +191,28 @@ describe('E068 Cherry Orchard parity', () => {
 
     expect(fieldScore(response)).toMatchObject({ quantity: 1, total: -1 })
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, ok, save, setup, finish, hand, buy, printed, completeRemaining, cardStacks, tileFor, fieldSession, enterCardSow, sowCard, finishToRound } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E068 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'E068_CherryOrchard'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, {}); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.ok(r.scores);assert.equal(r.scores[0]!.categories.find(c=>c.key==='fields')?.quantity,0);save("E068-N1-legal", r); });
+  it('E068 N2 real purchase and sow create three wood and only the natural last harvest gives a vegetable', () => { const card = 'E068_CherryOrchard', s = fieldSession(card); let r = sowCard(s, card, 'wood'); assert.equal(r.state.players[0]!.resources.wood, 0); assert.deepEqual(cardStacks(r, card), [{ kind: 'wood', remaining: 3 }]); save('E068-N2-sown', r); for (const [target, wood, vegetable, remaining] of [[12, 1, 1, 2], [14, 2, 1, 1]]) {
+      r = finishToRound(s, target!);
+      assert.equal(r.state.players[0]!.resources.wood, wood);
+      assert.equal(r.state.players[0]!.resources.vegetable, vegetable);
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'wood', remaining }]);
+      save(`E068-N2-${target}`, r);
+  } r = finish(s, completeRemaining(s), true); assert.equal(r.state.gameOver, true); assert.equal(r.state.players[0]!.resources.wood, 3); assert.equal(r.state.players[0]!.resources.vegetable, 2); assert.deepEqual(cardStacks(r, card), []); assert.equal(r.state.players[0]!.fields.length, 0); save('E068-N2-final', r); });
+  it('E068 N3 invalid grain target rejects before a real legal card field sow retry', () => { for (const bad of ['grain', 'vegetable'] as const) {
+      const card = 'E068_CherryOrchard', s = fieldSession(card);
+      let r = enterCardSow(s);
+      save(`E068-N3-before-${bad}`, r);
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ ...tileFor(card), crop: bad }] }));
+      assert.deepEqual(cardStacks(s.getState(), card), []);
+      r = ok(s.commitSelectionChoice(0, { crops: [{ ...tileFor(card), crop: 'wood' }] }));
+      assert.deepEqual(cardStacks(r, card), [{ kind: 'wood', remaining: 3 }]);
+      assert.equal(r.state.players[0]!.resources.grain, 1);
+      save(`E068-N3-retry-${bad}`, r);
+  } });
 })

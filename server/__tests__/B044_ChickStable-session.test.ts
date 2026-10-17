@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit20FutureFood from './_helpers/audit/ae-negative-20-future-food'
+
+describe('ae-negative-20-future-food', () => {
+  const { CHICK, sessions, save, ok, setup, menu, buy, schedule, reach } = audit20FutureFood
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B044 N1 real one wood or one clay purchase queues two food at exact third and fourth future rounds',()=>{for(const resource of['wood','clay']as const)for(const round of[5,10,11,12,14]){const s=setup(CHICK,round,state=>state.players[0]!.resources[resource]=1),{pending,r}=buy(s,CHICK);assert.equal(r.state.players[0]!.resources[resource],0);assert.equal(r.state.players[0]!.resources.food,100);assert.deepEqual(schedule(r,CHICK),[3,4].map(n=>round+n).filter(n=>n<=14).map(round=>({round,resources:{food:2}})));save(`B044-N1-${resource}-${round}`,{pending,r})}})
+  it('B044 N2 natural rounds six and seven receive exactly two food each with no early or opponent gain',()=>{const s=setup(CHICK,3,state=>state.players[0]!.resources.wood=1),control=setup(CHICK,3);buy(s,CHICK);buy(control,'B004_WoodPile');const five=reach(s,5),cfive=reach(control,5),six=reach(s,6),csix=reach(control,6),seven=reach(s,7),cseven=reach(control,7);assert.equal(five.state.players[0]!.resources.food,cfive.state.players[0]!.resources.food);assert.equal(six.state.players[0]!.resources.food,csix.state.players[0]!.resources.food+2);assert.equal(seven.state.players[0]!.resources.food,cseven.state.players[0]!.resources.food+4);assert.equal(seven.state.players[1]!.resources.food,cseven.state.players[1]!.resources.food);assert.equal(schedule(seven,CHICK).length,0);save('B044-N2',{five,six,seven})})
+  it('B044 N3 missing both alternative resources refuses and whole purchase undo cancels schedule before one retry',()=>{const poor=setup(CHICK),pending=menu(poor);assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,CHICK));const legal=ok(poor.resolveChoice(0,'B004_WoodPile'));assert.equal(schedule(legal,CHICK).length,0);const s=setup(CHICK,5,state=>state.players[0]!.resources.clay=1),r=buy(s,CHICK).r,undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,1);assert.equal(schedule(undone,CHICK).length,0);const retry=buy(s,CHICK).r;assert.equal(schedule(retry,CHICK).length,2);save('B044-N3',{pending,legal,r,undone,retry})})
+})

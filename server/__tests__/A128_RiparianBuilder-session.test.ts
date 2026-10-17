@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import type { Resource } from '../../shared/contract/types'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
@@ -13,6 +13,9 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import { listener as trueActionListener } from '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit15Build from './_helpers/audit/ae-negative-15-build'
 
 const CARD_ID = 'A128_RiparianBuilder'
 
@@ -450,4 +453,14 @@ describe('A128 Riparian Builder parity', () => {
     expect(nonTarget.interaction.stateId === 'wait' ? nonTarget.interaction.sourceCard : undefined)
       .not.toBe(CARD_ID)
   })
+})
+
+describe('ae-negative-15-build', () => {
+  const { RIPARIAN, sessions, save, ok, setup, turn, select, close, riparian, offer, commitRoom } = audit15Build
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A128 N1 opponent Reed Bank offers exactly one clay stone or ordinary wood room with exact payment',()=>{for(const [material,cost]of [['clay',4],['stone',3],['wood',5]] as const){const s=riparian(material,cost);const pending=offer(s);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.playerIndex===0);const r=commitRoom(s,pending);assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources[material],0);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[1]!.rooms,2);assert.ok(r.state.log.some(e=>e.key==='log.cardGrantedAction'));save(`A128-N1-${material}`,{pending,r})}})
+  it('A128 N2 own Reed Bank unrelated opponent and hand cannot offer owner construction',()=>{const own=turn(riparian('clay',4),0,'reed-bank');assert.equal(own.state.players[0]!.rooms,2);const s=riparian('clay',4);turn(s,0,'day-laborer');const unrelated=turn(s,1,'grain-seeds');assert.equal(unrelated.state.players[0]!.rooms,2);assert.ok(unrelated.interaction.stateId==='wait'&&unrelated.interaction.request.kind==='confirm-next-player');const hs=riparian('clay',4,false);const hand=offer(hs);assert.equal(hand.state.players[0]!.rooms,2);assert.ok(hand.interaction.stateId==='wait'&&hand.interaction.request.kind==='confirm-next-player');save('A128-N2',{own,unrelated,hand})})
+  it('A128 N3 decline and insufficient resources cannot leave a room or consume resources',()=>{const s=riparian('clay',4);const pending=offer(s);const declined=close(s,select(s,pending,false));assert.equal(declined.state.players[0]!.rooms,2);assert.equal(declined.state.players[0]!.resources.clay,4);const poor=riparian('clay',3);const denied=offer(poor);assert.equal(denied.state.players[0]!.rooms,2);if(denied.interaction.stateId==='wait'&&denied.interaction.request.kind==='choice')assert.ok(!denied.interaction.request.options.some(o=>o.value!=='__skip__'&&!o.disabled));save('A128-N3',{declined,denied})})
+  it('A128 N4 wrong actor illegal tile and two room payload reject before one legal room',()=>{const s=setup(RIPARIAN,state=>state.players[0]!.houseType='clay');let pending=offer(s);pending=select(s,pending);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='farm-select');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{rooms:[{row:1,col:1}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:99,col:99}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:1,col:1},{row:2,col:1}]}));const r=commitRoom(s,s.getState());assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources.clay,6);save('A128-N4',{pending,r})})
+  it('A128 N5 ordinary Farm Expansion cannot use the opponent trigger discount',()=>{const poor=riparian('clay',4);assertRejectedUnchanged(poor,()=>poor.takeAction(0,'farm-expansion'));const s=riparian('clay',5);let r=turn(s,0,'farm-expansion');if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'){const o=r.interaction.request.options.find(o=>o.labelKey==='actions.construct.name');assert.ok(o);r=ok(s.resolveChoice(0,o.value))}r=commitRoom(s,r);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.rooms,3);save('A128-N5',r)})
 })

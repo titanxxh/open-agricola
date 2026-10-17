@@ -4,6 +4,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A001_Shelter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit02Immediate from './_helpers/audit/ae-negative-02-immediate'
 
 const CARD_ID = 'A001_Shelter'
 
@@ -112,5 +115,63 @@ describe('A001 Shelter parity', () => {
       .not.toBe(CARD_ID)
     expect(response.state.players[0]!.stableTiles).toEqual([])
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
+})
+
+describe('ae-negative-02-immediate', () => {
+  const { setup, requireWait, play, accept } = audit02Immediate
+  describe('negative audit 02 immediate effects', () => {
+    it('A001 N1: Shelter rejects duplicate and foreign targets then builds one free stable', () => {
+        const session = setup('A001_Shelter', state => {
+          state.players[0]!.pastures = [
+            { id: 'one', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 },
+            { id: 'two', tiles: [{ row: 1, col: 2 }, { row: 1, col: 3 }], animalType: null, animalCount: 0 },
+          ]
+        })
+        const before = undoRuleSnapshot(session.getState())
+        let response = accept(session, play(session, 'A001_Shelter'))
+        const tile = { row: 0, col: 2 }
+        assert.equal(requireWait(response).request.kind, 'farm-select')
+        for (const stables of [[tile, tile], [{ row: 1, col: 2 }], [response.state.players[0]!.roomTiles[0]!]]) {
+          assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables }))
+        }
+        response = session.commitSelectionChoice(0, { stables: [tile] })
+        assert.equal(response.ok, true, response.error)
+        assert.deepEqual(response.state.players[0]!.stableTiles, [tile])
+        assert.equal(response.state.players[0]!.resources.wood, 0)
+        assert(response.state.players[1]!.minorHand.includes('A001_Shelter'))
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables: [tile] }))
+        assertUndoRestored(before, session.undoAction())
+        session.dispose()
+      })
+    it('A001 N2: Shelter cannot build a fifth stable when all four pieces are used', () => {
+        const session = setup('A001_Shelter', state => {
+          const player = state.players[0]!
+          player.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 1, col: 1 }]
+          player.pastures = [{ id: 'one', tiles: [{ row: 1, col: 2 }], animalType: null, animalCount: 0 }]
+        })
+        const response = play(session, 'A001_Shelter')
+        assert.equal(response.ok, true, response.error)
+        assert.equal(response.state.players[0]!.stableTiles.length, 4)
+        assert.equal(response.state.players[0]!.resources.wood, 0)
+        assert(response.state.players[1]!.minorHand.includes('A001_Shelter'))
+        assert.equal(requireWait(response).request.kind, 'confirm-next-player')
+        session.dispose()
+      })
+    it('A001 N3: Shelter must reject a stable inside a two-space pasture', () => {
+        const session = setup('A001_Shelter', state => {
+          state.players[0]!.pastures = [
+            { id: 'one', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 },
+            { id: 'two', tiles: [{ row: 1, col: 2 }, { row: 1, col: 3 }], animalType: null, animalCount: 0 },
+          ]
+        })
+        accept(session, play(session, 'A001_Shelter'))
+        assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { stables: [{ row: 1, col: 2 }] }))
+        const response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 2 }] })
+        assert.equal(response.ok, true, response.error)
+        assert.equal(response.state.players[0]!.stableTiles.length, 1)
+        assert.equal(response.state.players[0]!.resources.wood, 0)
+        session.dispose()
+      })
   })
 })

@@ -4,6 +4,9 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { choose, playOccupation, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
 import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected } from './_helpers/negative-rule-audit'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'E105_Pioneer'
 const FIREPLACE = 'Major_Fireplace1'
@@ -119,4 +122,11 @@ describe('E105 Pioneer before placement action', () => {
       expect(available()).toBe(false)
     })
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, pioneerChoice } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E105 N1 actual first Lessons chooses each of four building resources and grants exactly one food', () => { for (const resource of ['wood', 'clay', 'reed', 'stone'] as const) { const s = make('E105_Pioneer', undefined, false), r = pioneerChoice(s, lesson(s, 'E105_Pioneer'), resource); assert.equal(r.state.players[0]!.resources[resource], 1); assert.equal(r.state.players[0]!.resources.food, 101); assert.equal([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.clay, r.state.players[0]!.resources.reed, r.state.players[0]!.resources.stone].filter(n => n > 0).length, 1); save(`E105-N1-${resource}`, r) } })
+  it('E105 N2 most recently revealed empty Cattle Market rejects without Pioneer bonuses and another action gives none', () => { const s = make('E105_Pioneer', st => { st.roundActionOrder[7] = 'cattle-market'; st.actionSpaces.find(a => a.id === 'cattle-market')!.resources.cattle = 0 }, true, 8), r = assertEmptyAccumulationRejected(s, 0, 'cattle-market'); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.food, 100); assert.equal(r.state.players[0]!.resources.cattle, 0); const c = make('E105_Pioneer'), cr = finish(c, ok(c.takeAction(0, 'day-laborer')), false); assert.equal(cr.state.players[0]!.resources.food, 102); assert.equal(cr.state.players[0]!.resources.wood, 0); save('E105-N2', { r, cr }) })
 })

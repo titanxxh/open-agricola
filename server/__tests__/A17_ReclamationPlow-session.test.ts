@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -11,6 +11,12 @@ import type { ActionExecutionResult } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A017_ReclamationPlow'
 import '../../shared/cards/A/A137_RiverineShepherd'
+import '../../shared/cards/A/A016_RammedClay'
+import '../../shared/cards/A/A019_Handplow'
+import '../../shared/cards/A/A009_YoungAnimalMarket'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit05Fields from './_helpers/audit/ae-negative-05-fields'
 
 const CARD_ID = 'A017_ReclamationPlow'
 const A137_ID = 'A137_RiverineShepherd'
@@ -272,5 +278,98 @@ describe('A017_ReclamationPlow session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .not.toBe('ui.interactionReclamationPlow')
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.flagged).toBeFalsy()
+  })
+})
+
+describe('ae-negative-05-fields', () => {
+  const { RECLAMATION, sessions, setup, ok, choices, enter, buy, turn, reclamation, keep, trigger, accept, plow, obtainedSheep, flagged, nextRound } = audit05Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A017 N1 real purchase pays one wood and zero wood rejects before legal retry', () => {
+    const s = setup(RECLAMATION, { played: false, resources: { wood: 1 } })
+    const r = buy(s, enter(s), RECLAMATION)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+    assert.equal(r.state.players[0]!.minorPlayed.includes(RECLAMATION), true)
+    const poor = setup(RECLAMATION, { played: false })
+    const offer = enter(poor)
+    assert.equal(choices(offer).some(o => o.value === RECLAMATION && !('disabled' in o && o.disabled)), false)
+    assertRejectedUnchanged(poor, () => poor.resolveChoice(0, RECLAMATION))
+    assert.equal(buy(poor, offer, 'A054_Credit').state.players[0]!.minorHand.includes(RECLAMATION), true)
+  })
+  it('A017 N2 all obtained animals enable one plow only after rejected occupied outboard and nonadjacent targets', () => {
+    const s = reclamation({ existingField: true })
+    ok(s.takeAction(0, 'sheep-market'))
+    const offer = trigger(s, keep(s,1))
+    assert.equal(flagged(offer), true)
+    assert.equal(obtainedSheep(offer),1)
+    assert.equal(offer.state.players[0]!.fields.length, 1)
+    const r = accept(s, offer)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { tile: { row: 1,col: 2 } }))
+    for (const tile of [{row:1,col:0},{row:99,col:99},{row:2,col:4}]) assertRejectedUnchanged(s, () => s.commitSelectionChoice(0,{tile}))
+    const built = plow(s,r,{row:1,col:2},2)
+    assert.equal(built.state.players[0]!.fields.length, 2)
+    assert.equal(built.state.players[0]!.resources.sheep, 1)
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0,{tile:{row:1,col:2}}))
+  })
+  it('A017 N3 declining first full accommodation consumes the opportunity on a later real animal take', () => {
+    const s = reclamation()
+    ok(s.takeAction(0,'sheep-market'))
+    trigger(s,keep(s,1))
+    const declined = ok(s.resolveChoice(0,'__skip__'))
+    assert.equal(flagged(declined),true); assert.equal(declined.state.players[0]!.fields.length,0)
+    nextRound(s)
+    turn(s,0,'sheep-market')
+    const r = keep(s,2)
+    assert.equal(flagged(r),true); assert.equal(r.state.players[0]!.fields.length,0)
+    assert.ok(r.interaction.stateId==='wait' && r.interaction.request.kind==='confirm-next-player')
+  })
+  it('A017 N4 partial accommodation does not trigger or consume before a later qualifying animal take', () => {
+    const s = reclamation({sheep:2})
+    ok(s.takeAction(0,'sheep-market'))
+    const partial = keep(s,1)
+    assert.equal(obtainedSheep(partial),2)
+    const discards=partial.state.events.filter(event=>event.type==='farm.animalDiscarded')
+    assert.equal(discards.length,1)
+    const discarded=discards[0]!
+    assert.ok(discarded.type==='farm.animalDiscarded');assert.deepEqual(discarded.animals,{sheep:1})
+    assert.equal(flagged(partial),false); assert.equal(partial.state.players[0]!.fields.length,0)
+    nextRound(s)
+    const r = turn(s,0,'sheep-market')
+    assert.equal(r.state.players[0]!.resources.sheep,2)
+    const offer = trigger(s,keep(s,2))
+    const built = plow(s,accept(s,offer),{row:0,col:2})
+    assert.equal(flagged(built),true); assert.equal(built.state.players[0]!.fields.length,1)
+  })
+  it('A017 N5 opponent animal take does not flag or plow for the owner', () => {
+    const s = reclamation()
+    turn(s,0,'grain-seeds')
+    turn(s,1,'sheep-market')
+    const r = keep(s,1,1,true)
+    assert.equal(flagged(r),false); assert.equal(r.state.players[0]!.fields.length,0); assert.equal(r.state.players[1]!.fields.length,0)
+  })
+  it('A017 N6 improvement animal reward is not an animal accumulation source', () => {
+    const s = setup(RECLAMATION,{resources:{sheep:1},configure(state){state.players[0]!.minorHand.push('A009_YoungAnimalMarket')}})
+    const r = buy(s,enter(s),'A009_YoungAnimalMarket')
+    assert.equal(r.state.players[0]!.resources.cattle,1)
+    const kept = ok(s.resolveChoice(0,'confirm',{zones:[{id:'house:2-0',zoneType:'house',animalType:'cattle',animalCount:1}]}))
+    assert.equal(flagged(kept),false); assert.equal(kept.state.players[0]!.fields.length,0)
+  })
+  it('A017 N7 empty animal take and non animal action do not offer a plow', () => {
+    const s = reclamation({sheep:0})
+    const r = assertEmptyAccumulationRejected(s, 0, 'sheep-market')
+    assert.equal(flagged(r),false); assert.equal(r.state.players[0]!.resources.sheep,0)
+    assert.equal(r.interaction.stateId, 'idle')
+    const other = reclamation()
+    const grain = ok(other.takeAction(0,'grain-seeds'))
+    assert.equal(flagged(grain),false); assert.equal(grain.state.players[0]!.fields.length,0)
+  })
+  it('A017 N8 undo restores animals field once flag and worker before a single legal retry', () => {
+    const s = reclamation()
+    const before = undoRuleSnapshot(s.getState())
+    ok(s.takeAction(0,'sheep-market'))
+    const r = plow(s,accept(s,trigger(s,keep(s,1))),{row:0,col:2})
+    assert.equal(r.state.players[0]!.fields.length,1)
+    assertUndoRestored(before,s.undoAction())
+    ok(s.takeAction(0,'sheep-market'))
+    assert.equal(plow(s,accept(s,trigger(s,keep(s,1))),{row:0,col:2}).state.players[0]!.fields.length,1)
   })
 })

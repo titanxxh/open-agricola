@@ -6,9 +6,11 @@ import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confi
 import '../../shared/cards/B/B096_TreeFarmJoiner'
 import '../../shared/cards/B/B004_WoodPile'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import assert from 'node:assert/strict'
+import * as audit26Delayed from './_helpers/audit/ae-negative-26-delayed'
 
 const CARD_ID = 'B096_TreeFarmJoiner'
 const MINOR_ID = 'B004_WoodPile'
@@ -199,4 +201,13 @@ describe('B096 Tree Farm Joiner parity', () => {
     expect(response.state.players[0]!.minorHand).toContain(MINOR_ID)
     expect(response.state.players[1]!.minorHand).not.toContain(MINOR_ID)
   })
+})
+
+describe('ae-negative-26-delayed', () => {
+  const { JOIN, sessions, save, ok, finish, make, lesson, future, nextRound } = audit26Delayed
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B096 N1 actual first Lessons schedules exactly the next two odd rounds with one wood each and truncates at round fourteen',()=>{for(const[round,rounds]of[[8,[9,11]],[9,[11,13]],[12,[13]],[14,[]]]as const){const s=make(JOIN,100,round),a=lesson(s,JOIN),r=finish(s,a.chosen,false);assert.deepEqual(future(r,JOIN),rounds.map(round=>({round,resources:{wood:1}})));assert.equal(r.state.players[0]!.resources.wood,4);save(`B096-N1-${round}`,{a,r})}})
+  it('B096 N2 natural odd round delivery grants one wood then optional minor purchase pays printed reed without a person',()=>{const s=make(JOIN),a=lesson(s,JOIN),r=finish(s,a.chosen,false),pending=nextRound(s,9);let p=pending;for(let n=0;n<8;n++){assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='choice');const target=p.interaction.request.options.find(o=>o.value==='A056_Basket');if(target){assert.ok(!p.interaction.request.options.some(o=>o.value.startsWith('Major_')),JSON.stringify(p.interaction));const bought=finish(s,ok(s.resolveChoice(0,target.value)),false);assert.ok(bought.state.players[0]!.minorPlayed.includes('A056_Basket'));assert.equal(bought.state.players[0]!.resources.reed,p.state.players[0]!.resources.reed-1);assert.equal(future(bought,JOIN).length,1);save('B096-N2',{a,r,pending,p,bought});return}const o=p.interaction.request.options.find(o=>o.value!=='__skip__'&&o.value!=='__done__');assert.ok(o);p=ok(s.resolveChoice(0,o.value))}assert.fail('Minor menu not reached')})
+  it('B096 N3 declining actual scheduled minor preserves hand and remaining scheduled wood',()=>{const s=make(JOIN),a=lesson(s,JOIN),r=finish(s,a.chosen,false),pending=nextRound(s,9),after=finish(s,pending,false);assert.ok(after.state.players[0]!.minorHand.includes('A056_Basket'));assert.equal(future(after,JOIN).length,1);save('B096-N3',{a,r,pending,after})})
+  it('B096 N4 whole Lessons undo removes future wood while unrelated action with card in hand creates no schedule',()=>{const s=make(JOIN),a=lesson(s,JOIN),r=finish(s,a.chosen,false),undone=ok(s.undoAction());assert.equal(future(undone,JOIN).length,0);assert.ok(undone.state.players[0]!.occupationHand.includes(JOIN));const after=finish(s,ok(s.takeAction(0,'grain-seeds')),false);assert.equal(future(after,JOIN).length,0);save('B096-N4',{a,r,undone,after})})
 })

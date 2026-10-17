@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { AnimalType } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/C/C167_CattleBuyer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit58Livestock from './_helpers/audit/ae-negative-58-livestock'
 
 const CARD_ID = 'C167_CattleBuyer'
 
@@ -174,5 +177,59 @@ describe('C167 Cattle Buyer parity', () => {
     expect(response.interaction.stateId === 'wait'
       ? response.interaction.request.options?.some((option) => option.sourceCard === CARD_ID) ?? false
       : false).toBe(false)
+  })
+})
+
+describe('ae-negative-58-livestock', () => {
+  const { sessions, animals, ok, gainOf, save, make, finish, enter, choose, fencing, count } = audit58Livestock
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C167 N1 real opponent Fencing buys exactly one sheep boar or cattle for one two or two food', () => {
+    for (const animal of animals) {
+      const session = make('C167_CattleBuyer', state => { state.currentPlayerIndex = 1; state.players[0]!.resources.food = 2; state.players[1]!.resources.wood = 4 })
+      const pending = fencing(session)
+      const response = finish(session, choose(session, pending, option => gainOf(option)?.[animal] === 1))
+      assert.equal(response.state.players[0]!.resources.food, animal === 'sheep' ? 1 : 0)
+      assert.deepEqual(count(response), animals.map(candidate => candidate === animal ? 1 : 0))
+      assert.equal(response.state.players[1]!.resources.wood, 0)
+      assert.deepEqual(animals.map(candidate => response.state.players[1]!.resources[candidate]), [0, 0, 0])
+      save(`C167-N1-${animal}`, { pending, response })
+    }
+  })
+  it('C167 N2 one food excludes expensive animals zero food gives no purchase and optional decline preserves food', () => {
+    const session = make('C167_CattleBuyer', state => { state.currentPlayerIndex = 1; state.players[0]!.resources.food = 1; state.players[1]!.resources.wood = 4 })
+    const pending = enter(session, fencing(session), option => gainOf(option)?.sheep === 1)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.deepEqual(pending.interaction.request.options.filter(option => !option.disabled && option.value !== '__skip__').map(option => gainOf(option)), [{ sheep: 1 }])
+    const declined = finish(session, ok(session.resolveChoice(pending.interaction.playerIndex, '__skip__')))
+    assert.equal(declined.state.players[0]!.resources.food, 1)
+    assert.deepEqual(count(declined), [0, 0, 0])
+    const zero = make('C167_CattleBuyer', state => { state.currentPlayerIndex = 1; state.players[0]!.resources.food = 0; state.players[1]!.resources.wood = 4 })
+    const response = finish(zero, fencing(zero))
+    assert.deepEqual(count(response), [0, 0, 0])
+    save('C167-N2', { pending, declined, response })
+  })
+  it('C167 N3 own Fencing and card in hand cannot trigger while each real fence action still builds four fences', () => {
+    for (const [actor, played] of [[0, true], [1, false]] as const) {
+      const session = make('C167_CattleBuyer', state => { state.currentPlayerIndex = actor; state.players[actor]!.resources.wood = 4 }, played)
+      if (!played) assert.ok(session.getState().state.players[0]!.occupationHand.includes('C167_CattleBuyer'))
+      const response = finish(session, fencing(session, actor), true)
+      assert.deepEqual(count(response), [0, 0, 0])
+      assert.equal(response.state.players[actor]!.fenceSegments.length, 4)
+      save(`C167-N3-${actor}`, response)
+    }
+  })
+  it('C167 N4 invalid purchase choice preserves pending before legal sheep purchase and foreign response blocks whole undo', () => {
+    const session = make('C167_CattleBuyer', state => { state.currentPlayerIndex = 1; state.players[0]!.resources.food = 2; state.players[1]!.resources.wood = 4 })
+    const pending = enter(session, fencing(session), option => gainOf(option)?.sheep === 1)
+    assert.ok(pending.interaction.stateId === 'wait')
+    const rejected = assertRejectedUnchanged(session, () => session.resolveChoice(pending.interaction.stateId === 'wait' ? pending.interaction.playerIndex : 0, '__invalid_animal__'))
+    const response = finish(session, choose(session, pending, option => gainOf(option)?.sheep === 1))
+    const undoRejected = assertRejectedUnchanged(session, () => session.undoAction())
+    assert.deepEqual(count(response), [1, 0, 0])
+    assert.match(undoRejected.error ?? '', /cannot undo past boundary/)
+    assert.equal(undoRejected.state.players[0]!.resources.food, 1)
+    assert.equal(undoRejected.state.players[1]!.resources.wood, 0)
+    assert.equal(undoRejected.state.players[1]!.fenceSegments.length, 4)
+    save('C167-N4', { pending, rejected, response, undoRejected })
   })
 })

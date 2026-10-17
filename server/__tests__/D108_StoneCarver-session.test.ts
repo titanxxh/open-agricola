@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D108_StoneCarver'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'D108_StoneCarver'
 const FILLER = '__test_placeholder__'
@@ -163,4 +166,12 @@ describe('D108 Stone Carver parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, food: 4 })
     expect(stoneCarverConversions(response)).toHaveLength(0)
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, feedMenu, harvestTrade, workTrade } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D108 N1 harvest exchanges exactly one stone for three food and rejects two before legal retry', () => { const s = make('D108_StoneCarver', st => { st.players[0]!.resources.stone = 2 }, true, 4), p = feedMenu(s), rejected = assertRejectedUnchanged(s, () => harvestTrade(s, 'D108_StoneCarver', 2)), r = finish(s, harvestTrade(s, 'D108_StoneCarver', 1), false); assert.equal(r.state.players[0]!.resources.stone, 1); assert.equal(r.state.players[0]!.resources.food, 99); save('D108-N1', { p, rejected, r }) })
+  it('D108 N2 harvest decline and work phase keep stone while zero supply cannot convert', () => { const s = make('D108_StoneCarver', st => { st.players[0]!.resources.stone = 2 }, true, 4), p = feedMenu(s), r = finish(s, ok(s.resolveChoice(0, 'confirm', { selections: [] })), false); assert.equal(r.state.players[0]!.resources.stone, 2); assert.equal(r.state.players[0]!.resources.food, 96); const w = make('D108_StoneCarver', st => { st.players[0]!.resources.stone = 2 }), wr = finish(w, ok(w.takeAction(0, 'grain-seeds')), false); assert.equal(wr.state.players[0]!.resources.stone, 2); assert.equal(wr.state.players[0]!.resources.food, 100); const c = make('D108_StoneCarver', st => { st.players[0]!.resources.food = 0 }, true, 4), cp = feedMenu(c), rejected = assertRejectedUnchanged(c, () => harvestTrade(c, 'D108_StoneCarver', 1)), cr = finish(c, ok(c.resolveChoice(0, 'confirm', { selections: [] })), false); assert.equal(cr.state.players[0]!.resources.food, 0); save('D108-N2', { p, r, wr, cp, rejected, cr }) })
+  it('D108 N3 actual work exchange excludes Stone Carver while Fireplace vegetable conversion preserves both stones', () => { const s = make('D108_StoneCarver', st => { Object.assign(st.players[0]!.resources, { stone: 2, vegetable: 1 }); st.players[0]!.improvements = ['Major_Fireplace1'] }), a = workTrade(s, 'D108_StoneCarver', 'vegetable'); assert.equal(a.r.state.players[0]!.resources.stone, 2); save('D108-N3', a) })
 })

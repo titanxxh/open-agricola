@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E042_WaterGully'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit35Future from './_helpers/audit/ae-negative-35-future'
 
 const CARD_ID = 'E042_WaterGully'
 const FILLER = '__test_placeholder__'
@@ -179,4 +182,31 @@ describe('E042 Water Gully parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ cattle: 2, grain: 1 })
     expect(schedule(response)).toEqual([])
   })
+})
+
+describe('ae-negative-35-future', () => {
+  const { sessions, save, finish, progress, buy, future, delayed } = audit35Future
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E042 N1 actual Major Well one stone purchase queues cattle grain cattle and natural six seven eight receive both cattle in a real enclosed pasture', () => { const s = delayed('E042_WaterGully'), bought = finish(s, buy(s, 'E042_WaterGully')); assert.equal(bought.state.players[0]!.resources.stone, 0); assert.deepEqual(future(bought, 'E042_WaterGully'), [{ round: 6, kind: 'cattle', n: 1 }, { round: 7, kind: 'grain', n: 1 }, { round: 8, kind: 'cattle', n: 1 }]); const six = progress(s, 6), seven = progress(s, 7), eight = progress(s, 8); assert.deepEqual([six.state.players[0]!.resources.cattle, six.state.players[0]!.pastures[0]!.animalCount], [1, 1]); assert.equal(seven.state.players[0]!.resources.grain, 1); assert.deepEqual([eight.state.players[0]!.resources.cattle, eight.state.players[0]!.pastures[0]!.animalCount], [2, 2]); save('E042-N1', { bought, six, seven, eight }); });
+  it('E042 N2 no Major Well no stone and a held card cannot create or receive future cattle', () => {
+      const rows = [];
+      for (const [eligible, pay] of [[false, true], [true, false]] as const) {
+          const s = delayed('E042_WaterGully', 5, false, eligible, pay), p = buy(s, 'E042_WaterGully'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E042_WaterGully'));
+          assert.ok(p.state.players[0]!.minorHand.includes('E042_WaterGully'));
+          assert.deepEqual(future(p, 'E042_WaterGully'), []);
+          rows.push({ p, bad });
+      }
+      const t = delayed('E042_WaterGully'), hand = progress(t, 6);
+      assert.equal(hand.state.players[0]!.resources.cattle, 0);
+      save('E042-N2', { rows, hand });
+  });
+  it('E042 N3 round twelve thirteen fourteen purchases retain the original cattle grain cattle ordering without moving out of range goods onto fourteen', () => {
+      const rows = [];
+      for (const [round, expected] of [[12, [{ round: 13, kind: 'cattle', n: 1 }, { round: 14, kind: 'grain', n: 1 }]], [13, [{ round: 14, kind: 'cattle', n: 1 }]], [14, []]] as const) {
+          const s = delayed('E042_WaterGully', round), r = finish(s, buy(s, 'E042_WaterGully'));
+          assert.deepEqual(future(r, 'E042_WaterGully'), expected);
+          rows.push(r);
+      }
+      save('E042-N3', rows);
+  });
 })

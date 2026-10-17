@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import {
@@ -12,6 +12,9 @@ import '../../shared/cards/B/B030_WoodPalisades'
 import '../../shared/cards/B/B094_StockProtector'
 import '../../shared/cards/C/C001_Overhaul'
 import '../../shared/cards/E/E108_BlackberryFarmer'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit03MultiStep from './_helpers/audit/ae-negative-03-multi-step'
 
 const CARD_ID = 'C001_Overhaul'
 const B030_ID = 'B030_WoodPalisades'
@@ -470,5 +473,48 @@ describe('C1 Overhaul session', () => {
         animalCount: 2,
       },
     ])
+  })
+})
+
+describe('ae-negative-03-multi-step', () => {
+  const { sessions, OVERHAUL, one, two, ok, wait, play, fenceSetup } = audit03MultiStep
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('Overhaul mandatory reconstruction', () => {
+    it('C001 N1 raze cannot be canceled or add four fences and legal reconstruction keeps animals', () => {
+      const s = fenceSetup(one, true)
+      const before = undoRuleSnapshot(s.getState())
+      let r = play(s, OVERHAUL)
+      assert.equal(wait(r).request.kind, 'farm-select')
+      assert.equal(r.state.players[0]!.fenceSegments.length, 0)
+      assert.equal(r.state.players[0]!.resources.sheep, 2)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { cancel: true }))
+      const eight = ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4']
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: eight, palisadeEdges: [], extraWood: 0 }))
+      r = ok(s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
+      assert.equal(r.state.players[0]!.fenceSegments.length, 4)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.resources.sheep, 2)
+      assert(r.state.players[1]!.minorHand.includes(OVERHAUL))
+      assertUndoRestored(before, s.undoAction())
+    })
+    it('C001 N2 valid four-edge enclosure cannot replace seven returned fences', () => {
+      const s = fenceSetup(two)
+      play(s, OVERHAUL)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
+      const r = ok(s.commitSelectionChoice(0, { edges: two, palisadeEdges: [], extraWood: 0 }))
+      assert.equal(r.state.players[0]!.fenceSegments.length, 7)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+    })
+    it('C001 N3 a sixteen-fence plan cannot exceed the fifteen-piece supply after returning thirteen', () => {
+      const thirteen = ['H-0-1', 'H-0-2', 'H-0-3', 'H-0-4', 'H-1-1', 'H-1-2', 'H-1-3', 'H-1-4', 'V-0-1', 'V-0-2', 'V-0-3', 'V-0-4', 'V-0-5']
+      const s = fenceSetup(thirteen)
+      const sixteen = [...thirteen, 'H-2-3', 'V-1-3', 'V-1-4']
+      const fifteen = sixteen.filter(edge => edge !== 'H-1-3')
+      play(s, OVERHAUL)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: sixteen, palisadeEdges: [], extraWood: 0 }))
+      const r = ok(s.commitSelectionChoice(0, { edges: fifteen, palisadeEdges: [], extraWood: 0 }))
+      assert.equal(r.state.players[0]!.fenceSegments.length, 15)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+    })
   })
 })

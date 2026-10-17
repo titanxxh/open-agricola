@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { AnytimeAction } from '../../shared/contract/types'
 import '../../shared/cards/B/B069_PottersMarket'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit21Potters from './_helpers/audit/ae-negative-21-potters'
 
 const CARD_ID = 'B069_PottersMarket'
 
@@ -135,4 +138,14 @@ describe("B069 Potter's Market parity", () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 3, food: 2, vegetable: 0 })
     expect(pendingVegetables(response)).toBe(0)
   })
+})
+
+describe('ae-negative-21-potters', () => {
+  const { CARD, sessions, save, ok, setup, finish, buy, reach, ANYTIME, queue, loaded, active, use } = audit21Potters
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B069 N1 real two wood purchase gains no vegetable schedules nothing and whole undo restores cost',()=>{const s=setup(CARD,5,state=>state.players[0]!.resources.wood=2),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.vegetable,0);assert.deepEqual(queue(r),[]);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,2);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const retry=buy(s,CARD).r;assert.deepEqual(queue(retry),[]);save('B069-N1',{pending,r,undone,retry})})
+  it('B069 N2 recorded current three clay two food boundary pays once and insufficient resources or hand exclude anytime',()=>{const s=loaded(3,2),pending=active(s),r=use(s);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.resources.vegetable,0);assert.deepEqual(queue(r),[{round:6,resources:{vegetable:1}},{round:7,resources:{vegetable:1}}]);for(const[clay,food,played]of[[2,2,true],[3,1,true],[3,2,false]]as const){const t=loaded(clay,food,played),before=active(t);assert.ok(!before.interaction.anytimeActions.some(a=>a.id===ANYTIME));assertRejectedUnchanged(t,()=>t.takeAnytimeAction(0,ANYTIME));assert.deepEqual(queue(t.getState()),[])}save('B069-N2',{pending,r,ruleLimit:'Frozen CSV four clay conflicts with both current implementations three; cost oracle deferred'})})
+  it('B069 N3 two real current anytime payments stack independent future vegetables and wrong actor cannot add another',()=>{const s=loaded(6,4),pending=active(s),one=use(s);assertRejectedUnchanged(s,()=>s.takeAnytimeAction(1,ANYTIME));const two=use(s);assert.equal(two.state.players[0]!.resources.clay,0);assert.equal(two.state.players[0]!.resources.food,0);assert.equal(queue(two).reduce((n,x)=>n+(x.resources.vegetable??0),0),4);assert.equal(two.state.players[1]!.resources.vegetable,0);save('B069-N3',{pending,one,two})})
+  it('B069 N4 actual active payment and natural two round starts deliver vegetables only at exact due rounds',()=>{const s=loaded(3),c=loaded(3,100,false),pending=active(s),cpending=active(c);use(s);finish(s,s.getState());finish(c,cpending);const six=reach(s,6),csix=reach(c,6),seven=reach(s,7),cseven=reach(c,7),eight=reach(s,8),ceight=reach(c,8);assert.equal(six.state.players[0]!.resources.vegetable,csix.state.players[0]!.resources.vegetable+1);assert.equal(seven.state.players[0]!.resources.vegetable,cseven.state.players[0]!.resources.vegetable+2);assert.equal(eight.state.players[0]!.resources.vegetable,ceight.state.players[0]!.resources.vegetable+2);assert.deepEqual(queue(eight),[]);assert.equal(eight.state.players[1]!.resources.vegetable,ceight.state.players[1]!.resources.vegetable);save('B069-N4',{pending,cpending,six,csix,seven,cseven,eight,ceight})})
+  it('B069 N5 late round thirteen schedules only reachable fourteen and recorded final round behavior preserves OA resources',()=>{const s=loaded(3,2,true,13),pending=active(s),r=use(s);assert.deepEqual(queue(r),[{round:14,resources:{vegetable:1}}]);const t=loaded(3,2,true,14),last=active(t);assert.ok(!last.interaction.anytimeActions.some(a=>a.id===ANYTIME));assertRejectedUnchanged(t,()=>t.takeAnytimeAction(0,ANYTIME));assert.equal(t.getState().state.players[0]!.resources.clay,3);assert.equal(t.getState().state.players[0]!.resources.food,2);save('B069-N5',{pending,r,last,ruleLimit:'Final round availability differs historically; independent ruling deferred'})})
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
@@ -7,6 +7,8 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import '../../shared/cards/D/D065_GrainSieve'
 import type { ActionFlow } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import assert from 'node:assert/strict'
+import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 
 const CARD_ID = 'D065_GrainSieve'
 
@@ -130,4 +132,30 @@ describe('D065_GrainSieve session', () => {
     // Only 1 grain field (remaining: 2 yields 1 grain) => +1 grain from harvest, no bonus
     expect(player.resources.grain).toBe(grainBefore + 1)
   })
+})
+
+describe('ae-negative-40-crops', () => {
+  const { sessions, save, setup, finish, completeRound, hand, buy, printed, fields, denyMinor } = audit40Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D065 N1 actual hand purchase pays printed cost and meets each prerequisite', () => { const card = 'D065_GrainSieve'; const s = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.resources.wood, 0); save("D065-N1-legal", r); const t = setup(card, 14, st => { hand(st, card); Object.assign(st.players[0]!.resources, { "wood": 0 }); }); denyMinor(t, card); save("D065-N1-short", t.getState()); });
+  it('D065 N2 natural field phases reward two and three harvested grain exactly once', () => { for (const n of [2, 3]) {
+      const card = 'D065_GrainSieve', s = setup(card, 7, st => fields(st, n, Array.from({ length: n }, () => ({ kind: 'grain', remaining: 2 }))));
+      const r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'fishing']));
+      assert.equal(r.state.round, 8);
+      assert.equal(r.state.players[0]!.resources.grain, n + 1);
+      assert.equal(r.state.players[0]!.resources.food, 36);
+      assert.equal(r.state.players[0]!.fields.every(f => f.stacks?.[0]?.remaining === 1), true);
+      save(`D065-N2-${n}`, r);
+  } });
+  it('D065 N3 old grain vegetables hand and nonharvest exclude the extra grain', () => { for (const mode of ['old', 'vegetable', 'hand', 'nonharvest']) {
+      const card = 'D065_GrainSieve', s = setup(card, mode === 'nonharvest' ? 6 : 7, st => { if (mode === 'vegetable')
+          fields(st, 2, [{ kind: 'vegetable', remaining: 2 }, { kind: 'vegetable', remaining: 2 }]);
+      else
+          fields(st, mode === 'hand' ? 2 : 1, Array.from({ length: 2 }, () => ({ kind: 'grain', remaining: 2 }))); if (mode === 'old')
+          st.players[0]!.resources.grain = 20; if (mode === 'hand')
+          hand(st, card); });
+      const r = finish(s, completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'fishing']));
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'old' ? 21 : mode === 'hand' ? 2 : 0);
+      save(`D065-N3-${mode}`, r);
+  } });
 })

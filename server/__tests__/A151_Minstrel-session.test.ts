@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -6,6 +6,9 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A151_Minstrel'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit16Minstrel from './_helpers/audit/ae-negative-16-minstrel'
 
 const CARD_ID = 'A151_Minstrel'
 
@@ -216,4 +219,13 @@ describe('A151 Minstrel authoritative return-home flow', () => {
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-16-minstrel', () => {
+  const { CARD, sessions, save, setup, end, EIGHT } = audit16Minstrel
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A151 N1 real eight placements leave one vacant stage one space for workerless return home use',()=>{const s=setup();const {pending,r}=end(s,EIGHT,true);assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[0]!.workers.filter(w=>w.isActive).length,2);assert.equal(r.state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep,1);assert.equal(r.state.actionSpaces.find(a=>a.id==='sheep-market')!.takenBy.length,0);save('A151-N1',{pending,r})})
+  it('A151 N2 decline and hand leave vacant sheep accumulation untouched until next refill',()=>{for(const played of[true,false]){const s=setup(played);const {pending,r}=end(s,EIGHT,false);assert.equal(r.state.players[0]!.resources.sheep,0);assert.equal(r.state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep,2);save(`A151-N2-${played}`,{pending,r})}})
+  it('A151 N3 zero and two vacant stage one spaces cannot offer extra action',()=>{for(const spaces of[['sheep-market','fencing','major-improvement','grain-utilization','forest','reed-bank','clay-pit','fishing'],['day-laborer','fencing','major-improvement','traveling-players','forest','reed-bank','clay-pit','fishing']]){const s=setup();const {pending,r}=end(s,spaces,true);assert.equal(r.state.players[0]!.resources.sheep,spaces[0]==='sheep-market'?1:0);assert.ok(pending.interaction.stateId!=='wait'||pending.interaction.sourceCard!==CARD);save(`A151-N3-${spaces[0]}`,{pending,r})}})
+  it('A151 N4 sole unaffordable major target cannot offer unpaid action or stale return use',()=>{const s=setup(true,state=>state.players[0]!.resources.clay=0);const spaces=['day-laborer','fencing','sheep-market','grain-utilization','forest','reed-bank','grove','fishing'];const {pending,r}=end(s,spaces,true);assert.ok(pending.interaction.stateId!=='wait'||pending.interaction.sourceCard!==CARD);assert.equal(r.state.players[0]!.improvements.length,0);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'reuse-return-home'));save('A151-N4',{pending,r})})
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,9 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { commitFirstPlow, setupSowingSession, sowOptions } from './_helpers/batch07-sowing'
 
 import '../../shared/cards/A/A018_WheelPlow'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit04Plows from './_helpers/audit/ae-negative-04-plows'
 
 const CARD_ID = 'A018_WheelPlow'
 const FILLER = '__test_placeholder__'
@@ -165,5 +168,73 @@ describe('A018 Wheel Plow parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields.map((field) => field.stacks[0]?.remaining)).toEqual([3, 3, 3])
     expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+})
+
+describe('ae-negative-04-plows', () => {
+  const { WHEEL, sessions, ok, setup, choice, turn, play, farm, plow, skip, fields, finished, endRound, invalidBonus, blockedPurchase } = audit04Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  describe('Wheel Plow negative audit', () => {
+    it('A018 N1 real purchase enforces wood and two occupation prerequisites', () => {
+      blockedPurchase(WHEEL, { occupations: 1, resources: { wood: 2 } })
+      blockedPurchase(WHEEL, { resources: { wood: 1 } })
+      const r = play(setup({ played: false, resources: { wood: 2 } }), WHEEL)
+      assert.ok(r.state.players[0]!.minorPlayed.includes(WHEEL)); assert.equal(r.state.players[0]!.resources.wood, 0)
+    })
+    it('A018 N2 first person bonus rejects invalid geometry and undo restores once allowance', () => {
+      const s = setup()
+      let r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 1 })
+      farm(s, r); invalidBonus(s)
+      r = plow(s, s.getState(), { row: 0, col: 2 })
+      r = plow(s, r, { row: 0, col: 3 })
+      assert.equal(fields(r), 3); assert.equal(r.state.players[0]!.cardStates[WHEEL]?.flagged, true); finished(r)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 0, col: 4 } }))
+      const original = setup(); const before = undoRuleSnapshot(original.getState())
+      let done = plow(original, turn(original, 0, 'farmland')); done = plow(original, done); done = plow(original, done)
+      assert.equal(fields(done), 3)
+      assertUndoRestored(before, original.undoAction())
+      done = plow(original, turn(original, 0, 'farmland')); done = plow(original, done); done = plow(original, done)
+      assert.equal(fields(done), 3)
+      endRound(original)
+      const later = plow(original, turn(original, 0, 'farmland'))
+      assert.equal(fields(later), 4); finished(later)
+    })
+    it('A018 N3 second person and opponent Farmland cannot grant owner bonus', () => {
+      const s = setup(); turn(s, 0, 'grain-seeds')
+      let r = turn(s, 1, 'farmland'); r = plow(s, r)
+      assert.equal(r.state.players[1]!.fields.length, 1)
+      turn(s, 0, 'day-laborer'); const next = confirmNext(s, turn(s, 1, 'forest'))
+      assert.equal(next.state.round, 2)
+      turn(s, 0, 'grain-seeds'); turn(s, 1, 'forest')
+      r = plow(s, turn(s, 0, 'farmland'))
+      assert.equal(fields(r), 1); assert.ok(!r.state.players[0]!.cardStates[WHEEL]?.flagged); finished(r)
+    })
+    it('A018 N4 Cultivation bonus fields belong to the same sow action', () => {
+      const s = setup({ round: 14, resources: { grain: 3 } })
+      let r = plow(s, turn(s, 0, 'cultivation')); r = plow(s, r); r = plow(s, r)
+      assert.equal(fields(r), 3)
+      r = choice(s, r, o => o.value === 'sow' || o.labelKey === 'actions.sow.name')
+      r = ok(s.commitSelectionChoice(0, { crops: r.state.players[0]!.fields.map(({ row, col }) => ({ row, col, crop: 'grain' })) }))
+      assert.equal(r.state.players[0]!.resources.grain, 0)
+      assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining), [3, 3, 3]); finished(r)
+    })
+    it('A018 N5 decline consumption is recorded without deciding the optional allowance rule', () => {
+      const s = setup(); let r = plow(s, turn(s, 0, 'farmland')); r = skip(s, r)
+      assert.equal(fields(r), 1); finished(r)
+      assert.equal(r.state.players[0]!.cardStates[WHEEL]?.flagged, true)
+      endRound(s)
+      r = plow(s, turn(s, 0, 'farmland'))
+      assert.equal(fields(r), 2); finished(r)
+    })
+    it('A018 N6 last free farm tile cannot create phantom bonus fields', () => {
+      const s = setup({ lastPlot: true }); const r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 4 })
+      assert.equal(fields(r), 13); finished(r)
+    })
+  })
+  it('A018 N7 final plot bonus-first and normal-first paths complete without phantom fields', () => {
+    const s = setup({ lastPlot: true }); const normal = turn(s, 0, 'farmland')
+    assert.notEqual(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, WHEEL)
+    const r = plow(s, normal, { row: 0, col: 4 })
+    assert.equal(fields(r), 13); assert.equal(r.state.players[0]!.cardStates[WHEEL]?.flagged, true); finished(r)
   })
 })

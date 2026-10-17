@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D081_RoofLadder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Renovation from './_helpers/audit/ae-negative-43-renovation'
 
 const CARD_ID = 'D081_RoofLadder'
 
@@ -118,4 +121,11 @@ describe('D081 Roof Ladder parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.stone).toBe(0)
   })
+})
+
+describe('ae-negative-43-renovation', () => {
+  const { ROOF, sessions, save, ok, make, finish, purchase, buildings } = audit43Renovation
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D081 N1 actual wood purchase and two renovation directions waive reed and grant one stone only afterward',()=>{const s=make(ROOF,false,state=>state.players[0]!.resources.wood=1),a=purchase(s,ROOF);assert.equal(a.r.state.players[0]!.resources.wood,0);const outcomes=[];for(const house of['wood','clay'] as const){const t=make(ROOF,true,state=>{const p=state.players[0]!;p.houseType=house;p.resources[house==='wood'?'clay':'stone']=2}),r=finish(t,ok(t.takeAction(0,'house-redevelopment')));assert.equal(r.state.players[0]!.houseType,house==='wood'?'clay':'stone');assert.deepEqual(buildings(r),{food:0,wood:0,clay:0,reed:0,stone:1});outcomes.push(r)}save('D081-N1',{a,outcomes})})
+  it('D081 N2 future stone cannot fund current renovation and unrelated action grants no stone',()=>{const s=make(ROOF,true,state=>{state.players[0]!.houseType='clay';state.players[0]!.resources.stone=1}),bad=assertRejectedUnchanged(s,()=>s.takeAction(0,'house-redevelopment')),legal=ok(s.takeAction(0,'grain-seeds'));assert.equal(legal.state.players[0]!.resources.stone,1);const t=make(ROOF),other=ok(t.takeAction(0,'day-laborer'));assert.equal(other.state.players[0]!.resources.stone,0);save('D081-N2',{bad,legal,other})})
 })

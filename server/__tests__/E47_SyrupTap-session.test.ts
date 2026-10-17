@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
@@ -11,6 +11,8 @@ import { E047_SyrupTap_impl } from '../../shared/cards/E/E047_SyrupTap'
 
 import '../../shared/cards/E/E047_SyrupTap'
 import '../../shared/cards/C/C162_ForestOwner'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'E047_SyrupTap'
 
@@ -326,4 +328,27 @@ describe('E047 Syrup Tap parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(1)
     expect(futureFood(response)).toEqual([])
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, take, choose, finish, ready, fill, end, final, minor, purchase, rejectBuy, resource, future, points, ownMajor } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("E047 N1 real purchase and an actual wood accumulation collection queue exactly one next-round food", () => { const s = make('E047_SyrupTap', st => Object.assign(st.players[0]!.resources, { wood: 1, stone: 1 }), false), bought = purchase(s, 'E047_SyrupTap'); resource(bought, { wood: 0, stone: 0 }); fill(s); ready(s); const r = finish(s, take(s, 0, 'forest')); resource(r, { wood: 3, food: 100 }); assert.deepEqual(future(r, 'E047_SyrupTap'), [6]); const due = end(s); resource(due, { food: 101 }); assert.deepEqual(future(due, 'E047_SyrupTap'), []); save('E047-N1', { bought, r, due }); });
+  it("E047 N2 held card opponent and nonwood actions cannot schedule Syrup Tap and either cost shortage rejects", () => { for (const mode of ['wood', 'stone'])
+      save(`E047-N2-buy-${mode}`, rejectBuy(make('E047_SyrupTap', st => Object.assign(st.players[0]!.resources, { wood: mode === 'wood' ? 0 : 1, stone: mode === 'stone' ? 0 : 1 }), false), 'E047_SyrupTap')); for (const mode of ['hand', 'opponent', 'clay', 'labor']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('E047_SyrupTap', st => { st.currentPlayerIndex = a; Object.assign(st.players[0]!.resources, { wood: 1, stone: 1 }); }, mode !== 'hand'), r = finish(s, take(s, a, mode === 'clay' ? 'clay-pit' : mode === 'labor' ? 'day-laborer' : 'forest'), true, [], 'E047_SyrupTap');
+      assert.deepEqual(future(r, 'E047_SyrupTap'), []);
+      resource(r, { food: mode === 'labor' ? 102 : 100 });
+      save(`E047-N2-${mode}`, r);
+  } });
+  it("E047 N3 card-granted wood is excluded and late wood collections never schedule round fifteen", () => { const s = make('E047_SyrupTap', st => ownMajor(st, 'Major_Joinery')), p = minor(s), gift = finish(s, choose(s, 0, 'A006_StorageBarn'), true, [], 'E047_SyrupTap'); resource(gift, { wood: 1 }); assert.deepEqual(future(gift, 'E047_SyrupTap'), []); save('E047-N3-gift', { p, gift }); for (const round of [13, 14]) {
+      const t = make('E047_SyrupTap', undefined, true, round), r = finish(t, take(t, 0, 'forest'));
+      resource(r, { wood: 3 });
+      assert.deepEqual(future(r, 'E047_SyrupTap'), round === 13 ? [14] : []);
+      const due = round === 13 ? end(t) : final(t);
+      if (round === 13)
+          resource(due, { food: 97 });
+      else assert.equal(points(due,'E047_SyrupTap'),1);
+      save(`E047-N3-${round}`, { r, due });
+  } });
 })

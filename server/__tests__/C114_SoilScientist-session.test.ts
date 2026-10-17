@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C114_SoilScientist'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'C114_SoilScientist'
 const FILLER = '__test_placeholder__'
@@ -140,4 +142,43 @@ describe('C114 Soil Scientist parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, grain: 0, vegetable: 0 })
     expect(cardOption(response)).toBeUndefined()
   })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, save, setup, source, finish, next } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C114 N1 Clay Pit and Quarry put payment on their physical space and give exact grain or vegetable reward', () => {
+    for (const mode of ['clay', 'stone']) {
+      const s = setup('C114_SoilScientist', 14, state => { state.players[0]!.resources.stone = mode === 'clay' ? 1 : 0; state.players[0]!.resources.clay = mode === 'stone' ? 2 : 0; })
+      let r = source(s, ok(s.takeAction(0, mode === 'clay' ? 'clay-pit' : 'western-quarry')), 'C114_SoilScientist')
+      r = finish(s, r, true)
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'clay' ? 2 : 0)
+      assert.equal(r.state.players[0]!.resources.vegetable, mode === 'stone' ? 1 : 0)
+      assert.equal(r.state.players[0]!.resources[mode === 'clay' ? 'stone' : 'clay'], 0)
+      assert.equal(r.state.actionSpaces.find(a => a.id === (mode === 'clay' ? 'clay-pit' : 'western-quarry'))!.resources[mode === 'clay' ? 'stone' : 'clay'], mode === 'clay' ? 1 : 2)
+      save(`C114-N1-${mode}`, r)
+    }
+  })
+  it('C114 N2 decline or insufficient opposite goods and real opponent use give owner no crop reward', () => {
+    for (const mode of ['decline', 'stone-short', 'clay-short', 'opponent', 'unrelated']) {
+      const s = setup('C114_SoilScientist', 14, state => {
+        if (mode === 'decline') {
+          state.players[0]!.resources.stone = 1
+        }
+        else if (mode === 'clay-short')
+          state.players[0]!.resources.clay = 1
+      })
+      let r = finish(s, ok(s.takeAction(0, mode === 'clay-short' ? 'western-quarry' : mode === 'opponent' || mode === 'unrelated' ? 'forest' : 'clay-pit')))
+      if (mode === 'opponent') {
+        next(s)
+        r = finish(s, ok(s.takeAction(1, 'clay-pit')))
+      }
+      assert.equal(r.state.players[0]!.resources.grain, 0)
+      assert.equal(r.state.players[0]!.resources.vegetable, 0)
+      if (mode === 'decline')
+        assert.equal(r.state.players[0]!.resources.stone, 1)
+      save(`C114-N2-${mode}`, r)
+    }
+  })
+  it('C114 N3 a mixed Clay Pit pile still uses clay space rule and deposits stone rather than buying vegetables', () => { const s = setup('C114_SoilScientist', 14, state => { state.players[0]!.resources.stone = 1; state.actionSpaces.find(a => a.id === 'clay-pit')!.resources.stone = 1; }); const r = finish(s, ok(s.takeAction(0, 'clay-pit')), true); assert.equal(r.state.players[0]!.resources.grain, 2); assert.equal(r.state.players[0]!.resources.vegetable, 0); assert.equal(r.state.players[0]!.resources.clay, 2); assert.equal(r.state.players[0]!.resources.stone, 1); assert.equal(r.state.actionSpaces.find(a => a.id === 'clay-pit')!.resources.stone, 1); save('C114-N3', r); })
 })

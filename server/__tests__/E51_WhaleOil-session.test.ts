@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import '../../shared/cards/A/A116_WoodCutter'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -9,6 +9,9 @@ import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E051_WhaleOil'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'E051_WhaleOil'
 
@@ -266,4 +269,57 @@ describe('E051 Whale Oil parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(5)
     expect(cardFood(response)).toBe(0)
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, finish, next, lesson, take, move, prerequisites, hand, buy, printed, denyMinor, completeRemaining } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E051 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'E051_WhaleOil', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.resources.wood, 0); save('E051-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 0 }); }); denyMinor(t, card); save('E051-N1-short', t.getState()); });
+  it('E051 N2 empty Fishing rejects without storing food while nonempty Fishing funds later occupation fees', () => {
+    const card = 'E051_WhaleOil'
+    const prepare = (pile: number) => setup(card, 5, st => { hand(st, card); st.players[0]!.occupationPlayed = ['A125_Priest']; st.players[0]!.occupationHand = ['A098_StableArchitect', 'A101_CookeryOutfitter']; Object.assign(st.players[0]!.resources, { wood: 1, food: 0 }); st.actionSpaces.find(a => a.id === 'fishing')!.resources.food = pile })
+    const empty = prepare(0)
+    finish(empty, buy(empty, card)); move(empty, 'grain-seeds'); next(empty)
+    const rejected = assertEmptyAccumulationRejected(empty, 0, 'fishing')
+    assert.equal(rejected.state.players[0]!.resources.food, 0)
+    assert.equal(rejected.state.players[0]!.cardStates[card]?.extraData?.foodCount, 0)
+    save('E051-N2-empty-rejected', rejected)
+    const s = prepare(1)
+    finish(s, buy(s, card)); move(s, 'grain-seeds'); next(s)
+    let r = finish(s, take(s, 'fishing'))
+    assert.equal(r.state.players[0]!.resources.food, 1)
+    assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.foodCount, 1)
+    r = finish(s, completeRemaining(s)); assert.equal(r.state.round, 6)
+    r = finish(s, lesson(s, 'A098_StableArchitect'))
+    assert.equal(r.state.players[0]!.resources.food, 1)
+    assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.foodCount, 1)
+    save('E051-N2-first-occupation', r)
+    move(s, 'grain-seeds'); next(s); r = finish(s, take(s, 'fishing'))
+    assert.equal(r.state.players[0]!.resources.food, 2)
+    assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.foodCount, 2)
+    r = finish(s, completeRemaining(s)); assert.equal(r.state.round, 7)
+    r = finish(s, lesson(s, 'A101_CookeryOutfitter'))
+    assert.equal(r.state.players[0]!.resources.food, 3)
+    assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.foodCount, 2)
+    save('E051-N2-second-occupation', r)
+  });
+  it('E051 N3 hand opponent unrelated and empty stock cannot produce owner occupation income', () => {
+      for (const mode of ['hand', 'opponent', 'unrelated', 'stock']) {
+          const card = 'E051_WhaleOil', s = setup(card, 14, st => {
+              if (mode === 'hand')
+                  hand(st, card);
+              if (mode === 'opponent')
+                  st.currentPlayerIndex = 1;
+              if (mode === 'stock') {
+                  st.players[0]!.occupationPlayed = ['A125_Priest'];
+                  st.players[0]!.occupationHand = ['A098_StableArchitect'];
+                  st.players[0]!.resources.food = 1;
+              }
+          });
+          const r = finish(s, mode === 'stock' ? lesson(s, 'A098_StableArchitect') : take(s, mode === 'unrelated' ? 'forest' : 'fishing'), true);
+          assert.equal(r.state.players[0]!.cardStates[card]?.extraData?.foodCount ?? 0, 0);
+          assert.equal(r.state.players[0]!.resources.food, mode === 'stock' ? 0 : mode === 'hand' ? 41 : 40);
+          save(`E051-N3-${mode}`, r);
+      }
+  });
 })

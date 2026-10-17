@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
@@ -6,6 +6,9 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/B/B072_LoveforAgriculture'
 import type { AnimalZone } from '../../shared/domain/animal-zones'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit22Love from './_helpers/audit/ae-negative-22-love'
 
 
 type PastureCrop = { pastureId: string; crop: 'grain' | 'vegetable'; remaining: number }
@@ -484,4 +487,13 @@ describe('B072_LoveforAgriculture session', () => {
       }
     })
   })
+})
+
+describe('ae-negative-22-love', () => {
+  const { CARD, sessions, save, ok, finish, buy, reach, make, sow, crops, capacity } = audit22Love
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B072 N1 actual free purchase preserves pasture and supplies with whole purchase undo',()=>{const s=make(1,false),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(r.state.players[0]!.pastures.length,1);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(capacity(s,r),2);const undone=ok(s.undoAction());assert.ok(undone.state.players[0]!.minorHand.includes(CARD));save('B072-N1',{pending,r,undone})})
+  it('B072 N2 real one and two space pasture sow pays one crop makes exact grain or vegetable stack and reduces capacity by area',()=>{for(const size of[1,2])for(const crop of['grain','vegetable']as const){const s=make(size),a=sow(s,crop);assert.equal(a.r.state.players[0]!.resources[crop],0);assert.deepEqual(crops(a.r),[{pastureId:'love',tiles:Array.from({length:size},(_,i)=>({row:0,col:2+i})),crop,remaining:crop==='grain'?3:2}]);assert.equal(capacity(s,a.r),size);assert.equal(a.r.state.players[0]!.pastures.length,1);assert.equal(a.r.state.players[0]!.fields.length,0);save(`B072-N2-${size}-${crop}`,a)}})
+  it('B072 N3 size three or hand card cannot sow and wrong actor or nonpasture coordinate rejects before legal sow undo',()=>{for(const mode of['large','hand']){const s=make(mode==='large'?3:1,mode!=='hand');assertRejectedUnchanged(s,()=>s.takeAction(0,'grain-utilization'));assert.equal(crops(s.getState()),undefined);save(`B072-N3-${mode}`,s.getState())}const s=make(2);let pending=ok(s.takeAction(0,'grain-utilization'));if(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice'){const o=pending.interaction.request.options.find(o=>o.value==='sow');assert.ok(o);pending=ok(s.resolveChoice(0,o.value))}assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{crops:[{row:0,col:2,crop:'grain'}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{row:2,col:4,crop:'grain'}]}));const r=finish(s,ok(s.commitSelectionChoice(0,{crops:[{row:0,col:2,crop:'grain'}]})),false),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,1);assert.equal(capacity(s,undone),4);assert.ok(!crops(undone)||(crops(undone)as unknown[]).length===0);const retry=sow(s,'grain');assert.equal(capacity(s,retry.r),2);save('B072-N3',{pending,r,undone,retry})})
+  it('B072 N4 natural harvest reaps one pasture crop and the next harvest exhausts vegetable restoring capacity without removing fences',()=>{const s=make(2);sow(s,'vegetable');const eight=reach(s,8,false),ten=reach(s,10,false);assert.equal(eight.state.players[0]!.resources.vegetable,1);assert.equal(capacity(s,eight),2);assert.equal(ten.state.players[0]!.resources.vegetable,2);assert.equal(capacity(s,ten),4);assert.deepEqual(crops(ten),[]);assert.equal(ten.state.players[0]!.fenceSegments.length,6);assert.equal(ten.state.players[0]!.pastures.length,1);save('B072-N4',{eight,ten})})
 })

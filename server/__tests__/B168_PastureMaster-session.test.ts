@@ -5,13 +5,17 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/B/B168_PastureMaster'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
+import assert from 'node:assert/strict'
+import { positionKey } from '../../shared/domain/farm'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit31Plows from './_helpers/audit/ae-negative-31-plows'
 
 const CARD_ID = 'B168_PastureMaster'
 
@@ -334,4 +338,75 @@ describe('B168 Pasture Master parity', () => {
       food: 2, sheep: 0, boar: 0, cattle: 0,
     })
   })
+})
+
+describe('ae-negative-31-plows', () => {
+  const { sessions, save, setup, finish, next, lesson, take, move, noSource, pasture, animalKeep, renovate } = audit31Plows
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('B168 N1 real renovation adds food and exactly one sheep per occupied pasture with a stable', () => {
+    for (const both of [false, true]) {
+      const card = 'B168_PastureMaster', s = setup(card, 14, st => { Object.assign(st.players[0]!.resources, { clay: 2, reed: 1 }); pasture(st, [{ row: 0, col: 3 }], 'sheep', 1, true, 'p1'); pasture(st, [{ row: 0, col: 4 }], 'sheep', 1, both, 'p2'); })
+      let r = renovate(s, take(s, 'house-redevelopment'))
+      r = animalKeep(s, r, req => {
+        for (const z of req.zones) {
+          if (z.id === 'p1') {
+            z.animalType = 'sheep'
+            z.animalCount = 2
+          }
+          else if (z.id === 'p2') {
+            z.animalType = 'sheep'
+            z.animalCount = both ? 2 : 1
+          }
+          else {
+            z.animalType = null
+            z.animalCount = 0
+          }
+        }
+      })
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.houseType, 'clay')
+      assert.equal(r.state.players[0]!.resources.food, 22)
+      assert.equal(r.state.players[0]!.resources.sheep, both ? 4 : 3)
+      assert.deepEqual(r.state.players[0]!.pastures.map(p => p.animalCount), both ? [2, 2] : [2, 1])
+      save(`B168-N1-${both}`, r)
+    }
+  })
+  it('B168 N2 empty stable pasture and occupied unfenced stable yield food but no additional animal', () => {
+    for (const mode of ['empty', 'loose']) {
+      const card = 'B168_PastureMaster', s = setup(card, 14, st => {
+        Object.assign(st.players[0]!.resources, { clay: 2, reed: 1 })
+        pasture(st, [{ row: 0, col: 3 }], null, 0, true)
+        if (mode === 'loose') {
+          st.players[0]!.stableTiles.push({ row: 1, col: 3 })
+          st.players[0]!.stableAnimals[positionKey({ row: 1, col: 3 })] = { animalType: 'sheep', animalCount: 1 }
+          st.players[0]!.resources.sheep = 1
+        }
+      })
+      const r = finish(s, renovate(s, take(s, 'house-redevelopment')), true)
+      assert.equal(r.state.players[0]!.resources.food, 22)
+      assert.equal(r.state.players[0]!.resources.sheep, mode === 'loose' ? 1 : 0)
+      save(`B168-N2-${mode}`, r)
+    }
+  })
+  it('B168 N3 opponent renovation and hand-only occupation cannot give the owner food or sheep', () => {
+    for (const mode of ['hand', 'opponent']) {
+      const card = 'B168_PastureMaster', s = setup(card, 14, st => {
+        pasture(st, [{ row: 0, col: 3 }], 'sheep', 1, true)
+        if (mode === 'hand') {
+          st.players[0]!.occupationPlayed = []
+          st.players[0]!.occupationHand = [card]
+        }
+        else
+          st.currentPlayerIndex = 1
+        Object.assign(st.players[mode === 'opponent' ? 1 : 0]!.resources, { clay: 2, reed: 1 })
+      })
+      let r = take(s, 'house-redevelopment')
+      noSource(r, card)
+      r = finish(s, renovate(s, r), true)
+      assert.equal(r.state.players[0]!.resources.food, 20)
+      assert.equal(r.state.players[0]!.resources.sheep, 1)
+      save(`B168-N3-${mode}`, r)
+    }
+  })
+  it('B168 N4 real occupation play does not reward and unaffordable renovation rejects', () => { const card = 'B168_PastureMaster', s = setup(card, 14, st => { st.players[0]!.occupationPlayed = []; st.players[0]!.occupationHand = [card]; Object.assign(st.players[0]!.resources, { clay: 1, reed: 1 }); }); const r = finish(s, lesson(s, card), true); assert.ok(r.state.players[0]!.occupationPlayed.includes(card)); assert.equal(r.state.players[0]!.resources.food, 20); next(s); move(s, 'grain-seeds'); next(s); assertRejectedUnchanged(s, () => s.takeAction(0, 'house-redevelopment')); assert.equal(s.state.players[0]!.resources.food, 20); assert.equal(s.state.players[0]!.houseType, 'wood'); save('B168-N4', s.getState()); })
 })

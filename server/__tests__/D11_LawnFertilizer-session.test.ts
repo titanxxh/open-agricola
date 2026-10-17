@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A012_DrinkingTrough'
 import '../../shared/cards/D/D011_LawnFertilizer'
+import assert from 'node:assert/strict'
+import * as audit27Capacity from './_helpers/audit/ae-negative-27-capacity'
 
 const CARD_ID = 'D011_LawnFertilizer'
 
@@ -145,4 +147,13 @@ describe('D011_LawnFertilizer session', () => {
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(2)
     expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
   })
+})
+
+describe('ae-negative-27-capacity', () => {
+  const { LAWN, sessions, save, ok, finish, make, capacityCase, menu } = audit27Capacity
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D011 N1 actual reorganization allows exactly three sheep in a one cell pasture without stable and rejects fourth',()=>{capacityCase(LAWN,1,false,3,'D011-N1')})
+  it('D011 N2 actual reorganization allows exactly six sheep in a stabled one cell pasture and rejects seventh',()=>{capacityCase(LAWN,1,true,6,'D011-N2')})
+  it('D011 N3 two cell pastures retain ordinary four or eight capacity and reject capacity plus one',()=>{for(const stable of[false,true])capacityCase(LAWN,2,stable,stable?8:4,`D011-N3-${stable}`)})
+  it('D011 N4 real free purchase and whole undo preserve pasture geometry while restoring card hand',()=>{const s=make(LAWN,1,false,false),before=ok(s.getState()),pending=menu(s),r=finish(s,ok(s.resolveChoice(0,LAWN)),false),undone=ok(s.undoAction());assert.ok(r.state.players[0]!.minorPlayed.includes(LAWN));assert.ok(undone.state.players[0]!.minorHand.includes(LAWN));assert.deepEqual(undone.state.players[0]!.pastures,before.state.players[0]!.pastures);assert.equal(undone.state.players[0]!.stableTiles.length,0);save('D011-N4',{before,pending,r,undone})})
 })

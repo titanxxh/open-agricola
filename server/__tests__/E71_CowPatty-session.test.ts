@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E071_CowPatty'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit41Harvest from './_helpers/audit/ae-negative-41-harvest'
 
 const CARD_ID = 'E071_CowPatty'
 const FILLER = '__test_placeholder__'
@@ -237,5 +240,19 @@ describe('E071 Cow Patty parity', () => {
 
     expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
+  })
+})
+
+describe('ae-negative-41-harvest', () => {
+  const { sessions, ok, save, setup, finish, play, next, sow, source, cowFarm } = audit41Harvest
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E071 N1 real cattle prerequisite purchase offers only freshly sown adjacent fields and rejects old field before legal two field bonus',()=>{
+   const s=setup('E071_CowPatty',st=>{cowFarm(st);Object.assign(st.players[0]!.resources,{grain:1,vegetable:1})},false,5),bought=play(s,'E071_CowPatty');next(s,bought);next(s,finish(s,ok(s.takeAction(1,'reed-bank'))));const p=sow(s,ok(s.takeAction(0,'grain-utilization')),[{row:0,col:1,crop:'grain'},{row:1,col:1,crop:'vegetable'}]),q=source(s,p,'E071_CowPatty','selection'),bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:0,col:3}]})),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1},{row:1,col:1}]})));assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,4);assert.equal(r.state.players[0]!.fields[1]!.stacks[0]!.remaining,3);assert.equal(r.state.players[0]!.fields[6]!.stacks[0]!.remaining,2);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.vegetable,0);save('E071-N1',{bought,p,q,bad,r})
+  })
+  it('E071 N2 diagonal field held card and decline cannot add a bonus to a freshly paid seed',()=>{
+   for(const mode of ['diagonal','hand','decline']){const s=setup('E071_CowPatty',st=>{cowFarm(st,mode!=='diagonal');st.players[0]!.resources.grain=1},mode!=='hand',5),tile=mode==='diagonal'?{row:1,col:1}:{row:0,col:1},r=finish(s,sow(s,ok(s.takeAction(0,'grain-utilization')),[{...tile,crop:'grain'}]),false,mode==='decline'?undefined:'E071_CowPatty');assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,3);assert.equal(r.state.players[0]!.resources.grain,0);save(`E071-N2-${mode}`,r)}
+  })
+  it('E071 N3 an already played card still adds one adjacent crop when no cattle remain because cattle is a purchase prerequisite',()=>{
+   const s=setup('E071_CowPatty',st=>{cowFarm(st,true,0);st.players[0]!.resources.grain=1},true,5),p=sow(s,ok(s.takeAction(0,'grain-utilization')),[{row:0,col:1,crop:'grain'}]),q=source(s,p,'E071_CowPatty','selection'),r=finish(s,ok(s.commitSelectionChoice(0,{positions:[{row:0,col:1}]})));assert.equal(r.state.players[0]!.resources.cattle,0);assert.equal(r.state.players[0]!.fields[0]!.stacks[0]!.remaining,4);save('E071-N3',{p,q,r})
   })
 })

@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A057_MilkingParlor'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit08Income from './_helpers/audit/ae-negative-08-income'
 
 const CARD_ID = 'A057_MilkingParlor'
 const FILLER = '__test_placeholder__'
@@ -118,5 +121,30 @@ describe('A057 Milking Parlor parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, food: 0 })
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+  })
+})
+
+describe('ae-negative-08-income', () => {
+  const { PARLOR, sessions, buy, deny, ready, turn, food, parlor, printed, cookSheep } = audit08Income
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A057 N1 actual Milking Parlor purchase needs two wood and four distinct unused farm spaces', () => {
+    deny(parlor({ wood: 1 }), PARLOR); deny(parlor({ unused: 3 }), PARLOR); const r = buy(parlor(), PARLOR); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(printed(r), 1); assert.equal(r.state.players[0]!.resources.food, 40)
+  })
+  it('A057 N2 legally housed sheep thresholds include intervening two and over four cap', () => {
+    for (const [sheep, bonus] of [[0, 0], [1, 2], [2, 2], [3, 3], [4, 4], [5, 4]] satisfies Array<[number, number]>) { const r = buy(parlor({ sheep }), PARLOR); assert.equal(r.state.players[0]!.resources.food, 40 + bonus); assert.equal(printed(r), 1) }
+  })
+  it('A057 N3 legally housed cattle thresholds include over three cap', () => {
+    for (const [cattle, bonus] of [[0, 0], [1, 2], [2, 3], [3, 4], [4, 4]] satisfies Array<[number, number]>) { const r = buy(parlor({ cattle }), PARLOR); assert.equal(r.state.players[0]!.resources.food, 40 + bonus); assert.equal(printed(r), 1) }
+  })
+  it('A057 N4 combined sheep and cattle bonus is immediate and later real cooking cannot claw it back', () => {
+    const s = parlor({ sheep: 4, cattle: 3, fireplace: true }); let r = buy(s, PARLOR); assert.equal(r.state.players[0]!.resources.food, 48); turn(s, 1, 'forest'); ready(s, 0)
+    r = cookSheep(s, 4); assert.equal(r.state.players[0]!.resources.sheep, 0); assert.equal(r.state.players[0]!.resources.cattle, 3); assert.equal(r.state.players[0]!.resources.food, 56); assert.equal(printed(r), 1)
+    const before = parlor({ sheep: 4, cattle: 3, fireplace: true }); assert.equal(cookSheep(before, 4).state.players[0]!.resources.food, 48); r = buy(before, PARLOR); assert.equal(r.state.players[0]!.resources.food, 52); assert.equal(printed(r), 1)
+  })
+  it('A057 N5 whole purchase undo restores bonus wood and printed point before stale safe retry', () => {
+    const s = parlor({ sheep: 1, cattle: 1 }); const before = undoRuleSnapshot(s.getState()); let r = buy(s, PARLOR); assert.equal(r.state.players[0]!.resources.food, 44); assert.equal(printed(r), 1); assertRejectedUnchanged(s, () => s.resolveChoice(0, PARLOR)); assertUndoRestored(before, s.undoAction()); r = buy(s, PARLOR); assert.equal(r.state.players[0]!.resources.food, 44); assert.equal(printed(r), 1)
+  })
+  it('A057 N6 opponent housed sheep and cattle do not count for owner purchase bonus', () => {
+    const r = buy(parlor({ sheep: 4, cattle: 3, opponent: true }), PARLOR); assert.deepEqual(food(r), [40, 40]); assert.equal(r.state.players[0]!.resources.sheep, 0); assert.equal(r.state.players[0]!.resources.cattle, 0); assert.equal(printed(r), 1)
   })
 })

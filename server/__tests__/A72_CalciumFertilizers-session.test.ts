@@ -1,11 +1,15 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterAll, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A072_CalciumFertilizers'
 import '../../shared/cards/B/B113_PatchCaregiver'
+import assert from 'node:assert/strict'
+import fs from './_helpers/audit-evidence-fs'
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit10FieldSource from './_helpers/audit/ae-negative-10-field-source'
 
 const CARD_ID = 'A072_CalciumFertilizers'
 
@@ -477,4 +481,25 @@ describe('A072_CalciumFertilizers session', () => {
     expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
+})
+
+describe('ae-negative-10-field-source', () => {
+  const { CALCIUM, root, sessions, saved, save, setup, buy, deny, turn, fields, board, cropSupply, calcium } = audit10FieldSource
+  afterAll(() => { fs.mkdirSync(root, { recursive: true }); fs.writeFileSync(`${root}/manifest.json`, JSON.stringify({ raw: process.env.AGRICOLA_NEGATIVE_RAW === '1', files: saved }, null, 2)) })
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A072 N1 free purchase allows a Card Field but refuses one farmyard field tile', () => {
+   deny(setup(CALCIUM, { played: false, round: 14 }, state => fields(state, [null])), CALCIUM)
+   const s = setup(CALCIUM, { played: false, round: 14 }, state => { state.players[0]!.minorPlayed.push('B068_Beanfield'); state.players[0]!.occupationPlayed = ['A125_Priest', 'A111_WallBuilder']; state.players[0]!.cardStates.B068_Beanfield = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } } }); const r = buy(s, CALCIUM); assert.ok(r.state.players[0]!.minorPlayed.includes(CALCIUM)); assert.equal(r.state.players[0]!.fields.length, 0); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 }); assert.equal(r.state.players[0]!.resources.food, 40)
+  })
+  it('A072 N2 each real quarry grows each planted crop field once and leaves an empty field empty', () => {
+   for (const space of ['eastern-quarry', 'western-quarry']) { const s = calcium(); const before = s.getState().scores; const r = turn(s, 0, space); assert.deepEqual(board(r), [3, 2, 0]); assert.equal(r.state.players[0]!.resources.stone, 1); assert.deepEqual(cropSupply(r), { grain: 0, vegetable: 0 }); assert.ok(before); assert.ok(r.scores); assert.equal(r.state.log.filter(e => e.key === 'log.farmCropAdded').length, 2); save(`A072-N2-${space}`, { scoresBefore: before, response: r }) }
+  })
+  it('A072 N3 a legal vegetable Card Field grows once while Wood Field stays unchanged', () => {
+   const s = calcium(true, state => { const p = state.players[0]!; p.minorPlayed.push('B068_Beanfield', 'D075_WoodField'); p.occupationPlayed = ['A125_Priest', 'A111_WallBuilder']; p.cardStates.B068_Beanfield = { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } }; p.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }, { crop: 'wood', remaining: 1 }] } } }); const r = turn(s, 0, 'western-quarry'); assert.deepEqual(r.state.players[0]!.cardStates.B068_Beanfield?.extraData?.cardFieldStacks, [{ crop: 'vegetable', remaining: 3 }]); assert.deepEqual(r.state.players[0]!.cardStates.D075_WoodField?.extraData?.cardFieldStacks, [{ crop: 'wood', remaining: 2 }, { crop: 'wood', remaining: 1 }]); assert.deepEqual(board(r), [3, 2, 0]); save('A072-N3-card-fields', r)
+  })
+  it('A072 N4 unplayed owner opponent quarry and non quarry stone purchase cannot grow owner fields', () => {
+   let r = turn(calcium(false), 0, 'eastern-quarry'); assert.deepEqual(board(r), [2, 1, 0]); const s = calcium(); turn(s, 0, 'reed-bank'); r = turn(s, 1, 'eastern-quarry'); assert.deepEqual(board(r), [2, 1, 0]); assert.equal(r.state.players[1]!.resources.stone, 1)
+   const other = setup('B006_ExcursiontotheQuarry', { played: false, round: 14 }, state => { const p = state.players[0]!; p.minorPlayed = [CALCIUM]; p.occupationPlayed = ['A125_Priest']; fields(state, [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 1 }]) }); r = buy(other, 'B006_ExcursiontotheQuarry'); assert.deepEqual(board(r), [2, 1]); assert.equal(r.state.players[0]!.resources.stone, 2); assert.equal(r.state.players[0]!.resources.food, 38)
+  })
+  it('A072 N5 actual quarry undo restores crops supply worker pile logs and score before one retry', () => { const s = calcium(), before = undoRuleSnapshot(s.getState()); turn(s, 0, 'eastern-quarry'); const undone = s.undoAction(); save('A072-N5-undo', { before: JSON.parse(before), response: undone }); assertUndoRestored(before, undone); const r = turn(s, 0, 'eastern-quarry'); assert.deepEqual(board(r), [3, 2, 0]); assert.equal(r.state.players[0]!.resources.stone, 1); save('A072-N5-retry', r) })
 })

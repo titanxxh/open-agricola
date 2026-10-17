@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { describe, expect, it, afterEach } from 'vitest'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
@@ -9,6 +9,9 @@ import type { ActionChoiceOption } from '../../shared/contract/types'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import '../../shared/cards/C/C054_MarketBooth'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'C054_MarketBooth'
 
@@ -237,4 +240,44 @@ describe('C054_MarketBooth session', () => {
     expect(getFenceCount(after)).toBe(4)
     expect(after.supplyTokensConsumed?.fence).toBeUndefined()
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, finish, completeRound, move, prerequisites, hand, buy, noSource, pasture, printed, fields, denyMinor, harvestChoice } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C054 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'C054_MarketBooth', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, {}); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.supplyTokensConsumed?.stable, 1); save('C054-N1-legal', r); const excluded = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, {}); st.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }]; }); denyMinor(excluded, card); save('C054-N1-prerequisite', excluded.getState()); });
+  it('C054 N2 harvested grain and one reserve fence pay for five food before real feeding', () => { const card = 'C054_MarketBooth', s = setup(card, 4, st => { hand(st, card); fields(st, 1, [{ kind: 'grain', remaining: 1 }]); st.players[0]!.resources.food = 0; }); finish(s, buy(s, card)); move(s, 'forest'); move(s, 'reed-bank'); move(s, 'grain-seeds'); let r = confirmNext(s, s.getState()); save('C054-N2-real-purchase', r); r = harvestChoice(s, r, card, 1); r = finish(s, r, true); assert.equal(r.state.round, 5); assert.equal(r.state.players[0]!.resources.grain, 0); assert.equal(r.state.players[0]!.resources.food, 1); assert.equal(r.state.players[0]!.resources.begging, 0); assert.equal(r.state.players[0]!.supplyTokensConsumed?.fence, 1); save('C054-N2', r); });
+  it('C054 N3 unavailable supply grain or fence decline and hand card cannot exchange built components', () => {
+      for (const mode of ['grain', 'fences', 'decline', 'hand']) {
+          const card = 'C054_MarketBooth', s = setup(card, 4, st => {
+              st.players[0]!.resources.food = 4;
+              st.players[0]!.resources.grain = mode === 'grain' ? 0 : 1;
+              hand(st, card);
+              if (mode === 'fences')
+                  for (const [i, t] of [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 1, col: 2 }, { row: 1, col: 3 }].entries())
+                      pasture(st, [t], null, 0, false, `p${i}`);
+          });
+          let r: SessionResponse;
+          if (mode === 'hand')
+              r = completeRound(s, ['clay-pit', 'forest', 'reed-bank', 'grain-seeds']);
+          else {
+              finish(s, buy(s, card));
+              move(s, 'forest');
+              move(s, 'reed-bank');
+              move(s, 'grain-seeds');
+              r = confirmNext(s, s.getState());
+          }
+          if (mode !== 'decline') {
+              noSource(r, card);
+              assertRejectedUnchanged(s, () => s.resolveChoice(0, card));
+          }
+          r = finish(s, r, mode !== 'decline');
+          assert.equal(r.state.players[0]!.resources.food, 0);
+          assert.equal(r.state.players[0]!.resources.grain, mode === 'grain' ? 0 : 1);
+          assert.equal(r.state.players[0]!.supplyTokensConsumed?.fence ?? 0, 0);
+          assert.equal(r.state.players[0]!.supplyTokensConsumed?.stable ?? 0, mode === 'hand' ? 0 : 1);
+          assert.equal(r.state.players[0]!.fenceSegments.length, mode === 'fences' ? 15 : 0);
+          save(`C054-N3-${mode}`, r);
+      }
+  });
 })

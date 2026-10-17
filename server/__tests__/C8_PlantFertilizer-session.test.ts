@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
@@ -9,6 +9,8 @@ import '../../shared/cards/D/D075_WoodField'
 import '../../shared/cards/E/E080_RockGarden'
 import '../../shared/cards/A/A011_MudPatch'
 import { A011_MudPatch_impl } from '../../shared/cards/A/A011_MudPatch'
+import assert from 'node:assert/strict'
+import * as audit25Crop from './_helpers/audit/ae-negative-25-crop'
 
 const CARD_ID = 'C008_PlantFertilizer'
 
@@ -290,4 +292,13 @@ describe('C8 PlantFertilizer session', () => {
     const flow = session.withCtx(() => runCardEffectHook(state, player, CARD_ID, 'onBuy'))
     expect(flow).toBeNull()
   })
+})
+
+describe('ae-negative-25-crop', () => {
+  const { FERT, sessions, save, ok, setup, finish, menu, buy, FIRST, SECOND, make } = audit25Crop
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C008 N1 actual purchase adds one matching crop to each exact one field and preserves zero two and opponent fields',()=>{const s=make(FERT),before=ok(s.getState()),a=buy(s,FERT);assert.deepEqual(a.r.state.players[0]!.fields.map(f=>f.stacks),[[{kind:'grain',remaining:2}],[{kind:'vegetable',remaining:2}],[{kind:'grain',remaining:2}],[]]);assert.equal(a.r.state.players[0]!.resources.grain,0);assert.equal(a.r.state.players[0]!.resources.vegetable,0);assert.deepEqual(a.r.state.players[1]!.fields,before.state.players[1]!.fields);assert.ok(a.r.state.log.some(e=>e.key==='log.farmCropAdded'));save('C008-N1',{before,a})})
+  it('C008 N2 actual optional decline preserves all field stacks and still passes the card',()=>{const s=make(FERT),before=ok(s.getState()),pending=menu(s),chosen=ok(s.resolveChoice(0,FERT));assert.ok(chosen.interaction.stateId==='wait'&&chosen.interaction.request.kind==='choice');const r=finish(s,chosen,false);assert.deepEqual(r.state.players[0]!.fields,before.state.players[0]!.fields);assert.ok(r.state.players[1]!.minorHand.includes(FERT));save('C008-N2',{before,pending,chosen,r})})
+  it('C008 N3 whole purchase undo restores original one good stacks before exactly one replay',()=>{const s=make(FERT),a=buy(s,FERT),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.fields[0]!.stacks[0]!.remaining,1);assert.equal(undone.state.players[0]!.fields[1]!.stacks[0]!.remaining,1);assert.ok(undone.state.players[0]!.minorHand.includes(FERT));const retry=buy(s,FERT);assert.equal(retry.r.state.players[0]!.fields[0]!.stacks[0]!.remaining,2);save('C008-N3',{a,undone,retry})})
+  it('C008 N4 no eligible zero or two good field completes purchase without adding crops',()=>{const s=setup(FERT,8,state=>{state.players[0]!.fields=[{...FIRST,stacks:[]},{...SECOND,stacks:[{kind:'grain',remaining:2}]}]}),before=ok(s.getState()),a=buy(s,FERT);assert.deepEqual(a.r.state.players[0]!.fields,before.state.players[0]!.fields);save('C008-N4',{before,a})})
 })

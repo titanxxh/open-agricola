@@ -1,8 +1,8 @@
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-import { inactiveWorkersInSupply, workersAtHome } from '../../shared/domain/player'
+import { inactiveWorkersInSupply, workersAtHome, familySize } from '../../shared/domain/player'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -10,6 +10,9 @@ import { maxFences } from '../../shared/actions/effects/fencing'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A022_Telegram'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit05Population from './_helpers/audit/ae-negative-05-population'
 
 const CARD_ID = 'A022_Telegram'
 const FILLER = '__test_placeholder__'
@@ -161,4 +164,73 @@ describe('A022 Telegram parity', () => {
     expect(inactiveWorkersInSupply(returned.state.players[0]!)).toHaveLength(3)
   })
 
+})
+
+describe('ae-negative-05-population', () => {
+  const { TELEGRAM, sessions, ok, options, denied, buy, telegram, triggerRound, normal, naturalDue, withoutSnapshotEpoch } = audit05Population
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A022 N1 missing fee or fence reserve rejects and exact purchase undo schedules once', () => {
+    denied(telegram({ food: 1 }), TELEGRAM); denied(telegram({ reserve: 0 }), TELEGRAM)
+    const s = telegram({ food: 2 }); const before = undoRuleSnapshot(s.getState())
+    const r = buy(s, TELEGRAM); assert.equal(r.state.players[0]!.resources.food, 0); assert.equal(triggerRound(r), 2)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TELEGRAM)); assertUndoRestored(before, s.undoAction())
+    assert.equal(triggerRound(buy(s, TELEGRAM)), 2)
+  })
+  it('A022 N2 round fourteen is last valid target and round fifteen is never invented', () => {
+    for (const [round, expected] of [[13, 14], [14, undefined]]) {
+      const r = buy(telegram({ round }), TELEGRAM); assert.equal(triggerRound(r), expected); assert.equal(r.state.players[0]!.resources.food, 18)
+    }
+  })
+  it('A022 N3 real due-round supply turn rejects occupied target and wrong actor before legal temporary placement', () => {
+    const s = naturalDue(); normal(s, 'day-laborer'); normal(s, 'grain-seeds')
+    const beforeState = s.getState(); const beforeEpoch = beforeState.state.players[0]!.cardStates.__actionSnapshot__?.extraData?.token
+    assert.equal(typeof beforeEpoch, 'number'); assert(typeof beforeEpoch === 'number')
+    const before = undoRuleSnapshot(withoutSnapshotEpoch(beforeState)); const menu = ok(chooseSupplyWorkerTurn(s, TELEGRAM))
+    assert(options(menu).some(o => o.value === 'forest'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'grain-seeds'))
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, 'forest'))
+    const r = ok(s.resolveChoice(0, 'forest'))
+    assert.equal(familySize(r.state.players[0]!), 2); assert.equal(inactiveWorkersInSupply(r.state.players[0]!).length, 2)
+    assert.equal(r.state.players[0]!.resources.wood, 7)
+    assert.equal(r.state.players[0]!.workers.filter(w => w.supplyUse?.status === 'temporary').length, 1)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'forest'))
+    const undone = ok(s.undoAction())
+    const afterEpoch = undone.state.players[0]!.cardStates.__actionSnapshot__?.extraData?.token
+    assert.equal(typeof afterEpoch, 'number'); assert(typeof afterEpoch === 'number' && afterEpoch > beforeEpoch)
+    assert.equal(undone.state.players[0]!.cardStates.__actionSnapshot__?.extraData?.lastToken, afterEpoch)
+    assertUndoRestored(before, withoutSnapshotEpoch(undone))
+    chooseSupplyWorkerTurn(s, TELEGRAM); assert.equal(ok(s.resolveChoice(0, 'forest')).state.players[0]!.resources.wood, 7)
+  })
+  it('A022 N4 temporary person returns to supply after real rotation and cannot activate next round', () => {
+    const s = naturalDue(); chooseSupplyWorkerTurn(s, TELEGRAM); confirmNext(s, ok(s.resolveChoice(0, 'forest')))
+    normal(s, 'grain-seeds'); normal(s, 'day-laborer'); normal(s, 'clay-pit'); const r = normal(s, 'reed-bank')
+    assert.equal(r.state.round, 3); assert.equal(familySize(r.state.players[0]!), 2); assert.equal(inactiveWorkersInSupply(r.state.players[0]!).length, 3)
+    assert.equal(r.state.players[0]!.workers.some(w => w.supplyUse), false); assert.equal(r.interaction.stateId, 'idle')
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TELEGRAM))
+    assert.equal(familySize(ok(s.takeAction(0, 'grain-seeds')).state.players[0]!), 2)
+  })
+  it('A022 N5 no sixth component exists when all five people are active', () => {
+    const s = telegram({ played: true, people: 5 }); for (const p of s.state.players) markAllWorkersUsed(s.state, p)
+    const r = ok(s.performRoundEnd()); assert.equal(r.state.round, 2); assert.equal(r.interaction.stateId, 'idle')
+    assert.equal(familySize(r.state.players[0]!), 5); assert.equal(inactiveWorkersInSupply(r.state.players[0]!).length, 0)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, TELEGRAM))
+  })
+  it('A022 N6 actual fence use after purchase does not retarget the fixed round', () => {
+    const s = telegram({ round: 13 }); confirmNext(s, buy(s, TELEGRAM)); normal(s, 'grain-seeds')
+    const start = ok(s.takeAction(0, 'fencing'))
+    assert(start.interaction.stateId === 'wait' && start.interaction.request.kind === 'farm-select', JSON.stringify(start.interaction))
+    const r = ok(s.commitSelectionChoice(0, { edges: ['V-0-2'] }))
+    assert.equal(r.state.players[0]!.fenceSegments.length, 15); assert.equal(triggerRound(r), 14)
+    assert.equal(r.state.players[0]!.resources.wood, 0)
+  })
+  it('A022 N7 unused Telegram remains available after an ordinary placement and actual opponent turn', () => {
+    const s = naturalDue(); normal(s, 'day-laborer'); normal(s, 'grain-seeds')
+    const menu = ok(chooseSupplyWorkerTurn(s, TELEGRAM))
+    assert(options(menu).some(o => o.value === 'forest'))
+    const r = ok(s.resolveChoice(0, 'forest'))
+    assert.equal(r.state.players[0]!.resources.wood, 7)
+    assert.equal(familySize(r.state.players[0]!), 2)
+    assert.equal(inactiveWorkersInSupply(r.state.players[0]!).length, 2)
+    assert.equal(r.state.players[0]!.workers.filter(w => w.supplyUse?.status === 'temporary').length, 1)
+  })
 })

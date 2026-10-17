@@ -1,13 +1,16 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/A/A153_PigOwner'
 import type { AnytimeAction } from '../../shared/contract/types';
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit16Animals from './_helpers/audit/ae-negative-16-animals'
 
 const CARD_ID = 'A153_PigOwner'
 
@@ -160,4 +163,12 @@ describe('A153 Pig Owner parity', () => {
     expect(anytimeIds(response)).not.toContain(ANYTIME_ID)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(3)
   })
+})
+
+describe('ae-negative-16-animals', () => {
+  const { PIG, ANY, sessions, save, ok, turn, finish, pig, points } = audit16Animals
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A153 N1 four farm pigs never unlock the three point reward',()=>{const s=pig(4),r=finish(s,turn(s,0,'day-laborer'));assert.ok(!r.interaction.anytimeActions.some(a=>a.id===ANY));assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,ANY));assert.equal(points(r),0);save('A153-N1',r)})
+  it('A153 N2 five pigs across finite stable pasture and house award owner three points once',()=>{const s=pig(5);const entered=finish(s,turn(s,0,'day-laborer'));assert.ok(entered.interaction.anytimeActions.some(a=>a.id===ANY));const r=ok(s.takeAnytimeAction(0,ANY));assert.equal(points(r),3);assert.equal(isCardFlagged(r.state.players[0]!,PIG),true);assert.equal(r.state.players[0]!.resources.boar,5);assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,ANY));assert.equal(points(s.getState()),3);save('A153-N2',{entered,r})})
+  it('A153 N3 hand and actual wrong actor cannot claim five pig owner reward',()=>{const hs=pig(5,false),hand=finish(hs,turn(hs,0,'day-laborer'));assert.ok(!hand.interaction.anytimeActions.some(a=>a.id===ANY));const s=pig(5);finish(s,turn(s,0,'day-laborer'));assertRejectedUnchanged(s,()=>s.takeAnytimeAction(1,ANY));const r=ok(s.takeAnytimeAction(0,ANY));assert.equal(points(r),3);save('A153-N3',{hand,r})})
 })

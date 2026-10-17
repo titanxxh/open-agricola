@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A161_PatchCaretaker'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit17Sequence from './_helpers/audit/ae-negative-17-sequence'
 
 const CARD_ID = 'A161_PatchCaretaker'
 
@@ -115,4 +118,13 @@ describe('A161 Patch Caretaker parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.vegetable).toBe(0)
   })
+})
+
+describe('ae-negative-17-sequence', () => {
+  const { PATCH, sessions, save, ok, setup, turn, patch } = audit17Sequence
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A161 N1 second owner wood or food accumulation grants one vegetable only for nonempty entry',()=>{for(const[first,second]of[['forest','grove'],['fishing','traveling-players']]as const)for(const empty of[false,true]){if(empty){const blocked=setup(PATCH,state=>{const target=state.actionSpaces.find(a=>a.id===first)!;for(const key of['wood','food']as const)if(target.gainPerRound?.[key])target.resources[key]=0});const rejected=assertEmptyAccumulationRejected(blocked,0,first);assert.equal(rejected.state.players[0]!.resources.vegetable,0);save(`A161-N1-${first}-empty-first`,rejected)}const {start,r}=patch(first,second,true,empty);assert.equal(r.state.players[0]!.resources.vegetable,empty?0:1);assert.equal(r.state.players[1]!.resources.vegetable,0);save(`A161-N1-${first}-${empty}`,{start,r})}})
+  it('A161 N2 different goods non accumulation earlier action and hand cannot grant vegetable',()=>{for(const[first,second,played]of[['forest','clay-pit',true],['grain-seeds','grove',true],['forest','grove',false]]as const){const s=setup(PATCH,undefined,played);const initial=turn(s,0,first);for(const[actor,space]of[[1,'reed-bank'],[2,'day-laborer'],[3,'fishing']]as const)turn(s,actor,space);const r=turn(s,0,second);assert.equal(r.state.players[0]!.resources.vegetable,0);save(`A161-N2-${first}-${played}`,{initial,r})}})
+  it('A161 N3 actual opponent earlier wood never counts for owners first wood action',()=>{const s=setup(PATCH);turn(s,0,'grain-seeds');const opponent=turn(s,1,'forest');turn(s,2,'day-laborer');turn(s,3,'fishing');const r=turn(s,0,'grove');assert.equal(r.state.players[0]!.resources.vegetable,0);save('A161-N3',{opponent,r})})
+  it('A161 N4 whole second action undo restores vegetable and one retry grants only once',()=>{const {s,r}=patch('forest','grove');assertRejectedUnchanged(s,()=>s.takeAction(0,'grove'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.vegetable,0);const retry=turn(s,0,'grove');assert.equal(retry.state.players[0]!.resources.vegetable,1);save('A161-N4',{r,undone,retry})})
 })

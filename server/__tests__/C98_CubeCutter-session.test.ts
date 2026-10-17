@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C098_CubeCutter'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit46Harvest from './_helpers/audit/ae-negative-46-harvest'
 
 const CARD_ID = 'C098_CubeCutter'
 
@@ -93,4 +95,12 @@ describe('C098_CubeCutter session', () => {
     expect(flow).toBeUndefined()
   })
 
+})
+
+describe('ae-negative-46-harvest', () => {
+  const { CUBE, sessions, save, ok, make, nextRound, lesson, bonus } = audit46Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C098 N1 actual Lessons grants one immediate wood and whole undo removes it before one real replay',()=>{const s=make(CUBE,false),a=lesson(s,CUBE);assert.equal(a.state.players[0]!.resources.wood,1);assert.equal(bonus(a,CUBE),0);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,0);assert.ok(u.state.players[0]!.occupationHand.includes(CUBE));const r=lesson(s,CUBE);assert.equal(r.state.players[0]!.resources.wood,1);save('C098-N1',{a,u,r})})
+  it('C098 N2 actual harvest field phase pays exactly one wood and one food for one point while decline and zero wood do not',()=>{for(const accept of[true,false]){const s=make(CUBE,true,state=>state.players[0]!.resources.wood=2),r=nextRound(s,8,accept),t=make(CUBE,false,state=>state.players[0]!.resources.wood=2),control=nextRound(t,8,false);assert.equal(r.state.players[0]!.resources.wood,accept?1:2);assert.equal(r.state.players[0]!.resources.food,control.state.players[0]!.resources.food-(accept?1:0));assert.equal(bonus(r,CUBE),accept?1:0);assert.equal(bonus(r,CUBE,1),0);save(`C098-N2-${accept}`,{r,control})}const z=make(CUBE),zero=nextRound(z,8,false);assert.equal(bonus(zero,CUBE),0);assert.equal(zero.state.players[0]!.resources.wood,0);save('C098-N2-zero',zero)})
+  it('C098 N3 ordinary work never grants a harvest point and the next distinct harvest can pay once again',()=>{const s=make(CUBE,true,state=>state.players[0]!.resources.wood=2),mid=ok(s.takeAction(0,'reed-bank'));assert.equal(bonus(mid,CUBE),0);const eight=nextRound(s,8,true),nine=nextRound(s,9,false),ten=nextRound(s,10,true);assert.equal(bonus(eight,CUBE),1);assert.equal(bonus(nine,CUBE),1);assert.equal(bonus(ten,CUBE),2);assert.equal(ten.state.players[0]!.resources.wood,0);save('C098-N3',{mid,eight,nine,ten})})
 })

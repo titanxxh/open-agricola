@@ -1,0 +1,20 @@
+// Helpers of ae-negative-20-balance-session.test.ts from the negative audit snapshot fafd4f51b.
+import assert from 'node:assert/strict'
+import fs from '../audit-evidence-fs'
+import type { GameSession, SessionResponse } from '../../../game/authoritative-session'
+import type { GameState } from '../../../../shared/contract/types'
+import { createWorkSession } from '../session-fixtures'
+import { confirmNext } from '../negative-rule-audit'
+
+export const CARD='B049_Scales',MINOR='A037_Bucksaw',OCCS=['A110_Roughcaster','A119_FirewoodCollector','A103_Portmonger']
+export const sessions:GameSession[]=[]
+export const output=process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR??'output/ae-negative/20-balance-probes'
+export function save(id:string,value:unknown){fs.mkdirSync(output,{recursive:true});fs.writeFileSync(`${output}/${id}.json`,JSON.stringify(value,null,2))}
+export function ok(r:SessionResponse){assert.equal(r.ok,true,r.error);return JSON.parse(JSON.stringify(r)) as SessionResponse}
+export function setup(card:string,configure:(state:GameState)=>void=()=>{},round=8){const s=createWorkSession({seed:4242,options:{playerCount:2},configure(state){state.round=round;for(const p of state.players)Object.assign(p.resources,{food:100,wood:0,clay:0,reed:0,stone:0,grain:0,vegetable:0,sheep:0,boar:0,cattle:0});const p=state.players[0]!;p.minorHand=[card,'B004_WoodPile','A006_StorageBarn'];configure(state)}});sessions.push(s);return s}
+export function finish(s:GameSession,r:SessionResponse){for(let n=0;n<32&&r.interaction.stateId==='wait'&&r.interaction.request.kind!=='confirm-next-player';n++){const i=r.interaction;if(i.request.kind==='confirm-player-switch')r=ok(s.resolveChoice(i.request.fromPlayerIndex,'confirm'));else if(i.request.kind==='feed')r=ok(s.resolveChoice(i.playerIndex,'confirm',{selections:[]}));else if(i.request.kind==='animal-reorg')r=ok(s.resolveChoice(i.playerIndex,'confirm',{zones:i.request.zones}));else{assert.ok(i.request.kind==='choice'||i.request.kind==='select-trigger',JSON.stringify(i));const o=i.request.options.find(o=>(!('disabled'in o)||!o.disabled)&&o.value==='__skip__')??i.request.options.find(o=>(!('disabled'in o)||!o.disabled)&&o.value==='__done__')??i.request.options.find(o=>(!('disabled'in o)||!o.disabled));assert.ok(o);r=ok(s.resolveChoice(i.playerIndex,o.value))}}return r}
+export function ready(s:GameSession){let r=s.getState();if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-next-player')r=confirmNext(s,r);r=finish(s,r);assert.equal(r.interaction.stateId,'idle',JSON.stringify(r.interaction));return r}
+export function turn(s:GameSession,actor:number,space:string){const r=ready(s);assert.equal(r.state.currentPlayerIndex,actor);return ok(s.takeAction(actor,space))}
+export function make(played=true,n=0,configure:(state:GameState)=>void=()=>{}){return setup(CARD,state=>{const p=state.players[0]!;p.minorPlayed=played?[CARD]:[];p.minorHand=[...(played?[]:[CARD]),MINOR,'B004_WoodPile','A006_StorageBarn'];p.occupationPlayed=OCCS.slice(0,n);p.occupationHand=OCCS.slice(n);p.resources.wood=1;p.resources.clay=2;configure(state)},5)}
+export function select(s:GameSession,r:SessionResponse,card:string,actor=0){for(let n=0;n<10&&r.interaction.stateId==='wait'&&(r.interaction.request.kind==='choice'||r.interaction.request.kind==='select-trigger');n++){const i=r.interaction;assert.ok(i.request.kind==='choice'||i.request.kind==='select-trigger');const o=i.request.options.find(o=>o.value===card||o.value===`major:${card}`||o.value===`minor:${card}`)??i.request.options.find(o=>o.value.startsWith('action-improvement-'));assert.ok(o,JSON.stringify(i));r=ok(s.resolveChoice(actor,o.value));if(r.state.players[actor]!.occupationPlayed.includes(card)||r.state.players[actor]!.minorPlayed.includes(card)||r.state.players[actor]!.improvements.includes(card)||(['B004_WoodPile','A006_StorageBarn'].includes(card)&&!r.state.players[actor]!.minorHand.includes(card)&&r.state.players.some((p,index)=>index!==actor&&p.minorHand.includes(card))))break}return finish(s,r)}
+export function minor(s:GameSession,card:string){return select(s,turn(s,0,'meeting-place'),card)}

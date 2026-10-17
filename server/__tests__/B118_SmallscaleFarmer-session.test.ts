@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B118_SmallscaleFarmer'
+import assert from 'node:assert/strict'
+import * as audit27Endphase from './_helpers/audit/ae-negative-27-endphase'
 
 const CARD_ID = 'B118_SmallscaleFarmer'
 
@@ -61,4 +63,13 @@ describe('B118 Small-scale Farmer parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(2)
   })
+})
+
+describe('ae-negative-27-endphase', () => {
+  const { SMALL, sessions, save, ok, finish, make, transition, lesson } = audit27Endphase
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B118 N1 natural next round grants one wood only for exactly two actual rooms',()=>{for(const rooms of[2,3,4]){const s=make(SMALL,true,0,2,1,rooms),c=make(SMALL,false,0,2,1,rooms),r=transition(s),control=transition(c);assert.equal(r.state.players[0]!.resources.wood,control.state.players[0]!.resources.wood+(rooms===2?1:0));assert.equal(r.state.players[0]!.roomTiles.length,rooms);save(`B118-N1-${rooms}`,{r,control})}})
+  it('B118 N2 card only in hand with two rooms gains no round start wood',()=>{const s=make(SMALL,false),r=transition(s),c=transition(make(SMALL,false));assert.equal(r.state.players[0]!.resources.wood,c.state.players[0]!.resources.wood);assert.ok(r.state.players[0]!.occupationHand.includes(SMALL));save('B118-N2',{r,c})})
+  it('B118 N3 real midround first Lessons and unrelated action never grant the next round wood early',()=>{const s=make(SMALL,false),a=lesson(s,SMALL);assert.equal(a.r.state.players[0]!.resources.wood,0);const other=make(SMALL),r=finish(other,ok(other.takeAction(0,'grain-seeds')),false);assert.equal(r.state.players[0]!.resources.wood,0);save('B118-N3',{a,r})})
+  it('B118 N4 two consecutive natural round starts grant one wood each rather than repeating within a round',()=>{const s=make(SMALL),c=make(SMALL,false),r=transition(s),control=transition(c),after=transition(s,10),other=transition(c,10);assert.equal(r.state.players[0]!.resources.wood,control.state.players[0]!.resources.wood+1);assert.equal(after.state.players[0]!.resources.wood,other.state.players[0]!.resources.wood+2);save('B118-N4',{r,control,after,other})})
 })

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { familySize, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E113_Godmother'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'E113_Godmother'
 
@@ -88,4 +91,25 @@ describe('E113 Godmother native session', () => {
     )).toBe(false)
     expect(response.scores[0]!.total).toBe(scoreBefore)
   })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, save, setup, finish, next } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E113 N1 ordinary and urgent real Family Growth give exactly one vegetable each', () => {
+    for (const space of ['wish-children', 'urgent-wish-children']) {
+      const s = setup('E113_Godmother', 14, state => {
+        if (space === 'wish-children') {
+          state.players[0]!.rooms = 3
+          state.players[0]!.roomTiles.push({ row: 0, col: 0 })
+        }
+      })
+      const r = finish(s, ok(s.takeAction(0, space)))
+      assert.equal(familySize(r.state.players[0]!), 3)
+      assert.equal(r.state.players[0]!.resources.vegetable, 1)
+      assert.equal(r.state.players[1]!.resources.vegetable, 0)
+      save(`E113-N1-${space}`, r)
+    }
+  })
+  it('E113 N2 rejected no-room growth unrelated Forest and real opponent growth give owner no vegetable', () => { const s = setup('E113_Godmother', 14, state => { state.players[1]!.rooms = 3; state.players[1]!.roomTiles.push({ row: 0, col: 0 }); }); assertRejectedUnchanged(s, () => s.takeAction(0, 'wish-children')); finish(s, ok(s.takeAction(0, 'forest'))); next(s); const r = finish(s, ok(s.takeAction(1, 'wish-children'))); assert.equal(r.state.players[0]!.resources.vegetable, 0); assert.equal(r.state.players[1]!.resources.vegetable, 0); assert.equal(familySize(r.state.players[1]!), 3); save('E113-N2', r); })
 })

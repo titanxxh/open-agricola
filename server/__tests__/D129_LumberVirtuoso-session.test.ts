@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -7,6 +7,8 @@ import '../../shared/cards/D/D129_LumberVirtuoso'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import type { GameState } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 describe('D129_LumberVirtuoso session', () => {
   /**
@@ -190,3 +192,46 @@ function drainHarvest(session: GameSession, resp: SessionResponse): SessionRespo
   }
   return current.state
 }
+
+describe('ae-negative-51-family', () => {
+  const { sessions, ok, options, save, setup, choose, finish, completeRound, build, offer } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D129 N1 real harvest discards excess wood to five before ordinary paid stable or wood room', () => {
+    for (const mode of ['stable-five', 'stable-eight', 'room']) {
+      const s = setup('D129_LumberVirtuoso', 4, state => Object.assign(state.players[0]!.resources, { wood: mode === 'stable-five' ? 5 : 8, reed: 2 }))
+      let r = offer(s, completeRound(s), 'D129_LumberVirtuoso')
+      r = choose(s, r, o => mode === 'room' ? o.labelKey === 'actions.construct.name' || JSON.stringify(o.descriptionPreview).includes('actions.construct.name') : o.labelKey === 'actions.stables.name' || JSON.stringify(o.descriptionPreview).includes('actions.stables.name'))
+      if (mode === 'room')
+        r = build(s, r)
+      else {
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'stable')
+        r = ok(s.commitSelectionChoice(0, { stables: [r.interaction.request.farm.selectableTiles[0]!] }))
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.wood, mode === 'room' ? 0 : 3)
+      assert.equal(r.state.players[0]!.resources.reed, mode === 'room' ? 0 : 2)
+      assert.equal(r.state.players[0]!.rooms, mode === 'room' ? 3 : 2)
+      assert.equal(r.state.players[0]!.stableTiles.length, mode === 'room' ? 0 : 1)
+      save(`D129-N1-${mode}`, r)
+    }
+  })
+  it('D129 N2 four wood optional decline and nonwood-house room exclusion preserve resources', () => {
+    for (const mode of ['short', 'decline', 'clay']) {
+      const s = setup('D129_LumberVirtuoso', 4, state => {
+        Object.assign(state.players[0]!.resources, { wood: mode === 'short' ? 4 : 8, reed: 2 })
+        if (mode === 'clay')
+          state.players[0]!.houseType = 'clay'
+      })
+      let r = completeRound(s)
+      if (mode === 'clay') {
+        r = offer(s, r, 'D129_LumberVirtuoso')
+        assert.ok(!options(r).some(o => o.labelKey === 'actions.construct.name'))
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.wood, mode === 'short' ? 4 : 8)
+      assert.equal(r.state.players[0]!.rooms, 2)
+      assert.equal(r.state.players[0]!.stableTiles.length, 0)
+      save(`D129-N2-${mode}`, r)
+    }
+  })
+})

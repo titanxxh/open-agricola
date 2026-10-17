@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -6,6 +6,8 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/E/E108_BlackberryFarmer'
 import '../../shared/cards/B/B030_WoodPalisades'
+import assert from 'node:assert/strict'
+import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
 const CARD_ID = 'E108_BlackberryFarmer'
 
@@ -88,4 +90,11 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
     expect(result).toBeUndefined()
     expect(state.pendingFutureMeeples.filter((entry) => entry.cardId === CARD_ID)).toEqual([])
   })
+})
+
+describe('ae-negative-47-cards', () => {
+  const { sessions, save, ok, make, finish, ONE, fence, future, reach } = audit47Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E108 N1 four real paid fences schedule one food for exactly next four rounds and naturally release only the next-round food', () => { const s = make('E108_BlackberryFarmer', st => { st.players[0]!.resources.wood = 4 }, true, 8), fenced = fence(s, ONE, false); assert.equal(fenced.state.players[0]!.resources.wood, 0); assert.deepEqual(future(fenced, 'E108_BlackberryFarmer'), [9, 10, 11, 12].map(round => ({ round, resources: { food: 1 } }))); const p = reach(s, 9), r = finish(s, p, false); assert.equal(r.state.players[0]!.resources.food, 103); assert.deepEqual(future(r, 'E108_BlackberryFarmer').map(e => e.round), [10, 11, 12]); save('E108-N1', { fenced, p, r }) })
+  it('E108 N2 round twelve schedules only thirteen fourteen and round fourteen hand-only or nonfencing actions cannot schedule extra food', () => { for (const round of [12, 14]) { const s = make('E108_BlackberryFarmer', st => { st.players[0]!.resources.wood = 4 }, true, round), r = fence(s, ONE, false); assert.deepEqual(future(r, 'E108_BlackberryFarmer'), (round === 12 ? [13, 14] : []).map(round => ({ round, resources: { food: 1 } }))); save(`E108-N2-${round}`, r) } const c = make('E108_BlackberryFarmer', st => { st.players[0]!.resources.wood = 4 }, false), cr = fence(c, ONE, false); assert.equal(future(cr, 'E108_BlackberryFarmer').length, 0); const w = make('E108_BlackberryFarmer'), wr = finish(w, ok(w.takeAction(0, 'grain-seeds')), false); assert.equal(future(wr, 'E108_BlackberryFarmer').length, 0); save('E108-N2-controls', { cr, wr }) })
 })

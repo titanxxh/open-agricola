@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D044_ForestWell'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'D044_ForestWell'
 const FILLER = '__test_placeholder__'
@@ -137,4 +139,24 @@ describe('D044 Forest Well parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(1)
     expect(futureRounds(response)).toEqual([])
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, take, finish, ready, fill, end, final, purchase, rejectBuy, resource, future, points, occupations } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D044 N1 real purchase with two occupations snapshots wood supply and naturally delivers one food", () => { const s = make('D044_ForestWell', st => { occupations(st.players[0]!, 2); Object.assign(st.players[0]!.resources, { wood: 3, stone: 1 }); }, false), r = purchase(s, 'D044_ForestWell'); resource(r, { wood: 3, stone: 0, food: 99 }); assert.deepEqual(future(r, 'D044_ForestWell'), [6, 7, 8]); fill(s); ready(s); const collected = finish(s, take(s, 0, 'forest')); resource(collected, { wood: 6 }); assert.deepEqual(future(collected, 'D044_ForestWell'), [6, 7, 8]); const due = end(s); resource(due, { food: 100 }); save('D044-N1', { r, collected, due }); });
+  it("D044 N2 occupation food stone gates zero wood and held card exclude payments or scheduling", () => { for (const mode of ['occupation', 'food', 'stone']) {
+      const s = make('D044_ForestWell', st => { occupations(st.players[0]!, mode === 'occupation' ? 1 : 2); Object.assign(st.players[0]!.resources, { wood: 3, food: mode === 'food' ? 0 : 100, stone: mode === 'stone' ? 0 : 1 }); }, false);
+      save(`D044-N2-${mode}`, rejectBuy(s, 'D044_ForestWell'));
+  } const z = make('D044_ForestWell', st => { occupations(st.players[0]!, 2); st.players[0]!.resources.stone = 1; }, false), zero = purchase(z, 'D044_ForestWell'), dueZero = end(z); assert.deepEqual(future(zero, 'D044_ForestWell'), []); resource(dueZero, { food: 99 }); save('D044-N2-zero', { zero, dueZero }); const s = make('D044_ForestWell', st => { occupations(st.players[0]!, 2); Object.assign(st.players[0]!.resources, { wood: 3, stone: 1 }); }, false), r = end(s, true, [], 'D044_ForestWell'); resource(r, { food: 100 }); assert.deepEqual(future(r, 'D044_ForestWell'), []); save('D044-N2-hand', r); });
+  it("D044 N3 late Forest Well purchases truncate the wood snapshot and contribute one final point", () => { for (const round of [13, 14]) {
+      const s = make('D044_ForestWell', st => { occupations(st.players[0]!, 2); Object.assign(st.players[0]!.resources, { wood: 4, stone: 1 }); }, false, round), r = purchase(s, 'D044_ForestWell');
+      assert.deepEqual(future(r, 'D044_ForestWell'), round === 13 ? [14] : []);
+      const due = round === 13 ? end(s) : final(s);
+      if (round === 13)
+          resource(due, { food: 96 });
+      else
+          assert.equal(points(due, 'D044_ForestWell'), 1);
+      save(`D044-N3-${round}`, { r, due });
+  } });
 })

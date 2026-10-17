@@ -1,11 +1,14 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { Field } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B093_Confidant'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Delayed from './_helpers/audit/ae-negative-26-delayed'
 
 const CARD_ID = 'B093_Confidant'
 const FILLER = '__test_placeholder__'
@@ -133,4 +136,14 @@ describe('B093 Confidant parity', () => {
     expect(skipped.ok, skipped.error).toBe(true)
     expect(scheduledRounds(skipped)).toEqual([7])
   })
+})
+
+describe('ae-negative-26-delayed', () => {
+  const { CONF, sessions, save, ok, finish, make, lesson, future, schedule, nextRound, bonusMenu } = audit26Delayed
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B093 N1 actual first Lessons pays exactly two three or four supply food and schedules only that many next rounds',()=>{for(const n of[2,3,4]){const s=make(CONF),a=lesson(s,CONF),r=schedule(s,a.chosen,n);assert.equal(r.state.players[0]!.resources.food,100-n);assert.deepEqual(future(r,CONF),Array.from({length:n},(_,i)=>({round:9+i,resources:{food:1}})));save(`B093-N1-${n}`,{a,r})}})
+  it('B093 N2 below two food rejects the actual occupation before a legal free first occupation alternative',()=>{const s=make(CONF,1),pending=ok(s.takeAction(0,'lessons')),error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,CONF)),r=finish(s,pending.state.players[0]!.occupationPlayed.includes('A110_Roughcaster')?pending:ok(s.resolveChoice(0,'A110_Roughcaster')),false);assert.ok(r.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'));assert.equal(future(r,CONF).length,0);assert.equal(r.state.players[0]!.resources.food,1);assert.ok(r.state.players[0]!.occupationHand.includes(CONF));save('B093-N2',{pending,error,r})})
+  it('B093 N3 natural scheduled food delivery offers optional sow or fence and declining consumes no extra resource',()=>{const s=make(CONF),a=lesson(s,CONF),r=schedule(s,a.chosen,2),pending=nextRound(s,9),before=ok(pending),after=finish(s,pending,false);assert.equal(future(after,CONF).length,1);assert.equal(after.state.players[0]!.fields[0]!.stacks.length,0);assert.equal(after.state.players[0]!.fenceSegments.length,0);assert.equal(after.state.players[0]!.resources.grain,before.state.players[0]!.resources.grain);assert.equal(after.state.players[0]!.resources.wood,before.state.players[0]!.resources.wood);save('B093-N3',{a,r,pending,after})})
+  it('B093 N4 whole Lessons undo restores paid food card and future schedule before one replay',()=>{const s=make(CONF),a=lesson(s,CONF),r=schedule(s,a.chosen,4),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.occupationHand.includes(CONF));assert.equal(future(undone,CONF).length,0);const second=lesson(s,CONF),retry=schedule(s,second.chosen,2);assert.equal(future(retry,CONF).length,2);save('B093-N4',{a,r,undone,second,retry})})
+  it('B093 N5 natural scheduled food accepts one ordinary sow or four wood fencing without placing a worker',()=>{for(const kind of['sow','fence']as const){const s=make(CONF),a=lesson(s,CONF),scheduled=schedule(s,a.chosen,2),pending=nextRound(s,9),before=ok(pending),selected=bonusMenu(s,pending,kind),r=finish(s,ok(s.commitSelectionChoice(0,kind==='sow'?{crops:[{row:0,col:1,crop:'grain'}]}:{edges:['H-0-2','H-1-2','V-0-2','V-0-3'],palisadeEdges:[],extraWood:0})),false);assert.equal(future(r,CONF).length,1);assert.equal(selected.state.players[0]!.resources.food,scheduled.state.players[0]!.resources.food+1);assert.equal(r.state.players[0]!.resources.food,selected.state.players[0]!.resources.food);assert.deepEqual(r.state.players[0]!.workers,before.state.players[0]!.workers);if(kind==='sow'){assert.equal(r.state.players[0]!.resources.grain,before.state.players[0]!.resources.grain-1);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[{kind:'grain',remaining:3}]);assert.equal(r.state.players[0]!.resources.wood,before.state.players[0]!.resources.wood)}else{assert.equal(r.state.players[0]!.resources.wood,before.state.players[0]!.resources.wood-4);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.pastures[0]!.tiles.length,1);assert.equal(r.state.players[0]!.resources.grain,before.state.players[0]!.resources.grain)}save(`B093-N5-${kind}`,{a,scheduled,pending,selected,r})}})
 })

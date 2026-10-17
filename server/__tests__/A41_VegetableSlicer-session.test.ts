@@ -1,7 +1,7 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { playImprovement } from '../../shared/actions/effects/improvement'
@@ -11,6 +11,9 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A041_VegetableSlicer'
 import '../../shared/cards/A/A060_OrientalFireplace'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit07Spaces from './_helpers/audit/ae-negative-07-spaces'
 
 const CARD_ID = 'A041_VegetableSlicer'
 const FIREPLACE_ID = 'Major_Fireplace1'
@@ -409,5 +412,29 @@ describe('A041 parity batch-02 characterization', () => {
     expect(resp.state.players[0]!.improvements).toContain(COOKING_HEARTH_ID)
     expect(resp.state.players[0]!.minorPlayed).not.toContain(ORIENTAL_FIREPLACE_ID)
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, vegetable: 0 })
+  })
+})
+
+describe('ae-negative-07-spaces', () => {
+  const { A041, ORIENTAL, sessions, setup, turn, buy, denied, hearth, reward } = audit07Spaces
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A041 N1 fee shortage rejects forged card and exact one wood buys no reward', () => {
+    denied(setup({ card: A041, played: false }), A041); const r = buy(setup({ card: A041, played: false, resources: { wood: 1 } }), A041); reward(r, 0, 0)
+  })
+  it('A041 N2 actual major Fireplace return grants two wood one vegetable exactly once', () => {
+    for (const n of [1, 2]) { const fireplace = `Major_Fireplace${n}`, target = `Major_CookingHearth${n}`; const s = setup({ card: A041, fireplace, hearth: target }); const r = hearth(s); assert.ok(r.state.players[0]!.improvements.includes(target)); assert.equal(r.state.players[0]!.improvements.includes(fireplace), false); assert.ok(r.state.availableMajorImprovements.includes(fireplace)); assert.ok(r.state.events.some(e => e.type === 'resource.paid' && e.returnedCardId === fireplace)); reward(r, 2, 1); assertRejectedUnchanged(s, () => s.resolveChoice(0, target)); reward(s.getState(), 2, 1) }
+  })
+  it('A041 N3 cash clay Hearth purchase grants no upgrade reward', () => {
+    const s = setup({ card: A041, resources: { clay: 4 } }); const r = hearth(s); assert.ok(r.state.players[0]!.improvements.includes('Major_CookingHearth1')); assert.equal(r.state.players[0]!.resources.clay, 0); reward(r, 0, 0)
+  })
+  it('A041 N4 opponent actual Fireplace upgrade grants no holder reward', () => {
+    const s = setup({ card: A041, opponentFireplace: 'Major_Fireplace2', hearth: 'Major_CookingHearth2' }); turn(s, 0, 'forest'); const r = hearth(s, 1); assert.ok(r.state.players[1]!.improvements.includes('Major_CookingHearth2')); assert.ok(r.state.availableMajorImprovements.includes('Major_Fireplace2')); reward(r, 3, 0); reward(r, 0, 0, 1)
+  })
+  it('A041 N5 actual Oriental return keeps the narrow accepted no-reward difference', () => {
+    const s = setup({ card: A041, fireplace: ORIENTAL }); const r = hearth(s); assert.ok(r.state.players[0]!.improvements.includes('Major_CookingHearth1')); assert.equal(r.state.players[0]!.minorPlayed.includes(ORIENTAL), false); assert.ok(r.state.events.some(e => e.type === 'resource.paid' && e.returnedCardId === ORIENTAL)); reward(r, 0, 0)
+  })
+  it('A041 N6 real earlier upgrade is not retroactive and undo later return restores reward', () => {
+    const past = setup({ card: A041, played: false, fireplace: 'Major_Fireplace1', resources: { wood: 1 } }); reward(hearth(past), 1, 0); turn(past, 1, 'forest'); reward(buy(past, A041), 0, 0)
+    const s = setup({ card: A041, fireplace: 'Major_Fireplace1' }); const before = undoRuleSnapshot(s.getState()); reward(hearth(s), 2, 1); assertUndoRestored(before, s.undoAction()); const r = hearth(s); assert.equal(r.state.players[0]!.improvements.includes('Major_Fireplace1'), false); reward(r, 2, 1)
   })
 })

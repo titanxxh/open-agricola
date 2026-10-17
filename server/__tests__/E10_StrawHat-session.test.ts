@@ -24,6 +24,9 @@ import '../../shared/cards/D/D050_ForeignAid'
 import '../../shared/cards/D/D051_Archway'
 import '../../shared/cards/D/D074_RoyalWood'
 import '../../shared/cards/M/M062_HearthBrush'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit02Reservations from './_helpers/audit/ae-negative-02-reservations'
 
 const CARD_ID = 'E010_StrawHat'
 const A092_ID = 'A092_AdoptiveParents'
@@ -530,5 +533,40 @@ describe('D051_Archway session', () => {
     expect(resp.ok).toBe(false)
     expect(resp.state.actionSpaces.find((space) => space.id === D051_ID)?.takenBy)
       .toEqual([{ playerId: resp.state.players[0]!.id, workerId: '1' }])
+  })
+})
+
+describe('ae-negative-02-reservations', () => {
+  const { E, setup, wait, option, endWork } = audit02Reservations
+  describe('02 reservations negative Session audit', () => {
+    it('E010 N1 actual Farmland food choice rewards once in round three and stale acceptance is rejected', () => {
+        const s = setup(E); let r = endWork(s, 'farmland'); const food = option(r, o => o.labelKey === 'actions.gain.name')
+        r = s.resolveChoice(0, food); assert.equal(r.ok, true, r.error); assert.equal(r.state.players[0]!.resources.food, 21)
+        assert.equal(r.state.round, 4); assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, food)); s.dispose()
+      })
+    it('E010 N2 no Farmland person gives no food and no response', () => {
+        const s = setup(E); const r = endWork(s); assert.equal(r.state.players[0]!.resources.food, 20)
+        assert.equal(r.state.round, 4); assert.equal(r.interaction.stateId, 'idle'); s.dispose()
+      })
+    it('E010 N3 actual Farmland move gives two food without another worker or rotation', () => {
+        const s = setup(E); let r = endWork(s, 'farmland'); r = s.resolveChoice(0, option(r, o => o.labelKey === 'actions.move-farmer-to-space.name')); wait(r)
+        assertRejectedUnchanged(s, () => s.resolveChoice(1, 'day-laborer'))
+        r = s.resolveChoice(0, 'day-laborer'); assert.equal(r.ok, true, r.error)
+        assert.equal(r.state.players[0]!.resources.food, 22); assert.equal(r.state.round, 4); assert.equal(r.state.players[0]!.workers.filter(w => w.isActive).length, 2)
+        assertRejectedUnchanged(s, () => s.resolveChoice(0, 'day-laborer')); s.dispose()
+      })
+    it('E010 N4 real Farmland placement outside its two rounds has no bonus', () => {
+        const s = setup(E, 2); const r = endWork(s, 'farmland'); assert.equal(r.state.players[0]!.resources.food, 20)
+        assert.equal(r.state.round, 3); assert.equal(r.interaction.stateId, 'idle'); s.dispose()
+      })
+    it('E010 N5 real round six Farmland food choice rewards exactly one food', () => {
+        const s = setup(E, 6); let r = endWork(s, 'farmland'); r = s.resolveChoice(0, option(r, o => o.labelKey === 'actions.gain.name'))
+        assert.equal(r.ok, true, r.error); assert.equal(r.state.players[0]!.resources.food, 21); assert.equal(r.state.round, 7); s.dispose()
+      })
+    it('E010 N6 opponents Farmland person cannot grant the owner a food choice', () => {
+        const s = setup(E); const r = endWork(s, 'grain-seeds', 'farmland')
+        assert.equal(r.state.players[0]!.resources.food, 20); assert.equal(r.state.round, 4); assert.equal(r.interaction.stateId, 'idle'); s.dispose()
+      })
   })
 })

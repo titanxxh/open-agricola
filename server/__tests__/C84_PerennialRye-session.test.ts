@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C084_PerennialRye'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Harvest from './_helpers/audit/ae-negative-43-harvest'
 
 const CARD_ID = 'C084_PerennialRye'
 const ANYTIME_ID = 'C84-perennial-rye-anytime'
@@ -232,4 +235,12 @@ describe('C084 Perennial Rye parity', () => {
     const active = enterActiveInteraction(session, nextRound.state.currentPlayerIndex)
     expect(anytimeOffered(active)).toBe(true)
   })
+})
+
+describe('ae-negative-43-harvest', () => {
+  const { RYE, sessions, save, ok, make, menu, purchase, yard, nextRound, rye } = audit43Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C084 N1 real two occupation purchase pays one food and lesser prerequisite rejects before free alternative',()=>{const s=make(RYE,false,state=>{state.round=2;state.players[0]!.resources.food=1;state.players[0]!.occupationPlayed=['A110_Roughcaster','A116_WoodCutter']}),a=purchase(s,RYE);assert.equal(a.r.state.players[0]!.resources.food,0);for(const mode of['occupation','food']){const t=make(RYE,false,state=>{state.round=2;state.players[0]!.resources.food=mode==='food'?0:1;state.players[0]!.occupationPlayed=mode==='food'?['A110_Roughcaster','A116_WoodCutter']:['A110_Roughcaster']}),pending=menu(t),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,RYE)),legal=ok(t.resolveChoice(0,'B004_WoodPile'));assert.ok(legal.state.players[0]!.minorHand.includes(RYE));save(`C084-N1-${mode}`,{pending,bad,legal})}save('C084-N1-buy',a)})
+  it('C084 N2 exactly one species breeds per nonharvest round and repeat refuses before natural next round reset',()=>{const s=make(RYE,true,state=>{state.round=2;yard(state,2,2);state.players[0]!.resources.grain=2}),r=rye(s,'boar');assert.equal(r.state.players[0]!.resources.sheep,2);assert.equal(r.state.players[0]!.resources.boar,3);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.roundPhase,'work');assert.deepEqual(r.state.players[0]!.pastures.map(p=>[p.animalType,p.animalCount]),[['sheep',2],['boar',3]]);const bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C84-perennial-rye-anytime')),three=nextRound(s,3);const again=rye(s);assert.equal(again.state.players[0]!.resources.grain,0);assert.equal(again.state.players[0]!.resources.sheep,3);assert.equal(again.state.players[0]!.resources.boar,3);save('C084-N2',{r,bad,three,again})})
+  it('C084 N3 harvest rounds zero grain and one parent forbid anytime before a legal ordinary action',()=>{for(const mode of['harvest','grain','parent']){const s=make(RYE,true,state=>{state.round=mode==='harvest'?7:2;yard(state,mode==='parent'?1:2);state.players[0]!.resources.grain=mode==='grain'?0:1}),bad=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,'C84-perennial-rye-anytime')),legal=ok(s.takeAction(0,'reed-bank'));assert.equal(legal.state.players[0]!.resources.sheep,mode==='parent'?1:2);assert.equal(legal.state.players[0]!.resources.grain,mode==='grain'?0:1);save(`C084-N3-${mode}`,{bad,legal})}})
 })

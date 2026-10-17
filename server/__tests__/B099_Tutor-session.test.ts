@@ -9,6 +9,10 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/B/B099_Tutor'
 import '../../shared/cards/B/B121_Geologist'
+import './_helpers/audit/ae-negative-B099'
+import assert from 'node:assert/strict'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
 
 const CARD_ID = 'B099_Tutor'
 const BEFORE = 'B121_Geologist'
@@ -94,5 +98,59 @@ describe('B099 Tutor parity', () => {
     const response = playOccupation(session, 0, 'lessons', CARD_ID)
 
     expect(tutorBonus(session, response)).toBe(0)
+  })
+})
+
+describe('ae-negative-B099', () => {
+  it('B099 N1 real earlier, own and opponent occupations score zero; later own play, undo and retry score 1/0/1', () => {
+    const session = createWorkSession({ seed: 99, configure: state => {
+      state.players[0]!.occupationHand = ['B121_Geologist', 'B099_Tutor', 'A116_WoodCutter']
+      state.players[1]!.occupationHand = ['A143_Stonecutter']
+      state.players.forEach(p => { p.resources.food = 20 })
+    } })
+    const bonus = (r: SessionResponse) => r.scores?.[0]?.categories.find(c => c.key === 'cardBonusVp')?.total ?? 0
+    const take = (actor: number, space: string, card?: string) => {
+      const before = session.getState()
+      if (before.interaction.stateId === 'wait' && before.interaction.request.kind === 'confirm-next-player') confirmNext(session, before)
+      assert.equal(session.getState().state.currentPlayerIndex, actor)
+      let r = session.takeAction(actor, space)
+      assert.equal(r.ok, true, r.error)
+      if (card && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice' && r.interaction.request.options.some(o => o.value === card)) {
+        assertRejectedUnchanged(session, () => session.resolveChoice(actor, '__missingOccupation__'))
+        r = session.resolveChoice(actor, card)
+        assert.equal(r.ok, true, r.error)
+      }
+      if (card) assert.ok(r.state.players[actor]!.occupationPlayed.includes(card))
+      return r
+    }
+    try {
+      take(0, 'lessons', 'B121_Geologist')
+      take(1, 'forest')
+      take(0, 'clay-pit')
+      take(1, 'reed-bank')
+      const tutor = take(0, 'lessons', 'B099_Tutor')
+      assert.equal(tutor.state.round, 2)
+      assert.equal(bonus(tutor), 0)
+      take(1, 'forest')
+      take(0, 'clay-pit')
+      take(1, 'reed-bank')
+      take(0, 'forest')
+      const opponent = take(1, 'lessons', 'A143_Stonecutter')
+      assert.equal(opponent.state.round, 3)
+      assert.equal(bonus(opponent), 0)
+      take(0, 'clay-pit')
+      take(1, 'reed-bank')
+      const later = take(0, 'lessons', 'A116_WoodCutter')
+      assert.equal(later.state.round, 4)
+      assert.equal(bonus(later), 1)
+      const undone = session.undoAction()
+      assert.equal(undone.ok, true, undone.error)
+      assert.equal(bonus(undone), 0)
+      assert.deepEqual(undone.state.players[0]!.occupationPlayed, ['B121_Geologist', 'B099_Tutor'])
+      assert.ok(undone.state.players[0]!.occupationHand.includes('A116_WoodCutter'))
+      const retry = take(0, 'lessons', 'A116_WoodCutter')
+      assert.equal(bonus(retry), 1)
+      assert.equal(retry.state.events.filter(event => event.type === 'card.played' && event.cardId === 'A116_WoodCutter').length, 1)
+    } finally { session.dispose() }
   })
 })

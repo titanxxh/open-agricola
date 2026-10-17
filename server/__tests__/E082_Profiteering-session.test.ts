@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import { descriptionEffects } from './_helpers/choice-description'
+import * as audit43Exchanges from './_helpers/audit/ae-negative-43-exchanges'
+
+describe('ae-negative-43-exchanges', () => {
+  const { PROFIT, sessions, save, ok, make, options, choose, trigger, finish, purchase, buildings } = audit43Exchanges
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E082 N1 actual purchase gives exactly one owner food and undo removes it before one replay',()=>{const s=make(PROFIT,false),a=purchase(s,PROFIT),u=ok(s.undoAction());assert.equal(a.r.state.players[0]!.resources.food,1);assert.equal(u.state.players[0]!.resources.food,0);assert.ok(u.state.players[0]!.minorHand.includes(PROFIT));const retry=purchase(s,PROFIT);assert.equal(retry.r.state.players[0]!.resources.food,1);save('E082-N1',{a,u,retry})})
+  it('E082 N2 Day Laborer trades only one owned wood for one different stone and cannot select absent clay',()=>{const s=make(PROFIT,true,state=>state.players[0]!.resources.wood=1),pending=trigger(s,ok(s.takeAction(0,'day-laborer')),PROFIT);const pay=options(pending).some(o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='payment'&&e.resourcesPaid?.wood===1))?choose(s,pending,o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='payment'&&e.resourcesPaid?.wood===1)):pending;assert.ok(!options(pay).some(o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='resourceExchange'&&e.resourcesGained?.wood===1)));const bad=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'__invalid_resource__')),r=choose(s,pay,o=>descriptionEffects(o.descriptionPreview).some(e=>e.kind==='resourceExchange'&&e.resourcesGained?.stone===1));assert.deepEqual(buildings(r),{food:2,wood:0,clay:0,reed:0,stone:1});save('E082-N2',{pending,pay,bad,r})})
+  it('E082 N3 decline no resource and unrelated action retain building resources',()=>{const s=make(PROFIT,true,state=>state.players[0]!.resources.wood=1),pending=trigger(s,ok(s.takeAction(0,'day-laborer')),PROFIT),r=finish(s,pending,false);assert.deepEqual(buildings(r),{food:2,wood:1,clay:0,reed:0,stone:0});const t=make(PROFIT),empty=finish(t,ok(t.takeAction(0,'day-laborer')),false);assert.deepEqual(buildings(empty),{food:2,wood:0,clay:0,reed:0,stone:0});const v=make(PROFIT,true,state=>state.players[0]!.resources.wood=1),other=ok(v.takeAction(0,'grain-seeds'));assert.deepEqual(buildings(other),{food:0,wood:1,clay:0,reed:0,stone:0});save('E082-N3',{pending,r,empty,other})})
+})

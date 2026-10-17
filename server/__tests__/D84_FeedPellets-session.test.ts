@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D084_FeedPellets'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit43Harvest from './_helpers/audit/ae-negative-43-harvest'
 
 const CARD_ID = 'D084_FeedPellets'
 
@@ -102,4 +104,12 @@ describe('D084_FeedPellets session', () => {
     expect(flow).toBeUndefined()
   })
 
+})
+
+describe('ae-negative-43-harvest', () => {
+  const { PELLETS, sessions, save, ok, make, purchase, yard, nextRound } = audit43Harvest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D084 N1 real free purchase gains one sheep only for owner and holding card gives no sheep',()=>{const s=make(PELLETS,false,state=>state.players[0]!.stableTiles=[{row:0,col:2}]),a=purchase(s,PELLETS);assert.equal(a.r.state.players[0]!.resources.sheep,1);assert.equal(a.r.state.players[1]!.resources.sheep,0);const t=make(PELLETS,false),other=ok(t.takeAction(0,'reed-bank'));assert.equal(other.state.players[0]!.resources.sheep,0);save('D084-N1',{a,other})})
+  it('D084 N2 natural feeding trades exactly one vegetable for an owned sheep and normal breeding then adds one offspring',()=>{for(const accept of[true,false]){const s=make(PELLETS,true,state=>{yard(state);state.players[0]!.resources.vegetable=2}),before=ok(s.getState()),r=nextRound(s,8,accept);assert.equal(r.state.players[0]!.resources.vegetable,accept?1:2);assert.equal(r.state.players[0]!.resources.sheep,accept?3:1);assert.equal(r.state.players[1]!.resources.sheep,0);save(`D084-N2-${accept}`,{before,r})}})
+  it('D084 N3 zero vegetable no animals and midround action cannot manufacture a new animal type',()=>{for(const mode of['vegetable','animals']){const s=make(PELLETS,true,state=>{yard(state,mode==='animals'?0:1);state.players[0]!.resources.vegetable=mode==='vegetable'?0:1}),r=nextRound(s,8,false);assert.equal(r.state.players[0]!.resources.sheep,mode==='animals'?0:1);assert.equal(r.state.players[0]!.resources.boar,0);save(`D084-N3-${mode}`,r)}const s=make(PELLETS,true,state=>{yard(state);state.players[0]!.resources.vegetable=1}),mid=ok(s.takeAction(0,'reed-bank'));assert.equal(mid.state.players[0]!.resources.sheep,1);assert.equal(mid.state.players[0]!.resources.vegetable,1);save('D084-N3-mid',mid)})
 })

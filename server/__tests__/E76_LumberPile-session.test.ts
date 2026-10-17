@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E076_LumberPile'
 import '../../shared/cards/B/B085_FarmHand'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit42Purchase from './_helpers/audit/ae-negative-42-purchase'
 
 const CARD_ID = 'E076_LumberPile'
 const FARM_HAND = 'B085_FarmHand'
@@ -246,4 +249,13 @@ describe('E076 Lumber Pile parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(3)
     expect(session.withCtx(() => getExtraRoomCapacity(response.state.players[0]!))).toBe(0)
   })
+})
+
+describe('ae-negative-42-purchase', () => {
+  const { sessions, ok, save, setup, finish, play, stables, pendingBuy } = audit42Purchase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E076 N1 real Lumber Pile purchase returns one or three physical stables for exactly three wood each and undo restores finite stables',()=>{for(const count of [1,3]){const s=setup('E076_LumberPile',st=>stables(st),false,5),p=pendingBuy(s,'E076_LumberPile');assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='selection');const r=finish(s,ok(s.commitSelectionChoice(0,{positions:p.state.players[0]!.stableTiles.slice(0,count)})));assert.equal(r.state.players[0]!.resources.wood,count*3);assert.equal(r.state.players[0]!.stableTiles.length,4-count);const u=ok(s.undoAction());assert.equal(u.state.players[0]!.resources.wood,0);assert.equal(u.state.players[0]!.stableTiles.length,4);assert.ok(u.state.players[0]!.minorHand.includes('E076_LumberPile'));save(`E076-N1-${count}`,{p,r,u})}})
+  it('E076 N2 fourth stable and nonexistent target reject before a legal three stable return',()=>{const s=setup('E076_LumberPile',st=>stables(st),false,5),p=pendingBuy(s,'E076_LumberPile');assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='selection');const bad=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:p.interaction.stateId==='wait'&&p.interaction.request.kind==='selection'?p.state.players[0]!.stableTiles:[]})),missing=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{positions:[{row:2,col:4}]})),r=finish(s,ok(s.commitSelectionChoice(0,{positions:p.state.players[0]!.stableTiles.slice(0,3)})));assert.equal(r.state.players[0]!.resources.wood,9);assert.equal(r.state.players[0]!.stableTiles.length,1);save('E076-N2',{p,bad,missing,r})})
+  it('E076 N3 duplicate stable target cannot mint duplicate wood while a legal one stable return is available',()=>{const s=setup('E076_LumberPile',st=>stables(st,1),false,5),p=pendingBuy(s,'E076_LumberPile');assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='selection');const bad=s.commitSelectionChoice(0,{positions:[p.state.players[0]!.stableTiles[0]!,p.state.players[0]!.stableTiles[0]!]});if(!bad.ok){assert.equal(bad.state.players[0]!.resources.wood,0);const r=finish(s,ok(s.commitSelectionChoice(0,{positions:[p.state.players[0]!.stableTiles[0]!]})));assert.equal(r.state.players[0]!.resources.wood,3);assert.equal(r.state.players[0]!.stableTiles.length,0);save('E076-N3',{p,bad,r})}else{const r=finish(s,bad);assert.equal(r.state.players[0]!.resources.wood,3);assert.equal(r.state.players[0]!.stableTiles.length,0);save('E076-N3',{p,bad,r})}})
+  it('E076 N4 no stables creates no free wood and declining actual return preserves every piece',()=>{for(const count of [0,2]){const s=setup('E076_LumberPile',st=>stables(st,count),false,5),r=play(s,'E076_LumberPile');assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.stableTiles.length,count);save(`E076-N4-${count}`,r)}})
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A031_DebtSecurity'
 import '../../shared/cards/A/A060_OrientalFireplace'
 import '../../shared/cards/D/D059_EarthOven'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Cooking from './_helpers/audit/ae-negative-38-cooking'
 
 const CARD_ID = 'D059_EarthOven'
 const FIREPLACE_ID = 'Major_Fireplace1'
@@ -192,4 +195,52 @@ describe('D059 Earth Oven parity', () => {
     expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 3 }))
   })
+})
+
+describe('ae-negative-38-cooking', () => {
+  const { sessions, save, ok, options, ready, action, buy, bonus, printed, cook, earth, returned, bake } = audit38Cooking
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D059 N1 actual return of either Fireplace or Oriental Fireplace plays Earth Oven with three printed points and exactly one major for Debt Security', () => {
+      const rows = [];
+      for (const card of ['Major_Fireplace1', 'Major_Fireplace2', 'A060_OrientalFireplace'] as const) {
+          const s = earth(card), p = buy(s, 'D059_EarthOven'), r = returned(s, p, card);
+          save('D059-N1-r-' + card, r);
+          assert.ok(r.state.players[0]!.minorPlayed.includes('D059_EarthOven'));
+          assert.equal(r.state.players[0]!.improvements.includes(card) || r.state.players[0]!.minorPlayed.includes(card), false);
+          assert.equal(printed(r, 'D059_EarthOven'), 3);
+          assert.equal(bonus(r, 'A031_DebtSecurity'), 1);
+          if (card.startsWith('Major'))
+              assert.ok(r.state.availableMajorImprovements.includes(card));
+          rows.push({ p, r });
+      }
+      save('D059-N1', rows);
+  });
+  it('D059 N2 actual purchase followed by native anytime cooking applies all four literal food rates and excludes Earth Oven grain from anytime', () => {
+      const rows = [];
+      for (const [type, food] of [['vegetable', 103], ['sheep', 102], ['boar', 103], ['cattle', 103]] as const) {
+          const s = earth('Major_Fireplace1', type), bought = returned(s, buy(s, 'D059_EarthOven'), 'Major_Fireplace1'), opponent = action(s, 1, 'reed-bank');
+          ready(s);
+          const r = cook(s, type, 1, 'D059_EarthOven');
+          assert.deepEqual([r.state.players[0]!.resources[type], r.state.players[0]!.resources.food], [0, food]);
+          rows.push({ bought, opponent, r });
+      }
+      const q = earth(), bought = returned(q, buy(q, 'D059_EarthOven'), 'Major_Fireplace1'), opponent = action(q, 1, 'reed-bank');
+      ready(q);
+      const p = ok(q.takeAnytimeAction(0, 'exchange'));
+      assert.equal(options(p).some(o => o.value.includes('D059_EarthOven') && o.effectPreview && 'resourcesPaid' in o.effectPreview && (o.effectPreview.resourcesPaid?.grain ?? 0) > 0), false);
+      save('D059-N2', { rows, bought, opponent, p });
+  });
+  it('D059 N3 actual returned Fireplace permits two grain Bake Bread for four food while no Fireplace or a Cooking Hearth alone cannot buy', () => {
+      const s = earth(), bought = returned(s, buy(s, 'D059_EarthOven'), 'Major_Fireplace1'), opponent = action(s, 1, 'reed-bank');
+      ready(s);
+      const r = bake(s, 2, 'D059_EarthOven');
+      assert.deepEqual([r.state.players[0]!.resources.grain, r.state.players[0]!.resources.food], [0, 104]);
+      const rows = [];
+      for (const card of ['', 'Major_CookingHearth1'] as const) {
+          const t = earth(card), p = buy(t, 'D059_EarthOven'), bad = assertRejectedUnchanged(t, () => t.resolveChoice(0, 'D059_EarthOven'));
+          assert.ok(p.state.players[0]!.minorHand.includes('D059_EarthOven'));
+          rows.push({ p, bad });
+      }
+      save('D059-N3', { bought, opponent, r, rows });
+  });
 })

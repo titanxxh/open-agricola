@@ -1,0 +1,20 @@
+// Helpers of ae-negative-26-rustic-session.test.ts from the negative audit snapshot fafd4f51b.
+import assert from 'node:assert/strict'
+import fs from '../audit-evidence-fs'
+import type { GameSession, SessionResponse } from '../../../game/authoritative-session'
+import type { GameState } from '../../../../shared/contract/types'
+import { createWorkSession } from '../session-fixtures'
+import { confirmNext } from '../negative-rule-audit'
+
+export const CARD='B111_Rustic'
+export const sessions:GameSession[]=[]
+export const output=process.env.AGRICOLA_NEGATIVE_ARTIFACT_DIR??'output/ae-negative/26-rustic-probes'
+export function save(id:string,value:unknown){fs.mkdirSync(output,{recursive:true});fs.writeFileSync(`${output}/${id}.json`,JSON.stringify(value,null,2))}
+export function ok(r:SessionResponse){assert.equal(r.ok,true,`${r.error} ${JSON.stringify(r.interaction)}`);return JSON.parse(JSON.stringify(r)) as SessionResponse}
+export function setup(card:string,round=5,configure:(state:GameState)=>void=()=>{}){const s=createWorkSession({seed:4242,options:{playerCount:2},configure(state){state.round=round;for(const p of state.players)Object.assign(p.resources,{food:100,wood:0,clay:0,reed:0,stone:0,grain:0,vegetable:0});const p=state.players[0]!;p.minorHand=[card,'B004_WoodPile','A006_StorageBarn'];configure(state)}});sessions.push(s);return s}
+export function ready(s:GameSession,accept=true){let r=s.getState();if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='confirm-next-player')r=confirmNext(s,r);r=finish(s,r,accept);assert.equal(r.interaction.stateId,'idle',JSON.stringify(r.interaction));return r}
+export function finish(s:GameSession,r:SessionResponse,accept=true){for(let n=0;n<32&&r.interaction.stateId==='wait'&&r.interaction.request.kind!=='confirm-next-player';n++){const i=r.interaction;if(i.request.kind==='confirm-player-switch')r=ok(s.resolveChoice(i.request.fromPlayerIndex,'confirm'));else if(i.request.kind==='feed')r=ok(s.resolveChoice(i.playerIndex,'confirm',{selections:[]}));else if(i.request.kind==='animal-reorg')r=ok(s.resolveChoice(i.playerIndex,'confirm',{zones:i.request.zones}));else if(i.request.kind==='farm-select'){assert.equal(i.request.farm.farmType,'plow');r=ok(s.commitSelectionChoice(i.playerIndex,{tile:i.request.farm.selectableTiles[0]!}))}else{assert.ok(i.request.kind==='choice'||i.request.kind==='select-trigger',JSON.stringify(i));const options:import('../../shared/contract/types').ActionChoiceOption[]=i.request.options,o=(accept?options.find(o=>!o.disabled&&!['__skip__','__done__','__pass__'].includes(o.value)&&o.labelKey!=='actions.exchange.name'):undefined)??options.find(o=>!o.disabled&&['__skip__','__done__','__pass__'].includes(o.value));assert.ok(o,JSON.stringify(i));r=ok(s.resolveChoice(i.playerIndex,o.value))}}return JSON.parse(JSON.stringify(r)) as SessionResponse}
+export function make(house:'wood'|'clay'|'stone'='clay',count=1,played=true){return setup(CARD,8,state=>{const p=state.players[0]!;p.minorHand=['B004_WoodPile','A006_StorageBarn'];p.occupationPlayed=played?[CARD]:[];p.occupationHand=played?['__test_placeholder__']:[CARD];p.houseType=house;Object.assign(p.resources,{wood:5*count,clay:5*count,stone:5*count,reed:2*count})})}
+export function bonus(r:SessionResponse){return r.state.players[0]!.cardStates[CARD]?.counters?.bonusVp??0}
+export function enter(s:GameSession){ready(s);let r=ok(s.takeAction(0,'farm-expansion'));for(let n=0;n<8;n++){if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='farm-select'){assert.equal(r.interaction.request.farm.farmType,'room');return r}assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice',JSON.stringify(r.interaction));const o=r.interaction.request.options.find(o=>o.labelKey==='actions.construct.name');assert.ok(o,JSON.stringify(r.interaction));r=ok(s.resolveChoice(0,o.value))}assert.fail('Room construction not reached')}
+export function build(s:GameSession,count=1){const pending=enter(s),r=finish(s,ok(s.commitSelectionChoice(0,{rooms:[{row:1,col:1},{row:2,col:1}].slice(0,count)})),false);return{pending,r}}

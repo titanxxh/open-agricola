@@ -1,13 +1,15 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/B/B143_ClayWarden'
+import assert from 'node:assert/strict'
+import * as audit29Resources from './_helpers/audit/ae-negative-29-resources'
 
 describe('B143_ClayWarden session', () => {
   const setup = (currentPlayerIndex = 0) => {
@@ -199,4 +201,12 @@ describe('B143 Clay Warden parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 1 })
     expect(response.state.players[1]!.resources.clay).toBe(3)
   })
+})
+
+describe('ae-negative-29-resources', () => {
+  const { sessions, save, make, action, lesson } = audit29Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B143 N1 three player opponent Hollow grants two clay only to its owner', () => { const bought = lesson(make('B143_ClayWarden', false), 'B143_ClayWarden'); assert.equal(bought.state.players[0]!.resources.clay, 0); const s = make('B143_ClayWarden', true, 3, s => s.actionSpaces.find(a => a.id === 'hollow')!.resources.clay = 3), first = action(s, 0, 'grain-seeds'), r = action(s, 1, 'hollow'); assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.food, r.state.players[1]!.resources.clay], [2, 10, 3]); save('B143-N1', { bought, first, r }); });
+  it('B143 N2 four player opponent Hollow grants one clay and one food while owner Hollow is excluded', () => { const s = make('B143_ClayWarden', true, 4, s => s.actionSpaces.find(a => a.id === 'hollow-4')!.resources.clay = 3), first = action(s, 0, 'grain-seeds'), r = action(s, 1, 'hollow-4'); assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.food, r.state.players[1]!.resources.clay], [1, 11, 3]); const t = make('B143_ClayWarden', true, 4, s => s.actionSpaces.find(a => a.id === 'hollow-4')!.resources.clay = 3), own = action(t, 0, 'hollow-4'); assert.deepEqual([own.state.players[0]!.resources.clay, own.state.players[0]!.resources.food], [3, 10]); save('B143-N2', { first, r, own }); });
+  it('B143 N3 a held card and opponent Reed Bank cannot grant Clay Warden goods', () => { const s = make('B143_ClayWarden', false, 3, s => s.actionSpaces.find(a => a.id === 'hollow')!.resources.clay = 3), first = action(s, 0, 'grain-seeds'), hand = action(s, 1, 'hollow'); assert.equal(hand.state.players[0]!.resources.clay, 0); const t = make('B143_ClayWarden'), start = action(t, 0, 'grain-seeds'), r = action(t, 1, 'reed-bank'); assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.food], [0, 10]); save('B143-N3', { first, hand, start, r }); });
 })

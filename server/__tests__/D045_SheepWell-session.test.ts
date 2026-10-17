@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D045_SheepWell'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'D045_SheepWell'
 const FILLER = '__test_placeholder__'
@@ -137,4 +139,21 @@ describe('D045 Sheep Well parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(21)
     expect(futureRounds(response)).toEqual([7, 8])
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, end, final, purchase, rejectBuy, resource, future, points, sheep } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D045 N1 real purchase counts three physically housed sheep and receives a naturally due food", () => { const s = make('D045_SheepWell', st => { sheep(st.players[0]!, 3); st.players[0]!.resources.stone = 2; }, false), r = purchase(s, 'D045_SheepWell'); resource(r, { stone: 0, sheep: 3 }); assert.deepEqual(future(r, 'D045_SheepWell'), [6, 7, 8]); const due = end(s); resource(due, { food: 101, sheep: 3 }); save('D045-N1', { r, due }); });
+  it("D045 N2 zero sheep is legal but shortages or a held Sheep Well never queue food", () => { save('D045-N2-stone', rejectBuy(make('D045_SheepWell', st => { sheep(st.players[0]!, 3); st.players[0]!.resources.stone = 1; }, false), 'D045_SheepWell')); const z = make('D045_SheepWell', st => { st.players[0]!.resources.stone = 2; }, false), zero = purchase(z, 'D045_SheepWell'), dueZero = end(z); assert.deepEqual(future(zero, 'D045_SheepWell'), []); resource(dueZero, { food: 100 }); save('D045-N2-zero', { zero, dueZero }); const s = make('D045_SheepWell', st => { sheep(st.players[0]!, 3); st.players[0]!.resources.stone = 2; }, false), r = end(s, true, [], 'D045_SheepWell'); resource(r, { food: 100 }); assert.deepEqual(future(r, 'D045_SheepWell'), []); save('D045-N2-hand', r); });
+  it("D045 N3 late housed-sheep purchases truncate and receive one food alongside real breeding and final points", () => { for (const round of [13, 14]) {
+      const s = make('D045_SheepWell', st => { sheep(st.players[0]!, 3); st.players[0]!.resources.stone = 2; }, false, round), r = purchase(s, 'D045_SheepWell');
+      assert.deepEqual(future(r, 'D045_SheepWell'), round === 13 ? [14] : []);
+      const due = round === 13 ? end(s) : final(s);
+      if (round === 13)
+          resource(due, { food: 97, sheep: 4 });
+      else
+          assert.equal(points(due, 'D045_SheepWell'), 2);
+      save(`D045-N3-${round}`, { r, due });
+  } });
 })

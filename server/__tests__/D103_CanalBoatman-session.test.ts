@@ -1,7 +1,7 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { internalActionDefinitions } from '../../shared/actions/index'
@@ -12,6 +12,8 @@ import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../sha
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/D/D103_CanalBoatman'
 import '../../shared/cards/D/D150_GodlySpouse'
+import assert from 'node:assert/strict'
+import * as audit46Wood from './_helpers/audit/ae-negative-46-wood'
 
 const CARD_ID = 'D103_CanalBoatman'
 const LISTENER_ID = 'D103-canal-boatman-after-place-farmer'
@@ -278,4 +280,12 @@ describe('D103_CanalBoatman session', () => {
       expect(hasGodlySpouseOption).toBe(false)
     }
   })
+})
+
+describe('ae-negative-46-wood', () => {
+  const { CANAL, sessions, save, ok, make, trigger, finish, ready, lesson, pile, canal, extraWorker, acceptCanal } = audit46Wood
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D103 N1 Fishing or Reed Bank pays one food uses a distinct second finite worker on the card and grants exactly one selected bundle',()=>{const bought=lesson(make(CANAL,false),CANAL);assert.equal(bought.state.players[0]!.resources.stone,0);for(const[space,grain,food]of[['fishing',false,0],['reed-bank',true,1]] as const){const s=canal(space,food),pending=ok(s.takeAction(0,space)),r=acceptCanal(s,pending,grain);assert.equal(r.state.players[0]!.resources.food,space==='fishing'?1:0);assert.equal(r.state.players[0]!.resources.stone,grain?0:3);assert.equal(r.state.players[0]!.resources.grain,grain?1:0);assert.equal(r.state.players[0]!.resources.vegetable,grain?1:0);assert.equal(extraWorker(r).length,1);assert.equal(workersAvailable(r.state,r.state.players[0]!),0);assert.notEqual(extraWorker(r)[0]!.workerId,r.state.actionSpaces.find(a=>a.id===space)!.takenBy[0]!.workerId);save(`D103-N1-${space}`,{bought,pending,r})}})
+  it('D103 N2 decline zero food and the actual last person cannot place an extra worker or claim a bundle',()=>{const s=canal(),pending=trigger(s,ok(s.takeAction(0,'fishing')),CANAL),declined=finish(s,pending,false);assert.equal(extraWorker(declined).length,0);assert.equal(declined.state.players[0]!.resources.food,3);const t=canal('reed-bank',0),poor=finish(t,ok(t.takeAction(0,'reed-bank')));assert.equal(extraWorker(poor).length,0);assert.equal(poor.state.players[0]!.resources.grain,0);const v=canal('reed-bank');finish(v,ok(v.takeAction(0,'grain-seeds')));ready(v);finish(v,ok(v.takeAction(1,'day-laborer')));ready(v);const last=finish(v,ok(v.takeAction(0,'reed-bank')));assert.equal(extraWorker(last).length,0);assert.equal(last.state.players[0]!.resources.stone,0);assert.equal(last.state.players[0]!.resources.vegetable,0);save('D103-N2',{pending,declined,poor,last})})
+  it('D103 N3 whole paid Fishing undo restores both worker placements food and bundle before one replay and unrelated actions do not trigger',()=>{const s=canal(),a=acceptCanal(s,ok(s.takeAction(0,'fishing'))),u=ok(s.undoAction());assert.equal(extraWorker(u).length,0);assert.equal(workersAvailable(u.state,u.state.players[0]!),2);assert.equal(u.state.players[0]!.resources.food,1);assert.equal(u.state.players[0]!.resources.stone,0);assert.equal(pile(u,'fishing','food'),2);const r=acceptCanal(s,ok(s.takeAction(0,'fishing')));assert.equal(extraWorker(r).length,1);assert.equal(r.state.players[0]!.resources.stone,3);const t=canal(),other=finish(t,ok(t.takeAction(0,'day-laborer')));assert.equal(extraWorker(other).length,0);assert.equal(other.state.players[0]!.resources.stone,0);save('D103-N3',{a,u,r,other})})
 })

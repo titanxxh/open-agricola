@@ -1,12 +1,15 @@
 import { type SessionResponse } from '../game/authoritative-session'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionFlow } from '../../shared/contract/types'
-import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { setActiveWorkerCount, setWorkersAtHome, familySize } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D050_ForeignAid'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'D050_ForeignAid'
 
@@ -168,4 +171,39 @@ describe('D050 Foreign Aid parity', () => {
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, save, setup, finish, improvement, take, prerequisites, hand, buy, printed, house, denyMinor } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D050 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'D050_ForeignAid', s = setup(card, 11, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, {}); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 0); assert.equal(r.state.players[0]!.resources.food, 46); save('D050-N1-legal', r); const excluded = setup(card, 12, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, {}); }); denyMinor(excluded, card); save('D050-N1-prerequisite', excluded.getState()); });
+  it('D050 N2 the owner cannot use urgent growth but an earlier quarry and hand or opponent growth remain legal', () => {
+      const card = 'D050_ForeignAid', s = setup(card, 14, st => house(st, 3));
+      assertRejectedUnchanged(s, () => s.takeAction(0, 'urgent-wish-children'));
+      let r = finish(s, take(s, 'western-quarry'), true);
+      assert.equal(r.state.players[0]!.resources.stone, 2);
+      save('D050-N2-owner', r);
+      for (const mode of ['hand', 'opponent']) {
+          const t = setup(card, 14, st => {
+              house(st, 3);
+              if (mode === 'hand')
+                  hand(st, card);
+              else
+                  st.currentPlayerIndex = 1;
+          });
+          r = finish(t, take(t, 'urgent-wish-children'), true);
+          assert.equal(familySize(r.state.players[mode === 'opponent' ? 1 : 0]!), 3);
+          save(`D050-N2-${mode}`, r);
+      }
+  });
+  it('D050 N3 the three legal final stage actions are blocked while earlier improvement is legal', () => {
+      const card = 'D050_ForeignAid', order = ['sheep-market', 'fencing', 'grain-utilization', 'major-improvement', 'wish-children', 'western-quarry', 'house-redevelopment', 'pig-market', 'vegetable-seeds', 'cattle-market', 'eastern-quarry', 'cultivation', 'urgent-wish-children', 'farm-redevelopment'];
+      for (const space of ['cultivation', 'urgent-wish-children', 'farm-redevelopment']) {
+          const s = setup(card, 14, st => { st.roundActionOrder = order; house(st, 3); Object.assign(st.players[0]!.resources, { clay: 3, reed: 1 }); st.players[0]!.minorHand = ['E050_WildGreens']; });
+          assertRejectedUnchanged(s, () => s.takeAction(0, space));
+          const r = improvement(s, take(s, 'major-improvement'), 'E050_WildGreens');
+          assert.ok(r.state.players[0]!.minorPlayed.includes('E050_WildGreens'));
+          save(`D050-N3-${space}`, r);
+      }
+  });
 })

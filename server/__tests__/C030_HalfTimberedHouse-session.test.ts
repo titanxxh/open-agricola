@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { computeScores } from '../../shared/domain/scoring'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C030_HalfTimberedHouse'
 import '../../shared/cards/D/D034_LuxuriousHostel'
+import assert from 'node:assert/strict'
+import type { PlayerState, Resource } from '../../shared/contract/types'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'C030_HalfTimberedHouse'
 const HOSTEL_ID = 'D034_LuxuriousHostel'
@@ -136,4 +139,28 @@ describe('C030 Half-Timbered House parity', () => {
     expect(bonusScore(session, response, CARD_ID)).toBe(4)
     expect(bonusScore(session, response, HOSTEL_ID)).toBe(0)
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, final, purchase, rejectBuy, undo, resource, bonus, points, house } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C030 N1 real purchase pays each of four resources and missing any one rejects before whole undo", () => { const cost = { wood: 1, clay: 1, stone: 2, reed: 1 }; for (const missing of ['wood', 'clay', 'stone', 'reed'] satisfies Array<keyof Resource>) {
+      const s = make('C030_HalfTimberedHouse', st => { Object.assign(st.players[0]!.resources, cost); st.players[0]!.resources[missing]--; }, false);
+      save(`C030-N1-missing-${missing}`, rejectBuy(s, 'C030_HalfTimberedHouse'));
+  } const s = make('C030_HalfTimberedHouse', st => Object.assign(st.players[0]!.resources, cost), false), r = purchase(s, 'C030_HalfTimberedHouse'), u = undo(s); resource(r, { wood: 0, clay: 0, stone: 0, reed: 0 }); resource(u, cost); save('C030-N1', { r, u }); });
+  it("C030 N2 actual final scoring pays only stone rooms and excludes a held card", () => { for (const [type, n, held] of [['wood', 2, false], ['clay', 2, false], ['stone', 2, false], ['stone', 3, false], ['stone', 5, false], ['stone', 3, true]] satisfies Array<[
+      PlayerState['houseType'],
+      number,
+      boolean
+  ]>) {
+      const s = make('C030_HalfTimberedHouse', st => house(st.players[0]!, n, type), !held, 14), r = final(s);
+      assert.equal(bonus(r, 'C030_HalfTimberedHouse'), type === 'stone' && !held ? n : 0);
+      assert.equal(points(r, 'C030_HalfTimberedHouse'), 0);
+      save(`C030-N2-${type}-${n}-${held}`, r);
+  } });
+  it("C030 N3 multiple stone-house cards award a single highest bonus including a tie", () => { for (const n of [3, 4, 5]) {
+      const s = make('C030_HalfTimberedHouse', st => { house(st.players[0]!, n, 'stone'); st.players[0]!.minorPlayed.push('D034_LuxuriousHostel'); }, true, 14), r = final(s);
+      assert.equal(bonus(r, 'C030_HalfTimberedHouse') + bonus(r, 'D034_LuxuriousHostel'), n === 5 ? 5 : 4);
+      save(`C030-N3-${n}`, r);
+  } });
 })

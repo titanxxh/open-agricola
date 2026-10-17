@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B013_CarpentersParlor'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18Construction from './_helpers/audit/ae-negative-18-construction'
 
 const CARD_ID = 'B013_CarpentersParlor'
 
@@ -142,4 +145,13 @@ describe('B013 Carpenter\'s Parlor parity', () => {
     expect(response.state.players[0]!.rooms).toBe(3)
     expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, reed: 0 })
   })
+})
+
+describe('ae-negative-18-construction', () => {
+  const { PARLOR, sessions, save, ok, setup, turn, choose, room } = audit18Construction
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B013 N1 actual one and two wooden rooms each cost exactly two wood and two reed',()=>{for(const count of[1,2]){const s=setup(PARLOR,state=>Object.assign(state.players[0]!.resources,{wood:2*count,reed:2*count}));const {pending,r}=room(s,count);assert.equal(r.state.players[0]!.rooms,2+count);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.reed,0);save(`B013-N1-${count}`,{pending,r})}})
+  it('B013 N2 clay stone and unplayed hand preserve ordinary five material two reed price',()=>{for(const[type,played]of[['clay',true],['stone',true],['wood',false]]as const){const s=setup(PARLOR,state=>{const p=state.players[0]!;p.houseType=type;p.resources[type]=5;p.resources.reed=2},played);const{pending,r}=room(s);assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources[type],0);assert.equal(r.state.players[0]!.resources.reed,0);save(`B013-N2-${type}-${played}`,{pending,r})}})
+  it('B013 N3 missing wood or reed cannot construct and legal alternative does not spend either',()=>{for(const[wood,reed]of[[1,2],[2,1]]){const s=setup(PARLOR,state=>Object.assign(state.players[0]!.resources,{wood,reed}));let pending=s.getState();if(!s.getActionAvailability(0)['farm-expansion']){assertRejectedUnchanged(s,()=>s.takeAction(0,'farm-expansion'))}else{pending=turn(s,0,'farm-expansion');assert.ok(pending.interaction.stateId==='wait');if(pending.interaction.request.kind==='choice')assert.ok(!pending.interaction.request.options.some(o=>o.labelKey==='actions.construct.name'&&!o.disabled));else{assert.ok(pending.interaction.request.kind==='farm-select');assert.equal(pending.interaction.request.farm.farmType,'stable');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:1,col:1}]}))}ok(s.undoAction())}const r=turn(s,0,'grain-seeds');assert.equal(r.state.players[0]!.rooms,2);assert.equal(r.state.players[0]!.resources.wood,wood);assert.equal(r.state.players[0]!.resources.reed,reed);save(`B013-N3-${wood}-${reed}`,{pending,r})}})
+  it('B013 N4 wrong actor and illegal coordinate reject before discounted construction and full action undo',()=>{const s=setup(PARLOR,state=>Object.assign(state.players[0]!.resources,{wood:2,reed:2}));const pending=choose(s,turn(s,0,'farm-expansion'),'actions.construct.name');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{rooms:[{row:1,col:1}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:[{row:99,col:99}]}));const r=choose(s,ok(s.commitSelectionChoice(0,{rooms:[{row:1,col:1}]})),undefined,false),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.rooms,2);assert.equal(undone.state.players[0]!.resources.wood,2);assert.equal(undone.state.players[0]!.resources.reed,2);const retry=room(s).r;assert.equal(retry.state.players[0]!.rooms,3);assert.equal(retry.state.players[0]!.resources.wood,0);save('B013-N4',{pending,r,undone,retry})})
 })

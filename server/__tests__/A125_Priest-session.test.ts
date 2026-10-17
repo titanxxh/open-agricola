@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit14Immediate from './_helpers/audit/ae-negative-14-immediate'
+
+describe('ae-negative-14-immediate', () => {
+  const { PRIEST, sessions, save, ok, setup, play, material } = audit14Immediate
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A125 N1 exactly two clay rooms at actual purchase give three clay two reed two stone',()=>{const s=setup(PRIEST,state=>material(state,'clay'));const r=play(s,PRIEST);assert.equal(r.state.players[0]!.resources.clay,3);assert.equal(r.state.players[0]!.resources.reed,2);assert.equal(r.state.players[0]!.resources.stone,2);assert.equal(r.state.players[0]!.resources.food,40);save('A125-N1',r)})
+  it('A125 N2 wood stone and three clay rooms fail the exact house predicate',()=>{for(const[type,rooms]of[['wood',2],['stone',2],['clay',3]] as const){const s=setup(PRIEST,state=>material(state,type,rooms));const r=play(s,PRIEST);assert.deepEqual(['clay','reed','stone'].map(k=>r.state.players[0]!.resources[k as 'clay'|'reed'|'stone']),[0,0,0]);save(`A125-N2-${type}-${rooms}`,r)}})
+  it('A125 N3 opponent two clay rooms and later owner renovation cannot apply retroactively',()=>{const s=setup(PRIEST,state=>{state.players[1]!.houseType='clay';state.players[0]!.resources.clay=2;state.players[0]!.resources.reed=1});const first=play(s,PRIEST);assert.equal(first.state.players[0]!.resources.clay,2);assert.equal(first.state.players[1]!.resources.clay,0);confirmNext(s,first);confirmNext(s,ok(s.takeAction(1,'grain-seeds')));let r=ok(s.takeAction(0,'house-redevelopment'));if(r.interaction.stateId==='wait'&&r.interaction.promptKey==='ui.interactionChooseRenovationTarget')r=ok(s.resolveChoice(0,'clay'));assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources.stone,0);save('A125-N3',{first,r})})
+  it('A125 N4 invalid choice and undo cannot retain a duplicate purchase reward',()=>{const s=setup(PRIEST,state=>material(state,'clay'));const first=play(s,PRIEST);assertRejectedUnchanged(s,()=>s.resolveChoice(0,PRIEST));const undone=ok(s.undoAction());assert.deepEqual(['clay','reed','stone'].map(k=>undone.state.players[0]!.resources[k as 'clay'|'reed'|'stone']),[0,0,0]);assert(undone.state.players[0]!.occupationHand.includes(PRIEST));const retry=play(s,PRIEST);assert.equal(retry.state.players[0]!.resources.clay,3);save('A125-N4',{first,undone,retry})})
+})

@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B113_PatchCaregiver'
+import assert from 'node:assert/strict'
+import { getLogicalFields } from '../../shared/cards/helpers/card-field'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Patch from './_helpers/audit/ae-negative-26-patch'
 
 const CARD_ID = 'B113_PatchCaregiver'
 const FILLER = '__test_placeholder__'
@@ -155,4 +159,13 @@ describe('B113 Patch Caregiver parity', () => {
       }
     })
   }
+})
+
+describe('ae-negative-26-patch', () => {
+  const { CARD, sessions, save, ok, finish, make, lesson, purchase, field, sowMenu, nextRound } = audit26Patch
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B113 N1 actual first Lessons optional crop buys exactly one grain for one food or vegetable for three food',()=>{for(const crop of['grain','vegetable']as const){const s=make(),a=lesson(s),r=purchase(s,a.chosen,crop);assert.equal(r.state.players[0]!.resources.food,crop==='grain'?99:97);assert.equal(r.state.players[0]!.resources[crop],2);assert.equal(r.state.players[0]!.resources[crop==='grain'?'vegetable':'grain'],1);assert.equal(field(r).stacks.length,0);assert.equal(r.state.players[1]!.resources.grain,0);save(`B113-N1-${crop}`,{a,r})}})
+  it('B113 N2 decline or zero food preserves all supplies while card remains a usable empty field',()=>{for(const food of[0,100]){const s=make(food),a=lesson(s),r=finish(s,a.chosen,false);assert.equal(r.state.players[0]!.resources.food,food);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.vegetable,1);assert.equal(field(r).stacks.length,0);save(`B113-N2-${food}`,{a,r})}})
+  it('B113 N3 whole occupation and crop purchase undo removes logical field and restores food hand and purchased crop',()=>{const s=make(),a=lesson(s),r=purchase(s,a.chosen,'vegetable'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.players[0]!.resources.vegetable,1);assert.ok(undone.state.players[0]!.occupationHand.includes(CARD));assert.ok(!getLogicalFields(undone.state.players[0]!).some(f=>f.id===`card:${CARD}`));const second=lesson(s),retry=purchase(s,second.chosen,'grain');assert.equal(retry.state.players[0]!.resources.grain,2);save('B113-N3',{a,r,undone,second,retry})})
+  it('B113 N4 actual later sow targets the card field for ordinary grain or vegetable and undo restores its empty slot',()=>{for(const crop of['grain','vegetable']as const){const s=make(),a=lesson(s),played=finish(s,a.chosen,false);nextRound(s);const pending=sowMenu(s),tile=field(pending).slots[0]!.tile,wrong=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{crops:[{...tile,crop}]})),r=finish(s,ok(s.commitSelectionChoice(0,{crops:[{...tile,crop}]})),false);assert.deepEqual(field(r).stacks,[{kind:crop,remaining:crop==='grain'?3:2}]);assert.equal(r.state.players[0]!.resources[crop],0);const undone=ok(s.undoAction());assert.equal(field(undone).stacks.length,0);assert.equal(undone.state.players[0]!.resources[crop],1);save(`B113-N4-${crop}`,{a,played,pending,wrong,r,undone})}})
 })

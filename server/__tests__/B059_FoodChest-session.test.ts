@@ -7,6 +7,9 @@ import '../../shared/cards/C/C096_Merchant'
 import '../../shared/cards/A/A151_Minstrel'
 import '../../shared/cards/D/D117_WoodExpert'
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit21Foodchest from './_helpers/audit/ae-negative-21-foodchest'
 
 const CARD_ID = 'B059_FoodChest'
 const MERCHANT = 'C096_Merchant'
@@ -207,4 +210,12 @@ describe('B059 Food Chest parity', () => {
     expect(foodChestGains(response)).toEqual([])
   })
 
+})
+
+describe('ae-negative-21-foodchest', () => {
+  const { CARD, sessions, save, ok, setup, finish, menu, buy, major } = audit21Foodchest
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B059 N1 real one wood Food Chest purchase on Major Improvement gives exactly four food',()=>{const s=setup(CARD,8,state=>state.players[0]!.resources.wood=1),{pending,r}=major(s);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[1]!.resources.food,100);save('B059-N1',{pending,r,expectedFood:104});assertRuleOutcome(r.state.players[0]!.resources.food,104)})
+  it('B059 N2 actual Meeting Place purchase gives only two food and whole undo restores wood and food before replay',()=>{const s=setup(CARD,8,state=>state.players[0]!.resources.wood=1),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,102);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const retry=buy(s,CARD).r;assert.equal(retry.state.players[0]!.resources.food,102);save('B059-N2',{pending,r,undone,retry})})
+  it('B059 N3 cost shortfall invalid actor and hand on Meeting Place give no Food Chest benefit',()=>{const s=setup(CARD),pending=menu(s);assertRejectedUnchanged(s,()=>s.resolveChoice(0,CARD));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'B004_WoodPile'));const legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.food,100);assert.ok(legal.state.players[0]!.minorHand.includes(CARD));save('B059-N3',{pending,legal})})
 })

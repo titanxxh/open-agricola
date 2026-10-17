@@ -4,12 +4,15 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/A/A114_SeasonalWorker'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D097_BeggingStudent'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { passPreparationExchanges } from './_helpers/negative-rule-audit'
+import * as audit45Phase from './_helpers/audit/ae-negative-45-phase'
 
 const CARD_ID = 'D097_BeggingStudent'
 
@@ -181,4 +184,26 @@ describe('D097 Begging Student parity', () => {
     expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
     expect(response.state.players[0]!.resources.begging).toBe(1)
   })
+})
+
+describe('ae-negative-45-phase', () => {
+  const { sessions, save, setup, choice, finish, turn, completeRound, requestOf } = audit45Phase
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D097 N1 real Lessons adds exactly one begging marker while unrelated hand card does not', () => { const s = setup('D097_BeggingStudent', 4, state => { state.players[0]!.occupationPlayed = []; state.players[0]!.occupationHand = ['D097_BeggingStudent']; }); let r = turn(s, 'lessons'); if (r.state.players[0]!.occupationHand.includes('D097_BeggingStudent'))
+    r = choice(s, r, o => o.value === 'D097_BeggingStudent'); assert.equal(r.state.players[0]!.resources.begging, 1); assert.ok(r.state.players[0]!.occupationPlayed.includes('D097_BeggingStudent')); save('D097-N1', r); })
+  it('D097 N2 real harvest free occupation or decline changes no food fee and adds no further begging', () => { for (const accept of [true, false]) {
+    const s = setup('D097_BeggingStudent', 4, state => { state.players[0]!.occupationHand = ['A114_SeasonalWorker']; state.players[0]!.resources.begging = 1; })
+    let r = completeRound(s)
+    r = passPreparationExchanges(s, r)
+    if (requestOf(r).kind === 'select-trigger')
+      r = choice(s, r, o => o.value === 'D097_BeggingStudent')
+    r = choice(s, r, o => accept ? !['__skip__', '__done__', '__pass__'].includes(o.value) : o.value === '__skip__')
+    if (accept && r.state.players[0]!.occupationHand.includes('A114_SeasonalWorker'))
+      r = choice(s, r, o => o.value === 'A114_SeasonalWorker')
+    assert.equal(r.state.players[0]!.occupationPlayed.includes('A114_SeasonalWorker'), accept)
+    assert.equal(r.state.players[0]!.resources.food, 16)
+    assert.equal(r.state.players[0]!.resources.begging, 1)
+    save(`D097-N2-${accept}`, r)
+  } })
+  it('D097 N3 non harvest return home offers no free occupation and creates no new begging', () => { const s = setup('D097_BeggingStudent', 5, state => { state.players[0]!.occupationHand = ['A114_SeasonalWorker']; state.players[0]!.resources.begging = 1; }); const r = finish(s, completeRound(s)); assert.equal(r.state.round, 6); assert.deepEqual(r.state.players[0]!.occupationHand, ['A114_SeasonalWorker']); assert.equal(r.state.players[0]!.resources.food, 20); assert.equal(r.state.players[0]!.resources.begging, 1); save('D097-N3', r); })
 })

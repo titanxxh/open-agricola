@@ -1,7 +1,7 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
@@ -10,6 +10,9 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E123_ResourceHoarder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'E123_ResourceHoarder'
 
@@ -360,4 +363,12 @@ describe('E123_ResourceHoarder session', () => {
     result = withActiveRegistry(ruleRegistry, () => executeCardListener(costListener, mkContext('improvement', 'computeCosts')))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ reed: 1 })
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, lesson, resources, rooms, build, improvement, ownerTurn, topPayment } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E123 N1 actual Lessons piles six goods and real Fireplace can use exactly top clay or decline use', () => { for (const k of [0, 1]) { const s = make('E123_ResourceHoarder', st => { st.players[0]!.resources.clay = 2; st.availableMajorImprovements = ['Major_Fireplace1'] }, false), played = finish(s, lesson(s, 'E123_ResourceHoarder')); assert.deepEqual(played.state.players[0]!.cardStates.E123_ResourceHoarder?.stack, ['stone', 'clay', 'stone', 'reed', 'wood', 'clay']); ownerTurn(s); const p = improvement(s), r = finish(s, topPayment(s, p, k), false); resources(r, { clay: k }); assert.deepEqual(r.state.players[0]!.cardStates.E123_ResourceHoarder?.stack, ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'].slice(0, 6 - k)); assert.ok(r.state.players[0]!.improvements.includes('Major_Fireplace1')); save(`E123-N1-${k}`, { played, p, r }) } })
+  it('E123 N2 native room and renovation consumes top clay while covered wood cannot be reached', () => { for (const [house, kind, k] of [['clay', 'room', 1], ['wood', 'room', 0], ['wood', 'renovate', 1]] as const) { const s = make('E123_ResourceHoarder', st => { rooms(st, 2, house); Object.assign(st.players[0]!.resources, { [house]: 5, clay: house === 'wood' ? 2 : 5, reed: 2 }) }, false, 14), played = finish(s, lesson(s, 'E123_ResourceHoarder')); ownerTurn(s); const p = kind === 'room' ? build(s, 1, 'room', false) : ok(s.takeAction(0, 'house-redevelopment')), r = finish(s, topPayment(s, p, k), false); resources(r, kind === 'room' ? { [house]: k > 0 ? 1 : 0, reed: 0 } : { clay: 1, reed: 1 }); assert.deepEqual(r.state.players[0]!.cardStates.E123_ResourceHoarder?.stack, ['stone', 'clay', 'stone', 'reed', 'wood', 'clay'].slice(0, 6 - k)); save(`E123-N2-${house}-${kind}`, { played, p, r }) } })
+  it('E123 N3 noneligible Day Laborer preserves stack and invalid payment rejects before legal retry while unplayed has no discount', () => { const s = make('E123_ResourceHoarder', st => { st.players[0]!.resources.clay = 2; st.availableMajorImprovements = ['Major_Fireplace1'] }, false), played = finish(s, lesson(s, 'E123_ResourceHoarder')); ownerTurn(s); const a = finish(s, ok(s.takeAction(0, 'day-laborer')), false); assert.equal(a.state.players[0]!.cardStates.E123_ResourceHoarder?.stack?.length, 6); ownerTurn(s); const p = improvement(s), rejected = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'use-lower-stone-only')), r = finish(s, topPayment(s, p, 1), false); resources(r, { clay: 1 }); const c = make('E123_ResourceHoarder', st => { st.players[0]!.resources.clay = 1; st.availableMajorImprovements = ['Major_Fireplace1'] }, false), rejectedHand = assertRejectedUnchanged(c, () => c.takeAction(0, 'major-improvement')), cr = finish(c, ok(c.takeAction(0, 'grain-seeds')), false); resources(cr, { grain: 1, clay: 1 }); save('E123-N3', { played, a, p, rejected, r, rejectedHand, cr }) })
 })

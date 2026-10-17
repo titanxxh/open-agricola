@@ -10,6 +10,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { expectWait } from './_helpers/trigger-select'
 import { choose, restoreSession, snapshotResponse } from './_helpers/card-play-lifecycle'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit08Flow from './_helpers/audit/ae-negative-08-flow'
 
 describe('A055_JunkRoom session log dedupe', () => {
   it('logs Junk Room gain only once when playing a minor improvement', () => {
@@ -327,5 +330,29 @@ describe('A055 Junk Room parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(response.state.players[1]!.resources).toMatchObject({ wood: 0, food: 0 })
+  })
+})
+
+describe('ae-negative-08-flow', () => {
+  const { JUNK, BUCK, UPHOLSTERY, sessions, ok, opts, turn, buy, deny, improve, gainCount, resource, junk, source, purchaseUndo } = audit08Flow
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A055 N1 missing wood or clay rejects before exact self reward once', () => {
+    for (const resources of [{ wood: 0, clay: 1, food: 0 }, { wood: 1, clay: 0, food: 0 }]) deny(junk({ played: false, resources }), JUNK); const r = buy(junk({ played: false, resources: { wood: 1, clay: 1, food: 0 } }), JUNK); resource(r, 'wood', 0); assert.equal(r.state.players[0]!.resources.clay, 0); resource(r, 'food', 1); assert.equal(gainCount(r, JUNK), 1)
+  })
+  it('A055 N2 actual later minor gives one food and stale purchase cannot repeat reward', () => {
+    const s = junk({ hand: [BUCK], resources: { wood: 1, food: 0 } }); const r = improve(s, BUCK); resource(r, 'wood', 0); resource(r, 'food', 1); assert.equal(gainCount(r, JUNK), 1); assertRejectedUnchanged(s, () => s.resolveChoice(0, BUCK))
+  })
+  it('A055 N3 actual major purchase rewards owner once compared with no-card control', () => {
+    for (const noCard of [false, true]) { const r = improve(junk({ noCard, resources: { clay: 2, food: 0 } }), 'Major_Fireplace1'); assert.equal(r.state.players[0]!.resources.clay, 0); resource(r, 'food', noCard ? 0 : 1); assert.ok(r.state.players[0]!.improvements.includes('Major_Fireplace1')) }
+  })
+  it('A055 N4 decline foreign purchase and nonimprovement grant no holder food', () => {
+    const skip = junk({ hand: [BUCK], resources: { wood: 1, food: 0 } }); const offer = turn(skip, 0, 'meeting-place'); assert.ok(opts(offer).some(o => o.value === '__skip__')); resource(ok(skip.resolveChoice(0, '__skip__')), 'food', 0)
+    const s = junk({ opponentHand: [BUCK], opponent: { wood: 1, food: 0 } }); turn(s, 0, 'forest'); const r = improve(s, BUCK, 1); resource(r, 'food', 0); resource(r, 'food', 0, 1); assert.ok(r.state.players[1]!.minorPlayed.includes(BUCK)); resource(turn(junk(), 0, 'day-laborer'), 'food', 2)
+  })
+  it('A055 N5 self and later purchase undo restore fee and one replay reward', () => {
+    for (const played of [false, true]) { const s = junk({ played, hand: played ? [BUCK] : [], resources: { wood: 1, clay: played ? 0 : 1, food: 0 } }); const before = undoRuleSnapshot(s.getState()); const card = played ? BUCK : JUNK; const r = buy(s, card); resource(r, 'food', 1); assert.equal(gainCount(r, JUNK), 1); purchaseUndo(before, s.undoAction()); const replay = buy(s, card); resource(replay, 'food', 1); assert.equal(gainCount(replay, JUNK), 1) }
+  })
+  it('A055 N6 two after sources reject consumed source and undo first response restores choice', () => {
+    for (const first of [JUNK, UPHOLSTERY]) { const s = junk({ extra: [UPHOLSTERY], hand: [BUCK], resources: { wood: 1, reed: 1, food: 0 } }); const initial = improve(s, BUCK); assert.ok(initial.interaction.stateId === 'wait' && initial.interaction.request.kind === 'select-trigger'); assertRejectedUnchanged(s, () => s.resolveChoice(1, first)); const chosen = ok(s.resolveChoice(0, first)); resource(chosen, 'food', first === JUNK ? 1 : 0); const undone = ok(s.undoStep()); assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'select-trigger'); assert.deepEqual(opts(undone).filter(o => [JUNK, UPHOLSTERY].includes(o.value)).map(o => o.value).sort(), [JUNK, UPHOLSTERY].sort()); resource(undone, 'food', 0); let r = source(s, undone, first); const second = first === JUNK ? UPHOLSTERY : JUNK; assertRejectedUnchanged(s, () => s.resolveChoice(0, first)); r = source(s, r, second); resource(r, 'food', 1); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(r.state.players[0]!.cardStates[UPHOLSTERY]?.counters?.reed, 1); assert.equal(gainCount(r, JUNK), 1) }
   })
 })

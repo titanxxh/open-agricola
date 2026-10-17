@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
@@ -9,6 +9,8 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E110_Dentist'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'E110_Dentist'
 
@@ -160,5 +162,38 @@ describe('E110_Dentist session', () => {
     const stack = getCardStack(updated, CARD_ID)
     // Should have at least 2 (pre-existing) + potentially 1 new from this harvest
     expect(stack.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, save, setup, choose, source, finish, completeRound } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E110 N1 harvest stores at most one wood irretrievably and feeding counts old plus newly stored wood', () => {
+    for (const accept of [true, false]) {
+      const s = setup('E110_Dentist', 4, state => { state.players[0]!.resources.wood = 2; state.players[0]!.cardStates.E110_Dentist = { stack: ['wood', 'wood'] }; })
+      let r = completeRound(s)
+      r = source(s, r, 'E110_Dentist')
+      r = accept ? choose(s, r, o => !['__skip__', '__pass__'].includes(o.value)) : finish(s, r)
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.wood, accept ? 1 : 2)
+      assert.deepEqual(r.state.players[0]!.cardStates.E110_Dentist?.stack, accept ? ['wood', 'wood', 'wood'] : ['wood', 'wood'])
+      assert.equal(r.state.players[0]!.resources.food, accept ? 20 : 19)
+      save(`E110-N1-${accept}`, r)
+    }
+  })
+  it('E110 N2 zero wood cannot store and nonharvest round cannot pay stored wood food', () => {
+    for (const round of [4, 5]) {
+      const s = setup('E110_Dentist', round, state => {
+        if (round === 5) {
+          state.players[0]!.resources.wood = 1
+          state.players[0]!.cardStates.E110_Dentist = { stack: ['wood', 'wood'] }
+        }
+      })
+      const r = finish(s, completeRound(s))
+      assert.equal(r.state.players[0]!.resources.food, round === 4 ? 17 : 21)
+      assert.equal(r.state.players[0]!.resources.wood, round === 4 ? 0 : 1)
+      assert.deepEqual(r.state.players[0]!.cardStates.E110_Dentist?.stack ?? [], round === 4 ? [] : ['wood', 'wood'])
+      save(`E110-N2-${round}`, r)
+    }
   })
 })

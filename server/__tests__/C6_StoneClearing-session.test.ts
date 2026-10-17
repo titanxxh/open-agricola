@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { reap } from '../../shared/actions/effects/reap'
@@ -16,6 +16,9 @@ import '../../shared/cards/E/E068_CherryOrchard'
 import '../../shared/cards/E/E069_MelonPatch'
 import '../../shared/cards/E/E070_CropRotationField'
 import '../../shared/cards/E/E072_ArtichokeField'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit24Resources from './_helpers/audit/ae-negative-24-resources'
 
 const CARD_ID = 'C006_StoneClearing'
 
@@ -457,4 +460,13 @@ describe('C006_StoneClearing cross-card integration', () => {
     expect(player.fields.every((f) => !fieldIsEmpty(f))).toBe(true)
     expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
   })
+})
+
+describe('ae-negative-24-resources', () => {
+  const { CLEAR, sessions, save, ok, finish, menu, buy, FIRST, make, reach } = audit24Resources
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C006 N1 actual paid passing purchase plants exactly one stone per empty own field and preserves existing grain vegetable',()=>{const s=make(CLEAR),{pending,r}=buy(s,CLEAR);assert.equal(r.state.players[0]!.resources.food,99);assert.equal(r.state.players[0]!.resources.stone,0);assert.deepEqual(r.state.players[0]!.fields.map(f=>f.stacks),[[{kind:'stone',remaining:1}],[{kind:'grain',remaining:2}],[{kind:'vegetable',remaining:2}]]);assert.deepEqual(r.state.players[1]!.fields[0]!.stacks,[]);save('C006-N1',{pending,r})})
+  it('C006 N2 no food rejects before free alternative and hand-only card does not plant stone',()=>{const s=make(CLEAR,0),pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,CLEAR)),r=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')),false);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[]);assert.ok(r.state.players[0]!.minorHand.includes(CLEAR));save('C006-N2',{pending,rejected,r})})
+  it('C006 N3 natural next field phase harvests one stone only and releases the planted field for later actual sow',()=>{const s=make(CLEAR),c=make(CLEAR);buy(s,CLEAR);buy(c,'B004_WoodPile');const next=reach(s,8),control=reach(c,8);assert.equal(next.state.players[0]!.resources.stone,control.state.players[0]!.resources.stone+1);assert.deepEqual(next.state.players[0]!.fields[0]!.stacks,[]);const actor=next.state.currentPlayerIndex;assert.equal(actor,0);let start=ok(s.takeAction(0,'grain-utilization'));if(start.interaction.stateId==='wait'&&start.interaction.request.kind==='choice')start=ok(s.resolveChoice(0,'sow'));assert.ok(start.interaction.stateId==='wait'&&start.interaction.request.kind==='farm-select'&&start.interaction.request.farm.farmType==='sow');const r=finish(s,ok(s.commitSelectionChoice(0,{crops:[{...FIRST,crop:'grain'}]})),false);assert.deepEqual(r.state.players[0]!.fields[0]!.stacks,[{kind:'grain',remaining:3}]);save('C006-N3',{next,control,start,r})})
+  it('C006 N4 whole purchase undo restores food all field stacks and passing ownership before one replay',()=>{const s=make(CLEAR),before=ok(s.getState()),a=buy(s,CLEAR),undone=ok(s.undoAction());assert.deepEqual(undone.state.players[0]!.fields,before.state.players[0]!.fields);assert.equal(undone.state.players[0]!.resources.food,100);assert.ok(undone.state.players[0]!.minorHand.includes(CLEAR));assert.ok(!undone.state.players[1]!.minorHand.includes(CLEAR));const retry=buy(s,CLEAR).r;assert.deepEqual(retry.state.players[0]!.fields[0]!.stacks,[{kind:'stone',remaining:1}]);save('C006-N4',{before,a,undone,retry})})
 })

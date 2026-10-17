@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -7,6 +7,9 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B079_Corf'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit22Corf from './_helpers/audit/ae-negative-22-corf'
 
 const CARD_ID = 'B079_Corf'
 const LISTENER = B079_Corf_impl.listeners[0]!
@@ -178,4 +181,13 @@ describe('B079_Corf session', () => {
 
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-22-corf', () => {
+  const { CARD, sessions, save, ok, setup, ready, finish, menu, buy, make, use } = audit22Corf
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B079 N1 actual one reed purchase gives no immediate stone and whole undo restores cost and ownership before one replay',()=>{const s=make(),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources.stone,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.reed,1);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const retry=buy(s,CARD).r;assert.equal(retry.state.players[0]!.resources.stone,0);save('B079-N1',{pending,r,undone,retry});const denied=setup(CARD,9),menuState=menu(denied);assertRejectedUnchanged(denied,()=>denied.resolveChoice(0,CARD));const legal=finish(denied,ok(denied.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.stone,0);save('B079-N1-poor',{menuState,legal})})
+  it('B079 N2 real owner quarry two three four stone awards the exact zero one one general supply bonus on both quarries',()=>{for(const space of['western-quarry','eastern-quarry'])for(const n of[2,3,4]){const s=make(n);buy(s,CARD);use(s,1,'grain-seeds');const a=use(s,0,space);assert.equal(a.r.state.players[0]!.resources.stone,n+(n>=3?1:0));assert.equal(a.r.state.actionSpaces.find(x=>x.id===space)!.resources.stone,0);assert.equal(a.r.state.players[1]!.resources.stone,0);save(`B079-N2-${space}-${n}`,{a})}})
+  it('B079 N3 actual opponent quarry awards only one owner stone at the threshold and unrelated or hand card gives none',()=>{for(const n of[2,3,4]){const s=make(n);buy(s,CARD);const a=use(s,1,'western-quarry');assert.equal(a.r.state.players[0]!.resources.stone,n>=3?1:0);assert.equal(a.r.state.players[1]!.resources.stone,n);save(`B079-N3-${n}`,{a})}const h=use(make(3),0,'western-quarry');assert.equal(h.r.state.players[0]!.resources.stone,3);const s=make(3);buy(s,CARD);use(s,1,'grain-seeds');const a=use(s,0,'forest');assert.equal(a.r.state.players[0]!.resources.stone,0);save('B079-N3-hand-other',{h,a})})
+  it('B079 N4 real quarry whole action undo restores pile resources and permits one replay while occupied retry rejects',()=>{const s=make(3,false,true);buy(s,CARD);use(s,1,'grain-seeds');const a=use(s,0,'western-quarry'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.stone,a.before.state.players[0]!.resources.stone);assert.equal(undone.state.actionSpaces.find(x=>x.id==='western-quarry')!.resources.stone,3);const retry=use(s,0,'western-quarry');assert.equal(retry.r.state.players[0]!.resources.stone,4);use(s,1,'day-laborer');const occupied=ready(s);assert.equal(occupied.state.round,9);assert.ok(occupied.state.actionSpaces.find(a=>a.id==='western-quarry')!.takenBy.length);assertRejectedUnchanged(s,()=>s.takeAction(0,'western-quarry'));save('B079-N4',{a,undone,retry,rejected:s.getState()})})
 })

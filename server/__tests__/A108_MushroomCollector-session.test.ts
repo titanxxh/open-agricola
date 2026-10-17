@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A108_MushroomCollector'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit13Collect from './_helpers/audit/ae-negative-13-collect'
 
 const CARD_ID = 'A108_MushroomCollector'
 const FILLER = '__test_placeholder__'
@@ -110,5 +113,36 @@ describe('A108 Mushroom Collector parity', () => {
     expect(response.state.players[0]!.resources.clay).toBe(2)
     expect(cardOption(response)).toBeUndefined()
     expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+})
+
+describe('ae-negative-13-collect', () => {
+  const { MUSH, sessions, save, ok, setup, turn, choice, accept } = audit13Collect
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A108 N1 exchange returns exactly one wood to the used source for two food', () => {
+    const session = setup(MUSH); const pending = turn(session, 0, 'forest'); assert.equal(pending.state.players[0]!.resources.wood, 3)
+    const response = accept(session, pending); assert.equal(response.state.players[0]!.resources.wood, 2); assert.equal(response.state.players[0]!.resources.food, 42)
+    assert.equal(response.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 1); assert.equal(response.state.actionSpaces.find(s => s.id === 'clay-pit')!.resources.wood ?? 0, 0); save('A108-N1', response)
+  })
+  it('A108 N2 decline and no wood cannot grant food or return nonexistent wood', () => {
+    const session = setup(MUSH); const pending = turn(session, 0, 'forest'); choice(pending)
+    const response = ok(session.resolveChoice(0, '__skip__')); assert.equal(response.state.players[0]!.resources.wood, 3); assert.equal(response.state.players[0]!.resources.food, 40); assert.equal(response.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 0)
+    const emptySession = setup(MUSH, state => state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 0); const empty = assertEmptyAccumulationRejected(emptySession, 0, 'forest'); assert.equal(empty.state.players[0]!.resources.food, 40); assert.equal(empty.state.players[0]!.resources.wood, 0); assert.equal(empty.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 0); save('A108-N2', { response, empty })
+  })
+  it('A108 N3 empty source rejects without exchanging existing reserve wood', () => {
+    const session = setup(MUSH, state => { state.actionSpaces.find(s => s.id === 'forest')!.resources.wood = 0; state.players[0]!.resources.wood = 1 })
+    const response = assertEmptyAccumulationRejected(session, 0, 'forest'); assert.equal(response.state.players[0]!.resources.wood, 1); assert.equal(response.state.players[0]!.resources.food, 40); assert.equal(response.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 0); save('A108-N3', response)
+  })
+  it('A108 N4 nonwood opponent and unplayed collections do not offer owner exchange', () => {
+    const clay = turn(setup(MUSH, state => state.players[0]!.resources.wood = 1), 0, 'clay-pit'); assert.equal(clay.state.players[0]!.resources.food, 40); assert.equal(clay.state.players[0]!.resources.wood, 1)
+    const unplayed = turn(setup(MUSH, undefined, false), 0, 'forest'); assert.equal(unplayed.state.players[0]!.resources.food, 40); assert.equal(unplayed.state.players[0]!.resources.wood, 3)
+    const session = setup(MUSH); turn(session, 0, 'grain-seeds'); const response = turn(session, 1, 'forest'); assert.equal(response.state.players[0]!.resources.food, 40); assert.equal(response.state.players[1]!.resources.food, 40); assert.equal(response.state.players[1]!.resources.wood, 3); save('A108-N4', { response, clay, unplayed })
+  })
+  it('A108 N5 invalid actor value and stale exchange reject and undo restores exact source', () => {
+    const session = setup(MUSH); const pending = turn(session, 0, 'forest'); const option = choice(pending).find(o => o.sourceCard === MUSH && o.value !== '__skip__'); assert.ok(option)
+    assertRejectedUnchanged(session, () => session.resolveChoice(1, option.value)); assertRejectedUnchanged(session, () => session.resolveChoice(0, '__invented_exchange__'))
+    const response = ok(session.resolveChoice(0, option.value)); assertRejectedUnchanged(session, () => session.resolveChoice(0, option.value)); assert.equal(response.state.players[0]!.resources.food, 42)
+    const undone = ok(session.undoAction()); assert.equal(undone.state.players[0]!.resources.food, 40); assert.equal(undone.state.players[0]!.resources.wood, 0); assert.equal(undone.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 3)
+    const retry = accept(session, turn(session, 0, 'forest')); assert.equal(retry.state.players[0]!.resources.food, 42); assert.equal(retry.state.actionSpaces.find(s => s.id === 'forest')!.resources.wood, 1); save('A108-N5', { response, undone, retry })
   })
 })

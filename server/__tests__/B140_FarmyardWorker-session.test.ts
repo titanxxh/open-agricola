@@ -1,5 +1,5 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -9,6 +9,9 @@ import '../../shared/cards/B/B140_FarmyardWorker'
 import '../../shared/cards/B/B012_Stockyard'
 import '../../shared/cards/B/B113_PatchCaregiver'
 import '../../shared/cards/M/M095_FallowFields'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit29Timing from './_helpers/audit/ae-negative-29-timing'
 
 const CARD_ID = 'B140_FarmyardWorker'
 const FILLER = '__test_placeholder__'
@@ -328,4 +331,39 @@ describe('B140 Farmyard Worker parity', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(false)
   })
 
+})
+
+describe('ae-negative-29-timing', () => {
+  const { sessions, save, ok, make, finish, progress, farmworker, sow } = audit29Timing
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B140 N1 real ordinary field sow adds no early food and grants two exactly once at end of work', () => { const s = farmworker(), sown = sow(s); assert.equal(sown.state.players[0]!.resources.food, 100); assert.deepEqual(sown.state.players[0]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }]); const r = progress(s, 15); assert.equal(r.state.players[0]!.resources.food, 98); assert.equal(r.state.gameOver, true); save('B140-N1', { sown, r }); });
+  it('B140 N2 plowing does not place a good and sowing a card field or sowing with the card held grants no reward', () => { const s = farmworker(), plow = ok(s.takeAction(0, 'farmland')); assert.ok(plow.interaction.stateId === 'wait' && plow.interaction.request.kind === 'farm-select'); ok(s.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })); const r = progress(s, 15); assert.equal(r.state.players[0]!.resources.food, 96); const t = farmworker(false), sown = sow(t), hand = progress(t, 15); assert.equal(hand.state.players[0]!.resources.food, 96); const q = make('B140_FarmyardWorker', true, state => { state.round = 14; state.players[0]!.occupationPlayed.push('B141_FieldCaretaker'); state.players[0]!.resources.grain = 1; }), card = sow(q, true), virtual = progress(q, 15); assert.equal(virtual.state.players[0]!.resources.food, 96); save('B140-N2', { plow, r, sown, hand, card, virtual }); });
+  it('B140 N3 a newly collected housed sheep rewards once while an unchanged existing sheep gives no reward and pure anytime reorganization is unavailable', () => { const rows = []; for (const old of [false, true]) {
+      const s = make('B140_FarmyardWorker', true, state => { const p = state.players[0]!; p.stableTiles = [{ row: 0, col: 1 }]; state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 1; if (old) {
+          p.resources.sheep = 1;
+          const t = p.roomTiles[0]!;
+          p.houseAnimals = { [`${t.row}-${t.col}`]: 'sheep' };
+      } });
+      let pending: SessionResponse;
+      if (old) {
+          const unavailable = assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'reorganize'));
+          assert.equal(unavailable.error, 'anytime action unavailable');
+          const r = progress(s, 6);
+          assert.equal(r.state.players[0]!.resources.food, 100);
+          rows.push({ unavailable, r });
+          continue;
+      }
+      else
+          pending = ok(s.takeAction(0, 'sheep-market'));
+      assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'animal-reorg');
+      const stable = pending.interaction.request.zones.find(z => z.zoneType === 'stable');
+      assert.ok(stable);
+      const moved = finish(s, ok(s.resolveChoice(0, 'confirm', { zones: [{ ...stable, animalType: 'sheep', animalCount: 1 }] })));
+      assert.equal(moved.state.players[0]!.resources.food, 100);
+      const r = progress(s, 6);
+      assert.equal(r.state.players[0]!.resources.food, old ? 100 : 102);
+      assert.equal(r.state.players[0]!.resources.sheep, 1);
+      assert.deepEqual(r.state.players[0]!.stableAnimals['0-1'], { animalType: 'sheep', animalCount: 1 });
+      rows.push({ pending, moved, r });
+  } save('B140-N3', rows); });
 })

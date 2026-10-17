@@ -3,11 +3,14 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/B/B141_FieldCaretaker'
 import { B141_FieldCaretaker_impl } from '../../shared/cards/B/B141_FieldCaretaker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit29Exchanges from './_helpers/audit/ae-negative-29-exchanges'
 
 const CARD_ID = 'B141_FieldCaretaker'
 const VIRTUAL_COL = 2141
@@ -277,4 +280,28 @@ describe('B141 Field Caretaker parity', () => {
     expect(response.scores[0]!.categories.find((category) => category.key === 'fields'))
       .toMatchObject({ quantity: 1, total: -1 })
   })
+})
+
+describe('ae-negative-29-exchanges', () => {
+  const { sessions, save, ok, make, finish, choose, buy, caretaker } = audit29Exchanges
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B141 N1 actual occupation selects each printed zero one and three clay exchange without excess grain', () => { const results = []; for (const [clay, grain] of [[0, 1], [1, 2], [3, 3]]) {
+      const s = caretaker(clay!), p = buy(s, 'B141_FieldCaretaker'), r = finish(s, choose(s, p, o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesGained?.grain === grain));
+      assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.grain], [0, grain]);
+      results.push({ p, r });
+  } save('B141-N1', results); });
+  it('B141 N2 insufficient three clay branch rejects and legal cheaper branch continues while decline preserves clay', () => { const s = caretaker(1), p = buy(s, 'B141_FieldCaretaker'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'xor:2')), r = finish(s, choose(s, p, o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesGained?.grain === 2)); assert.deepEqual([r.state.players[0]!.resources.clay, r.state.players[0]!.resources.grain], [0, 2]); const t = caretaker(3), start = buy(t, 'B141_FieldCaretaker'), decline = finish(t, choose(t, start, o => o.value === '__skip__')); assert.deepEqual([decline.state.players[0]!.resources.clay, decline.state.players[0]!.resources.grain], [3, 0]); save('B141-N2', { p, bad, r, start, decline }); });
+  it('B141 N3 card field uses one seed and rejects two simultaneous crops and ordinary scoring excludes its virtual tile', () => { const results = []; for (const crop of ['grain', 'vegetable'] as const) {
+      const s = make('B141_FieldCaretaker', true, 3, state => state.players[0]!.resources[crop] = 1);
+      let p = ok(s.takeAction(0, 'grain-utilization'));
+      if (p.interaction.stateId === 'wait' && p.interaction.request.kind === 'choice')
+          p = choose(s, p, o => o.labelKey === 'actions.sow.name');
+      assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'farm-select');
+      const bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: -1, col: 2141, crop }, { row: -1, col: 2141, crop }] })), r = finish(s, ok(s.commitSelectionChoice(0, { crops: [{ row: -1, col: 2141, crop }] })));
+      assert.equal(r.state.players[0]!.resources[crop], 0);
+      assert.deepEqual(r.state.players[0]!.cardStates.B141_FieldCaretaker?.extraData?.cardFieldStacks, [{ crop, remaining: crop === 'grain' ? 3 : 2 }]);
+      assert.ok(r.scores);
+      assert.equal(r.scores[0]!.categories.find(c => c.key === 'fields')?.total, -1);
+      results.push({ p, bad, r });
+  } save('B141-N3', results); });
 })

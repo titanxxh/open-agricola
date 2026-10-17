@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
@@ -10,6 +10,9 @@ import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/C/C094_StableCleaner'
 import { D088_Millwright } from '../../shared/cards/D/D088_Millwright'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit38Fields from './_helpers/audit/ae-negative-38-fields'
 
 const CARD_ID = 'C056_FeedFence'
 
@@ -288,4 +291,35 @@ describe('C056_FeedFence session', () => {
     expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
     expect(resp.scores).toHaveLength(2)
   })
+})
+
+describe('ae-negative-38-fields', () => {
+  const { sessions, save, ok, make, choose, finish, ready, action, buy, fence, stablePending } = audit38Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C056 N1 actual wood purchase and one clay substituted stable or two mixed payment stables grant exactly one food per stable', () => {
+      const b = fence(false, 1), bought = finish(b, buy(b, 'C056_FeedFence'));
+      assert.equal(bought.state.players[0]!.resources.wood, 0);
+      const rows = [];
+      for (const count of [1, 2] as const) {
+          const s = fence(true, (count - 1) * 2), p = stablePending(s), r = finish(s, ok(s.commitSelectionChoice(0, { stables: Array.from({ length: count }, (_, i) => ({ row: 0, col: i + 1 })) })));
+          assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.clay, r.state.players[0]!.resources.food, r.state.players[0]!.stableTiles.length], [0, 0, 100 + count, count]);
+          rows.push({ p, r });
+      }
+      save('C056-N1', { bought, rows });
+  });
+  it('C056 N2 the actual fourth farmyard stable grants three food while an occupied room and a second clay substitution reject before legal retry', () => { const s = fence(true, 0, 1, 3), p = stablePending(s), wrong = assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { stables: [{ row: 0, col: 4 }] })), occupied = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [{ row: 1, col: 0 }] })), r = finish(s, ok(s.commitSelectionChoice(0, { stables: [{ row: 0, col: 4 }] }))); assert.deepEqual([r.state.players[0]!.stableTiles.length, r.state.players[0]!.resources.food], [4, 103]); const t = fence(true, 0, 2), p2 = stablePending(t), bad = assertRejectedUnchanged(t, () => t.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }, { row: 0, col: 2 }] })), control = finish(t, ok(t.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }))); assert.deepEqual([control.state.players[0]!.stableTiles.length, control.state.players[0]!.resources.clay, control.state.players[0]!.resources.food], [1, 1, 101]); save('C056-N2', { p, wrong, occupied, r, p2, bad, control }); });
+  it('C056 N3 held card stables pay normal wood and actual opponent stable building gives the owner no food', () => {
+      const s = fence(false, 2, 0), p = stablePending(s), hand = finish(s, ok(s.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] })));
+      assert.deepEqual([hand.state.players[0]!.resources.wood, hand.state.players[0]!.resources.food], [0, 100]);
+      const t = make('C056_FeedFence', true, s => { s.players[1]!.resources.wood = 2; }), first = action(t, 0, 'reed-bank');
+      ready(t);
+      let q = ok(t.takeAction(1, 'farm-expansion'));
+      if (q.interaction.stateId === 'wait' && q.interaction.request.kind === 'choice')
+          q = choose(t, q, o => o.labelKey === 'actions.stables.name');
+      const opponent = finish(t, ok(t.commitSelectionChoice(1, { stables: [{ row: 0, col: 1 }] })));
+      assert.equal(opponent.state.players[0]!.resources.food, 100);
+      assert.equal(opponent.state.players[1]!.resources.food, 100);
+      save('C056-N3', { p, hand, first, q, opponent });
+  });
+  it('C056 N4 missing printed purchase wood cannot buy Feed Fence and one normal wood stable remains legal without using the optional clay substitution', () => { const s = fence(false, 0), p = buy(s, 'C056_FeedFence'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'C056_FeedFence')); const t = fence(true, 2, 0), q = stablePending(t), r = finish(t, ok(t.commitSelectionChoice(0, { stables: [{ row: 0, col: 1 }] }))); assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food, r.state.players[0]!.stableTiles.length], [0, 101, 1]); save('C056-N4', { p, bad, q, r }); });
 })

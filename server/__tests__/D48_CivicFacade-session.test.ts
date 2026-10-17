@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D048_CivicFacade'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'D048_CivicFacade'
 const FILLER = '__test_placeholder__'
@@ -129,4 +131,17 @@ describe('D048 Civic Facade parity', () => {
       expect(response.state.players[0]!.resources.food).toBe(20)
     },
   )
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, take, finish, end, purchase, rejectBuy, resource, house } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("D048 N1 real three-room purchase and actual Lessons change the strict hand comparison across natural starts", () => { const s = make('D048_CivicFacade', st => { house(st.players[0]!, 3); st.players[0]!.occupationHand = ['A125_Priest', 'A103_Portmonger', 'A110_Roughcaster']; st.players[0]!.resources.clay = 1; }, false), r = purchase(s, 'D048_CivicFacade'); resource(r, { clay: 0, food: 100 }); const six = end(s); resource(six, { food: 101 }); const lessons = finish(s, take(s, 0, 'lessons'), true, ['A125_Priest']); resource(lessons, { food: 101 }); assert.equal(lessons.state.players[0]!.occupationHand.length, 2); assert.equal(lessons.state.players[0]!.minorHand.length, 2); const seven = end(s, true, [], 'D048_CivicFacade'); resource(seven, { food: 101 }); save('D048-N1', { r, six, lessons, seven }); });
+  it("D048 N2 two rooms clay shortage ties fewer occupations and hand-only card cannot earn the round-start food", () => { for (const mode of ['room', 'clay'])
+      save(`D048-N2-buy-${mode}`, rejectBuy(make('D048_CivicFacade', st => { house(st.players[0]!, mode === 'room' ? 2 : 3); st.players[0]!.resources.clay = mode === 'clay' ? 0 : 1; }, false), 'D048_CivicFacade')); for (const mode of ['tie', 'fewer', 'hand']) {
+      const s = make('D048_CivicFacade', st => { house(st.players[0]!, 3); st.players[0]!.resources.clay = 1; st.players[0]!.occupationHand = mode === 'hand' ? ['A125_Priest', 'A103_Portmonger', 'A110_Roughcaster', 'A100_Curator'] : mode === 'fewer' ? ['A125_Priest'] : ['A125_Priest', 'A103_Portmonger']; }, mode !== 'hand'), r = end(s, true, [], 'D048_CivicFacade');
+      resource(r, { food: 100 });
+      save(`D048-N2-${mode}`, r);
+  } });
+  it("D048 N3 foreign ownership pays the actual owner only and ordinary work cannot pay early", () => { const s = make('D048_CivicFacade', st => { st.players[0]!.minorPlayed = []; st.players[1]!.minorPlayed = ['D048_CivicFacade']; house(st.players[1]!, 3); st.players[1]!.occupationHand = ['A116_WoodCutter', 'A123_FrameBuilder', 'A101_CookeryOutfitter']; st.players[1]!.minorHand=['A010_WoodenShed']; }), r = end(s); resource(r, { food: 100 }); resource(r, { food: 101 }, 1); save('D048-N3-foreign', r); const t = make('D048_CivicFacade', st => { st.players[0]!.occupationHand = ['A125_Priest', 'A103_Portmonger', 'A110_Roughcaster']; }), mid = finish(t, take(t, 0, 'clay-pit'), true, [], 'D048_CivicFacade'); resource(mid, { food: 100 }); save('D048-N3-midround', mid); });
 })

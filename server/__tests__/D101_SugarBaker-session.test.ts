@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D101_SugarBaker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as audit46Wood from './_helpers/audit/ae-negative-46-wood'
 
 const CARD_ID = 'D101_SugarBaker'
 const FIREPLACE = 'Major_Fireplace1'
@@ -169,4 +172,12 @@ describe('D101 Sugar Baker parity', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'grain-utilization')!.resources.food)
       .toBe(0)
   })
+})
+
+describe('ae-negative-46-wood', () => {
+  const { SUGAR, sessions, save, ok, trigger, finish, ready, lesson, bonus, next, pile, sugar, sow } = audit46Wood
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D101 N1 real Lessons creates no early point and completed Grain Utilization sow optionally pays one food onto that physical space',()=>{const bought=lesson(sugar(1,false),SUGAR);assert.equal(bonus(bought,SUGAR),0);for(const accept of[true,false]){const s=sugar(),pending=trigger(s,sow(s),SUGAR),r=finish(s,pending,accept);assert.equal(r.state.players[0]!.resources.food,accept?0:1);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(bonus(r,SUGAR),accept?1:0);assert.equal(pile(r,'grain-utilization','food'),accept?1:0);assert.equal(r.state.players[0]!.fields[0]!.stacks.length,1);save(`D101-N1-${accept}`,{bought,pending,r})}})
+  it('D101 N2 zero food unrelated Grain Seeds and a repeated stale choice cannot manufacture Sugar Baker points or food',()=>{const s=sugar(0),r=finish(s,sow(s));assert.equal(bonus(r,SUGAR),0);assert.equal(pile(r,'grain-utilization','food'),0);const t=sugar(),other=finish(t,ok(t.takeAction(0,'grain-seeds')));assert.equal(bonus(other,SUGAR),0);const v=sugar(),pending=trigger(v,sow(v),SUGAR),a=finish(v,pending,true),bad=assertRejectedUnchanged(v,()=>v.resolveChoice(0,'__stale_sugar_payment__'));assert.equal(bonus(a,SUGAR),1);assert.equal(pile(bad,'grain-utilization','food'),1);save('D101-N2',{r,other,pending,a,bad})})
+  it('D101 N3 the next round actual opponent visitor receives the one placed food without another owner payment',()=>{const s=sugar(),a=finish(s,sow(s),true),nine=next(s,9);assert.equal(pile(nine,'grain-utilization','food'),1);finish(s,ok(s.takeAction(0,'day-laborer')));ready(s);const before=ok(s.getState()),r=finish(s,sow(s,1));save('D101-N3-observation',{a,nine,before,r});const actual={foodDelta:r.state.players[1]!.resources.food-before.state.players[1]!.resources.food,pile:pile(r,'grain-utilization','food'),ownerBonus:bonus(r,SUGAR)};save('D101-N3',{a,nine,before,r,actual});assertRuleOutcome(actual,{foodDelta:1,pile:0,ownerBonus:1})})
 })

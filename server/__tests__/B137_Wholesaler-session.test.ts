@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/B/B137_Wholesaler'
+import assert from 'node:assert/strict'
+import * as audit29Timing from './_helpers/audit/ae-negative-29-timing'
 
 describe('B137_Wholesaler session', () => {
   /**
@@ -233,4 +235,19 @@ describe('B137_Wholesaler session', () => {
     expect(data!.stoneTaken).toBe(false)
     expect(data!.cattleTaken).toBe(false)
   })
+})
+
+describe('ae-negative-29-timing', () => {
+  const { sessions, save, action, lesson, progress, wholesale } = audit29Timing
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B137 N1 actual purchase stores one of each good and each legal late action collects its matching good once', () => { const bought = lesson(wholesale(false), 'B137_Wholesaler'); assert.deepEqual(bought.state.players[0]!.cardStates.B137_Wholesaler?.extraData?.wholesaler, { vegetableTaken: false, boarTaken: false, stoneTaken: false, cattleTaken: false }); const rows = []; for (const [space, type, key] of [['vegetable-seeds', 'vegetable', 'vegetableTaken'], ['pig-market', 'boar', 'boarTaken'], ['eastern-quarry', 'stone', 'stoneTaken'], ['cattle-market', 'cattle', 'cattleTaken']] as const) {
+      const s = wholesale(), r = action(s, 0, space);
+      assert.equal(r.state.players[0]!.resources[type], 2);
+      assert.ok(r.state.players[0]!.cardStates.B137_Wholesaler?.extraData?.wholesaler && JSON.stringify(r.state.players[0]!.cardStates.B137_Wholesaler.extraData.wholesaler).includes(`"${key}":true`));
+      if (type === 'boar' || type === 'cattle')
+          assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 2);
+      rows.push(r);
+  } save('B137-N1', { bought, rows }); });
+  it('B137 N2 real repeat use across round thirteen and fourteen gives no second stored vegetable and an opponent cannot consume the owner store', () => { const s = wholesale(true, 13), first = action(s, 0, 'vegetable-seeds'), fourteen = progress(s, 14), r = action(s, 0, 'vegetable-seeds'); assert.equal(first.state.players[0]!.resources.vegetable, 2); assert.equal(r.state.players[0]!.resources.vegetable, 3); const t = wholesale(), start = action(t, 0, 'grain-seeds'), opponent = action(t, 1, 'vegetable-seeds'); assert.equal(opponent.state.players[0]!.resources.vegetable, 0); assert.equal(opponent.state.players[1]!.resources.vegetable, 1); save('B137-N2', { first, fourteen, r, start, opponent }); });
+  it('B137 N3 held Wholesaler and unrelated Grain Seeds never collect stored goods', () => { const s = wholesale(false), hand = action(s, 0, 'vegetable-seeds'); assert.equal(hand.state.players[0]!.resources.vegetable, 1); const t = wholesale(), other = action(t, 0, 'grain-seeds'); assert.equal(other.state.players[0]!.resources.vegetable, 0); assert.equal(other.state.players[0]!.cardStates.B137_Wholesaler?.extraData?.wholesaler, undefined); save('B137-N3', { hand, other }); });
 })

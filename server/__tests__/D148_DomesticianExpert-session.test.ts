@@ -1,13 +1,16 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import '../../shared/cards/D/D148_DomesticianExpert'
 import '../../shared/cards/D/D012_MilkingPlace'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 describe('D148_DomesticianExpert session', () => {
   const setup = (roomTiles?: Array<{row: number, col: number}>) => {
@@ -255,5 +258,68 @@ describe('D148 Domestician Expert parity', () => {
 
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     expect(cardZone(response)).toBeUndefined()
+  })
+})
+
+describe('ae-negative-54-resources', () => {
+  const { sessions, ok, save, setup, take, farm } = audit54Resources
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D148 N1 actual sheep collection validates orthogonal room pairs and border capacity with legal house control', () => {
+    for (const rooms of [2, 3, 4]) {
+      const cap = rooms === 2 ? 2 : rooms === 3 ? 4 : 8
+      const s = setup('D148_DomesticianExpert', 14, state => {
+        const p = state.players[0]!
+        if (rooms >= 3)
+          p.roomTiles.push({ row: 1, col: 1 })
+        if (rooms === 4)
+          p.roomTiles.push({ row: 2, col: 1 })
+        p.rooms = rooms
+        state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = cap + 1
+      })
+      let r = take(s, 'sheep-market')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+      const z = r.interaction.request.zones.find(z => z.id === 'card:D148_DomesticianExpert')
+      assert.ok(z)
+      assert.equal(z.capacity, cap)
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap + 1, animalCounts: { sheep: cap + 1 } }] }))
+      r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap, animalCounts: { sheep: cap } }, { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] }))
+      assert.equal(r.state.players[0]!.resources.sheep, cap + 1)
+      assert.equal(r.state.players[0]!.cardStates['D148_DomesticianExpert']?.extraData?.held, cap)
+      save(`D148-N1-${rooms}`, r)
+    }
+  })
+  it('D148 N2 wrong species border attempt rejects and legal pasture retains two pigs', () => {
+    const s = setup('D148_DomesticianExpert', 14, state => { farm(state, 1); state.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = 2; })
+    let r = take(s, 'pig-market')
+    assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+    const z = r.interaction.request.zones.find(z => z.id === 'card:D148_DomesticianExpert')!
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'boar', animalCount: 2, animalCounts: { boar: 2 } }] }))
+    const p = r.interaction.request.zones.find(z => z.zoneType === 'pasture')!
+    r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...p, animalType: 'boar', animalCount: 2, animalCounts: { boar: 2 } }] }))
+    assert.equal(r.state.players[0]!.resources.boar, 2)
+    assert.equal(r.state.players[0]!.pastures[0]!.animalCount, 2)
+    save('D148-N2', r)
+  })
+  it('D148 N3 Milking Place and hand-only expert disable border while real pasture remains legal', () => {
+    for (const mode of ['milking', 'hand']) {
+      const s = setup('D148_DomesticianExpert', 14, state => {
+        farm(state, 1)
+        state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 3
+        if (mode === 'milking')
+          state.players[0]!.minorPlayed = ['D012_MilkingPlace']
+        else {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['D148_DomesticianExpert']
+        }
+      })
+      let r = take(s, 'sheep-market')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg')
+      assert.ok(!r.interaction.request.zones.some(z => z.id === 'card:D148_DomesticianExpert'))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ id: 'card:D148_DomesticianExpert', zoneType: 'card', animalType: 'sheep', animalCount: 3 }] }))
+      const p = r.interaction.request.zones.find(z => z.zoneType === 'pasture')!
+      r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...p, animalType: 'sheep', animalCount: 3, animalCounts: { sheep: 3 } }] }))
+      assert.equal(r.state.players[0]!.resources.sheep, 3)
+      save(`D148-N3-${mode}`, r)
+    }
   })
 })

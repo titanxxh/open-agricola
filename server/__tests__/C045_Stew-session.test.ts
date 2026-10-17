@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C045_Stew'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'C045_Stew'
 const FILLER = '__test_placeholder__'
@@ -120,4 +122,26 @@ describe('C045 Stew parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(3)
     expect(futureRounds(response)).toEqual([7, 8, 9])
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, take, finish, ready, fill, end, final, purchase, rejectBuy, resource, future } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C045 N1 real purchase and owner Day Laborer queue four foods with a natural next-round payout", () => { const s = make('C045_Stew', st => { st.players[0]!.resources.clay = 1; }, false), bought = purchase(s, 'C045_Stew'); resource(bought, { clay: 0, food: 100 }); fill(s); ready(s); const r = finish(s, take(s, 0, 'day-laborer')); resource(r, { food: 102 }); assert.deepEqual(future(r, 'C045_Stew'), [6, 7, 8, 9]); const due = end(s); resource(due, { food: 103 }); save('C045-N1', { bought, r, due }); });
+  it("C045 N2 held card opponent and unrelated work exclude Stew and missing clay rejects purchase", () => { save('C045-N2-cost', rejectBuy(make('C045_Stew', undefined, false), 'C045_Stew')); for (const mode of ['hand', 'opponent', 'unrelated']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('C045_Stew', st => { st.currentPlayerIndex = a; st.players[0]!.resources.clay = 1; }, mode !== 'hand'), r = finish(s, take(s, a, mode === 'unrelated' ? 'forest' : 'day-laborer'), true, [], 'C045_Stew');
+      resource(r, { food: mode === 'hand' ? 102 : 100 });
+      if (mode === 'opponent')
+          resource(r, { food: 102 }, 1);
+      assert.deepEqual(future(r, 'C045_Stew'), []);
+      save(`C045-N2-${mode}`, r);
+  } });
+  it("C045 N3 repeated genuine Day Laborer rounds stack payments and late uses never create round fifteen", () => { const s = make('C045_Stew'), first = finish(s, take(s, 0, 'day-laborer')), six = end(s); resource(six, { food: 103 }); const second = finish(s, take(s, 0, 'day-laborer')); resource(second, { food: 105 }); assert.deepEqual(future(second, 'C045_Stew'), [7, 7, 8, 8, 9, 9, 10]); const seven = end(s); resource(seven, { food: 107 }); save('C045-N3-repeat', { first, six, second, seven }); for (const round of [13, 14]) {
+      const t = make('C045_Stew', undefined, true, round), r = finish(t, take(t, 0, 'day-laborer'));
+      assert.deepEqual(future(r, 'C045_Stew'), round === 13 ? [14] : []);
+      const done = round === 13 ? end(t) : final(t);
+      if (round === 13)
+          resource(done, { food: 99 });
+      save(`C045-N3-${round}`, { r, done });
+  } });
 })

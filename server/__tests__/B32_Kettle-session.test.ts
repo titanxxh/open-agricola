@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/B/B032_Kettle'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Scoring from './_helpers/audit/ae-negative-19-scoring'
 
 const CARD_ID = 'B032_Kettle'
 const FILLER = '__test_placeholder__'
@@ -137,4 +140,14 @@ describe('B032 Kettle parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(9)
     expect(bonusVp(response)).toBe(3)
   })
+})
+
+describe('ae-negative-19-scoring', () => {
+  const { KETTLE, sessions, save, ok, turn, menu, buy, bonus, kettle, exchange } = audit19Scoring
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B032 N1 actual one clay grain field purchase and missing clay grain or only opponent field exclusion',()=>{const s=kettle(),{pending,r}=buy(s,KETTLE);assert.equal(r.state.players[0]!.resources.clay,0);assert.equal(bonus(r,KETTLE),0);save('B032-N1',{pending,r});for(const mode of['clay','empty','vegetable','opponent']){const ss=kettle(0,state=>{const p=state.players[0]!;if(mode==='clay')p.resources.clay=0;if(mode==='empty')p.fields[0]!.stacks=[];if(mode==='vegetable')p.fields[0]!.stacks=[{kind:'vegetable',remaining:1}];if(mode==='opponent'){state.players[1]!.fields=p.fields;p.fields=[]}}),denied=menu(ss);assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,KETTLE));const legal=ok(ss.resolveChoice(0,'A006_StorageBarn'));assert.equal(legal.state.players[0]!.resources.clay,mode==='clay'?0:1);assert.equal(bonus(legal,KETTLE),0);save(`B032-N1-${mode}`,{denied,legal})}})
+  it('B032 N2 each legal one three or five grain trade gives exact food and zero one or two bonus points',()=>{for(const[index,grain,food,points]of[[0,1,3,0],[1,3,4,1],[2,5,5,2]]){const s=kettle(grain,()=>{},true),{pending,r}=exchange(s,index!);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.food,20+food!);assert.equal(bonus(r,KETTLE),points);assert.equal(r.state.players[1]!.resources.food,20);save(`B032-N2-${grain}`,{pending,r})}})
+  it('B032 N3 batch and separate exchanges accumulate exact points without creating grain or duplicate score reads',()=>{const s=kettle(14,()=>{},true),first=exchange(s,1,3).r,r=exchange(s,2).r;assert.equal(first.state.players[0]!.resources.grain,5);assert.equal(bonus(first,KETTLE),3);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[0]!.resources.food,37);assert.equal(bonus(r,KETTLE),5);assert.equal(bonus(s.getState(),KETTLE),5);save('B032-N3',{first,r})})
+  it('B032 N4 negative quantity invalid index and wrong actor refuse before a legal one grain trade',()=>{const s=kettle(2,()=>{},true),pending=ok(s.takeAnytimeAction(0,'exchange'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'bulk:2=-1'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'bulk:9999=1'));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'bulk:0=1'));const r=ok(s.resolveChoice(0,'bulk:0=1'));assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[0]!.resources.food,23);assert.equal(bonus(r,KETTLE),0);save('B032-N4',{pending,r})})
+  it('B032 N5 whole Lessons with anytime exchange undo restores grain food and bonus before one retry',()=>{const s=kettle(5,state=>state.players[0]!.occupationHand=['A110_Roughcaster','A114_SeasonalWorker'],true);turn(s,0,'lessons');exchange(s,2);const r=ok(s.resolveChoice(0,'A110_Roughcaster')),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,5);assert.equal(undone.state.players[0]!.resources.food,20);assert.equal(bonus(undone,KETTLE),0);turn(s,0,'lessons');exchange(s,2);const retry=ok(s.resolveChoice(0,'A110_Roughcaster'));assert.equal(retry.state.players[0]!.resources.grain,0);assert.equal(bonus(retry,KETTLE),2);save('B032-N5',{r,undone,retry})})
 })

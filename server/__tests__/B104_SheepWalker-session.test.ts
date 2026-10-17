@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { cloneState } from '../../shared/session/state-bootstrap'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -7,6 +7,8 @@ import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../.
 import '../../shared/cards/B/B104_SheepWalker'
 import '../../shared/cards/D/D124_Emissary'
 import '../../shared/cards/D/D091_Plowman'
+import assert from 'node:assert/strict'
+import * as audit25Walker from './_helpers/audit/ae-negative-25-walker'
 
 const B104 = 'B104_SheepWalker'
 const D124 = 'D124_Emissary'
@@ -510,4 +512,13 @@ describe('B104 Sheep Walker anytime timing', () => {
     expect(response.state.gameOver).toBe(true)
     expect(response.scores).toHaveLength(2)
   })
+})
+
+describe('ae-negative-25-walker', () => {
+  const { sessions, save, ok, ready, finish, make, exchangeMenu, index, trade } = audit25Walker
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B104 N1 actual anytime exchange consumes exactly one farmyard sheep for one selected pig vegetable or stone',()=>{for(const type of['boar','vegetable','stone']as const){const s=make(),a=trade(s,type);assert.equal(a.r.state.players[0]!.resources.sheep,0);assert.equal(a.r.state.players[0]!.resources[type],1);assert.equal(a.r.state.players[0]!.resources.food,100);assert.equal(a.r.state.players[1]!.resources[type],0);if(type==='boar')assert.equal(a.r.state.players[0]!.pastures[0]!.animalType,'boar');save(`B104-N1-${type}`,a)}})
+  it('B104 N2 unknown trade changes no goods and over-request consumes at most the one available sheep before separate legal control',()=>{const s=make(),pending=exchangeMenu(s),n=index(pending,'stone'),unknown=JSON.parse(JSON.stringify(s.resolveChoice(0,'bulk:99999=1'))) as SessionResponse;save('B104-N2-unknown',{pending,unknown});assert.equal(unknown.ok,false);assert.equal(unknown.error,'log.actionNoExchange');assert.deepEqual(unknown.state,pending.state);assert.deepEqual(unknown.scores,pending.scores);assert.ok(unknown.interaction.stateId==='wait'&&pending.interaction.stateId==='wait');assert.deepEqual(unknown.interaction.request,pending.interaction.request);assert.equal(unknown.state.players[0]!.resources.sheep,1);assert.equal(unknown.state.players[0]!.resources.stone,0);assert.ok(unknown.interaction.stateId==='wait'&&unknown.interaction.request.kind==='choice');const over=ok(s.resolveChoice(0,`bulk:${n}=2`));assert.equal(over.state.players[0]!.resources.sheep,0);assert.equal(over.state.players[0]!.resources.stone,1);const control=make(),legal=trade(control,'stone');assert.equal(legal.r.state.players[0]!.resources.sheep,0);assert.equal(legal.r.state.players[0]!.resources.stone,1);save('B104-N2',{pending,unknown,over,legal})})
+  it('B104 N3 card in hand or no owned farmyard sheep exposes no Sheep Walker exchange',()=>{for(const mode of['hand','zero']){const s=make(mode!=='hand',mode==='zero'?0:1),r=ok(s.getState());const action=s.takeAnytimeAction(0,'exchange');if(action.ok){assert.ok(action.interaction.stateId==='wait'&&action.interaction.request.kind==='choice');assert.ok(action.interaction.request.options.every(o=>o.effectPreview?.kind!=='resourceExchange'||o.effectPreview.resourcesPaid?.sheep!==1))}else assert.equal(action.ok,false);save(`B104-N3-${mode}`,{r,action})}})
+  it('B104 N4 actual Lessons with anytime exchange supports whole action undo of sheep stone and occupation',()=>{const s=make();ready(s);const pending=ok(s.takeAction(0,'lessons')),a=trade(s,'stone'),r=finish(s,ok(s.resolveChoice(0,'A110_Roughcaster')),false),undone=ok(s.undoAction());assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(undone.state.players[0]!.resources.stone,0);assert.equal(undone.state.players[0]!.resources.sheep,1);assert.ok(undone.state.players[0]!.occupationHand.includes('A110_Roughcaster'));save('B104-N4',{pending,a,r,undone})})
 })

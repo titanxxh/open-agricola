@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, collectComputeCostsForFarmChoice } from '../../shared/cards/card-listeners'
@@ -9,6 +9,9 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/B/B030_WoodPalisades'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit44Cards from './_helpers/audit/ae-negative-44-cards'
 
 type OwnedPlayer = { session: GameSession; player: PlayerState }
 
@@ -459,4 +462,13 @@ describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
     expect(resp.state.players[0]!.fenceSegments.length).toBe(14)
     expect(readCardResourceStats(resp.state.players[0]!, 'C088_CarpentersApprentice')?.saved).toEqual({ wood: 2 })
   })
+})
+
+describe('ae-negative-44-cards', () => {
+  const { sessions, save, ok, make, finish, ONE, fence, build } = audit44Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C088 N1 wood room costs three wood and two reed while a clay room receives no wood discount', () => { const s = make('C088_CarpentersApprentice', st => Object.assign(st.players[0]!.resources, { wood: 3, reed: 2 })), r = build(s, 'room'); assert.equal(r.state.players[0]!.rooms, 3); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.reed, 0); const c = make('C088_CarpentersApprentice', st => { st.players[0]!.houseType = 'clay'; Object.assign(st.players[0]!.resources, { clay: 5, reed: 2 }) }), cr = build(c, 'room'); assert.equal(cr.state.players[0]!.rooms, 3); assert.equal(cr.state.players[0]!.resources.clay, 0); save('C088-N1', { r, cr }) })
+  it('C088 N2 first stable costs two wood and third plus fourth in one batch cost one wood each', () => { const s = make('C088_CarpentersApprentice', st => { st.players[0]!.resources.wood = 2; st.players[0]!.stableTiles = [{ row: 0, col: 1 }, { row: 0, col: 2 }] }), r = build(s, 'stable', [{ row: 1, col: 1 }, { row: 1, col: 2 }]); assert.equal(r.state.players[0]!.stableTiles.length, 4); assert.equal(r.state.players[0]!.resources.wood, 0); const c = make('C088_CarpentersApprentice', st => { st.players[0]!.resources.wood = 2 }), cr = build(c, 'stable'); assert.equal(cr.state.players[0]!.stableTiles.length, 1); assert.equal(cr.state.players[0]!.resources.wood, 0); save('C088-N2', { r, cr }) })
+  it('C088 N3 fourteen fence perimeter charges twelve wood and underfunded enclosure rejects atomically', () => { const edges = [...[1, 2, 3, 4].map(c => `H-0-${c}`), ...[1, 2, 3, 4].map(c => `H-3-${c}`), ...[0, 1, 2].map(r => `V-${r}-1`), ...[0, 1, 2].map(r => `V-${r}-5`)]; const s = make('C088_CarpentersApprentice', st => { st.players[0]!.resources.wood = 12 }), r = fence(s, edges, false); assert.equal(r.state.players[0]!.fenceSegments.length, 14); assert.equal(r.state.players[0]!.resources.wood, 0); const c = make('C088_CarpentersApprentice', st => { st.players[0]!.resources.wood = 4 }); ok(c.takeAction(0, 'fencing')); const rejected = assertRejectedUnchanged(c, () => c.commitSelectionChoice(0, { edges, extraWood: 0 })); const retry = finish(c, ok(c.commitSelectionChoice(0, { edges: ONE, extraWood: 0 })), false); assert.equal(retry.state.players[0]!.fenceSegments.length, 4); save('C088-N3', { r, rejected, retry }) })
+  it('C088 N4 thirteenth through fifteenth fences complete adjacent pasture with zero wood and retain all fifteen finite fence identities', () => { const edges = [...[1, 2, 3, 4].map(c => `H-0-${c}`), ...[1, 2, 3, 4].map(c => `H-2-${c}`), ...[0, 1].map(r => `V-${r}-1`), ...[0, 1].map(r => `V-${r}-5`)]; const s = make('C088_CarpentersApprentice', st => { const p = st.players[0]!; p.pastures = [{ id: 'eight', tiles: [0, 1].flatMap(row => [1, 2, 3, 4].map(col => ({ row, col }))), animalType: null, animalCount: 0 }]; p.fenceSegments = edges.map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } })) }); const r = fence(s, ['H-3-1', 'V-2-1', 'V-2-2'], false); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.fenceSegments.length, 15); assert.equal(r.state.players[0]!.pastures.reduce((n, p) => n + p.tiles.length, 0), 9); save('C088-N4', r) })
 })

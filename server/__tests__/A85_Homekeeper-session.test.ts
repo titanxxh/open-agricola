@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterAll, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 
 import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
 import '../../shared/cards/A/A085_Homekeeper'
+import assert from 'node:assert/strict'
+import { writeFileSync } from './_helpers/audit-evidence-fs'
+import { assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit11Growth from './_helpers/audit/ae-negative-11-growth'
 
 const CARD_ID = 'A085_Homekeeper'
 
@@ -182,5 +186,32 @@ describe('A085_Homekeeper session', () => {
     expect(resp.ok).toBe(true)
     expect(familySize(resp.state.players[0]!)).toBe(3)
     expect(newbornCount(resp.state.players[0]!)).toBe(1)
+  })
+})
+
+describe('ae-negative-11-growth', () => {
+  const { HOME, WAGE, sessions, directory, evidence, record, setup, turn, growth, values, geometry, denyGrowth, doubleRooms, lesson } = audit11Growth
+  afterAll(() => writeFileSync(`${directory}/native-responses.json`, JSON.stringify(evidence, null, 2)))
+  afterEach(context => sessions.splice(0).forEach(s => { record(`test-final:${context.task.name}`, s.getState()); s.dispose() }))
+  it('A085 N1 clay room with orthogonal field and pasture permits a real third newborn', () => { const s = setup(HOME, { house: 'clay' }, geometry); const r = growth(s); assert.deepEqual(values(r), { rooms: 2, family: 3, newborns: 1, wood: 0, reed: 0, grain: 0, food: 30 }); assert(s.state.players[0]!.minorHand.includes(WAGE)) })
+  it('A085 N2 stone room has the same single extra capacity', () => { const s = setup(HOME, { house: 'stone' }, geometry); assert.equal(values(growth(s)).family, 3) })
+  it('A085 N3 identical adjacency in a wooden house rejects room-required growth', () => denyGrowth(setup(HOME, {}, geometry)))
+  it('A085 N4 adjacent field without pasture rejects room-required growth', () => denyGrowth(setup(HOME, { house: 'clay' }, st => geometry(st, { row: 0, col: 0 }, null))))
+  it('A085 N5 adjacent pasture without field rejects room-required growth', () => denyGrowth(setup(HOME, { house: 'clay' }, st => geometry(st, null))))
+  it('A085 N6 field and pasture adjacent to different rooms do not combine', () => denyGrowth(setup(HOME, { house: 'clay' }, st => geometry(st, { row: 0, col: 0 }, { row: 2, col: 1 }))))
+  it('A085 N7 diagonal field and distant pasture do not provide capacity', () => denyGrowth(setup(HOME, { house: 'clay' }, st => geometry(st, { row: 0, col: 1 }, { row: 1, col: 2 }))))
+  it('A085 N8 Homekeeper still in hand provides no extra capacity', () => denyGrowth(setup(HOME, { played: false, house: 'clay' }, geometry)))
+  it('A085 N9 two qualifying rooms grant only one extra place with a fifth farmer still reserved', () => { const s = setup(HOME, { roomCount: 3, people: 4, house: 'clay' }, doubleRooms); assert.equal(s.state.players[0]!.workers.filter(w => !w.isActive).length, 1); denyGrowth(s); assert.equal(familySize(s.state.players[0]!), 4) })
+  it('A085 N10 two qualifying rooms allow the single fourth person', () => { const s = setup(HOME, { roomCount: 3, people: 3, house: 'clay' }, doubleRooms); assert.equal(values(growth(s)).family, 4) })
+  it('A085 N11 actual whole growth undo restores all farmers and permits one retry', () => { const s = setup(HOME, { house: 'clay' }, geometry); const before = undoRuleSnapshot(s.getState()); growth(s); assertUndoRestored(before, record('undo-homekeeper', s.undoAction())); assert.equal(values(growth(s)).family, 3) })
+  it('A085 N12 actual first Lesson is free and only later room growth uses Homekeeper', () => {
+    const s = setup(HOME, { played: false, house: 'clay', resources: { food: 1 } }, geometry)
+    const played = lesson(s, HOME); assert.equal(values(played).food, 1); assert.equal(values(played).family, 2)
+    turn(s, 1, 'forest'); assert.equal(values(growth(s)).family, 3)
+  })
+  it('A085 N13 actual later Lesson pays one food without immediate growth', () => {
+    const s = setup(HOME, { played: false, house: 'clay', resources: { food: 1 } }, st => { geometry(st); st.players[0]!.occupationPlayed = ['A111_WallBuilder']; st.players[0]!.occupationHand = [HOME, 'A125_Priest'] })
+    const played = lesson(s, HOME); assert.equal(values(played).food, 0); assert.equal(values(played).family, 2)
+    turn(s, 1, 'forest'); assert.equal(values(growth(s)).family, 3)
   })
 })

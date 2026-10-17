@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/A/A160_Lutenist'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit17Trade from './_helpers/audit/ae-negative-17-trade'
 
 const CARD_ID = 'A160_Lutenist'
 const FILLER = '__test_placeholder__'
@@ -124,4 +127,13 @@ describe('A160 Lutenist parity', () => {
       ? (response.interaction.request.options?.some((option) => option.sourceCard === CARD_ID) ?? false)
       : false).toBe(false)
   })
+})
+
+describe('ae-negative-17-trade', () => {
+  const { LUTE, sessions, save, setup, turn, finish, offer, material } = audit17Trade
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A160 N1 mandatory food and wood arrive before optional two food buys exactly one vegetable',()=>{const s=setup(LUTE,{food:1});turn(s,0,'grain-seeds');const pending=turn(s,1,'traveling-players');assert.equal(material(pending).food,2);assert.equal(material(pending).wood,1);const r=finish(s,pending);assert.equal(material(r).food,0);assert.equal(material(r).wood,1);assert.equal(material(r).vegetable,1);assert.equal(material(r,1).vegetable,0);save('A160-N1',{pending,r})})
+  it('A160 N2 decline and zero initial food retain mandatory gain without free vegetable',()=>{for(const food of[0,2]){const s=setup(LUTE,{food});turn(s,0,'grain-seeds');const pending=turn(s,1,'traveling-players'),r=finish(s,pending,false);assert.equal(material(r).food,food+1);assert.equal(material(r).wood,1);assert.equal(material(r).vegetable,0);save(`A160-N2-${food}`,{pending,r})}})
+  it('A160 N3 hand own and unrelated opponent cannot grant mandatory owner goods',()=>{for(const[played,own,space]of[[false,false,'traveling-players'],[true,true,'traveling-players'],[true,false,'fishing']]as const){const s=setup(LUTE,{},played);const r=own?turn(s,0,space):finish(s,offer(s,space));assert.equal(material(r).wood,0);assert.equal(material(r).vegetable,0);save(`A160-N3-${played}-${own}`,r)}})
+  it('A160 N4 wrong actor illegal and stale purchase cannot spend or produce twice',()=>{const s=setup(LUTE,{food:3});turn(s,0,'grain-seeds');const pending=turn(s,1,'traveling-players');assertRejectedUnchanged(s,()=>s.resolveChoice(1,'buy'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'buy-two'));const r=finish(s,pending);assert.equal(material(r).food,2);assert.equal(material(r).vegetable,1);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'buy'));save('A160-N4',r)})
 })

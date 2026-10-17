@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
@@ -12,6 +12,9 @@ import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 import '../../shared/cards/C/C052_HuntsmansHat'
 import type { ActionExecutionResult, ActionFlow } from '../../shared/contract/types'
 import type { DraftGameEvent } from '../../shared/contract/events'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected } from './_helpers/negative-rule-audit'
+import * as audit37Food from './_helpers/audit/ae-negative-37-food'
 
 const CARD_ID = 'C052_HuntsmansHat'
 const LISTENER_ID = 'C52-huntsmans-hat-after-boar-gain'
@@ -246,4 +249,49 @@ describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)',
     const result = session.withCtx(() => executeCardListener(listener, ctx))
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-37-food', () => {
+  const { sessions, ok, options, save, setup, finish, next, take, move, prerequisites, hand, buy, pasture, printed, ownMajor, denyMinor } = audit37Food
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C052 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'C052_HuntsmansHat', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); ownMajor(st, 'Major_Fireplace1'); Object.assign(st.players[0]!.resources, { "reed": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.reed, 0); save('C052-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); ownMajor(st, 'Major_Fireplace1'); Object.assign(st.players[0]!.resources, { "reed": 0 }); }); denyMinor(t, card); save('C052-N1-short', t.getState()); const excluded = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "reed": 1 }); }); denyMinor(excluded, card); save('C052-N1-prerequisite', excluded.getState()); });
+  it('C052 N2 each new action space pig grants one food independent of quantity', () => {
+      for (const n of [1, 3]) {
+          const card = 'C052_HuntsmansHat', s = setup(card, 14, st => { ownMajor(st, 'Major_Fireplace1'); pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }]); st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = n; });
+          const r = finish(s, take(s, 'pig-market'), true);
+          assert.equal(r.state.players[0]!.resources.boar, n);
+          assert.equal(r.state.players[0]!.pastures[0]!.animalCount, n);
+          assert.equal(r.state.players[0]!.resources.food, 40 + n);
+          save(`C052-N2-${n}`, r);
+      }
+  });
+  it('C052 N3 empty pile hand only opponent and nonpig gains exclude owner food', () => {
+      for (const mode of ['empty', 'hand', 'opponent', 'sheep']) {
+          const card = 'C052_HuntsmansHat', s = setup(card, 14, st => {
+              ownMajor(st, 'Major_Fireplace1');
+              pasture(st, [{ row: 0, col: 3 }]);
+              st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = mode === 'empty' ? 0 : 1;
+              st.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep = 1;
+              if (mode === 'hand')
+                  hand(st, card);
+              if (mode === 'opponent')
+                  st.currentPlayerIndex = 1;
+          });
+          const r = mode === 'empty' ? assertEmptyAccumulationRejected(s, 0, 'pig-market') : finish(s, take(s, mode === 'sheep' ? 'sheep-market' : 'pig-market'), true);
+          assert.equal(r.state.players[0]!.resources.food, 40);
+          save(`C052-N3-${mode}`, r);
+      }
+      const card = 'C052_HuntsmansHat', s = setup(card, 14, st => { hand(st, card); ownMajor(st, 'Major_Fireplace1'); st.players[0]!.resources.reed = 1; pasture(st, [{ row: 0, col: 3 }], 'sheep', 1); st.players[0]!.occupationPlayed = ['B104_SheepWalker']; });
+      finish(s, buy(s, card));
+      move(s, 'forest');
+      next(s);
+      let cardResult = ok(s.takeAnytimeAction(0, 'exchange'));
+      const trade = options(cardResult).find(o => o.effectPreview?.kind === 'resourceExchange' && o.effectPreview.resourcesPaid?.sheep === 1 && o.effectPreview.resourcesGained?.boar === 1);
+      assert.ok(trade);
+      cardResult = finish(s, ok(s.resolveChoice(0, trade.value)), true);
+      assert.equal(cardResult.state.players[0]!.resources.boar, 1);
+      assert.equal(cardResult.state.players[0]!.resources.sheep, 0);
+      assert.equal(cardResult.state.players[0]!.resources.food, 40);
+      save('C052-N3-card-supplied', cardResult);
+  });
 })

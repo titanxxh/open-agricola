@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B067_HandTruck'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit21Handtruck from './_helpers/audit/ae-negative-21-handtruck'
 
 const CARD_ID = 'B067_HandTruck'
 
@@ -104,4 +107,13 @@ describe('B067_HandTruck session', () => {
     expect(resp.ok).toBe(false)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-21-handtruck', () => {
+  const { CARD, sessions, save, ok, setup, finish, menu, buy, loaded, placements, bake } = audit21Handtruck
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B067 N1 actual one wood purchase gives no immediate grain and cost shortfall or undo cannot duplicate card',()=>{const s=setup(CARD,8,state=>state.players[0]!.resources.wood=1),{pending,r}=buy(s,CARD);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.grain,0);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const poor=setup(CARD),denied=menu(poor);assertRejectedUnchanged(poor,()=>poor.resolveChoice(0,CARD));const legal=finish(poor,ok(poor.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.grain,0);save('B067-N1',{pending,r,undone,denied,legal})})
+  it('B067 N2 genuine one or two owner accumulation placements add exactly that many grain before actual baking',()=>{for(const n of[1,2]){const s=loaded(),before=placements(s,n),{pending,r}=bake(s);assert.equal(r.state.players[0]!.resources.grain,n);assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+2);assert.equal(r.state.players[1]!.resources.grain,0);save(`B067-N2-${n}`,{before,pending,r})}})
+  it('B067 N3 zero initial grain becomes a mandatory real bake while decline with seed and hand card gain no extra grain',()=>{const s=loaded(0),before=placements(s,1),forced=bake(s);assert.equal(forced.r.state.players[0]!.resources.grain,0);assert.equal(forced.r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+2);for(const mode of['decline','hand']){const t=loaded(1,mode!=='hand'),b=placements(t,1),result=bake(t,mode!=='decline');assert.equal(result.r.state.players[0]!.resources.grain,0);assert.equal(result.r.state.players[0]!.resources.food,b.state.players[0]!.resources.food+2);save(`B067-N3-${mode}`,{b,...result})}save('B067-N3',{before,...forced})})
+  it('B067 N4 no oven rejects and whole bake undo restores seed food and true accumulation occupants',()=>{const poor=loaded(0,true,false),beforePoor=placements(poor,1);assertRejectedUnchanged(poor,()=>poor.takeAction(0,'grain-utilization'));assert.equal(poor.getState().state.players[0]!.resources.grain,0);const s=loaded(),before=placements(s,2),{pending,r}=bake(s),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,1);assert.equal(undone.state.players[0]!.resources.food,before.state.players[0]!.resources.food);assert.deepEqual(undone.state.actionSpaces.find(a=>a.id==='forest')!.takenBy,before.state.actionSpaces.find(a=>a.id==='forest')!.takenBy);const retry=bake(s).r;assert.equal(retry.state.players[0]!.resources.grain,2);save('B067-N4',{beforePoor,before,pending,r,undone,retry})})
 })

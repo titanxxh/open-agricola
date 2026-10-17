@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { setActiveWorkerCount, setWorkersAtHome, familySize } from '../../shared/domain/player'
 import {
   getRoundPersonPlacementDetails,
   recordRoundPlacement,
@@ -9,6 +9,8 @@ import {
 import { runCardListeners } from '../../shared/cards/card-listeners'
 
 import { D160_Midwife_impl } from '../../shared/cards/D/D160_Midwife'
+import assert from 'node:assert/strict'
+import * as audit56Family from './_helpers/audit/ae-negative-56-family'
 
 const CARD_ID = 'D160_Midwife'
 
@@ -116,4 +118,12 @@ describe('D160_Midwife session', () => {
       params: { grain: 1 },
     }))
   })
+})
+
+describe('ae-negative-56-family', () => {
+  const { sessions, ok, save, make, finish, ready, people } = audit56Family
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D160 N1 opponent first real person on either ordinary or urgent growth grants exactly one owner grain',()=>{for(const space of['wish-children','urgent-wish-children']){const s=make('D160_Midwife',st=>{st.currentPlayerIndex=1;people(st.players[1]!,3);setActiveWorkerCount(st.players[1]!,2)},true,14),r=finish(s,ok(s.takeAction(1,space)),true);assert.equal(familySize(r.state.players[1]!),3);assert.equal(r.state.players[0]!.resources.grain,1);assert.equal(r.state.players[1]!.resources.grain,0);save(`D160-N1-${space}`,r)}})
+  it('D160 N2 opponent second real person growth after three intervening players cannot grant grain',()=>{const s=make('D160_Midwife',st=>{st.currentPlayerIndex=1},true,14),first=finish(s,ok(s.takeAction(1,'grain-seeds')));for(const[actor,space]of[[2,'clay-pit'],[3,'reed-bank'],[0,'forest']]as const){assert.equal(ready(s).state.currentPlayerIndex,actor);finish(s,ok(s.takeAction(actor,space)));}assert.equal(ready(s).state.currentPlayerIndex,1);const r=finish(s,ok(s.takeAction(1,'urgent-wish-children')),true);assert.equal(r.state.players[0]!.resources.grain,0);assert.equal(r.state.players[1]!.resources.grain,1);save('D160-N2',{first,r})})
+  it('D160 N3 own first growth unrelated opponent placement and hand-only Midwife do not award owner grain',()=>{for(const mode of['self','unrelated','hand']){const actor=mode==='self'?0:1,s=make('D160_Midwife',st=>{st.currentPlayerIndex=actor},mode!=='hand',14),r=finish(s,ok(s.takeAction(actor,mode==='unrelated'?'clay-pit':'urgent-wish-children')),true);assert.equal(r.state.players[0]!.resources.grain,0);save(`D160-N3-${mode}`,r)}})
 })

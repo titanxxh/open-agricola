@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/B/B012_Stockyard'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit18AnimalHolders from './_helpers/audit/ae-negative-18-animal-holders'
 
 const CARD_ID = 'B012_Stockyard'
 
@@ -182,4 +185,13 @@ describe('B012 Stockyard parity', () => {
     expect(pastures).toMatchObject({ quantity: 0, total: -1 })
     expect(heldAnimals(response)).toEqual({ sheep: 3 })
   })
+})
+
+describe('ae-negative-18-animal-holders', () => {
+  const { STOCK, sessions, save, ok, pastures, setup, turn, reorg, assignment, buy, vp } = audit18AnimalHolders
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B012 N1 actual one wood one stone purchase gives one printed point without pasture',()=>{const s=setup(STOCK,state=>Object.assign(state.players[0]!.resources,{wood:1,stone:1}),false),{pending,r}=buy(s,STOCK);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.stone,0);assert.equal(vp(r,STOCK),1);assert.equal(r.state.players[0]!.pastures.length,0);save('B012-N1',{pending,r})})
+  it('B012 N2 real sheep accumulation stores exactly three same species without pasture and scores no pasture',()=>{for(const type of['sheep','boar','cattle']as const){const s=setup(STOCK,state=>{state.round=14;const space=type==='sheep'?'sheep-market':type==='boar'?'pig-market':'cattle-market';state.actionSpaces.find(a=>a.id===space)!.resources[type]=3});const space=type==='sheep'?'sheep-market':type==='boar'?'pig-market':'cattle-market',pending=turn(s,0,space);assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='animal-reorg');const r=ok(s.resolveChoice(0,'confirm',{zones:[assignment(pending,STOCK,{[type]:3})]}));assert.equal(r.state.players[0]!.resources[type],3);assert.equal(r.state.players[0]!.pastures.length,0);assert.ok(r.scores);assert.equal(r.scores[0]!.categories.find(c=>c.key==='pastures')!.total,-1);save(`B012-N2-${type}`,{pending,r})}})
+  it('B012 N3 mixed species rejects without mutation then one species legal retry discards other',()=>{const s=setup(STOCK,state=>{state.round=14;const p=state.players[0]!;pastures(state,1);p.resources.sheep=1;p.houseAnimals = { '2-0': 'sheep' };state.actionSpaces.find(a=>a.id==='pig-market')!.resources.boar=1});const pending=reorg(s,'pig-market');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assignment(pending,STOCK,{sheep:1,boar:1})]}));const r=ok(s.resolveChoice(0,'confirm',{zones:[assignment(pending,STOCK,{sheep:1})]}));assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[0]!.resources.boar,0);save('B012-N3',{pending,r})})
+  it('B012 N4 fourth animal illegal owner and stale choices reject then three same species remain',()=>{const s=setup(STOCK,state=>{state.round=14;state.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=4}),pending=turn(s,0,'sheep-market');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'confirm',{zones:[assignment(pending,STOCK,{sheep:4})]}));assertRejectedUnchanged(s,()=>s.resolveChoice(1,'confirm',{zones:[assignment(pending,STOCK,{sheep:3})]}));const r=ok(s.resolveChoice(0,'confirm',{zones:[assignment(pending,STOCK,{sheep:3})]}));assert.equal(r.state.players[0]!.resources.sheep,3);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'obsolete-animal-reorg',{zones:[assignment(pending,STOCK,{sheep:3})]}));save('B012-N4',{pending,r})})
 })

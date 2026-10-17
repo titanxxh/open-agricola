@@ -1,12 +1,15 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B042_ForestInn'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C158_ForestCampaigner'
 import '../../shared/cards/D/D170_FoldBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit56Purchase from './_helpers/audit/ae-negative-56-purchase'
 
 describe('C158 Forest Campaigner session', () => {
   it('opens a strict non-Farmland space when its food makes the action payable', () => {
@@ -130,4 +133,12 @@ describe('C158 Forest Campaigner parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 1 })
   })
+})
+
+describe('ae-negative-56-purchase', () => {
+  const { sessions, ok, save, make, finish, choose, ready, woodPiles } = audit56Purchase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C158 N1 actual owner placement at seven eight and nine wood grants zero one or one food before source collection',()=>{for(const total of[7,8,9]){const s=make('C158_ForestCampaigner',st=>woodPiles(st,total),true,14),r=finish(s,ok(s.takeAction(0,'forest')));assert.equal(r.state.players[0]!.resources.food,total>=8?101:100);assert.equal(r.state.players[0]!.resources.wood,total-3);assert.equal(r.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,0);save(`C158-N1-${total}`,r)}})
+  it('C158 N2 real one-food grant before Lessons can fund its fee with no initial food and occupied rejection cannot repeat the bonus',()=>{const s=make('C158_ForestCampaigner',st=>{woodPiles(st,8);st.players[0]!.resources.food=0;st.players[0]!.occupationHand=['A125_Priest','A133_Braggart'];},true,14),p=ok(s.takeAction(0,'lessons')),r=finish(s,choose(s,p,o=>o.value==='A125_Priest'));assert.equal(r.state.players[0]!.resources.food,0);assert.ok(r.state.players[0]!.occupationPlayed.includes('A125_Priest'));ready(s);const rejected=assertRejectedUnchanged(s,()=>s.takeAction(1,'lessons'));assert.equal(rejected.state.players[0]!.resources.food,0);save('C158-N2',{p,r,rejected})})
+  it('C158 N3 actual opponent placement and a hand-only card grant owner no forest-count food',()=>{for(const mode of['opponent','hand']){const actor=mode==='opponent'?1:0,s=make('C158_ForestCampaigner',st=>{st.currentPlayerIndex=actor;woodPiles(st,8)},mode!=='hand',14),r=finish(s,ok(s.takeAction(actor,'forest')));assert.equal(r.state.players[0]!.resources.food,100);save(`C158-N3-${mode}`,r)}})
 })

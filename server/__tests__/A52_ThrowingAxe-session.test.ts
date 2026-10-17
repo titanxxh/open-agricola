@@ -2,10 +2,17 @@ import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A052_ThrowingAxe } from '../../shared/cards/A/A052_ThrowingAxe'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import '../../shared/cards/A/A051_DriftNetBoat'
+import '../../shared/cards/A/A053_Claypipe'
+import '../../shared/cards/A/A006_StorageBarn'
+import { countRoomAnimals } from '../../shared/domain/animals'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit08Triggers from './_helpers/audit/ae-negative-08-triggers'
 
 describe('A052_ThrowingAxe prerequisite', () => {
   it('blocks when round < 7', () => {
@@ -129,4 +136,27 @@ describe('A052 Throwing Axe parity', () => {
     expect(opponent.state.players[0]!.resources.food).toBe(0)
     expect(opponent.state.players[1]!.resources).toMatchObject({ food: 0, wood: 3 })
   })
+})
+
+describe('ae-negative-08-triggers', () => {
+  const { AXE, sessions, scenario, setup, ok, ready, turn, enter, buy, values, bonus, retryFree, barn, addBarn } = audit08Triggers
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  scenario('A052 N1 round seven permits the actual one wood purchase', () => { const s = setup(AXE, { played: false, round: 7, resources: { wood: 1 } }); const r = buy(s, enter(s), AXE); assert.equal(values(r).wood, 0); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 0, cardPlayed: true } })
+  scenario('A052 N2 round six rejects a forged early purchase before a legal retry', () => { const s = setup(AXE, { played: false, round: 6, resources: { wood: 1 } }); const r = retryFree(s, AXE); assert.equal(values(r).wood, 1); assert.equal(r.state.players[0]!.minorHand.includes(AXE), true); return { round: 6, wood: 1, cardInHand: true } })
+  scenario('A052 N3 zero wood rejects a forged purchase in round seven before a legal retry', () => { const s = setup(AXE, { played: false, round: 7 }); const r = retryFree(s, AXE); assert.equal(values(r).wood, 0); assert.equal(r.state.players[0]!.minorHand.includes(AXE), true); return { round: 7, wood: 0, cardInHand: true } })
+  scenario('A052 N4 Forest with one market pig grants exactly two food', () => { const r = turn(setup(AXE, { round: 10 }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); bonus(r, AXE, 2); return { wood: 3, food: 22, marketPigs: 1 } })
+  scenario('A052 N5 zero market pigs prevent the Forest food bonus', () => { const r = turn(setup(AXE, { round: 10, pigs: 0 }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20, marketPigs: 0 } })
+  scenario('A052 N6 two market pigs still grant only two food', () => { const r = turn(setup(AXE, { round: 10, pigs: 2 }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); bonus(r, AXE, 2); return { wood: 3, food: 22, marketPigs: 2 } })
+  scenario('A052 N7 Day Laborer is not a wood accumulation space', () => { const r = turn(setup(AXE, { round: 10 }), 0, 'day-laborer'); assert.equal(values(r).food, 22); assert.equal(values(r).wood, 0); bonus(r, AXE, 0); return { food: 22, wood: 0 } })
+  scenario('A052 N8 Storage Barn wood from a real Joinery gives no accumulation bonus', () => { const s = setup(AXE, { round: 10, configure: addBarn }); const r = barn(s); assert.equal(values(r).wood, 1); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 1, food: 20 } })
+  scenario('A052 N9 opponent Forest cannot grant owner or opponent food from the owner card', () => { const s = setup(AXE, { round: 10 }); turn(s, 0, 'grain-seeds'); const r = turn(s, 1, 'forest'); assert.equal(values(r).food, 20); assert.equal(values(r, 1).food, 20); assert.equal(values(r, 1).wood, 3); bonus(r, AXE, 0); return { ownerFood: 20, opponentFood: 20, opponentWood: 3 } })
+  scenario('A052 N10 Forest while the card is in hand gives no food bonus', () => { const r = turn(setup(AXE, { round: 10, played: false }), 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20 } })
+  scenario('A052 N11 empty Forest rejects even with a pig on the market', () => { const s = setup(AXE, { round: 10, forest: 0 }); const r = assertEmptyAccumulationRejected(s, 0, 'forest'); assert.equal(values(r).wood, 0); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { emptyEntryRejected: true, supplementalFood: 0 } })
+  scenario('A052 N12 a real Pig Market clearance removes the condition before owner Forest', () => {
+    const s = setup(AXE, { round: 10 }); turn(s, 0, 'grain-seeds'); let r = turn(s, 1, 'pig-market')
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'animal-reorg') r = ok(s.resolveChoice(1, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }] }))
+    assert.equal(values(r, 1).boar, 1); assert.equal(countRoomAnimals(r.state.players[1]!), 1); assert.equal(r.state.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar, 0)
+    r = turn(s, 0, 'forest'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 20); bonus(r, AXE, 0); return { wood: 3, food: 20, marketPigs: 0, opponentHousedPigs: 1 }
+  })
+  scenario('A052 N13 occupied Forest rejects a repeated request before a legal retry', () => { const s = setup(AXE, { round: 10 }); turn(s, 0, 'forest'); turn(s, 1, 'grain-seeds'); ready(s, 0); assertRejectedUnchanged(s, () => s.takeAction(0, 'forest')); const r = turn(s, 0, 'clay-pit'); assert.equal(values(r).wood, 3); assert.equal(values(r).food, 22); return { wood: 3, food: 22 } })
 })

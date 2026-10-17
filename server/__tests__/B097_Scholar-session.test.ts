@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit24Scholar from './_helpers/audit/ae-negative-24-scholar'
+
+describe('ae-negative-24-scholar', () => {
+  const { sessions, save, ok, finish, nextRound, scholarChoice, makeScholar } = audit24Scholar
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B097 N1 real round start occupation pays exactly one food and no person while optional decline preserves supply',()=>{const s=makeScholar(),round=nextRound(s),r=finish(s,scholarChoice(s,round,'A110_Roughcaster'),false);assert.ok(r.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'));assert.equal(r.state.players[0]!.resources.food,99);assert.equal(r.state.players[0]!.workers.filter(w=>w.isActive).length,2);assert.ok(!r.state.actionSpaces.some(a=>a.takenBy.some(w=>w.playerId===r.state.players[0]!.id)));save('B097-N1',{round,r})})
+  it('B097 N2 actual start-round minor purchase pays its printed reed once without allowing a major',()=>{const s=makeScholar(),round=nextRound(s),pending=scholarChoice(s,round,'improvement');assert.ok(pending.interaction.stateId==='wait'&&pending.interaction.request.kind==='choice');assert.ok(pending.interaction.request.options.every(o=>!o.value.startsWith('Major_')));const rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'Major_Fireplace1')),r=finish(s,ok(s.resolveChoice(0,'A056_Basket')),false);assert.equal(round.state.round,6);assert.equal(pending.state.players[0]!.resources.reed,2);assert.equal(r.state.players[0]!.resources.reed,pending.state.players[0]!.resources.reed-1);assert.ok(r.state.players[0]!.minorPlayed.includes('A056_Basket'));assert.equal(r.state.players[0]!.resources.food,100);save('B097-N2',{round,pending,rejected,r})})
+  it('B097 N3 wooden clay house or Scholar still in hand do not expose a round-start occupation offer',()=>{for(const mode of['wood','clay','hand']as const){const s=makeScholar(mode==='hand'?'stone':mode,100,mode!=='hand'),round=nextRound(s),r=finish(s,round,false);assert.ok(!r.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'));assert.ok(!r.state.players[0]!.minorPlayed.includes('A056_Basket'));assert.equal(r.state.players[0]!.resources.food,100);save(`B097-N3-${mode}`,{round,r})}})
+  it('B097 N4 declining natural round-start choices changes neither cards nor occupation food',()=>{const s=makeScholar(),round=nextRound(s),r=finish(s,round,false);assert.equal(r.state.players[0]!.resources.food,100);assert.ok(r.state.players[0]!.occupationHand.includes('A110_Roughcaster'));assert.ok(r.state.players[0]!.minorHand.includes('A056_Basket'));save('B097-N4',{round,r})})
+})

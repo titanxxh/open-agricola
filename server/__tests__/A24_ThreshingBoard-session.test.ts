@@ -1,11 +1,14 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import '../../shared/cards/A/A024_ThreshingBoard'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit06Actions from './_helpers/audit/ae-negative-06-actions'
 
 const CARD_ID = 'A024_ThreshingBoard'
 
@@ -169,5 +172,45 @@ describe('A024 Threshing Board parity', () => {
     expect(options(response).some((option) => option.value === CARD_ID)).toBe(false)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.wood).toBe(1)
+  })
+})
+
+describe('ae-negative-06-actions', () => {
+  const { A024, sessions, setup, ok, opts, turn, buy, denied, plow, skipRemaining, bake, bakeSetup } = audit06Actions
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A024 N1 occupation or wood shortage rejects forged card before legal purchase', () => {
+    const occ = ['A125_Priest', 'A124_Knapper']
+    denied(setup({ card: A024, played: false, occupations: occ.slice(0, 1), resources: { wood: 1 } }), A024)
+    denied(setup({ card: A024, played: false, occupations: occ }), A024)
+    const r = buy(setup({ card: A024, played: false, occupations: occ, resources: { wood: 1 } }), A024); assert.equal(r.state.players[0]!.resources.wood, 0); assert.ok(r.state.players[0]!.minorPlayed.includes(A024))
+  })
+  it('A024 N2 Farmland bakes once and rejects wrong actor or room plow target before retry', () => {
+    const s = bakeSetup(); const offer = turn(s, 0, 'farmland')
+    assertRejectedUnchanged(s, () => s.resolveChoice(1, opts(offer).find(o => o.value !== '__skip__')!.value))
+    bake(s, offer); assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 1, col: 0 } }))
+    const r = plow(s); assert.equal(r.state.players[0]!.resources.food, 42); assert.equal(r.state.players[0]!.fields.length, 1)
+  })
+  it('A024 N3 Cultivation grants one reachable bake and cannot replay it after plowing', () => {
+    const s = bakeSetup(); bake(s, turn(s, 0, 'cultivation')); const r = skipRemaining(s, plow(s))
+    assert.equal(r.state.players[0]!.fields.length, 1); assert.equal(r.state.players[0]!.resources.food, 42)
+    assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Fireplace1'))
+  })
+  it('A024 N4 missing grain or cookery skips bake while core plow remains legal', () => {
+    for (const config of [{ resources: { grain: 0 }, cookery: true }, { resources: { grain: 1 }, cookery: false }]) {
+      const s = bakeSetup(config); const r = turn(s, 0, 'farmland')
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+      const done = plow(s); assert.equal(done.state.players[0]!.resources.grain, config.resources.grain); assert.equal(done.state.players[0]!.resources.food, 40); assert.equal(done.state.players[0]!.fields.length, 1)
+    }
+  })
+  it('A024 N5 decline other space and opponent Farmland do not consume owner grain', () => {
+    const decline = bakeSetup(); turn(decline, 0, 'farmland'); ok(decline.resolveChoice(0, '__skip__')); const d = plow(decline)
+    assert.equal(d.state.players[0]!.resources.grain, 1); assert.equal(d.state.players[0]!.resources.food, 40)
+    const s = bakeSetup({ opponent: { grain: 1 }, opponentCookery: true }); turn(s, 0, 'forest'); turn(s, 1, 'farmland'); const r = plow(s, 1)
+    assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.resources.food, 40); assert.equal(r.state.players[0]!.fields.length, 0); assert.equal(r.state.players[1]!.fields.length, 1); assert.equal(r.state.players[1]!.resources.grain, 1); assert.equal(r.state.players[1]!.resources.food, 40)
+  })
+  it('A024 N6 action undo restores baked grain food field and placement before replay', () => {
+    const s = bakeSetup(); const before = undoRuleSnapshot(s.getState()); bake(s, turn(s, 0, 'farmland')); plow(s)
+    assertUndoRestored(before, s.undoAction()); turn(s, 0, 'farmland'); ok(s.resolveChoice(0, '__skip__')); const r = plow(s)
+    assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.resources.food, 40); assert.equal(r.state.players[0]!.fields.length, 1)
   })
 })

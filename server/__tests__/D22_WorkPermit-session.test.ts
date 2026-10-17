@@ -2,7 +2,7 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { collectScheduledEffectPreviews } from '../../shared/actions/scheduled-effect-preview'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
@@ -11,9 +11,14 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
   workersAtHome,
+  familySize,
+  workersAvailable,
 } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D022_WorkPermit'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Supply from './_helpers/audit/ae-negative-32-supply'
 
 const CARD_ID = 'D022_WorkPermit'
 const FILLER = '__test_placeholder__'
@@ -202,4 +207,20 @@ describe('D022 Work Permit parity', () => {
     expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(2)
     expect(response.state.players[0]!.workers.find((worker) => worker.id === '3')?.supplyUse?.status).toBe('reserved')
   })
+})
+
+describe('ae-negative-32-supply', () => {
+  const { sessions, save, pendingCard, finish, progress, buy, permit, supplyPlace } = audit32Supply
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('D022 N1 actual one resource purchase pays one food and its exact reserved supply person acts in the next natural round without spending a family person', () => { const s = permit(), bought = finish(s, buy(s, 'D022_WorkPermit')), id = bought.state.players[0]!.cardStates.D022_WorkPermit?.extraData?.reservedWorkerId; assert.ok(typeof id === 'string'); assert.equal(bought.state.players[0]!.resources.food, 99); assert.equal(bought.state.players[0]!.resources.wood, 1); const due = progress(s, 6, 'D022_WorkPermit'), steps = supplyPlace(s, 'D022_WorkPermit'); assert.equal(steps.r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy[0]!.workerId, id); assert.deepEqual([familySize(steps.r.state.players[0]!), workersAvailable(steps.r.state, steps.r.state.players[0]!), steps.r.state.players[0]!.resources.food], [2, 2, 101]); const later = progress(s, 7, 'D022_WorkPermit'); assert.equal(pendingCard(later, 'D022_WorkPermit'), false); assert.equal(later.state.players[0]!.workers.length, 5); assert.equal(familySize(later.state.players[0]!), 2); save('D022-N1', { bought, due, steps, later }); });
+  it('D022 N2 every building resource unit determines the later round once and is not paid as the card fee', () => { const s = permit(true), bought = finish(s, buy(s, 'D022_WorkPermit')); assert.deepEqual([bought.state.players[0]!.resources.wood, bought.state.players[0]!.resources.clay, bought.state.players[0]!.resources.reed, bought.state.players[0]!.resources.stone], [1, 2, 1, 0]); assert.equal(bought.state.players[0]!.cardStates.D022_WorkPermit?.extraData?.targetRound, 9); const due = progress(s, 9, 'D022_WorkPermit'); assert.equal(due.state.round, 9); const steps = supplyPlace(s, 'D022_WorkPermit'); assert.equal(familySize(steps.r.state.players[0]!), 2); assert.equal(workersAvailable(steps.r.state, steps.r.state.players[0]!), 2); save('D022-N2', { bought, due, steps }); });
+  it('D022 N3 zero building resources and no finite supply person prevent purchase without spending food', () => { const rows = []; for (const [supply, resources] of [[true, false], [false, true]]) {
+      const s = permit(false, 12, supply, resources), p = buy(s, 'D022_WorkPermit');
+      assert.ok(p.state.players[0]!.minorHand.includes('D022_WorkPermit'));
+      const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'D022_WorkPermit'));
+      assert.equal(p.state.players[0]!.resources.food, 100);
+      assert.equal(p.state.players[0]!.workers.length, 5);
+      rows.push({ p, bad });
+  } save('D022-N3', rows); });
+  it('D022 N4 a target beyond round fourteen pays the printed fee but neither clamps nor reserves a person', () => { const s = permit(false, 14), r = finish(s, buy(s, 'D022_WorkPermit')); assert.ok(r.state.players[0]!.minorPlayed.includes('D022_WorkPermit')); assert.equal(r.state.players[0]!.resources.food, 99); assert.equal(r.state.players[0]!.cardStates.D022_WorkPermit?.extraData?.targetRound, undefined); assert.ok(r.state.players[0]!.workers.every(w => !w.supplyUse)); save('D022-N4', r); });
 })

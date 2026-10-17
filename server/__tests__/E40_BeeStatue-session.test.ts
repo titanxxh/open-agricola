@@ -1,12 +1,15 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E040_BeeStatue'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit35Placement from './_helpers/audit/ae-negative-35-placement'
 
 describe('E040_BeeStatue session', () => {
   const setup = () => {
@@ -170,4 +173,27 @@ describe('E040 Bee Statue parity', () => {
 
     expect(session.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual([])
   })
+})
+
+describe('ae-negative-35-placement', () => {
+  const { sessions, save, finish, ready, action, progress, buy, bee } = audit35Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('E040 N1 actual clay purchase creates the exact stack and five natural Day Laborer uses pop grain stone grain stone vegetable then a sixth gives nothing', () => {
+      const s = bee(), bought = finish(s, buy(s, 'E040_BeeStatue'));
+      assert.equal(bought.state.players[0]!.resources.clay, 0);
+      assert.deepEqual(getCardStack(bought.state.players[0]!, 'E040_BeeStatue'), ['vegetable', 'stone', 'grain', 'stone', 'grain']);
+      const opponent = action(s, 1, 'forest');
+      ready(s);
+      const rows = [];
+      for (const [round, grain, stone, vegetable, remaining] of [[5, 1, 0, 0, 4], [6, 1, 1, 0, 3], [7, 2, 1, 0, 2], [8, 2, 2, 0, 1], [9, 2, 2, 1, 0], [10, 2, 2, 1, 0]] as const) {
+          if (round > 5)
+              progress(s, round, '', ['forest', 'reed-bank', 'grain-seeds', 'meeting-place']);
+          const r = action(s, 0, 'day-laborer');
+          assert.deepEqual([r.state.players[0]!.resources.grain, r.state.players[0]!.resources.stone, r.state.players[0]!.resources.vegetable, getCardStack(r.state.players[0]!, 'E040_BeeStatue').length], [grain, stone, vegetable, remaining]);
+          rows.push(r);
+      }
+      save('E040-N1', { bought, opponent, rows });
+  });
+  it('E040 N2 real opponent Day Laborer and an unrelated owner action do not pop the stack created by actual purchase', () => { const s = bee(), bought = finish(s, buy(s, 'E040_BeeStatue')), opponent = action(s, 1, 'day-laborer'), owner = action(s, 0, 'reed-bank'); assert.equal(getCardStack(owner.state.players[0]!, 'E040_BeeStatue').length, 5); assert.deepEqual([owner.state.players[0]!.resources.grain, owner.state.players[0]!.resources.stone, owner.state.players[0]!.resources.vegetable], [0, 0, 0]); save('E040-N2', { bought, opponent, owner }); });
+  it('E040 N3 insufficient clay cannot purchase and a held card gives no grain on a real Day Laborer use', () => { const s = bee(false, 1), p = buy(s, 'E040_BeeStatue'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'E040_BeeStatue')); assert.ok(p.state.players[0]!.minorHand.includes('E040_BeeStatue')); const t = bee(), held = action(t, 0, 'day-laborer'); assert.deepEqual([held.state.players[0]!.resources.food, held.state.players[0]!.resources.grain, getCardStack(held.state.players[0]!, 'E040_BeeStatue').length], [102, 0, 0]); save('E040-N3', { p, bad, held }); });
 })

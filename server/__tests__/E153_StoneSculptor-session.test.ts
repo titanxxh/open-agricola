@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { describe, expect, it, afterEach } from 'vitest'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -7,6 +7,9 @@ import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { FeedSelection } from '../../shared/session/session-core'
 
 import '../../shared/cards/E/E153_StoneSculptor'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
 
 const CARD_ID = 'E153_StoneSculptor'
 
@@ -256,4 +259,11 @@ describe('E153_StoneSculptor harvest integration', () => {
     expect(resp.ok).toBe(true)
     expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBeUndefined()
   })
+})
+
+describe('ae-negative-55-phase', () => {
+  const { sessions, ok, save, make, finish, score, end, trade, feed } = audit55Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('E153 N1 actual harvest exchanges one stone for one food and one scored point while duplicate use rejects before one legal retry',()=>{const s=make('E153_StoneSculptor',st=>{st.players[0]!.resources.stone=2},true,4),p=feed(s),rejected=assertRejectedUnchanged(s,()=>trade(s,2)),r=finish(s,ok(trade(s,1)));assert.equal(r.state.players[0]!.resources.stone,1);assert.equal(r.state.players[0]!.resources.food,97);assert.equal(score(r,'E153_StoneSculptor'),1);save('E153-N1',{p,rejected,r})})
+  it('E153 N2 decline zero stone nonharvest and hand-only card cannot earn a Stone Sculptor point',()=>{for(const mode of['decline','stone','round','hand']){const s=make('E153_StoneSculptor',st=>{if(mode==='stone'||mode==='hand'){st.players[0]!.resources.food=3;st.players[0]!.resources.grain=1;}st.players[0]!.resources.stone=mode==='stone'?0:1},mode!=='hand',mode==='round'?5:4),initial=mode==='round'?end(s):feed(s);let rejected:SessionResponse|undefined;if(mode!=='round'){assert.ok(initial.interaction.stateId==='wait'&&initial.interaction.request.kind==='feed');const recipes=(initial.interaction.request.exchangeCatalog??[]).filter(recipe=>recipe.sourceId==='E153_StoneSculptor');if(mode==='hand')assert.deepEqual(recipes,[]);if(mode==='stone'){assert.ok((initial.interaction.request.exchangeCatalog??[]).some(recipe=>recipe.from.grain===1&&recipe.to.food===1));assert.equal(initial.state.players[0]!.resources.stone,0);assert.ok(recipes.length<=1);if(recipes.length){assert.equal(recipes[0]!.from.stone,1);assert.equal(Math.min(recipes[0]!.max??Infinity,initial.state.players[0]!.resources.stone),0);}rejected=assertRejectedUnchanged(s,()=>trade(s,1));}}const r=finish(s,initial,false,mode==='round'?'E153_StoneSculptor':undefined);assert.equal(score(r,'E153_StoneSculptor'),0);assert.equal(r.state.players[0]!.resources.grain,mode==='stone'||mode==='hand'?1:0);assert.equal(r.state.players[0]!.resources.stone,mode==='stone'?0:1);save(`E153-N2-${mode}`,{initial,rejected,r})}})
 })

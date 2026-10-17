@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, newbornCount } from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, newbornCount, familySize } from '../../shared/domain/player'
 import { E030_ChildsToy } from '../../shared/cards/E/E030_ChildsToy'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { ActionChoiceOption } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'E030_ChildsToy'
 
@@ -242,4 +244,36 @@ describe('E030_ChildsToy session', () => {
       expect(session.withCtx(() => meetsCardPrerequisites(player, E030_ChildsToy, state.round, state))).toBe(true)
     })
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, choose, finish, ready, fill, end, final, minor, purchase, rejectBuy, undo, resource, points, house, newborn } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("E030 N1 real purchases accept either one wood or one clay with exactly two adults and retain the unused alternative", () => { for (const mode of ['wood', 'clay', 'bothwood', 'bothclay']) {
+      const s = make('E030_ChildsToy', st => { Object.assign(st.players[0]!.resources, { wood: mode === 'clay' ? 0 : 1, clay: mode === 'wood' ? 0 : 1 }); }, false), p = minor(s), r = finish(s, choose(s, 0, 'E030_ChildsToy'), true, [mode.endsWith('clay') || mode === 'clay' ? '"clay":1' : '"wood":1']), u = undo(s);
+      resource(r, { wood: mode === 'bothclay' ? 1 : 0, clay: mode === 'bothwood' ? 1 : 0 });
+      assert.equal(points(r, 'E030_ChildsToy'), 2);
+      assert.ok(u.state.players[0]!.minorHand.includes('E030_ChildsToy'));
+      save(`E030-N1-${mode}`, { p, r, u });
+  } ; const s = make('E030_ChildsToy', st => { st.players[0]!.resources.wood = 1; }, false, 14); purchase(s, 'E030_ChildsToy'); const scored = final(s); assert.equal(points(scored, 'E030_ChildsToy'), 2); save('E030-N1-final', scored); });
+  it("E030 N2 three or four genuine adults reject purchase while two adults plus a real newborn permit it", () => { for (const n of [3, 4]) {
+      const s = make('E030_ChildsToy', st => { house(st.players[0]!, n); setActiveWorkerCount(st.players[0]!, n); st.players[0]!.resources.wood = 1; }, false, 7);
+      save(`E030-N2-${n}`, rejectBuy(s, 'E030_ChildsToy'));
+  } const s = make('E030_ChildsToy', st => { house(st.players[0]!, 3); st.players[0]!.resources.wood = 1; }, false, 7), grown = newborn(s); fill(s); ready(s); const r = purchase(s, 'E030_ChildsToy'); assert.equal(newbornCount(r.state.players[0]!), 1); assert.equal(familySize(r.state.players[0]!), 3); resource(r, { wood: 0 }); save('E030-N2-newborn', { grown, r }); });
+  it("E030 N3 genuine round-seven newborn needs six food and declining grain conversion causes one begging while held and nonharvest controls do not", () => { for (const [held, round] of [[false, 7], [true, 7], [false, 5]] satisfies Array<[
+      boolean,
+      number
+  ]>) {
+      const s = make('E030_ChildsToy', st => { house(st.players[0]!, 3); st.players[0]!.resources.food = 5; st.players[0]!.resources.grain = 1; }, !held, round), grown = newborn(s), p = end(s, false, [], undefined, 'feed');
+      save(`E030-N3-${held}-${round}-feeding`, { grown, p });
+      if (!held && round === 7) {
+          assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'feed');
+          assert.equal(p.interaction.request.remaining, 1);
+          assert.equal(p.interaction.request.foodUsed, 5);
+          assert.ok(p.interaction.request.exchangeCatalog?.some(e => e.from.grain === 1 && e.to.food === 1));
+      }
+      const r = finish(s, p, false);
+      resource(r, { food: round === 5 ? 5 : 0, grain: 1, begging: !held && round === 7 ? 1 : 0 });
+      save(`E030-N3-${held}-${round}`, { grown, p, r });
+  } });
 })

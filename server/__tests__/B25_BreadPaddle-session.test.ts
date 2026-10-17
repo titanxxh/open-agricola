@@ -1,7 +1,7 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import '../../shared/cards/A/A125_Priest'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -11,6 +11,9 @@ import '../../shared/cards/B/B025_BreadPaddle'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit19Occupations from './_helpers/audit/ae-negative-19-occupations'
 
 const CARD_ID = 'B025_BreadPaddle'
 
@@ -293,4 +296,13 @@ describe('B025 Bread Paddle parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
     expect(response.interaction.stateId === 'wait' && response.interaction.sourceCard === CARD_ID).toBe(false)
   })
+})
+
+describe('ae-negative-19-occupations', () => {
+  const { PADDLE, OCC, sessions, save, ok, turn, buy, choose, occupation, paddle } = audit19Occupations
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B025 N1 actual one wood purchase adds exactly one food and no immediate baking',()=>{const s=paddle(false),{pending,r}=buy(s,PADDLE);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,21);assert.equal(r.state.players[0]!.resources.grain,1);assertRejectedUnchanged(s,()=>s.resolveChoice(0,PADDLE));save('B025-N1',{pending,r})})
+  it('B025 N2 real occupation offers one optional bake using one grain for two food and decline keeps grain',()=>{for(const accept of[true,false]){const s=paddle(),pending=occupation(s,turn(s,0,'lessons')),r=choose(s,pending,accept);assert.ok(r.state.players[0]!.occupationPlayed.includes(OCC));assert.equal(r.state.players[0]!.resources.grain,accept?0:1);assert.equal(r.state.players[0]!.resources.food,accept?22:20);if(accept)assert.equal(r.state.log.filter(e=>e.key==='log.bakeBread').length,1);save(`B025-N2-${accept}`,{pending,r})}})
+  it('B025 N3 hand opponent occupation missing grain and missing oven cannot create bread food',()=>{for(const mode of['hand','opponent','grain','oven']){const s=paddle(mode!=='hand',mode==='grain'?0:1,mode!=='oven');let pending:SessionResponse;if(mode==='opponent'){turn(s,0,'day-laborer');pending=occupation(s,turn(s,1,'lessons'),1)}else pending=occupation(s,turn(s,0,'lessons'));const r=choose(s,pending,false);assert.equal(r.state.players[0]!.resources.grain,mode==='grain'?0:1);assert.equal(r.state.players[0]!.resources.food,mode==='opponent'?22:20);save(`B025-N3-${mode}`,{pending,r})}})
+  it('B025 N4 whole first occupation and bread undo restores grain food and occupation then retry once',()=>{const s=paddle();const first=choose(s,occupation(s,turn(s,0,'lessons'))),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.grain,1);assert.equal(undone.state.players[0]!.resources.food,20);assert.ok(undone.state.players[0]!.occupationHand.includes(OCC));const retry=choose(s,occupation(s,turn(s,0,'lessons')));assert.equal(retry.state.players[0]!.resources.grain,0);assert.equal(retry.state.players[0]!.resources.food,22);save('B025-N4',{first,undone,retry})})
 })

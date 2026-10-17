@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -13,6 +13,7 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
   workersAvailable,
+  familySize,
 } from '../../shared/domain/player'
 import { addSyntheticLinkedOccupancyRef, addWorkerRef, isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 
@@ -22,6 +23,9 @@ import '../../shared/cards/C/C023_JobContract'
 // one option (which would otherwise auto-resolve past the choice state the
 // tests need to observe).
 import '../../shared/cards/C/C057_Crudite'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit32Placement from './_helpers/audit/ae-negative-32-placement'
 
 const CARD_ID = 'C022_BasketChair'
 const FILLER_MINOR = 'C057_Crudite' // free-cost, no prerequisites
@@ -460,4 +464,12 @@ describe('C022_BasketChair session', () => {
     expect(remaining?.workerId).toBe('2')
     expect(isSyntheticLinkedOccupancy(remaining, { linkedWorkerId: '2' })).toBe(true)
   })
+})
+
+describe('ae-negative-32-placement', () => {
+  const { sessions, save, ok, make, choose, finish, ready, action, buy, accept, chair, firstChair } = audit32Placement
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('C022 N1 actual first placed adult is held after paying reed and another person immediately places without collecting the first resource twice', () => { const s = chair(), steps = firstChair(s), p = accept(s, steps.purchase, 'C022_BasketChair'); assert.equal(p.state.players[0]!.resources.reed, 0); assert.equal(getWorkerHeldOnCard(p.state.players[0]!, 'C022_BasketChair'), steps.first.state.actionSpaces.find(a => a.id === 'forest')!.takenBy[0]!.workerId); assert.equal(p.state.actionSpaces.find(a => a.id === 'forest')!.takenBy.length, 0); const placing = accept(s, p, 'C022_BasketChair'), r = finish(s, ok(s.resolveChoice(0, 'day-laborer'))); assert.deepEqual([r.state.players[0]!.resources.wood, r.state.players[0]!.resources.food], [3, 102]); assert.equal(r.state.actionSpaces.find(a => a.id === 'day-laborer')!.takenBy.length, 1); assert.equal(workersAvailable(r.state, r.state.players[0]!), 0); save('C022-N1', { steps, p, placing, r }); });
+  it('C022 N2 declining the recall and lacking reed preserve the actual first placement', () => { const s = chair(), steps = firstChair(s), r = finish(s, choose(s, steps.purchase, o => o.value === '__skip__')); assert.equal(getWorkerHeldOnCard(r.state.players[0]!, 'C022_BasketChair'), undefined); assert.equal(r.state.actionSpaces.find(a => a.id === 'forest')!.takenBy.length, 1); assert.equal(workersAvailable(r.state, r.state.players[0]!), 1); const t = chair(3, 0), poor = firstChair(t); assert.ok(poor.purchase.state.players[0]!.minorHand.includes('C022_BasketChair')); assertRejectedUnchanged(t, () => t.resolveChoice(0, 'C022_BasketChair')); assert.equal(poor.purchase.state.actionSpaces.find(a => a.id === 'forest')!.takenBy.length, 1); save('C022-N2', { steps, r, poor }); });
+  it('C022 N3 first Meeting Place cannot recall and a real growth newborn remains on its space when the first adult is recalled', () => { const s = chair(2), own = finish(s, buy(s, 'C022_BasketChair')); assert.equal(getWorkerHeldOnCard(own.state.players[0]!, 'C022_BasketChair'), undefined); assert.equal(own.state.actionSpaces.find(a => a.id === 'meeting-place')!.takenBy.length, 1); const q = make('C022_BasketChair', false, state => { state.players[0]!.rooms = 3; state.players[0]!.roomTiles.push({ row: 1, col: 1 }); state.players[0]!.resources.reed = 1; state.players[0]!.minorHand = ['C022_BasketChair', 'C016_FieldFences']; }), growth = action(q, 0, 'wish-children'); assert.equal(familySize(growth.state.players[0]!), 3); assert.ok(growth.state.players[0]!.minorHand.includes('C022_BasketChair')); action(q, 1, 'grain-seeds'); ready(q); const purchase = buy(q, 'C022_BasketChair'), recalled = finish(q, accept(q, purchase, 'C022_BasketChair')), refs = recalled.state.actionSpaces.find(a => a.id === 'wish-children')!.takenBy; assert.equal(refs.length, 1); assert.equal(recalled.state.players[0]!.workers.find(w => w.id === refs[0]!.workerId)!.isNewborn, true); assert.ok(getWorkerHeldOnCard(recalled.state.players[0]!, 'C022_BasketChair')); save('C022-N3', { own, growth, purchase, recalled }); });
 })

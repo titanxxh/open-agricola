@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 
 import '../../shared/cards/C/C004_WritingBoards'
 
 import { GameSession } from '../game/authoritative-session'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit23Purchase from './_helpers/audit/ae-negative-23-purchase'
 
 const CARD_ID = 'C004_WritingBoards'
 
@@ -83,4 +86,13 @@ describe('C004_WritingBoards session', () => {
       expect(response.scores[0]!.total).toBe(scoreBefore)
     },
   )
+})
+
+describe('ae-negative-23-purchase', () => {
+  const { BOARDS, sessions, save, ok, ready, finish, menu, buy, prepare } = audit23Purchase
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C004 N1 actual paid passing purchase counts zero one or three own played occupations only',()=>{for(const count of[0,1,3]){const s=prepare(BOARDS,count),{pending,r}=buy(s,BOARDS);assert.equal(r.state.players[0]!.resources.food,99);assert.equal(r.state.players[0]!.resources.wood,count);assert.equal(r.state.players[1]!.resources.wood,0);assert.equal(r.state.players[0]!.occupationPlayed.length,count);assert.equal(r.state.players[0]!.minorPlayed.length,1);assert.ok(r.state.log.length>pending.state.log.length);save(`C004-N1-${count}`,{pending,r})}})
+  it('C004 N2 no food rejects before a real free passing alternative without occupation wood',()=>{const s=prepare(BOARDS,3,0,'wood',0,0),pending=menu(s),rejected=assertRejectedUnchanged(s,()=>s.resolveChoice(0,BOARDS)),legal=finish(s,ok(s.resolveChoice(0,'B004_WoodPile')));assert.equal(legal.state.players[0]!.resources.wood,0);assert.ok(legal.state.players[0]!.minorHand.includes(BOARDS));save('C004-N2',{pending,rejected,legal})})
+  it('C004 N3 whole purchase undo restores food wood and passing hands then awards once on replay',()=>{const s=prepare(BOARDS,3),{pending,r}=buy(s,BOARDS),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.players[0]!.resources.wood,0);assert.ok(undone.state.players[0]!.minorHand.includes(BOARDS));assert.ok(!undone.state.players[1]!.minorHand.includes(BOARDS));const retry=buy(s,BOARDS).r;assert.equal(retry.state.players[0]!.resources.wood,3);assert.equal(retry.state.players[0]!.resources.food,99);save('C004-N3',{pending,r,undone,retry})})
+  it('C004 N4 real first Lessons occupation then later purchase includes that played occupation and excludes hand occupations',()=>{const s=prepare(BOARDS);const occupation=finish(s,ok(s.takeAction(0,'lessons')));assert.ok(occupation.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'));ready(s);finish(s,ok(s.takeAction(1,'grain-seeds')));const{pending,r}=buy(s,BOARDS);assert.equal(r.state.players[0]!.resources.wood,1);save('C004-N4',{occupation,pending,r})})
 })

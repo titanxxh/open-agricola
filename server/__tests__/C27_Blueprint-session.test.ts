@@ -1,5 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { PaymentSolver } from '../../shared/actions/payment'
 import {
@@ -15,6 +15,10 @@ import {
 } from '../../shared/cards/card-listeners'
 import '../../shared/cards/C/C027_Blueprint'
 import '../../shared/cards/B/B131_Equipper'
+import assert from 'node:assert/strict'
+import type { Resource } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit33Native from './_helpers/audit/ae-negative-33-native'
 
 const CARD_ID = 'C027_Blueprint'
 const ROUTING_LISTENER_ID = 'C27-blueprint-compute-choice-candidates'
@@ -229,4 +233,34 @@ describe('C027_Blueprint session — minor-improvement routing for 3 majors', ()
 
     expect(extras.some((option) => option.value === 'Major_Joinery')).toBe(false)
   })
+})
+
+describe('ae-negative-33-native', () => {
+  const { sessions, traces, save, make, take, choose, opts, finish, minor, purchase, undo, resource, major, ownMajor } = audit33Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C027 N1 real purchase and all three literal minor-action workshops pay one less stone", () => { const b = make('C027_Blueprint', undefined, false), bought = purchase(b, 'C027_Blueprint'), u = undo(b); resource(bought, { food: 99 }); resource(u, { food: 100 }); for (const [id, good] of [['Major_Joinery', 'wood'], ['Major_Pottery', 'clay'], ['Major_Basket', 'reed']] satisfies Array<[
+      string,
+      keyof Resource
+  ]>) {
+      const s = make('C027_Blueprint', st => { st.players[0]!.resources[good] = 2; st.players[0]!.resources.stone = 1; }), p = minor(s), o = opts(p).find(o => o.value === id);
+      assert.ok(o);
+      const r = finish(s, choose(s, 0, o.value));
+      resource(r, { [good]: 0, stone: 0 });
+      assert.ok(r.state.players[0]!.improvements.includes(id));
+      save(`C027-N1-${good}`, { bought, u, p, r });
+  } });
+  it("C027 N2 hand missing stone nonlisted or unavailable major rejects without a discounted purchase", () => { for (const mode of ['hand', 'stone', 'owned', 'nonlisted']) {
+      const s = make('C027_Blueprint', st => { Object.assign(st.players[0]!.resources, { wood: 2, stone: mode === 'stone' ? 0 : 1, clay: 2 }); if (mode === 'owned')
+          ownMajor(st, 'Major_Joinery', 1); }, mode !== 'hand'), p = minor(s), id = mode === 'nonlisted' ? 'Major_Fireplace1' : 'Major_Joinery';
+      assert.equal(opts(p).some(o => o.value === id && !('disabled' in o && o.disabled)), false);
+      const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, id)), r = finish(s, choose(s, 0, 'B004_WoodPile'));
+      assert.ok(!r.state.players[0]!.improvements.includes(id));
+      save(`C027-N2-${mode}`, { p, bad, r });
+  } const s = make('C027_Blueprint', st => Object.assign(st.players[0]!.resources, { clay: 2, stone: 2 })), r = finish(s, major(s, 'Major_Fireplace1')); resource(r, { clay: 0, stone: 2 }); save('C027-N2-normalMajor', r); });
+  it("C027 N3 a real Equipper card-derived minor ability excludes affordable Blueprint majors", () => { const s = make('C027_Blueprint', st => { st.players[0]!.occupationPlayed = ['B131_Equipper']; st.players[0]!.minorHand = ['C013_WoodSlideHammer', 'B004_WoodPile', 'A006_StorageBarn']; st.players[0]!.resources.stone = 1; st.actionSpaces.find(x => x.id === 'forest')!.resources.wood = 3; }, true, 5, 3); let p = take(s, 0, 'forest'); for (let n = 0; n < 8 && !opts(p).some(o => o.value === 'C013_WoodSlideHammer'); n++) {
+      assert.ok(p.interaction.stateId === 'wait');
+      const o = opts(p).find(o => o.value !== '__skip__' && o.value !== '__pass__');
+      assert.ok(o);
+      p = choose(s, 0, o.value);
+  } assert.equal(opts(p).some(o => o.value === 'Major_Joinery'), false); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Joinery')), r = finish(s, choose(s, 0, 'C013_WoodSlideHammer'), false); resource(r, { wood: 2, stone: 1 }); assert.ok(r.state.players[0]!.minorPlayed.includes('C013_WoodSlideHammer')); save('C027-N3', { p, bad, r }); });
 })

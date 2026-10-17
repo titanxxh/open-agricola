@@ -1,13 +1,16 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C163_MaterialDeliveryman'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit57Resources from './_helpers/audit/ae-negative-57-resources'
 
 const CARD_ID = 'C163_MaterialDeliveryman'
 
@@ -290,5 +293,46 @@ describe('C163_MaterialDeliveryman', () => {
     } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('ae-negative-57-resources', () => {
+  const { sessions, ok, save, make, finish, ready, buildings } = audit57Resources
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('C163 N1 actual owner or opponent Forest collection at four five six seven eight and nine goods grants exact single threshold resource', () => {
+    for (const actor of [0, 1]) for (const amount of [4, 5, 6, 7, 8, 9]) {
+      const session = make('C163_MaterialDeliveryman', state => { state.currentPlayerIndex = actor; state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = amount })
+      const response = finish(session, ok(session.takeAction(actor, 'forest')))
+      const expected = { wood: actor === 0 ? amount : 0, clay: 0, reed: 0, stone: 0 }
+      if (amount === 5) expected.wood++
+      if (amount === 6) expected.clay++
+      if (amount === 7) expected.reed++
+      if (amount >= 8) expected.stone++
+      assert.deepEqual(buildings(response), expected)
+      if (actor === 1) assert.equal(response.state.players[1]!.resources.wood, amount)
+      assert.equal(response.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood, 0)
+      save(`C163-N1-${actor}-${amount}`, response)
+    }
+  })
+  it('C163 N2 in-hand card and nonaccumulating Day Laborer cannot grant threshold building resources', () => {
+    const hand = make('C163_MaterialDeliveryman', state => { state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 8 }, false)
+    const handResponse = finish(hand, ok(hand.takeAction(0, 'forest')))
+    assert.deepEqual(buildings(handResponse), { wood: 8, clay: 0, reed: 0, stone: 0 })
+    const unrelated = make('C163_MaterialDeliveryman'), control = finish(unrelated, ok(unrelated.takeAction(0, 'day-laborer')))
+    assert.deepEqual(buildings(control), { wood: 0, clay: 0, reed: 0, stone: 0 })
+    assert.equal(control.state.players[0]!.resources.food, 102)
+    save('C163-N2', { handResponse, control })
+  })
+  it('C163 N3 occupied accumulation rejection cannot repeat threshold reward and whole collection undo restores original pile', () => {
+    const session = make('C163_MaterialDeliveryman', state => { state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 7 })
+    const response = finish(session, ok(session.takeAction(0, 'forest'))), undone = ok(session.undoAction())
+    assert.deepEqual(buildings(response), { wood: 7, clay: 0, reed: 1, stone: 0 })
+    assert.deepEqual(buildings(undone), { wood: 0, clay: 0, reed: 0, stone: 0 })
+    assert.equal(undone.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood, 7)
+    const replay = finish(session, ok(session.takeAction(0, 'forest')))
+    ready(session)
+    const rejected = assertRejectedUnchanged(session, () => session.takeAction(1, 'forest'))
+    assert.deepEqual(buildings(replay), { wood: 7, clay: 0, reed: 1, stone: 0 })
+    save('C163-N3', { response, undone, replay, rejected })
   })
 })

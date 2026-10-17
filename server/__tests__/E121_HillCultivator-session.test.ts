@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E121_HillCultivator'
+import * as audit50Cards from './_helpers/audit/ae-negative-50-cards'
 
 const CARD_ID = 'E121_HillCultivator'
 const FILLER = '__test_placeholder__'
@@ -83,4 +84,11 @@ describe('E121 Hill Cultivator parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 0 })
   })
+})
+
+describe('ae-negative-50-cards', () => {
+  const { sessions, save, ok, make, finish, ready, resources } = audit50Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E121 N1 Grain Seeds gives exactly two clay and Vegetable Seeds gives exactly three clay', () => { for (const [space, crop, clay] of [['grain-seeds', 'grain', 2], ['vegetable-seeds', 'vegetable', 3]] as const) { const s = make('E121_HillCultivator', undefined, true, 14), r = finish(s, ok(s.takeAction(0, space))); resources(r, { [crop]: 1, clay }); save(`E121-N1-${crop}`, r) } })
+  it('E121 N2 nonseed owner and actual opponent seed or hand-only Vegetable Seeds never grant clay', () => { const s = make('E121_HillCultivator'), a = finish(s, ok(s.takeAction(0, 'day-laborer'))); ready(s); const r = finish(s, ok(s.takeAction(1, 'grain-seeds'))); resources(r, { food: 102, clay: 0 }); resources(r, { grain: 1, clay: 0 }, 1); const c = make('E121_HillCultivator', undefined, false, 14), cr = finish(c, ok(c.takeAction(0, 'vegetable-seeds'))); resources(cr, { vegetable: 1, clay: 0 }); save('E121-N2', { a, r, cr }) })
 })

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/domain/player'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/C/C129_SecondSpouse'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 /**
  * Helper: occupy a space with a player's worker and record it as their Nth round placement.
@@ -228,5 +231,41 @@ describe('C129 Second Spouse parity', () => {
     const response = session.takeAction(0, 'urgent-wish-children')
     expect(response.ok).toBe(false)
     expect(familySize(response.state.players[0]!)).toBe(2)
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, save, setup, finish, next, take, move } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C129 N1 genuine opponent first placement permits occupied Urgent Wish while preserving real placement history', () => { const s = setup('C129_SecondSpouse', 14, state => state.currentPlayerIndex = 1); move(s, 'urgent-wish-children'); next(s); finish(s, take(s, 'forest')); next(s); const r = finish(s, take(s, 'urgent-wish-children')); assert.equal(familySize(r.state.players[0]!), 3); assert.equal(familySize(r.state.players[1]!), 3); assert.equal(r.state.actionSpaces.find(a => a.id === 'urgent-wish-children')!.takenBy.length, 4); save('C129-N1', r); })
+  it('C129 N2 opponent second own first and hand-only occupations cannot bypass occupied Urgent Wish', () => {
+    for (const mode of ['second', 'self', 'hand']) {
+      const s = setup('C129_SecondSpouse', 14, state => {
+        if (mode === 'second')
+          state.currentPlayerIndex = 1
+        if (mode === 'hand') {
+          state.players[0]!.occupationPlayed = []
+          state.players[0]!.occupationHand = ['C129_SecondSpouse']
+        }
+      })
+      if (mode === 'second') {
+        for (const space of ['grain-seeds', 'forest', 'clay-pit', 'urgent-wish-children', 'reed-bank']) {
+          move(s, space)
+        }
+        next(s)
+      }
+      else {
+        move(s, mode === 'self' ? 'urgent-wish-children' : 'grain-seeds')
+        next(s)
+        finish(s, take(s, mode === 'self' ? 'forest' : 'urgent-wish-children'))
+        next(s)
+        finish(s, take(s, 'clay-pit'))
+        next(s)
+      }
+      assertRejectedUnchanged(s, () => s.takeAction(0, 'urgent-wish-children'))
+      const r = finish(s, take(s, mode === 'second' ? 'day-laborer' : 'reed-bank'))
+      assert.equal(familySize(r.state.players[0]!), mode === 'self' ? 3 : 2)
+      save(`C129-N2-${mode}`, r)
+    }
   })
 })

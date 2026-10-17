@@ -1,13 +1,16 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B146_Illusionist'
 import { getActionDefinition } from '../../shared/actions/index'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit29Exchanges from './_helpers/audit/ae-negative-29-exchanges'
 
 const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
 
@@ -385,4 +388,12 @@ describe('discard-from-hand action', () => {
     ))
     expect(result.type).toBe('fail')
   })
+})
+
+describe('ae-negative-29-exchanges', () => {
+  const { sessions, save, ok, finish, action, pending, choose, illusion } = audit29Exchanges
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
+  it('B146 N1 real discard rejects a played card and discards exactly one hand card before receiving one extra wood', () => { const s = illusion(), p = pending(s, ok(s.takeAction(0, 'forest')), 'B146_Illusionist'), accepted = choose(s, p, o => o.value !== '__skip__'), bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'occ:B146_Illusionist')), r = finish(s, ok(s.resolveChoice(0, 'occ:A116_WoodCutter'))); assert.equal(r.state.players[0]!.resources.wood, 4); assert.deepEqual(r.state.players[0]!.occupationHand, []); assert.deepEqual(r.state.players[0]!.minorHand, ['C004_WritingBoards']); assert.ok(r.state.players[0]!.occupationPlayed.includes('B146_Illusionist')); save('B146-N1', { p, accepted, bad, r }); });
+  it('B146 N2 decline and Lantern House preserve the actual hand without bonus wood', () => { const s = illusion(), p = pending(s, ok(s.takeAction(0, 'forest')), 'B146_Illusionist'), decline = finish(s, choose(s, p, o => o.value === '__skip__')); assert.equal(decline.state.players[0]!.resources.wood, 3); assert.deepEqual(decline.state.players[0]!.occupationHand, ['A116_WoodCutter']); const t = illusion(true, true), blocked = action(t, 0, 'forest'); assert.equal(blocked.state.players[0]!.resources.wood, 3); assert.deepEqual(blocked.state.players[0]!.occupationHand, ['A116_WoodCutter']); save('B146-N2', { p, decline, blocked }); });
+  it('B146 N3 held Illusionist actual opponent wood and food accumulation cannot discard the owner hand', () => { const s = illusion(false), hand = action(s, 0, 'forest'); assert.equal(hand.state.players[0]!.resources.wood, 3); const t = illusion(), first = action(t, 0, 'grain-seeds'), opponent = action(t, 1, 'forest'); assert.equal(opponent.state.players[1]!.resources.wood, 3); assert.deepEqual(opponent.state.players[0]!.occupationHand, ['A116_WoodCutter']); const q = illusion(), food = action(q, 0, 'fishing'); assert.deepEqual(food.state.players[0]!.occupationHand, ['A116_WoodCutter']); save('B146-N3', { hand, first, opponent, food }); });
 })

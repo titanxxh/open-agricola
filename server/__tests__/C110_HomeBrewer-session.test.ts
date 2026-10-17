@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C110_HomeBrewer'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'C110_HomeBrewer'
 const FILLER = '__test_placeholder__'
@@ -150,5 +152,50 @@ describe('C110 Home Brewer parity', () => {
     const response = resolveHomeBrewer(session, session.performRoundEnd(), 'food')
 
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 19 })
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, options, gains, points, save, setup, choose, source, finish, completeRound, grainField, bonus } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C110 N1 actual harvest chooses exactly one grain for three food or one scored point and may decline', () => {
+    for (const mode of ['food', 'vp', 'decline']) {
+      const s = setup('C110_HomeBrewer', 4, state => state.players[0]!.resources.grain = 2)
+      let r = completeRound(s)
+      r = source(s, r, 'C110_HomeBrewer')
+      assert.ok(options(r).some(o => gains(o, 'food') === 3))
+      if (mode === 'decline')
+        r = finish(s, r)
+      else
+        r = choose(s, r, o => mode === 'food' ? gains(o, 'food') === 3 : points(o) === 1)
+      r = finish(s, r)
+      assert.equal(r.state.round, 5)
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'decline' ? 2 : 1)
+      assert.equal(r.state.players[0]!.resources.food, mode === 'food' ? 20 : 17)
+      assert.equal(bonus(r, 'C110_HomeBrewer'), mode === 'vp' ? 1 : 0)
+      save(`C110-N1-${mode}`, r)
+    }
+  })
+  it('C110 N2 freshly reaped grain is usable but no grain and a nonharvest round cannot brew', () => {
+    for (const mode of ['reap', 'empty', 'nonharvest']) {
+      const s = setup('C110_HomeBrewer', mode === 'nonharvest' ? 5 : 4, state => {
+        if (mode === 'reap')
+          grainField(state, 1)
+        if (mode === 'nonharvest')
+          state.players[0]!.resources.grain = 1
+      })
+      let r = completeRound(s)
+      if (mode === 'reap') {
+        r = source(s, r, 'C110_HomeBrewer')
+        r = choose(s, r, o => gains(o, 'food') === 3)
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.grain, mode === 'nonharvest' ? 1 : 0)
+      assert.equal(r.state.players[0]!.resources.food, mode === 'reap' ? 20 : mode === 'empty' ? 17 : 21)
+      assert.equal(bonus(r, 'C110_HomeBrewer'), 0)
+      if (mode === 'reap')
+        assert.equal(r.state.players[0]!.fields[0]!.stacks.length, 0)
+      save(`C110-N2-${mode}`, r)
+    }
   })
 })

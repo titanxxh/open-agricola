@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -7,6 +7,9 @@ import type { DraftGameEvent } from '../../shared/contract/events'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { A048_ShavingHorse_impl } from '../../shared/cards/A/A048_ShavingHorse'
 import '../../shared/cards/A/A048_ShavingHorse'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit08Fields from './_helpers/audit/ae-negative-08-fields'
 
 const CARD_ID = 'A048_ShavingHorse'
 const AFTER_OBTAIN = A048_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-obtain')!
@@ -405,5 +408,24 @@ describe('A048_ShavingHorse session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(3)
+  })
+})
+
+describe('ae-negative-08-fields', () => {
+  const { HORSE, BASE, sessions, ok, setup, options, choose, buy, deny, turn, cardFlow, goods, forest } = audit08Fields
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A048 N1 actual printed one wood purchase cannot trigger without obtained wood', () => { deny(setup(HORSE), HORSE); const r = buy(setup(HORSE, { resources: { wood: 7 } }), HORSE); assert.deepEqual(goods(r), [6, 40]) })
+  it('A048 N2 actual Forest reaches four five six with optional accept and decline', () => {
+   const low = forest(1); assert.deepEqual(goods(turn(low, 0, 'forest')), [4, 40])
+   for (const initial of [2, 3]) for (const accept of [true, false]) { const s = forest(initial); const r = cardFlow(s, turn(s, 0, 'forest'), HORSE, accept); assert.deepEqual(goods(r), [initial + 3 - Number(accept), 40 + 3 * Number(accept)]) }
+  })
+  it('A048 N3 reaching seven and eight automatically exchanges exactly one wood', () => { for (const initial of [4, 5]) { const s = forest(initial); const r = cardFlow(s, turn(s, 0, 'forest'), HORSE); assert.deepEqual(goods(r), [initial + 2, 43]); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-next-player') } })
+  it('A048 N4 one large ten wood obtain causes only one exchange', () => { const s = forest(0, 10); assert.deepEqual(goods(cardFlow(s, turn(s, 0, 'forest'), HORSE)), [9, 43]) })
+  it('A048 N5 large owner stock without new wood and opponent wood do not trigger', () => { const s = forest(8); let r = turn(s, 0, 'grain-seeds'); assert.deepEqual(goods(r), [8, 40]); r = turn(s, 1, 'forest'); assert.deepEqual(goods(r), [8, 40]); assert.equal(r.state.players[1]!.resources.wood, 3) })
+  it('A048 N6 real Baseboards purchase wood gain triggers away from accumulation space', () => { const s = setup(BASE, { resources: { wood: 5 } }, state => { state.players[0]!.minorPlayed = [HORSE] }); const r = cardFlow(s, buy(s, BASE), HORSE); assert.deepEqual(goods(r), [6, 41]); assert.ok(!r.state.players[0]!.minorHand.includes(BASE)) })
+  it('A048 N7 actual fencing wood payment cannot trigger or recurse', () => { const s = forest(9); const r = turn(s, 0, 'fencing'); assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select'); const after = ok(s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'] })); assert.deepEqual(goods(after), [5, 40]); assert.equal(after.state.players[0]!.fenceSegments.length, 4) })
+  it('A048 N8 invalid wrong actor stale exchange and whole obtain undo allow one retry', () => {
+   const s = forest(2); const before = undoRuleSnapshot(s.getState()); let r = turn(s, 0, 'forest'); if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') r = choose(s, r, o => o.value === HORSE)
+   const choice = options(r).find(o => o.value !== '__skip__'); assert.ok(choice); assertRejectedUnchanged(s, () => s.resolveChoice(1, choice.value)); assertRejectedUnchanged(s, () => s.resolveChoice(0, 'invalid-horse-exchange')); r = ok(s.resolveChoice(0, choice.value)); assert.deepEqual(goods(r), [4, 43]); assertRejectedUnchanged(s, () => s.resolveChoice(0, choice.value)); assertUndoRestored(before, s.undoAction()); assert.deepEqual(goods(cardFlow(s, turn(s, 0, 'forest'), HORSE)), [4, 43])
   })
 })

@@ -1,6 +1,6 @@
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { getCardEffect, getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
@@ -8,6 +8,9 @@ import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/
 
 import '../../shared/cards/D/D102_SampleStableMaker'
 import '../../shared/cards/B/B085_FarmHand'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit03Stables from './_helpers/audit/ae-negative-03-stables'
 
 const CARD_ID = 'D102_SampleStableMaker'
 const FIELD_EFFECT = 'sample-stable-maker-return'
@@ -207,5 +210,66 @@ describe('D102_SampleStableMaker card effect', () => {
     }))
 
     expect(withActiveRegistry(ruleRegistry, () => getAvailableStableSupplyCount(state, player))).toBe(1)
+  })
+})
+
+describe('ae-negative-03-stables', () => {
+  const { D102, sessions, ok, setup, choose, turn, returnWindow, returnSelection, makerGoods } = audit03Stables
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  describe('Sample Stable Maker negative audit', () => {
+    it('D102 N1 real return gains once and offers only a minor improvement', () => {
+      const s = setup({ card: D102, round: 5, stableCount: 2, resources: { clay: 2, stone: 2 } })
+      const before = returnSelection(s)
+      const baseline = makerGoods(before)
+      let r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+      assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.sourceCard === D102)
+      assert.ok(r.interaction.allowedCommands.includes('undoStep'))
+      const undone = ok(s.undoStep())
+      assert.deepEqual(makerGoods(undone), baseline)
+      assert.ok(undone.interaction.stateId === 'wait' && undone.interaction.request.kind === 'selection')
+      r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+      assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+      r = choose(s, r, o => o.value !== '__skip__')
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, 'Major_Pottery'))
+      if (!r.state.players[0]!.minorPlayed.includes('D076_SocialBenefits')) r = ok(s.resolveChoice(0, 'D076_SocialBenefits'))
+      assert.ok(r.state.players[0]!.minorPlayed.includes('D076_SocialBenefits'))
+      assert.equal(r.state.players[0]!.resources.reed, 1)
+    })
+    it('D102 N2 nonexistent stable cannot grant exchange goods', () => {
+      const s = setup({ card: D102, round: 5, stableCount: 2 })
+      const r = returnSelection(s)
+      const baseline = makerGoods(r)
+      const bad = s.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] })
+      const outcome = { accepted: bad.ok, ...makerGoods(bad) }
+      if (!bad.ok) {
+        assert.deepEqual(makerGoods(bad), baseline)
+        const good = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+        assert.deepEqual(makerGoods(good), { stables: 1, wood: 1, grain: 2, food: 41 })
+      }
+      assertRuleOutcome(outcome, { accepted: false, stables: 2, wood: 0, grain: 1, food: 40 })
+    })
+    it('D102 N3 duplicate or two stable selection is rejected before one legal return', () => {
+      const s = setup({ card: D102, round: 5, stableCount: 2 })
+      returnSelection(s)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 1 }] }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }, { row: 0, col: 2 }] }))
+      const r = ok(s.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] }))
+      assert.deepEqual(makerGoods(r), { stables: 1, wood: 1, grain: 2, food: 41 })
+    })
+    it('D102 N4 declining a real return-home opportunity keeps both stables and all goods', () => {
+      const s = setup({ card: D102, round: 5, stableCount: 2 })
+      const r = choose(s, returnWindow(s), o => o.value === '__skip__')
+      assert.deepEqual(makerGoods(r), { stables: 2, wood: 0, grain: 1, food: 40 })
+      assert.equal(r.state.round, 6)
+    })
+    it('D102 N5 no built stable offers no return-home exchange', () => {
+      const s = setup({ card: D102, round: 5 })
+      turn(s, 0, 'reed-bank'); turn(s, 1, 'forest'); turn(s, 0, 'grain-seeds')
+      const r = confirmNext(s, turn(s, 1, 'clay-pit'))
+      assert.equal(r.state.round, 6)
+      assert.deepEqual(makerGoods(r), { stables: 0, wood: 0, grain: 1, food: 40 })
+      assert.ok(r.interaction.stateId === 'idle')
+    })
   })
 })

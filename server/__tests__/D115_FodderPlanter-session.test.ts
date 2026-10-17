@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D115_FodderPlanter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit04Harvest from './_helpers/audit/ae-negative-04-harvest'
 
 const CARD_ID = 'D115_FodderPlanter'
 
@@ -158,5 +161,68 @@ describe('D115 Fodder Planter parity', () => {
     expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.resources.grain).toBe(2)
     expect(response.state.players[0]!.fields.every((field) => field.stacks.length === 0)).toBe(true)
+  })
+})
+
+describe('ae-negative-04-harvest', () => {
+  const { PLANTER, sessions, ok, options, nursery, breeding, arrange, sowMenu } = audit04Harvest
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  describe('Fodder Planter newborn-limited crop sow', () => {
+    it('D115 N1 actual first occupation play grants no work-phase crop or second activation', () => {
+      const s = nursery({ played: false, species: [] })
+      let r = ok(s.takeAction(0, 'lessons'))
+      if (!r.state.players[0]!.occupationPlayed.includes(PLANTER)) {
+        assert(options(r).some(o => o.value === PLANTER)); r = ok(s.resolveChoice(0, PLANTER))
+      }
+      assert(r.state.players[0]!.occupationPlayed.includes(PLANTER)); assert.equal(r.state.players[0]!.resources.food, 20)
+      assert.equal(r.state.players[0]!.resources.grain, 3); assert(r.state.players[0]!.fields.every(f => !f.stacks.length))
+      assertRejectedUnchanged(s, () => s.resolveChoice(0, PLANTER))
+    })
+    it('D115 N2 one housed newborn rejects excess fields noncrops and missing vegetables before legal sow', () => {
+      const s = nursery(); breeding(s); sowMenu(s, arrange(s), 1)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'grain' }, { row: 1, col: 2, crop: 'grain' }] }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'wood' }] }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'vegetable' }] }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 0, crop: 'grain' }] }))
+      const r = ok(s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'grain' }] }))
+      assert.equal(r.state.players[0]!.resources.grain, 2); assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 3 }], [], []])
+    })
+    it('D115 N3 two newborns reject a third field before mixed crop sow', () => {
+      const s = nursery({ species: ['sheep', 'boar'], grain: 2, vegetable: 1 }); breeding(s); sowMenu(s, arrange(s, 3, 3), 2)
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'grain' }, { row: 1, col: 2, crop: 'grain' }, { row: 1, col: 3, crop: 'vegetable' }] }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { crops: [{ row: 1, col: 1, crop: 'grain' }] }))
+      const r = ok(s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'grain' }, { row: 1, col: 2, crop: 'vegetable' }] }))
+      assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.resources.vegetable, 0)
+      assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 3 }], [{ kind: 'vegetable', remaining: 2 }], []])
+    })
+    it('D115 N3b duplicate sow coordinates represent at most one field and one seed', () => {
+      const s = nursery({ species: ['sheep', 'boar'], grain: 2 }); breeding(s); sowMenu(s, arrange(s, 3, 3), 2)
+      const r = s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'grain' }, { row: 1, col: 1, crop: 'grain' }] })
+      ok(r)
+      assert.equal(r.state.players[0]!.resources.grain, 1)
+      assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks), [[{ kind: 'grain', remaining: 3 }], [], []])
+    })
+    it('D115 N4 no newborn no seed or no field never plants a crop', () => {
+      const none = nursery({ species: [] }); for (const p of none.state.players) markAllWorkersUsed(none.state, p)
+      const noBirth = ok(none.performRoundEnd()); assert.equal(noBirth.state.round, 5); assert.equal(noBirth.interaction.stateId, 'idle')
+      for (const config of [{ grain: 0 }, { fields: 0 }]) {
+        const s = nursery(config); breeding(s); const r = arrange(s)
+        assert.equal(r.state.round, 5); assert.equal(r.interaction.stateId, 'idle'); assert(r.state.players[0]!.fields.every(f => !f.stacks.length))
+      }
+    })
+    it('D115 N5 a newborn without an accommodation slot grants no sow', () => {
+      const s = nursery({ stable: false }); breeding(s)
+      const r = arrange(s, 2, 0, true)
+      assert.equal(r.state.players[0]!.resources.sheep, 2); assert.equal(r.state.players[0]!.resources.cattle, 1)
+      assert.equal(r.state.round, 5); assert.equal(r.interaction.stateId, 'idle'); assert.equal(r.state.players[0]!.resources.grain, 3)
+    })
+    it('D115 N6 decline preserves crops and stale work-phase sow is rejected', () => {
+      const s = nursery(); breeding(s); const offered = arrange(s)
+      assert.equal(options(offered).some(o => o.value === '__skip__'), true)
+      const r = ok(s.resolveChoice(0, '__skip__'))
+      assert.equal(r.state.players[0]!.resources.grain, 3); assert(r.state.players[0]!.fields.every(f => !f.stacks.length))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { crops: [{ row: 1, col: 1, crop: 'grain' }] }))
+      assert.equal(r.state.round, 5)
+    })
   })
 })

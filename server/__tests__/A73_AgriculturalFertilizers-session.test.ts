@@ -1,10 +1,21 @@
 import { setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A073_AgriculturalFertilizers'
+import '../../shared/cards/A/A075_LumberMill'
+import '../../shared/cards/A/A079_GardenHoe'
+import '../../shared/cards/A/A020_DoubleTurnPlow'
+import '../../shared/cards/A/A115_ChiefForester'
+import '../../shared/cards/A/A071_ClearingSpade'
+import '../../shared/cards/A/A066_FeedingDish'
+import '../../shared/cards/A/A078_Canoe'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import { getUsedFarmyardTileKeys } from '../../shared/domain/farmyard-usage'
+import * as audit10FarmPaySow from './_helpers/audit/ae-negative-10-farm-pay-sow'
 
 const CARD_ID = 'A073_AgriculturalFertilizers'
 
@@ -254,4 +265,24 @@ describe('A073_AgriculturalFertilizers session', () => {
     )
     expect(a73Option).toBeUndefined()
   })
+})
+
+describe('ae-negative-10-farm-pay-sow', () => {
+  const { FERT, PLOW, sessions, scenario, setup, ok, res, opts, turn, close, complete, enter, purchase, buy, deny, farm, stable, fence, offeredSow, sow, stack, undo } = audit10FarmPaySow
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  scenario('A073 N1 a real pasture permits the free actual purchase',()=>{const r=buy(setup(FERT,{played:false,pastureCols:[4]}),FERT);assert.equal(res(r).wood,0);return{cardPlayed:true,woodPaid:0,pastureCount:1}})
+  scenario('A073 N2 no pasture rejects the forged purchase before a legal retry',()=>{const r=deny(setup(FERT,{played:false}),FERT);assert.equal(res(r).wood,0);return{unavailable:true,forgedRejected:true,legalRetryCompleted:true}})
+  scenario('A073 N3 two new stable spaces grant one additional Sow paying both crop seeds',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:4,grain:1,vegetable:1}});const before=getUsedFarmyardTileKeys(s.getState().state.players[0]!).size;let r=stable(s);assert.equal(getUsedFarmyardTileKeys(r.state.players[0]!).size-before,2);assert.equal(offeredSow(r),true);r=sow(s,r,[{row:0,col:1,crop:'grain'},{row:0,col:2,crop:'vegetable'}]);assert.equal(res(r).wood,0);assert.equal(res(r).grain,0);assert.equal(res(r).vegetable,0);assert.equal(stack(r,1),3);assert.equal(stack(r,2),2);return{woodPaid:4,newUsedSpaces:2,extraSowCount:1,grainPaid:1,vegetablePaid:1,grainStack:3,vegetableStack:2}})
+  scenario('A073 N4 one new stable space gives no additional Sow',()=>{const r=complete(stable(setup(FERT,{pastureCols:[4],resources:{wood:2,grain:1}}),[{row:1,col:1}]));assert.equal(offeredSow(r),false);assert.equal(res(r).wood,0);assert.equal(res(r).grain,1);return{newStableCount:1,extraSowCount:0,woodPaid:2,grain:1}})
+  scenario('A073 N5 two stables inside already used pasture give no additional Sow',()=>{const s=setup(FERT,{pastureCols:[3,4],resources:{wood:4,grain:1}});const before=getUsedFarmyardTileKeys(s.getState().state.players[0]!).size;const r=complete(stable(s,[{row:2,col:3},{row:2,col:4}]));assert.equal(getUsedFarmyardTileKeys(r.state.players[0]!).size-before,0);assert.equal(offeredSow(r),false);assert.equal(res(r).wood,0);return{stableCount:2,newUsedSpaces:0,extraSowCount:0,woodPaid:4}})
+  scenario('A073 N6 declining the granted Sow preserves both seeds',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:4,grain:1,vegetable:1}});let r=stable(s);assert.equal(offeredSow(r),true);const skip=opts(r).find(o=>o.value==='__skip__');assert.ok(skip);r=complete(close(s,ok(s.resolveChoice(0,skip.value))));assert.equal(res(r).grain,1);assert.equal(res(r).vegetable,1);assert.equal(stack(r,1),0);return{declined:true,grain:1,vegetable:1,planted:0}})
+  scenario('A073 N7 fencing two adjacent new spaces grants one additional Sow',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:5,grain:1}});let r=fence(s);assert.equal(offeredSow(r),true);r=sow(s,r,[{row:0,col:1,crop:'grain'}]);assert.equal(res(r).wood,0);assert.equal(stack(r,1),3);return{newUsedSpaces:2,woodPaid:5,fencePieces:9,extraSowCount:1,grainStack:3}})
+  scenario('A073 N8 fencing one adjacent new space gives no additional Sow',()=>{const r=complete(fence(setup(FERT,{pastureCols:[4],resources:{wood:3,grain:1}}),false));assert.equal(offeredSow(r),false);assert.equal(res(r).wood,0);assert.equal(res(r).grain,1);return{newUsedSpaces:1,woodPaid:3,fencePieces:7,extraSowCount:0,grain:1}})
+  scenario('A073 N9 two actual wooden rooms grant one additional Sow after full payment',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:10,reed:4,grain:1}});farm(s,'room');let r=ok(s.commitSelectionChoice(0,{rooms:[{row:1,col:1},{row:2,col:1}]}));assert.equal(r.state.players[0]!.rooms,4);assert.equal(res(r).wood,0);assert.equal(res(r).reed,0);assert.equal(offeredSow(r),true);r=sow(s,r,[{row:0,col:1,crop:'grain'}]);return{rooms:4,woodPaid:10,reedPaid:4,extraSowCount:1,grainStack:stack(r,1)}})
+  scenario('A073 N10 separate one-space actions do not accumulate a two-space trigger',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:5,grain:1}});complete(fence(s,false));turn(s,1,'grain-seeds');const r=complete(stable(s,[{row:1,col:1}]));assert.equal(offeredSow(r),false);assert.equal(res(r).grain,1);assert.equal(res(r).wood,0);return{separateActions:2,eachNewUsedSpaces:1,extraSowCount:0,grain:1}})
+  scenario('A073 N11 opponent two-stable construction cannot grant owner Sow',()=>{const s=setup(FERT,{pastureCols:[4],resources:{grain:1},configure(state){state.players[1]!.resources.wood=4}});turn(s,0,'grain-seeds');const r=complete(stable(s,undefined,1));assert.equal(offeredSow(r),false);assert.equal(res(r).grain,2);assert.equal(res(r,1).wood,0);return{opponentStableCount:2,ownerExtraSowCount:0}})
+  scenario('A073 N12 unplayed Fertilizers cannot grant Sow after construction',()=>{const r=complete(stable(setup(FERT,{played:false,pastureCols:[4],resources:{wood:4,grain:1}})));assert.equal(offeredSow(r),false);assert.equal(res(r).grain,1);return{inHand:true,extraSowCount:0,grain:1}})
+  scenario('A073 N13 Double Turn Plow exposes its real two-field action granularity without a resolved rule oracle',()=>{const s=setup(FERT,{round:3,fields:0,pastureCols:[4],resources:{grain:2},configure(state){state.players[0]!.minorHand.push(PLOW)}});let r=purchase(s,enter(s),PLOW);for(let n=0;n<2;n++){for(let q=0;q<3&&r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice';q++){if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'){const choice=opts(r).find(o=>o.value!=='__skip__');assert.ok(choice,JSON.stringify(r.interaction));r=ok(s.resolveChoice(0,choice.value))}}assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='farm-select'&&r.interaction.request.farm.farmType==='plow',JSON.stringify(r.interaction));const tile=r.interaction.request.farm.selectableTiles[0];assert.ok(tile);r=ok(s.commitSelectionChoice(0,{tile}))}assert.equal(r.state.players[0]!.fields.length,2);assert.equal(res(r).grain,1);const extra=offeredSow(r);if(extra)r=ok(s.resolveChoice(0,opts(r).find(o=>o.value==='__skip__')!.value));complete(r);return{paidGrain:1,newFields:2,additionalSowObserved:extra,ruleUnresolved:true}})
+  scenario('A073 N14 undo qualifying construction and Sow restores the real farm before one retry',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:4,vegetable:1}});const before=undoRuleSnapshot(s.getState());let r=sow(s,stable(s),[{row:0,col:1,crop:'vegetable'}]);assert.equal(res(r).wood,0);assert.equal(stack(r,1),2);r=undo(s,before,()=>sow(s,stable(s),[{row:0,col:1,crop:'vegetable'}]));assert.equal(res(r).wood,0);assert.equal(res(r).vegetable,0);assert.equal(stack(r,1),2);return{fullScopeRestored:true,retryStableCount:2,retryVegetableStack:2,retryWood:0}})
+  scenario('A073 N15 illegal stable targets reject before a legal qualifying construction',()=>{const s=setup(FERT,{pastureCols:[4],resources:{wood:4,vegetable:1}});farm(s,'stable');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{stables:[{row:0,col:1},{row:0,col:2}]}));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{stables:[{row:3,col:0}]}));let r=ok(s.commitSelectionChoice(0,{stables:[{row:1,col:1},{row:1,col:2}]}));assert.equal(offeredSow(r),true);r=sow(s,r,[{row:0,col:1,crop:'vegetable'}]);assert.equal(r.state.players[0]!.stableTiles.length,2);assert.equal(res(r).wood,0);return{illegalTargetsRejected:true,legalStableCount:2,woodPaid:4,vegetableStack:2}})
 })

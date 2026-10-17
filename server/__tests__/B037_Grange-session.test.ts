@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import assert from 'node:assert/strict'
+import * as audit19Immediate from './_helpers/audit/ae-negative-19-immediate'
 
 const CARD_ID = 'B037_Grange'
 
@@ -61,4 +63,12 @@ describe('B037 Grange prerequisites', () => {
       expect(JSON.stringify(rejected.state)).toBe(before)
     }
   })
+})
+
+describe('ae-negative-19-immediate', () => {
+  const { GRANGE, sessions, save, ok, setup, buy, score, denied, farm } = audit19Immediate
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B037 N1 six own empty physical fields and all housed species grant one food and three printed points',()=>{const s=setup(GRANGE,state=>farm(state)),{pending,r}=buy(s,GRANGE);assert.equal(r.state.players[0]!.resources.food,21);assert.equal(r.state.players[0]!.fields.length,6);assert.equal(score(r,GRANGE),3);assert.equal(r.state.players[1]!.resources.food,20);save('B037-N1',{pending,r})})
+  it('B037 N2 five physical fields or each missing housed species refuse without food or points',()=>{for(const[fields,missing]of[[5,''],[6,'sheep'],[6,'boar'],[6,'cattle']]as const){const s=setup(GRANGE,state=>farm(state,fields,missing)),{pending,r}=denied(s,GRANGE);assert.equal(r.state.players[0]!.resources.food,20);assert.equal(score(r,GRANGE),0);save(`B037-N2-${fields}-${missing}`,{pending,r})}})
+  it('B037 N3 actual purchase undo restores food and three points before one legal retry',()=>{const s=setup(GRANGE,state=>farm(state)),r=buy(s,GRANGE).r,undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,20);assert.equal(score(undone,GRANGE),0);assert.ok(undone.state.players[0]!.minorHand.includes(GRANGE));const retry=buy(s,GRANGE).r;assert.equal(retry.state.players[0]!.resources.food,21);assert.equal(score(retry,GRANGE),3);save('B037-N3',{r,undone,retry})})
 })

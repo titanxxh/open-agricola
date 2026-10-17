@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E013_StoneHouseReconstruction'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Anytime from './_helpers/audit/ae-negative-28-anytime'
 
 const CARD_ID = 'E013_StoneHouseReconstruction'
 const ANYTIME_ID = 'E13-stone-house-reconstruction-anytime'
@@ -211,4 +214,11 @@ describe('E013 Stone House Reconstruction parity', () => {
     })
     expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(false)
   })
+})
+
+describe('ae-negative-28-anytime', () => {
+  const { RECON, sessions, save, ok, finish, make, id, offered, use } = audit28Anytime
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E013 N1 actual anytime clay to stone pays normal two stone and one reed with no worker placement',()=>{const a=use(make(RECON,'clay',2,1,7),RECON);assert.equal(a.r.state.players[0]!.resources.stone,0);assert.equal(a.r.state.players[0]!.resources.reed,0);assert.equal(a.r.state.players[0]!.resources.food,7);assert.ok(!a.r.interaction.anytimeActions.some(x=>x.id===id(RECON)));save('E013-N1',a)})
+  it('E013 N2 wood stone and card in hand or insufficient normal cost cannot expose free reconstruction before a legal action',()=>{for(const[house,stone,reed,played]of[['wood',2,1,true],['stone',2,1,true],['clay',1,1,true],['clay',2,0,true],['clay',2,1,false]]as const){const s=make(RECON,house,stone,reed,7,played),before=ok(s.getState());assert.ok(!offered(s,RECON));const rejected=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,id(RECON))),r=finish(s,ok(s.takeAction(0,'grain-seeds')),false);assert.equal(r.state.players[0]!.houseType,house);save(`E013-N2-${house}-${stone}-${reed}-${played}`,{before,rejected,r})}})
 })

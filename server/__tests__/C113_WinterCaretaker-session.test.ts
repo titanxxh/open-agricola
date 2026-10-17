@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C113_WinterCaretaker'
+import assert from 'node:assert/strict'
+import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
 const CARD_ID = 'C113_WinterCaretaker'
 const FILLER = '__test_placeholder__'
@@ -179,5 +181,38 @@ describe('C113 Winter Caretaker parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, vegetable: 2 })
+  })
+})
+
+describe('ae-negative-48-crops', () => {
+  const { sessions, ok, options, gains, save, setup, choose, source, finish, completeRound, play } = audit48Crops
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C113 N1 actual first occupation immediately gives one grain only', () => { const s = setup('C113_WinterCaretaker'), r = play(s, 'C113_WinterCaretaker'); assert.equal(r.state.players[0]!.resources.grain, 1); assert.equal(r.state.players[0]!.resources.vegetable, 0); assert.equal(r.state.players[0]!.resources.food, 20); save('C113-N1', r); })
+  it('C113 N2 buying one vegetable is after feeding and may decline with insufficient postfeeding food excluded', () => {
+    for (const mode of ['accept', 'decline', 'short', 'nonharvest']) {
+      const s = setup('C113_WinterCaretaker', mode === 'nonharvest' ? 5 : 4, state => state.players[0]!.resources.food = mode === 'short' ? 4 : 5)
+      let r = completeRound(s)
+      for (let n = 0; n < 20 && !(r.interaction.stateId === 'wait' && options(r).some(o => o.value === 'C113_WinterCaretaker' || gains(o, 'vegetable') === 1)); n++) {
+        if (r.interaction.stateId === 'idle')
+          break
+        const i = r.interaction
+        assert.ok(i.stateId === 'wait')
+        if (i.request.kind === 'feed')
+          r = ok(s.resolveChoice(i.playerIndex, 'confirm', { selections: [] }))
+        else if (i.request.kind === 'confirm-player-switch')
+          r = ok(s.resolveChoice(i.playerIndex, 'confirm'))
+        else
+          r = finish(s, r)
+      }
+      if (mode === 'accept') {
+        r = source(s, r, 'C113_WinterCaretaker')
+        assert.equal(r.state.players[0]!.resources.food, 2)
+        r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.vegetable, mode === 'accept' ? 1 : 0)
+      assert.equal(r.state.players[0]!.resources.food, mode === 'accept' ? 0 : mode === 'short' ? 1 : mode === 'nonharvest' ? 6 : 2)
+      save(`C113-N2-${mode}`, r)
+    }
   })
 })

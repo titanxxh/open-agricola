@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A045_FireProtectionPond'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit07Future from './_helpers/audit/ae-negative-07-future'
 
 const CARD_ID = 'A045_FireProtectionPond'
 const FILLER = '__test_placeholder__'
@@ -145,5 +148,33 @@ describe('A045 Fire Protection Pond parity', () => {
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources.food).toBe(21)
     expect(pondEntries(response).map((entry) => entry.round)).toEqual([7, 8, 9, 10, 11])
+  })
+})
+
+describe('ae-negative-07-future', () => {
+  const { POND, sessions, setup, buy, deny, turn, rounds, complete, food, renovationSetup, renovate } = audit07Future
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('A045 N1 wooden house and one food gate purchase without immediate schedule', () => {
+    for (const houseType of ['clay', 'stone'] satisfies Array<'clay' | 'stone'>) deny(setup(POND, {}, state => { state.players[0]!.houseType = houseType }), POND)
+    deny(setup(POND, { resources: { food: 0 } }), POND)
+    const r = buy(setup(POND), POND); assert.equal(r.state.players[0]!.resources.food, 39); assert.deepEqual(rounds(r, POND), [])
+  })
+  it('A045 N2 actual purchase and first renovation schedule once before natural later stone renovation', () => {
+    const s = renovationSetup({ played: false }); buy(s, POND); turn(s, 1, 'forest'); let r = renovate(s)
+    assert.equal(r.state.players[0]!.houseType, 'clay'); assert.deepEqual(rounds(r, POND), [6, 7, 8, 9, 10, 11]); assert.equal(r.state.players[0]!.cardStates[POND]?.flagged, true)
+    r = confirmNext(s, turn(s, 1, 'clay-pit')); assert.equal(r.state.round, 6); assert.deepEqual(food(r), [40, 40]); assert.deepEqual(rounds(r, POND), [7, 8, 9, 10, 11])
+    r = renovate(s); assert.equal(r.state.players[0]!.houseType, 'stone'); assert.deepEqual(rounds(r, POND), [7, 8, 9, 10, 11])
+    for (let i = 0; i < 6; i++) { r = complete(s, i === 0); assert.equal(r.state.round, 7 + i); assert.deepEqual(food(r), [[41, 40], [38, 36], [39, 36], [36, 32], [37, 32], [33, 28]][i]); assert.deepEqual(rounds(r, POND), [7, 8, 9, 10, 11].filter(round => round > 7 + i)) }
+  })
+  it('A045 N3 real opponent renovation and owner unrelated action cannot schedule owner pond', () => {
+    const s = renovationSetup({}, state => { Object.assign(state.players[1]!.resources, { clay: 2, reed: 1 }) }); turn(s, 0, 'grain-seeds'); const r = renovate(s, 1)
+    assert.equal(r.state.players[1]!.houseType, 'clay'); assert.equal(r.state.players[0]!.houseType, 'wood'); assert.deepEqual(rounds(r, POND), []); assert.equal(r.state.players[0]!.cardStates[POND]?.flagged ?? false, false)
+  })
+  it('A045 N4 controlled late real renovation truncates next six rounds', () => {
+    for (const round of [13, 14]) { const r = renovate(renovationSetup({ round })); assert.equal(r.state.players[0]!.houseType, 'clay'); assert.equal(r.state.players[0]!.cardStates[POND]?.flagged, true); assert.deepEqual(rounds(r, POND), round === 13 ? [14] : []) }
+  })
+  it('A045 N5 unaffordable renovation rejects then legal renovation undo and retry restores flag and schedule', () => {
+    const unavailable = renovationSetup({ clay: 1, reed: 0 }); assertRejectedUnchanged(unavailable, () => unavailable.takeAction(0, 'house-redevelopment')); assert.deepEqual(rounds(unavailable.getState(), POND), [])
+    const s = renovationSetup(); const before = undoRuleSnapshot(s.getState()); let r = renovate(s); assert.deepEqual(rounds(r, POND), [6, 7, 8, 9, 10, 11]); assertUndoRestored(before, s.undoAction()); r = renovate(s); assert.deepEqual(rounds(r, POND), [6, 7, 8, 9, 10, 11])
   })
 })

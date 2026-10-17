@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/C/C082_HardwareStore'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit43Exchanges from './_helpers/audit/ae-negative-43-exchanges'
 
 const CARD_ID = 'C082_HardwareStore'
 
@@ -108,4 +111,12 @@ describe('C082 Hardware Store parity', () => {
       grain: 1, wood: 0, clay: 0, reed: 0, stone: 0,
     })
   })
+})
+
+describe('ae-negative-43-exchanges', () => {
+  const { STORE, sessions, save, ok, make, trigger, finish, menu, purchase, buildings } = audit43Exchanges
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C082 N1 real purchase pays wood and clay and missing clay rejects before free legal alternative',()=>{const s=make(STORE,false,state=>Object.assign(state.players[0]!.resources,{wood:1,clay:1})),a=purchase(s,STORE);assert.deepEqual(buildings(a.r),{food:0,wood:0,clay:0,reed:0,stone:0});assert.equal(a.r.scores![0]!.categories.find(c=>c.key==='cards')?.entries.find(e=>'cardId'in e&&e.cardId===STORE)?.score,1);const t=make(STORE,false,state=>state.players[0]!.resources.wood=1),pending=menu(t),bad=assertRejectedUnchanged(t,()=>t.resolveChoice(0,STORE)),legal=ok(t.resolveChoice(0,'B004_WoodPile'));assert.ok(legal.state.players[0]!.minorHand.includes(STORE));save('C082-N1',{a,pending,bad,legal})})
+  it('C082 N2 Day Laborer funds exactly one complete bundle and decline preserves both food',()=>{for(const accept of[true,false]){const s=make(STORE),pending=trigger(s,ok(s.takeAction(0,'day-laborer')),STORE),r=finish(s,pending,accept);assert.deepEqual(buildings(r),accept?{food:0,wood:1,clay:1,reed:1,stone:1}:{food:2,wood:0,clay:0,reed:0,stone:0});assert.deepEqual(buildings(r,1),{food:0,wood:0,clay:0,reed:0,stone:0});save(`C082-N2-${accept}`,{pending,r})}})
+  it('C082 N3 unrelated action and card in hand never grant the building bundle',()=>{for(const played of[true,false]){const s=make(STORE,played),r=ok(s.takeAction(0,'grain-seeds'));assert.deepEqual(buildings(r),{food:0,wood:0,clay:0,reed:0,stone:0});assert.equal(r.state.players[0]!.resources.grain,1);save(`C082-N3-${played}`,r)}})
 })

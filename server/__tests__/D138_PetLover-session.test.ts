@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { AnimalType } from '../../shared/contract/types'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D138_PetLover'
+import assert from 'node:assert/strict'
+import { assertEmptyAccumulationRejected } from './_helpers/negative-rule-audit'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'D138_PetLover'
 const FILLER = '__test_placeholder__'
@@ -209,4 +212,12 @@ describe('D138 Pet Lover parity', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep)
       .toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, resources, pool, farm, pet } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('D138 N1 each exactly-one animal market replacement leaves its original animal and grants supply animal three food grain', () => { for (const [space, good] of [['sheep-market', 'sheep'], ['pig-market', 'boar'], ['cattle-market', 'cattle']] as const) { const s = make('D138_PetLover', st => { farm(st); pool(st, space, good, 1) }, true, 14), p = ok(s.takeAction(0, space)), r = pet(s, p, true); resources(r, { [good]: 1, food: 103, grain: 1 }); assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources[good], 1); save(`D138-N1-${good}`, { p, r }) } })
+  it('D138 N2 normal collection of one and zero or two accumulated animals give no replacement bonus', () => { for (const count of [0, 1, 2]) { const s = make('D138_PetLover', st => { farm(st); pool(st, 'sheep-market', 'sheep', count) }), p = count === 0 ? assertEmptyAccumulationRejected(s, 0, 'sheep-market') : ok(s.takeAction(0, 'sheep-market')), r = count === 0 ? p : count === 1 ? pet(s, p, false) : finish(s, p, false); resources(r, { sheep: count, food: 100, grain: 0 }); assert.equal(r.state.actionSpaces.find(a => a.id === 'sheep-market')!.resources.sheep, 0); save(`D138-N2-${count}`, { p, r }) } })
+  it('D138 N3 actual opponent market and hand-only Pet Lover collect normally without replacement', () => { const s = make('D138_PetLover', st => pool(st, 'sheep-market', 'sheep', 1)); finish(s, ok(s.takeAction(0, 'grain-seeds')), false); ready(s); const r = finish(s, ok(s.takeAction(1, 'sheep-market')), false); resources(r, { food: 100, grain: 1, sheep: 0 }); resources(r, { food: 100, grain: 0, sheep: 1 }, 1); const c = make('D138_PetLover', st => pool(st, 'sheep-market', 'sheep', 1), false), cr = finish(c, ok(c.takeAction(0, 'sheep-market')), false); resources(cr, { sheep: 1, food: 100, grain: 0 }); save('D138-N3', { r, cr }) })
 })

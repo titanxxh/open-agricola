@@ -1,11 +1,14 @@
 import { type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A111_WallBuilder'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/negative-rule-audit'
+import * as audit13Build from './_helpers/audit/ae-negative-13-build'
 
 const CARD_ID = 'A111_WallBuilder'
 
@@ -201,5 +204,26 @@ describe('A111 Wall Builder parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(futureFoodRounds(response)).toEqual([13, 14])
+  })
+})
+
+describe('ae-negative-13-build', () => {
+  const { WALL, sessions, save, ok, setup, turn, build, schedule, finish } = audit13Build
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('A111 N1 one and two rooms schedule four food once while a stable schedules none',()=>{
+   for(const count of[1,2]){const r=build(setup(WALL),count);assert.deepEqual(schedule(r).map(e=>[e.round,e.food]),[[6,1],[7,1],[8,1],[9,1]]);assert.equal(r.state.players[0]!.resources.food,40);save(`A111-N1-${count}`,r)}
+   const stable=build(setup(WALL),1,0,true);assert.deepEqual(schedule(stable),[]);save('A111-N1-stable',stable)
+  })
+  it('A111 N2 natural rounds deliver to the owner once and consume each scheduled food',()=>{
+   const session=setup(WALL);const built=build(session,1);turn(session,1,'reed-bank');turn(session,0,'day-laborer');let r=confirmNext(session,turn(session,1,'clay-pit'));assert.equal(r.state.round,6);assert.equal(r.state.players[0]!.resources.food,43);assert.equal(r.state.players[1]!.resources.food,40);assert.deepEqual(schedule(r).map(e=>e.round),[7,8,9])
+   r=finish(session);assert.equal(r.state.round,7);assert.equal(r.state.players[0]!.resources.food,46);r=finish(session);assert.equal(r.state.round,8);assert.equal(r.state.players[0]!.resources.food,45);r=finish(session);assert.equal(r.state.round,9);assert.equal(r.state.players[0]!.resources.food,48);assert.deepEqual(schedule(r),[]);assert.deepEqual(session.getState().state,r.state);save('A111-N2',{built,r})
+  })
+  it('A111 N3 late rounds clip future food at round fourteen',()=>{
+   for(const round of[12,14]){const r=build(setup(WALL,undefined,true,round),1);assert.deepEqual(schedule(r).map(e=>e.round),round===12?[13,14]:[]);assert.equal(r.state.players[0]!.resources.food,40);save(`A111-N3-${round}`,r)}
+  })
+  it('A111 N4 unplayed opponent illegal build and undo cannot leave owner schedule',()=>{
+   const unplayed=build(setup(WALL,undefined,false),1);assert.deepEqual(schedule(unplayed),[])
+   const opponent=setup(WALL);turn(opponent,0,'grain-seeds');const other=build(opponent,1,1);assert.deepEqual(schedule(other),[]);save('A111-N4-opponent',other)
+   const session=setup(WALL);turn(session,0,'farm-expansion');let r=session.getState();if(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'){const option=r.interaction.request.options.find(o=>o.labelKey==='actions.construct.name');assert.ok(option);r=ok(session.resolveChoice(0,option.value))}assertRejectedUnchanged(session,()=>session.commitSelectionChoice(0,{rooms:[{row:99,col:99}]}));assert.deepEqual(schedule(session.getState()),[]);r=ok(session.commitSelectionChoice(0,{rooms:[{row:1,col:1}]}));const undone=ok(session.undoAction());assert.deepEqual(schedule(undone),[]);assert.equal(undone.state.players[0]!.rooms,2);assert.equal(undone.state.players[0]!.resources.wood,10);save('A111-N4',{r,undone,unplayed})
   })
 })

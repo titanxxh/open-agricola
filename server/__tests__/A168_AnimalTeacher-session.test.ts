@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { AnimalType } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -6,6 +6,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/A/A168_AnimalTeacher'
 import '../../shared/cards/A/A116_WoodCutter'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit17Lessons from './_helpers/audit/ae-negative-17-lessons'
 
 const CARD_ID = 'A168_AnimalTeacher'
 
@@ -174,4 +177,14 @@ describe('A168 Animal Teacher parity', () => {
     expect(nonTarget.interaction.stateId === 'wait' ? nonTarget.interaction.sourceCard : undefined)
       .not.toBe(CARD_ID)
   })
+})
+
+describe('ae-negative-17-lessons', () => {
+  const { CARD, sessions, save, ok, setup, turn, finish, material, prepareHousing, enter } = audit17Lessons
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A168 N1 real Lessons and Lessons4 buy exactly one sheep boar or cattle at zero one or two food',()=>{for(const space of['lessons','lessons-4'])for(const [type,cost]of[['sheep',0],['boar',1],['cattle',2]]as const){const s=setup(CARD,{food:10},true,prepareHousing);const pending=enter(s,space);assert.ok(pending.state.players[0]!.occupationPlayed.includes('A110_Roughcaster'));const food=pending.state.players[0]!.resources.food;const r=finish(s,pending,true,type);assert.equal(material(r)[type],1);assert.equal(material(r).food,food-cost);for(const other of['sheep','boar','cattle']as const)if(other!==type)assert.equal(material(r)[other],0);save(`A168-N1-${space}-${type}`,{pending,r})}})
+  it('A168 N2 decline preserves food and zero food still permits only free sheep after Lessons',()=>{const s=setup(CARD,{food:4});const pending=enter(s),decline=finish(s,pending,false);assert.equal(material(decline).food,material(pending).food);assert.equal(material(decline).sheep,0);const poor=setup(CARD,{food:1});const pp=enter(poor);assert.equal(material(pp).food,0);const r=finish(poor,pp,true,'sheep');assert.equal(material(r).sheep,1);assert.equal(material(r).boar,0);assert.equal(material(r).cattle,0);assert.equal(material(r).food,0);save('A168-N2',{pending,decline,pp,r})})
+  it('A168 N3 unrelated action opponent Lessons and still in hand cannot grant animal',()=>{const s=setup(CARD);const unrelated=turn(s,0,'day-laborer');assert.equal(material(unrelated).sheep,0);const hs=setup(CARD,{},false);const hand=turn(hs,0,'grain-seeds');assert.equal(material(hand).sheep,0);const os=setup(CARD,{},true,state=>state.players[1]!.occupationHand=['A114_SeasonalWorker']);turn(os,0,'grain-seeds');let other=turn(os,1,'lessons');if(other.interaction.stateId==='wait'&&other.interaction.request.kind==='choice')other=ok(os.resolveChoice(1,'A114_SeasonalWorker'));assert.equal(material(other).sheep,0);save('A168-N3',{unrelated,hand,other})})
+  it('A168 N4 invalid wrong actor and stale animal choice cannot purchase twice',()=>{const s=setup(CARD,{food:4});const pending=enter(s);assertRejectedUnchanged(s,()=>s.resolveChoice(1,'buy'));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'buy-all'));const r=finish(s,pending,true,'cattle');assert.equal(material(r).cattle,1);assertRejectedUnchanged(s,()=>s.resolveChoice(0,'buy-again'));save('A168-N4',{pending,r})})
+  it('A168 N5 playing Animal Teacher through real Lessons can offer the printed immediate after action purchase',()=>{const s=setup(CARD,{food:2},false);let pending=turn(s,0,'lessons');if(!pending.state.players[0]!.occupationPlayed.includes(CARD))pending=ok(s.resolveChoice(0,CARD));assert.ok(pending.state.players[0]!.occupationPlayed.includes(CARD));const r=finish(s,pending,true,'sheep');assert.equal(material(r).sheep,1);assert.equal(material(r).food,2);save('A168-N5',{pending,r})})
 })

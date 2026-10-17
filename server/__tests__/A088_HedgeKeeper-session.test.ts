@@ -1,10 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getOwnOrdinaryFenceReserveCount } from '../../shared/domain/supply-tokens'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A088_HedgeKeeper'
+import '../../shared/cards/A/A087_Conservator'
+import '../../shared/cards/A/A090_PlowDriver'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
+import * as audit11FarmFuture from './_helpers/audit/ae-negative-11-farm-future'
 
 const CARD_ID = 'A088_HedgeKeeper'
 const FILLER = '__test_placeholder__'
@@ -105,4 +110,24 @@ describe('A088 Hedge Keeper session', () => {
     expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
   })
 
+})
+
+describe('ae-negative-11-farm-future', () => {
+  const { HEDGE, sessions, scenario, setup, ok, res, ready, turn, complete, lessons, denyHost, FOUR, SIX, closed, fenceEntry, fenceCommit, fence, fields } = audit11FarmFuture
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  scenario('A088 N1 real first and later Lessons pay zero and one food without an immediate ability',()=>{for(const prior of[0,1]){const s=setup(HEDGE,{played:false,occupations:prior,resources:{food:prior},house:'stone'});const r=lessons(s,HEDGE);assert.equal(res(r).food,0);assert.equal(fields(r),0);assert.equal(r.state.players[0]!.fenceSegments.length,0)}return{firstFee:0,laterFee:1,immediateFields:0,immediateFences:0}})
+  scenario('A088 N2 missing the later Lessons food rejects a real forged entry before a legal action',()=>{return denyHost(setup(HEDGE,{played:false,occupations:1}),'lessons')})
+  scenario('A088 N3 legal closed pasture geometry permits 1 new free fences at zero wood',()=>{const s=setup(HEDGE,{configure(state){closed(state,[{"row": 1, "col": 2}, {"row": 1, "col": 3}])}});const r=fence(s,["V-1-3"]);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,7);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),8);return{newFences:1,woodPaid:0,totalFences:7,reserve:8}})
+  scenario('A088 N4 legal closed pasture geometry permits 2 new free fences at zero wood',()=>{const s=setup(HEDGE,{configure(state){closed(state,[{"row": 1, "col": 2}, {"row": 1, "col": 3}, {"row": 2, "col": 2}])}});const r=fence(s,["H-3-3", "V-2-4"]);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,10);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),5);return{newFences:2,woodPaid:0,totalFences:10,reserve:5}})
+  scenario('A088 N5 legal closed pasture geometry permits 3 new free fences at zero wood',()=>{const s=setup(HEDGE,{configure(state){closed(state,[{"row": 1, "col": 3}])}});const r=fence(s,["H-1-4", "H-2-4", "V-1-5"]);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,7);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),8);return{newFences:3,woodPaid:0,totalFences:7,reserve:8}})
+  scenario('A088 N6 4 actual new fences still pay 1 wood after the discount',()=>{const s=setup(HEDGE,{resources:{wood:1}}),r=fence(s,FOUR);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),11);return{newFences:4,woodPaid:1,reserve:11}})
+  scenario('A088 N7 6 actual new fences still pay 3 wood after the discount',()=>{const s=setup(HEDGE,{resources:{wood:3}}),r=fence(s,SIX);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,6);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),9);return{newFences:6,woodPaid:3,reserve:9}})
+  scenario('A088 N8 six fences with two wood reject before four legal fences pay one wood',()=>{const s=setup(HEDGE,{resources:{wood:2}});fenceEntry(s);assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:SIX,extraWood:0}));const r=fenceCommit(s,FOUR);assert.equal(res(r).wood,1);return{underpaidRejected:true,retryFences:4,retryWood:1}})
+  scenario('A088 N9 fifteen real placed fence pieces cannot be exceeded by the discount',()=>{const s=setup(HEDGE,{resources:{wood:10},configure(state){closed(state,[{row:0,col:2},{row:0,col:3},{row:1,col:2},{row:1,col:3},{row:1,col:4}],true)}});assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(s.getState().state.players[0]!)),0);const result=denyHost(s,'fencing');return{...result,fences:15,reserve:0}})
+  scenario('A088 N10 open room field and outside farm fence targets reject before a closed legal pasture',()=>{const s=setup(HEDGE,{resources:{wood:5},configure(state){state.players[0]!.fields=[{row:0,col:3,stacks:[]}]}});fenceEntry(s);for(const edges of[['H-0-1'],['H-1-0','H-2-0','V-1-0','V-1-1'],['H-0-3','H-1-3','V-0-3','V-0-4'],['H-3-5']])assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges,extraWood:0}));const r=fenceCommit(s,FOUR);assert.equal(res(r).wood,4);return{rejected:[true,true,true,true],retryFences:4,retryWood:4}})
+  scenario('A088 N11 Hedge Keeper in hand cannot discount owner fences',()=>{const r=fence(setup(HEDGE,{played:false,resources:{wood:4}}));assert.equal(res(r).wood,0);return{newFences:4,woodPaid:4,discount:0}})
+  scenario('A088 N12 only the opponent Hedge Keeper cannot discount owner fences',()=>{const r=fence(setup(HEDGE,{opponent:true,resources:{wood:4}}));assert.equal(res(r).wood,0);return{newFences:4,woodPaid:4,discount:0}})
+  scenario('A088 N13 a later natural round grants three free fences again without accumulating a quota',()=>{const s=setup(HEDGE,{round:5,resources:{wood:1}});fence(s);turn(s,1,'forest');turn(s,0,'day-laborer');let r=confirmNext(s,turn(s,1,'grain-seeds'));assert.equal(r.state.round,6);ready(s,0);r=fence(s,['H-0-2','H-1-2','V-0-3']);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,7);return{round:6,totalFences:7,totalWoodPaid:1,secondFreeFences:3}})
+  scenario('A088 N14 actual discounted fence undo probes full restoration before one retry',()=>{const s=setup(HEDGE,{resources:{wood:1}});const before=undoRuleSnapshot(s.getState());fence(s);assertUndoRestored(before,s.undoAction());const r=fence(s);assert.equal(res(r).wood,0);assert.equal(r.state.players[0]!.fenceSegments.length,4);return{restored:true,retryFences:4,retryWood:0}})
+  scenario('A088 N15 the opponent actual four fence action pays full wood despite the owner Hedge Keeper',()=>{const s=setup(HEDGE,{configure(state){state.players[1]!.resources.wood=4}});complete(turn(s,0,'day-laborer'));turn(s,1,'fencing');const r=complete(ok(s.commitSelectionChoice(1,{edges:FOUR,palisadeEdges:[],extraWood:0})));assert.equal(res(r,1).wood,0);assert.equal(r.state.players[1]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.fenceSegments.length,0);return{opponentWoodPaid:4,opponentFences:4,ownerFences:0}})
 })

@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { setActiveWorkerCount } from '../../shared/domain/player'
+import { setActiveWorkerCount, familySize } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/E/E014_WoodSaw'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit28Woodsaw from './_helpers/audit/ae-negative-28-woodsaw'
 
 const CARD_ID = 'E014_WoodSaw'
 
@@ -151,4 +154,13 @@ describe('E014 Wood Saw parity', () => {
 
     expect(woodSawOffered(response)).toBe(false)
   })
+})
+
+describe('ae-negative-28-woodsaw', () => {
+  const { CARD, ANY, sessions, save, ok, finish, make, menu, anytime, tiles, rooms } = audit28Woodsaw
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E014 N1 actual one wood purchase permits no worker construction and undo restores card cost and hand',()=>{const s=make(false,[3],1,0),pending=menu(s),r=finish(s,ok(s.resolveChoice(0,CARD)),false),undone=ok(s.undoAction());assert.equal(r.state.players[0]!.resources.wood,0);assert.ok(r.state.players[0]!.minorPlayed.includes(CARD));assert.equal(undone.state.players[0]!.resources.wood,1);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));save('E014-N1',{pending,r,undone})})
+  it('E014 N2 actual Build Rooms action may build two affordable rooms at once while all opponents have strictly larger families',()=>{for(const others of[[3],[3,4]])save(`E014-N2-${others.length+1}`,rooms(make(true,others),2))})
+  it('E014 N3 any equal or smaller opponent family and card only in hand exclude the public anytime entry before a legal action',()=>{for(const[others,played]of[[[2],true],[[3,2],true],[[3],false]]as const){const s=make(played,[...others]),before=ok(s.getState());assert.ok(!before.interaction.anytimeActions.some(a=>a.id===ANY));const rejected=assertRejectedUnchanged(s,()=>s.takeAnytimeAction(0,ANY)),r=finish(s,ok(s.takeAction(0,'grain-seeds')),false);assert.equal(r.state.players[0]!.rooms,2);assert.equal(familySize(r.state.players[0]!),2);save(`E014-N3-${others.join('-')}-${played}`,{before,rejected,r})}})
+  it('E014 N4 unaffordable two room target rejects before a legal single room without placing or duplicating a person',()=>{const s=make(true,[3],5,2),a=anytime(s),rejected=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{rooms:tiles})),r=finish(s,ok(s.commitSelectionChoice(0,{rooms:tiles.slice(0,1)})),false);assert.equal(r.state.players[0]!.rooms,3);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.reed,0);assert.deepEqual(r.state.players[0]!.workers,a.before.state.players[0]!.workers);save('E014-N4',{a,rejected,r})})
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -8,6 +8,8 @@ import '../../shared/cards/A/A055_JunkRoom'
 import '../../shared/cards/D/D013_Trowel'
 import type { ActionFlow } from '../../shared/contract/types'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import assert from 'node:assert/strict'
+import * as audit57Phase from './_helpers/audit/ae-negative-57-phase'
 
 const CARD_ID = 'D161_CabbageBuyer'
 
@@ -584,5 +586,29 @@ describe('D161_CabbageBuyer session', () => {
       resourcesPaid: { food: 3 },
       resourcesGained: { vegetable: 1 },
     })
+  })
+})
+
+describe('ae-negative-57-phase', () => {
+  const { sessions, ok, save, finish, choose, renovation, cabbage } = audit57Phase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D161 N1 real owner or opponent renovation followed by no minor or major improvement buys one vegetable for three two or one food', () => {
+    for (const actor of [0, 1]) for (const [improvement, cost] of [['none', 3], ['minor', 2], ['major', 1]] as const) {
+      const session = cabbage(actor), result = renovation(session, actor, improvement)
+      assert.equal(result.response.state.players[0]!.resources.food, 10 - cost); assert.equal(result.response.state.players[0]!.resources.vegetable, 1); assert.equal(result.response.state.players[actor]!.houseType, 'clay'); assert.equal(result.response.state.players[0]!.cardStates.D161_CabbageBuyer?.extraData?.inFlight, null)
+      save(`D161-N1-${actor}-${improvement}`, result)
+    }
+  })
+  it('D161 N2 optional decline insufficient food and card only in hand never pay or grant vegetable after actual renovation', () => {
+    for (const [mode, food] of [['decline', 3], ['insufficient', 2], ['hand', 3]] as const) {
+      const session = cabbage(1, food, mode !== 'hand'), result = renovation(session, 1, 'none', mode !== 'decline')
+      assert.equal(result.response.state.players[0]!.resources.food, food); assert.equal(result.response.state.players[0]!.resources.vegetable, 0); assert.equal(result.response.state.players[1]!.houseType, 'clay')
+      save(`D161-N2-${mode}`, result)
+    }
+  })
+  it('D161 N3 an unrelated major improvement without renovation does not offer a vegetable or leave an in-flight tracker', () => {
+    const session = cabbage(), pending = ok(session.takeAction(0, 'major-improvement')), response = finish(session, choose(session, pending, option => option.value === 'Major_Fireplace1')), track = response.state.players[0]!.cardStates.D161_CabbageBuyer?.extraData?.inFlight
+    assert.equal(response.state.players[0]!.resources.vegetable, 0); assert.equal(response.state.players[0]!.resources.food, 10); assert.ok(track === undefined || track === null); assert.ok(response.state.players[0]!.improvements.includes('Major_Fireplace1'))
+    save('D161-N3', { pending, response })
   })
 })

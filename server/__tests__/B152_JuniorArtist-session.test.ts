@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import '../../shared/cards/B/B152_JuniorArtist'
+import assert from 'node:assert/strict'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 
 const CARD_ID = 'B152_JuniorArtist'
@@ -255,4 +257,32 @@ describe('B152_JuniorArtist session', () => {
     } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, take, finish, ready, play, undo, pile, at, res } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B152 N1 real purchase and accepted Day Laborer jump collect Traveling Players with the same person', () => { const b = make('B152_JuniorArtist', undefined, false), bought = finish(b, play(b, 'B152_JuniorArtist')), undone = undo(b), s = make('B152_JuniorArtist', st => pile(st, 'traveling-players', 'food', 3)), p = take(s, 0, 'day-laborer'), worker = at(p, 'day-laborer')[0]!.workerId, r = finish(s, p, true, ['traveling-players']); res(r, { food: 104 }); assert.equal(at(r, 'traveling-players')[0]?.workerId, worker); assert.equal(at(r, 'day-laborer').length, 0); assert.equal(workersAvailable(r.state, r.state.players[0]!), 1); save('B152-N1', { bought, undone, p, r }); });
+  it('B152 N2 Day Laborer can fund both the jump and a real Lessons occupation fee', () => { const s = make('B152_JuniorArtist', st => { st.players[0]!.resources.food = 0; }), p = take(s, 0, 'day-laborer'), r = finish(s, p, true, ['"lessons"', 'A125_Priest']); res(r, { food: 0 }); assert.ok(r.state.players[0]!.occupationPlayed.includes('A125_Priest')); assert.equal(at(r, 'lessons').length, 1); assert.equal(workersAvailable(r.state, r.state.players[0]!), 1); save('B152-N2', { p, r }); });
+  it('B152 N3 real occupied targets held card opponent unrelated action and decline prevent a jump', () => { for (const mode of ['occupied', 'hand', 'opponent', 'unrelated', 'decline']) {
+      const a = mode === 'opponent' ? 1 : 0, s = make('B152_JuniorArtist', st => { if (mode === 'occupied') {
+          st.currentPlayerIndex = 1;
+          st.players.slice(1).forEach((p, i) => { p.occupationHand = [['A110_Roughcaster', 'A123_FrameBuilder'], ['A099_FellowGrazer', 'A100_Curator'], ['A101_CookeryOutfitter', 'A102_Grocer']][i]!; });
+      } if (mode === 'opponent')
+          st.currentPlayerIndex = 1; }, mode !== 'hand');
+      if (mode === 'occupied')
+          for (const [i, target] of [[1, 'lessons'], [2, 'lessons-4'], [3, 'traveling-players']] satisfies Array<[
+              number,
+              string
+          ]>) {
+              ready(s);
+              finish(s, take(s, i, target), true);
+          }
+      if (mode === 'occupied')
+          ready(s);
+      const p = take(s, a, mode === 'unrelated' ? 'grain-seeds' : 'day-laborer'), r = finish(s, p, mode !== 'decline', [], mode === 'decline' ? undefined : 'B152_JuniorArtist');
+      res(r, { food: a === 0 && mode !== 'unrelated' ? 102 : 100 });
+      assert.equal(at(r, 'day-laborer', a).length, mode === 'unrelated' ? 0 : 1);
+      save(`B152-N3-${mode}`, { p, r });
+  } });
 })

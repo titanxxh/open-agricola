@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E127_DiligentFarmer'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'E127_DiligentFarmer'
 
@@ -100,4 +103,32 @@ describe('E127_DiligentFarmer session', () => {
     const flow = session.withCtx(() => effect!.onBuy!(state, player))
     expect(flow).toBeUndefined()
   })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, save, setup, choose, finish, play, build, offer } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E127 N1 three maximum scoring categories permit exactly one free room and decline preserves farm', () => {
+    for (const mode of ['accept', 'decline', 'two']) {
+      const s = setup('E127_DiligentFarmer', 14, state => { Object.assign(state.players[0]!.resources, { grain: 8, vegetable: mode === 'two' ? 0 : 4 }); state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }, { row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }, { row: 1, col: 1, stacks: [] }, { row: 1, col: 2, stacks: [] }]; })
+      let r = play(s, 'E127_DiligentFarmer')
+      if (mode === 'accept') {
+        r = offer(s, r, 'E127_DiligentFarmer')
+        r = choose(s, r, o => !['__skip__', '__pass__'].includes(o.value))
+        assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'room')
+        assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 1, col: 3 }, { row: 2, col: 1 }] }))
+        r = build(s, r)
+      }
+      else
+        r = finish(s, r)
+      assert.equal(r.state.players[0]!.rooms, mode === 'accept' ? 3 : 2)
+      assert.equal(r.state.players[0]!.resources.wood, 0)
+      assert.equal(r.state.players[0]!.resources.reed, 0)
+      assert.ok(r.scores)
+      for (const key of ['fields', 'grains'])
+        assert.equal(r.scores[0]!.categories.find(c => c.key === key)?.total, 4)
+      save(`E127-N1-${mode}`, r)
+    }
+  })
+  it('E127 N2 fenced four stables count as third maximum scoring category for actual free room', () => { const s = setup('E127_DiligentFarmer', 14, state => { const p = state.players[0]!; p.resources.grain = 8; p.fields = [{ row: 0, col: 0, stacks: [] }, { row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] }, { row: 1, col: 1, stacks: [] }, { row: 1, col: 2, stacks: [] }]; const tiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }, { row: 1, col: 3 }, { row: 1, col: 4 }]; p.stableTiles = tiles; p.pastures = [{ id: 'fenced-stables', tiles, animalType: null, animalCount: 0 }]; p.fenceSegments = ['H-0-3', 'H-0-4', 'H-2-3', 'H-2-4', 'V-0-3', 'V-1-3', 'V-0-5', 'V-1-5'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: p.id } })); }); let r = play(s, 'E127_DiligentFarmer'); assert.ok(r.scores); assert.equal(r.scores[0]!.categories.find(c => c.key === 'stables')?.total, 4); r = build(s, offer(s, r, 'E127_DiligentFarmer')); assert.equal(r.state.players[0]!.rooms, 3); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.reed, 0); save('E127-N2', r); })
 })

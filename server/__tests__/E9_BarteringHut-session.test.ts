@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { Resource } from '../../shared/contract/types'
 import '../../shared/cards/E/E009_BarteringHut'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit26Barter from './_helpers/audit/ae-negative-26-barter'
 
 const CARD_ID = 'E009_BarteringHut'
 
@@ -186,4 +189,13 @@ describe('E009 Bartering Hut parity', () => {
 
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, sheep: 1 })
   })
+})
+
+describe('ae-negative-26-barter', () => {
+  const { CARD, sessions, save, ok, finish, make, buy, trade, decline } = audit26Barter
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('E009 N1 real passing purchase mixed building goods pay exact two three or four for legally housed sheep pig or cattle',()=>{for(const[animal,goods]of[['sheep',['wood','clay']],['boar',['wood','clay','reed']],['cattle',['wood','clay','reed','stone']]]as const){const s=make(Object.fromEntries(goods.map(g=>[g,1]))),a=buy(s),paid=trade(s,a.r,animal,[...goods]),r=finish(s,decline(s,paid),false);assert.equal(r.state.players[0]!.resources[animal],1);for(const good of goods)assert.equal(r.state.players[0]!.resources[good],0);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(r.state.players[1]!.resources[animal],0);save(`E009-N1-${animal}`,{a,paid,r})}})
+  it('E009 N2 two actual trades permit one sheep and one pig then finish without a third trade',()=>{const s=make({wood:3,clay:2}),a=buy(s),first=trade(s,a.r,'sheep',['wood','clay']),second=trade(s,first,'boar',['wood','wood','clay']),r=finish(s,second,false);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[0]!.resources.boar,1);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.clay,0);assert.ok(!(r.interaction.stateId==='wait'&&r.interaction.request.kind==='choice'));save('E009-N2',{a,first,second,r})})
+  it('E009 N3 declining first offer retains second and declining both cannot consume food or grain as building resources',()=>{const s=make({wood:2}),a=buy(s),first=decline(s,a.r),paid=trade(s,first,'sheep',['wood','wood']),r=finish(s,paid,false);assert.equal(r.state.players[0]!.resources.sheep,1);save('E009-N3-second',{a,first,paid,r});const empty=make(),b=buy(empty),one=decline(empty,b.r),two=decline(empty,one),end=finish(empty,two,false);assert.equal(end.state.players[0]!.resources.food,100);assert.equal(end.state.players[0]!.resources.sheep+end.state.players[0]!.resources.boar+end.state.players[0]!.resources.cattle,0);save('E009-N3-empty',{b,one,two,end})})
+  it('E009 N4 unknown trade rejects before legal exchange and entire passing purchase undo restores goods animals hand and occupancy',()=>{const s=make({wood:1,clay:1}),before=ok(s.getState()),a=buy(s),error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'unknown-barter-trade')),paid=trade(s,a.r,'sheep',['wood','clay']),r=finish(s,decline(s,paid),false),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.resources.clay,1);assert.equal(undone.state.players[0]!.resources.sheep,0);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);save('E009-N4',{before,a,error,paid,r,undone})})
 })

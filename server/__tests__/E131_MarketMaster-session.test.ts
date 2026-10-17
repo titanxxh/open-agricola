@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setActiveWorkerCount } from '../../shared/domain/player'
 import { findTravelingPlayersSpace } from '../../shared/cards/helpers/action-space-categories'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E131_MarketMaster'
+import assert from 'node:assert/strict'
+import * as audit51Family from './_helpers/audit/ae-negative-51-family'
 
 const CARD_ID = 'E131_MarketMaster'
 const TARGET_ID = 'A100_Curator'
@@ -195,5 +197,36 @@ describe('E131 Market Master parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(TARGET_ID)
     expect(response.state.players[0]!.resources.food).toBe(2)
+  })
+})
+
+describe('ae-negative-51-family', () => {
+  const { sessions, save, setup, choose, finish, offer, take, market } = audit51Family
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('E131 N1 real last person Traveling Players plays one occupation for one food or may decline', () => {
+    for (const accept of [true, false]) {
+      const s = setup('E131_MarketMaster')
+      let r = market(s)
+      if (accept) {
+        r = offer(s, r, 'E131_MarketMaster')
+        r = choose(s, r, o => o.value === 'A125_Priest' || !['__skip__', '__pass__'].includes(o.value))
+        if (!r.state.players[0]!.occupationPlayed.includes('A125_Priest'))
+          r = choose(s, r, o => o.value === 'A125_Priest')
+      }
+      r = finish(s, r)
+      assert.equal(r.state.players[0]!.resources.food, accept ? 21 : 22)
+      assert.equal(r.state.players[0]!.occupationPlayed.includes('A125_Priest'), accept)
+      assert.equal(r.state.actionSpaces.flatMap(a => a.takenBy).filter(w => w.playerId === r.state.players[0]!.id).length, 2)
+      save(`E131-N1-${accept}`, r)
+    }
+  })
+  it('E131 N2 first person and zero food on last Traveling Players cannot play held occupation', () => {
+    for (const mode of ['first', 'short']) {
+      const s = setup('E131_MarketMaster', 14, state => state.players[0]!.occupationHand = ['A125_Priest'])
+      const r = mode === 'first' ? finish(s, take(s, 'traveling-players')) : market(s, 0, 0)
+      assert.ok(!r.state.players[0]!.occupationPlayed.includes('A125_Priest'))
+      assert.equal(r.state.players[0]!.resources.food, mode === 'first' ? 22 : 0)
+      save(`E131-N2-${mode}`, r)
+    }
   })
 })

@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C141_SheepProvider'
+import * as audit53Cards from './_helpers/audit/ae-negative-53-cards'
 
 const CARD_ID = 'C141_SheepProvider'
 
@@ -88,4 +89,11 @@ describe('C141_SheepProvider session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
+})
+
+describe('ae-negative-53-cards', () => {
+  const { sessions, save, ok, make, finish, ready, resources, pool } = audit53Cards
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  it('C141 N1 owner and actual opponent Sheep Market each grant owner exactly one grain without rewarding third player', () => { const s = make('C141_SheepProvider', st => pool(st, 'sheep-market', 'sheep', 1)), r = finish(s, ok(s.takeAction(0, 'sheep-market')), false); resources(r, { grain: 1, sheep: 1 }); resources(r, { grain: 0 }, 2); const c = make('C141_SheepProvider', st => pool(st, 'sheep-market', 'sheep', 1)); finish(c, ok(c.takeAction(0, 'day-laborer')), false); ready(c); const cr = finish(c, ok(c.takeAction(1, 'sheep-market')), false); resources(cr, { grain: 1 }); resources(cr, { grain: 0, sheep: 1 }, 1); resources(cr, { grain: 0 }, 2); save('C141-N1', { r, cr }) })
+  it('C141 N2 nonmarket use and unplayed Sheep Provider cannot grant extra grain', () => { const s = make('C141_SheepProvider'), r = finish(s, ok(s.takeAction(0, 'grain-seeds')), false); resources(r, { grain: 1 }); const c = make('C141_SheepProvider', st => pool(st, 'sheep-market', 'sheep', 1), false), cr = finish(c, ok(c.takeAction(0, 'sheep-market')), false); resources(cr, { grain: 0, sheep: 1 }); save('C141-N2', { r, cr }) })
 })

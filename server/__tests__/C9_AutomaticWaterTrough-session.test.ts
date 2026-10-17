@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit25Trough from './_helpers/audit/ae-negative-25-trough'
 const CARD_ID = 'C009_AutomaticWaterTrough'
 
 describe('C009_AutomaticWaterTrough session', () => {
@@ -113,4 +116,13 @@ describe('C009_AutomaticWaterTrough session', () => {
         child.children.some((nested) => nested.type === 'leaf' && nested.params?.cattle === 1)),
     ).toBe(false)
   })
+})
+
+describe('ae-negative-25-trough', () => {
+  const { CARD, sessions, save, ok, finish, menu, make, purchase, animal } = audit25Trough
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('C009 N1 actual one wood purchase gains one selected legally housed animal for exact zero one or two food',()=>{for(const[type,cost]of[['sheep',0],['boar',1],['cattle',2]]as const){const s=make(),a=purchase(s),r=animal(s,a.chosen,type);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,2-cost);assert.equal(r.state.players[0]!.resources[type],1);assert.equal(['sheep','boar','cattle'].reduce((n,k)=>n+r.state.players[0]!.resources[k as 'sheep'],0),1);assert.equal(r.state.players[1]!.resources[type],0);assert.ok(r.state.players[1]!.minorHand.includes(CARD));save(`C009-N1-${type}`,{a,r})}})
+  it('C009 N2 optional decline or occupied household cannot replace an existing animal or create excess animals',()=>{for(const occupied of[false,true]){const s=make(2,1,occupied),a=purchase(s),r=finish(s,a.chosen,false);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,2);assert.equal(r.state.players[0]!.resources.sheep,occupied?1:0);assert.equal(r.state.players[0]!.resources.boar,0);assert.equal(r.state.players[0]!.resources.cattle,0);save(`C009-N2-${occupied}`,{a,r})}})
+  it('C009 N3 missing wood refuses card and zero food permits only the free sheep with unknown branch rejected',()=>{const ss=make(2,0),pending=menu(ss),error=assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,CARD)),alternative=finish(ss,ok(ss.resolveChoice(0,'B004_WoodPile')),false);assert.ok(alternative.state.players[0]!.minorHand.includes(CARD));save('C009-N3-wood',{pending,error,alternative});const s=make(0),a=purchase(s),unknown=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'missing-animal')),r=animal(s,a.chosen,'sheep');assert.equal(r.state.players[0]!.resources.food,0);assert.equal(r.state.players[0]!.resources.sheep,1);assert.equal(r.state.players[0]!.resources.boar,0);assert.equal(r.state.players[0]!.resources.cattle,0);save('C009-N3-food',{a,unknown,r})})
+  it('C009 N4 whole cattle purchase undo restores wood food animals and passing hand before one sheep replay',()=>{const s=make(),a=purchase(s),r=animal(s,a.chosen,'cattle'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,1);assert.equal(undone.state.players[0]!.resources.food,2);assert.equal(undone.state.players[0]!.resources.cattle,0);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));const second=purchase(s),retry=animal(s,second.chosen,'sheep');assert.equal(retry.state.players[0]!.resources.sheep,1);assert.equal(retry.state.players[0]!.resources.food,2);save('C009-N4',{a,r,undone,second,retry})})
 })

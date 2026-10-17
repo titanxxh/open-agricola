@@ -3,7 +3,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A125_Priest'
 import '../../shared/cards/B/B099_Tutor'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -12,6 +12,9 @@ import '../../shared/cards/A/A001_Shelter'
 import '../../shared/cards/A/A037_Bucksaw'
 import '../../shared/cards/D/D152_Patron'
 import '../../shared/cards/B/B049_Scales'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit20Balance from './_helpers/audit/ae-negative-20-balance'
 
 const CARD_ID = 'B049_Scales'
 const PLACEHOLDER = '__test_placeholder__'
@@ -302,4 +305,14 @@ describe('B049 Scales parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(BUCKSAW_ID)
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
+})
+
+describe('ae-negative-20-balance', () => {
+  const { CARD, MINOR, OCCS, sessions, save, ok, turn, make, select, minor } = audit20Balance
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B049 N1 real wood purchase needs no occupation and never rewards its own play',()=>{const s=make(false),r=minor(s,CARD);assert.ok(r.state.players[0]!.minorPlayed.includes(CARD));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,100);for(const mode of['occupation','wood']){const ss=make(false,mode==='occupation'?1:0,state=>{if(mode==='wood')state.players[0]!.resources.wood=0}),pending=turn(ss,0,'meeting-place');const i=pending.interaction;if(i.stateId==='wait'&&i.request.kind==='choice'&&i.request.options.some(o=>o.value.startsWith('action-improvement-'))){const o=i.request.options.find(o=>o.value.startsWith('action-improvement-'))!;ok(ss.resolveChoice(0,o.value))}assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,CARD));const legal=select(ss,ss.getState(),'B004_WoodPile');assert.equal(legal.state.players[0]!.resources.food,100);save(`B049-N1-${mode}`,{pending,legal})}save('B049-N1',r)})
+  it('B049 N2 actual occupation balances one improvement for two food while unequal final counts grant none',()=>{for(const n of[0,1]){const s=make(true,n),card=OCCS[n]!,pending=turn(s,0,'lessons'),r=select(s,pending,card);assert.ok(r.state.players[0]!.occupationPlayed.includes(card));assert.equal(r.state.players[0]!.resources.food,100-(n?1:0)+(n?0:2));assert.equal(r.state.log.filter(e=>e.key==='log.playOccupation').length,1);save(`B049-N2-${n}`,{pending,r})}})
+  it('B049 N3 actual normal minor and major each balance two occupations for exactly two food',()=>{const s=make(true,2),minorResult=minor(s,MINOR);assert.ok(minorResult.state.players[0]!.minorPlayed.includes(MINOR));assert.equal(minorResult.state.players[0]!.resources.food,102);const m=make(true,2),pending=turn(m,0,'major-improvement'),majorResult=select(m,pending,'Major_Fireplace1');assert.ok(majorResult.state.players[0]!.improvements.includes('Major_Fireplace1'));assert.equal(majorResult.state.players[0]!.resources.clay,0);assert.equal(majorResult.state.players[0]!.resources.food,102);save('B049-N3',{minorResult,pending,majorResult})})
+  it('B049 N4 passing improvement hand Scales and opponent occupation cannot trigger owner balance food',()=>{const s=make(true,1),passing=minor(s,'A006_StorageBarn');assert.equal(passing.state.players[0]!.resources.food,100);assert.ok(passing.state.players[1]!.minorHand.includes('A006_StorageBarn'));assert.equal(passing.state.players[0]!.minorPlayed.length,1);const h=make(false),hand=select(h,turn(h,0,'lessons'),OCCS[0]!);assert.equal(hand.state.players[0]!.resources.food,100);const other=make(true,0,state=>state.players[1]!.occupationHand=[OCCS[0]!,OCCS[1]!]);turn(other,0,'reed-bank');const pending=turn(other,1,'lessons'),o=select(other,pending,OCCS[0]!,1);assert.equal(o.state.players[0]!.resources.food,100);assert.equal(o.state.players[1]!.resources.food,100);save('B049-N4',{passing,hand,pending,o})})
+  it('B049 N5 invalid choice actor and whole occupation undo restore balanced food and card before one retry',()=>{const s=make(),pending=turn(s,0,'lessons');assertRejectedUnchanged(s,()=>s.resolveChoice(1,OCCS[0]!));assertRejectedUnchanged(s,()=>s.resolveChoice(0,'invalid-occupation'));const r=select(s,pending,OCCS[0]!),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,100);assert.equal(undone.state.players[0]!.occupationPlayed.length,0);assert.ok(undone.state.players[0]!.occupationHand.includes(OCCS[0]!));const retry=select(s,turn(s,0,'lessons'),OCCS[0]!);assert.equal(retry.state.players[0]!.resources.food,102);save('B049-N5',{pending,r,undone,retry})})
 })

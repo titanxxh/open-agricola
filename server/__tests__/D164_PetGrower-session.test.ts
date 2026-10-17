@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -6,6 +6,8 @@ import type { AnimalType } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D164_PetGrower'
 import '../../shared/cards/A/A099_FellowGrazer'
+import assert from 'node:assert/strict'
+import * as audit57Livestock from './_helpers/audit/ae-negative-57-livestock'
 
 const CARD_ID = 'D164_PetGrower'
 const OTHER_OCCUPATION = 'A099_FellowGrazer'
@@ -236,5 +238,35 @@ describe('D164 Pet Grower parity', () => {
     expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.resources.sheep).toBe(0)
     expect(response.state.actionSpaces.find(space => space.id === 'sheep-market')!.takenBy).toEqual([])
+  })
+})
+
+describe('ae-negative-57-livestock', () => {
+  const { sessions, animals, ok, save, make, pasture, finish, count, collect } = audit57Livestock
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D164 N1 actual Sheep Pig and Cattle Market with animals housed outside the house each grant exactly one additional sheep', () => {
+    for (const [space, animal] of [['sheep-market', 'sheep'], ['pig-market', 'boar'], ['cattle-market', 'cattle']] as const) {
+      const session = make('D164_PetGrower', state => { pasture(state.players[0]!, null, 0, true); state.actionSpaces.find(candidate => candidate.id === space)!.resources[animal] = 1 }, true, 14), response = collect(session, 0, space)
+      assert.equal(response.state.players[0]!.resources.sheep, animal === 'sheep' ? 2 : 1)
+      assert.equal(response.state.players[0]!.resources[animal], animal === 'sheep' ? 2 : 1)
+      save(`D164-N1-${animal}`, response)
+    }
+  })
+  it('D164 N2 using a market then housing its single animal as the house pet suppresses the extra sheep', () => {
+    for (const [space, animal] of [['sheep-market', 'sheep'], ['pig-market', 'boar'], ['cattle-market', 'cattle']] as const) {
+      const session = make('D164_PetGrower', state => { pasture(state.players[0]!); state.actionSpaces.find(candidate => candidate.id === space)!.resources[animal] = 1 }, true, 14), response = collect(session, 0, space, true)
+      assert.deepEqual(count(response), animals.map(candidate => candidate === animal ? 1 : 0))
+      assert.equal(Object.values(response.state.players[0]!.houseAnimals).includes(animal), true)
+      save(`D164-N2-${animal}`, response)
+    }
+  })
+  it('D164 N3 hand card opponent animal collection and unrelated owner placement never grant owner sheep', () => {
+    for (const mode of ['hand', 'opponent', 'unrelated']) {
+      const actor = mode === 'opponent' ? 1 : 0
+      const session = make('D164_PetGrower', state => { state.currentPlayerIndex = actor; pasture(state.players[actor]!); state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1 }, mode !== 'hand', 14)
+      const response = mode === 'unrelated' ? finish(session, ok(session.takeAction(0, 'grain-seeds'))) : collect(session, actor, 'pig-market')
+      assert.equal(response.state.players[0]!.resources.sheep, 0)
+      save(`D164-N3-${mode}`, response)
+    }
   })
 })

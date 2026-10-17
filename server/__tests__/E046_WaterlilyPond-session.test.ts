@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E046_WaterlilyPond'
+import assert from 'node:assert/strict'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'E046_WaterlilyPond'
 const FILLER = '__test_placeholder__'
@@ -131,4 +133,22 @@ describe('E046 Waterlily Pond parity', () => {
 
     expect(cardEntry?.score).toBe(1)
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, end, final, purchase, rejectBuy, resource, future, points, occupations } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("E046 N1 exactly two occupations allow real free purchase and both naturally due foods", () => { const s = make('E046_WaterlilyPond', st => occupations(st.players[0]!, 2), false), r = purchase(s, 'E046_WaterlilyPond'); assert.deepEqual(future(r, 'E046_WaterlilyPond'), [6, 7]); resource(r, { food: 100 }); const six = end(s), seven = end(s); resource(six, { food: 101 }); resource(seven, { food: 102 }); save('E046-N1', { r, six, seven }); });
+  it("E046 N2 one or three occupations and a held card cannot produce Waterlily Pond food", () => { for (const n of [1, 3])
+      save(`E046-N2-${n}`, rejectBuy(make('E046_WaterlilyPond', st => occupations(st.players[0]!, n), false), 'E046_WaterlilyPond')); const s = make('E046_WaterlilyPond', st => occupations(st.players[0]!, 2), false), r = end(s, true, [], 'E046_WaterlilyPond'); resource(r, { food: 100 }); assert.deepEqual(future(r, 'E046_WaterlilyPond'), []); save('E046-N2-hand', r); });
+  it("E046 N3 late purchases with exactly two occupations clip and preserve one final printed point", () => { for (const round of [13, 14]) {
+      const s = make('E046_WaterlilyPond', st => occupations(st.players[0]!, 2), false, round), r = purchase(s, 'E046_WaterlilyPond');
+      assert.deepEqual(future(r, 'E046_WaterlilyPond'), round === 13 ? [14] : []);
+      const due = round === 13 ? end(s) : final(s);
+      if (round === 13)
+          resource(due, { food: 97 });
+      else
+          assert.equal(points(due, 'E046_WaterlilyPond'), 1);
+      save(`E046-N3-${round}`, { r, due });
+  } });
 })

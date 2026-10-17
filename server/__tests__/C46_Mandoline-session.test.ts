@@ -1,5 +1,5 @@
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
@@ -7,6 +7,9 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type { GameState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C046_Mandoline'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit36Native from './_helpers/audit/ae-negative-36-native'
 
 const CARD_ID = 'C046_Mandoline'
 const ANYTIME_ID = 'C46-mandoline-anytime'
@@ -178,4 +181,30 @@ describe('C046 Mandoline parity', () => {
     expect(isCardFlagged(nextRound.state.players[0]!, CARD_ID)).toBe(false)
     expect(anytimeOffered(enterActiveInteraction(session))).toBe(true)
   })
+})
+
+describe('ae-negative-36-native', () => {
+  const { sessions, traces, save, make, finish, ready, fill, end, final, purchase, rejectBuy, resource, future, bonus, plow, anytime } = audit36Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); traces.splice(0); });
+  it("C046 N1 real purchase and a paid anytime use grant one point and two naturally due foods", () => { const s = make('C046_Mandoline', st => Object.assign(st.players[0]!.resources, { wood: 1, vegetable: 2 }), false), bought = purchase(s, 'C046_Mandoline'); resource(bought, { wood: 0 }); fill(s); ready(s); const p = plow(s); assert.ok(p.interaction.anytimeActions.some(a => a.id === 'C46-mandoline-anytime')); const used = anytime(s, 'C46-mandoline-anytime'); resource(used, { vegetable: 1 }); assert.equal(bonus(used, 'C046_Mandoline'), 1); assert.deepEqual(future(used, 'C046_Mandoline'), [6, 7]); finish(s, used); const six = end(s), seven = end(s); resource(six, { food: 101 }); resource(seven, { food: 102 }); assert.deepEqual(future(seven, 'C046_Mandoline'), []); save('C046-N1', { bought, p, used, six, seven }); });
+  it("C046 N2 same-round repeat absent vegetable held card foreign actor and missing wood prevent a payment", () => { save('C046-N2-cost', rejectBuy(make('C046_Mandoline', undefined, false), 'C046_Mandoline')); const s = make('C046_Mandoline', st => { st.players[0]!.resources.vegetable = 2; }), p = plow(s), used = anytime(s, 'C46-mandoline-anytime'), bad = assertRejectedUnchanged(s, () => s.takeAnytimeAction(0, 'C46-mandoline-anytime')); resource(used, { vegetable: 1 }); assert.equal(bonus(used, 'C046_Mandoline'), 1); assert.deepEqual(future(used, 'C046_Mandoline'), [6, 7]); save('C046-N2-repeat', { p, used, bad, r: finish(s, used) }); for (const mode of ['vegetable', 'hand', 'opponent']) {
+      const a = mode === 'opponent' ? 1 : 0, t = make('C046_Mandoline', st => { st.currentPlayerIndex = a; Object.assign(st.players[0]!.resources, { wood: 1, vegetable: mode === 'vegetable' ? 0 : 1 }); }, mode !== 'hand'), before = plow(t, a, 'C046_Mandoline');
+      assert.equal(before.interaction.anytimeActions.some(x => x.id === 'C46-mandoline-anytime'), false);
+      const rejected = assertRejectedUnchanged(t, () => t.takeAnytimeAction(a, 'C46-mandoline-anytime')), r = finish(t, before, true, [], 'C046_Mandoline');
+      assert.deepEqual(future(r, 'C046_Mandoline'), []);
+      assert.equal(bonus(r, 'C046_Mandoline'), 0);
+      save(`C046-N2-${mode}`, { before, rejected, r });
+  } });
+  it("C046 N3 late-round paid uses award actual final points while future food stops at fourteen", () => { for (const round of [13, 14]) {
+      const s = make('C046_Mandoline', st => { st.players[0]!.resources.vegetable = 1; }, true, round), p = plow(s), used = anytime(s, 'C46-mandoline-anytime');
+      resource(used, { vegetable: 0 });
+      assert.deepEqual(future(used, 'C046_Mandoline'), round === 13 ? [14] : []);
+      finish(s, used);
+      const due = round === 13 ? end(s) : s.getState();
+      if (round === 13)
+          resource(due, { food: 97 });
+      const scored = final(s);
+      assert.equal(bonus(scored, 'C046_Mandoline'), 1);
+      save(`C046-N3-${round}`, { p, used, due, scored });
+  } });
 })

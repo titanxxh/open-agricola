@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { afterEach, it, describe } from 'vitest'
+import * as audit25Merchant from './_helpers/audit/ae-negative-25-merchant'
+
+describe('ae-negative-25-merchant', () => {
+  const { CARD, sessions, save, ok, finish, make, turn, decline } = audit25Merchant
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B103 N1 actual first Lessons pays no food and immediately grants exactly one wood and reed',()=>{const s=make(false),pending=turn(s,0,'lessons'),r=finish(s,ok(s.resolveChoice(0,CARD)),false);assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.reed,1);assert.equal(r.state.players[0]!.resources.food,100);save('B103-N1',{pending,r})})
+  it('B103 N2 actual Meeting Place decline gains one food and major action decline selects only one vegetable',()=>{for(const kind of['food','vegetable']as const){const s=make(),pending=turn(s,0,kind==='food'?'meeting-place':'major-improvement'),r=decline(s,pending,kind);assert.equal(r.state.players[0]!.resources.food,100+(kind==='food'?1:0));assert.equal(r.state.players[0]!.resources.vegetable,kind==='vegetable'?1:0);assert.equal(r.state.players[0]!.resources.wood,0);save(`B103-N2-${kind}`,{pending,r})}})
+  it('B103 N3 hand only and opponent improvement decline grant no owner alternative or resource',()=>{for(const mode of['hand','opponent']){const s=make(mode!=='hand');if(mode==='opponent')finish(s,turn(s,0,'grain-seeds'),false);const actor=mode==='opponent'?1:0,pending=turn(s,actor,'meeting-place');assert.ok(pending.interaction.stateId!=='wait'||pending.interaction.request.kind!=='choice'||pending.interaction.request.options.every(o=>o.sourceCard!==CARD));const r=finish(s,pending,false);assert.equal(r.state.players[0]!.resources.food,100);assert.equal(r.state.players[0]!.resources.vegetable,0);save(`B103-N3-${mode}`,{pending,r})}})
+  it('B103 N4 whole real improvement decline undo restores gained resource and occupancy before one replay',()=>{const s=make(),before=ok(s.getState()),pending=turn(s,0,'major-improvement'),r=decline(s,pending,'vegetable'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.vegetable,0);assert.deepEqual(undone.state.actionSpaces,before.state.actionSpaces);const retry=decline(s,turn(s,0,'major-improvement'),'food');assert.equal(retry.state.players[0]!.resources.food,101);assert.equal(retry.state.players[0]!.resources.vegetable,0);save('B103-N4',{before,pending,r,undone,retry})})
+})

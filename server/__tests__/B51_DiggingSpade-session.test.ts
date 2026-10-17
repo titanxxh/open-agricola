@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { B051_DiggingSpade } from '../../shared/cards/B/B051_DiggingSpade'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit20Collect from './_helpers/audit/ae-negative-20-collect'
 
 const CARD_ID = 'B051_DiggingSpade'
 
@@ -91,4 +94,13 @@ describe('B051_DiggingSpade session', () => {
       expect(session.withCtx(() => meetsCardPrerequisites(player, B051_DiggingSpade, state.round, state))).toBe(true)
     })
   })
+})
+
+describe('ae-negative-20-collect', () => {
+  const { SPADE, sessions, save, ok, setup, turn, purchaseMenu, buy, owner, boar } = audit20Collect
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B051 N1 actual one wood purchase starts at round seven and before seven or missing wood refuses',()=>{const s=setup(SPADE,state=>state.players[0]!.resources.wood=1,7),{pending,r}=buy(s,SPADE);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.food,100);save('B051-N1',{pending,r});for(const[round,wood]of[[6,1],[7,0]]){const ss=setup(SPADE,state=>state.players[0]!.resources.wood=wood!,round),denied=purchaseMenu(ss);assertRejectedUnchanged(ss,()=>ss.resolveChoice(0,SPADE));const legal=ok(ss.resolveChoice(0,'B004_WoodPile'));assert.equal(legal.state.players[0]!.resources.food,100);save(`B051-N1-${round}-${wood}`,{denied,legal})}})
+  it('B051 N2 clay accumulation pays food for zero through four legally housed boar only',()=>{for(const n of[0,1,2,3,4]){const s=setup(SPADE,state=>{state.players[0]!.resources.wood=1;boar(state,n)});buy(s,SPADE);const before=owner(s),r=turn(s,0,'clay-pit');assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food+n);assert.equal(r.state.players[0]!.resources.boar,n);assert.equal(r.state.players[1]!.resources.food,before.state.players[1]!.resources.food);save(`B051-N2-${n}`,{before,r})}})
+  it('B051 N3 opponent clay unrelated action and card in hand cannot grant owner boar food',()=>{const hand=turn(setup(SPADE,state=>boar(state,1)),0,'clay-pit');assert.equal(hand.state.players[0]!.resources.food,100);const s=setup(SPADE,state=>{state.players[0]!.resources.wood=1;boar(state,3)});buy(s,SPADE);const other=turn(s,1,'clay-pit'),unrelated=turn(s,0,'forest');assert.equal(other.state.players[0]!.resources.food,100);assert.equal(other.state.players[1]!.resources.food,100);assert.equal(unrelated.state.players[0]!.resources.food,100);save('B051-N3',{hand,other,unrelated})})
+  it('B051 N4 actual clay collection undo restores food and same finite animals before one retry',()=>{const s=setup(SPADE,state=>{state.players[0]!.resources.wood=1;boar(state,3)});buy(s,SPADE);const before=owner(s),r=turn(s,0,'clay-pit'),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.food,before.state.players[0]!.resources.food);assert.equal(undone.state.players[0]!.resources.boar,3);const retry=turn(s,0,'clay-pit');assert.equal(retry.state.players[0]!.resources.food,before.state.players[0]!.resources.food+3);save('B051-N4',{before,r,undone,retry})})
 })

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B123_RoofBallaster'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit27Ballaster from './_helpers/audit/ae-negative-27-ballaster'
 
 const CARD_ID = 'B123_RoofBallaster'
 const FILLER = '__test_placeholder__'
@@ -91,4 +94,13 @@ describe('B123 Roof Ballaster parity', () => {
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, stone: 0 })
   })
+})
+
+describe('ae-negative-27-ballaster', () => {
+  const { CARD, sessions, save, ok, ready, finish, make, lesson } = audit27Ballaster
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('B123 N1 actual first Lessons optional one food total grants one stone per two three or five real rooms',()=>{for(const rooms of[2,3,5]){const s=make(rooms),a=lesson(s);assert.equal(a.r.state.players[0]!.resources.food,0);assert.equal(a.r.state.players[0]!.resources.stone,rooms);assert.equal(a.r.state.players[1]!.resources.stone,0);assert.equal(a.r.state.players[0]!.rooms,rooms);save(`B123-N1-${rooms}`,a)}})
+  it('B123 N2 second occupation pays ordinary one food before one additional food buys room count stone',()=>{const s=make(3,2,false),a=lesson(s);assert.equal(a.r.state.players[0]!.resources.food,0);assert.equal(a.r.state.players[0]!.resources.stone,3);assert.equal(a.r.state.players[0]!.occupationPlayed.length,2);save('B123-N2',a)})
+  it('B123 N3 optional decline zero remaining food hand only and opponent action cannot grant stone',()=>{for(const mode of['decline','food']){const s=make(2,mode==='food'?0:1),a=lesson(s,false);assert.equal(a.r.state.players[0]!.resources.food,mode==='food'?0:1);assert.equal(a.r.state.players[0]!.resources.stone,0);save(`B123-N3-${mode}`,a)}const s=make(),first=finish(s,ok(s.takeAction(0,'grain-seeds')),false);ready(s);const second=finish(s,ok(s.takeAction(1,'clay-pit')),false);assert.equal(second.state.players[0]!.resources.stone,0);assert.ok(second.state.players[0]!.occupationHand.includes(CARD));save('B123-N3-hand',{first,second})})
+  it('B123 N4 unknown optional choice rejects before exact acceptance and whole Lessons undo restores food stone rooms and hand',()=>{const s=make(3),pending=ok(s.takeAction(0,'lessons')),chosen=ok(s.resolveChoice(0,CARD));assert.ok(chosen.interaction.stateId==='wait'&&chosen.interaction.request.kind==='choice');const error=assertRejectedUnchanged(s,()=>s.resolveChoice(0,'unknown-ballaster-choice')),r=finish(s,chosen,true),undone=ok(s.undoAction());assert.equal(r.state.players[0]!.resources.stone,3);assert.equal(undone.state.players[0]!.resources.stone,0);assert.equal(undone.state.players[0]!.resources.food,1);assert.equal(undone.state.players[0]!.rooms,3);assert.ok(undone.state.players[0]!.occupationHand.includes(CARD));const retry=lesson(s);assert.equal(retry.r.state.players[0]!.resources.stone,3);save('B123-N4',{pending,chosen,error,r,undone,retry})})
 })

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import '../../shared/cards/B/B148_PetBroker'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 describe('B148_PetBroker session', () => {
   const setup = () => {
@@ -92,4 +95,21 @@ describe('B148_PetBroker session', () => {
     expect(cardZone?.animalType).toBe('sheep')
     expect(cardZone?.animalCount).toBe(1)
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, choice, finish, play, undo, res, reorg } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B148 N1 real first purchase stores its sheep on its own card and undo restores it', () => { const s = make('B148_PetBroker', undefined, false), p = play(s, 'B148_PetBroker'), r = finish(s, p), u = undo(s); res(r, { sheep: 1, food: 100 }); assert.deepEqual(r.state.players[0]!.cardStates.B148_PetBroker?.extraData?.animalCounts, { sheep: 1 }); res(u, { sheep: 0 }); assert.ok(u.state.players[0]!.occupationHand.includes('B148_PetBroker')); save('B148-N1', { p, r, u }); });
+  it('B148 N2 occupation count controls actual sheep capacity and rejects excess or other species', () => { for (const n of [1, 3]) {
+      const s = make('B148_PetBroker', st => { st.players[0]!.occupationPlayed.push(...['A125_Priest', 'A133_Braggart'].slice(0, n - 1)); st.players[0]!.resources.sheep = n; st.players[0]!.resources.boar = 1; }), p = reorg(s);
+      assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'animal-reorg');
+      const z = p.interaction.request.zones.find(z => z.id === 'card:B148_PetBroker');
+      assert.ok(z);
+      assert.equal(z.capacity, n);
+      const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: n + 1 }] })), wrong = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'boar', animalCount: 1 }] })), r = choice(s, 0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: n }] });
+      res(r, { sheep: n, boar: 0 });
+      save(`B148-N2-${n}`, { p, bad, wrong, r });
+  } });
+  it('B148 N3 a held card provides no holder or purchase sheep', () => { const s = make('B148_PetBroker', st => { st.players[0]!.resources.sheep = 0; }, false), p = reorg(s); assert.ok(p.interaction.stateId === 'wait' && p.interaction.request.kind === 'animal-reorg'); assert.equal(p.interaction.request.zones.some(z => z.id === 'card:B148_PetBroker'), false); const room = p.interaction.request.zones.find(z => z.zoneType === 'house'); assert.ok(room); const r = choice(s, 0, 'confirm', { zones: [{ ...room, animalType: 'sheep', animalCount: 1 }] }); res(r, { sheep: 1 }); save('B148-N3', { p, r }); });
 })

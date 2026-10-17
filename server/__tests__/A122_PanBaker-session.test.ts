@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
@@ -7,6 +7,9 @@ import '../../shared/cards/A/A122_PanBaker'
 import '../../shared/cards/B/B130_FullPeasant'
 import '../../shared/cards/D/D066_PotterCeramics'
 import '../../shared/cards/D/D075_WoodField'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
+import * as audit14Sow from './_helpers/audit/ae-negative-14-sow'
 
 const CARD_ID = 'A122_PanBaker'
 
@@ -183,4 +186,14 @@ describe('A122 Pan Baker parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
   })
+})
+
+describe('ae-negative-14-sow', () => {
+  const { PAN, FIELD, sessions, save, ok, setup, turn, sow } = audit14Sow
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('A122 N1 real Grain Utilization adds two clay one wood before ordinary sow once',()=>{const s=setup(PAN);const pending=sow(s,turn(s,0,'grain-utilization'));assert.equal(pending.state.players[0]!.resources.clay,2);assert.equal(pending.state.players[0]!.resources.wood,1);const r=ok(s.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'}]}));assert.equal(r.state.players[0]!.resources.clay,2);assert.equal(r.state.players[0]!.resources.wood,1);assert.equal(r.state.players[0]!.resources.grain,1);save('A122-N1',{pending,r})})
+  it('A122 N2 incoming wood unlocks card field sow from empty reserve',()=>{const s=setup(PAN,state=>{const p=state.players[0]!;p.fields=[];p.resources.grain=0;p.minorPlayed=[FIELD]});assert.equal(s.getActionAvailability(0)['grain-utilization'],true);const pending=sow(s,turn(s,0,'grain-utilization'));assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{crops:[{row:-1,col:4075,crop:'grain'}]}));const r=ok(s.commitSelectionChoice(0,{crops:[{row:-1,col:4075,crop:'wood'}]}));assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.resources.clay,2);assert.deepEqual(readCardExtraData(r.state.players[0]!,FIELD,'cardFieldStacks'),[{crop:'wood',remaining:3},null]);save('A122-N2',{pending,r})})
+  it('A122 N3 hand nonmatching Cultivation and opponent use cannot reward owner',()=>{const basic=turn(setup(PAN),0,'day-laborer');assert.equal(basic.state.players[0]!.resources.clay,0);assert.equal(basic.state.players[0]!.resources.wood,0);const handS=setup(PAN,undefined,false);sow(handS,turn(handS,0,'grain-utilization'));const hand=ok(handS.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'}]}));assert.equal(hand.state.players[0]!.resources.clay,0);assert.equal(hand.state.players[0]!.resources.wood,0);const s=setup(PAN,state=>{state.players[1]!.fields=[{row:0,col:1,stacks:[]}];state.players[1]!.resources.grain=1});turn(s,0,'day-laborer');const pending=turn(s,1,'grain-utilization');assert.equal(pending.state.players[0]!.resources.clay,0);assert.equal(pending.state.players[0]!.resources.wood,0);save('A122-N3',{basic,hand,pending})})
+  it('A122 N4 incoming bonus attempt blocks with retained resources and explicit undo removes them',()=>{const s=setup(PAN,state=>{state.players[0]!.fields=[];state.players[0]!.resources.grain=0});assert.equal(s.getActionAvailability(0)['grain-utilization'],true);const attempted=turn(s,0,'grain-utilization');assert.ok(attempted.interaction.stateId==='wait'&&attempted.interaction.request.kind==='engine-blocked');assert.equal(attempted.state.players[0]!.resources.clay,2);assert.equal(attempted.state.players[0]!.resources.wood,1);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.clay,0);assert.equal(undone.state.players[0]!.resources.wood,0);save('A122-N4',{attempted,undone,acceptedDifference:'ADR0015 permits a startable before chain, then blocks the mandatory unavailable body and retains effects until explicit undo'})})
+  it('A122 N5 whole action undo removes bonus and crop stack before exactly one retry',()=>{const s=setup(PAN);sow(s,turn(s,0,'grain-utilization'));const first=ok(s.commitSelectionChoice(0,{crops:[{row:0,col:1,crop:'grain'}]}));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.equal(undone.state.players[0]!.resources.clay,0);assert.equal(undone.state.players[0]!.resources.grain,2);sow(s,turn(s,0,'grain-utilization'));const retry=ok(s.commitSelectionChoice(0,{crops:[{row:0,col:2,crop:'grain'}]}));assert.equal(retry.state.players[0]!.resources.wood,1);assert.equal(retry.state.players[0]!.resources.clay,2);save('A122-N5',{first,undone,retry})})
 })

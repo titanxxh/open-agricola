@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -12,6 +12,9 @@ import { rollAndCacheCardPick } from '../../shared/cards/helpers/card-random'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import assert from 'node:assert/strict'
+import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
+import * as auditA132 from './_helpers/audit/ae-negative-A132'
 
 describe('A132_Publican session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -714,5 +717,55 @@ describe('A132_Publican session', () => {
     expect(after.players[0]!.cardStates?.A132_Publican?.counters?.bonusVp).toBeUndefined()
     // Owner should only have lost grain from sowing
     expect(after.players[0]!.resources.grain).toBe(grainBefore - 1)
+  })
+})
+
+describe('ae-negative-A132', () => {
+  const { CARD, sessions, setup, accept, start, score } = auditA132
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  describe('A132 negative audit: unconditional sow and response ownership', () => {
+    it('N1 rejects the wrong responder and a duplicate offer, then completes a legal transfer once', () => {
+      const session = setup()
+      const pending = start(session)
+      assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+      assert.equal(pending.interaction.playerIndex, 0)
+      const option = pending.interaction.request.options?.find(o => o.value !== '__skip__')
+      assert.ok(option)
+      assertRejectedUnchanged(session, () => session.resolveChoice(1, option.value))
+      const { response } = accept(session, session.getState(), 0)
+      assertRejectedUnchanged(session, () => session.resolveChoice(0, option.value))
+      assert.equal(response.state.players[0]!.resources.grain, 0)
+      assert.equal(response.state.players[1]!.resources.grain, 2)
+      const completed = session.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+      assert.equal(completed.ok, true, completed.error)
+      assert.equal(completed.state.players[1]!.resources.grain, 1)
+      assert.deepEqual(completed.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+      assert.equal(score(completed), 1)
+    })
+    it('N2 [expected failure] Chief Forester single-field sow cannot earn Publican grain or points', () => {
+      const session = setup({ restricted: true })
+      let r = accept(session, start(session, true), 1).response
+      const illegalOffer = r.interaction.stateId === 'wait' && r.interaction.sourceCard === CARD
+      if (illegalOffer) accept(session, r, 0)
+      r = session.commitSelectionChoice(1, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+      assert.equal(r.ok, true, r.error)
+      assert.equal(r.state.players[1]!.resources.wood, 3)
+      assert.deepEqual(r.state.players[1]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+      assert.deepEqual(r.state.players[1]!.fields[1]!.stacks, [])
+      assertRuleOutcome({ illegalOffer, ownerGrain: r.state.players[0]!.resources.grain,
+        opponentGrain: r.state.players[1]!.resources.grain, bonus: score(r) },
+      { illegalOffer: false, ownerGrain: 1, opponentGrain: 0, bonus: 0 })
+    })
+    it.each([{ grain: 0, self: false }, { grain: 1, self: true }])('N3 non-triggering sow still completes ($grain grain, self=$self)', config => {
+      const session = setup(config)
+      const actor = config.self ? 0 : 1
+      const r = start(session, false, actor)
+      assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
+      const done = session.commitSelectionChoice(actor, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+      assert.equal(done.ok, true, done.error)
+      assert.equal(score(done), 0)
+      assert.equal(done.state.players[0]!.resources.grain, 0)
+      assert.deepEqual(done.state.players[actor]!.fields[0]!.stacks, [{ kind: 'grain', remaining: 3 }])
+    })
   })
 })

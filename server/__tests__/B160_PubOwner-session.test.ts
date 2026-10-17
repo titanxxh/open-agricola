@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -7,6 +7,7 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/B/B160_PubOwner'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
+import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B160_PubOwner'
 
@@ -146,4 +147,19 @@ describe('B160_PubOwner session', () => {
     // After round end, PubOwner should have given 1 grain during return home phase
     expect(resp.state.players[0]!.resources.grain).toBe(2 + 1)
   })
+})
+
+describe('ae-negative-30-native', () => {
+  const { sessions, commands, save, make, finish, play, res, phase, pub } = audit30Native
+  afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
+  it('B160 N1 real purchase and three actual occupied spaces grant two separate grain', () => { const s = make('B160_PubOwner', undefined, false), bought = finish(s, play(s, 'B160_PubOwner')); res(bought, { grain: 1 }); const x = phase(s, [[1, 'forest'], [2, 'clay-pit'], [3, 'reed-bank'], [0, 'fishing']]); res(x.before, { grain: 1 }); res(x.r, { grain: 2 }); save('B160-N1', { bought, ...x }); });
+  it('B160 N2 every missing named space and held card prevents return-home grain', () => { for (const mode of ['forest', 'clay-pit', 'reed-bank', 'hand']) {
+      const s = make('B160_PubOwner', undefined, mode !== 'hand'), places = pub.map(([a, space]): [
+          number,
+          string
+      ] => [a, space === mode ? 'copse' : space]), x = phase(s, places, mode === 'hand' ? [] : [mode]);
+      res(x.r, { grain: 1 });
+      save(`B160-N2-${mode}`, x);
+  } });
+  it('B160 N3 three opponents alone can satisfy all occupied condition', () => { const s = make('B160_PubOwner'), x = phase(s, [[0, 'fishing'], [1, 'forest'], [2, 'clay-pit'], [3, 'reed-bank'], [0, 'copse']]); res(x.before, { grain: 0 }); res(x.r, { grain: 1 }); save('B160-N3', x); });
 })

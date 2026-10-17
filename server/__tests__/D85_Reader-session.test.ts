@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { familySize, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D085_Reader'
+import assert from 'node:assert/strict'
+import * as audit43Capacity from './_helpers/audit/ae-negative-43-capacity'
 
 const CARD_ID = 'D085_Reader'
 
@@ -113,4 +115,11 @@ describe('D085 Reader native session', () => {
   it('does not provide room when Reader is absent', () => {
     expectFamilyGrowth(setup(7, 10, false), false)
   })
+})
+
+describe('ae-negative-43-capacity', () => {
+  const { READER, sessions, save, ok, make, FILLERS, lesson, ownerReady, grow } = audit43Capacity
+  afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
+  it('D085 N1 real Reader Lessons counts itself at normal six threshold and gives only one actual family space',()=>{for(const total of[5,6,7]){const s=make(READER,false,state=>{state.players[0]!.occupationPlayed=FILLERS.slice(0,total-1);state.players[0]!.resources.food=10}),bought=lesson(s,READER);ownerReady(s);const r=grow(s,total>=6);assert.equal(bought.state.players[0]!.occupationPlayed.length,total);save(`D085-N1-${total}`,{bought,r})}})
+  it('D085 N2 simultaneous draft needs seven occupations even with ten card pool and absent Reader never grants room',()=>{for(const total of[6,7]){const s=make(READER,false,state=>{state.draftMode='simultaneous';state.draftPoolSize=10;state.players[0]!.occupationPlayed=FILLERS.slice(0,total-1);state.players[0]!.resources.food=10}),bought=lesson(s,READER);ownerReady(s);const r=grow(s,total===7);save(`D085-N2-${total}`,{bought,r})}const t=make(READER,false,state=>state.players[0]!.occupationPlayed=FILLERS),r=grow(t,false),legal=ok(t.takeAction(0,'grain-seeds'));save('D085-N2-absent',{r,legal})})
 })

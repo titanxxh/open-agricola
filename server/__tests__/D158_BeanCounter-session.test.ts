@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D158_BeanCounter'
+import assert from 'node:assert/strict'
+import * as audit56Purchase from './_helpers/audit/ae-negative-56-purchase'
 
 const CARD_ID = 'D158_BeanCounter'
 
@@ -56,4 +58,11 @@ describe('D158 Bean Counter session', () => {
     ]))
     expect(resp.scores).toEqual(beforeScores)
   })
+})
+
+describe('ae-negative-56-purchase', () => {
+  const { sessions, ok, save, make, finish, transition, pasture, legalRounds } = audit56Purchase
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  it('D158 N1 three actual Sheep Market uses across natural rounds store one then two food and release exactly three on the third',()=>{const s=make('D158_BeanCounter',st=>{st.roundActionOrder=[...legalRounds];pasture(st.players[0]!);st.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1},true,5);for(const[index,round]of[[0,5],[1,6],[2,7]]){if(index!>0)transition(s,round!);const before=ok(s.getState()),r=finish(s,ok(s.takeAction(0,'sheep-market')));assert.equal(r.state.players[0]!.resources.food-before.state.players[0]!.resources.food,index===2?3:0);assert.equal(r.state.players[0]!.cardStates.D158_BeanCounter?.counters?.food,index===2?0:index!+1);save(`D158-N1-${index}`,{before,r})}})
+  it('D158 N2 base action late round-fourteen space opponent and hand-only card cannot store a Bean Counter food',()=>{for(const mode of['base','late','opponent','hand']){const actor=mode==='opponent'?1:0,s=make('D158_BeanCounter',st=>{st.currentPlayerIndex=actor;st.roundActionOrder=[...legalRounds];st.actionSpaces.find(a=>a.id==='sheep-market')!.resources.sheep=1;if(mode==='late')Object.assign(st.players[0]!.resources,{clay:2,reed:1});},mode!=='hand',14),r=finish(s,ok(s.takeAction(actor,mode==='late'?'farm-redevelopment':mode==='base'?'grain-seeds':'sheep-market')));assert.equal(r.state.players[0]!.cardStates.D158_BeanCounter?.counters?.food??0,0);assert.equal(r.state.players[0]!.resources.food,100);save(`D158-N2-${mode}`,r)}})
 })
