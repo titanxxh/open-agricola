@@ -188,6 +188,8 @@ const opening = createOpeningSession({
 
 For startup regressions, drive draft, parent selection, and opening choices through public commands. Check `state` and `interaction` before proceeding; do not call `loadState` to erase an unexpected wait. `assertSessionFixture(session, expected)` can check the contract again after setup commands. See `first-round-start-session.test.ts` and `session-fixtures.test.ts` for complete examples.
 
+`server/__tests__/_helpers/session-assertions.ts` holds shared Session checks: `assertRejectedUnchanged` requires a rejected command to leave the returned and live `state`, `interaction` and `scores` unchanged; `confirmNext` and `getChoiceOptions` drive waits; `undoRuleSnapshot` and `assertUndoRestored` compare undo results. To keep failure evidence, call `createScenarioEvidence(import.meta.url)` from `server/__tests__/_helpers/scenario-evidence.ts` in the suite, register each Session with `track(session)`, and freeze intermediate data with `record(label, value)`. The helper disposes tracked Sessions and writes a bounded checkpoint only when a test fails. `AGRICOLA_TEST_DIAGNOSTIC=1` also writes passing diagnostics, and `AGRICOLA_TEST_EVIDENCE_DIR` selects a directory outside Git (default: the system temporary directory). Concurrent tests in one suite are rejected.
+
 Do not assume that `POST /api/game/dev/*` exists. Available setup mechanisms are:
 
 - **`GameSession.loadState(state)`** — load a `SerializedGameState` defined in `shared/session/serialization.ts`.

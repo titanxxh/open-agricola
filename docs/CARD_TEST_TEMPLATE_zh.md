@@ -192,6 +192,8 @@ const opening = createOpeningSession({
 
 开局回归通过公开命令推进轮抽、父母选择和开局选择，继续行动前检查 `state` 与 `interaction`，不要用 `loadState` 抹掉意外的 wait。可用 `assertSessionFixture(session, expected)` 在开局命令后再次检查契约。完整示例见 `first-round-start-session.test.ts` 和 `session-fixtures.test.ts`。
 
+`server/__tests__/_helpers/session-assertions.ts` 提供共享的 Session 检查：`assertRejectedUnchanged` 要求被拒绝的命令在返回值和 live 会话中都不改变 `state`、`interaction` 与 `scores`；`confirmNext`、`getChoiceOptions` 用于推进等待；`undoRuleSnapshot` 和 `assertUndoRestored` 用于比较撤销结果。需要保留失败现场时，在 suite 中调用 `server/__tests__/_helpers/scenario-evidence.ts` 的 `createScenarioEvidence(import.meta.url)`，用 `track(session)` 登记每个会话，用 `record(label, value)` 冻结中间数据。helper 负责释放已登记的会话，仅在测试失败时写出有界现场。`AGRICOLA_TEST_DIAGNOSTIC=1` 会同时写出成功诊断，`AGRICOLA_TEST_EVIDENCE_DIR` 指定 Git 外目录（默认系统临时目录）。同一 suite 内的 concurrent 测试会被拒绝。
+
 不要假设存在 `POST /api/game/dev/*`。当前可用的状态预设方式有：
 
 - **`GameSession.loadState(state)`** —— 加载一份 `SerializedGameState`（`shared/session/serialization.ts`）
