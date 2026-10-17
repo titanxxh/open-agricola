@@ -299,12 +299,21 @@ describe("A143 command boundaries", () => {
   })
   it("whole actual purchase undo restores discounted stone before one retry", () => {
     const s = setup(state => Object.assign(state.players[0]!.resources, { wood: 2, stone: 1 }))
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        assert.deepEqual(player.improvements, ['Major_Joinery'])
+      }
+    }
     const first = buy(s, 'Major_Joinery')
+    assertOutcome(first)
     const undone = undo(s)
     assert.equal(undone.state.players[0]!.resources.stone, 1)
     assert.equal(undone.state.players[0]!.resources.wood, 2)
     assert.ok(!undone.state.players[0]!.improvements.includes('Major_Joinery'))
     const retry = buy(s, 'Major_Joinery')
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.resources.stone, 0)
     save('A143-N5', { first, undone, retry })
   })

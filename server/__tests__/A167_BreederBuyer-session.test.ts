@@ -313,7 +313,23 @@ describe("A167 command boundaries", () => {
   })
   it("whole construction undo restores animal payment and finite structures before retry", () => {
     const s = farm('wood')
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, {
+          wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0,
+          sheep: 1, boar: 0, cattle: 0, begging: 0,
+        })
+        assert.equal(player.rooms, 3)
+        assert.deepEqual(player.roomTiles.map(tile => `${tile.row}-${tile.col}`).sort(), ['1-0', '1-1', '2-0'])
+        assert.deepEqual(player.stableTiles, [{ row: 0, col: 1 }])
+        assert.deepEqual(player.pastures, [])
+        assert.deepEqual(player.fenceSegments, [])
+      }
+      assertAnimalPlacement(s, response, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+    }
     const r = build(s, turn(s, 0, 'farm-expansion'), 'room')
+    assertOutcome(r)
     assert.equal(r.state.players[0]!.rooms, 3)
     assert.equal(r.state.players[0]!.roomTiles.length, 3)
     assert.equal(r.state.players[0]!.stableTiles.length, 1)
@@ -328,6 +344,7 @@ describe("A167 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.wood, 7)
     assert.equal(undone.state.players[0]!.resources.reed, 2)
     const retry = build(s, turn(s, 0, 'farm-expansion'), 'stable')
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.resources.sheep, 1)
     assertAnimalPlacement(s, retry, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     save('A167-N5', { r, undone, retry })

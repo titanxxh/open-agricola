@@ -288,10 +288,23 @@ describe("A144 command boundaries", () => {
   })
   it("invalid plow rejects and own undo restores full stock before a single legal retry", () => {
     const s = setup(state => fields(state, 0, 4))
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 15, clay: 4, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        assert.deepEqual(player.fields, [
+          { row: 0, col: 0, stacks: [] }, { row: 0, col: 1, stacks: [] },
+          { row: 0, col: 2, stacks: [] }, { row: 0, col: 3, stacks: [] },
+          { row: 0, col: 4, stacks: [] },
+        ])
+        assert.deepEqual(store(result), [3, 0])
+      }
+    }
     let r = turn(s, 0, 'farmland')
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { tile: { row: 99, col: 99 } }))
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'plow')
     r = close(s, ok(s.commitSelectionChoice(0, { tile: r.interaction.request.farm.selectableTiles[0]! })))
+    assertOutcome(r)
     assert.equal(r.state.players[0]!.fields.length, 5)
     assert.equal(r.state.players[0]!.resources.clay, 4)
     assert.deepEqual(store(r), [3, 0])
@@ -300,6 +313,7 @@ describe("A144 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.clay, 0)
     assert.deepEqual(store(undone), [3, 4])
     const retry = plow(s, 0)
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.resources.clay, 4)
     assert.deepEqual(store(retry), [3, 0])
     save('A144-N5', { r, undone, retry })

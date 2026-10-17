@@ -366,7 +366,15 @@ describe("A155 command boundaries", () => {
   })
   it("invalid repeated input and whole undo preserve exactly one retry reward", () => {
     const s = setup(state => pile(state, 'traveling-players', 'food', 2))
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, s.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 1, clay: 0, reed: 0, stone: 0, food: 42, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food, 0)
+      }
+    }
     const first = turn(s, 0, 'traveling-players')
+    assertOutcome(first)
     assert.equal(first.state.players[0]!.resources.food, 42)
     assert.equal(first.state.players[0]!.resources.wood, 1)
     assert.equal(first.state.players[0]!.resources.grain, 1)
@@ -377,6 +385,7 @@ describe("A155 command boundaries", () => {
     assert.equal(undone.state.players[0]!.resources.grain, 0)
     assert.equal(undone.state.players[0]!.resources.food, 40)
     const retry = turn(s, 0, 'traveling-players')
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.resources.wood, 1)
     assert.equal(retry.state.players[0]!.resources.grain, 1)
     const occupied = setup(state => pile(state, 'traveling-players', 'food', 2))

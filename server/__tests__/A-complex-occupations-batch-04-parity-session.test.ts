@@ -1244,7 +1244,16 @@ describe('A147 command boundaries', () => {
   })
   it('whole own animal purchase undo restores pile food and housing before retry', () => {
     const session = setup('sheep', 1)
-    extraAnimal(session, collect(session, 0, 'sheep-market', 'sheep'), 'sheep')
+    const assertOutcome = (response: SessionResponse) => {
+      for (const result of [response, session.getState()]) {
+        const player = result.state.players[0]!
+        assert.deepEqual(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 2, boar: 0, cattle: 0, begging: 0 })
+        assert.equal(result.state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep, 0)
+      }
+      assertAnimalPlacement(session, response, [2, 0, 0], [{ id: 'housing', animalType: 'sheep', animalCount: 2, capacity: 4 }])
+    }
+    const first = extraAnimal(session, collect(session, 0, 'sheep-market', 'sheep'), 'sheep')
+    assertOutcome(first)
     const before = starts.get(session)
     assert.ok(before)
     const undone = session.undoAction()
@@ -1258,6 +1267,7 @@ describe('A147 command boundaries', () => {
     assert.equal(undone.state.players[0]!.resources.sheep, 0)
     assert.equal(undone.state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep, 1)
     const retry = extraAnimal(session, collect(session, 0, 'sheep-market', 'sheep'), 'sheep')
+    assertOutcome(retry)
     assert.equal(retry.state.players[0]!.resources.sheep, 2)
     assert.equal(retry.state.players[0]!.resources.food, 0)
   })
