@@ -1158,4 +1158,20 @@ describe('check-direct-session-log', () => {
 
     expect(findDirectSessionLogViolations(root)).toEqual([])
   })
+
+  it('reports prefix updates but not other unary reads of state.log', () => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/unary.ts', [
+      'export function unary(state: GameState) {',
+      '  const missing = !state.log.some(entry => entry.key === "log.familyGrowth")',
+      '  const negative = -state.log.length',
+      '  --state.log[0]!.args.count',
+      '  return [missing, negative]',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/unary.ts', line: 4, kind: 'state-log-write' }),
+    ])
+  })
 })

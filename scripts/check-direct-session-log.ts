@@ -712,7 +712,9 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
         && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
         && isStateLogMutationTarget(node.left, scopedStateLikeNames, scopedStateLogAliases))
       || (ts.isDeleteExpression(node) && isStateLogMutationTarget(node.expression, scopedStateLikeNames, scopedStateLogAliases))
-      || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      || ((ts.isPostfixUnaryExpression(node)
+          || (ts.isPrefixUnaryExpression(node)
+            && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)))
         && isStateLogMutationTarget(node.operand, scopedStateLikeNames, scopedStateLogAliases))) {
       addViolation(node, 'state-log-write')
     }
