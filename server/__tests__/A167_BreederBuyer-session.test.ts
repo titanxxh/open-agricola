@@ -278,6 +278,7 @@ describe("A167 command boundaries", () => {
       }
   })
   it("room only stable only and unplayed hand cannot give livestock", () => {
+    const expected = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     for (const counts of [{ room: 1, stable: 0 }, { room: 0, stable: 1 }, { room: 1, stable: 1 }]) {
       const played = counts.room + counts.stable < 2
       const s = farm('wood', played, counts)
@@ -285,6 +286,8 @@ describe("A167 command boundaries", () => {
       assert.equal(r.state.players[0]!.resources.sheep, 0)
       assert.equal(r.state.players[0]!.resources.boar, 0)
       assert.equal(r.state.players[0]!.resources.cattle, 0)
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [expected, expected, expected, expected])
       save(`A167-N2-${counts.room}-${counts.stable}`, r)
     }
   })

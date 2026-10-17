@@ -302,11 +302,14 @@ describe("A164 command boundaries", () => {
     }
   })
   it("decline hand opponent and non wood action cannot exchange supply wood", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     const ds = setup({ wood: 1 }, true, state => state.actionSpaces.find(a => a.id === 'forest')!.resources.wood = 2)
     const decline = finish(ds, turn(ds, 0, 'forest'), false)
     assert.equal(material(decline).wood, 3)
     assert.equal(material(decline).sheep, 0)
     assertAnimalPlacement(ds, decline, [0, 0, 0], [])
+    for (const actual of [decline, ds.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, wood: 3 }, baseline, baseline, baseline])
     for (const [played, own, space] of [[false, true, 'forest'], [true, false, 'forest'], [true, true, 'clay-pit']] as const) {
       const s = setup({ wood: 1 }, played)
       const r = own ? turn(s, 0, space) : offer(s, space)
@@ -316,6 +319,10 @@ describe("A164 command boundaries", () => {
       assertAnimalPlacement(s, r, [0, 0, 0], [])
       assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood ?? 0, 0)
       assertTurnFinished(r, own ? 0 : 1)
+      const owner = !own ? { ...baseline, wood: 1, food: 22 }
+        : space === 'forest' ? { ...baseline, wood: 4 } : { ...baseline, wood: 1, clay: 1 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [owner, own ? baseline : { ...baseline, wood: 3 }, baseline, baseline])
       save(`A164-N3-${played}-${own}-${space}`, r)
     }
     save('A164-N3', decline)

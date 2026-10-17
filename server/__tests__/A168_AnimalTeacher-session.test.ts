@@ -315,6 +315,9 @@ describe("A168 command boundaries", () => {
     assert.equal(material(decline).food, 3)
     assert.equal(material(decline).sheep, 0)
     assert.deepEqual([material(decline).sheep, material(decline).boar, material(decline).cattle], [0, 0, 0])
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [decline, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 3 }, baseline, baseline, baseline])
     const poor = setup({ food: 1 })
     const pp = enterAnimalChoices(poor, enter(poor))
     assert.equal(material(pp).food, 0)
@@ -334,15 +337,22 @@ describe("A168 command boundaries", () => {
     assert.equal(material(r).cattle, 0)
     assert.equal(material(r).food, 0)
     assertAnimalPlacement(poor, r, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+    for (const actual of [r, poor.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 0, sheep: 1 }, baseline, baseline, baseline])
     save('A168-N2', { pending, decline, pp, r })
   })
   it("unrelated action opponent Lessons and still in hand cannot grant animal", () => {
     const s = setup()
     const unrelated = turn(s, 0, 'day-laborer')
     assert.equal(material(unrelated).sheep, 0)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [unrelated, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22 }, baseline, baseline, baseline])
     const hs = setup({}, false)
     const hand = turn(hs, 0, 'grain-seeds')
     assert.equal(material(hand).sheep, 0)
+    for (const actual of [hand, hs.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, grain: 1 }, baseline, baseline, baseline])
     for (const lesson of ['lessons', 'lessons-4']) {
       const heldSession = setup({}, false, state => { state.players[0]!.occupationHand = [CARD, 'A110_Roughcaster'] })
       const picker = turn(heldSession, 0, lesson)
@@ -368,6 +378,8 @@ describe("A168 command boundaries", () => {
       for (const [response, actor] of [[unrelated, 0], [hand, 0], [other, 1]] as const)
         assertTurnFinished(response, actor)
       assert.equal(material(other).sheep, 0)
+      for (const actual of [other, os.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, grain: 1 }, { ...baseline, food: lesson === 'lessons' ? 20 : 19 }, baseline, baseline])
       for (const response of [unrelated, hand, other]) {
         assert.deepEqual(response.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
       }

@@ -389,14 +389,24 @@ describe("A141 command boundaries", () => {
   })
   it("either or both unoccupied named spaces cannot award vegetable", () => {
     for (const spaces of [['grove', 'day-laborer', 'forest', 'reed-bank', 'clay-pit', 'fishing'], ['grain-seeds', 'hollow', 'forest', 'reed-bank', 'clay-pit', 'fishing'], ['grove', 'hollow', 'forest', 'reed-bank', 'clay-pit', 'fishing']]) {
-      const { r } = end(setup(), spaces)
+      const s = setup()
+      const { r } = end(s, spaces)
       assert.equal(r.state.players[0]!.resources.vegetable, 0)
+      const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 60, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+      const owner = spaces[0] === 'grain-seeds' ? { ...baseline, grain: 1, reed: 1 } : { ...baseline, wood: 2, reed: 1 }
+      const opponent = spaces[1] === 'day-laborer' ? { ...baseline, clay: 1, food: 62 } : { ...baseline, clay: 2 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [owner, opponent, { ...baseline, wood: 3, food: 61 }])
       save(`A141-N2-${spaces[0]}-${spaces[1]}`, r)
     }
   })
   it("hand never grants return home reward and natural harvest does not duplicate", () => {
-    const hand = end(setup(5, undefined, false), SIX).r
+    const handSession = setup(5, undefined, false)
+    const hand = end(handSession, SIX).r
     assert.equal(hand.state.players[0]!.resources.vegetable, 0)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 60, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [hand, handSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, grain: 1, reed: 1 }, { ...baseline, clay: 1, food: 62 }, { ...baseline, wood: 3, food: 61 }])
     const harvestSession = setup(4)
     const harvested = end(harvestSession, SIX).r
     assert.equal(harvested.state.round, 5)
@@ -543,6 +553,11 @@ describe("A157 command boundaries", () => {
     assert.equal(on.r.state.players[0]!.resources.food - off.r.state.players[0]!.resources.food, 1)
     for (const actor of [1, 2, 3])
       assert.equal(on.r.state.players[actor]!.resources.food, off.r.state.players[actor]!.resources.food)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 60, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [on.r, on.s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, clay: 1, grain: 1, food: 61 }, { ...baseline, food: 63 }, { ...baseline, wood: 3, clay: 2 }, { ...baseline, reed: 1, food: 61 }])
+    for (const actual of [off.r, off.s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, clay: 1, grain: 1 }, { ...baseline, food: 63 }, { ...baseline, wood: 3, clay: 2 }, { ...baseline, reed: 1, food: 61 }])
     save('A157-N1', { on: on.r, off: off.r })
   })
   it("either empty Lessons space grants one food and both occupied grant none", () => {
@@ -581,6 +596,11 @@ describe("A157 command boundaries", () => {
     assert.equal(on.r.state.round, 5)
     assert.equal(on.r.state.players[0]!.resources.food - off.r.state.players[0]!.resources.food, 1)
     assert.equal(on.s.getState().state.players[0]!.resources.food, on.r.state.players[0]!.resources.food)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 60, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [on.r, on.s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, clay: 1, grain: 1, food: 57 }, { ...baseline, food: 59 }, { ...baseline, wood: 3, clay: 2, food: 56 }, { ...baseline, reed: 1, food: 57 }])
+    for (const actual of [off.r, off.s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, clay: 1, grain: 1, food: 56 }, { ...baseline, food: 59 }, { ...baseline, wood: 3, clay: 2, food: 56 }, { ...baseline, reed: 1, food: 57 }])
     const feedingSession = setup(4, state => { state.players[0]!.resources.food = 0 })
     let work = ok(feedingSession.getState())
     for (const [index, space] of EIGHT.entries()) {

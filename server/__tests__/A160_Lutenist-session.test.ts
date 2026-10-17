@@ -236,6 +236,7 @@ describe("A160 command boundaries", () => {
     save('A160-N1', { pending, r })
   })
   it("decline and zero initial food retain mandatory gain without free vegetable", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     for (const food of [0, 2]) {
       const s = setup({ food })
       turn(s, 0, 'grain-seeds')
@@ -246,6 +247,8 @@ describe("A160 command boundaries", () => {
       assert.equal(material(r).food, food + 1)
       assert.equal(material(r).wood, 1)
       assert.equal(material(r).vegetable, 0)
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: food === 0 ? 1 : 3, wood: 1, grain: 1 }, { ...baseline, food: 21 }, baseline, baseline])
       save(`A160-N2-${food}`, { pending, r })
     }
   })
@@ -261,6 +264,11 @@ describe("A160 command boundaries", () => {
       assert.equal(material(r).food, own ? 21 : 22)
       assert.equal(material(r).wood, 0)
       assert.equal(material(r).vegetable, 0)
+      const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [
+          { ...baseline, food: own ? 21 : 22 }, { ...baseline, food: own ? 20 : 21 }, baseline, baseline,
+        ])
       assertTurnFinished(r, own ? 0 : 1)
       save(`A160-N3-${played}-${own}`, r)
     }

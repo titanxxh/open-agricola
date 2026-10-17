@@ -226,9 +226,13 @@ describe("A146 command boundaries", () => {
       }
   })
   it("ordinary Day Laborer food and reserve food cannot count as accumulation", () => {
-    const r = turn(setup(state => state.players[0]!.resources.food = 3), 0, 'day-laborer')
+    const s = setup(state => state.players[0]!.resources.food = 3)
+    const r = turn(s, 0, 'day-laborer')
     assert.equal(r.state.players[0]!.resources.food, 5)
     assert.deepEqual(res(r), [0, 0, 0, 0])
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [r, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 5 }, baseline, baseline, baseline])
     save('A146-N3', r)
   })
   it("hand and actual opponent accumulation do not reward wrong owner", () => {

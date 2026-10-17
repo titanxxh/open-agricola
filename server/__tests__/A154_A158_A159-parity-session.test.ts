@@ -323,6 +323,7 @@ describe("A154 command boundaries", () => {
     }
   })
   it("decline and no supply keep grain and bonus unchanged", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     for (const grain of [0, 1]) {
       const s = setup(grain)
       const pending = offer(s)
@@ -333,6 +334,8 @@ describe("A154 command boundaries", () => {
       assert.equal(r.state.players[1]!.resources.grain, 0)
       assert.equal(vp(r), 0)
       assertScoreAttribution(s, r, 0)
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 42, grain }, { ...baseline, food: 41 }, baseline, baseline])
       save(`A154-N2-${grain}`, { pending, r })
     }
   })
@@ -512,14 +515,19 @@ describe("A158 command boundaries", () => {
     }
   })
   it("decline absent goods own space unrelated opponent and hand cannot exchange", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     const s = setup({ grain: 1 })
     const declined = finish(s, offer(s, 'traveling-players'), false)
     assert.equal(material(declined).grain, 1)
     assert.equal(material(declined).food, 22)
+    for (const actual of [declined, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22, grain: 1 }, { ...baseline, food: 21 }, baseline, baseline])
     const poor = setup()
     const noGoods = offer(poor, 'traveling-players')
     assertTurnFinished(noGoods, 1)
     assert.equal(material(noGoods).food, 22)
+    for (const actual of [noGoods, poor.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22 }, { ...baseline, food: 21 }, baseline, baseline])
     for (const [played, own, space] of [[false, false, 'traveling-players'], [true, true, 'traveling-players'], [true, false, 'fishing']] as const) {
       const ss = setup({ grain: 1 }, played)
       const r = own ? turn(ss, 0, space) : offer(ss, space)
@@ -528,6 +536,8 @@ describe("A158 command boundaries", () => {
       if (!own)
         assert.equal(material(r).food, 22)
       assertTurnFinished(r, own ? 0 : 1)
+      for (const actual of [r, ss.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: own ? 21 : 22, grain: 1 }, { ...baseline, food: own ? 20 : 21 }, baseline, baseline])
       save(`A158-N2-${played}-${own}-${space}`, r)
     }
     save('A158-N2', { declined, noGoods })
@@ -655,22 +665,29 @@ describe("A159 command boundaries", () => {
     }
   })
   it("decline no wood hand own and unrelated opponent cannot grant food", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     const s = setup({ wood: 1 })
     const decline = finish(s, offer(s, 'fishing'), false)
     assert.equal(material(decline).wood, 1)
     assert.equal(material(decline).food, 22)
     assert.deepEqual(decline.state.players.map(player => player.resources.wood), [1, 0, 0, 0])
+    for (const actual of [decline, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22, wood: 1 }, { ...baseline, food: 21 }, baseline, baseline])
     const poor = setup()
     const none = offer(poor, 'reed-bank')
     assertTurnFinished(none, 1)
     assert.equal(material(none).food, 22)
     assert.deepEqual(none.state.players.map(player => player.resources.wood), [0, 0, 0, 0])
+    for (const actual of [none, poor.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22 }, { ...baseline, reed: 1 }, baseline, baseline])
     for (const [played, space] of [[false, 'fishing'], [true, 'grain-seeds']] as const) {
       const ss = setup({ wood: 1 }, played), r = offer(ss, space)
       assert.equal(material(r).wood, 1)
       assert.equal(material(r).food, 22)
       assert.deepEqual(r.state.players.map(player => player.resources.wood), [1, 0, 0, 0])
       assertTurnFinished(r, 1)
+      for (const actual of [r, ss.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22, wood: 1 }, space === 'fishing' ? { ...baseline, food: 21 } : { ...baseline, grain: 1 }, baseline, baseline])
       save(`A159-N2-${played}`, r)
     }
     const ownSession = setup({ wood: 1 }, true, state => state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 2)
@@ -680,6 +697,8 @@ describe("A159 command boundaries", () => {
     assert.equal(material(own).food, 22)
     assert.equal(material(own, 1).wood, 0)
     assert.deepEqual(own.state.players.map(player => player.resources.wood), [1, 0, 0, 0])
+    for (const actual of [own, ownSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 22, wood: 1 }, baseline, baseline, baseline])
     save('A159-N2', { decline, none, own })
   })
   it("invalid actor and stale exchange cannot duplicate wood or food", () => {

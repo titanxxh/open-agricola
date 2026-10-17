@@ -427,6 +427,11 @@ describe("A156 command boundaries", () => {
       assert.equal(material(r).food, played ? 1 : 3)
       assert.deepEqual(material(r), { wood: 0, clay: 0, reed: played ? 1 : 0, stone: 0, food: played ? 1 : 3, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
       assert.equal(material(r, 1).food, 20)
+      const expectedPlayers = played
+        ? [{ ...baseline, food: 1, reed: 1 }, baseline, baseline, baseline]
+        : [{ ...baseline, food: 3 }, { ...baseline, reed: 1 }, baseline, baseline]
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), expectedPlayers)
       assertTurnFinished(r, played ? 0 : 1)
       save(`A156-N2-${played}`, r)
     }
@@ -438,6 +443,8 @@ describe("A156 command boundaries", () => {
     assert.deepEqual(material(unrelated), { wood: 0, clay: 0, reed: 0, stone: 0, food: 3, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
     assert.equal(material(unrelated, 1).food, 20)
     assert.equal(material(unrelated, 1).wood, 3)
+    for (const actual of [unrelated, unrelatedSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 3 }, { ...baseline, wood: 3 }, baseline, baseline])
     save('A156-N2', { declined, denied, unrelated })
   })
   it("empty opponent pile rejects without a food transfer or general supply good", () => {

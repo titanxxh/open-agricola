@@ -198,6 +198,7 @@ describe('A142 command boundaries', () => {
     }
   })
   it('Reed Bank zero or one and hand cannot trigger crop reward', () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     const empty = setup({ reed: 0, food: 40 })
     const rejected = assertEmptyAccumulationRejected(empty, 0, 'reed-bank')
     assert.equal(rejected.interaction.stateId, 'idle')
@@ -207,6 +208,8 @@ describe('A142 command boundaries', () => {
       const response = turn(session, 0, 'reed-bank')
       expect(response.state.players[0]!.resources).toMatchObject({ reed: params.reed, grain: 0, vegetable: 0, food: 40 })
       complete(response, 0)
+      for (const actual of [response, session.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 40, reed: params.reed }, baseline, baseline])
     }
   })
   it('actual opponent Reed Bank rewards only owner and decline keeps crops', () => {
@@ -250,6 +253,9 @@ describe('A142 command boundaries', () => {
     const response = turn(session, 0, 'reed-bank')
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, reed: 2, grain: 1, vegetable: 0 })
     complete(response, 0)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [response, session.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 1, reed: 2, grain: 1 }, baseline, baseline])
     assertRejectedUnchanged(session, () => session.resolveChoice(1, 'vegetable'))
     assertRejectedUnchanged(session, () => session.resolveChoice(0, 'unpaid-vegetable'))
     const activeSession = setup({ food: 2 })

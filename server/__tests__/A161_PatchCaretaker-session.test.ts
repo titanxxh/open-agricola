@@ -221,6 +221,7 @@ describe("A161 command boundaries", () => {
       }
   })
   it("different goods non accumulation earlier action and hand cannot grant vegetable", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     for (const [first, second, played] of [['forest', 'clay-pit', true], ['grain-seeds', 'grove', true], ['forest', 'grove', false]] as const) {
       const s = setup(undefined, played)
       const initial = turn(s, 0, first)
@@ -229,6 +230,10 @@ describe("A161 command boundaries", () => {
       const r = turn(s, 0, second)
       assert.equal(r.state.players[0]!.resources.vegetable, 0)
       assertTurnFinished(r, 0)
+      const owner = first === 'grain-seeds' ? { ...baseline, wood: 2, grain: 1 }
+        : second === 'clay-pit' ? { ...baseline, wood: 3, clay: 1 } : { ...baseline, wood: 5 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [owner, { ...baseline, reed: 1 }, { ...baseline, food: 42 }, { ...baseline, food: 41 }])
       save(`A161-N2-${first}-${played}`, { initial, r })
     }
   })
@@ -241,6 +246,9 @@ describe("A161 command boundaries", () => {
     const r = turn(s, 0, 'grove')
     assert.equal(r.state.players[0]!.resources.vegetable, 0)
     assertTurnFinished(r, 0)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [r, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, wood: 2, grain: 1 }, { ...baseline, wood: 3 }, { ...baseline, food: 42 }, { ...baseline, food: 41 }])
     save('A161-N3', { opponent, r })
   })
   it("whole second action undo restores vegetable and one retry grants only once", () => {
