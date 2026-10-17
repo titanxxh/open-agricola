@@ -24,6 +24,7 @@ const setup = ({ sheep = 3, stone = 2, round = 5 } = {}) => {
     player.improvements = []
     player.cardStates = {}
     player.pastures = []
+    player.stableTiles = index === 0 && sheep > 0 ? [{ row: 0, col: 0 }] : []
     player.resources = {
       ...player.resources,
       wood: 0,
@@ -131,6 +132,7 @@ describe('D045 Sheep Well parity', () => {
 
     const response = session.performRoundEnd()
 
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources.food).toBe(21)
     expect(futureRounds(response)).toEqual([7, 8])

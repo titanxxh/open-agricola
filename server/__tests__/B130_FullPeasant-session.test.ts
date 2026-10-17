@@ -37,8 +37,8 @@ const setup = (options?: {
 
   const grain = state.actionSpaces.find((s) => s.id === 'grain-utilization')
   const fencing = state.actionSpaces.find((s) => s.id === 'fencing')
-  if (grain) grain.takenBy = options?.grainOccupied ? state.players[1]!.id : null
-  if (fencing) fencing.takenBy = options?.fencingOccupied ? state.players[1]!.id : null
+  if (grain) grain.takenBy = options?.grainOccupied ? [{ playerId: state.players[1]!.id, workerId: '1' }] : []
+  if (fencing) fencing.takenBy = options?.fencingOccupied ? [{ playerId: state.players[1]!.id, workerId: '1' }] : []
 
   session.loadState(state)
   return session

@@ -129,7 +129,7 @@ describe('E161_ElderBaker session integration', () => {
     return resp
   }
 
-  it('minor-improvement choice list contains Major_StoneOven candidate', () => {
+  it('automatically buys Stone Oven through Minor Improvement when the hand is empty', () => {
     const session = setup()
     const state = session.getState().state
     state.players[0]!.minorHand = []
@@ -137,15 +137,15 @@ describe('E161_ElderBaker session integration', () => {
 
     const resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    const values = (resp.interaction.request.options ?? []).map((o) => o.value)
-    expect(values).toContain(STONE_OVEN_ID)
+    expect(resp.state.players[0]!.minorHand).toEqual([])
+    expect(resp.state.players[0]!.improvements).toContain(STONE_OVEN_ID)
+    expect(resp.state.availableMajorImprovements).not.toContain(STONE_OVEN_ID)
   })
 
   it('selecting Major_StoneOven via minor-improvement plays it as a major', () => {
     const session = setup()
     const state = session.getState().state
-    state.players[0]!.minorHand = []
+    state.players[0]!.minorHand = ['A030_BakingSheet']
     session.loadState(state)
 
     let resp = enterMinorChoice(session)

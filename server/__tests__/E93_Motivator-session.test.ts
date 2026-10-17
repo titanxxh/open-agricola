@@ -32,7 +32,7 @@ const setup = (condition: 'full' | 'gap' | 'no-supply' | 'no-card' = 'full', moo
   player.occupationPlayed = condition === 'no-card' ? [] : [CARD_ID]
   player.roomTiles = [{ row: 2, col: 0 }, { row: 2, col: 1 }]
   player.fields = Array.from({ length: 15 }, (_, index) => ({
-    row: Math.floor(index / 5), col: index % 5, crop: null, remaining: 0,
+    row: Math.floor(index / 5), col: index % 5, stacks: [],
   })).filter(({ row, col }) => row !== 2 || col > 1)
   if (condition === 'gap') player.fields.pop()
   if (condition === 'no-supply') setActiveWorkerCount(player, 5)

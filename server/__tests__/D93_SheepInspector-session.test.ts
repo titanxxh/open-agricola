@@ -241,7 +241,7 @@ describe('D093_SheepInspector end-to-end via GameSession', () => {
 
     // Pretend the player already placed another worker earlier on 'forest'.
     const forest = state.actionSpaces.find((s) => s.id === 'forest')
-    if (forest) forest.takenBy = player.id
+    if (forest) forest.takenBy = [{ playerId: player.id, workerId: '1' }]
 
     session.loadState(state)
     return session

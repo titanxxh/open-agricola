@@ -32,7 +32,7 @@ const setup = ({
   owner.minorPlayed = ['B056_Brook']
   owner.resources.food = 0
   owner.resources.grain = 1
-  owner.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+  owner.fields = [{ row: 0, col: 0, stacks: [] }]
   for (const [spaceId, resource] of [
     ['forest', 'wood'], ['clay-pit', 'clay'], ['reed-bank', 'reed'], ['sheep-market', 'sheep'],
   ] as const) {

@@ -108,7 +108,8 @@ describe('A045 Fire Protection Pond parity', () => {
   it('A045 S2: cannot play Fire Protection Pond outside a wooden house', () => {
     const response = enterImprovementChoice(setup({ houseType: 'clay' }))
 
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.interaction.stateId === 'wait'
       ? getChoiceOptions(response)?.some((option) => option.value === CARD_ID)
       : false).toBe(false)

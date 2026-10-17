@@ -161,7 +161,7 @@ describe('C015 Trellis parity', () => {
 describe('C016 Field Fences parity', () => {
   it('C016 S1: paying two food may build field-adjacent fences at the discounted cost', () => {
     const session = setup({ cardId: 'C016_FieldFences', played: false, resources: { food: 2, wood: 3 } })
-    session.state.players[0]!.fields = [{ row: 0, col: 3, crop: null, remaining: 0 }]
+    session.state.players[0]!.fields = [{ row: 0, col: 3, stacks: [] }]
     session.loadState(session.state)
     let response = playMinor(session, 'C016_FieldFences')
     response = accept(session, response, 'C016_FieldFences')
@@ -183,7 +183,7 @@ describe('C017 Newly-Plowed Field parity', () => {
   const withFields = (count: number) => {
     const session = setup({ cardId: 'C017_NewlyPlowedField', played: false })
     session.state.players[0]!.fields = Array.from({ length: count }, (_, index) => ({
-      row: Math.floor(index / 3), col: index % 3 + 2, crop: null, remaining: 0,
+      row: Math.floor(index / 3), col: index % 3 + 2, stacks: [],
     }))
     session.loadState(session.state)
     return session
@@ -381,7 +381,7 @@ describe('C033 Greening Plan parity', () => {
   ])('C033 $scenario: $fields unplanted fields score $score', ({ fields, score }) => {
     const session = setup({ cardId: 'C033_GreeningPlan', round: 14 })
     session.state.players[0]!.fields = Array.from({ length: fields }, (_, index) => ({
-      row: Math.floor(index / 3), col: index % 3 + 2, crop: null, remaining: 0,
+      row: Math.floor(index / 3), col: index % 3 + 2, stacks: [],
     }))
     session.loadState(session.state)
     expect(bonusScore(session.getState(), 'C033_GreeningPlan')).toBe(score)
