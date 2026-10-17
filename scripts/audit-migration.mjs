@@ -373,21 +373,43 @@ try {
   const options = new Map()
   for (let index = 0; index < arguments_.length; index += 2) {
     if (!arguments_[index]?.startsWith('--') || !arguments_[index + 1]) fail('options require --name value')
-    options.set(arguments_[index].slice(2), arguments_[index + 1])
+    const name = arguments_[index].slice(2)
+    if (options.has(name)) fail(`duplicate option: --${name}`)
+    options.set(name, arguments_[index + 1])
   }
-  const { manifest, summary } = readManifest(options.get('manifest') ?? defaultManifest)
-  if (action === 'check') process.stdout.write(`${JSON.stringify(summary)}\n`)
-  else if (action === 'check-native') {
-    const result = checkNative(manifest)
+  const workflowActions = ['control', 'status', 'adopt-legacy', 'delivery', 'publish']
+  const transferActions = ['preflight', 'export', 'import']
+  if (action === 'help') {
+    process.stdout.write(`${JSON.stringify({ commands: ['check', 'check-native', 'prepare', 'verify', 'preserve', ...workflowActions, ...transferActions, 'run'], operationsGuide: 'docs/operations/ci-checks.md' })}\n`)
+  } else if (action === 'preserve') {
+    const { checkPreservation } = await import('./audit-migration/preservation.mjs')
+    process.stdout.write(`${JSON.stringify(checkPreservation(root, options))}\n`)
+  } else if (workflowActions.includes(action)) {
+    const { workflowCommand } = await import('./audit-migration/delivery.mjs')
+    process.stdout.write(`${JSON.stringify(await workflowCommand(root, action, options))}\n`)
+  } else if (transferActions.includes(action)) {
+    const { transferCommand } = await import('./audit-migration/transfer.mjs')
+    const result = await transferCommand(root, action, options)
     process.stdout.write(`${JSON.stringify(result)}\n`)
-    if (result.typesExit || result.fileInventoryExit || result.missingTypeRoots.length) process.exitCode = 1
+    if (action === 'preflight' && !result.ready) process.exitCode = 2
+  } else if (action === 'run') {
+    const { runValidation } = await import('./audit-migration/run.mjs')
+    process.stdout.write(`${JSON.stringify(await runValidation(root, options))}\n`)
+  } else {
+    const { manifest, summary } = readManifest(options.get('manifest') ?? defaultManifest)
+    if (action === 'check') process.stdout.write(`${JSON.stringify(summary)}\n`)
+    else if (action === 'check-native') {
+      const result = checkNative(manifest)
+      process.stdout.write(`${JSON.stringify(result)}\n`)
+      if (result.typesExit || result.fileInventoryExit || result.missingTypeRoots.length) process.exitCode = 1
+    }
+    else if (action === 'prepare') process.stdout.write(`${JSON.stringify(prepare(manifest, options.get('output')))}\n`)
+    else if (action === 'verify') {
+      const result = verify(options.get('output'))
+      process.stdout.write(`${JSON.stringify(result)}\n`)
+      if (result.typesExit || result.fileInventoryExit || result.behaviorExit || result.unresolvedSourceCases || result.missingTypeRoots.length) process.exitCode = 1
+    } else fail('usage: node scripts/audit-migration.mjs check|check-native|prepare|verify [--manifest file] [--output external-run-directory]')
   }
-  else if (action === 'prepare') process.stdout.write(`${JSON.stringify(prepare(manifest, options.get('output')))}\n`)
-  else if (action === 'verify') {
-    const result = verify(options.get('output'))
-    process.stdout.write(`${JSON.stringify(result)}\n`)
-    if (result.typesExit || result.fileInventoryExit || result.behaviorExit || result.unresolvedSourceCases || result.missingTypeRoots.length) process.exitCode = 1
-  } else fail('usage: node scripts/audit-migration.mjs check|check-native|prepare|verify [--manifest file] [--output external-run-directory]')
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : error}\n`)
   process.exitCode = 1

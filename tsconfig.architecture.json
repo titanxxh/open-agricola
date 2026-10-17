@@ -24,7 +24,14 @@
     "scripts/__tests__/check-test-rule-environments.test.ts",
     "scripts/__tests__/scenario-evidence.test.ts",
     "scripts/__tests__/trigger-select.test.ts",
-    "scripts/__tests__/audit-migration.test.ts"
+    "scripts/__tests__/audit-migration.test.ts",
+    "scripts/__tests__/audit-committed-source.test.ts",
+    "scripts/__tests__/audit-preservation.test.ts",
+    "scripts/__tests__/audit-workflow-control.test.ts",
+    "scripts/__tests__/audit-workflow-delivery.test.ts",
+    "scripts/__tests__/audit-publication.test.ts",
+    "scripts/__tests__/audit-transfer.test.ts",
+    "scripts/__tests__/audit-run.test.ts"
   ],
   "exclude": []
 }

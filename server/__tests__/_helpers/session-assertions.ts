@@ -1,6 +1,44 @@
 import assert from 'node:assert/strict'
 import type { GameSession, SessionResponse } from '../../game/authoritative-session'
-import type { ActionChoiceOption } from '../../../shared/contract/types'
+import type { ActionChoiceOption, PlayerState, ResourceKey } from '../../../shared/contract/types'
+
+/** Absolute expectations must cover every seat and exactly the selected resource fields. */
+export function assertSeatResources<const Field extends ResourceKey>({
+  session, response, fields, expected,
+}: {
+  session: Pick<GameSession, 'state'>
+  response: Pick<SessionResponse, 'state'>
+  fields: readonly [Field, ...Field[]]
+  expected: readonly {
+    playerId: PlayerState['id']
+    resources: Record<NoInfer<Field>, number>
+  }[]
+}): void {
+  const selectedFields = new Set<string>(fields)
+  assert.ok(fields.length > 0, 'resource fields must not be empty')
+  assert.equal(selectedFields.size, fields.length, 'resource fields must not contain duplicates')
+  for (const { scope, state } of [{ scope: 'returned', state: response.state }, { scope: 'live', state: session.state }]) {
+    assert.equal(state.players.length, expected.length,
+      `${scope} seat ${Math.min(state.players.length, expected.length)}: expected ${expected.length} seats, received ${state.players.length}`)
+    for (let seat = 0; seat < expected.length; seat++) {
+      const expectation = expected[seat]
+      assert.ok(expectation, `${scope} seat ${seat}: missing expectation`)
+      const { playerId, resources } = expectation
+      const label = `${scope} seat ${seat} (${playerId})`
+      const player = state.players[seat]
+      assert.ok(player, `${label}: missing player`)
+      assert.equal(player.id, playerId, `${label} playerId: identity or order changed`)
+      for (const field of Object.keys(resources)) {
+        assert.ok(selectedFields.has(field), `${label} field ${field}: extra expectation`)
+      }
+      for (const field of fields) {
+        assert.ok(Object.hasOwn(resources, field), `${label} field ${field}: missing expectation`)
+        assert.ok(Object.hasOwn(player.resources, field), `${label} field ${field}: missing resource`)
+        assert.equal(player.resources[field], resources[field], `${label} field ${field}`)
+      }
+    }
+  }
+}
 
 export function getChoiceOptions(response: Pick<SessionResponse, 'interaction'>): ActionChoiceOption[] {
   const interaction = response.interaction

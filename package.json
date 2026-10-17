@@ -31,6 +31,7 @@
     "test:bench": "RUN_BENCHMARKS=1 vitest run --project fast-tests tests/payment-solver-benchmark.test.ts --testTimeout=20000 --disableConsoleIntercept",
     "test:e2e": "playwright test",
     "verify": "tsx scripts/verify.ts",
+    "audit:migration": "node scripts/audit-migration.mjs",
     "verify:e2e:browser-sandbox": "VITE_SANDBOX_EXECUTOR=browser tsx scripts/verify.ts e2e-tests/local-sandbox.spec.ts",
     "verify:e2e:webkit": "tsx scripts/verify.ts e2e-tests/frontend-browser-scenario-matrix.spec.ts --browser=webkit --grep @webkit",
     "check:architecture": "pnpm run lint && pnpm run check:test-project-coverage && pnpm run check:test-rule-environments && pnpm run check:session-test-types && pnpm run check:direct-session-log && pnpm run check:effects-file-list && pnpm run check:generated-cards-sync && pnpm run check:no-dsl -- --strict && pnpm run check:catalog-types && pnpm run check:card-impl-boundaries && pnpm run check:card-state-boundaries && pnpm run check:architecture-types && pnpm run check:architecture-tests && pnpm run check:prompt-sync -- --strict && pnpm run check:dependencies && pnpm run check:browser-boundaries",

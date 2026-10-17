@@ -1,0 +1,1 @@
+export function adoptLegacy(input: { root: string; workspace: string; request: { directory: string } }): Promise<{ version: number; directory: string; root: string; workspace: string; entries: Array<{ file: string; originalSha256: string; delegateSha256: string; backup: string | null; alreadyAdopted: boolean }>; adoptedAt: string }>

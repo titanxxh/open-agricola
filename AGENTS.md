@@ -25,7 +25,6 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 - 三层 `shared/` + `server/` + `client/`，前端只负责渲染、输入收集、视角化展示，不做规则裁定。
 - 后端 `GameSession`（`server/game/authoritative-session.ts`）是 `GameState` 的**唯一写入者**。
 - WebSocket 房间对局是实时同步主链路；HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口，不通过 HTTP 另建规则写入主链路。
-- 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
 - 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`。
 
 ## Commands
@@ -34,31 +33,19 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 ./restart-local.sh       # 本地应用启动 / 重启统一入口，默认绑 127.0.0.1
 ./restart-local.sh --intranet   # 改绑局域网 IP（eth0/en0），供同网段其他机器访问
-pnpm test                   # vitest 全量（fast + slow）
-pnpm test:fast              # 只跑 fast project（CI 默认）
-pnpm test:slow              # 只跑 slow project（单卡 session 测试）
-pnpm test:llm               # 固定卡牌测试、历史 golden 与账本回归，不调 API，进 CI
-pnpm test:llm:dry           # 专用本地环境的固定 case 合成浏览器演练，不调付费 API
-pnpm test:llm:live --model <id> # 已确认模型/预算后的完整浏览器验收，保存独立批次
-pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
 pnpm verify prepush         # 最终版本的完整 fast + lint，记录源码指纹与结果
 pnpm verify <file.spec.ts>   # 隔离环境重启应用并跑 Playwright；不传文件则跑全部
 pnpm verify status          # 查看验证记录是否仍对应当前源码
-pnpm run lint               # ESLint（error 必须清零）
-pnpm run build              # tsc + vite build
 ```
+
+完整命令以 `package.json` 为准。选择本地验收、联合 audit 或交付流程时，读 `docs/operations/ci-checks.md`；编写规则测试时，读 `docs/CARD_TEST_TEMPLATE.md`。
 
 修改工坊生成流程、prompt 或模型准入时，先读 `docs/test/llm-card-gen.md` 的固定测试入口、费用账本与本地产物要求。
 
 本地开发**统一使用 Node.js 24.15+**；`engines` 声明 `^24.15.0 || >=26.0.0`（`isolated-vm` 7 要求 `node >= 24`，`jsdom` 30 只接受 `^24.15.0 || >=26.0.0`，**不支持 Node 25**）；`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
 
 ## Testing
-
-三层：
-- **Unit**（`shared/**/__tests__/*.test.ts`）——纯领域逻辑，造 mock state 调函数。
-- **Session**（`server/__tests__/*.test.ts`）——直接实例化 `GameSession`，调 `takeAction()` 等，断言 `resp.state` / `pending` / `ok`。
-- **E2E**（`e2e-tests/*.spec.ts`）——Playwright 浏览器测试。
 
 规则正确性按风险选择最小测试层：机械约束用静态门禁；简单即时资源效果可直接调用公开 effect / listener 做行为测试；支付、选择 / pending、延迟效果、跨玩家和多步 flow 必须用 Session 测试，断言 `state` / `interaction` / `log` / `scores`。禁止只验证导出和对象形状的通用 smoke test。前端渲染单独做 E2E。Session 测试默认 **2 人游戏**。详见 `docs/CARD_TEST_TEMPLATE.md`。
 
@@ -118,11 +105,7 @@ pnpm run build              # tsc + vite build
 ## Change Boundaries
 
 - 不引入循环依赖。
-- 卡牌相关能力尽可能在卡牌文件内部闭环，不要把单卡逻辑扩散到主路径。
-- **后端权威**：规则在 `shared/` + `server/`；不在前端 UI 加规则。
-- 不为单卡改动主路径（`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts`）。用现有扩展点（hooks、modifiers、卡牌定义字段）。
 - 项目仍处于开发阶段，不需要维护旧存档、旧 `engineStack` / pending cursor、旧 action id 的向后兼容；除非用户明确要求，不要把缺少兼容迁移作为 PR review blocker。
-- 测试时**默认 2 人游戏**。
 
 ## Verification After Changes
 
@@ -136,6 +119,8 @@ pnpm run build              # tsc + vite build
 ## Commit & CI Workflow
 
 **永远使用 rebase，禁止 merge。**
+
+Audit 迁移的执行、发布与合入统一使用 `pnpm audit:migration`；先读取 Git 外 workspace 的持久暂停状态与当前 HEAD 的审查事实。授权、冻结验收和跨机器恢复入口见 `docs/operations/ci-checks.md`，旧交接记录不能作为新授权。
 
 每次 `git push` 之前需要 rebase main，发现冲突要先解决；在最终源码上运行 `pnpm verify prepush`，失败立刻定位修复。需要本机全量 CI 时按 `docs/operations/ci-checks.md` 执行，prepush 仅覆盖 fast + lint，不代表完整 CI。
 
@@ -152,8 +137,7 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 ## Common Pitfalls
 
 - **不要 commit `docs/superpowers/*`**：superpowers skill 产出的 spec / plan / working notes 不进 git。这是会话/PR 中间产物，污染 git history。即使 brainstorming / executing-plans skill 默认要求 commit spec，**违反默认行为，等用户明确要求才 commit**。每次 `git add` 必须显式排除 `docs/superpowers/`。
-- **应用真实行为验收必须重启**：统一用 `./restart-local.sh`；定向 Vitest 调试不需要启动应用，最终门禁见上文。
-- **Session 构造时就可能产生开局交互**：事后清手牌不能消除它。复用 `server/__tests__/_helpers/session-fixtures.ts`：真实开局用 `createOpeningSession`，显式选择 seed 并断言阶段 / interaction；工作阶段场景用 `createWorkSession`，在加载前固定所有手牌，无关手牌用 `['__test_placeholder__']`，不能用会触发重新发牌的空数组。两种夹具的边界和示例见 `docs/CARD_TEST_TEMPLATE.md` §5.2。
+- **准备 Session 前读 `docs/CARD_TEST_TEMPLATE.md` §5.2**：构造时可能产生开局交互，事后清手牌不能消除。按测试目标使用 `createOpeningSession` 或 `createWorkSession`，在加载前固定手牌；空数组会触发重新发牌，无关手牌用 `['__test_placeholder__']`。
 
 ## Docs Map
 

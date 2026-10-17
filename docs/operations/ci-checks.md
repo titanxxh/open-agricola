@@ -53,6 +53,90 @@ node scripts/audit-migration.mjs verify --output /absolute/path/outside-reposito
 
 尚未迁移的旧场景会保留其原有完整快照写法，证据按本次运行、源文件和场景隔离保存在 Git 外。迁入原生测试后，成功仅留摘要，完整证据只用于失败或显式诊断。联合验收不能替代最终源码的 prepush 与完整 CI。
 
+### 持久暂停、执行归属与审查状态
+
+迁移控制统一使用 `pnpm audit:migration`（等同 `node scripts/audit-migration.mjs`）。先指定 Git 外的 workspace；没有 `control.json` 时默认暂停。控制记录只保存当前授权范围，worker claim 和操作结果分别不可覆盖，旧 `implementation-state.json`、交接文案及其他 worker 的结果不构成授权。
+
+```bash
+pnpm audit:migration control --run /external/workspace --request /external/pause.json
+pnpm audit:migration status --run /external/workspace --issue <issue> --pr <pr> --head <full-sha>
+```
+
+`pause.json` 示例（完全暂停）；若用户允许“只完成当前 issue”，把 `finishOnly` 改为精确的 `[{"issue":123,"pr":456,"head":"<full-sha>"}]`，不能扩大到后续票：
+
+```json
+{"kind":"pause","authority":"用户本次暂停指令的引用","finishOnly":[]}
+```
+
+只有用户明确恢复后才记录 `{"kind":"resume","authority":"恢复指令的引用"}`。每次控制变更递增 epoch，使旧 claim 失效。协调者通过 `control` 的 `grant` 请求创建新 claim：
+
+```json
+{
+  "kind":"grant",
+  "authority":"当前任务及允许操作的用户指令引用",
+  "assignment":{
+    "id":"unique-run-id","worker":"worker-name",
+    "issue":123,"pr":456,"head":"<full-sha>",
+    "operations":["local-validation:frozen-native","local-validation:frozen-strict","local-validation:frozen-check-native","local-validation:raw-prepare","local-validation:raw-verify","local-validation:prepush","local-validation:local-proof"]
+  }
+}
+```
+
+`grant` 返回不可变 claim 文件路径。纯工具验收可用 `"kind":"tooling","head":"<full-sha>"` 替换 issue/pr/head 目标，不能获得远端写权限。PR 的远端操作单独授予 `publication:push`、`publication:update-pr`、`publication:request-review` 或 `delivery:merge`，不会由本地通过自动推导。操作失败或结果不明后先只读核对，再创建新 claim；不要覆盖原结果。
+
+各阶段开始前都核对 claim、epoch 和暂停范围。已经开始的本地子进程可能继续运行，但暂停后其结果不能作为当前授权成功记录，也不能进入下一阶段；`status` 会列出已准入操作和 PID 身份，不声称进程已停止。远端操作在同一控制锁内重新检查并执行；暂停在已开始的远端操作结束后生效。锁不会按超时删除，进程身份无法确认时需要人工核对恢复。这个边界约束这些入口，不拦截任意手工 shell 命令。
+
+`status` 只读取远端，不请求 review、不重试、不合入。它分别报告精确 HEAD 的 Code、Security、真实 bot `+1`、未解决 threads、PR 身份、本地证据、远端 CI，以及授权状态。机器标记与文字结论矛盾是 `conflict`；缺失或不完整观察是 `unknown`。审查状态字段仅描述事实；`mergePermitted` 始终为 false，执行许可还须在真正写入时核对 claim。可通过 `--request` 提供 issue/pr/head/worktree/raw/prepush，读取对应的本地证明。
+
+`publish --run ... --request ...` 仅更新 claim 指定的既有本仓库 PR，校验当前 main、分支和本地证据；push 使用精确远端 SHA 的 lease。请求包含 `assignment`、`head`、`worktree`、`raw`、`prepush`、`branch`、绝对路径 `bodyFile`，以及可选 `title`、`review`（`code` / `security`）；它不创建后续票。review 请求带 HEAD 标记，重试前读取已有请求，避免重复发送。旧发布 config 可通过 `{"config":"/external/config.json","assignment":"/external/claim.json"}` 接入同一入口。
+
+`delivery --run ... --request ...` 同样要求精确 claim、pr/head/worktree/raw/prepush；`merge:true` 才会执行管理员 rebase merge，随后核对合入 tree。`reconcile:true` 则只读检查已合入结果，不重试 merge、不改控制记录。默认仍要求本地门禁、Code、Security、真实大拇指、threads 和 PR/main CI；仅当用户明确免除远端 CI 时，可记录精确 issue/pr/head 的 `{"kind":"remote-ci-policy","id":"unique-policy-id","authority":"用户原话引用",...}`。这不会免除 Code、Security 或大拇指，也不会把实际 CI 状态改写成 passed。
+
+旧 Git 外 Python 入口须显式接入，不能保留另一套执行逻辑：
+
+```bash
+pnpm audit:migration adopt-legacy --run /external/workspace --request /external/adopt.json
+```
+
+`adopt.json` 为 `{"directory":"/absolute/old-artifact-directory"}`。安装器仅在暂停状态工作，把受支持的八个活跃执行入口保存为带摘要的不可执行文本备份，替换成薄代理并生成收据。代理从 `OA_AUDIT_ASSIGNMENT` 读取 claim；缺少 claim 会在执行/远端写入前失败。归档和既有证据保留为历史，不作为可执行入口。
+
+### 冻结验收与跨机器恢复
+
+`run` 固定 HEAD、批次、完整目标集、服务配置及新输出目录，逐阶段执行原生行为、strict 实际输入清单、`check-native`、RAW 组装/全量验证、完整 prepush 和最终字节核对。它复用上面的 RAW 入口，不复制一套规则验收器：
+
+```bash
+pnpm audit:migration preflight --database-env /private/test-database.env
+pnpm audit:migration run --config /external/run.json
+```
+
+preflight 只核对本机配置、依赖可解析性及源提交可用性，不启动或连接服务；原生 ABI 和实际服务由验收检查。先按既有入口准备本地测试服务，私密文件只提供 `TEST_DATABASE_URL=...`。`run.json` 示例：
+
+```json
+{
+  "head":"<full-sha>","batch":"M01",
+  "workspace":"/external/workspace","assignment":"/external/workspace/claims/unique-run-id.json",
+  "output":"/external/new-run-directory",
+  "services":{"databaseEnv":"/private/test-database.env"}
+}
+```
+
+批次必须已完整承接；目标包含该批次的完整原生文件、清单全部 `nativeScope` 和可选 `extraTargets`。成功 RAW 必须覆盖清单全部 3,252 个原始职责，不能有失败、skip/todo、缺少类型根或成功原生测试产生的全状态证据。`final.json` 保留每阶段结果；它直接核对 HEAD 中的 tracked blob 与文件模式，不能仅凭 Git status 的“干净”推断字节一致；任何源码或 HEAD 变化都要求新输出、新 claim 和重跑。测试断言的字段及参与者选择仍须人工审查，参见 `docs/CARD_TEST_TEMPLATE.md` §5.2、§9.1。
+
+跨机器导出只打包候选提交、未公开的精简源提交及显式选择的小型 JSON 收据，不递归打包整个 artifacts，也不带环境文件、服务数据或依赖：
+
+```bash
+pnpm audit:migration export --base <available-main-ancestor> --output /external/new-transfer-directory
+# 可选 --receipts /external/explicit-json-file-list.json
+```
+
+保存返回的 manifest SHA-256，并将整个目录传到新机器。新机器先准备受支持的 Node/pnpm，正常 clone/fetch 取得 bundle 所列 prerequisite commits，再按 `transfer.json.bootstrap` 的命令 fetch `source.bundle` 中的候选分支、checkout 精确 HEAD 并执行 `pnpm install --frozen-lockfile`。候选工具代码可能尚未推送，不能假设 GitHub 上已有该 CLI。
+
+```bash
+node scripts/audit-migration.mjs import --archive /external/transferred-directory --expected-head <full-sha> --manifest-sha256 <digest> --output /external/new-workspace
+```
+
+import 核对成员、摘要、体积、bundle refs/prerequisites、候选 tree 和原始源身份，创建没有 claims 的暂停 workspace。旧收据放在 `historical/`，不写入当前 `output/verification/`。新机器须安装依赖、重新配置本地服务、取得当前授权并重跑 native/strict/RAW/prepush；导入成功不代表当前主机通过验收。
+
 ## 本机全量 CI
 
 本机执行普通 CI 与 CI Full 的并集；`pnpm test` 已覆盖 fast + slow，无需再重复 `pnpm test:fast`：

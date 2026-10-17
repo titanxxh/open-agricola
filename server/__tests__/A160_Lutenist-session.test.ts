@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import { type GameState } from '../../shared/contract/types'
 import { createWorkSession } from './_helpers/session-fixtures'
 
-import { assertRejectedUnchanged, confirmNext , getChoiceOptions } from './_helpers/session-assertions'
+import { assertRejectedUnchanged, assertSeatResources, confirmNext, getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
@@ -134,22 +134,40 @@ describe('A160 Lutenist parity', () => {
   })
 
   it('A160 S5: the owner using Traveling Players does not trigger Lutenist', () => {
-    const response = setup({ actor: 0 }).takeAction(0, 'traveling-players')
+    const session = setup({ actor: 0 })
+    const response = session.takeAction(0, 'traveling-players')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 4, wood: 0, vegetable: 0 })
+    assertSeatResources({
+      session, response, fields: ['food', 'wood', 'vegetable'],
+      expected: [
+        { playerId: 'p1', resources: { food: 4, wood: 0, vegetable: 0 } },
+        { playerId: 'p2', resources: { food: 0, wood: 0, vegetable: 0 } },
+        { playerId: 'p3', resources: { food: 0, wood: 0, vegetable: 0 } },
+        { playerId: 'p4', resources: { food: 0, wood: 0, vegetable: 0 } },
+      ],
+    })
     expect(response.interaction.stateId === 'wait'
-      ? (getChoiceOptions(response)?.some((option) => option.sourceCard === CARD_ID) ?? false)
+      ? getChoiceOptions(response).some((option) => option.sourceCard === CARD_ID)
       : false).toBe(false)
   })
 
   it('A160 S6: an opponent using a non-Traveling-Players space does not trigger Lutenist', () => {
-    const response = setup().takeAction(1, 'day-laborer')
+    const session = setup()
+    const response = session.takeAction(1, 'day-laborer')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, vegetable: 0 })
+    assertSeatResources({
+      session, response, fields: ['food', 'wood', 'vegetable'],
+      expected: [
+        { playerId: 'p1', resources: { food: 1, wood: 0, vegetable: 0 } },
+        { playerId: 'p2', resources: { food: 2, wood: 0, vegetable: 0 } },
+        { playerId: 'p3', resources: { food: 0, wood: 0, vegetable: 0 } },
+        { playerId: 'p4', resources: { food: 0, wood: 0, vegetable: 0 } },
+      ],
+    })
     expect(response.interaction.stateId === 'wait'
-      ? (getChoiceOptions(response)?.some((option) => option.sourceCard === CARD_ID) ?? false)
+      ? getChoiceOptions(response).some((option) => option.sourceCard === CARD_ID)
       : false).toBe(false)
   })
 })

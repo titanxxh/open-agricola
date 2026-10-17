@@ -35,3 +35,7 @@ If the concept you need isn't in the glossary yet, that's a signal: either you'r
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0007 (event-sourced orders) -- but worth reopening because..._
+
+## Reviewing rule tests
+
+When implementing or reviewing Session assertions or audit migration, read `docs/CARD_TEST_TEMPLATE.md` §5.2 and §9.1. Review the actual inputs inside callbacks and loops, the card owner, acting player and bystanders, and independent expected values including ordinary action gains. A passed destination title proves execution, not complete rule assertions. Mechanical seat/field and assertions-only preservation checks enforce their declared contracts; the reviewer decides whether the chosen inputs and fields express the rule.

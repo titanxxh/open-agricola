@@ -163,6 +163,10 @@ Session 的公开命令和查询自行绑定规则。不要为 Session 场景或
 
 行动执行与查询上下文对象必须显式包含 `actionHooks`。验证某个 Session 时传入 `session.actionHooks`，独立通用规则测试使用测试自有的 `ActionHookRegistry`。不查询通用规则的纯调用可显式填写 `actionHooks: undefined`，不能把它当作规则消费者的回退值。该字段不替代临时卡牌环境。
 
+奖励和支付边界使用 `server/__tests__/_helpers/session-assertions.ts` 的 `assertSeatResources({ session, response, fields, expected })`。资源字段列表必须非空且不重复，每个席位按顺序提供一个 `{ playerId, resources }` 预期；resources 仅包含所选字段且不能漏字段。helper 将独立的绝对预期分别与 returned response 和 live Session 比较，同时核对玩家身份及顺序。预期中保留正常行动收益和费用，不能从待测观测反推资源预期。
+
+每个实际执行的排除输入分别断言，包括未打出卡、持有者自己行动、无关行动、拒绝购买、资源不足，以及循环中的 off/control 输入。正例通过不能证明这些输入。原子拒绝命令使用 `assertRejectedUnchanged`；成功但未触发卡牌的行动仍需独立预期。资源比较不能替代 interaction、农场、日志或计分断言。reviewer 判断所选字段及输入分支是否符合规则；helper 只强制所选字段和席位完整。
+
 新 Session 场景使用 `server/__tests__/_helpers/session-fixtures.ts`。两个 helper 均默认 2 人，初始断言失败会释放 Session；成功返回的 Session 由调用方在使用后释放。
 
 | Helper | 契约 |
@@ -502,6 +506,8 @@ const resp = session.takeAction(X, 'ACTION_ID')
 将审计场景分批迁入现有的单卡和通用机制 Session 测试。每个围绕卡牌或机制划分的批次，提交为可独立审查的 PR。main 接收归并后的测试及其需要的 helper 和门禁，不先整体导入按编号组织的旧 audit 套件。
 
 维护一份小型迁移清单，记录源 audit 提交、每个旧场景 ID 和目标测试。已有测试覆盖某个场景时，注明该测试，并核对它保留了场景的断言。保留不同的拒绝、支付、pending、撤销和重试行为。同一批次从迁移源中删除已迁场景和不再使用的 helper。用例数量不能单独证明覆盖完整。
+
+明确声明仅增加断言的改动，执行 `node scripts/audit-migration.mjs preserve --base <commit> --head <commit> --files <external-json-file-list>`。JSON 列表必须包含全部改动文件，使用规范的相对 `.test.ts` 路径。保守 AST 检查保留原断言相对命令及分支的位置，拒绝修改 import、夹具、驱动参数、循环输入、标题及其他非断言语法；不支持的新增语法不予认证。普通重构仍走常规 review 和行为测试。此证明只能保全现有源码职责，不能证明原本缺失的输入、字面预期正确或任意运行时纯度。
 
 剩余 audit 场景保留在本地迁移工作区。每批以候选 PR 的生产代码和 native 测试为基础，只叠加尚未迁移的 audit 场景。验收这份联合源码，并把结果附在该批 PR 中。该批合入后，同步当前 main，再准备下一批。main CI 检查该 PR 中存在的文件，不依赖未合入的 audit 分支。原始 audit 证据保存在 Git 外。新确认的生产缺陷单独建 issue 跟踪。
 
