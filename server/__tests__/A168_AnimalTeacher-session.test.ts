@@ -344,6 +344,21 @@ describe("A168 command boundaries", () => {
     const hand = turn(hs, 0, 'grain-seeds')
     assert.equal(material(hand).sheep, 0)
     for (const lesson of ['lessons', 'lessons-4']) {
+      const heldSession = setup({}, false, state => { state.players[0]!.occupationHand = [CARD, 'A110_Roughcaster'] })
+      const picker = turn(heldSession, 0, lesson)
+      assert.ok(picker.interaction.stateId === 'wait' && picker.interaction.request.kind === 'choice')
+      assert.equal(picker.interaction.playerIndex, 0)
+      assert.ok(getChoiceOptions(picker).some(option => option.value === 'A110_Roughcaster' && !option.disabled))
+      const held = ok(heldSession.resolveChoice(0, 'A110_Roughcaster'))
+      assertTurnFinished(held, 0)
+      for (const response of [held, heldSession.getState()]) {
+        assert.deepEqual(response.state.players[0]!.occupationHand, [CARD])
+        assert.deepEqual(response.state.players[0]!.occupationPlayed, ['A110_Roughcaster'])
+        assert.deepEqual(response.state.players.map(player => player.resources), Array.from({ length: 4 }, (_, actor) => ({ wood: 0, clay: 0, reed: 0, stone: 0, food: actor === 0 && lesson === 'lessons-4' ? 19 : 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })))
+      }
+      save(`A168-N3-held-${lesson}`, { picker, held })
+    }
+    for (const lesson of ['lessons', 'lessons-4']) {
       const os = setup({}, true, state => state.players[1]!.occupationHand = ['A114_SeasonalWorker'])
       turn(os, 0, 'grain-seeds')
       let other = turn(os, 1, lesson)
