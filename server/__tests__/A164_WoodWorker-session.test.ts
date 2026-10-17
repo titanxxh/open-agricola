@@ -310,6 +310,8 @@ describe("A164 command boundaries", () => {
     for (const [played, own, space] of [[false, true, 'forest'], [true, false, 'forest'], [true, true, 'clay-pit']] as const) {
       const s = setup({ wood: 1 }, played)
       const r = own ? turn(s, 0, space) : offer(s, space)
+      for (const actual of [r, s.getState()])
+        assert.equal(material(actual).wood, own && space === 'forest' ? 4 : 1)
       assert.equal(material(r).sheep, 0)
       assertAnimalPlacement(s, r, [0, 0, 0], [])
       assert.equal(r.state.actionSpaces.find(a => a.id === space)!.resources.wood ?? 0, 0)

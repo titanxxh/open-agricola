@@ -244,6 +244,21 @@ describe("A167 command boundaries", () => {
       Object.assign(p.resources, { wood: 2 * counts.stable + (type === 'wood' ? 5 * counts.room : 0), clay: type === 'clay' ? 5 * counts.room : 0, stone: type === 'stone' ? 5 * counts.room : 0, reed: 2 * counts.room })
     }, played)
   }
+  function assertSingleWoodConstruction(s: GameSession, response: SessionResponse, wood = 0, reed = 0) {
+    for (const result of [response, s.getState()]) {
+      const player = result.state.players[0]!
+      assert.deepEqual(player.resources, {
+        wood, clay: 0, reed, stone: 0, food: 40, grain: 0, vegetable: 0,
+        sheep: 1, boar: 0, cattle: 0, begging: 0,
+      })
+      assert.equal(player.rooms, 3)
+      assert.deepEqual(player.roomTiles.map(tile => `${tile.row}-${tile.col}`).sort(), ['1-0', '1-1', '2-0'])
+      assert.deepEqual(player.stableTiles, [{ row: 0, col: 1 }])
+      assert.deepEqual(player.pastures, [])
+      assert.deepEqual(player.fenceSegments, [])
+    }
+    assertAnimalPlacement(s, response, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+  }
   it("one actual room and stable together give one matching house material animal in either order", () => {
     for (const [type, animal] of [['wood', 'sheep'], ['clay', 'boar'], ['stone', 'cattle']] as const)
       for (const first of ['room', 'stable'] as const) {
@@ -294,6 +309,7 @@ describe("A167 command boundaries", () => {
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { rooms: [{ row: 1, col: 1 }] }))
     assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { rooms: [{ row: 99, col: 99 }] }))
     const done = build(s, r, 'room')
+    assertSingleWoodConstruction(s, done)
     assert.equal(done.state.players[0]!.resources.sheep, 1)
     assertAnimalPlacement(s, done, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'build-again'))
@@ -304,6 +320,7 @@ describe("A167 command boundaries", () => {
     const room = getChoiceOptions(richPending).find(option => !option.disabled && option.labelKey === 'actions.construct.name')
     assert.ok(room)
     const richDone = build(rich, richPending, 'room')
+    assertSingleWoodConstruction(rich, richDone, 7, 2)
     assert.deepEqual([richDone.state.players[0]!.resources.wood, richDone.state.players[0]!.resources.reed, richDone.state.players[0]!.rooms, richDone.state.players[0]!.stableTiles.length], [7, 2, 3, 1])
     assert.ok(!richDone.state.players[0]!.roomTiles.some(tile => tile.row === 2 && tile.col === 1))
     assert.ok(!richDone.state.players[0]!.stableTiles.some(tile => tile.row === 0 && tile.col === 2))
@@ -314,19 +331,7 @@ describe("A167 command boundaries", () => {
   it("whole construction undo restores animal payment and finite structures before retry", () => {
     const s = farm('wood')
     const assertOutcome = (response: SessionResponse) => {
-      for (const result of [response, s.getState()]) {
-        const player = result.state.players[0]!
-        assert.deepEqual(player.resources, {
-          wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0,
-          sheep: 1, boar: 0, cattle: 0, begging: 0,
-        })
-        assert.equal(player.rooms, 3)
-        assert.deepEqual(player.roomTiles.map(tile => `${tile.row}-${tile.col}`).sort(), ['1-0', '1-1', '2-0'])
-        assert.deepEqual(player.stableTiles, [{ row: 0, col: 1 }])
-        assert.deepEqual(player.pastures, [])
-        assert.deepEqual(player.fenceSegments, [])
-      }
-      assertAnimalPlacement(s, response, [1, 0, 0], [{ id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+      assertSingleWoodConstruction(s, response)
     }
     const r = build(s, turn(s, 0, 'farm-expansion'), 'room')
     assertOutcome(r)
