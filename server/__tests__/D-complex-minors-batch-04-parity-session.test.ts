@@ -360,7 +360,7 @@ describe('D029 Muck Rake parity', () => {
     const session = setupMinor({ cardId: 'D029_MuckRake', played: true })
     const player = session.state.players[0]!
     player.stableTiles = types.map((_, index) => ({ row: 0, col: index + 1 }))
-    player.stableAnimals = Object.fromEntries(types.map((type, index) => [`0-${index + 1}`, type]))
+    player.stableAnimals = Object.fromEntries(types.map((type, index) => [`0-${index + 1}`, { animalType: type, animalCount: 1 }]))
     player.resources.sheep = types.filter((type) => type === 'sheep').length
     player.resources.boar = types.filter((type) => type === 'boar').length
     player.resources.cattle = types.filter((type) => type === 'cattle').length

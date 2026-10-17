@@ -25,7 +25,7 @@ const hasSheepInPasture = (player: PlayerState): boolean =>
 const hasSheepAnywhere = (player: PlayerState): boolean =>
   (player.resources.sheep ?? 0) > 0 ||
   countRoomAnimals(player, 'sheep') > 0 ||
-  Object.values(player.stableAnimals ?? {}).some((animal) => animal === 'sheep') ||
+  Object.values(player.stableAnimals ?? {}).some((animal) => animal.animalType === 'sheep' && animal.animalCount > 0) ||
   hasSheepInPasture(player)
 
 const hasPasture = (player: PlayerState): boolean =>

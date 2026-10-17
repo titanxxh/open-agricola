@@ -575,7 +575,7 @@ const EDGES_FOR_ONE = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
 const playerAnimalCount = (player: PlayerState, type: 'sheep' | 'boar' | 'cattle') => {
   const pasture = player.pastures.reduce((sum, current) => sum + (current.animalType === type ? current.animalCount : 0), 0)
   const house = (Object.values(player.houseAnimals)[0] ?? null) === type ? Object.values(player.houseAnimals).length : 0
-  const stables = Object.values(player.stableAnimals).filter((animal) => animal === type).length
+  const stables = Object.values(player.stableAnimals).reduce((sum, assignment) => sum + (assignment.animalType === type ? assignment.animalCount : 0), 0)
   return pasture + house + stables
 }
 

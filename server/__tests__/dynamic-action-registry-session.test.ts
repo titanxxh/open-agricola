@@ -79,20 +79,10 @@ it('a real Forest Tallyman purchase makes its private space executable without l
   const beforeResponse = session.getState()
   const beforeInteraction = JSON.stringify(beforeResponse.interaction)
   sessionEvidence.record('before private action', beforeResponse)
-  // #1258: undo materializes these two known defaults after a public card purchase.
+  // Recovery preserves these original representations after a public purchase.
   expect(beforeResponse.state.players[0]!.playedCards).toEqual([])
   expect(beforeResponse.state.actionSpaces.find(space => space.id === cardId)?.blockedBy).toBeUndefined()
-  const expectedBefore = {
-    ...beforeResponse,
-    state: {
-      ...beforeResponse.state,
-      players: beforeResponse.state.players.map((player, index) => index === 0
-        ? { ...player, playedCards: ['occupation:A162_ForestTallyman'] } : player),
-      actionSpaces: beforeResponse.state.actionSpaces.map(space => space.id === cardId
-        ? { ...space, blockedBy: [] } : space),
-    },
-  }
-  const before = undoRuleSnapshot(expectedBefore)
+  const before = undoRuleSnapshot(beforeResponse)
   const assertOutcome = (response: SessionResponse) => {
     for (const result of [response, session.getState()]) {
       expect(result.state.players[0]!.resources).toEqual({ wood: 3, clay: 2, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 })
@@ -111,8 +101,8 @@ it('a real Forest Tallyman purchase makes its private space executable without l
   expect(used.state.currentPlayerIndex).toBe(0)
   const undone = session.undoAction()
   sessionEvidence.record('after private action undo', undone)
-  expect(undone.state.players[0]!.playedCards).toEqual(['occupation:A162_ForestTallyman'])
-  expect(undone.state.actionSpaces.find(space => space.id === cardId)?.blockedBy).toEqual([])
+  expect(undone.state.players[0]!.playedCards).toEqual([])
+  expect(undone.state.actionSpaces.find(space => space.id === cardId)?.blockedBy).toBeUndefined()
   assertUndoRestored(before, undone)
   assertUndoRestored(before, session.getState())
   expect(JSON.stringify(undone.interaction)).toBe(beforeInteraction)

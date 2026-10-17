@@ -423,7 +423,7 @@ describe("B084 command boundaries", () => {
     assert.equal(r.state.players[1]!.resources.boar, 0)
     assert.deepEqual(r.state.futureMeeples.filter(x => x.cardId === A), [])
     const p = r.state.players[0]!
-    assert.equal(countRoomAnimals(p) + Object.values(p.stableAnimals).filter(v => v === 'boar').length, 2)
+    assert.equal(countRoomAnimals(p) + Object.values(p.stableAnimals).filter(v => v.animalType === 'boar').length, 2)
   })
   it("the first arrival rejects illegal housing and accepts one legal pig placement", () => {
     const s = setup(A, () => { }, false)

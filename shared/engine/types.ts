@@ -7,6 +7,11 @@ import type {
 } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
 
+/** Choice failure phase is known by the engine, independently of retryability. */
+export type EngineChoiceResult = ActionExecutionResult & {
+  disposition?: 'rejected-input' | 'accepted-blocked' | 'execution-failed'
+}
+
 export type NodeState = 'ready' | 'resolved' | 'blocked'
 
 export type EngineNodeType =

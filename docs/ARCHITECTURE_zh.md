@@ -526,6 +526,8 @@ type SessionResponse = {
 
 单测直接断言该结构；WS 由 `GameSession.buildSyncPayload()` 序列化并按 viewer 裁剪后广播。`InteractionState` 是前端交互真相。
 
+**Session 修复契约（#1257）。** 内部命令结果区分 Input Rejection 和已接受强制续行的阻塞。pending 输入校验和可重试的选择拒绝显式标记输入拒绝；选择分支已接受后发生的执行失败仍是阻塞推进。Session 结算先恢复被拒绝命令的完整检查点，包括 history 和行动起点元数据，再生成响应；原 state、scores、interaction 和撤销资格保持不变。不能仅凭 `ok:false` 或 `recoverable:true` 判断拒绝。合法输入破坏 continuation guard 时仍按 ADR 0015 执行持久化恢复和失败记忆；非法输入不能仅因位于 guarded scope 中而产生这类副作用。
+
 ---
 
 ### 6.4 round.ts 额外回合轮转扩展点（contributeExtraTurn / hasPendingExtraTurn）
@@ -571,6 +573,10 @@ Turn Scope 在人员放置、沼泽特殊行动或等价的卡牌行动格使用
 行动执行作用域在单个 Rule Action 的生命周期开始前建立，并持续覆盖它的 pending 选择、continuation、listener 和后置效果。同一 Turn 内的多个 Rule Action 使用不同的行动作用域，但共用 Turn Scope。按行动计算 delta 的消费者读取 action transaction，而不是 Turn 起点快照。
 
 `actionContext.trueAction` 与这三种生命周期相互独立。它只表示某个效果是否算作执行其命名行动，供 action listener 判断；它既不创建 Turn，也不能替代行动执行作用域。一次免费建造可以使用 `trueAction: false`，同时仍把实际建造 delta 暴露给通用的“当你建造时”规则。
+
+### 6.6 快照数据与可执行规则恢复
+
+**Session 修复契约（#1258、#1270；ADR 0028）。** 开局发牌由新局创建负责。加载或恢复已有 Session 时保留显式空手牌、已有卡牌身份、缺失的可选规则字段、动物安置和历史，不重新发牌或补写不同的规则状态表示。必需输入无效时拒绝加载，不把它转换为新游戏。纯捕获保留观测到的数据；Session 的 rehydration 从本局规则重建已知可执行定义和 engine cursor，不替换快照数据。普通 undo、命令检查点、暂定检查点与进程恢复共用该保全契约；显示名及公共事件 cancellation/archive 仍遵守各自边界。
 
 ## 7. shared/actions/ — 行动定义与 Hook 系统
 
@@ -1288,6 +1294,8 @@ farm-position backed card animal zone 使用 `AnimalZone.farmPosition` / `counts
 第三个并列方法 `getBuiltSpecialStables?(player)`（#200）返回该卡**当前矗立**的特殊 stable 位置（建造前空，D102 / E76 回收后再次为空）。聚合 `collectBuiltSpecialStables(player) => { position, sourceCardId }[]` 遍历所有卡。`serializeState`（`shared/session/serialization.ts`）据此给每个序列化玩家派生**展示派生字段** `SerializedPlayerState.specialStables: { position, sourceCardId }[]`；同一序列化层也派生 `playedCardAnimalZones` / `farmCardAnimalZones` / `borrowedPlayedCardAnimalZones` 供 card animal zone 常驻展示。领域真相仍在 `cardStates` / card effect 计算结果，这些字段只进 snapshot，不进 `PlayerState`/`GameState` 领域顶层，`rehydrateState` 反序列化时显式剥离避免泄漏回权威态。前端 `GameContainerApi` 从 `displayPlayer.specialStables` 派生「已建特殊 stable top-left 集合」传给 FarmBoard，渲染 `.farmhand-center-built` 实心常驻 overlay，无需读任何单卡 `cardStates`。
 
 ---
+
+**Session 修复契约（#1267；ADR 0029）。** 每个已占用的真实无围栏畜舍按农场位置保存一个 `{ animalType, animalCount }` 分配；数量归零时省略 entry，畜舍实体仍保留在 `stableTiles`。容量由当前后端规则派生。动物重整、分区回读、支付、容量整理和恢复保留实际数量；按动物数的规则累计数量，按占用格、存在性或物种集合的规则维持各自口径。合法布局写入、回读和正常交接后，库存与已安置分区总数一致，不能因存储丢量多开一次整理。前端通过现有动物安置流程展示后端派生的畜舍数量和容量。
 
 ## 10. 其他 shared/ 模块
 

@@ -205,7 +205,7 @@ describe('supply worker combinations through Session', () => {
       const player = state.players[0]!
       player.minorHand = ['E003_TeaTime']
       player.resources.grain = 1
-      player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
       state.roundActionOrder[0] = 'grain-utilization'
     })
     chooseSupplyWorkerTurn(session, GUEST_ROOM)
@@ -472,7 +472,7 @@ describe('temporary people at harvest and scoring', () => {
       const player = state.players[0]!
       player.occupationPlayed = ['A151_Minstrel']
       player.resources.grain = 2
-      player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }, { row: 0, col: 1, crop: null, remaining: 0 }]
+      player.fields = [{ row: 0, col: 0, stacks: [] }, { row: 0, col: 1, stacks: [] }]
       state.roundActionOrder.splice(0, 4, 'sheep-market', 'grain-utilization', 'fencing', 'major-improvement')
       for (const [spaceId, owner, workerId] of [
         ['major-improvement', 0, '1'], ['fencing', 0, '2'], ['sheep-market', 1, '1'], ['day-laborer', 1, '2'],
@@ -491,7 +491,7 @@ describe('temporary people at harvest and scoring', () => {
     expect(completed.ok, completed.error).toBe(true)
     expect(completed.state.round).toBe(6)
     expect(completed.state.players[0]!.resources.grain).toBe(1)
-    expect(completed.state.players[0]!.fields[1]!.crop).toBeNull()
+    expect(completed.state.players[0]!.fields[1]!.stacks).toEqual([])
   })
 
   it('does not treat Lessons as vacant for Night-School Student or Bohemian after a temporary return', () => {

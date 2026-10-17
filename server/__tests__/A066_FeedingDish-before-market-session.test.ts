@@ -141,7 +141,7 @@ describe('A066 Feeding Dish ownership before actual market use', () => {
       pasture(player)
       player.resources.sheep = 1
       if (storage === 'room') { player.houseAnimals = { [positionKey(player.roomTiles[0]!)]: 'sheep' } }
-      if (storage === 'stable') { player.stableTiles = [{ row: 0, col: 2 }]; player.stableAnimals = { '0-2': 'sheep' } }
+      if (storage === 'stable') { player.stableTiles = [{ row: 0, col: 2 }]; player.stableAnimals = { '0-2': { animalType: 'sheep', animalCount: 1 } } }
       if (storage === 'card') {
         player.occupationPlayed = ['D148_DomesticianExpert']
         player.cardStates.D148_DomesticianExpert = { extraData: { animalType: 'sheep', held: 1 } }

@@ -102,10 +102,12 @@ export const applyAnimalReorgToPlayer = (params: {
     .filter(zone => zone.zoneType === 'house' && zone.animalType && zone.animalCount > 0)
     .map(zone => [zone.id.slice('house:'.length), zone.animalType!]))
   const stableZones = animalReorg.zones.filter((zone) => zone.zoneType === 'stable')
-  const stableAnimals: Record<string, AnimalType | null> = {}
+  const stableAnimals: PlayerState['stableAnimals'] = {}
   stableZones.forEach((zone) => {
     const key = zone.id.replace('stable:', '')
-    stableAnimals[key] = zone.animalType ?? null
+    if (zone.animalType && zone.animalCount > 0) {
+      stableAnimals[key] = { animalType: zone.animalType, animalCount: zone.animalCount }
+    }
   })
   player.stableAnimals = stableAnimals
   for (const animal of ALL_ANIMAL_KEYS) {
@@ -136,22 +138,15 @@ export const buildPastureDisplayMap = (
 }
 
 export const buildStableDisplayMap = (
-  player: PlayerState | null | undefined,
+  player: (PlayerState & { stableAnimalZones?: AnimalReorgState['zones'] }) | null | undefined,
   animalReorg: AnimalReorgState | null | undefined,
 ) => {
-  const map = new Map<string, AnimalDisplay>()
-  ;(player?.stableTiles ?? []).forEach((tile) => {
-    const key = positionKey(tile)
-    const type = player?.stableAnimals?.[key] ?? null
-    map.set(key, {
-      animalType: type as AnimalType | null,
-      animalCount: type ? 1 : 0,
-    })
-  })
-  Object.entries(player?.stableAnimals ?? {}).forEach(([key, type]) => {
-    map.set(key, {
-      animalType: type as AnimalType | null,
-      animalCount: type ? 1 : 0,
+  const map = new Map<string, AnimalDisplay & { capacity: number }>()
+  player?.stableAnimalZones?.forEach(zone => {
+    map.set(zone.id.slice('stable:'.length), {
+      animalType: zone.animalType,
+      animalCount: zone.animalCount,
+      capacity: zone.capacity,
     })
   })
   animalReorg?.zones
@@ -160,6 +155,7 @@ export const buildStableDisplayMap = (
       map.set(zone.id.replace('stable:', ''), {
         animalType: zone.animalType,
         animalCount: zone.animalCount,
+        capacity: zone.capacity,
       })
     })
   return map

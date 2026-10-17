@@ -1,4 +1,4 @@
-import { captureStateWithHistory } from './history-streams'
+import { restoreSessionState } from './state-recovery'
 // Catalog-dependent state helpers (server-facing).
 //
 // For the client-safe slice (pure data, no catalog), see `./state-constants`.
@@ -56,13 +56,7 @@ import {
   type DefaultSandboxDeckId,
   type InitialStateOptions,
 } from './state-constants'
-import {
-  assertEventSizeUnderLimit,
-  assertGameEventEnvelope,
-  assertJsonSafeEvent,
-  assertKnownGameEventShape,
-  assertPublicGameEvent,
-} from '../events/guards'
+import { isPersistedGameEvent } from '../events/guards'
 import { normalizePublicEventArchive } from '../events/archive'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
@@ -82,19 +76,6 @@ import { createMoorActionSpaces } from '../moor/action-spaces'
 
 export * from './state-constants'
 
-const isPersistedGameEvent = (event: unknown): event is GameState['events'][number] => {
-  if (typeof event !== 'object' || event === null) return false
-  try {
-    assertGameEventEnvelope(event)
-    assertKnownGameEventShape(event)
-    assertPublicGameEvent(event)
-    assertJsonSafeEvent(event)
-    assertEventSizeUnderLimit(event, 4096)
-  } catch {
-    return false
-  }
-  return true
-}
 
 const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
   const next = deckIds
@@ -625,20 +606,16 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
 
 /** Undo snapshots copy core fields and share immutable history versions. */
 export const cloneStateWithHistory = (state: GameState, getActionDefinition?: ActionDefinitionLookup): GameState =>
-  normalizeState(captureStateWithHistory(state), getActionDefinition)
+  restoreSessionState(state, getActionDefinition)
 
 export const cloneState = (state: GameState): GameState => {
-  let raw: GameState
-  if (typeof structuredClone === 'function') {
-    try {
-      raw = structuredClone(state)
-    } catch {
-      raw = JSON.parse(JSON.stringify(state)) as GameState
-    }
-  } else {
-    raw = JSON.parse(JSON.stringify(state)) as GameState
-  }
-  return normalizeState(raw, id => state.actionSpaces.find(space => space.id === id))
+  const cloned = restoreSessionState(state, id => state.actionSpaces.find(space => space.id === id))
+  // Preview copies permit callers to mutate their own history records;
+  // recovery snapshots keep the immutable history-stream representation.
+  cloned.log = JSON.parse(JSON.stringify(state.log)) as GameState['log']
+  cloned.events = JSON.parse(JSON.stringify(state.events)) as GameState['events']
+  cloned.publicEventArchive = JSON.parse(JSON.stringify(state.publicEventArchive)) as GameState['publicEventArchive']
+  return cloned
 }
 
 /** Snake Opening is a multiplayer variant: a single seat has nothing to reverse and keeps the standard 2 food. */

@@ -14,7 +14,7 @@ const farm = (state: GameState, animal: 'sheep' | 'boar' | 'cattle', mode: 'past
   if (mode === 'mixed') {
     p.houseAnimals = { '1-0': animal }
     p.stableTiles.push({ row: 0, col: 3 })
-    p.stableAnimals = { '0-3': animal }
+    p.stableAnimals = { '0-3': { animalType: animal, animalCount: 1 } }
     p.resources[animal] = 4
   }
 }
@@ -60,7 +60,7 @@ describe('E138 counts owned placed farm animals exactly once', () => {
     expect(placed.state.players[0]!.resources.sheep).toBe(8)
     expect(placed.state.players[0]!.pastures[0]!.animalCount).toBe(6)
     expect(Object.values(placed.state.players[0]!.houseAnimals)).toEqual(['sheep'])
-    expect(Object.values(placed.state.players[0]!.stableAnimals)).toEqual(['sheep'])
+    expect(Object.values(placed.state.players[0]!.stableAnimals)).toEqual([{ animalType: 'sheep', animalCount: 1 }])
     session.dispose()
   })
 

@@ -239,7 +239,7 @@ describe('room-manager seat assignment', () => {
     expect(toRoomMeta(classicRoom).enableSnakeOpening).toBe(false)
   })
 
-  it('defaults a legacy mid-stage Farmers of the Moor draft pool to seven', () => {
+  it('preserves the current seven-card draft configuration through a mid-stage Farmers of the Moor snapshot', () => {
     const session = new GameSession(123, undefined, {
       playerCount: 2,
       draftMode: 'simultaneous',
@@ -247,8 +247,6 @@ describe('room-manager seat assignment', () => {
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
-    session.state.draftMode = undefined
-    session.state.draftPoolSize = undefined
     session.state.draft!.stage = 'farmersOfTheMoorMinor'
     session.state.draft!.poolSize = 4
     const serialized = serializeSessionSnapshot(session.state, session)

@@ -444,7 +444,8 @@ describe('provenance undo/replay reconstruction', () => {
       to: { kind: 'player', playerId: liveState.players[0]!.id },
       reason: 'gain',
     }])
-    const corruptedPacket = liveState.publicEventArchive[0] as Record<string, unknown>
+    const corruptedPacket = { ...liveState.publicEventArchive[0] } as Record<string, unknown>
+    liveState.publicEventArchive = [corruptedPacket as typeof liveState.publicEventArchive[number]]
     corruptedPacket.debug = () => 'bad'
     const beforeEvents = cloneJson(liveState.events)
     const beforeArchive = liveState.publicEventArchive

@@ -18,9 +18,10 @@ const CARD_ID = 'B051_DiggingSpade'
 
 const countBoarInFarmyard = (player: PlayerState): number => {
   const inHouse = countRoomAnimals(player, 'boar')
-  const inStables = Object.values(player.stableAnimals ?? {}).filter(
-    (a) => a === 'boar',
-  ).length
+  const inStables = Object.values(player.stableAnimals ?? {}).reduce(
+    (sum, assignment) => sum + (assignment.animalType === 'boar' ? assignment.animalCount : 0),
+    0,
+  )
   const inPastures = (player.pastures ?? []).reduce(
     (sum: number, p: Pasture) =>
       sum + (p.animalType === 'boar' ? p.animalCount : 0),

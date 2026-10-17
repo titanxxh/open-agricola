@@ -681,7 +681,7 @@ describe("A134 command boundaries", () => {
       p.houseAnimals = { '2-0': 'sheep' }
       p.resources.sheep = 1
       p.stableTiles = [{ row: 0, col: 1 }]
-      p.stableAnimals = { '0-1': 'boar' }
+      p.stableAnimals = { '0-1': { animalType: 'boar', animalCount: 1 } }
       p.resources.boar = 1
     })
     const a = read(pet, FULL, 0)

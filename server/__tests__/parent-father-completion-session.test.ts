@@ -518,7 +518,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
     const player = session.state.players[0]!
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, player.resources.sheep = 1).map(tile => [`${tile.row}-${tile.col}`, 'sheep']));
     player.stableTiles = [{ row: 0, col: 0 }]
-    player.stableAnimals = { '0-0': 'boar' }
+    player.stableAnimals = { '0-0': { animalType: 'boar', animalCount: 1 } }
     player.resources.boar = 1
     expect(session.loadState(session.state).ok).toBe(true)
     auditClaim(session, 'PS03', 2)
@@ -812,7 +812,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
         pen.animalCount = pen.tiles.length * 2
         player.resources.cattle += pen.animalCount
       }
-      player.stableAnimals = Object.fromEntries(player.stableTiles.map((tile) => [`${tile.row}-${tile.col}`, 'cattle' as const]))
+      player.stableAnimals = Object.fromEntries(player.stableTiles.map((tile) => [`${tile.row}-${tile.col}`, { animalType: 'cattle' as const, animalCount: 1 }]))
       player.resources.cattle += player.stableTiles.length
     }
     expect(session.loadState(session.state).ok).toBe(true)

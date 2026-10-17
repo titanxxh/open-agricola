@@ -13,7 +13,7 @@ const countPigsOnFarm = (player: CardListenerContext['player']): number => {
   }
   count += countRoomAnimals(player, 'boar')
   for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal === 'boar') count++
+    if (animal.animalType === 'boar') count += animal.animalCount
   }
   return count
 }

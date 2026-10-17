@@ -1153,7 +1153,7 @@ describe('RoomCommitter', () => {
     expect(recoveredCommitter.isBlocked(room.id)).toBe(false)
   })
 
-  it('continues a replay when rehydration normalizes the persisted frame', async () => {
+  it('continues a replay while rehydration preserves the persisted frame', async () => {
     const room = makeRoom()
     const firstCommitter = createCommitter()
     ;(await firstCommitter.prepareRoom(room, { missingPrefix: false }))
@@ -1178,9 +1178,9 @@ describe('RoomCommitter', () => {
     const restored = snapshotToRoom((await persistence.load(room.id))!)
     expect(restored.session.state.actionSpaces.find(
       (space) => space.id === 'C104_Collector',
-    )?.blockedBy).toEqual([])
+    )?.blockedBy).toBeUndefined()
     expect(restored.session.state.players[0]!.playedCards)
-      .toEqual(['occupation:C104_Collector'])
+      .toEqual([])
 
     const recoveredCommitter = createCommitter({})
     expect((await recoveredCommitter.prepareRoom(restored, { missingPrefix: true }))).toMatchObject({

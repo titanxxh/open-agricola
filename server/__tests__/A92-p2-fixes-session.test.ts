@@ -483,7 +483,7 @@ describe('A92 P2 fixes', () => {
       const pending = session.resolveChoice(0, OCCUPIED_SPACE_CHOICE_PREFIX + failingSpaceId)
       expect(pending.ok, pending.error).toBe(true)
       expect(getChoiceOptions(pending).map(option => option.value)).toEqual(['auto-fail'])
-      expect(target.takenBy).toEqual([{ playerId: p0.id, workerId: oldWorker.id }, { playerId: p0.id, workerId: promotedWorker.id }])
+      expect(session.state.actionSpaces.find(space => space.id === failingSpaceId)!.takenBy).toEqual([{ playerId: p0.id, workerId: oldWorker.id }, { playerId: p0.id, workerId: promotedWorker.id }])
       expect(failureCalls.get(session)?.get(failingSpaceId)).toEqual({ executed: 1, resolved: 0 })
       const recovered = rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session))))
       const restoredTarget = recovered.state.actionSpaces.find(space => space.id === failingSpaceId)!

@@ -40,7 +40,7 @@ describe('Moor animal housing clause audit', () => {
     player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, 1).map(tile => [`${tile.row}-${tile.col}`, 'horse']));
     player.resources.cattle = 1
     player.stableTiles = [{ row: 1, col: 2 }]
-    player.stableAnimals = { '1-2': 'cattle' }
+    player.stableAnimals = { '1-2': { animalType: 'cattle', animalCount: 1 } }
     session.state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 1
     session.loadState(session.state)
     let response = session.takeAction(0, 'pig-market')

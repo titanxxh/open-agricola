@@ -510,7 +510,7 @@ describe('E148 rule boundaries', () => {
   })
 
   it("opponent target consumes only its token and exact free stable cannot be doubled or submitted by opponent", () => {
-    for (const popFailureHistory of [false, true]) {
+    for (const recoverPending of [false, true]) {
       const s = setup(L, 3, state => { state.players[0]!.cardStates[L] = { extraData: { reservedActionSpaces: ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion'] } } })
       finish(s, place(s, 0, 'reed-bank'))
       let r = place(s, 1, 'grain-seeds')
@@ -525,6 +525,7 @@ describe('E148 rule boundaries', () => {
       const tiles = i.request.farm.selectableTiles
       assert.ok(tiles.length > 1)
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(1, { stables: [tiles[0]!] }))
+      if (recoverPending) s.loadState(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(s.state, s)))))
       const before = s.getState()
       const beforeState = JSON.stringify(before.state)
       const beforeScores = JSON.stringify(before.scores)
@@ -538,11 +539,13 @@ describe('E148 rule boundaries', () => {
       assert.equal(JSON.stringify(rejected.state), beforeState)
       assert.equal(JSON.stringify(rejected.scores), beforeScores)
       assert.deepEqual(wait(s.getState()).request, i.request)
-      // Current OA history leak, tracked in #1257; this rejection is not fully atomic.
-      assert.deepEqual(rejected.interaction.allowedCommands, ['commitSelection', 'undoStep'])
-      if (popFailureHistory) {
+      assert.deepEqual(rejected.interaction.allowedCommands, ['commitSelection'])
+      const repeated = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { stables: [tiles[0]!, tiles[1]!] }))
+      assert.equal(repeated.error, 'log.buildStableFail')
+      if (recoverPending) {
         const historyPop = s.undoStep()
-        assert.equal(historyPop.ok, true, historyPop.error)
+        assert.equal(historyPop.ok, false)
+        assert.equal(historyPop.error, 'cannot undo past boundary')
         assert.equal(JSON.stringify({ state: historyPop.state, interaction: historyPop.interaction, scores: historyPop.scores }), beforePublic)
       }
       r = s.commitSelectionChoice(0, { stables: [tiles[0]!] })
@@ -557,7 +560,7 @@ describe('E148 rule boundaries', () => {
       assert.equal(switchBack.request.fromPlayerIndex, 0)
       assert.equal(switchBack.request.toPlayerIndex, 1)
       assert.equal(r.state.currentPlayerIndex, 1)
-      evidence.record('E148 over-max legal retry', { popFailureHistory })
+      evidence.record('E148 over-max legal retry', { recoverPending })
     }
   })
 

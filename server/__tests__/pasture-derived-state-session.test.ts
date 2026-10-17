@@ -3,7 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { createWorkSession } from './_helpers/session-fixtures'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
-import { serializeState } from '../../shared/session/serialization'
+import { rehydrateState, serializeState } from '../../shared/session/serialization'
 
 import '../../shared/cards/A/A001_Shelter'
 import '../../shared/cards/A/A012_DrinkingTrough'
@@ -193,7 +193,7 @@ describe('pasture facts stay derived across authoritative commands', () => {
       const snapshot = session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks,}))
       expect(snapshot.players[0]!.pastures[0]).toMatchObject({ size: 1, stables: 1 })
       expect(JSON.stringify(session.state)).toBe(before)
-      const restored = new GameSession(snapshot)
+      const restored = new GameSession(rehydrateState(snapshot))
       try { expectPasture(restored, restored.getState(), 4, 1) } finally { restored.dispose() }
     } finally { session.dispose() }
   })

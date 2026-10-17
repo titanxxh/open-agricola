@@ -531,6 +531,8 @@ type SessionResponse = {
 
 Tests assert this structure directly. WebSocket paths serialize it through `GameSession.buildSyncPayload()`, filter it for the viewer, and broadcast it. `InteractionState` remains the frontend interaction authority.
 
+**Session repair contract (#1257).** Internal command outcomes distinguish Input Rejection from accepted mandatory blocking. Pending-input validation and retryable choice rejection identify rejected input explicitly; a failed execution after accepting a branch remains blocked progression. Session settlement restores the complete rejected command checkpoint, including history and action-start metadata, before rebuilding the response. The prior state, scores, interaction and undo eligibility remain unchanged. `ok:false` and `recoverable:true` alone do not identify rejection. Rule-valid guard-breaking commands retain their durable provisional restoration and failed-attempt memory under ADR 0015; an invalid input does not gain that side effect merely because it was submitted inside a guarded scope.
+
 ### 6.4 Extra-Turn Rotation Extension: `contributeExtraTurn` and `hasPendingExtraTurn`
 
 A092 Adoptive Parents introduced the extra-turn mechanism at the rotation layer under #203 and #204. Providers normally run after ordinary workers are exhausted. A provider with `extraTurnBeforeWorkers: true` also competes with ordinary placement during normal rotation; resolving either choice consumes one turn before the next eligible player acts.
@@ -576,6 +578,10 @@ A Turn Scope begins before its worker placement, Moor special action, or equival
 An action-execution scope begins before one Rule Action's lifecycle and remains active through its pending choices, continuations, listeners, and trailing effects. Multiple Rule Actions in one Turn use separate action scopes while sharing the Turn Scope. Per-action delta consumers use the action transaction, not the Turn's start snapshot.
 
 `actionContext.trueAction` is independent of all three lifetimes. It says only whether an effect counts as taking its named action for action listeners. It neither creates a Turn nor replaces an action-execution scope: a free build may use `trueAction: false` while still exposing its actual build delta to generic “when you build” rules.
+
+### 6.6 Snapshot data and executable-rule recovery
+
+**Session repair contract (#1258, #1270; ADR 0028).** New-game creation owns initial dealing. Loading or restoring an existing Session preserves present empty hands, stored card identities, missing optional rule fields, animal assignments and history; it does not re-deal or materialize a different rule-state representation. Invalid required input is rejected instead of being converted into a new game. Pure capture retains observed data. Session-owned rehydration rebuilds known executable definitions and engine cursors without replacing the captured data. Ordinary undo, command checkpoints, provisional checkpoints and process recovery share this preservation contract. Existing display-name and public-event cancellation/archive rules still apply at their respective boundaries.
 
 ## 7. `shared/actions/`: Actions and Hooks
 
@@ -1310,6 +1316,8 @@ Animal payment is centralized in `shared/domain/animal-payment.ts`. During an or
 The third method, added under #200, returns currently standing special-stable positions: empty before construction and empty again after D102 or E76 returns it. `collectBuiltSpecialStables(player)` aggregates `{ position, sourceCardId }[]` across cards. `serializeState` derives the display-only `SerializedPlayerState.specialStables` array for every serialized player, alongside the three persistent card-animal-zone projections. Domain truth remains in `cardStates` and card-effect results. These fields exist only in snapshots, not top-level `PlayerState` or `GameState`; `rehydrateState` strips them explicitly to prevent leakage into authoritative state. `GameContainerApi` derives the set of built-special-stable top-left positions from `displayPlayer.specialStables` and passes it to FarmBoard, which renders a persistent filled `.farmhand-center-built` overlay without reading card-specific `cardStates`.
 
 ---
+
+**Session repair contract (#1267; ADR 0029).** Each occupied physical loose stable stores one `{ animalType, animalCount }` assignment by farm-position key; zero-count entries are omitted while the stable itself remains in `stableTiles`. Capacity is derived from the current backend rules. Reorganization, zone reads, payment, capacity enforcement and recovery retain the actual count. Animal-number rules sum counts; occupied-space, presence and distinct-species rules keep their own semantics. A confirmed legal assignment must have matching resource and assigned-zone totals after write/read and normal handoff, with no extra reorganization caused by lost storage. The client renders backend-derived stable count and capacity through the existing animal-assignment flow.
 
 ## 10. Other `shared/` modules
 

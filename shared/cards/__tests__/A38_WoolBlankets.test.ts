@@ -55,7 +55,7 @@ describe('A038_WoolBlankets prerequisite (5 Sheep)', () => {
   it('IS satisfied counting stableAnimals (3 pasture + 2 stable sheep)', () => {
     const player = createPlayer({
       pastures: [makePasture(2, 3, 'sheep')],
-      stableAnimals: { 's1': 'sheep', 's2': 'sheep' },
+      stableAnimals: { 's1': { animalType: 'sheep', animalCount: 1 }, 's2': { animalType: 'sheep', animalCount: 1 } },
     })
     expect(A038_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(true)
   })

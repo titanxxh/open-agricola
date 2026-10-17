@@ -481,7 +481,7 @@ describe('buildFarmBoardProjection', () => {
       }],
       houseAnimals: { '2-0': 'boar' },
       stableTiles: [{ row: 1, col: 0 }],
-      stableAnimals: { '1-0': 'cattle' },
+      stableAnimals: { '1-0': { animalType: 'cattle', animalCount: 1 } },
     })
     const owner = createPlayer({
       id: 'owner',
@@ -563,7 +563,7 @@ describe('buildFarmBoardProjection', () => {
     })
     expect(projection.pastureCapacityMap).toEqual(new Map([['pasture-1', 5]]))
     expect(projection.houseDisplayMap.get('2-0')).toEqual({ animalType: 'sheep', animalCount: 1 })
-    expect(projection.stableDisplayMap.get('1-0')).toEqual({ animalType: 'boar', animalCount: 1 })
+    expect(projection.stableDisplayMap.get('1-0')).toEqual({ animalType: 'boar', animalCount: 1, capacity: 1 })
     expect(projection.cardDisplayMap.get('CARD1')).toMatchObject({
       animalType: 'horse',
       animalCount: 1,

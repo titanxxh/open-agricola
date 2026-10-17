@@ -41,7 +41,7 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     player.minorPlayed.push(CARD_ID)
     // Single unfenced stable, occupied by a sheep.
     player.stableTiles = [{ row: 0, col: 0 }]
-    player.stableAnimals = { '0-0': 'sheep' }
+    player.stableAnimals = { '0-0': { animalType: 'sheep', animalCount: 1 } }
     session.loadState(state)
 
     const effect = session.withCtx(() => getCardEffect(CARD_ID))!
@@ -79,7 +79,7 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
       { row: 0, col: 0 },
       { row: 0, col: 1 },
     ]
-    player.stableAnimals = { '0-0': 'sheep', '0-1': null }
+    player.stableAnimals = { '0-0': { animalType: 'sheep', animalCount: 1 } }
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E083_ShepherdsWhistle_post-reorg-check')!
@@ -102,7 +102,7 @@ describe('E083_ShepherdsWhistle session — reorganize fallback', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.stableTiles = [{ row: 0, col: 0 }]
-    player.stableAnimals = { '0-0': 'sheep' }
+    player.stableAnimals = { '0-0': { animalType: 'sheep', animalCount: 1 } }
     session.loadState(state)
 
     const adHoc = getAdHocAction('card_E083_ShepherdsWhistle_post-reorg-check')!

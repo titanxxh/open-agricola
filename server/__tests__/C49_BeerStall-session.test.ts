@@ -92,7 +92,7 @@ describe('C049_BeerStall session', () => {
     player.resources.grain = 3
     player.stableTiles = [{ row: 2, col: 2 }]
     player.pastures = []
-    player.stableAnimals = { '2-2': 'sheep' }
+    player.stableAnimals = { '2-2': { animalType: 'sheep', animalCount: 1 } }
 
     session.loadState(state)
 
@@ -248,7 +248,7 @@ describe('C049 Beer Stall parity', () => {
       col: index + 2,
     }))
     if (occupied && stables > 0) {
-      player.stableAnimals = { '0-2': 'sheep' }
+      player.stableAnimals = { '0-2': { animalType: 'sheep', animalCount: 1 } }
       player.resources.sheep = 1
     }
     if (fenced && stables > 0) {

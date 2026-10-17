@@ -13,7 +13,7 @@ const cardImpl = {
         .filter((pasture) => pasture.animalType === 'cattle')
         .reduce((sum, pasture) => sum + Math.min(pasture.tiles.length, pasture.animalCount), 0)
       count += countRoomAnimals(player, 'cattle')
-      count += Object.values(player.stableAnimals ?? {}).filter((animal) => animal === 'cattle').length
+      count += Object.values(player.stableAnimals ?? {}).filter((animal) => animal.animalType === 'cattle' && animal.animalCount > 0).length
       return count
     },
   },

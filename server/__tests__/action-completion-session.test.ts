@@ -56,7 +56,30 @@ const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: '__completi
 
 describe('action admission and blocked recovery through public Session commands', () => {
 
-  it.each(['or', 'xor', 'choice'] as const)('retains prior gain events when a sole mandatory %s step fails', (type) => {
+  it.each(['or', 'xor'] as const)('retains an accepted %s branch when execution fails recoverably', type => {
+    const { session, registry } = setup({ type, children: [
+      { type: 'leaf', actionId: '__recoverably_failed_branch__' },
+      { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+    ] })
+    registry.register({ ...registry.get('gain')!, id: '__recoverably_failed_branch__',
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'fail', errorKey: 'log.action', recoverable: true }),
+    })
+    const offered = session.takeAction(0, 'forest')
+    expect(offered.interaction.stateId).toBe('wait')
+    if (offered.interaction.stateId !== 'wait' || offered.interaction.request.kind !== 'choice') throw new Error('Expected branch choice')
+    const option = offered.interaction.request.options[0]!
+    const blocked = session.resolveChoice(0, option.value)
+    expect(blocked.ok).toBe(false)
+    expect(blocked.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'engine-blocked' } })
+    expect(blocked.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toHaveLength(1)
+    const undone = session.undoAction()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.actionSpaces.find(space => space.id === 'forest')!.takenBy).toEqual([])
+    session.dispose()
+  })
+
+  it.each(['or', 'xor', 'choice'] as const)('retains prior gain events when a sole mandatory %s step fails recoverably', (type) => {
     const { session, registry } = setup({ type: 'seq', children: [
       { type: 'leaf', actionId: 'gain', params: { food: 1 } },
       type === 'choice' ? { type: 'leaf', actionId: '__failed_branch__' }
@@ -64,7 +87,7 @@ describe('action admission and blocked recovery through public Session commands'
     ] })
     const fail: ActionDefinition['execute'] = ({ player, eventSink }) => {
       eventSink?.emit({ type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: player.id }, reason: 'gain' })
-      return { type: 'fail', errorKey: 'log.action' }
+      return { type: 'fail', errorKey: 'log.action', recoverable: true }
     }
     registry.register({
       ...registry.get('gain')!, id: '__failed_branch__',
