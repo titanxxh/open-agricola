@@ -122,7 +122,7 @@ describe('A151 Minstrel parity', () => {
     placeWorker(state, 1, 'sheep-market', '1')
     placeWorker(state, 2, 'major-improvement', '1')
     state.players[0]!.resources.grain = 1
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     expect(session.getState().actionAvailability?.['grain-utilization']).toBe(true)
     let response = endRound(session)

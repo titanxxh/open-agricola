@@ -164,7 +164,7 @@ describe('A122 Pan Baker parity', () => {
     if (actor === 1) {
       const opponent = state.players[1]!
       opponent.resources.grain = 1
-      opponent.fields = [{ row: 1, col: 0, crop: null, remaining: 0 }]
+      opponent.fields = [{ row: 0, col: 1, stacks: [] }]
     }
     session.loadState(state)
     return session

@@ -39,8 +39,8 @@ describe('A073_AgriculturalFertilizers session', () => {
     player.resources.vegetable = 1
     // Add empty fields for sow
     player.fields = [
-      { row: 0, col: 3, crop: null, remaining: 0 },
-      { row: 0, col: 4, crop: null, remaining: 0 },
+      { row: 0, col: 3, stacks: [] },
+      { row: 0, col: 4, stacks: [] },
     ]
 
     session.loadState(state)
@@ -94,7 +94,7 @@ describe('A073_AgriculturalFertilizers session', () => {
     player.resources.grain = 2
     player.resources.vegetable = 1
     player.fields = [
-      { row: 0, col: 3, crop: null, remaining: 0 },
+      { row: 0, col: 3, stacks: [] },
     ]
 
     session.loadState(state)
@@ -178,8 +178,8 @@ describe('A073_AgriculturalFertilizers session', () => {
     player.resources.vegetable = 1
 
     player.fields = [
-      { row: 0, col: 3, crop: null, remaining: 0 },
-      { row: 0, col: 4, crop: null, remaining: 0 },
+      { row: 0, col: 3, stacks: [] },
+      { row: 0, col: 4, stacks: [] },
     ]
 
     session.loadState(state)

@@ -153,7 +153,7 @@ describe('A129 Swagman parity', () => {
     const session = setup('A129_Swagman', 3)
     const state = session.getState().state
     state.players[0]!.resources = { ...state.players[0]!.resources, grain: 1, wood: 2 }
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     const response = driveSwagman(session, session.takeAction(0, 'grain-seeds'), true)
     expect(response.state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy).toEqual([])
@@ -165,7 +165,7 @@ describe('A129 Swagman parity', () => {
     const session = setup('A129_Swagman', 3)
     const state = session.getState().state
     state.players[0]!.resources.grain = 1
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     const response = driveSwagman(session, session.takeAction(0, 'grain-seeds'), false)
     expect(response.state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy).toHaveLength(1)
@@ -176,7 +176,7 @@ describe('A129 Swagman parity', () => {
     const session = setup('A129_Swagman', 3)
     const state = session.getState().state
     state.players[0]!.resources.wood = 2
-    state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
     const response = driveSwagman(session, session.takeAction(0, 'farm-expansion'), true)
     expect(response.state.actionSpaces.find((space) => space.id === 'farm-expansion')!.takenBy).toEqual([])

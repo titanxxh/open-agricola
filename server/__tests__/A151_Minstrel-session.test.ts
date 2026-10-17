@@ -151,7 +151,7 @@ const setupReturnHome = ({ doable = true } = {}) => {
   const owner = state.players[0]!
   owner.occupationPlayed = [CARD_ID]
   owner.resources.grain = doable ? 1 : 0
-  owner.fields = doable ? [{ row: 0, col: 0, crop: null, remaining: 0 }] : []
+  owner.fields = doable ? [{ row: 0, col: 0, stacks: [] }] : []
 
   const sink = state.actionSpaces.find((space) => space.id === '__test-worker-sink__')!
   for (const spaceId of ['sheep-market', 'fencing', 'major-improvement']) {

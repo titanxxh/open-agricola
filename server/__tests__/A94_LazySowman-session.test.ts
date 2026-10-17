@@ -31,7 +31,7 @@ const setup = (options?: {
   setWorkersAtHome(state, player, options?.workersAvailable ?? 2)
   player.resources.grain = options?.grain ?? 0
   player.resources.vegetable = options?.vegetable ?? 0
-  player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+  player.fields = [{ row: 0, col: 0, stacks: [] }]
 
   if (options?.withCard ?? true) {
     player.occupationPlayed.push('A094_LazySowman')
@@ -41,8 +41,8 @@ const setup = (options?: {
   const dayLaborer = state.actionSpaces.find((space) => space.id === 'day-laborer')
   const meetingPlace = state.actionSpaces.find((space) => space.id === 'meeting-place')
   if (!dayLaborer || !meetingPlace) throw new Error('required action space missing')
-  dayLaborer.takenBy = opponentId
-  meetingPlace.takenBy = options?.meetingPlaceOccupied === false ? [] : opponentId
+  dayLaborer.takenBy = [{ playerId: opponentId, workerId: '1' }]
+  meetingPlace.takenBy = options?.meetingPlaceOccupied === false ? [] : [{ playerId: opponentId, workerId: '2' }]
 
   session.loadState(state)
   return session
@@ -172,7 +172,7 @@ describe('A094_LazySowman session', () => {
     state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy = []
     setWorkersAtHome(state, opponent, 1)
     opponent.resources.grain = 1
-    opponent.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    opponent.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
 
     let resp = session.takeAction(1, 'grain-utilization')

@@ -42,7 +42,7 @@ describe('A085_Homekeeper session', () => {
       { row: 0, col: 0 },
       { row: 2, col: 2 },
     ]
-    player.fields = [{ row: 0, col: 1, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
     player.pastures = [
       {
         id: 'p1',
@@ -69,8 +69,8 @@ describe('A085_Homekeeper session', () => {
       { row: 2, col: 2 },
     ]
     player.fields = [
-      { row: 0, col: 1, crop: null, remaining: 0 },
-      { row: 2, col: 3, crop: null, remaining: 0 },
+      { row: 0, col: 1, stacks: [] },
+      { row: 2, col: 3, stacks: [] },
     ]
     player.pastures = [
       {
@@ -105,7 +105,7 @@ describe('A085_Homekeeper session', () => {
       { row: 0, col: 0 },
       { row: 2, col: 2 },
     ]
-    player.fields = [{ row: 0, col: 1, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
     player.pastures = [
       {
         id: 'p1',
@@ -128,7 +128,7 @@ describe('A085_Homekeeper session', () => {
     player.houseType = 'wood'
     player.occupationPlayed = [CARD_ID]
     player.roomTiles = [{ row: 0, col: 0 }]
-    player.fields = [{ row: 0, col: 1, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
     player.pastures = [
       {
         id: 'p1',
@@ -159,7 +159,7 @@ describe('A085_Homekeeper session', () => {
       { row: 0, col: 0 },
       { row: 2, col: 2 },
     ]
-    player.fields = [{ row: 0, col: 1, crop: null, remaining: 0 }]
+    player.fields = [{ row: 0, col: 1, stacks: [] }]
     player.pastures = [
       {
         id: 'p1',

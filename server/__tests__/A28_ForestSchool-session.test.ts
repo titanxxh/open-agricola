@@ -35,7 +35,7 @@ const setup = (withForestSchool: boolean, options?: { playerCount?: number; spac
 
   const lessons = state.actionSpaces.find((space) => space.id === spaceId)
   if (!lessons) throw new Error(`${spaceId} space missing`)
-  lessons.takenBy = state.players[1]!.id
+  lessons.takenBy = [{ playerId: state.players[1]!.id, workerId: state.players[1]!.workers[0]!.id }]
 
   session.loadState(state)
   return session

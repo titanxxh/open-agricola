@@ -72,7 +72,7 @@ describe('A144 Sequestrator parity', () => {
     const session = setup({ actor: 1 })
     const state = session.getState().state
     const actor = state.players[1]!
-    actor.fields = Array.from({ length: 4 }, (_, col) => ({ row: 0, col, crop: null, remaining: 0 }))
+    actor.fields = Array.from({ length: 4 }, (_, col) => ({ row: 0, col, stacks: [] }))
     session.loadState(state)
     let response = session.takeAction(1, 'farmland')
     expect(response.interaction).toMatchObject({
@@ -112,7 +112,7 @@ describe('A144 Sequestrator parity', () => {
   it('A144 S4: existing five fields do not receive stored clay retroactively', () => {
     const session = setup({ played: false })
     const state = session.getState().state
-    state.players[0]!.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, crop: null, remaining: 0 }))
+    state.players[0]!.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, stacks: [] }))
     session.loadState(state)
     const response = chooseCard(session, session.takeAction(0, 'lessons'), CARD_ID)
     expect(response.state.players[0]!.resources.clay).toBe(0)
@@ -123,7 +123,7 @@ describe('A144 Sequestrator parity', () => {
     const session = setup()
     const state = session.getState().state
     const owner = state.players[0]!
-    owner.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, crop: null, remaining: 0 }))
+    owner.fields = Array.from({ length: 5 }, (_, col) => ({ row: 0, col, stacks: [] }))
     setStoredResource(owner, CARD_ID, 'clay', 0)
     session.loadState(state)
     let response = session.takeAction(0, 'farmland')
