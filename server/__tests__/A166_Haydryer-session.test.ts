@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -11,6 +12,15 @@ import { confirmNext , getChoiceOptions } from './_helpers/session-assertions'
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
 
 const CARD_ID = 'A166_Haydryer'
 
@@ -261,6 +271,7 @@ describe("A166 command boundaries", () => {
       const { pending, r } = end(s)
       assert.equal(r.state.round, 5)
       assert.equal(material(r).cattle, 1)
+      assertAnimalPlacement(s, r, [0, 0, 1], [{ id: count === 0 ? 'house:2-0' : 'p0', animalType: 'cattle', animalCount: 1, capacity: count === 0 ? 1 : 2 }])
       const control = end(phaseSetup(4, count, 0, false)).r
       assert.equal(material(r).food - material(control).food, -(4 - count))
       save(`A166-N1-${count}`, { pending, r, control })
@@ -282,11 +293,14 @@ describe("A166 command boundaries", () => {
     assert.equal(material(hand).cattle, 0)
     const ordinary = end(phaseSetup(3, 1)).r
     assert.equal(material(ordinary).cattle, 0)
+    for (const response of [declined, poor, hand, ordinary]) assert.deepEqual([material(response).sheep, material(response).boar, material(response).cattle], [0, 0, 0])
     save('A166-N2', { declined, poor, hand, ordinary })
   })
   it("four pastures clamp free cattle cost without creating food", () => {
     const on = end(phaseSetup(4, 4)).r, off = end(phaseSetup(4, 4, 0, false)).r
     assert.equal(material(on).cattle, 1)
+    assert.deepEqual([material(on).sheep, material(on).boar, material(on).cattle], [0, 0, 1])
+    assert.deepEqual(on.state.players[0]!.pastures.map(pasture => ({ id: pasture.id, type: pasture.animalType, count: pasture.animalCount })), [{ id: 'p0', type: 'cattle', count: 1 }, { id: 'p1', type: null, count: 0 }, { id: 'p2', type: null, count: 0 }, { id: 'p3', type: null, count: 0 }])
     assert.equal(material(on).food, material(off).food)
     save('A166-N3', { on, off, limitation: 'Runtime free grant is automatic; printed optionality remains unadjudicated here' })
   })

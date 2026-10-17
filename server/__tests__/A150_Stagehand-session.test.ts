@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -11,6 +12,15 @@ import { assertRejectedUnchanged, confirmNext , getChoiceOptions , expectTileFar
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
@@ -265,10 +275,30 @@ describe("A150 command boundaries", () => {
     assert.equal(poor.state.players[0]!.rooms, 2)
     assert.equal(poor.state.players[0]!.stableTiles.length, 0)
     const s = stage(2)
-    const pending = offer(s)
+    let pending = offer(s)
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'confirm-player-switch')
+    assert.deepEqual(pending.interaction.request, { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 })
+    pending = ok(s.resolveChoice(1, 'confirm'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.sourceCard, STAGE)
+    assert.equal(pending.interaction.playerIndex, 0)
+    const stable = getChoiceOptions(pending).find(option => !option.disabled && option.labelKey === 'actions.stables.name')
+    assert.ok(stable)
     const r = drive(s, pending, 'stable')
     assert.equal(r.state.players[0]!.resources.wood, 0)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'build-another-stable'))
-    save('A150-N3', { poor, pending, r })
+    assertStaleRejected(s, () => s.resolveChoice(0, stable.value))
+    const rich = stage(4)
+    const richSwitch = offer(rich)
+    assert.ok(richSwitch.interaction.stateId === 'wait' && richSwitch.interaction.request.kind === 'confirm-player-switch')
+    const richPending = ok(rich.resolveChoice(1, 'confirm'))
+    const richStable = getChoiceOptions(richPending).find(option => !option.disabled && option.labelKey === 'actions.stables.name')
+    assert.ok(richStable)
+    const richDone = drive(rich, richPending, 'stable')
+    assert.equal(richDone.state.players[0]!.resources.wood, 2)
+    assert.deepEqual(richDone.state.players[0]!.stableTiles, [{ row: 0, col: 1 }])
+    assert.ok(!richDone.state.players[0]!.stableTiles.some(tile => tile.row === 0 && tile.col === 2))
+    assertStaleRejected(rich, () => rich.resolveChoice(0, richStable.value))
+    save('A150-N3', { poor, pending, r, richPending, richDone })
   })
 })

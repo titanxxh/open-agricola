@@ -1,4 +1,5 @@
 import { type SessionResponse, GameSession } from '../game/authoritative-session'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { describe, expect, it } from 'vitest'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -12,6 +13,15 @@ import { assertEmptyAccumulationRejected, assertRejectedUnchanged, confirmNext ,
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
 
 function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
@@ -386,6 +396,10 @@ describe("A156 command boundaries", () => {
       assert.equal(material(r, 1).food, 21)
       assert.equal(material(r)[type], 1)
       assert.equal(material(r, 2)[type], 0)
+      if (type === 'sheep' || type === 'boar') {
+        assertAnimalPlacement(s, r, [type === 'sheep' ? 1 : 0, type === 'boar' ? 1 : 0, 0], [{ id: 'housing', animalType: type, animalCount: 1, capacity: 4 }])
+        assertAnimalPlacement(s, r, [type === 'sheep' ? 1 : 0, type === 'boar' ? 1 : 0, 0], [{ id: 'house:2-0', animalType: type, animalCount: 1, capacity: 1 }], 1)
+      }
       save(`A156-N1-${space}`, { pending, r })
     }
   })

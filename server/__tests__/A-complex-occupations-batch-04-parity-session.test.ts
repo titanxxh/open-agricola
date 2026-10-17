@@ -1,4 +1,5 @@
 import { captureStateWithHistory } from '../../shared/session/history-streams'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
 import type { CropStack } from '../../shared/contract/types'
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { expectFarmSelection, expectTileFarmSelection, assertEmptyAccumulationRejected } from './_helpers/session-assertions'
@@ -27,6 +28,15 @@ import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnaps
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
 
 type CardId =
   | 'A085_Homekeeper' | 'A093_BedMaker' | 'A094_LazySowman' | 'A098_StableArchitect'
@@ -1143,6 +1153,7 @@ describe('A147 command boundaries', () => {
     ])
     const confirmed = session.resolveChoice(actor, 'confirm', { zones: interaction.request.zones })
     assert.equal(confirmed.ok, true, confirmed.error)
+    assertAnimalPlacement(session, confirmed, [type === 'sheep' ? count : 0, type === 'boar' ? count : 0, type === 'cattle' ? count : 0], [{ id: actor === 0 ? 'housing' : 'house:2-0', animalType: type, animalCount: count, capacity: actor === 0 ? 4 : 1 }], actor)
     return confirmed
   }
   function collectionComplete(response: SessionResponse, actor: 0 | 1) {
@@ -1194,6 +1205,7 @@ describe('A147 command boundaries', () => {
       const response = food === 0 ? collectionComplete(collected, 0) : extraAnimal(session, collected, 'sheep', false)
       assert.equal(response.state.players[0]!.resources.sheep, 1)
       assert.equal(response.state.players[0]!.resources.food, food)
+      assertAnimalPlacement(session, response, [1, 0, 0], [{ id: 'housing', animalType: 'sheep', animalCount: 1, capacity: 4 }])
     }
   })
   it('empty own market rejects without buying an animal and no other space triggers', () => {
@@ -1206,11 +1218,13 @@ describe('A147 command boundaries', () => {
     const unrelated = collectionComplete(turn(setup('sheep', 1), 0, 'day-laborer'), 0)
     assert.equal(unrelated.state.players[0]!.resources.sheep, 0)
     assert.equal(unrelated.state.players[0]!.resources.food, 3)
+    assert.deepEqual([unrelated.state.players[0]!.resources.sheep, unrelated.state.players[0]!.resources.boar, unrelated.state.players[0]!.resources.cattle], [0, 0, 0])
   })
   it('hand opponent and invalid choice cannot consume owner food or grant animals', () => {
     const handSession = setup('sheep', 1, 1, false)
     const hand = collectionComplete(collect(handSession, 0, 'sheep-market', 'sheep'), 0)
     assert.equal(hand.state.players[0]!.resources.food, 1)
+    assert.deepEqual(hand.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[1, 0, 0], [0, 0, 0], [0, 0, 0]])
     const otherSession = setup('sheep', 1)
     turn(otherSession, 0, 'grain-seeds')
     const other = collectionComplete(collect(otherSession, 1, 'sheep-market', 'sheep'), 1)

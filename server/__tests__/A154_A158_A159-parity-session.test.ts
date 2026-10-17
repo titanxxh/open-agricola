@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -14,6 +15,15 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 import { descriptionEffects } from './_helpers/choice-description'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertStaleRejected(session: GameSession, command: () => SessionResponse) {
+  const before = session.getState()
+  const expected = { state: captureStateWithHistory(before.state), interaction: structuredClone(before.interaction), scores: structuredClone(before.scores) }
+  const rejected = assertRejectedUnchanged(session, command)
+  for (const response of [rejected, session.getState()]) {
+    assert.deepEqual({ state: captureStateWithHistory(response.state), interaction: response.interaction, scores: response.scores }, expected)
+  }
+}
 
 function assertTurnFinished(response: SessionResponse, actor: number) {
   assert.equal(response.ok, true, response.error)
@@ -504,7 +514,14 @@ describe("A158 command boundaries", () => {
     expected[0]!.food += 9
     expected[0]!.vegetable -= 1
     expected[1]!.food += pileFood
-    const pending = offer(s, 'traveling-players')
+    let pending = offer(s, 'traveling-players')
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'confirm-player-switch')
+    pending = ok(s.resolveChoice(1, 'confirm'))
+    assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+    assert.equal(pending.interaction.playerIndex, 0)
+    assert.equal(pending.interaction.sourceCard, CULINARY)
+    const vegetable = getChoiceOptions(pending).find(option => !option.disabled && descriptionEffects(option.descriptionPreview).some(effect => (effect.kind === 'payment' || effect.kind === 'resourceExchange') && effect.resourcesPaid?.vegetable === 1))
+    assert.ok(vegetable)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'trade-all-goods'))
     const r = finish(s, pending, true, 'vegetable')
     assert.deepEqual(r.state.players.map(player => player.resources), expected)
@@ -514,7 +531,17 @@ describe("A158 command boundaries", () => {
     assert.equal(material(r).vegetable, 0)
     assert.equal(material(r).food, 29)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'trade-again'))
-    save('A158-N3', { pending, r })
+    assertStaleRejected(s, () => s.resolveChoice(0, vegetable.value))
+    const rich = setup({ grain: 1, sheep: 1, vegetable: 2 }, true, prepareHousing)
+    const richSwitch = offer(rich, 'traveling-players')
+    assert.ok(richSwitch.interaction.stateId === 'wait' && richSwitch.interaction.request.kind === 'confirm-player-switch')
+    const richPending = ok(rich.resolveChoice(1, 'confirm'))
+    const richVegetable = getChoiceOptions(richPending).find(option => !option.disabled && descriptionEffects(option.descriptionPreview).some(effect => (effect.kind === 'payment' || effect.kind === 'resourceExchange') && effect.resourcesPaid?.vegetable === 1))
+    assert.ok(richVegetable)
+    const richDone = finish(rich, richPending, true, 'vegetable')
+    assert.deepEqual([material(richDone).grain, material(richDone).sheep, material(richDone).vegetable, material(richDone).food], [1, 1, 1, 29])
+    assertStaleRejected(rich, () => rich.resolveChoice(0, richVegetable.value))
+    save('A158-N3', { pending, r, richPending, richDone })
   })
 })
 
@@ -657,6 +684,7 @@ describe("A159 command boundaries", () => {
     assert.equal(material(r, 1).wood, 1)
     assert.equal(material(r).food, 24)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, 'trade'))
+    assertStaleRejected(s, () => s.resolveChoice(0, exchange.value))
     save('A159-N3', r)
   })
 })

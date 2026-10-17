@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { computeAnimalZones, type AnimalZone } from '../../shared/domain/animal-zones'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -12,6 +13,15 @@ import { assertRejectedUnchanged, confirmNext , getChoiceOptions } from './_help
 import { createScenarioEvidence } from './_helpers/scenario-evidence'
 
 const sessionEvidence = createScenarioEvidence(import.meta.url)
+
+function assertAnimalPlacement(session: GameSession, initial: SessionResponse, totals: [number, number, number], expected: Pick<AnimalZone, 'id' | 'animalType' | 'animalCount' | 'capacity'>[], actor = 0) {
+  for (const response of [initial, session.getState()]) {
+    const player = response.state.players[actor]!
+    assert.deepEqual([player.resources.sheep, player.resources.boar, player.resources.cattle], totals)
+    const zones = session.withCtx(() => computeAnimalZones(player, response.state))
+    assert.deepEqual(zones.filter(zone => zone.animalCount !== undefined && zone.animalCount > 0).map(zone => ({ id: zone.id, animalType: zone.animalType, animalCount: zone.animalCount, capacity: zone.capacity })), expected)
+  }
+}
 
 const FILLER = '__test_placeholder__'
 
@@ -239,6 +249,7 @@ describe("A148 command boundaries", () => {
       assert.equal(z.capacity, cap)
       const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap }] }))
       assert.equal(done.state.players[0]!.resources.sheep, cap)
+      assertAnimalPlacement(s, done, [cap, 0, 0], [{ id: `card:${WOOL}`, animalType: 'sheep', animalCount: cap, capacity: cap }])
       assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))
       assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
       assert.equal(done.interaction.playerIndex, 0)
@@ -275,12 +286,14 @@ describe("A148 command boundaries", () => {
       zones: [{ ...house, animalType: 'boar', animalCount: 1, animalCounts: { boar: 1 } }],
     }))
     assert.equal(housed.state.players[0]!.resources.boar, 1)
+    assertAnimalPlacement(stocked, housed, [0, 1, 0], [{ id: 'house:2-0', animalType: 'boar', animalCount: 1, capacity: 1 }])
     assert.ok(housed.interaction.stateId === 'wait')
     assert.deepEqual(housed.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(housed.interaction.playerIndex, 0)
     assert.equal(housed.state.currentPlayerIndex, 0)
     const done = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalCount: 2 }] }))
     assert.equal(done.state.players[0]!.resources.sheep, 2)
+    assertAnimalPlacement(s, done, [2, 0, 0], [{ id: `card:${WOOL}`, animalType: 'sheep', animalCount: 2, capacity: 2 }])
     assert.ok(done.interaction.stateId === 'wait', JSON.stringify(done.interaction))
     assert.deepEqual(done.interaction.request, { kind: 'confirm-next-player', nextPlayerIndex: 1 })
     assert.equal(done.interaction.playerIndex, 0)
@@ -394,12 +407,14 @@ describe("A152 command boundaries", () => {
     save('A152-N2', { declined, poor })
   })
   it("any opponent Lessons placement suppresses night school", () => {
-    const s = setup(5, state => state.players[1]!.occupationHand = ['A110_Roughcaster'])
-    const spaces = [...EIGHT]
-    spaces[1] = 'lessons'
-    const { r } = end(s, spaces, null, false)
-    assert.deepEqual(r.state.players[0]!.occupationPlayed, [STUDENT])
-    assert.equal(r.state.players[0]!.resources.food, 60)
-    save('A152-N3', r)
+    for (const lesson of ['lessons', 'lessons-4']) {
+      const s = setup(5, state => state.players[1]!.occupationHand = ['A110_Roughcaster'])
+      const spaces = [...EIGHT]
+      spaces[1] = lesson
+      const { r } = end(s, spaces, null, false)
+      assert.deepEqual(r.state.players[0]!.occupationPlayed, [STUDENT])
+      assert.equal(r.state.players[0]!.resources.food, 60)
+      save(`A152-N3-${lesson}`, r)
+    }
   })
 })
