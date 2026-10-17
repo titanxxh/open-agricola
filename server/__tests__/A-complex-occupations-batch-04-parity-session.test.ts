@@ -1111,6 +1111,7 @@ describe('A147 command boundaries', () => {
   const DEALER = 'A147_AnimalDealer'
   type Animal = 'sheep' | 'boar' | 'cattle'
   const starts = new WeakMap<GameSession, { rules: string; interaction: string }>()
+  const baselineResources = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
   function setup(type: Animal, count: number, food = 1, played = true) {
     return sessionEvidence.track(createWorkSession({
       seed: 4242,
@@ -1206,6 +1207,8 @@ describe('A147 command boundaries', () => {
       assert.equal(response.state.players[0]!.resources.sheep, 1)
       assert.equal(response.state.players[0]!.resources.food, food)
       assertAnimalPlacement(session, response, [1, 0, 0], [{ id: 'housing', animalType: 'sheep', animalCount: 1, capacity: 4 }])
+      for (const actual of [response, session.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baselineResources, food, sheep: 1 }, baselineResources, baselineResources])
     }
   })
   it('empty own market rejects without buying an animal and no other space triggers', () => {
@@ -1215,16 +1218,21 @@ describe('A147 command boundaries', () => {
     assert.equal(rejected.state.currentPlayerIndex, 0)
     assert.equal(rejected.state.players[0]!.resources.sheep, 0)
     assert.equal(rejected.state.players[0]!.resources.food, 1)
-    const unrelated = collectionComplete(turn(setup('sheep', 1), 0, 'day-laborer'), 0)
+    const unrelatedSession = setup('sheep', 1)
+    const unrelated = collectionComplete(turn(unrelatedSession, 0, 'day-laborer'), 0)
     assert.equal(unrelated.state.players[0]!.resources.sheep, 0)
     assert.equal(unrelated.state.players[0]!.resources.food, 3)
     assert.deepEqual([unrelated.state.players[0]!.resources.sheep, unrelated.state.players[0]!.resources.boar, unrelated.state.players[0]!.resources.cattle], [0, 0, 0])
+    for (const actual of [unrelated, unrelatedSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baselineResources, food: 3 }, baselineResources, baselineResources])
   })
   it('hand opponent and invalid choice cannot consume owner food or grant animals', () => {
     const handSession = setup('sheep', 1, 1, false)
     const hand = collectionComplete(collect(handSession, 0, 'sheep-market', 'sheep'), 0)
     assert.equal(hand.state.players[0]!.resources.food, 1)
     assert.deepEqual(hand.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[1, 0, 0], [0, 0, 0], [0, 0, 0]])
+    for (const actual of [hand, handSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baselineResources, food: 1, sheep: 1 }, baselineResources, baselineResources])
     const otherSession = setup('sheep', 1)
     turn(otherSession, 0, 'grain-seeds')
     const other = collectionComplete(collect(otherSession, 1, 'sheep-market', 'sheep'), 1)
@@ -1233,6 +1241,8 @@ describe('A147 command boundaries', () => {
     assert.deepEqual(other.state.players.map(player => [player.resources.sheep, player.resources.boar, player.resources.cattle]), [[0, 0, 0], [1, 0, 0], [0, 0, 0]])
     assert.equal(other.state.players[1]!.resources.sheep, 1)
     assert.equal(other.state.players[1]!.resources.food, 40)
+    for (const actual of [other, otherSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baselineResources, food: 1, grain: 1 }, { ...baselineResources, sheep: 1 }, baselineResources])
     const session = setup('sheep', 1)
     const pending = collect(session, 0, 'sheep-market', 'sheep')
     const valid = dealerOffer(pending, 'sheep')

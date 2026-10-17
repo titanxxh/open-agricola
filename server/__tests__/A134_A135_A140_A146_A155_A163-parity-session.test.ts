@@ -342,18 +342,26 @@ describe("A155 command boundaries", () => {
     }
   })
   it("unrelated Fishing and Day Laborer cannot grant wood or grain", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
     for (const space of ['fishing', 'day-laborer']) {
-      const r = turn(setup(), 0, space)
+      const s = setup()
+      const r = turn(s, 0, space)
       assert.equal(r.state.players[0]!.resources.wood, 0)
       assert.equal(r.state.players[0]!.resources.grain, 0)
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: space === 'fishing' ? 41 : 42 }, baseline, baseline, baseline])
       assertTurnFinished(r, 0)
       save(`A155-N2-${space}`, r)
     }
   })
   it("hand and actual opponent Traveling Players do not grant owner rewards", () => {
-    const hand = turn(setup(undefined, false), 0, 'traveling-players')
+    const handSession = setup(undefined, false)
+    const hand = turn(handSession, 0, 'traveling-players')
     assert.equal(hand.state.players[0]!.resources.wood, 0)
     assert.equal(hand.state.players[0]!.resources.grain, 0)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [hand, handSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 41 }, baseline, baseline, baseline])
     const s = setup()
     turn(s, 0, 'day-laborer')
     const other = turn(s, 1, 'traveling-players')
@@ -479,6 +487,14 @@ describe("A163 command boundaries", () => {
     return s
   }
   it("first through fifth real placed person gains mapped material from Resource Market", () => {
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    const ordinaryOutcomes = [
+      [{ ...baseline, food: 41, reed: 1, stone: 1 }, baseline, baseline, baseline],
+      [{ ...baseline, food: 41, reed: 1, stone: 1, grain: 1 }, { ...baseline, food: 42 }, { ...baseline, wood: 3 }, { ...baseline, clay: 1 }],
+      [{ ...baseline, food: 41, reed: 2, stone: 1, grain: 1 }, { ...baseline, food: 43 }, { ...baseline, wood: 5 }, { ...baseline, clay: 3 }],
+      [{ ...baseline, food: 41, wood: 1, reed: 2, stone: 1, grain: 1 }, { ...baseline, food: 44 }, { ...baseline, wood: 5, stone: 1 }, { ...baseline, clay: 3, stone: 1 }],
+      [{ ...baseline, food: 41, wood: 1, reed: 2, stone: 1, grain: 1, vegetable: 1 }, { ...baseline, food: 44, sheep: 1 }, { ...baseline, wood: 5, stone: 1, boar: 1 }, { ...baseline, clay: 3, stone: 1, cattle: 1 }],
+    ]
     for (const ordinal of [1, 2, 3, 4, 5]) {
       const on = beforeExpert(ordinal), off = beforeExpert(ordinal, false)
       const a = turn(on, 0, 'resource-market-4'), b = turn(off, 0, 'resource-market-4')
@@ -488,6 +504,10 @@ describe("A163 command boundaries", () => {
       assert.equal(getRoundPersonPlacementOrder(a.state.players[0]!).length, ordinal)
       assertTurnFinished(a, 0)
       assertTurnFinished(b, 0)
+      const expectedOff = ordinaryOutcomes[ordinal - 1]
+      assert.ok(expectedOff)
+      for (const actual of [b, off.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), expectedOff)
       save(`A163-N1-${ordinal}`, { a, b })
     }
   })
@@ -496,6 +516,9 @@ describe("A163 command boundaries", () => {
     const a = turn(on, 0, 'forest'), b = turn(off, 0, 'forest')
     assert.equal(a.state.players[0]!.resources.wood, b.state.players[0]!.resources.wood)
     assert.deepEqual(a.state.players[0]!.resources, b.state.players[0]!.resources)
+    const forestBaseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [a, on.getState(), b, off.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...forestBaseline, wood: 3 }, forestBaseline, forestBaseline, forestBaseline])
     const s = setup()
     turn(s, 0, 'grain-seeds')
     const r = turn(s, 1, 'resource-market-4')

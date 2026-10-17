@@ -272,7 +272,11 @@ describe("A166 command boundaries", () => {
       assert.equal(r.state.round, 5)
       assert.equal(material(r).cattle, 1)
       assertAnimalPlacement(s, r, [0, 0, 1], [{ id: count === 0 ? 'house:2-0' : 'p0', animalType: 'cattle', animalCount: 1, capacity: count === 0 ? 1 : 2 }])
-      const control = end(phaseSetup(4, count, 0, false)).r
+      const controlSession = phaseSetup(4, count, 0, false)
+      const control = end(controlSession).r
+      const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+      for (const actual of [control, controlSession.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 56, clay: 1, grain: 1 }, { ...baseline, food: 19 }, { ...baseline, food: 16, wood: 3, clay: 2 }, { ...baseline, food: 17, reed: 1 }])
       assert.equal(material(r).food - material(control).food, -(4 - count))
       save(`A166-N1-${count}`, { pending, r, control })
     }
@@ -326,36 +330,56 @@ describe("A166 command boundaries", () => {
         assert.equal(actual.state.round, 8)
         assert.deepEqual(actual.state.players[0]!.resources, { wood: 0, clay: 1, reed: 0, stone: 0, food: played ? 53 : 56, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: played ? 1 : 0, begging: 0 })
         assert.deepEqual(actual.state.players.map(player => player.resources.cattle), played ? [1, 0, 0, 0] : [0, 0, 0, 0])
+        assert.deepEqual(actual.state.players.map(player => player.resources.food), played ? [53, 19, 16, 17] : [56, 19, 16, 17])
       }
       assertAnimalPlacement(s, r, [0, 0, played ? 1 : 0], played ? [{ id: 'p0', animalType: 'cattle', animalCount: 1, capacity: 2 }] : [])
       save(`A166-N1-7-${played}`, r)
     }
   })
   it("decline unaffordable hand and nonharvest cannot grant cattle", () => {
-    const { pending: declineOffer, r: declined } = end(phaseSetup(4, 1), false)
+    const declineSession = phaseSetup(4, 1)
+    const { pending: declineOffer, r: declined } = end(declineSession, false)
     assert.ok(declineOffer.interaction.stateId === 'wait')
     assert.equal(declineOffer.interaction.sourceCard, HAY)
     assert.equal(declineOffer.interaction.playerIndex, 0)
     assert.equal(material(declined).cattle, 0)
-    const poor = end(phaseSetup(4, 1, 0, true, 0), false, true).r
+    const poorSession = phaseSetup(4, 1, 0, true, 0)
+    const poor = end(poorSession, false, true).r
     assert.equal(poor.state.round, 5)
     assert.equal(poor.state.roundPhase, 'work')
     assert.equal(poor.interaction.stateId, 'idle')
     assert.equal(material(poor).food, 0)
     assert.equal(material(poor).cattle, 0)
-    const hand = end(phaseSetup(4, 1, 0, false)).r
+    const handSession = phaseSetup(4, 1, 0, false)
+    const hand = end(handSession).r
     assert.equal(material(hand).cattle, 0)
-    const ordinary = end(phaseSetup(3, 1)).r
+    const ordinarySession = phaseSetup(3, 1)
+    const ordinary = end(ordinarySession).r
     assert.equal(material(ordinary).cattle, 0)
     for (const response of [declined, poor, hand, ordinary]) assert.deepEqual([material(response).sheep, material(response).boar, material(response).cattle], [0, 0, 0])
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    const scenarios = [
+      { response: declined, session: declineSession, resources: [{ ...baseline, food: 56, clay: 1, grain: 1 }, { ...baseline, food: 19 }, { ...baseline, food: 16, wood: 3, clay: 2 }, { ...baseline, food: 17, reed: 1 }] },
+      { response: poor, session: poorSession, resources: [{ ...baseline, food: 0, clay: 1, grain: 1, begging: 4 }, { ...baseline, food: 19 }, { ...baseline, food: 16, wood: 3, clay: 2 }, { ...baseline, food: 17, reed: 1 }] },
+      { response: hand, session: handSession, resources: [{ ...baseline, food: 56, clay: 1, grain: 1 }, { ...baseline, food: 19 }, { ...baseline, food: 16, wood: 3, clay: 2 }, { ...baseline, food: 17, reed: 1 }] },
+      { response: ordinary, session: ordinarySession, resources: [{ ...baseline, food: 60, clay: 1, grain: 1 }, { ...baseline, food: 23 }, { ...baseline, wood: 3, clay: 2 }, { ...baseline, food: 21, reed: 1 }] },
+    ]
+    for (const scenario of scenarios)
+      for (const actual of [scenario.response, scenario.session.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), scenario.resources)
     save('A166-N2', { declined, poor, hand, ordinary })
   })
   it("four pastures clamp free cattle cost without creating food", () => {
-    const on = end(phaseSetup(4, 4)).r, off = end(phaseSetup(4, 4, 0, false)).r
+    const on = end(phaseSetup(4, 4)).r
+    const offSession = phaseSetup(4, 4, 0, false)
+    const off = end(offSession).r
     assert.equal(material(on).cattle, 1)
     assert.deepEqual([material(on).sheep, material(on).boar, material(on).cattle], [0, 0, 1])
     assert.deepEqual(on.state.players[0]!.pastures.map(pasture => ({ id: pasture.id, type: pasture.animalType, count: pasture.animalCount })), [{ id: 'p0', type: 'cattle', count: 1 }, { id: 'p1', type: null, count: 0 }, { id: 'p2', type: null, count: 0 }, { id: 'p3', type: null, count: 0 }])
     assert.equal(material(on).food, material(off).food)
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [off, offSession.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 56, clay: 1, grain: 1 }, { ...baseline, food: 19 }, { ...baseline, food: 16, wood: 3, clay: 2 }, { ...baseline, food: 17, reed: 1 }])
     save('A166-N3', { on, off, limitation: 'Runtime free grant is automatic; printed optionality remains unadjudicated here' })
   })
 })

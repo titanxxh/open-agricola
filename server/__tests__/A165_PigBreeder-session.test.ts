@@ -215,6 +215,9 @@ describe("A165 command boundaries", () => {
       const { r } = end(s)
       assert.equal(material(r).boar, pigs)
       assertAnimalPlacement(s, r, [0, pigs, 0], [{ id: 'p0', animalType: 'boar', animalCount: pigs, capacity: 4 }])
+      const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 60, clay: 1, grain: 1, boar: pigs }, { ...baseline, food: 23 }, { ...baseline, wood: 3, clay: 2 }, { ...baseline, reed: 1, food: 21 }])
       save(`A165-N3-${round}-${pigs}-${played}`, r)
     }
     for (const played of [true, false]) {
@@ -267,6 +270,9 @@ describe("A165 command boundaries", () => {
     assert.equal(material(r).boar, 2)
     assert.equal(material(r).sheep, 1)
     assertAnimalPlacement(s, r, [1, 2, 0], [{ id: 'p0', animalType: 'boar', animalCount: 2, capacity: 2 }, { id: 'house:2-0', animalType: 'sheep', animalCount: 1, capacity: 1 }])
+    const baseline = { wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+    for (const actual of [r, s.getState()])
+      assert.deepEqual(actual.state.players.map(player => player.resources), [{ ...baseline, food: 60, clay: 1, grain: 1, sheep: 1, boar: 2 }, { ...baseline, food: 23 }, { ...baseline, wood: 3, clay: 2 }, { ...baseline, reed: 1, food: 21 }])
     save('A165-N4', r)
   })
 })

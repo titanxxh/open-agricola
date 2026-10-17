@@ -242,6 +242,9 @@ describe("A144 command boundaries", () => {
       assert.deepEqual(store(r), [3, 4])
       assert.equal(r.state.players[0]!.resources.reed, 0)
       assert.equal(r.state.players[0]!.resources.clay, 0)
+      const baseline = { wood: 15, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [baseline, baseline, baseline])
       save(`A144-N1-${farm}`, r)
     }
   })
@@ -285,6 +288,9 @@ describe("A144 command boundaries", () => {
       const r = plow(s, 0)
       assert.equal(r.state.players[0]!.resources.clay, 0)
       assert.equal(r.state.players[0]!.resources.reed, 0)
+      const baseline = { wood: 15, clay: 0, reed: 0, stone: 0, food: 40, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 }
+      for (const actual of [r, s.getState()])
+        assert.deepEqual(actual.state.players.map(player => player.resources), [baseline, baseline, baseline])
       save(`A144-N4-${count}-${played}-${empty}`, r)
     }
   })
