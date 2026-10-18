@@ -74,21 +74,13 @@
 
 后续简化原则：只有当同一种 helper 能服务至少两张当前或近期目标卡，才抽新抽象；否则维持卡内闭环。
 
-## 4. 架构审阅
-
-本轮审阅没有发现新的“仅前端裁定规则”路径，也没有开放的通用基础设施 blocker。下表只保留会继续约束新增卡牌 / 后续改动的架构事项；已完成的一次性基础设施记录不再作为待办保留。
-
-| 事项 | 当前代码证据 | 后续约束 |
-|---|---|---|
-| 服务端 Workshop 会话隔离 | `server/game/custom-session-executor.ts`、`custom-session-worker.ts`、`game-router.ts`、`connection/room-router.ts` | 尚未内置的可执行 Workshop 卡按 HTTP session / WS room 把完整命令放入独立 Worker，房间 FIFO 覆盖 Durable Commit，同一连接的换房 / 换座等待在途命令；任何 Worker dispatch、timeout、runtime warning 或响应构造失败都会恢复含 pending/undo history 的命令前 checkpoint 并保留诊断。进程级 15 槽统一计算 WS Room、恢复 Room 与 HTTP sandbox 的 Worker 预留；`built_in=1` 卡仍直接使用内置实现且不创建 Worker，浏览器本地 sandbox 不变。 |
-
-## 5. 基础设施待办
+## 4. 基础设施待办
 
 只登记尚未实现的跨卡机制。机制实现并有测试或门禁覆盖后删除该条，并把新的通用机制写进 `docs/ARCHITECTURE.md` 对应的 module 节。已完成的工作记录在 PR、ADR 和测试里，不放在这里。
 
 当前没有未决条目。
 
-## 6. 参考实现坏味道：不要照抄
+## 5. 参考实现坏味道：不要照抄
 
 - 不把导入的前置条件元数据当作规则权威。前置条件以出版社卡牌文字、印刷图标和官方裁定为准；参考实现运行时未使用的字段，在 OA 通用校验中可能成为实际限制。
 - 不用混合开轮扫描近似揭牌或开工反应；不靠牌区索引恢复准备窗口，也不在来源发现时按当前支付能力删掉合法反应。
@@ -101,7 +93,7 @@
 - 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 
-## 7. 参考实现使用 Special Effect 的卡牌
+## 6. 参考实现使用 Special Effect 的卡牌
 
 | Deck | 卡牌 |
 |---|---|
@@ -111,11 +103,11 @@
 | D | `D101_SugarBaker`, `D102_SampleStableMaker`, `D103_CanalBoatman`, `D107_Bellfounder`, `D010_StorksNest`, `D116_TreeInspector`, `D124_Emissary`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D129_LumberVirtuoso`, `D134_OysterEater`, `D137_TradeTeacher`, `D138_PetLover`, `D014_HammerCrusher`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D158_BeanCounter`, `D161_CabbageBuyer`, `D167_PureBreeder`, `D020_TurnwrestPlow`, `D022_WorkPermit`, `D023_PioneeringSpirit`, `D026_CarpentersYard`, `D027_Retraining`, `D051_Archway`, `D066_PotterCeramics`, `D070_StrawManure`, `D071_Changeover`, `D072_StableManure`, `D074_RoyalWood`, `D082_HuntingTrophy`, `D092_ChildOmbudsman`, `D093_SheepInspector`, `D094_HenpeckedHusband`, `D096_Furnisher`, `D098_Transactor` |
 | E | `E103_Wolf`, `E106_EmergencySeller`, `E010_StrawHat`, `E112_GrainThief`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E134_Omnifarmer`, `E148_Lazybones`, `E162_Entrepreneur`, `E166_Roastmaster`, `E167_DairyCrier`, `E022_GuestRoom`, `E027_PiggyBank`, `E004_Thunderbolt`, `E051_WhaleOil`, `E052_Cubbyhole`, `E053_BoarSpear`, `E058_LunchtimeBeer`, `E005_NightLoot`, `E073_Scythe`, `E074_AshTrees`, `E076_LumberPile`, `E078_SleightofHand`, `E081_AlchemistsLab`, `E083_ShepherdsWhistle`, `E085_MasterTanner`, `E086_PenBuilder` |
 
-## 8. Hook 点清单
+## 7. Hook 点清单
 
 Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
-## 9. 源码排除项
+## 8. 源码排除项
 
 | 来源 | 原因 |
 |---|---|
@@ -125,7 +117,7 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `E132_Shearer` | `E132_VeggieLover` 的参考实现 legacy 源文件。 |
 | 参考实现 `implemented=false` 且无运行时行为的卡牌 | 除非 OA 明确作为产品扩展实现，否则排除出行为对齐范围。 |
 
-## 10. 单卡附录
+## 9. 单卡附录
 
 状态值：`已对齐`、`已接受差异`、`需复核`、`排除`。
 

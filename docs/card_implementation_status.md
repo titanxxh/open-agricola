@@ -74,21 +74,13 @@ Cards excluded because of reference anti-patterns:
 
 Extract a new abstraction only when the same helper serves at least two current or near-term target cards; otherwise keep the logic card-local.
 
-## 4. Architecture review
-
-This review found no new frontend-only rule adjudication path and no open blocker in shared infrastructure. The table keeps only architectural matters that continue to constrain new cards and later changes; completed one-time infrastructure records are not kept as to-dos.
-
-| Matter | Current code evidence | Constraint going forward |
-|---|---|---|
-| Server-side Workshop session isolation | `server/game/custom-session-executor.ts`, `custom-session-worker.ts`, `game-router.ts`, `connection/room-router.ts` | Executable Workshop cards that are not built in run every command in a dedicated Worker per HTTP session / WS Room. The Room FIFO covers Durable Commit, and Room or seat switches on the same connection wait for in-flight commands. Any Worker dispatch, timeout, runtime warning or response-construction failure restores the pre-command checkpoint, including pending and undo history, and keeps diagnostics. One process-wide budget of 15 slots counts Worker reservations for WS Rooms, recovered Rooms and HTTP sandboxes. `built_in=1` cards still use the built-in implementation without a Worker; the browser-local sandbox is unchanged. |
-
-## 5. Infrastructure backlog
+## 4. Infrastructure backlog
 
 Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module section of `docs/ARCHITECTURE.md`. Completed work lives in pull requests, ADRs and tests, not here.
 
 No entries are open.
 
-## 6. Reference anti-patterns: do not copy
+## 5. Reference anti-patterns: do not copy
 
 - Do not treat imported prerequisite metadata as rule authority. Prerequisites follow publisher card text, printed icons and official rulings; a field the reference runtime ignores can become a real restriction under OA's generic validation.
 - Do not approximate reveal or start-of-work reactions with a mixed round-start scan, restore preparation windows by zone index, or drop legal reactions by current affordability during source discovery.
@@ -101,7 +93,7 @@ No entries are open.
 - Do not copy mutable PHP args or in-place cost rewriting; OA keeps structured modifiers and payment enumeration.
 - Reference platform status fields such as `banned` and `implemented` must not drive OA product behavior automatically.
 
-## 7. Cards that use the reference Special Effect
+## 6. Cards that use the reference Special Effect
 
 | Deck | Cards |
 |---|---|
@@ -111,11 +103,11 @@ No entries are open.
 | D | `D101_SugarBaker`, `D102_SampleStableMaker`, `D103_CanalBoatman`, `D107_Bellfounder`, `D010_StorksNest`, `D116_TreeInspector`, `D124_Emissary`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D129_LumberVirtuoso`, `D134_OysterEater`, `D137_TradeTeacher`, `D138_PetLover`, `D014_HammerCrusher`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D158_BeanCounter`, `D161_CabbageBuyer`, `D167_PureBreeder`, `D020_TurnwrestPlow`, `D022_WorkPermit`, `D023_PioneeringSpirit`, `D026_CarpentersYard`, `D027_Retraining`, `D051_Archway`, `D066_PotterCeramics`, `D070_StrawManure`, `D071_Changeover`, `D072_StableManure`, `D074_RoyalWood`, `D082_HuntingTrophy`, `D092_ChildOmbudsman`, `D093_SheepInspector`, `D094_HenpeckedHusband`, `D096_Furnisher`, `D098_Transactor` |
 | E | `E103_Wolf`, `E106_EmergencySeller`, `E010_StrawHat`, `E112_GrainThief`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E134_Omnifarmer`, `E148_Lazybones`, `E162_Entrepreneur`, `E166_Roastmaster`, `E167_DairyCrier`, `E022_GuestRoom`, `E027_PiggyBank`, `E004_Thunderbolt`, `E051_WhaleOil`, `E052_Cubbyhole`, `E053_BoarSpear`, `E058_LunchtimeBeer`, `E005_NightLoot`, `E073_Scythe`, `E074_AshTrees`, `E076_LumberPile`, `E078_SleightofHand`, `E081_AlchemistsLab`, `E083_ShepherdsWhistle`, `E085_MasterTanner`, `E086_PenBuilder` |
 
-## 8. Hook inventory
+## 7. Hook inventory
 
 Hook ownership is derived from `ALL_CARD_IMPLS` and is not mirrored here; query the registry directly instead of keeping a copy that drifts.
 
-## 9. Source exclusions
+## 8. Source exclusions
 
 | Source | Reason |
 |---|---|
@@ -125,7 +117,7 @@ Hook ownership is derived from `ALL_CARD_IMPLS` and is not mirrored here; query 
 | `E132_Shearer` | Legacy reference source file of `E132_VeggieLover`. |
 | Cards the reference marks `implemented=false` with no runtime behavior | Outside behavior-alignment scope unless OA implements them explicitly as a product extension. |
 
-## 10. Per-card appendix
+## 9. Per-card appendix
 
 Status values are `Aligned`, `Accepted difference`, `Needs review` and `Excluded`.
 
