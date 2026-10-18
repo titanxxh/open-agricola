@@ -1030,7 +1030,7 @@ Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流�
 
 ## 11. server/ — 后端权威
 
-服务端负责连接、Room、持久提交、持久化与产品 HTTP API。它自己不裁定规则：所有规则写入都经过 `GameSession`。
+服务端负责连接、Room、持久提交、持久化与产品 HTTP API。`GameSession`（`server/game/authoritative-session.ts`）是服务端的规则命令与查询 seam，规则修改在它驱动的 `GameCore` 与 action leaf 中执行；连接、持久化与 HTTP 基础设施从不在它之外裁定规则。
 
 ### 11.1 server/connection/ — WebSocket 入口
 
