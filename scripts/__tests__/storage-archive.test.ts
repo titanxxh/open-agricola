@@ -10,29 +10,36 @@ import { importFixture } from './_helpers/import-fixture'
 import { importSqlite } from '../sqlite-import/import'
 import { exportStorageArchive, restoreStorageArchive } from '../storage-archive'
 import { validateArchiveInIsolation } from '../storage-archive-cli'
-import { getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
+import { databaseMaintenance, getTestDatabaseUrl } from '../../server/__tests__/_helpers/postgres'
+import { releaseAll, releaseQueue } from '../../server/__tests__/_helpers/release-all'
 import { testStorageEnvironment } from '../../server/__tests__/_helpers/objects'
 import { PostgresDatabase } from '../../server/database/postgres'
 import { S3ObjectStore } from '../../server/storage/s3-store'
 import { PostgresRoomPersistence } from '../../server/game/persistence/postgres-adapter'
 import { snapshotToRoom } from '../../server/game/room'
 import { assertStorageReady } from '../../server/db'
-const cleanups: Array<() => Promise<void>> = []
-afterEach(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); cleanups.length = 0 })
+// A timed-out test body keeps running and may register more cleanups during or
+// after teardown, so every cleanup is self-contained and runs even after a failure.
+const cleanups = releaseQueue()
+afterEach(() => cleanups.release())
+const dropDatabase = async (name: string) => {
+  const admin = databaseMaintenance()
+  try { await admin.exec(`DROP DATABASE IF EXISTS "${name}"`) } finally { await admin.close() }
+}
 it('round-trips native PostgreSQL recovery bytes and private S3 objects, then applies newer erasure facts', async () => {
-  const fixture = await importFixture(); cleanups.push(() => fixture.close())
+  const fixture = await importFixture(); cleanups.register(() => fixture.close())
   await importSqlite(fixture.paths, fixture.db, fixture.resources)
   const archive = join(fixture.paths.cardArt, '..', 'archive')
   const manifest = await exportStorageArchive(getTestDatabaseUrl(), fixture.db, fixture.resources.objects, archive, 'test-build')
-  const admin = new PostgresDatabase({ connectionString: getTestDatabaseUrl(), max: 1, statement_timeout: 120_000 })
-  cleanups.push(() => admin.close())
+  const admin = databaseMaintenance()
+  cleanups.register(() => admin.close())
   const makeTarget = async (schema = manifest.schema) => {
     const name = `backup_${randomUUID().replaceAll('-', '')}`
     await admin.exec(`CREATE DATABASE "${name}"`)
     const url = new URL(getTestDatabaseUrl()); url.pathname = `/${name}`
     const db = new PostgresDatabase({ connectionString: url.toString(), schema })
     const objects = S3ObjectStore.fromEnv(testStorageEnvironment(), `test/${randomUUID()}/`)
-    cleanups.push(async () => { await objects.clearPrefix(); objects.close(); await db.close(); await admin.exec(`DROP DATABASE "${name}"`) })
+    cleanups.register(() => releaseAll([() => objects.clearPrefix(), () => objects.close(), () => db.close(), () => dropDatabase(name)]))
     return { db, objects, url: url.toString() }
   }
   const target = await makeTarget()
@@ -52,7 +59,7 @@ it('round-trips native PostgreSQL recovery bytes and private S3 objects, then ap
   await target.db.exec('CREATE SCHEMA extensions; ALTER EXTENSION citext SET SCHEMA extensions; DROP SCHEMA public')
   await target.db.exec(`ALTER SCHEMA "${manifest.schema}" RENAME TO public`)
   const publicDb = new PostgresDatabase({ connectionString: target.url })
-  cleanups.push(() => publicDb.close())
+  cleanups.register(() => publicDb.close())
   await publicDb.exec('ALTER EXTENSION citext SET SCHEMA public; DROP SCHEMA extensions')
   const publicArchive = join(fixture.root, 'public-archive')
   await exportStorageArchive(target.url, publicDb, target.objects, publicArchive, 'test-public-build')
