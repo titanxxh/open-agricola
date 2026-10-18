@@ -1220,68 +1220,37 @@ Deployment commands and the metric catalog live in [`HOW_TO_DEPLOY.md`](HOW_TO_D
 
 ## 12. `client/`: Frontend
 
-### 12.1 Client bundle boundaries
+The client renders authoritative snapshots, collects input and keeps temporary local UI state. It never adjudicates rules.
+
+### 12.1 Client bundles
 
 | Bundle | Entry | Paths | Constraint |
 |---|---|---|---|
-| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain`, and `i18n`. Card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
-| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy-loads Workshop sandbox UI; rules still execute through the backend sandbox path. Permissions apply only to the exact entry and files in `scripts/architecture-policy.mjs`; the directory has no blanket exemption. |
-| `local-sandbox-worker` | lazily created `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting. Its four Worker-side files may import complete `shared/*` through exact file permissions. Main-bundle `local-transport`, `persistence`, and `workshop-launch` use type-only shared imports, keeping the engine out of the main bundle. |
-| `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | Has no login, cookies, WebSocket, or command sending. It reads only public Replay JSON and reuses display filtering and board projection compiled at archive time. |
+| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain` and `i18n`; card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy Workshop sandbox UI; rules execute through the backend sandbox path. |
+| `local-sandbox-worker` | `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting; only its Worker-side files may import complete `shared/*`, and main-bundle `local-transport`, `persistence` and `workshop-launch` use type-only shared imports. |
+| `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | No login, cookies, WebSocket or commands; reads only public Replay JSON with display filtering compiled at archive time. |
 
-Strict main-bundle budgets in `scripts/check-bundle-size.ts` are 550 KB raw and 170 KB gzip.
+- Exact entry and file permissions live in `scripts/architecture-policy.mjs`; no directory has a blanket exemption. ESLint `architecture/imports` and `pnpm run check:browser-boundaries` enforce them as CI errors.
+- `scripts/check-bundle-size.ts` budgets the main bundle at 550 KB raw and 170 KB gzip, as a separate post-build check.
 
-### 12.2 Service layer under `client/services/`
+### 12.2 Services and synchronized state
 
-- `gameTransport.ts`: `WsGameTransport` manages the WebSocket connection in the service layer, not React Context. URL switches include `?transport=ws`, `?player=p1|p2`, and `?room=devN`.
-- `card-meta.ts`: fetches card metadata from `GET /cards-manifest.json` at startup. The `CUSTOM_*` overlay reads only `shared/cards/custom-card-metadata.ts`.
-- `rehydrate.ts`: a lightweight rehydrator that skips `ActionSpace.onTaken` callbacks and breaks dependency chains into `shared/actions` and `shared/cards/catalog`.
-- `llm/generation/`: the browser owns `GenerationAttempt`, immutable request construction, provider tool protocol, bounded GitHub reads and complete-source results. The LLM credential goes only to the configured provider; neither the game backend nor GitHub receives it. Each attempt resolves current GitHub main and pins subsequent reads to that SHA; a missing file returns a tool error so the model can choose another reference at the same SHA. Network/rate-limit failures pause for explicit retry. `server/workshop-references.ts` serves authenticated Workshop reads of latest main and fixed-commit tree metadata using project GitHub credentials; it accepts no caller URLs or model credentials. PostgreSQL shares per-user/global request budgets, upstream cooldowns and one-hour main-confirmed commit authorization across instances (see Platform C1.2). Retrying initialization preserves the confirmed SHA. The browser still fetches pinned raw text anonymously and verifies blob hashes. Source references are independent of the site release.
-- `GET /api/workshop/sandbox-contract` returns the deployed runtime's hooks, actions, helper bodies, semantics and content identity from `server/workshop-sandbox-contract.ts`. This includes the validator's required literal object/array structure and inline listener functions. It serves no reference corpus. The short generation prompt includes that contract; on-demand GitHub documentation and built-in examples cannot expand it. `POST /api/workshop/cards/validate-code` binds validation to source and sandbox identities. Only separately verified provider/endpoint/model tuples are admitted.
-- `WorkshopAbilityPanel` applies results through the draft reducer: follow-ups use the selected candidate, playtest repair uses the tested source, and raw cost/prerequisite requirements remain part of the frozen input. Editing ability input or switching model configuration cancels the old attempt and prevents late adoption or repair. The last valid candidate survives failed/manual edits. Visible messages and compact provenance are projected for recovery; raw tool/reasoning/signature records stay in page memory. Full request, recovery and acceptance contracts are in `docs/PLATFORM_DESIGN.md` and `docs/test/llm-card-gen.md`.
+- `gameTransport.ts` (`WsGameTransport`) owns the WebSocket in the service layer. It journals unconfirmed commands per tab, isolates old socket callbacks, suspends input while reconnecting, queries receipts, waits for a complete filtered snapshot, and retries only still-valid inputs with their original identity.
+- `card-meta.ts` fetches `GET /cards-manifest.json`; `rehydrate.ts` rehydrates snapshots without importing `shared/actions` or the card catalog.
+- `client/hooks/useGameSync.ts` replaces `state`, `pending`, `interaction` and `scores` as a unit on every `stateUpdate`. There are no optimistic commits: a click sends a command, and game UI changes only after the snapshot arrives. Local ephemeral state (hover, drafts, inputs) is separate and invalid selections clear on a new snapshot.
+- Reconnect runs `joinRoom` → `roomJoined(status, …)`: `waiting` restores the waiting page and only `playing` continues to `getState`; a `roomWaiting` broadcast after `newGame` hides the old board.
+- The client consumes public events by `occurrenceId` for transient notifications, highlights and animations; an initial snapshot initializes the cursor without replaying history. The Action Log reads `publicEventArchive` as a read-only timeline.
+- Player names localize through `client/utils/player-name.ts` from generated-name provenance and seat index; supplied names render literally.
+- `llm/generation/`: the browser owns generation attempts, the provider tool protocol and bounded GitHub reads pinned to one main SHA. The LLM credential goes only to the configured provider. `server/workshop-references.ts` serves authenticated tree metadata with project credentials and accepts no caller URL or model credential; the browser fetches pinned raw text anonymously and verifies blob hashes. `GET /api/workshop/sandbox-contract` supplies the deployed contract the prompt is built from; references cannot widen it. `POST /api/workshop/cards/validate-code` binds validation to source and sandbox identities, and only separately verified provider / endpoint / model tuples are admitted. See [Platform design](PLATFORM_DESIGN.md) and [`docs/test/llm-card-gen.md`](test/llm-card-gen.md).
 
-### 12.3 Synchronized state layer
+### 12.3 Views and local sandbox
 
-- `client/hooks/useGameSync.ts` hydrates the server snapshot and holds `state`, `pending`, `interaction`, and `scores`, replacing them as a unit.
-- A `stateUpdate` is processed as `normalizeState()`, `createActionSpaces()`, overlay server `resources` and `takenBy` on template fields, then replace the store.
-- The frontend makes no optimistic commits. A click sends a command and UI state changes only after `stateUpdate` arrives.
-- Local ephemeral UI state such as hover, draft selection, and input fields is separate. On a new snapshot, invalid local selection is cleared.
-- Reconnect follows `socket reconnect -> joinRoom -> roomJoined(status, players, maxPlayers)`. `waiting` restores the waiting page; only `playing` continues to `getState -> stateUpdate -> full replacement`. When `newGame` returns connected players to waiting because seats are absent, the server broadcasts `roomWaiting(roomId, players, maxPlayers)` and the frontend immediately hides the old board and restores the waiting page.
+- `client/app/GameContainerApi.tsx` with `useTransportSetup`, `LobbyPage.tsx` and `PageRouter.tsx` orchestrate views and derive interactivity from `viewPlayerId` and `playerIndex`.
+- The default playtest path is backend `POST /api/game/new-sandbox`. With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs in the browser: `LocalGameTransport` implements `GameTransport`, the Worker assembles shared `GameCore` with locally validated custom code, and `server/__tests__/local-sandbox-parity.test.ts` locks behavior to the server executor. A ten-second timeout rebuilds the Worker from the last persisted snapshot, including `engineStackCursor`, and tells the UI it rolled back. One IndexedDB slot persists the game; a mismatched schema is deleted. A playtest pinned to an `exactVersionId` still uses the backend sandbox.
+- `AuthContext` is the site login session (password, GitHub or Google) and stores no Issue-write authorization; `LocaleContext` switches locale.
 
-### 12.4 View orchestration
-
-`client/app/GameContainerApi.tsx`, with inline `useTransportSetup` connection management, plus `LobbyPage.tsx` and `PageRouter.tsx`. It derives window interactivity from `viewPlayerId` and `playerIndex` and owns local ephemeral state.
-
-### 12.5 Browser-local playtest sandbox under `client/local-sandbox/`
-
-With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs entirely in the browser without server participation. The default remains backend `POST /api/game/new-sandbox`.
-
-- Startup: `WorkshopPage` assembles `LocalGameConfig`, including card JSON, source, and sandbox settings, and writes it to sessionStorage. An embedded iframe uses `?localSandbox=1`. `useTransportSetup` creates `LocalGameTransport`, which implements the complete `GameTransport` interface and enters `useGameSync` exactly like HTTP or WebSocket transport.
-- Engine Worker: `LocalSandboxCore` assembles shared `GameCore`, registering custom implementation through `registerCustomCardImpl` and `registerBrowserBackedCustomCard`. Card code passes shared AST validation and local `ts.transpileModule`; TypeScript exists only in the Worker chunk. `new Function` invokes it synchronously. `server/__tests__/local-sandbox-parity.test.ts` locks behavior to the server isolated-vm executor. Snapshot assembly reuses `shared/session/sync-payload.ts`, the same function as `GameSession.buildSyncPayload`. Local mode defaults to a `debug` view, matching anonymous backend sandbox HTTP behavior.
-- Infinite-loop recovery: after a ten-second request timeout, terminate and rebuild the Worker, restore the latest persisted snapshot including `engineStackCursor`, keep pending interaction alive, and tell the UI it rolled back.
-- Persistence: one IndexedDB slot with debounced writes through `onPersist`. Entering playtest offers to continue the previous game. A mismatched schema or corrupt save is silently deleted; old-save compatibility is not maintained.
-- Known boundary: a playtest pinned to the editor's exact draft version through `exactVersionId` still uses the backend sandbox because that card data is absent from Workshop frontend state.
-
-`ActionBoard` calls `getBoardPlayerCount(players)` to set `action-board--{n}p`: 830 px for two players and 1,000 px for three or four.
-
-### 12.6 Contexts
-
-- `AuthContext`: site-login session by password, GitHub, or Google. It does not store Bug Issue write authorization.
-- `LocaleContext`: locale switching.
-
-### 12.7 Three-layer ESLint enforcement
-
-Important rules in `eslint.config.js` are:
-
-- `client/{app,components,services,hooks,contexts,utils}/**` cannot import `shared/session`, `shared/engine`, Card Sources, generated card catalog, or per-card implementations. UI metadata must use `public/cards-manifest.json` and `client/services/card-meta`.
-- Privileged entries and Worker-side files are explicitly named in `scripts/architecture-policy.mjs`; ordinary pages and Replay Viewer have no rule-runtime exceptions.
-- TypeScript resolution normalizes relative import paths; runtime graph checks reject nonliteral dependencies, production imports into excluded source files, missing source roots, parse errors, and stale permissions. Module URLs must name an authorized entry; Vite closure checks retain virtual-module edges.
-- `package.json` declares `sideEffects` as the bundler tree-shaking baseline.
-- A violation is a CI error.
-
-### 12.8 Game Context, Replay Viewer, and Bug Report seam
-
-Startup becomes:
+### 12.4 Game Context, Replay Viewer and Bug Report
 
 ```text
 GameContextRouter
@@ -1292,79 +1261,49 @@ GameContextRouter
   └─ removed -> Replay Tombstone page
 ```
 
-- `?context=<roomId>` is parsed before the current card manifest and global login gate. Active unauthenticated flow preserves complete `returnTo`; completed, expired, and removed contexts load no authentication dependency.
-- Active recovery keeps the existing WebSocket, but `joinRoom` carries `intent:'resume'`. The server restores only the original seat through persisted site `userId -> playerIndex`. During a save pause, every online seat sees the same status and new-command controls are disabled.
-- `ReplayShell` validates the Replay header and content-addressed Viewer manifest, selects `viewerBuildId`, and creates a `credentialless`, `sandbox="allow-scripts"` iframe only after perspective selection. The historical Viewer is an independent read-only bundle with no login, cookies, WebSocket, or ClientCommand. It reads public JSON Segments and switches among `p1...pN | open` using filtering code compiled at archive time.
-- For retained evidence, the parent authenticates with the site cookie and projects the original seat, then sends the single Frame and Replay-header custom-card snapshot through `postMessage` to a historical Viewer with a validated `viewerBuildId`. The Viewer does not call authenticated APIs.
-- Opening a completed game without a perspective requires seat or open selection before any Frame is shown. Desktop automatic layout defaults to a timeline-first split; mobile defaults to board-first. The automatic breakpoint is 900 px. A manual layout writes to the URL and overrides the responsive default. The "Evidence for this step" panel always shows Step, round, actor, allowlisted intent, and Frame Hash.
-- Playback starts at Step 0 and supports play or pause, previous and next, slider seeking, and keyboard control. A corrupt Segment marks an unavailable interval and can resume at the next checkpoint; it is never silently repaired.
-- Bug Report uses the finalized three-step footer: required symptom, automatic context, and author identity. A server draft must be saved before starting GitHub OAuth. Cancelling authorization returns to the same `submissionId`; after submission, status is polled. If the submission response is lost, immediately reread authoritative status and resume polling. A successful report cannot be created twice.
-- An active Reporter anchors the latest committed Step. A completed-game Reporter must be an original participant and anchors the currently displayed Step. The public Issue embeds no Frame, screenshot, log, or other player's hidden information.
-- Issue Submission Connection is separate from `AuthContext`. The report footer owns initial connection; Settings shows status and disconnect only. An invalid connection never switches to Hosted Issue Identity automatically.
+- `?context=<roomId>` is parsed before the card manifest and login gate; an unauthenticated active context keeps the complete `returnTo`, and non-active contexts load no authentication dependency.
+- Active recovery joins with `intent:'resume'`; the server restores only the original seat. During a save pause every online seat sees the same status and new-command controls are disabled.
+- `ReplayShell` validates the Replay header and content-addressed Viewer manifest and creates a `credentialless`, `sandbox="allow-scripts"` iframe only after a perspective is chosen. The historical Viewer never calls authenticated APIs; retained evidence is passed by `postMessage`.
+- A corrupt Segment marks an unavailable interval and resumes at the next checkpoint; it is never silently repaired.
+- Bug Report saves a server draft before GitHub OAuth, resumes the same `submissionId` after cancellation and polls status after submission; a lost submission response rereads the authoritative status, so a report is never created twice. An active Reporter anchors the latest committed Step; a completed-game Reporter must be an original participant and anchors the displayed Step.
+- The Issue Submission Connection is separate from `AuthContext`: the report footer owns the initial connection, Settings shows status and disconnect only, and an invalid connection never switches to Hosted Issue Identity.
 
 ---
 
 ## 13. Testing strategy
 
-### 13.1 Three layers
+Rule correctness is proven at the backend seam with the smallest sufficient layer; see [`docs/CARD_TEST_TEMPLATE.md`](CARD_TEST_TEMPLATE.md) for the card test template.
 
-| Layer | Directory | Purpose | Required on a main PR |
-|---|---|---|---|
-| Unit | `shared/**/__tests__/*.test.ts` and `client/**/__tests__/*.test.ts` | Pure domain logic using mock state and direct function calls | Yes, in fast projects |
-| Session | `server/__tests__/*.test.ts` | Instantiate `GameSession`, call `takeAction`, and assert `resp.state`, `pending`, `interaction`, and `ok` | Yes, in slow project; one card per `[A-E][0-9]*-session.test.ts` file |
-| E2E | `e2e-tests/*.spec.ts` | Playwright with two browser windows for multiplayer paths | Manual or workflow |
+### 13.1 Layers
 
-#### Authoritative display projections
-
-`serializeState` derives `lockedFarmTileKeys`, `playerPanelSummary`, and `moorSpecialActionAvailability` on each serialized player. Sync and persistence activate the owning Session context before executing hooks. Live UI, local-worker UI, and Replay read these snapshot-only values; rehydration removes them from authoritative PlayerState. Pure perspective filtering lives in `shared/projections/serialized-state.ts` and does not import rule runtime. Existing historical Replay Viewer builds and payloads remain immutable; new fields are additive and new Viewer builds consume them.
-
-Action definitions are assembled once in `shared/actions/index.ts`. Seasonal internal actions capture the complete resolver during construction; recursive replacement, alternative and before-flow doability still resolve base, internal, and ad-hoc actions. Major metadata queries, gain configuration, navigation and LLM streaming have independent modules to avoid reverse imports.
-
-#### Architecture fitness coverage
-
-`pnpm run check:architecture` executes the architecture scripts, contract type checks, existing contract tests through `check:architecture-tests`, and strict sandbox prompt/documentation synchronization. The contract test selection covers effects, resource provenance, event mapping, interaction commands, Card Source, PromptKey, rendered LLM prompt contracts, CI wiring, and the listener purity guard (positive and negative cases plus a two-player Session). These tests retain their existing Vitest project ownership and also run under `pnpm test` / `pnpm test:fast`. Bundle size budgets remain a separate post-build check; browser dependency isolation is enforced by the architecture entry itself.
-
-Architecture checks should stay as simple as possible. Their purpose is to catch common architecture mistakes in code written by agents and developers, not to defend against deliberately constructed bypasses or prove arbitrary JavaScript safe. Prefer source discovery, file lists, import boundaries, and small local syntax checks. Keep each diagnostic actionable and keep maintenance cost proportional to the real mistake it prevents. Runtime security boundaries and behavioral tests remain separate responsibilities.
-
-For the legacy log and effect scanners, this means:
-
-- Reuse `scripts/source-files.ts` to discover and parse every supported source extension. Each required log root (`shared`, `server`, `scripts`) must exist and contain source. Missing or empty roots, parse errors, and unsupported filesystem entries fail rather than appearing clean.
-- Keep the existing log-write detection rules. Record the reason for each named production exemption and require it to match a write recognized by those rules. Removed files, renamed functions, or removed writes make an exemption stale. A hit is a maintenance check, not proof of the exempt function's semantics.
-- Keep the effect allowlist limited to top-level production files and reuse the checker in the architecture test. Do not introduce fixed lists for `internal/` or test directories.
-- Do not expand this coverage fix with symbol/dataflow engines, complex alias propagation, callback or subclass analysis, or a catalogue of `bind`/`call`/`apply` and dynamic-import bypasses. Tests cover the supported ordinary forms, real repository examples, and scanner failures; they are not an adversarial language-feature suite. Review findings outside this contract require a concrete common repository use case before expanding the checker.
-
-| Invariant | Executable coverage | Boundary |
+| Layer | Directory | Purpose |
 |---|---|---|
-| Physical `shared` / `server` / `client` layering | ESLint `architecture/imports` errors | Tests have explicit exemptions; this checks imports, not runtime ownership. |
-| Card Source scope and cross-card references | `pnpm run check:card-impl-boundaries` | TypeScript AST checks production Card Source files and same-file card-ID literals or top-level const aliases. `Major_*`, `reaches`, purchase candidates, and prerequisite candidates are explicit exceptions. It does not follow cross-file dataflow. Empty or mismatched source scope fails. |
-| Runtime dependency cycles | `pnpm run check:dependencies` | Every runtime SCC, including self-cycles and literal dynamic-import cycles, fails. There is no cycle baseline. Explicit type-only declarations erase; inline type specifiers still load a module under verbatimModuleSyntax. Any other top-level directory holding sources is an `unclassified source root`, except untracked directories that `git check-ignore` reports as ignored (`.gitignore`, `.git/info/exclude`); tracked directories always count. |
-| Browser and Replay isolation | `pnpm run check:browser-boundaries` | Checks transitive closures from both production entries using the source graph and real Vite module graphs. Metadata permissions are exact files with reasons; new Worker entries and unauthorized sandbox imports fail. Missing entry evidence fails. |
-| Compile-time architecture contracts | `pnpm run check:architecture-types` | `tsconfig.architecture.json` runs a real no-emit TypeScript program over policy and checker tests, including positive and negative type assertions. Vitest alone is not type evidence. |
-| Scan completeness | direct session log, effect-file list, no-DSL, test-project coverage, Card Source and field-boundary checks | Required roots and parseable sources are mandatory. Card declarations and all registered implementations are independently compared; major files may declare multiple cards. Parents use their separate metadata/runtime model. |
-| Trailing listener snapshots | `pnpm run check:card-impl-boundaries` | Handlers are enumerated from resolved `ALL_CARD_IMPLS`, whose IDs must match every production Card Source declaring `impl`. Direct `improvements` / `minorPlayed` / `occupationPlayed` length reads fail in `immediatelyAfter` and `after`; non-trailing reads and membership checks remain valid. The check parses the resolved handler body only and does not follow helper calls or derived values. Empty, incomplete, or unparseable runtime scope fails. Runtime diagnostics identify the card and listener without claiming an original source line. |
-| Listener state purity | Runtime guard installed by Vitest setup in every listener-dispatching project, plus `pnpm run check:card-impl-boundaries` | The guard wraps every `executeCardListener` / `invokeCardCostCandidateTransform` call, and every loaded Card Impl listener function in place, with deep read-only proxies (including descriptor and `eventQuery` results) and fails on any write or returned live reference; it proves only executed branches. The static scan parses every resolved handler and cost-candidate transform for explicit writes rooted in the context parameter, following same-function aliases only. Neither follows cross-file dataflow; no whole-program mutation proof is claimed. Contract tests: `shared/cards/__tests__/listener-purity-guard.test.ts`, `server/__tests__/listener-purity-gate-session.test.ts`. |
-| Generated catalog matches Card Sources | `pnpm run check:generated-cards-sync` | Structural source/catalog equality without a hard-coded card count. |
-| `GameSession` owns the server command boundary | `CONTEXT.md`, ADR-0014, review, and three-layer import errors | This is ownership, not a claim that only one source file contains assignments. No whole-program mutation proof is attempted. |
-| Canonical architecture wiring | `pnpm run check:architecture` and `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Both CI workflows call the aggregator once. Public main PR/push events run automatically; private automatic jobs are skipped and trusted local full CI remains required. Manual dispatch is preserved. Required GitHub checks follow the verified activation sequence in `docs/operations/ci-checks.md`. |
+| Unit | `shared/**/__tests__/*.test.ts`, `client/**/__tests__/*.test.ts` | Pure domain logic with mock state and direct calls |
+| Session | `server/__tests__/*.test.ts` | Instantiate `GameSession`, call commands, assert `state`, `interaction`, `log` and `scores`; card Session tests live in `[A-E]*-session.test.ts` files |
+| E2E | `e2e-tests/*.spec.ts` | Playwright browser tests for rendering and multiplayer paths |
 
-`vitest.config` has several fast subprojects, `fast-shared`, `fast-cards`, `fast-card-runtime`, `fast-client`, `fast-server`, `fast-scripts`, and `fast-tests`, plus `slow` and `llm`. `pnpm test:fast` first runs `check:test-project-coverage`, independently discovering repository tests and checking that each belongs to exactly one fast, slow, or LLM project. CI defaults to `pnpm test:fast`; use `pnpm test:slow` for per-card session tests, `pnpm run test:e2e` with frontend and backend running, and `pnpm exec vitest run <file>` for one file.
+- Session tests default to two players and use `server/__tests__/_helpers/session-fixtures.ts` (`createOpeningSession`, `createWorkSession`).
+- Do not use DOM shape, button copy or page structure as proof of rules; test rendering separately with E2E.
+- Vitest projects are `fast-shared`, `fast-cards`, `fast-card-runtime`, `fast-client`, `fast-server`, `fast-scripts`, `fast-tests`, `slow` and `llm`. `pnpm test:fast` first runs `check:test-project-coverage`, which requires every test file to belong to exactly one project. Commands and verification records are documented in [`AGENTS.md`](../AGENTS.md) and [`docs/operations/ci-checks.md`](operations/ci-checks.md).
+- Serialized display projections (`lockedFarmTileKeys`, `playerPanelSummary`, `moorSpecialActionAvailability`, card-state presentation, animal zones, special stables) are derived in the owning Session context and stripped on rehydration; pure perspective filtering lives in `shared/projections/serialized-state.ts`. New fields are additive, and existing Replay Viewer builds and payloads stay immutable.
+- Prefer calling `GameSession` methods directly; `/api/game/*` or WebSocket messages serve black-box contracts. Assert resources, played cards, `cardStates`, action spaces, `pending` / `interaction`, `log` and `scores`.
 
-### 13.2 Backend-boundary test entry points
+### 13.2 Architecture fitness
 
-- Call `GameSession` methods directly; this is preferred.
-- Call `/api/game/*` or send WebSocket messages for a black-box contract.
-- Follow [`docs/CARD_TEST_TEMPLATE.md`](CARD_TEST_TEMPLATE.md), using a two-player game by default.
+`pnpm run check:architecture` is the single architecture gate, called once by each CI workflow. It runs the architecture scripts, the contract type checks, the contract tests through `check:architecture-tests` and the sandbox prompt / documentation sync. Checks stay simple: they catch common mistakes by agents and developers, not deliberate bypasses, and each diagnostic must be actionable.
 
-Recommended assertion targets are:
+| Invariant | Executable coverage | Limits |
+|---|---|---|
+| Physical `shared` / `server` / `client` layering | ESLint `architecture/imports` | Imports, not runtime ownership |
+| Card Source scope and cross-card references | `pnpm run check:card-impl-boundaries` | Same-file AST over production Card Sources; `Major_*`, `reaches`, purchase and prerequisite candidates are exceptions; no cross-file dataflow; empty or mismatched scope fails |
+| Runtime dependency cycles | `pnpm run check:dependencies` | Every runtime SCC, including self-cycles and literal dynamic imports, fails; no baseline; explicit type-only imports erase but inline type specifiers still load; tracked or non-ignored unclassified source roots fail |
+| Browser and Replay isolation | `pnpm run check:browser-boundaries` | Source graph plus real Vite module graphs |
+| Compile-time architecture contracts | `pnpm run check:architecture-types` | Real no-emit program over `tsconfig.architecture.json` |
+| Scan completeness | direct session log, effect-file list, no-DSL, test-project coverage, Card Source and field-boundary checks | Missing or unparseable roots fail |
+| Trailing listener snapshots | `pnpm run check:card-impl-boundaries` | Direct `improvements` / `minorPlayed` / `occupationPlayed` length reads fail in `immediatelyAfter` and `after`; membership checks stay valid; resolved handler bodies only |
+| Listener state purity | Runtime guard in every listener-dispatching Vitest project, plus `check:card-impl-boundaries` | Proves executed branches only |
+| Generated catalog matches Card Sources | `pnpm run check:generated-cards-sync` | Structural equality |
+| `GameSession` owns the command seam | `CONTEXT.md`, ADR 0014, review and layering errors | Ownership, not a whole-program mutation proof |
+| Canonical architecture wiring | `pnpm run check:architecture`, `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Both CI workflows call the aggregator once; required checks follow `docs/operations/ci-checks.md` |
 
-```text
-state.players[n].resources
-state.players[n].minorPlayed / occupationPlayed / improvements
-state.players[n].cardStates
-state.actionSpaces[*].takenBy / resources
-pending / interaction
-log
-scores
-```
-
-Do not use DOM shape, button copy, or page structure as the primary proof of rules correctness. Test frontend rendering separately with E2E.
+Prefer source discovery, file lists, import boundaries and small syntax checks. Scanners reuse `scripts/source-files.ts`; a missing or empty required root, a parse error or an unsupported entry fails, and a named exemption that no longer matches a recognized write is stale. Do not grow checkers into symbol or dataflow engines without a concrete repository case.
