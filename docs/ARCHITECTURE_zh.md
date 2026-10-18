@@ -593,24 +593,26 @@ Turn Scope 在人员放置、沼泽特殊行动或等价的卡牌行动格使用
 
 ## 7. shared/actions/ — 行动定义与 Hook 系统
 
+本 module 负责行动定义、卡牌 hook 与 listener 挂接的行动生命周期、支付、阶段 hook 和农场类提交。单卡规则留在卡牌文件里，只通过下面的 seam 接入本 module。
+
 ### 7.1 目录
 
-```
+```text
 shared/actions/
-├── index.ts               actionDefinitionLookup Map（27 base + internal 共发现）
-├── flow.ts                ActionFlow 节点表达式（leaf / seq / parallel / xor / or + optional metadata）
-├── hooks.ts               Hook 注册 + 调度
+├── index.ts               actionDefinitionLookup Map；自动发现基础行动与内部行动
+├── flow.ts                ActionFlow：leaf、seq、parallel、xor、or 及可选 metadata
+├── hooks.ts               Hook 注册与分发
 ├── hook-matrix.ts         buildHookMatrix() 优化矩阵
-├── internal-actions.ts    引擎内部辅助 action（mark-card-trigger 等）
-├── effects/               base action 实现（一文件一 action）
+├── internal-actions.ts    mark-card-trigger 等内部引擎行动
+├── effects/               基础行动，每个行动一个文件
 │   └── internal/          内部 effect
 ├── factories/             行动工厂
-├── helpers/               支付、动物、农场等共享 helper
+├── helpers/               支付、动物、农场共享 helper
 ├── payment/               PaymentSolver 与执行器
 └── __tests__/
 ```
 
-### 7.2 ActionDefinition
+### 7.2 `ActionDefinition`
 
 ```ts
 type ActionDefinition = {
@@ -621,7 +623,9 @@ type ActionDefinition = {
   roundAvailable?: number
   gainPerRound?: Partial<Resource>
   canBeExecutedByPlayer?(state, player): boolean
+  canBeOfferedByPlayer?(state, player): boolean
   originalActionCondition?(context): boolean
+  isAlreadySatisfied?(context): boolean
   costPreview?(...): CostPreview
   isDoable?(...): boolean
   isAutomatic?(...): boolean
@@ -629,455 +633,261 @@ type ActionDefinition = {
   resolveChoice?(state, player, value, payload?): ActionExecutionResult
   emitLeafActionDetail?: boolean
   flow?: ActionFlow
+  flowFactory?(planningContext): ActionFlow
   getBaseChoiceOptions?(...): ActionChoiceOption[]
   choicePromptKey?: PromptKey
   noChoiceLogKey?: string
 }
 ```
 
-`descriptionKey` 保留行动格印刷文本。可选的 `rulesKey` 指向独立本地化的补充裁定或实现限制，不影响行动合法性或执行。
+- `descriptionKey` 是印刷行动文字；`rulesKey` 是独立的本地化补充裁定，不影响合法性与执行。
+- Hook 不属于 `ActionDefinition`。通用变体规则注册到当前 Core 的 `ActionHookRegistry`；卡牌反应用 Card Listener。
+- `getBaseChoiceOptions` 是 opt-in 的选择管线：基础选项、注入 `computeChoiceCandidates`、按 `value` 去重、按 `costPreview.canExecute` 过滤。零候选失败，一个直接结算，两个及以上弹选择。它与 `execute() → choice → computeArgs.extraOptions` 路径互斥。
+- `flowFactory` 是纯数据计划，执行与描述共用。
+- `canBeOfferedByPlayer` 在显式可选 offer 中区分非支付资格与支付能力：有资格但付不起时选项仍可见、Accept 禁用；资格本身不授权执行。
+- `originalActionCondition` 与 `isAlreadySatisfied` 见 §7.5.1–§7.5.2。
 
-Hook 不进 `ActionDefinition`。通用变体规则显式注册到当前 Core 的 `ActionHookRegistry`；卡牌行动监听使用 Card Listener。
+测试：`shared/engine/__tests__/engine-choice-candidates.test.ts`、`shared/actions/effects/__tests__/improvement-offer.test.ts`。
 
-`getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A087_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。`renovate-house` 的 card-authored exact/free cost 通过 `actionContext.exactCost` 表达，和 construct / stables / plow 的 参考实现 `formatCost` 语义一致。 普通叶子和 OR/XOR 内选中的叶子共用此管线，包括按 selectedOption 重算费用；Silage 的粮食来源选择也复用该入口。
+### 7.3 Effect 与内部行动
 
-### 7.3 effects/ 自动发现
+- `shared/actions/index.ts` 只导入顶层基础 effect 和 `effects/internal/` 来构造 `actionDefinitionLookup`。`scripts/check-effects-file-list.ts` 是顶层 effect 文件的唯一白名单，`shared/actions/effects/__tests__/architecture-guard.test.ts` 复用它。
+- 每个行动一个文件。effect 文件不堆叠多卡逻辑：宿主行动子步骤用 `internalChildren`，内部 effect 放 `effects/internal/`，纯 helper 放 `shared/actions/helpers/`。
+- listener 需要的状态修改若没有现成 leaf，就新增可复用的内部行动，不在 handler 里直接改（§7.7）。
 
-`scripts/check-effects-file-list.ts` 是 top-level production effects allow-list 的单一来源；`shared/actions/effects/__tests__/architecture-guard.test.ts` 复用它，并继续守住 action id allow-list。`shared/actions/index.ts` 只导入 top-level base effects 和 `effects/internal/` 内部 effects，构建 `actionDefinitionLookup`。**禁止新增 top-level effect 文件来堆叠多卡逻辑**；需要 host action 子步骤时使用 `internalChildren` 或把内部 effect 放在 `shared/actions/effects/internal/`，纯 helper 放在 `shared/actions/helpers/`。
+通用内部行动及其契约：
 
-`collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。卡牌提供的行动格如果本身是累积格，必须声明 `gainPerRound`，把累积资源存入 `ActionSpace.resources`，并使用标准 `collect` flow，使 collect listener 与事件语义保持一致。
+| 行动 | 契约 |
+|---|---|
+| `collect` | 从累积格取物的唯一入口，部分领取和跨格领取通过 `actionContext: { spaceId?, resource?, amount? }`。卡牌提供的累积格声明 `gainPerRound`，货物存于 `ActionSpace.resources`。 |
+| `gain` | 结算前先确定接收者。付款方出资的 gain 先校验完整转账再移动资源，事件保留付款方来源。显式资源参数与行动格配置的基础收益分开识别。 |
+| `return-to-space` | 把货物返还到 `actionContext.targetSpaceId` 指定的格；支付与移动事件使用同一目标。 |
+| `place-farmer-on-space` | 在固定目标上额外放一名工人并展开目标 flow。`allowOccupied` 只放宽占用，不绕过封锁、轮次开放、可执行性或工人供应。卡牌不在 handler 里写 `ActionSpace.takenBy`。 |
+| 无人物使用与固定目标跳转 | 卡牌可不放置、不消耗人物而执行完整行动格 flow（`place-farmer.actionContext.viaCardJump`），或把绑定工人跳转到固定目标（`jumpLeaf`）。查询与执行绑定同一工人；费用、否决、联动封锁和防递归仍生效。 |
+| 授予的规则行动 | 卡牌授予规则行动时直接调用该行动；授予某行动不展开平时提供它的整个行动格。 |
+| `pass-minor-card-to-left` | 把已打出的小改良移入左侧玩家手牌，清除其卡牌状态，发出公开 `card.passed` 与私有手牌变更。后续触发读取 `card.passed`。 |
+| `individual-food-cost` | 职业的强制个人食物费用，独立于职业费用和 PaymentSolver：支付现有食物，缺口用乞讨补；缺粮时需显式确认；预览与结算读取实时库存。 |
+| `take-from-card` | 先扣来源卡 counter，再把入库委托给 `gain`，因此 Gain reaction 能观察从卡上移出的货物。listener 只订阅二者之一。 |
+| `special-effect` | listener 返回 leaf 的通用修改分发器：counter、flag、infobox、卡堆、supply token、农场格状态与标记领取。`claim-farmyard-goods-tokens` 按来源领取，可选附带已提交坐标。`countCardUse: false` 标记不应计为卡牌使用的整理操作。 |
+| `receive` | 在一次 transaction 中为一名玩家结算到期的未来货物，见 §7.6。 |
+| `activate-card` / `activate-card-effect` / `activate-extra-turn` | listener、阶段效果和额外回合 provider 的激活 leaf，见 §7.6–§7.7。 |
+| `reap` | 普通收获与私人田间阶段收获，见 §7.6。 |
 
-`place-farmer-on-space` 是指定目标额外放人的 internal action。它从当前 owner 家里取可用工人放到 `params.spaceId`，然后默认返回目标 action 的 `expandFlow` leaf；`params.allowOccupied` 只跳过 occupied 检查，不跳过 linked block / round availability / action executability / worker supply。需要 piggyback 或固定目标连锁放人的卡牌应使用该 internal action，不要在 listener handler 内直接改 `ActionSpace.takenBy`。
+- 职业可用性、选择提交和直接 / 免费打出共用同一个前置门禁。改良费用预览与支付以授予的 `sourceCard` 或实体行动格 ID 作为 `actionCardId`。
+- 选择类后续行动在 `actionContext` 中携带语义来源（例如 `extraCropPlacement`）；后续卡牌读取该标记，不读来源卡 ID。
 
-`pass-minor-card-to-left` 是跨玩家传递已打出小改良的 internal action。它从当前玩家的 `minorPlayed` / `improvements` 移除目标卡，清理该卡在原玩家的 `cardStates`，把卡加入左手玩家 `minorHand`，发送 `card.passed` public event 和目标玩家私有 `cardEffectHandChanged`；后续触发条件应消费 `card.passed` provenance，不直接扫描手牌差异。
+测试：`shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,special-effect,farmyard-goods-claim}.test.ts`、`server/__tests__/empty-accumulation-admission-session.test.ts`。
 
-额外加作物的 follow-up selection 通过 `actionContext.extraCropPlacement` 表达 provenance；pending / anytime 构造必须从 `contextSnapshot.actionContext` 传递该 marker，后续卡牌只读语义 marker，不判断创建 pending 的 sourceCard id。
+### 7.4 `payment/`
 
-`gain` 先解析所有接收者。由付款方出资时，必须足额支付单人数量乘以接收人数；失败不改变任一方资源，事件来源保留付款方。其余来源先取显式 `actionContext.sourceLocation`，卡牌发放保留卡牌来源，普通行动格发放标记行动格。`return-to-space` 可通过 `actionContext.targetSpaceId` 指定其他实时行动格；付款及移动事件使用同一目标。
+`PaymentSolver`（`solver.ts`）是支付的唯一生产入口：可负担方案、支付选项、选项解析、执行和结构化收据，以及费用预览、typed-flat 费用、房间支付、简单 trade 副作用和卡牌费用候选 helper。`payment/internal/*` 只供 payment 包及其算法测试（`shared/actions/payment/internal/__tests__`）使用；`shared/actions/payment/__tests__/import-boundary.test.ts` 禁止其他导入。外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`。
 
-职业可用性、选择提交及直接／免费打出统一调用卡牌前置检查。改善费用预览和付款一致地使用授予者 `sourceCard` 或实体行动格 ID 作为 `actionCardId`；私有手牌展示仅使用真实 source card。卡内折扣由此可辨别行动来源，同时不会把行动格 ID 当作私有卡牌。
+**统一的 `ComplexCost` 模型。** 建房、翻修、围栏、马厩、犁地、职业、大小改良和 `pay` leaf 都经 `computeAllBuyableCombinations` 枚举：
 
-`individual-food-cost` 结算职业牌自身的强制食物费用，独立于普通职业打出费用及 PaymentSolver。它按实时库存支付食物，差额获得乞讨标记；付款事件与来源卡统计只记录实际支出的食物，乞讨单独记录为资源获得。缺粮时返回必须显式确认的单选请求，不提供跳过；既有合法 anytime 可先换粮，恢复后的预览和最终确认均读取实时库存。足额及零费用自动结算。C127 将此效果和无房生育组成必选序列，保留人物上限与显式 Undo。
+| 字段 | 含义 |
+|---|---|
+| `fees` | 每次行动的固定费用。`computeCosts.costs` 的差值并入 `fees[0]`；负总额 clamp 为 0，折扣不会退还其他资源。 |
+| `unitFee` + `nb` | 单位费用乘数量（房间、翻修房间、围栏段、马厩）。 |
+| `trades` | `from → to` 替代。`Trade.scope: 'action'` 每次行动对资源池转换一次；`'unit'` 对每个单位行运行候选闭包。`minCost` / `maxCost`、`replaceUpTo`、`groupMin` / `groupMax` 约束使用次数；每个单位 `TradeUsage` 记录实际替换量。 |
+| `bonuses` | 每次行动的折扣或折扣选择。`optional` 增加不用折扣的分支；`capDiscountAtCost` 把可变折扣封顶在当前费用；`trackChoiceIndex` 记录 `bonusChoiceIndex`；只有 `choiceAffectsState` 让选择免于支配剪枝；`conditions` 按数量重新求值。 |
+| `CostResourceRemovalModifier` | 枚举前从所有费用中结构性删除某资源键，并在后续折扣后保持删除。表达“不再需要 X”时用它，不用超大封顶折扣模拟。 |
+| `paymentResourceProviders` | 卡牌内部声明的仅支付虚拟资源：可用量、可覆盖资源、消耗来源。它们以自身 key 出现在 `resourcesPaid`，不进入成本行或 `PlayerState.resources`。 |
+| `paymentBudget` | 最终 `resourcesPaid` 的上限；不提供资源，也不提前限制几何或单位数。 |
+| `minimumResourcesPaid` | 最终 `resourcesPaid` 的下限，在支配剪枝前检查；准入与支付 child 共用。 |
+| `resourceReserve` | 支付后某资源池保留的最低总量；只过滤方案。 |
 
-### 7.4 payment/
+**固定管线顺序**（领域规则，不是卡牌优先级）：基础候选（`fee`、`fees`、`unitFee`、动态 `getBaseCosts`）→ 结构性删资源 → 候选闭包 → action 级 trade → bonus → 卡牌提供的支付资源 → card → 可负担方案 → `paymentBudget` / `minimumResourcesPaid` / `resourceReserve` 过滤 → 支配剪枝与排序。
 
-`shared/actions/payment/`：
+- **候选闭包**（[ADR 0004](adr/0004-candidate-closure-replaces-cost-modifier-ordering.md)）：卡牌购买和职业费用先规范化为 Cost Candidate List，再对所有 `deriveCardCostCandidate` 转换求不动点并做强制饱和。结果与注册顺序无关，任何地方都没有 `order` 字段。每个 resources + `originalFeeIndex` 组保留一条代表行。卡牌只声明单候选转换与 `cardCostCandidateMandatory`；动态基础费用来自 `CardImpl.getBaseCosts()`。静态消费者通过 `getPrintedImprovementCostCandidates()` 读取印刷候选。
+- **两条费用路径**（[ADR 0003](adr/0003-card-purchase-compute-card-costs-candidates.md)）：大小改良与职业费用走候选管线；其他行动聚合 `computeCosts` 结果。候选 metadata（`sources`、`originalFeeIndex`、Cost Attribution）不进入 `PaymentSolution`，由收据并入 `sourceCards`。
+- **支配剪枝**在资源可行性过滤之后执行，豁免支付路径身份、影响状态的 bonus choice 和 card 支付。
+- **Cost Attribution**：saved / paid 统计来自归因，不来自 pay leaf 的 `sourceCard`。行动 `computeCosts` 声明 `costAttribution`；宿主在真实执行后写入 clamp 后的前后差值。
+- **支付选项身份**：选项值为 `<prefix>:<index>~<identity>`。即使重算后列表位置变化，也按身份结算；支付已不存在时可恢复地拒绝并保留菜单。
+- **收据**：职业与改良提交保留所属宿主付款的准确资源、bonus 来源和返还卡；免费打出携带显式空收据。
+- **Supply token 也是支付资源**：围栏和马厩像普通资源一样流经 `cost`、solver、`resourcesPaid` 和 `resource.paid`。支付只增加 `player.supplyTokensConsumed`。剩余容量通过 `getOwnOrdinaryFenceBuildLimit()`、`getOwnOrdinaryFenceReserveCount()` 或 `getAvailableStableSupplyCount()` 读取。
+- **授予的费用优惠**：授予的翻修在自身 leaf 的 `actionContext.costBonuses` 中携带可序列化、有来源的 `Bonus[]`，按实时目标与 `computeCosts` 合并；不安装临时玩家 modifier。
+- **校验**：`validateComplexCost`、`validateTradeModifier`（单位 trade 不得带 `minNumRooms`）和 `validateBonus` 在开发环境抛错，生产环境降级为无方案。`resourcesPaid` 含负值的分支被丢弃。
+- **资源承诺**（[ADR 0019](adr/0019-resource-commitments-preserve-unsettled-trades.md)）在命令边界检查，不是预付，也不是 solver 预留。
 
-- `solver.ts` —— 生产支付生命周期和支付相关 facade 入口：计算可支付方案、判断可支付性、构造支付选择、解析玩家选择、执行支付并返回结构化 receipt；preview-cost、typed-flat、room payment、simple resource/trade side effect、card cost candidate helper 也从这里进入。
-- `internal/enumerate.ts` —— `computeAllBuyableCombinations` / `keepOnlyOptimals`（资源可行性过滤后的严格支配剪枝；豁免 feeIdentity / 有状态副作用的 bonus choice / card 支付；卡牌提供的支付资源按自身 key 参与比较，ADR 0004 Amendment）/ `sortPaymentSolutions`
-- `internal/execute.ts` —— `payResources` / `executePaymentSolution`
-- `internal/cost-modifiers.ts` / `internal/preview-cost.ts` —— `computeCosts` hook 集成与 card-purchase cost preview glue
-- `internal/room-payment.ts` / `internal/typed-flat.ts` —— 房间 / typed flat cost 兼容 helper
-- `internal/cache.ts` —— solution cache
+测试：`shared/actions/payment/internal/__tests__/{candidate-closure,cost-modifier-permutation-probe,enumerate,cost-modifiers}.test.ts`、`shared/actions/payment/__tests__/{solver,card-purchase}.test.ts`、`shared/actions/effects/__tests__/{improvement-cost-candidates,pay-supply-token,renovation}.test.ts`。
 
-生产 effect / helper / card runtime 默认通过 `PaymentSolver` 进入支付生命周期或支付相关 facade；外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`，只有 `shared/actions/payment/internal/__tests__` 保留算法白盒测试；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用，边界测试禁止生产代码和非 payment 内部测试直接 import。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement']` 区分行动空间费用 vs 卡牌购买费用。
+### 7.5 Hook 系统
 
-**统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
+- 每个 `GameCore` 拥有自己的 `ActionHookRegistry`（`actionHooks`）。分发、可用性、费用预览和规则 helper 显式接收它，没有进程级默认值。上下文对象声明 `actionHooks`，只有无通用规则的纯调用才用 `undefined`。注册表是每个 Core 重建的运行时依赖，从不进入状态或游标。
+- `CardRegistry` 也没有进程默认值：卡牌查找使用临时同步的 `withCtx` 绑定，嵌套调用和异常后恢复；未绑定环境的查找直接失败。自定义代码 adapter 在调用不可信代码前剥离 `actionHooks`。
 
-厩舍单价来自默认费用或该次行动的 `exactCost` / `costOverride`。拿到实际 `stableCount` 和 `stableUnitCost` 后，一次完整的 farm-choice 查询提供整次 `computeCosts.costs`、trades、bonuses、providers 和费用归因，并保留行动来源与上下文。引擎预先收集的 `context.costs` 不再重复修改单价。因此整次加价 1 木时，一座普通厩舍支付 3 木，两座支付 5 木。准入、描述、农场选择和支付共用该 resolver；C094 直接调用其可用性检查，不再预先聚合另一份费用 delta。
-
-- `fees: Partial<Resource>[]` —— per-action 总固定费用。`computeCosts` 返回的 raw `costs` 总成本 delta 写入 `fees[0]`；有来源的 参考实现 `addBonus` / `addBonusChoices` 优先表达为 `bonuses`，有来源且保留原始候选的 参考实现 `addCost` 优先表达为 `trades`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
-- `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
-- typed flat fencing / stables 支付若传入单一 `{fee:{wood:N}}`，enumerate 会在套用 costType modifiers 前规范化为单位成本：fencing 为 `{unitFee:{wood:1}, nb:N}`，stables 为 `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`。stable farm-choice 的可支付性和结算会保留 `{unitFee, nb}`，再追加 payload-aware `computeCosts` trades、bonuses 和 providers。这样 A16/C56 这类参考实现 `addCost` per-unit alternative 仍能先生成 cost row，再被 D88 这类 bonus choice 继续替换。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 经候选闭包作用在每个 unit cost row 上（无顺序字段，可达行集合与 trade 注册顺序无关）。`minCost` / `maxCost` 限定可替换的 cost row，`replaceUpTo` 替换不超过声明目标的当前可用量，`groupMin` / `groupMax` 限定所有 row 合计使用次数。每个 unit-scoped `TradeUsage` 会保留实际移除和加入的资源，使部分 `replaceUpTo` 的费用归因精确反映实际值。`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选；C88 用相等的 group bounds 强制恰好折扣对应数量的 stable row。
-- `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
-- `CostResourceRemovalModifier` —— `type:'remove-resource'` 在枚举前从 `fee` / `fees` / `unitFee` 结构化删除指定资源键，并在 `costResourceRemovals` 保留约束来源和各费用路径的实际减免量；用于 C014 这类“不再需要某资源”的规则。该约束会在每次后置 bonus 后再次应用，因此 E123 不能使用已删除费用，D013 等成本 bonus 也不能把该资源重新加入；最终减免通过 `PaymentSolution.bonusReductions` 写入 Cost Attribution。
-- `paymentResourceProviders` —— 卡牌 / hook 提供的虚拟支付资源。provider 在卡牌内部声明稳定 key、可用量、可覆盖的真实成本资源以及执行时的消费来源；它不写入 `fee` / `fees` / `PlayerState.resources`，只在 `PaymentSolution.resourcesPaid` 中以自身 key 出现，并由 executor 消耗来源状态。
-- `paymentBudget` —— 对最终 `PaymentSolution.resourcesPaid` 的资源上限过滤。它不提供资源、不改变成本候选，也不提前限制几何/单位数量；必须在 trades / bonuses / paymentResourceProviders / cards 都生成最终支付方案后检查。
-- `minimumResourcesPaid`：最终 `PaymentSolution.resourcesPaid` 的下限，在替代支付、折扣之后、最优方案裁剪之前校验。改善流程通过 `actionContext.minimumResourcesPaid` 传入；候选准入和支付子节点复用同一个受约束预览。
-- `resourceReserve` —— 支付后声明的资源池总量必须至少保留指定数量。它只过滤最终支付方案，不改变成本候选或支付执行。
-- `Bonus.capDiscountAtCost` —— 把可变折扣封顶到当前正费用，但仍是后置 bonus；“不再需要某资源”必须使用 `CostResourceRemovalModifier`，不能用任意大 capped discount 模拟。普通 bonus choice 必须能完整应用折扣，不能靠 clamp 产生 no-op 或部分折扣。
-- `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，表示玩家选了第几个 choice；它本身不是 dominance pruning 的豁免理由。
-- `Bonus.choiceAffectsState` —— 标记该 choice identity 会被 after-pay 等 listener 消费并改变状态；只有这类方案禁止互相 dominance pruning。E123 需要该标记，B145/D88 这类无状态 replacement 不需要。
-- `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C013_WoodSlideHammer `minNumRooms: 5`）。
-
-**Card / occupation ComputeCardCosts candidate pipeline（候选闭包，ADR 0004）**：major / minor improvement 购买成本和职业费用在进入 payment solver 前先规范化成 Cost Candidate List，再对全部 `deriveCardCostCandidate` 转换求候选闭包（`candidate-closure.ts` `closeCandidates()`）：不动点枚举 + Mandatory Saturation 过滤，结果与 listener 注册顺序 / 命名无关（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）。卡牌只声明单候选转换（candidate → candidate(s) | null）和 `cardCostCandidateMandatory` 标志：optional（参考实现 "can pay instead"）天然保留原候选；mandatory（参考实现 "costs less" / 替换语义）经饱和过滤隐藏仍可被强制转换的行。fixed-price 卡是"不依赖输入的 optional / mandatory 转换"，闭包去重后只产出一行，无需任何先行声明。折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution（dedupe key 中 sources 视为无序集合）；闭包输出后每个 resources + originalFeeIndex 组只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment），支付选定后由 improvement / occupation payment glue 写入 option `sourceCards`、`resource.paid.bonusSources` 和 Card Resource Stats（单候选行默认使用 index 0 metadata）。
-
-职业费用按 ADR 0003/0004 的批准扩展复用候选闭包。E060 用一份建材替代至多两份应付食物，剩余替代额度不产生食物；免费职业不收建材。候选来源与成本归因从预览保留到内部 pay child 和实际 receipt，旧 trade 表达已删除。
-
-**统一管线阶段顺序（固定领域规则，非卡牌偏序）**：基础候选（fee/fees/unitFee + getBaseCosts 动态候选）→ cost-type modifier 的结构化资源删除 → 候选闭包（card-purchase deriveCardCostCandidate / unit-trade 转换）→ action-scope trades 组合枚举 → bonuses（含 capped / choices，必须最后求值，因折扣以最终成本为上界）→ card-provided payment resources 覆盖成本 → cards → 生成可支付方案 → paymentBudget 过滤最终实付资源 → Pareto + 排序。
-
-**两层 condition 评估**（`cost-modifiers.ts`）：
-
-- `evaluateStaticConditions(player, conditions)` —— 仅依赖 player 当前状态的静态判定（`houseTypeWood/Clay/Stone`）。
-- `evaluateConditions(player, conditions, nb)` —— 在 static 之上再判定 nb-aware 约束（`minNumRooms`）。enumerate 在生成 payment 分支和 bonus 应用时调用。
-- `getModifiersForCostType(player, costType)` —— 只用 static-only filter（`evaluateStaticConditions`），不再读 `player.rooms`。nb-aware 决策延后到 enumerate，确保 construct 的 `nb=rooms-to-build` 和 renovation 的 `nb=player.rooms` 都能正确驱动 `minNumRooms` gate。
-
-**`Trade.scope`**：
-
-| scope | 应用位置 | max 默认 | 典型用例 |
-|---|---|---|---|
-| `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A028_ForestSchool（lessons cost）、A088_HedgeKeeper（fencing 全部 3 段一次换）|
-| `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）、C056_FeedFence（至多一座纯木 stable）、C088_CarpentersApprentice（恰好折扣指定数量的 stable）|
-
-scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
-
-**Validation**：
-
-- `validateComplexCost(cost)` —— dev 抛错 + prod 降级为 "no affordable solutions"。检查 `nb` 与 `cards` 互斥、`scope:'unit'` trade 必须配合 `nb`。
-- `validateTradeModifier(modifier)` —— 拒绝 scope:'unit' + minNumRooms 组合及非法 grouped-use bounds。
-- `validateBonus(bonus)` —— 恰好一个 `discount` 或 `choices`、`choices` 非空。
-- typed cost payment solution 后处理会丢弃任何 `resourcesPaid` 出现负数的分支；参考实现 `addCost` alternative 不能表现为“多造资源再退款”的 surplus 组合。
-
-**Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；`trades` / `bonuses` / `paymentResourceProviders` 经 `executionContext.costTrades` / `costBonuses` / `paymentResourceProviders` 追加到本次 payment child。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
-
-授予的翻修可在其 leaf 的 `actionContext.costBonuses` 中携带可序列化 `Bonus[]`。翻修准入、效果预览及宿主的内部付款通过同一成本组装入口，将本次 bonus 与 `computeCosts` 结果合并，并读取实时目标与房间数。`discounted-action` 规则操作使用该输入，先检查非 optional leaf，再提供可选行动，不临时安装玩家 modifier。pending/cursor 恢复保留 leaf 输入与付款成本；独立反应或 anytime 翻修有自己的 leaf，不继承授予行动的 bonus。优惠来源保留在付款选项及 `resource.paid.bonusSources`。该扩展属于现有翻修行动成本路径，不进入卡牌购买 candidate pipeline。
-
-D015_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。Renovation 的 mandatory 折扣走 `Bonus.optional=false`；B128_Plumber 等 target-sensitive listener 从 `params.selectedOption` 读取本次目标材质后返回 sourced mandatory bonus choices。
-
-### 7.5 Hook 系统：行动生命周期 phase（10 个）
-
-每个 `GameCore` 通过只读字段 `actionHooks` 独立持有 `ActionHookRegistry`。`HookDispatcher`、flow 可用性、费用预览和直接规则 helper 显式接收该注册表，不再存在进程级 ActionHook 默认值或缓存的 flow dispatcher。`GameCore.validateFarmChoice()` 为完整查询绑定卡牌环境；HTTP、服务端 worker 和本地沙盒适配器共用这个入口。
-
-执行、可用性、原生 effect、engine 和序列化上下文对象必须声明 `actionHooks`。允许脱离通用规则执行的纯调用使用 `ActionHookRegistry | undefined` 字段：基础说明等纯调用可显式填写 `undefined`；Session 规则路径转发已有 owner。查询通用规则的消费者仍要求真实注册表。必填字段只能阻止对象漏属性，不能阻止省略整个可选 context 参数、传错 owner 或传入无效的显式 `undefined`。
-
-`CardRegistry` 不再发布持久的进程级默认值。卡牌 effect、listener 和 modifier 查询继续通过 `withCtx` 同步临时绑定会话环境。确实查询通用 ActionHook 的 native 回调链通过 `FlowEffectContext` 携带所属的 `actionHooks`，包含额外回合查询；卡牌注册表仍使用临时绑定。未绑定卡牌环境时，查询明确失败。显式空注册表或卡牌没有 effect，仍是合法的空结果。
-
-加载状态、恢复 cursor 和 undo 保留同一 Core 的规则注册表。新建 Core，包括 worker 重建，按官方、变体和自定义卡牌定义建立自己的注册表。注册表与可执行 handler 是运行时依赖，不进入游戏状态或 cursor。临时卡牌环境在嵌套调用和异常结束后恢复原环境。 `rehydrateState()` 只还原数据，不查询规则；所属 Core 随后在自身卡牌环境内恢复行动定义和 modifier。服务端与浏览器自定义代码适配器在调用卡牌代码前，从 listener 和 effect 参数中移除 `actionHooks`。
-
-```
-isDoable                 改变行动可执行性
-computeReplace           整张行动替换
-computeCosts             调整成本（围栏折扣 / 卡牌购买折扣等）
-computeArgs              追加 execute() 已返 choice 的额外选项
-computeChoiceCandidates  针对 opt-in getBaseChoiceOptions 注入候选
+```text
+isDoable                 修改行动是否可执行
+computeReplace           替换整个行动
+computeCosts             调整费用，包括围栏与卡牌购买折扣
+computeArgs              为 execute() 返回的选择追加选项
+computeChoiceCandidates  向 opt-in 的 getBaseChoiceOptions 注入候选
 computeExchanges         注入运行时 CardExchange
 before / immediatelyAfter / after
-anytime                  额外注册的 anytime 行动
+anytime                  注册额外的 anytime 行动
 ```
 
-`ActionHookContext { actionHooks, state, player, space, actionId, phase, result?, choice?, doable? }`。`ActionMutationContext` 在执行期额外携带 `eventSink`，action/effect 通过它记录当前事务的 `DraftGameEvent`；`result.extraData` 携执行元数据（如 fence 的 `newPastures` / `newEdges`）。
+- `ActionHookContext` 为 `{ actionHooks, state, player, space, actionId, phase, result?, choice?, doable? }`；执行期 `ActionMutationContext.eventSink` 记录事件。`ActionHookResult` 为 `{ doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard? }`。顶层 `flow.sourceCard` 会复制给缺少来源的子 leaf。
+- Card listener 默认只匹配已打出卡牌；只有显式 `zones` 才扫描手牌。匹配结果携带 `ownerCardId` / `ownerCardZone`。手牌 listener 同样保持纯函数，按视角序列化时隐藏从隐藏手牌派生的全部信息。
+- Listener `scope` 为 `player`、`opponent` 或 `any`。匹配按 listener ID 枚举；尾随节点按 owner 分组（全局、当前玩家、其他玩家），组内按打出顺序稳定排序。反应 listener 进入 trigger-select；compute / query listener 确定性聚合。
 
-事件事务由 engine 的 `EventStore` 管理：public action / internal leaf 开始时建立 frame，action 成功推进后补齐 `schemaVersion/id/seq/round/phase/visibility` 并提交到 `state.events`，同时追加 `publicEvents.committed` archive packet；失败、取消、rollback 或 optional skip 不追加事件。提交时会按当前 `state.nextEventSeq` 重新定序，避免父 action pending 期间其他子流程先提交事件后产生重复 `seq`。提交前会校验公开性、JSON 安全、大小上限和已知 event type/字段；恢复 pending/engine snapshot 时也会校验事务内事件，避免把未完成 frame 的非法事件写回。
+**事件是规则事实的来源。** `EventStore` 为每个公开行动或内部 leaf 开启 transaction，只在成功时提交（失败、取消、回滚和跳过都不追加），按 `state.nextEventSeq` 重新编号，校验可见性、JSON 安全、大小与已知字段，并追加 `publicEvents.committed` 包。`state.log` 是事件 mapper 派生的 UI 缓存。Listener 读取 `transactionEvents` / `eventQuery`，资源事实不读未提交的全局 `state.events` 或 `context.result`。
 
-农场变更事件 `farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt` 和 `farm.fenceBuilt` 必须包含 `newlyUsedTiles: { playerId, row, col }[]`。每个生产入口在成功变更前取得权威已使用格集合，并在变更后、尾随响应前立即记录集合差。已使用格包括房间、田地、马厩、牧场格、地形和被封锁的农场格。因此，在已有牧场或田地建马厩、分割牧场和地形转为田地的新增使用格均为空。普通建造、特殊马厩、直接建马厩和 Moor 入口遵守同一合同。定时 `receive` 实际新增房间时，也发出既有 `farm.roomBuilt`，记录实际房间坐标、房型、日程来源和变更前后的使用差值。房型不符或建房失败时不发建房事实；该入口无需 active Turn、新 hook 或新事件类型。必填事实经事件校验，并由事件投影、pending 快照和 Replay 保留；消费者不能从响应执行时的版图重新推算差值。
+- 农场修改事件（`farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt`、`farm.fenceBuilt`）携带 `newlyUsedTiles`，在修改前后、尾随反应之前捕获。围栏提交还携带 `newlyEnclosedPastureTiles`。地形放置与封锁状态修改发出 `farm.spacesUsed`。计划领取的房间同样发出 `farm.roomBuilt`。
+- 消费者通过 `getActionNewlyUsedTiles()` / `getNewlyEnclosedPastureTiles()` 从宿主捕获的 `actionEvents` 读取这些已提交事实并按玩家过滤；不从后来的几何重建差异，不保存行动前缓存，也不回退到更大的 Turn 范围。
+- 印刷的围栏数量与触发只计算普通 `type='fence'` 段（`hasOrdinaryFenceBuiltEvent()`）。
+- 动物兑换经 exchange / trade 路径扣减，使已安置动物保持同步。按 trade 的资源门槛使用 `immediatelyAfter.trade-applied` 与 `extraData.preResources`。
 
-围栏提交还必须记录 `newlyEnclosedPastureTiles: { playerId, row, col }[]`，取提交前后牧场坐标集合的差。它表示未围住的格子变为牧场，与未使用变为使用的格子及变化的牧场组件（`newPastures`）分别记录。因此首次围住未围栏马厩会记录其格子，分割已有牧场则为空。C179 只读取原宿主捕获的行动事件中的这一事实，并按受影响玩家过滤，不再保存行动前的牧场缓存。
+**触发帧。** 宿主行动提交时，引擎在任何 `afterHostCommitListeners` 修改之前冻结 `transactionEvents`、`actionEvents` 以及匹配到的尾随 listener 集合与顺序。延迟的续行复用这一帧，不重新匹配。`CardListenerContext.triggerSnapshot` 只存在于 `immediatelyAfter` / `after`，保存宿主提交时各玩家的 occupation / minor / major / improvement / played 列表；询问“这是第 N 张”的 listener 读取它，`check:card-impl-boundaries` 拒绝在这些阶段直接读取实时长度。激活时不再检查 owner 卡是否仍在原牌区。该帧随 `activate-card` 节点序列化。对返回 flow 的宿主的反应携带 `preservedTransactionEvents` / `preservedActionEvents`，后续每次提交都会扩展它们。
 
-`farm.spacesUsed` 为地形放置及封锁状态变更记录同一所属玩家坐标事实。`selection` leaf 只在同步 selection effect 执行前后捕获使用状态与原有格范围；`special-effect` leaf 只在添加农场格状态前后捕获使用状态。只有成功的 unused→used 变化才发出事实。初始即覆盖地形的新增扩建格、覆盖地形替换、不封锁的物资标记及未变化的封锁均不计入；快照不会跨 leaf 或延伸到后续响应。C048 沿用宿主提交时持牌检查和 Turn 凭据消费这些事实。A040 将宿主事实与未领取黏土标记的位置取交集；这些原生单格入口达不到 A073 的两格门槛。
+- 费用预览（`previewComputeCosts`）在查询纯度契约下求值 `computeCosts`，不克隆状态。
 
-`getActionNewlyUsedTiles(context)` 只读取宿主已捕获 `actionEvents` 中的已提交几何事件，按效果玩家 ID 过滤并去重坐标，不回退到更宽的 transaction 或 Turn 范围。嵌套宿主各自保留事实，延后的外层响应不会再次消费内层变更。每次行动的几何事实不再使用临时牌状态缓存。提交时的卡牌准入继续采用已冻结的 listener 集合和 `triggerSnapshot`；新增几何事实不会让之后响应中新打出的卡追溯响应旧事件。
+测试：`shared/engine/__tests__/{event-transaction,trigger-snapshot,hook-dispatch,continuation-event-scopes}.test.ts`、`shared/actions/effects/__tests__/farm-action-events.test.ts`、`shared/cards/__tests__/card-listener-zones.test.ts`。
 
-`farmyardSpaceStates` 按 `sourceCardId` 与 `spaceKey` 保存持续物资归属。`claim-farmyard-goods-tokens` special effect 接受可选 `positions`；传入时，可领取查询和实际执行将其作为已提交的用格坐标并按来源卡过滤，不从后来的版图重建宿主用格事实。省略时保留原有按当前使用状态进行的整来源领取行为。执行只消费当前尚存且可领取的标记，并通过 `resource.moved`、卡牌资源统计及工作阶段建筑材料计数记录一次实际转移。E103 等匹配物资响应也识别经该 effect 获得的物资。pending leaf 保留坐标参数，snapshot 与 undo 保留标记。A040 打出时，只在动态真实版图中不属于 `getUsedFarmyardTileKeys` 的格上放一份不封锁的黏土标记；M111 作物和普通锁等临时放置限制不会排除仍 unused 的格子。后续清空、再用或扩建均不补标记。A040 独立的可选兑换只读取该领取宿主实际转移的黏土，兑换上限和公开剩余量无需重复标量库存。实际领取与提供可选兑换分别是有意义的 listener 发动；`used` 和 `card.triggered` 记录这些发动，与单次物资领取独立。
+#### 7.5.1 公开 `ActionNode` 执行顺序
 
-卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 必须是 state-pure flow builder；包括本卡 `cardStates[cardId]` 在内的所有状态修改都通过返回 flow/leaf 进入 engine。trigger-select preview 在克隆 state/player 上执行 card listener，并且只根据返回结果判定该 activation 是否可选；listener 写 preview clone 属于纯度违规（见 §7.7 listener 纯度门禁）。只有 stage card-effect handler 仍可通过可检测的 clone 修改建立适用性。真实写入只在玩家选择 activation 后发生。
+`computeReplace → before → strict isDoable → computeCosts → execute → immediatelyAfter → after`
 
-通用 `ActionNode('place-farmer')` 启动时不会分发卡牌 `before` listener，因为此时目标行动格尚未确定。目标选定后，所有放人路径都会以该目标作为 `context.space`，同时分发 `before / <target-space-id>` 和 `before / place-farmer`，对同时匹配两个身份的 listener 去重，然后展开目标 action flow 并级联目标放人的 `after` listener。普通顶层放人、可选目标或固定目标的额外放人、以及卡牌跳转共用这个目标已知边界。因此 A174 这类监听扩展行动格 ID 的卡牌和 D090 这类监听放人生命周期的卡牌会看到相同的目标行动格上下文。
+1. `computeReplace` 最先执行，此前 `actionContext.targetSpaceId` 已解析出 `context.space`。只改 `actionId` 时，后续所有阶段沿用新 ID。
+2. 每个匹配的 `decline + alternativeFlow` 贡献一棵完整子树。`buildReplacementChoiceNode()` 在原行动的可选提示前插入普通 XOR，并设 `requiresExplicitChoice=true`，即使只有一个替换也等待玩家选择；原分支保留其可选性，提供菜单时任何分支的 `before` 都不执行。选中的分支重新进入本管线，只跳过自身 producer；原分支携带 `checkedReplaceAction`，只有分发器解读它。`resolvedReplacement` 让决定跨恢复保持；放人或移动授予新机会时重置 producer 守卫。
+3. `before` listener 编译为原 leaf 之前的 `activate-card` leaf，按 owner 进入 trigger-select。使用前资格在实际使用行动格时收集一次（`collectBeforePlacementFlows`、`collectBeforeActionSpaceUseFlows`）；`requiresNewPlacement` 排除工人移动。
+4. Strict `isDoable` 读取真实 `before` 修改后的状态：基础 `canBeExecutedByPlayer`、费用预览、hook 与 listener 的 `isDoable`。失败时，只有已接受的必选续行可以通过 `isAlreadySatisfied` 按同一 transaction 中先前的事实结算，此时本体与尾随 listener 不执行。选项级 listener 同样过滤职业手牌选项，`reserveResources` 传入支付 leaf。
+5. `computeCosts` 填充 `executionContext.costs`、`costTrades`、`costBonuses` 与 `paymentResourceProviders`。
+6. 执行本体（`getBaseChoiceOptions` 或 `execute()`）；`resolveChoice` 继续前重新校验可执行性与费用。
+7. `immediatelyAfter` 与 `after` 从冻结的触发帧执行（§7.5）。内部 `activate-card` 绕过本管线，把返回的 flow 交还引擎。
 
-**架构决策（2026-05-29）：trailing trigger frame 必须固定在 host action 成功触发时。** `immediatelyAfter` / `after` 这类 trailing phases 的 listener 可能被编译成稍后执行的 `activate-card` leaf；执行前还可能先跑 `afterHostCommitListeners` / `onBuy` flow，并继续打出职业或改良。为避免 listener handler 在真正执行时读到 later live state，engine 在 host action commit 后、任何 `afterHostCommitListeners` 修改 state 前，捕获一个 trigger frame：当前 `transactionEvents` / `actionEvents`，以及本次 `immediatelyAfter` / `after` 的 matched card listener set 与顺序。若 host action 经过 deferred continuation，continuation 必须复用这个 trigger frame，不得按 later state 重新匹配 listener 或重排 listener。v1 trigger frame 只约束 card listener，不冻结 action hook results；trailing action hook 独立求值，其结果不由该 card-listener trigger frame 冻结。
+复合行动在展开前完成替换选择并保留延迟展开标记，子行动随后各自做替换决定（[ADR 0027](adr/0027-composite-actions-use-existing-replacement-selection.md)）。`EngineTree.insertBefore()` / `insertAfter()` 保留父级 OR/XOR 的选择。直接 `cancel` 受保护原子行动（`plow`、`sow`、`construct`、`stables`、`fence`、`reorganize`、`selection`）会被可恢复地拒绝；可选性来自 `optional` metadata 与 `__skip__`，撤销来自历史。
 
-`CardListenerContext.triggerSnapshot` 保存触发时只读事实，只在 successful action 后的 trailing phases 提供：`immediatelyAfter` / `after`。`before`、`isDoable`、`computeCosts`、`computeArgs`、`computeChoiceCandidates`、`computeReplace`、`anytime`、`computeExchanges` 不提供 snapshot，继续读取 live state。第一阶段保存每个玩家的 card type 列表快照和由列表长度派生的 count：`occupation`、`minor`、`major`、`improvement`、`played`。列表来源固定为 host action commit 后的现有 card type 语义：`occupation/minor/major` 都使用 `collectCardsAs(player, type)`，`major` 包含 `alsoCountsAs: ['major']` 的已打出 minor；`improvement` 是 `minor` 与 `major` 类型列表的 unique union，`played` 是 `occupation` / `minor` / `major` 类型列表的 unique union，dual-type card 不重复计数。列表顺序沿用 `collectCardsAs`：按 `player.improvements` → `player.minorPlayed` → `player.occupationPlayed` 扫描，unique union 保留第一次出现顺序，不额外排序。`card.played` 事件只用于判断当前 action 是否真的打出了 card 及其类型/id，不用于推导历史数量。snapshot helper 在没有 `triggerSnapshot` 时可 fallback 到 live player，但这只用于直接调用 listener 的单元测试、旧 helper 调用或非 trailing phase 兼容；engine 正常执行 `immediatelyAfter` / `after` 时必须提供 snapshot。`CardListenerContext.player` / `ownerPlayer` 仍是 live 输入；返回 flow 只在 action leaf 执行时修改状态。按“第 N 张职业 / 第 N 张改良 / 职业数与改良数是否相等”判断的 listener 必须通过 trigger snapshot helper 读取数量，不能直接读 live `context.player.*Played.length`。`check:card-impl-boundaries` 会守住这个约束：trailing listener 中直接读取 live played-count 报错，非 trailing phase 不受该 snapshot guard 约束；membership 判断如 `context.player.*Played.includes(...)` 不因 snapshot guard 禁止，具体外卡 id 由跨卡 id guard 处理。后续若出现新的触发时事实需求，再扩展 `triggerSnapshot`，不引入完整 `PlayerState` 克隆。
+测试：`server/__tests__/action-replacement-session.test.ts`、`shared/engine/__tests__/engine-pipeline.test.ts`、`shared/actions/__tests__/flow-replacement-admission.test.ts`。
 
-matched card listener set 冻结后，activation 前不重新检查 owner card 是否仍在原 zone。触发资格由 trigger-time 判定；listener body 读取 live `ownerPlayer` / `effectPlayer`，返回的 flow 再把收益、pending 和状态写入路由到正确玩家。
+#### 7.5.2 当前步骤准入与 blocked 恢复
 
-trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardActionParams` 携带 `triggerSnapshot`，`transactionEvents` / `actionEvents` / `triggerSnapshot` 随 node cursor 序列化与恢复。pending 恢复后继续使用 cursor 中的 trigger frame，禁止从恢复后的 live state 重算 snapshot、重新匹配 listener 或重排 listener。该约束必须有 cursor roundtrip 测试覆盖。host 返回 flow 时，其 reaction 没有固定 frame：它在 `preservedTransactionEvents` / `preservedActionEvents` 中携带 host 前缀，并从记录的起点读取 live 事件。每次事务提交（包括显式 flush 和 pending 重发）都会把已提交事件按事件 id 合并进这些保留范围，以及 pending / deferred host 捕获的事件中，因此经过支付或选择等待后，reaction 仍能看到 host 自己的事实及 flow 主体的事实。trigger-select 预览通过 `activationEventReadContext()` 读取与执行相同的范围。
+可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper；普通放人与卡牌授予放人共用 `isPlacementActionDoableInFlowContext()`。见 [ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md)。
 
-卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
+- 当前原子步骤可执行，或适用的 `before` 能开始，行动即可开始；这不承诺能完成。SEQ 检查下一步，OR/XOR 检查任一分支入口。没有整条 flow 搜索；支付、动物容量和围栏几何仍是原子检查。
+- 查询不消耗资源、激活、事件或私有游标，也不使用可用性缓存。
+- `originalActionCondition` 是原分支的结构条件：空累积格不能被固定或附加收益重新开放，明确的替换仍有资格。
+- 卡牌创建的行动格默认使用 Strict Action Entry；标准复合行动格显式 opt-in（[ADR 0018](adr/0018-future-schedule-and-authoritative-action-entry.md)）。
+- 递归 key 包含已消费的替换 producer ID，同名替代可以推进，无进展的循环会终止。
+- 已接受的根与必选续行把义务传到复合后代；显式可选节点在接受前仍可跳过。不可用的必选节点进入 `engine-blocked`，保留已发生的效果，等待 `undoStep` / `undoAction`。非法输入恢复命令检查点并保留交互；已发出菜单中过期的选项被可恢复地拒绝。
+- 本体开始前，不可用的必选宿主只在合法 anytime 列表非空时提供 Continue 窗口；Continue 严格复查，不重放 `before`。
 
-`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard? }`。`computeCosts` 返回的 `costs` / `trades` / `bonuses` / `paymentResourceProviders` 会通过 `applyComputeCostResults()` 进入本次 `executionContext.costs` / `costTrades` / `costBonuses` / `paymentResourceProviders`；construct / renovation / fencing payment 会把它们附加到 `ComplexCost` 后再枚举。farm-choice commit pass 使用 `collectFarmChoiceCostAdjustments()` 保留 farm-payload-aware `costs` / `trades` / `bonuses` / `paymentResourceProviders` / `costAttribution`，其中 fence settlement 会把 payment adjustment 一并传给 typed payment。`costAttribution` 服务 action-path `computeCosts` 的 Card Resource Stats 归因；listener 声明 source card 与成本 delta，construct / fencing / stables / plow host action 在真实执行后按 before/after 成本差和 clamp 写入 saved / paid。construct 实际产生非零 saved / paid 时，还会把对应 source id 投影到 internal pay 的 candidate metadata，进而写入 `resource.paid.bonusSources` / action detail；它只表示该卡参与了成本变化，不表示整笔 action payment 属于该卡。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
+测试：`server/__tests__/{anytime-admission-session,empty-accumulation-admission-session,moor-admission-deep-session}.test.ts`。
 
-当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
+#### 7.5.3 Pay-child 不变量
 
-**费用预览查询（Issues #942/#949）：**基于现有查询纯度契约，`previewComputeCosts` 直接在当前上下文调用 `computeCosts`，不再克隆全量状态。仅测试启用的纯度保护覆盖通用 `computeCosts` hook；重复预览测试检查权威状态、事件、RNG 和私有 cursor 不变，同时核对费用、可用性和真实支付行为。Stage activation 预览仍按 [ADR-0008](adr/0008-node-parallel-reaction-dispatch.md) 使用 clone 检测可触发的直接变更；允许状态变更的执行阶段沿用现有语义。纯度门禁只证明已执行分支，不代表生产运行时具备全局变更保护。
+- `pay` 是内部结算 child。公开宿主行动负责业务修改、事件与完成。禁止的形态：`seq:[pay, apply-*]`、顶层 `apply-*` effect、`PlayerState` 支付草稿或任何跨行动支付槽。
+- `beforeHostListeners`、`afterHostCommitListeners` 与 `afterHostListeners` 编码每个宿主的支付位置。翻修、改良、职业、建房、围栏和马厩的强制支付在尾随效果之前结算，反应不能花掉仍欠宿主的资源。
+- 改良与职业的 `onBuy` 在 `afterHostCommitListeners` 中执行：支付完成、宿主提交卡牌、执行 `onBuy`，再进入尾随反应。一次性自身打出收益放在 `onBuy`；打出的卡不匹配自身的 `occupation` / `improvement` 尾随反应，但仍计入触发快照。“打出某卡后”的效果监听已提交的宿主，不监听其 `pay` child。
+- `shared/actions/helpers/improvement-purchase-lifecycle.ts` 负责购买支付后的提交（返还卡、传牌、`card.played` / `card.passed`、手牌变更）。`params.allowedPurchases` 约束所有候选来源；`purchaseActionCardId` 把本次购买节点来源传入 `onBuy`；`playedFromHand` 在手牌变化前冻结。
+- 必选的 `afterHostCommit` 续行及其返回或注入的一切保持必选；不可执行的后代进入 blocked，使用普通撤销。listener 上的 `mandatory: true` 即使没有触发菜单也会传播。
+- `animal-reorg` 请求把整理交给 Session 子流程，宿主保留自己的反应：`before` 一次，子流程结束后 `immediatelyAfter` / `after` 各一次。
+- `activate-card-effect` 从内部结果表读取 `paymentInfo`，执行 `onBuy` 或阶段 hook；阶段激活携带 owner、target 与阶段 metadata。
 
-`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`GameCore` 透传到 `interaction`。
+测试：`shared/actions/effects/__tests__/pay-child-context.test.ts`、`shared/engine/__tests__/internal-children.test.ts`、`server/__tests__/action-hook-continuations-session.test.ts`。
 
-### 7.5.1 Public ActionNode 执行顺序
+### 7.6 阶段 hook
 
-普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> immediatelyAfter -> after`。
-
-Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / 参考实现 `actRestart` 类回退走 history rollback。`construct` / `fence` 的 entry doability 必须先排除无 reachable room / 无 legal fence commit 的真实 state，避免 confirm-only pending 没有正常提交路径。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。
-
-1. `computeReplace` 最先运行，早于 `before` / strict `isDoable` / `computeCosts`。执行前先用 `actionContext.targetSpaceId` 把 `context.space` 解析为目标行动格，因此 replacement 与后续所有 phase 看到同一目标格，而不是外层 flow 的 host space。`HookDispatcher.applyComputeReplace()` 先跑 action hook replacement，再跑匹配的 card listener `phase='computeReplace'`。
-2. 如果 `computeReplace` 只替换 `actionId`，后续所有阶段都使用替换后的 `actionId` 继续。
-3. 每个返回 `decline + alternativeFlow` 的 listener 按 ID 确定顺序贡献一棵完整子树。`buildReplacementChoiceNode()` 分别检查各分支的当前步骤准入，在原行动的可选提示前插入普通 XOR；保留内部 XOR、owner、来源、提示、目标格和行动身份。运行时 XOR 记录 `replacementOriginalNodeId`，并在 `replacementSourceCards` 中独立保存各替代来源，不覆盖内部 leaf 的来源；choice request 标注 `requiresExplicitChoice=true`，因此唯一替代也等待玩家输入。原分支显示“不替换”，保留原有可选性。展示菜单时不运行任何分支的 `before`。
-4. 玩家选择 replacement 分支后，分支中的每个 leaf 都作为普通 action 重新进入本流水线。该分支只携带继承的 `skipComputeReplaceListenerIds` 与产生本分支的 listener ID，因此 nested action 仍可被其他 replacement listener 替代；它不携带 `checkedReplaceAction`，普通 `before` / `immediatelyAfter` / `after` listener 继续运行。original fallback leaf 携带 `checkedReplaceAction=true`，dispatcher 把它仅作为 replacement bookkeeping 并统一跳过 replacement 计算；其他 phase 不得把该标记解释为行动语义或据此屏蔽普通 listener。
-5. 没有 decline replacement 后，engine 先执行 `before` card listener dispatch。匹配到的 reaction listener 被编译成 internal `activate-card` leaf，并插入在原 action leaf 前面；同一 card owner / phase 下的多个 reaction listener 默认包成 `ParallelNode(mode='trigger-select')`，由 owner 选择顺序。跨 owner 的同一时机 reaction 会拆成各 owner 自己的 activation/prompt。trigger-select 评估时，结构暂不适用的 child 本轮不显示且不永久 resolve，后续 sibling 执行后会重新评估；结构适用但当前不可支付的 listener 仍显示为 disabled。对没有 `cardIds`、靠 `context.sourceCard` 守卫的全局 listener，activation metadata 会继承本次 event 的 `sourceCard` 作为展示/选择卡牌 id，避免退到 listener id。
-6. 一个 leaf 的替换选择完成后，`resolvedReplacement` 在运行 `before` 前固定其 action ID 和来源；该 leaf 或其内部 pending 恢复时不重新计算替换，并仅在最终可执行性校验中携带 `checkedReplaceAction=true`，排除仅用于替代准入的 `isDoable` 回退，不改变普通执行及 pending payload 的上下文。当前步骤准入、mandatory continuation 探测和 before-trigger pass gate 使用同一个已固定行动与来源；后来才可用的替代不能作为跳过 enabling before 或为不可支付 host 建立 guard 的依据。`beforePhaseResolved` 防止重复执行 before activation。这些运行时字段随 clone 和私有 cursor 保存恢复；新行动节点独立计算自己的替换。
-7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。只有已接受的 mandatory continuation 此时可用 `ActionDefinition.isAlreadySatisfied` 查询当前 transaction events；此时 `before` 已完成，命中后该 leaf 直接完成，不执行 action 本体，也不派发 `immediatelyAfter` / `after`。新 action 和 optional action 不使用这个出口。
-   `occupation` 的手牌选项构建与 forged choice 校验也会用 `choice=<occupationId>` 跑选项级 `isDoable` card listener；这用于 B93 这类“打出后必须支付 onBuy 最低后续成本”的前置过滤。listener 返回的 `reserveResources` 会继续传入 occupation payment leaf，确保后续必付成本不能被职业付款选项提前花掉。
-8. 然后执行 `computeCosts`，把费用覆盖 / sourced trades / bonus choices / payment resource providers 写入本次 `executionContext.costs` / `costTrades` / `costBonuses` / `paymentResourceProviders`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
-9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 保留已选行动，重新验证当前可执行性和成本，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `immediatelyAfter` / `after`。
-10. `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；它们的 trigger frame 在 host commit 后立即固定。`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 的 activation 真正执行前运行，`afterHostListeners` settlement 则故意保留在 参考实现 slot 中，等 host `after` 之后再运行。
-11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
-
-组合行动的直接入口 `Engine.fromAction()` 和 `expandFlow` leaf 先创建保留展开标记的 ActionNode，在展开前运行已有 `computeReplace` 选择。选择原分支后才展开原 flow；该入口不额外执行组合宿主的 before/after 生命周期。展开继承 owner、来源、producer 守卫和 mandatory 义务，私有 cursor 保存展开标记及原 flow 的节点 ID/标签风格。展开完成后交回 Session driver 重算下一节点 owner，避免用宿主玩家执行跨玩家子行动。 `EngineTree.insertBefore()` / `insertAfter()` 把选中分支包成续行 SEQ 时保留父 OR/XOR 的选择身份；该 SEQ 完成后父节点才继续或结束，不重选另一计划。描述查询只读展开原 flow，保留行动格和 choice 的资源预览。`checkedReplaceAction` 只冻结组合宿主的替换选择，展开时清除该标记，使子行动仍可使用自己的替代。B026 在此边界返回互斥的 Sow/Bake、Fencing/Sow 和 Fencing/Bake 计划，每个计划允许单个行动或任意顺序的两个行动。见 [ADR 0027](adr/0027-composite-actions-use-existing-replacement-selection.md)。
-
-作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），每个 owner 组内按卡牌 play order 与匹配序稳定排序，并由该 owner 执行 activation/prompt。reaction listener 默认进入 trigger-select；compute / query listener 仍按确定性顺序聚合，不产生玩家选择。
-
-Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['played']`，扫描 `improvements` / `minorPlayed` / `occupationPlayed`。只有显式声明 `zones: ['hand']` 或 `zones: ['hand', 'played']` 的 listener 才会扫描 `minorHand` / `occupationHand`。匹配结果携带 `ownerCardId` 与 `ownerCardZone`，并通过 `activate-card` params、trigger-select preview、`executeCardListener()` 透传给 handler；handler 不应自行重扫手牌/已打出数组来推断 owner 区域。
-
-手牌 listener 只用于“卡牌存在于手牌时就必须监听历史”的卡牌局部规则。它仍必须遵守 state-pure flow builder 约束：只读当前 transaction events / state，状态更新通过返回 flow 落到本卡 `cardStates[cardId]`。当该卡仍在手牌中时，per-viewer serialization 必须对非 owner 隐藏对应 `cardStates[cardId]`、以该手牌卡为 source 的 public events、由这些事件派生的 log entry、过滤后的 event/archive seq cursor、runtime `publicEventCancellations` 和按手牌 id keyed 的 `cardAvailability`，避免从局部历史或可打出性元数据反推隐藏手牌。禁止为了单卡历史需求新增 `PlayerState.stats` / `GameState` 顶层全局 stat；没有该卡的对局不应为该卡维护额外历史。
-
-### 7.5.2 当前步骤准入、before 与 blocked 恢复
-
-行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。入口 helper 延迟求值基础判定，只对带自定义判定的 strict 复合行动执行这次前置检查。flow 查询中，叶子的基础回退只在没有 `costPreview` 时执行；复合流程遍历和 strict gate 保持原有顺序。每次查询仍基于完整的当前状态执行适用的 hook 与费用预览，不缓存可用性结果。查询不消费资源、触发、事件或私有 cursor。 普通放人和卡牌授予的额外放人共享 `isPlacementActionDoableInFlowContext()`，包含 `place-farmer.before` 的准入回退、显式 veto、strict 前置条件和 before 抑制语义。额外放人的可达性 resolver 通过无环的 `action-definition-lookup.ts` 同时查询行动格及内部行动，能够预览包含 `gain` / `pay` 的 before flow。
-
-`originalActionCondition` 表达原动作分支的结构条件。原分支不满足此条件时，普通 `isDoable: true` 结果或附加收益 before 不能重新打开入口。累积格及 `collect` 以实际可领取的商品为准；定向或部分收取按真实目标、商品子集和数量判断，不能只检查 `gainPerRound`。空格的固定收益、owner 奖励及卡牌附加收益不授予准入。明确授权的 `computeReplace` 仍独立检查；复合动作沿实际 `flow` 或纯 `flowFactory` 检查当前步骤，使合法子替代保持可执行。Strict Action Entry 的归属等硬限制仍先行。普通、额外放人和移动目标共用这一查询，权威执行再次校验。
-
-
-准入递归键由行动 ID、参数和排序后的已消费 replacement producer ID 组成。同名行动的替代若消耗了一个新来源，可以继续检查其实际可执行性；重复相同键则终止探测。这样 E151 的 `skipRoomCheck` 替代可以通过真实 family-growth 判定，无需卡牌 `isDoable` 绕过，也不会无限递归。
-
-引擎在状态变化后重新评估 before 候选，每次 activation 只消费一次。已接受的根行动和必选续行会向复合后代传播义务。选中分支不能返回父选择以逃过未履行的义务；明确 optional 节点在接受前仍可跳过。必选叶节点或复合节点不可执行时产生 `engine-blocked`；普通失败保留先前效果，等待玩家显式 `undoStep` 或 `undoAction`。无效结构化提交恢复命令检查点并保留原交互。已发出的选择菜单中，若提交选项对应的行动已不可执行（例如 anytime 行动花掉了所有可选支付所需的资源），该提交以可恢复失败被拒绝并保留菜单，不进入阻塞；支付选项只会结算其标识所指的那种支付。
-
-必选宿主在执行本体前仍不可行时，仅当当前合法 anytime 列表非空才提供“继续”窗口，包括没有触发任何 before listener 的情况；不分析相关性或未来是否成功。Anytime 执行后回到同一窗口；继续按钮严格重验宿主，不重复 before。继续失败或最初没有 anytime 时进入 blocked。原有阶段与 provisional guard 仍然有效。已提供的分支在选择前变得不可行时，也进入同一窗口。受保护观察在命令结算时还会检查未来必选步骤和必选选择，包括观察后动态返回的续行；未接受的可选分支不属于义务。Pending 与 before 单次消费状态随 engine cursor 序列化，撤销使用既有命令和 Rule Action 历史。
-
-不再有通用整流程搜索、确定性输入适配器或普通 completion scope。支付求解、动物容量和围栏几何仍属于原子规则检查。只有不存在特殊围栏 policy，且所有匹配的围栏费用 listener 都声明 `monotoneFenceCost` 时，围栏候选才可剪掉付不起费用的严格超集。跨玩家恢复、Protected Observation 门禁和保留同一已揭示选择的 fallback 继续遵守 ADR 0015 的 provisional 语义。
-
-### 7.5.3 Pay child 架构不变量
-
-`pay` 是 internal settlement child；public host action 负责业务 mutation、事件事实和 completion。不要把业务 mutation 放回 `pay`，也不要用 `seq:[pay, apply-*]` 或顶层 `apply-*` effect 表达同一件事。
-
-`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 是 host action 在 参考实现 pay slot 上的显式差异：
-
-- `renovation` / `improvement` / `occupation` / `construct` / `fencing` / `stables` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
-- `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `immediatelyAfter` / `after`。 自身打出的一次性资源、购买、未来安排及文案明确包括本牌的收益统一放在 `onBuy`。`getMatchingListeners()` 按完成选择排除触发玩家刚打出的本牌对自身 `occupation` / `improvement` 的尾随反应；旧牌、其他玩家、手牌监听、compute/before 阶段及外层 `place-farmer.after` 的资格保留。已提交本牌仍计入触发快照的卡牌数量；资格排除不改变快照。文案规定在牌打出或建造后生效的能力监听已提交的 host 行动，而非较早的 `pay` 子行动。
-- `stables` 保持 `farm.stableBuilt -> resource.paid(stables) -> after-stables effects`：农场 mutation 仍是 host action 的事实，但 mandatory payment 会在 reaction 花费这些资源前结算。
-- `fencing` 明确是 `beforeHostListeners`，避免 `A034_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
-- mandatory 传播不改变 fencing 结算顺序：先校验合法布局，再结算支付，最后提交权威 fence；不得因此允许 `seq:[pay, apply-*]`。
-
-禁止的形态：
-
-- `seq:[pay, apply-*]`。
-- 顶层 `apply-*` effect 文件。
-- `PlayerState` payment scratchpad 或跨 action 临时支付槽位。
-
-`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook；`afterHostCommit` activation 是 mandatory，其返回 flow 会递归继承该义务。阶段 reaction dispatcher 也使用该 child 执行 harvest field / before-end card-effect activation。stage activation 可携带 `ownerPlayerId` / `targetPlayerId` / stage hook metadata，并在 `ParallelNode(mode='trigger-select')` preview 中用 cloned state/player 评估 applicable / doable / mandatory pass。flow-returning handler 返回 flow 即视为可执行；direct-mutation void handler 若在 clone 上产生变更，也视为可执行，但真实 mutation 只在玩家选择该 activation 后落地。choice flow 的真实 max / options 由后续 action leaf 再按 live state 生成或校验。trigger-select pass gate 以 preview 后的结果为准：显式 mandatory 或 enabled non-before non-optional result 会禁用 pass，root `flow.optional === true` 可允许 pass；before-end stage activation 继续以 `beforeEndGameMandatory` 为准，即使该 activation 是 no-flow direct mutation；`before` trigger 继续由原 action continuation 判定 pass 是否可用。`onBuy` 的 `paymentInfo` 路径不读取 stage target metadata。`occupation-gate` 是 no-op internal gate，只给需要先展示/执行其他节点、但 OR 分支可执行性仍必须按 occupation 判断的 flow 使用。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
-
-`PaymentResourceMap` 覆盖真实资源、supply token 和卡牌提供的虚拟支付资源：`fence` / `stable` 与 `wood` / `food` 一样进入 `cost`、`payLeaf`、payment solver、`resourcesPaid`、`PaymentInfo` 和 `resource.paid`；虚拟支付资源不进入 `cost`，但会在 `PaymentSolution.resourcesPaid` / payment choice label 中以稳定 key 出现。支付 supply token 时只增加 `player.supplyTokensConsumed`，不修改已建 `fenceSegments` / `stableTiles`；所有“还能建多少 fence / stable”的读取必须走 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()`，不能再使用固定 15 / 4 上限。
-
-声明 `mandatory: true` 的 listener，即使是唯一激活项、没有触发菜单，也会将强制义务传入其返回流程。无法足额转账时进入可撤销的阻塞，不会结束行动。
-
-`purchaseActionCardId` 保存本次购买节点由哪个行动格或卡牌提供。展开目标行动格 flow 时记录目标格身份；卡牌直接授予的新购买使用该卡自己的来源，不继承父购买身份。`improvement` 构造内部子流程时将来源快照传入本次 `onBuy` activation，支付 pending、恢复与撤销保留该值。它独立于 `sourceCard` 日志归因、`costActionCardId` 成本查询和用格统计。B059 直接 Major 购买或 Minstrel 展开 Major 得 4 食物；Merchant 新授予的第二买，包括 Minstrel→Major→Merchant，均得 2。奖励仍由卡牌自己的 `onBuy` 返回。
-
-`improvement` 在修改手牌前冻结 `result.extraData.playedFromHand`，并保留到支付完成与 `onBuy` 返回 flow 结束。它表示本次牌的物理来源；minor / major 身份和购入行动来源各自保留。D118 只根据该事实奖励从手牌打出的卡，不把公共大设施当作手牌。
-
-### 7.6 阶段型 Hook（按触发顺序）
-
-普通轮转和卡牌授予的独立 Turn 共用一棵固定的 `onEndTurn` 来源树。`buildEndTurnReactionFlow()` 收集当时持有和明确保留的所有回合结束来源，不按当前 flag 或支付能力过滤。总来源只有一个时直接展开；多个来源，包括暂时不适用的来源，保留在 `ParallelNode(mode='trigger-select')` 中。每次选择后通过实时克隆状态预览重算资格、支付和 mandatory/pass 状态。已完成来源保持 resolved；窗口中新打出的卡只参加后续窗口。所有已选择的嵌套 flow 和必要动物重整完成后，窗口只关闭一次当前 Turn Scope，不再次扫描打出区。
-
-C048 只在已捕获的几何宿主提交时已有本牌、自身 `actionEvents` 含新增使用格且 Turn Scope 有效时记录 `qualifiedTurnToken`。回合结束 flow 在获得食物前先记录 `rewardedTurnToken`。多个 Rule Action 共用这些凭据；下一 Turn 使用新身份，不能领取过期资格。不再使用 placement 前后的几何缓存，也不强制新增最后领奖的 phase。
-
-
-阶段 flow 完成时，Session 在 `completeFrameIfStage` 弹出并续接之前检查未处置动物。存在此类动物时，保留已完成的父阶段 frame，嵌套既有 `reorganize`，处理后恢复原 `stageResume`。检查当前终态，不能只依赖一次 driver 调用中的资源 delta，因为外部 choice callback 可能已执行 gain。普通繁殖阶段保留 `harvest-breed` 约束；其他阶段使用普通动物处理，允许合法即时烹饪或弃置，不要求先住房。重整子流完成时不再次嵌套自己。单选自动执行获得动物时同样保留父流程，并在嵌套前提交资源事件，保证尾部奖励和原阶段或行动续接不丢失。
-
-```
-准备阶段: onBeforeStartOfTurn → 增轮 / action.revealed → onAfterRevealAction → onPreparation
-  → 累积格补充 → onRoundStart（StartOfTurn）→ onEndPreparation → onBeforeWork → onWorkStart → work.started
-工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
-回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
-回合结束: onRoundEnd → onAfterRoundEnd
-收获 (4/7/9/11/13/14):
-  onBeforeHarvest → harvestPrepWindow → onStartHarvest
-  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap'] → reap reaction parallel
-    → onAfterReap → onEndHarvestFieldPhase → onHarvest
-  → postReapAnytimeWindow → onStartHarvestFeedingPhase → onHarvestFeedingPhase
-    → feed → onEndHarvestFeedingPhase
-  → breed → onEndHarvest → onAfterHarvest
-终局前: round 14 的 onAfterRoundEnd 完成后，onBeforeEndGame → preScoringWindow → gameover；不进入第 15 轮准备窗口
+```text
+Preparation: onBeforeStartOfTurn -> advance round / action.revealed -> onAfterRevealAction -> onPreparation
+  -> accumulate -> onRoundStart (StartOfTurn) -> onEndPreparation -> onBeforeWork -> onWorkStart -> work.started
+Work:        PlaceFarmer -> atomic actions -> onEndTurn -> allWorkersUsed -> onAllWorkersPlaced
+Return home: onBeforeReturnHome -> onStartReturnHome -> onReturnHome
+Round end:   onRoundEnd -> onAfterRoundEnd
+Harvest in rounds 4/7/9/11/13/14:
+  onBeforeHarvest -> harvestPrepWindow -> onStartHarvest
+  -> onStartHarvestFieldPhase -> onHarvestFieldPhase -> reap [dispatch 'reap'] -> reap reaction parallel
+    -> onAfterReap -> onEndHarvestFieldPhase -> onHarvest
+  -> postReapAnytimeWindow -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
+    -> feed -> onEndHarvestFeedingPhase
+  -> breed -> onEndHarvest -> onAfterHarvest
+Before game end: after round 14 onAfterRoundEnd completes, without opening round-15 preparation,
+  onBeforeEndGame -> preScoringWindow -> gameover
 ```
 
-跳过整个收获只在全部 `onBeforeHarvest` hook 完成后、`harvestPrepWindow` 前激活一次。待生效的卡牌状态标记会被消费为本轮标记；标记生效期间，该玩家不参与收获准备、收田、收田后 anytime、喂食与供暖、繁殖、收获阶段 hook，也不触发由该玩家卡牌拥有的 listener。`onBeforeHarvest` 仍在排除前正常结算，阶段转入 `preparation` 后普通 `onRoundEnd` 恢复执行。E58 这类只跳过田地和繁殖的效果继续使用独立的窄机制。
+阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、收获前、收获田间阶段和终局前的共享模型：
 
-`onBeforeHarvest` 完成后，`harvestPrepWindow` 在任何 `onStartHarvest` / field-phase 卡牌结算前按座次遍历玩家。已打出的卡可声明 `preHarvestGoodsWanted`；准备窗口会把所有已打出消费者的需求汇总，再和当前存量及必然收割量比较。若卡牌在普通收割前就消费该资源，则改为声明 `preHarvestGoodsWantedBeforeReap`；当前存量必须独立覆盖汇总后的收割前需求，田里的作物不计入。E58 这类可以选择跳过田地阶段的卡牌声明 `maySkipHarvestFieldPhase`；其可能发生的收割不会被任何消费者视为必然。没有有用且可支付的限次 `harvest` exchange 的玩家直接跳过。harvest exchange 的使用次数按来源和轮次记录，因此这里使用后，后续喂食窗口只能使用剩余额度。当前由 A61/C29/C54/C98/C110/D70/E110 声明粮食或木材需求，提供者从 exchange metadata 发现，不维护卡牌 ID 清单。
+- 每个窗口冻结玩家顺序（规则要求时从起始玩家标记顺时针），并在每名玩家进入时，按持牌、手牌启用的 hook 与纯 `stageEligibility` 查询捕获一棵固定的 `activate-card-effect` 来源树。来源发现从不按当前支付能力过滤。
+- 单个来源直接展开；多个来源进入 `ParallelNode(mode='trigger-select')`。每次选择后，handler、支付与必选 / Pass 状态按实时克隆预览重算。已完成的来源不重放；窗口内打出的卡只参加后续窗口。
+- 窗口上下文、玩家顺序与树游标保存在 `stageResume`；恢复时不重扫牌区，也不重读已变化的标记。旧的串行阶段保留 `resumeAfterCardId` 用于自身索引恢复。
+- 嵌套可选分支保留兑换机会，不削弱必选根。`requiresExplicitChoice` 在实时兑换可能提供资金时保持购买选择开放。
+- 阶段完成时，未安置动物先嵌套现有 `reorganize` flow，再恢复帧。
+- 阶段子流程的私有事件保留到最外层响应。
 
-普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每块田先通过 `computeHarvestCount(state, player, field)` 得到本次普通 reap 要移动的 crop 数量、`sources`、`tags` 和 `scope`；单卡只能通过 `registerHarvestCountModifier(cardId, modifier)` 增减 `delta`、设置 `override`、追加语义 `tags` 或把 `scope` 升为 `field`，不要在 `reap` 主路径添加单卡分支。默认 `top-stack` scope 只收原始顶堆，只有 E73 这类 full-field 能用 `field` scope 跨堆。`HarvestReapSummary.harvestedCrops` 按 field/crop 记录实际收获数量与来源；`HarvestReapSummary.harvestedPositions` 记录当前完整 Harvest 中实际收割过的每块 Logical Field：普通田使用农场坐标，Card Field 使用规范虚拟坐标；私人 reap 与没有产出作物的田不进入。`HarvestReapSummary.harvestCountApplications` 按 field/crop/scope 记录每次 harvest count 应用的 `count`、`sources`、`tags` 和 `scope`，包括 E112 这类 supply-instead-of-field 的零收获应用。后续卡牌若要判断“本次收获规则实际怎么作用”，必须读取 applications，不要反查外卡 `cardStates`。A112/D72 这类额外收获选择门槛通过 `registerHarvestSelectionThresholdModifier()` / `computeHarvestSelectionThreshold()` 扩展；helper 只接收当前 `state/player/field/sourceCard/baseThreshold`，由注册 modifier 返回更低阈值来源，调用方不读取具体外卡 id。`grainFields` / `vegetableFields` 仍按收获过的田数计数，不按 crop amount 计数。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
+各窗口的不变量：
 
-`onHarvest` 完成后、喂食阶段开始前，`postReapAnytimeWindow` 按 Harvest 顺序遍历玩家。只有 `buildAnytimeEntries()` 找到当前可执行的 registry action 或卡牌 listener flow 时，才建立可跳过的 synthetic choice；完成一次 anytime flow 后按实时状态重建同一玩家的能力，没有剩余能力时自动推进，Pass 则显式推进。所有玩家完成后，`executeFeedingLogic()` 才冻结 `remaining` / `foodUsed`，因此窗口内资源变化会进入喂食计算，同时真实 `feed` / `heating` pending 仍保持锁定。
+- **准备阶段**：`onRoundStart` 即 StartOfTurn；`onBeforeStartOfTurn` 在轮次增加前执行并收到 `nextRound`；揭牌上下文保留实际 `actionId` / `roundSlot`。工作顺序（`roundFirstPlayerId`）在 StartOfTurn 之前冻结。`startFirstRoundAfterSetup()` 是新局的唯一入口：bootstrap 不提前累积，加载工作阶段状态也不重新准备。
+- **StartOfTurn**：回合开始激活、计划领取、付款门控的 offer 和计划行动共用一棵玩家树。到期货物按玩家合并为一次 `receive`，保留各条目来源且不触发 Gain；`futureMeeple.resolved` 只在实际领取后提交。
+- **未来计划**（[ADR 0018](adr/0018-future-schedule-and-authoritative-action-entry.md)）：Exact Future Target 保留目标轮，超出 `current round < target <= 14` 时丢弃；Future Prefix 保留仍存在的连续后缀。一次性的未来 offer 使用 `scheduled-offer` 行动与 `cardStates[cardId].extraData.scheduledOffers`，不用资源 token。卡牌排未来 token，不自写 `targetRound` 状态机。
+- **回合结束**：普通轮转与卡牌驱动的 Turn 共用 `buildEndTurnReactionFlow()` 的同一棵冻结来源树；窗口完成时关闭 Turn Scope 一次。卡牌以既有 Turn 身份记录每 Turn 一次的凭据。
+- **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与；顺序保存在 `stageResume.extra.beforeHarvestPlayerOrder`。
+- **跳过整个收获**：待生效标记在所有 `onBeforeHarvest` 之后激活一次，该轮之后的每个收获步骤、阶段 hook 和 listener 都排除该玩家。
+- **收获准备**：`harvestPrepWindow` 依据 `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata，只提供可支付、有次数限制且能产出所需货物的 Harvest 兑换。使用次数按来源和轮次记录。
+- **收割**：`reap` 是内部行动。完整收获使用 `trigger: { phase: 'harvest' }`；私人田间阶段收割不写收获摘要。`computeHarvestCount()` 返回带 `sources` / `tags` / `scope` 的数量，只能通过 `registerHarvestCountModifier()` 修改。逐作物 `reap` 事件汇入一个 parallel flow，之后才进入 `onAfterReap`。
+- **收割后 anytime**：按收获顺序、在计算喂食之前提供；每个 flow 后重建。
+- **喂食**：`computeHarvestFeedingRequirement()` 只能通过 `registerHarvestFeedingRequirementModifier()` 修改。feed 请求携带权威兑换目录（§7.9）；`handleFeedResolved()` 在任何修改前校验完整的有序计划。
+- **繁殖**：`getBreedThreshold()` 取已打出卡中最小的阈值；`computeHarvestBreedOrderPriority()` 只调整繁殖顺序。
+- **收获摘要**是规则事实：`harvestReapSummary`（作物、位置、数量应用）与 `harvestBreedSummary`（安置后结算的新生动物）保留到 `onAfterHarvest`；卡牌通过 `getHarvestOutcome()` 组合它们。
+- **终局前**：`onBeforeEndGame` 按 target 座位顺序与 `beforeEndGameScope` 分发；`handHooks` 不支持它。随后 `preScoringWindow` 逐玩家只提供 `preScoring: true` 的 anytime listener，结束后才写 `gameOver`。计分前花费使用显式 flow；Scoring Reserve 不扣真实资源。
+- **`onBeforePlayerTurn`** 是唯一的 non-flow hook：只做 skip-control，返回 `{ skipTurn?: true } | void`，从不返回 `ActionFlow`，也不产生 pending。
+- **定时规则**：`CardEffect.timedRules` 声明闭合的 `TimedRule` / `RuleBody`，由原生注册编译进既有 hook；`timed-rules.ts` 不查询运行时注册表。执行期公式来自 `rule-queries.ts`。
 
-喂食需求通过 `computeHarvestFeedingRequirement(state, player)` 计算，默认公式是 `familySize * 2 - newbornCount`；E30/E159 这类只改变所需食物数量的卡通过 `registerHarvestFeedingRequirementModifier(cardId, modifier)` 扩展公式，不新增 `BeforeFeed` / `AfterFeed` 阶段 hook，也不在喂食主路径写单卡分支。
+测试：`server/__tests__/{preparation-bga-session,before-harvest-reaction-dispatch-session,stage-animal-settlement-session,parallel-trigger-multi-session}.test.ts`、`server/__tests__/stage-hook-flow.test.ts`、`shared/actions/__tests__/future-meeples-entries.test.ts`。
 
-喂食草稿会列出所有仍有次数的 `harvest` exchange，即使它按初始资源暂时不可支付，因为前一个已选交换可能产出其输入。前端按选择顺序推演选择；`handleFeedResolved()` 用权威资源和各来源剩余次数重放提交的 `(sourceId, exchangeIndex, count)` 有序计划，只有完整计划合法时才统一落地，拒绝时状态和喂食交互都保持不变。`CardExchange.fromFarmyard` / `Trade.fromFarmyard` 将动物输入限制为当前已安置的动物；后端在 feed request 中随来源次数上限发布按物种划分的 `placedAnimals`；草稿投影与有序校验都会为每笔动物支付扣减这个余额，不把同批次刚获得的动物视为已安置。
+### 7.7 Listener 纯度
 
-Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存。`harvestReapSummary` 在 field phase 累计本次实际 reaped crops；`harvestBreedSummary.resources`、`animalTypes`、`animalCount` 在繁殖对应的重排确认后结算为成功安置的新生动物。`harvestBreedPlacement` 在等待期间记录安置最低数量与动物余额，包含修改后的父母阈值及寄养繁殖归属。动物支付会降低最低数量，直到该物种耗尽才失去新生动物；随后获得的动物会增加最低数量，不能恢复已耗尽的新生动物。嵌套重排使用同一记录排除弃掉的新生动物，原始繁殖重排确认后释放记录。弃掉的新生动物不计入，弃掉旧动物本身也不抹除已安置的新生动物。两份 summary 必须保留到 `onEndHarvest` / `onAfterHarvest` 全部完成后再清理，供 E134 这类“本次 harvest 后处理”读取实际收获/繁殖结果。不新增 `state.harvestOutcomeSummary` 顶层状态；卡牌通过 `getHarvestOutcome(state, playerId)` 从现有两份 summary 组合读取 outcome。Breed phase 通过 `getBreedThreshold(state, player, animalType, { sourceCard })` 计算每种动物的繁殖阈值，默认 2；helper 只枚举已打出卡的 `CardImpl.effect.computeBreedThreshold`，同一 animal type 多个 modifier 取最小 threshold。需要调整本次 harvest breed 处理顺序的卡牌使用 `CardImpl.effect.computeHarvestBreedOrderPriority(state, player)`，默认 0，数字越大越晚，priority 相同保持 harvest order；该 hook 只作用于 breeding phase。E84 只在 `sourceCard === 'harvest'` 时返回 sheep threshold=1，让 1 sheep + capacity 直接在 harvest breed 中产生 newborn sheep，并写入 `harvestBreedSummary.resources.sheep`。卡牌不得用具体卡牌 id、live animal count 或 virtual resource 推导 newborn 事实；breeding modifier 的影响必须先体现在 `harvestBreedSummary.resources` 中，再由后续卡牌消费。
+`CardListenerRegistration.handler` 在分发、预览和可执行判断路径上是状态纯的 flow 构造器，对齐参考实现：反应收集只构造激活 leaf，状态修改发生在行动 leaf 中。
 
-`reap` 是可由 ActionFlow/internal 执行的内部 action；私人田地收获通过 `trigger: { phase: 'private-field-phase', cardId: sourceCard }` 进入同一 action，不启动完整 Harvest：先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
+- handler 可以读取状态与事件，返回 `ActionHookResult`、`ActionFlow`、费用、可执行性或选项。每次修改，包括写自身 `cardStates[cardId]`，都是返回的 leaf（`gain`、`pay`、`special-effect`、`exchange` 或可复用的内部行动）。
+- 分发从不为预算结果而执行 handler。listener 激活是普通内部 leaf（`activate-card`），携带 listener、卡牌、事件、owner 与触发玩家；`event.actionContext` 保留触发时的 `targetSpaceId`。
+- **门禁**：所有会分发 listener 的 Vitest project 都安装 `shared/cards/__tests__/listener-purity-guard.ts`，为每次调用提供深层只读 Proxy，任何写入或返回实时引用都会失败。`pnpm run check:card-impl-boundaries` 静态拒绝所有已解析 handler 与 `deriveCardCostCandidate` 中对 context 的显式写入。没有豁免清单。
+- **Trigger-select**（`ParallelNode`）负责 select、pass、mandatory 与 independent 语义，没有 listener 专用节点。结构暂不适用的 child 本轮隐藏，sibling 执行后重新评估；适用但付不起的 child 保持可见并禁用。`mandatory: true` 只在必选 child 适用且可执行时禁用 Pass。Card listener 的适用性只来自返回结果；阶段卡牌效果仍在克隆上预览。
+- **before 可达性**：同一时机的多个 `before` listener 是由玩家排序的真实触发 flow，从不静态模拟。能让不可达行动变为可达的卡牌通过 scoped `isDoable` opt-in，并在 `skipBeforeTriggers` 下让开。Pass 门禁先用 `skipBeforeTriggers=true` 检查原行动，再只看通用替换回退。
+- **合成分发**：`trade-applied` 与 `harvest-feed-conversion` 只执行确定性 `seq` / `parallel` flow 中的非可选 `special-effect` leaf；那里不支持支付、获得或交互。
+- **Owner 与切换**：owner 与触发玩家显式传递；跨玩家确认和撤销边界由运行时负责。`confirm-player-switch` 由交出控制的玩家提交，并建立撤销边界。
+- **暂定续行**（[ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md)）：每个修改命令都经过一个结算边界，带规范化身份与检查点；作用域、守卫、受保护观察和失败记忆保存在私有会话游标中。
+- 不要给 `CardListenerRegistration` 增加 `order` 字段；稳定的回退顺序来自 `playOrderIndex`。
 
-`onAllWorkersPlaced` 在所有玩家耗尽普通放人和正常轮转 provider 后、归家前执行。每名玩家的 activation 复用 `ParallelNode(mode='trigger-select')`，可自行选择同时发生的收尾效果顺序。供应放置使用 §6.4 的有限人物身份和统一清理，不激活永久家庭成员。
+测试：`shared/cards/__tests__/listener-purity-guard.test.ts`、`shared/cards/__tests__/listener-purity-wave*.test.ts`、`server/__tests__/authoritative-command-settlement.test.ts`。
 
-阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 执行可暂停的子流程。准备阶段按 BGA 窗口顺序推进，`onRoundStart` 只表示 StartOfTurn，`onBeforeWork` 与 `onWorkStart` 分别表示 beforeWork 与 startOfWork。`onBeforeStartOfTurn` 在增轮之前运行；`FlowEffectContext.roundPreparation` 的 `before-reveal` 分支提供 `nextRound`。揭牌入口更新轮号并提交实际 `action.revealed`，后续 `after-reveal` 上下文保存本次 `revealedAction` 的 `actionId` 与 `roundSlot`，没有本次揭牌则为 null。揭牌反应不得从当前轮的行动牌排列追发过去的事件。`onPreparation` 完成后才补充累积格，并提交 `action.accumulated`。
+### 7.8 农场类提交
 
-每个准备窗口冻结自己的起始玩家顺时针顺序。各玩家真正进入窗口时，Stage Dispatch 根据当时持牌、手牌 hook 和纯 `stageEligibility` 查询构造固定的 `activate-card-effect` 来源树。它不提前冻结所有玩家，不调用 handler 来筛选当时付不起的来源。Handler、费用和可执行性在 activation 被选择时从实时状态重算；例如石屋 Plow Driver 可以先领计划食物再支付。购买、传牌、随时行动、pending 恢复和撤销继续同一树，完成来源不重放，新购牌只参加之后开启的窗口。当前来源离场时遵守通用持牌检查，明确保留的定时义务继续执行。
+每种农场类型都在 `shared/actions/effects/` 下自己的 `ActionDefinition.resolveChoice` 中闭环：
 
-准备阶段预览递归检查整棵 flow 的可选节点，据此保留兑换机会。必选来源内部有可选分支时，来源根仍为必选；可选购买不能让玩家跳过必领奖励。独立购买使用既有 OR 分支。组合节点的 `ActionFlow.requiresExplicitChoice` 投影既有 request 标记，并随 cursor 恢复和克隆保留。当当前只能选择完成时，购买窗口仍等待玩家决定，允许通过实时兑换支付下一项，避免 Session 自动选择完成。对于声明该标记的组合节点，插入 anytime 时清除尚未选择分支的 OR/XOR 请求，恢复后由同一宿主按实时资源重算分支，已完成分支仍保持完成。未声明标记的既有选择保留已发出的请求和付款恢复语义。OR 全部分支完成时仍自动结束。该标记属于原生扩展，在 Workshop flow 准入中保持关闭。
+- **房间**（`construct.ts`）：`room-payment.ts` 展开逐房间费用变体；印刷的“每间房”折扣使用 `scope:'unit'`。屋内动物按真实房间保存在 `houseAnimals`。
+- **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
+- **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。
+- **播种**（`sow.ts`）：没有支付组合。`maxSelections` 计算 Logical Field，`maxSeedSelections` 限制作物槽；行动作物许可与田地 owner 的许可取交集；`isUnconditionalSow` 保留显式限制。
 
-显式可选决定还可通过 `ActionDefinition.canBeOfferedByPlayer` 区分非支付资格与当前支付能力。有资格但当前不可执行时，接受选项禁用，放弃仍可选；请求等待所属玩家决定或兑换。插入 anytime 会刷新尚未接受的可选宿主，不重放已完成的同级节点。A096 使用这一边界，允许把木头奖励兑换成随后的购买费用。发展卡资格仍检查归属、前置条件、行动类型、允许购买清单和注入候选；没有合法候选或规则 veto 时自动结束。选择与支付继续使用普通执行准入，候选资格不授权执行。未启用这一机制的行动保持原有行为。
+首轮 payload 为 `fence: {edges, palisadeEdges, extraWood, fenceSources?}`、`room: {rooms}`、`stable: {stables}`、`plow: {tile}`、`sow: {crops}`，以 `{type:'choice', value:'confirm', payload}` 提交。第二轮支付把 payload 保存在 `pending.actionContext.farmPayload`。建房与围栏的入口可执行性会拒绝没有可达提交的状态。
 
-每名玩家的 StartOfTurn 树把回合开始 activation、计划领取、付款门控 offer 和计划行动放入同一 `ParallelNode(mode='trigger-select')`。普通到期货物按玩家合并为一次内部 `receive`，各 entry 保留 `sourceCardId`；Receive listener 不隐式触发 Gain listener。依赖领取完成的后续奖励保留顺序依赖，只有实际领取后才提交 `futureMeeple.resolved`。`field` / `stable` / `forest` / `moor` 仍展开为既有耕田、免费畜栏与地形行动。必要的标准兑换机会按实时状态重建，准备阶段包含谷物和蔬菜的基础兑换。到期畜栏记录只在建造时抵扣自身预留组件；成功建造扣减预留，窗口结束释放剩余数量。预约地形的候选位置在选项、请求和提交边界都从当前农场推导。窗口收尾消费拒绝或无法执行的可选定时领取，不再触发一次 Receive。不另跑先全部领取、再全部行动、最后扫描卡牌的旧链。
+#### 7.8.1 围栏段与 policy
 
-累积格补充完成、进入 StartOfTurn 前冻结本轮 `roundFirstPlayerId`。随后发生的起始玩家标记转移影响下一轮工作顺序；每个阶段窗口的玩家顺序是独立的 continuation。工作入口与 Roman Pot 等消费者使用冻结工作顺序。若 before-work 放人已耗尽起始玩家，入口沿同一工作顺序找首个仍可行动的玩家；所有人实际用完工人时进入正常 all-workers-placed 级联。准备窗口、领取与累积格补充在恢复时均不重复。四个新增阶段 hook 是原生 Card Effect 扩展，不新增 Action Hook phase，也不自动加入 Workshop 能力白名单；自定义能力仍由既有契约和执行准入测试开放。
+- `FenceSegment.type`（普通围栏或 palisade）与 `FenceSegment.source`（谁的 token）相互独立。借用围栏是 `source.kind='borrowed'` 的普通段。
+- 围栏主路径从不按卡牌 ID 或单卡开关分支。卡牌行为使用 `fencePolicy`：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`newRegionBounds`、`connectionPolicy`、`allowedNewRegionTiles`、`allowTerrainInNewRegions`、`suppressTerrainRegions`、`costPolicy`、`paymentBudget`、`cancelPolicy`、`preserveAnimalTotals`、`promptHintKey`。
+- `sourcePolicy: { kind: 'borrowed', donorCaps }` 要求 `fenceSources` 覆盖每条新普通边；服务端按出借方实时库存重新 clamp 上限，并消耗出借方供应。
+- `segmentBounds.total` 合并限制普通围栏与 palisade。`canStartFencing` 用 `validateFenceSelection()` 预检至少一个合法提交，后者仍是最终原子校验。
+- `costPolicy` 只设置本次行动的基础单价，`computeCosts.fence` 折扣仍生效。`paymentBudget` 只过滤最终支付，不限制几何。`promptHintKey` 只是文案。
 
-新局直接发牌、普通选秀或父母选择完成后，统一进入 `startFirstRoundAfterSetup()` 和完整准备阶段链。Bootstrap 不预先补充累积格；首轮实际揭牌与补充各执行一次。父母奖励与本轮计划进入对应的准备步骤，手牌 Elder 在 StartOfTurn 提供选择。加载工作阶段状态、恢复私有游标或创建工作阶段测试夹具均不重新进入首轮准备，不额外增长资源或追发揭牌。
-
-Before-Harvest 窗口会在激活 Harvest skip 前，根据 Start Player Marker 冻结顺时针玩家顺序；即使玩家将跳过本次 Harvest，也仍参与该窗口。每名玩家只结算自己的当前适用 `onBeforeHarvest` activation：单卡直接展开，多卡进入 `ParallelNode(mode='trigger-select')`。每次选择后都在克隆的实时状态上重新判断 applicability 与 mandatory/pass；选择 optional activation 后即视为承诺执行，不再弹出第二次 optional 确认。冻结顺序和当前 offset 保存在 `stageResume.extra.beforeHarvestPlayerOrder`，序列化恢复时不会重新读取已经变化的起始玩家标记。handler 必须返回可重放 flow，真实状态修改只能放在 action leaf。
-
-Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先把该玩家全部可触发 card-effect 编译成 `activate-card-effect` activation，再以 `ParallelNode(mode='trigger-select')` 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，`handHooks` 不支持 `onBeforeEndGame`；同一 target step 内多个 activation 默认进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player。
-
-全部 before-end target 完成后，`preScoringWindow` 按座次遍历玩家，只查询标记了 `preScoring: true` 的 `anytime` listener。当前没有可用 marked flow 的玩家直接跳过，不产生空交互；否则用 optional XOR 展示可用卡牌 flow。完成一次 flow 后按实时状态重建同一玩家窗口，Pass 才推进下一玩家，因此 `onBeforeEndGame` 刚获得的资源仍可消费。anytime listener 可声明 `blockedAnytimeInteractionKinds`；构建入口和命令重检时，若当前 pending request 属于其中一种 kind，就不会暴露该能力。所有玩家 Pass 或没有可用 marked flow 后，才写入 `gameOver` 并进入 `gameover` interaction。
-
-阶段 hook 子流程产生 privateEvents 时，嵌套 `respond()` 不得提前 drain 外层 response buffer；`stageResume` 恢复阶段需要把私有事件保留到最外层响应统一发送。
-
-准备阶段窗口通过固定 activation 树与完整 typed stage continuation 恢复，不依赖会变化的已打出牌数组索引；窗口上下文、玩家顺序和树 cursor 一起保留。其他尚未迁入 reaction dispatch 的串行阶段仍使用 `resumeAfterCardId` 辅助其索引恢复，不能把这个旧 anchor 机制用于准备窗口来源发现。
-
-未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。只有存在到期 offer 时，来源才取得资格。选项准入和付款读取实时状态，所以起初付不起的机会可以在同一窗口兑换后使用。创建或恢复请求不消费 offer；付款或目标应用成功才消费。拒绝或窗口结束时，未使用的到期 offer 一并过期。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
-
-可执行说明使用 `ChoiceDescriptionPreview`。描述树保留顺序、互斥与多选分支、并行次序、可选性以及规则执行玩家。`Engine.describe()` 读取执行 flow，不推进 cursor，也不执行行动。`Engine.describeFlow()` 描述独立计划，不构造执行引擎或日志存储。原本不透明的原生行动通过纯 `ActionDefinition.flowFactory` 接收仅含数据的 `ActionFlowPlanningContext`，真实执行调用同一个工厂。四季行动和卡牌行动格复用此契约。卡牌行动格计划将每个 leaf 绑定到实际行动格，保留显式跨玩家转移，并声明本玩家从棋盘获得资源的来源。领取事件和资源统计遵循该来源；资源监听器观察实际产生资源的 leaf，避免外层行动对同一事件重复计数。基础说明注册普通、internal 和 ad-hoc 行动，排除所有玩家修正，并保留各执行玩家的分支。资源领取和选择说明与执行复用目标及选择计划。随时行动、选择项、棋盘规则和定时效果详情使用同一个渲染器。卡牌正文继续人工维护。棋盘基础费用排除玩家修正；当前交互选项使用 Interaction Player 和后端支付求解器，保留数量上限和替代支付来源。烤面包选项由后端提供实际兑换比例及数量上限。造房、建马厩数量，翻修目标、职业目标和设施购买均使用 PaymentSolver 的实际路径，包括资源提供者、退回卡牌、原支付路径身份及购买结果。显式 exact cost 同时作用于候选准入和真实付款。闲置时的私密 anytime 预览只发给当前操作玩家；浏览公共农场保留操作身份和草稿，同时隐藏私密操作。
-
-原生棋盘计划也从执行与准入使用的同一份数据生成按回合变化的改良类型和依次领取首种缺少资源的说明。基础说明保留全部条件分支，不只显示当前回合或当前库存对应的结果。医务所提示读取共享的沼泽工人选择策略：病人只能前往医务所，健康工人也可以使用。资源图标提供本地化可访问名称及付款模式信息；完整说明变化时，选项和随时行动控件仍绑定其后端权威身份。
-
-卡牌源码内的 `CardEffect.timedRules` 声明闭合的 `TimedRule` 和 `RuleBody`。官方卡注册将 flow 阶段编译到已有 hook。同一来源的到期规则合成一个 flow，因此阶段续接仍按卡牌恢复。通用 rule action 在真实执行时计算条件和公式。 从田取作物的 operation 先通过标准 gain 将选定数量收入库存，再执行 Card Field owner continuation。卡牌随后可提供独立可选兑换，不推迟或重复库存收入。未来说明保留田地、供应、家庭人数和卡牌记录的符号数量，不预测未来状态，也不运行任意回调。事件阶段适配器保留收取、Receive、额外行动及轮到玩家时的实际时序。已激活义务只有显式声明保留时才随来源离区继续执行；派发保留原工人或效果拥有者，而非当前持卡人，恢复时重建相应监听器。即使公开描述合并数量，重复效果仍逐次执行。
-
-`timed-rules.ts` 编译计划并读取排期事实，不查询运行时卡牌注册表。`rule-queries.ts` 为 internal rule action 提供执行时的公式和条件查询。Snapshot 读取位于无运行时查询依赖的 `action-snapshot-state.ts`，写入操作及更广泛的棋盘查询保持分离。移动准入和执行共用目标计划，没有合法目标时不会弹出可选接受窗口。沼泽农夫特殊行动的执行、准入和展示也共用 `getMoorSpecialActionEffectPlan`，涵盖地形约束、卡牌加成及购买类型。
-
-`collectScheduledEffectPreviews()` 投影已安排的领取、购买机会、定时规则，以及明确的工人和阶段义务。`ScheduledEffectPreview` 包含回合、阶段、来源、完整描述和重复次数。分组身份包含完整归一化描述及时间，只改变展示。前端按领取玩家颜色分区，并按来源保留独立标记；点击回合打开完整清单。常驻能力不复制到棋盘各回合。玩家过滤隐藏私有来源和未揭示行动身份，rehydration 剥离展示投影。展示字段和行动描述在与不可变权威 core 组合成 Snapshot Frame 前经过 JSON 边界，避免 undefined 预览属性产生无效 Replay delta，同时保留 core 的共享引用。
-
-### 7.7 Listener activation purity + 参考实现对齐
-
-**架构决策（2026-05-13）：`CardListenerRegistration.handler` 在 listener dispatch / preview / doable 路径中必须是 state-pure flow builder。** 它可以读取 `GameState` / `PlayerState` / event，返回 `ActionHookResult`、`ActionFlow`、`costs`、`doable`、`extraOptions` 等结构化结果；不能直接修改 `GameState`、`PlayerState`、`ActionSpace`、`player.cardStates`、资源、农场格、日志或 pending。
-
-当前 no-peek worktree 已把 `buildPhaseTrailingNodes` 改为不执行 handler；这只是 Phase 1 安全切口。后续设计不能再依赖 dispatch-time handler peek 或一次性 `preComputedResult`。
-
-参考语义：
-
-- `PlayerCards::getReaction($event)` 只收集 listening cards 并生成 `ACTIVATE_CARD` leaf，不执行卡牌 listener body。
-- `ActivateCard::getFlow()` 在 leaf 真正推进时调用卡牌方法得到 flow；`isDoable()` / `isIndependent()` / `getDescription()` 也可能重建 flow，因此 listener 方法必须可重复调用且无副作用。
-- 真正的状态修改放在 action / `SPECIAL_EFFECT` leaf 里执行，而不是放在 reaction 构建阶段。
-
-OA 对齐规则：
-
-- 需要改资源、动物、农场、`cardStates` 或 log 的 listener，必须返回 leaf / seq flow，让 `gain`、`pay`、`special-effect`、`exchange` 等 action 执行状态修改。
-- 如果缺通用 mutation leaf，新增可复用 internal action；不要在单卡 handler 内直接 mutate，也不要在核心路径加单卡分支。
-- `effect.onBuy` 等非-listener 执行路径可保留现状；但一旦被 listener / preview / doable 复用，也必须遵守 state-pure flow builder 语义。
-- stage card-effect handler 在 trigger-select preview 中用 cloned state/player 运行；返回 flow 或 clone 上可检测的 direct mutation 都可用于 applicable / doable 判定，纯资源 preview 读取该 activation 的执行玩家资源与 supply token，真实 mutation 只能在 activation leaf 被选择后落地。
-- dispatch 阶段不得通过执行 handler 来制造一次性 `preComputedResult` 语义；可以收集 registration metadata、构造 activation leaf、或做纯 `isDoable` / preview 查询。
-- listener activation 是普通 internal leaf：`leaf actionId='activate-card'`，params 携 `{ listenerId, cardId, event, ownerPlayerId, triggerPlayerId }`。`event.actionContext` 必须保留触发 leaf 的 target context，尤其是 card-granted placement / jump / wrapper action 写入的 `targetSpaceId`，避免 listener 在执行时回落到外层 frame space。它 bypass public action pipeline，不跑普通 action hooks / cost / generic log；listener 返回的 `flow` / `followUpActions` 仍回到 engine 统一执行。
-- owner 与 trigger player 必须显式进入 event / params。opponent scope 触发时，activation 以 owner 为执行玩家；跨玩家 UI 确认和 undo boundary 由 runtime 处理，目标上不暴露为卡牌 flow primitive。
-- `confirm-player-switch` 由 `fromPlayerIndex` 持有并提交：离开控制权的玩家显式确认把控制权交给 `toPlayerIndex`。确认后必须立刻写入 undo boundary。目标玩家随后进入跨玩家 prompt 时，`allowedCommands` 不暴露 `undoStep` / `undoAction`，`SessionResponse.historyLength` / `hasActionStartSnapshot` 表示当前可执行的 undo 能力，而不是内部 raw history。目标玩家后续作出选择后，undo 最多回到切换后的 prompt，不能跨回触发玩家的行动状态。已完成的 frame 会跳过已耗尽的嵌套返回点并直接切回 frame owner；只有后续交互确实以某个中间响应玩家为目标时才会再次切给该玩家。`animal-reorg` 这类直接跨玩家响应 frame 没有独立的切换确认，因此 pending 期间直接阻止 undo，并持久化 `undoBoundaryOnResolve`；每次提交响应本身都是 boundary，不能恢复触发玩家的状态或重新打开跨玩家 prompt。
-
-**2026-05-13 Wave 1 落地规则：listener handler 不再承担"先改状态再返回 flow"的桥接职责。** 对于本轮已迁移的 B48 / E103 / C148 / A144 / D82 / D27，handler 只读取当前状态并返回可重放 flow 或纯查询结果：
-
-- 卡上计数、flag、infobox、stack pop、major swap 等状态修改统一走 `special-effect` leaf；本轮补齐 `set-counter`、`pop-card-stack-top`、`swap-improvement-with-board`。
-- 跨玩家奖励用 `gain` leaf 的 `recipientPlayerId` / `payerId`，不要在 handler 内直接改 trigger player 资源。
-- optional accept/decline 语义必须由 flow 表达。典型例子：D27 Retraining 先执行 `set-flag false`，再把 `swap-improvement-with-board` 放入 optional child；decline 只清 flag，不预留 / 回滚公共 major 池。
-- 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
-
-**合成 dispatch 边界：** `trade-applied` 和 `harvest-feed-conversion` 仍通过 immediate-special-effect helper 执行确定性的状态同步叶子。该 helper 只遍历非 optional 的 `special-effect` leaf 与确定性的 `seq` / `parallel`，不支持支付、资源增益或交互。`reap` 和计划资源领取使用真实 engine flow。计划资源的 `receive` leaf 原子提交资源增量与 `futureMeeple.resolved`，后续 listener 直接订阅 `receive`；不再合成 `future-meeple-resolved` 行动。内部 `complete-preparation` leaf 只结清已拒绝或空计划，不再次派发资源领取。StartOfTurn 内的依赖读取已完成 frame 的事件：engine 通过只读 `completedTransactionEvents` 将当前事务事实交给 mutation action，阶段 effect 使用 `FlowEffectContext.transactionEvents`，不能依赖尚未写入全局 `state.events` 的事实。`harvest-feed-conversion` 只转发真实 `harvest.feedConverted`，不合成 `resource.exchanged`。
-
-**2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
-
-- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`consume-pending-extra-turns`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`、`record-scoring-reserve-bonus`、`add-farmyard-space-state`、`claim-farmyard-goods-tokens`、`claim-field-goods-tokens`、`grow-field-and-non-field-crops`、`consume-supply-token`。`record-scoring-reserve-bonus` 只记录终局 Scoring Reserve 与 bonus VP，不扣真实资源；target 由 server-side `actionContext.targetPlayerId` 解析，reserved 只校验非负整数 real resource 与不超过 `target.resources - 已选 Scoring Reserve`。shared scoring 卡牌可随该记录写入 `cardType`，让非持卡 target player 的 score entry 仍保留来源卡牌归类。
-- B18 这类 future-meeple 写入走 lazy flow；after-pay listener 不再立即 queue。
-- C93 / C130 对 action space 的资源写入返回 `special-effect.add-resource-to-space`，额外放人仍保持 optional。
-- E148 opponent-scope listener 用 owner-targeted `special-effect` 更新 reserved action spaces / stable；"无空地但需要移除 marker" 这种无收益状态同步可返回 `countCardUse: false`，避免把纯清理计入卡牌 used stats。
-- `countCardUse: false` 只用于 listener 结果需要执行 housekeeping flow、但不应被视为卡牌效果触发的场景；不要用它隐藏真实收益或玩家选择。
-
-**2026-09-16 Listener 纯度门禁：上述不变量已可执行。** `shared/cards/card-listeners.ts` 的 `executeCardListener` 与 `invokeCardCostCandidateTransform` 把每次 handler / `deriveCardCostCandidate` 调用都经过可选的 `CardListenerInvocationInterceptor`；生产环境不设置。所有能触发 listener dispatch 的 Vitest project（`fast-shared`、`fast-cards`、`fast-card-runtime`、`fast-server`、`fast-tests`、`slow`）通过 `setup-listener-purity.ts` 安装 `shared/cards/__tests__/listener-purity-guard.ts`：
-
-- 单次调用期间，guard 把 `state`、`player`、`triggerPlayer`、`ownerPlayer`、`effectPlayer`、`space`、`actionContext`、`params`、`result`、`transactionEvents`、`actionEvents`、`triggerSnapshot`、`extraData` 以及转发的支付上下文（`costs`、`costTrades`、`costBonuses`、`paymentResourceProviders`、`costAttribution`）以深层只读 Proxy 交给 listener；经 `Object.getOwnPropertyDescriptor(s)` 取到的值同样被包裹，`eventQuery` 也被重建，使 `find` / `filter` 的结果与 predicate 参数都是受保护的 frame 事件。任何赋值、`delete`、`defineProperty`、原型修改、freeze 或数组修改——无论直接、经别名还是在 helper 内部——都会抛出 `ListenerPurityViolationError`，指明卡牌、listener、调用类型、phase、action 与属性路径。抛错前权威值不会被写入，`GameCore` 命令结算会回滚该命令。
-- 返回结果若仍引用受保护对象（例如把 live `cardStates` 过滤后的数组直接作为 `set-extra-data` 的 value），属于 `returned-authoritative-reference` 违规；listener 必须返回副本。
-- Proxy 只存在于该次调用。listener 自己新建的对象不会被包裹，返回的 flow 之后仍可通过 action leaf 修改状态。嵌套的 `executeCardListener` 调用复用外层 Proxy。受保护输入与 listener 外部捕获对象之间的引用同一性不成立；engine 测试用 `resolveAuthoritative`。
-- trigger-select preview 不再把 preview clone 被修改视为 card listener 的适用信号，适用性只来自返回结果。stage card-effect handler 仍对 clone 执行，不在本门禁范围。工坊自定义 listener 在 isolate 内对序列化 context 执行，无法触及权威对象，但同样经过 interceptor。
-- `setup-register-all.ts` 还调用 `guardCardImplListeners(ALL_CARD_IMPLS)`，就地重写每个已注册的 `handler` 与 `deriveCardCostCandidate`，因此大量直接调用 `impl.listeners[i].handler(ctx)` 的定点测试无需手工清单即受保护；就地包装的 handler 再经 `executeCardListener` 派发时只包一次。新的定点测试仍可像 `listener-purity-wave*.test.ts` 那样显式使用 `invokeListenerHandlerUnderGuard` 或 `guardedListener`。`shared/cards/__stubs__` 的 listener stub 在测试侧 ledger 记录观测，效果以返回 leaf 表达。
-- 覆盖边界：运行时 guard 只证明被执行到的分支。`pnpm run check:card-impl-boundaries` 作为补充，解析 `ALL_CARD_IMPLS` 中每个 handler 与 `deriveCardCostCandidate` 的函数体，对根为 context 参数的显式写入失败，包括同函数内的别名、`??` / `||` / 三元回退、`.find()` 结果、`for...of` 变量和数组回调参数；同时把 `Object.values` / `Object.entries` / 属性描述符结果及 `Reflect.get` 视为仍根于其参数，把 `Reflect.set` / `deleteProperty` / `defineProperty` 视为写入；不跟踪 helper 或跨文件调用。没有例外清单；需要修改状态的 listener 必须把写入迁到 action leaf。
-
-**多 reaction 同 phase 触发**采用 PARALLEL trigger selection：
-
-- action reaction listener、harvest field stage card-effect、before-end card-effect 在同一 owner / phase 下默认进入 `ParallelNode(mode='trigger-select')`。不同 owner 的同一时机 reaction 拆成各自 owner 的 activation/prompt；单 child 可直接展开以减少 UI 噪音；compute / query hook 保持确定性聚合。
-- 不翻转 `mandatory` 默认值；`mandatory: true` 只影响 `ParallelNode(mode='trigger-select')`：当前结构适用且可执行的 mandatory child 会让 `__pass__` disabled，避免 guaranteed effect 被静默跳过。结构暂不适用的 child 本轮不显示且不永久 resolve，后续 sibling 改变资源/状态后会重新评估；当前结构适用但暂时不可支付的 child 仍展示为 disabled，让玩家知道 trigger 存在。
-- 多个 optional / interactive trigger 同时可用时，必须显式给卡主玩家选择触发顺序，并允许 pass 跳过剩余 optional trigger。自动 flow 不再在 dispatcher 里与交互 flow 分开排序；是否可继续由 trigger-select preview 与真实 action leaf 校验共同决定。select-trigger option 默认以卡牌 id 作为 `value`；当同一层出现重复 `sourceCard`（同一张卡多个 listener child）时，`value` 改用 activation node id，`sourceCard` 仍保留展示用卡牌 id。
-- before-space listener 在实际使用行动格时收集一次，返回 flow 先于目标行动及其 reaction 菜单执行。普通／卡牌放人及 jump 使用 `collectBeforePlacementFlows`，工人移动使用 `collectBeforeActionSpaceUseFlows`。两者共用匹配、owner 归属和去重，包括现有注册在 `place-farmer` 上的 listener。牌面要求新放人的 listener 声明 `requiresNewPlacement: true`，工人移动不触发它们。资格在使用时读取实时状态；返回 flow 不随目标内部 `collect` 被替换而消失，从另一格 partial collect 不会重复这个使用边界。工人移动在 Turn Scope 开始后、目标 flow 之前执行这些 flow，并传入真实目标格与 action context。
-
-- generic `ParallelNode` 负责 select/pass/mandatory/independent 语义；不再引入 listener-trigger 专用 runtime node。
-- `trigger-select` preview 支持 card listener `activate-card`、stage card-effect `activate-card-effect` 和 extra-turn provider `activate-extra-turn` child。card listener child 与 stage card-effect child 都按 child owner / target player 建立 preview state/player；card listener 的 preview 与 activation 都从 child event 的 `targetSpaceId` 解析 `context.space`。纯资源 flow preview 使用该执行玩家的资源与 fence/stable supply token；select-trigger pending 会保留原 host action 的 `targetSpaceId`，确保 activation 执行时 listener 仍看到触发行动格。stage card-effect child 在 cloned state/player 上运行 live hook，返回 flow 或产生 clone mutation 即 applicable/doable，并据此更新 pass disabled 状态。one-shot extra-turn provider 若到真实 activation 时已不再贡献 flow，会 fail 而不是静默消费 provider prompt。
-- 不为 `CardListenerRegistration` 引入 / 复活 `order` 排序字段；fallback 稳定顺序来自 `playOrderIndex`（occupation < minor < improvement，数组 index），只服务单 child 展开、显示和确定性序列化。需要玩家选择时用 parallel trigger selection 显式化。
-
-**2026-05-14 bake / trigger-select rule:** `bake-bread` is non-empty by default. Optional bake opportunities must be expressed by outer `optional` flow metadata. `ParallelNode(mode='trigger-select')` displays structurally applicable trigger options, including currently unaffordable options as disabled; disabled choices are server-rejected and remain unresolved. For before-action trigger-select, `__pass__` is disabled only when skipping remaining triggers would leave the action continuation impossible and at least one currently enabled trigger can make the action layer prove the continuation directly complete or reachable through the remaining select before-chain. Pure resource flows pass previewed resources into the continuation guard; non-resource flows ask the same guard with the current resource context, so cards such as D17 / C60 can express reachability through scoped `isDoable` listeners instead of engine-side simulation. The engine asks generic continuation guards and does not import bake-bread / D66 / oven rules; bake-specific direct continuation and before-chain reachability live in the action/card layer. Compact structured choice values such as `bulk:` are allowed through `InteractionRequest.kind === 'choice'` metadata (`structuredChoicePrefixes`), not by engine action-id special cases.
-
-替换选择保留各 listener 的完整替代子树，见 §7.5.1。接受分支后必须履行必需续行，显式可选的内部步骤仍可拒绝。原行动准入不能借用已拒绝替代的 `isDoable` 回退；替代来源只归因到其被选中的分支。同链守卫保留 producer listener ID；放人或移动人物产生新的行动格机会时，`resetComputeReplaceGuards()` 只清除替换记录并保留其他行动上下文，因此新播种机会可以再次使用同一来源，旧替换链仍防止递归重复。
-
-**2026-05-22 before-reachability 决策：** 多个同一时机的 `before` listener 不是 availability 阶段可静态排序或预览的链路；它们属于真实 trigger 流程，顺序由玩家通过 `ParallelNode(mode='trigger-select')` 执行。卡牌如果能让原本不可达的 action 先进入 before 流程，应通过 scoped `isDoable` listener 返回 `doable: true` 表达启动 opt-in，并在 `actionContext.skipBeforeTriggers === true` 的 continuation 中退出。所有 before listener 和它们触发的 after / exchange / optional 分支真实执行完以后，原 action leaf 必须用真实 state 重新做 strict doable 检查；如果仍不可达，不能继续原 action，只能走现有 blocked / undo-only 语义。不要为 before-grant reachability 添加单卡 payment preview，也不要在 dispatcher 中枚举 before listener 顺序或静态模拟资源 / 转换链。参考模型是 C60 Small Potter's Oven / D66 Potter Ceramics / `STUB_BeforeBakeGainClay`：先让 action 进入 trigger-select，玩家按真实顺序执行 unlocker，剩余 trigger 与 pass gate 基于新状态重算，最终 continuation 再严格检查。
-
-**2026-08-29 Provisional Continuation 结算：** 每个公开的 `GameCore` 写命令只经过一次原子 settlement，使用规范化命令身份和完整的命令入口 checkpoint。未完成的 mandatory host 在 `before` 链中首次切换响应玩家或产生 Protected Observation 时，Session 在该命令 checkpoint 开启 Provisional Continuation Scope。Scope 按 Engine 提供的 mandatory-host ancestry 嵌套：同一 host 复用 scope，嵌套 host 建立 child；child abort 只恢复自身 checkpoint，未 guarded parent abort 会恢复整个子树。每个命令边界都以 `skipBeforeTriggers=true` strict-probe 所有 active host；成功后建立 guard，后续破坏 guard 的命令在发布前恢复。Undo history 会保留被恢复 host frame 的身份，因此 settlement 会继续关联原 scope，并原子拒绝破坏既有 guard 的撤销。activation descendants 只抑制产生它的那个 `before` listener，其他 listener 仍可形成真正的 nested host。
-
-**2026-09-01 Mandatory post-host continuation 修订：** mandatory `afterHostCommit` continuation 会把义务传播到每层动态 descendant。任一 descendant 不可执行时进入 `engine-blocked`；`undoStep` 保持普通撤销语义，`undoAction` 作为整个 Rule Action 的回退。若 host choice 来自 Protected Observation 发布后创建的 pending interaction，Session 会在这个已发布的交互 checkpoint 建立 scope。显式 `undoAction` 会回到同一交互和同一缓存结果，撤销 host、支付与 follow-up，记住失败命令并保留 sibling option。它不会恢复到观察之前、重掷结果、按卡牌 ID 分支或改变支付顺序。
-
-随机与隐藏信息通用原语把 observation 报告给当前 settlement；dev 命令把任意隐藏手牌移到公开区域前，也必须先报告这次公开。只有所有仍 active 的 ancestor 都 guarded 时命令才可发布；同一命令已经完成的 host 不再参与 gate，仍 active 的未 guarded ancestor 则会把 GameState、Engine/Session cursor、事件、隐藏区域和 RNG 一并恢复到命令入口。Strict replacement probe 对每个 alternative leaf 使用与 direct action 相同的 `isDoable` hook 与 listener pipeline。规范化失败命令会保留到规则相关状态真正变化。集合语义的命令字段，包括 `commitSelection` 农场元素和动物重整的 `choice.payload.zones`，按与数组顺序无关的方式规范化。耗尽 optional flow 后自动执行的拒绝使用嵌套命令 settlement，因为解析 `__skip__` 仍可能执行后续效果。成功的 provisional 命令，以及需要持久化失败记忆的拒绝命令，携带内部 durable-transition 标记；即使公开 Frame hash 未变化，`RoomCommitter` 仍记录 Replay Step。其他公开 Frame 未变化的命令，会将私有 `sessionCursor` 与独立持有的基准做等价于 canonical JSON 的比较；cursor-only 转换仍会持久化，且不会把 cursor 暴露到 Replay Frame。公开 Frame 变化或设置 `durableTransition` 时跳过私有比较；公开 Frame 的哈希方式保持不变。durable rejection 的错误只发送给提交 socket，其他玩家收到同一已提交版本的无错快照。恢复完成后，公开日志会按原因区分“该选择会破坏必做后续”和“随机或隐藏信息结果暂时不能公开”，解释拒绝原因，并说明在规则状态变化前不能重试。持久化明确分离 authoritative `state`、公开/回放 `frame` 和私有 `sessionCursor`：scope ancestry、rollback checkpoint、guard 与失败记忆可在恢复后继续，但不会进入 Replay Frame；只有同时匹配当前规则状态与 pending interaction 的命令键会作为 `rejectedCommandKeys` 投影给该交互的接收者，由共享客户端提交路径对所有 request kind 禁用精确重试。Scope abort 会追加自身明确的 rollback log 和一个新的恢复 Frame，不重写旧 Step。详见 ADR 0015。
-
-### 7.8 farm-type 提交
-
-5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：
-
-- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体，并把本次 `computeCosts` 的 `costTrades` / `costBonuses` / `paymentResourceProviders` 附加到 construct `ComplexCost`；farm selection 的 `maxSelections` 也使用同一 adjusted construct cost。多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
-- **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
-- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses/paymentResourceProviders/paymentBudget 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
-- **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。`maxSelections` 按 Logical Field 计数，`maxSeedSelections` 独立限制提交的作物 slot 数，包括同一 Card Field 的多个 slot。行动作物许可与田的 `allowedCrops` 在候选展示和权威提交时都取交集；行动不能放宽田自身的播种许可。`isUnconditionalSow` 保留指定田授权等行动本身的限制，即使当前只有一块 eligible 田。作物限制先对照普通田的谷物／蔬菜权限，即使当前没有田；随后再检查实际 Card Field 的权限。当前种子库存不决定行动是否受限。
-
-farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
-
-`plow.actionContext.allowedTiles` 限制本次可选坐标；`plow.actionContext.adjacencyPolicy` 只表达本次 plow 的邻接策略（`ignore` / `notAdjacentToFields`），不改变后续普通 plow 默认邻接。
-
-### 7.8.1 Fence segment / policy 不变量
-
-`FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；borrowed fence 是 `type='fence'` 且 `source.kind='borrowed'` 的普通边界，不是新 segment type。
-
-fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`newRegionBounds`、`connectionPolicy`、`allowedNewRegionTiles`、`allowTerrainInNewRegions`、`suppressTerrainRegions`、`costPolicy`、`paymentBudget`、`cancelPolicy`、`preserveAnimalTotals`、`promptHintKey`。
-
-`sourcePolicy: { kind: 'borrowed', donorCaps }` 表示本次 ordinary fence 的 token source、build limit 和 segment source 都由 donor caps 提供。提交 payload 必须用 `fenceSources: Record<edgeId, donorPlayerId>` 为每条新增普通 fence 指定 donor；后端按当前 donor reserve 重新截断 cap，再校验 source key 精确覆盖新增 ordinary edges、donor 不超 cap、不能指向行动玩家自己。成功后新 segment 写入 borrowed source，并通过 `supplyTokensConsumed.fence` 消耗 donor supply；donor 后续 `getOwnOrdinaryFenceReserveCount()` / own ordinary fencing max 会自然下降。`farm.fenceBuilt.fences` 必须带完整新 `FenceSegment[]`，包括 source owner。
-
-`segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 参考实现 `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 先做通用 policy 资源 / supply 可行性估算；在真实 state 中还会用 `validateFenceSelection()` 预检至少一个 legal fence commit，避免 confirm-only pending 无法完成。最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
-
-`fencePolicy.costPolicy` 只表达 参考实现 `formatCost` 的本次基础单位成本；entry guard 与最终校验仍要叠加 `computeCosts.fence` 折扣/加价，确保 B93 future fence 这类嵌套 action 可以继续吃 E16 / C16 等围栏折扣。
-
-`fencePolicy.paymentBudget` 只限制最终实付资源，例如 B15 Carpenter's Bench 的“只能使用本次收集的 wood”。它不等同于 `segmentBounds.total.max`，因此合法 fence shape 不能按预算资源数提前裁剪；折扣、免费 fence、虚拟支付资源和 solver 选路完成后，才按 `PaymentSolution.resourcesPaid` 过滤。
-
-`fencePolicy.promptHintKey` 只透传交互提示文案 key，不参与规则裁定；具体 key 由卡牌文件提供，前端只按通用 `promptParams.hintKey` 渲染。
-
-C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply，并由通用 protected-action guard 拒绝 direct cancel、保留动物总量。
+测试：`shared/actions/__tests__/fencing.test.ts`、`shared/actions/effects/__tests__/{fence-resolveChoice,fencing-entry-guard,construct-resolveChoice,sow-permissions}.test.ts`。
 
 ### 7.9 Anytime 窗口策略
 
-多来源的 Turn 结束选择器在自身节点显式声明开放的 `anytimeWindow`，trigger-select request 保留该声明。插入 anytime 时只清除尚未选择子效果的 trigger-select 菜单，返回后重新预览同一组固定 child，已完成 child 保持完成。这不把权限授予子付款或选择、单来源阶段 flow、兄弟节点或其他阶段；每个当前等待节点仍遵守自身权限合同。
+`shared/session/anytime-policy.ts` 的 `computeAnytimePolicy()` 在每次 `buildInteraction()` 时计算一次 card listener 的 anytime 可用性；客户端从不导入它。`GameCore.getAnytimePolicyInput()` 提供活动上下文、`stageResume`、请求类型与请求的 `anytimeWindow`。
 
+- flow 或请求可声明 `{ allowed: true, blockedIds? }` 或 `{ allowed: false }`。声明只属于当前等待节点；父节点、兄弟节点和续行都不授予权限。
+- 优先级：无上下文；供暖；engine-blocked；下一玩家确认（禁用 exchange）；玩家切换确认；动物整理；当前节点的显式窗口；默认的阶段 hook 链封锁；普通允许。metadata 不能覆盖前面的硬封锁；格式错误的窗口关闭。
+- 三个消费者共享同一快照：`buildAnytimeEntries()` 过滤条目；`buildInteraction()` 只在允许且非空时暴露 `takeAnytimeAction`；`takeAnytimeAction()` 在注入前执行该策略。
+- 卡牌条目共用当前步骤准入（§7.5.2）；根 `optional` 不能绕过，新行动使用自身的来源、参数、费用与执行者。
+- 嵌套 anytime flow 插在当前 pending 树之前；父级以同一个 `PendingEnvelope` 返回。
+- 重入：Anytime Ability 的 sequence 进行中时，该玩家在所有帧中都不能再进入同一条目。`allowAnytimeReentry` 只解除这一限制，目前只有系统 `exchange` 设置它。同一能力内的货物或目标选项共用其条目。
+- 替代回合的 anytime 行动（`replacesTurn`）只在工作阶段空闲时可用，完整 flow 和回合结束 hook 结束后才轮转。
+- 完成：必须等完整注入 sequence 结束的终结反应，用 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY` 标记最后一个 leaf，消费者同时要求该标记与引擎的注入标记。
+- **兑换批次**：一次提交在任何支付前校验所有配方索引与次数，整批结算后再执行必要的动物整理。配方可在指定交互类型中禁用 anytime（`blockedAnytimeInteractionKinds`）；繁殖期间动物烹饪配方不可用。`bulk:` 这类紧凑选项值通过请求的 `structuredChoicePrefixes` 准入，从不靠行动 ID 特判。
+- **喂食目录**：`feed` 请求以稳定的 `(sourceId, exchangeIndex)` 发布 `exchangeCatalog`；客户端只按它起草，提交时同时匹配原目录与实时重建的目录。
+- 动物整理是系统子流程，从不作为 anytime 条目。工作阶段空闲回合与 `confirm-next-player` 是当前玩家的窗口；`confirm-player-switch` 与阶段 hook 链默认封锁，除非当前节点开启窗口。`computeResourceCommitments()` 的限制在命令边界执行（[ADR 0019](adr/0019-resource-commitments-preserve-unsettled-trades.md)）。
 
-当前 pending 交互中的卡牌 anytime 可用项，由 `shared/session/anytime-policy.ts` 的 `computeAnytimePolicy()` 在每次 `buildInteraction()` 中计算；前端不导入该规则查询。
-
-`GameCore.getAnytimePolicyInput()` 提供活动上下文、`stageResume`、当前 `InteractionRequest.kind` 和该 request 的 `anytimeWindow`。Flow / request 可显式声明 `{ allowed: true, blockedIds?: string[] }` 或 `{ allowed: false }`。权限只属于当前等待节点，不从父 optional、兄弟或 continuation 继承。Optional leaf 的窗口仅覆盖接受 / 跳过提示，即使后续付款选择复用同一个 engine node，后续 request 仍须自己声明窗口。窗口随 Engine cursor 保存和恢复。提示键仅负责文案，不授予权限；普通 exchange / bake flow 自己声明允许且禁用 `exchange`。
-
-优先级依次为：没有活动上下文、heating、engine-blocked、next-player confirmation（允许但禁用 exchange）、player-switch confirmation、animal reorganization、当前显式窗口、默认 stage-hook-chain 禁止、普通窗口允许。显式元数据不能放宽前面的硬性禁止；非法窗口按关闭处理。D132 在来源 optional 节点声明开放；其数量选择声明关闭，避免冻结的支付数量受随时兑换影响。
-
-三个消费点共享该策略结果：
-
-1. `buildAnytimeEntries()` — filters the auto-discovered registry + card-listener entries; returns `[]` if `!allowed`, otherwise removes any entry whose id is in `blockedIds`.
-2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
-3. `phases/round.ts::takeAnytimeAction()` — server-entry enforcement before any anytime injection. Additional guards (gameOver, draft phase, active-owner mismatch) sit at the function entry; the policy itself only sees pending-shape inputs.
-
-Nested anytime flows are injected ahead of the current pending tree. Parent pending state remains on its original pending host as a `PendingEnvelope`; when the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` surfaces the parent envelope again instead of going idle.
-
-每个 anytime 入口都在引擎 sequence 内运行，以能力入口 ID 和发起玩家标识。默认情况下，该 sequence 已开始且尚未结束时，`buildAnytimeEntries()` 会跨全部引擎 frame 排除同一玩家的同一入口；直接命令也使用该过滤结果。其他能力（包括同一卡牌的不同能力）仍按普通窗口策略判断。sequence 覆盖 before 效果、支付、主体收益、嵌套选择、动物整理和后置响应，主体收益完成不会解除限制。完成或显式跳过后解除限制，私有游标恢复与撤销保留这一生命周期。窗口中尚未选中的入口不受此限制。费用不足且没有其他合法 anytime 的续行进入既有 blocked / undo 路径。
-
-系统 `ActionDefinition` 与卡牌 `CardListenerRegistration` 都支持 `allowAnytimeReentry?: boolean`。只有 `true` 豁免活动入口限制；窗口策略、归属与操作者检查、费用、使用次数、配方禁用与 continuation guard 仍全部生效。当前仅系统 `exchange` 开启。因此，在普通收获繁殖阶段以外，exchange 引发的动物整理期间可以再次通过 exchange 烹饪，B104 配方仅能支付当前已安置的羊；exchange／bake 选择、heating 和下一玩家确认期间仍禁止 exchange。喂养支持包含跨玩家选择的嵌套 anytime flow，结束后恢复同一笔尚未支付的喂养余额。新增卡牌例外必须有合法、可达的使用场景及原生 Session 结算和恢复证据，人工测试 listener 只能证明引擎契约。这是设计时要求，不是运行时穷举预检；ADR-0015 当前步骤准入规则保持不变。
-
-同一 Anytime Ability 的商品或目标选项共享入口与限制。D124 和 M126 各提供一个卡牌 anytime 入口，具体选项在内部选择。每次发动结算一件商品或一组兑换；多个选项时先选择，再扣资源或使用标记，只有一个合法选项时沿用普通单选执行行为。反悔使用现有撤销及其可用性边界，不增加取消按钮或批量交互。D124 保留商品不得重复及原有时机规则，M126 保留四枚共享使用标记及原有时机规则。普通 XOR 在嵌套行动后仍保留原候选列表，实际付款使用当前资源；选项变得付不起时沿用既有 blocked / undo 行为。
-
-若 anytime flow 的终止 reaction 必须等整个 injected sequence 完成后才运行，可在最后一个 leaf 上写入 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`。completion listener 必须同时看到该 marker 与引擎添加的 injected-anytime marker，因此空栈顶层 anytime action 不会被误判为 suspended-flow completion。
-
-普通收获 `roundPhase === 'breeding'` 期间，动物换食物的烹饪配方不可用，直接选择及 bulk 权威提交都拒绝。该阶段规则同时保护父母动物和新生儿。全部喂食结束 hook 完成后才进入繁殖阶段并发送 `harvest.phaseStarted`；进入收获结束 hook 前恢复 `harvest`，两端新增动物的合法烹饪窗口保留。非烹饪动物兑换、喂食阶段烹饪及 D167 等繁殖阶段以外的新增动物即时烹饪继续可用。配方身份和嵌套重整续接保持一致，不新增动物计数或卡牌 ID 特判。
-
-一次兑换提交可以包含多种配方及各自的正整数次数，作为一个 Exchange Batch 结算。后端在任何支付或收益前校验所有配方索引和次数；非法条目使整批拒绝，资源和交互保持不变。合法整数请求继续按顺序结算，并按实时额度截断数量。如果整批结束后存在新获得且未安置的动物，且来源交互本身不是动物整理，exchange 通过 `internalChildren.afterHostListeners` 安排 `reorganize`，完成后再恢复被暂停的父交互。`CardExchange.blockedAnytimeInteractionKinds` 会复制到各条 `Trade`；系统 anytime 入口将来源请求类型保存在 `actionContext.anytimeInteractionKind`，统一用于准入、候选构造及提交校验（包括 bulk）。被禁用的配方保留 trade 索引，但不提供可执行选项。B104 用三条声明 `fromFarmyard`、`anytime` / `harvest` 的配方替代独立 listener；动物整理期间，包括最后繁殖后的整理，也可支付当前有效动物区中已安置的羊。待安置动物和未确认预填不提供支付额度，每笔支付都会扣减实时安置余额。从动物整理发起兑换时刷新并恢复原 pending host，不新增另一层整理。B104 沿用包括到期行动准备在内的默认 exchange 窗口，不提供专属计分前机会。
-
-收获喂食请求会发布权威 `exchangeCatalog`。每条记录用稳定的 `(sourceId, exchangeIndex)` 标识当前可用配方，并投影 `from`、`to`、`max` 与 `fromFarmyard`。目录存在时，客户端只按该目录构建兑换草稿，不再从卡牌 metadata 重建动态 listener 提供的兑换。提交前，服务端必须同时匹配最新权威交互投影和按实时状态重建的目录，再进行任何资源修改；嵌套 anytime 结束后恢复喂养时刷新该投影；因此动态 Harvest exchange 能进入 UI，而伪造、过期或超限配方会被原子拒绝。
-
-OA-vs-the reference design notes:
-
-- Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
-- `postReapAnytimeWindow` 是 `onHarvest` 完成后、喂食状态计算前的通用开放窗口。它只查询普通 anytime registry / listener，不含卡牌 ID 分支；每次嵌套 flow 完成后重新计算能力，并跳过没有可执行能力的玩家。
-- 准备阶段反应树在次序选择或当前支付条件需要时，将标准 `exchange` 与已捕获的可选来源、预约机会放在同一窗口。兑换包含谷物和蔬菜的基础转换，读取实时状态，可在执行前补足已取得资格的来源所需费用。准备阶段排除无关的卡牌 anytime 能力；无需拥有到期 action token，也不强制先领取再反应。
-- 喂养按收获顺序逐玩家结算。队列只保存玩家序号，不预扣全员食物；轮到该玩家才扣食。`foodUsed` 记录已付款，`remaining` 记录未付需求。合法嵌套 anytime 结束后恢复同一 pending host，刷新兑换目录及动物可用量，不重复预扣；只有玩家的合法喂养机会结束才判断乞讨。已经吃饱且没有收获兑换的玩家不增加确认步骤。
-- 普通 anytime 查询与鉴权使用当前 pending 节点的实际归属者；活动的 provisional continuation 保留原有 frame owner 辅助行动窗口及 guard 策略。阶段 synthetic host 与插入其中的真实选择分开处理，跨玩家确认及受保护观察沿用原有边界。
-- 官方 Card Effect 可声明只读 `computeResourceCommitments(state, owner)`，从卡内状态派生参与者必须保有的资源。Session 聚合并发承诺，若命令破坏承诺则在发布前恢复命令检查点。这不预扣款、不在 PaymentSolver 锁资，也不放宽 Continuation Guard；卡牌在一次原子成交中解除承诺并交换双方资源，见 ADR-0019。
-- 同步兑换反应支持立即执行的 `special-effect` 和 `gain` leaf，不执行 optional、选择或 pending flow。Listener 保持只读，资源和日志通过正常 event sink 产生。
-- Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
-- 带 `stageResume` 的阶段 hook chain 默认禁止 anytime，保持系统 hook 链不让出控制权的约束。动物重整和当前等待节点显式声明的 `anytimeWindow` 可以开放窗口。Exchange / bake flow 和 D132 终局前的 optional 选择各自声明窗口，权限不依赖提示键。D132 内层 `resource-quantity-select` 仍禁止 anytime，因为它的上限由当前食物和空格状态冻结，无法在任意 anytime 改动后安全恢复。
+测试：`shared/session/__tests__/anytime-policy.test.ts`、`server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session}.test.ts`。
 
 ---
 

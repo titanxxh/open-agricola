@@ -1,78 +1,37 @@
-# 8. NODE_PARALLEL reaction dispatch alignment
+# 8. Same-timing reactions use parallel trigger selection
 
 - Status: Accepted
 - Date: 2026-07-02
-- Amended: 2026-10-16
 
 ## Context
 
-参考实现的卡牌反应分两类：
+In the reference implementation, `PlayerCards::getReaction($event)` collects the cards that can react to an event and offers them as card activations under `NODE_PARALLEL`; card methods run only when an activation leaf executes, previews its doability or rebuilds its description. Compute hooks only aggregate deterministically.
 
-1. `PlayerCards::getReaction($event)` 收集同一事件下可触发的卡牌，并把它们作为 `NODE_PARALLEL` 下的 card activation 交给玩家选择。卡牌方法只在 activation leaf 真正执行、`isDoable()` 预览或描述重建时调用。
-2. `applyEffects()` / compute 类 hook 只做确定性聚合，不暴露玩家排序选择。
-
-OA 之前的 action listener 已有 `ParallelNode(mode='trigger-select')`，但触发选择需要单卡 opt-in；harvest field stage hook 还有一套手写分流，把自动 flow 与可交互 flow 分开；extra-turn provider 只取第一个可用卡牌。这些差异会造成三个问题：
-
-- 同一时机多张可选 reaction 的顺序被实现细节决定，而不是由玩家决定。
-- 自动 flow 和交互 flow 被 dispatcher 预先分类，和 参考实现的 activation leaf 模型不一致。
-- `M057_Taps` 与 `A092_AdoptiveParents` 等 extra-turn provider 同时存在时，后注册或后扫描的 provider 会被隐藏。
+OA required a per-card opt-in for trigger selection, split Harvest field stage hooks into hand-written automatic and interactive flows, and took only the first extra-turn provider, so with M057 Taps and A092 Adoptive Parents together one provider hid the other. Reaction order was decided by implementation details rather than by the player.
 
 ## Decision
 
-Issue [#1063](https://github.com/titanxxh/open-agricola/issues/1063) retires `during` rather than repairing it. It ran after execution, had no reliable event/choice or pending semantics, and its only two native consumers express ordinary completed-action rewards through `after`. Successful-host trailing reactions are `immediatelyAfter` and `after`; they retain the existing commit snapshot, payment, continuation, and owner-controlled ordering boundaries. Workshop source validation and executable-manifest registration reject unsupported phases before execution, without translating `during` to `after` or rewriting saved source. A read-only production inventory on 2026-10-09 found no retained Workshop executable using `during`, so no data migration is required. Reading an author's saved draft or version remains available for editing.
-
-Issues #1096 and #1099–#1102 separate card activation from completion reactions. Own-play benefits run in the existing `onBuy` slot after payment and card commitment. A played card cannot match its own direct `occupation` / `improvement.immediatelyAfter` or `.after`; explicit self-inclusive rules supply that component in `onBuy`. Other cards and owners still react, and the newly committed card still counts in the trigger snapshot. This boundary does not freeze enclosing placement reactions. Normal and extra placement admission share before-flow resolution and preserve veto/strict guards.
-
-1. Action reaction listener 的 `before` / `immediatelyAfter` / `after` 同一 trigger player / phase 下默认进入 `ParallelNode(mode='trigger-select')`。单 child 直接展开；compute / query hook 继续确定性聚合。
-2. Harvest field 三个 stage hook 与 before-end card-effect step 使用同一个 `activate-card-effect` child。每个 target step 收集 activation 后进入 trigger-select，不再手写自动 / 交互分流。
-3. `trigger-select` preview 支持三类 child：
-   - `activate-card`
-   - `activate-card-effect`
-   - `activate-extra-turn`
-4. Stage card-effect preview 在 cloned state/player 上运行；返回 flow 或在 clone 上产生可检测 direct mutation 都表示 activation applicable。真实 mutation 只在玩家选中 activation 后落地。
-5. Extra-turn 从 first-match 改为 provider selection：
-   - `collectExtraTurnContributions()` 聚合所有 `contributeExtraTurn` provider。
-   - 单 provider 直接展开。
-   - 多 provider 进入 one-shot trigger-select，child 是 `activate-extra-turn`。
-   - provider 选中后才展开该卡自己的 flow。
-6. Extra-turn skip / forced consume 从玩家级全局计数改为 per-source 计数：
-   - `_extraTurnSkipCountsByCard`
-   - `_extraTurnConsumedCountsByCard`
-   这样多张 provider 卡并存时，消耗的是具体来源卡的一次 opportunity。
-7. `onBeforeHarvest` 进入同一 `activate-card-effect` reaction dispatch：
-   - 窗口开启时按 Start Player Marker 冻结顺时针 target-player 顺序，不按原始 seat index 扫描。
-   - Before Harvest 发生在 skip-harvest 过滤之前，因此该窗口不排除跳过本次 Harvest 的玩家。
-   - 每个 target player 独立收集自己的 applicable activation，不跨玩家合并 trigger-select。
-   - 单个 applicable child 直接展开；多个 child 才进入 `ParallelNode(mode='trigger-select')`。
-   - activation 的 mandatory / optional 由 live cloned-state preview 返回的 root flow 推导；每次选择后重新预览剩余 child。
-   - mandatory activation 未完成时禁止 Pass；完成后 Pass 只跳过当前 target player 剩余的 optional activation。
-   - handler 只构造可重放 flow，真实状态修改必须落在选中后执行的 action leaf。
-
-8. Round preparation uses the same activation model under #1145, with distinct `onAfterRevealAction`, `onPreparation`, `onEndPreparation` and `onWorkStart` hooks. `onRoundStart` means BGA StartOfTurn. BeforeStart runs before incrementing and receives `nextRound`; reveal context records the actual action and slot. Each window freezes its own player order, then captures each player's eligible sources only on that player's entry. Native `stageEligibility` is a pure source-qualification query, separate from live handler/payment preview. The fixed source tree survives purchase, passing, anytime, pending restoration and undo; new cards join later windows rather than the active tree.
-9. StartOfTurn combines that player's scheduled receipts, offers, actions and card activations in one trigger-select tree. Receipt-dependent bonuses retain executable dependencies and resolved facts follow actual receipt. Source discovery never drops a stone-house Plow Driver merely because food is currently zero, or treats Cob's grain payment as source qualification. Accumulation follows Preparation, work order freezes before StartOfTurn, and the native hook vocabulary does not automatically expand Workshop support. First-round setup uses the same preparation chain and accumulates once; work-state loading does not reenter it.
-
-10. Turn-end reactions use the same fixed-source activation model under #1199. Ordinary rotation and card movement share source discovery, including explicitly retained timed obligations. Discovery captures every end-turn source, including a currently unqualified or unaffordable source; live cloned preview decides applicability and mandatory/optional status after each selected child. One total source expands directly; multiple sources keep the full frozen tree. Selected completion never rescans played zones, and newly played cards join later windows. A card may record qualification and reward receipts against the existing active Turn identity, but cannot infer a past host's eligibility from current card ownership. The multi-source selector explicitly opens its own anytime window; returning from a detour refreshes only its unselected menu, preserving source identity and completed children. Permission remains local to the current waiting node and does not extend to nested payments or unrelated stages.
+- **Default trigger selection**: `before` / `immediatelyAfter` / `after` action reaction listeners for one trigger player and phase enter `ParallelNode(mode='trigger-select')` by default. A single child expands directly. Compute and query hooks stay deterministic aggregation and never enter trigger-select.
+- **Activation children**: trigger-select previews `activate-card` (listeners), `activate-card-effect` (stage card effects) and `activate-extra-turn` (extra-turn providers, ADR 0001). Stage card-effect preview runs on cloned state and players; a returned flow or a detectable clone mutation marks the activation applicable. Real mutation happens only after the player selects it.
+- **Stage Dispatch**: preparation windows (`onBeforeStartOfTurn`, `onAfterRevealAction`, `onPreparation`, `onRoundStart` = StartOfTurn, `onEndPreparation`, `onBeforeWork`, `onWorkStart`), turn end, `onBeforeHarvest`, the three Harvest field hooks and before-end use the same `activate-card-effect` model. Each window freezes its player order (clockwise from the Start Player Marker where the rule requires it) and captures a player's eligible sources only on that player's entry through the pure `stageEligibility` query. Discovery never filters by current affordability; live cloned preview decides applicability, payment and mandatory / pass state after each selection.
+- The fixed source tree survives purchases, passing, anytime actions, pending restoration and undo. Completed sources never replay; cards played inside a window join only later windows. Window context, player order and cursor are part of the recoverable stage continuation and are never reread from a changed marker.
+- **StartOfTurn** combines a player's scheduled receipts, offers, actions and card activations in one tree; receipt-dependent bonuses keep their dependencies, and resolved facts follow actual receipt. Accumulation follows Preparation, work order freezes before StartOfTurn, and first-round setup uses the same chain and accumulates once.
+- **Before-Harvest** runs before Harvest skips apply, so every player participates; each target player resolves only their own activations.
+- **Turn end** shares source discovery between ordinary rotation and card-driven Turns, including explicitly retained timed obligations. The multi-source selector opens its own anytime window; permission stays local to that waiting node.
+- **Own play and completion are separate**: a one-time own-play benefit runs in `onBuy` after payment and commitment, and a played card does not match its own direct `occupation` / `improvement` trailing reactions. Other cards and owners still react, and the new card counts in the trigger snapshot.
+- The `during` phase is retired; successful-host trailing reactions are `immediatelyAfter` and `after`. Workshop validation rejects unsupported phases instead of translating them.
+- Native hook vocabulary does not automatically extend the Workshop allowlist.
 
 ## Consequences
 
-正面：
-
-- 同一时机多卡 reaction 对齐 参考实现：玩家选择来源卡和触发顺序。
-- `M057_Taps`、`A092_AdoptiveParents` 和未来 extra-turn provider 可以共存，不再互相遮蔽。
-- Undo 后不需要保存旧 pending options；恢复到 action start / step 后重新派生 trigger-select。
-- Harvest field stage hook 与 before-end hook 走同一 activation 模型，减少手写 dispatcher 差异。
-- Before Harvest 与其他 reaction window 使用同一多卡选序语义；共享资源竞争由冻结的 start-player order 决定，后位玩家从前位结算后的 live state 重新派生可用效果。
-
-约束：
-
-- Reaction hook 应返回可重放 `ActionFlow`，状态修改落到 action leaf。准备窗口用固定来源树恢复；尚未迁入 generic reaction dispatcher 的其他 direct stage hook 仍保持串行扫描，新增同类能力应优先接入 activation 模型。
-- Compute / query hook 不能进入 trigger-select；费用、可达性、计分等聚合必须继续保持确定性和无玩家排序选择。
-- 测试不能断言同一时机多卡按打出区顺序自动执行；必须断言 trigger-select、来源卡选择、pass / mandatory gate 和 undo 重新派生。
-- Preparation 与 Before Harvest 的冻结玩家顺序、窗口上下文和当前 order cursor 属于可恢复的阶段 continuation；序列化恢复不得重新读取可能已经变化的 Start Player Marker，也不得复用旧 pending options。
+- Players choose source and order for same-timing reactions, as in the reference.
+- Extra-turn providers coexist; undo re-derives trigger-select from restored state instead of storing old options.
+- Handlers must return replayable flows. Serial stages not yet migrated keep their own continuation; new stage abilities should use the activation model.
+- Tests assert trigger-select, source selection, pass / mandatory gates and undo re-derivation, never automatic execution in play-zone order.
 
 ## Alternatives considered
 
-- **保留单卡 opt-in**：拒绝。新卡作者需要知道何时打开开关，容易遗漏，也会继续和 参考实现 `NODE_PARALLEL` 默认语义不一致。
-- **继续手写 harvest field 分流**：拒绝。自动 / 交互分类会把 dispatcher 变成规则裁定层，且不能自然覆盖 direct mutation preview。
-- **Extra-turn 继续 first-match**：拒绝。多个 provider 并存时会隐藏后续 provider，玩家无法选择先用 `M057_Taps` 还是 `A092_AdoptiveParents`。
-- **引入全局 skipped provider 队列**：拒绝。per-source cardState / transient counter 已能表达机会消耗，不需要把单卡机会提升成 GameState 顶层结构。
+- Keeping the per-card opt-in: easy to forget and inconsistent with the reference default.
+- Keeping the hand-written Harvest field split: turns the dispatcher into a rule-adjudication layer.
+- First-match extra turns: hides later providers.
+- A global skipped-provider queue: per-source counters already express consumed opportunities.
