@@ -102,17 +102,17 @@ pnpm run build              # tsc + vite build
 
 | Doc | When to update |
 |---|---|
-| `docs/card_implementation_status.md` | 官方卡实现变化，或社区卡引入 / 修复通用机制、基础设施 gap、accepted divergence 时 |
+| `docs/card_implementation_status.md` | 官方卡实现变化，或（含社区卡）出现基础设施 gap、accepted divergence 时；新的通用机制写进 `docs/ARCHITECTURE.md` |
 | `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 `card_implementation_status.md` |
 | `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层） |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
 
 **`card_implementation_status.md` 同步检查清单**（需要更新该文档时）：
-- §2 问题优先清单 — 修复后移除或降级，新增 gap 立即登记
-- §3 已接受差异 / §11 源码排除 / §12 单卡附录 — 只登记有意的偏离和排除；已对齐的卡不逐条记录，行为以卡牌文件和相邻测试为准
-- §6 基础设施 — 新加的通用机制要登记
-- §8 反模式 — 新增设计禁令时补充
+- Open issues by priority — 修复后移除或降级，新增 gap 立即登记
+- Accepted differences / Source exclusions / Per-card appendix — 只登记有意的偏离和排除；已对齐的卡不逐条记录，行为以卡牌文件和相邻测试为准
+- Infrastructure backlog — 只登记尚未实现的跨卡缺口；实现后删除该条，新的通用机制写进 `docs/ARCHITECTURE.md` 对应 module 节
+- Reference anti-patterns — 新增设计禁令时补充
 - Hook 归属由 `ALL_CARD_IMPLS` 派生，不在文档里维护副本
 
 ## Change Boundaries

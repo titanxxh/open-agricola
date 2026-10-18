@@ -4,44 +4,40 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-10-17。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考代码仅作实现对照。
+> 更新日期：2026-10-18。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
-## 2. 问题优先汇总
+## 1. 问题优先汇总
 
-参考实现 PHP 路径默认相对 `参考实现`；OA 路径默认相对本仓库。
-
-[Issue #848](https://github.com/titanxxh/open-agricola/issues/848) 剩余 26 张牌已按 #854–#870 实现，并补充原生 Session 回归。原 A097/C140 替换缺陷已由 PR #853 完成；本次共享替换回归还覆盖 Freshman 免费职业入口中的 B154 前置检查。下表独立后续仍不属于该 28 张牌议题。
+参考实现 PHP 路径相对参考实现源码树；OA 路径相对本仓库。
 
 | 优先级 | 范围 | 待处理事项 |
 |---|---|---|
 | 已暂缓 | `C131_PrivateTeacher` [#1175](https://github.com/titanxxh/open-agricola/issues/1175) | 本次不修改；新职业能否在同一次 Grain Seeds 立即触发仍待规则确认。 |
 
-## 3. 已接受差异
+## 2. 已接受差异
 
 除非产品方向改变，以下内容不算当前 bug。
-
-2026-05-25 重审后，旧 `docs/card_progress.md` §5/§6 的“已接受简化 / 刻意行为差异”不再作为接受依据；相关卡牌已改列 §2 / §11，或在重审后改为已对齐。
 
 | 类别 | 卡牌 |
 |---|---|
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
 | Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |
-| 用 schema-up metadata 替代 参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
+| 用 schema-up metadata 替代参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
 | 参考实现未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
 | 参考实现 banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
-| 参考实现 stable / FarmHand 模型差异 | `B085_FarmHand` |
+| 参考实现 stable / FarmHand 模型差异 | `B085_FarmHand` | 已接受差异 | FarmHand stable 通过 Farm Expansion 的 `stables` leaf wrapper（`actionContext.farmHand`）进入共享 stables 付费 / `farm.stableBuilt` 事件 / after-stables listener 链路，cost = 2 wood 并随 C88 等折扣统一生效；OA 允许同一次 stables leaf 混合建造普通 stable 与 FarmHand 特殊 stable。差异：FarmHand 位置不进 `stableTiles`（不计入动物 zone / loose stable 容量），仅经 `computeExtraRoomCapacity` +1 住房，stable count 口径由 `shared/domain/stables.ts` 单独派生。`farm.stableBuilt` item 带 `kind: 'normal' \| 'special'`，special 带 `sourceCardId`。Return-stable（D102 / E76 经 `stable-removal` helper）从通用聚合结果列出特殊 stable，并调用来源卡的 `returnSpecialStable` 归还；FarmHand 清 `extraData.position`、释放 1 个 stable supply、住房容量回 0，但保留 `flagged`（每局一次，回收后不再提供），不产生动物重整 flow。已建特殊 stable 经通用 `getBuiltSpecialStables(player)` hook 以 `SerializedPlayerState.specialStables` 投影给客户端；前端不读 `cardStates['B085_FarmHand']`，也不 import `shared/cards`。 |
 | 卡牌驱动的工人移动复用普通放人合法性，包括容量或 modifier 允许的已占用目标。D051 的移动以及 E010 每名实际移动的工人各自开启新的规则 Turn Scope，但不增加轮转机会；E010 的食物分支不开启 Turn。 | `D051_Archway`, `E010_StrawHat` |
-| Candidate Closure：optional 分支候选集是 参考实现单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 参考实现 optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
+| Candidate Closure：optional 分支候选集是参考实现单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与参考实现 optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
 | Candidate Closure：等价候选行（同 resources + originalFeeIndex、仅 sources 不同）只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment）；玩家不再看到仅归因不同的重复支付选项，未选中链的卡不进该选项 hover 归因 | 全部 card-purchase cost 修改卡（C95/E109 fixed-price 双子、A75/D117 bypass 链等） |
 | B104 沿用系统 exchange 默认窗口，有意移除原独立入口的计分前机会；收获配方继续可用。 | `B104_SheepWalker` |
 
-## 4. 简洁度审阅
+## 3. 简洁度审阅
 
-行数只是信号，不是结论。复核口径：按当前 Card Source 文件和 canonical 参考实现 PHP 文件统计非空非注释行；方法 / 函数声明行保留。仅剔除 OA 的 `import` / `export` 行，以及 参考实现的 `<?php` / `namespace` / `use` 行。
+行数只是信号，不是结论。复核口径：按当前 Card Source 文件和 canonical 参考实现 PHP 文件统计非空非注释行；方法 / 函数声明行保留。仅剔除 OA 的 `import` / `export` 行，以及参考实现的 `<?php` / `namespace` / `use` 行。
 
-简洁度比较要先排除 参考实现坏味道：如果 参考实现通过 `Actions/*`、`Core/*`、`Models/*` 等主路径，或其他卡牌文件里的显式 cardId 分支来补某张卡的行为，这张卡不进入简洁度比较。参考实现 `implemented=false` 的卡没有可比实现，直接跳过且不在本节列出。
+简洁度比较要先排除参考实现坏味道：如果参考实现通过 `Actions/*`、`Core/*`、`Models/*` 等主路径，或其他卡牌文件里的显式 cardId 分支来补某张卡的行为，这张卡不进入简洁度比较。参考实现 `implemented=false` 的卡没有可比实现，直接跳过且不在本节列出。
 
-剔除 参考实现坏味道和未实现项后，当前 OA/参考实现 > 1.5 且可公平比较的卡牌剩 6 张：
+剔除参考实现坏味道和未实现项后，当前 OA/参考实现 > 1.5 且可公平比较的卡牌剩 6 张：
 
 | 卡牌 | 参考实现 | OA | 比例 | 原因 / 后续判断 |
 |---|---:|---:|---:|---|
@@ -52,47 +48,33 @@
 | `B156_StorehouseKeeper` | 29 | 44 | 1.52 | 参考实现用 `isActionCardEvent('ResourceMarket')` + `gainNode` XOR；OA 需要显式列出 resource-market 变体并包 listener / typed flow。低边界项，只有出现更多 action-space alias 卡时才值得抽 helper。 |
 | `B107_Manservant` | 33 | 50 | 1.52 | 参考实现的 `onBuy` 复用 `onPlayerAfterRenovation()` 并直接返回 `futureMeeplesNode`；OA 需要复用 `placeFood`、after-renovation listener、stone-house guard、`queueFutureMeeples` + node bridge。低边界项，优先级低。 |
 
-因 参考实现坏味道而排除的卡牌：
+因参考实现坏味道而排除的卡牌：
 
 | 卡牌 | 排除原因 |
 |---|---|
-| `D036_BreedRegistry` | 参考实现在 `Core/参考实现` 为本卡更新 infobox。 |
-| `E161_ElderBaker` | 参考实现在 `ActionCards.js` 和 `Actions/参考实现` 对本卡做主路径特判。 |
-| `C088_CarpentersApprentice` | 参考实现在 `Actions/参考实现` 和 `Actions/参考实现` 对本卡做主路径特判。 |
-| `A041_VegetableSlicer` | 参考实现在 `Actions/参考实现` 对本卡做支付路径特判。 |
-| `A087_Conservator` | 参考实现在 `Actions/参考实现` 对本卡做翻修路径特判。 |
-| `D131_CraftsmanshipPromoter` | 参考实现在 `Actions/参考实现` 对本卡做主路径特判。 |
-| `D001_ZigzagHarrow` | 参考实现在 `Models/参考实现` 提供本卡专用几何 helper。 |
-| `E016_BriarHedge` | 参考实现在 `Actions/参考实现` 对本卡做围栏路径特判。 |
+| `D036_BreedRegistry` | 参考实现在 `Core/` 中为本卡更新 infobox。 |
+| `E161_ElderBaker` | 参考实现在 `ActionCards.js` 和 `Actions/` 主路径中特判本卡。 |
+| `C088_CarpentersApprentice` | 参考实现在两条 `Actions/` 主路径中特判本卡。 |
+| `A041_VegetableSlicer` | 参考实现在 `Actions/` 支付路径中特判本卡。 |
+| `A087_Conservator` | 参考实现在 `Actions/` 翻修路径中特判本卡。 |
+| `D131_CraftsmanshipPromoter` | 参考实现在 `Actions/` 主路径中特判本卡。 |
+| `D001_ZigzagHarrow` | 参考实现在 `Models/` 中提供本卡专用几何 helper。 |
+| `E016_BriarHedge` | 参考实现在 `Actions/` 围栏路径中特判本卡。 |
 | `B138_ForestGuardian` | 参考实现的其他卡牌路径显式枚举本卡。 |
-| `C016_FieldFences` | 参考实现在 `Actions/参考实现` 对本卡做围栏路径特判。 |
-| `C027_Blueprint` | 参考实现在 `Actions/参考实现` 对本卡做主路径特判。 |
+| `C016_FieldFences` | 参考实现在 `Actions/` 围栏路径中特判本卡。 |
+| `C027_Blueprint` | 参考实现在 `Actions/` 主路径中特判本卡。 |
 | `B146_Illusionist` | 参考实现的其他卡牌路径显式枚举本卡。 |
 | `B042_ForestInn` | 参考实现的其他卡牌路径显式枚举本卡。 |
 | `C162_ForestOwner` | 参考实现的其他卡牌路径显式判断本卡。 |
-| `A106_SlurrySpreader` | 参考实现在 `Actions/参考实现` 对本卡做收获路径特判。 |
-| `D132_HideFarmer` | 参考实现在 `Managers/参考实现` 对本卡做计分路径特判。 |
-| `E096_Elder` | 参考实现在 `States/参考实现` 对本卡做回合路径特判。 |
-| `E155_Visionary` | 参考实现在 `Actions/参考实现` 和 参考实现对本卡做特判。 |
+| `A106_SlurrySpreader` | 参考实现在 `Actions/` 收获路径中特判本卡。 |
+| `D132_HideFarmer` | 参考实现在 `Managers/` 计分路径中特判本卡。 |
+| `E096_Elder` | 参考实现在 `States/` 回合路径中特判本卡。 |
+| `E155_Visionary` | 参考实现在 `Actions/` 路径及其他位置特判本卡。 |
 | `E153_StoneSculptor` | 参考实现的其他卡牌路径显式枚举本卡。 |
-
-近期 PR / 本轮简化后已经降下来的旧高比例项：
-
-| 卡牌 | 变化 |
-|---|---|
-| `A111_WallBuilder` | 本轮改为 after construct 直接返回 inline `futureMeeplesNode`，去掉 built-room delta、action snapshot token 和卡内 extraData 防重；按当前复核口径已低于 1.5。 |
-| `B018_GrasslandHarrow` | 本轮让 future meeple 支持 `field`/`stable` 到期触发 action；B18 只保留 after-pay 计算目标轮并排 `field` future meeple，移除卡内 `targetRound` / `onRoundStart` 状态机。 |
-| `E118_KindlingGatherer` | 本轮合并 `place-farmer` / `collect` / `gain` 三个同 handler listener，保留 action-space provenance 过滤。 |
-| `E148_Lazybones` | `action-space-tokens` 负责预留选择和面向 owner 的 token 消耗。打出后通过通用 bounded choice multi-select 提供四个独立行动格候选，上限受可用 stable supply 限制；嵌套 anytime 后由 projection 刷新上限。预留和对手触发的免费建造仍在卡牌局部闭环。 |
-| `C041_FarmStore` | #244 后用卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
-| `D080_BrickHammer` | #244 后走 `getPrintedImprovementResourceCost()`，不再手写 cost / altCosts 分支。 |
-| `E142_Smuggler` | 改为连续两个可选的标准交换阶段，使第二次交换可使用第一次获得的货物，且每一步都能触发 exchange 监听。 |
-| `E156_ClaypitOwner` | #244 后 printed/base cost helper 覆盖 minor altCosts 与 major fee candidates。 |
-| `D117_WoodExpert` | #259/#272 后从当前 Cost Candidate List 派生候选，已低于 1.5 阈值。 |
 
 后续简化原则：只有当同一种 helper 能服务至少两张当前或近期目标卡，才抽新抽象；否则维持卡内闭环。
 
-## 5. 架构审阅
+## 4. 架构审阅
 
 本轮审阅没有发现新的“仅前端裁定规则”路径，也没有开放的通用基础设施 blocker。下表只保留会继续约束新增卡牌 / 后续改动的架构事项；已完成的一次性基础设施记录不再作为待办保留。
 
@@ -133,15 +115,16 @@
 | Injected anytime completion 边界 | `action-context-flags.ts`、`INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`、`C094_StableCleaner`、`B027_Toolbox` | nested anytime sequence 的最后一个 leaf 可标记 completion；消费者必须同时看到该 marker 与引擎的 injected-anytime marker，使 anytime action 自身 reaction 完整结算后才打开回合后窗口，而空栈顶层 anytime action 仍归入即将进行的 Turn。监听器、行动、选择、替换动态生成的 flow 及 follow-up action 只继承 injected-anytime 来源标记，使嵌套 reaction 保持该边界。 |
 | Action replacement choice 聚合 | `HookDispatcher.applyComputeReplace()`、`buildReplaceChoiceFlow()`、`checkedReplaceAction`、`skipComputeReplaceListenerIds` | 所有匹配且 declined 的 replacement 都按顺序保留为独立选择，不再互相覆盖。每个 replacement 分支只跳过自身 producer 与继承 guard，因此 nested action 仍可使用其他 replacement。original fallback 和冻结 leaf 的最终可执行性检查携带 `checkedReplaceAction`，禁止 `computeReplace` 与仅用于替代准入的 `isDoable` 回退重新打开选择；普通 before/after listener 与行动语义判断忽略它。免费职业替代复用职业行动的统一选项策略，包括选项级 veto listener。 组合行动在展开前使用同一个替换选择，原分支保留延迟展开标记；展开后子行动独立计算替换。准入递归键包含已消费的 producer ID，允许同名行动在消耗替换来源后继续，并终止无进展循环。B026 用互斥双行动计划限制一次围栏，E151 复用额外住房容量，无需重复 `isDoable` 放行。 |
 | 卡牌存储资源领取 | `take-from-card`、`gain`、`card.stackChanged`、`resource.moved`、`D036_BreedRegistry` | `take-from-card` 先扣除来源卡 counters，再把玩家库存入账委托给标准 `gain` leaf。因此 Gain reaction 能观察从卡牌移入的货物；只关心来源卡 counter 生命周期的 listener 仍可监听 `take-from-card`。资源获得 listener 不得为同一次移动同时订阅这两个 action。 |
+| 必选续行的已满足判定 | `ActionDefinition.isAlreadySatisfied`、当前 transaction 事件、`plow` | 只有已接受的必选续行在严格可执行检查失败后，才可按“已满足”结算。行动检查同一 transaction 中先前发出的事实；`before` 已经完成，行动本体和尾随 listener 不再执行。新开始的行动和可选行动保持普通可执行判断。 |
 | Mandatory post-host continuation 传播 | `afterHostCommitListeners`、`enforceCompositeContinuationMandatory()`、`engine-blocked` | host 提交后，其必选 internal child 和动态返回或注入的各层复合后代保持 mandatory。普通失败进入 blocked 并显式 undo；跨玩家和 Protected Observation 保留既有 provisional 恢复。公共路径不按卡牌或行动 ID 分支，支付顺序仍由 host 与 pay-child 生命周期负责。 |
 | Provisional mandatory continuation settlement | `runAuthoritativeCommand()`、`probeMandatoryContinuations()`、`ProvisionalContinuationScope`、`reportProtectedObservation()`、`authoritativeCommandKey()`、`durableTransition`、`C051_FishingNet`、ADR 0015 | Mandatory `before` 链中的跨玩家或 Protected Observation 风险使用嵌套的命令入口 checkpoint 与 strict guard。耗尽的 optional flow 把自动 `__skip__` 作为嵌套命令结算；集合语义的命令 payload 使用与顺序无关的键。卡牌只返回普通 flow 和 scoped reachability；公共路径不得按 Publican、Hammer Crusher、Building Tycoon、Sow、Construct 或 Renovate ID 分支。若 scoped `isDoable` gate 对应的 `before` flow 已完成支付或解锁，它必须在 `skipBeforeTriggers` probe 中退出；strict probe 只评估剩余 host、不重复收取已完成效果，并对 replacement alternative 运行完整 `isDoable`。Observation gate 忽略同一命令已完成的 scope，但保留 active ancestor；包括 `devPlayCard` 在内的隐藏手牌公开必须在 mutation 前报告 Protected Observation。若 mandatory post-host continuation 来自已经发布的受保护 choice，则在该 choice checkpoint 开启显式 `undoAction` fallback scope；回滚保留已公开的缓存结果，记住失败命令，并继续提供 sibling option。Undo history 会保留被恢复 host frame 的身份，使 settlement 继续关联原 scope，并原子拒绝破坏 guard 的撤销。Scope/checkpoint/失败元数据只进入私有 session cursor；每个已发布 provisional transition 和 abort 仍是 append-only Replay Step。破坏 guard 的命令、被阻止的 Protected Observation 和 scope abort 会分别追加面向玩家的恢复日志，不新增交互。 |
 | 可执行行动说明与定时规则 | `ChoiceDescriptionPreview`、`CardEffect.timedRules`、`RuleBody`、`Engine.describe()`、`collectScheduledEffectPreviews()`、ADR 0024 | 实际 flow 和闭合操作提供递归效果说明，延迟数量在到期前保留公式。按来源与领取玩家分组，保留完整时序、费用、条件和重复执行。棋盘基础规则与当前玩家支付选项共享后端定义。按回合变化的卡牌类型和依次领取首种缺少资源的计划保留全部基础分支，执行时选择实际匹配项；沼泽摆放提示读取执行使用的同一工人选择策略。B069 重叠的蔬菜领取独立执行；D069 提供付费买蔬菜的机会，不再免费领取。 从田取作物的 operation 在 Card Field owner continuation 之前收入库存。A058 随后提供独立可选的限量兑换，不再重复 gain。 |
 | 阶段 CardEffect reaction dispatch | `stageResume`、`activate-card-effect`、`stageEligibility`、`ParallelNode(mode='trigger-select')`、ADR 0008 | 准备窗口按玩家进入时的持牌与只读资格构造固定来源树，费用与 handler 在选中时按实时状态重算；新牌只参加后续窗口，恢复不重扫牌区。嵌套可选分支保留兑换机会，不削弱必选来源；独立购买复用 OR 选择。显式可选决定通过 `canBeOfferedByPlayer` 区分非支付资格与支付能力，兑换后刷新同一 pending 宿主，不重放已完成奖励。StartOfTurn 的计划领取、offer、行动与卡牌来源共用一棵玩家树并保留领取依赖。Harvest field、before-harvest 与 before-end 保留既有 activation/mandatory 语义；其他未迁入的串行阶段继续使用原续接机制。 |
 | 回合结束响应来源 | `buildEndTurnReactionFlow()`、`activate-card-effect`、`qualifiedTurnToken` / `rewardedTurnToken`、C048/B027/D074/E093/M062/M063 | 普通与移动工人的 Turn 冻结全部持有和保留的结束来源。多来源树保留暂不适用的 child，实时重评资格与支付；完成来源不重放，新牌只参加后续窗口。选择器显式声明自己的 anytime 窗口，插入行动后刷新同一树。卡牌从已提交宿主事实取得资格，以既有 Turn 身份记录每 Turn 一次的凭据。 |
 | 收获前反应窗口 | `getBeforeHarvestPlayerIndices()`、`continueBeforeHarvestReactionHook()`、`stageResume.extra.beforeHarvestPlayerOrder`、`activate-card-effect`、A166/C092/D032/D098 | 在应用 Harvest skip 前，按 Start Player Marker 冻结顺时针玩家顺序。每名玩家独立结算其当前可用反应；多卡进入 `trigger-select`，mandatory flow 禁止 Pass，选择 optional activation 后直接承诺执行，不再二次确认。冻结顺序和游标可跨序列化恢复。卡牌 handler 只构造可重放 flow，preview 时不得修改真实状态。 |
+| 计分前 anytime 窗口 | `CardListenerRegistration.preScoring`、`CardListenerRegistration.blockedAnytimeInteractionKinds`、`continuePreScoringWindow()`、`stageResume.hook='preScoringWindow'`、A102/C18/C46/C69/C87/C94/C101/C115/D13/D87/D114/D124/E13/E14/E27 | 所有 `onBeforeEndGame` target 完成后，只按玩家顺序提供已标记且当前可用的 anytime listener。完成一次卡牌 flow 后按实时状态重建该玩家窗口，Pass 才推进；没有可用 marked flow 的玩家直接跳过，所有玩家完成后才写入 `gameOver`。卡牌 listener 可声明在指定 pending interaction kind 中隐藏 anytime 能力，包括动物整理。 |
 | 兑换批次与配方交互限制 | `CardExchange.blockedAnytimeInteractionKinds`、`Trade.blockedAnytimeInteractionKinds`、`actionContext.anytimeInteractionKind`、`exchange`、B104 | 系统 exchange 保存来源交互类型，统一用于准入、选项和提交校验。一次提交整批结算后再进行必要的动物整理，随后恢复父交互。B104 使用元数据配方，在 animal-reorg 中也仅能支付当前已安置动物；待安置动物和未确认预填不提供支付额度。整批开始结算前校验所有配方索引和次数，普通烹饪仍可执行。 |
 | 权威喂食兑换目录 | `FeedExchangeCatalogEntry`、`getFeedExchangeCatalog()`、`InteractionRequest.kind='feed'`、C062 | feed request 以稳定 `(sourceId, exchangeIndex)` 投影基础兑换、已打出卡牌配方和动态 listener 配方；客户端只渲染该目录。服务端提交时同时匹配最初目录与实时重建目录，并校验有序资源草稿和使用上限；伪造或过期批次在 mutation 前原子拒绝。 |
-| 计分前 anytime 窗口 | `CardListenerRegistration.preScoring`、`CardListenerRegistration.blockedAnytimeInteractionKinds`、`continuePreScoringWindow()`、`stageResume.hook='preScoringWindow'`、A102/C18/C46/C69/C87/C94/C101/C115/D13/D87/D114/D124/E13/E14/E27 | 所有 `onBeforeEndGame` target 完成后，只按玩家顺序提供已标记且当前可用的 anytime listener。完成一次卡牌 flow 后按实时状态重建该玩家窗口，Pass 才推进；没有可用 marked flow 的玩家直接跳过，所有玩家完成后才写入 `gameOver`。卡牌 listener 可声明在指定 pending interaction kind 中隐藏 anytime 能力，包括动物整理。 |
 | Harvest 交换窗口与喂食结算 | `CardEffect.preHarvestGoodsWanted`、`CardEffect.preHarvestGoodsWantedBeforeReap`、`CardEffect.maySkipHarvestFieldPhase`、`harvestPrepWindow`、`handleFeedResolved()`、`harvestExchangeUsage`、`harvest.feedConverted`、A61/C29/C54/C98/C105/C110/D70/E110 | `onStartHarvest` 前会把已打出卡牌的需求汇总，与当前存量加必然收割量比较；收割前需求则必须由当前存量独立覆盖。准备窗口只提供可支付、会产出缺少资源且有次数限制的 Harvest exchange。喂食草稿展示所有仍有次数的 Harvest exchange，按规范顺序推演选择，允许前一个交换的产出支付后一个交换；后端在任何状态变更前按实时资源和剩余次数验证完整有序计划，拒绝时保持状态与 pending 不变。随后用实时食物支付已冻结的剩余需求；只有多余食物留存，缺口才转为乞讨。 |
 | 整个收获的参与者排除 | `scheduleNextHarvestSkip()`、`activatePendingHarvestSkips()`、`isPlayerSkippingCurrentHarvest()`、C108 | 待生效标记在 `onBeforeHarvest` 后激活，此后从本次收获的全部玩家流程、持有者阶段 hook 和持有者卡牌 listener 中排除该玩家。标记按轮次生效且只消费一次；只跳过田地和繁殖的效果保持独立。 |
 | 收割后 anytime 窗口 | `continuePostReapAnytimeWindow()`、`PendingSyntheticKind='post-reap-anytime'`、`buildAnytimeEntries()`、`HarvestReapSummary.harvestedPositions`、D071 | `onHarvest` 完成后、喂食计算前，按 Harvest 顺序提供当前可执行的 anytime action。每次 flow 后按实时状态重建，空玩家直接跳过，Pass 推进；D071 以本次 Harvest 实际收割过的田与当前恰含 1 个作物的 Logical Field 的交集，派生普通田和 Card Field 候选。喂食读取最终实时资源，允许可恢复的 anytime 交互；`heating` 仍锁定。Session 主路径不含 D071 分支。 |
@@ -166,11 +149,11 @@
 | Improvement purchase lifecycle | `shared/actions/helpers/improvement-purchase-lifecycle.ts`、`shared/actions/effects/improvement.ts`、`CardPurchasePayment`、`activate-card-effect` | major/minor improvement 购买的 payment preview / option / receipt 仍由 `CardPurchasePayment` 负责；支付成功后的状态提交、returned card、minor passing、`improvementPayment` extraData、`card.played` / `card.passed` event、private hand change event 集中走 improvement purchase lifecycle helper。public action 路径仍遵守 `pay` child → host commit → after-host-commit `onBuy`；direct play path 复用同一 commit helper 后再执行 `onBuy`。禁止把业务 mutation 放回 `pay`，也不要恢复 `apply-improvement` effect 或 `PlayerState` payment scratchpad。`params.allowedPurchases` 在可执行判断、提供的菜单和 `resolveChoice` 中限制所有候选来源（major、包括仅 minor 菜单在内的手牌 minor，以及 `computeChoiceCandidates` 注入的选项），因此只有其他改良买得起时，不会提供受限的可选购买。 `purchaseActionCardId` 将本次购买节点来源快照送入 onBuy，独立于 sourceCard、成本来源及用格统计；新卡授予的购买不继承父购买身份。 |
 | Parent Card Definition 数据边界 | `shared/parents/*`、`public-assets.ref`、`public-assets.required.json`、`client/services/parent-assets.ts`、`client/app/parents/*`、`shared/parents/__tests__/parent-cards-complete.test.ts`、`shared/parents/selection.ts`、`shared/parents/mother-rewards.ts`、`shared/parents/father-completion.ts`、`shared/session/ordinary-card-draw.ts`、`shared/domain/scoring.ts` | Parent Cards 是扩展专用结构化数据和 runtime asset 引用，不属于 A-E Card Source / Card Definition / Card Impl 投影；portrait / back 通过 `publicAssetUrl()` 读取 `public-assets.ref` 固定 commit 下、由 required 清单声明的外部资源，不在主仓保留图片副本；setup / simultaneous mother+father selection、可选 direct deal 及房间重开模式持久化、唯一 mother/father 后端自动提交、mother round gain 排入真实 `state.futureMeeples` 并在 direct deal / simultaneous draft finalize 时结算当轮奖励、开局 mother schedule log 通过 `parent.motherScheduled` public event 派生且通过稳定 `playerId` 跟随 WS 席位显示名、ActionBoard round slot future token、`parentCards` scoring、father typed requirement variants（PS03/PS04/PS06/PS08）、father simple/complex side quest 完成、奖励、draw keep-one transport + UI、ordinary draw pending action gate、sow completion marker、father resource choice structured preview、PS06/PS08 simple resource reward runtime coverage 已由后端权威接入；father reward manual keys 仍作为复杂奖励 schema-up residual scope 保留；候选与普通抽牌牌堆必须使用非公开 seed，不在前端补规则裁定。 |
 | Through the Seasons 变体边界 | `shared/seasons/*`、`createSeasonActionSpaces()`、`registerThroughTheSeasonsHooks()`、`registerThroughTheSeasonsCardListeners()`、`server/__tests__/through-the-seasons-*-session.test.ts` | Through the Seasons 是 Game Variant，不是卡牌来源；四季行动格常驻公开 board，只有 `state.throughTheSeasons.currentSeason` 对应行动格可执行，季节在下一轮开始时推进并应用 setup 调整。季节版图动作走后端 ActionFlow；Winter/Spring/Summer 这类普通行动修正注册到每个 Core 独立的 `ActionHookRegistry`，季节行动分支必须复用 flow child doability 以包含 hook/listener 可执行性；Summer Day Laborer 额外 grain 用 action snapshot token 限制为每次放人一次，并复用现有 `bonus-grain` effect，使公开事件、资源统计和派生行动日志均包含这项奖励；Autumn major-improvement 强制建筑资源折扣走会话级 global card-purchase candidate listener 并由 `cardCostCandidateMandatory` 隐藏未折扣候选；variant listener 不写玩家 `cardStates`，不在前端补规则。 |
-| Farmers of the Moor hand setup / draft 边界 | `shared/session/state-bootstrap.ts`、`shared/draft/draft-manager.ts`、`shared/draft/types.ts`、`server/game/__tests__/draft-session.test.ts`、`shared/session/__tests__/farmers-of-the-moor-setup.test.ts` | Farmers of the Moor 小改良来源独立于已出版普通小改良牌池；可发 FoM 小改良不足时默认拒绝开局，只有 room option `allowIncompleteFarmersOfTheMoorMinorDeal` 开启时才允许等量减少到 0 张。非 draft 发 4 张 FoM 小改良（不足时按选项等量减少）+ 3 张已出版小改良；simultaneous draft 分阶段执行职业、FoM 小改良、已出版小改良，当前阶段只提交对应 card type。Community Deck / custom minor 只进入已出版小改良部分；Parent Cards selection 仍在手牌确定后启动，不进入 FoM card source。当前可发 FoM 小改良池只包含已实现的 117 张：`M015` / `M016` / `M017` / `M018` / `M019` / `M020` / `M021` / `M022` / `M023` / `M024` / `M025` / `M026` / `M027` / `M028` / `M029` / `M030` / `M031` / `M032` / `M033` / `M034` / `M035` / `M036` / `M037` / `M038` / `M039` / `M040` / `M041` / `M042` / `M043` / `M044` / `M045` / `M046` / `M047` / `M048` / `M049` / `M050` / `M051` / `M052` / `M053` / `M054` / `M055` / `M056` / `M057` / `M058` / `M059` / `M060` / `M061` / `M062` / `M063` / `M064` / `M065` / `M066` / `M067` / `M068` / `M069` / `M070` / `M071` / `M072` / `M073` / `M074` / `M075` / `M076` / `M077` / `M078` / `M079` / `M080` / `M081` / `M082` / `M083` / `M084` / `M085` / `M086` / `M087` / `M088` / `M089` / `M090` / `M091` / `M092` / `M093` / `M094` / `M095` / `M096` / `M097` / `M098` / `M099` / `M100` / `M101` / `M102` / `M103` / `M104` / `M105` / `M106` / `M107` / `M108` / `M109` / `M110` / `M111` / `M112` / `M113` / `M114` / `M115` / `M116` / `M117` / `M118` / `M119` / `M120` / `M121` / `M122` / `M123` / `M124` / `M125` / `M126` / `M127` / `M128` / `M129` / `M130` / `M131`。 |
+| Farmers of the Moor hand setup / draft 边界 | `shared/session/state-bootstrap.ts`、`shared/draft/draft-manager.ts`、`shared/draft/types.ts`、`server/game/__tests__/draft-session.test.ts`、`shared/session/__tests__/farmers-of-the-moor-setup.test.ts` | Farmers of the Moor 小改良来源独立于已出版普通小改良牌池；可发 FoM 小改良不足时默认拒绝开局，只有 room option `allowIncompleteFarmersOfTheMoorMinorDeal` 开启时才允许等量减少到 0 张。非 draft 发 4 张 FoM 小改良（不足时按选项等量减少）+ 3 张已出版小改良；simultaneous draft 分阶段执行职业、FoM 小改良、已出版小改良，当前阶段只提交对应 card type。Community Deck / custom minor 只进入已出版小改良部分；Parent Cards selection 仍在手牌确定后启动，不进入 FoM card source。当前可发 FoM 小改良池只包含已实现的 117 张：`M015`–`M131`。 |
 | Snake Opening 变体边界 | `InitialStateOptions.enableSnakeOpening`、`GameState.snakeOpening`、`shared/session/phases/round.ts` 的 `nextWorkRotationIdx()`、`snakeOpening.reversed` public event、`shared/session/__tests__/starting-food.test.ts`、`server/__tests__/snake-opening-session.test.ts` | Snake Opening 是 Game Variant，不是卡牌来源。它只改变开局食物（每人 3）和第 1 回合工作阶段轮转：正向轮转首次要绕过冻结的 `roundFirstPlayerId` 时置 `snakeOpening.reversed`，从刚行动的座位含本人开始反向寻找下一位，反向顺序持续到本工作阶段结束，下一工作阶段开始时重置。单人局忽略该选项。只有工作阶段轮转（`finishCompletedActionTurn`、reorganize continuation、skip 循环）读取 `nextWorkRotationIdx`；Before-Harvest Reaction Window、收获顺序和回合开始选首位仍走正向 helper。不要用放置计数或卡牌状态推导反转，也不要围绕它加单卡分支。 |
 | Farmers of the Moor 小改良发牌池派生 | `getImplementedFarmersOfTheMoorMinorIds()`、`implementedMinorImprovementCards`、`CardDefinition.requiresFarmersOfTheMoor`、`cardAllowedForPlayerCount()` | 当前可发 FoM 小改良池从已实现 registry 动态派生，只筛选 FoM 专属小改良和当前人数可用牌；`state-bootstrap` 不再维护与 card registry 平行的手写 id 清单。 |
 | Card description icon rendering | `shared/cards/{A,B,C,D,E,M,major,community}/*.ts`、`shared/parents/cards/*.ts`、`shared/i18n/{en,zh}.ts`、`client/components/common/ResourceText.tsx`、`client/components/common/PlayerCard.tsx`、`scripts/__tests__/card-description-icons.test.ts`、`scripts/__tests__/card-description-double-underscore.test.ts` | 生产卡牌描述中资源、动物、地形、稳定厩、栅栏、田地和奖励分使用 `ResourceText` token 渲染图标；fast-scripts 门禁会扫描所有生产卡牌描述，阻止应图标化词回退成 plain text。`__...__` 只用于精确的卡牌名、行动名和行动位名引用，不用于数量、费用、模式说明、资源 icon 组合或非规范行动名；门禁也会阻止命名行动/行动位以裸文本或引号形式出现。FoM 的 `<FOREST>` / `<MOOR>` 由 `ResourceText` 映射到已有 terrain icon 样式；Moor major 卡牌 art 通过 `public-assets.ref` 固定的外部资源加载，Forester's Lodge 使用逻辑路径 `assets/moor/major/M012.png`。 |
-| Farmers of the Moor terrain / deferred minor runtime 边界 | `docs/adr/0007-farmers-of-the-moor-variant-runtime.md`、`player.farmTerrain`、`player.farmyardExtensions`、`shared/moor/terrain-flow.ts`、`shared/moor/farm-terrain.ts`、`shared/moor/terrain-adjacency.ts`、farmyard validation helpers、`shared/cards/major/supply.ts`、`player.cardStates[cardId]`、`player.farmyardSpaceStates`、`server/__tests__/farmers-of-the-moor-compatibility-session.test.ts`、`server/__tests__/moor-minors-terrain-flow-session.test.ts`、`server/__tests__/M038_M039_M043_moor-adjacency-overrides-session.test.ts`、`server/__tests__/M041_M109_moor-complex-special-minors-session.test.ts`、`server/__tests__/M044_M049_moor-future-terrain-minors-session.test.ts`、`server/__tests__/M046_M047_moor-covered-terrain-session.test.ts`、`server/__tests__/M050_M051_moor-farmyard-extension-session.test.ts`、`server/__tests__/M052_M053_moor-temporary-people-session.test.ts`、`server/__tests__/M075_M130_moor-minors-session.test.ts`、`server/__tests__/M088_M126_moor-minors-session.test.ts`、`server/__tests__/moor-batch1-scoring-cookery-exchange-session.test.ts`、`server/__tests__/moor-special-action-listener-minors-session.test.ts`、`server/__tests__/E358_FarmersOfTheMoorHeating-session.test.ts`、`server/__tests__/M018_M062_M063_M068_M106_M113_moor-major-supply-minors-session.test.ts`、`server/__tests__/moor-minor-384-room-build-session.test.ts`、`shared/cards/M/moor-batch1-helpers.ts`、`shared/moor/heating.ts` | FoM 小改良已分批进入 runtime：`M015` / `M016` / `M017` / `M018` / `M019` / `M020` / `M021` / `M022` / `M023` / `M024` / `M025` / `M026` / `M027` / `M028` / `M029` / `M030` / `M031` / `M032` / `M033` / `M034` / `M035` / `M036` / `M037` / `M038` / `M039` / `M040` / `M041` / `M042` / `M043` / `M044` / `M045` / `M046` / `M047` / `M048` / `M049` / `M050` / `M051` / `M052` / `M053` / `M054` / `M055` / `M056` / `M057` / `M058` / `M059` / `M060` / `M061` / `M062` / `M063` / `M064` / `M065` / `M066` / `M067` / `M068` / `M069` / `M070` / `M071` / `M072` / `M073` / `M074` / `M075` / `M076` / `M077` / `M078` / `M079` / `M080` / `M081` / `M082` / `M083` / `M084` / `M085` / `M086` / `M087` / `M088` / `M089` / `M090` / `M091` / `M092` / `M093` / `M094` / `M095` / `M096` / `M097` / `M098` / `M099` / `M100` / `M101` / `M102` / `M103` / `M104` / `M105` / `M106` / `M107` / `M108` / `M109` / `M110` / `M111` / `M112` / `M113` / `M114` / `M115` / `M116` / `M117` / `M118` / `M119` / `M120` / `M121` / `M122` / `M123` / `M124` / `M125` / `M126` / `M127` / `M128` / `M129` / `M130` / `M131` 已实现。Visible Forests / Visible Moors 是 `farmTerrain.kind` 的公开 top layer；Covered Farm Terrain 存在同条 terrain entry 的 `covered`，不参与 visible 计数、Cut Peat / Slash and Burn 候选或 visible terrain 奖励；Fell Trees 移除 top forest 后会 reveal covered terrain，且不触发 cleared-space token listener。FoM terrain 小改良通过通用 selection leaf 复用 `InteractionRequest.selection` / `farm-position` / selectable tiles：可在 unused farmyard 放置 forest/moor、移除 visible terrain、把 forest 改为 moor、按既有 adjacency 规则把 moor 换成 field；future terrain token 复用 `futureMeeples` round entry，`forest`/`moor` 到期转成 optional terrain selection，`field` 继续转成 optional plow，不支持任意多层 stacked terrain；fenced terrain adjacency 通过纯 helper 统计 forest-field / forest-moor edge；plow / fence 一次性非标准邻接通过 actionContext `adjacencyPolicy`、`allowedTiles`、`fencePolicy` 表达，普通后续 plow/fence 保持默认邻接；M038 fenced terrain 在 terrain 全清前只记录在本卡 `cardStates`，不进入 `player.pastures`。Special action listener 复用现有 played-zone `CardListener` 扫描和普通 ActionFlow/pending，不把 special action 当 action space，也不触发 place-farmer/action-space hook；Special action 资源获得/支付、Fell Trees reveal 和 Slash and Burn 翻田等结果走 `GameEvent` 后由 log mapper 派生 `log.actionDetail`，不直接写 `state.log`；Black Market / Illicit Work 这类 special action 自带 follow-up 时，先完成 follow-up，再通过内部 after-listeners action 读取最终状态；M041/M058/M059/M109 复用普通 `plow` / `sow` / `pay` / `gain` ActionFlow，M054/M055 通过后端 Moor special choice action 复用现有 special action 校验与效果执行，M057 通过 extra-turn hook 和后端 Moor special choice action 的 take-card-action 模式，在无普通工人时选择并完整执行可见 special action card，完成后以本卡 extraData 标记本轮已用；M056/M131 使用 `cardStates[cardId].extraData.scheduledOffers` 与 `scheduled-offer` internal action 表达 future round optional offer，due token 先消费，再按可执行性弹出 Cut Peat 或 animal purchase。M052 通过 `family-growth` 的 `holdNewbornOnCard` actionContext 复用 card-held-worker 生命周期，M053 通过 `temporaryFromSupply` place-farmer 和 `farmTerrainMarkers` 表达 forest-bound supply person。M059 通过 trigger payload / selection extraData + `allowedFields:'fromSelectedFields'` 限制 optional sow 到新 field，M060 在 Horse Market 后通过 card-local post-reorg check 读取动物重整后的 horse count 再决定是否弹 sow；Counter / phase-listener 小改良使用 `cardStates[cardId].counters.usage`、既有 listener/action hook、optional pending 和卡牌局部 ActionFlow，不在前端或单卡外散落临时状态。Farmyard space state 小改良使用 `player.farmyardSpaceStates` 记录 blocked space / farmyard goods token / field goods token / non-field crop space；`getUsedFarmyardTileKeys()` 只把 `blocksPlacement` 计为占用，goods token 通过 `special-effect` claim 在格子真正被使用或 field/private-field-phase sow/reap 触发后发放，non-field crop space 通过 placement lock 阻止覆盖但仍算 unused。Farmyard Extensions 使用 `player.farmyardExtensions` 扩展共享 farmyard geometry；used/unused、plow/room/stable/fence、terrain placement、border edge、scoring 和 FarmBoard 均读取动态形状，M050/M051 通过 farm-position selection 提交真实坐标。FoM heating 小改良通过 heating metadata/context 和 `cardStates` 进入供暖需求计算：M032/M085 走静态 metadata，M082 走 wood-to-fuel context 且按折扣前需求扣实际转换 wood，M086 在 harvest field phase 写入当次 harvest 折扣；`1 Sheep` / `Exactly 1 Sheep` 等动物数量前置走通用 prerequisite parser。Major-supply 小改良复用 stack-aware supply helper、`move-major-improvement-to-top` special effect 和卡牌局部 listener/modifier，不在购买主路径硬编码单卡。Room/build/harvest-building 小改良复用 construct `scope:'unit'` modifier、after construct/collect listener、`trueAction:false` follow-up flow、以及 harvest-local `extraData` food craft-building used 标记。任意多层 stacked terrain 仍不实现；Moving Up Major Improvement / Upgrade 必须走 stack-aware major supply 与 card identity metadata。 |
+| Farmers of the Moor terrain / deferred minor runtime 边界 | `docs/adr/0007-farmers-of-the-moor-variant-runtime.md`、`player.farmTerrain`、`player.farmyardExtensions`、`shared/moor/terrain-flow.ts`、`shared/moor/farm-terrain.ts`、`shared/moor/terrain-adjacency.ts`、farmyard validation helpers、`shared/cards/major/supply.ts`、`player.cardStates[cardId]`、`player.farmyardSpaceStates`、`server/__tests__/farmers-of-the-moor-compatibility-session.test.ts`、`server/__tests__/moor-minors-terrain-flow-session.test.ts`、`server/__tests__/M038_M039_M043_moor-adjacency-overrides-session.test.ts`、`server/__tests__/M041_M109_moor-complex-special-minors-session.test.ts`、`server/__tests__/M044_M049_moor-future-terrain-minors-session.test.ts`、`server/__tests__/M046_M047_moor-covered-terrain-session.test.ts`、`server/__tests__/M050_M051_moor-farmyard-extension-session.test.ts`、`server/__tests__/M052_M053_moor-temporary-people-session.test.ts`、`server/__tests__/M075_M130_moor-minors-session.test.ts`、`server/__tests__/M088_M126_moor-minors-session.test.ts`、`server/__tests__/moor-batch1-scoring-cookery-exchange-session.test.ts`、`server/__tests__/moor-special-action-listener-minors-session.test.ts`、`server/__tests__/E358_FarmersOfTheMoorHeating-session.test.ts`、`server/__tests__/M018_M062_M063_M068_M106_M113_moor-major-supply-minors-session.test.ts`、`server/__tests__/moor-minor-384-room-build-session.test.ts`、`shared/cards/M/moor-batch1-helpers.ts`、`shared/moor/heating.ts` | FoM 小改良 `M015`–`M131` 均已实现。Visible Forests / Visible Moors 是 `farmTerrain.kind` 的公开 top layer；Covered Farm Terrain 存在同条 terrain entry 的 `covered`，不参与 visible 计数、Cut Peat / Slash and Burn 候选或 visible terrain 奖励；Fell Trees 移除 top forest 后会 reveal covered terrain，且不触发 cleared-space token listener。FoM terrain 小改良通过通用 selection leaf 复用 `InteractionRequest.selection` / `farm-position` / selectable tiles：可在 unused farmyard 放置 forest/moor、移除 visible terrain、把 forest 改为 moor、按既有 adjacency 规则把 moor 换成 field；future terrain token 复用 `futureMeeples` round entry，`forest`/`moor` 到期转成 optional terrain selection，`field` 继续转成 optional plow，不支持任意多层 stacked terrain；fenced terrain adjacency 通过纯 helper 统计 forest-field / forest-moor edge；plow / fence 一次性非标准邻接通过 actionContext `adjacencyPolicy`、`allowedTiles`、`fencePolicy` 表达，普通后续 plow/fence 保持默认邻接；M038 fenced terrain 在 terrain 全清前只记录在本卡 `cardStates`，不进入 `player.pastures`。Special action listener 复用现有 played-zone `CardListener` 扫描和普通 ActionFlow/pending，不把 special action 当 action space，也不触发 place-farmer/action-space hook；Special action 资源获得/支付、Fell Trees reveal 和 Slash and Burn 翻田等结果走 `GameEvent` 后由 log mapper 派生 `log.actionDetail`，不直接写 `state.log`；Black Market / Illicit Work 这类 special action 自带 follow-up 时，先完成 follow-up，再通过内部 after-listeners action 读取最终状态；M041/M058/M059/M109 复用普通 `plow` / `sow` / `pay` / `gain` ActionFlow，M054/M055 通过后端 Moor special choice action 复用现有 special action 校验与效果执行，M057 通过 extra-turn hook 和后端 Moor special choice action 的 take-card-action 模式，在无普通工人时选择并完整执行可见 special action card，完成后以本卡 extraData 标记本轮已用；M056/M131 使用 `cardStates[cardId].extraData.scheduledOffers` 与 `scheduled-offer` internal action 表达 future round optional offer，due token 先消费，再按可执行性弹出 Cut Peat 或 animal purchase。M052 通过 `family-growth` 的 `holdNewbornOnCard` actionContext 复用 card-held-worker 生命周期，M053 通过 `temporaryFromSupply` place-farmer 和 `farmTerrainMarkers` 表达 forest-bound supply person。M059 通过 trigger payload / selection extraData + `allowedFields:'fromSelectedFields'` 限制 optional sow 到新 field，M060 在 Horse Market 后通过 card-local post-reorg check 读取动物重整后的 horse count 再决定是否弹 sow；Counter / phase-listener 小改良使用 `cardStates[cardId].counters.usage`、既有 listener/action hook、optional pending 和卡牌局部 ActionFlow，不在前端或单卡外散落临时状态。Farmyard space state 小改良使用 `player.farmyardSpaceStates` 记录 blocked space / farmyard goods token / field goods token / non-field crop space；`getUsedFarmyardTileKeys()` 只把 `blocksPlacement` 计为占用，goods token 通过 `special-effect` claim 在格子真正被使用或 field/private-field-phase sow/reap 触发后发放，non-field crop space 通过 placement lock 阻止覆盖但仍算 unused。Farmyard Extensions 使用 `player.farmyardExtensions` 扩展共享 farmyard geometry；used/unused、plow/room/stable/fence、terrain placement、border edge、scoring 和 FarmBoard 均读取动态形状，M050/M051 通过 farm-position selection 提交真实坐标。FoM heating 小改良通过 heating metadata/context 和 `cardStates` 进入供暖需求计算：M032/M085 走静态 metadata，M082 走 wood-to-fuel context 且按折扣前需求扣实际转换 wood，M086 在 harvest field phase 写入当次 harvest 折扣；`1 Sheep` / `Exactly 1 Sheep` 等动物数量前置走通用 prerequisite parser。Major-supply 小改良复用 stack-aware supply helper、`move-major-improvement-to-top` special effect 和卡牌局部 listener/modifier，不在购买主路径硬编码单卡。Room/build/harvest-building 小改良复用 construct `scope:'unit'` modifier、after construct/collect listener、`trueAction:false` follow-up flow、以及 harvest-local `extraData` food craft-building used 标记。任意多层 stacked terrain 仍不实现；Moving Up Major Improvement / Upgrade 必须走 stack-aware major supply 与 card identity metadata。 |
 | Farmers of the Moor terrain 提交期校验 | `getUsedFarmyardTileKeys()`、`commitSelectionChoice()`、`validateFarmPositions()`、`applyTerrainSelectionEffect()` | `selectableTiles` 只作为 pending 展示和第一层候选；`farm-position` 提交与 terrain effect 执行时都会重新读取当前 farmyard 占用，防止同一 round 多个 future terrain token 复用已经被前一个 token 占用的格子。 |
 | Farmyard usage canonical seam | `shared/domain/farmyard-usage-core.ts`、`shared/domain/farmyard-usage.ts`、`shared/domain/farmyard-geometry.ts`、`shared/domain/farmyard-regions.ts`、`shared/domain/farm.ts`、`A073_AgriculturalFertilizers`、`B132_EstateMaster` | used / unused farmyard spaces 统一从 `farmyard-usage-core.ts` 读取；`farmyard-usage.ts` / `farm.ts` 只保留兼容 facade，几何和 fenced region 派生拆到无反向依赖的 domain helper。卡牌不得手写 3x5 或局部 occupied set 计数；必须包含 farmyard extensions、terrain、blocked farmyard spaces 和 derived pasture tiles。 |
 | Farm / action-space source metadata | `FenceSegment.type/source`、`WorkerRef.synthetic.kind='linked-occupancy'`、`ActionSpace.blockedBy`、stable count helpers、special-stable card-effect hooks、supply/family token helpers、`action-space-tokens`、action-space category helpers、`actionSpaceAttachments` cardState、`place-farmer-on-space`、`PlayerActionSpaceConfig.gainPerRound` | fence、linked occupancy、5/6 linked action-space blocking、special stable、stable count、token supply、行动格预留 marker 与行动格资源附件都走 source/type metadata、cardState 与 domain/helper；公共基础 action definition 的 player-count filter 覆盖 2-6，5/6 专属行动格单独建模；Lessons / Hollow / wood accumulation / Traveling Players / Resource Market 这类跨人数 action-space 语义走共享 category helper，并覆盖 5/6 变体；指定目标的额外放人 / piggyback 放人走 `place-farmer-on-space` internal action，`allowOccupied` 只放宽占用，不绕过 blocked、round availability、action executability 或 worker supply；确实需要 direct-click 硬拒绝的 action space 用通用 `strictCanExecute` opt-in，不要在主路径恢复单卡 import 或卡牌 id 分支。卡牌提供的累积格声明 `gainPerRound`，资源存入 `ActionSpace.resources` 并走标准 `collect`，不再用 card state 或 `take-from-card` 模拟累积。 |
@@ -200,83 +183,26 @@
 
 Gain 来源区分显式资源参数和行动格配置的基础收益。C168 在卡内复用这一既有区分（#1125），保留额外奖励，以及其他卡牌授予的真实日工行动。4 人 Session 回归覆盖接受、拒绝、支付、动物安置、Farmers of the Moor 组合和撤销重试，不新增触发标记。
 
-## 6. 基础设施待办
+## 5. 基础设施待办
 
-Session 按 ADR 0028 保留快照中的手牌、卡牌身份、可选规则数据及历史（#1258/#1270）。输入拒绝按 ADR 0015 恢复完整命令检查点（#1257），已接受强制续行的阻塞和 guard violation 仍遵循各自契约。无围栏畜舍按 ADR 0029 保存物种及数量（#1267）；E012/C089 的两只、三只动物在确认、支付、撤销及恢复后保持一致，畜舍展示分区向两客户端投影后端容量。公开历史校验及 Frame 专属牧场投影仍属于独立解码边界。
+只登记尚未实现的跨卡机制。机制实现并有测试或门禁覆盖后删除该条，并把新的通用机制写进 `docs/ARCHITECTURE.md` 对应的 module 节。已完成的工作记录在 PR、ADR 和测试里，不放在这里。
 
-Issue #1204 使厩舍费用在同一支付方案中只计入一次完整的 payload-aware `computeCosts` 贡献。整次费用与声明的逐座价格分开，准入、当前预览和实际支付对一座或多座厩舍保持一致。保留 C088 的数量相关优惠及逐座替代支付；C094 直接复用共享可用性检查，删除卡内预先聚合。Session 回归覆盖预算边界、折扣、精确或覆盖单价、来源限定费用、归因、只读预览、恢复与 undo。
+当前没有未决条目。
 
-Issue #1205 通过共用的 `card-worker:<sourceCard>` 占位工厂修复卡上人员恢复。直接加载、JSON/新 Session 和 PostgreSQL 房间恢复均保留占位及派生的可用工人数；占位格不可执行，人员只在正常归家时释放。两人 Session 回归同时覆盖 undo/重试、含冒号的来源 ID、放弃效果和拒绝未知格，不新增 D103 专用恢复分支或重复工人数计数。
+## 6. 参考实现坏味道：不要照抄
 
-#1201 修复空累积格准入及 C127 可跳过强制个人费用的问题。空格附加收益不授予使用资格，Riverbank Forest 的固定芦苇也不例外；实际异种库存及明确合法替代仍可用。C127 缺粮可领乞讨，缺粮确认允许先用已有合法换粮能力，普通职业费用保持独立。对应 Session 断言覆盖拒绝原子性、付款/乞讨、生育、恢复及撤销；历史审计 RAW 统计保持原样。
-
-#1197 删除 C179 的行动前牧场缓存。5 人 Session 回归覆盖两种响应顺序的嵌套分割、多个新牧场、已有未围栏马厩、动物安置与计分、投影 / Replay、pending 恢复和撤销重做。
-
-回合结束响应（#1199）在普通轮转与卡牌授予的独立 Turn 之间共用固定来源发现。动态资格与支付、选择器自己的显式 anytime 权限和本卡 Turn 凭据取代串行重扫与 placement 几何缓存。详见 §5 和 Architecture §6.5/§7.6/Anytime Window Policy。
-
-提交时的农场使用状态事实（#1195）是响应新增使用格的共享基础设施，详见 §5 与 Architecture §7。四类几何事件以及 `farm.spacesUsed` 覆盖原有农场格的真实变更；后者由 selection 同步变更与添加封锁状态提交产生，不把新增版图的初始地形算成 unused→used。定时房间领取只在成功建房后发出既有建房事实。卡牌只读取已捕获宿主事实，C048 保留提交时持牌检查及 Turn 凭据。农场格物资领取支持可选坐标过滤，原始物资归属可随嵌套响应、pending 恢复及 undo 保留，无需第二份剩余计数状态（#1203）。
-
-#1193 通过分开行动级折扣与选中的卡上供给，修复 B015 / E074 来源覆盖及多造实体。Session 覆盖明确跳过、库存上限、超量选择、palisade、支付选择、触发顺序、嵌套围栏、anytime、恢复和 undo；旧共享 pending 槽及 reserve / clear API 已删除。
-
-会话规则隔离（#1188, #1190–#1192）让每个 `GameCore` 独立持有显式传递的 `ActionHookRegistry`，执行、可用性、费用预览和农场预校验共用该局规则。卡牌效果保留同步 `withCtx` 作用域，不再发布持久默认环境；缺少环境时明确失败，显式空注册表仍合法。加载、撤销和 worker 重建在所属 Core 环境内恢复规则，注册表和 handler 不进入状态或 cursor 序列化。
-
-每行 `altCosts` 都是完整基础费用候选，须包含各替代方案共有的费用。折扣和替代付款仍走通用支付管线。卡内奖励分公式保留牌文列出的有限例外，与印刷卡牌分分开；存储预览复用同一计分回调。Session 回归验证实际费用、转换后的支付及后续计分边界，无需新增通用扩展点。
-
-2026-10-14 negative-test 中方案已明确的 19 项 issue 已按原有扩展点修复；C131 仍在 §2 待定；E038、E052 已由 main 的独立修复解决。阶段动物处置在弹出父阶段前嵌套既有重整流程，费用替代复用成本候选并保留支付归因，手牌来源在卡牌承诺前冻结。农田、动物与住房数量继续从权威位置或既有容量查询派生。回归以相邻公开 Session 测试为准，不把旧错误行为或审计归档导入 production。
-
-当前规则修复可复用已有卡牌局部 hook 和动态前置检查，无需新增扩展点。付款前的独立资源兑换使用显式 pay/gain flow：收益进入库存，后续 host 付款保留自身实际支付的资源明细。非法特殊畜栏提交复用可恢复选择失败；强制续行的 blocked 仍遵循 ADR 0015。
-
-#1145–#1150 的通用契约由 §5 和 Architecture §5.3/§6.4/§7.6 记录：准备窗口固定来源树、动态行动格执行目录同步和本次购买节点来源。原生新增 hook 不自动扩张 Workshop 白名单。纯计分继续派生当前在场事实；`getPlayerCookeryCards()` 包含大小烹饪改良，oven 不计，双身份不另复制计数。住房到期与永久人员供应同样复用已有查询和身份，不维护重复计数。
-
-房间动物容纳区（ADR 0026，#1133）以真实房间坐标为身份，安置只保存在 `houseAnimals` 映射中。各房容量始终为 1；通用区域占用分组保留普通全屋一只宠物的限制，并支持 A086 每房一只。动物区搜索、预填、安置校验、支付和序列化共同使用此模型；实际房间与带房养标记的卡牌边界区保持独立。
-
-牧场面积与围栏内马厩计数由 `shared/domain/pasture.ts` 的领域查询派生。权威牧场只保存身份、格子和动物分配，不再持久化 `size` 或 `stables`。建造、归还马厩、容量修正、卡牌前置与奖励、父母卡条件及计分共用当前农场事实。快照投影展示计数，加载时移除这些字段。`pasture-derived-state-session.test.ts` 覆盖免费与付费建造、传牌、容量修正、非法选择、归还、撤销重做及快照恢复；`shared/domain/__tests__/pasture.test.ts` 验证实时查询且不写状态。
-
-#1096 与 #1099–#1102 统一卡牌生效和尾随反应的边界：一次性打出效果在支付、提交后的 `onBuy` 执行，已打出的本牌不响应本次直接打牌完成事件。明确包括自身的收益保留自身 `onBuy` 部分及后续基于触发快照的反应。普通和额外放人共享 before 准入、完整行动解析、veto 与 strict 门禁。依赖职业费用的后续奖励按已提交的卡牌及付款玩家筛选，包括嵌套职业。Session 测试覆盖事件顺序、pending 恢复、撤销、计分及不可执行的后续动作。
-
-通用 Choice Preview（ADR 0024，issues #1045–#1052）从可执行原语生成未来安排、资源移动、完整交换、支付路径对应结果、未来购买机会、行动格身份和来源卡计分。Farm Target Choice 由后端声明合法农场格和整块卡牌田，前端绑定可见作物槽，不解析不透明选项值，也不会自动选择多个绑定中的第一个。手牌选择共用规范卡牌身份。已知的确定性存储投影只读取计分，不推进 Engine；无展示意义的记账步骤隐藏。这些机制解决 19 张卡牌的展示审计问题，无需单卡预览回调或核心卡号分支。
-
-#994–#1002 建立 Card State 边界：来源卡只读规则贡献、按来源归还特殊畜栏、围栏使用真实 AnimalZone 数量、当前节点显式 Anytime Window，以及规范化的公开展示。普通视角只接收明确的公开／玩家私有信息，本人也不接收内部状态；恢复和全开 Replay 保留原始数据。默认架构入口现扫描领域层、行动层（包括 internal effect）、引擎、会话、投影、服务端、前端和 Replay Viewer，拒绝固定单卡状态／提示键依赖与前端原始状态读取。原生和沙盒 Session 验证结算、恢复、undo、视角隔离和通用多来源行为，前端验证记录后的展示。契约见 Architecture §8.3 和 ADR 0023。
-
-Occupation-hand 选择在 Session 提交和内部 selection effect 中共用子集验证。重复编号、非手牌和非法数量在效果、随机观察及私有缓存写入前被拒绝，非法提交保留原等待选择。
-
-次要改良购买资格在可用性、手牌候选和权威提交间共用授予类型、命名行动身份与卡牌元数据（#1128）。要求 Major Improvement 行动的小发展可进入真实主要改良机会，同时保留小发展手牌、支付、打出区和计分身份。非命名行动的建造牌效不授予该例外，主要改良机会的替换 hook 仍只按 major 范围结算。Hook 注入的主要改良候选仍可在次要改良机会中合法购买；pending 选择校验拒绝未提供的主要改良。
-
-房间和普通畜栏选择在支付或放置前整体拒绝含重复坐标的批次（#1127/#1129）。Session 回归覆盖普通行动与卡牌授予的行动，拒绝时资源、几何、供应、卡牌状态和待选交互不变，并可合法重试。原有多座建造费用和折扣保持不变。
-
-动物重整自动补位已在共享动物区与请求边界实现，详见 §5 基础设施表；核心路径不增加卡号分支。
-
-当前选项可用性由原生纯查询 `CardEffect.projectInteractionRequest` 实现：活动 pending 的选项及数量上限在展示与权威校验前刷新，覆盖嵌套 anytime、撤销和恢复。卡牌局部条件保留 pending 归属、随机观察、资源承诺和原有选项展示策略；未来必需流程继续沿用 ADR 0015 语义。
-
-Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提交统一执行已选田授权，额外田非法提交保留可恢复待选。作坊收获兑换可拒绝，重复作坊计分共用 costed-bonus 资源预算。喂养逐玩家结算并支持可恢复跨玩家 anytime；资源承诺保留在卡内，由 Session 命令边界原子校验（ADR-0019）。上述机制有原生 Session 回归，不在核心流程添加卡号分支。
-
-#848 的共享缺口已补齐：付款方出资的 gain 先校验完整转账再移动资源；显式 mandatory listener 即使不经过触发菜单也保留强制义务；普通及免费职业入口统一校验前置；改善预览与付款保留授予行动的上下文。农场货物放置采用 `farm.animalMoved.newlyPlacedOnFarmyard` 和实体田格的 `resource.moved` 事件。Writing Chamber 复用已有完整 post-score summary 读取独立负分条目，不改变其他计分卡的输入。组件退款仍为 #849 跟踪的独立已接受限制。
-
-共享支付枚举支持 `ComplexCost.minimumResourcesPaid`，在折扣和替代支付后、最优方案裁剪前校验；改善候选和提交共用该约束。嵌套 OR/XOR 叶子复用普通候选管线。基础田地计分只统计 Farmyard Field；卡牌终局投入通过明确选择和真实支付结算。职业后续必付食物复用已有课费支付预览及 `reserveResources` 契约。
-
-供应人物身份、预留、正常轮转和归家处置已由 §5 与 `docs/ARCHITECTURE.md` §6.4 的共享边界支持；卡牌时机与费用保留在卡内。
-
-**浏览器本地工坊试玩沙盒**（PR #619 / wayfinder #605，已完成）：新增 `client/local-sandbox/` 的浏览器端自定义卡编译 + 执行基础设施，`VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行。复用 shared 的 AST validator + compiler，在 Web Worker 内用 `new Function` 执行卡代码，执行语义与服务端 isolated-vm executor 由 `server/__tests__/local-sandbox-parity.test.ts` 钉死等价。**边界**：仅服务单人工坊试玩 dry-run（作者自己的卡），不服务真实多人对局——真实对局卡代码执行仍走服务端 isolated-vm，后端权威不变（accepted divergence，见 §3）。**安全**：浏览器执行器非硬隔离，用 strict mode + shadow globals + worker capability removal 三层深度防御；第三方 published 卡的权威隔离由服务端保证。详见 `docs/ARCHITECTURE.md` §12.5 与 `docs/CUSTOM_CARD_SANDBOX.md` §8。
-
-后续若发现需要跨多张卡的新机制，先在本节新增待办；实现完成并有测试或守卫后，从本节移除并同步 §5 / §12。
-
-## 8. 参考实现坏味道：不要照抄
-
-- 不把导入的前置条件元数据当作规则权威。前置条件以出版社卡牌文字、印刷图标和官方裁定为准。参考实现运行时未使用的字段，在 OA 通用校验中可能成为实际限制。
-- 不用混合开轮扫描近似揭牌或开工反应；不靠牌区索引恢复准备窗口，不在来源发现时按当前支付能力删掉合法反应。
-- 不从最初放人格、外层 frame 或最后一个工人反推购买来源；新授予的购买必须保留自己的节点身份。
-
-- 一次性自身打出效果不得用 `occupation` / `improvement.after` listener；文案要求成功打出或建造卡牌后生效时，不得提前监听 `pay.after`。自身生效用 `onBuy`，后续反应用已提交的 host 行动。
-
-通用消费者不得读取固定单卡的原始状态或提示键，不得枚举内部字段生成展示，也不得把完整内部状态发送给本人。应添加来源只读规则／展示查询或可复用的显式 flow 契约；默认 card-state 架构门禁检查这些边界。
-
-- 中心化 `SpecialEffect.js` cardId dispatch 和单卡 JS 方法。OA 应保留 typed pending/action flow。
-- 参考实现在 action/main path 中出现卡名或一次性逻辑，例如全局 Scythe-style flag 或 C88 stable/fence cost relocation。OA 应优先使用卡牌本地 hooks/helpers。
-- fencing 主路径不得为 C1 / B30 / E149 增加卡牌 id 分支或 `noWoodPalisades` / `midnightFencer` 一类单卡开关；用 `FenceSegment.type` / `source` 与 generic `fencePolicy` 表达差异。
-- 参考实现 mutable PHP args 和原地 cost rewrite。OA 应保留结构化 modifiers 和 payment enumeration。
+- 不把导入的前置条件元数据当作规则权威。前置条件以出版社卡牌文字、印刷图标和官方裁定为准；参考实现运行时未使用的字段，在 OA 通用校验中可能成为实际限制。
+- 不用混合开轮扫描近似揭牌或开工反应；不靠牌区索引恢复准备窗口，也不在来源发现时按当前支付能力删掉合法反应。
+- 不从最初放人格、外层 frame 或最后一个工人反推购买来源；新授予的购买保留自己的节点身份。
+- 一次性自身打出效果不得用 `occupation` / `improvement.after` listener；文案要求成功打出或建造卡牌后生效时，不得监听 `pay.after`。自身生效用 `onBuy`，后续反应用已提交的 host 行动。
+- 通用消费者不得读取固定单卡的原始状态或提示键，不得枚举内部字段生成展示，也不得把完整内部状态发送给本人。应添加来源只读规则／展示查询或可复用的显式 flow 契约；默认 card-state 架构门禁检查这些边界。
+- 不把 `cardId` dispatch 集中到 `SpecialEffect.js` 或单卡 JS 方法；OA 保留 typed pending / action flow。
+- 不在 action / main path 中写卡名或一次性逻辑，例如全局 Scythe-style flag 或 C88 的 stable / fence cost relocation；OA 优先使用卡牌本地 hooks / helpers。
+- fencing 主路径不得为 C1 / B30 / E149 增加卡牌 id 分支或 `noWoodPalisades` / `midnightFencer` 一类单卡开关；用 `FenceSegment.type` / `source` 与通用 `fencePolicy` 表达差异。
+- 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 
-## 9. 参考实现使用 Special Effect 的卡牌
+## 7. 参考实现使用 Special Effect 的卡牌
 
 | Deck | 卡牌 |
 |---|---|
@@ -286,25 +212,25 @@ Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提
 | D | `D101_SugarBaker`, `D102_SampleStableMaker`, `D103_CanalBoatman`, `D107_Bellfounder`, `D010_StorksNest`, `D116_TreeInspector`, `D124_Emissary`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D129_LumberVirtuoso`, `D134_OysterEater`, `D137_TradeTeacher`, `D138_PetLover`, `D014_HammerCrusher`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D158_BeanCounter`, `D161_CabbageBuyer`, `D167_PureBreeder`, `D020_TurnwrestPlow`, `D022_WorkPermit`, `D023_PioneeringSpirit`, `D026_CarpentersYard`, `D027_Retraining`, `D051_Archway`, `D066_PotterCeramics`, `D070_StrawManure`, `D071_Changeover`, `D072_StableManure`, `D074_RoyalWood`, `D082_HuntingTrophy`, `D092_ChildOmbudsman`, `D093_SheepInspector`, `D094_HenpeckedHusband`, `D096_Furnisher`, `D098_Transactor` |
 | E | `E103_Wolf`, `E106_EmergencySeller`, `E010_StrawHat`, `E112_GrainThief`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E134_Omnifarmer`, `E148_Lazybones`, `E162_Entrepreneur`, `E166_Roastmaster`, `E167_DairyCrier`, `E022_GuestRoom`, `E027_PiggyBank`, `E004_Thunderbolt`, `E051_WhaleOil`, `E052_Cubbyhole`, `E053_BoarSpear`, `E058_LunchtimeBeer`, `E005_NightLoot`, `E073_Scythe`, `E074_AshTrees`, `E076_LumberPile`, `E078_SleightofHand`, `E081_AlchemistsLab`, `E083_ShepherdsWhistle`, `E085_MasterTanner`, `E086_PenBuilder` |
 
-## 10. Hook 点清单
+## 8. Hook 点清单
 
 Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
-## 11. 源码排除项
+## 9. 源码排除项
 
 | 来源 | 原因 |
 |---|---|
-| `C054_MarketStall` | `C054_MarketBooth` 的 参考实现 legacy 源文件。 |
-| `C071_SlurrySpreader` | `C071_Slurry` 的 参考实现 legacy/错误命名源文件。 |
-| `D011_LawnFertilzer` | `D011_LawnFertilizer` 的 参考实现 typo 源文件。 |
-| `E132_Shearer` | `E132_VeggieLover` 的 参考实现 legacy 源文件。 |
+| `C054_MarketStall` | `C054_MarketBooth` 的参考实现 legacy 源文件。 |
+| `C071_SlurrySpreader` | `C071_Slurry` 的参考实现 legacy/错误命名源文件。 |
+| `D011_LawnFertilzer` | `D011_LawnFertilizer` 的参考实现 typo 源文件。 |
+| `E132_Shearer` | `E132_VeggieLover` 的参考实现 legacy 源文件。 |
 | 参考实现 `implemented=false` 且无运行时行为的卡牌 | 除非 OA 明确作为产品扩展实现，否则排除出行为对齐范围。 |
 
-## 12. 单卡附录
+## 10. 单卡附录
 
 状态值：`已对齐`、`已接受差异`、`需复核`、`排除`。
 
-`需复核` 表示未对齐：已经发现 参考实现差异或高置信行为风险，需要修复或补测试确认后才能改为 `已对齐`；它不是“已接受差异”。
+`需复核` 表示未对齐：已经发现参考实现差异或高置信行为风险，需要修复或补测试确认后才能改为 `已对齐`；它不是“已接受差异”。
 
 逐卡全量表不再在此维护。未列出的卡牌均为已对齐，其行为由 `shared/cards/` 下的卡牌文件定义、由相邻测试锁定；这里只记录有意的偏离和排除项。
 
