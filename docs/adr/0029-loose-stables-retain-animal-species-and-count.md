@@ -1,15 +1,26 @@
-# Loose stables retain animal species and count
+# 29. Loose stables retain animal species and count
 
 - Status: Accepted
 - Date: 2026-10-17
-- Issue: #1267
 
-Loose-stable storage currently retains only a species per farm position. E012 Animal Bedding and C089 Stable Master can increase one stable's capacity above one, but a confirmed assignment of two or three animals loses its count when written back. Resource totals still use submitted counts, so E012 can leave three sheep in inventory while its actual zones contain two animals and require another reorganization.
+## Context
 
-The maintainer chose one count-bearing assignment per physical loose stable over parallel species and count maps. `stableAnimals` records `{ animalType, animalCount }` at the stable's position key. A nonempty entry has one enabled species and a positive integer count. Empty assignments are omitted; `stableTiles` continues to own the stable's physical existence. Capacity belongs to the current rule query and is not stored as the assignment quantity. Preserve physical holder identity rather than putting ordinary stable animals in E012's card state or inferring allocation from total resources.
+Issue #1267. Loose-stable storage kept only a species per farm position. When cards such as E012 Animal Bedding or C089 Stable Master raised one stable's capacity above one, a confirmed assignment of two or three animals lost its count on write-back while resource totals kept the submitted counts, forcing another reorganization.
 
-Reorganization, zone queries, payment, capacity enforcement, prefill, scoring, serialization and recovery consume the same assignment. Animal-number rules sum `animalCount`; presence, occupied-space and distinct-species rules retain their respective meanings. Removing some animals from a stable decrements its count and removes the entry only at zero. Reducing capacity preserves resource totals until the player explicitly places or discards displaced animals under the existing reorganization contract. No old species-string save migration is required.
+## Decision
 
-The frontend renders the backend's actual stable count and capacity and submits assignments to the existing authoritative reorganization command. Local presentation does not adjudicate E012 or C089 rules. A legal assignment must survive write/read, return/live response, turn handoff and recovery with inventory and assigned counts consistent. Completing an unrelated continuation cannot repair a lost count or certify a valid assignment.
+- Each occupied physical loose stable stores one `{ animalType, animalCount }` assignment in `stableAnimals` at its position key: one enabled species and a positive integer count. Empty assignments are omitted; `stableTiles` still owns the stable's existence. Capacity comes from the current rule query and is never stored as the assignment quantity.
+- Reorganization, zone queries, payment, capacity enforcement, prefill, scoring, serialization and recovery consume the same assignment. Animal-number rules sum `animalCount`; presence, occupied-space and distinct-species rules keep their meanings.
+- Removing animals decrements the count and removes the entry only at zero. Reducing capacity keeps resource totals until the player places or discards displaced animals through reorganization.
+- The frontend renders the backend's stable count and capacity and submits through the existing reorganization command; it adjudicates no card rule. Completing an unrelated continuation never repairs a lost count or certifies an assignment.
+- Room-holder permissions and mixed-species card-holder rules keep their own contracts (ADR 0026).
 
-Session acceptance covers E012's two-animal stable and ordinary one-animal control, C089's three-animal first stable and ordinary subsequent stable, atomic over-capacity rejection, one normal confirmation, partial payment, capacity reduction, undo and JSON/private-cursor recovery. C089 was independently reproduced and is covered by the same Session repair. Existing room-holder permissions and mixed-species card-holder rules retain their separate contracts under ADR 0026.
+## Consequences
+
+- A legal assignment survives write / read, response, handoff and recovery with inventory and assigned counts consistent.
+- No migration for old species-only saves is provided.
+
+## Alternatives considered
+
+- Parallel species and count maps: two structures to keep consistent.
+- Storing stable animals in a card's state, or inferring allocation from totals: loses physical holder identity.

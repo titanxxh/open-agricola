@@ -1,24 +1,31 @@
-# Farmers of the Moor uses explicit variant runtime paths
+# 7. Farmers of the Moor uses explicit variant runtime paths
 
 - Status: Accepted
 - Date: 2026-06-23
 
-Farmers of the Moor will be implemented as a game variant with explicit runtime paths instead of being folded into existing base-game flows. The variant owns its special action command, heating interaction, horse support, farm terrain state, and major improvement supply selection. Player-side Farmers of the Moor state that naturally participates in existing rules, such as `farmTerrain`, `sickWorkerIds`, `fuel`, and `horse`, lives on `PlayerState` rather than under a nested `player.farmersOfTheMoor` object.
+## Context
 
-Special actions use a dedicated `takeSpecialAction` command. They are work-phase turn actions, not action spaces and not anytime actions: they require an unplaced healthy worker, do not consume that worker, do not place a worker on an action space, and do not trigger place-farmer or action-space placement hooks.
+Farmers of the Moor adds special actions, heating, horses, farm terrain and its own major supply. Folding these into base flows with small conditionals would blur action-space, feeding and supply semantics.
 
-Heating uses a dedicated `heating` interaction after each player's food feeding is resolved. It does not extend the existing locked `feed` request, because the current feed request freezes food requirements and food used. The heating request owns fuel payment, voluntary underpayment, and wood-to-fuel conversion for that heating step.
+## Decision
 
-Horses are added to the shared animal/resource type system, but are gated by `enableFarmersOfTheMoor`. When the variant is disabled, horse stays at zero, is hidden from UI, and does not participate in animal reorganization, breeding, exchanges, or scoring. When the variant is enabled, generic animal semantics include horse, while cards that explicitly name sheep, wild boar, and cattle keep that narrower wording.
+- Farmers of the Moor is a Game Variant with explicit runtime paths. Player state that takes part in existing rules (`farmTerrain`, `sickWorkerIds`, `fuel`, `horse`) lives on `PlayerState`, not under a nested variant object.
+- Special actions use the dedicated `takeSpecialAction` command. They are work-phase turn actions, neither action spaces nor anytime actions: they need an unplaced healthy worker, do not consume or place it, and trigger no place-farmer or action-space hooks.
+- Heating is a dedicated `heating` interaction after each player's feeding; it owns fuel payment, voluntary underpayment and wood-to-fuel conversion, and does not extend the frozen `feed` request.
+- Horses join the shared animal and resource types but are gated by `enableFarmersOfTheMoor`; when the variant is disabled a horse stays at zero, is hidden and takes no part in reorganization, breeding, exchanges or scoring. When it is enabled, generic animal semantics include horses, while cards naming sheep, boar and cattle keep that wording.
+- Major supply selection uses the variant registry and stack-aware helpers (ADR 0006).
+- Reserved rule terms keep one meaning for every Moor card:
+  - Visible Forests / Visible Moors are the public top-layer `farmTerrain` entries; at most one Covered Farm Terrain sits under each, is serialized for every viewer, and revealing it is not a cleared-space event.
+  - Blocked Farmyard Spaces, Farmyard Space and Field Goods Tokens, and Non-field Crop Spaces live in `player.farmyardSpaceStates` and are enforced through shared farmyard validation, never frontend filtering. A goods token makes its space used only with `blocksPlacement`; a Non-field Crop Space stays non-Field and unused for scoring and capacity but blocks placement while it holds a crop.
+  - Farmyard Extensions live in `player.farmyardExtensions` and extend the shared geometry that every farm reader uses.
+  - Moving Up a Major Improvement and Upgrade use the stack-aware supply helpers and identity metadata, never raw pushes into `availableMajorImprovements`.
+  - Usage counters live in the owning card's `cardStates`.
 
-Major improvement supply selection uses a variant registry. The base game, 5/6-player duplicate supply, and Farmers of the Moor supply are separate templates selected by the enabled variant combination. Purchase and return-to-supply logic must operate through the stack-aware supply helper rather than scattering `enableFarmersOfTheMoor` branches through improvement flows.
+## Consequences
 
-Some Farmers of the Moor minor improvement rule terms still have reserved runtime contracts so future minor cards do not invent incompatible local meanings:
+- Feeding and action-space semantics stay unchanged for the base game.
+- New Moor cards reuse the reserved terms instead of inventing local meanings.
 
-- Visible Forests / Visible Moors are the public top-layer `player.farmTerrain` entries whose visible `kind` is `forest` / `moor`; serialization must also preserve any Covered Farm Terrain for every viewer so later effects can reveal it without inventing local hidden state. The runtime supports at most one visible top terrain plus one Covered Farm Terrain per coordinate; removing the visible top and revealing covered terrain is not a cleared-space event.
-- Blocked Farmyard Space lives in `player.farmyardSpaceStates` and means a farmyard position that card effects make unavailable to room, field, stable, fence, or terrain placement through shared farmyard validation inputs, not through frontend-only filtering. Farmyard Space Goods Tokens and Field Goods Tokens use the same state list but do not make the space used unless `blocksPlacement` is set. Non-field Crop Spaces also use this list; they remain non-Field and unused for farmyard scoring/capacity, but block placement while holding a crop.
-- Farmyard Extensions live in `player.farmyardExtensions` and extend the shared farmyard geometry. Used/unused, room/stable/plow/fence, terrain placement, border-edge validation, scoring, and FarmBoard rendering must read the dynamic farmyard shape; extension spaces are normal farm coordinates, not frontend-only slots.
-- Moving Up Major Improvement and Upgrade use the stack-aware major supply return/purchase helpers and card identity metadata; they must not push raw ids into `availableMajorImprovements`.
-- Usage Counters live under the owning card's `player.cardStates[cardId]` counters or extraData and are consumed by card-local listeners or existing shared helpers.
+## Alternatives considered
 
-The rejected alternative was to attach Farmers of the Moor behavior to existing base flows with small conditionals: special actions as pseudo action spaces, heating fields on `feed`, horses as ad hoc resources, and Farmers of the Moor major cards appended to the existing supply. That would look smaller initially, but it would blur rule boundaries, make feed and action-space semantics harder to reason about, and recreate the ordering problems that the stack-aware major supply was introduced to avoid.
+- Special actions as pseudo action spaces, heating fields on `feed`, ad hoc horse resources and appended Moor majors: smaller at first, but blurs rule boundaries and recreates the supply ordering problems.

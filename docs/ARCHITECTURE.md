@@ -835,12 +835,14 @@ Tests: `shared/session/__tests__/anytime-policy.test.ts`, `server/__tests__/{any
 
 ## 8. `shared/cards/`: Card Source closure
 
+This module owns every card's single source and the generic seams a card plugs into: hooks and listeners (§7), local state, Card Fields and capability metadata. A card's ability stays closed inside its own file.
+
 ### 8.1 Card Source and projections
 
-ADR 0002 defines the target state. A card author maintains one Card Source:
+A card author maintains one Card Source ([ADR 0002](adr/0002-card-source-manifest-projection.md)):
 
 ```ts
-export const A123_FrameBuilder = defineOccupationCard({
+export const CardName = defineOccupationCard({   // the constant shares the file name
   meta: { id, name, deck, number, category, desc, cost, players },
   impl: { modifiers, listeners, effect, prerequisiteCheck, reaches },
 })
@@ -848,66 +850,59 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 | Concept | Form | Readers |
 |---|---|---|
-| Card Source | `shared/cards/{A..E,major,community}/{Card}.ts`, containing `meta` and optional `impl` | Server, sandbox, and tests; forbidden from the main client bundle |
+| Card Source | `shared/cards/{A..E,M,major,community}/{Card}.ts`, containing `meta` and optional `impl` | Server, sandbox and tests; forbidden from the main client bundle |
 | Card Display | `public/cards-manifest.json`, built from Card Source `meta` | Main client bundle through `client/services/card-meta` |
 | Card Impl | Card Source `impl`, projected into `shared/cards/catalog.generated.ts` and `CardRegistry` | Server and sandbox; forbidden from the main client bundle |
 
-The target state removes `shared/cards-display/` and generates no shadow display directory. `shared/cards/community/*` uses the same single source as base and major cards. `shared/cards/community/auto-catalog.ts` no longer exists.
+- `meta` is the Card Definition: serializable, frontend-visible fields without runtime behavior. Declarative rule fields (`cost`, `prerequisite`, `*Prerequisites`, `cardField`, `isCookery`, capability metadata) are allowed; `modifier(s)`, `listeners`, `effect` and `prerequisiteCheck` are not. `desc` and `prerequisite` are printed text; optional localizable `rules` is a supplemental ruling with no runtime effect. Static conditions use `*Prerequisites`; dynamic ones use `impl.prerequisiteCheck`.
+- `impl` holds `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls and `reaches`. Builders may project `reaches` to the manifest top level, never into `meta`.
+- `scripts/build-cards-manifest.ts` extracts `meta` statically with the TypeScript AST and never imports a Card Source at runtime; `meta` contains only JSON-like literals and simple same-file constants.
+- `definePlayerActionCard` declares `playerActionCardType`; the deal pool and UI use it rather than card numbers or i18n.
+- Production descriptions render resources, animals, terrain and points as `ResourceText` icon tokens; `__…__` marks exact card, action and space names. `scripts/__tests__/card-description-icons.test.ts` and `card-description-double-underscore.test.ts` gate this.
+- Card faces, trigger labels, log previews and Replay share `client/components/common/cardText.ts`: each name or text field falls back on its own from the canonical translation to `meta.locales[locale]` (empty values skipped) to source metadata, names also accept legacy `cards.<id>.name` aliases, and card-owned prompts reference names with `{card:<id>}`. Player names follow the generated-name provenance in `client/utils/player-name.ts` (§12).
 
-`meta` is the Card Definition. It contains only serializable, frontend-visible fields without runtime behavior. Declarative rules fields such as `cost`, `prerequisite`, `occupationPrerequisites`, `improvementPrerequisites`, `cardField`, and `isCookery` are allowed. `modifier`, `modifiers`, `listeners`, `effect`, and `prerequisiteCheck` are forbidden. `desc` preserves printed card text; optional localizable `rules` contains separate supplemental rulings or implementation limits and never changes runtime behavior. `prerequisite` is printed text, structured static conditions use the `*Prerequisites` fields, and dynamic conditions use `impl.prerequisiteCheck`.
-
-Card faces, trigger labels, log previews, and replay rendering share the display helpers in `client/components/common/cardText.ts`. Names and individual text fields use the canonical translation section, then `meta.locales[locale]`, then source metadata (names additionally support legacy `cards.<id>.name` aliases before the source fallback). Card-owned prompts and buttons reference names with `{card:<id>}`, resolved by `translateCardText`, rather than copying translated names into each string. These references affect presentation only and never execute rules.
-
-Within metadata locales, empty or whitespace-only descriptions, supplemental rules, and prerequisites fall back to their source fields independently. A translated name can therefore coexist with a source description while a draft translation is incomplete.
-
-Hotseat and both sandbox executors initialize unnamed seats with the same `Player N` convention and `PlayerState.nameIsDefault = true`. The presentation boundary in `client/utils/player-name.ts` localizes names using this provenance and the seat index, including handoffs, player tabs, scores, and log text. Supplied names, including account names such as `PlayerA`, `playerF`, or `Player 6`, are rendered literally. WebSocket creation and joining send only supplied names; missing names stay empty in the room connection metadata and retain engine-generated provenance through joining, reconnecting, and rematches. Authoritative renaming clears the flag; undo preserves the current name and its provenance together. Replay identity overrides clear generated-name provenance when replacing the name. Completed-game result rows and replay participants retain this provenance as `name_is_default` / `nameIsDefault`, so result summaries, perspective selectors, and the Replay Viewer use the same presentation boundary. Log entries identify their primary player with `playerId` and additional name parameters with `playerRefs`; both snapshot and event rows resolve these identities before timeline deduplication. Presentation does not mutate authoritative name values.
-
-`impl` is the Card Impl and contains `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls, and `reaches`. Modifiers belong to the implementation, not Card Display. Builders may statically extract `reaches` and project it at the top level of the manifest, but it does not belong in `meta`.
-
-`scripts/build-cards-manifest.ts` must statically extract `meta` with the TypeScript AST. It must not import a Card Source or generated catalog at runtime. `meta` may contain only JSON-like literals and simple same-file constant references; `impl` may contain arbitrary runtime code.
+Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/check-generated-cards-sync.ts`.
 
 ### 8.2 Generated catalog and registry
 
 | File | Role |
 |---|---|
-| `shared/cards/catalog.generated.ts` | Generates `allCardSources`, `minorImprovementCards`, `occupationCards`, `implemented*`, and `ALL_CARD_IMPLS` from Card Sources |
+| `shared/cards/catalog.generated.ts` | Generated from Card Sources: `catalogCardDefinitions`, the card lists (`minorImprovementCardsList`, `occupationCardsList`, `implemented*CardsList`) and ID lists |
+| `shared/cards/register-all.ts` | Generated `ALL_CARD_IMPLS`, the resolved Card Impl map (`scripts/generate-register-all.ts`) |
+| `shared/cards/catalog.ts` | Catalog facade, such as `minorImprovementCards` / `occupationCards` without community cards |
 | `shared/cards/active-registry.ts` | Temporary synchronous `CardRegistry` scope; no persistent default |
-| `shared/cards/registry.ts` | `CardRegistry` class with `loadByIds` and `unload` |
-| `shared/cards/custom-registry.ts` | Server and sandbox runtime implementation, session context, effects, listeners, and modifiers for `CUSTOM_*` cards |
-| `shared/cards/custom-card-metadata.ts` | Frontend `CUSTOM_*` Card Display, artwork URL, and O number |
+| `shared/cards/registry.ts` | `CardRegistry` with `loadByIds` and `unload` for per-room loading |
+| `shared/cards/custom-registry.ts` | Server and sandbox runtime implementation, session context, effects, listeners and modifiers for `CUSTOM_*` cards |
+| `shared/cards/custom-card-metadata.ts` | Frontend `CUSTOM_*` Card Display, artwork URL and O number |
 
-Production paths access cards only through `catalog.generated.ts` and `CardRegistry`. Tests may import an individual Card Source for exact assertions. The target state removes `CardBase`, `MinorImprovement`, `Occupation`, and `PlayerActionCard` class semantics. It uses a plain Card Definition with `kind: 'minor' | 'occupation' | 'playerAction' | 'major'`, and replaces `instanceof` with `kind`.
-
-`CardRegistry.loadByIds(ids, lookup)` and `unload(id)` support dynamic per-room card loading.
+- Production paths access cards only through the generated catalog and `CardRegistry`; tests may import a single Card Source. Card Definitions are plain data with `kind: 'minor' | 'occupation' | 'playerAction' | 'major'`.
+- The generated catalog must stay in sync (`pnpm run check:generated-cards-sync`); Workshop PR generation patches fetched upstream generated files, never the deployment host's local tree.
+- The major runtime source enters the backend only through `major/runtime.generated.ts`.
+- The server and sandbox register only custom runtime parts; the main client registers only display metadata and never imports the custom runtime registry.
 
 ### 8.3 Local state in `cardStates`
 
-- Persistent counters, one-time flags, and local state belong in `player.cardStates[cardId]`, not top-level `PlayerState`. Shared farmyard-space state across multiple FoM minor improvements is an exception stored in `player.farmyardSpaceStates`; it contains only authoritative blocked-space, farmyard-goods-token, field-goods-token, and non-field-crop-space metadata. Shared helpers distinguish placement lock from farmyard used or unused state. FoM Farmyard Extension geometry is another exception stored in `player.farmyardExtensions`, because it changes shared farmyard geometry rather than one card's local state.
-- History used by one card or a small set of cards should live in `cardStates[cardId].extraData`. If the history must begin before a card is played, use an explicit hand-zone listener rather than a global statistic.
-- A complex card interaction that waits for a later player choice uses an explicit continuation through `pending` and `EngineStack.push`, never a hidden shared slot.
-- The recommended shape is `{ cardId, kind:'choice'|'delayedEffect', payload }`.
-- A card may hold a worker in `cardStates[cardId].extraData.heldWorkerId`, where the worker is neither in `takenBy` nor at home. `shared/cards/helpers/card-held-workers.ts` supplies `holdWorkerOnCard`, `getWorkerHeldOnCard`, `releaseWorkerFromCard`, and `getCardHeldWorkerIds`; return-home releases all held workers. `family-growth` can use `actionContext.holdNewbornOnCard` to place a newborn directly on the card, avoiding action-space occupancy before return-home and preventing reuse as a capacity source.
-- A card may write read-only UI markers to `cardStates[cardId].extraData.farmTerrainMarkers`. FarmBoard renders a marker inside its terrain tile, while backend card state remains authoritative for rules.
-- A card may write cross-player public markers into the target's `cardStates[sourceCard].extraData.publicCardMarkers`. A helper aggregates them and scoring writes them to `cardBonusVp`. FarmBoard displays them in the source player's summary area, not outside the farm board.
+- Persistent counters, one-time flags and local state live in `player.cardStates[cardId]`, never top-level `PlayerState`. History a card needs before it is played uses an explicit hand-zone listener (§7.5), not a global statistic.
+- Shared exceptions are facts several cards and the farm geometry rely on: `player.farmyardSpaceStates` (blocked spaces, farmyard and field goods tokens, non-field crop spaces; placement lock is distinct from used / unused) and `player.farmyardExtensions`.
+- A later player choice is an explicit continuation: the card returns a flow whose leaf issues a request and waits in a `pending` envelope, never in a hidden shared slot.
+- Held workers use `shared/cards/helpers/card-held-workers.ts`; return home releases them. `family-growth` may place a newborn directly on a card through `actionContext.holdNewbornOnCard`.
+- Read-only UI markers (`extraData.farmTerrainMarkers`) and cross-player public markers (`extraData.publicCardMarkers`, scored through `cardBonusVp`) are rendered generically.
+- **Visibility** ([ADR 0023](adr/0023-explicit-card-state-visibility-and-presentation.md)): card state is internal by default. Native `presentation` declarations and `getStatePresentation(player)` opt facts into public adapters; serialization records normalized `cardStatePresentation`, stripped on rehydration. Player-private `privateData` follows the storage player, not the current holder. Viewer snapshots, events, histories and seat-view Replay expose only public facts and the viewer's own private data, even to the card's owner; authoritative state, recovery, undo, debug full state and all-open Replay keep raw state. `card.stateChanged` events carry keys without values, and projection strips values from historical events without rewriting Frames.
+- `getRuleContributions(player)` exposes read-only component reservations and unused-space reductions; consumers combine unique sources, floor finite values, reject negatives and non-numbers, and cap deductions. Generic stable discovery and return dispatch by `sourceCardId`, and only the source changes its construction state. Query inputs and results are detached from storage, for native and Workshop cards alike.
 
-Card Sources own both storage and interpretation. Native `presentation` declarations opt specific counter keys, stacks, Card Fields, held workers, reservations, attachments and markers into common display adapters; `getStatePresentation(player)` supplies source-specific facts such as resource pairs or lying animals. `infobox` and resource statistics are explicitly public adapter channels. Authoritative serialization records normalized `cardStatePresentation`; frontend and seat-view Replay render these facts and authoritative animal/stable projections without decoding raw fields. Derived facts are stripped on rehydration and are never a second writable source of truth.
+Tests: `server/__tests__/card-state-visibility-session.test.ts`.
 
-Card state has three audiences: internal (default), public presentation, and player-private `privateData`. Ordinary snapshots, patches, dev WS snapshots, events, histories and seat-view Bug Reports/Replay expose only public facts and the viewer's declared private data, including when the viewer owns the card. Private data follows the storage player rather than the current card holder. Authoritative state, recovery, undo, debug full state and all-open Replay retain raw state. New `card.stateChanged` events carry source/key metadata without values; projection also removes values from historical events without rewriting immutable Frames or their Viewer references. New Frames record the additive presentation facts and use a newly built content-addressed Viewer. The existing JSON Frame/delta container schema is unchanged; the Room header locks its Viewer build at creation (ADR 0011).
+### 8.4 Helpers under `shared/cards/helpers/`
 
-`getRuleContributions(player)` provides read-only component reservations and unused-space reductions. Shared consumers combine unique played sources, floor finite values, reject negatives/non-numbers and cap deductions at the category's size. Generic stable discovery and return dispatch by `sourceCardId`; the source alone changes its construction state. Farmyard geometry receives actual non-pasture animal counts from AnimalZones instead of inspecting a card or subtracting capacity. Query inputs/results are detached from authoritative storage, and native/Workshop read-only queries use the same contract.
+- `pay-gain-node.ts`: pay-then-gain, pay-then-action and return-then-gain templates.
+- `stage-effects.ts`: stage-effect flags and optional once-per-card Harvest exchanges through the existing exchange executor.
+- `card-state.ts`, `round-placement.ts`: one-time state, the raw Work Placement Chronology and Person Placement Order (§6.5).
+- `action-snapshot.ts`: the active Turn Scope identity and start snapshot (§6.5).
+- `card-held-workers.ts`, `card-field.ts`: held workers (§8.3) and Card Fields (§8.5).
 
-### 8.4 Convenience helpers under `shared/cards/helpers/`
+### 8.5 Card Fields and the Logical Field seam
 
-- `pay-gain-node.ts`: templates for gain after payment, an appended action after payment, or returning resources to the current space before gaining.
-- `stage-effects.ts`: stage card-effect flags and optional once-per-card Harvest exchanges. Craft buildings expose a skip-or-convert flow through the existing exchange executor and trade events; querying the harvest hook does not consume materials.
-- `card-state.ts` and `round-placement.ts`: one-time `flagged` or `extraData` state, raw Work Placement Chronology, and Person Placement Order. Ordinal person effects exclude same-worker relocations but include normal temporary placements and a recalled worker's later normal placement. Effects scoped to the second person's placement use `isCurrentActionSecondPersonPlacement()`, which matches the second normal placement's worker against the current action context's `placedWorkerId`, falling back to the active action snapshot only when the context has no placement identity, and rejects injected anytime contexts.
-- `action-snapshot.ts`: the active Turn Scope identity and start snapshot described in section 6.5. Per-action deltas belong to action transactions, not this snapshot.
-- `card-held-workers.ts`: worker holding described in section 8.3.
-- `card-field.ts`: declarative card-as-field factory described below.
-
-### 8.5 The generic `cardField` extension
-
-`CardDefinition.cardField` declaratively configures a card as a field:
+See [ADR 0017](adr/0017-logical-field-ownership-boundary.md).
 
 ```ts
 cardField?: {
@@ -916,168 +911,119 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` registers the Card Field owner and derives its sow integration. An individual card declares only the configuration and optional `onReap` / `onCropRemoved` callbacks for owner-specific side effects.
+- `makeCardFieldImpl(cardId, def, options?)` registers the Card Field owner and derives sow integration; a card adds only configuration and optional `onReap` / `onCropRemoved` callbacks. Virtual columns come from `deriveVirtualTileCol(cardId, slotIdx)`.
+- The card-facing interface has three entries: `getLogicalFields(player)` (an immutable projection of Farmyard Fields plus every played Card Field, including empty fixed slots), `getFarmyardFields(player)` (geometry, fencing, adjacency, occupancy), and `mutateLogicalFields(state, player, options?)` with named `place`, `insertBottom`, `grow`, `remove` and atomic `replace`, which validates the target and then writes through the owning adapter.
+- Storage accepts every legal field good. `allowedCrops` is the ordinary Sow capability, not the storage schema: `place` enforces it unless a card effect bypasses it explicitly; Sow and `replace` always enforce it; `insertBottom` adds a rule-granted crop under the top without a new slot or the Sow whitelist.
+- `fieldOperationFlow` `move` accepts `sourceCrops`; the destination continuation rechecks the source crop and quantity, destination occupancy and `allowedCrops` before storing positions or mutating.
+- Card Field slots store a top `{ crop, remaining }` and optional `below` layers. Normal Reap takes one crop per occupied slot; extra and whole-field harvest continue through lower layers.
+- A Card Field has one stable Logical Field id and one `groupKey`; its slots keep stable coordinates. Base field scoring counts Farmyard Fields only.
+- `onReap` runs only for reap; `onCropRemoved` for every real removal. Each runs after the shared mutation, once per crop, and returned flows join the ordinary parallel reaction. A selection resolves a removal callback's flow before its next parent continuation.
+- `reap` is the single reaping implementation for both storage owners (§7.6). A multi-slot Card Field reaps every occupied slot but counts once per Logical Field and crop.
+- The low-level adapter inside `card-field.ts` is the only Card Impl code that touches `PlayerState.fields`; `check:card-impl-boundaries` rejects any property or bracket access named `fields` in other production card and helper sources, whatever the receiver, with no allowlist.
 
-Virtual tile columns derive from `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`, preventing cross-deck collisions. Capacity slots for adjacent numbers in one deck require auditing; the current 11 cards all have capacity at most three, leaving ample margin.
+Tests: `shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`, `shared/actions/effects/__tests__/{reap,sow-permissions}.test.ts`.
 
-The card-facing interface has three entry points. `getLogicalFields(player)` returns an immutable, deterministic projection of Farmyard Fields plus every registered played Card Field, including empty fixed-capacity slots. `getFarmyardFields(player)` is the explicit narrower query for plowing, fencing, adjacency, board occupancy, and other Field-tile geometry. `mutateLogicalFields(state, player, options?)` supplies named `place`, `insertBottom`, `grow`, `remove`, and atomic `replace` operations; it validates the target before writing through the owning Farmyard or Card State adapter.
+### 8.6 Naming, capabilities and boundaries
 
-Field storage accepts every legal field good: grain, vegetable, wood, and stone. A Card Field's `allowedCrops` is its ordinary Sow capability, not its storage schema. `place` applies that whitelist by default and lets a card effect explicitly bypass it; ordinary Sow and `replace` remain whitelist-restricted. Owner callbacks inspect the actual good before applying crop-specific effects.
-
-`fieldOperationFlow` supports an optional `sourceCrops` constraint for `move`. The destination continuation carries that same constraint and rechecks the current source crop and quantity before either selection stores temporary positions or mutates a field. Destination occupancy and `allowedCrops` are also checked before committing the selection. Cards declare their permitted source goods locally; A071 permits grain and vegetable from either storage owner. Movement still uses the shared mutations and returns the source owner's callback flow.
-
-Card Field slots store their top `{ crop, remaining }` and optional `below` layers in bottom-to-top order. `insertBottom` places a rule-granted crop without adding a slot or applying the ordinary sow whitelist. Projections expose all layers for crop counts while preserving each slot's top and identity. Normal Reap allocates one crop per occupied Card Field slot, additional or whole-field harvest counts continue through lower layers, and last-crop callbacks inspect every layer. The client displays buried layers but maps selectable tops to the original slot, including holes.
-
-Base field scoring counts Farmyard Fields only; Card Fields remain available to Logical Field rules, Sow, and Reap.
-
-A Card Field has one stable Logical Field id and one `groupKey` regardless of capacity. Its fixed slots retain stable selection coordinates when another slot becomes empty. The low-level Farmyard adapter inside `card-field.ts` is the only Card Impl code allowed to access `PlayerState.fields` directly. `check:card-impl-boundaries` rejects property or bracket access named `fields` in production A–E, Farmers of the Moor, major, community, and helper sources, regardless of receiver name and without a legacy allowlist.
-
-The side-effect callbacks are:
-
-```ts
-onReap?: (ctx: {
-  state: GameState
-  player: PlayerState
-  crop: ExtraSowableCrop
-  amount: number
-  isLast: boolean
-  cardId: string
-  trigger: ReapTrigger
-  sourceCard?: string
-}) => ActionFlow | void
-
-onCropRemoved?: (ctx: {
-  state: GameState
-  player: PlayerState
-  crop: ExtraSowableCrop
-  amount: number
-  isLast: boolean
-  cardId: string
-  reason: FarmCropRemovedEvent['reason']
-  trigger?: ReapTrigger
-  sourceCard?: string
-}) => ActionFlow | void
-```
-
-`onReap` runs only for reap and preserves harvest-specific card semantics. `onCropRemoved` runs for every real crop removal, including reap. Each callback runs after the shared mutation and once per crop; returned flows join the ordinary `parallel` reaction.
-
-When a selection effect returns a removal callback's `ActionFlow`, the engine resolves that dynamic child before advancing to the selection's next parent continuation. Immediate effects caused by the removed crop therefore finish before the removing card's own follow-up action.
-
-The `reap` action is the single reaping implementation for both storage owners. It iterates occupied Logical Field slots through `computeHarvestCount()`, persists removal through `mutateLogicalFields()`, and produces the same resources, Harvest Count applications (including zero-yield applications), harvested crops/positions/field counts, crop events, generic listeners, and owner callbacks. Multi-slot Card Fields reap every occupied slot but count once per Logical Field and crop. Private Field Phases enter the same action with a private trigger and do not write the full-Harvest summary.
-
-The 11 cards currently migrated to this helper are B68, D75, E80, D25, E72, C70, E68, E69, E70, B113, and B141.
-
-### 8.6 Naming and constraints
-
-- Card files use `{Deck}_{Number}_{Name}.ts`, for example `A123_FrameBuilder.ts`, and export a constant with the same name.
-- Keep a card's ability closed inside its card file wherever possible. Do not spread it into core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts`, or `server/game/authoritative-session.ts`.
-- Prefer hooks, generic `CardDefinition` fields such as `cost`, `reward`, and `prerequisite`, and `cardStates`.
-- Forbidden patterns are card-specific conditionals in core files, centralized card-effect registries, and frontend card-specific rules.
-
-Runtime cross-card identity and capability queries must use typed `CardDefinition` metadata and played-card helpers: `getPlayedCardDefinitions(player)`, `collectCardDefinitionsAs(player, type)`, and `playerHasCardCapability(player, capability, { asType? })`. They inspect only `player.improvements`, `player.minorPlayed`, and `player.occupationPlayed`, never hands. `asType` reuses `cardCountsAs`, preserving existing identity semantics for dual-type cards.
-
-Registered generic metadata currently includes `preventsHandDiscard`, `fireplaceIdentity`, `cookingHearthIdentity`, `ovenIdentity`, `firewoodBuildTrigger`, `potteryIdentity`, `animalHolder`, `blocksHouseAnimalZones`, and `waresSalesmanGains`. These fields belong to Card Source `meta` and may project into catalog and manifest, but add no frontend behavior. In OA, `ovenIdentity` represents oven-family identity and includes upgrades or minors such as Oven Installation for Oven Damper-style scoring. This intentional project abstraction does not require every such card to provide a baking exchange or trigger Firewood. An upgrade may retain scoring identity while opting out of build-trigger semantics with `firewoodBuildTrigger:false`. Migrated paths include B146 and C35 hand-discard prevention, B153 major-identity scoring, C75 and A27 fireplace, hearth, and oven triggers, B31 pottery identity, E144 wares-gain options, D86 animal-holder occupation filtering, D12 house-animal-zone blocking, and M72 oven-family scoring.
-
-`check:card-impl-boundaries` is part of `pnpm run check:architecture`, the canonical local architecture verification command used by both CI workflows. Runtime reads of another non-Major card ID in production Card Sources, including nested ordinary, M, major, and community layouts must migrate to a generic capability, action-context provenance, Harvest outcome, breeding-threshold modifier, synthetic occupancy, trigger snapshot, or another extension point. `Major_*`, `reaches`, `allowedPurchases`, and prerequisite candidate lists are explicit exceptions. `--warn-only` is available for an intentional temporary audit but is not an integration-validation path.
-
-When printed card text names another ordinary card, the source card may declare it as a named printed target. Its ID must appear in `reaches` or equivalent declarative metadata, and runtime may inspect only public facts such as existence, owner, or played status. The source must not inspect the target's private implementation state in `cardStates`, `counters`, or `extraData`, or simulate branches of the target's ability. A checker exception must bind one exact source-target pair and allowed read shape; a broad allowlist cannot bypass this boundary.
+- Card files use `{Deck}_{Number}_{Name}.ts` and export a constant with the same name.
+- A card's ability stays inside its file. Core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts` and `server/game/authoritative-session.ts` never change for one card; there is no centralized card-effect registry and no frontend card rule.
+- Cross-card identity and capability queries use typed metadata and played-card helpers: `getPlayedCardDefinitions(player)`, `collectCardDefinitionsAs(player, type)` and `playerHasCardCapability(player, capability, { asType? })`, reading only played zones; `asType` reuses `cardCountsAs` for dual-type identity. Registered capability metadata (`preventsHandDiscard`, `fireplaceIdentity`, `cookingHearthIdentity`, `ovenIdentity`, `firewoodBuildTrigger`, `potteryIdentity`, `animalHolder`, `blocksHouseAnimalZones`, `waresSalesmanGains`) lives in `meta` and adds no frontend behavior. `ovenIdentity` is OA's oven-family identity and does not imply a baking exchange; an upgrade can keep scoring identity and opt out of build triggers with `firewoodBuildTrigger: false`.
+- `check:card-impl-boundaries`, part of `pnpm run check:architecture`, rejects runtime reads of another non-major card's ID in production Card Sources. Explicit exceptions are `Major_*`, `reaches`, `allowedPurchases` and prerequisite candidate lists.
+- A card whose printed text names another card may declare it as a named printed target in `reaches` and read only its public facts (existence, owner, played status), never its private state; a checker exception binds one exact source-target pair.
+- Metadata audits must cover new metadata fields with fixtures.
 
 ### 8.7 Minor-improvement passing
 
-OA marks the reference passing minor improvements with `CardDefinition.passing?: boolean`. The host action in `shared/actions/effects/improvement.ts` first completes purchase payment through an internal `pay` child, then reads its result map and commits the purchase during `completeInternalChildren`. For a passing card:
-
-- it does not enter `buyer.minorPlayed`; it is pushed into `nextPlayer.minorHand`, wrapping from `state.currentPlayerIndex`;
-- it does not increment `totalMinorBuilt`, add `activeModifiers`, or enter `providesOccupation` or `isField` paths;
-- it emits `card.passed` with `fromPlayerId`, `toPlayerId`, and `cardId` instead of `card.played`;
-- `onBuy` still runs through internal `activate-card-effect` in `afterHostCommitListeners`, so the buyer receives the effect while the next player receives the card in hand for a later `actBuy`.
-
-Listener isolation follows naturally: a passing card never enters `minorPlayed`, so `getPlayerCardIds` omits it and card-entered-play reactions skip it. No `apply-improvement` effect or `extraData.passing` scratchpad is needed. The improvement host action, pay child, and `activate-card-effect` jointly implement the reference passing behavior.
-
-On the client, `PublicEventCardPassAnimation` subscribes to the `card.passed` event stream and animates the card between `data-card-anchor` and `data-hand-anchor` DOM anchors. LogPanel derives a `log.cardPassed` i18n entry through the existing `mapCardPassed` mapper.
+`CardDefinition.passing?: boolean` marks a minor that is passed after purchase. The improvement host completes payment through its internal `pay` child, then commits the purchase in `completeInternalChildren`: the card goes to the next player's `minorHand` (not `minorPlayed`), does not count toward `totalMinorBuilt`, adds no modifiers, emits `card.passed` instead of `card.played`, and `onBuy` still runs through `activate-card-effect` in `afterHostCommitListeners`. Card-entered-play reactions skip it naturally. The client animates `card.passed` and the mapper derives `log.cardPassed`.
 
 ---
 
 ## 9. `shared/domain/`: Domain aggregation
 
-Derived views and invariant checks live here. `PlayerState` remains plain JSON-serializable data; every "can I do X?" query belongs to `PlayerBoard`.
+Derived views and invariant checks live here. `PlayerState` stays plain JSON; every "can I do X?" query belongs to `PlayerBoard`. Domain code is shared by the main client, sandbox and server.
 
 ```text
 shared/domain/
 ├── player-board.ts          PlayerBoard and the playerBoard factory
 ├── farmyard.ts             farm-rule validation and normalizePlayerFarm
 ├── farmyard-interaction.ts interaction payload projections for farm-select and farm-position
+├── farmyard-usage-core.ts  canonical used / unused farmyard spaces
 ├── pasture.ts              derived pasture sizes, stable counts and base capacity
 ├── animal-zones.ts         animal-zone capacity and accommodation
+├── animal-reorg.ts         Animal Reorg Prefill
+├── animal-payment.ts       animal payment order
 ├── animals.ts              animal model
 ├── scoring.ts              scoring and PlayerScoreSummary
-├── scoring-reserve.ts      final Scoring Reserve reads, aggregation, and scoring-clone deduction
+├── scoring-reserve.ts      final Scoring Reserve reads, aggregation and scoring-clone deduction
 ├── farm.ts, field.ts, space.ts, farmyard-space-states.ts
 └── index.ts
 ```
 
-`PlayerBoard(player, state)` exposes three sub-boundaries: `farmyard`, `farmInteraction`, and `animals`. `farmyard` only validates and queries farm rules, such as `canPlow`, `canSow`, `canBuildFence`, `canBuildRoom`, and `canBuildStable`. `farmInteraction` only derives `farm-select` or `farm-position` `InteractionRequest` payloads from the current farm, action context, and payment feasibility. `animals` owns zone capacity and accommodation. A frontend local farm draft consumes only the server-provided interaction payload; it does not call these rule boundaries.
+**PlayerBoard.** `PlayerBoard(player, state)` exposes `farmyard` (validation and queries such as `canPlow`, `canSow`, `canBuildFence`, `canBuildRoom`, `canBuildStable`), `farmInteraction` (derives `farm-select` / `farm-position` payloads) and `animals` (zone capacity and accommodation). A frontend farm draft consumes only the server payload.
 
-Domain aggregation is shared by the main client, sandbox, and server and therefore belongs to bundle-safe layer `[A]`.
+**Farmyard.**
 
-`PlayerState.pastures` stores pasture identity, tiles and animal placement. It does not store `size` or `stables`: `getPastureSize()`, `getPastureStableCount()` and `getFencedStableCount()` derive those facts from pasture tiles and current `stableTiles`. `getPastureViews()` exposes detached views with the derived area, stable count and base capacity. Animal-zone capacity modifiers receive those current views before replacement and additive modifiers run. Construction and stable returns change only the real stable positions; rule queries, scoring and parent-card requirements immediately see the result without count synchronization. Serialized player pastures add display-only `size` and `stables`; loading removes those fields while preserving pasture identity and animal assignments. Reading a view or serializing it never redistributes animals or writes rule state.
+- Used / unused spaces are read only from `farmyard-usage-core.ts`, including extensions, terrain, blocked spaces and derived pasture tiles; `farmyard-usage.ts` and `farm.ts` are compatibility facades. Cards never hand-count a grid. Only `blocksPlacement` counts as occupied.
+- Pastures persist identity, tiles and animal assignments. `getPastureSize()`, `getPastureStableCount()` and `getFencedStableCount()` derive the rest; `getPastureViews()` returns detached views; serialized `size` / `stables` are display-only and stripped on load.
+- Farm and action-space provenance uses source / type metadata: `FenceSegment.type/source`, `WorkerRef.synthetic`, `ActionSpace.blockedBy`, supply-token helpers, action-space category helpers across player counts, reservation tokens and attachments. Base action definitions filter player counts 2–6; 5/6-only spaces are separate.
+- Farmers of the Moor terrain ([ADR 0007](adr/0007-farmers-of-the-moor-variant-runtime.md)) is the public top layer of `farmTerrain.kind`, with Covered Farm Terrain in `covered`. Terrain changes go through the generic selection leaf and are revalidated against live occupancy at submission and effect time; future terrain tokens reuse `futureMeeples` entries. Fenced terrain adjacency is a pure helper; one-off adjacency uses `adjacencyPolicy` / `allowedTiles` / `fencePolicy`. Multi-layer stacked terrain is not supported.
+- Farmyard Extensions extend the shared geometry; every farm reader uses the dynamic shape.
 
-Scoring Reserve is a final-scoring choice reservation, not part of the Payment Pipeline. A card writes `{ reserved, score, cardType? }` to the target player's `cardStates[sourceCard].extraData.scoringReserveBonus` through `special-effect.record-scoring-reserve-bonus`. `computeScores()` aggregates every selected reserve and deducts it from a scoring clone before running the existing automatic costed-bonus solver. If later pre-scoring actions leave the player unable to cover the combined selection, the reserve bundle and its bonus entries are invalidated instead. Resource-based major scoring also reads remaining resources from the resulting clone. `ScoreEntry.type='bonus'` must carry `cardId` and may carry `cardType` and `reserved` attribution. If the target has not played the source card, the Scoring Reserve record supplies `cardType` explicitly.
+**Animals.**
 
-`cardBonusVp` is the single score category for nonprinted bonus VP produced by cards. Preserve `cardId` and `cardType` attribution on `ScoreEntry.type='bonus'` wherever possible. Printed VP on the card itself remains in `cards`; compact and live scoring must keep `cards` separate from `cardBonusVp`. Legacy `cardsBonus`, `cardStateBonusVp`, and `cardBonus` shapes are removed and must not be read, merged, or supported by clients or documentation.
+- Each real room owns a capacity-one Room Animal Holder (`house:<positionKey>`); `PlayerState.houseAnimals` is the only writable room assignment ([ADR 0026](adr/0026-each-room-is-an-animal-holder.md)). `roomAnimalZones` is a display projection stripped on load. Occupancy groups and `occupiedZoneLimit` (ordinary room holders share a limit of one) constrain occupied holders across rooms and card zones, through the pure `shared/contract/animal-zone-occupancy.ts` query.
+- Loose stables store `{ animalType, animalCount }` per farm position ([ADR 0029](adr/0029-loose-stables-retain-animal-species-and-count.md)); an empty stable has no entry and stays in `stableTiles`. Animal-number rules sum counts; occupied-space, presence and distinct-species rules keep their own semantics.
+- Every "can accommodate" question uses `canAccommodateAnimalTotals()` or `canAccommodateAllAnimals()`, which search for a legal final assignment (allowing a later system `reorganize`) and respect `occupiedZoneLimit` and required-empty groups (`requiredEmptyZoneGroupIds`: at least one tagged zone per group stays empty). A card never tests a single zone locally. A candidate that permanently reduces holder capacity is filtered against post-payment capacity.
+- `onComputeAnimalZones(player, zones, state)` adds zones; `computePastureCapacityModifiers(player, state)` returns replacement then additive modifiers in play order; `onComputeSharedAnimalZones()` contributes Hosted Card Animal Zones, stored in the card owner's `animalCountsByZone` but settled by `animalOwnerPlayerId` (and `breedingOwnerPlayerId` for breeding). Every holder writer persists `cardId`, `ownerPlayerId` and `animalOwnerPlayerId`; rewrites and cross-player deductions touch only the current Animal Owner's entries. `computeAnimalZones` fills a missing `cardId` on a card zone. A fixed animal type uses `allowedAnimalType`; `animalType` is only current occupancy.
+- A farm-position-backed zone declares `farmPosition`, `countsFarmyardSpaceAsUnused` and `displaySource: 'farm-position'`; the client renders only server-provided zones there.
+- `isHouseAnimalZone()` / `countHouseAnimals()` include tagged `houseAnimalZone` zones; `blocksHouseAnimalZones` removes them.
+- Animal statistics and consumption (`getAssignedAnimalsByType()`, `subtractAnimalsFromBoard()`) read and write legacy holder fields together with `animalCountsByZone`. Payment order lives in `animal-payment.ts`: card-local `consumeAnimalPayment()`, then board and holders, then counter-backed holders marked `capacityCounterKey` / `capacityLossOnPayment`. A specific card counter named in `animalPaymentPreference.prefer` goes first and disables the counter-backed fallback. System removals notify cards through `onAnimalRemoved()`.
+- Reorganization validates identity, species, counts, mixing, capacity, inventory, exclusive limits and required-empty groups before mutation; invalid input returns a recoverable `log.reorganizeFail` and changes nothing. Omitted zones are empty; under-assignment discards animals deliberately. Entering reorganization moves animals displaced from inactive or reduced card storage to reserve without reducing totals.
+- Animal Reorg Prefill (`prefillAnimalZones()`) fixes valid existing occupancy and adds as many reserve animals as fit, without writing placement until confirmation; `actionContext.prefill=false` opts out.
+- Farmyard-only exchanges (`CardExchange.fromFarmyard` / `Trade.fromFarmyard`) pay only with currently placed animals in both the exchange and the ordered feeding path; the feed request publishes the placed balance, and animals gained in the same feeding batch are still unplaced.
+- `animalKeysForState()` adds horses only with Farmers of the Moor. Breeding and score adjustments use `computeBreedableAnimalCount()` and `computeAnimalScoreAdjustment()`.
+- Special stables use the card-effect trio `getSpecialStablePositions`, `applySpecialStable` and `getBuiltSpecialStables`, and core stables code imports no card. They are offered only when `actionContext.farmHand === true` (the Farm Expansion stables leaf), through protocol field `farmHandPositions`. Built ones project to `SerializedPlayerState.specialStables` (stripped on rehydration); an unaccepted position rejects the whole batch recoverably.
 
-Public card markers also score under `cardBonusVp`. A `publicCardMarkers` entry may contribute positive or negative points, and its bonus score entry uses `sourceCardId` attribution without introducing another category.
+**Scoring.**
 
-`computePastureCapacityModifiers(player, state)` returns pasture-capacity modifiers for `computeAnimalZones` to apply while creating pasture zones. Modifiers are `replacement` or `additive`. All replacements run in play order, followed by all additives in play order. A size-one-pasture replacement such as D011 Lawn Fertilizer therefore always precedes additives such as A012 Drinking Trough or B072 Love for Agriculture, without cross-card ID reads or scratch markers. With no modifier, capacity remains `size * 2 * 2^stables`.
+- `cardBonusVp` is the single category for non-printed card points, attributed by `cardId` / `cardType`; printed card VP stays in `cards`; public card markers may score negative. Old `cardsBonus` / `cardStateBonusVp` / `cardBonus` shapes are gone.
+- Scoring Reserve is a final-scoring reservation, not payment, recorded through `special-effect` `record-scoring-reserve-bonus`. `computeScores()` deducts every selected reserve from a scoring clone before the costed-bonus solver, resource-based major scoring reads that clone, and an unpayable combination invalidates the bundle.
 
-Each real `roomTiles` position owns a capacity-one Room Animal Holder (`house:<positionKey>`). `PlayerState.houseAnimals` is the only writable room assignment; `roomAnimalZones` is a serialized display projection, stripped on load. A shared `occupancyGroup` and `occupiedZoneLimit` constrain the number of occupied holders across rooms or card zones. Ordinary room holders share a limit of one; A086 adjusts that group limit without changing per-room capacity. Accommodation search, fixed-layout prefill, final assignment validation and client draft gating share the pure `shared/contract/animal-zone-occupancy.ts` group query. Construction adds a holder; renovation preserves its coordinate identity. Payments and house queries derive animals from the room map; tagged house-edge card zones remain separate. See ADR 0026.
+**Major improvement supply** ([ADR 0006](adr/0006-stack-aware-major-improvement-supply.md), [ADR 0016](adr/0016-separate-supply-family-from-improvement-identity.md)): variant templates create real card-ID stacks; the board exposes each stack's top. Purchase, return and swap go through supply helpers, and production reads use supply query helpers. Upgrade identity uses `*Identity` metadata, never the stack's `familyId`. Duplicates keep their concrete IDs as source and attribution. Bottom-row rules use `isBottomRowMajorImprovement()` / `getAvailableBottomRowMajorImprovementIds()`.
 
-`AnimalZone.houseAnimalZone?: boolean` marks a non-house zone that counts as a house animal zone. After all `onComputeAnimalZones` calls, `computeAnimalZones` removes both ordinary `zoneType === 'house'` zones and zones with `houseAnimalZone === true` when the player has the `blocksHouseAnimalZones` capability. House-zone rules use `isHouseAnimalZone()` and `countHouseAnimals()`, not direct `player.houseAnimals`, which would miss tagged zones such as D148 Domestician Expert.
-
-Every "can accommodate" question uses `canAccommodateAnimalTotals(state, player, targetCounts)` or the add-only wrapper `canAccommodateAllAnimals(state, player, animals)`. These search for a legal assignment of final animal totals and allow later system `reorganize`. A card must not substitute a local test of whether any current zone can accept one more animal; that incorrectly rejects states made legal by reorganization. The search memoizes failed workspace assignments to avoid repeatedly enumerating equivalent branches for multicandidate exchanges such as M031 on an impossible late-game farm. `occupiedZoneLimit` applies during search, preventing false accommodation across multiple zones of the same card. If a candidate permanently reduces holder capacity, such as paying C148's held animal, candidate filtering uses postpayment capacity.
-
-The `onComputeAnimalZones` card-effect signature is `(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`. The third argument allows global facts, such as A148 Woolgrower and B086 Truffle Searcher reading `state.completedFeedingPhases`, without per-card postplay counters. Cards that do not need it may name it `_state`.
-
-`onComputeSharedAnimalZones(owner, animalOwner, zones, state)` lets a card owner contribute a borrowed played-card zone for another animal owner. A shared zone carries, or receives from `computeAnimalZones`, `cardId`, `ownerPlayerId`, `animalOwnerPlayerId`, `displayOwnerName`, and `displaySource:'borrowed-played-card'`. If breeding belongs to someone else, it sets `breedingOwnerPlayerId`. When a card effect adds `zoneType:'card'` without `cardId`, `computeAnimalZones` fills in the current card ID so reorganization writes and accommodation queries use the same persistent identity. A fixed animal type must use `allowedAnimalType`; `animalType` is current visible occupancy, not a printed restriction for final-total search. Pasture replacement and additive modifiers no longer belong here and instead use `computePastureCapacityModifiers`.
-
-Farm-position-backed and hosted card zones may store animals in `cardStates[cardId].extraData.animalCountsByZone`. A Hosted Card Animal Zone writes into the card owner's state, while statistics, payment, capacity search, pending-animal detection, and reorganization assign it to `animalOwnerPlayerId`. Breeding includes a zone with `breedingOwnerPlayerId` for that breeding owner and subtracts it from the Animal Owner's temporary breeding count. Reorganization and capacity rewrites route by `ownerPlayerId` to the card owner and replace only entries for the current Animal Owner; they must not erase another player's use of the same shared card.
-
-Every ordinary holder writer persists `cardId`, `ownerPlayerId`, and `animalOwnerPlayerId` on each `animalCountsByZone` entry. A cross-player deduction consumes only entries explicitly owned by that Animal Owner. `serializeState` derives `SerializedPlayerState.playedCardAnimalZones`, `farmCardAnimalZones`, and `borrowedPlayedCardAnimalZones`, letting the frontend display 0/N zones for owner Played Cards, FarmBoard positions, and Played Cards "by others" outside active reorganization. An active `InteractionAnimalReorgZone` draft forwards owner metadata, overrides that read-only projection, and enables controls.
-
-Animal statistics and consumption helpers such as `getAssignedAnimalsByType()` and `subtractAnimalsFromBoard()` must read and write legacy `animalCounts` or `held` together with per-zone `animalCountsByZone`; otherwise a later reorganization can rehydrate consumed animals from stale per-zone state. Server-derived `occupiedZoneLimit` and `allowedAnimalTypes` travel with `InteractionAnimalReorgZone`. The unified reorganization helper enforces the first, while the second lets the UI disable animal types the backend will reject. Before any reorganization mutation, the backend validates unique known zone ids, zone types, enabled animal species, nonnegative integer counts, count consistency, mixing restrictions, capacities, per-species inventory totals, exclusive limits, and required-empty groups. Invalid submissions return recoverable `log.reorganizeFail` with state, history, and interaction unchanged. Both an array and `{ zones }` are accepted; omitted zones are empty and underassignment deliberately discards animals. The tolerant normalizer remains for recovery, not submission repair. Entering reorganization synchronizes inactive or reduced card storage without reducing resource totals, leaving displaced animals in reserve for the player to place or discard. The frontend contains no card-ID-specific rules.
-
-Animal Reorg Prefill is a server-derived draft, built by `shared/domain/animal-reorg.ts` for both action requests and live interaction projection. `prefillAnimalZones()` fixes every existing valid occupancy and searches compatible remaining space for the maximum number of reserve animals, with stable tie-breaking. It shares capacity, mixing, card validation, exclusive-zone and required-empty constraints with accommodation search; accommodation queries still allow global reorganization. Invalid existing layouts are left for manual correction. Prefill never writes placement, discards resources or emits placement/breeding rewards. Confirmation remains the strict atomic settlement boundary. Harvest newborn settlement locates the affected player's harvest-source breeding event after the current `harvest.phaseStarted` breeding marker and replaces that event by ID. The harvest flow creates one such breeding leaf per participating player; previous harvests, other players and private card breeding are excluded, and JSON restore or undo does not require shared object references. Explicit manual flows opt out through `actionContext.prefill=false`, carried as `InteractionRequest.prefill=false`; passive flows default to prefill. The client initializes from this draft and preserves edits on identical snapshots; changed animal inventory or zone metadata refreshes the draft.
-
-`AnimalZone.requiredEmptyZoneGroupIds` declares final-assignment constraints without changing zone capacity. For each group id, at least one tagged zone must be empty; one zone may belong to multiple groups. `canAccommodateAnimalTotals()` checks the constraint at the search terminal, the pending payload carries it through `InteractionAnimalReorgZone`, and `reorganize` rejects an invalid assignment before mutation. The frontend applies the same generic confirmation guard. Cards only tag zones and request reorganization when play creates an invalid assignment; shared paths contain no card ids.
-
-A farm-position-backed animal zone enters `InteractionAnimalReorgZone` through `AnimalZone.farmPosition`, `countsFarmyardSpaceAsUnused`, and `displaySource:'farm-position'`. FarmBoard renders only server-provided zones at those farm positions and never decides legal spaces. An ordinary single-zone holder continues to use `cardStates[cardId].extraData.animalCounts`. Multiple farm-position zones for one card use `animalCountsByZone[zoneId]` and persist `capacity`, `allowedAnimalType`, `allowedAnimalTypes`, and `farmPosition` with each nonempty zone for display outside active reorganization. Reorganization cleanup removes vanished zones. A card offering multiple candidate positions but allowing only one uses `occupiedZoneLimit`.
-
-Animal payment is centralized in `shared/domain/animal-payment.ts`. During an ordinary exchange, played cards first consume local markers or holders through the `consumeAnimalPayment` card effect. `subtractAnimalsFromBoard()` then deducts from the farm board, ordinary `extraData.animalCounts` holders, and `animalCountsByZone` farm-position holders. Counter-backed holders whose consumption permanently reduces capacity come last. `AnimalZone.capacityCounterKey` plus `capacityLossOnPayment` describes that source and its postpayment loss. When `animalPaymentPreference.prefer` names a card counter, only that source is consumed; no match does not fall back to another counter-backed holder. System removals from reorganization or capacity enforcement notify cards through `onAnimalRemoved` so they can synchronize local markers without card-specific state in the main path. C148 Mud Wallower exposes its `held` counter through this metadata. Candidate filtering for M031 Livestock Market and similar cards simulates the shared payment helper and never reads C148's private `cardStates`. Card-specific breeding amounts and animal-score adjustments use `computeBreedableAnimalCount` and `computeAnimalScoreAdjustment`, so core breeding and scoring never inspect a particular card's state.
-
-**Special-stable card-effect extension.** The parallel methods are `getSpecialStablePositions?(state, player) => FarmTilePosition[]`, `applySpecialStable?(state, player, position) => boolean`, and `getBuiltSpecialStables?(player) => FarmTilePosition[]`. In Farm Expansion's Build Stables `farm-select`, core `shared/actions/effects/stables.ts` uses `collectSpecialStablePositions(state, player)` from `card-effects.ts` to aggregate candidates with `sourceCardId`, and `applySpecialStableAt(state, player, position)` to delegate settlement to the accepting card and return its source. Candidates enter protocol field `farmHandPositions`, whose name is retained for frontend compatibility. Settlement writes `kind:'special'` and `sourceCardId` into the `farm.stableBuilt` item. The generic gate is `actionContext.farmHand === true`, set only by the Farm Expansion stables-leaf wrapper. Other stable-building entry points such as E148, A089, and C94 do not expose special stables. B085 Farm Hand, at a two-by-two field center, is currently the only implementation; core stables code imports no card. A submitted special-stable position that no source accepts returns a recoverable failure, preserving the current selection and rejecting the whole ordinary/special batch before publication. This input rejection is distinct from an accepted mandatory continuation becoming blocked.
-
-The third method, added under #200, returns currently standing special-stable positions: empty before construction and empty again after D102 or E76 returns it. `collectBuiltSpecialStables(player)` aggregates `{ position, sourceCardId }[]` across cards. `serializeState` derives the display-only `SerializedPlayerState.specialStables` array for every serialized player, alongside the three persistent card-animal-zone projections. Domain truth remains in `cardStates` and card-effect results. These fields exist only in snapshots, not top-level `PlayerState` or `GameState`; `rehydrateState` strips them explicitly to prevent leakage into authoritative state. `GameContainerApi` derives the set of built-special-stable top-left positions from `displayPlayer.specialStables` and passes it to FarmBoard, which renders a persistent filled `.farmhand-center-built` overlay without reading card-specific `cardStates`.
+Tests: `shared/domain/__tests__/`, `shared/actions/__tests__/animals.test.ts`, `shared/actions/effects/__tests__/reorganize-engine.test.ts`.
 
 ---
 
-**Session repair contract (#1267; ADR 0029).** Each occupied physical loose stable stores one `{ animalType, animalCount }` assignment by farm-position key; zero-count entries are omitted while the stable itself remains in `stableTiles`. Capacity is derived from the current backend rules. Reorganization, zone reads, payment, capacity enforcement and recovery retain the actual count. Animal-number rules sum counts; occupied-space, presence and distinct-species rules keep their own semantics. A confirmed legal assignment must have matching resource and assigned-zone totals after write/read and normal handoff, with no extra reorganization caused by lost storage. The client renders backend-derived stable count and capacity through the existing animal-assignment flow.
-
-## 10. Other `shared/` modules
+## 10. Other `shared/` modules and Game Variants
 
 ### 10.1 `shared/draft/`
 
-`draft-manager.ts` contains pure functions for simultaneous card selection: `initDraftState`, `processSubmit`, `tryAdvanceRound`, and `finalizeDraft`. `types.ts` defines `DraftState`, `DraftPool`, and `DraftPickPayload`. Set `draftMode: 'simultaneous'` and `draftPoolSize: 7..10` in `createRoom` to enable it.
+Pure functions for simultaneous selection (`initDraftState`, `processSubmit`, `tryAdvanceRound`, `finalizeDraft`); `createRoom` enables it with `draftMode: 'simultaneous'` and `draftPoolSize: 7..10`. With Farmers of the Moor, occupations, FoM minors and published minors draft in separate stages, the FoM minor pool derives from the implemented registry and refuses to start when short unless `allowIncompleteFarmersOfTheMoorMinorDeal` is set; Community Deck minors join only the published part.
 
-### 10.2 `shared/i18n/`
+### 10.2 Game Variants
 
-UI copy keys and localized resources. `PromptKey` is centralized in `shared/contract/prompt-keys.ts`.
+A Game Variant changes setup, public state, Action Spaces, phase flow or scoring for one game; it is not a card source and adds no frontend rules.
+
+- **Parent Cards** ([ADR 0005](adr/0005-parent-cards-dedicated-expansion-runtime.md)) are structured data in `shared/parents/*` with assets pinned by `public-assets.ref`, separate from Card Source projections; selection, rewards and side quests are backend-authoritative and use non-public seeds.
+- **Through the Seasons** keeps the four season spaces on the board and enables only the current one; its modifiers register in each Core's `ActionHookRegistry` and never write player `cardStates`.
+- **Farmers of the Moor** ([ADR 0007](adr/0007-farmers-of-the-moor-variant-runtime.md)) adds terrain, extensions, horses, heating and its major supply through the generic seams in §9.
+- **Snake Opening** reverses only round-1 work rotation (§6.4).
 
 ### 10.3 `shared/custom-code/`
 
-`ast-validator.ts` validates custom-card TypeScript with an AST, allowing only approved imports and blocking forbidden APIs, network, and I/O. `sandbox-listener-actions.ts` is the single source for listener actions used by prompts, the validator, and server and browser manifests. Runtime isolation lives under `server/custom-code/`.
+Workshop cards are admitted only through the deployed Workshop Capability Contract ([ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)).
 
-### 10.4 `shared/utils/`
+- `ast-validator.ts` validates custom-card TypeScript with an AST: approved imports only, no forbidden APIs, network or I/O; `effect` must be an object literal; listener phases and effect keys must be in the contract allowlist.
+- `sandbox-listener-actions.ts` is the single action list shared by prompts, the validator, server and browser manifests and doc sync (`pnpm run check:prompt-sync`); GitHub references cannot widen it.
+- `flow-admission.ts`, `contract-admission.ts` and `listener-result-validator.ts` reject, before the engine, any output outside the contract: unlisted actions, foreign-card nodes and listeners, unopened node fields, wrong-typed opened fields and parameters, undocumented parameters, query results of the wrong type and writes to another card's or player's animal zones. Native card flows are not checked.
+- Listener `costs` must come with matching `costAttribution`. Sandbox constraints are documented in [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md); runtime isolation lives in `server/custom-code/` (§11.4).
 
-Generic helpers such as deep cloning, IDs, and math. It contains no business rules. `rng.ts` holds the seeded random streams: the numeric generator for an Explicit Seed and the HMAC-SHA256 stream for a wide seed, built on `@noble/hashes` because the rules also run in a browser Worker where the platform hash API is asynchronous.
+Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-contract-*-session.test.ts`.
+
+### 10.4 `shared/i18n/` and `shared/utils/`
+
+`shared/i18n/` holds UI copy keys and resources; `PromptKey` lives in `shared/contract/prompt-keys.ts`. `shared/utils/` holds generic helpers with no business rules; `rng.ts` owns the Explicit Seed generator and the HMAC-SHA256 wide-seed streams.
 
 ---
 

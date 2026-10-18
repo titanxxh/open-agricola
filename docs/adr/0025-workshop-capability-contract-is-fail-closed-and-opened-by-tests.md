@@ -1,37 +1,28 @@
-# Workshop Capability Contract is fail-closed and opened by fixed tests
+# 25. Workshop Capability Contract is fail-closed and opened by fixed tests
 
 - Status: Accepted
 - Date: 2026-10-10
 
-The Workshop Capability Contract is the one scope shared by model generation, source admission and execution. We reach that alignment by narrowing execution to the contract. Custom declarations and runtime return values that leave the contract, as scoped below, are rejected explicitly before they reach authoritative settlement, and native rule paths are not changed to make a custom capability safe. Before this decision the action allowlist only fed the prompt and its sync check, so a custom flow could dispatch an unlisted native action.
+## Context
 
-A name belongs to the contract only while at least one fixed behavior test drives it through a two-player GameSession on unmodified native paths. Names in the previously documented list are candidates: each one gets such a test or is removed. New capabilities open in demand-driven slices, each with its own issue and fixed test. Anything not listed is not open. Candidate capabilities are tracked in a GitHub issue; the sandbox reference does not enumerate unopened native interfaces with reasons.
+The listener action allowlist only fed the generation prompt and its sync check, so a custom flow could dispatch an unlisted native action. PR #1053 tried to open every serializable native mechanism at once (45 hooks, 31 listener identities, 25 leaf actions) with a host-side mirror of native semantics and changes to about 50 native files; ten review rounds kept finding admitted values whose native meaning differed, and it closed unmerged.
 
-## Scope of admission
+## Decision
 
-Admission checks these things and nothing else:
-
-- the listed names: effect hooks, listener actions, phases and scopes, leaf actions, `special-effect` kinds, and the resource names and interaction kinds in the declared metadata and listener fields;
-- the listener and flow-node fields a card may set, the types of the open node control fields (`optional`, `promptKey`, `anytimeWindow`, `actionContext.targetPlayerId`, `actionContext.trueAction`), and that each listener, returned node and returned animal zone belongs to the card itself;
-- the types of the effect metadata and listener data fields a card declares, because the engine reads several of them by truthiness;
-- the parameter keys each action documents, and the types of the params that the leaf actions running a native farm or card action take (`improvement.types`, `occupation.exactCost`, `emit-choice.options` and `promptKey`, the `selection` candidates), because those actions fall back to a default on another type, and the shape of each `emit-choice` option, because the options are sent to every client as written;
-- the field types of the card-local `special-effect` writes;
-- the top-level type of a query hook result.
-
-Admission also fixes what a custom `reap` and `breed` mean: a field phase outside Harvest, and breeding whose source is the card. It writes that context onto the leaf, and a card cannot write it. The leaf actions that run a native action are admitted as flow leaves only: a replacement `actionId` would keep the replaced action's context, and a `followUpActions` entry has no node to carry one.
-
-Admission does not check other parameter values, cost structures, schedules, or the contents of a query result. Their native consumers validate them, as they do for native cards. Mirroring those rules on the host is the approach this decision rejects, so a review finding of that kind is answered by pointing here, not by adding another validator.
-
-Admission serves honest authors and model mistakes. It must produce a clear error; it does not bound adversarial workloads beyond the isolate's existing time and memory limits.
-
-That threat model rests on where custom code can run. A room loads only the approved snapshot of a card that passed pull-request review and that its author then switched live. A card that is not live is refused when its own author creates the room, and skipped otherwise. An unreviewed card runs only in its author's own Workshop Sandbox session. Code that reaches other players has therefore been reviewed, and the isolate still bounds its memory, time and access. A hook failure or an out-of-contract result keeps the existing behavior: when it happens while a command is being settled, the first occurrence rejects and rolls back the command with the error, and a repeated identical failure skips that card's effect so a game containing a faulty card can continue. This is deliberate. A failure outside a command, such as a query that runs while a response is assembled, is recorded as a card warning and contributes a neutral result.
-
-## Considered options
-
-PR #1053 expanded the contract to every native mechanism that could be serialized across the isolation boundary (45 hooks, 31 listener identities, 25 leaf actions) and audited the whole surface at once. That needed a hand-written host-side mirror of native data semantics and changes to about 50 engine, payment and effect source files outside the sandbox modules. Ten review rounds produced 70 threads, with 11 new ones in the last round, each an admitted value whose native meaning differed from its declaration. A complete audit of that surface has no finite completion condition, so the PR was closed unmerged.
-
-Constraining only the prompt while execution stays wider was also rejected: accepted source and executed behavior would then differ.
+- The Workshop Capability Contract is the one scope shared by model generation, source admission and execution. Execution is narrowed to the contract: custom declarations and runtime results outside it are rejected before authoritative settlement, and native rule paths are not changed to make a custom capability safe.
+- A name belongs to the contract only while a fixed behavior test drives it through a two-player GameSession on unmodified native paths. New capabilities open in demand-driven slices, each with its own issue and test; anything not listed is closed. Candidate capabilities are tracked in a GitHub issue; the sandbox reference lists only open names.
+- **Admission checks only**: the listed names (effect hooks, listener actions, phases, scopes, leaf actions, `special-effect` kinds, declared resource names and interaction kinds); the listener and flow-node fields a card may set, the types of open control fields (`optional`, `promptKey`, `anytimeWindow`, `actionContext.targetPlayerId`, `actionContext.trueAction`), and that every listener, node and animal zone belongs to the card itself; the types of declared metadata and listener data fields; each action's documented parameter keys and the types of native farm and card action parameters and `emit-choice` options; card-local `special-effect` field types; and the top-level type of a query result.
+- Admission fixes the meaning of custom `reap` (a field phase outside Harvest) and `breed` (breeding sourced by the card) by writing that context onto the leaf; a card cannot write it. Native-action leaves are admitted only as flow leaves, not as replacement `actionId`s or `followUpActions`.
+- Admission does not mirror native validation of other values, costs, schedules or query contents; native consumers validate them as they do for native cards. Review findings of that kind are answered by this ADR.
+- Admission serves honest authors and model mistakes with a clear error; it does not bound adversarial workloads beyond the isolate's time and memory limits.
+- Threat model: only reviewed, approved and live snapshots reach other players; unreviewed cards run only in their author's sandbox, and the isolate bounds memory, time and access. During command settlement, a first hook failure or out-of-contract result rejects and rolls back the command; a repeated identical failure skips that card's effect. A failure outside a command records a card warning and contributes a neutral result.
 
 ## Consequences
 
-More requests receive an explicit capability-gap answer. We prefer that to a card that is admitted and behaves incorrectly. Possible native defects noticed during the expansion are fixed separately, and only with a failing test that uses an official card.
+- More requests receive an explicit capability-gap answer instead of an admitted card that behaves incorrectly.
+- Native defects found while opening capabilities are fixed separately, with a failing test that uses an official card.
+
+## Alternatives considered
+
+- Opening the whole serializable surface at once: no finite completion condition for the audit.
+- Constraining only the prompt: accepted source and executed behavior would differ.

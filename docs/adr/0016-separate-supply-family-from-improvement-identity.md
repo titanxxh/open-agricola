@@ -1,8 +1,22 @@
-# Separate supply family from improvement identity
+# 16. Supply family is separate from improvement identity
 
 - Status: Accepted
 - Date: 2026-08-31
 
-Major improvement supply family records a physical card's stack or row on the supply board, while improvement identity records the explicit rule meaning that a card counts as a named improvement or its upgrade. We keep these concepts separate because expansion replacements can occupy a base improvement's stack without inheriting its named rules identity; rules about supply position use the family, while rules about named improvements or upgrades require explicit identity metadata.
+## Context
 
-The rejected alternative was to infer rule identity from supply family or card-id prefixes. That is shorter locally, but it incorrectly treats cards such as Furniture Stall as Joinery upgrades and cannot express independently designed replacement and dual-type cards reliably.
+Expansion replacements can occupy a base improvement's supply stack without inheriting that improvement's named rules identity. Inferring identity from the stack treated unrelated cards, such as Furniture Stall, as Joinery upgrades.
+
+## Decision
+
+- A major improvement's supply family records only its physical stack or row on the supply board.
+- Improvement identity, meaning that a card counts as a named improvement or its upgrade, is explicit `*Identity` metadata read through `playerHasCardCapability()` or a card-definition lookup.
+- Rules about supply position use the family; rules about named improvements or upgrades use identity.
+
+## Consequences
+
+- Replacement and dual-type cards express their identity independently of where they sit.
+
+## Alternatives considered
+
+- Inferring identity from supply family or card-ID prefixes: shorter locally, but wrong for replacement and dual-type cards.
