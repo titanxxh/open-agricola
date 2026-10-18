@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import '../../shared/cards/register-all'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { cloneState } from '../../shared/session/state-bootstrap'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 
 const B104 = 'B104_SheepWalker'
 const sessions: GameSession[] = []
@@ -46,7 +46,7 @@ const setup = (placed = 1, played = true) => {
 }
 
 const snapshot = (response: SessionResponse): SessionResponse => ({
-  ...response, state: cloneState(response.state), interaction: structuredClone(response.interaction),
+  ...response, state: captureStateWithHistory(response.state), interaction: structuredClone(response.interaction),
 })
 const sheepWalkerOptions = (response: SessionResponse) => {
   expect(response.ok, response.error).toBe(true)
@@ -110,7 +110,7 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     expect(original.interaction.request.zones.some(zone => zone.animalType === 'sheep' && zone.animalCount > 0)).toBe(true)
     const opened = snapshot(session.takeAnytimeAction(0, 'exchange'))
     expect(sheepWalkerOptions(opened)).toEqual([])
-    expect(session.resolveChoice(0, 'cancel').state).toEqual(original.state)
+    expect(captureStateWithHistory(session.resolveChoice(0, 'cancel').state)).toEqual(original.state)
   })
 
   it('shares the live placed-sheep budget across mixed recipes and repeated exchange', () => {
@@ -137,7 +137,7 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     const opened = snapshot(session.takeAnytimeAction(0, 'exchange'))
     const response = session.resolveChoice(0, `bulk:${recipe(opened, 'stone')}=1,${recipe(opened, 'vegetable')}=${count}`)
     expect(response.ok).toBe(false)
-    expect(response.state).toEqual(opened.state)
+    expect(captureStateWithHistory(response.state)).toEqual(opened.state)
     expect(response.interaction).toEqual(opened.interaction)
     const valid = session.resolveChoice(0, `bulk:${recipe(opened, 'stone')}=1`)
     expect(valid.ok, valid.error).toBe(true)
@@ -152,11 +152,11 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     const stone = recipe(opened, 'stone')
     const wrongActor = session.resolveChoice(1, `bulk:${stone}=1`)
     expect(wrongActor.ok).toBe(false)
-    expect(wrongActor.state).toEqual(opened.state)
+    expect(captureStateWithHistory(wrongActor.state)).toEqual(opened.state)
     expect(wrongActor.interaction).toEqual(opened.interaction)
     const cancelled = session.resolveChoice(0, 'cancel')
     expectOriginalReorg(session, cancelled, host, original)
-    expect(cancelled.state).toEqual(original.state)
+    expect(captureStateWithHistory(cancelled.state)).toEqual(original.state)
     const reopened = snapshot(session.takeAnytimeAction(0, 'exchange'))
     session = new GameSession(JSON.parse(JSON.stringify({ state: reopened.state, sessionCursor: session.createSessionPrivateCursor() })))
     sessions.push(session)
@@ -167,7 +167,7 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     const undone = session.undoStep()
     expect(undone.ok, undone.error).toBe(true)
     expect(undone.state.players).toEqual(reopened.state.players)
-    expect(undone.state.actionSpaces).toEqual(reopened.state.actionSpaces)
+    expect(captureStateWithHistory(undone.state).actionSpaces).toEqual(reopened.state.actionSpaces)
     expect(undone.state.events).toEqual(reopened.state.events)
     expect(undone.state.log).toEqual(reopened.state.log)
     expect(undone.interaction).toEqual(reopened.interaction)

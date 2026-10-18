@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { cloneState } from '../../shared/session/state-bootstrap'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -15,7 +15,7 @@ const D124 = 'D124_Emissary'
 const FILLER = '__test_placeholder__'
 
 const snapshot = (response: SessionResponse): SessionResponse => ({
-  ...response, state: cloneState(response.state), interaction: structuredClone(response.interaction),
+  ...response, state: captureStateWithHistory(response.state), interaction: structuredClone(response.interaction),
 })
 
 const exchangeOption = (response: SessionResponse, destination: 'boar' | 'vegetable' | 'stone') => {
