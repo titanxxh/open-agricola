@@ -333,7 +333,7 @@ type ActionChoiceOption = {
 
 Choice Preview 由共享的可执行规则计划派生（[ADR 0024](adr/0024-choice-previews-use-shared-rule-plans.md)）；卡牌不加展示回调。
 
-- `effectPreview` 的类型有 `resourceExchange`、`payment`、`text`、`resourceMovement`、`futureSchedule`、`futureOffers`、`actionSpace`、`cardScore` 和 `fieldContents`，由纯查询 `ActionDefinition.previewEffect` 产生。未来请求与执行共用 `normalizeFutureSchedule`（目标过滤、前缀、条件、费用、房间类型）。`seq(pay, gain[, bonus-vp])` 的预览自动聚合，手写的 pay 与 gain leaf 也一样。
+- `effectPreview` 的类型包括 `resourceExchange`、`payment`、`text`、`resourceMovement`、`futureSchedule`、`futureOffers`、`actionSpace`、`cardScore` 和 `fieldContents`，完整集合见 `shared/contract/types.ts` 中的 `ChoiceEffectPreview` union。它们由纯查询 `ActionDefinition.previewEffect` 产生。未来请求与执行共用 `normalizeFutureSchedule`（目标过滤、前缀、条件、费用、房间类型）。`seq(pay, gain[, bonus-vp])` 的预览自动聚合，手写的 pay 与 gain leaf 也一样。
 - `descriptionPreview` 递归描述 flow（`ChoiceDescriptionPreview`）：顺序、互斥与可兼选择、并行顺序、可选性和执行者。`Engine.describe()` 读取可执行 flow 而不推进；`Engine.describeFlow()` 描述独立计划；不透明的原生行动提供纯 `ActionDefinition.flowFactory`，执行也调用它。基础描述不含玩家 modifier，并保留所有条件分支；延后的数量在到期前保留其公式。
 - 可见选项文字来自 `descriptionPreview` 与 `effectPreview`；`choiceLabelKey` 只用于语义覆盖。`special-effect` 从 `params.kind` 提供语义描述，纯展示同步不出现在描述中。
 - 预览描述的是声明的效果，不保证未来条件成立。连续且相同的未来条目合并，其他条目按顺序分别显示。
@@ -511,7 +511,7 @@ type SessionResponse = {
 |---|---|---|---|
 | 轮转选出的普通放人或沼泽特殊行动 | 消耗当前机会 | 开启新作用域 | 每个完整规则行动一个 |
 | 贡献的额外回合 | 开启额外机会 | 开启新作用域 | 每个完整规则行动一个 |
-| 卡牌驱动的工人移动（每名移动的工人） | 无新机会 | 每名移动的工人开启新作用域 | 每个完整规则行动一个 |
+| 经 `move-farmer-to-space` 的工人移动（每名移动的工人） | 无新机会 | 每名移动的工人开启新作用域 | 每个完整规则行动一个 |
 | 仍属于当前回合的即时规则行动 | 无新机会 | 继承当前作用域 | 开启新作用域 |
 | 不算回合的阶段或 anytime 规则行动 | 无新机会 | 无 | 开启新作用域 |
 | 单纯的获得、支付、选择或 listener 激活 | 无新机会 | 若存在则继承 | 留在外层作用域 |
@@ -519,6 +519,7 @@ type SessionResponse = {
 - Turn Scope 在放人、沼泽特殊行动或卡牌驱动的行动格使用之前开始，覆盖该回合的每个规则行动、尾随效果、必需的整理和回合结束 hook，之后清除，之后的处理不会再看到已完成回合的身份或起点快照。移动工人产生的回合把普通人员行动的触发身份传给这些 hook，并在选择下一名工人前关闭。
 - 执行“在你的回合”效果需要 owner 的活动作用域；可执行性查询可以投影当前轮转玩家即将开启的作用域。
 - 同一回合的多个规则行动共享 Turn Scope，各用独立的行动作用域。按行动的差值使用行动 transaction。
+- 同一人物的 `jumpLeaf` 跳转与不放人的 `viaCardJump` 使用留在外围 Turn Scope（如有）中；只有 `move-farmer-to-space` 用 `turn-scope` begin / end 包住每次移动。
 - `actionContext.trueAction` 只表示一个效果对 listener 而言是否算作执行了具名行动；它不开启回合，也不开启行动作用域。
 - **人员放置序号**按 Work Placement Chronology 中的正常人员放置计数：同一工人移动不推进；正常放置临时或召回的人物会推进。`isCurrentActionSecondPersonPlacement()` 优先使用当前上下文的 `placedWorkerId`。
 
@@ -1275,8 +1276,8 @@ POST   /api/v1/github-app/webhook
 `server/workshop.ts` 与 `server/workshop-pr/` 提供自定义卡上传、编译、沙盒与 PR 投递。完整产品流程见 [Platform design](PLATFORM_DESIGN.md)。
 
 - 沙盒设置（`sandbox_settings`、`sandbox_cards`）持久化人数、牌组与变体开关；`POST /api/game/new-sandbox` 把它们传给 `createInitialState()`。
-- 审核与发布是 `server/workshop-status.ts` 中的两个维度：审核 `unsubmitted / in_review / approved / stale / merged`，发布 `live`。卡牌绑定一个基于 `main`、打开且非草稿的 PR，并固定其 head 与 Design Draft。只有有 push 权限的审核者对精确 head 的真实批准才能批准一个版本；发布时重新查询 GitHub，要求 head、审核 SHA、批准 SHA 与固定版本一致。任何不一致、关闭、转为草稿、改变 base、撤销批准或查询失败都会让卡牌进入 `stale·offline`。
-- 合入 `main` 的 PR 让卡牌毕业为只读的 `merged`；启动时 `markBuiltInMergedCards` 让内置定义接管。
+- 审核与发布是 `server/workshop-status.ts` 中的两个维度：审核 `unsubmitted / in_review / approved / stale / merged`，发布 `live`。卡牌绑定一个基于 `main`、打开且非草稿的 PR，并固定其 head 与 Design Draft。只有有 push 权限的审核者对精确 head 的真实批准才能批准一个版本；发布时重新查询 GitHub，要求 head、审核 SHA、批准 SHA 与固定版本一致。任何不一致、关闭、转为草稿、改变 base 或撤销批准都会让卡牌进入 `stale·offline`，处理 webhook 或发布时 GitHub 查询失败也是如此。绑定后立即刷新若暂时失败，则保留 `in_review` 绑定、清除同步时间，作者可通过 `refresh-pr-status` 重试。
+- 合入 `main` 的 PR 让已批准的卡牌毕业为只读的 `merged`。在批准之前观察到的合入会被记录（`github_pr_status='merged'`），只有在有权限的精确 head 批准被核对后才毕业；合入其他 base 的 PR 进入 `stale·offline`。在线的已合入卡牌继续提供其审核快照直到发布，之后启动时 `markBuiltInMergedCards` 让内置定义接管。
 - 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照；作者自己未上线的卡会以指引拒绝创建，其他无法加载的 ID 静默过滤。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，生成文件冲突会暂停投递。见 [GitHub App runbook](operations/github-oauth-app-setup.md)。
