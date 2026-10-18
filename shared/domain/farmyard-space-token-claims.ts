@@ -15,6 +15,7 @@ const addResources = (
   }
 }
 
+/** Removes the claimable tokens and returns their goods; the caller credits them through `receive`. */
 export const claimFarmyardGoodsTokens = (
   player: PlayerState,
   sourceCardId: string,
@@ -31,7 +32,6 @@ export const claimFarmyardGoodsTokens = (
     return false
   })
   player.farmyardSpaceStates = remaining
-  addResources(player.resources, gained)
   return gained
 }
 
@@ -52,6 +52,7 @@ export const hasClaimableFarmyardGoodsTokens = (
 const positionSet = (positions?: Array<{ row: number; col: number }>) =>
   positions ? new Set(positions.map(positionKey)) : null
 
+/** Removes the claimable tokens and returns their goods; the caller credits them through `receive`. */
 export const claimFieldGoodsTokens = (
   player: PlayerState,
   sourceCardId?: string,
@@ -68,7 +69,6 @@ export const claimFieldGoodsTokens = (
     return false
   })
   player.farmyardSpaceStates = remaining
-  addResources(player.resources, gained)
   return gained
 }
 

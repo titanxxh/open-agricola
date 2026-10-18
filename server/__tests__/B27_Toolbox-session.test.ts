@@ -162,16 +162,10 @@ describe('B27 Toolbox session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
 
-    expect(resp.interaction.request.kind).toBe('select-trigger')
+    // Only Potters Yard reacts to its own receipt, so its optional exchange opens without a trigger selection.
+    expect(resp.interaction.request.kind).toBe('choice')
     expect(resp.interaction.request.options?.filter(option => !option.value.startsWith('__'))
-      .map(option => option.sourceCard)).toEqual([POTTERS_YARD_ID])
-    const exchange = resp.interaction.request.options?.find((option) => option.sourceCard === POTTERS_YARD_ID)
-    expect(exchange).toBeDefined()
-    resp = session.resolveChoice(0, exchange!.value)
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).not.toBe('ui.interactionToolboxImprovement')
+      .every(option => option.sourceCard === POTTERS_YARD_ID)).toBe(true)
 
     const skipPottersYard = resp.interaction.request.options?.find((option) => option.value === '__skip__')
     expect(skipPottersYard, JSON.stringify(resp.interaction)).toBeDefined()

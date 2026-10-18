@@ -35,6 +35,8 @@ import { occupationGateAction } from './effects/internal/occupation-gate'
 import { storeOnCardAction } from './effects/internal/store-on-card'
 import { moveFarmerToSpaceAction } from './effects/internal/move-farmer-to-space'
 import { popCardStackAction } from './effects/internal/pop-card-stack'
+import { claimFarmyardGoodsTokensAction } from './effects/internal/claim-farmyard-goods-tokens'
+import { claimFieldGoodsTokensAction } from './effects/internal/claim-field-goods-tokens'
 import { pushCardStackAction } from './effects/internal/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { consumeCardCounterAction } from './effects/internal/consume-card-counter'
@@ -103,6 +105,8 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   spendWorkerAction,
   setFirstPlayerAction,
   popCardStackAction,
+  claimFarmyardGoodsTokensAction,
+  claimFieldGoodsTokensAction,
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,

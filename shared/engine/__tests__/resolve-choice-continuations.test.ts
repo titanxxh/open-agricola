@@ -105,6 +105,33 @@ describe('resolveChoice continuations keep native requests pending', () => {
     expect(seen.map((entry) => entry.phase)).toEqual(['immediatelyAfter', 'after'])
   })
 
+  it('runs a flow returned by the first leaf of a selected sequence branch before the later siblings', () => {
+    const { state, player } = setup()
+    const order: string[] = []
+    const first = action('order-first', () => {
+      order.push('first')
+      return { type: 'flow', flow: { type: 'leaf', actionId: 'order-child' } }
+    })
+    const child = action('order-child', () => { order.push('child'); return { type: 'ok' } })
+    const second = action('order-second', () => { order.push('second'); return { type: 'ok' } })
+    const other = action('order-other', () => ({ type: 'ok' }))
+    const branch = new XorNode('branch', [
+      new SequenceNode('picked', [new ActionNode('first-node', first.id), new ActionNode('second-node', second.id)]),
+      new ActionNode('other-node', other.id),
+    ])
+    const { engine } = makeEventTestEngine([first, child, second, other], new SequenceNode('root', [branch]))
+    const context = { state, player, space: asActionSpace(first) }
+
+    withActiveRegistry(new CardRegistry(), () => {
+      expect(engine.proceed(context).type).toBe('choice')
+      engine.resolveChoice('picked', context)
+      let step = engine.proceed(context)
+      for (let index = 0; index < 10 && step.type !== 'done'; index++) step = engine.proceed(context)
+      expect(step.type).toBe('done')
+    })
+    expect(order).toEqual(['first', 'child', 'second'])
+  })
+
   it('waits for a non-choice request returned after an earlier choice', () => {
     const { state, player } = setup()
     const submitted: string[] = []

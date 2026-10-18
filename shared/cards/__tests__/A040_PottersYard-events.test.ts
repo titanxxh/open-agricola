@@ -32,8 +32,8 @@ describe('Potters Yard committed host facts', () => {
     const { context, state, used } = setup()
     const before = JSON.stringify(state)
     expect(invoke({ ...context, actionEvents: [used] })).toEqual({ sourceCard: CARD, flow: {
-      type: 'leaf', actionId: 'special-effect', sourceCard: CARD,
-      params: { kind: 'claim-farmyard-goods-tokens', positions: [{ playerId: context.player.id, row: 0, col: 2 }] },
+      type: 'leaf', actionId: 'claim-farmyard-goods-tokens', sourceCard: CARD,
+      params: { positions: [{ playerId: context.player.id, row: 0, col: 2 }] },
     } })
     expect(JSON.stringify(state)).toEqual(before)
   })
@@ -54,10 +54,10 @@ describe('Potters Yard committed host facts', () => {
     expect(invoke(candidate)).toBeUndefined()
   })
 
-  it('offers exchange only for actual committed clay on this claim host', () => {
+  it('offers exchange only for actual committed clay received from this card', () => {
     const { context, received } = setup()
-    const result = invoke({ ...context, actionId: 'special-effect', sourceCard: CARD,
-      params: { kind: 'claim-farmyard-goods-tokens' }, actionEvents: [received] })
+    const result = invoke({ ...context, actionId: 'receive', sourceCard: CARD,
+      params: { fromCard: { clay: 1 } }, actionEvents: [received] })
     expect(result?.flow).toMatchObject({ type: 'xor', optional: true, children: [{ type: 'seq', children: [
       { actionId: 'pay', params: { clay: 1 } }, { actionId: 'gain', params: { food: 2 } },
     ] }] })
@@ -65,8 +65,8 @@ describe('Potters Yard committed host facts', () => {
 
   it.each(['missing-snapshot', 'new-card', 'foreign-source', 'other-owner', 'draft', 'transaction-only', 'no-clay'])('does not exchange %s receipts', scenario => {
     const { context, received, player, state } = setup()
-    const candidate: CardListenerContextInput = { ...context, actionId: 'special-effect', sourceCard: CARD,
-      params: { kind: 'claim-farmyard-goods-tokens' }, actionEvents: [received] }
+    const candidate: CardListenerContextInput = { ...context, actionId: 'receive', sourceCard: CARD,
+      params: { fromCard: { clay: 1 } }, actionEvents: [received] }
     player.resources.clay = 10
     if (scenario === 'missing-snapshot') candidate.triggerSnapshot = undefined
     if (scenario === 'new-card') candidate.triggerSnapshot = createTriggerSnapshot({ players: [{ ...player, minorPlayed: [] }] })

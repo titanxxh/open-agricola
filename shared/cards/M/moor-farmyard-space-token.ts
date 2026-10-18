@@ -97,7 +97,7 @@ export const makeFarmyardGoodsClaimListener = (
     const player = context.ownerPlayer ?? context.player
     if (!hasClaimableFarmyardGoodsTokens(player, cardId)) return
     return {
-      flow: specialEffectLeaf(cardId, { kind: 'claim-farmyard-goods-tokens' }),
+      flow: { type: 'leaf', actionId: 'claim-farmyard-goods-tokens', sourceCard: cardId },
       sourceCard: cardId,
     }
   },

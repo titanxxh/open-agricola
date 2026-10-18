@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { specialEffectAction } from '../special-effect'
 import { receiveAction } from '../receive'
+import { claimFarmyardGoodsTokensAction } from '../internal/claim-farmyard-goods-tokens'
 import { createInitialState } from '../../../session/state-bootstrap'
 import { getWorkPhaseBuildingResources } from '../../../session/work-phase-resources'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
@@ -21,14 +21,17 @@ function setup() {
 }
 
 describe('farmyard goods claim effect', () => {
-  it.each(['work', 'preparation'] as const)('records actual claimed goods once in %s phase', phase => {
+  it.each(['work', 'preparation'] as const)('claims goods once and credits them through receive in %s phase', phase => {
     const { context, state, player, events } = setup()
     state.roundPhase = phase
     state.players[1]!.farmyardSpaceStates = structuredClone(player.farmyardSpaceStates)
     const otherTokens = structuredClone(state.players[1]!.farmyardSpaceStates)
-    const claim = { ...context, params: { kind: 'claim-farmyard-goods-tokens', positions: [{ row: 0, col: 2 }, { row: 0, col: 2 }] } }
-    expect(specialEffectAction.execute(claim)).toEqual({ type: 'ok' })
-    expect(specialEffectAction.execute(claim)).toEqual({ type: 'ok' })
+    const claim = { ...context, params: { positions: [{ row: 0, col: 2 }, { row: 0, col: 2 }] } }
+    const credit = { type: 'leaf', actionId: 'receive', sourceCard: 'source', params: { fromCard: { clay: 1 } } }
+    expect(claimFarmyardGoodsTokensAction.execute(claim)).toEqual({ type: 'flow', flow: credit })
+    expect(claimFarmyardGoodsTokensAction.execute(claim)).toEqual({ type: 'ok' })
+    expect(player.resources.clay).toBe(0)
+    expect(receiveAction.execute({ ...context, params: credit.params })).toEqual({ type: 'ok', resourcesGained: { clay: 1 } })
     expect(player.resources.clay).toBe(1)
     expect(state.players[1]!.farmyardSpaceStates).toEqual(otherTokens)
     expect(state.players[1]!.resources.clay).toBe(0)
@@ -43,7 +46,7 @@ describe('farmyard goods claim effect', () => {
   it.each([null, [{ row: 0.5, col: 2 }], [{ row: 0, col: '2' }], '0-2'])('rejects malformed coordinate scope %j atomically', positions => {
     const { context, state, events } = setup()
     const before = JSON.stringify(state)
-    expect(specialEffectAction.execute({ ...context, params: { kind: 'claim-farmyard-goods-tokens', positions } })).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
+    expect(claimFarmyardGoodsTokensAction.execute({ ...context, params: { positions } })).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
     expect(JSON.stringify(state)).toEqual(before)
     expect(events).toEqual([])
   })
@@ -51,7 +54,7 @@ describe('farmyard goods claim effect', () => {
   it('does not sweep live used tiles when an explicit empty host scope was supplied', () => {
     const { context, player, events } = setup()
     player.fields = [{ row: 0, col: 2, stacks: [] }]
-    expect(specialEffectAction.execute({ ...context, params: { kind: 'claim-farmyard-goods-tokens', positions: [] } })).toEqual({ type: 'ok' })
+    expect(claimFarmyardGoodsTokensAction.execute({ ...context, params: { positions: [] } })).toEqual({ type: 'ok' })
     expect(player.farmyardSpaceStates).toHaveLength(3)
     expect(player.resources.clay).toBe(0)
     expect(events).toEqual([])

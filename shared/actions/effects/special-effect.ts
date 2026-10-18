@@ -19,10 +19,7 @@ import {
   writeCardExtraData,
   writePrivateCardData,
   popFromCardStack,
-  addCardResourceGained,
 } from '../../cards/helpers/card-state'
-import { addResourcesFromCards } from '../../session/stats'
-import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { initCardState } from '../../cards/__stubs__/helpers'
 import {
   fieldFindStackOfKind,
@@ -48,7 +45,6 @@ import {
   normalizeScoringReserveResources,
 } from '../../domain/scoring-reserve'
 import { addFarmyardSpaceState, getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
-import { claimFarmyardGoodsTokens, claimFieldGoodsTokens } from '../../domain/farmyard-space-token-claims'
 import {
   addConsumedSupplyTokenCount,
   getOwnOrdinaryFenceReserveCount,
@@ -84,8 +80,6 @@ export type SpecialEffectParams =
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
   | { kind: 'add-farmyard-space-state'; state: FarmyardSpaceState }
-  | { kind: 'claim-farmyard-goods-tokens'; positions?: Array<{ row: number; col: number }> }
-  | { kind: 'claim-field-goods-tokens'; positions?: Array<{ row: number; col: number }> }
   | { kind: 'grow-field-and-non-field-crops' }
   | { kind: 'consume-supply-token'; key: SupplyTokenKey; amount?: number }
   | { kind: 'consume-pending-extra-turns' }
@@ -318,46 +312,6 @@ export const specialEffectAction: ActionDefinition = {
         const newlyUsedTiles = getNewlyUsedFarmyardTiles(target, usedBefore)
         if (newlyUsedTiles.length > 0) {
           eventSink?.emit<'farm.spacesUsed'>({ type: 'farm.spacesUsed', sourceCardId: sourceCard, newlyUsedTiles })
-        }
-        return { type: 'ok' }
-      }
-      case 'claim-farmyard-goods-tokens': {
-        if (p.positions !== undefined && (!Array.isArray(p.positions)
-          || p.positions.some(position => !position || !Number.isInteger(position.row) || !Number.isInteger(position.col)))) {
-          return { type: 'fail', errorKey: 'log.specialEffectFail' }
-        }
-        const gained = claimFarmyardGoodsTokens(target, sourceCard, p.positions)
-        if (Object.keys(gained).length > 0) {
-          addResourcesFromCards(target, gained)
-          addCardResourceGained(target, sourceCard, gained)
-          trackWorkPhaseBuildingResources(state, target.id, gained)
-          eventSink?.emit<'resource.moved'>({
-            type: 'resource.moved',
-            resources: gained,
-            from: { kind: 'card', playerId: target.id, cardId: sourceCard },
-            to: { kind: 'player', playerId: target.id },
-            reason: 'cardEffect',
-            sourceCardId: sourceCard,
-          })
-        }
-        return { type: 'ok' }
-      }
-      case 'claim-field-goods-tokens': {
-        const positions = Array.isArray(p.positions)
-          ? p.positions.filter((pos): pos is { row: number; col: number } =>
-              Number.isFinite(pos?.row) && Number.isFinite(pos?.col),
-            )
-          : undefined
-        const gained = claimFieldGoodsTokens(target, sourceCard, positions)
-        if (Object.keys(gained).length > 0) {
-          eventSink?.emit<'resource.moved'>({
-            type: 'resource.moved',
-            resources: gained,
-            from: { kind: 'card', playerId: target.id, cardId: sourceCard },
-            to: { kind: 'player', playerId: target.id },
-            reason: 'cardEffect',
-            sourceCardId: sourceCard,
-          })
         }
         return { type: 'ok' }
       }

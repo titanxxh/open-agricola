@@ -692,7 +692,7 @@ return {
 | -------------------------- | --------------------------------------------------------------------------------- |
 | `bonus-vp`                 | **固定 +1 VP，不接受 `amount` / `vp` 参数**。要 N 分就把 N 个 leaf 串入 seq                       |
 | `store-on-card`            | params 形如 `{ wood: 1, clay: 2 }`，写入 `player.cardStates[CARD_ID].counters`         |
-| `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
+| `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail；货物经 `receive` 进入供应区，订阅 `receive` 的 listener 能看到，订阅 `gain` 的看不到 |
 | `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
 | `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
