@@ -25,6 +25,7 @@ import { GameSession } from '../../server/game/authoritative-session'
 import { serializeSessionSnapshot } from '../../shared/session/serialization'
 import { encodeRoomBody } from '../../server/game/persistence/room-body-codec'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
+import { allocateTestPort } from '../test-ports'
 
 const scriptPath = resolve(import.meta.dirname, '../../restart-local.sh')
 const tempDirs: string[] = []
@@ -356,4 +357,169 @@ esac
     expect(processGroupExists(oldGroup)).toBe(false)
     expect(processGroupExists(newGroup)).toBe(false)
   }, 20_000)
+})
+
+describe.skipIf(process.platform !== 'linux')('restart-local owned processes', () => {
+  // A stub checkout whose backend and frontend are plain loopback listeners.
+  const launcher = async () => {
+    const root = mkdtempSync(join(tmpdir(), 'oa-restart-owned-'))
+    tempDirs.push(root)
+    const bin = join(root, 'bin')
+    const nodeBin = join(root, 'node_modules/.bin')
+    mkdirSync(bin, { recursive: true })
+    mkdirSync(nodeBin, { recursive: true })
+    execFileSync('git', ['init', '-q'], { cwd: root })
+    writeFileSync(join(root, 'restart-local.sh'), readFileSync(scriptPath))
+    chmodSync(join(root, 'restart-local.sh'), 0o755)
+    writeServicesStub(root)
+    const server = join(root, 'server.cjs')
+    writeFileSync(server, `
+const [port, readyFile] = process.argv.slice(2)
+const listener = require('node:net').createServer()
+listener.on('error', () => process.exit(1))
+listener.listen(Number(port), '127.0.0.1', () => {
+  if (readyFile) require('node:fs').writeFileSync(readyFile, String(process.pid))
+})
+`)
+    // TEST_FOREIGN_FRONTEND makes an unrelated session take the frontend port
+    // after the backend is up, before the frontend can bind it.
+    // TEST_BACKEND_CHILD keeps the listener as a child of the group leader, and
+    // TEST_KILL_BACKEND_LEADER makes that leader exit while the frontend starts.
+    writeExecutable(join(nodeBin, 'tsx'), `#!/bin/bash
+case "$*" in *local-rooms.ts*) exit 0 ;; esac
+echo "$$" > "$TEST_BACKEND_PID_FILE"
+if [ -n "\${TEST_FOREIGN_FRONTEND:-}" ]; then
+  setsid node "$TEST_SERVER" "$FRONTEND_PORT" "$TEST_FOREIGN_FRONTEND" &
+  for _ in $(seq 100); do [ -f "$TEST_FOREIGN_FRONTEND" ] && break; sleep 0.05; done
+fi
+[ -n "\${TEST_BACKEND_CHILD:-}" ] || exec node "$TEST_SERVER" "$BACKEND_PORT"
+node "$TEST_SERVER" "$BACKEND_PORT" &
+wait
+`)
+    writeExecutable(join(nodeBin, 'vite'), `#!/bin/bash
+while [ $# -gt 0 ]; do [ "$1" = --port ] && port="$2"; shift; done
+[ -z "\${TEST_KILL_BACKEND_LEADER:-}" ] || kill -9 "$(cat "$TEST_BACKEND_PID_FILE")"
+exec node "$TEST_SERVER" "$port"
+`)
+    writeExecutable(join(bin, 'pnpm'), '#!/bin/bash\nexit 0\n')
+    const backendPort = await allocateTestPort()
+    const frontendPort = await allocateTestPort({ taken: [backendPort] })
+    const owned = join(root, 'owned-processes')
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      PNPM_BIN: join(bin, 'pnpm'),
+      BACKEND_PORT: String(backendPort),
+      FRONTEND_PORT: String(frontendPort),
+      OWNED_PROCESSES_FILE: owned,
+      REPLAY_VIEWER_BUILD_ID: 'test-viewer',
+      GAME_BUILD_ID: 'test-game',
+      TEST_SERVER: server,
+      TEST_BACKEND_PID_FILE: join(root, 'backend.pid'),
+    }
+    const run = (args: string[], extra: Record<string, string> = {}) => {
+      const result = spawnSync('bash', [join(root, 'restart-local.sh'), ...args], {
+        cwd: root, encoding: 'utf8', input: '', timeout: 30_000, env: { ...env, ...extra },
+      })
+      return { status: result.status, output: `${result.stdout}\n${result.stderr}` }
+    }
+    const startForeign = async (port: number) => {
+      const ready = join(root, `foreign-${port}.pid`)
+      spawn('setsid', [process.execPath, server, String(port), ready], { stdio: 'ignore' })
+      await waitForFile(ready)
+      const pid = Number(readFileSync(ready, 'utf8'))
+      processGroups.push(pid)
+      return pid
+    }
+    const recordedGroups = () => readFileSync(owned, 'utf8').trim().split('\n')
+      .map(line => Number(line.split('\t')[0]!.replace(/^-/, '')))
+    return { root, run, owned, frontendPort, startForeign, recordedGroups }
+  }
+
+  it('stops exactly the processes it started, also when cleanup repeats', async () => {
+    const { run, owned, recordedGroups } = await launcher()
+
+    const started = run([])
+    expect(started.status, started.output).toBe(0)
+    const groups = recordedGroups()
+    processGroups.push(...groups)
+    expect(groups).toHaveLength(2)
+    expect(groups.every(processGroupExists)).toBe(true)
+
+    const stopped = run(['--kill-only'])
+    expect(stopped.status, stopped.output).toBe(0)
+    expect(groups.some(processGroupExists)).toBe(false)
+    expect(existsSync(owned)).toBe(false)
+
+    const repeated = run(['--kill-only'])
+    expect(repeated.status, repeated.output).toBe(0)
+    expect(repeated.output).toContain('No recorded processes are running')
+  }, 60_000)
+
+  it('stops a recorded group whose leader exited while its children still run', async () => {
+    const { root, run, recordedGroups } = await launcher()
+
+    const started = run([], { TEST_BACKEND_CHILD: '1' })
+    expect(started.status, started.output).toBe(0)
+    const groups = recordedGroups()
+    processGroups.push(...groups)
+    const backend = Number(readFileSync(join(root, 'backend.pid'), 'utf8'))
+    expect(groups).toContain(backend)
+    process.kill(backend, 'SIGKILL')
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(processGroupExists(backend)).toBe(true)
+
+    const stopped = run(['--kill-only'])
+    expect(stopped.status, stopped.output).toBe(0)
+    expect(groups.some(processGroupExists)).toBe(false)
+  }, 60_000)
+
+  it('stops a group whose leader exited before ownership was recorded', async () => {
+    const { root, run, recordedGroups } = await launcher()
+
+    const started = run([], { TEST_BACKEND_CHILD: '1', TEST_KILL_BACKEND_LEADER: '1' })
+    expect(started.status, started.output).toBe(0)
+    const groups = recordedGroups()
+    processGroups.push(...groups)
+    const backend = Number(readFileSync(join(root, 'backend.pid'), 'utf8'))
+    expect(groups).toContain(backend)
+    expect(processGroupExists(backend)).toBe(true)
+
+    const stopped = run(['--kill-only'])
+    expect(stopped.status, stopped.output).toBe(0)
+    expect(groups.some(processGroupExists)).toBe(false)
+  }, 60_000)
+
+  it('refuses to start over a listener it did not start, and kill-only leaves it running', async () => {
+    const { run, frontendPort, startForeign } = await launcher()
+    const foreign = await startForeign(frontendPort)
+
+    const started = run([])
+    expect(started.status).not.toBe(0)
+    expect(started.output).toContain(`frontend port ${frontendPort} is held by a process this launcher did not start`)
+    expect(processGroupExists(foreign)).toBe(true)
+
+    const stopped = run(['--kill-only'])
+    expect(stopped.status, stopped.output).toBe(0)
+    expect(processGroupExists(foreign)).toBe(true)
+  }, 60_000)
+
+  it('keeps a listener that takes the frontend port during startup', async () => {
+    const { root, run } = await launcher()
+    const foreignReady = join(root, 'foreign-frontend.pid')
+
+    const started = run([], { TEST_FOREIGN_FRONTEND: foreignReady })
+    const foreign = Number(readFileSync(foreignReady, 'utf8'))
+    processGroups.push(foreign)
+    const backend = Number(readFileSync(join(root, 'backend.pid'), 'utf8'))
+    processGroups.push(backend)
+    expect(started.status).not.toBe(0)
+    expect(started.output).toContain('another process acquired frontend port')
+    expect(processGroupExists(backend)).toBe(false)
+    expect(processGroupExists(foreign)).toBe(true)
+
+    const stopped = run(['--kill-only'])
+    expect(stopped.status, stopped.output).toBe(0)
+    expect(processGroupExists(foreign)).toBe(true)
+  }, 60_000)
 })

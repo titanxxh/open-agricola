@@ -107,6 +107,13 @@ are created automatically; each survives backend restarts independently.
   --instances N                  Start 1 (default) or 2 local app instances behind
                                  the same public entry. PostgreSQL/S3 stay shared.
   -h, --help                     Show this help.
+
+Environment:
+  OWNED_PROCESSES_FILE           Record the processes this launcher starts in
+                                 this file, and stop only those: a listener on
+                                 the ports that the launcher did not start is
+                                 left running and fails the start. Isolated
+                                 test environments set it.
 EOF
 }
 
@@ -374,6 +381,74 @@ reset_persisted_dev_rooms() {
 }
 
 STARTED_PROCESS_TARGETS=()
+STARTED_PROCESS_TIMES=()
+OWNED_PROCESSES_FILE="${OWNED_PROCESSES_FILE:-}"
+
+process_start_time() {
+  { ps -o lstart= -p "${1#-}" 2>/dev/null || true; } | sed 's/^ *//'
+}
+
+# The leader's start time is read at launch: a leader that exits before
+# ownership is recorded still leaves an identifiable group.
+remember_started_target() {
+  STARTED_PROCESS_TARGETS+=("$1")
+  STARTED_PROCESS_TIMES+=("$(process_start_time "$1")")
+}
+
+# Each line holds a kill target and its leader's start time, so a recycled
+# PID is never signalled.
+record_owned_processes() {
+  local index=0
+
+  [ -n "$OWNED_PROCESSES_FILE" ] || return 0
+  : > "$OWNED_PROCESSES_FILE"
+  for ((index = 0; index < ${#STARTED_PROCESS_TARGETS[@]}; index += 1)); do
+    printf '%s\t%s\n' "${STARTED_PROCESS_TARGETS[$index]}" "${STARTED_PROCESS_TIMES[$index]}" >> "$OWNED_PROCESSES_FILE"
+  done
+}
+
+stop_owned_processes() {
+  local targets=()
+  local target=""
+  local started=""
+  local current=""
+
+  if [ -f "$OWNED_PROCESSES_FILE" ]; then
+    while IFS=$'\t' read -r target started; do
+      [ -n "$target" ] && [ -n "$started" ] || continue
+      current="$(process_start_time "$target")"
+      if [ "$current" = "$started" ]; then
+        targets+=("$target")
+      elif [ -z "$current" ] && [ "${target#-}" != "$target" ] && kill -0 -- "$target" 2>/dev/null; then
+        # The leader exited but members remain, such as backend children on
+        # APP_BASE_PORT. A PGID stays allocated while any member lives, so
+        # this is still the recorded group.
+        targets+=("$target")
+      fi
+    done < "$OWNED_PROCESSES_FILE"
+  fi
+  if [ "${#targets[@]}" -gt 0 ]; then
+    echo "  Stopping ${#targets[@]} process target(s) recorded in $OWNED_PROCESSES_FILE..."
+    if ! terminate_process_targets "${targets[@]}"; then
+      echo "Error: failed to stop the recorded processes"
+      return 1
+    fi
+  else
+    echo "  No recorded processes are running"
+  fi
+  rm -f "$OWNED_PROCESSES_FILE"
+}
+
+require_port_released() {
+  local port="$1"
+  local label="$2"
+
+  if ! wait_for_port_state "$port" "no" 10 0.2; then
+    echo "Error: $label port $port is held by a process this launcher did not start; leaving it running."
+    list_listening_pids "$port" | while IFS= read -r pid; do ps -p "$pid" -o pid=,command= || true; done
+    return 1
+  fi
+}
 
 cleanup_failed_start() {
   local status=$?
@@ -402,9 +477,9 @@ start_and_wait() {
   fi
   local pid=$!
   if [ "$detached" -eq 1 ]; then
-    STARTED_PROCESS_TARGETS+=("-$pid")
+    remember_started_target "-$pid"
   else
-    STARTED_PROCESS_TARGETS+=("$pid")
+    remember_started_target "$pid"
   fi
   echo "  PID: $pid"
 
@@ -419,7 +494,7 @@ start_and_wait() {
           { [ "$detached" -eq 0 ] && is_descendant_of "$listener" "$pid"; }; then
           if [ "$detached" -eq 0 ] && [ "$listener" != "$pid" ]; then
             # Killing a launcher alone can orphan its listener after a later failure.
-            STARTED_PROCESS_TARGETS+=("$listener")
+            remember_started_target "$listener"
           fi
           return 0
         fi
@@ -444,9 +519,14 @@ trap cleanup_failed_start EXIT
 
 if [ "$KILL_ONLY" -eq 1 ]; then
   echo "Stopping existing processes (kill-only)..."
-  stop_port_listeners "$FRONTEND_PORT" "frontend"
-  stop_port_listeners "$BACKEND_PORT" "backend"
-  echo "Done. Ports $FRONTEND_PORT / $BACKEND_PORT cleared."
+  if [ -n "$OWNED_PROCESSES_FILE" ]; then
+    stop_owned_processes
+    echo "Done. Processes recorded for ports $FRONTEND_PORT / $BACKEND_PORT stopped."
+  else
+    stop_port_listeners "$FRONTEND_PORT" "frontend"
+    stop_port_listeners "$BACKEND_PORT" "backend"
+    echo "Done. Ports $FRONTEND_PORT / $BACKEND_PORT cleared."
+  fi
   exit 0
 fi
 
@@ -528,8 +608,14 @@ if [[ "${OBSERVABILITY_ENABLED:-true}" == "true" && -n "${OBSERVABILITY_METRICS_
     node "$SCRIPT_DIR/scripts/observability.mjs"
 fi
 echo "Stopping existing processes..."
-stop_port_listeners "$FRONTEND_PORT" "frontend"
-stop_port_listeners "$BACKEND_PORT" "backend"
+if [ -n "$OWNED_PROCESSES_FILE" ]; then
+  stop_owned_processes
+  require_port_released "$FRONTEND_PORT" "frontend"
+  require_port_released "$BACKEND_PORT" "backend"
+else
+  stop_port_listeners "$FRONTEND_PORT" "frontend"
+  stop_port_listeners "$BACKEND_PORT" "backend"
+fi
 
 if [ "$RESET_CONFIRMED" -eq 1 ]; then
   echo "Resetting fixed dev rooms..."
@@ -585,6 +671,7 @@ else
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 fi
+record_owned_processes
 
 echo ""
 echo "Persistent dev state: PostgreSQL + private S3"
