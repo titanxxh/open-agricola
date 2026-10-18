@@ -731,20 +731,20 @@ anytime                  注册额外的 anytime 行动
 ### 7.6 阶段 hook
 
 ```text
-Preparation: onBeforeStartOfTurn -> advance round / action.revealed -> onAfterRevealAction -> onPreparation
-  -> accumulate -> onRoundStart (StartOfTurn) -> onEndPreparation -> onBeforeWork -> onWorkStart -> work.started
-Work:        PlaceFarmer -> atomic actions -> onEndTurn -> allWorkersUsed -> onAllWorkersPlaced
-Return home: onBeforeReturnHome -> onStartReturnHome -> onReturnHome
-Round end:   onRoundEnd -> onAfterRoundEnd
-Harvest in rounds 4/7/9/11/13/14:
-  onBeforeHarvest -> harvestPrepWindow -> onStartHarvest
-  -> onStartHarvestFieldPhase -> onHarvestFieldPhase -> reap [dispatch 'reap'] -> reap reaction parallel
-    -> onAfterReap -> onEndHarvestFieldPhase -> onHarvest
-  -> postReapAnytimeWindow -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
-    -> feed -> onEndHarvestFeedingPhase
-  -> breed -> onEndHarvest -> onAfterHarvest
-Before game end: after round 14 onAfterRoundEnd completes, without opening round-15 preparation,
-  onBeforeEndGame -> preScoringWindow -> gameover
+准备阶段: onBeforeStartOfTurn → 增轮 / action.revealed → onAfterRevealAction → onPreparation
+  → 累积格补充 → onRoundStart（StartOfTurn）→ onEndPreparation → onBeforeWork → onWorkStart → work.started
+工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
+回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
+回合结束: onRoundEnd → onAfterRoundEnd
+收获（第 4/7/9/11/13/14 轮）:
+  onBeforeHarvest → harvestPrepWindow → onStartHarvest
+  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap'] → reap reaction parallel
+    → onAfterReap → onEndHarvestFieldPhase → onHarvest
+  → postReapAnytimeWindow → onStartHarvestFeedingPhase → onHarvestFeedingPhase
+    → feed → onEndHarvestFeedingPhase
+  → breed → onEndHarvest → onAfterHarvest
+终局前: 第 14 轮 onAfterRoundEnd 完成后，不进入第 15 轮准备窗口，
+  onBeforeEndGame → preScoringWindow → gameover
 ```
 
 阶段 hook 返回 `ActionFlow`，通过 `EngineStack` 作为可恢复子流程运行。**Stage Dispatch**（[ADR 0008](adr/0008-node-parallel-reaction-dispatch.md)）是准备窗口、StartOfTurn、回合结束、收获前、收获田间阶段和终局前的共享模型：
@@ -1037,8 +1037,8 @@ Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流�
 ```text
 server/connection/
 ├── ws-server.ts      new WebSocketServer({ server, path: '/ws' })
-├── room-router.ts    routes ClientCommand.type to GameSession or Lobby
-└── broadcaster.ts    fans out StateUpdateEnvelope
+├── room-router.ts    根据 ClientCommand.type 路由到 GameSession / Lobby
+└── broadcaster.ts    StateUpdateEnvelope 扇出
 ```
 
 - 一个 Room 恰好拥有一个 `GameSession`。WebSocket handler 通过 Room 与连接队列等待 `dispatch()`，Room 的 `ready | blocked` 闸门位于命令入口。
@@ -1051,13 +1051,13 @@ server/connection/
 server/game/
 ├── room.ts                    Room { id, session, players, maxPlayers, startedAt }
 ├── room-registry.ts           RoomRegistry
-├── lobby.ts                   lobby, room list, and automatic join
-├── room-persistence-checkpoint.ts  awaited waiting/seat metadata and discard lifecycle
-├── authoritative-session.ts   GameSession extends GameCore; command-execution center
+├── lobby.ts                   大厅 / 房间列表 / 自动加入
+├── room-persistence-checkpoint.ts  等待态 / 座位元数据异步写入和丢弃生命周期
+├── authoritative-session.ts   GameSession extends GameCore — 命令执行中心
 └── persistence/
-    ├── room-persistence.ts    abstract persistence contract
+    ├── room-persistence.ts    抽象接口
     ├── postgres-adapter.ts    PostgreSQL rooms.state_json
-    └── memory-adapter.ts      test injection
+    └── memory-adapter.ts      测试注入
 ```
 
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
@@ -1076,19 +1076,19 @@ server/game/
 
 ```text
 server/game/
-├── room-committer.ts          only external seam for Durable Room Commit
-├── replay-codec.ts            canonical JSON, delta, gzip, and Frame Hash
+├── room-committer.ts          Durable Room Commit 的唯一外部 seam
+├── replay-codec.ts            canonical JSON、delta、gzip、Frame Hash
 ├── game-context-store.ts      lifecycle resolver
-├── replay-store.ts            public manifest, Segment, and Anchor read model
-├── replay-viewer-build.ts     Viewer Build integrity checks
+├── replay-store.ts            公开 manifest、Segment、Anchor read model
+├── replay-viewer-build.ts     Viewer Build 完整性校验
 └── persistence/
-    └── postgres-adapter.ts      atomic Room, Replay, and Result transaction
+    └── postgres-adapter.ts      Room + Replay + Result 的原子事务
 server/game-context-routes.ts  lifecycle resolver
-server/replay-routes.ts        manifest, Segment, Anchor, and Viewer/Asset static reads
-server/bug-report-routes.ts    draft, GitHub connection, submit/status, and audit
+server/replay-routes.ts        manifest、Segment、Anchor、Viewer/Asset 静态读取
+server/bug-report-routes.ts    draft、GitHub connection、submit/status、audit
 server/bug-report/
-├── bug-report-store.ts        PostgreSQL draft/attempt/claim state machine
-└── github-issue-client.ts     sole external GitHub App adapter
+├── bug-report-store.ts        PostgreSQL draft/attempt/claim 状态机
+└── github-issue-client.ts     GitHub App 唯一外部 adapter
 ```
 
 `RoomCommitter` 是具体的深 module，也是发布 seam（[ADR 0014](adr/0014-durable-room-commit-is-the-publish-seam.md)）；不要为它加单一实现的 interface。它唯一的提交操作返回：
@@ -1102,11 +1102,10 @@ type RoomCommitResult =
 
 ```text
 ClientCommand
-  -> room-router: validate seat and payload
-  -> GameSession: built-in cards synchronously produce SessionResponse;
-     executable Workshop cards return asynchronously from the session Worker
-  -> RoomCommitter: serialize once and atomically write Room snapshot plus Replay Step
-  -> Broadcaster: after commit, build viewer-filtered envelopes and send them
+  → room-router：验证座位与 payload
+  → GameSession：内置卡同步产生 SessionResponse；可执行 Workshop 卡由会话 Worker 异步返回
+  → RoomCommitter：序列化一次，原子写 Room snapshot + Replay Step
+  → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
 ```
 
 - 只有公开 Frame Hash 与私有会话游标都未变化、且未设置 `durableTransition` 时才是 `unchanged`；只改变游标的转换也会持久化，并重复同一个 Frame。重连与补拉不产生 Step。
@@ -1125,11 +1124,11 @@ ClientCommand
 
 ```text
 server/custom-code/
-├── runtime.ts           sandbox runtime
-├── engine.ts            source validation, compilation, and manifest extraction
-├── isolate-runner.ts    isolated-vm entry
-├── executor-worker.ts   Worker Thread entry
-└── client.ts            synchronous main-process to Worker Thread client
+├── runtime.ts           沙盒运行时
+├── engine.ts            源码校验、编译与 manifest 提取
+├── isolate-runner.ts    isolated-vm 隔离入口
+├── executor-worker.ts   Worker Thread 入口
+└── client.ts            主进程 → Worker Thread 同步调用客户端
 ```
 
 - 后端只保存 `compiled_code + code_manifest`。非内置的可执行工坊卡在其 HTTP 沙盒或 WebSocket Room 中，把每个 `GameSession` 命令放进专用 Worker（`CustomSessionExecutor`）执行；同一 Room 按 FIFO 执行直至 Durable Commit，不同 Room 并行；同一连接之后的 Room 或座位变更不能改变进行中命令的 Room 或 Replay 行动者。
@@ -1255,11 +1254,11 @@ Bug Report 投递遵循 [ADR 0012](adr/0012-github-issue-submission-identity-and
 
 ```text
 GameContextRouter
-  ├─ active -> AuthProvider -> existing PageRouter / GameContainerApi plus optional read-only Anchor drawer
-  ├─ completed -> ReplayShell -> credentialless Replay Viewer iframe
-  ├─ expired with retained Anchor -> credentialless historical Viewer for one-frame evidence
-  ├─ expired -> Expired Game Context page
-  └─ removed -> Replay Tombstone page
+  ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi + 可选只读 Anchor 抽屉
+  ├─ completed → ReplayShell → credentialless Replay Viewer iframe
+  ├─ expired + retained Anchor → credentialless 历史 Viewer 单帧证据
+  ├─ expired → Expired Game Context 页面
+  └─ removed → Replay Tombstone 页面
 ```
 
 - `?context=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
@@ -1280,7 +1279,7 @@ GameContextRouter
 | 层 | 目录 | 目的 |
 |---|---|---|
 | Unit | `shared/**/__tests__/*.test.ts`、`client/**/__tests__/*.test.ts` | 用 mock 状态与直接调用测试纯领域逻辑 |
-| Session | `server/__tests__/*.test.ts` | 实例化 `GameSession`、调用命令，断言 `state`、`interaction`、`log` 与 `scores`；卡牌 Session 测试放在 `[A-E]*-session.test.ts` 文件中 |
+| Session | `server/__tests__/*.test.ts` | 实例化 `GameSession`、调用命令，断言 `state`、`interaction`、`log` 与 `scores`；命名为 `[A-E][0-9]*_*-session.test.ts` 或 `M[0-9]*_*-session.test.ts` 的卡牌 Session 测试进入 `slow` project（`scripts/test-project-globs.ts` 的 `SLOW_INCLUDE`） |
 | E2E | `e2e-tests/*.spec.ts` | Playwright 浏览器测试，覆盖渲染与多人路径 |
 
 - Session 测试默认 2 人游戏，并使用 `server/__tests__/_helpers/session-fixtures.ts`（`createOpeningSession`、`createWorkSession`）。

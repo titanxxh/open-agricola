@@ -1279,7 +1279,7 @@ Rule correctness is proven at the backend seam with the smallest sufficient laye
 | Layer | Directory | Purpose |
 |---|---|---|
 | Unit | `shared/**/__tests__/*.test.ts`, `client/**/__tests__/*.test.ts` | Pure domain logic with mock state and direct calls |
-| Session | `server/__tests__/*.test.ts` | Instantiate `GameSession`, call commands, assert `state`, `interaction`, `log` and `scores`; card Session tests live in `[A-E]*-session.test.ts` files |
+| Session | `server/__tests__/*.test.ts` | Instantiate `GameSession`, call commands, assert `state`, `interaction`, `log` and `scores`; card Session tests named `[A-E][0-9]*_*-session.test.ts` or `M[0-9]*_*-session.test.ts` run in the `slow` project (`SLOW_INCLUDE` in `scripts/test-project-globs.ts`) |
 | E2E | `e2e-tests/*.spec.ts` | Playwright browser tests for rendering and multiplayer paths |
 
 - Session tests default to two players and use `server/__tests__/_helpers/session-fixtures.ts` (`createOpeningSession`, `createWorkSession`).
