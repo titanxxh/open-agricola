@@ -22,7 +22,7 @@ Violating any invariant below is an architecture bug:
 - **Physical three-layer boundary:** ESLint `architecture/imports` enforces `shared/` ⇄ `server/` ⇄ `client/` as CI errors. There are no circular dependencies.
 - **Two client bundles:** `client-app` does not import `shared/{engine,session,actions,cards,custom-code,draft}`; sandbox and Worker permissions are restricted to the exact entries and files in `scripts/architecture-policy.mjs`.
 - **The node tree is the only state machine:** `engine.peekPendingEnvelope()` and the pending host derive what execution is waiting for.
-- **`EngineStack.push` and `pop`** are the only injection path for hooks, anytime actions, and nested subflows. Never mutate `pending` directly.
+- **Flows enter the engine only through its seams**: `EngineStack.push` / `pop` create and leave nested frames, and `Engine.injectBeforeFlows()` inserts hook and anytime flows into the current frame. Never mutate `pending` directly.
 - **`ActionFlow` matches the reference's small algebra:** the card DSL exposes only `leaf`, `seq`, `parallel`, `xor`, and `or` plus metadata. Runtime-only nodes do not enter card flows.
 - **Listener handlers do not mutate state:** listener, preview, and doability paths build flows or return structured values. Mutation occurs only while an action leaf executes.
 - **Card-local closure:** a card is finished inside `shared/cards/{Deck}/{Card}.ts`. Core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts` and `server/game/authoritative-session.ts` do not change for one card. A new hook point requires tests and documentation in the same change.
@@ -416,7 +416,7 @@ type EngineFrame = {
 }
 ```
 
-- Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendingHost` and `toCursor`. `push` / `pop` are the only injection path for hooks, anytime actions and nested subflows; nothing mutates `pending` directly.
+- Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendingHost` and `toCursor`. `push` / `pop` create and leave nested frames (subflows, confirmations, farm selection); hook and anytime flows enter the current frame through `Engine.injectBeforeFlows()`. Nothing mutates `pending` directly.
 - `EngineStackCursor` is serialized into `PersistedSessionSnapshot.sessionCursor.engineStackCursor`; public and Replay `SerializedGameState.engineStack` stays empty.
 - Undo history stores a detached cursor of the complete stack (every frame, its identity, reason, stage continuation, deferred switch and resolve boundary); `undoStep()` / `undoAction()` rebuild it without advancing.
 - `SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection` or `card-draft`. Synthetic windows such as `post-reap-anytime` appear in both `SubFlowReason` and `PendingSyntheticKind`.
