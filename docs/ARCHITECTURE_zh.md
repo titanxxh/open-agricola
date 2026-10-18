@@ -4,25 +4,38 @@
 
 > 本文件是中文翻译镜像；[ARCHITECTURE.md](ARCHITECTURE.md) 是唯一权威版本。
 
-> 以下为当前 `main` 已落地架构的中文翻译。
-> 本文档替换历史的 `ENGINE_ARCHITECTURE.md` 与 `ENGINE_NEW_ARCHITECTURE.md`。
+> 当前 `main` 架构的 module 地图。每节说明一个 module 的职责、不变量和 seam，并指向承载细节的入口文件、ADR 和测试。卡牌行为以各卡的 Session 测试为准，设计决策见 [`docs/adr/`](adr/)。
 
 ---
 
 ## 1. 设计目标与不变量
 
-主链路 = **WebSocket 房间对局 + 后端权威 + 前端被动渲染**；HTTP 退化为启动 / 调试 / 运维 / 测试通道。
+主链路 = **WebSocket 房间对局 + 后端权威 + 前端被动渲染**；HTTP 用于启动、调试、运维、测试，以及版本化的 Game Context、Replay 和 Bug Report 产品接口。
 
 不变量（违反即架构 bug）：
 
 - **后端唯一 owner**：`GameSession`（`server/game/authoritative-session.ts`）是唯一服务端游戏命令入口并持有 `GameState`；具体修改由它驱动的 `GameCore` 和 action leaf 执行。
-- **全量快照**：同房间所有客户端收到同一份 `stateUpdate`，前端不做局部 patch。
-- **弱客户端**：前端只渲染、收集输入、管理本地 UI 临时态，不裁定规则。
 - **命令驱动**：前端只发"我要做什么"，后端校验、执行、落状态、产生日志后广播。
+- **弱客户端**：前端只渲染、收集输入、管理本地 UI 临时态，不裁定规则，也不做乐观提交：等 `stateUpdate` 到达再改游戏 UI。
+- **全量快照**：同房间所有客户端收到同一份 `stateUpdate`，前端不做局部 patch。
+- **WS 游戏主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`。
+- **InteractionState 是前端唯一交互真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
 - **单一领域实现**：行动 / 引擎 / 卡牌 / 回合 / 收获 / 计分统一放 `shared/`，前后端共用同一套领域模型。
-- **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `architecture/imports` 强制（CI error）。
-- **卡牌就地闭环**：卡牌特效写在卡牌文件内部，不向核心路径扩散。
+- **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `architecture/imports` 强制（CI error）；不引入循环依赖。
+- **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；sandbox 和 Worker 仅按 `scripts/architecture-policy.mjs` 中的精确入口及文件授权。
+- **节点树是唯一状态机**："等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
+- **EngineStack.push / pop** 是 hook / anytime / 嵌套子流程的唯一注入路径，不直接改 `pending`。
+- **ActionFlow 对齐参考实现小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
+- **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
+- **卡牌就地闭环**：卡牌在 `shared/cards/{Deck}/{Card}.ts` 内部完成；`shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件不为单卡修改。新增 Hook 点必须同时补测试和文档。
+- **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
 - **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。
+- **Durable Room Commit**：成功且改变公开 Frame 或 Private Session Cursor 的命令，以及任何带 `durableTransition` 标记的响应，先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
+- **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
+- **失败不扩散**：命令错误只回发起者；durable rejection 仍向其他座位发送已提交版本的无错快照。持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
+- **30 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
+- **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
+- **测试默认 2 人游戏**：规则正确性站后端边界，不通过 DOM 反推规则。
 
 ---
 
@@ -1021,9 +1034,7 @@ fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.t
 
 C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply，并由通用 protected-action guard 拒绝 direct cancel、保留动物总量。
 
----
-
-## Anytime Window Policy
+### 7.9 Anytime 窗口策略
 
 多来源的 Turn 结束选择器在自身节点显式声明开放的 `anytimeWindow`，trigger-select request 保留该声明。插入 anytime 时只清除尚未选择子效果的 trigger-select 菜单，返回后重新预览同一组固定 child，已完成 child 保持完成。这不把权限授予子付款或选择、单来源阶段 flow、兄弟节点或其他阶段；每个当前等待节点仍遵守自身权限合同。
 
@@ -1606,6 +1617,18 @@ Durable Room Commit 要求 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 
 
 首版不引入新的 metrics 后端。结构化日志和健康状态至少暴露：普通 Room 数、容量拒绝、Durable Room Commit latency/error/retry、blocked Room 数、Hash 冲突、Replay payload 大小/损坏、GitHub queue/attempt/rate-limit、缺失 Viewer Build。日志字段只含稳定 id 和数值，不含受保护 payload。
 
+#### 平台运行观测
+
+`server/observability/` 管理有界数值指标、采集、管理员网关和总览健康，不写规则状态。`Broadcaster` 在已有编码发送处按收件人计量一次；`stateUpdate` 回合取该包实际返回的状态，undo 和恢复也遵循此口径。回合为 `1`–`14`、`pregame`（draft/parent selection）、`postgame`（gameOver/playing 第 15 回合）、`none`、`unknown`。其他事件使用捕获的 Room/命令上下文。禁止把房间、账号、命令/请求身份、卡牌、payload 或异常文本作为标签。
+
+命令单调时钟耗时覆盖解析后的 dispatch、队列等待、receipt/ownership 校验、Session 执行、持久化提交及本地发布。首次相关响应另行统计，pending receipt 不等于完成。提交仍然先持久化再发布，冻结重试语义不变。投影、JSON 编码和 `ws.send` 入队分别统计，嵌套阶段有重叠；入队不代表网络送达或前端渲染。指标失败不得改变游戏结果。默认进程指标覆盖 CPU、RSS/heap、事件循环延迟和 GC；Worker 墙钟耗时不等于 Worker CPU。
+
+应用端口绑定 app 容器内 loopback，私有 Prometheus 通过 bearer 保护的入口发现和逐实例转发采集。稳定端口/slot 标签跨进程身份变化，PromQL 处理 counter reset，合并 histogram bucket 后再计算分位数。入口拥有全站基于租约/epoch 的房间汇总，并通过带过期时间的私有 presence 行对在线用户去重；应用进程提供本地连接、队列、Worker、持久化健康。采集仅更新运行 presence，不写游戏状态，不遍历快照/history 采集平台 gauge。
+
+Grafana 仅访问 Prometheus 汇总。每个 `/ops/` 资源和查询重新校验当前站点 session 与 `ADMIN_USERS`。30 秒原子一次性交接安装 HttpOnly 看板 cookie，关联原始 session；删除、过期和权限变化在下一次请求生效。代理丢弃客户端凭据/身份头，传递可逆 ASCII 编码的站点用户名并强制 Viewer，仅允许 GET/HEAD 和只读数据源查询 POST。禁用 Grafana login token、匿名/basic 登录、公开看板、编辑和 Live；生产不发布私有服务端口。指标清单和新鲜度边界见[部署文档](HOW_TO_DEPLOY.md#operations-monitoring)。
+
+浏览器按 10% 会话抽样上传有界、限速的命令 RTT、首快照就绪、快照到 React layout commit 耗时。每项起止使用同一浏览器单调时钟，不跨时钟相减，也不宣称测到浏览器 paint。样本仅含数值耗时、有界 kind/outcome 和回合，属于不可信观测输入。
+
 ---
 
 ## 12. client/ — 前端
@@ -1758,98 +1781,3 @@ scores
 ```
 
 **不要把 DOM、按钮文案、页面结构作为规则正确性的主要断言依据**。前端渲染单独做 E2E。
-
-### 13.3 工程命令
-
-```bash
-pnpm install                # canvas 需要系统库 libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-local.sh       # 本地开发 / 运行 / 测试统一入口（绝对路径启动 tsx + vite，避免跨 worktree pkill 误伤）
-pnpm test                   # vitest 全量（fast + slow）
-pnpm test:fast              # 只跑 fast project（CI 默认）
-pnpm test:slow              # 只跑 slow project（单卡 session 测试）
-pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
-pnpm exec vitest run <file> # 单文件
-pnpm run lint               # ESLint（error 必须清零）
-pnpm run build              # tsc + vite build
-```
-
-本地开发统一 Node.js 24.15+ 且不含 Node 25 线（`engines`：`^24.15.0 || >=26.0.0`）；`better-sqlite3` 等原生依赖按 Node ABI 编译。
-
-### 13.4 Replay、恢复与 Bug Report 上线门槛
-
-实现按以下可独立验证的切片推进：
-
-1. 数据库迁移、canonical JSON / delta / gzip / Hash codec。
-2. Durable Room Commit、失败暂停/重试、30 Room 容量限制。
-3. Game Context resolver、active 原座位恢复、evidence 权限。
-4. Replay manifest/Segment、历史 Viewer Build、桌面/手机回放 UI。
-5. Bug Report draft、GitHub App connection/queue、三步报告 UI。
-6. 匿名化、Tombstone、删除 ledger、部署和生产验收。
-
-自动化必须覆盖：
-
-- codec round-trip、最多 15 delta、提前 checkpoint、Hash mismatch 和损坏 Segment 后续恢复；
-- snapshot + Step 原子事务、gameOver 原子完成、相同 Hash 幂等、不同 Hash 阻断、数据库故障暂停与重启恢复；
-- 两个同时提交玩家得到连续 `stepNo`，最后提交触发结算且交换到达顺序不改变结果；
-- 普通 `ok=false` 和 unchanged 只回发起者；durable rejection 提交后才向其他座位发送无错快照；提交成功前任何座位都收不到未落盘状态；
-- active Room 双座位恢复、座位替换、他人隐藏信息遮蔽、暂停期间重连等待；
-- completed/expired/removed/unknown resolver、无登录公开 Replay、Anchor mismatch、缓存与错误码；
-- 桌面 auto 时间线布局、手机 auto 棋盘布局、手动 URL 覆盖、视角选择、播放/暂停/前后步/跳转、键盘和 axe；
-- OAuth 取消保留草稿、本人/Hosted 作者、稳定标记对账、限流与三次失败、重复点击、断开/撤销；
-- 删号 Issue 脱敏、Replay Participant 匿名化、Tombstone、维护者全开理由与永久审计。
-
-最终性能探针在 2 CPU / 2 GiB、真实命令与 Replay 写入负载下重跑 25/30/35，并补跑 30 Room late-state：30 Room 必须满足 action p99 ≤250ms、event-loop p99 ≤100ms、RSS ≤1.8GiB；35 Room 用于确认首个失败点。
-
-生产验收必须由两个真实站点账号完成一局：双方在进行中分别恢复且只能看见自己的隐藏信息；完赛后在未登录浏览器选择两个座位视角和全开视角；再分别用本人 GitHub 和 Hosted Issue Identity 创建 smoke Issue、核对 Anchor/Reporter 字段并关闭。地图在 CI、前后端部署、这些线上步骤和删除/回滚演练全部通过前不关闭。
-
----
-
-## 14. 关键不变量速查
-
-1. **后端权威**：规则在 `shared/` + `server/`；前端不裁定。
-2. **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/`；ESLint CI error 强制。
-3. **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；sandbox 和 Worker 仅按 `scripts/architecture-policy.mjs` 中的精确入口及文件授权。
-4. **WS 游戏主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`；Game Context、Replay 和 Bug Report 使用版本化 HTTP 产品接口。
-5. **InteractionState 是前端唯一真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
-6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
-7. **EngineStack.push / pop**：hook / anytime / 嵌套子流程唯一注入路径，不直接改 `pending`。
-8. **卡牌就地闭环**：`shared/cards/{Deck}/{Card}.ts` 内部完成；不改 `shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件。新增 Hook 点必须同时补测试和文档。
-9. **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
-10. **不引入循环依赖**。
-11. **不为单卡改主路径**。
-12. **测试默认 2 人游戏**；规则正确性站后端边界，不通过 DOM 反推规则。
-13. **前端不做乐观提交**：等 `stateUpdate` 到达再改 UI。
-14. **ActionFlow 对齐 参考实现小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
-15. **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
-16. **Durable Room Commit**：成功且改变公开 Frame 或 Private Session Cursor 的命令，以及任何带 `durableTransition` 标记的响应，先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
-17. **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
-18. **失败不扩散**：命令错误只回发起者；durable rejection 仍向其他座位发送已提交版本的无错快照。持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
-19. **30 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
-20. **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
-
----
-
-## 15. 文档导航
-
-| Topic | Doc |
-|---|---|
-| 卡牌测试模板 | `docs/CARD_TEST_TEMPLATE.md` |
-| 卡牌实现现状 / 描述对齐 / 计划 | `docs/card_implementation_status.md` |
-| 平台 / Workshop | `docs/PLATFORM_DESIGN.md` |
-| 部署 | `docs/HOW_TO_DEPLOY.md` |
-| 自定义卡沙盒约束 | `docs/CUSTOM_CARD_SANDBOX.md` |
-| CI 检查 | `docs/operations/ci-checks.md` |
-| GitHub OAuth | `docs/operations/github-oauth-app-setup.md` |
-| 已知卡牌架构债务 | `docs/card_implementation_status.md` |
-
-## 平台运行观测
-
-`server/observability/` 管理有界数值指标、采集、管理员网关和总览健康，不写规则状态。`Broadcaster` 在已有编码发送处按收件人计量一次；`stateUpdate` 回合取该包实际返回的状态，undo 和恢复也遵循此口径。回合为 `1`–`14`、`pregame`（draft/parent selection）、`postgame`（gameOver/playing 第 15 回合）、`none`、`unknown`。其他事件使用捕获的 Room/命令上下文。禁止把房间、账号、命令/请求身份、卡牌、payload 或异常文本作为标签。
-
-命令单调时钟耗时覆盖解析后的 dispatch、队列等待、receipt/ownership 校验、Session 执行、持久化提交及本地发布。首次相关响应另行统计，pending receipt 不等于完成。提交仍然先持久化再发布，冻结重试语义不变。投影、JSON 编码和 `ws.send` 入队分别统计，嵌套阶段有重叠；入队不代表网络送达或前端渲染。指标失败不得改变游戏结果。默认进程指标覆盖 CPU、RSS/heap、事件循环延迟和 GC；Worker 墙钟耗时不等于 Worker CPU。
-
-应用端口绑定 app 容器内 loopback，私有 Prometheus 通过 bearer 保护的入口发现和逐实例转发采集。稳定端口/slot 标签跨进程身份变化，PromQL 处理 counter reset，合并 histogram bucket 后再计算分位数。入口拥有全站基于租约/epoch 的房间汇总，并通过带过期时间的私有 presence 行对在线用户去重；应用进程提供本地连接、队列、Worker、持久化健康。采集仅更新运行 presence，不写游戏状态，不遍历快照/history 采集平台 gauge。
-
-Grafana 仅访问 Prometheus 汇总。每个 `/ops/` 资源和查询重新校验当前站点 session 与 `ADMIN_USERS`。30 秒原子一次性交接安装 HttpOnly 看板 cookie，关联原始 session；删除、过期和权限变化在下一次请求生效。代理丢弃客户端凭据/身份头，传递可逆 ASCII 编码的站点用户名并强制 Viewer，仅允许 GET/HEAD 和只读数据源查询 POST。禁用 Grafana login token、匿名/basic 登录、公开看板、编辑和 Live；生产不发布私有服务端口。指标清单和新鲜度边界见[部署文档](HOW_TO_DEPLOY.md#operations-monitoring)。
-
-浏览器按 10% 会话抽样上传有界、限速的命令 RTT、首快照就绪、快照到 React layout commit 耗时。每项起止使用同一浏览器单调时钟，不跨时钟相减，也不宣称测到浏览器 paint。样本仅含数值耗时、有界 kind/outcome 和回合，属于不可信观测输入。
