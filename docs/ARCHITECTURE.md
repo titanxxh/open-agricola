@@ -852,7 +852,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 |---|---|---|
 | Card Source | `shared/cards/{A..E,M,major,community}/{Card}.ts`, containing `meta` and optional `impl` | Server, sandbox and tests; forbidden from the main client bundle |
 | Card Display | `public/cards-manifest.json`, built from Card Source `meta` | Main client bundle through `client/services/card-meta` |
-| Card Impl | Card Source `impl`, projected into `shared/cards/catalog.generated.ts` and `CardRegistry` | Server and sandbox; forbidden from the main client bundle |
+| Card Impl | Card Source `impl`, collected into the generated `ALL_CARD_IMPLS` (`shared/cards/register-all.ts`; majors through `major/runtime.generated.ts`) and `CardRegistry` | Server and sandbox; forbidden from the main client bundle |
 
 - `meta` is the Card Definition: serializable, frontend-visible fields without runtime behavior. Declarative rule fields (`cost`, `prerequisite`, `*Prerequisites`, `cardField`, `isCookery`, capability metadata) are allowed; `modifier(s)`, `listeners`, `effect` and `prerequisiteCheck` are not. `desc` and `prerequisite` are printed text; optional localizable `rules` is a supplemental ruling with no runtime effect. Static conditions use `*Prerequisites`; dynamic ones use `impl.prerequisiteCheck`.
 - `impl` holds `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls and `reaches`. Builders may project `reaches` to the manifest top level, never into `meta`.
@@ -925,7 +925,7 @@ Tests: `shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`, `shar
 
 ### 8.6 Naming, capabilities and boundaries
 
-- Card files use `{Deck}_{Number}_{Name}.ts` and export a constant with the same name.
+- Card files use `{Deck}_{Number}_{Name}.ts` and export a constant with the same name; a major-family file such as `major/fireplace.ts` exports each physical card it holds.
 - A card's ability stays inside its file. Core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts` and `server/game/authoritative-session.ts` never change for one card; there is no centralized card-effect registry and no frontend card rule.
 - Cross-card identity and capability queries use typed metadata and played-card helpers: `getPlayedCardDefinitions(player)`, `collectCardDefinitionsAs(player, type)` and `playerHasCardCapability(player, capability, { asType? })`, reading only played zones; `asType` reuses `cardCountsAs` for dual-type identity. Registered capability metadata (`preventsHandDiscard`, `fireplaceIdentity`, `cookingHearthIdentity`, `ovenIdentity`, `firewoodBuildTrigger`, `potteryIdentity`, `animalHolder`, `blocksHouseAnimalZones`, `waresSalesmanGains`) lives in `meta` and adds no frontend behavior. `ovenIdentity` is OA's oven-family identity and does not imply a baking exchange; an upgrade can keep scoring identity and opt out of build triggers with `firewoodBuildTrigger: false`.
 - `check:card-impl-boundaries`, part of `pnpm run check:architecture`, rejects runtime reads of another non-major card's ID in production Card Sources. Explicit exceptions are `Major_*`, `reaches`, `allowedPurchases` and prerequisite candidate lists.
@@ -963,7 +963,7 @@ shared/domain/
 
 **Farmyard.**
 
-- Used / unused spaces are read only from `farmyard-usage-core.ts`, including extensions, terrain, blocked spaces and derived pasture tiles; `farmyard-usage.ts` and `farm.ts` are compatibility facades. Cards never hand-count a grid. Only `blocksPlacement` counts as occupied.
+- Used / unused spaces are read only from `farmyard-usage-core.ts`, including extensions, terrain, blocked spaces and derived pasture tiles; `farmyard-usage.ts` and `farm.ts` are compatibility facades. Cards never hand-count a grid. Rooms, terrain, fields, stables and pasture tiles always count as used; a `farmyardSpaceStates` entry joins them only with `blocksPlacement`.
 - Pastures persist identity, tiles and animal assignments. `getPastureSize()`, `getPastureStableCount()` and `getFencedStableCount()` derive the rest; `getPastureViews()` returns detached views; serialized `size` / `stables` are display-only and stripped on load.
 - Farm and action-space provenance uses source / type metadata: `FenceSegment.type/source`, `WorkerRef.synthetic`, `ActionSpace.blockedBy`, supply-token helpers, action-space category helpers across player counts, reservation tokens and attachments. Base action definitions filter player counts 2–6; 5/6-only spaces are separate.
 - Farmers of the Moor terrain ([ADR 0007](adr/0007-farmers-of-the-moor-variant-runtime.md)) is the public top layer of `farmTerrain.kind`, with Covered Farm Terrain in `covered`. Terrain changes go through the generic selection leaf and are revalidated against live occupancy at submission and effect time; future terrain tokens reuse `futureMeeples` entries. Fenced terrain adjacency is a pure helper; one-off adjacency uses `adjacencyPolicy` / `allowedTiles` / `fencePolicy`. Multi-layer stacked terrain is not supported.
@@ -986,7 +986,7 @@ shared/domain/
 
 **Scoring.**
 
-- `cardBonusVp` is the single category for non-printed card points, attributed by `cardId` / `cardType`; printed card VP stays in `cards`; public card markers may score negative. Old `cardsBonus` / `cardStateBonusVp` / `cardBonus` shapes are gone.
+- `cardBonusVp` is the single category for non-printed card points, attributed by `cardId` / `cardType`; printed card VP stays in `cards`; public card markers may score negative. Each bonus source enters the category once: generic scoring already reads `cardStates[cardId].counters.bonusVp`, so a card storing points there never also returns them from `computeBonusScore`. Old `cardsBonus` / `cardStateBonusVp` / `cardBonus` shapes are gone.
 - Scoring Reserve is a final-scoring reservation, not payment, recorded through `special-effect` `record-scoring-reserve-bonus`. `computeScores()` deducts every selected reserve from a scoring clone before the costed-bonus solver, resource-based major scoring reads that clone, and an unpayable combination invalidates the bundle.
 
 **Major improvement supply** ([ADR 0006](adr/0006-stack-aware-major-improvement-supply.md), [ADR 0016](adr/0016-separate-supply-family-from-improvement-identity.md)): variant templates create real card-ID stacks; the board exposes each stack's top. Purchase, return and swap go through supply helpers, and production reads use supply query helpers. Upgrade identity uses `*Identity` metadata, never the stack's `familyId`. Duplicates keep their concrete IDs as source and attribution. Bottom-row rules use `isBottomRowMajorImprovement()` / `getAvailableBottomRowMajorImprovementIds()`.

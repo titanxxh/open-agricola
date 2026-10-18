@@ -853,7 +853,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 |---|---|---|
 | Card Source | `shared/cards/{A..E,M,major,community}/{Card}.ts`，包含 `meta` 与可选 `impl` | 服务端、沙盒和测试；主 client bundle 禁止引用 |
 | Card Display | 由 Card Source `meta` 生成的 `public/cards-manifest.json` | 主 client bundle 通过 `client/services/card-meta` 读取 |
-| Card Impl | Card Source `impl`，投影到 `shared/cards/catalog.generated.ts` 与 `CardRegistry` | 服务端和沙盒；主 client bundle 禁止引用 |
+| Card Impl | Card Source `impl`，汇集到生成的 `ALL_CARD_IMPLS`（`shared/cards/register-all.ts`；大改良经 `major/runtime.generated.ts`）与 `CardRegistry` | 服务端和沙盒；主 client bundle 禁止引用 |
 
 - `meta` 即 Card Definition：可序列化、前端可见、无运行时行为的字段。允许声明式规则字段（`cost`、`prerequisite`、`*Prerequisites`、`cardField`、`isCookery`、能力 metadata）；不允许 `modifier(s)`、`listeners`、`effect` 与 `prerequisiteCheck`。`desc` 与 `prerequisite` 是印刷文字；可本地化的 `rules` 是补充裁定，不影响运行时。静态条件用 `*Prerequisites`，动态条件用 `impl.prerequisiteCheck`。
 - `impl` 包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用与 `reaches`。构建器可以把 `reaches` 投影到 manifest 顶层，但不能放进 `meta`。
@@ -926,7 +926,7 @@ cardField?: {
 
 ### 8.6 命名、能力与边界
 
-- 卡牌文件使用 `{Deck}_{Number}_{Name}.ts`，导出同名常量。
+- 卡牌文件使用 `{Deck}_{Number}_{Name}.ts`，导出同名常量；`major/fireplace.ts` 这类大改良家族文件导出其中的每张实体卡。
 - 卡牌能力留在自己的文件里。`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts` 与 `server/game/authoritative-session.ts` 等核心文件从不为单卡修改；没有集中的卡牌效果注册表，也没有前端卡牌规则。
 - 跨卡身份与能力查询使用类型化 metadata 和已打出卡 helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)` 与 `playerHasCardCapability(player, capability, { asType? })`，只读取已打出区域；`asType` 复用 `cardCountsAs` 处理双类型身份。已注册的能力 metadata（`preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`firewoodBuildTrigger`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`）位于 `meta`，不增加前端行为。`ovenIdentity` 是 OA 的烤炉家族身份，不代表一定有烤面包兑换；升级卡可保留计分身份，并用 `firewoodBuildTrigger: false` 退出建造触发。
 - `check:card-impl-boundaries` 属于 `pnpm run check:architecture`，拒绝生产 Card Source 在运行时读取其他非大改良卡的 ID。显式例外是 `Major_*`、`reaches`、`allowedPurchases` 与前置候选列表。
@@ -964,7 +964,7 @@ shared/domain/
 
 **农场。**
 
-- 已用 / 未用格只从 `farmyard-usage-core.ts` 读取，包含扩展、地形、封锁格与派生的牧场格；`farmyard-usage.ts` 与 `farm.ts` 只是兼容 facade。卡牌从不手动数格子。只有 `blocksPlacement` 计为占用。
+- 已用 / 未用格只从 `farmyard-usage-core.ts` 读取，包含扩展、地形、封锁格与派生的牧场格；`farmyard-usage.ts` 与 `farm.ts` 只是兼容 facade。卡牌从不手动数格子。房间、地形、田地、马厩与牧场格始终计为已用；`farmyardSpaceStates` 中的条目只有带 `blocksPlacement` 时才计入。
 - 牧场持久化身份、格子与动物安置。`getPastureSize()`、`getPastureStableCount()` 与 `getFencedStableCount()` 派生其余信息；`getPastureViews()` 返回独立视图；序列化的 `size` / `stables` 只用于展示，加载时剥离。
 - 农场与行动格来源使用 source / type metadata：`FenceSegment.type/source`、`WorkerRef.synthetic`、`ActionSpace.blockedBy`、supply token helper、跨人数的行动格类别 helper、预留标记与附件。基础行动定义按 2–6 人过滤；5/6 人专属格单独建模。
 - Farmers of the Moor 地形（[ADR 0007](adr/0007-farmers-of-the-moor-variant-runtime.md)）是 `farmTerrain.kind` 的公开顶层，被覆盖的地形在 `covered`。地形变化走通用 selection leaf，在提交与效果执行时按实时占用重新校验；未来地形 token 复用 `futureMeeples` 条目。围起地形的相邻计算是纯 helper；一次性的相邻规则使用 `adjacencyPolicy` / `allowedTiles` / `fencePolicy`。不支持多层堆叠地形。
@@ -987,7 +987,7 @@ shared/domain/
 
 **计分。**
 
-- `cardBonusVp` 是卡牌产生的非印刷分数的唯一类别，按 `cardId` / `cardType` 归因；卡牌自身的印刷分数留在 `cards`；公开卡牌标记可以计负分。旧的 `cardsBonus` / `cardStateBonusVp` / `cardBonus` 形状已删除。
+- `cardBonusVp` 是卡牌产生的非印刷分数的唯一类别，按 `cardId` / `cardType` 归因；卡牌自身的印刷分数留在 `cards`；公开卡牌标记可以计负分。每个奖励来源只进入该类别一次：通用计分已读取 `cardStates[cardId].counters.bonusVp`，因此把分数存进该计数器的卡牌不能再从 `computeBonusScore` 返回它们。旧的 `cardsBonus` / `cardStateBonusVp` / `cardBonus` 形状已删除。
 - Scoring Reserve 是终局计分预留，不是支付，通过 `special-effect` 的 `record-scoring-reserve-bonus` 记录。`computeScores()` 在有费用奖励求解之前从计分副本中扣除每个已选预留，基于资源的大改良计分读取该副本，组合付不起时整组失效。
 
 **大改良供应**（[ADR 0006](adr/0006-stack-aware-major-improvement-supply.md)、[ADR 0016](adr/0016-separate-supply-family-from-improvement-identity.md)）：变体模板生成真实卡牌 ID 的供应堆；版图只暴露每堆顶部。购买、归还与交换走供应 helper，生产读取使用供应查询 helper。升级身份使用 `*Identity` metadata，从不使用供应堆的 `familyId`。复制卡保留各自的具体 ID 作为来源与归因。底行规则使用 `isBottomRowMajorImprovement()` / `getAvailableBottomRowMajorImprovementIds()`。
