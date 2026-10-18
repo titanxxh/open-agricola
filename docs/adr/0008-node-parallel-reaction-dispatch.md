@@ -26,7 +26,7 @@ OA required a per-card opt-in for trigger selection, split Harvest field stage h
 
 - Players choose source and order for same-timing reactions, as in the reference.
 - Extra-turn providers coexist; undo re-derives trigger-select from restored state instead of storing old options.
-- Handlers must return replayable flows. Serial stages not yet migrated keep their own continuation; new stage abilities should use the activation model.
+- Reaction listeners must return replayable flows and put state changes in action leaves. A stage card effect may still mutate directly: its preview runs on a clone, and the live mutation happens only after the player selects it. Serial stages not yet migrated keep their own continuation; new stage abilities should use the activation model.
 - Tests assert trigger-select, source selection, pass / mandatory gates and undo re-derivation, never automatic execution in play-zone order.
 
 ## Alternatives considered
