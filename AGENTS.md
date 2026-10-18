@@ -2,31 +2,18 @@
 
 > 适用 Claude Code / Cursor / Codex 等 agent；CLAUDE.md 软链到本文件。
 
-## Project
+Open Agricola 是后端权威、通过 WebSocket 实时同步的 Agricola 在线桌游。
 
-Open Agricola——后端权威 + WebSocket 实时多人同步的 Agricola 桌游在线复刻。三层架构：`shared/`（领域逻辑）+ `server/`（HTTP + WS 服务）+ `client/`（React UI）。
+## Project map
 
-## Agent skills
+- `shared/`：领域规则、引擎、卡牌、协议契约。
+- `server/`：HTTP、WebSocket、房间与权威 `GameSession`。
+- `client/`：React 渲染、输入收集和视角化展示。
+- `docs/ARCHITECTURE.md`：架构索引，链接到 `docs/architecture/` 的模块文档。
 
-### Issue tracker
+`server/game/authoritative-session.ts` 中的 `GameSession` 是 `GameState` 的唯一写入者。规则裁定放在 `shared/` 和 `server/`，前端只负责展示和收集输入。
 
-Issues and PRDs are tracked in GitHub Issues for `titanxxh/open-agricola` using the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Use the default five-label triage vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. See `docs/agents/domain.md`.
-
-## Architecture Boundaries
-
-- 三层 `shared/` + `server/` + `client/`，前端只负责渲染、输入收集、视角化展示，不做规则裁定。
-- 后端 `GameSession`（`server/game/authoritative-session.ts`）是 `GameState` 的**唯一写入者**。
-- WebSocket 房间对局是实时同步主链路；HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口，不通过 HTTP 另建规则写入主链路。
-- 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
-- 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`（索引）及其链接的 `docs/architecture/` module 文档。
+<important if="需要运行构建、测试、lint 或本地应用命令">
 
 ## Commands
 
@@ -49,120 +36,154 @@ pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
 
-修改工坊生成流程、prompt 或模型准入时，先读 `docs/test/llm-card-gen.md` 的固定测试入口、费用账本与本地产物要求。
+统一使用 Node.js 24.15+，版本范围为 `^24.15.0 || >=26.0.0`，不支持 Node 25。`isolated-vm`、`jsdom` 和原生依赖有版本及 ABI 要求；不要用更低版本启动应用。
 
-本地开发**统一使用 Node.js 24.15+**；`engines` 声明 `^24.15.0 || >=26.0.0`（`isolated-vm` 7 要求 `node >= 24`，`jsdom` 30 只接受 `^24.15.0 || >=26.0.0`，**不支持 Node 25**）；`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
+</important>
+
+<important if="探索模块职责、规则实现路径或架构设计">
+
+## Domain docs
+
+先读根目录 `CONTEXT.md` 和相关 `docs/adr/`，再从架构索引定位模块。领域术语与文档读取方式见 `docs/agents/domain.md`。
+
+</important>
+
+<important if="创建、读取或更新 GitHub Issue、PRD 或分诊标签">
+
+## Issue tracker
+
+Issues 和 PRDs 使用 `gh` 管理在 `titanxxh/open-agricola`，见 `docs/agents/issue-tracker.md`。默认分诊标签为 `needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`，见 `docs/agents/triage-labels.md`。
+
+</important>
+
+<important if="修改模块依赖、游戏规则、引擎、协议或存档格式">
+
+## Architecture boundaries
+
+- 保持 `shared/`、`server/`、`client/` 三层边界，不引入循环依赖。
+- WebSocket 房间对局是实时同步主链路。HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口；不通过 HTTP 另建规则写入主链路。
+- 项目仍处于开发阶段。除非用户明确要求，不维护旧存档、旧 `engineStack` / pending cursor 或旧 action id 的向后兼容，也不把缺少兼容迁移作为 PR review blocker。
+
+</important>
+
+<important if="新增或修改卡牌实现，或扩展卡牌通用机制">
+
+## Card implementation rules
+
+卡牌能力优先在卡牌文件内闭环，保持文件精简。复用现有 hooks、modifiers、Card Definition 的 `cost` / `reward` / `prerequisite`，局部状态写入 `player.cardStates[cardId]`。
+
+- 不在核心路径增加单卡 `if-else`、集中式卡牌效果注册表或前端特定卡规则。
+- `shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts` 等主路径，只因可复用通用扩展、核心 bug、性能优化或明确的协议 / 同步演进而修改。
+- 优先复用现有 Hook phase。新增 Hook 点必须同时补测试和文档。后续选择和延迟效果使用显式 pending / continuation。
+- 每个 effect 一个文件，从 `shared/actions/effects/` 自动发现；Anytime 行动同样自动发现，行动工厂在 `shared/actions/factories/`。不要在 effect 文件中堆叠多卡逻辑。
+- 卡牌文件按 `{Deck}_{Number}_{Name}.ts` 命名，例如 `A123_FrameBuilder.ts`；导出常量与卡牌同名。
+
+## Card workflow
+
+新增或修改卡牌实现时，先给出基于 `docs/CARD_TEST_TEMPLATE.md` 的测试说明，得到确认后再编码。测试说明先交代：
+
+- 难易程度：单卡局部修复、复用现有 hook/helper，还是需要通用机制。
+- 基础设施缺口：ActionFlow、pending、payment、field、animal、action-pool 是否已有所需能力；缺失时先设计通用扩展。
+- 落地边界：选择最小可验证切片。要改主路径时，说明服务哪些卡和哪些测试。
+- 测试层及原因：直接行为测试写明输入、公开 effect / listener 调用、预期 flow、资源 delta 和不触发情况。
+
+Session 测试说明必须从一局新的 2 人游戏开始，写清资源、已打出卡牌、行动格占用、农场版图和 `cardStates` 的准备；列出每步交互及调用的后端接口或命令，逐步断言 `state` / `interaction` / `log` / `scores`，并列出不应触发效果的情况。
+
+</important>
+
+<important if="编写或修改规则测试、Session 测试或前端 E2E">
 
 ## Testing
 
-三层：
-- **Unit**（`shared/**/__tests__/*.test.ts`）——纯领域逻辑，造 mock state 调函数。
-- **Session**（`server/__tests__/*.test.ts`）——直接实例化 `GameSession`，调 `takeAction()` 等，断言 `resp.state` / `pending` / `ok`。
-- **E2E**（`e2e-tests/*.spec.ts`）——Playwright 浏览器测试。
+| Layer | Location | 用法 |
+|---|---|---|
+| Unit | `shared/**/__tests__/*.test.ts` | mock state，直接调用纯领域逻辑 |
+| Session | `server/__tests__/*.test.ts` | 实例化 `GameSession`，调用 `takeAction()` 等，断言 `resp.state` / `pending` / `ok` |
+| E2E | `e2e-tests/*.spec.ts` | Playwright 验证前端渲染和浏览器交互 |
 
-规则正确性按风险选择最小测试层：机械约束用静态门禁；简单即时资源效果可直接调用公开 effect / listener 做行为测试；支付、选择 / pending、延迟效果、跨玩家和多步 flow 必须用 Session 测试，断言 `state` / `interaction` / `log` / `scores`。禁止只验证导出和对象形状的通用 smoke test。前端渲染单独做 E2E。Session 测试默认 **2 人游戏**。详见 `docs/CARD_TEST_TEMPLATE.md`。
+按风险选择最小充分层：机械约束用静态门禁；简单即时资源效果直接调用公开 effect / listener；支付、选择 / pending、延迟效果、跨玩家和多步 flow 必须用 Session 测试，断言 `state` / `interaction` / `log` / `scores`。不要写只检查导出和对象形状的通用 smoke test。前端渲染单独做 E2E。
 
-## Card Implementation Rules
+Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.ts`：
 
-**总规范：卡牌能力尽量在卡牌文件内部闭环，不能扩散。卡牌文件保持精简。**
+- 真实开局用 `createOpeningSession`，显式选择 seed 并断言阶段和 interaction。
+- 工作阶段用 `createWorkSession`，在加载前固定所有手牌。无关手牌用 `['__test_placeholder__']`，空数组会触发重新发牌。
+- Session 构造时可能已有开局交互，事后清手牌不能消除它。夹具边界见 `docs/CARD_TEST_TEMPLATE.md` §5.2。
 
-扩展原则：无特殊原因不要改动主路径（`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts` 等核心文件）。
+</important>
 
-**优先使用：** Hook 系统（`shared/actions/hooks.ts`）、Card Definition 通用字段（`cost`、`reward`、`prerequisite`）、卡牌局部状态（`player.cardStates[cardId]`）。
+<important if="修改工坊生成流程、prompt 或模型准入">
 
-**禁止：** 在核心文件中添加针对某张卡的 `if-else`；创建集中的卡牌效果注册表；在前端硬编码卡牌特定规则；让前端替后端做规则裁定。
+先读 `docs/test/llm-card-gen.md`，遵循固定测试入口、费用账本与本地产物要求。
 
-**只有在下列情况才允许改动主路径：** 新增可复用的通用扩展机制；修复核心 bug；性能优化；明确的协议层 / 同步层演进（如 WS、snapshot/patch、pending 模型）。
+</important>
 
-**Hook 与状态设计：** 优先复用现有 Hook phase，不要轻易新增 Hook 点。持续计数 / 标记 / 局部状态优先写入 `player.cardStates[cardId]`。后续选择 / 延迟效果优先走显式 `pending` / continuation 语义，不要在前端偷偷补流程。新增 Hook 点必须同时补测试和文档。
+<important if="修改代码契约、卡牌机制、文档或文档指针">
 
-**Effect 不膨胀：**行动从 `shared/actions/effects/*.ts` 自动发现（每个效果一个文件）。Anytime 行动同样自动发现。行动工厂在 `shared/actions/factories/`。**禁止在 effect 文件中堆叠多卡逻辑**。
+## Doc sync
 
-**命名规范：** 卡牌文件 `{Deck}_{Number}_{Name}.ts`（例如 `A123_FrameBuilder.ts`）；类型导出常量名同卡牌名。
-
-## Card Workflow
-
-新增 / 修改卡牌实现前，先做一轮简短设计判断，并把结论写进测试说明或实现计划：
-- **难易程度**：判断是单卡局部修复、复用现有 hook/helper、还是需要通用机制。
-- **基础设施缺口**：明确是否缺 ActionFlow / pending / payment / field / animal / action-pool 等通用能力；缺基础设施时先设计通用扩展，禁止在主路径塞单卡 `if-else`。
-- **落地边界**：优先选择最小可验证切片；如果要改主路径，说明它服务哪些卡和哪些测试，而不是只服务单卡。
-
-新增 / 修改卡牌实现时，**必须先提供测试说明**，得到确认后再编码。测试说明基于 `docs/CARD_TEST_TEMPLATE.md` 编写，必须先说明选择直接行为测试还是 Session 测试及原因。直接行为测试写清输入、公开 effect / listener 调用、预期 flow / 资源 delta 和不触发情况；Session 测试必须包含：
-- 从一局新的 2 人游戏开始的初始状态准备
-- 前置条件（玩家资源、已打出卡牌、行动格占用、农场版图、`cardStates`）
-- 玩家交互序列、每步调用的后端接口或命令
-- 每步后必须断言的字段（`state` / `interaction` / `log` / `scores`）
-- 哪些情况不应触发卡牌效果
-
-## Doc Sync (硬性)
-
-> 文档分工固定如下，**不要新建并行主题文档**。原路径的英文文档是唯一权威版本；同名 `_zh.md` 仅作为中文翻译镜像，不属于并行真源。
-
-- 修改下表中的英文文档时，若存在同名 `_zh.md`，同一变更必须同步该中文镜像；没有 `_zh.md` 的文档仅维护英文权威版本。代码、测试和 agent 指针只读取英文权威文件。
+沿用下表的文档分工，不新建并行主题文档。英文文件是唯一权威版本；若存在同名 `_zh.md`，同一变更同步中文镜像。没有中文镜像时只维护英文。代码、测试和 agent 指针只读取英文权威文件。
 
 | Doc | When to update |
 |---|---|
-| `docs/card_implementation_status.md` | 官方卡实现变化时按下方清单核对：修复或新增未决问题、有意偏离、源码排除，或（含社区卡）出现尚未实现的跨卡缺口；已对齐的卡不逐条记录，新的通用机制写进 `docs/architecture/` 中对应的 module 文档 |
-| `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 `card_implementation_status.md` |
-| `docs/ARCHITECTURE.md`、`docs/architecture/*.md` | 改通用扩展点（hook phase、ActionFlow node、协议层）或 module 职责 / 不变量 / seam 时，改对应的 module 文档；索引只写设计不变量、拓扑、分层与 module 表。只写职责、不变量、seam 和指针（入口文件、ADR、测试）；单卡行为、按 issue 记录的修复和实现叙述分别以该卡的测试（Session 或直接行为测试）、PR 和代码为准；体积与卡牌 ID 由 `scripts/__tests__/docs-budget.test.ts` 检查 |
-| `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
-| `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
+| `docs/card_implementation_status.md` | 官方卡实现变化，或社区卡出现尚未实现的跨卡缺口时，按下方清单核对；已对齐卡牌不逐条记录 |
+| `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 status 文档 |
+| `docs/ARCHITECTURE.md`、`docs/architecture/*.md` | 通用扩展点或模块职责、不变量、seam 变化时，更新对应模块文档；索引只保留设计不变量、拓扑、分层与模块表 |
+| `docs/CARD_TEST_TEMPLATE.md` | 测试策略或卡牌测试写法变化 |
+| `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 对应议题变化 |
 
-**`card_implementation_status.md` 同步检查清单**（需要更新该文档时）：
-- Open issues by priority — 修复后移除或降级，新增 gap 立即登记
-- Accepted differences / Source exclusions / Per-card appendix — 只登记有意的偏离和排除；已对齐的卡不逐条记录，行为以卡牌文件和相邻测试为准
-- Infrastructure backlog — 只登记尚未实现的跨卡缺口；实现后删除该条，新的通用机制写进 `docs/architecture/` 中对应的 module 文档
-- Reference anti-patterns — 新增设计禁令时补充
-- Hook 归属由 `ALL_CARD_IMPLS` 派生，不在文档里维护副本
+架构文档只写职责、不变量、seam 和入口文件、ADR、测试指针。单卡行为以该卡的 Session 或直接行为测试为准，按 issue 记录的修复以 PR 为准，实现叙述以代码为准。体积与卡牌 ID 由 `scripts/__tests__/docs-budget.test.ts` 检查。
 
-## Change Boundaries
+更新 status 文档时核对：
 
-- 不引入循环依赖。
-- 卡牌相关能力尽可能在卡牌文件内部闭环，不要把单卡逻辑扩散到主路径。
-- **后端权威**：规则在 `shared/` + `server/`；不在前端 UI 加规则。
-- 不为单卡改动主路径（`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts`）。用现有扩展点（hooks、modifiers、卡牌定义字段）。
-- 项目仍处于开发阶段，不需要维护旧存档、旧 `engineStack` / pending cursor、旧 action id 的向后兼容；除非用户明确要求，不要把缺少兼容迁移作为 PR review blocker。
-- 测试时**默认 2 人游戏**。
+- Open issues by priority：修复后移除或降级，新增 gap 立即登记。
+- Accepted differences / Source exclusions / Per-card appendix：只登记有意偏离和排除；已对齐的卡不逐条记录。
+- Infrastructure backlog：只登记尚未实现的跨卡缺口；实现后删除该条，把通用机制写入 `docs/architecture/` 中对应的模块文档。
+- Reference anti-patterns：新增设计禁令时补充。
+- Hook 归属从 `ALL_CARD_IMPLS` 派生，不在文档中维护副本。
 
-## Verification After Changes
+</important>
 
-调试与最终验证分开，命令和记录语义见 `docs/operations/ci-checks.md`：
+<important if="准备交付变更、复核验证结果或运行浏览器验收">
 
-1. 调试期间用 `pnpm verify focus <file.test.ts>` 验证最小相关范围；纯测试 / 工具 / 文档改动不要求每次重启应用。
-2. 涉及应用运行行为、UI 或 WS 时，最终验证先通过 `./restart-local.sh` 重启，再用浏览器 / Playwright / 命令行验真实行为；`pnpm verify <file.spec.ts>` 会在隔离环境调用该重启入口。PR 不在 GitHub Actions 上跑浏览器 E2E：本机跑通相关 spec 并把结果写进 PR 描述即可。
-3. 最终源码上运行 `pnpm verify prepush`（完整 `pnpm test:fast` + `pnpm run lint`）；按风险补相关 slow Session / E2E，定向测试不能代替完整门禁。
-4. 修改源码或 rebase 改变文件内容后重新验证；`pnpm verify status` 可检查本地记录的新鲜度。记录只辅助核对，不自动跳过检查。
+## Verification after changes
 
-## Commit & CI Workflow
+调试与最终验证分开，详见 `docs/operations/ci-checks.md`：
 
-**永远使用 rebase，禁止 merge。**
+1. 调试用 `pnpm verify focus <file.test.ts>` 验证最小范围。定向 Vitest 及纯测试、工具、文档调试不要求启动应用。
+2. 涉及应用运行行为、UI 或 WS，最终验收必须先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行验证真实行为。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。PR 的浏览器 E2E 在本机执行，通过后把结果写入 PR 描述；GitHub Actions 不在 PR 上跑浏览器 E2E。
+3. 最终源码运行 `pnpm verify prepush`，覆盖完整 fast 和 lint。按风险补 slow Session 或 E2E，定向测试不能替代完整门禁。
+4. 修改源码或 rebase 改变文件内容后重新验证。`pnpm verify status` 检查记录是否仍对应当前源码；记录不自动跳过检查。
 
-每次 `git push` 之前需要 rebase main，发现冲突要先解决；在最终源码上运行 `pnpm verify prepush`，失败立刻定位修复。需要本机全量 CI 时按 `docs/operations/ci-checks.md` 执行，prepush 仅覆盖 fast + lint，不代表完整 CI。
+</important>
 
-`git push` 之后**必须等到相关 GitHub Actions run 结束**；run 进行中或失败时当前任务都不算完成。失败立刻定位修复。
+<important if="准备 commit、rebase、push 或合入 PR">
 
-Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文，简洁明了。
+## Commit and CI workflow
 
-`.env` 中已有 `GH_TOKEN`；`source` 后即可调 GitHub API。完整的 curl/jq/gh CLI 命令（最近 run 状态、失败 job 日志、手动触发 workflow、查 repo variables）→ `docs/operations/ci-checks.md`。
+- 永远使用 rebase，禁止 merge。每次 push 前先 rebase main，解决冲突，再在最终源码上运行 `pnpm verify prepush`；失败立即定位修复。prepush 只覆盖 fast 和 lint，本机全量 CI 按 `docs/operations/ci-checks.md` 执行。
+- push 后必须等待相关 GitHub Actions run 结束。运行中或失败时任务不算完成；失败立即定位修复。
+- Commit 标题使用 `feat:` / `fix:` / `refactor:` / `docs:`，英文、简洁。
+- `.env` 已有 `GH_TOKEN`，source 后可调 GitHub API；查 run、失败日志、手动触发 workflow 和 repo variables 的命令见 `docs/operations/ci-checks.md`。
+- 除非用户明确要求，不提交 `docs/superpowers/*` 中的 spec、plan 或 working notes，即使 skill 默认要求提交。每次 `git add` 显式排除 `docs/superpowers/`。
+
+</important>
+
+<important if="发布版本、部署服务或修改部署配置">
 
 ## Deployment
 
-前端在发布 GitHub Release 后（`gh release create vX.Y.Z --generate-notes`）由 `.github/workflows/deploy-pages.yml` 自动部署；后端只允许在 owner 控制的本机用 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` 部署。GitHub Actions 固定使用 `ubuntu-latest`，额度不足时直接失败，不使用 self-hosted runner。完整步骤、环境变量、TLS、CORS、常见问题 → `docs/HOW_TO_DEPLOY.md`。
+前端发布 GitHub Release 后，由 `.github/workflows/deploy-pages.yml` 自动部署，命令为 `gh release create vX.Y.Z --generate-notes`。后端只在 owner 控制的本机用 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` 部署。GitHub Actions 固定使用 `ubuntu-latest`，额度不足直接失败，不使用 self-hosted runner。步骤、环境变量、TLS、CORS 和常见问题见 `docs/HOW_TO_DEPLOY.md`。
 
-## Common Pitfalls
+</important>
 
-- **不要 commit `docs/superpowers/*`**：superpowers skill 产出的 spec / plan / working notes 不进 git。这是会话/PR 中间产物，污染 git history。即使 brainstorming / executing-plans skill 默认要求 commit spec，**违反默认行为，等用户明确要求才 commit**。每次 `git add` 必须显式排除 `docs/superpowers/`。
-- **应用真实行为验收必须重启**：统一用 `./restart-local.sh`；定向 Vitest 调试不需要启动应用，最终门禁见上文。
-- **Session 构造时就可能产生开局交互**：事后清手牌不能消除它。复用 `server/__tests__/_helpers/session-fixtures.ts`：真实开局用 `createOpeningSession`，显式选择 seed 并断言阶段 / interaction；工作阶段场景用 `createWorkSession`，在加载前固定所有手牌，无关手牌用 `['__test_placeholder__']`，不能用会触发重新发牌的空数组。两种夹具的边界和示例见 `docs/CARD_TEST_TEMPLATE.md` §5.2。
-
-## Docs Map
+## Docs map
 
 | Topic | Doc |
 |---|---|
 | Architecture | `docs/ARCHITECTURE.md`（索引）→ `docs/architecture/*.md` |
 | Deployment | `docs/HOW_TO_DEPLOY.md` |
 | Platform & Workshop | `docs/PLATFORM_DESIGN.md` |
-| Card Test Template | `docs/CARD_TEST_TEMPLATE.md` |
+| Card test template | `docs/CARD_TEST_TEMPLATE.md` |
 | 卡牌实现现状 | `docs/card_implementation_status.md` |
-| CI Checks | `docs/operations/ci-checks.md` |
-| GitHub OAuth Setup | `docs/operations/github-oauth-app-setup.md` |
+| CI checks | `docs/operations/ci-checks.md` |
+| GitHub OAuth setup | `docs/operations/github-oauth-app-setup.md` |
