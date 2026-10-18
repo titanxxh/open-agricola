@@ -4,7 +4,7 @@ import type { GenerationReference } from '../../../../shared/contract/workshop-g
 import type { ToolCall, ToolDefinition } from './protocol'
 
 export const REFERENCE_REPOSITORY = 'titanxxh/open-agricola'
-export const REFERENCE_TOOL_VERSION = 'github-text-v5'
+export const REFERENCE_TOOL_VERSION = 'github-text-v6'
 export const REFERENCE_LIMITS = Object.freeze({ fileBytes: 256 * 1024, readLines: 160, resultBytes: 16 * 1024, searchHits: 40, httpRetries: 2, concurrency: 3 })
 export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
   { type: 'function', function: {
