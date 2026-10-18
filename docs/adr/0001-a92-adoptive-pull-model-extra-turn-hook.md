@@ -20,12 +20,12 @@ Rotation only considered players with `workersAvailable > 0`. A player with no r
 ## Consequences
 
 - Alternating placement holds for every extra-placement card, and several providers coexist without hiding each other.
-- Forfeit and consumption state stays in card-local state and per-source counters, not in `GameState`.
+- A card's forfeit flag stays in its own `cardStates`. The per-source counters `_extraTurnSkipCountsByCard` / `_extraTurnConsumedCountsByCard` are `PlayerState` fields: cleared when the next round opens, but part of the authoritative state that snapshots and undo restore.
 - The three rotation gates must change together; Session tests cover all three.
 
 ## Alternatives considered
 
 - Keep the push model and fix its dead code: it cannot restore alternation.
-- Add a global `GameState.skippedPlayers`: changes the core state and snapshot shape for what per-card state already expresses.
+- Add a global `GameState.skippedPlayers`: changes the core state and the snapshot / patch shape when a card-local forfeit flag already suffices.
 - Separate boolean and flow hooks: two predicates that must be kept in sync.
 - Extend `onBeforePlayerTurn` to return `{ skipTurn?, flow? }`: mixes skipping with extra turns and still needs a separate aggregate for rotation.
