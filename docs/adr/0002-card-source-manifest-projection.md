@@ -12,11 +12,11 @@ A card author wants one file for a card's display information and its rules, whi
 - A **Card Source** is the single author entry for every card in `shared/cards/{A..E,M,major,community}/`. It declares `meta` and optional `impl`.
 - `meta` is the Card Definition: serializable, frontend-visible and free of runtime behavior. `impl` is the Card Impl used by the server and sandbox: modifiers, listeners, effects, `prerequisiteCheck` and `reaches`.
 - `scripts/build-cards-manifest.ts` extracts `meta` statically with the TypeScript AST into `public/cards-manifest.json`; the frontend reads Card Display only through `client/services/card-meta`. `meta` therefore holds only JSON-like literals and simple same-file constants.
-- The server and sandbox read Card Sources through the generated `shared/cards/catalog.generated.ts`. Card Definitions are plain data distinguished by `kind`, not class instances.
+- The generated `shared/cards/catalog.generated.ts` holds Card Definition metadata only. The server and sandbox load native implementations from the generated `ALL_CARD_IMPLS` in `shared/cards/register-all.ts`, and major cards through `major/runtime.generated.ts`. Card Definitions are plain data distinguished by `kind`, not class instances.
 
 ## Consequences
 
-- Base, major, Moor and community cards share one model and one file per card.
+- Base, major, Moor and community cards share one model. Ordinary cards keep one file per card; a major-family file may export several physical Card Sources, which the generators discover.
 - Implementation fields cannot reach Card Display or the manifest.
 - Building the manifest never executes card modules.
 
