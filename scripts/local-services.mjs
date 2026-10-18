@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
 import { Pool } from 'pg'
 import { S3Client, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3'
+import { dropInvalidDatabases } from './invalid-databases.mjs'
 
 // Worktrees share dependencies and data with their main checkout. Tests get a
 // separate database; never derive a test connection from an external app URL.
@@ -44,6 +45,9 @@ if (!process.env.DATABASE_URL || testOnly) {
     const client = await pool.connect()
     try {
       await client.query('SELECT pg_advisory_lock(962)')
+      // Runs once before each verification and CI test run, never concurrently.
+      // It goes first: an invalid agricola_test still exists until it is dropped.
+      await dropInvalidDatabases(client)
       const result = await client.query("SELECT 1 FROM pg_database WHERE datname = 'agricola_test'")
       if (!result.rowCount) await client.query('CREATE DATABASE agricola_test')
     } finally {

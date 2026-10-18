@@ -49,7 +49,9 @@ export class PostgresDatabase {
       connectionTimeoutMillis: 10_000,
       statement_timeout: 30_000,
       ...config,
-      options: `-c search_path=${schema},public`,
+      // pg leaves a zero statement_timeout out of the startup packet, which would
+      // keep a role or database default in force; 0 means no limit here.
+      options: `-c search_path=${schema},public${config.statement_timeout === 0 ? ' -c statement_timeout=0' : ''}`,
       types: { getTypeParser: (oid: number) => oid === 20 ? safeInteger : types.getTypeParser(oid) },
     })
   }
