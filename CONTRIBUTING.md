@@ -67,7 +67,7 @@ See [AGENTS.md](AGENTS.md) for the complete card workflow, implementation rules,
 - Use concise English commit subjects with one of these prefixes: `feat:`, `fix:`, `refactor:`, or `docs:`.
 - Always rebase onto `main`; do not create merge commits.
 - Before every push, rebase onto `main` and run `pnpm verify prepush` on the final sources. Wait for all related GitHub Actions runs to finish after pushing; failures need to be fixed and skipped jobs are not successful verification.
-- Card changes must update [docs/card_implementation_status.md](docs/card_implementation_status.md). Changes to shared extension points such as hook phases, ActionFlow nodes, or protocols must update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Card changes must update [docs/card_implementation_status.md](docs/card_implementation_status.md). Changes to shared extension points such as hook phases, ActionFlow nodes, or protocols must update the matching module document under [docs/architecture/](docs/architecture/).
 
 ## Issues
 

@@ -1,6 +1,6 @@
 # Open Agricola
 
-Open Agricola 是一个后端权威、WebSocket 实时多人同步的 Agricola 在线复刻。本文档定义项目共享语言，供 agent、issue、PRD、测试说明和重构讨论使用；具体实现以 `docs/ARCHITECTURE.md` 和当前代码为准。
+Open Agricola 是一个后端权威、WebSocket 实时多人同步的 Agricola 在线复刻。本文档定义项目共享语言，供 agent、issue、PRD、测试说明和重构讨论使用；具体实现以 `docs/ARCHITECTURE.md` 及其 module 文档和当前代码为准。
 
 ## Language
 

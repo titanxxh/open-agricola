@@ -10,13 +10,13 @@
 >
 > - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署工坊能力契约；hook / phase / scope / actionId、helper 和运行语义来自实际运行的后端及 shared 描述元数据，样例由浏览器按需从 GitHub 读取
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
-> - **设计文档作者** — `docs/ARCHITECTURE.md` 提到沙盒的章节
+> - **设计文档作者** — `docs/architecture/shared-other.md` 与 `docs/architecture/server.md` 中提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证工坊能力契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
 > 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；已部署的工坊能力契约在运行时派生这些内容，由浏览器放入生成 prompt，**不再手工同步 prompt 表格**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
-> 2. 让 `docs/ARCHITECTURE.md` 引用本文件而不是另行维护一份
+> 2. 让架构 module 文档引用本文件而不是另行维护一份
 > 3. 支付语义、hook 参数/返回值和 helper 数据形状不是名字同步能覆盖的；同步更新 executor / prompt contract 测试，并按 `docs/test/llm-card-gen.md` 跑固定浏览器验收批次；历史 golden 回放保留为独立回归检查
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/domain/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
@@ -843,7 +843,7 @@ const CARD_IMPL = {
 ### 9.1 修改本文件 → 谁会自动同步
 
 - `server/workshop-sandbox-contract.ts` 从 shared 真相源和描述元数据派生部署的 hook / phase / scope / actionId 与 helper 正文，`client/services/llm/generation/prompt.ts` 包含该契约，由 `client/services/__tests__/generation-prompt.test.ts` 守卫。CI `pnpm run check:prompt-sync` 校验本文件的全部 `prompt-sync` 块与源码一致。浏览器从 GitHub 当前 main 读取本文和样例，每次尝试固定 SHA，不随站点打包发布。
-- `**docs/ARCHITECTURE.md**`：手工同步引用本文件即可。
+- `**docs/architecture/shared-other.md**`、`**docs/architecture/server.md**`：手工同步引用本文件即可。
 - `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
 
 ### 9.2 修改 hook / phase / scope / denylist 代码 → 必须更新本文件

@@ -113,6 +113,13 @@ describe('project metadata and anonymous pinned source reads', () => {
     expect(fetchReference).toHaveBeenCalledTimes(3)
   })
 
+  it('allows the architecture index and English module documents, not their Chinese mirrors', () => {
+    expect(allowedReferencePath('docs/ARCHITECTURE.md')).toBe(true)
+    expect(allowedReferencePath('docs/architecture/hooks.md')).toBe(true)
+    expect(allowedReferencePath('docs/architecture/hooks_zh.md')).toBe(false)
+    expect(allowedReferencePath('docs/architecture/nested/hooks.md')).toBe(false)
+  })
+
   it('rejects traversal, arbitrary URLs and incomplete arguments without network requests', async () => {
     const fetchReference = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ object: { sha: '3'.repeat(40) } })).mockResolvedValueOnce(Response.json({ tree: [{ path, sha, type: 'blob' }], truncated: false }))
     const refs = await ReferenceSession.createOpener(fetchReference)(signal())

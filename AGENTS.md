@@ -26,7 +26,7 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 - 后端 `GameSession`（`server/game/authoritative-session.ts`）是 `GameState` 的**唯一写入者**。
 - WebSocket 房间对局是实时同步主链路；HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口，不通过 HTTP 另建规则写入主链路。
 - 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
-- 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`。
+- 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`（索引）及其链接的 `docs/architecture/` module 文档。
 
 ## Commands
 
@@ -104,14 +104,14 @@ pnpm run build              # tsc + vite build
 |---|---|
 | `docs/card_implementation_status.md` | 官方卡实现变化时按下方清单核对：修复或新增未决问题、有意偏离、源码排除，或（含社区卡）出现尚未实现的跨卡缺口；已对齐的卡不逐条记录，新的通用机制写进 `docs/ARCHITECTURE.md` |
 | `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 `card_implementation_status.md` |
-| `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层）或 module 职责 / 不变量 / seam 时。只写职责、不变量、seam 和指针（入口文件、ADR、测试）；单卡行为、按 issue 记录的修复和实现叙述分别以该卡的测试（Session 或直接行为测试）、PR 和代码为准 |
+| `docs/ARCHITECTURE.md`、`docs/architecture/*.md` | 改通用扩展点（hook phase、ActionFlow node、协议层）或 module 职责 / 不变量 / seam 时，改对应的 module 文档；索引只写设计不变量、拓扑、分层与 module 表。只写职责、不变量、seam 和指针（入口文件、ADR、测试）；单卡行为、按 issue 记录的修复和实现叙述分别以该卡的测试（Session 或直接行为测试）、PR 和代码为准；体积与卡牌 ID 由 `scripts/__tests__/docs-budget.test.ts` 检查 |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
 
 **`card_implementation_status.md` 同步检查清单**（需要更新该文档时）：
 - Open issues by priority — 修复后移除或降级，新增 gap 立即登记
 - Accepted differences / Source exclusions / Per-card appendix — 只登记有意的偏离和排除；已对齐的卡不逐条记录，行为以卡牌文件和相邻测试为准
-- Infrastructure backlog — 只登记尚未实现的跨卡缺口；实现后删除该条，新的通用机制写进 `docs/ARCHITECTURE.md` 对应 module 节
+- Infrastructure backlog — 只登记尚未实现的跨卡缺口；实现后删除该条，新的通用机制写进 `docs/architecture/` 中对应的 module 文档
 - Reference anti-patterns — 新增设计禁令时补充
 - Hook 归属由 `ALL_CARD_IMPLS` 派生，不在文档里维护副本
 
@@ -159,7 +159,7 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 
 | Topic | Doc |
 |---|---|
-| Architecture | `docs/ARCHITECTURE.md` |
+| Architecture | `docs/ARCHITECTURE.md`（索引）→ `docs/architecture/*.md` |
 | Deployment | `docs/HOW_TO_DEPLOY.md` |
 | Platform & Workshop | `docs/PLATFORM_DESIGN.md` |
 | Card Test Template | `docs/CARD_TEST_TEMPLATE.md` |

@@ -1,0 +1,144 @@
+# Hooks, stage dispatch and listener purity
+
+[English](hooks.md) | [中文](hooks_zh.md)
+
+The hook registry, the public action execution order, Stage Dispatch and the listener purity rule; part of `shared/actions/` ([actions](actions.md)).
+
+## Hook system
+
+- Each `GameCore` owns its `ActionHookRegistry` (`actionHooks`). Dispatch, availability, cost previews and rule helpers receive it explicitly; there is no process-wide default. Context objects declare `actionHooks`, `undefined` only for pure calls with no generic rules. Registries are runtime dependencies rebuilt by each Core, never state or cursor data.
+- `CardRegistry` has no process default either: card lookups use a temporary synchronous `withCtx` binding, restored after nested calls and exceptions; a lookup without a bound environment fails. Custom-code adapters strip `actionHooks` before calling untrusted code.
+
+```text
+isDoable                 change whether an action is executable
+computeReplace           replace an entire action
+computeCosts             adjust costs, including fencing and card-purchase discounts
+computeArgs              add options to a choice returned by execute()
+computeChoiceCandidates  inject candidates into opt-in getBaseChoiceOptions
+computeExchanges         inject runtime CardExchange values
+before / immediatelyAfter / after
+anytime                  register additional anytime actions
+```
+
+- `ActionHookContext` is `{ actionHooks, state, player, space, actionId, phase, result?, choice?, doable? }`; during execution `ActionMutationContext.eventSink` records events. `ActionHookResult` (`shared/actions/hooks.ts`) is `{ doable?, actionId?, extraData?, extraOptions?, extraExchanges?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard?, countCardUse?, labelKey?, labelParams?, decline?, alternativeFlow? }`. `extraExchanges` injects runtime exchanges, `countCardUse` controls activation accounting, `labelKey` / `labelParams` label the contribution, and a `computeReplace` result with `decline` + `alternativeFlow` offers that flow as an alternative next to the original action instead of replacing it. A top-level `flow.sourceCard` is copied to child leaves that lack one.
+- Card listeners match played cards by default; only an explicit `zones` scans the hand. The match carries `ownerCardId` / `ownerCardZone`. A hand listener stays state-pure, and per-viewer serialization hides everything derived from the hidden card.
+- Listener `scope` is `player`, `opponent` or `any`. Matching enumerates by listener ID; trailing nodes group by owner (global, active player, others) and sort stably by play order. Reaction listeners use trigger-select; compute / query listeners aggregate deterministically.
+
+**Events are the source of rule facts.** `EventStore` opens a transaction per public action or internal leaf, commits only on success (failure, cancel, rollback and skip append nothing), resequences against `state.nextEventSeq`, validates visibility, JSON safety, size and known fields, and appends a `publicEvents.committed` packet. `state.log` is a UI cache derived by the event mapper. Listeners read `transactionEvents` / `eventQuery`, never uncommitted global `state.events` or `context.result` for resource facts.
+
+- Farm mutation events (`farm.fieldPlowed`, `farm.roomBuilt`, `farm.stableBuilt`, `farm.fenceBuilt`) carry `newlyUsedTiles`, captured around the mutation before trailing reactions. Fence commits also carry `newlyEnclosedPastureTiles`. Terrain placement and blocking-state mutations emit `farm.spacesUsed`. A scheduled room receipt emits `farm.roomBuilt` too.
+- Consumers read these committed facts from the host's captured `actionEvents` through `getActionNewlyUsedTiles()` / `getNewlyEnclosedPastureTiles()`, filtered by player. They never reconstruct a difference from later geometry, keep a before-action cache, or fall back to the wider Turn.
+- Printed fence counts and triggers count only ordinary `type='fence'` segments (`hasOrdinaryFenceBuiltEvent()`).
+- Animal exchanges deduct through the exchange / trade path so placed animals stay in sync. Per-trade thresholds use `immediatelyAfter.trade-applied` and `extraData.preResources`.
+
+**Trigger frame.** When a host action commits, the engine freezes `transactionEvents`, `actionEvents` and the matched trailing listener set and order before any `afterHostCommitListeners` mutation. Deferred continuations reuse that frame and never rematch. `CardListenerContext.triggerSnapshot` exists only in `immediatelyAfter` / `after` and holds each player's occupation / minor / major / improvement / played lists as of host commit; listeners asking "is this the Nth card" read it, and `check:card-impl-boundaries` rejects live length reads there. Activation does not recheck whether the owner card is still in its zone. The frame serializes with its `activate-card` node. A reaction to a host that returns a flow carries `preservedTransactionEvents` / `preservedActionEvents`, which every later commit extends.
+
+- Cost previews (`previewComputeCosts`) evaluate `computeCosts` without cloning state under the query-purity contract.
+
+Tests: `shared/engine/__tests__/{event-transaction,trigger-snapshot,hook-dispatch,continuation-event-scopes}.test.ts`, `shared/actions/effects/__tests__/farm-action-events.test.ts`, `shared/cards/__tests__/card-listener-zones.test.ts`.
+
+### Public `ActionNode` execution order
+
+`computeReplace → before → strict isDoable → computeCosts → execute → immediatelyAfter → after`
+
+1. `computeReplace` runs first, after `actionContext.targetSpaceId` resolves `context.space`. Changing only `actionId` carries through every later phase.
+2. Every matching `decline + alternativeFlow` contributes one complete subtree. `buildReplacementChoiceNode()` inserts an ordinary XOR before the original's optional prompt with `requiresExplicitChoice=true`, so even a single replacement waits for the player; the original branch keeps its optionality and no branch's `before` runs while offered. A chosen branch re-enters this pipeline skipping its own producer and every producer guard inherited from enclosing replacements; the original carries `checkedReplaceAction`, which only the dispatcher interprets. `resolvedReplacement` freezes the decision across restore; producer guards reset when placement or movement grants a new opportunity.
+3. `before` listeners compile to `activate-card` leaves before the original leaf, in trigger-select per owner. Before-use eligibility is collected once at the actual space use (`collectBeforePlacementFlows`, `collectBeforeActionSpaceUseFlows`); `requiresNewPlacement` excludes worker moves.
+4. Strict `isDoable` reads the state after real `before` mutations: base `canBeExecutedByPlayer`, cost preview, hook and listener `isDoable`. If it fails, only an already accepted mandatory continuation may resolve through `isAlreadySatisfied` against facts emitted earlier in the same transaction; the body and trailing listeners then do not run. Option-level listeners also filter occupation hand options, and `reserveResources` reaches the payment leaf.
+5. `computeCosts` fills `executionContext.costs`, `costTrades`, `costBonuses` and `paymentResourceProviders`.
+6. The body runs (`getBaseChoiceOptions` or `execute()`); `resolveChoice` revalidates doability and costs before continuing.
+7. `immediatelyAfter` and `after` run from the frozen trigger frame ([Hook system](#hook-system)). Internal `activate-card` bypasses this pipeline and hands any returned flow back to the engine.
+
+Composite actions select replacement before expansion and keep a deferred-expansion marker; children then make their own replacement decisions ([ADR 0027](../adr/0027-composite-actions-use-existing-replacement-selection.md)). `EngineTree.insertBefore()` / `insertAfter()` preserve the parent OR/XOR selection. Direct `cancel` of a protected atomic action (`plow`, `sow`, `construct`, `stables`, `fence`, `reorganize`, `selection`) is rejected recoverably; optionality comes from `optional` metadata and `__skip__`, reversal from history.
+
+Tests: `server/__tests__/action-replacement-session.test.ts`, `shared/engine/__tests__/engine-pipeline.test.ts`, `shared/actions/__tests__/flow-replacement-admission.test.ts`.
+
+### Current-step admission and blocked recovery
+
+Availability and authoritative entry share `GameCore.applyIsDoableCheck()` and the flow admission helpers; normal and card-granted placement share `isPlacementActionDoableInFlowContext()`. See [ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md).
+
+- An action can start when its current atom is executable or an applicable `before` can start; this does not promise completion. SEQ checks its next step, OR/XOR any branch entry. There is no whole-flow search; payment, animal capacity and fence geometry stay atomic checks.
+- Queries never consume resources, activations, events or the private cursor, and use no availability cache.
+- `originalActionCondition` is a structural condition of the original branch: an empty accumulation space cannot be reopened by fixed or bonus gains, while explicit replacements stay eligible.
+- Card-created Action Spaces use Strict Action Entry by default; standard composite spaces opt in ([ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)).
+- The recursion key includes consumed replacement producer IDs, so a same-named alternative may progress while loops without progress stop.
+- Accepted roots and mandatory continuations keep their obligation through composite descendants; explicit optional nodes stay skippable before acceptance. An unavailable mandatory node exposes `engine-blocked` and keeps earlier effects until `undoStep` / `undoAction`. Invalid input restores the command checkpoint and keeps the interaction; a stale option of an issued menu is rejected recoverably.
+- Before its body, an unavailable mandatory host offers a Continue window only when the legal anytime list is non-empty; Continue rechecks strictly without replaying `before`.
+
+Tests: `server/__tests__/{anytime-admission-session,empty-accumulation-admission-session,moor-admission-deep-session}.test.ts`.
+
+### Pay-child invariants
+
+- `pay` is an internal settlement child. The public host action owns business mutation, events and completion. Forbidden shapes: `seq:[pay, apply-*]`, top-level `apply-*` effects, a `PlayerState` payment scratchpad or any cross-action payment slot.
+- `beforeHostListeners`, `afterHostCommitListeners` and `afterHostListeners` encode where each host pays. Mandatory payment for renovation, improvement, occupation, construct, fencing and stables settles before trailing effects, so a reaction cannot spend resources still owed to the host.
+- Improvement and occupation `onBuy` run in `afterHostCommitListeners`: payment completes, the host commits the card, `onBuy` runs, then trailing reactions. One-time own-play benefits belong in `onBuy`; a played card does not match its own `occupation` / `improvement` trailing reactions, and still counts in the trigger snapshot. Effects "after a card is played" listen to the committed host, not its `pay` child.
+- `shared/actions/helpers/improvement-purchase-lifecycle.ts` owns the post-payment commit of purchases (returned card, passing, `card.played` / `card.passed`, hand change). `params.allowedPurchases` restricts every candidate source; `purchaseActionCardId` passes this purchase node's source into `onBuy`; `playedFromHand` is frozen before the hand changes.
+- A mandatory `afterHostCommit` continuation, and anything it returns or injects, stays mandatory; an impossible descendant blocks with ordinary undo. `mandatory: true` on a listener propagates even without a trigger menu.
+- An `animal-reorg` request hands reorganization to a Session subflow while the host keeps its own reactions: `before` once, then `immediatelyAfter` / `after` once after the subflow.
+- `activate-card-effect` reads `paymentInfo` from the internal result map and runs `onBuy` or a stage hook; stage activations carry owner, target and stage metadata.
+
+Tests: `shared/actions/effects/__tests__/pay-child-context.test.ts`, `shared/engine/__tests__/internal-children.test.ts`, `server/__tests__/action-hook-continuations-session.test.ts`.
+
+## Stage hooks
+
+```text
+Preparation: onBeforeStartOfTurn -> advance round / action.revealed -> onAfterRevealAction -> onPreparation
+  -> accumulate -> onRoundStart (StartOfTurn) -> onEndPreparation -> onBeforeWork -> onWorkStart -> work.started
+Work:        PlaceFarmer -> atomic actions -> onEndTurn -> allWorkersUsed -> onAllWorkersPlaced
+Return home: onBeforeReturnHome -> onStartReturnHome -> onReturnHome
+Round end:   onRoundEnd -> onAfterRoundEnd
+Harvest in rounds 4/7/9/11/13/14:
+  onBeforeHarvest -> harvestPrepWindow -> onStartHarvest
+  -> onStartHarvestFieldPhase -> onHarvestFieldPhase -> reap [dispatch 'reap'] -> reap reaction parallel
+    -> onAfterReap -> onEndHarvestFieldPhase -> onHarvest
+  -> postReapAnytimeWindow -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
+    -> feed -> onEndHarvestFeedingPhase
+  -> breed -> onEndHarvest -> onAfterHarvest
+Before game end: after round 14 onAfterRoundEnd completes, without opening round-15 preparation,
+  onBeforeEndGame -> preScoringWindow -> gameover
+```
+
+Stage hooks return `ActionFlow` and run as resumable subflows through `EngineStack`. **Stage Dispatch** ([ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)) is the shared model for preparation windows, StartOfTurn, turn end, Before-Harvest, Harvest field and before-end:
+
+- Each window freezes its player order (clockwise from the Start Player Marker where the rule says so) and, on each player's entry, captures a fixed tree of `activate-card-effect` sources using ownership, hand-enabled hooks and the pure `stageEligibility` query. Discovery never filters by current affordability.
+- One source expands directly; several enter `ParallelNode(mode='trigger-select')`. Handlers, payment and mandatory / pass state are recomputed from a live cloned-state preview after each selection. Completed sources never replay; cards played inside a window join only later windows.
+- Window context, player order and tree cursor persist in `stageResume`; restoration never rescans zones or rereads a changed marker. Legacy serial stages keep `resumeAfterCardId` for their own index recovery.
+- Nested optional branches keep exchange opportunities without weakening a mandatory root. `requiresExplicitChoice` keeps a purchase choice open while a live exchange could fund it.
+- At stage completion, unsettled animals nest the existing `reorganize` flow before the frame resumes.
+- Private events from stage subflows are held until the outermost response.
+
+Window-specific invariants:
+
+- **Preparation**: `onRoundStart` is StartOfTurn; `onBeforeStartOfTurn` runs before the round increments and receives `nextRound`; reveal context keeps the actual `actionId` / `roundSlot`. Work order (`roundFirstPlayerId`) freezes before StartOfTurn. `startFirstRoundAfterSetup()` is the single fresh-game entry: bootstrap never pre-accumulates and loading a work state never re-prepares.
+- **StartOfTurn**: round-start activations, scheduled receipts, payment-gated offers and scheduled actions share one player tree. Mature goods settle in one `receive` per player that keeps each entry's source and does not trigger Gain; `futureMeeple.resolved` commits only after the actual receipt.
+- **Future schedules** ([ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)): an Exact Future Target keeps its round and is dropped outside `current round < target <= 14`; a Future Prefix keeps its surviving contiguous suffix. One-time future offers use the `scheduled-offer` action and `cardStates[cardId].extraData.scheduledOffers`, not resource tokens. Cards queue future tokens instead of writing a `targetRound` state machine.
+- **Turn end**: ordinary rotation and card-driven Turns share one frozen source tree from `buildEndTurnReactionFlow()`; window completion closes the Turn Scope once. Cards record once-per-Turn receipts against the existing Turn identity.
+- **Before-Harvest**: player order freezes before Harvest skips activate; every player participates; the order lives in `stageResume.extra.beforeHarvestPlayerOrder`.
+- **Whole-Harvest skip**: a pending marker activates once after every `onBeforeHarvest` and excludes the player from every later Harvest step, stage hook and listener for that round.
+- **Harvest preparation**: `harvestPrepWindow` offers only payable, use-limited Harvest exchanges that produce a demanded good, from `preHarvestGoodsWanted` / `preHarvestGoodsWantedBeforeReap` / `maySkipHarvestFieldPhase` metadata. Usage is recorded per source and round.
+- **Reap**: `reap` is an internal action. A full Harvest uses `trigger: { phase: 'harvest' }`; a private field phase reaps without Harvest summaries. `computeHarvestCount()` returns counts with `sources` / `tags` / `scope`, changed only through `registerHarvestCountModifier()`. Per-crop `reap` events accumulate into one parallel flow before `onAfterReap`.
+- **Post-reap anytime**: offered in Harvest order before feeding is computed; rebuilt after each flow.
+- **Feeding**: `computeHarvestFeedingRequirement()` changes only through `registerHarvestFeedingRequirementModifier()`. The feed request carries an authoritative exchange catalog ([Anytime window policy](actions.md#anytime-window-policy)); `handleFeedResolved()` validates the whole ordered plan before any mutation.
+- **Breeding**: `getBreedThreshold()` takes the smallest played-card threshold; `computeHarvestBreedOrderPriority()` reorders breeding only.
+- **Harvest summaries** are rule facts: `harvestReapSummary` (crops, positions, count applications) and `harvestBreedSummary` (placed newborns, settled after placement) last until `onAfterHarvest`; cards compose them through `getHarvestOutcome()`.
+- **Before end**: `onBeforeEndGame` dispatches in target seating order with `beforeEndGameScope`; `handHooks` cannot use it. `preScoringWindow` then offers only `preScoring: true` anytime listeners per player before `gameOver`. Pre-scoring spending uses explicit flows; Scoring Reserve never deducts real resources.
+- **`onBeforePlayerTurn`** is the one non-flow hook: skip-control only, `{ skipTurn?: true } | void`, never an `ActionFlow`, never pending.
+- **Timed rules**: `CardEffect.timedRules` declares a closed `TimedRule` / `RuleBody` that native registration compiles into existing hooks; `timed-rules.ts` reads no runtime registry. Execution-time formulas come from `rule-queries.ts`.
+
+Tests: `server/__tests__/{preparation-bga-session,before-harvest-reaction-dispatch-session,stage-animal-settlement-session,parallel-trigger-multi-session}.test.ts`, `server/__tests__/stage-hook-flow.test.ts`, `shared/actions/__tests__/future-meeples-entries.test.ts`.
+
+## Listener purity
+
+`CardListenerRegistration.handler` is a state-pure flow builder on dispatch, preview and doability paths, matching the reference model where reaction collection only builds activation leaves and mutation happens in action leaves.
+
+- A handler may read state and events and return `ActionHookResult`, `ActionFlow`, costs, doability or options. Every mutation, including writes to its own `cardStates[cardId]`, is a returned leaf (`gain`, `pay`, `special-effect`, `exchange` or a reusable internal action).
+- Dispatch never runs a handler to precompute a result. A listener activation is an ordinary internal leaf (`activate-card`) carrying listener, card, event, owner and trigger player; `event.actionContext` keeps the triggering `targetSpaceId`.
+- **Gate**: every Vitest project that dispatches listeners installs `shared/cards/__tests__/listener-purity-guard.ts`, which hands each invocation deep read-only proxies and fails on any write or returned live reference. `pnpm run check:card-impl-boundaries` statically rejects explicit context writes in every resolved handler and `deriveCardCostCandidate`. There is no exemption list.
+- **Trigger-select** (`ParallelNode`) owns select, pass, mandatory and independent semantics; there is no listener-specific node. A structurally inapplicable child is hidden for this iteration and re-evaluated after siblings run; an applicable but unaffordable child stays visible and disabled. `mandatory: true` disables Pass only while a mandatory child is applicable and executable. Card-listener applicability comes only from the returned result; stage card effects still preview on clones.
+- **Before reachability**: same-time `before` listeners are a real trigger flow ordered by the player, never statically simulated. A card that can make an unreachable action reachable opts in through a scoped `isDoable` that steps aside under `skipBeforeTriggers`. The pass gate checks the original with `skipBeforeTriggers=true`, then only generic replacement fallbacks.
+- **Synthetic dispatch**: `trade-applied` and `harvest-feed-conversion` run only non-optional `special-effect` and `gain` leaves in deterministic `seq` / `parallel` flows (`executeImmediateSpecialEffectFlows()`); payments and interactions are not supported there.
+- **Owners and switches**: owner and trigger player are explicit; runtime owns cross-player confirmation and undo boundaries. `confirm-player-switch` is submitted by the outgoing player and creates an undo boundary.
+- **Provisional continuations** ([ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)): every mutating command crosses one settlement boundary with a normalized identity and checkpoint; scopes, guards, Protected Observation and failure memory live in the private session cursor.
+- Do not add an `order` field to `CardListenerRegistration`; stable fallback order comes from `playOrderIndex`.
+
+Tests: `shared/cards/__tests__/listener-purity-guard.test.ts`, `shared/cards/__tests__/listener-purity-wave*.test.ts`, `server/__tests__/authoritative-command-settlement.test.ts`.

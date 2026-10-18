@@ -1,0 +1,54 @@
+# client/ — 前端
+
+[English](client.md) | [中文](client_zh.md)
+
+> 本文件是中文翻译镜像；[client.md](client.md) 是唯一权威版本。
+
+客户端渲染权威快照、收集输入并管理本地 UI 临时态。它从不裁定规则。
+
+## 客户端 bundle
+
+| Bundle | 入口 | 路径 | 约束 |
+|---|---|---|---|
+| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 使用 WebSocket。从 `shared/*` 只导入 `contract`、`domain` 与 `i18n`；卡牌展示使用以 manifest 为后端的 `card-meta` 加 `custom-card-metadata`。 |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 懒加载的工坊沙盒 UI；规则经后端沙盒路径执行。 |
+| `local-sandbox-worker` | `client/local-sandbox/worker.ts` | `client/local-sandbox/` | 工坊试玩的浏览器引擎 Worker；只有其 Worker 侧文件可以导入完整的 `shared/*`，主 bundle 中的 `local-transport`、`persistence` 与 `workshop-launch` 只用类型导入 shared。 |
+| `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、cookie、WebSocket 或命令；只读取公开 Replay JSON，使用归档时编译的展示过滤。 |
+
+- 精确的入口与文件授权记录在 `scripts/architecture-policy.mjs`；没有目录级的豁免。ESLint `architecture/imports` 与 `pnpm run check:browser-boundaries` 把它们作为 CI 错误执行。
+- `scripts/check-bundle-size.ts` 把主 bundle 预算定为原始 550 KB、gzip 170 KB，作为单独的构建后检查。
+
+## 服务与同步状态
+
+- `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
+- `card-meta.ts` 拉取 `GET /cards-manifest.json`；`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
+- `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
+- 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
+- 客户端按 `occurrenceId` 消费公开事件，用于临时通知、高亮与动画；首个快照初始化游标，不重放历史。Action Log 把 `publicEventArchive` 当作只读时间线读取。
+- 玩家名通过 `client/utils/player-name.ts` 按生成名来源与座位号本地化；玩家提供的名字原样显示。
+- `llm/generation/`：浏览器持有生成尝试、provider 工具协议与固定到一个 main SHA 的有界 GitHub 读取。LLM 凭据只发给配置的 provider。`server/workshop-references.ts` 用项目凭据提供已认证的仓库树 metadata，不接受调用方 URL 或模型凭据；浏览器匿名拉取固定版本的原文并校验 blob hash。`GET /api/workshop/sandbox-contract` 提供 prompt 所依据的已部署契约；参考资料不能扩大它。`POST /api/workshop/cards/validate-code` 把校验绑定到源码与沙盒身份，只有另行验证过的 provider / endpoint / model 组合才被接受。见 [Platform design](../PLATFORM_DESIGN.md) 与 [`docs/test/llm-card-gen.md`](../test/llm-card-gen.md)。
+
+## 视图与本地沙盒
+
+- `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
+- 默认试玩路径是后端 `POST /api/game/new-sandbox`。设置 `VITE_SANDBOX_EXECUTOR=browser` 时，工坊试玩在浏览器中运行：`LocalGameTransport` 实现 `GameTransport`，Worker 用本地校验过的自定义代码组装共享的 `GameCore`，`server/__tests__/local-sandbox-parity.test.ts` 把行为锁定到服务端执行器。十秒超时会从最后持久化的快照（含 `engineStackCursor`）重建 Worker，并告知 UI 已回滚。对局保存在一个 IndexedDB 槽中，schema 不匹配时删除。固定到 `exactVersionId` 的试玩仍使用后端沙盒。
+- `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
+
+## Game Context、Replay Viewer 与 Bug Report
+
+```text
+GameContextRouter
+  ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi + 可选只读 Anchor 抽屉
+  ├─ completed → ReplayShell → credentialless Replay Viewer iframe
+  ├─ expired + retained Anchor → credentialless 历史 Viewer 单帧证据
+  ├─ expired → Expired Game Context 页面
+  └─ removed → Replay Tombstone 页面
+```
+
+- `?context=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
+- 活动恢复以 `intent:'resume'` 加入；服务端只恢复原座位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
+- `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
+- 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
+- Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
+- Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
+

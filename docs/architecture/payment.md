@@ -1,0 +1,34 @@
+# `shared/actions/payment/`: Payment
+
+[English](payment.md) | [中文](payment_zh.md)
+
+`PaymentSolver` (`solver.ts`) is the only production entry to payment: affordable solutions, payment choices, choice parsing, execution and the structured receipt, plus cost previews, typed-flat costs, room payment, simple trade side effects and card-cost candidate helpers. `payment/internal/*` is private to the package and its algorithm tests (`shared/actions/payment/internal/__tests__`); `shared/actions/payment/__tests__/import-boundary.test.ts` forbids every other import. External tests use `PaymentSolver` or `shared/actions/payment/__tests__/test-helpers.ts`.
+
+**One `ComplexCost` model.** Construct, renovation, fencing, stables, plow, occupation, minor and major improvement and `pay` leaves all enumerate through `computeAllBuyableCombinations`:
+
+| Field | Meaning |
+|---|---|
+| `fees` | Fixed per-action fees. A `computeCosts.costs` delta merges into `fees[0]`; negative totals clamp to zero, so a discount never refunds another resource. |
+| `unitFee` + `nb` | Per-unit cost times quantity (rooms, renovated rooms, fence segments, stables). |
+| `trades` | `from → to` substitutions. `Trade.scope: 'action'` converts the resource pool once per action; `'unit'` runs Candidate Closure on each unit row. `minCost` / `maxCost`, `replaceUpTo` and `groupMin` / `groupMax` bound uses; each unit `TradeUsage` records what it actually replaced. |
+| `bonuses` | Per-action discounts or discount choices. `optional` adds the no-bonus branch; `capDiscountAtCost` caps a variable discount at the current fee; `trackChoiceIndex` records `bonusChoiceIndex`; only `choiceAffectsState` exempts a choice from dominance pruning; `conditions` are re-evaluated per quantity. |
+| `costResourceRemovals` | Applied removals `{ resource, sourceCard, savedByFee }`. The input is a card's `CostResourceRemovalModifier` (`type: 'remove-resource'`, a `CostModifier`, not a `ComplexCost` key); `applyCostModifiers()` deletes the resource from every fee before enumeration and records it here, so enumeration keeps it removed after later bonuses and attributes the saving. Use it, not a large capped discount, for "no longer needs X". |
+| `paymentResourceProviders` | Payment-only virtual resources supplied by a card or a `computeCosts` hook: availability, covered resources, consumption source. They appear under their own key in `resourcesPaid` and never in cost rows or `PlayerState.resources`. |
+| `paymentBudget` | Ceiling on final `resourcesPaid`; it supplies nothing and never restricts geometry or unit count. |
+| `minimumResourcesPaid` | Floor on final `resourcesPaid`, checked before dominance pruning; admission and the payment child share it. |
+| `resourceReserve` | Keeps a minimum total in a resource pool after payment. `PaymentSolver` filters by it, together with a hook's `reserveResources`, after dominance pruning; it filters solutions only. |
+
+**Fixed pipeline order** (a domain rule, not a card precedence): base candidates (`fee`, `fees`, `unitFee`, dynamic `getBaseCosts`) → structural resource removal → Candidate Closure → action-scoped trades → bonuses → card-provided payment resources → cards → affordable solutions → `paymentBudget` / `minimumResourcesPaid` filters → dominance pruning and sorting → `resourceReserve` / `reserveResources` filter.
+
+- **Candidate Closure** ([ADR 0004](../adr/0004-candidate-closure-replaces-cost-modifier-ordering.md)): card-purchase and occupation costs normalize into a Cost Candidate List, and every `deriveCardCostCandidate` transform applies to a fixed point followed by Mandatory Saturation. Results are independent of registration order; candidate transforms and `TradeModifier` have no `order` field. Each resources + `originalFeeIndex` group keeps one representative row. A card declares only a single-candidate transform and `cardCostCandidateMandatory`; dynamic base costs come from `CardImpl.getBaseCosts()`. Static consumers read printed candidates through `getPrintedImprovementCostCandidates()`.
+- **Two cost paths** ([ADR 0003](../adr/0003-card-purchase-compute-card-costs-candidates.md)): major / minor improvement and occupation costs use the candidate pipeline; other actions aggregate `computeCosts` results. Candidate metadata (`sources`, `originalFeeIndex`, Cost Attribution) never enters `PaymentSolution`. Option building (`describePaymentSolution()` / `describePaymentEffectPreview()`) merges `sources` into each option's `sourceCards` before selection; the `PaymentReceipt` keeps them as `candidateSources` next to `costAttribution`.
+- **Dominance pruning** runs after resource feasibility and exempts payment-path identity, state-affecting bonus choices and card payment.
+- **Cost Attribution**: saved / paid statistics come from attribution, never from a pay leaf's `sourceCard`. Action `computeCosts` declare `costAttribution`; the host writes the clamped before / after delta after real execution.
+- **Payment option identity**: values are `<prefix>:<index>~<identity>`. Parsing settles the payment with that identity even if a recomputed list moved it; a vanished payment is a recoverable rejection that keeps the menu.
+- **Receipts**: occupation and improvement commits keep the owning host payment's exact resources, bonus sources and returned card; a free play carries an explicit empty receipt.
+- **Supply tokens are payment resources**: fences and stables flow through `cost`, the solver, `resourcesPaid` and `resource.paid` like any resource. Paying one increments only `player.supplyTokensConsumed`. Remaining capacity is read through `getOwnOrdinaryFenceBuildLimit()`, `getOwnOrdinaryFenceReserveCount()` or `getAvailableStableSupplyCount()`.
+- **Granted cost bonuses**: a granted renovation carries a serializable, sourced `Bonus[]` in its leaf's `actionContext.costBonuses`, merged with `computeCosts` against the live target; no temporary player modifier is installed.
+- **Validation**: `validateComplexCost` throws in development and, in production, logs and degrades to no solutions. `validateTradeModifier` (no `minNumRooms` on a unit trade, consistent group bounds) and `validateBonus` throw in every environment. Typed-cost enumeration (a `costType` is set) drops a branch with a negative `resourcesPaid` value; an untyped `ComplexCost` keeps it.
+- **Resource commitments** ([ADR 0019](../adr/0019-resource-commitments-preserve-unsettled-trades.md)) are checked at the command boundary and are not prepayment or solver reservations.
+
+Tests: `shared/actions/payment/internal/__tests__/{candidate-closure,cost-modifier-permutation-probe,enumerate,cost-modifiers}.test.ts`, `shared/actions/payment/__tests__/{solver,card-purchase}.test.ts`, `shared/actions/effects/__tests__/{improvement-cost-candidates,pay-supply-token,renovation}.test.ts`.

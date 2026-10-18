@@ -8,13 +8,13 @@ Read this document if you maintain:
 
 - AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed Workshop Capability Contract returned by `server/workshop-sandbox-contract.ts`. Hook, phase, scope, action-ID, helper and semantic facts come from the running backend and shared source metadata; reference examples are read from GitHub on demand.
 - Workshop UI copy in `client/app/workshop/AiCardDesigner.tsx` or `WorkshopPage.tsx`.
-- Sandbox references in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+- Sandbox references in [`docs/architecture/shared-other.md`](architecture/shared-other.md) and [`docs/architecture/server.md`](architecture/server.md).
 - LLM automation in `docs/test/llm-card-gen.md`, whose fixtures exercise this contract against a real model.
 
 When this document changes:
 
 1. Treat it as the human-readable mirror of hooks, phases, scopes, and action IDs. Source constants own the name allowlists: `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, and `SANDBOX_ALLOWED_ACTION_IDS`. Exhaustive maps own descriptions. The deployed Workshop Capability Contract renders them at runtime and the browser includes it in the generation prompt; there is no hand-copied prompt table. CI command `pnpm run check:prompt-sync` checks only that the names in each `prompt-sync` block match source.
-2. Make `docs/ARCHITECTURE.md` point here instead of maintaining another copy.
+2. Make the architecture module documents point here instead of maintaining another copy.
 3. Name synchronization does not cover payment semantics, hook parameters and return values, or helper data shapes. Update executor and prompt-contract tests and run the fixed browser acceptance batch described by `docs/test/llm-card-gen.md`; historical golden replay remains a separate regression check.
 
 Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject to this sandbox. They may import project helpers directly. This contract applies only to Workshop custom cards.
@@ -793,7 +793,7 @@ The local sandbox is a dry run for multiplayer play. Semantic divergence would b
 ### 9.1 After this document changes
 
 - `server/workshop-sandbox-contract.ts` derives deployed hooks, phases, scopes, action IDs and helper bodies from shared source and descriptive metadata. `client/services/llm/generation/prompt.ts` includes that contract, guarded by `client/services/__tests__/generation-prompt.test.ts`. CI `pnpm run check:prompt-sync` compares every marked block here with source. The browser reads this document and examples from current GitHub main, pinned per attempt; they are not bundled with the site.
-- `docs/ARCHITECTURE.md` only needs to point to this file.
+- `docs/architecture/shared-other.md` and `docs/architecture/server.md` only need to point to this file.
 - `client/app/workshop/AiCardDesigner.tsx` only needs to point to this file.
 
 ### 9.2 After hook, phase, scope, or denylist source changes

@@ -36,6 +36,7 @@ export class ReferenceError extends Error {
 export function allowedReferencePath(path: string): boolean {
   if (!/^[\w./-]+$/.test(path) || path.split('/').some(part => !part || part === '..' || part === '.')) return false
   return /^(docs\/(CUSTOM_CARD_SANDBOX|community-card-examples|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status)\.md)$/.test(path)
+    || /^docs\/architecture\/[a-z-]+\.md$/.test(path)
     || /^shared\/(cards|custom-code|actions|contract|domain|projections)\/.+\.ts$/.test(path)
     || /^server\/(custom-code\/.*|__tests__\/.*|game\/authoritative-session)\.ts$/.test(path)
     || /^tests\/llm-card-gen\/fixtures\/.+\.ts$/.test(path)

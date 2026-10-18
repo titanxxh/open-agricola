@@ -76,7 +76,7 @@ Extract a new abstraction only when the same helper serves at least two current 
 
 ## 4. Infrastructure backlog
 
-Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module section of `docs/ARCHITECTURE.md`. Completed work lives in pull requests, ADRs and tests, not here.
+Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module document under `docs/architecture/`. Completed work lives in pull requests, ADRs and tests, not here.
 
 No entries are open.
 
