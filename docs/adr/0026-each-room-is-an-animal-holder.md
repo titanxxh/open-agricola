@@ -1,17 +1,26 @@
-# Each room is an independent animal holder
+# 26. Each room is an independent animal holder
 
 - Status: Accepted
 - Date: 2026-10-13
-- Issue: https://github.com/titanxxh/open-agricola/issues/1133
 
-Each real room has an independent Room Animal Holder. The holder retains its room identity and animal assignment. A086 Animal Tamer grants one animal in each room. Ordinary house-pet rules still limit the entire house to one animal. Room capacity and permission to occupy several rooms are separate constraints.
+## Context
 
-The maintainer chose room holders over a single house-wide species-count pool. A pool can describe two animals in a two-room house, but cannot retain their room assignments or reject two animals assigned to the same room. Storing extra house animals on A086 would give them a card identity instead of a room identity.
+Issue [#1133](https://github.com/titanxxh/open-agricola/issues/1133). A086 Animal Tamer allows one animal in each room, while ordinary house-pet rules limit the house to one animal. A house-wide species-count pool could count two animals in a two-room house but could not keep their room assignments or reject two animals in one room.
 
-The design reuses animal-zone assignment, capacity validation, accommodation search, payment, and persistence. Each holder refers to a real room. Building adds a holder, and renovation preserves existing room identities. House totals are derived from room assignments. Separate card-provided animal zones retain their own identities and permissions.
+## Decision
 
-The room-position `houseAnimals` assignment map replaces the writable house aggregate. Room zone IDs derive from real room positions, and house totals are queries over that map.
+- Each real room owns a capacity-one Room Animal Holder `house:<positionKey>` that keeps its room identity and assignment. Building adds a holder; renovation preserves room identities.
+- `PlayerState.houseAnimals`, a room-position assignment map, is the only writable room assignment; house totals are queries over it. Serialized `roomAnimalZones` are read-only projections removed on load.
+- Room capacity and permission to occupy several rooms are separate constraints. Room holders share the owner's house occupancy group, whose ordinary occupied-holder limit is one; a card may raise that limit without changing per-room capacity.
+- The existing multi-zone occupancy limit is generalized to zone groups and shared by prefill, accommodation search and final validation. Separate card-provided zones keep their own groups and identities.
+- The UI submits assignments for server-provided holder IDs.
 
-The implementation generalizes the existing multi-zone occupancy limit to a zone group. Real room holders share the owner's house group. Its ordinary occupied-holder limit is one; A086 permits one occupied holder per real room. Local capacity remains one. Prefill, accommodation search, and final assignment validation use the same constraint. Separate card holders retain their existing groups.
+## Consequences
 
-The UI submits assignments for server-provided `house:<positionKey>` IDs. Serialized `roomAnimalZones` are read-only projections and are removed when loading a snapshot. No compatibility migration for the old aggregate is included.
+- Animal assignment, capacity validation, accommodation, payment and persistence are reused unchanged.
+- No compatibility migration for the old aggregate is provided.
+
+## Alternatives considered
+
+- A house-wide species-count pool: cannot keep room assignments.
+- Storing extra house animals on the card: gives them a card identity instead of a room identity.

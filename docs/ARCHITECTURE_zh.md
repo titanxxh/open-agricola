@@ -836,79 +836,74 @@ Before game end: after round 14 onAfterRoundEnd completes, without opening round
 
 ## 8. shared/cards/ — Card Source 闭环
 
-### 8.1 Card Source + 投影
+本 module 负责每张卡的唯一源文件，以及卡牌接入的通用 seam：hook 与 listener（§7）、局部状态、Card Field 和能力 metadata。卡牌能力留在它自己的文件里闭环。
 
-目标态见 ADR-0002。单卡作者只维护一个 Card Source：
+### 8.1 Card Source 与投影
+
+卡牌作者只维护一个 Card Source（[ADR 0002](adr/0002-card-source-manifest-projection.md)）：
 
 ```ts
-export const A123_FrameBuilder = defineOccupationCard({
+export const CardName = defineOccupationCard({   // the constant shares the file name
   meta: { id, name, deck, number, category, desc, cost, players },
   impl: { modifiers, listeners, effect, prerequisiteCheck, reaches },
 })
 ```
 
-| 概念 | 形态 | 谁能读取 |
+| 概念 | 形态 | 读者 |
 |---|---|---|
-| Card Source | `shared/cards/{A..E,major,community}/{Card}.ts`，包含 `meta` + 可选 `impl` | server / sandbox / tests；主 client bundle 禁止 |
-| Card Display | 从 Card Source 的 `meta` 构建出的 `public/cards-manifest.json` | 主 client bundle 通过 `client/services/card-meta` 读取 |
-| Card Impl | Card Source 的 `impl` 投影进 `shared/cards/catalog.generated.ts` / `CardRegistry` | server / sandbox；主 client bundle 禁止 |
+| Card Source | `shared/cards/{A..E,M,major,community}/{Card}.ts`，包含 `meta` 与可选 `impl` | 服务端、沙盒和测试；主 client bundle 禁止引用 |
+| Card Display | 由 Card Source `meta` 生成的 `public/cards-manifest.json` | 主 client bundle 通过 `client/services/card-meta` 读取 |
+| Card Impl | Card Source `impl`，投影到 `shared/cards/catalog.generated.ts` 与 `CardRegistry` | 服务端和沙盒；主 client bundle 禁止引用 |
 
-目标态删除 `shared/cards-display/`，不生成 shadow display 目录。`shared/cards/community/*` 与基础牌、major 一样使用单源；`shared/cards/community/auto-catalog.ts` 不再存在。
+- `meta` 即 Card Definition：可序列化、前端可见、无运行时行为的字段。允许声明式规则字段（`cost`、`prerequisite`、`*Prerequisites`、`cardField`、`isCookery`、能力 metadata）；不允许 `modifier(s)`、`listeners`、`effect` 与 `prerequisiteCheck`。`desc` 与 `prerequisite` 是印刷文字；可本地化的 `rules` 是补充裁定，不影响运行时。静态条件用 `*Prerequisites`，动态条件用 `impl.prerequisiteCheck`。
+- `impl` 包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用与 `reaches`。构建器可以把 `reaches` 投影到 manifest 顶层，但不能放进 `meta`。
+- `scripts/build-cards-manifest.ts` 用 TypeScript AST 静态提取 `meta`，运行时从不导入 Card Source；`meta` 只含 JSON 类字面量和同文件的简单常量。
+- `definePlayerActionCard` 声明 `playerActionCardType`；发牌池与 UI 据此区分，不靠卡号或 i18n 猜测。
+- 生产卡牌描述中的资源、动物、地形和分数通过 `ResourceText` token 渲染为图标；`__…__` 只标记精确的卡名、行动名和行动格名。`scripts/__tests__/card-description-icons.test.ts` 与 `card-description-double-underscore.test.ts` 负责门禁。
+- 卡面、触发标签、日志预览和 Replay 共用 `client/components/common/cardText.ts`：每个名字或文字字段各自依次回退到规范翻译、`meta.locales[locale]`（跳过空值）、源 metadata，名字还接受旧的 `cards.<id>.name` 别名，卡牌自有的提示用 `{card:<id>}` 引用卡名。玩家名按 `client/utils/player-name.ts` 中的生成名来源处理（§12）。
 
-`meta` 是 Card Definition：只允许可序列化、前端可见、无运行时行为的字段。允许 `cost`、`prerequisite`、`occupationPrerequisites`、`improvementPrerequisites`、`cardField`、`isCookery` 等声明式规则字段；禁止 `modifier` / `modifiers` / `listeners` / `effect` / `prerequisiteCheck`。`desc` 保留卡牌印刷文本；可选且可本地化的 `rules` 独立记录补充裁定或实现限制，不改变运行时行为。`prerequisite` 是印刷文本，结构化静态条件走 `*Prerequisites`，动态条件走 `impl.prerequisiteCheck`。
+测试：`shared/cards/__tests__/card-source-representatives.test.ts`、`scripts/check-generated-cards-sync.ts`。
 
-卡面、触发标签、日志预览和回放渲染共用 `client/components/common/cardText.ts` 的显示 helper。卡名和各个文本字段依次读取规范翻译分区、`meta.locales[locale]`、源码元数据；卡名在源码回退前还支持旧的 `cards.<id>.name` 别名。卡牌专属追问和按钮使用 `{card:<id>}` 引用卡名，由 `translateCardText` 解析，不再向各个字符串复制译名。这些引用只影响显示，不执行规则。
+### 8.2 生成目录与注册表
 
-元数据译文中的描述、补充规则和前置条件为空或仅有空白时，各自回退到对应的源码字段。因此，草稿翻译尚未完成时，已翻译的卡名可以与源码描述同时显示。
-
-热座和两种沙盒执行器对未命名座位统一初始化为 `Player N`，并设置 `PlayerState.nameIsDefault = true`。显示边界通过 `client/utils/player-name.ts` 根据这个来源标记和座位号本地化，覆盖交接提示、玩家条、分数和日志文字。用户提供的名称，包括 `PlayerA`、`playerF` 或 `Player 6` 这样的账号名，均按原文显示。WebSocket 创建和加入只发送用户提供的昵称；缺少昵称时，房间连接元数据中的名称保持为空，加入、重连和新一局都保留引擎默认名来源。权威改名会清除默认名标记；撤销同时保留当前名称及其来源。Replay 身份覆盖在替换名称时清除默认名标记。结束对局的结果行和回放参与者通过 `name_is_default` / `nameIsDefault` 保留这个来源，因此结果摘要、视角选择器和 Replay Viewer 使用相同的显示边界。日志通过 `playerId` 标识主要玩家，通过 `playerRefs` 标识其他姓名参数；快照行和事件行都先按身份解析名称，再进行时间线去重。显示层不修改权威状态中的名称值。
-
-`impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
-
-`scripts/build-cards-manifest.ts` 必须用 TypeScript AST 静态提取 `meta`，禁止 runtime import Card Source 或 generated catalog。`meta` 只允许 JSON-like 字面量和同文件简单常量引用；`impl` 可自由写运行时代码。
-
-### 8.2 Generated catalog + registry
-
-| 文件 | 作用 |
+| 文件 | 职责 |
 |---|---|
-| `shared/cards/catalog.generated.ts` | 从 Card Source 生成 `allCardSources`、`minorImprovementCards`、`occupationCards`、`implemented*`、`ALL_CARD_IMPLS` |
-| `shared/cards/active-registry.ts` | 同步临时 `CardRegistry` 作用域，无持久默认值 |
-| `shared/cards/registry.ts` | `CardRegistry` 类（loadByIds / unload） |
-| `shared/cards/custom-registry.ts` | server / sandbox 的 `CUSTOM_*` runtime impl + session context / effects / listeners / modifiers |
-| `shared/cards/custom-card-metadata.ts` | 前端 `CUSTOM_*` Card Display、art URL、O 编号 |
+| `shared/cards/catalog.generated.ts` | 从 Card Source 生成：`catalogCardDefinitions`、卡牌列表（`minorImprovementCardsList`、`occupationCardsList`、`implemented*CardsList`）与 ID 列表 |
+| `shared/cards/register-all.ts` | 生成的 `ALL_CARD_IMPLS`，即解析后的 Card Impl 映射（`scripts/generate-register-all.ts`） |
+| `shared/cards/catalog.ts` | 目录 facade，例如不含社区卡的 `minorImprovementCards` / `occupationCards` |
+| `shared/cards/active-registry.ts` | 临时同步的 `CardRegistry` 作用域；没有持久默认值 |
+| `shared/cards/registry.ts` | 带 `loadByIds` 与 `unload` 的 `CardRegistry`，用于按房间加载 |
+| `shared/cards/custom-registry.ts` | `CUSTOM_*` 卡在服务端与沙盒的运行时实现、会话上下文、效果、listener 与 modifier |
+| `shared/cards/custom-card-metadata.ts` | 前端的 `CUSTOM_*` Card Display、美术 URL 与 O 编号 |
 
-生产路径只通过 `catalog.generated.ts` 和 `CardRegistry` 访问卡牌；测试允许直接 import 单卡 Card Source 做精确断言。`CardBase` / `MinorImprovement` / `Occupation` / `PlayerActionCard` class 语义目标态删除，使用带 `kind: 'minor' | 'occupation' | 'playerAction' | 'major'` 的 plain Card Definition，并用 `kind` 替代 `instanceof`。
+- 生产路径只通过生成目录与 `CardRegistry` 访问卡牌；测试可以导入单个 Card Source。Card Definition 是带 `kind: 'minor' | 'occupation' | 'playerAction' | 'major'` 的纯数据。
+- 生成目录必须保持同步（`pnpm run check:generated-cards-sync`）；工坊 PR 生成基于已拉取的上游生成文件打补丁，从不读部署机本地的卡牌树。
+- 大改良运行时源码只经 `major/runtime.generated.ts` 进入后端。
+- 服务端与沙盒只注册自定义卡的运行时部分；主客户端只注册展示 metadata，从不导入自定义运行时注册表。
 
-`CardRegistry.loadByIds(ids, lookup)` / `unload(id)` 支持按房间动态装卡。
+### 8.3 `cardStates` 中的局部状态
 
-### 8.3 cardStates 局部状态
+- 持续计数、一次性标记和局部状态放在 `player.cardStates[cardId]`，不放 `PlayerState` 顶层。卡牌打出前就需要的历史使用显式的手牌区 listener（§7.5），不用全局统计。
+- 共享例外是多张卡和农场几何都依赖的事实：`player.farmyardSpaceStates`（封锁格、农场格与田地货物标记、非田作物格；放置锁与已用 / 未用状态分开）与 `player.farmyardExtensions`。
+- 后续玩家选择是显式续行：卡牌返回的 flow 中由 leaf 发出请求，并在 `pending` envelope 中等待，从不使用隐藏的共享槽。
+- 卡上工人使用 `shared/cards/helpers/card-held-workers.ts`；归家时释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把新生儿直接放到卡上。
+- 只读的 UI 标记（`extraData.farmTerrainMarkers`）与跨玩家公开标记（`extraData.publicCardMarkers`，计入 `cardBonusVp`）由通用逻辑渲染。
+- **可见性**（[ADR 0023](adr/0023-explicit-card-state-visibility-and-presentation.md)）：卡牌状态默认是内部的。原生 `presentation` 声明与 `getStatePresentation(player)` 把事实开放给公开 adapter；序列化记录规范化的 `cardStatePresentation`，rehydrate 时剥离。玩家私有的 `privateData` 属于存储它的玩家，而不是当前持有者。视角快照、事件、历史与座位视角 Replay 只暴露公开事实和观看者自己的私有数据，对卡牌所有者也是如此；权威状态、恢复、撤销、debug 完整状态与全开 Replay 保留原始状态。`card.stateChanged` 事件只带 key 不带值，投影也会去掉历史事件中的值，但不改写 Frame。
+- `getRuleContributions(player)` 暴露只读的组件预留与空格减免；消费者合并不重复的来源、取整有限值、拒绝负数与非数字并封顶扣减。通用马厩发现与归还按 `sourceCardId` 分发，只有来源卡改变自身的建造状态。查询的输入与结果都与存储分离，原生卡与工坊卡相同。
 
-- 持续计数 / 单次标记 / 局部状态写入 `player.cardStates[cardId]`，不污染 `PlayerState` 顶层字段。跨多张 FoM 小改良共享的 farmyard space 状态例外落到 `player.farmyardSpaceStates`，只保存后端权威的 blocked space / farmyard goods token / field goods token / non-field crop space 元数据；placement lock 与 farmyard used/unused 由共享 helper 区分。FoM Farmyard Extension 例外落到 `player.farmyardExtensions`，因为它改变共享 farmyard geometry，而不是单卡局部状态。
-- 只服务单卡或少数卡牌的历史记录优先落到 `cardStates[cardId].extraData`；如需覆盖卡牌打出前历史，使用显式 hand-zone listener，而不是新增全局 stat。
-- 复杂"等待玩家下一步选择"的卡牌交互抽显式 continuation 走 `pending` / `EngineStack.push`，不偷塞共享槽位。
-- 推荐结构：`{ cardId, kind:'choice'|'delayedEffect', payload }`。
-- 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把 newborn 直接放到卡上，避免其在回家前占用行动格或被再次用作容量来源。
-- 卡牌可在 `cardStates[cardId].extraData.farmTerrainMarkers` 写入只读 UI marker；来源声明公开展示 marker，FarmBoard 只在对应 terrain tile 内渲染，规则仍由后端卡牌状态裁定。
-- 卡牌可在目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers` 写入跨玩家公开 marker；helper 汇总后由 scoring 写入 `cardBonusVp`，FarmBoard 只在原玩家摘要区域展示，不把 marker 贴到农场板外侧。
+测试：`server/__tests__/card-state-visibility-session.test.ts`。
 
-Card Source 拥有状态的存储和解释。原生 `presentation` 声明把指定 counter key、stack、Card Field、持有工人、预留、附件和 marker 接入通用展示适配器；`getStatePresentation(player)` 返回配对资源或躺下动物等来源专属的通用事实。`infobox` 和资源统计明确属于公开适配通道。权威序列化记录规范化的 `cardStatePresentation`；前端和座位视角 Replay 只渲染这些事实，以及后端动物区和特殊畜栏投影，不解析原始字段。恢复时剥离派生事实，它不是第二份可写真源。
+### 8.4 `shared/cards/helpers/` 中的 helper
 
-卡牌状态有三种可见范围：默认内部、公开展示、玩家私有 `privateData`。普通快照、patch、dev WS、事件、历史，以及座位视角 Bug Report / Replay，只提供公开事实和该观察者明确的私有数据；卡牌本人也不接收内部字段。私有数据随存储玩家归属，不随传牌归属转移。权威状态、恢复、undo、完整调试状态和全开 Replay 保留原始数据。新的 `card.stateChanged` 只记录来源和字段 metadata，不记录值；投影也抹除历史事件中的值，不改写不可变 Frame 或其 Viewer 引用。 新 Frame 记录新增的展示事实，并使用重新构建、内容寻址的 Viewer。JSON Frame / delta 容器格式不变；Room header 在创建时锁定 Viewer build（ADR 0011）。
+- `pay-gain-node.ts`：先付后得、付后追加行动、退回后获得的模板。
+- `stage-effects.ts`：阶段效果标记，以及经现有兑换执行器的每卡一次可选收获兑换。
+- `card-state.ts`、`round-placement.ts`：一次性状态、原始 Work Placement Chronology 与人员放置序号（§6.5）。
+- `action-snapshot.ts`：活动 Turn Scope 身份与起点快照（§6.5）。
+- `card-held-workers.ts`、`card-field.ts`：卡上工人（§8.3）与 Card Field（§8.5）。
 
-`getRuleContributions(player)` 只读贡献组件预留和空格数量调整。共享消费者聚合去重后的已打出来源，将有限数值向下取整，排除负数、非数值，并把扣除限制在该类别数量内。通用特殊畜栏发现与归还按 `sourceCardId` 分派，由来源自己修改建造状态。Farmyard 几何接收 AnimalZones 的实际非牧场动物数量，不识别单卡或扣除容量。查询输入、结果与权威存储隔离，原生和 Workshop 只读查询遵循相同契约。
+### 8.5 Card Field 与 Logical Field seam
 
-### 8.4 helpers 糖衣层（`shared/cards/helpers/`）
-
-- `pay-gain-node.ts` —— "支付后得收益 / 支付后追加行动 / 返还到当前格再得"模板
-- `stage-effects.ts` —— 阶段型 card-effect 标记和每卡一次的可选收获兑换。作坊通过现有 exchange 执行器和交易事件提供使用／跳过流程，查询收获 hook 不会直接消耗材料。
-- `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData`、原始 Work Placement Chronology 与 Person Placement Order；“第 N 个人”排除同一工人搬迁，但包含正常放置的临时人员及召回后再次正常放置的人员。限定第二人放置动作的效果使用 `isCurrentActionSecondPersonPlacement()`，优先对照当前行动上下文的 `placedWorkerId`，缺少该身份时才读取当前 action snapshot，并排除注入的 anytime 上下文。
-- `action-snapshot.ts` —— §6.5 定义的当前 Turn Scope 身份和起点快照；按行动计算的 delta 属于 action transaction，不读取这里
-- `card-held-workers.ts` —— 见 §8.3
-- `card-field.ts` —— "卡牌即田"声明式工厂，详见 §8.5
-
-### 8.5 cardField 通用扩展点
-
-声明式"卡牌作为田"配置，定义在 `CardDefinition.cardField`：
+见 [ADR 0017](adr/0017-logical-field-ownership-boundary.md)。
 
 ```ts
 cardField?: {
@@ -917,167 +912,119 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` 注册 Card Field owner 并派生播种集成。单卡只声明配置，以及可选的 `onReap` / `onCropRemoved` owner 副作用回调。
+- `makeCardFieldImpl(cardId, def, options?)` 注册 Card Field owner 并派生播种接入；卡牌只添加配置与可选的 `onReap` / `onCropRemoved` 回调。虚拟列由 `deriveVirtualTileCol(cardId, slotIdx)` 得出。
+- 面向卡牌的 interface 有三个入口：`getLogicalFields(player)`（Farmyard Field 加上每张已打出 Card Field 的不可变投影，含空的固定槽）、`getFarmyardFields(player)`（几何、围栏、相邻与占用），以及带具名 `place`、`insertBottom`、`grow`、`remove` 与原子 `replace` 的 `mutateLogicalFields(state, player, options?)`，它先校验目标，再通过所属 adapter 写入。
+- 存储接受所有合法田地货物。`allowedCrops` 是普通播种能力，不是存储 schema：`place` 默认执行该白名单，卡牌效果可显式绕过；播种与 `replace` 始终执行；`insertBottom` 在顶层之下加入规则授予的作物，不新增槽，也不受播种白名单限制。
+- `fieldOperationFlow` 的 `move` 接受 `sourceCrops`；目标续行在保存位置或修改田地之前重新检查来源作物与数量、目标占用与 `allowedCrops`。
+- Card Field 槽保存顶层 `{ crop, remaining }` 与可选的 `below` 层。普通收割每个有作物的槽取一个；额外与整田收获继续深入下层。
+- Card Field 只有一个稳定的 Logical Field id 和一个 `groupKey`；槽保持稳定坐标。基础田地计分只计 Farmyard Field。
+- `onReap` 只在收割时执行；`onCropRemoved` 在每次真实移除时执行。两者都在共享修改之后、按作物各执行一次，返回的 flow 并入普通 parallel 反应。selection 会先解决移除回调返回的 flow，再进入它的下一个父级续行。
+- `reap` 是两种存储 owner 共用的唯一收割实现（§7.6）。多槽 Card Field 收割每个有作物的槽，但每个 Logical Field 与作物只计一次。
+- `card-field.ts` 内部的底层 adapter 是唯一触碰 `PlayerState.fields` 的 Card Impl 代码；`check:card-impl-boundaries` 在其他生产卡牌与 helper 源码中拒绝任何名为 `fields` 的属性或下标访问，无论接收者是谁，没有白名单。
 
-虚拟 tile col 由
-`deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
-派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
+测试：`shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`、`shared/actions/effects/__tests__/{reap,sow-permissions}.test.ts`。
 
-卡牌侧接口只有三个入口。`getLogicalFields(player)` 按确定顺序返回不可变投影，包含 Farmyard Field 和所有已打出且已注册的 Card Field，也包含固定容量中的空槽。`getFarmyardFields(player)` 是犁地、围栏、相邻、版图占位与 Field tile 几何规则显式使用的窄查询。`mutateLogicalFields(state, player, options?)` 提供具名的 `place`、`insertBottom`、`grow`、`remove` 与原子 `replace` 操作；它先验证目标，再经 Farmyard 或 Card State owner adapter 写入。
+### 8.6 命名、能力与边界
 
-Field storage 接受 grain、vegetable、wood、stone 四种合法 field good。Card Field 的 `allowedCrops` 表示普通 Sow 能力，不是存储 schema。`place` 默认执行该白名单，卡牌效果可显式绕过；普通 Sow 与 `replace` 仍受白名单限制。Owner callback 必须先检查实际 good，再执行特定作物副作用。
+- 卡牌文件使用 `{Deck}_{Number}_{Name}.ts`，导出同名常量。
+- 卡牌能力留在自己的文件里。`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts` 与 `server/game/authoritative-session.ts` 等核心文件从不为单卡修改；没有集中的卡牌效果注册表，也没有前端卡牌规则。
+- 跨卡身份与能力查询使用类型化 metadata 和已打出卡 helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)` 与 `playerHasCardCapability(player, capability, { asType? })`，只读取已打出区域；`asType` 复用 `cardCountsAs` 处理双类型身份。已注册的能力 metadata（`preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`firewoodBuildTrigger`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`）位于 `meta`，不增加前端行为。`ovenIdentity` 是 OA 的烤炉家族身份，不代表一定有烤面包兑换；升级卡可保留计分身份，并用 `firewoodBuildTrigger: false` 退出建造触发。
+- `check:card-impl-boundaries` 属于 `pnpm run check:architecture`，拒绝生产 Card Source 在运行时读取其他非大改良卡的 ID。显式例外是 `Major_*`、`reaches`、`allowedPurchases` 与前置候选列表。
+- 印刷文字点名其他卡牌时，卡牌可在 `reaches` 中声明 named printed target，只读取其公开事实（存在、owner、是否打出），从不读其私有状态；检查器例外只绑定一对精确的来源与目标。
+- metadata 审计必须为新增的 metadata 字段补 fixture。
 
-`fieldOperationFlow` 的 `move` 支持可选 `sourceCrops` 限制。目标 continuation 携带同一限制，两次选择都在暂存位置或修改田地之前重新检查当前来源作物和数量；目标占用与 `allowedCrops` 也在提交选择前验证。允许的来源资源由卡牌局部声明，A071 允许两种 storage owner 上的 grain 和 vegetable。搬移继续使用共享 mutation，并返回来源 owner 的回调 flow。
+### 8.7 小改良传牌
 
-Card Field 固定槽存储顶层 `{ crop, remaining }`，可带按底到顶排列的 `below` 层。`insertBottom` 放置牌面授予的作物，不增加播种槽，也不应用普通播种白名单。投影同时提供全部作物层、各槽顶层和稳定身份。普通 Reap 每个非空槽取一枚，额外或整田收割可继续取下层；末枚回调检查所有层。客户端展示底层，但只有顶层映射回原固定槽的选择坐标，空槽不会造成错位。
-
-基础田地计分只统计 Farmyard Field；Card Field 继续参与 Logical Field 规则、播种与收割。
-
-Card Field 无论容量多少都只有一个稳定 Logical Field id 和 `groupKey`；固定槽在其他槽清空后仍保留稳定选择坐标。`card-field.ts` 内的底层 Farmyard adapter 是 Card Impl 代码唯一可直接访问 `PlayerState.fields` 的位置。`check:card-impl-boundaries` 扫描 A–E、Farmers of the Moor、major、community 与生产 helper，不论 receiver 名称都拒绝名为 `fields` 的属性或 bracket 访问，并且没有遗留文件 allowlist。
-
-副作用回调签名：
-
-```ts
-onReap?: (ctx: {
-  state: GameState
-  player: PlayerState
-  crop: ExtraSowableCrop
-  amount: number
-  isLast: boolean
-  cardId: string
-  trigger: ReapTrigger
-  sourceCard?: string
-}) => ActionFlow | void
-
-onCropRemoved?: (ctx: {
-  state: GameState
-  player: PlayerState
-  crop: ExtraSowableCrop
-  amount: number
-  isLast: boolean
-  cardId: string
-  reason: FarmCropRemovedEvent['reason']
-  trigger?: ReapTrigger
-  sourceCard?: string
-}) => ActionFlow | void
-```
-
-`onReap` 只在 reap 时运行，保留收获专属语义；`onCropRemoved` 在每次真实作物移除时运行（包括 reap）。每种作物在共享写入后回调一次，返回的 flow 进入普通 `parallel` reaction。
-
-selection effect 返回移除回调的 `ActionFlow` 时，引擎先完成这个动态 child，再推进 selection 所在父流程的下一个 continuation。因此，被移除作物立即触发的效果总先于移除卡自身的后续行动结算。
-
-`reap` action 是两个存储 owner 唯一共用的收割实现。它遍历 Logical Field 的已有作物槽，统一经过 `computeHarvestCount()`，通过 `mutateLogicalFields()` 持久化移除，并产生一致的资源、Harvest Count application（包括零产出记录）、已收作物/位置/田数、作物事件、通用 listener 与 owner 回调。多槽 Card Field 会收割每个已有作物的槽，但每种作物只按一块 Logical Field 计数。Private Field Phase 用 private trigger 进入同一 action，不写完整 Harvest summary。
-
-当前迁移到该 helper 的 11 张卡：B68 / D75 / E80 / D25 / E72 / C70 / E68 / E69 / E70 /
-B113 / B141。
-
-### 8.6 命名 & 约束
-
-- 卡牌文件 `{Deck}_{Number}_{Name}.ts`（例 `A123_FrameBuilder.ts`），导出常量名同卡牌名。
-- 卡牌能力**尽量在卡牌文件内部闭环**，不能扩散到 `shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件。
-- 优先用 Hook 系统、`CardDefinition` 通用字段（`cost` / `reward` / `prerequisite`）、`cardStates`。
-- 禁止：核心文件内针对单卡的 `if-else`；集中式卡牌效果注册表；前端硬编码卡牌特定规则。
-
-运行时跨卡身份/能力读取必须优先落到 `CardDefinition` typed metadata 和 played-card helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)`、`playerHasCardCapability(player, capability, { asType? })` 只检查 `player.improvements` / `player.minorPlayed` / `player.occupationPlayed`，手牌不参与；`asType` 复用 `cardCountsAs`，因此 dual-type card 仍按既有身份语义进入查询。当前已登记的通用 metadata 包括 `preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`firewoodBuildTrigger`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`。这些字段属于 Card Source `meta`，可投影进 catalog / manifest，但不新增前端展示行为。`ovenIdentity` 在 OA 中表达 oven-family identity，包含 Oven Installation 这类 upgrade/minor，供 Oven Damper 等 oven-family 计分使用；这是项目内的有意抽象，不表示每张牌都必须提供 bake exchange 或触发 Firewood，升级牌可用 `firewoodBuildTrigger:false` 保留计分身份但退出 build-trigger 语义。已迁移路径包括 B146/C35 弃手牌禁止、B153 major identity scoring、C75/A27 fireplace/hearth/oven trigger、B31 pottery identity、E144 wares gain options、D86 animal-holder occupation filtering、D12 house animal zone blocking、M72 oven-family scoring。
-
-`check:card-impl-boundaries` 属于 `pnpm run check:architecture`；两份 CI workflow 与本机架构验证都复用这个唯一入口。生产 Card Source（包括嵌套普通卡、M、major 和 community） 中的运行时跨非 Major 卡 id 读取必须迁入通用 capability、action context provenance、harvest outcome、breeding threshold modifier、synthetic occupancy、trigger snapshot 等扩展点；`Major_*`、`reaches`、`allowedPurchases` 和 prerequisite candidate list 是明确例外。需要临时审计时可显式传 `--warn-only`，但不能作为合入验证路径。
-
-卡面文字明确点名另一张普通卡时，源卡可以把该目标作为 named printed target 使用；目标 id 必须出现在 `reaches` 或等价声明式 metadata 中，runtime 只允许做存在性 / 拥有者 / 是否已打出这类公开检查。源卡不得读取目标卡 `cardStates` / `counters` / `extraData` 等私有实现状态，也不得据此模拟目标卡能力分支；checker 例外必须绑定具体 source-target pair 和允许的读取形态，不能用粗粒度 allowlist 绕过边界。
-
-### 8.7 Minor improvement passing mechanism
-
-OA 通过 `CardDefinition.passing?: boolean` 标记 参考实现 minor improvement 的"过手"机制。
-`shared/actions/effects/improvement.ts` 的 host action 先用 internal `pay` child 完成购买支付，再在 `completeInternalChildren` 阶段读取 payment result map 并提交卡牌购买。passing 卡：
-
-- 不进 buyer.minorPlayed；卡 push 进 `nextPlayer.minorHand`（按 `state.currentPlayerIndex` wrap）
-- 不累加 `totalMinorBuilt`、不注入 `activeModifiers`、不触发 `providesOccupation` / `isField` 路径
-- emit `card.passed`（`fromPlayerId` / `toPlayerId` / `cardId`）替代 `card.played`
-- onBuy 仍通过 internal `activate-card-effect` 的 `afterHostCommitListeners` 执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
-
-listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCardIds` 自然不含 → "卡进场"反应 skip。
-无需 `apply-improvement` effect 或 `extraData.passing` scratchpad；参考实现 passing 行为由 improvement host action / pay child / `activate-card-effect` 三段承担。
-
-客户端：`PublicEventCardPassAnimation` 订阅 `card.passed` events 流，按 `data-card-anchor` / `data-hand-anchor` DOM 锚点播放卡片飞行动画；LogPanel 通过现有 `mapCardPassed` 派生 `log.cardPassed` i18n 条目。
+`CardDefinition.passing?: boolean` 标记购买后传给下家的小改良。改良宿主通过内部 `pay` child 完成支付，再在 `completeInternalChildren` 中提交购买：卡进入下一玩家的 `minorHand`（不进 `minorPlayed`），不计入 `totalMinorBuilt`，不安装 modifier，发出 `card.passed` 而不是 `card.played`，`onBuy` 仍经 `afterHostCommitListeners` 中的 `activate-card-effect` 执行。“卡牌进场”反应自然跳过它。客户端为 `card.passed` 播放动画，mapper 派生 `log.cardPassed`。
 
 ---
 
 ## 9. shared/domain/ — 领域聚合层
 
-派生视图 + 不变量校验集中处。`PlayerState` 仍是 JSON 可序列化纯数据，所有"我能不能 X"集中到 `PlayerBoard`。
+派生视图与不变量检查放在这里。`PlayerState` 保持纯 JSON；每个“我能否做 X？”的查询都属于 `PlayerBoard`。领域代码由主客户端、沙盒与服务端共用。
 
-```
+```text
 shared/domain/
-├── player-board.ts    PlayerBoard（playerBoard 工厂）
-├── farmyard.ts        农场规则校验 / normalizePlayerFarm
-├── farmyard-interaction.ts  farm-select / farm-position 交互 payload 投影
-├── pasture.ts         派生牧场面积、马厩数量与基础容量
-├── animal-zones.ts    动物分区容量与容纳判定（getTotalAnimalCapacity / getPastureCapacity / canAccommodateAnimalTotals）
-├── animals.ts         动物模型
-├── scoring.ts         计分 / PlayerScoreSummary
-├── scoring-reserve.ts 终局 Scoring Reserve 读取 / 汇总 / 扣 scoring clone
-├── farm.ts、field.ts、space.ts、farmyard-space-states.ts
+├── player-board.ts          PlayerBoard 与 playerBoard 工厂
+├── farmyard.ts             农场规则校验与 normalizePlayerFarm
+├── farmyard-interaction.ts farm-select 与 farm-position 的交互 payload 投影
+├── farmyard-usage-core.ts  规范的已用 / 未用农场格
+├── pasture.ts              派生的牧场面积、马厩数与基础容量
+├── animal-zones.ts         动物区容量与容纳
+├── animal-reorg.ts         动物重整自动补位
+├── animal-payment.ts       动物支付顺序
+├── animals.ts              动物模型
+├── scoring.ts              计分与 PlayerScoreSummary
+├── scoring-reserve.ts      终局 Scoring Reserve 的读取、汇总与计分副本扣减
+├── farm.ts, field.ts, space.ts, farmyard-space-states.ts
 └── index.ts
 ```
 
-`PlayerBoard(player, state)` 暴露 `farmyard`、`farmInteraction`、`animals` 三个子边界。`farmyard` 只做农场规则校验与查询（如 `canPlow` / `canSow` / `canBuildFence` / `canBuildRoom` / `canBuildStable`）；`farmInteraction` 只把当前玩家农场、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload；`animals` 负责动物分区容量与容纳判定。前端本地 farm draft 只消费服务端给出的 interaction payload，不调用这些规则边界。
+**PlayerBoard。** `PlayerBoard(player, state)` 暴露 `farmyard`（`canPlow`、`canSow`、`canBuildFence`、`canBuildRoom`、`canBuildStable` 等校验与查询）、`farmInteraction`（派生 `farm-select` / `farm-position` payload）与 `animals`（区域容量与容纳）。前端的农场草稿只消费服务端 payload。
 
-域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
+**农场。**
 
-`PlayerState.pastures` 保存牧场身份、格子与动物分配，不保存 `size` 或 `stables`。`getPastureSize()`、`getPastureStableCount()` 和 `getFencedStableCount()` 从牧场格子与当前 `stableTiles` 派生这些事实；`getPastureViews()` 返回脱离原状态的视图，包含实时面积、马厩数量与基础容量。动物区容量修正先接收这些当前视图，再按 replacement、additive 顺序执行。建造与归还马厩只改变真实马厩位置，规则查询、计分及父母卡条件随即读到结果，无需同步额外计数。序列化的玩家牧场增加仅用于展示的 `size` 和 `stables`；加载时移除这些字段，保留牧场身份和动物分配。读取视图或序列化不会重新分配动物，也不写入规则状态。
+- 已用 / 未用格只从 `farmyard-usage-core.ts` 读取，包含扩展、地形、封锁格与派生的牧场格；`farmyard-usage.ts` 与 `farm.ts` 只是兼容 facade。卡牌从不手动数格子。只有 `blocksPlacement` 计为占用。
+- 牧场持久化身份、格子与动物安置。`getPastureSize()`、`getPastureStableCount()` 与 `getFencedStableCount()` 派生其余信息；`getPastureViews()` 返回独立视图；序列化的 `size` / `stables` 只用于展示，加载时剥离。
+- 农场与行动格来源使用 source / type metadata：`FenceSegment.type/source`、`WorkerRef.synthetic`、`ActionSpace.blockedBy`、supply token helper、跨人数的行动格类别 helper、预留标记与附件。基础行动定义按 2–6 人过滤；5/6 人专属格单独建模。
+- Farmers of the Moor 地形（[ADR 0007](adr/0007-farmers-of-the-moor-variant-runtime.md)）是 `farmTerrain.kind` 的公开顶层，被覆盖的地形在 `covered`。地形变化走通用 selection leaf，在提交与效果执行时按实时占用重新校验；未来地形 token 复用 `futureMeeples` 条目。围起地形的相邻计算是纯 helper；一次性的相邻规则使用 `adjacencyPolicy` / `allowedTiles` / `fencePolicy`。不支持多层堆叠地形。
+- Farmyard Extension 扩展共享几何；所有农场读取方都使用动态形状。
 
-`Scoring Reserve` 是终局计分选择占用，不是 Payment Pipeline。卡牌通过 `special-effect.record-scoring-reserve-bonus` 把 `{ reserved, score, cardType? }` 写入目标玩家的 `cardStates[sourceCard].extraData.scoringReserveBonus`；`computeScores()` 先汇总所有已选 Scoring Reserve 并从 scoring clone 扣除，再运行现有 automatic costed-bonus solver。若后续 pre-scoring 行动使玩家无法覆盖合并后的选择，则整组 reserve 及其 bonus entry 改为失效。之后 resource-based major scoring 读取最终 clone 的剩余资源。`ScoreEntry.type='bonus'` 必须携带 `cardId`，并可以携带 `cardType` / `reserved` attribution；当 target player 没有打出 source card 时，`cardType` 由 Scoring Reserve 记录显式提供。
+**动物。**
 
-`Card Bonus VP` 的统一 score category 是 `cardBonusVp`：所有由卡牌产生的非印刷 bonus VP 都进入该 category，并尽量在 `ScoreEntry.type='bonus'` 上保留 `cardId` / `cardType` attribution。它不同于 printed Cards VP；卡牌本身印刷分仍进入 `cards` category，compact/live score 也必须保持 `cards` 与 `cardBonusVp` 分离。旧 `cardsBonus`、`cardStateBonusVp`、`cardBonus` score shapes 不保留，客户端和文档都不应读取、合并或兼容这些旧 key。
+- 每个真实房间拥有容量为一的 Room Animal Holder（`house:<positionKey>`）；`PlayerState.houseAnimals` 是唯一可写的房间安置（[ADR 0026](adr/0026-each-room-is-an-animal-holder.md)）。`roomAnimalZones` 是加载时剥离的展示投影。占用组与 `occupiedZoneLimit`（普通房间 holder 共享上限一）通过纯查询 `shared/contract/animal-zone-occupancy.ts` 约束房间与卡牌区域中被占用的 holder 数。
+- 无围栏马厩按农场位置保存 `{ animalType, animalCount }`（[ADR 0029](adr/0029-loose-stables-retain-animal-species-and-count.md)）；空马厩没有条目，但仍在 `stableTiles` 中。动物数量规则累加数量；占用格、存在性与不同物种规则保持各自语义。
+- 每个“能否容纳”的问题都使用 `canAccommodateAnimalTotals()` 或 `canAccommodateAllAnimals()`，它们搜索合法的最终安置（允许之后的系统 `reorganize`），并遵守 `occupiedZoneLimit` 与必空组（`requiredEmptyZoneGroupIds`：每组至少一个被标记区域为空）。卡牌从不在局部测试单个区域。会永久降低 holder 容量的候选按支付后的容量过滤。
+- `onComputeAnimalZones(player, zones, state)` 添加区域；`computePastureCapacityModifiers(player, state)` 按打出顺序先返回替换再返回叠加 modifier；`onComputeSharedAnimalZones()` 贡献 Hosted Card Animal Zone，存于卡牌 owner 的 `animalCountsByZone`，但按 `animalOwnerPlayerId`（繁殖时按 `breedingOwnerPlayerId`）结算。每个 holder 写入方都持久化 `cardId`、`ownerPlayerId` 与 `animalOwnerPlayerId`；改写与跨玩家扣减只触及当前 Animal Owner 的条目。`computeAnimalZones` 为缺少 `cardId` 的卡牌区域补上它。固定物种用 `allowedAnimalType`；`animalType` 只表示当前占用。
+- 由农场位置承载的区域声明 `farmPosition`、`countsFarmyardSpaceAsUnused` 与 `displaySource: 'farm-position'`；客户端只在该位置渲染服务端提供的区域。
+- `isHouseAnimalZone()` / `countHouseAnimals()` 包含标记了 `houseAnimalZone` 的区域；`blocksHouseAnimalZones` 会移除它们。
+- 动物统计与消耗（`getAssignedAnimalsByType()`、`subtractAnimalsFromBoard()`）同时读写旧 holder 字段与 `animalCountsByZone`。支付顺序在 `animal-payment.ts`：先卡牌局部的 `consumeAnimalPayment()`，再农场与 holder，最后是标记 `capacityCounterKey` / `capacityLossOnPayment` 的计数型 holder。`animalPaymentPreference.prefer` 指定的具体卡牌计数器最先扣，并关闭计数型 holder 的回退。系统移除通过 `onAnimalRemoved()` 通知卡牌。
+- 动物整理在修改前校验身份、物种、数量、混放、容量、库存、互斥上限与必空组；非法输入返回可恢复的 `log.reorganizeFail` 且不改变任何东西。省略的区域为空；少分配表示主动弃养。进入整理时，从停用或缩小的卡牌存储中移出的动物回到待安置状态，总数不减少。
+- 动物重整自动补位（`prefillAnimalZones()`）固定合法的现有占用，尽量补入待安置动物，确认前不写入安置；`actionContext.prefill=false` 可关闭。
+- 仅限农场动物的兑换（`CardExchange.fromFarmyard` / `Trade.fromFarmyard`）在兑换与有序喂食路径中都只能用当前已安置的动物支付；feed 请求发布已安置余额，同批喂食中刚获得的动物仍算未安置。
+- 只有启用 Farmers of the Moor 时 `animalKeysForState()` 才加入马。繁殖与计分调整使用 `computeBreedableAnimalCount()` 与 `computeAnimalScoreAdjustment()`。
+- 特殊马厩使用卡牌效果三件套 `getSpecialStablePositions`、`applySpecialStable` 与 `getBuiltSpecialStables`；核心马厩代码不导入任何卡牌。只有 `actionContext.farmHand === true`（农场扩建的建马厩 leaf）时才通过协议字段 `farmHandPositions` 提供它们。已建成的特殊马厩投影到 `SerializedPlayerState.specialStables`（rehydrate 时剥离）；没有卡牌接受的位置会让整批提交被可恢复地拒绝。
 
-公开卡牌 marker 也属于 `cardBonusVp`：`publicCardMarkers` 可提供正负分，`ScoreEntry.type='bonus'` 使用 marker 的 `sourceCardId` attribution，不新增独立 score category。
+**计分。**
 
-`computePastureCapacityModifiers(player, state)` 返回 pasture capacity modifier 列表，由 `computeAnimalZones` 在创建 pasture zone 时统一应用。modifier 分 `replacement` / `additive` 两类：先按打出顺序应用全部 replacement，再按打出顺序应用全部 additive；因此 D011_LawnFertilizer 这类 size-one pasture replacement 总是在 A012_DrinkingTrough / B072_LoveforAgriculture 这类 additive 前生效，不需要卡牌之间互读 id 或 scratch marker。没有 modifier 时 pasture 容量仍是 `size * 2 * 2^stables`。
+- `cardBonusVp` 是卡牌产生的非印刷分数的唯一类别，按 `cardId` / `cardType` 归因；卡牌自身的印刷分数留在 `cards`；公开卡牌标记可以计负分。旧的 `cardsBonus` / `cardStateBonusVp` / `cardBonus` 形状已删除。
+- Scoring Reserve 是终局计分预留，不是支付，通过 `special-effect` 的 `record-scoring-reserve-bonus` 记录。`computeScores()` 在有费用奖励求解之前从计分副本中扣除每个已选预留，基于资源的大改良计分读取该副本，组合付不起时整组失效。
 
-Animal Reorg Prefill（动物重整自动补位）由 `shared/domain/animal-reorg.ts` 为行动请求和实时交互投影统一生成。`prefillAnimalZones()` 固定已有有效安置，在兼容剩余空间中搜索最多可补入的待安置动物，同数量结果使用稳定顺序。容量、混养、卡牌校验、互斥区域和必空组复用容纳搜索的约束；容纳查询仍允许全局重排。已有布局本身非法时交给玩家手动修正。补位不写入真实安置、不弃养、不触发安置或繁殖奖励；确认仍是严格原子结算边界。收获新生动物结算在当前 `harvest.phaseStarted` 繁殖阶段标记之后，按受影响玩家和收获来源定位繁殖事件，再按事件 ID 替换。每名参与玩家在该收获流程中只有一个繁殖叶子；早先收获、其他玩家及卡牌私有繁殖均不受影响，JSON 恢复和撤销不依赖对象引用共享。明确的手动流程可通过 `actionContext.prefill=false` 关闭补位，并以 `InteractionRequest.prefill=false` 保留该意图；被动流程默认补位。前端用服务端草稿初始化，在相同快照下保留手动编辑，动物库存或区域元数据变化时刷新草稿。
+**大改良供应**（[ADR 0006](adr/0006-stack-aware-major-improvement-supply.md)、[ADR 0016](adr/0016-separate-supply-family-from-improvement-identity.md)）：变体模板生成真实卡牌 ID 的供应堆；版图只暴露每堆顶部。购买、归还与交换走供应 helper，生产读取使用供应查询 helper。升级身份使用 `*Identity` metadata，从不使用供应堆的 `familyId`。复制卡保留各自的具体 ID 作为来源与归因。底行规则使用 `isBottomRowMajorImprovement()` / `getAvailableBottomRowMajorImprovementIds()`。
 
-每个真实 `roomTiles` 位置对应容量 1 的房间动物容纳区（`house:<positionKey>`）。`PlayerState.houseAnimals` 是唯一可写的逐房安置；`roomAnimalZones` 仅为序列化展示投影，加载时剥离。共享 `occupancyGroup` 与 `occupiedZoneLimit` 约束房间或卡牌多个区域的占用数。普通房间组最多占用一间；A086 修改组限制，不改变各房间容量。容纳搜索、固定布局预填、最终提交与前端草稿检查复用纯 `shared/contract/animal-zone-occupancy.ts` 分组查询。建房增加容纳区，翻修保留坐标身份。支付与住房查询从房间映射派生动物；带房养标记的卡牌边界区仍独立。详见 ADR 0026。
-
-`AnimalZone.houseAnimalZone?: boolean` 标记“视作 house 动物区”的非 house zone。`computeAnimalZones` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，会统一移除普通 `zoneType === 'house'` 和 `houseAnimalZone === true` 的 zone。House-zone 规则统计必须使用 `isHouseAnimalZone()` / `countHouseAnimals()`，不要再直接读取 `player.houseAnimals` 后漏掉 D148_DomesticianExpert 这类 tagged zone。
-
-动物“可容纳”问题统一走 `canAccommodateAnimalTotals(state, player, targetCounts)` 或 add-only wrapper `canAccommodateAllAnimals(state, player, animals)`。它们按最终动物总量搜索合法 zone assignment，允许后续系统 `reorganize` 重新分配；卡牌不得用“当前任一 zone 是否还能塞下一只”的局部判断替代，否则会错误拒绝可通过重整达成的合法状态。搜索会 memoize 已失败的工作区分配状态，避免 M031 这类多候选交换在 impossible late-game farm 上重复枚举等价分支；`occupiedZoneLimit` 也必须在搜索期生效，避免候选被误判为可通过多个同卡 zone 容纳；如果候选本身会永久降低 holder 容量（例如 C148 held 被支付），候选过滤必须用支付后的容量。
-
-`onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B086_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。`onComputeSharedAnimalZones(owner, animalOwner, zones, state)` 用于 card owner 为其他 animal owner 贡献 borrowed played-card animal zone；shared zone 必须携带或由 `computeAnimalZones` 补齐 `cardId`、`ownerPlayerId`、`animalOwnerPlayerId`、`displayOwnerName` 和 `displaySource:'borrowed-played-card'`，若繁殖归属不同于 Animal Owner，则显式设置 `breedingOwnerPlayerId`。当前卡牌 effect 新增的 `zoneType:'card'` zone 若没有显式 `cardId`，`computeAnimalZones` 会自动补为当前 card id，保证 animal-reorg 写回和可容纳判断使用同一个可持久化 zone 身份。固定动物类型必须显式写 `allowedAnimalType`；`animalType` 是当前可见占用类型，不能被最终总量可容纳搜索当成印刷限制。pasture capacity replacement/additive 不再放在这里，改走 `computePastureCapacityModifiers`。
-
-farm-position backed card zones 和 hosted card zones 可把动物写入 `cardStates[cardId].extraData.animalCountsByZone`。Hosted Card Animal Zone 写入 card owner 的 card state，但统计、支付、capacity search、pending animal 检测和 reorg 操作按 `animalOwnerPlayerId` 归属到 Animal Owner；breeding phase 会把带 `breedingOwnerPlayerId` 的 zone 计入 breeding owner、并从 Animal Owner 的临时繁殖计数中扣除。reorg / capacity rewrite 按 `ownerPlayerId` 路由写回 card owner，同一卡只替换当前 Animal Owner 的 entries，不能清掉其他玩家借用同一卡的动物。所有普通 holder writer 都必须在 `animalCountsByZone` entry 上持久化 `cardId` / `ownerPlayerId` / `animalOwnerPlayerId`，跨玩家扣减只能消费显式属于目标 Animal Owner 的 entry。`serializeState` 会把当前玩家可见的 owner played-card zones、farm-position card zones 和 borrowed played-card zones 分别派生成 `SerializedPlayerState.playedCardAnimalZones`、`farmCardAnimalZones`、`borrowedPlayedCardAnimalZones`，让前端在非 reorg 状态也能展示 owner Played Cards、FarmBoard、Played Cards “by others” 的 0/N 卡牌动物区；active reorg 的 `InteractionAnimalReorgZone` draft 必须透传 owner metadata，覆盖该只读 projection 并启用控件。动物统计和消费 helper（例如 `getAssignedAnimalsByType()` / `subtractAnimalsFromBoard()`）必须同时读写 legacy `animalCounts` / `held` 与 per-zone `animalCountsByZone`，否则后续 reorg 会从 stale per-zone state 重新 hydrate 已消费动物。`occupiedZoneLimit` / `allowedAnimalTypes` 是后端算出的 zone metadata，必须随 `InteractionAnimalReorgZone` 传给前端；前者由统一 reorg helper 阻止超过 limit 的多 zone 分配，后者用于 UI 禁用后端一定会拒绝的动物类型。前端不写具体卡牌 id 规则。
-
-提交重排前校验唯一且已知的 zone id、zone 类型、已启用物种、非负整数数量、数量一致性、混放限制、容量、各物种库存、互斥上限及必空组；非法提交返回可恢复的 `log.reorganizeFail`，状态、历史和交互不变。数组和 `{ zones }` 两种格式均接受；省略区域为空，少分配表示主动弃养。宽容归一化仅用于恢复，不修补非法提交。进入重排时同步已消失或缩容的卡牌存储，但不减少资源总数，失去位置的动物留在待安置区，由玩家安置或弃养。
-
-`AnimalZone.requiredEmptyZoneGroupIds` 在不改变 zone capacity 的前提下声明最终分配约束：每个 group id 至少要有一个 tagged zone 为空，同一 zone 可以属于多个 group。`canAccommodateAnimalTotals()` 在搜索终点检查该约束，pending payload 通过 `InteractionAnimalReorgZone` 透传，`reorganize` 在 mutation 前拒绝非法分配，前端也只做同一套通用确认门禁。卡牌只负责标记 zone，并在打出后形成非法分配时请求重整；共享路径不读取卡牌 id。
-
-farm-position backed card animal zone 使用 `AnimalZone.farmPosition` / `countsFarmyardSpaceAsUnused` / `displaySource:'farm-position'` 进入 `InteractionAnimalReorgZone`，前端 FarmBoard 只把后端给出的 zone 渲染到对应农场格，不自行判断合法格。普通单 zone animal-holder 继续写 `cardStates[cardId].extraData.animalCounts`；同一卡多农场格 zone 写 `cardStates[cardId].extraData.animalCountsByZone[zoneId]`，并随非空 zone 持久化 `capacity` / `allowedAnimalType` / `allowedAnimalTypes` / `farmPosition` 供非 active reorg 状态继续显示。zone 消失时由 animal reorg 写回清理。需要“多个候选格但只能选一个”的卡牌使用 `occupiedZoneLimit`，避免同一卡多个候选 zone 同时容纳动物。
-
-动物支付统一走 `shared/domain/animal-payment.ts`。普通 exchange 扣动物时先让已打出卡牌通过 `consumeAnimalPayment` card effect 消费卡牌局部 marker / holder，再通过 `subtractAnimalsFromBoard()` 扣 farm board、普通 `extraData.animalCounts` animal-holder 和 `animalCountsByZone` farm-position-backed holder，最后才扣会永久损失容量的 counter-backed holder。`AnimalZone.capacityCounterKey` + `capacityLossOnPayment` 表达这类 holder 的容量来源和支付后容量损失；`animalPaymentPreference.prefer` 指向具体 card counter 时，只消费该来源，未命中时不回退扣其他 counter-backed holder；reorg / capacity enforcement 这类系统丢弃动物的路径通过 `onAnimalRemoved` card effect 通知卡牌同步局部 marker，不把具体卡牌状态写进主路径；C148 Mud Wallower 通过该 metadata 暴露 `held` counter，M031 Livestock Market 这类候选过滤只模拟共享支付 helper 后的 player，不读取 C148 私有 `cardStates`。繁殖数量和动物计分的单卡调整分别走 `computeBreedableAnimalCount` / `computeAnimalScoreAdjustment` card effect，核心 breed / scoring path 不读取具体卡牌状态。
-
-**Special-stable card-effect 扩展点**：`getSpecialStablePositions?(state, player) => FarmTilePosition[]` + `applySpecialStable?(state, player, position) => boolean` + `getBuiltSpecialStables?(player) => FarmTilePosition[]`。在 Farm-Expansion 的 Build Stables `farm-select` 里，核心 `shared/actions/effects/stables.ts` 通过 `card-effects.ts` 的 `collectSpecialStablePositions(state, player)`（聚合所有卡的候选，每项带 `sourceCardId`）和 `applySpecialStableAt(state, player, position)`（委派给接受该格的卡，返回 `sourceCardId`）发现并结算这些“非 `stableTiles` 普通格”的特殊 stable。候选注入协议字段 `farmHandPositions`（字段名为前端兼容保留），结算时填 `farm.stableBuilt` item 的 `kind:'special'` + `sourceCardId`。门控为通用的 `actionContext.farmHand === true`——仅 Farm-Expansion stables leaf wrapper 设置，E148 / A089 / C94 等其他“建 stable”入口不提供特殊 stable。当前唯一实现者是 B085_FarmHand（2×2 田地中心），核心 stables 文件不再 import 任何具体卡牌。提交的特殊畜栏位置若没有来源卡接受，返回可恢复失败，保留当前选择，并在发布前原子拒绝整个普通／特殊畜栏批次。这是非法输入拒绝，与已接受的强制续行变为 blocked 不同。
-
-第三个并列方法 `getBuiltSpecialStables?(player)`（#200）返回该卡**当前矗立**的特殊 stable 位置（建造前空，D102 / E76 回收后再次为空）。聚合 `collectBuiltSpecialStables(player) => { position, sourceCardId }[]` 遍历所有卡。`serializeState`（`shared/session/serialization.ts`）据此给每个序列化玩家派生**展示派生字段** `SerializedPlayerState.specialStables: { position, sourceCardId }[]`；同一序列化层也派生 `playedCardAnimalZones` / `farmCardAnimalZones` / `borrowedPlayedCardAnimalZones` 供 card animal zone 常驻展示。领域真相仍在 `cardStates` / card effect 计算结果，这些字段只进 snapshot，不进 `PlayerState`/`GameState` 领域顶层，`rehydrateState` 反序列化时显式剥离避免泄漏回权威态。前端 `GameContainerApi` 从 `displayPlayer.specialStables` 派生「已建特殊 stable top-left 集合」传给 FarmBoard，渲染 `.farmhand-center-built` 实心常驻 overlay，无需读任何单卡 `cardStates`。
+测试：`shared/domain/__tests__/`、`shared/actions/__tests__/animals.test.ts`、`shared/actions/effects/__tests__/reorganize-engine.test.ts`。
 
 ---
 
-**Session 修复契约（#1267；ADR 0029）。** 每个已占用的真实无围栏畜舍按农场位置保存一个 `{ animalType, animalCount }` 分配；数量归零时省略 entry，畜舍实体仍保留在 `stableTiles`。容量由当前后端规则派生。动物重整、分区回读、支付、容量整理和恢复保留实际数量；按动物数的规则累计数量，按占用格、存在性或物种集合的规则维持各自口径。合法布局写入、回读和正常交接后，库存与已安置分区总数一致，不能因存储丢量多开一次整理。前端通过现有动物安置流程展示后端派生的畜舍数量和容量。
+## 10. 其他 shared/ 模块与游戏变体
 
-## 10. 其他 shared/ 模块
+### 10.1 `shared/draft/`
 
-### 10.1 shared/draft/
+同时选牌的纯函数（`initDraftState`、`processSubmit`、`tryAdvanceRound`、`finalizeDraft`）；`createRoom` 用 `draftMode: 'simultaneous'` 与 `draftPoolSize: 7..10` 启用。启用 Farmers of the Moor 时，职业、FoM 小改良与已出版小改良分阶段选秀，FoM 小改良池从已实现的注册表派生，不足时拒绝开局，除非设置 `allowIncompleteFarmersOfTheMoorMinorDeal`；Community Deck 小改良只进入已出版部分。
 
-`draft-manager.ts` —— 纯函数 simultaneous 卡牌选择：`initDraftState` / `processSubmit` / `tryAdvanceRound` / `finalizeDraft`。`types.ts` 定义 `DraftState` / `DraftPool` / `DraftPickPayload`。`createRoom` 时 `draftMode: 'simultaneous'` + `draftPoolSize: 7..10` 启用。
+### 10.2 游戏变体
 
-### 10.2 shared/i18n/
+Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流程或计分；它不是卡牌来源，也不增加前端规则。
 
-UI 文案 key 与多语言资源；`PromptKey` 在 `shared/contract/prompt-keys.ts` 集中定义。
+- **Parent Cards**（[ADR 0005](adr/0005-parent-cards-dedicated-expansion-runtime.md)）是 `shared/parents/*` 中的结构化数据，素材由 `public-assets.ref` 固定，与 Card Source 投影分离；选择、奖励与支线任务由后端权威裁定，并使用非公开种子。
+- **Through the Seasons** 把四个季节格保留在版图上，只启用当前季节；其 modifier 注册在每个 Core 的 `ActionHookRegistry`，从不写玩家 `cardStates`。
+- **Farmers of the Moor**（[ADR 0007](adr/0007-farmers-of-the-moor-variant-runtime.md)）通过 §9 的通用 seam 增加地形、扩展、马、供暖与自己的大改良供应。
+- **Snake Opening** 只反转第 1 轮的工作轮转（§6.4）。
 
-### 10.3 shared/custom-code/
+### 10.3 `shared/custom-code/`
 
-`ast-validator.ts` —— 用户自定义卡牌 TypeScript 源码 AST 校验（白名单 import / 禁用 API / 网络与 IO 隔离）。listener action 由 `sandbox-listener-actions.ts` 单源定义，prompt、AST validator 与 server/browser manifest 共用。运行期隔离在 `server/custom-code/`。
+工坊卡只通过已部署的 Workshop Capability Contract 准入（[ADR 0025](adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)）。
 
-### 10.4 shared/utils/
+- `ast-validator.ts` 用 AST 校验自定义卡 TypeScript：只允许批准的导入，禁止被禁 API、网络与 I/O；`effect` 必须是对象字面量；listener phase 与 effect key 必须在契约白名单内。
+- `sandbox-listener-actions.ts` 是 prompt、validator、服务端与浏览器 manifest 和文档同步（`pnpm run check:prompt-sync`）共用的唯一行动列表；GitHub 参考资料不能扩大它。
+- `flow-admission.ts`、`contract-admission.ts` 与 `listener-result-validator.ts` 在进入引擎前拒绝契约之外的输出：未列出的行动、归属其他卡的节点与 listener、未开放的节点字段、类型错误的已开放字段与参数、未文档化的参数、类型错误的查询结果，以及写入其他卡或其他玩家的动物区。原生卡的 flow 不受检查。
+- listener 返回 `costs` 时必须同时返回匹配的 `costAttribution`。沙盒约束记录在 [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md)；运行时隔离位于 `server/custom-code/`（§11.4）。
 
-通用工具（深拷贝、ID、math 等），无业务规则。`rng.ts` 提供带种子的随机流：Explicit Seed 走数字生成器，宽种子走 HMAC-SHA256 流；后者基于 `@noble/hashes`，因为规则代码也在浏览器 Worker 中运行，而平台的哈希接口是异步的。
+测试：`shared/custom-code/__tests__/`、`server/__tests__/workshop-contract-*-session.test.ts`。
+
+### 10.4 `shared/i18n/` 与 `shared/utils/`
+
+`shared/i18n/` 存放 UI 文案 key 与资源；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。`shared/utils/` 存放不含业务规则的通用 helper；`rng.ts` 负责指定种子的生成器与 HMAC-SHA256 宽种子流。
 
 ---
 
