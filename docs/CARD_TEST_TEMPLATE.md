@@ -216,7 +216,7 @@ Do not assume that `POST /api/game/dev/*` exists. Available setup mechanisms are
 | `performRoundEnd()` | — | `roundEnd` | Advance the round; normally triggered by the engine |
 | `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | Undo one step or the whole action |
 
-> **Protocol names versus engine names:** WebSocket `ClientCommand.type` values do not exactly match `interaction.allowedCommands` strings. See `ARCHITECTURE.md` section 4.6. Use the first column when calling `GameSession` directly and the WebSocket column when driving a room.
+> **Protocol names versus engine names:** WebSocket `ClientCommand.type` values do not exactly match `interaction.allowedCommands` strings. See [InteractionState](architecture/contract.md#interactionstate-frontend-rendering-authority). Use the first column when calling `GameSession` directly and the WebSocket column when driving a room.
 
 ### 5.4 WebSocket Commands for Room Tests
 
@@ -533,7 +533,7 @@ describe('CXX_SomeCard', () => {
 
 ## 11. Relationship to the Architecture Document
 
-This template implements the test-layering strategy described in `docs/ARCHITECTURE.md`.
+This template implements the test-layering strategy described in [`docs/architecture/testing.md`](architecture/testing.md).
 
 - The architecture document defines testing principles.
 - This document defines how to write card test descriptions and cases.

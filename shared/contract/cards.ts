@@ -107,7 +107,7 @@ export type CardDefinition = {
   /**
    * The reference `$this->field = true` + `getFieldDetails`. Declarative card-field config.
    * When set, `shared/cards/helpers/card-field.ts` derives sow / harvest / isDoable
-   * behavior automatically (see docs/ARCHITECTURE.md → cardField).
+   * behavior automatically (see docs/architecture/cards.md → Card Fields).
    * `allowedCrops` mirrors the reference constraints (`null` = all 4 crops);
    * `capacity` is the number of independent stacks the card can hold.
    * Side-effects (e.g. E68 last-wood bonus) are wired via `makeCardFieldImpl`'s
