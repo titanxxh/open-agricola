@@ -2,25 +2,38 @@
 
 [English](ARCHITECTURE.md) | [中文](ARCHITECTURE_zh.md)
 
-> Canonical description of the architecture currently implemented on `main`.
-> This document replaces the historical `ENGINE_ARCHITECTURE.md` and `ENGINE_NEW_ARCHITECTURE.md` files.
+> Canonical module map of the architecture on `main`. Each section states a module's responsibilities, invariants and seams, and points to the entry files, ADRs and tests that hold the details. Card behavior lives in each card's Session tests; design decisions live in [`docs/adr/`](adr/).
 
 ---
 
 ## 1. Design Goals and Invariants
 
-The primary path is **WebSocket room gameplay + backend authority + passive frontend rendering**. HTTP is limited to startup, debugging, operations, and test support.
+The primary path is **WebSocket room gameplay + backend authority + passive frontend rendering**. HTTP serves startup, debugging, operations and test support, plus the versioned Game Context, Replay and Bug Report product APIs.
 
 Violating any invariant below is an architecture bug:
 
 - **Sole backend owner:** `GameSession` in `server/game/authoritative-session.ts` is the only server command entry and owns `GameState`; mutations execute in the `GameCore` and action leaves it drives.
-- **Full snapshots:** every client in a room receives the same `stateUpdate`; the frontend does not apply partial patches.
-- **Weak client:** the frontend renders, collects input, and manages temporary local UI state. It never adjudicates rules.
 - **Command-driven:** the frontend sends intent. The backend validates, executes, commits state, produces logs, and broadcasts.
+- **Weak client:** the frontend renders, collects input, and manages temporary local UI state. It never adjudicates rules and never commits optimistically: game UI changes only after `stateUpdate` arrives.
+- **Full snapshots:** every client in a room receives the same `stateUpdate`; the frontend does not apply partial patches.
+- **WebSocket game path:** `/ws` receives `ClientCommand` and emits `StateUpdateEnvelope`.
+- **`InteractionState` is the only frontend interaction truth:** `stateId` is `idle`, `wait`, or `gameover`; `wait` branches on `request.kind`.
 - **One domain implementation:** actions, engine, cards, rounds, harvest, and scoring live in `shared/` and are reused by both frontend and backend.
-- **Physical three-layer boundary:** ESLint `architecture/imports` enforces `shared/` ⇄ `server/` ⇄ `client/` as CI errors.
-- **Card-local closure:** card effects stay in their card files instead of spreading into core paths.
+- **Physical three-layer boundary:** ESLint `architecture/imports` enforces `shared/` ⇄ `server/` ⇄ `client/` as CI errors. There are no circular dependencies.
+- **Two client bundles:** `client-app` does not import `shared/{engine,session,actions,cards,custom-code,draft}`; sandbox and Worker permissions are restricted to the exact entries and files in `scripts/architecture-policy.mjs`.
+- **The node tree is the only state machine:** `engine.peekPendingEnvelope()` and the pending host derive what execution is waiting for.
+- **`EngineStack.push` and `pop`** are the only injection path for hooks, anytime actions, and nested subflows. Never mutate `pending` directly.
+- **`ActionFlow` matches the reference's small algebra:** the card DSL exposes only `leaf`, `seq`, `parallel`, `xor`, and `or` plus metadata. Runtime-only nodes do not enter card flows.
+- **Listener handlers do not mutate state:** listener, preview, and doability paths build flows or return structured values. Mutation occurs only while an action leaf executes.
+- **Card-local closure:** a card is finished inside `shared/cards/{Deck}/{Card}.ts`. Core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts` and `server/game/authoritative-session.ts` do not change for one card. A new hook point requires tests and documentation in the same change.
+- **Local `cardStates`:** persistent counters and markers use `player.cardStates[cardId]`; later choices use explicit pending state and continuations.
 - **Supply tokens are payment resources:** player supply limits such as fences and stables must not be hard-coded as 15 or 4. Read them through supply-token helpers or the payment-resource pipeline.
+- **Durable Room Commit:** a successful command that changes the public Frame or Private Session Cursor, or any response marked `durableTransition`, atomically writes Room snapshot and Replay Step before sending viewer-filtered state.
+- **Global Replay Steps:** simultaneous submissions still receive consecutive `stepNo`; automatic settlement belongs to the last triggering input and results do not depend on arrival order.
+- **Failures do not spread:** command errors reach only the caller; durable rejections still publish the committed version to peers as error-free snapshots. Persistence failure freezes the same Frame and blocks the Room instead of overwriting or advancing.
+- **Thirty-Room limit:** one instance counts ordinary waiting and playing Rooms. Only new creation is rejected; recovery is unaffected.
+- **Immutable historical Viewer:** a Room freezes schema and Build. Completed playback uses a credentialless read-only Viewer and never executes historical rules code.
+- **Tests default to two players.** Prove rules at the backend boundary, never infer them from the DOM.
 
 ---
 
@@ -1042,9 +1055,7 @@ The main fencing path must not branch on card IDs or card-specific flags. Do not
 
 C1 Overhaul counts, returns, and rebuilds only the player's own ordinary fences. Its `onBuy` first returns them using `consume-fence` with `sourcePolicy: 'ownOnly'`, then a `fencePolicy` limits the rebuild to ordinary fences paid from own ordinary supply. The generic protected-action guard rejects direct cancellation and preserves animal totals.
 
----
-
-## Anytime Window Policy
+### 7.9 Anytime window policy
 
 The multi-source Turn-end selector explicitly declares its own open `anytimeWindow`; trigger-select requests preserve that node declaration. A detour clears the pending menu of an unselected trigger-select node so the same frozen children are previewed again on return, while resolved children stay resolved. This does not confer permission on child payment/choice waits, single-source stage flows, siblings or other stages; each current waiting node retains its own permission contract.
 
@@ -1632,6 +1643,18 @@ After recording is enabled, the application may roll back only to a recorder-com
 
 Version one adds no metrics backend. Structured logs and health state must expose at least ordinary Room count, capacity rejection, Durable Room Commit latency, errors, and retries, blocked Room count, hash collisions, Replay payload size and corruption, GitHub queue, attempts, and rate limits, and missing Viewer Build. Log fields contain only stable IDs and numbers, never protected payloads.
 
+#### Platform operations observations
+
+`server/observability/` owns bounded numeric metrics, collection, the administrator gateway and overview health. It has no rule/state writer. `Broadcaster` observes the existing encoded send once per recipient; `stateUpdate` rounds come from that envelope's returned state, including undo/recovery. Rounds are `1`–`14`, `pregame` (draft/parent selection), `postgame` (gameOver/playing round 15), `none` and `unknown`. An unrelated event uses the captured Room/command context. Never tag metrics with Room, account, command/request identity, card, payload or exception text.
+
+Monotonic command duration spans parsed dispatch, queue wait, receipt/ownership checks, Session execution, durable commit and local publication. First correlated response is a separate measurement; a pending receipt is not completion. The commit boundary remains durable-before-publication, including frozen retries. Projection, JSON encoding and `ws.send` enqueue are separate overlapping stages; enqueue is not network delivery or client rendering. Metrics failures cannot change a game outcome. Default process metrics include CPU, RSS/heap, event-loop lag and GC; Worker wall time is not Worker CPU.
+
+A private Prometheus scraper uses bearer-authenticated ingress discovery and per-instance forwarding because application ports bind loopback inside the app container. Stable port/slot labels survive process identity changes; PromQL handles counter resets and merges histogram buckets before calculating percentiles. The ingress owns global lease/epoch-aware Room aggregates and distinct online users from expiring private presence rows; application processes expose local connections, queues, Workers and persistence health. Collection updates operational presence only, never game state. No snapshot/history is traversed to collect platform gauges.
+
+Grafana uses only aggregate Prometheus data. Every `/ops/` resource and query passes current site-session and `ADMIN_USERS` validation. A 30-second, atomic one-use handoff installs an HttpOnly dashboard cookie linked to the original session; deletion, expiry and permission changes take effect on the next request. The proxy drops supplied credentials/auth headers, supplies a reversible ASCII-encoded site username and Viewer role, and allows GET/HEAD plus the read-only datasource query POST. Grafana login tokens, anonymous/basic login, public dashboards, editing and Live are disabled; private service ports are not published in production. See [deployment operations](HOW_TO_DEPLOY.md#operations-monitoring) for the metric catalog and freshness limits.
+
+The browser sends 10% sampled, finite, rate-limited batches of command RTT, first-snapshot readiness and snapshot-to-React-layout-commit duration. Both endpoints use the same browser monotonic clock; no cross-clock subtraction or browser-paint claim is made. Samples contain numeric duration, finite kind/outcome and round only, and remain untrusted observational input.
+
 ---
 
 ## 12. `client/`: Frontend
@@ -1784,98 +1807,3 @@ scores
 ```
 
 Do not use DOM shape, button copy, or page structure as the primary proof of rules correctness. Test frontend rendering separately with E2E.
-
-### 13.3 Engineering commands
-
-```bash
-pnpm install                # canvas needs libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-local.sh       # unified local development, runtime, and test entry; absolute tsx/vite paths avoid cross-worktree pkill
-pnpm test                   # all Vitest projects, fast and slow
-pnpm test:fast              # fast projects only; CI default
-pnpm test:slow              # slow per-card session tests
-pnpm run test:e2e           # Playwright E2E; frontend and backend must be running
-pnpm exec vitest run <file> # one file
-pnpm run lint               # ESLint; zero errors required
-pnpm run build              # TypeScript plus Vite build
-```
-
-Local development standardizes on Node.js 24.15 or newer, excluding the Node 25 line (`engines`: `^24.15.0 || >=26.0.0`). Native dependencies such as `better-sqlite3` are built for its ABI.
-
-### 13.4 Replay, recovery, and Bug Report launch gates
-
-Implementation advances through independently verifiable slices:
-
-1. Database migration and canonical JSON, delta, gzip, and hash codec.
-2. Durable Room Commit, failure pause and retry, and the 30-Room limit.
-3. Game Context resolver, original-seat active recovery, and evidence authorization.
-4. Replay manifest and Segment, historical Viewer Build, and desktop and mobile playback UI.
-5. Bug Report draft, GitHub App connection and queue, and three-step reporting UI.
-6. Anonymization, Tombstone, deletion ledger, deployment, and production acceptance.
-
-Automation must cover:
-
-- codec round trip, at most 15 deltas, early checkpoints, hash mismatch, and recovery after a corrupt Segment;
-- atomic snapshot-plus-Step transaction, atomic game-over completion, same-hash idempotency, different-hash blocking, database-failure pause, and restart recovery;
-- consecutive `stepNo` for two simultaneous submitters, settlement triggered by the last submission, and results independent of arrival order;
-- ordinary `ok=false` and unchanged responses only to the caller, durable rejections committing before peers receive error-free snapshots, and no seat receiving unpersisted state before commit;
-- two-seat active-Room recovery, connection replacement, hidden-information filtering, and reconnect waiting during persistence pause;
-- completed, expired, removed, and unknown resolution; public Replay without login; Anchor mismatch; caching; and error codes;
-- desktop timeline-first auto layout, mobile board-first auto layout, manual URL override, perspective selection, play or pause, stepping, seeking, keyboard, and axe;
-- retained draft after OAuth cancellation, self and Hosted authors, stable-marker reconciliation, rate limits and three failures, duplicate clicks, disconnect, and revocation;
-- account-deletion Issue redaction, Replay Participant anonymization, Tombstone, and permanent audited maintainer access with a reason.
-
-The final performance probe runs under 2 CPU and 2 GiB with real commands and Replay-write load at 25, 30, and 35 Rooms, plus a late-state run at 30 Rooms. Thirty Rooms must satisfy action p99 no more than 250 ms, event-loop p99 no more than 100 ms, and RSS no more than 1.8 GiB. Thirty-five Rooms identifies the first failure point.
-
-Production acceptance requires two real site accounts to complete one game. During play, each restores independently and sees only its own hidden information. After completion, an unauthenticated browser selects both seat perspectives and open view. The two users then create smoke Issues using self GitHub identity and Hosted Issue Identity, verify Anchor and Reporter fields, and close them. Do not close the milestone until CI, frontend and backend deployment, these online steps, and deletion and rollback drills all pass.
-
----
-
-## 14. Key invariants
-
-1. **Backend authority:** rules live in `shared/` and `server/`; the frontend does not adjudicate.
-2. **Physical three-layer boundary:** `shared/` to `server/` to `client/`, enforced as an ESLint CI error.
-3. **Two client bundles:** `client-app` does not import `shared/{engine,session,actions,cards,custom-code,draft}`; sandbox and Worker permissions are restricted to the exact entries and files in `scripts/architecture-policy.mjs`.
-4. **WebSocket game path:** `/ws` receives `ClientCommand` and emits `StateUpdateEnvelope`; Game Context, Replay, and Bug Report use versioned HTTP product APIs.
-5. **`InteractionState` is the only frontend interaction truth:** `stateId` is `idle`, `wait`, or `gameover`; `wait` branches on `request.kind`.
-6. **The node tree is the only state machine:** the `PendingAction` union is gone. `engine.peekPendingEnvelope()` and the pending host derive what execution is waiting for.
-7. **`EngineStack.push` and `pop`:** the only injection path for hooks, anytime actions, and nested subflows. Never mutate `pending` directly.
-8. **Card-local closure:** finish a card inside `shared/cards/{Deck}/{Card}.ts`. Do not change core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts`, or `server/game/authoritative-session.ts`. A new hook point requires tests and documentation in the same change.
-9. **Local `cardStates`:** persistent counters and markers use `player.cardStates[cardId]`; later choices use explicit pending state and continuations.
-10. **No circular dependencies.**
-11. **Do not change a main path for one card.**
-12. **Tests default to two players.** Prove rules at the backend boundary, never infer them from the DOM.
-13. **No optimistic frontend commit:** wait for `stateUpdate` before changing game UI.
-14. **`ActionFlow` matches the reference's small algebra:** the card DSL exposes only `leaf`, `seq`, `parallel`, `xor`, and `or` plus metadata. Runtime-only nodes do not enter card flows.
-15. **Listener handlers do not mutate state:** listener, preview, and doability paths build flows or return structured values. Mutation occurs only while an action leaf executes.
-16. **Durable Room Commit:** a successful command that changes the public Frame or Private Session Cursor, or any response marked `durableTransition`, atomically writes Room snapshot and Replay Step before sending viewer-filtered state.
-17. **Global Replay Steps:** simultaneous submissions still receive consecutive `stepNo`; automatic settlement belongs to the last triggering input and results do not depend on arrival order.
-18. **Failures do not spread:** command errors reach only the caller; durable rejections still publish the committed version to peers as error-free snapshots. Persistence failure freezes the same Frame and blocks the Room instead of overwriting or advancing.
-19. **Thirty-Room limit:** one instance counts ordinary waiting and playing Rooms. Only new creation is rejected; recovery is unaffected.
-20. **Immutable historical Viewer:** a Room freezes schema and Build. Completed playback uses a credentialless read-only Viewer and never executes historical rules code.
-
----
-
-## 15. Documentation map
-
-| Topic | Document |
-|---|---|
-| Card test template | [`docs/CARD_TEST_TEMPLATE.md`](CARD_TEST_TEMPLATE.md) |
-| Card implementation status, description alignment, and plan | [`docs/card_implementation_status.md`](card_implementation_status.md) |
-| Platform and Workshop | [`docs/PLATFORM_DESIGN.md`](PLATFORM_DESIGN.md) |
-| Deployment | [`docs/HOW_TO_DEPLOY.md`](HOW_TO_DEPLOY.md) |
-| Custom-card sandbox constraints | [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) |
-| CI checks | [`docs/operations/ci-checks.md`](operations/ci-checks.md) |
-| GitHub OAuth | [`docs/operations/github-oauth-app-setup.md`](operations/github-oauth-app-setup.md) |
-| Known card-architecture debt | [`docs/card_implementation_status.md`](card_implementation_status.md) |
-
-## Platform operations observations
-
-`server/observability/` owns bounded numeric metrics, collection, the administrator gateway and overview health. It has no rule/state writer. `Broadcaster` observes the existing encoded send once per recipient; `stateUpdate` rounds come from that envelope's returned state, including undo/recovery. Rounds are `1`–`14`, `pregame` (draft/parent selection), `postgame` (gameOver/playing round 15), `none` and `unknown`. An unrelated event uses the captured Room/command context. Never tag metrics with Room, account, command/request identity, card, payload or exception text.
-
-Monotonic command duration spans parsed dispatch, queue wait, receipt/ownership checks, Session execution, durable commit and local publication. First correlated response is a separate measurement; a pending receipt is not completion. The commit boundary remains durable-before-publication, including frozen retries. Projection, JSON encoding and `ws.send` enqueue are separate overlapping stages; enqueue is not network delivery or client rendering. Metrics failures cannot change a game outcome. Default process metrics include CPU, RSS/heap, event-loop lag and GC; Worker wall time is not Worker CPU.
-
-A private Prometheus scraper uses bearer-authenticated ingress discovery and per-instance forwarding because application ports bind loopback inside the app container. Stable port/slot labels survive process identity changes; PromQL handles counter resets and merges histogram buckets before calculating percentiles. The ingress owns global lease/epoch-aware Room aggregates and distinct online users from expiring private presence rows; application processes expose local connections, queues, Workers and persistence health. Collection updates operational presence only, never game state. No snapshot/history is traversed to collect platform gauges.
-
-Grafana uses only aggregate Prometheus data. Every `/ops/` resource and query passes current site-session and `ADMIN_USERS` validation. A 30-second, atomic one-use handoff installs an HttpOnly dashboard cookie linked to the original session; deletion, expiry and permission changes take effect on the next request. The proxy drops supplied credentials/auth headers, supplies a reversible ASCII-encoded site username and Viewer role, and allows GET/HEAD plus the read-only datasource query POST. Grafana login tokens, anonymous/basic login, public dashboards, editing and Live are disabled; private service ports are not published in production. See [deployment operations](HOW_TO_DEPLOY.md#operations-monitoring) for the metric catalog and freshness limits.
-
-The browser sends 10% sampled, finite, rate-limited batches of command RTT, first-snapshot readiness and snapshot-to-React-layout-commit duration. Both endpoints use the same browser monotonic clock; no cross-clock subtraction or browser-paint claim is made. Samples contain numeric duration, finite kind/outcome and round only, and remain untrusted observational input.
