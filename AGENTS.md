@@ -102,9 +102,9 @@ pnpm run build              # tsc + vite build
 
 | Doc | When to update |
 |---|---|
-| `docs/card_implementation_status.md` | 官方卡实现变化，或（含社区卡）出现基础设施 gap、accepted divergence 时；新的通用机制写进 `docs/ARCHITECTURE.md` |
+| `docs/card_implementation_status.md` | 官方卡实现变化时按下方清单核对：修复或新增未决问题、有意偏离、源码排除，或（含社区卡）出现尚未实现的跨卡缺口；已对齐的卡不逐条记录，新的通用机制写进 `docs/ARCHITECTURE.md` |
 | `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 `card_implementation_status.md` |
-| `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层）或 module 职责 / 不变量 / seam 时。只写职责、不变量、seam 和指针（入口文件、ADR、测试）；单卡行为、按 issue 记录的修复和实现叙述分别以卡牌 Session 测试、PR 和代码为准 |
+| `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层）或 module 职责 / 不变量 / seam 时。只写职责、不变量、seam 和指针（入口文件、ADR、测试）；单卡行为、按 issue 记录的修复和实现叙述分别以该卡的测试（Session 或直接行为测试）、PR 和代码为准 |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
 

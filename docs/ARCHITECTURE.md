@@ -2,7 +2,7 @@
 
 [English](ARCHITECTURE.md) | [中文](ARCHITECTURE_zh.md)
 
-> Canonical module map of the architecture on `main`. Each section states a module's responsibilities, invariants and seams, and points to the entry files, ADRs and tests that hold the details. Card behavior lives in each card's Session tests; design decisions live in [`docs/adr/`](adr/).
+> Canonical module map of the architecture on `main`. Each section states a module's responsibilities, invariants and seams, and points to the entry files, ADRs and tests that hold the details. Card behavior lives in each card's tests; design decisions live in [`docs/adr/`](adr/).
 
 ---
 
