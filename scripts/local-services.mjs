@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
@@ -115,7 +115,13 @@ const containerText = Object.entries(containerValues).filter(([key]) => !key.sta
 writeFileSync(join(dataDir, 'dependencies.compose.env'), containerText, { mode: 0o600 })
 console.log('[services] PostgreSQL and S3 configuration ready; application and test data persist separately.')
 
-try { execFileSync('docker', ['network', 'inspect', 'open-agricola-local_default'], { stdio: 'ignore' }) }
-catch { execFileSync('docker', ['network', 'create', 'open-agricola-local_default'], { stdio: 'ignore' }) }
+// Monitoring and application containers join this network. A host without
+// Docker runs neither, so external dependencies then need no Docker at all.
+if (spawnSync('docker', ['--version'], { stdio: 'ignore' }).error?.code === 'ENOENT') {
+  console.log('[services] Docker is not installed; skipping the shared container network.')
+} else {
+  try { execFileSync('docker', ['network', 'inspect', 'open-agricola-local_default'], { stdio: 'ignore' }) }
+  catch { execFileSync('docker', ['network', 'create', 'open-agricola-local_default'], { stdio: 'ignore' }) }
+}
 
 execFileSync(process.execPath, ['scripts/observability.mjs', '--prepare-only'], { stdio: 'inherit', env: { ...process.env, SHARED_DATA_DIR: dataDir } })
