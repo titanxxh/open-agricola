@@ -1,25 +1,11 @@
-import { describe, it } from 'vitest'
-import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { checkGeneratedCardsSync } from '../../../../scripts/check-generated-cards-sync'
 
+// Compare in memory: rewriting the generated files here would race with tests
+// that import the catalog in parallel.
 describe('register-all.ts is in sync with generator', () => {
-  it('running generate:register-all produces no diff', () => {
-    const generatedFiles = [
-      'shared/cards/register-all.ts',
-      'shared/cards/catalog.generated.ts',
-      'shared/cards/major/generated.ts',
-      'shared/cards/major/runtime.generated.ts',
-    ]
-    const before = new Map(
-      generatedFiles.map((file) => [file, readFileSync(file, 'utf8')]),
-    )
-    execSync('pnpm run generate:register-all', { stdio: 'pipe' })
-    for (const file of generatedFiles) {
-      if (readFileSync(file, 'utf8') !== before.get(file)) {
-        throw new Error(
-          `${file} is out of sync with generator. Run: pnpm run generate:register-all`,
-        )
-      }
-    }
+  it('generate:register-all would produce no diff', () => {
+    const { staleFiles } = checkGeneratedCardsSync()
+    expect(staleFiles, 'Run: pnpm run generate:register-all').toEqual([])
   }, 30_000)
 })
