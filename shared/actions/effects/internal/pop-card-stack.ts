@@ -1,10 +1,7 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
 import { getCardStack, popFromCardStack } from '../../../cards/helpers/card-state'
-import { addCardResourceGained } from '../../../cards/helpers/card-state'
-import { gainResources } from '../gain'
-import { trackWorkPhaseBuildingResources } from '../../../session/work-phase-resources'
-import { addResourcesFromCards } from '../../../session/stats'
 import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import { receiveFromCardLeaf } from '../receive'
 
 const realResourceKeys = new Set<string>(REAL_RESOURCE_KEYS)
 
@@ -24,7 +21,7 @@ export const popCardStackAction: ActionDefinition = {
       kind: 'resourceMovement', resources: { [resource]: 1 }, from: { kind: 'card', cardId: sourceCard }, to: { kind: 'player' },
     } : undefined
   },
-  execute: ({ state, player, sourceCard, eventSink }) => {
+  execute: ({ player, sourceCard, eventSink }) => {
     if (!sourceCard) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
@@ -43,10 +40,6 @@ export const popCardStackAction: ActionDefinition = {
       return { type: 'ok' }
     }
     const gain: Partial<Resource> = { [resource]: 1 }
-    gainResources(player, gain)
-    trackWorkPhaseBuildingResources(state, player.id, gain)
-    addCardResourceGained(player, sourceCard, gain)
-    addResourcesFromCards(player, gain)
     eventSink?.emit<'card.stackChanged'>({
       type: 'card.stackChanged',
       cardId: sourceCard,
@@ -55,14 +48,6 @@ export const popCardStackAction: ActionDefinition = {
       delta: -1,
       reason: 'take',
     })
-    eventSink?.emit<'resource.moved'>({
-      type: 'resource.moved',
-      resources: gain,
-      from: { kind: 'card', playerId: player.id, cardId: sourceCard },
-      to: { kind: 'player', playerId: player.id },
-      reason: 'cardEffect',
-      sourceCardId: sourceCard,
-    })
-    return { type: 'ok', resourcesGained: gain }
+    return { type: 'flow', flow: receiveFromCardLeaf(sourceCard, gain) }
   },
 }

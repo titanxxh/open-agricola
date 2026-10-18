@@ -1,6 +1,7 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
 import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { initCardState } from '../../../cards/__stubs__/helpers'
+import { receiveFromCardLeaf } from '../receive'
 
 const positiveResources = (
   params: Record<string, unknown> | undefined,
@@ -62,15 +63,6 @@ export const takeFromCardAction: ActionDefinition = {
       ),
       reason: 'take',
     })
-    return {
-      type: 'flow',
-      flow: {
-        type: 'leaf',
-        actionId: 'gain',
-        sourceCard,
-        params: gain,
-        actionContext: { checkedReplaceAction: true },
-      },
-    }
+    return { type: 'flow', flow: receiveFromCardLeaf(sourceCard, gain) }
   },
 }

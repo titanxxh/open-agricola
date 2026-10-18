@@ -229,6 +229,7 @@ describe('ae-negative-33-native', () => {
       const offered = ok(s.takeAnytimeAction(0, 'E27-piggy-bank-anytime')), r = finish(s, offered, true, ['Major_Joinery']);
       resource(r, { wood: 0, stone: 0, food: 10 });
       assert.equal(stored(r), n - 6);
+      assert.equal(r.state.players[0]!.cardStates.E027_PiggyBank?.infobox, `${n - 6} / 6`);
       assert.ok(r.state.players[0]!.improvements.includes('Major_Joinery'));
       assert.equal(occupied(r).length, 1);
       assert.equal(r.interaction.anytimeActions.some(a => a.id === 'E27-piggy-bank-anytime'), false);

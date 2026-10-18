@@ -1054,6 +1054,8 @@ export const zh = {
     'bonus-vp': { name: '获得加分', description: '为来源卡牌获得 1 点额外分数' },
     breed: { name: '繁殖', description: '繁殖动物（收获 + 繁殖类卡共用的内部行动）' },
     'take-from-card': { name: '从卡牌取资源', description: '把来源卡牌上存放的资源移到自己的供给区' },
+    'claim-farmyard-goods-tokens': { name: '领取农场格货物', description: '把新使用的农场格上的货物移到自己的供给区' },
+    'claim-field-goods-tokens': { name: '领取田地货物', description: '把已播种田地上的货物移到自己的供给区' },
     'grain-thief-protect': { name: '保护谷物', description: '阻止当前谷物田被收割并改取 1 谷物' },
     'scythe-harvest-field': { name: '镰刀收割', description: '一次收完一块田顶层的所有作物' },
     'swap-field-grain-to-veg': { name: '田地置换', description: '把一块满谷物田换成一格蔬菜' },

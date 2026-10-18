@@ -644,7 +644,7 @@ The sixteen actions from `plow` on run the native action for the effect player, 
 |---|---|
 | `bonus-vp` | Always awards exactly one VP and accepts no `amount` or `vp`. For N points, sequence N leaves. |
 | `store-on-card` | Params look like `{ wood: 1, clay: 2 }` and write `player.cardStates[CARD_ID].counters`. |
-| `take-from-card` | Params look like `{ grain: 1 }`; deduct from `player.cardStates[CARD_ID].counters`, and fail the leaf when insufficient. |
+| `take-from-card` | Params look like `{ grain: 1 }`; deduct from `player.cardStates[CARD_ID].counters`, and fail the leaf when insufficient. The goods reach the supply through `receive`, so listeners on `receive` see them and listeners on `gain` do not. |
 | `gain` | Params look like `{ food: 2, wood: 1 }`. |
 | `pay` | Same shape, deducting resources. |
 | `bake-bread` | Starts a bread-baking subflow. |

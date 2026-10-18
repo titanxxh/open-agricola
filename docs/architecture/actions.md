@@ -76,16 +76,18 @@ Generic internal actions and their contracts:
 | granted rule actions | A card that grants a rule action invokes that action directly; granting an action does not expand the whole Action Space that normally offers it. |
 | `pass-minor-card-to-left` | Moves a played minor to the left player's hand, clears its card state and emits public `card.passed` plus a private hand change. Later triggers consume `card.passed`. |
 | `individual-food-cost` | An occupation's mandatory individual food cost, separate from the Occupation Cost and PaymentSolver: pays available food, begs for the shortfall, needs explicit confirmation on a shortage, and reads live inventory at preview and settlement. |
-| `take-from-card` | Deducts the source card's counters, then delegates inventory credit to `gain`, so Gain reactions observe goods moved off a card. A listener may subscribe to either layer or both; with both it runs at the delegated `gain` and again at the outer `take-from-card`. |
-| `special-effect` | The generic mutation dispatcher for listener-returned leaves: counters, flags, infobox, card stacks, supply tokens, farmyard space states and token claims. `claim-farmyard-goods-tokens` claims by source and, optionally, committed coordinates. `countCardUse: false` marks housekeeping that must not count as a card use. |
-| `receive` | Settles mature future goods for one player in one transaction; see [Stage hooks](hooks.md#stage-hooks). |
+| `take-from-card` | Deducts the source card's counters, then hands the credit to a `receive` child, so Receive reactions observe goods moved off a card and Gain reactions do not. |
+| `pop-card-stack` / `claim-farmyard-goods-tokens` / `claim-field-goods-tokens` | Remove a card's stack top or its claimable farm goods tokens and hand real goods to a `receive` child. Farmyard tokens are claimed by source and, optionally, committed coordinates; a non-goods stack item only changes the stack. |
+| `special-effect` | The generic mutation dispatcher for listener-returned leaves: counters, flags, infobox, card stacks, supply tokens and farmyard space states. It never credits goods to a supply. `countCardUse: false` marks housekeeping that must not count as a card use. |
+| `receive` | The only credit for existing goods entering a supply ([ADR 0030](../adr/0030-existing-goods-enter-supply-through-receive.md)). It settles mature future goods for one player in one transaction (see [Stage hooks](hooks.md#stage-hooks)) and credits goods a source action already removed from its card (`params.fromCard`). `gain` only brings new goods from the general supply. |
 | `activate-card` / `activate-card-effect` / `activate-extra-turn` | Activation leaves for listeners, stage effects and extra-turn providers; see [Stage hooks](hooks.md#stage-hooks) and [Listener purity](hooks.md#listener-purity). |
 | `reap` | Ordinary and private-field harvest; see [Stage hooks](hooks.md#stage-hooks). |
 
 - Occupation availability, choice submission and direct or free play share one prerequisite gate. Improvement cost preview and payment use the granting `sourceCard` or physical action-space ID as `actionCardId`.
 - Selection follow-ups carry semantic provenance in `actionContext` (for example `extraCropPlacement`); later cards read the marker, never the source card ID.
+- A resource listener subscribes to the action that credits the goods (`gain`, `collect`, `receive`, `reap`, `exchange`), never to a source action that hands its credit to `receive`; one movement must not reach the same listener twice. A listener about a card's own counters or stack may subscribe to the source action.
 
-Tests: `shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,special-effect,farmyard-goods-claim}.test.ts`, `server/__tests__/empty-accumulation-admission-session.test.ts`.
+Tests: `shared/actions/effects/__tests__/{collect,gain,place-farmer-on-space,place-farmer-jump,take-from-card,pop-card-stack,special-effect,farmyard-goods-claim}.test.ts`, `server/__tests__/{empty-accumulation-admission,receive-existing-goods}-session.test.ts`.
 
 ## Farm-type commit
 

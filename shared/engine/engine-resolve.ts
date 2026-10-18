@@ -840,7 +840,9 @@ export function engineResolveChoice(
         if (trailingHookNodes.length > 0) {
           int.tree.insertAfter(insertAnchor, trailingHookNodes)
         }
-        int.tree.insertAfter(insertAnchor, [flowNode])
+        // A leaf nested in the selected branch keeps its flow body next to itself,
+        // so the branch's later siblings run after it.
+        int.tree.insertAfter(child === targetNode ? insertAnchor : child.id, [flowNode])
         if (hookFlows.length > 0) {
           int.tree.insertAfter(insertAnchor, hookFlows)
         }

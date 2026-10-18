@@ -15,15 +15,6 @@ const SELECTION_EFFECT = 'm095-fallow-fields-place-food'
 type QueryableFarmSownEvent = FarmSownEvent | DraftGameEvent<'farm.sown'>
 type QueryableFarmCropRemovedEvent = FarmCropRemovedEvent | DraftGameEvent<'farm.cropRemoved'>
 
-const specialEffectLeaf = (
-  params: Record<string, unknown>,
-): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'special-effect',
-  sourceCard: CARD_ID,
-  params,
-})
-
 const fieldPosition = (
   player: CardListenerContext['player'],
   location: { kind: string; row?: number; col?: number; cardId?: string },
@@ -123,7 +114,7 @@ const listener: CardListenerRegistration = {
     if (positions.length === 0) return
     if (!hasClaimableFieldGoodsTokens(player, CARD_ID, positions)) return
     return {
-      flow: specialEffectLeaf({ kind: 'claim-field-goods-tokens', positions }),
+      flow: { type: 'leaf', actionId: 'claim-field-goods-tokens', sourceCard: CARD_ID, params: { positions } },
       sourceCard: CARD_ID,
     }
   },

@@ -43,7 +43,7 @@ const after: CardListenerRegistration = {
   phases: ['after'],
   handler: context => {
     if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
-    if (context.sourceCard === CARD_ID && context.params?.kind === 'claim-farmyard-goods-tokens') {
+    if (context.sourceCard === CARD_ID && context.actionId === 'receive') {
       const clay = sumResourceMovedToPlayer(context.actionEvents?.filter(event => 'schemaVersion' in event), 'clay', context.player.id,
         event => event.sourceCardId === CARD_ID && event.from.kind === 'card' && event.from.cardId === CARD_ID)
       if (clay <= 0) return
@@ -60,8 +60,7 @@ const after: CardListenerRegistration = {
     if (!hasClaimableFarmyardGoodsTokens(context.player, CARD_ID, positions)) return
     return {
       sourceCard: CARD_ID,
-      flow: { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
-        params: { kind: 'claim-farmyard-goods-tokens', positions } },
+      flow: { type: 'leaf', actionId: 'claim-farmyard-goods-tokens', sourceCard: CARD_ID, params: { positions } },
     }
   },
 }

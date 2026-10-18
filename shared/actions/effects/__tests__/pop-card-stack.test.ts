@@ -70,4 +70,27 @@ describe('pop-card-stack', () => {
       })).not.toThrow()
     })
   })
+
+  it('hands a real good to a receive child instead of crediting it directly', () => {
+    const player = makePlayer()
+    player.cardStates = { [CARD_ID]: { stack: ['field', 'clay'] } }
+    const events: DraftGameEvent[] = []
+
+    const result = popCardStackAction.execute({
+      state: { players: [player], actionSpaces: [] } as GameState,
+      player,
+      space: { id: 'pop-card-stack' } as ActionSpace,
+      sourceCard: CARD_ID,
+      eventSink: makeSink(events),
+    })
+
+    expect(result).toEqual({ type: 'flow', flow: {
+      type: 'leaf', actionId: 'receive', sourceCard: CARD_ID, params: { fromCard: { clay: 1 } },
+    } })
+    expect(player.cardStates?.[CARD_ID]?.stack).toEqual(['field'])
+    expect(player.resources.clay).toBe(0)
+    expect(events).toEqual([expect.objectContaining({
+      type: 'card.stackChanged', cardId: CARD_ID, resources: { clay: 1 }, delta: -1, reason: 'take',
+    })])
+  })
 })

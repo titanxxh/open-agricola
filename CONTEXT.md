@@ -717,8 +717,12 @@ _Avoid_: 当前行动玩家、浏览器 viewer、RoomPlayer
 不直接暴露给玩家选择的内部执行叶子，例如 payment internal、future meeple、selection、return-to-space、recall worker。
 _Avoid_: 玩家可直接选择的公开行动
 
+**Receive（领取已有货物）**:
+已有货物从回合格、卡上计数、卡上栈顶或农场格货物标记进入玩家供应区。来源动作只扣减自己的来源，入账统一交给 `receive`；资源获得类卡牌订阅 `receive`，不订阅来源动作（ADR 0030）。
+_Avoid_: Gain（从公共供应区获得新货物）、同时订阅来源动作和 `receive`
+
 **Future Receive**:
-回合开始时玩家从 future meeple / round card 拿回先前放置资源的 receive 语义。它属于内部阶段流程，但对卡牌语义等同于一次 Receive，不等同于普通 Gain。
+回合开始时玩家从 future meeple / round card 拿回先前放置资源的 receive 语义。它属于内部阶段流程，是 Receive 的一种，不等同于普通 Gain。
 _Avoid_: Gain、Action Space collect、round growth accumulation
 
 **Future Schedule（未来轮计划）**:

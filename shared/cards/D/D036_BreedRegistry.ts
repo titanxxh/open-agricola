@@ -153,7 +153,7 @@ const afterSheepGainListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   zones: ['hand', 'played'],
   phases: ['after'],
-  actions: ['collect', 'gain', 'pop-card-stack'],
+  actions: ['collect', 'gain'],
   handler: sheepGainHandler,
 }
 

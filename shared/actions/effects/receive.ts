@@ -2,6 +2,7 @@ import type { ActionDefinition, FutureMeepleResourceMap, GameState, PlayerState,
 import type { EventSink } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
+import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { extendedResourceKeyList } from '../../contract/state-constants'
 import { tryAddRoomTile } from '../../domain/farmyard'
 import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
@@ -52,6 +53,39 @@ const emitReceivedResources = (
   })
 }
 
+/**
+ * Credits goods that a source action already removed from the leaf's source card
+ * (counters, stack items or farm goods tokens), so every arrival of existing goods
+ * reaches Receive listeners through this one leaf.
+ */
+const receiveCardGoods = (
+  state: GameState,
+  player: PlayerState,
+  sourceCard: string,
+  resources: Partial<Resource>,
+  eventSink: EventSink | undefined,
+) => {
+  addResources(player, resources)
+  trackWorkPhaseBuildingResources(state, player.id, resources)
+  addResourcesFromCards(player, resources)
+  addCardResourceGained(player, sourceCard, resources)
+  eventSink?.emit<'resource.moved'>({
+    type: 'resource.moved',
+    resources,
+    from: { kind: 'card', playerId: player.id, cardId: sourceCard },
+    to: { kind: 'player', playerId: player.id },
+    reason: 'cardEffect',
+    sourceCardId: sourceCard,
+  })
+}
+
+export const receiveFromCardLeaf = (sourceCard: string, resources: Partial<Resource>) => ({
+  type: 'leaf' as const,
+  actionId: 'receive',
+  sourceCard,
+  params: { fromCard: resources },
+})
+
 export const completeScheduledReceipts = (state: GameState, player: PlayerState, ids: unknown, eventSink: EventSink): void => {
   const selected = Array.isArray(ids) ? new Set(ids.filter((id): id is string => typeof id === 'string')) : new Set<string>()
   const due = state.futureMeeples.filter(entry => selected.has(entry.id) && entry.playerId === player.id && entry.round === state.round)
@@ -71,7 +105,14 @@ export const receiveAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, context) => state.futureMeeples.filter(entry => Array.isArray(context?.params?.futureMeepleIds)
       && context.params.futureMeepleIds.includes(entry.id) && entry.playerId === player.id && entry.round === state.round)
       .every(entry => canReceiveScheduledEntry(player, entry.actionContext?.resourceCondition)),
-  execute: ({ state, player, params, eventSink }) => {
+  execute: ({ state, player, params, sourceCard, eventSink }) => {
+    const fromCard = params?.fromCard
+    if (fromCard !== undefined) {
+      if (!sourceCard || !fromCard || typeof fromCard !== 'object') return { type: 'fail', errorKey: 'log.actionFail' }
+      const resources = positiveResources(fromCard as Partial<Resource>)
+      if (Object.keys(resources).length > 0) receiveCardGoods(state, player, sourceCard, resources, eventSink)
+      return { type: 'ok', resourcesGained: resources }
+    }
     const scheduledIds = Array.isArray(params?.futureMeepleIds)
       ? new Set(params.futureMeepleIds.filter((id): id is string => typeof id === 'string')) : new Set<string>()
     const scheduled = state.futureMeeples.filter(entry => scheduledIds.has(entry.id)

@@ -14,7 +14,8 @@ import {
 } from '../../../engine/__tests__/event-test-helpers'
 import { createInitialPlayerStats } from '../../../session/stats'
 import { specialEffectAction } from '../special-effect'
-import { bonusFoodAction, bonusWoodAction, gainAction } from '../gain'
+import { bonusFoodAction, bonusGrainAction, bonusWoodAction, gainAction } from '../gain'
+import { receiveAction } from '../receive'
 import { takeFromCardAction } from '../internal/take-from-card'
 
 const drain = (engine: Engine, state: ReturnType<typeof makeEventTestState>): EngineStepResult => {
@@ -26,14 +27,14 @@ const drain = (engine: Engine, state: ReturnType<typeof makeEventTestState>): En
 }
 
 describe('take-from-card', () => {
-  it('takes stored goods through gain while preserving take-from-card reactions', () => {
+  it('credits stored goods through receive, so Receive and source reactions run and Gain reactions do not', () => {
     const state = makeEventTestState()
     const player = state.players[0]!
     const opponent = makeEventTestPlayer()
     opponent.id = 'p2'
     state.players.push(opponent)
     player.stats = createInitialPlayerStats({ isFirstPlayer: false })
-    player.minorPlayed = ['Test_Gain_Observer', 'Test_Take_Observer']
+    player.minorPlayed = ['Test_Gain_Observer', 'Test_Receive_Observer', 'Test_Take_Observer']
     player.cardStates = { Test_Source: { counters: { grain: 1 } } }
 
     const cardRegistry = new CardRegistry()
@@ -45,11 +46,18 @@ describe('take-from-card', () => {
       handler: () => ({ followUpActions: ['bonus-wood'] }),
     })
     cardRegistry.registerListener({
+      id: 'test-after-receive',
+      cardIds: ['Test_Receive_Observer'],
+      actions: ['receive'],
+      phases: ['after'],
+      handler: () => ({ followUpActions: ['bonus-food'] }),
+    })
+    cardRegistry.registerListener({
       id: 'test-after-take-from-card',
       cardIds: ['Test_Take_Observer'],
       actions: ['take-from-card'],
       phases: ['after'],
-      handler: () => ({ followUpActions: ['bonus-food'] }),
+      handler: () => ({ followUpActions: ['bonus-grain'] }),
     })
 
     const root = new ActionNode(
@@ -59,7 +67,7 @@ describe('take-from-card', () => {
       { grain: 1, recipientMode: 'others' },
     )
     const { engine } = makeEventTestEngine(
-      [takeFromCardAction, gainAction, bonusWoodAction, bonusFoodAction],
+      [takeFromCardAction, receiveAction, gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction],
       root,
     )
 
@@ -67,14 +75,19 @@ describe('take-from-card', () => {
 
     expect(finalStep.type).toBe('done')
     expect(player.cardStates.Test_Source?.counters?.grain).toBe(0)
-    expect(player.resources).toMatchObject({ grain: 1, wood: 1, food: 1 })
+    expect(player.resources).toMatchObject({ grain: 2, wood: 0, food: 1 })
     expect(opponent.resources.grain).toBe(0)
     expect(state.events?.filter((event) =>
       event.type === 'resource.moved' && event.sourceCardId === 'Test_Source'
-    )).toHaveLength(1)
+    )).toEqual([expect.objectContaining({
+      resources: { grain: 1 },
+      from: { kind: 'card', playerId: player.id, cardId: 'Test_Source' },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'cardEffect',
+    })])
   })
 
-  it('does not offer action-space replacements for the delegated gain', () => {
+  it('never offers Gain replacements for goods taken from a card', () => {
     const state = makeEventTestState()
     const player = state.players[0]!
     player.stats = createInitialPlayerStats({ isFirstPlayer: false })
@@ -103,7 +116,7 @@ describe('take-from-card', () => {
       { grain: 1 },
     )
     const { engine } = makeEventTestEngine(
-      [takeFromCardAction, gainAction, bonusWoodAction],
+      [takeFromCardAction, receiveAction, gainAction, bonusWoodAction],
       root,
     )
 
@@ -132,7 +145,7 @@ describe('take-from-card', () => {
       { sheep: 1 },
     )
     const { engine } = makeEventTestEngine(
-      [takeFromCardAction, gainAction, specialEffectAction],
+      [takeFromCardAction, receiveAction, specialEffectAction],
       root,
     )
 

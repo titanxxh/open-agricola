@@ -106,6 +106,8 @@ describe('effects architecture guard', () => {
       'bonus-wood',
       'breed',
       'build-farmhand-room',
+      'claim-farmyard-goods-tokens',
+      'claim-field-goods-tokens',
       'collect',
       'complete-parent-father',
       'complete-preparation',

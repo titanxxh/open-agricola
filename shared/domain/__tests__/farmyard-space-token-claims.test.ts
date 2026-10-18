@@ -13,11 +13,11 @@ function setup() {
 }
 
 describe('source-owned farmyard goods claims', () => {
-  it('claims only the committed host coordinates even after later geometry changes', () => {
+  it('claims only the committed host coordinates even after later geometry changes, leaving the credit to receive', () => {
     const player = setup()
     expect(hasClaimableFarmyardGoodsTokens(player, 'one', [{ row: 0, col: 2 }])).toBe(true)
     expect(claimFarmyardGoodsTokens(player, 'one', [{ row: 0, col: 2 }, { row: 0, col: 2 }])).toEqual({ clay: 1 })
-    expect(player.resources.clay).toBe(1)
+    expect(player.resources.clay).toBe(0)
     expect(player.farmyardSpaceStates?.map(token => [token.sourceCardId, token.spaceKey])).toEqual([['one', '1-2'], ['other', '0-2']])
     expect(claimFarmyardGoodsTokens(player, 'one', [{ row: 0, col: 2 }])).toEqual({})
   })
@@ -27,7 +27,7 @@ describe('source-owned farmyard goods claims', () => {
     const outer = [{ row: 0, col: 2 }, { row: 1, col: 2 }]
     expect(claimFarmyardGoodsTokens(player, 'one', [{ row: 1, col: 2 }])).toEqual({ clay: 1 })
     expect(claimFarmyardGoodsTokens(player, 'one', outer)).toEqual({ clay: 1 })
-    expect(player.resources.clay).toBe(2)
+    expect(player.resources.clay).toBe(0)
     expect(player.farmyardSpaceStates).toHaveLength(1)
   })
 
