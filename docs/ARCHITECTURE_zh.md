@@ -928,7 +928,7 @@ cardField?: {
 
 - 卡牌文件使用 `{Deck}_{Number}_{Name}.ts`，导出同名常量；`major/fireplace.ts` 这类大改良家族文件导出其中的每张实体卡。
 - 卡牌能力留在自己的文件里。`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts` 与 `server/game/authoritative-session.ts` 等核心文件从不为单卡修改；没有集中的卡牌效果注册表，也没有前端卡牌规则。
-- 跨卡身份与能力查询使用类型化 metadata 和已打出卡 helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)` 与 `playerHasCardCapability(player, capability, { asType? })`，只读取已打出区域；`asType` 复用 `cardCountsAs` 处理双类型身份。已注册的能力 metadata（`preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`firewoodBuildTrigger`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`）位于 `meta`，不增加前端行为。`ovenIdentity` 是 OA 的烤炉家族身份，不代表一定有烤面包兑换；升级卡可保留计分身份，并用 `firewoodBuildTrigger: false` 退出建造触发。
+- 跨卡身份与能力查询使用类型化 metadata 和已打出卡 helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)` 与 `playerHasCardCapability(player, capability, { asType? })`，只读取已打出区域；`asType` 复用 `cardCountsAs` 处理双类型身份。已注册的能力 metadata（`shared/cards/helpers/card-type.ts` 中的 `CardCapability` union，例如 `fireplaceIdentity`、`joineryIdentity`、`blocksRenovation` 与 `animalHolder`）位于 `meta`，不增加前端行为。`ovenIdentity` 是 OA 的烤炉家族身份，不代表一定有烤面包兑换；升级卡可保留计分身份，并用 `firewoodBuildTrigger: false` 退出建造触发。
 - `check:card-impl-boundaries` 属于 `pnpm run check:architecture`，拒绝生产 Card Source 在运行时读取其他非大改良卡的 ID。显式例外是 `Major_*`、`reaches`、`allowedPurchases` 与前置候选列表。
 - 印刷文字点名其他卡牌时，卡牌可在 `reaches` 中声明 named printed target，只读取其公开事实（存在、owner、是否打出），从不读其私有状态；检查器例外只绑定一对精确的来源与目标。
 - metadata 审计必须为新增的 metadata 字段补 fixture。
@@ -941,7 +941,7 @@ cardField?: {
 
 ## 9. shared/domain/ — 领域聚合层
 
-派生视图与不变量检查放在这里。`PlayerState` 保持纯 JSON；每个“我能否做 X？”的查询都属于 `PlayerBoard`。领域代码由主客户端、沙盒与服务端共用。
+派生视图与不变量检查放在这里。`PlayerState` 保持纯 JSON。玩家版图与农场查询（“这里能否犁地、播种或建造？”）经 `PlayerBoard`；其他领域谓词留在各自的聚合中，例如 `animal-zones.ts` 的 `canAccommodateAnimalTotals()`、`scoring-reserve.ts` 的 `canAddScoringReserve()` 与 `space.ts` 的 `canSpaceAcceptWorker()`。领域代码由主客户端、沙盒与服务端共用。
 
 ```text
 shared/domain/

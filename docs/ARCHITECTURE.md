@@ -927,7 +927,7 @@ Tests: `shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`, `shar
 
 - Card files use `{Deck}_{Number}_{Name}.ts` and export a constant with the same name; a major-family file such as `major/fireplace.ts` exports each physical card it holds.
 - A card's ability stays inside its file. Core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts` and `server/game/authoritative-session.ts` never change for one card; there is no centralized card-effect registry and no frontend card rule.
-- Cross-card identity and capability queries use typed metadata and played-card helpers: `getPlayedCardDefinitions(player)`, `collectCardDefinitionsAs(player, type)` and `playerHasCardCapability(player, capability, { asType? })`, reading only played zones; `asType` reuses `cardCountsAs` for dual-type identity. Registered capability metadata (`preventsHandDiscard`, `fireplaceIdentity`, `cookingHearthIdentity`, `ovenIdentity`, `firewoodBuildTrigger`, `potteryIdentity`, `animalHolder`, `blocksHouseAnimalZones`, `waresSalesmanGains`) lives in `meta` and adds no frontend behavior. `ovenIdentity` is OA's oven-family identity and does not imply a baking exchange; an upgrade can keep scoring identity and opt out of build triggers with `firewoodBuildTrigger: false`.
+- Cross-card identity and capability queries use typed metadata and played-card helpers: `getPlayedCardDefinitions(player)`, `collectCardDefinitionsAs(player, type)` and `playerHasCardCapability(player, capability, { asType? })`, reading only played zones; `asType` reuses `cardCountsAs` for dual-type identity. Registered capability metadata (the `CardCapability` union in `shared/cards/helpers/card-type.ts`, such as `fireplaceIdentity`, `joineryIdentity`, `blocksRenovation` and `animalHolder`) lives in `meta` and adds no frontend behavior. `ovenIdentity` is OA's oven-family identity and does not imply a baking exchange; an upgrade can keep scoring identity and opt out of build triggers with `firewoodBuildTrigger: false`.
 - `check:card-impl-boundaries`, part of `pnpm run check:architecture`, rejects runtime reads of another non-major card's ID in production Card Sources. Explicit exceptions are `Major_*`, `reaches`, `allowedPurchases` and prerequisite candidate lists.
 - A card whose printed text names another card may declare it as a named printed target in `reaches` and read only its public facts (existence, owner, played status), never its private state; a checker exception binds one exact source-target pair.
 - Metadata audits must cover new metadata fields with fixtures.
@@ -940,7 +940,7 @@ Tests: `shared/cards/__tests__/{AB,CD,EM}-logical-field-boundary.test.ts`, `shar
 
 ## 9. `shared/domain/`: Domain aggregation
 
-Derived views and invariant checks live here. `PlayerState` stays plain JSON; every "can I do X?" query belongs to `PlayerBoard`. Domain code is shared by the main client, sandbox and server.
+Derived views and invariant checks live here. `PlayerState` stays plain JSON. Player-board and farm queries ("can I plow, sow or build here?") go through `PlayerBoard`; other domain predicates live with their aggregate, such as `canAccommodateAnimalTotals()` in `animal-zones.ts`, `canAddScoringReserve()` in `scoring-reserve.ts` and `canSpaceAcceptWorker()` in `space.ts`. Domain code is shared by the main client, sandbox and server.
 
 ```text
 shared/domain/
