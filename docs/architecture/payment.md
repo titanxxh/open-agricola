@@ -2,7 +2,7 @@
 
 [English](payment.md) | [中文](payment_zh.md)
 
-`PaymentSolver` (`solver.ts`) is the only production entry to payment: affordable solutions, payment choices, choice parsing, execution and the structured receipt, plus cost previews, typed-flat costs, room payment, simple trade side effects and card-cost candidate helpers. `payment/internal/*` is private to the package and its algorithm tests (`shared/actions/payment/internal/__tests__`); `shared/actions/payment/__tests__/import-boundary.test.ts` forbids every other import. External tests use `PaymentSolver` or `shared/actions/payment/__tests__/test-helpers.ts`.
+The package index (`shared/actions/payment/index.ts`) exports three production facades. `PaymentSolver` (`solver.ts`) covers affordable solutions, payment choices, choice parsing, execution and the structured receipt, plus cost previews, typed-flat costs, room payment, simple trade side effects and card-cost candidate helpers. `CardPurchasePayment` (`card-purchase.ts`) is the card-purchase facade used by improvement purchase: previews, pay params, payment-option checks and the selected payment with its receipt and Cost Attribution. `describePaymentEffectPreview` formats the payment effect preview for construct, stables, occupation and renovation. `payment/internal/*` is private to the package and its algorithm tests (`shared/actions/payment/internal/__tests__`); `shared/actions/payment/__tests__/import-boundary.test.ts` forbids every other import. External tests use `PaymentSolver` or `shared/actions/payment/__tests__/test-helpers.ts`.
 
 **One `ComplexCost` model.** Construct, renovation, fencing, stables, plow, occupation, minor and major improvement and `pay` leaves all enumerate through `computeAllBuyableCombinations`:
 

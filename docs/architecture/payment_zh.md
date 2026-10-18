@@ -4,7 +4,7 @@
 
 > 本文件是中文翻译镜像；[payment.md](payment.md) 是唯一权威版本。
 
-`PaymentSolver`（`solver.ts`）是支付的唯一生产入口：可负担方案、支付选项、选项解析、执行和结构化收据，以及费用预览、typed-flat 费用、房间支付、简单 trade 副作用和卡牌费用候选 helper。`payment/internal/*` 只供 payment 包及其算法测试（`shared/actions/payment/internal/__tests__`）使用；`shared/actions/payment/__tests__/import-boundary.test.ts` 禁止其他导入。外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`。
+包入口（`shared/actions/payment/index.ts`）导出三个生产门面。`PaymentSolver`（`solver.ts`）负责可负担方案、支付选项、选项解析、执行和结构化收据，以及费用预览、typed-flat 费用、房间支付、简单 trade 副作用和卡牌费用候选 helper。`CardPurchasePayment`（`card-purchase.ts`）是改良购买使用的卡牌购买门面：预览、支付参数、支付选项检查，以及带收据与 Cost Attribution 的已选支付。`describePaymentEffectPreview` 为建造、马厩、职业与翻修格式化支付效果预览。`payment/internal/*` 只供 payment 包及其算法测试（`shared/actions/payment/internal/__tests__`）使用；`shared/actions/payment/__tests__/import-boundary.test.ts` 禁止其他导入。外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`。
 
 **统一的 `ComplexCost` 模型。** 建房、翻修、围栏、马厩、犁地、职业、大小改良和 `pay` leaf 都经 `computeAllBuyableCombinations` 枚举：
 

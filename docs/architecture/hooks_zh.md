@@ -47,7 +47,7 @@ anytime                  注册额外的 anytime 行动
 2. 每个匹配的 `decline + alternativeFlow` 贡献一棵完整子树。`buildReplacementChoiceNode()` 在原行动的可选提示前插入普通 XOR，并设 `requiresExplicitChoice=true`，即使只有一个替换也等待玩家选择；原分支保留其可选性，提供菜单时任何分支的 `before` 都不执行。选中的分支重新进入本管线，跳过自身 producer 以及从外层替换继承的所有 producer 守卫；原分支携带 `checkedReplaceAction`，只有分发器解读它。`resolvedReplacement` 让决定跨恢复保持；放人或移动授予新机会时重置 producer 守卫。
 3. `before` listener 编译为原 leaf 之前的 `activate-card` leaf，按 owner 进入 trigger-select。使用前资格在实际使用行动格时收集一次（`collectBeforePlacementFlows`、`collectBeforeActionSpaceUseFlows`）；`requiresNewPlacement` 排除工人移动。
 4. Strict `isDoable` 读取真实 `before` 修改后的状态：基础 `canBeExecutedByPlayer`、费用预览、hook 与 listener 的 `isDoable`。失败时，只有已接受的必选续行可以通过 `isAlreadySatisfied` 按同一 transaction 中先前的事实结算，此时本体与尾随 listener 不执行。选项级 listener 同样过滤职业手牌选项，`reserveResources` 传入支付 leaf。
-5. `computeCosts` 填充 `executionContext.costs`、`costTrades`、`costBonuses` 与 `paymentResourceProviders`。
+5. `computeCosts` 填充 `executionContext.costs`、`costTrades`、`costBonuses`、`paymentResourceProviders` 与 `costAttribution`。
 6. 执行本体（`getBaseChoiceOptions` 或 `execute()`）；`resolveChoice` 继续前重新校验可执行性与费用。
 7. `immediatelyAfter` 与 `after` 从冻结的触发帧执行（[Hook 系统](#hook-系统)）。内部 `activate-card` 绕过本管线，把返回的 flow 交还引擎。
 
@@ -112,7 +112,7 @@ anytime                  注册额外的 anytime 行动
 各窗口的不变量：
 
 - **准备阶段**：`onRoundStart` 即 StartOfTurn；`onBeforeStartOfTurn` 在轮次增加前执行并收到 `nextRound`；揭牌上下文保留实际 `actionId` / `roundSlot`。工作顺序（`roundFirstPlayerId`）在 StartOfTurn 之前冻结。`startFirstRoundAfterSetup()` 是新局的唯一入口：bootstrap 不提前累积，加载工作阶段状态也不重新准备。
-- **StartOfTurn**：回合开始激活、计划领取、付款门控的 offer 和计划行动共用一棵玩家树。到期货物按玩家合并为一次 `receive`，保留各条目来源且不触发 Gain；`futureMeeple.resolved` 只在实际领取后提交。
+- **StartOfTurn**：回合开始激活、计划领取、付款门控的 offer 和计划行动共用一棵玩家树。到期的普通货物按玩家合并为一次 `receive`，保留各条目来源且不触发 Gain；带 `roomType` 或 `actionContext.resourceCondition` 的条目各自单独一次 `receive`，保留自身的领取条件与依赖；`futureMeeple.resolved` 只在实际领取后提交。
 - **未来计划**（[ADR 0018](../adr/0018-future-schedule-and-authoritative-action-entry.md)）：Exact Future Target 保留目标轮，超出 `current round < target <= 14` 时丢弃；Future Prefix 保留仍存在的连续后缀。一次性的未来 offer 使用 `scheduled-offer` 行动与 `cardStates[cardId].extraData.scheduledOffers`，不用资源 token。卡牌排未来 token，不自写 `targetRound` 状态机。
 - **回合结束**：普通轮转与卡牌驱动的 Turn 共用 `buildEndTurnReactionFlow()` 的同一棵冻结来源树；窗口完成时关闭 Turn Scope 一次。卡牌以既有 Turn 身份记录每 Turn 一次的凭据。
 - **收获前**：在收获跳过生效前冻结玩家顺序；所有玩家都参与；顺序保存在 `stageResume.extra.beforeHarvestPlayerOrder`。

@@ -19,7 +19,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 |---|---|---|
 | Card Source | `shared/cards/{A..E,M,major,community}/{Card}.ts`, containing `meta` and optional `impl` | Server, sandbox and tests; forbidden from the main client bundle |
 | Card Display | `public/cards-manifest.json`, built from Card Source `meta` | Main client bundle through `client/services/card-meta` |
-| Card Impl | Card Source `impl`, collected into the generated `ALL_CARD_IMPLS` (`shared/cards/register-all.ts`; majors through `major/runtime.generated.ts`) and `CardRegistry` | Server and sandbox; forbidden from the main client bundle |
+| Card Impl | Card Source `impl`, collected into the generated `ALL_CARD_IMPLS` (`shared/cards/register-all.ts`, majors included) and `CardRegistry` | Server and sandbox; forbidden from the main client bundle |
 
 - `meta` is the Card Definition: serializable, frontend-visible fields without runtime behavior. Declarative rule fields (`cost`, `prerequisite`, `*Prerequisites`, `cardField`, `isCookery`, capability metadata) are allowed; `modifier(s)`, `listeners`, `effect` and `prerequisiteCheck` are not. `desc` and `prerequisite` are printed text; optional localizable `rules` is a supplemental ruling with no runtime effect. Static conditions use `*Prerequisites`; dynamic ones use `impl.prerequisiteCheck`.
 - `impl` holds `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls and `reaches`. Builders may project `reaches` to the manifest top level, never into `meta`.
@@ -44,7 +44,7 @@ Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/ch
 
 - Production paths access cards only through the generated catalog and `CardRegistry`; tests may import a single Card Source. Card Definitions are plain data with `kind: 'minor' | 'occupation' | 'playerAction' | 'major'`.
 - The generated catalog must stay in sync (`pnpm run check:generated-cards-sync`); Workshop PR generation patches fetched upstream generated files, never the deployment host's local tree.
-- The major runtime source enters the backend only through `major/runtime.generated.ts`.
+- An implementation-bearing major source enters the backend through two generated paths: `scripts/generate-register-all.ts` adds it to `ALL_CARD_IMPLS`, and `major/runtime.generated.ts` supplies `majorCardSources`, whose `impl.effect` `shared/cards/major/index.ts` merges into the major Card Definitions.
 - The server and sandbox register only custom runtime parts; the main client registers only display metadata and never imports the custom runtime registry.
 
 ## Local state in `cardStates`

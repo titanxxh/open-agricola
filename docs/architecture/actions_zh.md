@@ -78,7 +78,7 @@ type ActionDefinition = {
 | 授予的规则行动 | 卡牌授予规则行动时直接调用该行动；授予某行动不展开平时提供它的整个行动格。 |
 | `pass-minor-card-to-left` | 把已打出的小改良移入左侧玩家手牌，清除其卡牌状态，发出公开 `card.passed` 与私有手牌变更。后续触发读取 `card.passed`。 |
 | `individual-food-cost` | 职业的强制个人食物费用，独立于职业费用和 PaymentSolver：支付现有食物，缺口用乞讨补；缺粮时需显式确认；预览与结算读取实时库存。 |
-| `take-from-card` | 先扣来源卡 counter，再把入库委托给 `gain`，因此 Gain reaction 能观察从卡上移出的货物。listener 只订阅二者之一。 |
+| `take-from-card` | 先扣来源卡 counter，再把入库委托给 `gain`，因此 Gain reaction 能观察从卡上移出的货物。listener 可订阅任一层或两层都订阅；两层都订阅时，它在委托的 `gain` 与外层 `take-from-card` 各运行一次。 |
 | `special-effect` | listener 返回 leaf 的通用修改分发器：counter、flag、infobox、卡堆、supply token、农场格状态与标记领取。`claim-farmyard-goods-tokens` 按来源领取，可选附带已提交坐标。`countCardUse: false` 标记不应计为卡牌使用的整理操作。 |
 | `receive` | 在一次 transaction 中为一名玩家结算到期的未来货物，见 [阶段 hook](hooks_zh.md#阶段-hook)。 |
 | `activate-card` / `activate-card-effect` / `activate-extra-turn` | listener、阶段效果和额外回合 provider 的激活 leaf，见 [阶段 hook](hooks_zh.md#阶段-hook)与[Listener 纯度](hooks_zh.md#listener-纯度)。 |

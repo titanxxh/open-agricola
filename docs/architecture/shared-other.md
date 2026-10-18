@@ -11,8 +11,8 @@ Pure functions for simultaneous selection (`initDraftState`, `processSubmit`, `t
 A Game Variant changes setup, public state, Action Spaces, phase flow or scoring for one game; it is not a card source and adds no frontend rules.
 
 - **Parent Cards** ([ADR 0005](../adr/0005-parent-cards-dedicated-expansion-runtime.md)) are structured data in `shared/parents/*` with assets pinned by `public-assets.ref`, separate from Card Source projections; selection, rewards and side quests are backend-authoritative and use non-public seeds.
-- **Through the Seasons** keeps the four season spaces on the board and enables only the current one; its modifiers register in each Core's `ActionHookRegistry` and never write player `cardStates`.
-- **Farmers of the Moor** ([ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)) adds terrain, extensions, horses, heating and its major supply through the generic seams in [domain](domain.md).
+- **Through the Seasons** keeps the four season spaces on the board and enables only the current one; its modifiers register in each Core's `ActionHookRegistry` and never write player `cardStates`. The season advances as soon as the new round number commits, before preparation; preparation then applies ordinary round growth before the season's accumulation adjustments (`applyRoundGrowth()`, then `applySeasonPreparationAdjustments()`), which clamp at zero.
+- **Farmers of the Moor** ([ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)) adds terrain, extensions, horses, heating and its major supply through the generic seams in [domain](domain.md). Without simultaneous draft, `createInitialPlayers()` (`shared/session/state-bootstrap.ts`) deals each player 4 FoM minors plus 3 published minors; extra, custom and Community Deck minors join only the published deal, and a short FoM pool lowers every player's FoM portion equally only when `allowIncompleteFarmersOfTheMoorMinorDeal` is set.
 - **Snake Opening** reverses only round-1 work rotation ([Rotation, extra turns and supply people](session.md#rotation-extra-turns-and-supply-people)).
 
 ## `shared/custom-code/`
