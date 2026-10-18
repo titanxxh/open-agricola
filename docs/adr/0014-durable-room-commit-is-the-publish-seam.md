@@ -1,59 +1,51 @@
 # 14. Durable Room Commit is the publish seam
 
-- Status: Accepted
+- Status: Accepted (process and storage shape updated by ADR 0022)
 - Date: 2026-07-27
-- Amended: 2026-10-05
 
 ## Context
 
-ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game Context 访问契约，但当前连接层会先发送 `StateUpdateEnvelope`，再把 Room 标脏并延迟约一秒保存。这样无法保证玩家已经看到的步骤可在崩溃后恢复，也没有一个模块同时协调 Room 快照、Replay Step、结果归档和失败暂停。
-
-代表性真实命令与 Replay 写入的 2 CPU / 2 GiB 探针中，30 Room 的 action p99 为 88.5ms、CPU 为 83.6%，35 Room 的 action p99 升至 371.6ms、CPU 为 96.1%。该探针没有加载可执行 Workshop 卡；这类卡后来采用每 Room 一个会话 Worker、Worker 内一个代码执行 Worker 的双 Worker 形态。
+The connection layer sent `StateUpdateEnvelope` first and saved the Room about a second later, so a step players had seen could vanish in a crash, and no module coordinated Room snapshots, Replay Steps, result archives and failure pauses. A representative probe with real commands and Replay writes on 2 CPU / 2 GiB measured 30 Rooms at 88.5 ms action p99 and 83.6 % CPU, and 35 Rooms at 371.6 ms and 96.1 %; executable Workshop Rooms later use two Workers each.
 
 ## Decision
 
-### Durable publish
+**Durable publish.**
 
-1. `room-router` 继续同步调用服务端唯一游戏命令入口和 `GameState` owner `GameSession`；具体状态修改发生在它驱动的 `GameCore` 和 action leaf 中，而不是只允许 `authoritative-session.ts` 赋值。这个 ownership 是 review invariant；机械门禁只覆盖可精确定义的邻接命令入口和依赖边界，不宣称证明全部 mutation path。成功且改变公开 Frame 或 Private Session Cursor 的响应，以及带 `durableTransition` 的推进，随后只经过一个具体的 `RoomCommitter` 模块；它在同一 SQLite 事务内更新 Room 快照并追加 Replay Step，成功后才允许 `Broadcaster` 为 Room 内在线座位生成各自遮蔽后的 envelope。
-2. `RoomCommitter` 的小接口返回 committed、unchanged 或 blocked 结果，内部隐藏序列化、delta、gzip、Hash、事务、完成归档、幂等和重试。它不增加单实现 interface 或 factory；现有生产、JSON 和内存持久化 adapter seam 继续用于真实的多 adapter 差异。
-3. 普通失败（`resp.ok=false` 且没有 `durableTransition` 标记）只回发起连接，不增加 `roomVersion` 或 `stepNo`。带 `durableTransition` 的拒绝仍持久化并推进版本；其错误只回发起连接，其他座位收到同一已提交版本的无错快照，详见 [ADR-0015](0015-provisional-cross-player-continuation-resolution.md)。成功响应只有在公开 Frame Hash 与私有游标均未变化且没有 `durableTransition` 标记时才返回 unchanged，只向发起者确认当前状态；仅私有游标变化时仍创建 Replay Step，即使公开 Frame 重复。#941 以已捕获的私有游标为基准进行与 canonical JSON 等价的内容比较，仅共享已证明不可变的历史，替代私有游标 hash；公开 Frame 已变化或 `durableTransition` 已强制提交时跳过该比较。恢复后重建基准，改动后又还原的游标仍按内容判定 unchanged，公开 Frame Hash 算法不变。重连、补拉和心跳不经过 Durable Room Commit。
-4. `roomVersion` 和 `stepNo` 独立递增。`roomVersion` 标识成功提交后对玩家可见的状态版本；`stepNo` 标识已持久化权威推进的全局 Room 顺序，包括仅私有游标变化和 `durableTransition` 推进。多个玩家同时提交时仍按 Room 串行占用连续 Step；最后一份输入触发的自动结算属于该输入的 Step，而且结算结果不得依赖到达顺序。
-5. Step 0 在权威初始状态能够接收第一个互动命令前建立。互动 draft、Parent Selection 和其他多人提交发生在 Step 0 之后，各自按服务端接受顺序记录；classic deal 已包含在 Step 0。
-6. 写失败时保留同一份已捕获的 Room 快照、Frame（含终局 scores）、私有游标比较值、编码 payload 和 Replay Intent，重试不从后来变化的 Session 或 Worker 缓存重新捕获；快照所有权见 [ADR-0021](0021-room-owned-history-branches-and-recovery-snapshots.md)。Room 拒绝所有新游戏命令并向在线玩家显示保存暂停。系统按 1、2、5、10、30 秒退避，之后每 30 秒重试；成功后广播并恢复。暂停期间的新连接等待成功后再接收快照。进程在成功前退出时，重启恢复最后已提交 Step，玩家重做从未看到成功的操作。
-7. 相同 `roomId + stepNo + frameHash` 的重试是幂等成功；相同 `roomId + stepNo` 出现不同 Hash 时永久阻断该 Room 并报警，绝不覆盖。持久化整体异常时拒绝新建 Room，但已存在 Room 保留并继续重试。
+- `room-router` calls `GameSession`, the only server command entry and `GameState` owner; mutations run in the `GameCore` and action leaves it drives. This ownership is a review invariant; mechanical gates cover only the adjacent command entries and dependency seams.
+- Every response that changes the public Frame or the private session cursor, and every `durableTransition`, passes through one concrete `RoomCommitter`. It updates the Room snapshot and appends the Replay Step in one database transaction; only then may `Broadcaster` build per-viewer envelopes.
+- `RoomCommitter` returns `committed`, `unchanged` or `blocked` and hides serialization, delta, gzip, hashing, transactions, completion archives, idempotency and retries. It has no single-implementation interface or factory; the persistence adapter seam serves the real adapter differences.
+- An ordinary failure (`ok=false` without `durableTransition`) answers only its origin and advances neither `roomVersion` nor `stepNo`. A durable rejection commits; its error goes only to the origin while peers receive the same committed version without error (ADR 0015). `unchanged` requires both an unchanged public Frame Hash and private-cursor content equal to the captured baseline; a cursor-only change still records a Step. Reconnection, refetch and heartbeats never commit.
+- `roomVersion` and `stepNo` advance independently; simultaneous submissions take consecutive Steps and automatic settlement belongs to the last triggering input, independent of arrival order. Step 0 exists before the first interactive command.
+- A write failure keeps the exact captured snapshot, Frame (with final scores), cursor baseline, encoded payload and Intent, and retries without recapturing (snapshot ownership in ADR 0021). The Room rejects new commands and shows a save pause, and connections arriving during the pause wait for success before receiving a snapshot; retries back off 1, 2, 5, 10 and 30 seconds, then every 30 seconds. A process exit before success restores the last committed Step.
+- The same `roomId + stepNo + frameHash` retry is idempotent; a different hash for the same Step blocks the Room permanently and alerts. A persistence-wide failure rejects new Rooms while existing Rooms keep retrying.
 
-### Capacity and process shape
+**Capacity.**
 
-8. 内置卡 Room 保持主进程内执行与同步 SQLite 提交，不增加房间分片、Redis 或通用异步命令队列。尚未内置的可执行 Workshop 卡使用 Room 专属会话 Worker；该 Room 的命令队列必须覆盖会话执行、广播准备和 Durable Commit 完成，同一连接的换房 / 换座也不得越过在途命令，一个 `ready | blocked` 写入状态门阻止重试与新命令交错。
-9. 2 CPU / 2 GiB 单实例最多保留 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 不计数。由于每个可执行 Workshop session 最多占两个 Worker，在没有同形态容量探针前，可执行 Room 另限 15 个；进程级 15 个会话 Worker 槽统一计算 Room 预留与活跃 HTTP sandbox，恢复 Room 在恢复时也参与预留。提高任一上限前必须用对应生产形态的真实命令探针复验。
+- One instance keeps at most 30 ordinary in-memory Rooms (waiting and playing; fixed development Rooms excluded). Executable Workshop Rooms use a session Worker plus a code Worker; a process-wide budget of 15 Worker slots covers those Rooms, restored Rooms and HTTP sandboxes. The Room queue covers session execution, broadcast preparation and Durable Commit, and a `ready | blocked` gate stops retries interleaving with new commands. Raising either limit requires repeating the probe in the matching production shape.
 
-### Storage and delivery
+**Storage and delivery.**
 
-10. 下一可用数据库迁移一次性增加 Game Context、Replay 与 Bug Report 表；首个正式 Replay 格式使用 `schemaVersion=1`，不保留未上线实验格式兼容代码。迁移幂等回填既有 `rooms` 为 active Context、既有 `game_results` 为 completed Context，并让完成结果在冲突时优先；旧完成局标记 `legacy_no_replay`，不创建 Replay header 或 Frame。活动恢复继续使用 `rooms` / `room_players`，完成参与者继续使用 `game_results` / `game_result_players`，不复制这些事实。
-11. Replay 只增加 header 与 Step 表，不增加 Segment 表；`checkpointStepNo` 表达逻辑 Segment。Reported Game Evidence 也不增加 payload 表，由 Bug Report 的保留期限保护对应 Segment。
-12. `gameBuildId`、`schemaVersion` 和 `viewerBuildId` 在 Room 建立时锁定。标准卡展示逻辑随 Viewer Build 固定，图片与主站使用同一固定素材仓 commit，不归档图片历史；自定义卡公开快照写入 Replay header，图片复制到内容寻址的持久资源目录，不归档可执行源码。
-13. 完成 Replay 的存储 gzip/BLOB 不成为外部契约。公开 Replay API 返回判别式版本化 JSON；只有 `replayStatus=available` 返回 manifest 和 Segment，`legacy_no_replay` 只返回状态与 Game Result Archive 摘要。内容寻址的只读 Viewer Build 永久追加到后端持久卷，并在 `credentialless` iframe 内无 cookie 地直接读取公开 manifest 和 Segment。
-14. 顶层客户端先解析 Game Context，再决定是否加载当前卡牌 manifest 与 `AuthProvider`。活动局进入现有登录和 WebSocket 恢复链路；completed、expired 和 removed 页面在登录门外可用。结束局仅允许经历史 `userId → playerIndex` 证明的原参赛者创建 Bug Report。
+- Game Context, Replay and Bug Report tables were added in one migration with Replay `schemaVersion=1`; existing Rooms became active contexts, results completed contexts, and pre-launch completed games `legacy_no_replay`. Active recovery keeps `rooms` / `room_players`, and completed participants keep `game_results` / `game_result_players`.
+- Replay adds only header and Step tables (`checkpointStepNo` expresses Segments) and no evidence-payload table.
+- `gameBuildId`, `schemaVersion` and `viewerBuildId` are locked at Room creation. Standard card display ships with the Viewer Build and its assets come from the pinned asset site; custom-card snapshots and art are copied into content-addressed storage, never executable source.
+- Public Replay APIs return versioned JSON, never storage encoding. Content-addressed Viewer Builds are retained permanently and read public manifests and Segments without cookies.
+- The client resolves the Game Context before loading the card manifest and auth; only proven original participants can file a Bug Report from a completed game.
 
-### GitHub and operations
+**GitHub and operations.**
 
-15. GitHub 提交使用 SQLite 持久化草稿、稳定 `submissionId`、attempt 记录和单进程 claim 执行器，不增加外部队列。Issue Submission Connection 令牌使用 Node `crypto` 的 AES-256-GCM、每行独立 nonce 和 `keyId` 加密；PKCE state 复用扩展后的 `oauth_states`。
-16. Issue 只包含清洗后的现象和已批准定位键；首版不上传截图、日志或状态附件。公开主仓库 `titanxxh/open-agricola` 的自动化为游戏内报告添加 `needs-triage`，通知依赖 GitHub 原生 watching。
-17. 维护者全开取证复用现有管理员判定并永久审计。Replay 下架首版使用运维 CLI，删除 payload、保留 Tombstone，并追加数据库外删除 ledger；内容资源只有在没有其他未下架 Replay 引用时才删除，资源自身违规时先 Tombstone 所有引用局。旧备份恢复上线前重放该 ledger。
-18. 上线使用 `REPLAY_NEW_ROOMS_ENABLED` 与 `BUG_REPORTS_ENABLED` 两个开关。Viewer Build 先发布，随后部署数据库与后端，再启用新 Room 录制、公开回放和 GitHub 报告。已有 Replay header 的 Room 不受关闭新录制开关影响，必须继续写完。
-19. 首次启用前，恢复出的旧活动 Room 在接受命令前建立 `missingPrefix=true` 的 Step 0。启用录制后不得回滚到不认识该 Replay schema 的后端，只能回滚到兼容构建或向前修复。
+- GitHub submission uses persisted drafts, stable `submissionId`s, attempt rows and claims, with no external queue (ADR 0012). Issues carry only the sanitized symptom and approved locators; repository automation adds `needs-triage`.
+- Maintainer all-open forensics reuse administrator checks with permanent audit. Takedown deletes payloads, keeps Tombstones and appends the external deletion ledger (ADR 0010); a content resource is deleted only when no other non-removed Replay references it, and a violating resource first tombstones every game that references it.
+- Viewer Builds publish before the backend that freezes their ID. After recording is enabled, rollback is allowed only to recorder-compatible builds.
 
 ## Consequences
 
-- 已向玩家显示的成功状态一定有同事务的可恢复快照和 Replay Step；传输层不再决定持久化语义。
-- 首发容量为代表性 Replay 工作负载下留有 CPU 余量的 30 个普通内存 Room；其中双 Worker 的可执行 Workshop Room 保守限制为 15 个。
-- 当前一秒 debounce 仅可继续服务等待态元数据或旧 adapter；进行局成功步骤必须改走 Durable Room Commit。
-- 永久 Viewer Build、内容资源、删除 ledger 和兼容回滚成为生产部署的一部分，而不是普通前端构建的临时产物。
+- Every success a player has seen has a recoverable snapshot and Replay Step committed in the same transaction; transport no longer decides durability.
+- Permanent Viewer Builds, content resources, the deletion ledger and compatible rollback are part of production deployment.
 
 ## Alternatives considered
 
-- **广播后异步保存**：拒绝。玩家看到的成功步骤可能在崩溃后消失。
-- **用 Worker 或分片提高普通 Room 容量**：拒绝。可执行 Workshop 卡的 Worker 只承担不可信代码隔离，不用于提高容量。
-- **按玩家建立 Replay 链**：拒绝。权威 Frame 只有一份，视角应在读取时遮蔽。
-- **Redis 队列和独立提交 worker**：拒绝。当前单实例 SQLite 状态机已经能持久重试和对账。
-- **把历史 Viewer 放进每次覆盖的 GitHub Pages 构建**：拒绝。旧 Replay 引用的不可变 Viewer 会随部署消失。
+- Broadcasting before saving: a seen step can vanish.
+- Raising capacity with Workers or sharding: Workers exist only to isolate untrusted code.
+- Per-player Replay chains: there is one authoritative Frame; perspectives filter on read.
+- A Redis queue with separate commit workers: the Room state machine already retries and reconciles durably.
+- Shipping historical Viewers inside the overwritten Pages build: old Replays would lose their Viewer.

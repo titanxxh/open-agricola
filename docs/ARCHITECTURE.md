@@ -1029,6 +1029,8 @@ Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-contract-*-se
 
 ## 11. `server/`: Backend authority
 
+The server owns connections, Rooms, durable commit, persistence and the product HTTP APIs. It never adjudicates rules itself: every rule write goes through `GameSession`.
+
 ### 11.1 `server/connection/`: WebSocket entry
 
 ```text
@@ -1038,13 +1040,9 @@ server/connection/
 └── broadcaster.ts    fans out StateUpdateEnvelope
 ```
 
-Invariants:
-
-- One Room owns exactly one `GameSession`. The WebSocket handler awaits asynchronous `dispatch()` through the Room and connection queues.
-- `room-router` validates commands, authorizes seats, and calls `GameSession`; it never writes `GameState` directly.
-- `payload-validation.ts` is pure validation through `validateResourcePayload`, `validateSingleTilePayload`, and `validateMultiTilePayload`. It returns legal normalized values and never writes `GameSession`.
-- ADR-0022 extends ADR-0014 to asynchronous PostgreSQL: the Room's `ready | blocked` gate remains at command entry, and its queue holds authorization, rule execution, commit and publication together. Save retries retain the exact captured transition while the Room is blocked.
-- A rules command returning `resp.ok=false` without `durableTransition` responds only to its origin connection and neither increments `roomVersion` nor creates a Replay Step. A durable rejection still commits; only its error is restricted to the origin connection, while other seats receive the committed version as an error-free snapshot (ADR 0015).
+- One Room owns exactly one `GameSession`. The WebSocket handler awaits `dispatch()` through the Room and connection queues, and the Room's `ready | blocked` gate sits at command entry.
+- `room-router` validates commands, authorizes seats and calls `GameSession`; it never writes `GameState`. `payload-validation.ts` is pure validation that returns normalized values.
+- A rules command returning `ok=false` without `durableTransition` answers only its origin connection and creates no version or Replay Step. A durable rejection commits; only its error is private to the origin ([ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md)).
 
 ### 11.2 `server/game/`: Room and GameSession
 
@@ -1061,53 +1059,19 @@ server/game/
     └── memory-adapter.ts      test injection
 ```
 
-`RoomPlayer { ws, playerIndex, name, userId? }` represents a connection, not domain `PlayerState`. `GameSession` is a thin server wrapper around `GameCore` that injects the server custom-code executor. Connection binding, broadcasting, and persistence are outside it.
+- `RoomPlayer { ws, playerIndex, name, userId? }` is a connection seat, not `PlayerState`.
+- `roomId` identifies exactly one game ([ADR 0009](adr/0009-room-id-identifies-one-game.md)). `newGame` creates a new `GameSession` and UUID, never reusing the old ID, and moves online seats, player count, custom cards and variant flags to it in the same transaction that retires the old game. Only authoritative `gameOver` writes the Game Result Archive and deletes the recoverable snapshot, in one transaction; an archive-write failure rolls back and keeps the final state for retry. expiry, dissolution, deletion and unfinished restarts mark the Game Context `expired` and produce no result.
+- All hosted games, including Workshop, hotseat and development Rooms, use PostgreSQL and mandatory recording. `RoomPersistenceCheckpoint` durably acknowledges creation, waiting state and seats. Ordinary Rooms with every player disconnected are retained 30 minutes while waiting and seven days while playing; development games never idle-expire. Live startup performs no legacy cleanup, and missing recorded data blocks recovery instead of inventing a replacement.
+- Development slots `dev2`–`dev6` map to permanent game identities that survive restarts; rematch or reset assigns a fresh identity, and completed, expired or removed contexts never revive. A development account may hold several seats, and development resume needs a seat hint or a uniquely owned seat; ordinary Rooms derive the seat from authenticated ownership. A client-side `devMode` flag grants no development privilege. `room_players` stores ownership by `(room_id, player_index)`.
+- `room-queue.ts` serializes authorization, rules, asynchronous commit and publication per Room; moving a connection reserves both Room queues and the connection queue. Shutdown stops input, drains accepted work and closes the pool.
+- **Distributed Rooms** ([ADR 0022](adr/0022-distributed-room-recovery.md)): `RoomDirectory` assigns each Room to one application process with a PostgreSQL lease and monotonic epoch; commit and publication verify owner and expected version. `POST /api/rooms/locate` returns a `/nodes/<instanceId>/ws` route that `ingress.ts` forwards. `CommandStore` reserves each command's content fingerprint and commits its receipt with the Room transition; a repeated command returns the original receipt. `InvalidationStore` commits card / user barriers and per-instance tasks that every execution and publication checks; an operation completes only when each required instance acknowledges or loses its lease.
+- **History and recovery** ([ADR 0021](adr/0021-room-owned-history-branches-and-recovery-snapshots.md)): immutable history nodes and recovery records are Room-owned rows written in the Room transaction. Recovery restores the authoritative session, undo history and provisional checkpoints without decoding Replay payload. Query failures propagate unchanged for storage retry; only decoding and integrity failures of data that was read fail closed as `RoomHistoryCorruptionError`.
+- **Snapshot ownership**: `serializeSessionSnapshot` captures the authoritative core once; `state` and `frame` share immutable values; `rehydrateState` copies before normalization. `RoomCommitter` owns the captured Frame and payload for diffing and retries.
+- **History window**: viewer snapshots carry the latest 20 complete operation groups with stable record IDs, a viewer-bound branch ID, `projectionHash` anchors and an older-page cursor. `getHistory` / `historyPage` use active seat authorization and full viewer filtering; branch or projection changes return `history_branch_changed` / `history_projection_changed`. Reads never write a Room. HTTP, local and debug payloads stay complete.
 
-Development slots `dev2` through `dev6` point to permanent game identities in `development_room_slots`. An active recorded game keeps its identity on restart. Rematch or explicit reset retires the prior game and assigns a fresh UUID-suffixed identity; completed, expired and removed contexts are never revived. Development games have no idle expiry. All hosted rooms use PostgreSQL and mandatory recording. After every player disconnects, ordinary Rooms are retained for 30 minutes when `waiting` and seven days when `playing`; recovery includes `custom_card_ids` and reserved seats. Reconnection may replace a seat's previous connection.
+Tests: `server/game/__tests__/`, `server/__tests__/session-recovery-data.test.ts`.
 
-Non-production discovery resolves a slot only when the caller explicitly sets `developmentSlot`; the transport joins the returned permanent ID. Concrete Context links and pending command receipts keep their original target. Synthetic development account labels retain generated-name provenance, so they do not overwrite localized default game names as custom account names.
-
-Development Rooms allow one account to open separate connections for different requested seats. Join and resume preserve an explicit seat, including for local anonymous connections, `context` links and UUID-suffixed development games. The transport sends an explicit or acknowledged seat on reconnect and retains acknowledgements with pending commands across page reloads. Before acknowledgement, an unspecified seat stays unspecified; development resume requires a seat hint or a uniquely owned seat and rejects ambiguous or anonymous recovery instead of replacing another connection. Ordinary Room resume still derives the seat from authenticated ownership and ignores the supplied seat hint. A client-side `devMode` flag does not grant development Room privileges.
-
-`room_players` stores ownership by `(room_id, player_index)`, so one development account can retain several seats through restart and result archival. Saving complete ownership metadata reconciles obsolete pairs without updating unchanged owners or their join timestamps. Account-level Context and Bug Report lookups use the lowest owned seat as their deterministic representative; the lobby lists each owned seat separately. The schema migration preserves existing ownership rows, snapshots and development-slot identities.
-
-`roomId` uniquely identifies one game. `newGame` first creates a new `GameSession` and UUID, then switches online seats, player count, custom cards, persisted variant flags, and all connection references to the new Room record. It never reuses the old ID. The first `waiting -> playing` transition writes immutable `started_at`. Only authoritative `gameOver` writes scalar summaries to `game_results` and `game_result_players` and deletes `rooms.state_json` in one PostgreSQL transaction. TTL expiry, room dissolution, account deletion, and restart of an unfinished game delete only the recoverable snapshot and mark permanent Game Context as `expired`; they produce no result. An archive-write failure rolls back and retains the full final state for recovery or retry.
-
-`RoomPersistenceCheckpoint` durably acknowledges creation, waiting-room state and seat metadata. All hosted games, including Workshop, hotseat and fixed development rooms, use mandatory recording. The initial Frame and subsequent transitions commit Room state, incremental recovery records, Replay Step and terminal result in one PostgreSQL transaction before publication. Reads and metadata changes do not advance the authoritative version. `newGame` creates its replacement and retires the old active game in the same transaction before switching connection references.
-
-`room-queue.ts` serializes authorization, rules, asynchronous commit and publication. Moving a connection reserves both Room queues and the connection queue; disconnect, cleanup and administrative retirement use the same queue. Shutdown stops new input, releases pending retry waiters, drains accepted work and closes the database pool.
-
-A successful storage retry retains its waiters until asynchronous publication finishes. If publication fails, it releases the queue and closes the affected connections so they can recover the committed receipt and snapshot; it does not repeat a partially executed Room-adoption callback. Rematching or retiring an online completed game checks ownership and its persisted final Step version because completion has already removed the active Room row. This exception applies only to retirement; ordinary writes still require active Room recovery data.
-
-The stopped-application importer expires only proven unrecorded active games; live startup performs no legacy cleanup. Waiting rooms and games with recording intent, pinned builds, Replay or result evidence are preserved. Missing recorded data blocks recovery without inventing a replacement or a historical prefix. Independent HTTP/browser Workshop sandboxes remain available. See [ADR-0022](adr/0022-distributed-room-recovery.md).
-
-`RoomDirectory` assigns each Room to an application process using a PostgreSQL lease and monotonic ownership epoch. Commit and publication both verify that owner and the expected Room version. `POST /api/rooms/locate` supplies a same-origin `/nodes/<instanceId>/ws` route; `ingress.ts` forwards to private instances. Production Compose starts two independent application processes in one app container on the same physical host. Local launch defaults to one process and also supports two. Shared lobby presence and HTTP affinity preserve Room routing and nonrecoverable Sandbox access.
-
-Mutating commands carry a server-issued scope, stable command identity, Room identity and expected version or simultaneous-input window. `CommandStore` reserves their content fingerprint and commits their outcome in the same transaction as the Room transition. Repeated commands return the original receipt. The client journals pending commands, rediscovers the owner after normal reconnect, looks up receipts, resumes its existing seat and waits for an authoritative snapshot before accepting new input. A rematch only transfers online seats; disconnected old reservations cannot start the new game.
-
-`InvalidationStore` commits card/user barriers, affected Room retirement and per-instance tasks before returning an operation identity. Every execution and publication checks the shared barrier. Instances drain queues, dispose Room and Sandbox workers and acknowledge tasks; the operation remains pending until each required instance acknowledges or loses its lease. Account deletion uses renewable durable claims and retains pending external GitHub cleanup. Administration and settings show completion only after this contract is satisfied.
-
-**Recovery constraint for Issues #938–#940:** active recovery must preserve ordinary Undo History and nested provisional rollback checkpoints. Restoring the authoritative session and the RoomCommitter baseline needed to continue committing must remain independent of historical Replay payload. Recovery may verify Replay head metadata, but must not require decoding Replay checkpoints or deltas. See ADR-0011 §11 and ADR-0015.
-
-**Room history and recovery (Issues #947–#954):** PostgreSQL stores immutable history nodes in `room_history_nodes` and shared ordinary/nested checkpoint records in `room_recovery_nodes` (preserving the original recovery formats). `shared/session/history-streams.ts` captures a smaller core body and immutable branches without copying full historical arrays; `RoomHistoryStore` writes only new nodes in the existing Room/Replay transaction. Failed writes never admit uncommitted IDs to the durable cache. Query failures propagate unchanged for storage retry; only successfully read data's decoding and integrity failures become `RoomHistoryCorruptionError`. Missing references, invalid checksums and raw Frame Hash mismatch fail closed. The memory test adapter retains complete logical snapshots. Startup loads Room-owned history and recovery records in a bounded batch of queries.
-
-**Snapshot ownership (Issue #941):** `serializeSessionSnapshot` captures and freezes the authoritative core once. Its separate `state` and `frame` views share immutable nested core values and history records; player display fields are computed in the live session context and copied separately. Each player serialization computes animal zones once for its four display projections; that result is local to the call, with no cache across queries or commands. Frame constants, action-space execution-field removal and serialized key order remain unchanged. `rehydrateState` copies the smaller core before normalization or rule execution, including after Worker IPC has preserved aliases but removed object freezing. Restored rules can therefore write without changing either saved view.
-
-`RoomCommitter` takes ownership of the native snapshot's freshly captured Frame and copies final scores separately. Worker snapshots remain externally cached, so their smaller Frame body is copied while reusing immutable histories. The accepted diff baseline and failed-commit retry retain that captured Frame and encoded payload. PostgreSQL writes internal Room history version 2: one packed `state`, a structural `frameDelta` against that same saved state, and the raw Frame Hash. The delta retains all Frame differences, including derived values, constants, removed execution fields, scores, future fields and independently captured history references. Version 1 `frameWithoutStreams` records remain readable. This changes only Room storage; the memory test adapter, Worker IPC and Replay retain their logical snapshot formats.
-
-Packed latest, undo and checkpoint bodies use a level-1 gzip/base64 JSON envelope only when the complete envelope is smaller than the original JSON; history node records remain uncompressed. Recovery-record checksums cover the exact encoded text, and readers also accept raw JSON bodies. The latest envelope keeps only the lobby's turn-query fields available to PostgreSQL; recovery and local restart tooling decode the full body. Encoding never expands the referenced histories.
-
-Recovery applies the saved Frame delta to an independent copy of the smaller state body, joins exact history references and verifies the canonical raw Frame Hash without Replay payload or current-rule recomputation. Rules, Workshop, Worker IPC, Replay and debug snapshots retain complete logical history. Worker IPC carries a separate recovery identity catalog, outside the raw Frame, to preserve record/group/checkpoint identities across messages. JSON snapshots include the same catalog for every serialized alias path, preserving those identities after restart. Ordinary undo, command rollback, nested provisional scopes and Protected Observation retain their existing behavior; see [ADR-0021](adr/0021-room-owned-history-branches-and-recovery-snapshots.md).
-
-WebSocket viewer snapshots include `historyWindow`: the latest **20 complete operation groups**, stable record IDs, a viewer-bound branch ID and an optional older-page cursor. `getHistory` / `historyPage` use the existing active seat authorization (including replaced-connection rejection); full viewer filtering precedes paging, including hidden-hand events and cancellation payloads. Reads never write a Room or advance its version. HTTP/local/debug payloads remain complete. History nodes persist an append-path `continuationId`, separate from the changing head: ordinary appends retain the branch identity, while divergent successors and cancellations change it. Older cursors carry head anchors that must remain ancestors of the current streams. The client retains loaded pages and complete groups leaving the live window, deduplicates by record ID, and keeps timeline round DOM keys stable to preserve reading position. If reconnect skips an entire window, it retains the old reading range and exposes a cursor to fill the intervening gap. Rewind-detection lengths describe viewer-filtered streams, never hidden record counts. Forks, rewinds and viewer changes reset pages; request-scope identity rejects late responses even after switching away and back. Branch-invalidated cursors return `history_branch_changed`, prompting a fresh window.
-
-Viewer projection freshness is separate from branch identity: playing a previously private hand card can disclose older events and renumber existing viewer sequences without forking. Each display record carries a cumulative `projectionHash`; `projectionHeads` and page cursors anchor the three filtered streams. Hashes encode only visible record identities and projected values, normalizing identity-based participant names to IDs. Hidden payloads and hidden record counts do not enter these hashes. Ordinary appends and renames preserve existing prefix anchors. A changed prefix returns `history_projection_changed`; the client refreshes its snapshot and automatically refetches the previously loaded range, staging pages until it reaches the prior oldest group rather than issuing an undo notice or discarding the reading range. Refresh scopes reject stale pagination responses, including projection mismatches found while filling reconnect gaps. Timeline event DOM/selection keys use `occurrenceId` when available, including canceled payloads; legacy entries retain their fallback keys. History backfill stays separate from live occurrence-based feedback. These computed anchors are outside persisted Frames and do not rewrite Replay data. Computing them currently traverses the complete visible streams, not just the selected page. Record identity is independent of reusable event sequence numbers. Actor and other participant names are projected from stable identity; renaming no longer rewrites raw historical parameters. Completed Replay continues to use its archived participant names and existing anonymization projection. For the same rule/runtime source, these storage and presentation changes preserve Replay schema, raw Frame Hash chains and immutable Viewer Builds.
-
-Native windowed Room envelopes defer Session-name projection until the final Room-name projection, which falls back to Session names for missing or blank seat names. Full/direct Session and local payloads retain Session-name projection by default; debug keeps raw history names, and prepared Worker payloads retain their existing projection path. When no current or canceled event is hidden, archive projection reuses nonempty packets whose derived fields already match. Output arrays remain fresh, but shared packet records and nested fields must be treated as read-only; projection does not promise deep ownership. Visibility is reevaluated on every call, with no cache across commands.
-
-### 11.3 Game Context, Replay, and Bug Report
-
-This section is a cross-task implementation contract. `room-committer.ts`, `replay-codec.ts`, the seven-table migration, atomic PostgreSQL writes, the Game Context resolver, original-seat active-game recovery, public Replay and Anchor reads, and the immutable Replay Viewer are implemented. A later task supplies the Bug Report module.
+### 11.3 Durable Room Commit, Game Context, Replay and Bug Report
 
 ```text
 server/game/
@@ -1126,7 +1090,7 @@ server/bug-report/
 └── github-issue-client.ts     sole external GitHub App adapter
 ```
 
-`RoomCommitter` is a concrete deep module; do not add a one-implementation interface or factory. Its external surface exposes one commit operation returning:
+`RoomCommitter` is a concrete deep module and the publish seam ([ADR 0014](adr/0014-durable-room-commit-is-the-publish-seam.md)); do not add a one-implementation interface. Its one commit operation returns:
 
 ```ts
 type RoomCommitResult =
@@ -1134,8 +1098,6 @@ type RoomCommitResult =
   | { kind: 'unchanged' }
   | { kind: 'blocked'; error: string }
 ```
-
-The main path is:
 
 ```text
 ClientCommand
@@ -1146,21 +1108,22 @@ ClientCommand
   -> Broadcaster: after commit, build viewer-filtered envelopes and send them
 ```
 
-- `resp.ok=false` without `durableTransition` bypasses commit and responds only to the caller. A successful command returns `unchanged` only when both its public Frame Hash and private authoritative session cursor are unchanged and `durableTransition` is not set; a cursor-only transition still persists the Room snapshot and records a Step with a repeated public Frame. `durableTransition` forces a Step, including for a durable rejection that preserves rollback results and failure memory (ADR 0015). Only the submitting socket receives its error; peers receive the same committed version as an error-free snapshot. Reconnect and snapshot refetch create no Step.
-- Replay Step has a Room-global monotonic `stepNo`, independent of `roomVersion`. Concurrent players submitting in one interaction still serialize into consecutive Steps. Automatic engine settlement caused by the last submission belongs to that Step. Rule results must not depend on arrival order.
-- Step 0 is established before the first interactive command. The classic deal is already in the Frame. Interactive draft, Parent Selection, and explicit multiplayer submissions start at Step 1.
-- A terminal Frame also archives authoritative `PlayerScoreSummary[]`. At a `gameOver` Step, historical Viewer reuses the read-only `ScoringPad` to show categories, card bonuses, and totals.
-- An exhaustive protocol-boundary switch allowlists Replay Intent. Never store `requestId`, tokens, site `userId`, arbitrary raw WebSocket messages, or unvalidated payloads.
-- A write failure freezes the same Frame and Intent, marks the Room blocked, and rejects new game commands. Retry after 1, 2, 5, 10, and 30 seconds, then every 30 seconds. Reconnecting clients wait during the pause and never read uncommitted memory state. The same idempotency key with a different hash permanently blocks and alerts.
-- One instance allows at most 30 ordinary in-memory Rooms, counting both waiting and playing but excluding fixed development Rooms. An executable Workshop Room uses a session Worker plus a code Worker and has a separate limit of 15. The process-wide 15-slot accounting includes Worker reservations for WebSocket Rooms, restored Rooms, and HTTP sandboxes. A per-Room FIFO spans session execution through Durable Commit. Room or seat changes on the same connection wait for the in-flight command. Reaching a limit rejects only operations that need another corresponding Room or `newGame`. Built-in-card Rooms create no session Worker. Do not add Room sharding, Redis, or an external queue.
+- `unchanged` only when both the public Frame Hash and the private session cursor are unchanged and `durableTransition` is unset; a cursor-only transition persists with a repeated Frame. Reconnect and refetch create no Step.
+- Replay Steps have a Room-global monotonic `stepNo`, independent of `roomVersion`; simultaneous submissions serialize into consecutive Steps, automatic settlement belongs to the last triggering input, and rule results never depend on arrival order. Step 0 exists before the first interactive command. A terminal Frame archives `PlayerScoreSummary[]`.
+- Replay Intent is allowlisted by an exhaustive protocol switch; never store `requestId`, tokens, site `userId` or unvalidated payloads.
+- Replay archives use bounded authoritative state deltas ([ADR 0011](adr/0011-bounded-authoritative-state-delta-replays.md)).
+- A write failure freezes the same Frame and Intent, blocks the Room and retries with backoff; clients wait and never read uncommitted state. The same idempotency key with a different hash blocks permanently and alerts.
+- One instance allows at most 30 ordinary in-memory Rooms (waiting plus playing, excluding development Rooms) and 15 Worker slots shared by executable Workshop Rooms, restored Rooms and HTTP sandboxes. Reaching a limit rejects only operations that need another Room or Worker, including `newGame`.
+- Game Context links resolve by lifecycle ([ADR 0013](adr/0013-lifecycle-routed-game-context-access.md)): completed, expired and removed contexts and public Replay need no login; active descriptors, recovery, Bug Report, evidence and maintainer forensics enforce seat or administrator authorization. Errors use `{ ok:false, code, lifecycle?, message }`.
+- Completed Replay is public and retained until erasure ([ADR 0010](adr/0010-public-replay-retention-and-erasure.md)).
+- Bug Reports ([ADR 0012](adr/0012-github-issue-submission-identity-and-delivery.md)) are recoverable PostgreSQL drafts with a stable `submissionId`, attempt rows and atomic claims. The production GitHub App client and its test fake are the two adapters at that seam.
 
-Completed Replay and Bug Report behavior uses ADR 0013's public and private read contract. GitHub submission is recoverable through PostgreSQL drafts, stable `submissionId`, attempt rows, and atomic claims. The production GitHub App client and test fake are the two adapters at the true external seam.
+Tests: `server/game/__tests__/{room-committer,room-committer-private-cursor,replay-delta-shared-history}.test.ts`, `server/__tests__/{bug-report-routes,bug-report-store}.test.ts`, `e2e-tests/{replay-viewer,bug-report}.spec.ts`.
 
 ### 11.4 `server/custom-code/`: Isolated execution
 
 ```text
 server/custom-code/
-├── compiler.ts          TypeScript to JavaScript through ts-blank-space and esbuild
 ├── runtime.ts           sandbox runtime
 ├── engine.ts            source validation, compilation, and manifest extraction
 ├── isolate-runner.ts    isolated-vm entry
@@ -1168,31 +1131,24 @@ server/custom-code/
 └── client.ts            synchronous main-process to Worker Thread client
 ```
 
-The main backend stores only `compiled_code + code_manifest`. An executable Workshop card that is not built in gets a `CustomSessionExecutor` in both an HTTP sandbox and a WebSocket community Room. The entire `GameSession` command enters a dedicated Worker; one Room runs FIFO through Durable Commit and different Rooms run in parallel. Later room or seat changes on the same connection also enter the connection FIFO and cannot alter an in-flight command's Room or Replay actor.
+- The backend stores only `compiled_code + code_manifest`. A non-built-in executable Workshop card runs every `GameSession` command of its HTTP sandbox or WebSocket Room in a dedicated Worker (`CustomSessionExecutor`); one Room runs FIFO through Durable Commit, different Rooms in parallel, and a later Room or seat change on the same connection cannot alter an in-flight command's Room or Replay actor.
+- The main thread keeps only a non-executing mirror of the last successful snapshot, restored through a non-settling path so it never re-probes continuations. Inside the Worker, `client.ts` calls isolated-vm synchronously, so `Atomics.wait()` never blocks the HTTP or WebSocket event loop.
+- Before each command an in-memory checkpoint preserves pending state and undo history. A hook timeout or runtime warning restores it and keeps the diagnostic; a Worker crash or overall timeout rebuilds from the last snapshot.
+- `built_in=1` cards use the built-in implementation without a Worker.
+- Sandbox constraints have one source of truth, [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md), with `prompt-sync` blocks checked by `pnpm run check:prompt-sync`.
 
-The main thread retains only a nonexecuting mirror of the latest successful snapshot for broadcast, persistence, and seat validation. Returned snapshots enter that mirror through a nonsettling restore path, so it never re-probes authoritative continuations without executable card registrations. Inside the Worker, `client.ts` synchronously calls isolated-vm, so `Atomics.wait()` never runs on the HTTP or WebSocket event loop. Before each command, an in-memory checkpoint preserves pending state and undo history. A hook timeout or newly emitted runtime warning, including one from a read-only card query, restores that checkpoint while retaining the diagnostic warning. Worker crash or overall timeout terminates it and rebuilds from the latest successful snapshot. A source-shipped card marked `built_in=1` follows built-in implementation and creates no such Worker. Browser-local Workshop Worker and recovery behavior remain unchanged. The single source of truth for sandbox constraints is [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md), including its `prompt-sync:begin/end` marker blocks, validated by `pnpm run check:prompt-sync`.
+Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
 
 ### 11.5 HTTP endpoints
 
-`server/game-router.ts` and `server/index.ts` provide:
+HTTP serves operations, tests and debugging; it is not the real-time synchronization path. Responses match `SessionResponse`, and validation endpoints never write authoritative state. Inside a WebSocket Room, development commands use `ClientCommand`.
 
-- `GET /api/health`: health check;
-- `GET /api/rooms`: room list;
-- `GET /api/game/state`: current snapshot refetch;
-- `POST /api/game/new`: new game or test reset. Accepts `seed?: number` plus the same setup payload as WebSocket `createRoom` (player count, draft mode and pool size, community deck with `customCardIds`, and the expansion switches), mapped through `server/game/game-setup-options.ts` so both surfaces agree. This is a debugging and test path — product games, including local hotseat, are authoritative rooms;
-- `POST /api/game/load`: load test state;
-- `POST /api/game/dev/*`: single-player debugging and E2E setup;
-- `POST /api/game/new-sandbox`: create an independent `GameSession` without a WebSocket Room;
-- `GET /cards-manifest.json`: card metadata fetched by the main bundle at startup;
-- `POST /api/auth/oauth/:provider/start?intent=link`: authenticated GitHub / Google binding start, returning the provider authorization URL with PKCE S256;
-- `GET /api/auth/oauth/:provider/callback`: login/registration callback, or a cookie-free binding handoff to `?page=settings` with short-lived state/code (or cancellation) in the URL fragment;
-- `POST /api/auth/oauth/:provider/complete`: binding completion in the original frontend cookie partition. It atomically consumes a live binding state matching the current site user and provider before exchanging the code; it never creates a new site session.
+- `GET /api/health`, `GET /api/rooms`, `GET /api/game/state`.
+- `POST /api/game/new` accepts `seed?` plus the WebSocket `createRoom` setup, mapped through `server/game/game-setup-options.ts`. `POST /api/game/load`, `POST /api/game/dev/*` and `POST /api/game/new-sandbox` are debugging and Workshop sandbox paths.
+- `GET /cards-manifest.json` serves card metadata to the main bundle.
+- OAuth account binding: `POST /api/auth/oauth/:provider/start?intent=link`, `GET …/callback` and `POST …/complete`, with PKCE S256 and a fragment handoff that never creates a new site session.
 
-`client/app/useAccountLinking.ts` removes handoff fragment fields before submitting once, including during StrictMode effect replay, and refreshes linked identities on success. Errors remain in Settings rather than being normalized into the authenticated homepage. Binding does not widen account OAuth scopes or use the Issue Submission Connection's tokens or encryption keys.
-
-HTTP serves operations, tests, and debugging; it is not the real-time synchronization path. Responses match `SessionResponse`. Validation endpoints are pure and never write authoritative state. Inside a WebSocket Room, development commands should use `ClientCommand`.
-
-Game Context, Replay, and Bug Report are product read and integration APIs, not replacements for WebSocket game synchronization:
+Game Context, Replay and Bug Report are versioned product APIs:
 
 ```text
 GET    /api/v1/game-contexts/:roomId
@@ -1216,7 +1172,7 @@ POST   /api/v1/issue-submission-connection/github/complete
 POST   /api/v1/github-app/webhook
 ```
 
-Public Replay APIs return versioned JSON and never expose PostgreSQL gzip or BLOB encoding. A Segment expands at most one checkpoint chain and verifies every frame hash on the server. An Anchor must exactly match `stepNo + frameHash`. Completed, expired, and removed resolution and public Replay remain outside login. Active descriptors, recovery, Bug Report, temporary evidence, and maintainer forensics enforce ADR 0013's seat or administrator authorization independently. External errors retain ADR 0013's discriminated `{ ok:false, code, lifecycle?, message }` form.
+Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have per-IP quotas and size caps; authenticated evidence and report endpoints are rate-limited per account.
 
 ### 11.6 Workshop backend
 
@@ -1227,116 +1183,38 @@ Public Replay APIs return versioned JSON and never expose PostgreSQL gzip or BLO
 - A PR merged into `main` graduates an approved card to read-only `merged`. A merge seen before approval is recorded (`github_pr_status='merged'`) and graduates only after an authorized exact-head approval is reconciled; a PR merged into another base becomes `stale·offline`. A live merged card keeps serving its reviewed snapshot until release, when `markBuiltInMergedCards` lets the built-in definition take over on startup.
 - `customCardIds` in a real Room accept only live approved cards through their reviewed snapshot; an author's own non-live card rejects creation with guidance, and every other unloadable ID is filtered silently. Unreviewed code runs only in the Workshop sandbox and never reaches a multiplayer `GameSession`.
 - Author `unpublish` lets existing games finish; administrator takedown ends every Room embedding the card without scoring or Replay.
-- Submissions use one repository-scoped GitHub App; `workshop_submissions` freezes operation identity and Draft Version before remote writes, branch publication uses expected-head CAS, and generated-file conflicts pause delivery. See the [GitHub App runbook](operations/github-oauth-app-setup.md).
-- Workshop draft errors expose a typed `code` from `shared/contract/workshop.ts`.
+- Submissions use one repository-scoped GitHub App; `workshop_submissions` freezes operation identity and Draft Version before remote writes, branch publication uses expected-head CAS, uncertain PR creation is reconciled without another blind POST, and generated-file conflicts pause delivery. See the [GitHub App runbook](operations/github-oauth-app-setup.md).
+- Workshop draft errors expose a typed `code` from `shared/contract/workshop.ts`; the live-edit guard returns `live_edit_blocked` with HTTP 409.
 
 Tests: `server/__tests__/{workshop-api,workshop-submissions}.test.ts`, `server/workshop-pr/__tests__/`.
 
 ### 11.7 Database
 
-`server/db.ts` owns the asynchronous PostgreSQL connection through `pg`. Transactions retain one pool connection across awaits; nested transactions use serialized savepoints. Native PostgreSQL migrations are applied under an advisory lock before startup. Runtime persistence has no SQLite or JSON fallback.
+- `server/db.ts` owns the asynchronous PostgreSQL connection through `pg`: transactions keep one connection across awaits, nested transactions use savepoints, and native migrations run under an advisory lock before startup. There is no SQLite or JSON runtime fallback.
+- `scripts/import-sqlite.ts` imports a stopped schema-33 SQLite database through exact comparisons and blocks on damaged recorded games, and `data_imports` keeps a failed import behind a startup barrier; `scripts/validate-backup.ts` validates a PostgreSQL / S3 restore.
+- Product tables: `game_contexts`, `game_context_participants`, `game_replays`, `game_replay_steps`, `issue_submission_connections`, `account_deletion_requests`, `github_grant_revocations`, `bug_reports`, `bug_report_attempts`, `bug_report_evidence_audit`; plus `rooms`, `room_players`, `game_results`, `game_result_players`, `oauth_states` and the Room history and recovery tables. Segments are represented by `checkpointStepNo`; there are no Segment, evidence-payload, quota or webhook-delivery tables.
+- Games completed before recording are `legacy_no_replay`: they keep their result summary but have no Replay header or Frames.
 
-`scripts/import-sqlite.ts` reads a stopped schema-33 SQLite database into a private copy, validates its current format, stages retained resources through private S3, and commits application rows only after exact row/byte comparisons, Room-owned recovery, Replay chain/hash and resource checks pass. It preserves encoded recovery TEXT and Replay BYTEA. It only discards proven unrecorded active games; damaged recorded games block the import. `data_imports` keeps failed imports behind a startup barrier. The independent erasure ledger is merged and applied before validation. `scripts/validate-backup.ts` validates a controlled PostgreSQL/S3 restore; SQLite is only an input tool.
+### 11.8 GitHub delivery, security and deletion
 
-ADR 0014 uses the next available migration to add ten tables. The first production Replay is `schemaVersion=1`; no unreleased experimental format is retained:
+Bug Report delivery follows [ADR 0012](adr/0012-github-issue-submission-identity-and-delivery.md):
 
-| Table | Facts owned |
-|---|---|
-| `game_contexts` | Permanent `roomId`, `active/completed/expired/removed`, phase, `available/legacy_no_replay`, expiry, and Tombstone reason |
-| `game_context_participants` | Seat-to-site-user associations captured before an active Room is removed; account deletion nulls the foreign key for anonymous-seat evidence projection, and evidence cleanup removes the row |
-| `game_replays` | `schemaVersion`, `viewerBuildId`, `gameBuildId`, recording or completed state, latest Step, `missingPrefix`, and custom-card snapshot |
-| `game_replay_steps` | `roomId + stepNo`, `roomVersion`, `checkpointStepNo`, actor seat, allowlisted intent, payload kind or gzip, and Frame Hash |
-| `issue_submission_connections` | Numeric GitHub user ID, AES-256-GCM token and refresh token, nonce and tag, `keyId`, expiry, and revocation state |
-| `account_deletion_requests` | Submitted deletion request, next external cleanup time, and last error; the account is disabled first and a failed GitHub cleanup retries in background |
-| `github_grant_revocations` | Encrypted GitHub grants awaiting retry after a deletion race or temporary failure |
-| `bug_reports` | Stable `submissionId`, Reporter association, Anchor, draft, author choice, delivery state, Issue number and URL, and evidence expiry |
-| `bug_report_attempts` | Thirty-day delivery, reconciliation, and rate-limit attempt metadata; never token, symptom copy, or raw GitHub response |
-| `bug_report_evidence_audit` | Permanent maintainer identity, time, Anchor, perspective, and nonempty reason |
+- A draft freezes `roomId + stepNo + frameHash` after confirming the Reporter owns an original seat; one user keeps at most five undelivered reports. The public Issue carries a sanitized title and a body with no screenshot, log, Frame payload, other player identity or hidden information.
+- The production `github-issue-client` accepts only server-configured repository and installation IDs and reconciles uncertain responses by a stable body marker, accepting only an Issue created by the configured App after the attempt and ending uniquely with that marker. The client polls only site status, never GitHub. Self-authored submissions use an encrypted GitHub App user token (AES-256-GCM with `keyId`) and require confirming that the GitHub identity stays public; Hosted Issue Identity uses an installation token. An invalid connection never switches author.
+- Account deletion persists `deletion_pending`, signs out sessions and edits known Issue bodies through the installation adapter, retrying until GitHub confirms the site user ID is gone.
+- Maintainer evidence reads require a reason, are audited permanently, are rate-limited and reapply the current participant tombstone projection.
+- Erasure ([ADR 0010](adr/0010-public-replay-retention-and-erasure.md)): `server/game/replay-removal.ts` appends each batch to the independent `erasure/ledger.json` in private S3 with ETag CAS before deleting payloads; startup and restore apply it idempotently, a malformed ledger blocks restoration, and resource reads and uploads consult its permanent hash deny rules. Logs never contain tokens, Frame payloads, symptom text or raw GitHub responses.
 
-The following tables remain in use:
+### 11.9 Deployment, rollback and observability
 
-- `rooms` and `room_players` for active recovery snapshots and site-seat ownership;
-- `game_results` and `game_result_players` for completed scalar results, Replay Participant names, and internal user associations;
-- `oauth_states`, extended with an encrypted Bug Report PKCE verifier under its existing short-lived state and `returnTo` lifecycle. Account binding uses the separate server-only `account_pkce_verifier` column, valid for ten minutes and cleared on consumption; no new deployment secret is needed.
+Deployment commands and the metric catalog live in [`HOW_TO_DEPLOY.md`](HOW_TO_DEPLOY.md).
 
-Do not add Replay Segment, Reported Evidence payload, quota-counter, or webhook-delivery tables. `checkpointStepNo` represents Segments. `bug_reports.evidence_expires_at` protects a shared Segment only while the Context is incomplete; normal completion switches to the permanent Replay Archive. Report and attempt rows answer quotas and the sitewide GitHub sending window of 20 requests per minute. Revocation webhook operations are intrinsically idempotent.
-
-Migration must idempotently backfill existing data. `rooms` become active `game_contexts`; `game_results` become completed contexts; if one `roomId` exists in both, completed wins. A game completed before launch is marked `legacy_no_replay` and gets no `game_replays` header, Replay Frame, `schemaVersion`, or `viewerBuildId`. Its completed descriptor still returns the Game Result Archive summary; manifest and Segment exist only when `replayStatus=available`. Therefore an ID is `unknown_context` only when absent from both existing sources.
-
-### 11.8 GitHub delivery, security, and deletion
-
-- On draft creation, the server confirms that Reporter owns an original seat in active `room_players` or completed `game_result_players`, and freezes `roomId + stepNo + frameHash`. The trimmed symptom must contain 1 to 2,000 Unicode characters; there is no grammar or sentence-ending test. One user may retain at most five reports that are not discarded and have no known Issue number.
-- The production `github-issue-client` accepts only server-configured Repository ID and Installation ID, never client owner, repository, labels, or URL. Every GitHub request has a 15-second timeout. Marker reconciliation accepts only an Issue created by the configured GitHub App, no earlier than its delivery attempt, and ending uniquely with the expected marker. The fake adapter covers success, 401, permission 403, rate-limit 403 or 429, 410 or 422, network errors, 5xx, and reconciliation after an uncertain response.
-- Self-authored submission uses an encrypted GitHub App user token and requires confirmation that the public GitHub author identity cannot be anonymized by deleting the site account. The report persists the confirmed numeric GitHub user ID. Queueing and delivery reject silent account switching; the user must reconfirm after a change. Hosted Issue Identity uses an in-memory installation token. An invalid connection never changes author automatically. Token and refresh token use AES-256-GCM with per-row nonce and tag plus `keyId`. The PKCE verifier is encrypted and lives only until OAuth-state expiry. Each user retains one live Bug Report state. GitHub callback puts only state and code in the frontend URL fragment. After returning to the original top-level context, the frontend calls complete with a partitioned session; only then does the server consume state for the current site user and exchange the token.
-- The PostgreSQL executor atomically claims one `submissionId`. After an uncertain response, it reconciles by the stable body marker before retrying. Retry and rate limiting follow ADR 0012. The client polls only site status and never GitHub directly.
-- The Bug Report footer requests connection status for the current `roomId`. New-report entry is enabled only when the user is an original participant and the Room has at least one Replay Step. From an unauthenticated completed game, login preserves the current Replay Anchor. A saved draft remains recoverable or discardable after its associated active game expires or is removed. Waiting, unrecorded, and legacy-no-replay games return explicit anchor-unavailable states rather than pretending the user is not a participant.
-- Issue title is a sanitized and truncated `Game bug: <first symptom line>`. Body contains no screenshot, log, Frame payload, other-player identity, or hidden information. Creation, marker reconciliation, account-deletion anonymization, and Issue webhooks share the fixed public target `titanxxh/open-agricola`. Its `bug-report-triage.yml` workflow adds `needs-triage` to in-game reports when the submitting identity cannot set labels; notifications rely on native GitHub watching.
-- Explicit disconnect deletes tokens immediately. An account with only local unsubmitted drafts may delete those drafts and the account directly. If it has a connection, public Issue, or report already in delivery, account deletion first persists `deletion_pending`, signs out every session, and disables the local connection; the same installation adapter then edits known Issue bodies, retrying in background on failure. A discarded but previously submitted report with unknown Issue number reconciles by marker first. A GitHub `issues.deleted` webhook completes cleanup for a deleted Issue. Final internal association is cleared only after GitHub confirms that the body no longer contains the site user ID.
-- Full maintainer evidence reads require a nonempty reason and append `bug_report_evidence_audit`; the audit stores a maintainer identity snapshot unaffected by account-foreign-key deletion. Each maintainer may read at most 30 times per hour. Before returning evidence, the server reapplies the current Participant tombstone projection. Evidence that expired before launch without a seat snapshot treats every seat as anonymized.
-- Before `server/game/replay-removal.ts` deletes payloads, anonymizes or erases Results, and marks Contexts removed, it conditionally appends the entire versioned batch to `erasure/ledger.json` in private S3 storage. ETag compare-and-swap prevents concurrent removers from losing entries. This ledger is independent of PostgreSQL backups and must never be overwritten by an older restore. Startup and recovery tooling validate and idempotently apply it, including forbidden references discovered in old backups. Malformed ledger content blocks restoration. Resource reads and uploads also consult its permanent hash deny rules before returning data or accepting the same content again. Shared ordinary resources are retained while any durable reference remains; forbidden resources establish a catalog barrier and are deleted even if referenced. Unrelated corrupt Replay metadata does not block tombstones, but prevents unproven ordinary cleanup. Version one has no administration UI.
-- Public resolver, manifest, and Segment endpoints have independent per-IP read quotas and response-size caps. Active evidence, Bug Report, and maintainer endpoints are rate-limited by account. Logs must never contain tokens, Frame payloads, symptom text, or raw GitHub responses.
-
-### 11.9 Deployment, rollback, and observability
-
-PostgreSQL stores platform data and the shared upload/reference catalog. A private S3 bucket stores these keys; application images contain no authoritative resource files:
-
-```text
-card-art/<filename>             original Workshop upload; public URL unchanged
-replay-viewers/<viewerBuildId>/ immutable historical Viewer code Build
-replay-assets/<sha256>          content-addressed Replay Card Snapshot assets
-erasure/ledger.json             independent deletion ledger; never restore backward
-```
-
-`server/storage/` owns the S3 protocol, staged uploads, references, integrity checks, and cleanup claims. Upload intent is durable before writing S3. New uploads retain a 24-hour unreferenced grace period. Workshop drafts and immutable versions maintain references in their own PostgreSQL transaction. Replay preparation adds a durable reference before the frozen initial commit; that commit transfers it to the Replay atomically. Preparation references are released only after explicit retirement or shared cleanup proves there is no Room, Replay, live owner, allocation or unexpired pending command. Expired command scopes and abandoned allocation rows are collected periodically; an unknown scope never regains authority. Collectors lock resource rows, claim deletions, and reject new references while deletion is in progress. Only one claimant can delete an object, and another executor can resume an expired claim. Immutable Viewer references retain every published file.
-
-Local dependencies run PostgreSQL and the ARM64 S3-compatible service in persistent Docker volumes. `restart-local.sh` generates untracked local credentials, builds the Viewer, uploads its exact manifest/files, and starts the app after publication. Tests use a separate database and bucket with a unique schema/object prefix. A managed S3 endpoint uses this same protocol; switching endpoints requires explicit data transfer and validation.
-
-The complete target configuration is:
-
-```text
-DATABASE_URL
-S3_ENDPOINT
-S3_BUCKET
-S3_REGION
-S3_ACCESS_KEY_ID
-S3_SECRET_ACCESS_KEY
-S3_FORCE_PATH_STYLE
-REPLAY_VIEWER_BUILD_ID
-REPLAY_TRUST_PROXY
-GAME_BUILD_ID
-BUG_REPORTS_ENABLED
-BUG_REPORT_GITHUB_APP_ID
-BUG_REPORT_GITHUB_CLIENT_ID
-BUG_REPORT_GITHUB_CLIENT_SECRET
-BUG_REPORT_GITHUB_PRIVATE_KEY
-BUG_REPORT_GITHUB_WEBHOOK_SECRET
-BUG_REPORT_GITHUB_INSTALLATION_ID
-BUG_REPORT_GITHUB_REPOSITORY_ID
-BUG_REPORT_TOKEN_ENCRYPTION_KEYS
-BUG_REPORT_TOKEN_ACTIVE_KEY_ID
-```
-
-Durable Room Commit requires PostgreSQL, shared resources, `REPLAY_VIEWER_BUILD_ID`, and `GAME_BUILD_ID`. Recording is mandatory. Room creation freezes both Build IDs and its custom-card runtime snapshot. An unpublished custom card requires explicit player consent to permanent publication. Viewer Build ID is the SHA-256 of the complete `manifest.json`, which fixes the `index.html` entry and every file's SHA-256. A Build stores only Viewer code, styles, and card manifest. Board art, card art, and fonts share the main site's current asset-repository GitHub Pages source and are not archived. Builds validate the deployed Pages version/manifest against `public-assets.ref`; runtime URLs use that version as a cache key, not a historical snapshot. Replay CSP allows the asset site's Pages path for images and fonts. The former raw asset-repository path remains permitted for existing rooms' immutable Viewers; new builds use only Pages URLs. Room creation fails when Build validation fails.
-
-Before Step 0, custom-card artwork is copied into content-addressed S3 storage and the Replay header receives its immutable application URL. Waiting Rooms reject game writes until Step 0 exists. Unfinished expiry and Bug Report evidence retention retain their existing transaction boundaries; hourly shared collection removes eligible unreferenced objects. Missing recorded prefixes block recovery. Explicitly unrecorded active Rooms are discarded through Game Context lifecycle; no replacement prefix is invented.
-
-Deployment uses a controlled maintenance window: publish and validate the Viewer, migrate persistent data and resources, apply the independent erasure ledger, validate target-build restoration, then resume application traffic. Preserve historical Viewer bytes and the existing public origin/OAuth callback URLs. GitHub App configuration is required only for its optional product features. See `HOW_TO_DEPLOY.md` for deployment commands.
-
-After recording is enabled, the application may roll back only to a recorder-compatible build supporting every active Room `schemaVersion`; it cannot roll back to a backend predating the feature. The Viewer Build must exist before the backend freezes its ID into a new Room. Missing Viewer, unwritable persistence, or the 30-Room capacity limit makes readiness degraded and rejects new Rooms without sacrificing existing ones.
-
-Version one adds no metrics backend. Structured logs and health state must expose at least ordinary Room count, capacity rejection, Durable Room Commit latency, errors, and retries, blocked Room count, hash collisions, Replay payload size and corruption, GitHub queue, attempts, and rate limits, and missing Viewer Build. Log fields contain only stable IDs and numbers, never protected payloads.
-
-#### Platform operations observations
-
-`server/observability/` owns bounded numeric metrics, collection, the administrator gateway and overview health. It has no rule/state writer. `Broadcaster` observes the existing encoded send once per recipient; `stateUpdate` rounds come from that envelope's returned state, including undo/recovery. Rounds are `1`–`14`, `pregame` (draft/parent selection), `postgame` (gameOver/playing round 15), `none` and `unknown`. An unrelated event uses the captured Room/command context. Never tag metrics with Room, account, command/request identity, card, payload or exception text.
-
-Monotonic command duration spans parsed dispatch, queue wait, receipt/ownership checks, Session execution, durable commit and local publication. First correlated response is a separate measurement; a pending receipt is not completion. The commit boundary remains durable-before-publication, including frozen retries. Projection, JSON encoding and `ws.send` enqueue are separate overlapping stages; enqueue is not network delivery or client rendering. Metrics failures cannot change a game outcome. Default process metrics include CPU, RSS/heap, event-loop lag and GC; Worker wall time is not Worker CPU.
-
-A private Prometheus scraper uses bearer-authenticated ingress discovery and per-instance forwarding because application ports bind loopback inside the app container. Stable port/slot labels survive process identity changes; PromQL handles counter resets and merges histogram buckets before calculating percentiles. The ingress owns global lease/epoch-aware Room aggregates and distinct online users from expiring private presence rows; application processes expose local connections, queues, Workers and persistence health. Collection updates operational presence only, never game state. No snapshot/history is traversed to collect platform gauges.
-
-Grafana uses only aggregate Prometheus data. Every `/ops/` resource and query passes current site-session and `ADMIN_USERS` validation. A 30-second, atomic one-use handoff installs an HttpOnly dashboard cookie linked to the original session; deletion, expiry and permission changes take effect on the next request. The proxy drops supplied credentials/auth headers, supplies a reversible ASCII-encoded site username and Viewer role, and allows GET/HEAD plus the read-only datasource query POST. Grafana login tokens, anonymous/basic login, public dashboards, editing and Live are disabled; private service ports are not published in production. See [deployment operations](HOW_TO_DEPLOY.md#operations-monitoring) for the metric catalog and freshness limits.
-
-The browser sends 10% sampled, finite, rate-limited batches of command RTT, first-snapshot readiness and snapshot-to-React-layout-commit duration. Both endpoints use the same browser monotonic clock; no cross-clock subtraction or browser-paint claim is made. Samples contain numeric duration, finite kind/outcome and round only, and remain untrusted observational input.
+- PostgreSQL stores platform data and the shared resource catalog; private S3 stores `card-art/`, `replay-viewers/<viewerBuildId>/`, `replay-assets/<sha256>` and `erasure/ledger.json`. `server/storage/` owns staged uploads, references, integrity checks and cleanup claims; upload intent is durable before writing, new uploads keep a 24-hour unreferenced grace period, and only one claimant deletes an object.
+- Durable Room Commit requires PostgreSQL, shared resources, `REPLAY_VIEWER_BUILD_ID` and `GAME_BUILD_ID`. Room creation freezes both Build IDs and the custom-card runtime snapshot. The Viewer Build ID is the SHA-256 of its complete manifest; board art, card art and fonts come from the asset site pinned by `public-assets.ref`. Room creation fails when Build validation fails, and a waiting Room rejects game writes until Step 0 exists.
+- Rollback is allowed only to a recorder-compatible build supporting every active Room `schemaVersion`. A missing Viewer, unwritable persistence or the Room limit degrades readiness and rejects only new Rooms.
+- `server/observability/` owns bounded numeric metrics, collection, the administrator gateway and overview health, and never writes rule state. Metrics carry no Room, account, command, card, payload or exception identity, and a metrics failure cannot change a game. Command duration spans dispatch through local publication; projection, encoding and send are separate stages.
+- A private Prometheus scraper discovers instances through bearer-authenticated ingress; the ingress owns global Room aggregates and online users. Grafana reads only aggregates behind `/ops/`, which checks the current site session and `ADMIN_USERS` on every request through a one-use handoff cookie.
+- The browser sends sampled, rate-limited timing batches (command RTT, first snapshot, snapshot-to-layout) that the server treats as untrusted observations.
 
 ---
 

@@ -2,59 +2,31 @@
 
 - Status: Accepted
 - Date: 2026-10-04
-- Amended: 2026-10-05 (#941 follow-up)
-- Issues: #938–#942; #937 is completed by PR #945
 
 ## Context
 
-Late-game Room snapshots repeatedly copy and serialize logs, events, archives, ordinary Undo History and nested provisional checkpoints. These histories have different semantics: logs can prepend and change their display names, effective events roll back and reuse sequence numbers, and the public archive retains the cancellation record. A length or event sequence alone cannot identify a recoverable history version.
+Issues #938–#942. Late-game Room snapshots repeatedly copied and serialized logs, events, archives, ordinary Undo History and nested provisional checkpoints. These histories have different semantics: logs prepend and change display names, effective events roll back and reuse sequence numbers, and the public archive keeps cancellations. A length or sequence number cannot identify a recoverable history version.
 
 ## Decision
 
-Keep snapshots of the smaller core game and private execution state, and reference Room-owned immutable history records through explicit History Branch identities. Use these branches for logs, events, the public event archive and checkpoint reuse; a Frame overlay removes duplicated serialized core fields within the same snapshot. Preserve the existing ordinary undo and provisional restoration semantics, including after process recovery; do not replace the rules engine with an inverse-operation journal or a general persistent object tree.
+- Snapshots keep the smaller core game and private execution state and reference Room-owned immutable history records through explicit History Branch identities, used for logs, events, the public event archive and checkpoint reuse. Ordinary undo and provisional restoration semantics are unchanged, including after process recovery; there is no inverse-operation journal or persistent object tree.
+- One capture and restore model covers ordinary history, command checkpoints and every nested provisional checkpoint; shared checkpoints are stored once, and capture never deep-clones complete histories just to split them again. Rule and Workshop inputs keep their complete logical history.
+- PostgreSQL stores history nodes and recovery records incrementally inside the existing Room / Replay transaction and frozen-retry contract; the memory test adapter stores complete logical snapshots. Active recovery stays independent of Replay payload (ADR 0011).
+- Packed latest, undo and checkpoint bodies are serialized once and stored in a level-1 gzip / base64 envelope only when smaller; history nodes are never compressed individually. Recovery checksums cover the exact encoded text, readers accept raw JSON too, and the latest envelope exposes only the lobby's turn-query fields.
+- **Latest committed Frame.** The latest raw Frame is stored as a structural `frameDelta` against the same snapshot's packed `state`, with exact references to its `log`, `events` and `publicEventArchive` versions. The overlay keeps every difference (derived values, constants, removed execution fields, scores, history references), is self-contained in the Room snapshot and uses no field allowlist. Restoration applies it to an independent copy of the saved state, joins history and checks the canonical Frame Hash, without current rules, `serializeState` or Replay payload.
+- One in-memory capture of the authoritative core is shared by the snapshot's `state` and `frame` views as immutable values; display projections are captured separately, and rehydration copies the core before rules write to it. `RoomCommitter` owns the captured Frame and payload for its baseline and retries; private-cursor change detection compares owned content.
+- Restored state and Frame core bodies share no mutable values. Room record and group identities and History Branch references stay outside the raw Replay Frame, and the original raw Frame is verified before viewer filtering, the History Window or name projections apply.
+- Players keep access to the complete history. Live presentation uses a bounded History Window of complete operation groups; older records load on demand with participant authorization and viewer filtering. Names are projected from participant identity (current name, archived name or anonymization) without rewriting Replay payload or Frame Hashes.
+- History identity is distinct from reusable event sequences: undo then a different action, same-length replacement, rename, cancellation and nested recovery stay distinguishable. Missing records or inconsistent references are errors, never substituted silently.
 
-Use one capture and restore model for ordinary history, command checkpoints and every nested provisional checkpoint, including their embedded histories. Shared checkpoints may be represented once. Optimize capture itself so the SQLite path does not first deep-clone or expand complete histories only to split them again at the adapter boundary. The authoritative rule and Workshop inputs retain their complete logical history.
+## Consequences
 
-SQLite alone uses incremental physical storage. JSON and memory adapters materialize and store complete logical snapshots from the same recovery model. Updated history references and recovery records participate in the existing Room/Replay transaction and frozen retry contract. Active recovery, including the committer's baseline, remains independent of historical Replay payload as specified by [ADR-0011 §11](0011-bounded-authoritative-state-delta-replays.md).
+- Late-game save cost, write volume and memory fall while recovery and Replay stay exact; acceptance measurements are recorded in [Replay Room Capacity](../performance/replay-room-capacity.md).
+- Recovery tests must cover undo variants, reused sequences, renames, nested scope aborts, Protected Observation boundaries and restart continuation, and every new record write must survive atomic failure and retry.
 
-Serialize each packed latest, undo or checkpoint body once, then use a level-1 gzip/base64 JSON envelope only when its complete stored size is smaller. Do not expand referenced histories for compression or compress individual history-node records. Recovery-record checksums cover the exact encoded text before decoding. Readers accept raw JSON alongside compressed bodies. The latest envelope retains only the lobby SQL turn projection (`phase`, `gameOver`, current player and top-frame owner); recovery and local restart tooling decode the full body rather than treating that projection as authoritative state.
+## Alternatives considered
 
-Players retain access to the complete history. Real-time presentation uses a bounded History Window of complete operation groups; older records are read on demand with the existing participant authorization and viewer filtering. Historical names are projected from the game's participant identity using the current active name or archived Participant name, including anonymization. This presentation projection does not rewrite immutable Replay payload or its recorded Frame Hash.
-
-### Latest committed Frame
-
-Store the latest committed raw Frame as a structural `frameDelta` against the same snapshot's packed authoritative `state`, including exact references to the original versions of `log`, `events` and `publicEventArchive`. Internal Room history version 2 writes this overlay; version 1 `frameWithoutStreams` records remain readable. The overlay retains every difference, including derived display values, constant keys, removed execution fields, scores, future fields and history references that differ from state. It is self-contained within the Room snapshot, independent of prior Replay Steps, and uses no field allowlist or general object-graph cache.
-
-Issue #941 uses one in-memory capture of the authoritative core, shared by the snapshot's `state` and `frame` views as owned immutable values. Capture display projections separately from the live session context; copy the core again when rehydrating writable rules state, including after Worker IPC. The committer takes ownership of the freshly captured native Frame; externally cached Worker Frames still require a smaller-body copy, and final scores are copied separately. It retains these owned values and shared immutable histories for encoding, its accepted baseline and frozen retry. Shared core identity also stops unnecessary overlay traversal; the two logical views remain separate.
-
-Restore by applying the overlay to an independent copy of the smaller saved state body, joining Room-owned history values and checking the existing canonical Frame Hash. Restored state and Frame core bodies must not share mutable values. Do not call current rules or `serializeState` to recalculate old derived values, and do not read historical Replay payload. Original per-entry log parameters and name values must remain reproducible; a single current-name map cannot reconstruct the mixed name history in existing raw logs. Room record/group identities and History Branch references stay outside the raw Replay Frame. Existing log participant identity fields remain part of the exact raw Frame.
-
-Keep the complete logical Frame for Replay encoding, Worker IPC and the existing runtime snapshot consumers. Only its Room persistence representation changes. Verify the original raw Frame before applying viewer filtering, the History Window or current-name and anonymization projections; no Replay schema change is required by this storage representation.
-
-## Alternatives and consequences
-
-An inverse-state journal would need to capture every rule mutation, observation boundary and nested rollback. A general persistent object tree would require broad changes to the current mutable GameState model. Both enlarge the correctness boundary compared with sharing the large history data while retaining core snapshots. Merely compressing existing SQLite snapshots leaves the costly capture and cloning paths intact. The Frame overlay trades a structural comparison on save and a smaller-body copy on restore for fewer duplicated JSON fields and SQLite bytes; small-body compression adds synchronous encoding and decoding work to reduce those bytes further. The accepted measurements and continuing validation requirements are recorded below.
-
-The internal history identity is distinct from a reusable event sequence. Undo followed by a different action, same-length state replacement, player rename, cancellation and nested scope recovery must remain distinguishable. Missing recovery records or inconsistent references are errors; the implementation must not silently substitute another branch.
-
-Issues #947–#955 implemented the initial history/recovery representation. The completed #941 follow-up adds the shared core, exact Frame overlay and conditional small-body compression described above. It also replaces private-cursor hashing with owned content comparison and reuses canonical encodings only for proven immutable history records. Session-wide dirty tracking and caching every complete history-array prefix were rejected: the former adds mutation/invalidation obligations, while the latter can retain quadratic string storage.
-
-The #941 follow-up passed its own frozen two-player and four-player CPU, latency, write-volume and memory gates, exact Frame/cursor/Step equivalence, and both 30-Room capacity probes. Its acceptance uses a fresh post-#957 baseline, not the initial group's gains. Raw evidence and both groups' unchanged gates remain in [Replay Room Capacity](../performance/replay-room-capacity.md#issue-941-evaluation).
-
-## Original implementation sequence (completed)
-
-The following sequence records the initial staged rollout. Its first #941 slice was delivered by #948 in PR #957; that slice's hash-reuse limit is historical, superseded by the follow-up decision and acceptance above.
-
-1. Establish a fresh-Room baseline after PR #945 using fixed complete command transcripts. Include the existing two-player capacity workload and a four-player late-game workload with costs, payments, farm choices, undo and process recovery. Freeze improvement thresholds from repeated baseline measurements before implementing the optimizations.
-2. Limit the first #941 slice to reusing the existing private cursor hash through commit, frozen retry and acceptance. Preserve canonical encoding and the `committed` / `unchanged` decisions. Defer remaining serialization and change-detection work until the shared representation stabilizes.
-3. Implement #942 under the existing query-purity contract: remove the whole-state preview clone, extend test protection to generic `computeCosts` hooks, and validate repeated previews, real costs and payment outcomes in the relevant Session and Workshop paths.
-4. Implement #939/#940 as one common capture, history-reference and recovery model. Introduce stable record identity, actor and other participant-role references, complete operation-group membership, and exact raw-Frame parameter versions at this stage. Cover ordinary history and all nested checkpoints; retain complete logical output while the new storage is introduced.
-5. Implement #938 using the small Frame body and shared history versions. Verify exact raw-Frame reconstruction and Hash equality, including after rename and restart. Restore without Replay payload or current-rule recalculation.
-6. Switch the history window, authenticated on-demand reads and client consumption together. Keep viewer filtering and identity stable across window movement, paging, cancellation and undo branches. Apply current-name projection only to presentation. Earlier backend slices retain the full payload until this stage.
-7. Repeat the same workloads and accept the completed group only when both latency/CPU cost and cumulative persistence write volume improve beyond the frozen thresholds, while capacity and recovery requirements remain satisfied. A slice may improve one objective if the others remain within permitted variation.
-
-## Continuing validation requirements
-
-Recovery validation must include undoStep, undoAction, undo followed by a different action with a reused event sequence, same-length state replacement, rename, nested cross-player scope abort, Protected Observation boundaries and continuation after restart. Test SQLite atomic failure and retry for every new record/reference write, and round-trip the equivalent logical snapshot through JSON and memory adapters. Session fixtures use two players and explicit hands by default; the four-player fixtures are for the performance workload.
-
-Report logical serialized bytes separately from cumulative SQLite DB/WAL file writes. A WAL file's net growth is not its cumulative write volume. Run write tracing separately from latency measurement, retain raw results and exact invocations, and compare identical runtime and resource settings. Historical Replay payload and Viewer Builds remain immutable under ADR-0011; storage-only slices must preserve the raw Frame chain.
+- An inverse-state journal: must capture every mutation, observation boundary and nested rollback.
+- A general persistent object tree: broad changes to the mutable GameState model.
+- Only compressing existing snapshots: leaves the costly capture and cloning in place.
+- Session-wide dirty tracking or caching every history prefix: adds invalidation obligations or quadratic storage.
