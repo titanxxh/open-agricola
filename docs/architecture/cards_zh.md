@@ -21,7 +21,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 |---|---|---|
 | Card Source | `shared/cards/{A..E,M,major,community}/{Card}.ts`，包含 `meta` 与可选 `impl` | 服务端、沙盒和测试；主 client bundle 禁止引用 |
 | Card Display | 由 Card Source `meta` 生成的 `public/cards-manifest.json` | 主 client bundle 通过 `client/services/card-meta` 读取 |
-| Card Impl | Card Source `impl`，汇集到生成的 `ALL_CARD_IMPLS`（`shared/cards/register-all.ts`；大改良经 `major/runtime.generated.ts`）与 `CardRegistry` | 服务端和沙盒；主 client bundle 禁止引用 |
+| Card Impl | Card Source `impl`，汇集到生成的 `ALL_CARD_IMPLS`（`shared/cards/register-all.ts`，包括大改良）与 `CardRegistry` | 服务端和沙盒；主 client bundle 禁止引用 |
 
 - `meta` 即 Card Definition：可序列化、前端可见、无运行时行为的字段。允许声明式规则字段（`cost`、`prerequisite`、`*Prerequisites`、`cardField`、`isCookery`、能力 metadata）；不允许 `modifier(s)`、`listeners`、`effect` 与 `prerequisiteCheck`。`desc` 与 `prerequisite` 是印刷文字；可本地化的 `rules` 是补充裁定，不影响运行时。静态条件用 `*Prerequisites`，动态条件用 `impl.prerequisiteCheck`。
 - `impl` 包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用与 `reaches`。构建器可以把 `reaches` 投影到 manifest 顶层，但不能放进 `meta`。
@@ -46,7 +46,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 
 - 生产路径只通过生成目录与 `CardRegistry` 访问卡牌；测试可以导入单个 Card Source。Card Definition 是带 `kind: 'minor' | 'occupation' | 'playerAction' | 'major'` 的纯数据。
 - 生成目录必须保持同步（`pnpm run check:generated-cards-sync`）；工坊 PR 生成基于已拉取的上游生成文件打补丁，从不读部署机本地的卡牌树。
-- 大改良运行时源码只经 `major/runtime.generated.ts` 进入后端。
+- 带实现的大改良源码经两条生成路径进入后端：`scripts/generate-register-all.ts` 把它加入 `ALL_CARD_IMPLS`；`major/runtime.generated.ts` 提供 `majorCardSources`，`shared/cards/major/index.ts` 把其中的 `impl.effect` 合并进大改良 Card Definition。
 - 服务端与沙盒只注册自定义卡的运行时部分；主客户端只注册展示 metadata，从不导入自定义运行时注册表。
 
 ## `cardStates` 中的局部状态

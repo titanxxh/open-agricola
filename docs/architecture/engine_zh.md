@@ -70,7 +70,7 @@ type EngineFrame = {
 }
 ```
 
-- API 为 `push`、`pop`、`current`、`depth`、`peekPendingEnvelope`、`peekPendingHost` 与 `toCursor`。`push` / `pop` 创建与离开嵌套 frame（子流程、确认、农场选择）；hook 与 anytime flow 通过 `Engine.injectBeforeFlows()` 进入当前 frame。任何代码都不直接修改 `pending`。
+- API 为 `push`、`pop`、`current`、`depth`、`peekPendingEnvelope`、`peekPendingHost` 与 `toCursor`。`push` / `pop` 创建与离开嵌套 frame（子流程与确认）；hook 与 anytime flow 通过 `Engine.injectBeforeFlows()` 进入当前 frame，农场行动的 `farm-select` 请求作为 pending envelope 留在当前 frame 的行动节点上。任何代码都不直接修改 `pending`。
 - `EngineStackCursor` 序列化到 `PersistedSessionSnapshot.sessionCursor.engineStackCursor`；公开与 Replay 的 `SerializedGameState.engineStack` 保持为空。
 - 撤销历史保存整个栈的独立游标（每一帧、帧身份、原因、阶段续行、延迟切换与 resolve 边界）；`undoStep()` / `undoAction()` 重建它而不推进。
 - `SubFlowKind` 为 `choice`、`animal-reorg`、`confirm-next-player`、`confirm-player-switch`、`feed`、`farm-select`、`selection` 或 `card-draft`。`post-reap-anytime` 等合成窗口同时出现在 `SubFlowReason` 与 `PendingSyntheticKind`。
