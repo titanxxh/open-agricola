@@ -1029,7 +1029,7 @@ Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-contract-*-se
 
 ## 11. `server/`: Backend authority
 
-The server owns connections, Rooms, durable commit, persistence and the product HTTP APIs. It never adjudicates rules itself: every rule write goes through `GameSession`.
+The server owns connections, Rooms, durable commit, persistence and the product HTTP APIs. `GameSession` (`server/game/authoritative-session.ts`) is its rule command and query seam, and rule mutations run in the `GameCore` and action leaves it drives; connection, persistence and HTTP infrastructure never adjudicate rules outside it.
 
 ### 11.1 `server/connection/`: WebSocket entry
 
