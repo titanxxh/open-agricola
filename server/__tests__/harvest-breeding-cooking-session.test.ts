@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import '../../shared/cards/register-all'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { cloneState } from '../../shared/session/state-bootstrap'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
 import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { BASE_ANIMAL_KEYS } from '../../shared/contract/animals'
@@ -85,7 +85,7 @@ function sessionOptions(response: SessionResponse) {
 }
 
 function snapshot(response: SessionResponse): SessionResponse {
-  return { ...response, state: cloneState(response.state), interaction: structuredClone(response.interaction) }
+  return { ...response, state: captureStateWithHistory(response.state), interaction: structuredClone(response.interaction) }
 }
 
 describe('ordinary harvest breeding forbids animal cooking', () => {
@@ -115,7 +115,7 @@ describe('ordinary harvest breeding forbids animal cooking', () => {
     expect(stone, JSON.stringify(sessionOptions(opened))).toBeDefined()
     const rejected = session.resolveChoice(0, choice)
     expect(rejected.ok).toBe(false)
-    expect(rejected.state).toEqual(opened.state)
+    expect(captureStateWithHistory(rejected.state)).toEqual(opened.state)
     expect(rejected.interaction).toEqual(opened.interaction)
     expect(rejected.state.log).toEqual(opened.state.log)
     const traded = ok(session.resolveChoice(0, `bulk:${stone!.value.split(':')[1]}=1`))
@@ -132,7 +132,7 @@ describe('ordinary harvest breeding forbids animal cooking', () => {
     expect(before.interaction.anytimeActions.some(action => action.id === 'exchange')).toBe(false)
     const rejected = session.takeAnytimeAction(0, 'exchange')
     expect(rejected.ok).toBe(false)
-    expect(rejected.state).toEqual(before.state)
+    expect(captureStateWithHistory(rejected.state)).toEqual(before.state)
     expect(rejected.interaction).toEqual(before.interaction)
   })
 
