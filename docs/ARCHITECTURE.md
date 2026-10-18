@@ -126,7 +126,7 @@ e2e-tests/     Playwright browser tests
 
 ## 4. `shared/contract/`: Protocol Layer
 
-Its only purpose is to centralize shapes needed by the frontend, backend, and sandbox. The main frontend bundle may read only `shared/contract/`, `shared/i18n/`, `shared/domain/`, and manifest-backed `client/services/card-meta`; other shared modules do not enter that bundle.
+This module centralizes the shapes shared by the frontend, backend and sandbox, and contains no rule code. The main frontend bundle may read only `shared/contract/`, `shared/i18n/`, `shared/domain/` and the manifest-backed `client/services/card-meta`.
 
 ### 4.1 Key Files
 
@@ -164,43 +164,26 @@ Selected fields:
 }
 ```
 
-`actionSpaces[*].takenBy` is a `WorkerRef[]`. An ordinary reference contains only `playerId` and `workerId`. Linked occupancy created by a card may additionally contain `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`. Cleanup can then use semantic metadata stored on the action-space state instead of reading another card's ID.
+- `actionSpaces[*].takenBy` is `WorkerRef[]`. Card-created linked occupancy adds `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`, so cleanup reads semantic metadata instead of another card's ID.
+- `spend-worker` puts a Card-held Person on a non-interactive `card-worker:<sourceCard>` holder created by the pure factory in `shared/domain/card-worker-space.ts`. Its WorkerRefs are placement facts until return-home cleanup, even if the source card leaves the played zone; recovery recreates the holder definition from code and never accepts stored callbacks.
+- `workPhaseObtainedResources` (cleared after returning home) and `completedFeedingPhases` are shared facts cards read instead of keeping per-card counters.
+- Placement facts are aggregates: `farm.animalMoved.newlyPlacedOnFarmyard` counts newly placed reserve animals in physical farmyard zones (a card zone with a `farmPosition` on the owner's farm counts as physical), and `addFarmyardSpaceState(..., eventSink)` emits positive goods additions to a physical field as `resource.moved`; logical card fields stay separate locations.
 
-`spend-worker` records a Card-held Person on a noninteractive `card-worker:<sourceCard>` holder. Its WorkerRefs are authoritative placement facts: worker availability, undo and recovery retain them until normal return-home cleanup. Creation and Core-owned state normalization share the pure factory in `shared/domain/card-worker-space.ts`. JSON rehydration only decodes data; Core restores the holder after initializing its rule environment. Recovery recognizes the reserved prefix with a nonempty complete source ID, recreates the nonexecutable definition from code, and restores occupancy without accepting stored callbacks or arbitrary unknown executable spaces. The source card need not remain in the played zone for an already placed person to stay unavailable.
+**Events and logs.**
 
-`workPhaseObtainedResources` supports cards such as A53 that inspect resources gained during the previous work phase. It is cleared after the returning-home phase resolves.
+- `events` is the public structured rule-event stream. Backend rules write `GameEvent`s; mappers derive the text log, notifications, highlights, animations, audit and Replay. `log` is a cache and never a rule source. Only named cache boundaries write it (`appendImmediateEvents()`, `GameCore.flushEngineLog()`); `pnpm run check:direct-session-log` enforces this.
+- Every public `GameEvent['type']` appears in `shared/events/event-mapping-policy.ts`, marked mapped, conditionally mapped or intentionally silent per consumer. Adding an event type adds its policy entry, mapper fixtures and documentation. `eventsToLogEntries()` writes no generic fallback rows.
+- `buildLogPresentationPlan()` is the single source of Action Log relationships (`rows`, `consumedEvents`, `suppressedEvents`); the client never infers relationships from names, counts or card IDs.
+- `EventStore` gives each new event an opaque `occurrenceId`, kept through snapshots, rebasing, cancellation and projection. Derived log rows carry `LogEntry.sourceEvent = { occurrenceId, rowIndex }`; cache matching uses it plus the log key, and older records without these fields keep parameter-count matching.
+- Card purchases carry `PaymentInfo.publicPayment` into `card.played.payment` with a `paymentId` shared by the exact `resource.paid` event; a free play carries an explicit empty receipt.
+- `publicEventArchive` is append-only metadata: `publicEvents.committed` and `publicEvents.canceled` packets, validated before writing. Rules and listeners never read it. Runtime `publicEventCancellations` are restoration-response metadata only, filtered and remapped per viewer like the archive; reconnect and `getState` never replay them.
+- Only `visibility: 'public'` events enter `GameState.events`. `privateEvents` is a per-viewer synchronization layer for private prompts and hand or draft changes; it never enters Replay or rules.
 
-`completedFeedingPhases` increments in the feeding phase of `shared/session/phases/harvest.ts`. It matches the reference's global count. Cards such as A148 and B86 read it for completed-harvest-plus-one capacity instead of maintaining a per-card post-play counter.
+**Seed and viewer projection.** Game Seed is server-private ([ADR 0020](adr/0020-game-seed-is-server-private-and-unguessable.md)); `shared/utils/rng.ts` owns wide and Explicit Seeds. `filterSerializedStateForPlayer` drops `gameSeed` for every viewer and returns `null` for each Unrevealed Round Card, in `roundActionOrder` and in the `actionId` of goods scheduled on it (a card can reveal one early through the public `action.revealed` event). Live sync, Bug Report evidence and the Replay seat perspective share this projection. Dev-room `dev-viewer` sync keeps round-card order visible but still drops the seed; `debug` is the full state for hotseat rooms and the dev-room unredacted read.
 
-`events` is the public structured rule-event stream beneath `GameState.log`. Backend rules first write `GameEvent`; mappers then derive UI logs, animation cues, audit reports, and future replay. `log` remains the visible text-log cache and is never a rule source. Rule code does not write `state.log` directly. The only writers are named cache boundaries: mapper output from `appendImmediateEvents()` and mapper output flushed from engine `LogStore` by `GameCore.flushEngineLog()`. `pnpm run check:direct-session-log` enforces this boundary.
+**Persistence shapes.** `SerializedGameState` is the public network and Replay representation; its `engineStack` is always empty. `PersistedSessionSnapshot` stores authoritative `state`, public `frame` and a server-private `sessionCursor` (engine restoration data, history, provisional continuation metadata) that never reaches a viewer. Synchronization versions and connections are not part of `GameState`.
 
-The client incrementally consumes selected public events by stable `occurrenceId` to produce transient notifications, action, farm, and fence highlights, and resource animations. Its room-scoped seen set survives sliding windows and viewer sequence remapping; a new occurrence still produces feedback when it reuses a display sequence. An initial snapshot initializes the cursor without replaying historical events. Cancellation clears transient feedback and adds the restored snapshot to the seen set; local replay does not advance it. This cue layer serves UI feedback only. Legacy action-result detail also reaches the mapper through public events such as `action.detailLogged` instead of writing rule facts directly into `state.log`. `nextEventSeq` is the persisted event cursor. `normalizeState` drops old events that violate the public envelope, schema, JSON, or size guards, then continues from the greatest valid `seq`.
-
-`farm.animalMoved.newlyPlacedOnFarmyard` records newly placed reserve animals in physical farmyard zones. The reorganization commit compares per-zone counts, subtracts decreases in all existing zones from positive farmyard changes, and clamps at zero. Existing relocations fill farmyard increases before reserve animals; card-only storage and old animals changing zones do not count. Card zones with `farmPosition` on the animal owner's farm, such as Home Wood and Horse Trough, count as physical farmyard zones. This is an aggregate placement fact, not persistent animal identity. `addFarmyardSpaceState(..., eventSink)` emits positive goods additions as `resource.moved` to a physical field; logical card fields remain separate locations.
-
-Every public `GameEvent['type']` must appear in `shared/events/event-mapping-policy.ts`. The policy marks Action Log, public notification, board or farm highlight, resource animation, and replay handling as mapped, conditionally mapped, or intentionally silent. `eventsToLogEntries()` never writes generic fallback rows into `GameState.log`; replay-only summaries remain in the client timeline layer. A pull request adding an event type must also add its policy, mapper fixtures, and documentation.
-
-`buildLogPresentationPlan()` is the sole source for Action Log presentation relationships. `rows` are visible entries, `consumedEvents` are events absorbed into richer entries, and `suppressedEvents` are semantically excluded from the Action Log. The client timeline filters only by these structured event references; it must not infer relationships from player names, resource counts, card IDs, or events in another archive packet. A plain-resource `futureMeeple.resolved` is suppressed because a later `resource.moved(reason='receive')` shows the actual receipt. Resolutions with independent room, field, stable, forest, or moor effects retain a separate entry.
-
-Card purchases carry `PaymentInfo.publicPayment` from the pay child into `card.played.payment`: actual resources, bonus sources, returned card, and an opaque `paymentId` shared with the exact `resource.paid` event. A free play carries an explicit empty resource receipt without inventing a zero-payment event. The mapper renders that receipt even when the payment is in another packet/page; consumed relations use the explicit ID, not nearest-payment inference. Synthetic events without receipts have a bounded fallback that cannot reuse a payment preceding another play or sourced from another card. New receipt fields remain in newly recorded Replay Frames; existing Frames are not rewritten.
-
-New events receive an opaque `occurrenceId` when `EventStore` completes the draft. It identifies a Public Event Occurrence independently of reusable `id`/`seq`, archive numbering, player names and translations; transaction snapshots, commit rebasing, cancellation and viewer projection retain it. The mapper attaches `LogEntry.sourceEvent = { occurrenceId, rowIndex }` to each derived row. Snapshot-cache/event-timeline matching uses this association plus the log key, not display parameters, so separate identical triggers remain separate and canceled attempts cannot consume a later occurrence's cache row. Unmatched logs remain visible.
-
-Occurrence identity and log source association are JSON fields in newly written rule-event/log records, not only Room History presentation metadata: new Replay Frames therefore retain the association without depending on a Room or re-running rules. This does not change rule outcomes or rewrite existing Frames/hashes. Existing records without occurrence/source fields keep their original parameter-count matching; no backfill or migration is performed. New identified rows do not participate in that legacy matching pool.
-
-`publicEventArchive` is append-only public event metadata. A `publicEvents.committed` packet records committed public event IDs and sequences. A `publicEvents.canceled` packet records event IDs, sequences, and complete public payloads canceled by undo or provisional scope rollback for later replay and archive UI. Archive writes first validate packet-sequence and cursor invariants and reject private, malformed, non-JSON, or oversized payloads. If a corrupt event prevents writing a canceled packet, the runtime cancellation still returns without persisting the invalid payload. If live archive invariants are already corrupt, the restoration is not committed. Rules and card listeners read only current `GameState.events` or transaction events, never the archive.
-
-The client Action Log consumes `publicEventArchive` as a read-only replay timeline. It combines the archive with current `events` to rebuild active, canceled, and missing rows. Canceled rows retain their packet payload and render with strikethrough. Selecting a replay row produces local notification, highlight, and resource-animation cues with `replay:` IDs. It never modifies `GameState`, sends a command, or advances the live public-event cursor.
-
-Runtime `publicEventCancellations` for undo and provisional scope rollback is response metadata. It is not added to `GameState.events` and appears only in the current restoration response. When restoration removes committed public events, HTTP and WebSocket payloads include the cancellations. The client uses them to clear current transient feedback and align its public-event cursor with the restored snapshot. Reconnect and `getState` do not replay old cancellations. Persistent cancellation history remains in `publicEvents.canceled` packets. Before entering a per-viewer payload, runtime cancellation and that viewer's `publicEventArchive` use the same hidden-event filtering and sequence remapping.
-
-Initially, only rules events with `visibility: 'public'` may enter `GameState.events`. Private prompts, hands, draft state, and living-hand information remain in snapshot, privacy, and pending channels. `privateEvents` is a separate per-viewer synchronization layer describing private prompts and hand or draft changes visible in the current snapshot, such as `private.promptShown`, `private.handChanged`, and `private.draftUpdated`. The client consumes them as transient UI notifications. They never enter the public replay stream or become rule sources. Card-driven hand changes emit through a runtime-only response buffer, not `ActionExecutionResult`, engine snapshots, history, or `GameState.events`.
-
-Game Seed is server-private (ADR-0020). When no seed is given, `gameSeed` is a wide seed: a 128-bit random hex string whose random streams come from HMAC-SHA256 in counter mode, one labelled stream per use. An Explicit Seed is a number that keeps the original generator, so tests, dev rooms, and debug endpoints stay reproducible; it protects nothing. The ordinary-deck and parent-selection seeds are independent of `gameSeed` and equally wide. `shared/utils/rng.ts` owns both paths.
-
-The viewer projection `filterSerializedStateForPlayer` drops `gameSeed` for every seat and spectator, and returns `null` for each Unrevealed Round Card in `roundActionOrder` and in the `actionId` of goods scheduled on it. A round card is revealed when its round starts, and none is revealed before the `playing` phase; a card effect can reveal one earlier, which the projection reads from the public `action.revealed` event. Live sync, Bug Report evidence, and the Replay seat perspective share this projection. The `dev-viewer` sync mode, used only for live sync to a dev room, keeps the round-card order visible and still withholds the seed; `debug` remains the full state for hotseat rooms and the dev-room unredacted read.
-
-`SerializedGameState` is the public network and Replay representation of `GameState`; its `engineStack` is always empty. `PersistedSessionSnapshot` separately stores authoritative `state`, public `frame`, and a server-private `sessionCursor`. The private cursor contains engine restoration data, history, and provisional continuation metadata for cross-process recovery, and never enters a player or spectator payload. Interaction requests use a separate viewer-safe pending protocol so another player's choice data cannot leak through the cursor. Synchronization versions and room connections do not belong in `GameState`.
+Tests: `shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`, `shared/session/__tests__/{serialization-filter,serialization-archive-projection}.test.ts`.
 
 ### 4.3 PlayerState by Responsibility
 
@@ -211,11 +194,11 @@ The viewer projection `filterSerializedStateForPlayer` drops `gameSeed` for ever
 - Played cards: `improvements`, `minorPlayed`, `occupationPlayed`
 - Hands: `minorHand`, `occupationHand`
 - Persistent effects: `majorEffects`, `activeModifiers`
-- Supply tokens: `supplyTokensConsumed` records permanently consumed fence or stable components; helpers calculate the remaining limit dynamically
-- **Card-local state:** `cardStates`, described in section 8.3
-- **Worker identity:** `workers: Worker[]`, with five fixed slots identified by `'1'..'5'`. `isActive` and `isNewborn` describe permanent family members; optional `supplyUse` records a reserved, pending, or temporarily placed supply person, its source, return round, and return-to-supply or remove-from-game disposition.
+- Supply tokens: `supplyTokensConsumed` records permanently consumed fence or stable components; helpers calculate the remaining limit
+- Card-local state: `cardStates` (§8.3)
+- Worker identity: `workers: Worker[]` with five fixed slots `'1'..'5'`; `isActive` / `isNewborn` describe permanent family members, and optional `supplyUse` records a reserved, pending or temporarily placed supply person and its disposition
 
-`PlayerState.fields` is the private storage of Farmyard Fields. Card-facing rules use the Logical Field boundary described in section 8.5; only geometry and board-occupancy rules request Farmyard Fields explicitly. `Field.stacks: CropStack[]` stores the bottom stack at index 0 and the top stack last.
+`PlayerState.fields` stores Farmyard Fields (bottom stack first). Card-facing rules use the Logical Field seam (§8.5); only geometry and occupancy rules ask for Farmyard Fields.
 
 ### 4.4 ClientCommand
 
@@ -244,22 +227,11 @@ type ClientCommand = (
 ) & { requestId? }
 ```
 
-Important boundaries:
-
-- `newGame.seed` is honored only in a dev room. Any other Room ignores it and draws a wide seed (ADR-0020).
-- `loadGame` is a dev command like `devSetResources`: it replaces the authoritative state and is rejected outside a dev room.
-- There are no separate `reorg`, `feed`, `nextPlayer`, or `confirmPlayerSwitch` commands. Every such wait shape is sent through `choice`, with `payload` determined by `InteractionRequest.kind`.
-- `commitSelection` remains separate only for structured targeted selections such as farm-position, occupation-hand, resource-quantity, and resource-batch-exchange. Occupation-hand selections must be unique subsets of the player's hand within the declared limits; Session and the internal selection effect share validation before any effect, random observation or private cache write. Farm-position may use `validPositionGroups` for server-validated coordinate sets, including the adjacent two-space Farmers of the Moor Farmyard Extension. A selectable position may also carry `sourceCard`, `cardFieldSlot`, and `groupKey`: selection limits count distinct groups, and the backend canonicalizes multiple submitted positions from one group to one position before applying the effect. The client renders card-sourced virtual positions on the matching played-card slot instead of extending the farm grid.
-- `enableParentCards: true` enables Parent Cards. With `draftParents: false`, each player receives a parent pair directly without entering `parent-selection`. Room metadata persists this choice across `newGame` and backend restarts.
-- `enableSnakeOpening: true` enables the Snake Opening Game Variant (BGA "Snake opening"). The protocol default is `false`; the lobby form pre-checks it. `createInitialState` ignores it for a single seat. When active, every player starts with 3 food and `GameState.snakeOpening = { reversed: false }`; in round 1 the work rotation flips to reverse Round Work Order the first time it would wrap past `roundFirstPlayerId`, emits `snakeOpening.reversed`, restarts the backward walk from the seat that just acted, and stays reversed until the round ends. `continueAfterBeforeWork` resets `reversed` at each work phase start. Room metadata, `game_results`, `sandbox_settings`, and `newGame` persist the flag like the other variant flags.
-- Workshop cards use a two-dimensional state model from PRD #634 in `server/workshop-status.ts`: review state `unsubmitted / in_review / approved / stale / merged` and publication state `live`. `enterReview` atomically binds one eligible pull-request URL, pins its head as `review_commit_sha`, and pins the same Design Draft as `review_version_id`. A card branch reuses only a pull request that remains open, non-draft, and based on `main`. A closed pull request remains history and requires explicit resubmission. Merged pull requests follow built-in takeover. Draft or retargeted pull requests pause delivery without automatic replacement.
-- After binding, the server immediately refreshes the GraphQL snapshot to cover approval webhooks arriving before the local binding. A temporary refresh failure retains the successful binding, clears synchronization time, and lets the author retry through `refresh-pr-status`. A valid approval must match the current head and come from a reviewer with push permission. No OWNER approval is synthesized. Real exact-head approvals call `approveReviewedVersion` to set `approved_version_id`.
-- Publish re-queries GraphQL and requires the head SHA, review SHA, `approved_commit_sha`, and pinned-version mapping to agree before setting the card live. A different head, a closed pull request, draft transition, base other than `main`, dismissed approval, or `CHANGES_REQUESTED` becomes `stale·offline`. Potentially out-of-order synchronize, dismissal, and qualification events reread GraphQL first. Late review events for an already merged pull request retain the same-head binding; comment-only reviews preserve state. Unbound or ambiguous Workshop events do not query GitHub. An asynchronous snapshot commits only if the review binding, lifecycle, and monotonic update time are unchanged before and after the query; publish likewise checks an unchanged live-state token. GraphQL failure records the delivery and conservatively moves the card to `stale·offline`. `github_webhook_events` deduplicates delivery IDs. Webhooks invalidate and advance state, but publish never treats cached state as final. Migration v26 removed the old draft/published `status` column and reset existing cards to `unsubmitted·offline` under #632.
-- `customCardIds` affects a real room only with `enableCommunityDeck: true`. Otherwise the server ignores the IDs and stores no corresponding custom-card metadata. When enabled, only live Workshop cards that are approved and published are accepted, using the reviewed `approved_version_id` snapshot through `loadLiveDraft`. An author's unreviewed code may run only in the Workshop sandbox through `POST /api/game/new-sandbox` and the browser-local executor; it never enters real-time multiplayer.
-- Both real room creation and room recovery use `loadCustomCards(..., { liveOnly: true })`. Loading evaluates each ID independently. The requesting author's own non-live card sets `hasNotLive` and makes `handleCreateRoom` reject room creation with guidance to review and publish. Every other unloadable ID, including another author's non-live card, an unauthenticated request, or a missing ID, is silently filtered so the room can start without it. This prevents disclosing whether an ID names another user's draft. In all cases, unreviewed code never reaches the `GameSession` executor; only author-facing error feedback differs.
-- The former replay-snapshot consent round trip, `confirmReplayCardSnapshotPublic` and `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`, was removed because non-live cards can no longer enter real rooms.
-- Graduation under #642 occurs when the review pull request is closed as merged into `main`. The card enters terminal `merged` state, becomes read-only in Workshop, and rejects edit or unpublish. A pull request merged into another base does not graduate and becomes `stale·offline`. If merge arrives before approval, `github_pr_status='merged'` persists the fact. A later approval webhook or `refresh-pr-status` can read an approved MERGED snapshot, validate the frozen head and SHA binding, graduate the card, and reconcile built-in status immediately. A live merged card continues serving its reviewed snapshot until release. On service startup, `markBuiltInMergedCards` compares the built-in registry, sets `built_in=1`, lets the built-in definition take over, and retires the Workshop snapshot.
-- Takedown has two tracks under #631 and #641. Author `unpublish` is gentle: existing games finish with embedded snapshots while new rooms are blocked. Administrator `POST /api/admin/cards/:id/takedown` is a kill switch: it forces `stale·offline` and calls `lobby.endRoomsUsingCard` to terminate every active room embedding the card, broadcasting `roomDissolved` with reason `card_takedown`. Those games do not score, produce completed Replay, or retain partial recording rows. A dismissed GitHub review uses gentle invalidation and never kills active rooms automatically.
+- `newGame.seed` is honored only in a dev room; elsewhere it is ignored and a wide seed is drawn. `loadGame` and `dev*` commands are rejected outside a dev room.
+- There are no separate `reorg`, `feed`, `nextPlayer` or `confirmPlayerSwitch` commands: every wait shape submits through `choice`, with `payload` determined by `InteractionRequest.kind`.
+- `commitSelection` is only for structured targeted selections (farm-position, occupation-hand, resource-quantity, resource-batch-exchange). Occupation-hand selections must be unique subsets within the declared limits, validated before any effect or random observation. Farm-position may use server-validated `validPositionGroups`; positions carrying `sourceCard` / `cardFieldSlot` / `groupKey` count by group and are canonicalized by the backend.
+- Game Variant flags (`enableParentCards` / `draftParents`, `enableThroughTheSeasons`, `enableFarmersOfTheMoor`, `enableSnakeOpening`) are Room options persisted across `newGame` and restarts; `draftParents: false` deals each player a parent pair without `parent-selection`.
+- `customCardIds` take effect only with `enableCommunityDeck: true` and only for live, approved Workshop cards (§11.6).
 
 ### 4.5 ServerEvent and StateUpdateEnvelope
 
@@ -301,11 +273,10 @@ type GameSyncPayload = {
 }
 ```
 
-`stateUpdate`, `roomWaiting`, `gameStarted`, `playerJoined`, `playerDisconnected`, and `roomDissolved` are broadcasts. `roomCreated`, `roomJoined`, `authOk`, and request-level `error` are unicasts. WebSocket broadcasts build a per-viewer payload using the connection's `viewerPlayerId`: the target player receives real private prompts and `privateEvents`, while others receive `private-prompt` redaction. An HTTP sandbox without `X-Viewer-Player` keeps the unfiltered multi-seat development flow; with that header it uses the same viewer filtering and seat guard. `cardWarnings` appears only in HTTP debugging and sandbox payloads so Workshop confirmation gates can report runtime custom-card failures; it is never broadcast to WebSocket viewers. HTTP game envelopes also carry `gameInstanceId`, a server-issued identity tied to the session instance and rotated after a successful state load. Workshop playtest confirmation compares this identity because a game seed can be reused. It is neither authorization nor model input.
-
-Hosted writes carry `commandContext`: an authenticated server-issued scope, stable command ID, original Room ID and expected committed version. Draft and parent submissions also carry a non-undoable input-window ID shared across that simultaneous phase. `requestId` only correlates one transport exchange. The router resolves durable receipts before input freshness, rejects changed content under the same identity, and persists each result with its Room/lifecycle transaction. Receipts contain outcome identifiers and hashes rather than another Frame copy, and are private to their actor. Expired scopes cannot become new operations after cleanup.
-
-`WsGameTransport` keeps unconfirmed commands in a tab-local journal, isolates old socket callbacks, and suspends input while reconnecting. Recovery queries receipts before resuming the seat, waits for a complete filtered snapshot, then retries only still-valid original inputs with the same identity. Creation can recover without a previously received Room ID; rematch resolves its new permanent identity before accessing the retired Room. Terminal authentication, seat and lifecycle errors stop reconnecting. UI subscriptions belong to the transport, so they remain attached across sockets.
+- `stateUpdate`, `roomWaiting`, `gameStarted`, `playerJoined`, `playerDisconnected` and `roomDissolved` are broadcasts; `roomCreated`, `roomJoined`, `authOk` and request errors are unicasts.
+- Every broadcast is built per viewer from the connection's `viewerPlayerId`: the target receives real private prompts and `privateEvents`, others receive `private-prompt` redaction. An HTTP sandbox without `X-Viewer-Player` keeps the unfiltered development flow; with it, the same viewer filtering and seat guard apply.
+- `cardWarnings` appears only in HTTP debugging and sandbox payloads. HTTP envelopes carry `gameInstanceId`, rotated after a state load; it is neither authorization nor model input.
+- Hosted writes carry `commandContext` (scope, stable command ID, Room ID, expected committed version); simultaneous draft and parent inputs share an input-window ID. The router resolves durable receipts before freshness, rejects changed content under the same identity, and persists results with the Room transaction. Receipts hold outcome identifiers and hashes and are private to their actor. `requestId` only correlates one exchange.
 
 ### 4.6 InteractionState: Frontend Rendering Authority
 
@@ -337,15 +308,14 @@ Frontend buttons use these `InteractionCommand` values from `allowedCommands`:
 takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | undoAction
 ```
 
-WebSocket `ClientCommand.type` names do not exactly match `InteractionCommand`. The frontend determines what can be done from `allowedCommands`; online commands normalize to `choice`, `commitSelection`, `action`, and related protocol names.
+- WebSocket `ClientCommand.type` names do not match `InteractionCommand` one to one; the frontend decides what is possible only from `allowedCommands`, and online commands normalize to `choice`, `commitSelection`, `action` and related protocol names.
+- `shared/session/interaction-state-adapter.ts` is the server projection seam. `GameCore.buildInteraction()` passes current state, `EngineStack`, anytime, undo and score snapshots, and one `projectPendingRequest(...)`; request payload construction lives behind it. `redactInteractionForViewer` consumes an already derived `InteractionState`.
+- Every new interaction exposes its command and options explicitly and is validated by the backend. Improvement choice values are bare `cardId`s; payment options keep the `pay:*` namespace. There are no encoded choice shortcuts or frontend adjudication.
+- Native card effects may implement `CardEffect.projectInteractionRequest(state, player, request, actionId)`, a pure query scoped to its own pending action. Session calls it with the effective pending owner to refresh choice availability and quantity limits before presentation, authoritative commands and single-choice advancement. It preserves prompt metadata, accepted decisions, cached random observations and progress, and never reruns execution, payment, drawing or logging.
+- `emit-choice` `multiSelect` offers individual candidates with nonempty, comma-free values; the client submits `valuePrefix + values.join(',')`. Generic validation rejects unknown, disabled or duplicate candidates and counts outside the current bounds before any card hook, and structured-prefix admission cannot bypass it. `minSelections: 0` allows an empty subset; a multi-select always needs explicit confirmation.
+- A private choice about a card visible in the recipient's hand may set `promptParams.cardId`; non-recipients receive `private-prompt` without it. The frontend never reads `cardStates`.
 
-`shared/session/interaction-state-adapter.ts` is the server projection boundary for `InteractionState`. `GameCore.buildInteraction()` passes only current `GameState` and `EngineStack`, anytime, undo, and score snapshots, and one `projectPendingRequest(PendingInteractionProjectionInput)`. Construction of animal-reorg zones, farm-select payloads, and selection payloads lives behind that projection request builder instead of being scattered among adapter closures. Viewer redaction through `redactInteractionForViewer` consumes an already-derived `InteractionState` and never participates in pending or request derivation.
-
-When a private choice concerns one card already visible in the recipient's hand, the producer may set `promptParams.cardId`. Interaction Presentation localizes that card name for the prompt and highlights the matching hand card; non-recipients receive `private-prompt` without `promptParams`.
-
-Native card effects may implement `CardEffect.projectInteractionRequest(state, player, request, actionId)` to derive current choice availability or resource quantity limits. The callback is a pure query scoped to its own pending action; it must preserve prompt metadata, accepted decisions, cached random observations, and execution progress. Session refreshes the active pending request and its choices before presentation, authoritative commands, and single-choice advancement, using the effective pending owner (including cross-player responses). The same refreshed envelope drives submission validation, nested-anytime resumption, undo, and restored sessions. Projection never reruns action execution, payment, drawing, logging, or future mandatory continuations; cards retain their existing hidden/disabled-option and automatic-advance policies.
-
-`emit-choice` can declare `multiSelect: { valuePrefix, minSelections, maxSelections }`. Its options are individual candidates with nonempty, comma-free values, rather than all candidate combinations. The client collects a local subset and submits `valuePrefix + values.join(',')` through the ordinary `choice` command. Generic pending validation rejects unknown or disabled candidates, duplicates, and counts outside the current bounds before invoking any card hook; structured-prefix admission cannot bypass this validation. `minSelections: 0` permits an empty subset. Multi-select requests require an explicit confirmation even with one candidate. Cards derive dynamic limits through `projectInteractionRequest`; exhausted optional choices may become a single skip option. Card-local hooks own all resulting rule state, while the generic frontend renders candidate tiles, a count, confirmation, and optional skip controls.
+Tests: `shared/engine/__tests__/pending-validation.test.ts`, `shared/session/__tests__/{interaction-state-adapter,interaction-command-policy}.test.ts`, `server/__tests__/rejected-pending-input.test.ts`.
 
 ### 4.7 ActionChoiceOption and Previews
 
@@ -360,29 +330,27 @@ type ActionChoiceOption = {
 }
 ```
 
-`effectPreview` includes `resourceExchange`, `payment`, `text`, `resourceMovement`, `futureSchedule`, `futureOffers`, `actionSpace`, `cardScore`, and `fieldContents`. Common action primitives expose a pure `ActionDefinition.previewEffect` query; cards do not add presentation callbacks. Future requests share `normalizeFutureSchedule` with execution, including exact target filtering, prefixes, conditions, costs and room type. Queued-flow descriptors identify their own executable request and stop describing it after the queue has drained. The engine automatically aggregates previews for `seq(pay-resources, gain[, bonus-vp])` options. A card using handwritten `payLeaf` plus `gainLeaf` receives the same preview. Producers include `shared/cards/helpers/pay-gain-node.ts`, `shared/actions/effects/pay-helpers.ts`, and `shared/actions/effects/exchange.ts`.
+Choice Preview derives from shared executable rule plans ([ADR 0024](adr/0024-choice-previews-use-shared-rule-plans.md)); cards add no presentation callbacks.
 
-`descriptionPreview` is a recursive description of `ActionFlow`. A leaf uses `ActionDefinition.nameKey` plus its `effectPreview`; composite nodes join child descriptions by type: `SeqNode` with `, `, `XorNode` with ` / `, `OrNode` with ` + `, and `ParallelNode` with ` | `. The frontend prefers `descriptionPreview`, allowing ordinary leaves, pay/gain compositions, and nested XOR or SEQ nodes to derive option text from the engine.
+- `effectPreview` kinds are `resourceExchange`, `payment`, `text`, `resourceMovement`, `futureSchedule`, `futureOffers`, `actionSpace`, `cardScore` and `fieldContents`, produced by the pure `ActionDefinition.previewEffect`. Future requests share `normalizeFutureSchedule` (target filtering, prefixes, conditions, costs, room type) with execution. `seq(pay, gain[, bonus-vp])` previews aggregate automatically, including handwritten pay and gain leaves.
+- `descriptionPreview` recursively describes the flow (`ChoiceDescriptionPreview`): sequence, exclusive and inclusive choices, parallel order, optionality and actor. `Engine.describe()` reads the executable flow without advancing; `Engine.describeFlow()` describes a standalone plan; opaque native actions expose a pure `ActionDefinition.flowFactory` that execution also calls. Base descriptions omit player modifiers and keep every conditional case; deferred quantities keep their formula until due.
+- Visible option text comes from `descriptionPreview` and `effectPreview`; `choiceLabelKey` is only for semantic overrides. `special-effect` supplies semantic descriptions from `params.kind`, and display-only synchronization is omitted.
+- A preview describes declared effects; it does not promise that future conditions will hold. Consecutive identical future entries combine; others stay visible in order.
+- Current interaction choices use the Interaction Player and the authoritative payment solver, including quantity limits and alternative payment sources.
+- Farm-cell choices carry `ActionChoiceOption.target` (actor, logical field, positions, Card Field slots) and `targetCard`; the client renders these and submits the opaque value.
+- `collectScheduledEffectPreviews()` projects scheduled receipts, offers, timed rules and obligations as `ScheduledEffectPreview` (round, phase, source, description, multiplicity). Grouping changes display only; player filtering removes hidden sources and unrevealed action identity; rehydration strips these projections, and they cross the JSON boundary before joining a snapshot Frame.
 
-Generic helpers such as `pay-gain-node` no longer inject `choiceLabelKey: 'ui.interactionResourceExchange'` for mechanical pay/gain choices. Visible option text comes from `descriptionPreview` and `effectPreview`. Reserve `choiceLabelKey` and `choiceLabelParams` for semantic overrides such as field or quantity selection, `ui.interactionUseCard`, or `ui.interactionSeedResearcher`; do not duplicate i18n for plain resource exchanges. `special-effect` supplies semantic descriptions from `params.kind` so internal state synchronization is not exposed as a generic “Card Effect.” Display-only synchronization such as `set-infobox` is omitted from descriptions.
-
-Choice Preview describes declared effects before submission; it does not promise that future conditions or later choices will be satisfiable. Preserve explicit option names that distinguish branch meaning, and omit generic action names or repeated card names when they add no information beside the effect. For future schedules, combine only consecutive rounds with identical resources, amounts, and declared conditions. Alternating, nonconsecutive, or otherwise different entries remain individually visible in their declared order.
-
-Choice Preview is generated by generic mechanisms from authoritative rule data, without requiring each card to maintain a separate presentation implementation. For choices over farm cells, the server supplies legal targets and their selection bindings; the player selects directly on the farm board. The client does not infer target legality or interpret card-specific choice values.
-
-ADR-0024 records the shared rule-plan ownership decision. Opaque purchase outcomes and future-offer choices may migrate to executable shared primitives so execution and preview read the same rules. Declared deterministic storage writes may be projected on a detached copy using existing source-card scoring queries; this exposes the current source-card contribution change rather than a branch-wide final-score prediction. Card Field choices use their displayed slots with one Logical Field identity. A spatial target with multiple alternatives requires an explicit choice among those alternatives.
-
-`ActionChoiceOption.target` carries the actor, logical-field identity where applicable, occupied positions and explicit Card Field slot references. `targetCard` preserves physical action-card identity and its declared actions when several bindings share one cell. The frontend renders these facts and submits the original opaque value.
+Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tests__/anytime-description-session.test.ts`.
 
 ### 4.8 LogEntry
 
-`LogEntry { key, params, playerId? }` carries a structured i18n key plus rendering parameters. The frontend renders it for the active locale. New-game bootstrap entries may carry stable `playerId`; when WebSocket seat display names change, the client refreshes identity-based caches instead of matching potentially duplicate display text.
+`LogEntry { key, params, playerId? }` carries an i18n key plus parameters, rendered for the active locale. Bootstrap entries may carry stable `playerId` so seat display-name changes refresh by identity.
 
 ---
 
 ## 5. `shared/engine/`: Node-Tree Engine
 
-The node tree is the only state machine. `GameSession` no longer owns a `PendingAction` union; the engine cursor determines what input is awaited.
+The node tree is the only state machine: the engine cursor determines what input is awaited, and there is no `PendingAction` union.
 
 ### 5.1 Files
 
@@ -408,52 +376,30 @@ shared/engine/
 
 ### 5.2 Node Types
 
-Architecture decision from 2026-05-13: domain `ActionFlow` follows the reference node algebra and exposes only `leaf`, `seq`, `parallel`, `xor`, and `or`. `optional`, `promptKey`, `sourceCard`, `choiceLabel*`, and `targetPlayerId` are metadata, not domain node types. Cards and listeners construct only this small set; new rules must not expose runtime-only nodes through `ActionFlow`.
-
-Architecture decision from 2026-05-14: the runtime engine tree also has five concrete nodes: `ActionNode`, `SequenceNode`, `ParallelNode`, `XorNode`, and `OrNode`. Cross-player ownership, optional state, trigger selection, listener activation, and pending state are represented through node metadata, internal action leaves, pending envelopes, and frame state rather than wrapper nodes.
-
-`targetPlayerId` executes an ordinary flow node from another player's perspective. Runtime compilation converts it into `ownerPlayerId` metadata on the target subtree; a child with an explicit owner keeps that owner. Top-level Session builders and dynamic insertion paths for hooks, listeners, action `result.flow`, and resolveChoice follow-ups must carry the current effective owner so later siblings can return to the frame or ancestor owner. Cursor restoration persists node-owner metadata instead of inferring it from global `currentPlayerIndex`. `injectBeforeFlows(flows, ctx)` drains only injected nodes owned by `ctx.player`; a before-placement node owned by another player returns to the Session driver, which runs it in that player's context.
-
-Runtime nodes:
-
-- `ActionNode` is equivalent to the reference `LeafNode(action)` and calls `ActionDefinition.execute` with `actionId` and `params`.
-- `SequenceNode`, `ParallelNode`, `OrNode`, and `XorNode` correspond to the reference `SEQ`, `PARALLEL`, `OR`, and `XOR`. After choosing a composite branch, `XorNode` stores `selectedChildId` and traverses only that branch until completion so `xor(seq(...))` does not finish after its first successful leaf. A leaf selected directly by an OR/XOR branch stores the branch value as `selectedBranchChoice`, persisted in the cursor. When that leaf completes without an interaction of its own, its `immediatelyAfter` and `after` reactions receive the branch value as `choice`, whether it runs at once, after `before` reactions, or after an owner handoff. A leaf that issues its own request still completes with the submitted value as `choice`; for example, occupation reactions read the played card. `ParallelNode(mode='trigger-select')` implements reaction selection with pass and mandatory semantics for action listeners, phase card-effect activation, and extra-turn providers.
-
-Shared runtime metadata:
-
-- `ownerPlayerId`: cross-player execution owner, inherited from the ancestor or frame unless the child sets one explicitly.
-- `optional`, `optionalActive`, `optionalPromptKey`: optional accept or skip state. `xor` and `or` retain a direct `__skip__` option.
-- `mandatory`: an accepted mandatory continuation marks both its host node and descendant `ActionNode`s. Internal `afterHostCommit` children and every flow dynamically returned or injected from a mandatory node inherit the marker recursively. If a later leaf cannot execute, it returns mandatory-blocked and Session enters undo-only `engine-blocked` instead of silently completing a partial continuation.
-- `selectedChildId`: runtime selection cursor for `XorNode` and trigger-select `ParallelNode`. Cursor restoration persists it so a chosen composite branch or provider resumes after pending state, undo, or WebSocket restoration.
-- `resolveAfterSelection`: one-shot trigger-select mode. The parent resolves immediately after the selected child completes. Extra-turn provider selection uses this so sibling providers are not offered after one is chosen.
-- `pending: PendingEnvelope | null`: input envelope. `InteractionRequest` is a WebSocket and Session protocol shape, not a tree node. Leaf requests, `xor`, `or`, optional nodes, trigger-select parallel, and synthetic confirm, feed, and farm-select all pause and restore through pending envelopes. Every request kind a leaf returns, including from an OR/XOR-selected branch or after an earlier pending choice, opens a pending envelope whose option surface comes from `interactionRequestChoices()`; completion reactions run only after it is submitted.
-- `animal-reorg` hand-off: when a leaf returns an `animal-reorg` request (a `reorganize` leaf, or `breed` under last-harvest enforcement), Session hands the reorganization to a reorganize sub-flow pushed above the frame. `Engine.deferPendingActionCompletion()` settles the host as `ok` and inserts an internal deferred-host node after it. When the frame resumes after the sub-flow, that node runs the host's `immediatelyAfter` and `after` reactions once, on the reorganized farm, with the host's source card, action context, space, branch choice and request-time events. A host `reorganize` keeps all of its listener phases: the sub-flow leaf carries `__hostOwnedListenerPhases` and matches no replace, `before` or completion listeners or action hooks, so the host's `before` is not repeated. For any other host, and for a reorganization Session starts itself, the sub-flow is the reorganization and runs its own `reorganize` phases.
-
-Listener activation is an internal leaf: `ActionNode(actionId='activate-card')`. Its parameters include `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, ownerCardZone, triggerPlayerId }`. `event` retains the triggering action's `actionContext`, including `targetSpaceId`; activation resolves the listener's actual `space` from that context. It bypasses the ordinary public-action pipeline, executes only the listener body, and inserts returned flow or follow-up actions into the engine.
-
-`before` reaction leaves may return `ok.beforeHostContributions`: JSON values keyed by namespace and source card. The engine uses the existing `continuationParentHostNodeId` to upsert each contribution into the original, unstarted host's `actionContext`; a leaf cannot choose an arbitrary host, and a contribution without a valid before host fails. Repeating a source replaces its contribution rather than appending it. These values follow the host through pending, private cursor recovery and undo, and are not inherited by independently granted or nested actions.
-
-Fencing separates `fenceCostDiscounts` (wood relief only) from `fenceSupplyReservations` (explicitly selected card-held ordinary fence pieces). Admission, previews and payment use the same host context and current supply. Only selected physical supply increases available pieces; commit consumes at most the number of newly built ordinary fences, independently of discounts and palisades. Actual cost attribution feeds payment previews and `resource.paid.bonusSources`; physical use emits `farm.fenceConsumed` with the supplying card's `sourceCardId`, even when another card granted the fence action. No player-wide pending fence slot or after-reaction cleanup is needed.
-
-`BaseNode` implements shared metadata, pending state, and cursor round trips. `EngineTree` and the five concrete nodes implement traversal.
+- Domain `ActionFlow` follows the reference node algebra and exposes only `leaf`, `seq`, `parallel`, `xor` and `or`. `optional`, `promptKey`, `sourceCard`, `choiceLabel*` and `targetPlayerId` are metadata, not node types; runtime-only nodes never enter card flows.
+- The runtime tree has five concrete nodes: `ActionNode`, `SequenceNode`, `ParallelNode`, `XorNode`, `OrNode`. Cross-player ownership, optional state, trigger selection, listener activation and pending state are node metadata, internal leaves, pending envelopes and frame state, never wrapper nodes.
+- `targetPlayerId` compiles to `ownerPlayerId` on the target subtree; explicit child owners win. Every dynamic insertion path carries the current effective owner, and cursors persist owners instead of inferring them from `currentPlayerIndex`. `injectBeforeFlows()` drains only nodes owned by the current player and returns others to the Session driver.
+- `XorNode` stores `selectedChildId` and drains only that branch; a leaf selected directly by OR/XOR stores `selectedBranchChoice`. When that leaf completes without a request of its own, its trailing reactions receive it as `choice`; a leaf with its own request completes with the submitted value. `ParallelNode(mode='trigger-select')` implements reaction selection (§7.7); `resolveAfterSelection` makes it one-shot.
+- Shared metadata: `ownerPlayerId`; `optional` / `optionalActive` / `optionalPromptKey` (XOR and OR keep a direct `__skip__`); `mandatory`, inherited recursively by `afterHostCommit` children and dynamically returned flows, so a later unexecutable leaf returns mandatory-blocked and Session enters undo-only `engine-blocked`; `selectedChildId`; `pending: PendingEnvelope | null`.
+- Every request a leaf returns opens a pending envelope whose options come from `interactionRequestChoices()`; completion reactions run only after it is submitted. `InteractionRequest` is a protocol shape, not a node.
+- `before` reaction leaves may return `beforeHostContributions` keyed by namespace and source; the engine upserts them into the unstarted host's `actionContext` through `continuationParentHostNodeId`. A contribution without a valid before host fails, and repeating a source replaces its entry. They follow the host through pending, recovery and undo, and nested or independently granted actions do not inherit them.
 
 ### 5.3 Engine Public API
 
-`Engine` exposes this small interface to `GameCore`:
+`Engine` exposes a small interface to `GameCore`:
 
 - `step(ctx)`: advance to the next unresolved node and stop at pending input.
 - `resolveChoice(value, ctx, payload?)`: supply player input and continue.
-- `peekPendingEnvelope()`: return the current `PendingEnvelope`, or null.
-- `peekPendingHost()`: return the node hosting that envelope for `sourceCard`, `actionContext`, and owner lookup.
+- `peekPendingEnvelope()`: the current `PendingEnvelope`, or null.
+- `peekPendingHost()`: the node hosting that envelope, for `sourceCard`, `actionContext` and owner lookup.
 - `injectBeforeFlows(flows, ctx?)`: insert hook flows.
-- `snapshot()` / `restore(snapshot)`: serialize and rebuild the tree, including `nodeStates`, pending envelope, owner, optional, and trigger metadata.
-- `hasPendingChoiceCompositeAncestor()`: tell anytime handling whether execution is inside a branch ancestor.
+- `snapshot()` / `restore(snapshot)`: serialize and rebuild the tree, including node states, pending envelope, owner, optional and trigger metadata.
+- `hasPendingChoiceCompositeAncestor()`: whether execution is inside a branch ancestor, for anytime handling.
+- `describe()` / `describeFlow()`: pure descriptions (§4.7).
 
-Card-sourced anytime entries use `evaluateFlowDoable()` at the shared list builder; command validation and harvest/pre-scoring windows consume that same list. The probe ignores only the root optional flag and uses the new flow's own source, parameters, and action context. It preserves current-step admission, including legal before/replacement paths and gains preceding later payments. Existing card guards still apply to composite flows with bookkeeping prefixes. An unavailable direct invocation is rejected before history or engine mutation. Accepted anytime flows carry mandatory obligations in both idle and interrupted interactions, including their required descendants; failure retains any interrupted host and uses the existing blocked/explicit-undo policy. Inner optional choices retain their skip behavior. Dynamically returned listener, action, replacement, and choice flows, including follow-up actions, inherit the injected-anytime origin marker from their parent context; completion markers and unrelated action parameters are not inherited. Listener activation events preserve the host action parameters alongside source and action context, so trigger previews and execution use the same selected renovation target as admission.
+`GameCore.engineDeps()` and every engine `proceed` share `syncDynamicActionSpaces()`, which registers board spaces whose definitions are missing from the execution directory; cards create spaces through public mechanisms and never touch the Session registry. A missing definition is an internal invariant error that rolls back the authoritative command.
 
-An anytime listener may declare `replacesTurn: true` when accepting it consumes the owner's current work-phase turn instead of interleaving with another action. Such entries are offered only from an idle work-phase interaction. Session opens the ordinary Turn Scope and action snapshot before injecting the flow, then completes it through the same end-turn hooks and player rotation as a worker action. It never offers a turn replacement inside an active action, pending stage flow, or nested anytime window. E062 Sour Dough is the reference implementation.
-
-`GameCore.engineDeps()` and every engine `proceed` share `syncDynamicActionSpaces()`, registering current board spaces whose definitions are missing from the execution directory. Cards create board spaces through public mechanisms and do not access the Session registry. A missing ActionDefinition is an internal invariant error handled by authoritative command rollback, not ordinary blocked admission, an unavailable branch or an optional skip. Ordinary doability failures and accepted mandatory continuations retain their existing blocked/undo semantics. Immediate post-purchase use, creation and use within one flow, undo/rebuy and pending restoration share these synchronization boundaries.
+Tests: `shared/engine/__tests__/{engine,engine-flow,tree-selected-branch,restore-regressions,optional-node-context}.test.ts`.
 
 ### 5.4 EngineStack
 
@@ -470,19 +416,18 @@ type EngineFrame = {
 }
 ```
 
-Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendingHost`, and `toCursor`.
+- Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendingHost` and `toCursor`. `push` / `pop` are the only injection path for hooks, anytime actions and nested subflows; nothing mutates `pending` directly.
+- `EngineStackCursor` is serialized into `PersistedSessionSnapshot.sessionCursor.engineStackCursor`; public and Replay `SerializedGameState.engineStack` stays empty.
+- Undo history stores a detached cursor of the complete stack (every frame, its identity, reason, stage continuation, deferred switch and resolve boundary); `undoStep()` / `undoAction()` rebuild it without advancing.
+- `SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection` or `card-draft`. Synthetic windows such as `post-reap-anytime` appear in both `SubFlowReason` and `PendingSyntheticKind`.
 
-`EngineStackCursor` is serialized into `PersistedSessionSnapshot.sessionCursor.engineStackCursor`. Restoration uses `engine.snapshot()` and each concrete node's cursor restoration to rebuild the tree and locate pending hosts and traversal state; public and Replay `SerializedGameState.engineStack` remains empty.
-
-Ordinary undo history also stores a detached `EngineStackCursor`, including every parent frame, frame identity, subflow reason, stage continuation, deferred player switch and resolve boundary. `undoStep()` and `undoAction()` rebuild the complete stack without advancing it; they do not replace a nested frame with a top-level frame. History cursors remain private and survive the same JSON snapshot round-trip as command checkpoints. This preserves stage completion when an anytime action is undone and repeated inside animal reorganization.
-
-The post-Reap window uses `post-reap-anytime` in both `SubFlowReason` and `PendingSyntheticKind`, so Session can distinguish its root choice from nested card choices without a card-specific branch.
-
-`SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection`, or `card-draft`.
+Tests: `shared/engine/__tests__/engine-stack.test.ts`.
 
 ---
 
 ## 6. `shared/session/`: Session Layer
+
+`GameCore` coordinates `GameState`, `EngineStack`, history, phase progression, interaction building, undo and responses. Phase functions in `phases/` are pure helpers, not mixins; all coordination converges in `GameCore`.
 
 ### 6.1 Files
 
@@ -499,18 +444,9 @@ shared/session/
     └── draft.ts
 ```
 
-`shared/session/phases/` contains phase-specific pure functions such as `startBreedPhase`, `continueAfterFeed`, and `startNewRound`. These are not mixin or trait classes; all coordination converges in the main `GameCore` class.
-
 ### 6.2 GameCore Entry Points
 
-`GameCore` owns:
-
-- `state: GameState`
-- `engineStack: EngineStack`
-- Step history and the action-start `actionStartSnapshot`
-- End-game scoring cache
-
-Commands wrapped by `GameSession` in `authoritative-session.ts` and exposed to the server:
+`GameCore` owns `state`, `engineStack`, step history with the action-start snapshot, and the end-game scoring cache. `GameSession` (`server/game/authoritative-session.ts`) is a thin wrapper that injects the isolated custom-card executor and builds viewer-filtered or debug payloads. Commands exposed to the server:
 
 ```text
 takeAction(playerIndex, spaceId)
@@ -523,8 +459,6 @@ performRoundEnd()
 loadState(raw)
 undoStep() / undoAction()
 ```
-
-`GameCore` is the domain engine. `GameSession` in `server/game/authoritative-session.ts` is a thin wrapper that injects the isolated custom-card executor and creates viewer-filtered or debug synchronization payloads. `server/connection/` and `server/game/` own connections, broadcasts, and persistence.
 
 ### 6.3 Unified SessionResponse
 
@@ -542,59 +476,60 @@ type SessionResponse = {
 }
 ```
 
-Tests assert this structure directly. WebSocket paths serialize it through `GameSession.buildSyncPayload()`, filter it for the viewer, and broadcast it. `InteractionState` remains the frontend interaction authority.
+- Session tests assert this structure directly; WebSocket paths serialize it through `GameSession.buildSyncPayload()` and filter it per viewer.
+- Every mutating command crosses one settlement boundary ([ADR 0015](adr/0015-provisional-cross-player-continuation-resolution.md)). Input Rejection restores the complete command checkpoint, including history and action-start metadata; accepted mandatory blocking keeps its effects. `ok:false` or `recoverable:true` alone never classifies a rejection. A rule-valid guard-breaking command keeps its durable provisional restoration and failure memory; an invalid input inside a guarded scope gains neither.
 
-**Session repair contract (#1257).** Internal command outcomes distinguish Input Rejection from accepted mandatory blocking. Pending-input validation and retryable choice rejection identify rejected input explicitly; a failed execution after accepting a branch remains blocked progression. Session settlement restores the complete rejected command checkpoint, including history and action-start metadata, before rebuilding the response. The prior state, scores, interaction and undo eligibility remain unchanged. `ok:false` and `recoverable:true` alone do not identify rejection. Rule-valid guard-breaking commands retain their durable provisional restoration and failed-attempt memory under ADR 0015; an invalid input does not gain that side effect merely because it was submitted inside a guarded scope.
+Tests: `server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`.
 
-### 6.4 Extra-Turn Rotation Extension: `contributeExtraTurn` and `hasPendingExtraTurn`
+### 6.4 Rotation, extra turns and supply people
 
-A092 Adoptive Parents introduced the extra-turn mechanism at the rotation layer under #203 and #204. Providers normally run after ordinary workers are exhausted. A provider with `extraTurnBeforeWorkers: true` also competes with ordinary placement during normal rotation; resolving either choice consumes one turn before the next eligible player acts.
+**Extra turns** ([ADR 0001](adr/0001-a92-adoptive-pull-model-extra-turn-hook.md), [ADR 0008](adr/0008-node-parallel-reaction-dispatch.md)):
 
-- `contributeExtraTurn?: (state, player) => ActionFlow | void` is a `CardEffect` hook. It returns that card's provider flow when available and `void` otherwise. `runCardEffectHook` does not execute it automatically; rotation gating in `shared/session/phases/round.ts` consumes it explicitly.
-- `collectExtraTurnContributions(state, player)` is the sole source. `hasPendingExtraTurn` checks for providers; `collectExtraTurnFlow` compiles the real interaction. One provider expands directly. Multiple providers use one-shot `ParallelNode(mode='trigger-select')`, with each child an internal `activate-extra-turn` leaf. The player first selects a source card; only then does its flow expand. Provider flow may contain nested interactions such as `xor(seq(...))`, and the selected branch must drain completely before the provider finishes.
-- A repeatable provider may define internal adjunct `countExtraTurns`, allowing mandatory turn skipping or forced consumption to consume one opportunity. `_extraTurnSkipCountsByCard` and `_extraTurnConsumedCountsByCard` record per-card skipped and consumed counts. `countPendingExtraTurns` and `consumePendingExtraTurns` reuse provider aggregation instead of a global player counter. A noninteractive fallback consumes one source in stable card order only when automatic progression is required.
-- Three round gates treat a player with a pending extra turn as eligible: next-active-player selection via `nextSeatedPlayerIdx`, whose predicate is `workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`; `roundWorkComplete`, requiring every player to have no available workers and no pending extra turn; and the rotation skip loop, which stops on a zero-worker player with a pending extra turn so the flow can be injected.
-- `startPendingExtraTurnIfAny(core)` is the only injection path, shared by work-phase entry, confirm-next-player rotation, state loading, and undo restoration. It only injects into an empty engine stack at the current seat. With ordinary workers available, eligible providers appear alongside ordinary placement and legal Moor special actions. Without ordinary workers, the existing one-provider or one-shot provider selection applies. A supply provider can be declined only once ordinary workers are exhausted; choosing an ordinary placement preserves later opportunities unless the card requires the first turn. First-turn cards consume their opportunity in the existing `onEndTurn` hook, including after a Moor special action that places no person.
-- A92 contributes XOR use or forfeit. Choosing Forfeit exits later opportunities that round. It triggers when ordinary workers are exhausted while an inactive newborn remains, using the existing newborn-specific lifecycle. M057 enters the card or board selection flow for a Moor special action and still invokes normal special-action before and after listeners.
+- `contributeExtraTurn?: (state, player) => ActionFlow | void` is a `CardEffect` hook consumed explicitly by rotation in `shared/session/phases/round.ts`, never by `runCardEffectHook`.
+- `collectExtraTurnContributions()` is the single source; `hasPendingExtraTurn()` checks it and `collectExtraTurnFlow()` builds the interaction. Three gates treat a pending extra turn as eligibility: `nextSeatedPlayerIdx`, `roundWorkComplete` and the rotation skip loop.
+- `startPendingExtraTurnIfAny(core)` is the only injection path, shared by work-phase entry, confirm-next-player rotation, state loading and undo restoration, and injects only into an empty stack at the current seat. A provider with `extraTurnBeforeWorkers: true` appears alongside ordinary placement and legal Moor special actions; otherwise providers run after ordinary workers are exhausted. A supply provider can be declined only once ordinary workers are exhausted, and choosing ordinary placement keeps later opportunities unless the card requires the first turn, which it consumes in `onEndTurn`. Pending ordinary-card draws defer injection.
+- A repeatable provider may define `countExtraTurns`. Skips and forced consumption count per source card in `PlayerState` fields, and `countPendingExtraTurns()` reuses provider aggregation instead of a player-level counter; a non-interactive fallback consumes one source in stable card order only when automatic progression requires it.
+- `onBeforePlayerTurn` returning `{ skipTurn: true }` makes rotation pass the player before their turn starts.
+- Snake Opening (ignored for a single seat) gives every player 3 starting food. In round 1, `nextWorkRotationIdx()` reverses the work rotation the first time it would wrap past the Round Work Order start, emits `snakeOpening.reversed` and stays reversed for that work phase; other orderings use the forward helpers.
 
-`skipTurn`, used by cards such as D134 Oyster Eater through `{ skipTurn: true }`, mirrors the reference `Globals::setSkipNext` and makes rotation continue past the player before their turn starts. `contributeExtraTurn` keeps an eligible provider in rotation, and `extraTurnBeforeWorkers` permits choosing that provider before ordinary workers are exhausted. See *Extra Turn / Forfeit* in `CONTEXT.md`.
+**Supply people:**
 
-Supply placements use `place-farmer` with `actionContext.workerSource: { kind: 'supply', disposition, workerId? }`. Execution locks one finite worker ID before showing targets; submission, target action, events, linked occupancy, movement, and undo retain it. Target actions use ordinary action semantics and placement statistics. A card-driven placement records its person-action identity in the existing Turn Scope so end-of-turn hooks receive the same trigger as ordinary placement.
+- Supply placements use `place-farmer` with `actionContext.workerSource: { kind: 'supply', disposition, workerId? }`. Execution locks one finite worker ID before showing targets; submission, events, linked occupancy, movement and undo keep it. A card-driven placement records its person-action identity in the current Turn Scope.
+- `inactiveWorkersInSupply()` excludes reservations, pending placements, temporary people and removed tokens; `availableWorkers()` includes a recalled temporary person, while family size, housing, feeding and scoring use permanent members.
+- `returnSupplyWorkers()` runs after every `onBeforeReturnHome` and before `onStartReturnHome`, removing every location of the exact ID and applying its disposition; recalled or moved people keep theirs, and reservations without a due return round survive returning home. Before that, `recordReturnHomePlacements()` captures final positions in `__roundPlacement__`; return-home effects read `getReturnHomePlacements()` or `getReturningPersonPlacements()` (which excludes synthetic blocks and removed people), never live occupancy.
+- A reservation is distinct from a placement opportunity; the reserving card releases it at its declared timing (for example, in the target StartOfTurn tree). Supply opportunities use ordinary current-step admission: an accepted use with no legal target blocks until explicit undo, with no future-target preflight or refund.
+- When extra housing expires, its capacity clears first; insufficient housing permanently removes only the first active person in stable family order (`removedFromSupply`, references cleared, `worker.returned` with `to=removed`).
 
-Cards that use an action space without placing a person use `place-farmer` with `actionContext.viaCardJump: true`, a `targetSpaceId`, and no `workerId`. This worker-less branch neither requires nor mutates a worker, does not emit `worker.placed`, and does not increment placement statistics. The card must first validate the target through `isActionDoableInFlowContext()`; execution then expands the target's ordinary action flow so replacement, cost, listener, and submission validation remain authoritative. A151 Minstrel uses this path during returning home after all ordinary people have already been placed.
-
-A same-person `jumpLeaf` carries the exact person from the triggering placement. Candidates and authoritative execution query the target as a relocation with `ignoreWorkerAvailability`, without requiring another person at home. The card grants an occupied-target exception through scoped `computeArgs`; ownership, source location, linked blocks, vetoes, target payment and the complete target flow remain authoritative. Before reactions use action-space-use semantics and exclude `requiresNewPlacement`. A129 moves the same person between its two fixed targets and retains `jumpChain` recursion protection. Relocation does not advance Person Placement Order or open another Turn Scope.
-
-`inactiveWorkersInSupply()` excludes reservations, pending placements, temporary people, and permanently removed tokens. `availableWorkers()` includes a temporary person recalled from the board, while family size, housing, feeding, and person scoring still use permanent members. `returnSupplyWorkers()` runs after all `onBeforeReturnHome` hooks and before `onStartReturnHome`; it removes every location of the exact ID and applies its original disposition. Recalled or moved people retain that disposition. A returned token is immediately eligible for family growth. Reservations without a due return round survive returning home; cards release or unlock them at their declared timing. Before that cleanup, `recordReturnHomePlacements()` captures the final board positions after all before-return moves in the existing per-player `__roundPlacement__` history. Return-home occupancy effects read `getReturnHomePlacements()` instead of live occupancy, so a returned supply person still counts and a newly vacated space does not create a false return-home opportunity. Each entry preserves its supply disposition: occupancy checks retain removed people as historical occupants, while `getReturningPersonPlacements()` excludes synthetic blocks and `remove-from-game` entries. Swimming Class, Curator, Seed Researcher, and Night-School Student use the returning-person view; Turnip Farmer, Minstrel, Bohemian, and Food Distributor use start-return-home occupancy. The snapshot survives pending serialization and undo, and `resetRoundPlacements()` clears it next round; live WorkerRefs remain the placement authority. Curator counts distinct returning person IDs on spaces defined by `gainPerRound`, including emptied accumulation spaces. Ordinary blocked/anytime/undo and Protected Observation boundaries remain unchanged.
-
-The supply-person model distinguishes a reservation from a placement opportunity. D022 releases its reserved ID in the target StartOfTurn through `onRoundStart`, ordered alongside that player's other round-start sources. After release, family growth or another supply effect can consume it. D022 requires an available supply person and locks its ID when used; the original reservation does not last until use or decline.
-
-Supply opportunities use the same current-step admission as other mandatory flows. They do not promise a legal target after their preceding payment or effect: an accepted E022 use with no legal target keeps its spent card food, flag and pending person in `engine-blocked` until explicit undo restores them. B022 likewise retains its mandatory blocked/undo boundary when its only supply person is reserved by another card; the accepted purchase cannot keep its two-food gain by skipping placement. Do not add future-target preflight or automatic refunds to these providers. Pending ordinary-card draws prevent extra-turn injection; resolving the last draw resumes the opportunity menu. See the [approved model](https://github.com/titanxxh/open-agricola/issues/841#issuecomment-5582219668) and [Session acceptance plan](https://github.com/titanxxh/open-agricola/issues/842#issuecomment-5582333821).
-
-Expiring extra housing first clears that source's capacity, then compares family size with physical rooms plus `getExtraRoomCapacity()`. Insufficient remaining housing removes only the first active person in the stable family collection, marks `removedFromSupply`, clears action-space, linked-block and held-worker references through shared cleanup, and emits `worker.returned` with `to=removed`. Family size, feeding, scoring and growth supply derive from person facts without a separate family limit or person-to-room binding.
+Tests: `server/__tests__/{supply-workers-session,snake-opening-session}.test.ts`.
 
 ### 6.5 Turn Scope and Action-Execution Scope
 
-Rotation opportunity, Turn Scope, and action-execution scope are separate lifetimes. Cards whose text says “on your turn” or “in the same turn” consume Turn Scope. Cards that inspect what was actually built, plowed, sown, or otherwise changed consume the current action's scope or transaction result.
+Rotation opportunity, Turn Scope and action-execution scope are separate lifetimes. "On your turn" and "in the same turn" read the Turn Scope; "what was actually built / plowed / sown" reads the current action's scope or transaction.
 
 | Rule situation | Rotation opportunity | Turn Scope | Action-execution scope |
 |---|---|---|---|
-| Ordinary worker placement or a Moor special action selected by rotation | Consume the current opportunity | Open a new scope | Open one scope for each complete Rule Action |
-| A contributed Extra Turn | Open an additional opportunity | Open a new scope | Open one scope for each complete Rule Action |
-| D051 Archway, or each worker moved by E010 Straw Hat | No new opportunity | Open a new scope for each moved worker | Open one scope for each complete Rule Action |
-| An immediate Rule Action that remains part of the current Turn | No new opportunity | Inherit the current scope | Open a new scope |
-| A phase or anytime Rule Action that does not count as a Turn, such as Iron Hoe | No new opportunity | None | Open a new scope |
-| A raw gain, payment, choice, or listener activation | No new opportunity | Inherit a scope if one exists | Do not open a new scope; remain in the surrounding scope |
+| Ordinary placement or a Moor special action chosen by rotation | Consume the current opportunity | Open a new scope | One per complete Rule Action |
+| A contributed Extra Turn | Open an additional opportunity | Open a new scope | One per complete Rule Action |
+| A card-driven worker move (each moved worker) | No new opportunity | Open a new scope per moved worker | One per complete Rule Action |
+| An immediate Rule Action that stays part of the current Turn | No new opportunity | Inherit the current scope | Open a new scope |
+| A phase or anytime Rule Action that is not a Turn | No new opportunity | None | Open a new scope |
+| A raw gain, payment, choice or listener activation | No new opportunity | Inherit if one exists | Stay in the surrounding scope |
 
-A Turn Scope begins before its worker placement, Moor special action, or equivalent card-driven action-space use. It remains active through every Rule Action, trailing effect, required animal reorganization, and end-of-turn hook belonging to that Turn, then clears. D051 Archway and each E010 Straw Hat movement carry the ordinary person-action trigger into those end-of-turn hooks. D051 closes its Turn Scope after the target action space and its hooks are fully resolved; E010 closes one scope before starting the next moved worker's choice. Idle or later stage processing must never observe a completed Turn's stale identity or start snapshot.
+- A Turn Scope begins before its placement, Moor special action or card-driven space use and lasts through every Rule Action, trailing effect, required reorganization and end-of-turn hook of that Turn; then it clears, and later processing never observes a completed Turn's identity or start snapshot. A moved worker's Turn passes the ordinary person-action trigger to those hooks and closes before the next worker is chosen.
+- Executing an "on your turn" effect requires the owner's active scope; a doability query may project the scope the current rotation player is about to open.
+- Multiple Rule Actions in one Turn share the Turn Scope and use separate action scopes. Per-action deltas use the action transaction.
+- `actionContext.trueAction` only says whether an effect counts as taking its named action for listeners; it creates no Turn and no action scope.
+- **Person Placement Order** counts normal person placements in the Work Placement Chronology: moving the same worker does not advance it; normally placing a temporary or recalled person does. `isCurrentActionSecondPersonPlacement()` prefers the current context's `placedWorkerId`.
 
-An action-execution scope begins before one Rule Action's lifecycle and remains active through its pending choices, continuations, listeners, and trailing effects. Multiple Rule Actions in one Turn use separate action scopes while sharing the Turn Scope. Per-action delta consumers use the action transaction, not the Turn's start snapshot.
-
-`actionContext.trueAction` is independent of all three lifetimes. It says only whether an effect counts as taking its named action for action listeners. It neither creates a Turn nor replaces an action-execution scope: a free build may use `trueAction: false` while still exposing its actual build delta to generic “when you build” rules.
+Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-placement-session}.test.ts`.
 
 ### 6.6 Snapshot data and executable-rule recovery
 
-**Session repair contract (#1258, #1270; ADR 0028).** New-game creation owns initial dealing. Loading or restoring an existing Session preserves present empty hands, stored card identities, missing optional rule fields, animal assignments and history; it does not re-deal or materialize a different rule-state representation. Invalid required input is rejected instead of being converted into a new game. Pure capture retains observed data. Session-owned rehydration rebuilds known executable definitions and engine cursors without replacing the captured data. Ordinary undo, command checkpoints, provisional checkpoints and process recovery share this preservation contract. Existing display-name and public-event cancellation/archive rules still apply at their respective boundaries.
+See [ADR 0028](adr/0028-session-recovery-preserves-authoritative-snapshot-data.md). New-game creation owns initial dealing. Loading or restoring a Session preserves present empty hands, stored card identities, missing optional rule fields, animal assignments and history; it never re-deals, and it rejects invalid required input instead of converting it into a new game. `rehydrateState()` only decodes data; the owning Core then rebuilds known executable definitions and engine cursors without replacing the captured data. Undo, command checkpoints, provisional checkpoints and process recovery share this contract.
+
+Tests: `server/__tests__/session-recovery-data.test.ts`.
+
+---
 
 ## 7. `shared/actions/`: Actions and Hooks
 
@@ -1336,13 +1271,19 @@ POST   /api/v1/github-app/webhook
 
 Public Replay APIs return versioned JSON and never expose PostgreSQL gzip or BLOB encoding. A Segment expands at most one checkpoint chain and verifies every frame hash on the server. An Anchor must exactly match `stepNo + frameHash`. Completed, expired, and removed resolution and public Replay remain outside login. Active descriptors, recovery, Bug Report, temporary evidence, and maintainer forensics enforce ADR 0013's seat or administrator authorization independently. External errors retain ADR 0013's discriminated `{ ok:false, code, lifecycle?, message }` form.
 
-### 11.6 `server/workshop.ts` and `server/workshop-pr/`
+### 11.6 Workshop backend
 
-These modules provide the Workshop and Sandbox backend for custom-card upload, compilation, and pull-request integration. PostgreSQL tables `sandbox_settings` and `sandbox_cards` persist sandbox configuration: `playerCount`, `deckIds`, Through the Seasons, Farmers of the Moor, whether a game may start with too few FoM minor improvements, and Snake Opening. `POST /api/game/new-sandbox` reads these settings and passes `playerCount`, `deckIds`, `customCardIds`, and variant flags to `createInitialState()` for unified handling.
+`server/workshop.ts` and `server/workshop-pr/` provide custom-card upload, compilation, the sandbox and pull-request delivery. See [Platform design](PLATFORM_DESIGN.md) for the full product flow.
 
-Workshop draft errors expose a typed `code` from `shared/contract/workshop.ts`. The live-edit guard returns `live_edit_blocked` with HTTP `409`; clients distinguish an unchanged-revision restriction from a server revision mismatch and preserve unsaved edits when unpublishing.
+- Sandbox settings (`sandbox_settings`, `sandbox_cards`) persist player count, decks and variant flags; `POST /api/game/new-sandbox` passes them to `createInitialState()`.
+- Review and publication are two dimensions in `server/workshop-status.ts`: review `unsubmitted / in_review / approved / stale / merged` and publication `live`. A card binds one open, non-draft PR based on `main`, pinned to its head and Design Draft. Only real exact-head approvals from a reviewer with push permission approve a version; publishing re-queries GitHub and requires head, review SHA, approved SHA and pinned version to agree. Any mismatch, close, draft transition, base change, dismissal or failure moves the card to `stale·offline`.
+- A PR merged into `main` graduates the card to read-only `merged`; on startup `markBuiltInMergedCards` lets the built-in definition take over.
+- `customCardIds` in a real Room accept only live approved cards through their reviewed snapshot; an author's own non-live card rejects creation with guidance, and every other unloadable ID is filtered silently. Unreviewed code runs only in the Workshop sandbox and never reaches a multiplayer `GameSession`.
+- Author `unpublish` lets existing games finish; administrator takedown ends every Room embedding the card without scoring or Replay.
+- Submissions use one repository-scoped GitHub App; `workshop_submissions` freezes operation identity and Draft Version before remote writes, branch publication uses expected-head CAS, and generated-file conflicts pause delivery. See the [GitHub App runbook](operations/github-oauth-app-setup.md).
+- Workshop draft errors expose a typed `code` from `shared/contract/workshop.ts`.
 
-Workshop submissions use one repository-scoped GitHub App with separate write/read installation tokens. `workshop_submissions` freezes operation identity and Draft Version before remote writes, stores generated baselines, and fences local recovery with leases. Branch publication uses `updateRefs` expected-head CAS; uncertain PR creation is reconciled without another blind POST. Generated-file conflicts and maintainer PR state changes pause delivery. Only real exact-head reviews authorize publication; OWNER synthesis and submission OAuth are retired. See [Platform D5](PLATFORM_DESIGN.md#d5-workshop-to-github-pull-request-flow) and the [cutover runbook](operations/github-oauth-app-setup.md).
+Tests: `server/__tests__/{workshop-api,workshop-submissions}.test.ts`, `server/workshop-pr/__tests__/`.
 
 ### 11.7 Database
 

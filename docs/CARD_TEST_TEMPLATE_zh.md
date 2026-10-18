@@ -220,7 +220,7 @@ const opening = createOpeningSession({
 | `performRoundEnd()` | — | `roundEnd` | 推进回合（一般由引擎自动触发） |
 | `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | 单步 / 整动作回退 |
 
-> **协议名 vs 引擎名**：WS `ClientCommand.type` 与 `interaction.allowedCommands` 字符串并不完全相同（详见 `ARCHITECTURE_zh.md §7.2`）。测试里如果直接调 `GameSession`，用左一列；如果走 WS，用右一列。
+> **协议名 vs 引擎名**：WS `ClientCommand.type` 与 `interaction.allowedCommands` 字符串并不完全相同（详见 `ARCHITECTURE_zh.md §4.6`）。测试里如果直接调 `GameSession`，用左一列；如果走 WS，用右一列。
 
 ### 5.4 WebSocket 命令（若走房间路径）
 
