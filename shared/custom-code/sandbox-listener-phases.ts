@@ -42,7 +42,7 @@ export class UnsupportedSandboxListenerPhaseError extends UnsupportedSandboxList
 /** Reject the complete saved manifest before any effects, listeners or workers are installed. */
 export const assertSandboxListenerManifest = (cardId: string, manifest: CustomCodeManifest): void => {
   for (const listener of manifest.listeners) {
-    for (const phase of listener.phases ?? []) {
+    for (const phase of Array.isArray(listener.phases) ? listener.phases : []) {
       if (!isSandboxListenerPhase(phase)) {
         throw new UnsupportedSandboxListenerPhaseError(cardId, listener.registrationId, phase)
       }
