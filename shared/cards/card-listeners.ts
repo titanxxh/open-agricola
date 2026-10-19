@@ -48,6 +48,7 @@ export type CardListenerRegistration = {
   id: string
   cardIds?: string[]
   actions?: string[]
+  events?: GameEvent['type'][]
   phases?: ActionHookPhase[]
   scope?: CardListenerScope
   zones?: CardListenerZone[]
@@ -173,6 +174,9 @@ const matchesListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
 ) => {
+  if (registration.events && !context.actionEvents?.some(event => registration.events?.includes(event.type))) {
+    return false
+  }
   if (registration.actions && !matchesListenerAction(registration, context.actionId)) {
     return false
   }
