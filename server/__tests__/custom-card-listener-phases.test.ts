@@ -25,6 +25,8 @@ describe('saved custom-card listener phase admission', () => {
 
   it.each([
     {}, { actions: [], phases: ['after'] }, { actions: ['collect'] },
+    { actions: ['collect'], phases: 3 }, { actions: ['collect'], phases: null },
+    { actions: ['collect'], phases: 'after' },
     ...['store-on-card', 'take-from-card', 'pop-card-stack', 'spend-worker', 'special-effect', 'harvest-feed-conversion', 'selection']
       .map(action => ({ actions: ['collect', action], phases: ['after'] })),
     { actions: ['collect'], phases: ['anytime'] },
