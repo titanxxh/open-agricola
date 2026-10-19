@@ -1,6 +1,8 @@
-import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
-import type { CardGain } from './card-gain'
+import { getCardExchanges, getRemainingHarvestExchangeUses } from '../../actions/helpers/exchange-recipes'
+import { exchangeToTrade } from '../../actions/helpers/trades'
+import { REAL_RESOURCE_KEYS } from '../../contract/resource-keys'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -20,19 +22,21 @@ export const hasCardCounter = (
   key: string,
 ) => (player.cardStates?.[cardId]?.counters?.[key] ?? 0) > 0
 
-export const createSingleHarvestExchange = (
-  resource: keyof Resource,
-  gain: CardGain,
-  options: { sourceId: string },
-) => (_state: GameState, player: PlayerState): ActionFlow | undefined => {
-  if ((player.resources[resource] ?? 0) <= 0) return
+export const createSingleHarvestExchange = (sourceId: string) =>
+  (state: GameState, player: PlayerState): ActionFlow | undefined => {
+  const recipe = getCardExchanges(sourceId, state).find((entry) => entry.triggers?.includes('harvest'))
+  if (!recipe) return
+  const trade = exchangeToTrade(recipe, sourceId)
+  if (getRemainingHarvestExchangeUses(player, trade.sourceId ?? sourceId, trade.max, state.round) <= 0 ||
+    !REAL_RESOURCE_KEYS.every((resource) => (player.resources[resource] ?? 0) >= (trade.from[resource] ?? 0))) return
+  const entries = [{ trade, count: 1, harvestRound: state.round }]
   return {
     type: 'leaf',
     actionId: 'exchange',
-    sourceCard: options.sourceId,
+    sourceCard: sourceId,
     optional: true,
     actionContext: {
-      directTrade: { from: { [resource]: 1 }, to: gain, max: 1, sourceId: options.sourceId },
+      submittedExchangeBatch: entries,
     },
   }
 }

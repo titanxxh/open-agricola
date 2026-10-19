@@ -283,6 +283,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": true,
     "joineryIdentity": true,
+    "exchanges": [
+      {
+        "from": {
+          "wood": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "max": 1,
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
     "waresSalesmanGains": [
       {
         "wood": 1,
@@ -309,6 +323,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": true,
     "potteryIdentity": true,
+    "exchanges": [
+      {
+        "from": {
+          "clay": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "max": 1,
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
     "waresSalesmanGains": [
       {
         "clay": 1,
@@ -334,6 +362,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": true,
+    "exchanges": [
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "max": 1,
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
     "waresSalesmanGains": [
       {
         "reed": 2
@@ -628,6 +670,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": true,
     "joineryIdentity": true,
+    "exchanges": [
+      {
+        "from": {
+          "wood": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "max": 1,
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
     "waresSalesmanGains": [
       {
         "wood": 1,
@@ -654,6 +710,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "vp": 2,
     "extraVp": true,
     "potteryIdentity": true,
+    "exchanges": [
+      {
+        "from": {
+          "clay": 1
+        },
+        "to": {
+          "food": 2
+        },
+        "max": 1,
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
     "waresSalesmanGains": [
       {
         "clay": 1,
@@ -679,6 +749,20 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": true,
+    "exchanges": [
+      {
+        "from": {
+          "reed": 1
+        },
+        "to": {
+          "food": 3
+        },
+        "max": 1,
+        "triggers": [
+          "harvest"
+        ]
+      }
+    ],
     "waresSalesmanGains": [
       {
         "reed": 2

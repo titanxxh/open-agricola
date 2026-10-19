@@ -66,6 +66,12 @@ describe('harvest feed conversion card listener dispatch', () => {
     const { session } = setup()
     try {
       let resp = session.performRoundEnd()
+      for (let step = 0; step < 8 && resp.interaction.stateId === 'wait' &&
+        resp.interaction.request.kind === 'choice' &&
+        resp.interaction.request.options.some((option) => option.value === '__skip__'); step++) {
+        resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+        expect(resp.ok, resp.error).toBe(true)
+      }
       if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
         throw new Error('expected harvest feed pending')
       }

@@ -21,19 +21,13 @@ import { animalKeysForState } from '../../contract/animals'
 import { REAL_RESOURCE_KEYS } from '../../contract/resource-keys'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
-import {
-  getRegisteredMinorImprovement,
-  getRegisteredOccupation,
-} from '../../cards/registry-display'
-import type { CardExchange, ExchangeWindow } from '../../contract/cards'
-import { getMajorCard } from '../../cards/major'
+import type { ExchangeWindow } from '../../contract/cards'
 import { collectComputeExchanges } from '../../cards/card-listeners'
-import { isMajorCardId } from '../../cards/helpers/card-type'
 import { BASIC_CONVERSION_SOURCE_ID, basicConversionExchanges } from '../../cards/basic-conversion'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones'
-import { readCardExtraData, writeCardExtraData } from '../../cards/helpers/card-state'
+import { getCardExchanges, getRemainingHarvestExchangeUses, recordHarvestExchangeUses } from '../helpers/exchange-recipes'
 import {
   applyAnimalPayment,
   isAnimalResourceKey,
@@ -241,44 +235,6 @@ export const canAffordTrade = (
   })
 }
 
-type HarvestExchangeUsage = { round: number; count: number }
-
-const HARVEST_EXCHANGE_USAGE_KEY = 'harvestExchangeUsage'
-
-export const getRemainingHarvestExchangeUses = (
-  player: PlayerState,
-  sourceId: string,
-  max: number | undefined,
-  round: number,
-): number => {
-  if (max === undefined) return Number.POSITIVE_INFINITY
-  const usage = readCardExtraData<HarvestExchangeUsage>(
-    player,
-    sourceId,
-    HARVEST_EXCHANGE_USAGE_KEY,
-  )
-  const used = usage?.round === round ? usage.count : 0
-  return Math.max(0, max - used)
-}
-
-export const recordHarvestExchangeUses = (
-  player: PlayerState,
-  sourceId: string,
-  round: number,
-  count: number,
-): void => {
-  if (count <= 0) return
-  const usage = readCardExtraData<HarvestExchangeUsage>(
-    player,
-    sourceId,
-    HARVEST_EXCHANGE_USAGE_KEY,
-  )
-  writeCardExtraData(player, sourceId, HARVEST_EXCHANGE_USAGE_KEY, {
-    round,
-    count: (usage?.round === round ? usage.count : 0) + count,
-  } satisfies HarvestExchangeUsage)
-}
-
 /**
  * Get the maximum number of times a trade can be applied
  * @param player - Player state
@@ -381,119 +337,72 @@ export const reverseTrade = (trade: Trade): Trade => ({
 // Anytime Cookery Trades (metadata-driven)
 // ============================================
 
-const getCardExchanges = (cardId: string, state?: GameState): readonly CardExchange[] => {
-  if (isMajorCardId(cardId)) {
-    const major = getMajorCard(cardId)
-    if (major?.requiresFarmersOfTheMoor && state !== undefined && state.enableFarmersOfTheMoor !== true) return []
-    if (major?.exchanges) return major.exchanges
-  }
-  const minor = getRegisteredMinorImprovement(cardId)
-  if (minor?.requiresFarmersOfTheMoor && state !== undefined && state.enableFarmersOfTheMoor !== true) return []
-  if (minor?.exchanges) return minor.exchanges
-  const occ = getRegisteredOccupation(cardId)
-  if (occ?.requiresFarmersOfTheMoor && state !== undefined && state.enableFarmersOfTheMoor !== true) return []
-  if (occ?.exchanges) return occ.exchanges
-  return []
-}
-
 const playedCardIds = (player: PlayerState): readonly string[] => [
   ...player.improvements,
   ...player.minorPlayed,
   ...player.occupationPlayed,
 ]
 
-type ResolvedFeedExchange = FeedExchangeCatalogEntry & {
+type ResolvedExchange = FeedExchangeCatalogEntry & {
   trade: Trade
-  window: 'harvest' | 'anytime'
+  window: ExchangeWindow
 }
 
-export const getFeedExchangeCatalog = (
-  player: PlayerState,
-  state: GameState,
-  actionHooks?: ActionHookRegistry,
-): ResolvedFeedExchange[] => {
-  const entries: ResolvedFeedExchange[] = []
-  basicConversionExchanges.forEach((exchange, exchangeIndex) => {
-    const trade = exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)
-    entries.push({
-      sourceId: BASIC_CONVERSION_SOURCE_ID,
-      exchangeIndex,
-      from: { ...exchange.from },
-      to: { ...exchange.to },
-      max: exchange.max,
-      fromFarmyard: exchange.fromFarmyard,
-      trade,
-      window: 'anytime',
-    })
-  })
+export const getExchangeCatalog = ({
+  player, windows, state, actionHooks, includeBasicConversions = false,
+}: {
+  player: PlayerState
+  windows: readonly ExchangeWindow[]
+  state?: GameState
+  actionHooks?: ActionHookRegistry
+  includeBasicConversions?: boolean
+}): ResolvedExchange[] => {
+  const entries: ResolvedExchange[] = []
+  const add = (trade: Trade, exchangeIndex: number, window: ExchangeWindow) => {
+    const sourceId = trade.sourceId ?? trade.source
+    if (!sourceId) return
+    entries.push({ sourceId, exchangeIndex, from: { ...trade.from }, to: { ...trade.to },
+      max: trade.max, fromFarmyard: trade.fromFarmyard, trade, window })
+  }
+  if (includeBasicConversions && windows.includes('anytime')) {
+    basicConversionExchanges.forEach((exchange, index) =>
+      add(exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID), index, 'anytime'))
+  }
   for (const cardId of playedCardIds(player)) {
     getCardExchanges(cardId, state).forEach((exchange, exchangeIndex) => {
       const triggers = exchange.triggers ?? []
-      const window = triggers.includes('harvest')
-        ? 'harvest'
-        : triggers.includes('anytime') ? 'anytime' : undefined
+      const window = windows.find((candidate) => triggers.includes(candidate))
       if (!window) return
-      const trade = exchangeToTrade(exchange, cardId)
-      entries.push({
-        sourceId: trade.sourceId ?? cardId,
-        exchangeIndex,
-        from: { ...trade.from },
-        to: { ...trade.to },
-        max: trade.max,
-        fromFarmyard: trade.fromFarmyard,
-        trade,
-        window,
-      })
+      add(exchangeToTrade(exchange, cardId), exchangeIndex, window)
     })
   }
   const nextIndexBySource = new Map<string, number>()
-  for (const trade of collectComputeExchanges(state, player, 'harvest', actionHooks)) {
-    const sourceId = trade.sourceId ?? trade.source
-    if (!sourceId) continue
-    const exchangeIndex = nextIndexBySource.get(sourceId) ?? 0
-    nextIndexBySource.set(sourceId, exchangeIndex + 1)
-    entries.push({
-      sourceId,
-      exchangeIndex,
-      from: { ...trade.from },
-      to: { ...trade.to },
-      max: trade.max,
-      fromFarmyard: trade.fromFarmyard,
-      trade,
-      window: 'harvest',
-    })
+  for (const entry of entries) {
+    nextIndexBySource.set(entry.sourceId, Math.max(nextIndexBySource.get(entry.sourceId) ?? 0, entry.exchangeIndex + 1))
   }
-  return entries.filter(entry => isTradeAllowedDuringPhase(entry.trade, state))
+  if (state) {
+    for (const window of windows) {
+      for (const trade of collectComputeExchanges(state, player, window, actionHooks)) {
+        const sourceId = trade.sourceId ?? trade.source
+        if (!sourceId) continue
+        const exchangeIndex = nextIndexBySource.get(sourceId) ?? 0
+        nextIndexBySource.set(sourceId, exchangeIndex + 1)
+        add(trade, exchangeIndex, window)
+      }
+    }
+  }
+  return entries.filter((entry) => isTradeAllowedDuringPhase(entry.trade, state))
 }
 
-/**
- * Scan all played cards for exchanges visible in the given window.
- * Returns Trade-shaped entries (sourceId always populated).
- *
- * If `state` is provided, also runs `computeExchanges` listeners and appends
- * any runtime-derived trades (e.g. C62 CookeryExtension's doubled-food
- * harvest derivations). Old call sites that don't pass state continue to see
- * only metadata-driven trades.
- */
+export const getFeedExchangeCatalog = (player: PlayerState, state: GameState, actionHooks?: ActionHookRegistry) =>
+  getExchangeCatalog({ player, windows: ['harvest', 'anytime'], state, actionHooks, includeBasicConversions: true })
+
 export const getExchangesInWindow = (
   player: PlayerState,
   window: ExchangeWindow,
   state?: GameState,
   actionHooks?: ActionHookRegistry,
-): Trade[] => {
-  const out: Trade[] = []
-  for (const cardId of playedCardIds(player)) {
-    for (const ex of getCardExchanges(cardId, state)) {
-      if ((ex.triggers ?? []).includes(window)) {
-        out.push(exchangeToTrade(ex, cardId))
-      }
-    }
-  }
-  if (state) {
-    out.push(...collectComputeExchanges(state, player, window, actionHooks))
-  }
-  return out
-}
+): Trade[] => getExchangeCatalog({ player, windows: [window], state, actionHooks }).map((entry) => entry.trade)
 
 /**
  * Listener-driven exchange lookup: force-include exchanges whose `sourceId`
@@ -515,9 +424,6 @@ export const getExchangesByTradeIds = (
   }
   return out
 }
-
-const getPlayerCookeryTrades = (player: PlayerState, state?: GameState, actionHooks?: ActionHookRegistry): Trade[] =>
-  getExchangesInWindow(player, 'anytime', state, actionHooks)
 
 const isTradeAllowed = (trade: Trade, state: GameState | undefined, actionContext?: Record<string, unknown>): boolean => {
   const interactionKind = actionContext?.anytimeInteractionKind as InteractionRequest['kind'] | undefined
@@ -590,6 +496,7 @@ export const validateExchangeBatch = ({
   const placedAnimals = getPlacedAnimalsByType(player, state)
   const recipeUses = new Map<string, number>()
   const sourceUses = new Map<string, number>()
+  const harvestUses = new Map<string, number>()
   for (const { trade, count, harvestRound } of entries) {
     if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state)) return false
     const recipeKey = JSON.stringify(trade)
@@ -600,9 +507,12 @@ export const validateExchangeBatch = ({
     if (sourceId) {
       const sourceUsed = (sourceUses.get(sourceId) ?? 0) + count
       if (sourceUsed > (maxTradeTimesBySourceId?.[sourceId] ?? Infinity)) return false
-      if (harvestRound !== undefined && trade.max !== undefined &&
-        sourceUsed > getRemainingHarvestExchangeUses(player, sourceId, trade.max, harvestRound)) return false
       sourceUses.set(sourceId, sourceUsed)
+      if (harvestRound !== undefined && trade.max !== undefined) {
+        const harvestUsed = (harvestUses.get(sourceId) ?? 0) + count
+        if (harvestUsed > getRemainingHarvestExchangeUses(player, sourceId, trade.max, harvestRound)) return false
+        harvestUses.set(sourceId, harvestUsed)
+      }
     }
     for (const resource of REAL_RESOURCE_KEYS) {
       const amount = (trade.from[resource] ?? 0) * count
@@ -685,10 +595,17 @@ const buildExchangeOptions = (
   maxTradeTimesBySourceId?: Record<string, number>,
   actionContext?: Record<string, unknown>,
   actionHooks?: ActionHookRegistry,
-): { options: ActionChoiceOption[]; trades: Trade[] } => {
+): { options: ActionChoiceOption[]; trades: Trade[]; harvestRounds: Map<number, number> } => {
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
-  const trades: Trade[] = getPlayerCookeryTrades(player, state, actionHooks)
+  const harvestAllowed = state?.roundPhase === 'harvest' || state?.roundPhase === 'feeding' ||
+    typeof actionContext?.harvestExchangeRound === 'number'
+  const catalog = getExchangeCatalog({ player, windows: harvestAllowed ? ['anytime', 'harvest'] : ['anytime'], state, actionHooks })
+  const trades: Trade[] = catalog.map((entry) => entry.trade)
+  const harvestRounds = new Map<number, number>()
+  if (state) catalog.forEach((entry, index) => {
+    if (entry.window === 'harvest') harvestRounds.set(index, state.round)
+  })
   if (actionContext?.includeBasicConversions === true) {
     trades.push(...basicConversionExchanges.map(exchange => exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)))
   }
@@ -712,7 +629,10 @@ const buildExchangeOptions = (
     if (!isTradeAllowed(trade, state, actionContext) || !canAffordTrade(player, trade, 1, state)) continue
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
-    const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity)
+    const harvestRound = harvestRounds.get(i)
+    const remaining = sourceId && harvestRound !== undefined
+      ? getRemainingHarvestExchangeUses(player, sourceId, trade.max, harvestRound) : Infinity
+    const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity, remaining)
     if (max <= 0) continue
     options.push({
       value: `trade:${i}:${max}`,
@@ -722,7 +642,7 @@ const buildExchangeOptions = (
     })
   }
   options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })
-  return { options, trades }
+  return { options, trades, harvestRounds }
 }
 
 const resolveExchangeChoice = (
@@ -738,17 +658,14 @@ const resolveExchangeChoice = (
   }
   const tradeIds = actionContext?.tradeIds as string[] | undefined
   const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
-  const harvestExchangeRound = typeof actionContext?.harvestExchangeRound === 'number'
-    ? actionContext.harvestExchangeRound
-    : undefined
   const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
-  const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext, actionHooks)
+  const { trades, harvestRounds } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext, actionHooks)
   const allowedTrade = (trade: Trade): boolean => isTradeAllowed(trade, state, actionContext)
     && (!tradeIds?.length || tradeIds.includes(trade.sourceId ?? trade.source ?? ''))
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
-    const requestedTrades: { trade: Trade; count: number }[] = []
+    const requestedTrades: ExchangeBatchEntry[] = []
     for (const entry of payload.split(',')) {
       const parts = entry.split('=')
       const index = Number(parts[0])
@@ -760,13 +677,11 @@ const resolveExchangeChoice = (
         || !trade || !allowedTrade(trade)) {
         return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
       }
-      requestedTrades.push({ trade, count })
+      const harvestRound = harvestRounds.get(index)
+      requestedTrades.push({ trade, count, ...(harvestRound !== undefined ? { harvestRound } : {}) })
     }
     return executeExchangeBatch({
-      state, player, entries: requestedTrades.map((entry) => ({
-        ...entry, ...(harvestExchangeRound !== undefined && entry.trade.max !== undefined
-          ? { harvestRound: harvestExchangeRound } : {}),
-      })), maxTradeTimesBySourceId,
+      state, player, entries: requestedTrades, maxTradeTimesBySourceId,
       animalPaymentPreference, eventSink, actionHooks,
       reorganizeAnimals: actionContext?.anytimeInteractionKind !== 'animal-reorg',
     })
@@ -782,10 +697,10 @@ const resolveExchangeChoice = (
       || !trade || !allowedTrade(trade)) {
       return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
     }
+    const harvestRound = harvestRounds.get(index)
     return executeExchangeBatch({
       state, player, entries: [{ trade, count,
-        ...(harvestExchangeRound !== undefined && trade.max !== undefined
-          ? { harvestRound: harvestExchangeRound } : {}),
+        ...(harvestRound !== undefined ? { harvestRound } : {}),
       }], maxTradeTimesBySourceId,
       animalPaymentPreference, eventSink, actionHooks,
       reorganizeAnimals: actionContext?.anytimeInteractionKind !== 'animal-reorg',

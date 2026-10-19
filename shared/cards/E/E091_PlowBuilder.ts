@@ -31,7 +31,7 @@ const tradeAppliedListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.roundPhase !== 'harvest') return
+    if (context.state.roundPhase !== 'harvest' && context.state.roundPhase !== 'feeding') return
     const sourceId = context.extraData?.sourceId
     if (typeof sourceId !== 'string') return
     if (getCardDefinitionById(sourceId)?.joineryIdentity !== true) return
@@ -68,10 +68,11 @@ const choiceCandidateListener: CardListenerRegistration = {
 const anytimeListener: CardListenerRegistration = {
   id: 'E91-plow-builder-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.state.roundPhase !== 'harvest') return
+    if (context.state.roundPhase !== 'harvest' && context.state.roundPhase !== 'feeding') return
     // Rule: anytime gate is `isFlagged('usedJoinery') && !isFlagged`. The
     // `usedJoinery` flag is set by the trade-applied listener above.
     const usedJoinery = readCardExtraData<boolean>(context.player, CARD_ID, 'usedJoinery') === true

@@ -44,6 +44,7 @@ describe('Moor worker and conversion printed-rule audit', () => {
       { sourceId: 'Major_Fireplace1', exchangeIndex: 1, count: 1, sourceName: 'Fireplace' },
     ] })
     expect(response.ok, response.error).toBe(true)
+    if (response.interaction.request.kind === 'feed') response = session.resolveChoice(0, 'confirm', { selections: [] })
     expect(response.state.players[0]!.resources).toMatchObject({ boar: 0, food: 0, wood: 21, begging: 0 })
   })
 })

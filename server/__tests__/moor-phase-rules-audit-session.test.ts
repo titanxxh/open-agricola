@@ -380,6 +380,9 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     ] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(0)
+    if (response.interaction.request.kind === 'feed') {
+      response = session.resolveChoice(0, 'confirm', { selections: [] })
+    }
     const required = Math.max(0, 2 - Math.floor(sheep / 2))
     if (required > 0) {
       expect(response.interaction.playerIndex).toBe(0)
