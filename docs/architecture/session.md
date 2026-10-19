@@ -53,6 +53,7 @@ type SessionResponse = {
 
 - Session tests assert this structure directly; WebSocket paths serialize it through `GameSession.buildSyncPayload()` and filter it per viewer.
 - Every mutating command crosses one settlement boundary ([ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)). Input Rejection restores the complete command checkpoint, including history and action-start metadata; accepted mandatory blocking keeps its effects. `ok:false` or `recoverable:true` alone never classifies a rejection. A rule-valid guard-breaking command keeps its durable provisional restoration and failure memory; an invalid input inside a guarded scope gains neither.
+- Failure memory compares rule state without restoration/completion bookkeeping (`continuation.restored`, `anytime.completed`). Completion reactions retain their normal state changes and domain facts, which can reopen a failed command; completing a no-op anytime flow alone cannot.
 
 Tests: `server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`.
 
