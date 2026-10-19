@@ -2,66 +2,27 @@ import { installOfficialCardRegistry } from './card-environment'
 
 installOfficialCardRegistry()
 
-import { describe, it, expect } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import { readCardInfobox } from '../helpers/card-state'
-import { specialEffectAction } from '../../actions/effects/special-effect'
-import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
-import type { CardListenerContext } from '../card-listeners'
+import { describe, expect, it } from 'vitest'
+import { collectCardStatePresentation } from '../card-state-presentation'
+import { createInitialState } from '../../session/state-bootstrap'
+import { captureStateWithHistory } from '../../session/history-streams'
 
-import '../E/E027_PiggyBank'
+const CARD_ID = 'E027_PiggyBank'
 
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: 'P1', color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 1, grain: 0,
-      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    cardStates: {
-      E027_PiggyBank: { counters: { food: 3 } },
-    },
-    minorPlayed: ['E027_PiggyBank'],
-  } as unknown as PlayerState)
+describe('E027 Piggy Bank public presentation', () => {
+  it.each([
+    { food: 0, text: '0 / 6', counters: {} },
+    { food: 5, text: '5 / 6', counters: { food: 5 } },
+    { food: 6, text: '6 / 6', counters: { food: 6 } },
+    { food: 7, text: '7 / 6', counters: { food: 7 } },
+  ])('shows $text from its food counter without changing authoritative state', ({ food, text, counters }) => {
+    const state = createInitialState(42, { playerCount: 2 })
+    const player = state.players[0]!
+    player.minorPlayed = [CARD_ID]
+    player.cardStates[CARD_ID] = { counters: { food }, infobox: 'stale' }
+    const before = captureStateWithHistory(state)
 
-const createState = (player: PlayerState): GameState =>
-  ({ players: [player] } as unknown as GameState)
-
-const createSpace = (id: string): ActionSpace =>
-  ({ id, resources: {} } as unknown as ActionSpace)
-
-describe('E027_PiggyBank infobox', () => {
-  it('returns an infobox special-effect reflecting current food on card after store/take', () => {
-    const listener = getRegisteredCardListeners().find((l) => l.id === 'E27-piggy-bank-after-store')!
-    const player = createPlayer()
-    const state = createState(player)
-    const space = createSpace('any')
-
-    const result = executeCardListener(listener, {
-      state,
-      player,
-      space,
-      actionId: 'store-on-card',
-      phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(readCardInfobox(player, 'E027_PiggyBank')).toBeUndefined()
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'E027_PiggyBank',
-      params: { kind: 'set-infobox', text: '3 / 6' },
-    })
-    if (result?.flow?.type !== 'leaf') return
-    specialEffectAction.execute({
-      state,
-      player,
-      space,
-      sourceCard: result.flow.sourceCard,
-      params: result.flow.params,
-      actionContext: result.flow.actionContext,
-    })
-
-    expect(readCardInfobox(player, 'E027_PiggyBank')).toBe('3 / 6')
+    expect(collectCardStatePresentation(player)[CARD_ID]).toEqual({ infobox: text, counters })
+    expect(captureStateWithHistory(state)).toEqual(before)
   })
 })

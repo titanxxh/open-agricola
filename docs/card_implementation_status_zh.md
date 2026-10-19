@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-10-18。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-10-19。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 ## 1. 问题优先汇总
 
@@ -91,6 +91,7 @@
 - 不在 action / main path 中写卡名或一次性逻辑，例如全局 Scythe-style flag 或 C88 的 stable / fence cost relocation；OA 优先使用卡牌本地 hooks / helpers。
 - fencing 主路径不得为 C1 / B30 / E149 增加卡牌 id 分支或 `noWoodPalisades` / `midnightFencer` 一类单卡开关；用 `FenceSegment.type` / `source` 与通用 `fencePolicy` 表达差异。
 - 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
+- 可从权威计数派生的 infobox 使用卡牌自己的 `getStatePresentation`，不要用内部存取动作 listener 维护同步副本。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 
 ## 6. 参考实现使用 Special Effect 的卡牌

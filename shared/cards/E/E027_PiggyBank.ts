@@ -61,29 +61,6 @@ const anytimeListener: CardListenerRegistration = {
 }
 
 /**
- * After store-on-card / take-from-card: refresh infobox to "n / 6" so the
- * player can see how close they are to triggering the free-major payoff.
- */
-const updateInfoboxListener: CardListenerRegistration = {
-  id: 'E27-piggy-bank-after-store',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['store-on-card', 'take-from-card'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    const food = context.player.cardStates?.[CARD_ID]?.counters?.[FOOD_KEY] ?? 0
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'set-infobox', text: `${food} / ${FOOD_THRESHOLD}` },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-/**
  * computeCosts listener: when card is flagged, zero out costs for major improvements.
  */
 const computeCostsListener: CardListenerRegistration = {
@@ -104,9 +81,12 @@ const computeCostsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [anytimeListener, computeCostsListener, updateInfoboxListener],
+  listeners: [anytimeListener, computeCostsListener],
   effect: {
   id: CARD_ID,
+  getStatePresentation: player => ({
+    infobox: `${player.cardStates[CARD_ID]?.counters?.[FOOD_KEY] ?? 0} / ${FOOD_THRESHOLD}`,
+  }),
   onBeforeReturnHome: (_state, player) => {
     if ((player.resources.food ?? 0) < 1) return
 
