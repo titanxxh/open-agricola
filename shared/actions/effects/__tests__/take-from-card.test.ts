@@ -53,11 +53,12 @@ describe('take-from-card', () => {
       handler: () => ({ followUpActions: ['bonus-food'] }),
     })
     cardRegistry.registerListener({
-      id: 'test-after-take-from-card',
+      id: 'test-after-source-receive',
       cardIds: ['Test_Take_Observer'],
-      actions: ['take-from-card'],
+      actions: ['receive'],
       phases: ['after'],
-      handler: () => ({ followUpActions: ['bonus-grain'] }),
+      handler: context => context.sourceCard === 'Test_Source'
+        ? { followUpActions: ['bonus-grain'] } : undefined,
     })
 
     const root = new ActionNode(
@@ -71,7 +72,19 @@ describe('take-from-card', () => {
       root,
     )
 
-    const finalStep = withActiveRegistry(cardRegistry, () => drain(engine, state))
+    const finalStep = withActiveRegistry(cardRegistry, () => {
+      let step = drain(engine, state)
+      const remaining = new Set(['Test_Receive_Observer', 'Test_Take_Observer'])
+      while (step.type === 'choice') {
+        const option = step.choice.options.find(choice => choice.sourceCard && remaining.has(choice.sourceCard))
+        expect(option).toBeDefined()
+        if (!option?.sourceCard) throw new Error('Expected a source or receive reaction')
+        remaining.delete(option.sourceCard)
+        expect(engine.resolveChoice(option.value, { state, player, space: asActionSpace(takeFromCardAction) }).type).toBe('ok')
+        step = drain(engine, state)
+      }
+      return step
+    })
 
     expect(finalStep.type).toBe('done')
     expect(player.cardStates.Test_Source?.counters?.grain).toBe(0)

@@ -22,7 +22,7 @@ describe('literal ActionFlow validation', () => {
   })
 
   it.each(['flow', 'alternativeFlow'])('checks the listener %s result', field => {
-    const result = validateCardCode(`const CARD_IMPL = { listeners: [{ phases: ['after'],
+    const result = validateCardCode(`const CARD_IMPL = { listeners: [{ actions: ['collect'], phases: ['after'],
       handler: () => ({ ${field}: { type: 'seq', items: [] } }) }] }`)
     expect(result).toMatchObject({ valid: false, errors: [expect.stringContaining('children')] })
   })
