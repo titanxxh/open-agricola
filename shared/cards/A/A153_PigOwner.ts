@@ -21,6 +21,7 @@ const countPigsOnFarm = (player: CardListenerContext['player']): number => {
 const anytimeListener: CardListenerRegistration = {
   id: 'A153-pig-owner-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return

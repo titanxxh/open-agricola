@@ -36,6 +36,7 @@ const CARD_ID = 'D013_Trowel'
 const anytimeListener: CardListenerRegistration = {
   id: 'D13-trowel-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

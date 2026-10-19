@@ -10,6 +10,7 @@ const CARD_ID = 'M090_WinterStorehouse'
 const listener: CardListenerRegistration = {
   id: 'M090-winter-storehouse-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const usage = usageCounters(context.player, CARD_ID)

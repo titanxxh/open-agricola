@@ -295,7 +295,7 @@ listener 条目可以声明 `handler`、`actions`、`phases`、`scope`、`cardId
 
 listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家面前已打出时才会触发；`zones` 写了手牌时，卡在该玩家手牌里也会触发。`cardIds` 可以省略；如果写了，必须是 `[CARD_ID]`。
 
-省略 `actions` 或 `phases` 表示本节列出的集合；`anytime` 和 `computeExchanges` listener 另加各自的分发身份。它不会匹配 `forest` 这类行动格 id，也不会匹配清单之外的原生行动和阶段。
+每条 listener 必须明确声明非空的 `actions` 和 `phases`；每个目标必须支持每个声明的阶段。不合法的组合在源码、保存 manifest 和两种 executor 中整体拒绝。`anytime` 使用 `actions: ['anytime']`；`computeExchanges` 使用 `actions: ['compute-exchanges']`。`place-farmer` 支持 `before`、整格完成后的 `after` 和放人 `computeArgs`，不支持 `immediatelyAfter`。原生事件订阅和全局查询不属于 Workshop 子集。
 
 `actions` 只能使用以下高层 action ID；AST validator 会硬拒绝未知 ID：
 
@@ -317,6 +317,8 @@ listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家�
 - `bake-bread`
 - `breed`
 - `reap`
+- `anytime`
+- `compute-exchanges`
 <!-- prompt-sync:end id=listener-actions -->
 
 `sandboxListenerPhases` 是 Workshop listener phase 白名单。AST validator 拒绝新源码中不支持的阶段；已保存的可执行 manifest 在 Session 或 runtime 注册前检查，隔离 Session 工厂先检查原始卡牌，再剥离父进程镜像中的可执行字段。不支持的阶段会在任何卡牌 effect、listener 或 worker 安装前拒绝创建。HTTP 创建对局返回 400、`code: 'unsupported_listener_phase'` 及具体阶段错误；WS 创建在持久化 Room 前返回错误。`during` 不再支持，也不会映射为 `after`；草稿和历史版本仍可读取、编辑。
@@ -585,11 +587,12 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 ## 5.6 Anytime ability（任意时刻能力）
 
-不是单独的 API。直接写一个 listener，`phases: ['anytime']`，**不要** `actions:` 字段：
+声明一个 listener，使用 `actions: ['anytime']` 和 `phases: ['anytime']`：
 
 ```ts
 {
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime'],
   handler: (ctx) => {
     if (ctx.player.cardStates?.[CARD_ID]?.flagged) return  // 一次性闸门

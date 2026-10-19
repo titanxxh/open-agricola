@@ -17,6 +17,7 @@ const exchange: CardExchange = {
 const computeExchangesListener: CardListenerRegistration = {
   id: 'M107-pot-roast-recipe-compute-exchanges',
   cardIds: [CARD_ID],
+  actions: ['compute-exchanges'],
   phases: ['computeExchanges' as ActionHookPhase],
   handler: (context) => {
     const window = (context.extraData as { window?: string } | undefined)?.window

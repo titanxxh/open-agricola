@@ -93,6 +93,7 @@
 - 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
 - 可从权威计数派生的 infobox 使用卡牌自己的 `getStatePresentation`，不要用内部存取动作 listener 维护同步副本。
 - 行动格使用前 / 完整结束后的反应订阅既有 `place-farmer` 生命周期并筛选 `context.space`，不得用内部节点通配反应近似整格完成。
+- listener 资格由共享的封闭目标 / 阶段契约规定，不得从可执行动作注册推断，不得省略筛选条件或修改已注册的筛选对象。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 
 ## 6. 参考实现使用 Special Effect 的卡牌

@@ -10,6 +10,7 @@ const SHEEP_THRESHOLDS = [9, 8, 7, 6, 5, 5]
 const anytimeListener: CardListenerRegistration = {
   id: 'B35-hook-knife-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return

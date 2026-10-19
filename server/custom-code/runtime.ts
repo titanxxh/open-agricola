@@ -7,13 +7,13 @@ import { setCardListenerSource } from '../../shared/cards/card-listener-source.t
 import {
   boundListenerFilters, extraHookArguments, neutralEffectResult, registeredEffectMetadata, registeredListenerData,
 } from '../../shared/custom-code/contract-admission.ts'
-import { assertSandboxListenerPhases } from '../../shared/custom-code/sandbox-listener-phases.ts'
+import { assertSandboxListenerManifest } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
 export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void => {
   const { cardJson, compiledCode, codeManifest } = cardData
   if (!compiledCode || !codeManifest) return
-  assertSandboxListenerPhases(cardJson.id, codeManifest)
+  assertSandboxListenerManifest(cardJson.id, codeManifest)
 
   const cardId = cardJson.id
   const sessionCtx = getCurrentSessionContext()

@@ -9,6 +9,7 @@ const CARD_ID = 'M040_MoorFire'
 const anytimeListener: CardListenerRegistration = {
   id: 'M040-moor-fire-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getTerrainTiles(context.player, 'moor').length !== 1) return

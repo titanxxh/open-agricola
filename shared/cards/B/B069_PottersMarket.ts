@@ -9,6 +9,7 @@ const CARD_ID = 'B069_PottersMarket'
 const anytimeListener: CardListenerRegistration = {
   id: 'B69-potters-market-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if ((context.player.resources.clay ?? 0) < 3) return

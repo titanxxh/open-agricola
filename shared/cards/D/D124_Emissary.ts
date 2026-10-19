@@ -12,6 +12,7 @@ const GOOD_TYPES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable
 const anytimeListener: CardListenerRegistration = {
   id: 'D124-emissary-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime'],
   preScoring: true,
   blockedAnytimeInteractionKinds: ['animal-reorg'],

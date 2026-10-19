@@ -24,6 +24,27 @@ describe('saved custom-card listener phase admission', () => {
   const error = /CUSTOM_StalePhase.*stale-listener.*unsupported listener phase 'during'/
 
   it.each([
+    {}, { actions: [], phases: ['after'] }, { actions: ['collect'] },
+    ...['store-on-card', 'take-from-card', 'pop-card-stack', 'spend-worker', 'special-effect', 'harvest-feed-conversion', 'selection']
+      .map(action => ({ actions: ['collect', action], phases: ['after'] })),
+    { actions: ['collect'], phases: ['anytime'] },
+    { actions: ['collect'], phases: ['after'], events: ['farm.sown'] },
+  ])('rejects the complete saved registration in both executors and session entry: %j', invalid => {
+    const data = staleCard()
+    data.codeManifest = JSON.parse(JSON.stringify({ effectHooks: ['onBuy'], listeners: [
+      { registrationId: 'valid', actions: ['collect'], phases: ['after'] },
+      { registrationId: 'invalid', ...invalid },
+    ] }))
+    for (const register of [registerExecutorBackedCustomCard, registerBrowserBackedCustomCard]) {
+      const context = new SessionCardContext()
+      expect(() => withSessionContext(context, () => register(data))).toThrow(/listener|Listener/)
+      expect(context.customEffects.size).toBe(0)
+      expect(context.customListeners).toEqual([])
+    }
+    expect(() => new GameSession(1063, [data], { playerCount: 2 })).toThrow(/listener|Listener/)
+  })
+
+  it.each([
     { runtime: 'server', register: registerExecutorBackedCustomCard },
     { runtime: 'browser', register: registerBrowserBackedCustomCard },
   ])('rejects a saved manifest before partially registering its effects or listeners in $runtime', ({ register }) => {

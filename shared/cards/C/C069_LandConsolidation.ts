@@ -20,6 +20,7 @@ const hasExtraCropPending = (context: CardListenerContext): boolean => {
 const anytimeListener: CardListenerRegistration = {
   id: 'C69-land-consolidation-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

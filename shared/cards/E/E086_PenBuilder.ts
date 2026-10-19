@@ -10,6 +10,7 @@ const CAPACITY_RULE = { counter: 'discards', capacityPerUnit: 2 }
 const anytimeListener: CardListenerRegistration = {
   id: 'E86-pen-builder-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.resources.wood < 1) return

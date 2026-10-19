@@ -108,15 +108,13 @@ export function listenerContractError(listener: ListenerFilters): string | undef
 export function snapshotCardListener(listener: CardListenerRegistration, sourceCard?: string): CardListenerRegistration {
   const error = listenerContractError(listener)
   if (error) throw new Error(error)
-  const snapshot: CardListenerRegistration = {
-    ...listener,
-    ...(listener.cardIds ? { cardIds: [...listener.cardIds] } : {}),
-    ...(listener.actions ? { actions: [...listener.actions] } : {}),
-    ...(listener.events ? { events: [...listener.events] } : {}),
-    ...(listener.phases ? { phases: [...listener.phases] } : {}),
-    ...(listener.zones ? { zones: [...listener.zones] } : {}),
-    ...(listener.blockedAnytimeInteractionKinds ? { blockedAnytimeInteractionKinds: [...listener.blockedAnytimeInteractionKinds] } : {}),
-  }
+  const snapshot: CardListenerRegistration = { ...listener }
+  if (snapshot.cardIds) snapshot.cardIds = [...snapshot.cardIds]
+  if (snapshot.actions) snapshot.actions = [...snapshot.actions]
+  if (snapshot.events) snapshot.events = [...snapshot.events]
+  snapshot.phases = [...snapshot.phases]
+  if (snapshot.zones) snapshot.zones = [...snapshot.zones]
+  if (snapshot.blockedAnytimeInteractionKinds) snapshot.blockedAnytimeInteractionKinds = [...snapshot.blockedAnytimeInteractionKinds]
   for (const value of Object.values(snapshot)) if (Array.isArray(value)) Object.freeze(value)
   const owner = sourceCard ?? getCardListenerSource(listener)
   if (owner) setCardListenerSource(snapshot, owner)

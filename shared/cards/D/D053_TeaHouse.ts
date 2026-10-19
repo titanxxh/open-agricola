@@ -11,6 +11,7 @@ const CARD_ID = 'D053_TeaHouse'
 const anytimeListener: CardListenerRegistration = {
   id: 'D53-tea-house-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   replacesTurn: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

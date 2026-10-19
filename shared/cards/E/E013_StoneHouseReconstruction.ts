@@ -20,6 +20,7 @@ const CARD_ID = 'E013_StoneHouseReconstruction'
 const anytimeListener: CardListenerRegistration = {
   id: 'E13-stone-house-reconstruction-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

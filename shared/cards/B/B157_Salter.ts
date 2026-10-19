@@ -22,6 +22,7 @@ registerAdHocAction(salterPickAction)
 const anytimeListener: CardListenerRegistration = {
   id: 'B157-salter-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { state, player } = context

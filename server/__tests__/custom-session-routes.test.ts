@@ -78,7 +78,7 @@ const mockRes = (): MockRes => {
   } as unknown as MockRes
 }
 
-const createRunawayCard = (db: PostgresDatabase, authorId: string, manifestPhase = 'after') => {
+const createRunawayCard = (db: PostgresDatabase, authorId: string, manifestPhase = 'after', manifestAction = 'collect') => {
   const compiled = validateAndCompileCustomCode(SOURCE, 'CUSTOM_RouteRunaway')
   expect(compiled.valid).toBe(true)
   if (!compiled.valid) throw new Error(compiled.errors.join('; '))
@@ -104,7 +104,7 @@ const createRunawayCard = (db: PostgresDatabase, authorId: string, manifestPhase
       compiledCode: compiled.compiledCode,
       codeManifest: {
         ...compiled.manifest,
-        listeners: compiled.manifest.listeners.map(listener => ({ ...listener, phases: [manifestPhase] })),
+        listeners: compiled.manifest.listeners.map(listener => ({ ...listener, actions: [manifestAction], phases: [manifestPhase] })),
         cardDefinition: compiled.cardDefinition,
       },
       artUrl: null,
@@ -134,13 +134,13 @@ afterEach(async () => {
 
 describe('custom session routes', () => {
   it.each(['/api/game/new', '/api/game/new-sandbox'].flatMap(url =>
-    [false, true].map(guarded => ({ url, guarded })),
-  ))('rejects unsupported saved phases in $url (authority=$guarded) without replacing the game', async ({ url, guarded }) => {
+    [false, true].flatMap(guarded => ['phase', 'target'].map(invalid => ({ url, guarded, invalid }))),
+  ))('rejects unsupported saved $invalid in $url (authority=$guarded) without replacing the game', async ({ url, guarded, invalid }) => {
     const db = await createTestDatabase()
     databases.push(db)
     await addUser(db, 'phase-author', 'phase-token')
     // Simulate a retained executable snapshot; new source cannot compile this phase.
-    const customCard = await createRunawayCard(db, 'phase-author', 'during')
+    const customCard = await createRunawayCard(db, 'phase-author', invalid === 'phase' ? 'during' : 'after', invalid === 'phase' ? 'collect' : 'special-effect')
     await approveCurrentDraft(db, { cardId: customCard.id, authorId: 'phase-author' })
     await publish(db, { cardId: customCard.id, authorId: 'phase-author', baseRevision: customCard.revision })
     const gameDatabase = await import('../db.ts')
@@ -168,8 +168,8 @@ describe('custom session routes', () => {
       expect(rejected.statusCode).toBe(400)
       expect(JSON.parse(rejected.body)).toMatchObject({
         ok: false,
-        code: 'unsupported_listener_phase',
-        error: expect.stringMatching(/CUSTOM_RouteRunaway.*unsupported listener phase 'during'/),
+        code: invalid === 'phase' ? 'unsupported_listener_phase' : 'unsupported_listener_subscription',
+        error: expect.stringContaining(invalid === 'phase' ? "unsupported listener phase 'during'" : "unsupported action target 'special-effect'"),
       })
       expect(workerObservation()).toEqual(workersBefore)
       const current = mockRes()

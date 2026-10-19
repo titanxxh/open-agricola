@@ -25,6 +25,7 @@ const emptyTargetsFor = (player: CardListenerContext['player'], crop: 'grain' | 
 const anytimeListener: CardListenerRegistration = {
   id: 'A71-clearing-spade-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const sourceFields = getLogicalFields(context.player).flatMap((field) => {

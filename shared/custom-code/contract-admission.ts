@@ -2,7 +2,7 @@ import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook, type CardEf
 import type { ActionHookPhase } from '../actions/hooks'
 import type { CardListenerScope } from '../cards/card-listeners'
 import { admitCustomFlow } from './flow-admission'
-import { isSandboxListenerAction } from './sandbox-listener-actions'
+import { isSandboxListenerAction, type SandboxListenerAction } from './sandbox-listener-actions'
 import { isSandboxListenerPhase } from './sandbox-listener-phases'
 import { isSandboxListenerScope } from './sandbox-listener-scopes'
 import { admitEffectMetadata, admitListenerData } from './sandbox-declarations'
@@ -36,7 +36,7 @@ const outsideContract = (detail: string): Error =>
 /** Saved manifests and fresh source use the same explicit subset of native subscription permission. */
 export function boundListenerFilters(
   listener: { actions?: string[]; phases?: ActionHookPhase[]; events?: unknown; globalQuery?: unknown },
-): { actions: string[]; phases: ActionHookPhase[] } {
+): { actions: SandboxListenerAction[]; phases: ActionHookPhase[] } {
   if (listener.events !== undefined || listener.globalQuery !== undefined) throw outsideContract('listener event/global query selector')
   const { actions, phases } = listener
   if (!actions?.length || !phases?.length) throw outsideContract('listener requires explicit nonempty actions and phases')

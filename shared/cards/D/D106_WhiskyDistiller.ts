@@ -20,6 +20,7 @@ const CARD_ID = 'D106_WhiskyDistiller'
 const anytimeListener: CardListenerRegistration = {
   id: 'D106-whisky-distiller-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.state.round + 2 > 14) return

@@ -12,7 +12,7 @@ const getOwner = (context: CardListenerContext) =>
 
 const createStorageReleaseListener = (params: {
   id: string
-  actionId: string
+  actionId: NonNullable<CardListenerRegistration['actions']>[number]
   resource: keyof Resource
   shouldTrigger: (player: CardListenerContext['player']) => boolean
 }): CardListenerRegistration => ({

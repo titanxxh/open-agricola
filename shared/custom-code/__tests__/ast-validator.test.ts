@@ -71,6 +71,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         listeners: [
           {
             id: 'test-listener',
+            actions: ['collect'],
             phases: ['before', 'after'],
             handler: (ctx) => {},
           },
@@ -221,6 +222,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     const result = validateCardCode(`
       const CARD_IMPL = {
         listeners: [{
+          actions: ['collect'],
           phases: ['after'],
           handler: () => {
             const payload = {}
@@ -238,6 +240,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     const result = validateCardCode(`
       const CARD_IMPL = {
         listeners: [{
+          actions: ['collect'],
           phases: ['after'],
           handler: () => {
             const result = { extraData: { ok: true } }
@@ -686,7 +689,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   it('accepts the computeExchanges phase and rejects a phase the engine does not have', () => {
     const listenerWithPhase = (phase: string) => validateCardCode(`
       const CARD_IMPL = {
-        listeners: [{ id: 'test-listener', phases: ['${phase}'], handler: (ctx) => ({ extraExchanges: [] }) }],
+        listeners: [{ id: 'test-listener', actions: ['compute-exchanges'], phases: ['${phase}'], handler: (ctx) => ({ extraExchanges: [] }) }],
       }
     `)
     expect(listenerWithPhase('computeExchanges')).toEqual({ valid: true })
@@ -755,7 +758,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const CARD_ID = 'CUSTOM_Test'
       const CARD_IMPL = {
         listeners: [{ id: 'label', cardIds: [CARD_ID], actions: ['collect'], phases: ['after'], scope: 'any', handler: () => {} },
-          { phases: ['anytime'], zones: ['hand', 'played'], mandatory: true, preScoring: true, replacesTurn: false,
+          { actions: ['anytime'], phases: ['anytime'], zones: ['hand', 'played'], mandatory: true, preScoring: true, replacesTurn: false,
             blockedAnytimeInteractionKinds: ['animal-reorg'], handler: () => {} }],
       }
     `)
@@ -1109,6 +1112,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         listeners: [
           {
             id: 'test',
+            actions: ['collect'],
             phases: ['before', 'immediatelyAfter', 'after', 'computeCosts', 'computeArgs', 'computeChoiceCandidates', 'computeReplace', 'isDoable'],
             handler: (ctx) => {},
           },

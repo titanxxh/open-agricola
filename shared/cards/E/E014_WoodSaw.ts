@@ -18,6 +18,7 @@ const CARD_ID = 'E014_WoodSaw'
 const anytimeListener: CardListenerRegistration = {
   id: 'E14-wood-saw-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

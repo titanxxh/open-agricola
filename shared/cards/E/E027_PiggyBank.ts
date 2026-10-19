@@ -18,6 +18,7 @@ const FOOD_THRESHOLD = 6
 const anytimeListener: CardListenerRegistration = {
   id: 'E27-piggy-bank-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

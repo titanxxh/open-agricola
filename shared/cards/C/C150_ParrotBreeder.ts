@@ -122,6 +122,7 @@ const afterPlaceFarmerOpponentListener: CardListenerRegistration = {
 const anytimeListener: CardListenerRegistration = {
   id: 'C150-parrot-breeder-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   scope: 'player',
   replacesTurn: true,

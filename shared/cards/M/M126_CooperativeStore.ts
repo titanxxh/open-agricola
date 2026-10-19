@@ -13,6 +13,7 @@ const TARGET_RESOURCES = ['wood', 'clay', 'reed'] as const
 const anytimeListener: CardListenerRegistration = {
   id: 'M126-cooperative-store-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const usage = usageCounters(context.player, CARD_ID)

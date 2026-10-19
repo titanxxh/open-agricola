@@ -13,7 +13,7 @@ import { validateSession, extractToken } from './auth.ts'
 import { allowAnonymousAccess } from './anonymous-access.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
-import { UnsupportedSandboxListenerPhaseError } from '../shared/custom-code/sandbox-listener-phases.ts'
+import { UnsupportedSandboxListenerError } from '../shared/custom-code/sandbox-listener-phases.ts'
 import { defaultSandboxDeckIds } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
 import {
@@ -1081,7 +1081,7 @@ export const handleGameRoute = async (req: IncomingMessage, res: ServerResponse)
     responses.set(res, req)
     return await handleAuthorizedGameRoute(req, res)
   } catch (error) {
-    if (error instanceof UnsupportedSandboxListenerPhaseError) {
+    if (error instanceof UnsupportedSandboxListenerError) {
       rawJson(res, 400, { ok: false, code: error.code, error: error.message })
       return true
     }

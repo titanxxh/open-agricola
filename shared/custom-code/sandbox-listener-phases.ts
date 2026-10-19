@@ -21,17 +21,26 @@ export type SandboxListenerPhase = typeof sandboxListenerPhases[number]
 export const isSandboxListenerPhase = (value: unknown): value is SandboxListenerPhase =>
   typeof value === 'string' && (sandboxListenerPhases as readonly string[]).includes(value)
 
-export class UnsupportedSandboxListenerPhaseError extends Error {
-  readonly code = 'unsupported_listener_phase'
+export class UnsupportedSandboxListenerError extends Error {
+  readonly code: 'unsupported_listener_subscription' | 'unsupported_listener_phase' = 'unsupported_listener_subscription'
+
+  constructor(cardId: string, listenerId: string, detail: string) {
+    super(`Custom card ${cardId} listener "${listenerId}": ${detail}`)
+    this.name = 'UnsupportedSandboxListenerError'
+  }
+}
+
+export class UnsupportedSandboxListenerPhaseError extends UnsupportedSandboxListenerError {
+  override readonly code = 'unsupported_listener_phase'
 
   constructor(cardId: string, listenerId: string, phase: unknown) {
-    super(`Custom card ${cardId} listener "${listenerId}": unsupported listener phase '${String(phase)}'`)
+    super(cardId, listenerId, `unsupported listener phase '${String(phase)}'`)
     this.name = 'UnsupportedSandboxListenerPhaseError'
   }
 }
 
-/** Saved compiled manifests must obey the same phase contract as new source. */
-export const assertSandboxListenerPhases = (cardId: string, manifest: CustomCodeManifest): void => {
+/** Reject the complete saved manifest before any effects, listeners or workers are installed. */
+export const assertSandboxListenerManifest = (cardId: string, manifest: CustomCodeManifest): void => {
   for (const listener of manifest.listeners) {
     for (const phase of listener.phases ?? []) {
       if (!isSandboxListenerPhase(phase)) {
@@ -40,10 +49,10 @@ export const assertSandboxListenerPhases = (cardId: string, manifest: CustomCode
     }
   }
   for (const listener of manifest.listeners) {
-    if ('events' in listener || 'globalQuery' in listener) throw new Error(`Custom card ${cardId} listener ${listener.registrationId}: unsupported selector`)
+    if ('events' in listener || 'globalQuery' in listener) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, 'unsupported selector')
     const error = listenerContractError({ ...listener, id: listener.registrationId })
-    if (error) throw new Error(`Custom card ${cardId}: ${error}`)
-    if (!listener.actions?.every(isSandboxListenerAction)) throw new Error(`Custom card ${cardId} listener ${listener.registrationId}: unsupported listener action`)
+    if (error) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, error)
+    if (!listener.actions?.every(isSandboxListenerAction)) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, 'unsupported listener action')
   }
 }
 
@@ -61,6 +70,6 @@ export const sandboxListenerPhaseMeta: Record<SandboxListenerPhase, { desc: stri
   computeChoiceCandidates: { desc: '计算可选项时', usage: '修改选项列表' },
   computeReplace: { desc: '替换行动', usage: '替换为别的效果' },
   isDoable: { desc: '判断行动可用性', usage: '让不可用行动变可用' },
-  anytime: { desc: '任意时刻', usage: '全局触发' },
+  anytime: { desc: '任意时刻', usage: "actions: ['anytime']，列出当前合法的主动能力" },
   computeExchanges: { desc: '列出可用兑换时', usage: "actions: ['compute-exchanges']，返回 extraExchanges 追加依赖当前状态的兑换" },
 }

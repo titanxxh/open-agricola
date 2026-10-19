@@ -56,6 +56,7 @@ const adoptiveAvailable = (player: PlayerState): boolean =>
 const anytimeGrowListener: CardListenerRegistration = {
   id: 'A92-adoptive-parents-anytime-grow',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Suppress this anytime grow while the player is inside A92's own

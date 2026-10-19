@@ -10,6 +10,7 @@ const CARD_ID = 'C046_Mandoline'
 const anytimeListener: CardListenerRegistration = {
   id: 'C46-mandoline-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

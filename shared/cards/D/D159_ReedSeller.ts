@@ -42,7 +42,7 @@ export const D159_ReedSeller = defineOccupationCard({
       },
     },
     listeners: [{
-      id: 'D159-reed-seller-anytime', cardIds: [CARD_ID], phases: ['anytime'],
+      id: 'D159-reed-seller-anytime', cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'],
       handler: ({ player }) => player.resources.reed >= SALE_RULE.amount && !saleOf(player)
         ? { flow: { type: 'leaf', actionId: START, sourceCard: CARD_ID }, sourceCard: CARD_ID }
         : undefined,

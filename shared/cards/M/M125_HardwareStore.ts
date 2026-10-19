@@ -12,6 +12,7 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 const listener: CardListenerRegistration = {
   id: 'M125-hardware-store-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const usage = usageCounters(context.player, CARD_ID)

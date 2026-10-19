@@ -39,7 +39,7 @@ const buildFlow = (cardId: string): ActionFlow | null => {
 }
 
 const makeListener = (
-  actionList: string[],
+  actionList: NonNullable<CardListenerRegistration['actions']>,
   listenerId: string,
 ): CardListenerRegistration => ({
   id: listenerId,

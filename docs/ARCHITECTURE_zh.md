@@ -45,7 +45,7 @@
 - **节点树是唯一状态机**："等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
 - **flow 只经引擎 seam 进入**：`EngineStack.push` / `pop` 创建与离开嵌套 frame，`Engine.injectBeforeFlows()` 把 hook 与 anytime flow 插入当前 frame。不直接改 `pending`。
 - **ActionFlow 对齐参考实现小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
-- **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
+- **listener 契约**：注册必须显式声明封闭契约内的目标和阶段，可执行的内部动作不自动获得订阅资格；注册后的筛选条件为脱离输入的不可变快照。listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
 - **卡牌就地闭环**：卡牌在 `shared/cards/{Deck}/{Card}.ts` 内部完成；`shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件不为单卡修改。新增 Hook 点必须同时补测试和文档。
 - **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
 - **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。

@@ -9,6 +9,7 @@ const CARD_ID = 'C143_StoneBuyer'
 const anytimeListener: CardListenerRegistration = {
   id: 'C143-stone-buyer-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
