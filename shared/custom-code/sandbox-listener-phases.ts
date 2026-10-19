@@ -1,5 +1,7 @@
 import type { ActionHookPhase } from '../actions/hooks'
 import type { CustomCodeManifest } from './types'
+import { listenerContractError } from '../cards/listener-contract'
+import { isSandboxListenerAction } from './sandbox-listener-actions'
 
 export const sandboxListenerPhases = [
   'before',
@@ -37,6 +39,12 @@ export const assertSandboxListenerPhases = (cardId: string, manifest: CustomCode
       }
     }
   }
+  for (const listener of manifest.listeners) {
+    if ('events' in listener || 'globalQuery' in listener) throw new Error(`Custom card ${cardId} listener ${listener.registrationId}: unsupported selector`)
+    const error = listenerContractError({ ...listener, id: listener.registrationId })
+    if (error) throw new Error(`Custom card ${cardId}: ${error}`)
+    if (!listener.actions?.every(isSandboxListenerAction)) throw new Error(`Custom card ${cardId} listener ${listener.registrationId}: unsupported listener action`)
+  }
 }
 
 /**
@@ -54,5 +62,5 @@ export const sandboxListenerPhaseMeta: Record<SandboxListenerPhase, { desc: stri
   computeReplace: { desc: '替换行动', usage: '替换为别的效果' },
   isDoable: { desc: '判断行动可用性', usage: '让不可用行动变可用' },
   anytime: { desc: '任意时刻', usage: '全局触发' },
-  computeExchanges: { desc: '列出可用兑换时', usage: '返回 extraExchanges，追加依赖当前状态的兑换；不写 actions' },
+  computeExchanges: { desc: '列出可用兑换时', usage: "actions: ['compute-exchanges']，返回 extraExchanges 追加依赖当前状态的兑换" },
 }

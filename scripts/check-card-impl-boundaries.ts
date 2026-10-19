@@ -7,6 +7,7 @@ import ts from 'typescript'
 import { walkSourceFiles, parseSource } from './source-files'
 import { isTestFile } from './architecture-policy.mjs'
 import { collectListenerMutationFindings, parseListenerFunction } from './listener-mutation-scan'
+import { listenerContractError } from '../shared/cards/listener-contract'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -17,7 +18,7 @@ export type CardImplBoundaryViolation = {
   line?: number
   cardId: string
   referencedCardId?: string
-  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation' | 'farm-layout-write'
+  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation' | 'farm-layout-write' | 'listener-subscription-contract'
   message?: string
 }
 
@@ -80,6 +81,9 @@ export type RuntimeCardImpl = {
   file: string
   listeners?: readonly {
     id: string
+    actions?: readonly unknown[]
+    events?: readonly unknown[]
+    globalQuery?: unknown
     phases?: readonly string[]
     handler?: unknown
     deriveCardCostCandidate?: unknown
@@ -432,6 +436,8 @@ export function checkCardImplBoundaries(
     }
     for (const card of runtimeCards) {
       for (const listener of card.listeners ?? []) {
+        const contractError = listenerContractError(listener)
+        if (contractError) violations.push({ file: card.file, cardId: card.cardId, kind: 'listener-subscription-contract', message: contractError })
         for (const [role, fn] of [['handler', listener.handler], ['deriveCardCostCandidate', listener.deriveCardCostCandidate]] as const) {
           if (typeof fn !== 'function') continue
           const mutationViolations = collectListenerStateMutationViolations(fn, card.file, card.cardId, listener.id, role)
@@ -525,6 +531,9 @@ async function runCli(): Promise<void> {
     file: sourceFilesById.get(cardId) ?? cardId,
     listeners: impl.listeners?.map((listener) => ({
       id: listener.id,
+      actions: listener.actions,
+      events: listener.events,
+      globalQuery: listener.globalQuery,
       phases: listener.phases,
       handler: listener.handler,
       deriveCardCostCandidate: listener.deriveCardCostCandidate,
