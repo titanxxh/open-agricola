@@ -39,7 +39,7 @@ const setup = ({ wood = 10, delta = 0, actionContext, sourceScoped = false }: {
     registry.setEffect({ id: SOURCE, contributeExtraTurn: () => flow })
     if (actionContext || sourceScoped) {
       registry.registerListener({
-        id: SOURCE, cardIds: [SOURCE], phases: ['anytime'], handler: () => ({ sourceCard: SOURCE, flow }),
+        id: SOURCE, cardIds: [SOURCE], actions: ['anytime'], phases: ['anytime'], handler: () => ({ sourceCard: SOURCE, flow }),
       })
       anytimeSessions.add(session)
     }

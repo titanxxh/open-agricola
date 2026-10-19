@@ -113,7 +113,7 @@ describe('anytime reentry', () => {
     session.withCtx(() => requireActiveCardRegistry('anytime reentry declaration').registerListener({
       id: cardId,
       cardIds: [cardId],
-      phases: ['anytime'],
+      actions: ['anytime'], phases: ['anytime'],
       ...(allowAnytimeReentry === undefined ? {} : { allowAnytimeReentry }),
       handler: () => ({
         sourceCard: cardId,
@@ -270,7 +270,7 @@ describe('anytime reentry', () => {
       for (const resource of ['food', 'clay']) registry.registerListener({
         id: `${cardId}-${resource}`,
         cardIds: [cardId],
-        phases: ['anytime'],
+        actions: ['anytime'], phases: ['anytime'],
         handler: () => ({ flow: { type: 'leaf', actionId: 'gain', sourceCard: cardId, params: { [resource]: 1 } } }),
       })
       registry.registerListener({
@@ -305,7 +305,7 @@ describe('anytime reentry', () => {
     session.withCtx(() => requireActiveCardRegistry('anytime reentry test').registerListener({
       id: cardId,
       cardIds: [cardId],
-      phases: ['anytime'],
+      actions: ['anytime'], phases: ['anytime'],
       handler: () => ({ flow: { type: 'leaf', actionId: 'gain', sourceCard: cardId, params: { sheep: 2 } } }),
     }))
     const started = session.takeAnytimeAction(0, cardId)
@@ -335,7 +335,7 @@ describe('anytime reentry', () => {
     session.withCtx(() => requireActiveCardRegistry('anytime reentry test').registerListener({
       id: cardId,
       cardIds: [cardId],
-      phases: ['anytime'],
+      actions: ['anytime'], phases: ['anytime'],
       handler: (context) => ({ flow: {
         type: 'seq',
         children: [

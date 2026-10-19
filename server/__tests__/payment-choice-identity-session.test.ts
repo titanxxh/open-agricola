@@ -95,7 +95,7 @@ describe('#1070 payment menu choice after an anytime action', () => {
       registry.registerListener(payAfterForest([{ clay: 1 }, { reed: 1 }, { grain: 1 }]))
       // Stand-in for an anytime ability that spends the clay.
       registry.registerListener({
-        id: `${CARD}:spend-clay`, cardIds: [CARD], phases: ['anytime'],
+        id: `${CARD}:spend-clay`, cardIds: [CARD], actions: ['anytime'], phases: ['anytime'],
         handler: ({ player }) => (player.resources.clay ?? 0) > 0
           ? { labelKey: 'ui.yes', flow: { type: 'leaf', actionId: 'pay', sourceCard: CARD, params: { cost: { clay: 1 } } } }
           : undefined,
@@ -154,13 +154,13 @@ describe('#1070 payment menu choice after an anytime action', () => {
       registry.registerListener(payAfterForest([{ clay: 1 }, { reed: 1 }, { grain: 1 }]))
       // Stand-ins for anytime abilities that spend both resources, then return one.
       registry.registerListener({
-        id: `${CARD}:spend-all`, cardIds: [CARD], phases: ['anytime'],
+        id: `${CARD}:spend-all`, cardIds: [CARD], actions: ['anytime'], phases: ['anytime'],
         handler: ({ player }) => (player.resources.clay ?? 0) > 0 && (player.resources.reed ?? 0) > 0
           ? { labelKey: 'ui.yes', flow: { type: 'leaf', actionId: 'pay', sourceCard: CARD, params: { cost: { clay: 1, reed: 1 } } } }
           : undefined,
       })
       registry.registerListener({
-        id: `${CARD}:regain-reed`, cardIds: [CARD], phases: ['anytime'],
+        id: `${CARD}:regain-reed`, cardIds: [CARD], actions: ['anytime'], phases: ['anytime'],
         handler: ({ player }) => (player.resources.reed ?? 0) === 0
           ? { labelKey: 'ui.yes', flow: { type: 'leaf', actionId: 'gain', sourceCard: CARD, params: { reed: 1 } } }
           : undefined,

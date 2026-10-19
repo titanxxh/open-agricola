@@ -22,7 +22,7 @@ import {
   type CustomCardData,
 } from '../../shared/cards/custom-registry'
 import type { GameState, InteractionAnimalReorgZone, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
-import { rewriteCardId } from './extract'
+import { adaptHistoricalCardSource } from './extract'
 import { workshopCardJsonFromDefinition } from '../../server/workshop-draft-validation'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
@@ -63,7 +63,7 @@ export interface CompiledCardArtifacts {
  */
 function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
   const code = opts.historicalRecording
-    ? rewriteCardId(opts.llmGeneratedCode, opts.cardId)
+    ? adaptHistoricalCardSource(opts.llmGeneratedCode, opts.cardId)
     : opts.llmGeneratedCode
   const result = validateAndCompileCustomCode(code, opts.cardId)
   if (!result.valid) {

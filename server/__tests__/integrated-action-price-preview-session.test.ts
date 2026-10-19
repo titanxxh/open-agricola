@@ -170,7 +170,7 @@ describe('integrated action prices agree with authoritative execution', () => {
       state.players[0]!.minorPlayed = [source]
     })
     session.withCtx(() => requireActiveCardRegistry('private anytime preview').registerListener({
-      id: 'test-private-anytime-minor', cardIds: [source], phases: ['anytime'],
+      id: 'test-private-anytime-minor', cardIds: [source], actions: ['anytime'], phases: ['anytime'],
       handler: () => ({ flow: { type: 'leaf', actionId: 'improvement', sourceCard: source, params: { types: ['minor'] } } }),
     }))
     const response = session.getState()

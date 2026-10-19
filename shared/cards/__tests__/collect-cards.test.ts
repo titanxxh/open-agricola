@@ -92,6 +92,7 @@ describe('Collect action card listeners', () => {
 
   const boarSpearAfterListener: Record<string, unknown> = {
     id: 'E53-boar-spear-after',
+    actions: ['collect'],
     phases: ['after' as ActionHookPhase],
     handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result } = context
@@ -114,6 +115,7 @@ describe('Collect action card listeners', () => {
 
   const mushroomCollectorImmediatelyAfterListener: Record<string, unknown> = {
     id: 'A108-mushroom-collector-immediately-after',
+    actions: ['collect'],
     phases: ['immediatelyAfter' as ActionHookPhase],
     handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result } = context
@@ -136,6 +138,7 @@ describe('Collect action card listeners', () => {
 
   const reclamationPlowAfterListener: Record<string, unknown> = {
     id: 'A17-reclamation-plow-after',
+    actions: ['collect'],
     phases: ['after' as ActionHookPhase],
     handler: (context: CardListenerContext): ActionHookResult | void => {
       const { actionId, result, player } = context

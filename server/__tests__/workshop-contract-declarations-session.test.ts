@@ -335,7 +335,7 @@ describe('Workshop Capability Contract listener data fields', () => {
   })
 
   it('replacesTurn: the anytime entry uses up the owner\'s turn without placing a worker', () => {
-    const session = start(`{ listeners: [{ cardIds: [CARD_ID], phases: ['anytime'], replacesTurn: true,
+    const session = start(`{ listeners: [{ cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], replacesTurn: true,
       handler: () => ({ sourceCard: CARD_ID, flow: ${GAIN_FOOD} }) }] }`, { workers: [2, 2] })
     const entry = `${CARD_ID}:listener:0`
     expect(session.getState().interaction.anytimeActions.map(action => action.id)).toEqual([entry])
@@ -353,9 +353,9 @@ describe('Workshop Capability Contract listener data fields', () => {
 
   it('blockedAnytimeInteractionKinds: hides the anytime entry during the named interaction', () => {
     const session = start(`{ listeners: [
-      { cardIds: [CARD_ID], phases: ['anytime'], blockedAnytimeInteractionKinds: ['farm-select'],
+      { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], blockedAnytimeInteractionKinds: ['farm-select'],
         handler: () => ({ sourceCard: CARD_ID, flow: ${GAIN_FOOD} }) },
-      { cardIds: [CARD_ID], phases: ['anytime'], handler: () => ({ sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { grain: 1 }) }) },
+      { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], handler: () => ({ sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { grain: 1 }) }) },
     ] }`)
     const offered = (interaction: { anytimeActions: Array<{ id: string }> }) => interaction.anytimeActions.map(action => action.id)
 
@@ -371,12 +371,12 @@ describe('Workshop Capability Contract listener data fields', () => {
   it('preScoring: only the marked anytime entry is offered in the window before scoring', () => {
     // The marked entry is offered once: using it sets the card's flag.
     const session = start(`{ listeners: [
-      { cardIds: [CARD_ID], phases: ['anytime'], preScoring: true,
+      { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], preScoring: true,
         handler: (ctx) => ctx.player.cardStates[CARD_ID] && ctx.player.cardStates[CARD_ID].flagged ? undefined
           : { sourceCard: CARD_ID, flow: { type: 'seq', children: [
               { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
               ${GAIN_FOOD}] } } },
-      { cardIds: [CARD_ID], phases: ['anytime'], handler: () => ({ sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { grain: 1 }) }) },
+      { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], handler: () => ({ sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { grain: 1 }) }) },
     ] }`, roundEnding(14))
 
     // Earlier Harvest windows list no option of the card and are skipped.
@@ -394,7 +394,7 @@ describe('Workshop Capability Contract listener data fields', () => {
 
 describe('Workshop Capability Contract computeExchanges phase', () => {
   it('adds the returned exchange to the owner\'s exchange menu', () => {
-    const session = start(`{ listeners: [{ cardIds: [CARD_ID], phases: ['computeExchanges'],
+    const session = start(`{ listeners: [{ cardIds: [CARD_ID], actions: ['compute-exchanges'], phases: ['computeExchanges'],
       handler: (ctx) => ctx.extraData.window === 'anytime'
         ? { sourceCard: CARD_ID, extraExchanges: [{ from: { food: 2 }, to: { wood: 1 }, triggers: ['anytime'] }] }
         : undefined }] }`)

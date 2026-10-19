@@ -60,3 +60,11 @@ export function rewriteCardId(code: string, targetId: string): string {
   const newWindow = window.replace(idFieldRe, `$1${targetId}$3`)
   return code.slice(0, defStart) + newWindow
 }
+
+/** Only the historical M7 recording omitted the now-required anytime target. */
+export function adaptHistoricalCardSource(code: string, targetId: string): string {
+  return rewriteCardId(code, targetId).replace(
+    /(cardIds:\s*\[CARD_ID\],\s*)(phases:\s*\['anytime'\])/g,
+    "$1actions: ['anytime'], $2",
+  )
+}

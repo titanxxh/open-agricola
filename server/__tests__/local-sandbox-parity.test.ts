@@ -292,7 +292,7 @@ const CARD_IMPL = {
 
   it.each([
     [`effect: { id: CARD_ID, beforeEndGameMandatory: 'false', onBeforeEndGame: () => undefined }`, 'effect beforeEndGameMandatory must be a boolean'],
-    [`listeners: [{ phases: ['anytime'], replacesTurn: 1, handler: () => undefined }]`, 'listener replacesTurn must be a boolean'],
+    [`listeners: [{ actions: ['anytime'], phases: ['anytime'], replacesTurn: 1, handler: () => undefined }]`, 'listener replacesTurn must be a boolean'],
     // A function would vanish in serialization and leave the listener optional.
     [`listeners: [{ actions: ['collect'], phases: ['before'], mandatory: () => true, handler: () => undefined }]`, 'listener mandatory must be a boolean'],
   ])('rejects a declaration of the wrong type identically when saving: %s', (impl, message) => {

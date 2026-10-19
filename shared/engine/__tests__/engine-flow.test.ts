@@ -87,6 +87,7 @@ const createPlayer = () =>
     minorPlayed: [],
     occupationHand: [],
     occupationPlayed: [],houseAnimals: {},
+    cardStates: {},
     stableAnimals: {},
     pastures: [],
     fenceSegments: [],
@@ -251,7 +252,7 @@ describe('Engine flow nodes', () => {
     }
     const replacement: ActionDefinition = {
       ...action,
-      id: 'strict-probe-replacement',
+      id: 'plow',
     }
     actionHooks.register({
       id: 'strict-probe-replace',
@@ -296,7 +297,7 @@ describe('Engine flow nodes', () => {
     const state = createState()
     state.players = [player]
     const original: ActionDefinition = {
-      id: 'strict-alternative-original',
+      id: 'sow',
       nameKey: 'test',
       descriptionKey: 'test',
       roundAvailable: 1,
@@ -306,7 +307,7 @@ describe('Engine flow nodes', () => {
     }
     const replacement: ActionDefinition = {
       ...original,
-      id: 'strict-alternative-replacement',
+      id: 'plow',
       canBeExecutedByPlayer: () => true,
     }
     requireActiveCardRegistry('strict replacement alternative probe test').registerListener({
@@ -605,6 +606,7 @@ describe('Engine flow nodes', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'owner-pay-listener',
+      actions: ['gain'], phases: ['after'],
       cardIds: ['OWNER_PAY_CARD'],
       handler: () => ({
         flow: { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: 'OWNER_PAY_CARD' },
@@ -612,6 +614,7 @@ describe('Engine flow nodes', () => {
     })
     cardRegistry.registerListener({
       id: 'owner-other-listener',
+      actions: ['gain'], phases: ['after'],
       cardIds: ['OWNER_OTHER_CARD'],
       handler: () => ({ extraData: { applicable: true } }),
     })
@@ -673,6 +676,7 @@ describe('Engine flow nodes', () => {
     const cardRegistry = new CardRegistry()
     const listener = {
       id: 'listener-1',
+      actions: ['gain'], phases: ['after'],
       cardIds: ['C1'],
       handler: () => ({
         flow: { type: 'leaf' as const, actionId: 'pay', params: { cost: { wood: 1 } } },
@@ -680,6 +684,7 @@ describe('Engine flow nodes', () => {
     }
     const listener2 = {
       id: 'listener-2',
+      actions: ['gain'], phases: ['after'],
       cardIds: ['C2'],
       handler: () => ({ extraData: { applicable: true } }),
     }
@@ -746,7 +751,7 @@ describe('Engine flow nodes', () => {
     cardRegistry.registerListener({
       id: 'cross-owner-after',
       cardIds: ['CROSS_AFTER_CARD'],
-      actions: ['trigger-cross-owner-after'],
+      actions: ['collect'],
       phases: ['after'],
       scope: 'any',
       mandatory: true,
@@ -763,7 +768,7 @@ describe('Engine flow nodes', () => {
     setActiveCardRegistry(cardRegistry)
 
     const triggerAction: ActionDefinition = {
-      id: 'trigger-cross-owner-after',
+      id: 'collect',
       nameKey: 'test.crossOwnerAfter',
       descriptionKey: 'test.crossOwnerAfter',
       roundAvailable: 1,
@@ -819,7 +824,7 @@ describe('Engine flow nodes', () => {
       id: 'hand-select-after',
       cardIds: ['HAND_SELECT_CARD'],
       zones: ['hand'],
-      actions: ['trigger-hand-select'],
+      actions: ['collect'],
       phases: ['after'],
       handler: (context: CardListenerContext) => {
         seen.push({
@@ -835,14 +840,14 @@ describe('Engine flow nodes', () => {
       id: 'hand-select-after-2',
       cardIds: ['HAND_SELECT_CARD_2'],
       zones: ['hand'],
-      actions: ['trigger-hand-select'],
+      actions: ['collect'],
       phases: ['after'],
       handler: () => ({ extraData: { applicable: true } }),
     })
     setActiveCardRegistry(cardRegistry)
 
     const triggerAction: ActionDefinition = {
-      id: 'trigger-hand-select',
+      id: 'collect',
       nameKey: 'test.handSelect',
       descriptionKey: 'test.handSelect',
       roundAvailable: 1,
@@ -906,6 +911,7 @@ describe('Engine flow nodes', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'optional-before-flow',
+      actions: ['collect', 'gain'],
       cardIds: ['OPTIONAL_BEFORE_CARD'],
       phases: ['before'],
       handler: () => {
@@ -926,7 +932,7 @@ describe('Engine flow nodes', () => {
     setActiveCardRegistry(cardRegistry)
 
     const triggerAction: ActionDefinition = {
-      id: 'trigger-optional-before',
+      id: 'collect',
       nameKey: 'test.optionalBefore',
       descriptionKey: 'test.optionalBefore',
       roundAvailable: 1,
@@ -980,6 +986,7 @@ describe('Engine flow nodes', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'restored-optional-before-flow',
+      actions: ['collect', 'gain'],
       cardIds: ['RESTORED_OPTIONAL_BEFORE_CARD'],
       phases: ['before'],
       handler: () => {
@@ -999,7 +1006,7 @@ describe('Engine flow nodes', () => {
     setActiveCardRegistry(cardRegistry)
 
     const triggerAction: ActionDefinition = {
-      id: 'trigger-restored-optional-before',
+      id: 'collect',
       nameKey: 'test.restoredOptionalBefore',
       descriptionKey: 'test.restoredOptionalBefore',
       roundAvailable: 1,
@@ -1560,7 +1567,7 @@ describe('Engine flow nodes', () => {
   it('computeReplace decline offers xor between replacement and original action', () => {
     const events: string[] = []
     const original: ActionDefinition = {
-      id: 'original',
+      id: 'sow',
       nameKey: 'actions.construct.name',
       descriptionKey: 'actions.construct.description',
       roundAvailable: 1,
@@ -1585,7 +1592,7 @@ describe('Engine flow nodes', () => {
     }
     requireActiveCardRegistry('engine-flow').registerListener({
       id: 'offer-replacement',
-      actions: ['original'],
+      actions: ['sow'],
       phases: ['computeReplace'],
       handler: (hookContext) => {
         if (hookContext.actionContext?.checkedReplaceAction === true) return
@@ -1603,7 +1610,7 @@ describe('Engine flow nodes', () => {
     registry.register(original)
     registry.register(replacement)
     const engine = new Engine({
-      tree: new EngineTree(new ActionNode('action-original', 'original')),
+      tree: new EngineTree(new ActionNode('action-original', 'sow')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -1634,7 +1641,7 @@ describe('Engine flow nodes', () => {
   it('keeps every computeReplace alternative with branch-local recursion guards', () => {
     const events: string[] = []
     const original: ActionDefinition = {
-      id: 'multi-replace-original',
+      id: 'sow',
       nameKey: 'actions.construct.name',
       descriptionKey: 'actions.construct.description',
       roundAvailable: 1,
@@ -1838,7 +1845,7 @@ describe('Engine flow nodes', () => {
 
   it('marks replacement continuation descendant actions mandatory', () => {
     const original: ActionDefinition = {
-      id: 'replacement-continuation-original',
+      id: 'sow',
       nameKey: 'actions.sow.name',
       descriptionKey: 'actions.sow.description',
       roundAvailable: 1,
@@ -1866,7 +1873,7 @@ describe('Engine flow nodes', () => {
     }
     requireActiveCardRegistry('engine-flow').registerListener({
       id: 'offer-blocking-replacement-continuation',
-      actions: ['replacement-continuation-original'],
+      actions: ['sow'],
       phases: ['computeReplace'],
       handler: (hookContext) => {
         if (hookContext.actionContext?.checkedReplaceAction === true) return
