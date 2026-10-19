@@ -172,15 +172,8 @@ describe('B27 Toolbox session', () => {
     resp = session.resolveChoice(0, skipPottersYard!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.kind).toBe('select-trigger')
-    expect(resp.interaction.request.options?.filter(option => !option.value.startsWith('__'))
-      .map(option => option.sourceCard)).toEqual([CARD_ID])
-    const toolboxWindow = resp.interaction.request.options?.find(option => option.sourceCard === CARD_ID)
-    expect(toolboxWindow).toBeDefined()
-    resp = session.resolveChoice(0, toolboxWindow!.value)
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
+    // The explicit completion subscription is the only remaining reaction.
+    expect(resp.interaction.request.kind).toBe('choice')
     expect(resp.interaction.promptKey, JSON.stringify(resp.interaction)).toBe('ui.interactionToolboxImprovement')
 
     const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
