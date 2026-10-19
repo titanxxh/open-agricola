@@ -1,4 +1,5 @@
 import type { ActionHookPhase } from '../actions/hooks'
+import type { GameEvent } from '../contract/events'
 import type { CardListenerRegistration } from './card-listeners'
 import { getCardListenerSource, setCardListenerSource } from './card-listener-source'
 
@@ -70,7 +71,7 @@ export const listenerEventContract = [
   'farm.fieldPlowed', 'farm.roomBuilt', 'farm.stableBuilt', 'farm.fenceBuilt', 'farm.spacesUsed',
   'worker.useCompleted', 'farm.terrainChanged',
   'anytime.completed',
-] as const
+] as const satisfies readonly GameEvent['type'][]
 Object.freeze(listenerEventContract)
 export type CardListenerEvent = typeof listenerEventContract[number]
 
