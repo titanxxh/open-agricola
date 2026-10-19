@@ -7,6 +7,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit38Harvest from './_helpers/audit/ae-negative-38-harvest'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => {
   const setup = () => {
     const session = new GameSession(42)
@@ -40,7 +50,7 @@ describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => 
 
   it('rejects a count above max without mutating the feeding draft', () => {
     const session = setup()
-    let resp = session.performRoundEnd()
+    let resp = enterFeeding(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
     expect(resp.interaction.playerIndex).toBe(0)
@@ -72,7 +82,7 @@ describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => 
 
   it('allows count=1 (within max)', () => {
     const session = setup()
-    let resp = session.performRoundEnd()
+    let resp = enterFeeding(session)
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
@@ -94,7 +104,7 @@ describe('C059_SchnappsDistillery harvest max enforcement (server-side)', () => 
 
   it('rejects an unknown source without mutating the feeding draft', () => {
     const session = setup()
-    let resp = session.performRoundEnd()
+    let resp = enterFeeding(session)
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     const before = session.getState()

@@ -8,6 +8,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const CARD_ID = 'D108_StoneCarver'
 const FILLER = '__test_placeholder__'
 
@@ -68,7 +78,7 @@ const playOccupation = (session: GameSession) => {
 }
 
 const enterFeed = (session: GameSession) => {
-  const response = session.performRoundEnd()
+  const response = enterFeeding(session)
   expect(response.interaction).toMatchObject({
     stateId: 'wait',
     playerIndex: 0,

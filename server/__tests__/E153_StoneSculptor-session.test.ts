@@ -11,6 +11,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const CARD_ID = 'E153_StoneSculptor'
 
 const setupHarvestRound = (round = 4) => {
@@ -32,22 +42,21 @@ const setupHarvestRound = (round = 4) => {
 }
 
 const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedSelection[]> = {}) => {
-  let resp = session.performRoundEnd()
+  const submitted = new Set<number>()
+  let resp = enterFeeding(session)
   while (resp.interaction.stateId === 'wait') {
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+    if (resp.interaction.request.kind === 'feed') {
       const idx = resp.interaction.playerIndex
-      const sel = feedSelections[idx] ?? []
-      resp = session.resolveChoice(idx, 'confirm', { selections: sel })
-    } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
-    } else if (resp.interaction.stateId === 'wait') {
-      const opts = resp.interaction.request.options ?? []
-      const next = opts.find((o) => o.value === '__skip__') ?? opts[0]
-      if (!next) break
-      resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, next.value)
+      const selections = submitted.has(idx) ? [] : feedSelections[idx] ?? []
+      submitted.add(idx)
+      resp = session.resolveChoice(idx, 'confirm', { selections })
+    } else if (resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones ?? [])
     } else {
-      break
+      const opts = resp.interaction.request.options ?? []
+      const next = opts.find((option) => option.value === '__skip__') ?? opts[0]
+      if (!next) break
+      resp = session.resolveChoice(resp.interaction.playerIndex, next.value)
     }
     if (!resp.ok) throw new Error(resp.error ?? 'failed to drain harvest')
   }
@@ -150,7 +159,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     state.players[1]!.resources.food = 5
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
+    let resp = enterFeeding(session)
     expect(resp.interaction).toMatchObject({
       stateId: 'wait',
       playerIndex: 0,
@@ -238,7 +247,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     state.players[1]!.resources.food = 5
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
+    let resp = enterFeeding(session)
     expect(resp.interaction).toMatchObject({
       stateId: 'wait',
       playerIndex: 0,

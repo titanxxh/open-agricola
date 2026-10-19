@@ -11,6 +11,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const CARD_ID = 'C109_SchnappsDistiller'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
@@ -67,7 +77,7 @@ const setupHarvestSession = () => {
 describe('C109_SchnappsDistiller — metadata exchange', () => {
   it('rejects an over-limit harvest exchange and accepts a legal retry', () => {
     const session = setupHarvestSession()
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected harvest feed')
     expect(response.interaction).toMatchObject({
@@ -146,7 +156,7 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
 
   it('declines the optional harvest exchange and leaves the vegetable for normal feeding', () => {
     const session = setupHarvestSession()
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected harvest feed')
 

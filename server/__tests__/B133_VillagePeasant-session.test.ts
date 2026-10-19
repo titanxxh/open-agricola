@@ -69,7 +69,17 @@ const finishGame = (session: GameSession) => {
     player.occupationHand = [FILLER]
   })
   session.loadState(state)
-  return session.performRoundEnd()
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait') {
+    if (session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    } else {
+      expect(response.interaction.request.kind).toBe('feed')
+      response = session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
+    }
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
 }
 
 describe('B133 Village Peasant parity', () => {
