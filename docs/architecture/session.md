@@ -100,6 +100,12 @@ Rotation opportunity, Turn Scope and action-execution scope are separate lifetim
 
 Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-placement-session}.test.ts`.
 
+## Player Feeding Settlement
+
+`handleFeedResolved()` resolves the offered and live recipe catalogs and validates the complete batch before replacing its pending frame with an ordinary Exchange flow. Its private `feedingResume` stores remaining demand, prepaid food, conversion costs and the player queue. Every batch reaction and required animal reorganization completes before remaining food payment, begging and heating. Snapshot recovery and undo restore that continuation with the engine cursor, so completed exchange and prepaid food never replay.
+
+Tests: `server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-conversion-listener-session}.test.ts`.
+
 ## Snapshot data and executable-rule recovery
 
 See [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md). New-game creation owns initial dealing. Loading or restoring a Session preserves present empty hands, stored card identities, missing optional rule fields, animal assignments and history; it never re-deals, and it rejects invalid required input instead of converting it into a new game. `rehydrateState()` only decodes data; the owning Core then rebuilds known executable definitions and engine cursors without replacing the captured data. Undo, command checkpoints, provisional checkpoints and process recovery share this contract.

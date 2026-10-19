@@ -12,8 +12,8 @@ const handFeedConversionListener: CardListenerRegistration = {
   id: 'x-hand-feed-conversion-listener',
   cardIds: [LISTENER_CARD],
   zones: ['hand'],
-  actions: ['harvest-feed-conversion'],
-  phases: ['immediatelyAfter'],
+  actions: ['exchange'],
+  phases: ['after'],
   handler: (context) => {
     const converted = context.transactionEvents.find((event) => event.type === 'harvest.feedConverted')
     if (!converted || context.ownerCardZone !== 'hand') return undefined

@@ -24,7 +24,6 @@ import * as audit34Scoring from './_helpers/audit/ae-negative-34-scoring'
 const CARD_ID = 'D036_BreedRegistry'
 const AFTER_SHEEP_GAIN = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-sheep-gain')!
 const AFTER_EXCHANGE_SHEEP_CONVERSION = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-exchange-sheep-conversion')!
-const AFTER_HARVEST_SHEEP_CONVERSION = D036_BreedRegistry_impl.listeners.find((listener) => listener.id === 'D36-breed-registry-after-harvest-sheep-conversion')!
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -86,7 +85,7 @@ const executeSpecialEffectLeaves = (ruleOwner: GameSession,
 }
 
 const setupDirectContext = (
-  actionId: 'collect' | 'gain' | 'exchange' | 'harvest-feed-conversion',
+  actionId: 'collect' | 'gain' | 'exchange',
   transactionEvents: Array<
     DraftGameEvent<'resource.moved'>
     | DraftGameEvent<'resource.exchanged'>
@@ -107,7 +106,7 @@ const setupDirectContext = (
     player,
     space: { id: actionId === 'collect' ? 'sheep-market' : 'cooking' },
     actionId,
-    phase: actionId === 'harvest-feed-conversion' ? 'immediatelyAfter' : 'after',
+    phase: 'after',
     transactionEvents,
     result,
     ownerPlayer: player,
@@ -213,19 +212,10 @@ describe('D036_BreedRegistry session', () => {
     expect(readCardExtraData<boolean>(ctx.player, CARD_ID, 'sheepConvertedToFood')).toBe(true)
   })
 
-  it('keeps exchange and harvest conversion listeners on separate phases', () => {
-    expect(AFTER_EXCHANGE_SHEEP_CONVERSION.phases).toEqual(['after'])
-    expect(AFTER_EXCHANGE_SHEEP_CONVERSION.actions).toEqual(['exchange'])
-    expect(AFTER_HARVEST_SHEEP_CONVERSION.phases).toEqual(['immediatelyAfter'])
-    expect(AFTER_HARVEST_SHEEP_CONVERSION.actions).toEqual(['harvest-feed-conversion'])
-  })
-
-  it('marks sheepConverted from harvest.feedConverted sheep cost', () => {
-    const { session: ruleSession6, context: ctx } = setupDirectContext('harvest-feed-conversion', [feedConverted()], { type: 'ok' })
-
-    const result = ruleSession6.withCtx(() => executeCardListener(AFTER_HARVEST_SHEEP_CONVERSION, ctx))
+  it('uses the canonical exchanged resource fact when feeding also projects a harvest fact', () => {
+    const { session: ruleSession6, context: ctx } = setupDirectContext('exchange', [exchanged(), feedConverted()], { type: 'ok' })
+    const result = ruleSession6.withCtx(() => executeCardListener(AFTER_EXCHANGE_SHEEP_CONVERSION, ctx))
     executeSpecialEffectLeaves(ruleSession6, result?.flow, ctx.state, ctx.player)
-
     expect(readCardExtraData<boolean>(ctx.player, CARD_ID, 'sheepConvertedToFood')).toBe(true)
   })
 

@@ -6,7 +6,6 @@ import { evaluateFlowDoable, isActionVetoedInFlowContext, isPlacementActionDoabl
 import type {
   DraftGameEvent,
   EventSink,
-  GameEvent,
 } from '../contract/events.ts'
 import type {
   ActionChoiceOption,
@@ -75,11 +74,9 @@ import {
 } from './state-bootstrap.ts'
 import { clearWorkPhaseBuildingResources } from '../session/work-phase-resources.ts'
 import {
-  addFoodFromConversion,
   incFirstPlayer,
   incHarvestedGrain,
   incHarvestedVegetable,
-  incResourceConverted,
 } from '../session/stats.ts'
 import { getMinorImprovement } from '../cards/registry-display.ts'
 import { buildEndTurnReactionFlow } from '../cards/helpers/end-turn-reactions'
@@ -113,14 +110,13 @@ import {
   type PendingInteractionProjectionInput,
 } from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
 import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-feeding-requirement.ts'
-import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import {
   activatePendingHarvestSkips,
@@ -130,7 +126,6 @@ import {
 import { recordReturnHomePlacements, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, findPlayerById, findPlayerIndexById, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
-import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
 import { getPlacedAnimalsByType, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import {
   canAffordTrade,
@@ -138,7 +133,8 @@ import {
   getExchangesInWindow,
   getFeedExchangeCatalog,
   getRemainingHarvestExchangeUses,
-  recordHarvestExchangeUses,
+  validateExchangeBatch,
+  type ExchangeBatchEntry,
 } from '../actions/effects/exchange.ts'
 import {
   getAvailableMajorImprovementIds,
@@ -146,15 +142,13 @@ import {
   takeMajorImprovementFromSupply,
 } from '../cards/major/supply.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
-import { EventStore } from '../events/store.ts'
 import { prependDerivedLogEntries } from '../events/log-cache.ts'
 import {
   appendPublicEventCanceledPacket,
   assertPublicEventArchiveCanAppend,
   PublicEventArchivePayloadError,
 } from '../events/archive.ts'
-import { PaymentSolver } from '../actions/payment'
-import { convertResources, exchangeToTrade, hasValidResources } from '../actions/helpers/trades.ts'
+import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
@@ -3647,6 +3641,17 @@ export class GameCore {
             return
           }
         }
+        if (frame.feedingResume) {
+          const animalOwnerIndex = this.state.players.findIndex(candidate => this.hasPendingAnimals(candidate))
+          if (animalOwnerIndex !== -1) {
+            this.startReorganizeSubFlow(animalOwnerIndex, 'anytime')
+            return
+          }
+          this.finalizeActionLog(frameOwnerPlayer)
+          this.engineStack.pop()
+          this.finishFeedingSettlement(ownerIdx, frame.feedingResume)
+          return
+        }
         if (this.stageDispatch.completeFrameIfStage(frame)) return
         if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
           // The frame's engine/source were replaced in-place; loop again with
@@ -3830,7 +3835,8 @@ export class GameCore {
               this.turnOwnerPlayerIndex = null
               return
             }
-            if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
+            if (this.getAnimalCount(player) > this.getAnimalCount(before) &&
+              !(result.type === 'ok' && result.internalChildren?.afterHostListeners?.some((child) => child.actionId === 'reorganize'))) {
               const pIdx = effectivePlayerIndex
               frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
               this.flushEngineLog()
@@ -3883,7 +3889,9 @@ export class GameCore {
       // sub-flow. An `animal-reorg` request (last-harvest enforcement without
       // newborns) is handled in the `step.type === 'choice'` block above.
 
-      if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
+      if (this.getAnimalCount(player) > this.getAnimalCount(before) &&
+        !(step.type === 'ok' && step.result.type === 'ok' &&
+          step.result.internalChildren?.afterHostListeners?.some((child) => child.actionId === 'reorganize'))) {
         const pIdx = effectivePlayerIndex
         frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
         this.flushEngineLog()
@@ -4305,43 +4313,6 @@ export class GameCore {
     return this.respond()
   }
 
-  private dispatchHarvestFeedConversionListeners(
-    player: PlayerState,
-    transactionEvents: readonly (GameEvent | DraftGameEvent)[],
-  ): void {
-    const space = this.createSyntheticSpace('harvest-feed-conversion')
-    const results = runCardListeners({
-      actionHooks: this.actionHooks, state: this.state,
-      player,
-      space,
-      actionId: 'harvest-feed-conversion',
-      phase: 'immediatelyAfter',
-      transactionEvents,
-    })
-    if (results.length === 0) return
-    if (!Array.isArray(this.state.events)) this.state.events = []
-    if (!Number.isSafeInteger(this.state.nextEventSeq) || this.state.nextEventSeq < 1) {
-      this.state.nextEventSeq = 1
-    }
-    const store = new EventStore()
-    const frame = store.beginFrame({
-      actorPlayerId: player.id,
-      sourceActionId: 'harvest-feed-conversion',
-    })
-    executeImmediateSpecialEffectFlows({ actionHooks: this.actionHooks, state: this.state,
-      player,
-      space,
-      eventSink: frame.sink,
-      results,
-    })
-    const completed = frame.complete(this.state)
-    if (completed.length > 0) {
-      store.commitTransaction(this.state)
-    } else {
-      store.rollbackTransaction()
-    }
-  }
-
   private handleFeedResolved(
     playerIndex: number,
     selections: FeedSelections,
@@ -4349,158 +4320,71 @@ export class GameCore {
     const interaction = this.buildInteraction()
     const request = interaction.stateId === 'wait' ? interaction.request : undefined
     const frame = this.engineStack.current()
-    if (
-      request?.kind !== 'feed' ||
-      frame?.ownerPlayerIndex !== playerIndex
-    ) {
-      return this.respond(false, 'no pending feed')
+    if (request?.kind !== 'feed' || frame?.ownerPlayerIndex !== playerIndex) {
+      return this.rejectInput('no pending feed')
     }
-    const feedRequest = request
-    const pendingRemaining = feedRequest.remaining
-    const pendingFoodUsed = feedRequest.foodUsed
-    const pendingFeedQueue = feedRequest.feedQueue ?? []
     const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-
+    if (!player) return this.rejectInput('invalid player')
     const currentCatalog = getFeedExchangeCatalog(player, this.state, this.actionHooks)
-    const offeredCatalog = feedRequest.exchangeCatalog ?? []
-    const lookupExchange = (
-      sourceId: string,
-      idx: number,
-    ) => {
-      const wasOffered = offeredCatalog.some((entry) =>
-        entry.sourceId === sourceId && entry.exchangeIndex === idx,
-      )
-      if (!wasOffered) return undefined
-      return currentCatalog.find((entry) =>
-        entry.sourceId === sourceId && entry.exchangeIndex === idx,
-      )
+    const offeredCatalog = request.exchangeCatalog ?? []
+    const entries: ExchangeBatchEntry[] = []
+    for (const selection of selections) {
+      if (!selection.sourceId || !Number.isSafeInteger(selection.exchangeIndex) ||
+        !Number.isSafeInteger(selection.count) || selection.count <= 0) {
+        return this.rejectInput('invalid harvest feed selections')
+      }
+      const offered = offeredCatalog.some((entry) => entry.sourceId === selection.sourceId &&
+        entry.exchangeIndex === selection.exchangeIndex)
+      const resolved = offered ? currentCatalog.find((entry) => entry.sourceId === selection.sourceId &&
+        entry.exchangeIndex === selection.exchangeIndex) : undefined
+      if (!resolved) return this.rejectInput('invalid harvest feed selections')
+      entries.push({
+        trade: resolved.trade, count: selection.count,
+        ...(resolved.window === 'harvest' ? { harvestRound: this.state.round } : {}),
+      })
     }
-
-    const perSourceUsed = new Map<string, number>()
-    type ResolvedSel = (typeof selections)[number] & {
-      _exchange: ReturnType<typeof getFeedExchangeCatalog>[number]
-    }
-    const resolvedSelections: ResolvedSel[] = []
-    let resourceDraft: Partial<Resource> = { ...player.resources }
-    const placedAnimals = getPlacedAnimalsByType(player, this.state)
-    for (const sel of selections) {
-      if (
-        !sel.sourceId
-        || !Number.isSafeInteger(sel.exchangeIndex)
-        || !Number.isSafeInteger(sel.count)
-        || sel.count <= 0
-      ) return this.respond(false, 'invalid harvest feed selections')
-      const resolved = lookupExchange(sel.sourceId, sel.exchangeIndex)
-      if (!resolved) return this.respond(false, 'invalid harvest feed selections')
-      const exchange = resolved.trade
-      if (resolved.max !== undefined) {
-        const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
-        const sourceLimit = resolved.window === 'harvest'
-          ? getRemainingHarvestExchangeUses(
-              player,
-              resolved.sourceId,
-              resolved.max,
-              this.state.round,
-            )
-          : resolved.max
-        if (usedSoFar + sel.count > sourceLimit) {
-          return this.respond(false, 'invalid harvest feed selections')
-        }
-        perSourceUsed.set(sel.sourceId, usedSoFar + sel.count)
-      }
-      for (const animal of animalKeysForState(this.state)) {
-        const cost = (exchange.from[animal] ?? 0) * sel.count
-        if (exchange.fromFarmyard && cost > (placedAnimals[animal] ?? 0)) {
-          return this.respond(false, 'invalid harvest feed selections')
-        }
-        placedAnimals[animal] = Math.max(0, (placedAnimals[animal] ?? 0) - cost)
-      }
-      resourceDraft = convertResources(
-        resourceDraft,
-        exchangeToTrade(exchange, sel.sourceId),
-        sel.count,
-      )
-      if (!hasValidResources(resourceDraft)) {
-        return this.respond(false, 'invalid harvest feed selections')
-      }
-      resolvedSelections.push({ ...sel, _exchange: resolved })
+    if (!validateExchangeBatch({ state: this.state, player, entries })) {
+      return this.rejectInput('invalid harvest feed selections')
     }
 
     this.pushHistory()
-    const usedResources: Partial<Resource> = { food: pendingFoodUsed }
-    for (const sel of resolvedSelections) {
-      const resolved = sel._exchange
-      const exchange = resolved.trade
-      const times = sel.count
-      const costMap: Record<string, number> = {}
-      for (const [k, v] of Object.entries(exchange.from)) {
-        const total = (v as number) * times
-        if (isAnimalResourceKey(k)) {
-          applyAnimalPayment(player, this.state, k, total)
-        } else {
-          ;(player.resources as Record<string, number>)[k] -= total
-        }
-        costMap[k] = total
-        usedResources[k as keyof Resource] = (usedResources[k as keyof Resource] ?? 0) + total
-        incResourceConverted(player, k as keyof Resource, total)
-      }
-      const gainMap: Record<string, number> = {}
-      for (const [k, v] of Object.entries(exchange.to)) {
-        const total = (v as number) * times
-        ;(player.resources as Record<string, number>)[k] += total
-        gainMap[k] = total
-        if (k === 'food') {
-          const fromKey0 = (Object.keys(exchange.from)[0] ?? null) as
-            | keyof Resource
-            | null
-          if (fromKey0) addFoodFromConversion(player, fromKey0, total)
-        }
-      }
-      const feedConvertedEvents = appendImmediateEvents(this.state, [{
-        type: 'harvest.feedConverted',
-        playerId: player.id,
-        source: sel.sourceId,
-        cost: costMap,
-        food: gainMap,
-      }], { actorPlayerId: player.id })
-      this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
-      if (resolved.window === 'harvest' && resolved.max !== undefined) {
-        recordHarvestExchangeUses(
-          player,
-          resolved.sourceId,
-          this.state.round,
-          times,
-        )
-      }
-      if (exchange.sideEffect && times > 0) {
-        PaymentSolver.applyTradeSideEffect(
-          this.state,
-          player,
-          exchange.sideEffect,
-          times,
-          sel.sourceId ?? exchange.sourceId ?? 'unknown',
-        )
+    const resourcesConverted: Partial<Resource> = {}
+    for (const { trade, count } of entries) {
+      for (const resource of REAL_RESOURCE_KEYS) {
+        const amount = (trade.from[resource] ?? 0) * count
+        if (amount > 0) resourcesConverted[resource] = (resourcesConverted[resource] ?? 0) + amount
       }
     }
-    const foodUsed = Math.min(player.resources.food, pendingRemaining)
+    const flow: ActionFlow = {
+      type: 'leaf', actionId: 'exchange',
+      actionContext: { submittedExchangeBatch: entries, harvestFeed: true },
+    }
+    frame.feedingResume = {
+      remaining: request.remaining, foodUsed: request.foodUsed,
+      feedQueue: request.feedQueue ?? [], resourcesConverted,
+    }
+    this.engineStack.replaceCurrentFrameEngine(this.createFlowEngine(flow, playerIndex), { kind: 'flow', flow })
+    this.runEngineSteps()
+    return this.respond()
+  }
+
+  private finishFeedingSettlement(playerIndex: number, resume: NonNullable<EngineFrame['feedingResume']>): void {
+    const player = this.state.players[playerIndex]
+    if (!player) return
+    const usedResources: Partial<Resource> = {
+      ...resume.resourcesConverted,
+      food: (resume.resourcesConverted.food ?? 0) + resume.foodUsed,
+    }
+    const foodUsed = Math.min(player.resources.food, resume.remaining)
     player.resources.food -= foodUsed
     usedResources.food = (usedResources.food ?? 0) + foodUsed
-    const deficit = pendingRemaining - foodUsed
+    const deficit = resume.remaining - foodUsed
     if (deficit > 0) {
       player.resources.begging += deficit
       usedResources.begging = (usedResources.begging ?? 0) + deficit
     }
     this.logHarvestResourceEntry('log.harvestFeedDetail', player, usedResources)
-
-    const feedQueue = pendingFeedQueue
-    // Pop the current feed synthetic frame before either pushing the next
-    // player's frame (queue still has entries) or returning to the breed
-    // phase (queue empty). Without this pop the engineStack would accumulate
-    // one residual `__interaction_only__` frame per resolved player.
-    const top = this.engineStack.current()
-    if (top?.reason === 'feed') this.engineStack.pop()
-    return this.startHeatingOrContinue(playerIndex, feedQueue)
+    this.startHeatingOrContinue(playerIndex, resume.feedQueue)
   }
 
   private handleHeatingResolved(

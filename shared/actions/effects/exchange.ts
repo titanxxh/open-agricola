@@ -11,6 +11,8 @@ import type {
   Trade,
   ResourceKey,
   FeedExchangeCatalogEntry,
+  ExchangeBatchEntry,
+  InternalActionChildren,
 } from '../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
@@ -553,7 +555,7 @@ const recordCookeryConversion = (
   }
 }
 
-export type ExchangeBatchEntry = { trade: Trade; count: number }
+export type { ExchangeBatchEntry } from '../../contract/types'
 
 export type ExchangeRecipeReceipt = {
   sourceId: string | undefined
@@ -569,54 +571,44 @@ export type ExchangeBatchResult =
       resourcesPaid: Partial<Resource>
       resourcesGained: Partial<Resource>
       extraData: { exchangeBatch: ExchangeRecipeReceipt[] }
+      internalChildren?: InternalActionChildren
     }
   | Extract<ActionExecutionResult, { type: 'fail' }>
 
-/** A batch is validated using recipe credits only, before listeners can award goods. */
-export const executeExchangeBatch = ({
-  state,
-  player,
-  entries,
-  maxTradeTimesBySourceId,
-  harvestExchangeRound,
-  animalPaymentPreference,
-  eventSink,
-  actionHooks,
-}: {
+type ExchangeBatchInput = {
   state: GameState
   player: PlayerState
   entries: readonly ExchangeBatchEntry[]
   maxTradeTimesBySourceId?: Readonly<Record<string, number>>
-  harvestExchangeRound?: number
-  animalPaymentPreference?: AnimalPaymentPreference
-  eventSink?: EventSink
-  actionHooks?: ActionHookRegistry
-}): ExchangeBatchResult => {
-  const invalid = (): Extract<ExchangeBatchResult, { type: 'fail' }> => ({
-    type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true,
-  })
+}
+
+/** Plans use only direct recipe credits, before listeners can award goods. */
+export const validateExchangeBatch = ({
+  state, player, entries, maxTradeTimesBySourceId,
+}: ExchangeBatchInput): boolean => {
   const resources = { ...player.resources }
   const placedAnimals = getPlacedAnimalsByType(player, state)
-  const recipeUses = new Map<Trade, number>()
+  const recipeUses = new Map<string, number>()
   const sourceUses = new Map<string, number>()
-  for (const { trade, count } of entries) {
-    if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state)) return invalid()
-    const used = (recipeUses.get(trade) ?? 0) + count
-    if (used > (trade.max ?? Infinity)) return invalid()
-    recipeUses.set(trade, used)
+  for (const { trade, count, harvestRound } of entries) {
+    if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state)) return false
+    const recipeKey = JSON.stringify(trade)
+    const used = (recipeUses.get(recipeKey) ?? 0) + count
+    if (used > (trade.max ?? Infinity)) return false
+    recipeUses.set(recipeKey, used)
     const sourceId = trade.sourceId ?? trade.source
     if (sourceId) {
       const sourceUsed = (sourceUses.get(sourceId) ?? 0) + count
-      if (sourceUsed > (maxTradeTimesBySourceId?.[sourceId] ?? Infinity)) return invalid()
-      if (harvestExchangeRound !== undefined && trade.max !== undefined &&
-        sourceUsed > getRemainingHarvestExchangeUses(player, sourceId, trade.max, harvestExchangeRound)) return invalid()
+      if (sourceUsed > (maxTradeTimesBySourceId?.[sourceId] ?? Infinity)) return false
+      if (harvestRound !== undefined && trade.max !== undefined &&
+        sourceUsed > getRemainingHarvestExchangeUses(player, sourceId, trade.max, harvestRound)) return false
       sourceUses.set(sourceId, sourceUsed)
     }
     for (const resource of REAL_RESOURCE_KEYS) {
       const amount = (trade.from[resource] ?? 0) * count
-      if (amount > (resources[resource] ?? 0)) return invalid()
+      if (amount > (resources[resource] ?? 0)) return false
       if (isAnimalResourceKey(resource)) {
-        if (trade.fromFarmyard && amount > (placedAnimals[resource] ?? 0)) return invalid()
+        if (trade.fromFarmyard && amount > (placedAnimals[resource] ?? 0)) return false
         placedAnimals[resource] = Math.max(0, (placedAnimals[resource] ?? 0) - amount)
       }
       resources[resource] = (resources[resource] ?? 0) - amount
@@ -626,10 +618,26 @@ export const executeExchangeBatch = ({
     }
   }
 
+  return true
+}
+
+export const executeExchangeBatch = ({
+  state, player, entries, maxTradeTimesBySourceId,
+  animalPaymentPreference, eventSink, actionHooks, harvestFeed, reorganizeAnimals = true,
+}: ExchangeBatchInput & {
+  animalPaymentPreference?: AnimalPaymentPreference
+  eventSink?: EventSink
+  actionHooks?: ActionHookRegistry
+  harvestFeed?: true
+  reorganizeAnimals?: boolean
+}): ExchangeBatchResult => {
+  if (!validateExchangeBatch({ state, player, entries, maxTradeTimesBySourceId })) {
+    return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
+  }
   let paid: Partial<Resource> = {}
   let gained: Partial<Resource> = {}
   const receipts: ExchangeRecipeReceipt[] = []
-  for (const { trade, count } of entries) {
+  for (const { trade, count, harvestRound } of entries) {
     const preResources = { ...player.resources }
     const sourceId = trade.sourceId ?? trade.source
     applyTrade(player, trade, count, animalPaymentPreference, state)
@@ -638,10 +646,16 @@ export const executeExchangeBatch = ({
       PaymentSolver.applyTradeSideEffect(state, player, trade.sideEffect, count, sourceId ?? 'unknown')
     }
     const exchangeEvent = emitResourceExchanged(eventSink, player, trade, count)
+    if (harvestFeed && sourceId) {
+      eventSink?.emit<'harvest.feedConverted'>({
+        type: 'harvest.feedConverted', playerId: player.id, source: sourceId,
+        cost: scaleResources(trade.from, count), food: scaleResources(trade.to, count),
+      })
+    }
     dispatchTradeAppliedListener(state, player, trade, count, eventSink,
       exchangeEvent ? [exchangeEvent] : [], preResources, actionHooks)
-    if (harvestExchangeRound !== undefined && trade.max !== undefined && sourceId) {
-      recordHarvestExchangeUses(player, sourceId, harvestExchangeRound, count)
+    if (harvestRound !== undefined && trade.max !== undefined && sourceId) {
+      recordHarvestExchangeUses(player, sourceId, harvestRound, count)
     }
     const receipt = {
       sourceId, times: count, preResources,
@@ -652,7 +666,16 @@ export const executeExchangeBatch = ({
     gained = mergePositiveResources(gained, receipt.gained)
   }
   trackWorkPhaseBuildingResources(state, player.id, gained)
-  return { type: 'ok', resourcesPaid: paid, resourcesGained: gained, extraData: { exchangeBatch: receipts } }
+  const placed = getPlacedAnimalsByType(player, state)
+  const needsReorganization = reorganizeAnimals && animalKeysForState(state).some((key) =>
+    (gained[key] ?? 0) > 0 && (player.resources[key] ?? 0) > (placed[key] ?? 0),
+  )
+  return {
+    type: 'ok', resourcesPaid: paid, resourcesGained: gained, extraData: { exchangeBatch: receipts },
+    ...(needsReorganization ? {
+      internalChildren: { afterHostListeners: [{ actionId: 'reorganize', actionContext: { onlyIfUnplaced: true } }] },
+    } : {}),
+  }
 }
 
 const buildExchangeOptions = (
@@ -740,8 +763,12 @@ const resolveExchangeChoice = (
       requestedTrades.push({ trade, count })
     }
     return executeExchangeBatch({
-      state, player, entries: requestedTrades, maxTradeTimesBySourceId,
-      harvestExchangeRound, animalPaymentPreference, eventSink, actionHooks,
+      state, player, entries: requestedTrades.map((entry) => ({
+        ...entry, ...(harvestExchangeRound !== undefined && entry.trade.max !== undefined
+          ? { harvestRound: harvestExchangeRound } : {}),
+      })), maxTradeTimesBySourceId,
+      animalPaymentPreference, eventSink, actionHooks,
+      reorganizeAnimals: actionContext?.anytimeInteractionKind !== 'animal-reorg',
     })
   }
   if (choice.startsWith('trade:')) {
@@ -756,8 +783,12 @@ const resolveExchangeChoice = (
       return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
     }
     return executeExchangeBatch({
-      state, player, entries: [{ trade, count }], maxTradeTimesBySourceId,
-      harvestExchangeRound, animalPaymentPreference, eventSink, actionHooks,
+      state, player, entries: [{ trade, count,
+        ...(harvestExchangeRound !== undefined && trade.max !== undefined
+          ? { harvestRound: harvestExchangeRound } : {}),
+      }], maxTradeTimesBySourceId,
+      animalPaymentPreference, eventSink, actionHooks,
+      reorganizeAnimals: actionContext?.anytimeInteractionKind !== 'animal-reorg',
     })
   }
   return { type: 'ok' }
@@ -797,6 +828,8 @@ export const anytimeExchangeAction: ActionDefinition = {
   anytime: true,
   allowAnytimeReentry: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
+    const submitted = ctx?.actionContext?.submittedExchangeBatch
+    if (submitted) return validateExchangeBatch({ state, player, entries: submitted })
     const batch = ctx?.actionContext?.batchExchange as { maxTotal?: number } | undefined
     if (batch) {
       return BUILDING_RESOURCES.some((resource) => (player.resources[resource] ?? 0) > 0)
@@ -809,6 +842,13 @@ export const anytimeExchangeAction: ActionDefinition = {
       .options.some((option) => option.value !== 'cancel')
   },
   execute: ({ state, player, actionContext, eventSink, actionHooks }) => {
+    if (actionContext?.submittedExchangeBatch) {
+      return executeExchangeBatch({
+        state, player, entries: actionContext.submittedExchangeBatch,
+        actionHooks, eventSink, harvestFeed: actionContext.harvestFeed,
+        reorganizeAnimals: actionContext.anytimeInteractionKind !== 'animal-reorg',
+      })
+    }
     const batch = actionContext?.batchExchange as
       | { cardId: string; maxTotal: number; promptKey?: PromptKey; requireAtLeastOne?: boolean }
       | undefined
@@ -837,6 +877,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       return executeExchangeBatch({
         state, player, entries: [{ trade: directTrade, count: 1 }],
         animalPaymentPreference, eventSink, actionHooks,
+        reorganizeAnimals: actionContext?.anytimeInteractionKind !== 'animal-reorg',
       })
     }
     const filterIds = actionContext?.tradeIds as string[] | undefined
@@ -868,15 +909,6 @@ export const anytimeExchangeAction: ActionDefinition = {
     if (batch && batchPayload) {
       return resolveBatchExchange(state, player, batch, batchPayload, eventSink, actionHooks)
     }
-    const result = resolveExchangeChoice(state, player, choice, actionContext, eventSink, actionHooks)
-    if (result.type === 'ok' && actionContext?.anytimeInteractionKind !== 'animal-reorg') {
-      const placed = getPlacedAnimalsByType(player, state)
-      if (animalKeysForState(state).some((key) =>
-        (result.resourcesGained?.[key] ?? 0) > 0 && (player.resources[key] ?? 0) > (placed[key] ?? 0),
-      )) {
-        result.internalChildren = { afterHostListeners: [{ actionId: 'reorganize' }] }
-      }
-    }
-    return result
+    return resolveExchangeChoice(state, player, choice, actionContext, eventSink, actionHooks)
   },
 }

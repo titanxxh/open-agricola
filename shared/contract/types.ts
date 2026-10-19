@@ -723,6 +723,14 @@ export type CanBeExecutedByPlayer = (
 export type ActionContext = Record<string, unknown> & {
   /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
   costBonuses?: Bonus[]
+  submittedExchangeBatch?: ExchangeBatchEntry[]
+  harvestFeed?: true
+}
+
+export type ExchangeBatchEntry = {
+  trade: Trade
+  count: number
+  harvestRound?: number
 }
 
 export type ActionAvailabilityContext = {
