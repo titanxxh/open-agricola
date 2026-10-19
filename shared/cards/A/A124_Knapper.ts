@@ -20,12 +20,10 @@ const isRound5to7ActionSpace = (context: CardListenerContext): boolean => {
 const listener: CardListenerRegistration = {
   id: 'A124-knapper-before-action',
   cardIds: [CARD_ID],
+  actions: ['place-farmer'],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return
-    // Fire only for the top-level space action (actionId === spaceId), not
-    // sub-actions (e.g., 'collect') triggered inside the space's flow.
-    if (context.actionId !== context.space.id) return
     if (!isRound5to7ActionSpace(context)) return
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },

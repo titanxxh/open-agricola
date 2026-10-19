@@ -55,10 +55,10 @@ const getAboveSpaceId = (
 const listener: CardListenerRegistration = {
   id: 'B120-sweep-before-place-farmer',
   cardIds: [CARD_ID],
+  actions: ['place-farmer'],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return
-    if (context.actionId !== context.space.id) return
     const round = context.state.round
     const aboveId = getAboveSpaceId(round, context.state.roundActionOrder ?? [])
     if (!aboveId) return
