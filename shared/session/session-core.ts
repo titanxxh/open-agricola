@@ -446,7 +446,9 @@ const ruleStateKey = (state: GameState): string => {
   } = state
   return canonicalJson({
     ...rules,
-    events: rules.events.filter((event) => event.type !== 'continuation.restored'),
+    // Lifecycle bookkeeping alone does not reopen a failed command. Completion
+    // reactions still invalidate it through their own state changes or facts.
+    events: rules.events.filter((event) => event.type !== 'continuation.restored' && event.type !== 'anytime.completed'),
     players: rules.players.map(({ name: _name, nameIsDefault: _nameIsDefault, ...player }) => player),
   })
 }

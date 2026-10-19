@@ -55,6 +55,7 @@ type SessionResponse = {
 
 - Session 测试直接断言这一结构；WebSocket 路径通过 `GameSession.buildSyncPayload()` 序列化并按视角过滤。
 - 每个修改命令都经过一个结算边界（[ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)）。输入拒绝恢复完整的命令检查点，包括历史与行动起点 metadata；已接受的必选阻塞保留其效果。仅凭 `ok:false` 或 `recoverable:true` 不能判定为拒绝。规则上合法但破坏守卫的命令保留其持久的暂定恢复与失败记忆；在受守卫范围内提交的非法输入两者都不获得。
+- 失败记忆比较规则状态时排除恢复与完成的记账事件（`continuation.restored`、`anytime.completed`）。完成反应产生的状态变化和领域事实仍能重新开放失败命令；仅完成无效果的 anytime flow 不会。
 
 测试：`server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`。
 

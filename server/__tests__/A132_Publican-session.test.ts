@@ -12,6 +12,7 @@ import { rollAndCacheCardPick } from '../../shared/cards/helpers/card-random'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged, assertRuleOutcome } from './_helpers/negative-rule-audit'
 import * as auditA132 from './_helpers/audit/ae-negative-A132'
@@ -539,12 +540,53 @@ describe('A132_Publican session', () => {
     resp = session.resolveChoice(1, 'left')
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.players[1]!.resources.grain).toBe(0)
+    expect(resp.state.events.filter(event => event.type === 'anytime.completed')).toEqual([
+      expect.objectContaining({ anytimeActionId: '__TEST_noop_anytime__', actorPlayerId: 'p2' }),
+    ])
     expect(session.createSessionPrivateCursor().failedAuthoritativeCommands).toHaveLength(1)
+    expect(resp.actionAvailability?.['grain-utilization']).toBe(false)
     expect(session.takeAction(1, 'grain-utilization').ok).toBe(false)
     expect(resp.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(1)
     expect(resp.scores).toHaveLength(2)
+  })
+
+  it('rederives failed Sow after a no-op anytime completion reaction changes resources', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    state.players[1]!.resources.grain = 0
+    session.loadState(state)
+    registerNoopAnytime(session, '__TEST_noop_anytime__')
+    session.withCtx(() => requireActiveCardRegistry('Publican completion reaction test').registerListener({
+      id: '__TEST_completion_grain__',
+      events: ['anytime.completed'],
+      phases: ['after'],
+      handler: context => {
+        if (!context.actionEvents?.some(event => event.type === 'anytime.completed'
+          && event.anytimeActionId === '__TEST_noop_anytime__')) return
+        return { flow: { type: 'leaf', actionId: 'gain', params: { grain: 1 } } }
+      },
+    }))
+
+    let resp = advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization'))
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('A132_Publican')
+    resp = advancePastPlayerSwitches(session, session.resolveChoice(0, '__skip__'))
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(session.createSessionPrivateCursor().failedAuthoritativeCommands).toHaveLength(1)
+
+    resp = session.takeAnytimeAction(1, '__TEST_noop_anytime__')
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(session.createSessionPrivateCursor().failedAuthoritativeCommands).toHaveLength(1)
+    resp = session.resolveChoice(1, 'left')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.players[1]!.resources.grain).toBe(1)
+    expect(session.createSessionPrivateCursor().failedAuthoritativeCommands).toEqual([])
+
+    resp = advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization'))
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe('A132_Publican')
   })
 
   it('restores an active scope and its failure memory from the private cursor', () => {
