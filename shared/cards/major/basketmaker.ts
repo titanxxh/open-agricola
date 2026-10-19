@@ -6,7 +6,7 @@ import type { GameState, PlayerState } from '../../contract/types'
 const buildBasketImpl = (cardId: string) => ({
   effect: {
     id: cardId,
-    onHarvest: createSingleHarvestExchange('reed', { food: 3 }, { sourceId: cardId }),
+    onHarvest: createSingleHarvestExchange(cardId),
     computeCostedBonus: (_state: GameState, player: PlayerState): BonusScoreLevel[] => [
       { cost: {}, score: 0 },
       ...[2, 4, 5].flatMap((amount, index) => player.resources.reed >= amount
@@ -24,6 +24,7 @@ export const Major_Basket = defineMajorCard({
   cost: { reed: 2, stone: 2 },
   vp: 2,
   extraVp: true,
+  exchanges: [{ from: { reed: 1 }, to: { food: 3 }, max: 1, triggers: ['harvest'] }],
   waresSalesmanGains: [{ reed: 2 }],
   desc: [
     '[Harvest]',
@@ -44,6 +45,7 @@ export const Major_Basket2 = defineMajorCard({
   cost: { reed: 2, stone: 3 },
   vp: 2,
   extraVp: true,
+  exchanges: [{ from: { reed: 1 }, to: { food: 3 }, max: 1, triggers: ['harvest'] }],
   waresSalesmanGains: [{ reed: 2 }],
   desc: [
     '[Harvest]',

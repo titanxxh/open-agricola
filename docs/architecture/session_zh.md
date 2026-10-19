@@ -107,6 +107,8 @@ type SessionResponse = {
 
 `handleFeedResolved()` 解析已提供目录与实时配方，完整校验批次后，把原等待帧替换为普通 Exchange flow。私有 `feedingResume` 保存剩余需求、已付食物、转换成本和玩家队列。完整批次反应与必需的动物整理结束后，才支付剩余食物、补乞讨和供暖。快照恢复与撤销同时恢复续行和引擎游标，不重做已完成兑换或重复扣除已付食物。
 
+批次后仍有合法 anytime 行动时，新的 feed 等待保存同一续行。提交空批次结束该机会；再次兑换则累计转换成本，不重复支付已付食物。没有可用 anytime 行动时自动继续结算。这样反应奖励可以用于新批次，卡牌行动也可在剩余食物付款前完成。
+
 测试：`server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-conversion-listener-session}.test.ts`。
 
 ## 快照数据与可执行规则恢复

@@ -105,6 +105,8 @@ Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-plac
 
 `handleFeedResolved()` resolves the offered and live recipe catalogs and validates the complete batch before replacing its pending frame with an ordinary Exchange flow. Its private `feedingResume` stores remaining demand, prepaid food, conversion costs and the player queue. Every batch reaction and required animal reorganization completes before remaining food payment, begging and heating. Snapshot recovery and undo restore that continuation with the engine cursor, so completed exchange and prepaid food never replay.
 
+If a legal anytime action remains after a batch, a new feed pending keeps the same continuation. An empty submission closes that opportunity; another batch adds conversion costs without repaying prepaid food. With no available anytime action, settlement continues automatically. This lets reaction rewards fund a new batch and card actions complete before the remaining food is paid.
+
 Tests: `server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-conversion-listener-session}.test.ts`.
 
 ## Snapshot data and executable-rule recovery

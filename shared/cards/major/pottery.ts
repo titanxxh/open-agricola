@@ -6,7 +6,7 @@ import type { GameState, PlayerState } from '../../contract/types'
 const buildPotteryImpl = (cardId: string) => ({
   effect: {
     id: cardId,
-    onHarvest: createSingleHarvestExchange('clay', { food: 2 }, { sourceId: cardId }),
+    onHarvest: createSingleHarvestExchange(cardId),
     computeCostedBonus: (_state: GameState, player: PlayerState): BonusScoreLevel[] => [
       { cost: {}, score: 0 },
       ...[3, 5, 7].flatMap((amount, index) => player.resources.clay >= amount
@@ -25,6 +25,7 @@ export const Major_Pottery = defineMajorCard({
   vp: 2,
   extraVp: true,
   potteryIdentity: true,
+  exchanges: [{ from: { clay: 1 }, to: { food: 2 }, max: 1, triggers: ['harvest'] }],
   waresSalesmanGains: [{ clay: 1, reed: 1 }],
   desc: [
     '[Harvest]',
@@ -46,6 +47,7 @@ export const Major_Pottery2 = defineMajorCard({
   vp: 2,
   extraVp: true,
   potteryIdentity: true,
+  exchanges: [{ from: { clay: 1 }, to: { food: 2 }, max: 1, triggers: ['harvest'] }],
   waresSalesmanGains: [{ clay: 1, reed: 1 }],
   desc: [
     '[Harvest]',

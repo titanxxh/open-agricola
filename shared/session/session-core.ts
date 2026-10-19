@@ -133,10 +133,10 @@ import {
   getMaxTradeTimes,
   getExchangesInWindow,
   getFeedExchangeCatalog,
-  getRemainingHarvestExchangeUses,
   validateExchangeBatch,
   type ExchangeBatchEntry,
 } from '../actions/effects/exchange.ts'
+import { getRemainingHarvestExchangeUses } from '../actions/helpers/exchange-recipes'
 import {
   getAvailableMajorImprovementIds,
   returnMajorImprovementToSupply,
@@ -3649,6 +3649,12 @@ export class GameCore {
           }
           this.finalizeActionLog(frameOwnerPlayer)
           this.engineStack.pop()
+          this.startFeedSubFlow(ownerIdx, frame.feedingResume.remaining,
+            frame.feedingResume.foodUsed, frame.feedingResume.feedQueue)
+          const feedingFrame = this.engineStack.current()!
+          feedingFrame.feedingResume = frame.feedingResume
+          if (this.buildAnytimeEntries().length > 0) return
+          this.engineStack.pop()
           this.finishFeedingSettlement(ownerIdx, frame.feedingResume)
           return
         }
@@ -4348,21 +4354,27 @@ export class GameCore {
     }
 
     this.pushHistory()
-    const resourcesConverted: Partial<Resource> = {}
+    const resourcesConverted: Partial<Resource> = { ...frame.feedingResume?.resourcesConverted }
     for (const { trade, count } of entries) {
       for (const resource of REAL_RESOURCE_KEYS) {
         const amount = (trade.from[resource] ?? 0) * count
         if (amount > 0) resourcesConverted[resource] = (resourcesConverted[resource] ?? 0) + amount
       }
     }
+    const feedingResume = {
+      remaining: request.remaining, foodUsed: request.foodUsed,
+      feedQueue: request.feedQueue ?? [], resourcesConverted,
+    }
+    if (entries.length === 0) {
+      this.engineStack.pop()
+      this.finishFeedingSettlement(playerIndex, feedingResume)
+      return this.respond()
+    }
     const flow: ActionFlow = {
       type: 'leaf', actionId: 'exchange',
       actionContext: { submittedExchangeBatch: entries, harvestFeed: true },
     }
-    frame.feedingResume = {
-      remaining: request.remaining, foodUsed: request.foodUsed,
-      feedQueue: request.feedQueue ?? [], resourcesConverted,
-    }
+    frame.feedingResume = feedingResume
     this.engineStack.replaceCurrentFrameEngine(this.createFlowEngine(flow, playerIndex), { kind: 'flow', flow })
     this.runEngineSteps()
     return this.respond()

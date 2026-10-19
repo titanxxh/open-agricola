@@ -312,6 +312,7 @@ describe('harvest session flow', () => {
     resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'D060_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
     ] })
+    if (resp.interaction.request.kind === 'feed') resp = session.resolveChoice(0, 'confirm', { selections: [] })
 
     const p = resp.state.players[0]!
     // 1 clay -> 2 food; need 2 food, all consumed; no begging

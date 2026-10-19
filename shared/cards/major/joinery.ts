@@ -6,7 +6,7 @@ import type { GameState, PlayerState } from '../../contract/types'
 const buildJoineryImpl = (cardId: string) => ({
   effect: {
     id: cardId,
-    onHarvest: createSingleHarvestExchange('wood', { food: 2 }, { sourceId: cardId }),
+    onHarvest: createSingleHarvestExchange(cardId),
     computeCostedBonus: (_state: GameState, player: PlayerState): BonusScoreLevel[] => [
       { cost: {}, score: 0 },
       ...[3, 5, 7].flatMap((amount, index) => player.resources.wood >= amount
@@ -25,6 +25,7 @@ export const Major_Joinery = defineMajorCard({
   vp: 2,
   extraVp: true,
   joineryIdentity: true,
+  exchanges: [{ from: { wood: 1 }, to: { food: 2 }, max: 1, triggers: ['harvest'] }],
   waresSalesmanGains: [{ wood: 1, reed: 1 }],
   desc: [
     '[Harvest]',
@@ -46,6 +47,7 @@ export const Major_Joinery2 = defineMajorCard({
   vp: 2,
   extraVp: true,
   joineryIdentity: true,
+  exchanges: [{ from: { wood: 1 }, to: { food: 2 }, max: 1, triggers: ['harvest'] }],
   waresSalesmanGains: [{ wood: 1, reed: 1 }],
   desc: [
     '[Harvest]',

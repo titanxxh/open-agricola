@@ -98,7 +98,13 @@ describe('immediate listener flows retain their owner', () => {
 
   it.each([false, true])('settles harvest feeding and consumes the owner extra turns, veto=%s', vetoed => {
     const session = setup('feeding', vetoed)
-    const offered = session.performRoundEnd()
+    let offered = session.performRoundEnd()
+    for (let step = 0; step < 8 && offered.interaction.stateId === 'wait' &&
+      offered.interaction.request.kind === 'choice' &&
+      offered.interaction.request.options.some((option) => option.value === '__skip__'); step++) {
+      offered = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
+      expect(offered.ok, offered.error).toBe(true)
+    }
     expect(offered.ok, offered.error).toBe(true)
     expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
 
