@@ -112,8 +112,8 @@ describe('E105 Pioneer before placement action', () => {
       expect(available({ skipBeforeTriggers: true })).toBe(false)
       expect(snapshotResponse(session.getState())).toEqual(before)
       const registry = requireActiveCardRegistry('Pioneer placement regression')
-      registry.registerListener({ id: 'CUSTOM_Pioneer-placement-veto', actions: ['major-improvement'], phases: ['isDoable'],
-        handler: () => ({ doable: false }) })
+      registry.registerListener({ id: 'CUSTOM_Pioneer-placement-veto', globalQuery: true, phases: ['isDoable'],
+        handler: context => context.space.id === 'major-improvement' ? { doable: false } : undefined })
       expect(available()).toBe(false)
       registry.removeListenersWhere((listener) => listener.id === 'CUSTOM_Pioneer-placement-veto')
       const space = state.actionSpaces.find((entry) => entry.id === 'major-improvement')!
