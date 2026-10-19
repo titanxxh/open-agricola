@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from './person-use'
 import type {
   CostModifierType,
   FutureMeepleRoomType,
@@ -195,6 +196,8 @@ export type WorkerPlacedEvent = GameEventBase<'worker.placed'> & {
   spaceId: string
   viaCardId?: string
 }
+
+export type WorkerUseCompletedEvent = GameEventBase<'worker.useCompleted'> & PersonUseReceipt
 
 export type WorkerReturnedEvent = GameEventBase<'worker.returned'> & {
   workers: Array<{ playerId: string; workerId: string }>
@@ -445,6 +448,7 @@ export type GameEvent =
   | FarmAnimalDiscardedEvent
   | FarmAnimalBredEvent
   | WorkerPlacedEvent
+  | WorkerUseCompletedEvent
   | WorkerReturnedEvent
   | WorkerPromotedEvent
   | ActionRevealedEvent

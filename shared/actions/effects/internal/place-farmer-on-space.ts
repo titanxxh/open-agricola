@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from '../../../contract/person-use'
 import type { ActionHookRegistry } from '../../hooks'
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
@@ -15,6 +16,7 @@ const collectAfterPlacementFlows = (
   player: PlayerState,
   targetSpace: ActionSpace,
   actionContext: Record<string, unknown> | undefined,
+  personUse: PersonUseReceipt,
 ): ActionFlow[] => {
   const context = {
     actionHooks,
@@ -27,7 +29,7 @@ const collectAfterPlacementFlows = (
     actionContext,
   }
   return getMatchingListeners(context).map((entry) =>
-    activatePlacementListenerFlow(entry, player.id, actionContext),
+    activatePlacementListenerFlow(entry, player.id, actionContext, personUse),
   )
 }
 
@@ -35,6 +37,7 @@ const activatePlacementListenerFlow = (
   entry: MatchedCardListener,
   triggerPlayerId: string,
   actionContext: Record<string, unknown> | undefined,
+  personUse: PersonUseReceipt,
 ): ActionFlow => ({
   type: 'leaf',
   actionId: 'activate-card',
@@ -44,7 +47,7 @@ const activatePlacementListenerFlow = (
     cardId: entry.cardId,
     phase: 'after',
     actionId: 'place-farmer',
-    event: { result: { type: 'ok' } },
+    event: { result: { type: 'ok', personUse } },
     ownerPlayerId: entry.ownerPlayerId,
     ownerCardZone: entry.ownerCardZone,
     triggerPlayerId,
@@ -94,7 +97,7 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
 
     addWorkerRef(targetSpace, player.id, worker.id)
     addLinkedSpaceBlocks(state, targetSpace, player.id, worker.id)
-    recordRoundPlacement(player, targetSpace.id, worker.id)
+    const personUse = recordRoundPlacement(player, targetSpace.id, worker.id)
     incPlacedFarmers(player)
 
     const cardId = typeof params?.sourceCard === 'string' ? params.sourceCard : sourceCard
@@ -126,7 +129,7 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
       actionContext: targetActionContext,
     }
     const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
-    const afterFlows = collectAfterPlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
+    const afterFlows = collectAfterPlacementFlows(actionHooks, state, player, targetSpace, targetActionContext, personUse)
     if (beforeFlows.length === 0 && afterFlows.length === 0) {
       return { type: 'flow', flow: targetLeaf, extraData: { actionContextWrite } }
     }

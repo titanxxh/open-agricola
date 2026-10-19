@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from '../../contract/person-use'
 import type { GameState, PlayerState, SupplyWorkerSource, WorkerRef } from '../../contract/types'
 import { isInjectedAnytimeActionContext } from '../../engine/action-context-flags'
 import { readActionSnapshotExtraData } from './action-snapshot'
@@ -58,16 +59,19 @@ export const isCurrentActionSecondPersonPlacement = (
   return workerId === placements[1]!.workerId
 }
 
-export const recordRoundPlacement = (
+export function recordRoundPlacement(player: PlayerState, spaceId: string, workerId: string, relocation?: false): PersonUseReceipt
+export function recordRoundPlacement(player: PlayerState, spaceId: string, workerId: string, relocation: true): undefined
+export function recordRoundPlacement(
   player: PlayerState,
   spaceId: string,
   workerId: string,
   relocation = false,
-): void => {
+): PersonUseReceipt | undefined {
   const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
   const current = getRoundPlacementDetails(player)
   const placement: RoundPlacementEntry = { spaceId, workerId, ...(relocation ? { relocation: true } : {}) }
   cs.extraData = { ...(cs.extraData ?? {}), placements: [...current, placement] }
+  return relocation ? undefined : { workerId, placementOrdinal: getRoundPersonPlacementDetails(player).length }
 }
 
 export const resetRoundPlacements = (player: PlayerState): void => {

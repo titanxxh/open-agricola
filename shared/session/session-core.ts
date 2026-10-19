@@ -1611,7 +1611,7 @@ export class GameCore {
       space,
       actionId: 'place-farmer',
       phase: 'after' as const,
-      result: { type: 'ok' as const },
+      result: { type: 'ok' as const, personUse: this.engineStack.current()?.personUse },
     }
     const matched = getMatchingListeners(context)
     if (matched.length === 0) return false
@@ -1623,7 +1623,7 @@ export class GameCore {
         'after',
         'place-farmer',
         this.state,
-        {},
+        { result: context.result },
         context.player.id,
         undefined,
         undefined,
