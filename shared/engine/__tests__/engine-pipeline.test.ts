@@ -97,7 +97,7 @@ const registerBeforeGrant = (actionId: string, phases?: string[]) => {
     mandatory: true,
     handler: (ctx) => {
       if (
-        actionId === 'pending-before-cost' &&
+        actionId === 'occupation' &&
         (ctx as { pendingCommit?: boolean }).pendingCommit !== true
       ) {
         return undefined
@@ -424,7 +424,7 @@ describe('Engine pipeline phase order', () => {
     let committed = false
     let receivedCosts: unknown
     const action: ActionDefinition = {
-      id: 'proceed-before-cost',
+      id: 'gain',
       nameKey: 'test',
       descriptionKey: 'test',
       roundAvailable: 1,
@@ -466,7 +466,7 @@ describe('Engine pipeline phase order', () => {
     let committed = false
     let receivedCosts: unknown
     const action: ActionDefinition = {
-      id: 'xor-before-cost',
+      id: 'collect',
       nameKey: 'test',
       descriptionKey: 'test',
       roundAvailable: 1,
@@ -515,7 +515,7 @@ describe('Engine pipeline phase order', () => {
     let committed = false
     let receivedCosts: unknown
     const action: ActionDefinition = {
-      id: 'pending-before-cost',
+      id: 'occupation',
       nameKey: 'test',
       descriptionKey: 'test',
       roundAvailable: 1,

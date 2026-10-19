@@ -71,7 +71,7 @@ describe('resolveChoice continuations keep native requests pending', () => {
   it.each(['xor', 'or'] as const)('waits for a non-choice request from a selected %s branch', (kind) => {
     const { state, player } = setup()
     const submitted: string[] = []
-    const quantity = action('continuation-quantity', quantityRequest, (_context, choice) => {
+    const quantity = action('exchange', quantityRequest, (_context, choice) => {
       submitted.push(choice)
       return { type: 'ok' }
     })
@@ -136,7 +136,7 @@ describe('resolveChoice continuations keep native requests pending', () => {
     const { state, player } = setup()
     const submitted: string[] = []
     const host = action(
-      'continuation-two-step',
+      'exchange',
       () => ({
         type: 'request',
         request: { kind: 'choice', options: [{ value: 'continue', labelKey: 'ui.interactionContinue' }] },
@@ -200,7 +200,7 @@ describe('selected OR/XOR branch choice', () => {
     { before: true, restore: true },
   ])('reaches completion reactions (before=$before, restore=$restore)', ({ before, restore }) => {
     const { state, player } = setup()
-    const host = action('branch-host', () => ({ type: 'ok' }))
+    const host = action('collect', () => ({ type: 'ok' }))
     const other = action('branch-other', () => ({ type: 'ok' }))
     const { engine } = makeEventTestEngine(
       [host, other, getActionDefinition('gain')!],

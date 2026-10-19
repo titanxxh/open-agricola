@@ -73,7 +73,7 @@ describe('trailing trigger snapshots', () => {
   })
 
   it('stores trigger-time played-card lists and counts on trailing activation nodes', () => {
-    const trigger = action('trigger-snapshot-host', (context) => {
+    const trigger = action('occupation', (context) => {
       context.player.occupationPlayed.push('A114_SeasonalWorker')
       return { type: 'ok' }
     })
@@ -112,7 +112,7 @@ describe('trailing trigger snapshots', () => {
   })
 
   it('listener helpers read trigger-time counts after an earlier listener mutates live state', () => {
-    const trigger = action('trigger-snapshot-mutation-host', (context) => {
+    const trigger = action('occupation', (context) => {
       context.player.occupationPlayed.push('A114_SeasonalWorker')
       return { type: 'ok' }
     })
@@ -166,7 +166,7 @@ describe('trailing trigger snapshots', () => {
   })
 
   it('restores trailing trigger snapshots from the cursor instead of live state', () => {
-    const trigger = action('trigger-snapshot-cursor-host', (context) => {
+    const trigger = action('occupation', (context) => {
       context.player.occupationPlayed.push('A114_SeasonalWorker')
       return { type: 'ok' }
     })
@@ -208,7 +208,7 @@ describe('trailing trigger snapshots', () => {
   })
 
   it('executes matched listeners even if an earlier listener moves the owner card out of its trigger zone', () => {
-    const trigger = action('trigger-snapshot-zone-host', () => ({ type: 'ok' }))
+    const trigger = action('occupation', () => ({ type: 'ok' }))
     const moveObserver = action('move-observer-card', (context) => {
       context.player.minorPlayed = context.player.minorPlayed.filter((id) => id !== 'B082_ValueAssets')
       context.player.minorHand.push('B082_ValueAssets')

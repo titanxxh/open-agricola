@@ -56,7 +56,7 @@ describe('completed continuation event scopes', () => {
     cards.registerListener({
       id: `${cardId}:completion`,
       cardIds: [cardId],
-      actions: ['continuation-host'],
+      actions: ['collect'],
       phases: ['immediatelyAfter', 'after'],
       mandatory: true,
       handler: (ctx) => {
@@ -74,7 +74,7 @@ describe('completed continuation event scopes', () => {
       context.eventSink.emit({ type: 'resource.moved', resources: { clay: 7 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: player.id }, reason: 'gain' })
       return { type: 'ok' }
     })
-    const host = action('continuation-host', (context) => {
+    const host = action('collect', (context) => {
       context.eventSink.emit({ type: 'resource.moved', resources: { stone: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: player.id }, reason: 'gain' })
       const pay = { actionId: 'pay', params: { cost: { fees: [{ food: 1 }, { wood: 1 }] } }, resultKey: 'payment' }
       if (kind === 'internal') {
@@ -157,7 +157,7 @@ describe('returned flow continuation prefixes', () => {
       cards.registerListener({
         id: `${cardId}:listener`,
         cardIds: [cardId],
-        actions: ['return-flow-host'],
+        actions: ['collect'],
         phases: ['immediatelyAfter', 'after'],
         mandatory: true,
         handler: (ctx) => {
@@ -166,7 +166,7 @@ describe('returned flow continuation prefixes', () => {
         },
       })
       const body = { type: 'flow' as const, flow: { type: 'leaf' as const, actionId: 'gain', sourceCard: cardId, params: { clay: 1 } } }
-      const host = action('return-flow-host', (context) => {
+      const host = action('collect', (context) => {
         context.player.resources.wood += 1
         context.eventSink.emit({ type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: player.id }, reason: 'gain' })
         return requestFirst

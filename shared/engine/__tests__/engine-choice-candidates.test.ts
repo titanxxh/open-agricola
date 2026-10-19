@@ -84,7 +84,7 @@ const buildOptInAction = (
   baseOptions: ActionChoiceOption[],
   resolveCalls: { value: string; params: Record<string, unknown> | undefined }[],
 ): ActionDefinition => ({
-  id: 'opt-in-choice-action',
+  id: 'improvement',
   nameKey: 'test', descriptionKey: 'test',
   roundAvailable: 1, gainPerRound: {},
   canBeExecutedByPlayer: () => true,
@@ -174,7 +174,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   it('recomputes computeCosts with selectedOption before auto-resolved resolveChoice', () => {
     requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-selected-costs',
-      actions: ['opt-in-choice-action'],
+      actions: ['improvement'],
       phases: ['computeCosts'],
       handler: (ctx) => ctx.params?.selectedOption === 'stone'
         ? {
@@ -212,7 +212,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   it('presents a choice when ≥2 affordable options after merging hook extras', () => {
     requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-extra-option',
-      actions: ['opt-in-choice-action'],
+      actions: ['improvement'],
       phases: ['computeChoiceCandidates'],
       handler: () => ({
         extraOptions: [{ value: 'extra', labelKey: 'extra-label' }],
@@ -265,7 +265,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   it('dedups duplicate option values (first wins) so listeners cannot override base labels', () => {
     requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-duplicate-option',
-      actions: ['opt-in-choice-action'],
+      actions: ['improvement'],
       phases: ['computeChoiceCandidates'],
       handler: () => ({
         extraOptions: [{ value: 'shared', labelKey: 'extra-shared-label' }],
@@ -289,7 +289,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
   it('filters unaffordable options out via per-option canExecute(params.selectedOption)', () => {
     requireActiveCardRegistry('engine-choice-candidates').registerListener({
       id: 'test-affordable-extra',
-      actions: ['opt-in-choice-action'],
+      actions: ['improvement'],
       phases: ['computeChoiceCandidates'],
       handler: () => ({
         extraOptions: [{ value: 'rich', labelKey: 'rich' }],

@@ -241,6 +241,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C1'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       handler: () => ({
         flow: { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
       }),
@@ -267,6 +269,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C1'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       mandatory: true,
       handler: () => undefined,
     })
@@ -285,6 +289,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['MutationOnlyCard'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       handler: (context) => {
         const effectPlayer = context.effectPlayer ?? context.player
         effectPlayer.cardStates.MutationOnlyCard = { ready: true }
@@ -305,6 +311,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['SilentCard'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       handler: () => undefined,
     })
     setActiveCardRegistry(cardRegistry)
@@ -523,6 +531,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['CleanupCard'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       handler: () => ({
         flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
       }),
@@ -551,6 +561,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['OptionalCard'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       handler: () => ({
         flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true },
       }),
@@ -575,6 +587,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['NonResourceFlowCard'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       handler: () => ({
         flow: { type: 'leaf', actionId: 'custom-follow-up' },
       }),
@@ -603,6 +617,8 @@ describe('ParallelNode trigger-select mode', () => {
     cardRegistry.registerListener({
       id: 'listener-a',
       cardIds: ['C126_Excavator'],
+      actions: ['place-farmer'],
+      phases: ['after'],
       mandatory: true,
       handler: () => ({
         flow: {
