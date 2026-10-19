@@ -11,4 +11,3 @@ export const enterFeeding = (session: GameSession): SessionResponse => {
   }
   return response
 }
-
