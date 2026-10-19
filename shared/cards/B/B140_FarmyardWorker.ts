@@ -11,6 +11,7 @@ const CARD_ID = 'B140_FarmyardWorker'
 const farmyardListener: CardListenerRegistration = {
   id: 'B140-farmyard-worker-after-farmyard',
   cardIds: [CARD_ID],
+  events: ['farm.animalMoved', 'farm.sown', 'farm.cropAdded', 'resource.moved'],
   phases: ['after' as ActionHookPhase],
   mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
@@ -18,7 +19,7 @@ const farmyardListener: CardListenerRegistration = {
     const onFarmyard = (location: ResourceLocation) =>
       location.kind === 'field' && location.playerId === context.player.id &&
       getFarmyardTilePositions(context.player).some((tile) => tile.row === location.row && tile.col === location.col)
-    const events = createEventQuery((context.actionEvents ?? context.transactionEvents).filter((event) =>
+    const events = createEventQuery((context.actionEvents ?? []).filter((event) =>
       !event.actorPlayerId || event.actorPlayerId === context.player.id,
     ))
     const placed = events.has('farm.animalMoved', (event) =>
