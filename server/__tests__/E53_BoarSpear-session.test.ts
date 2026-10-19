@@ -15,6 +15,7 @@ import '../../shared/cards/B/B137_Wholesaler'
 import assert from 'node:assert/strict'
 import { assertRuleOutcome } from './_helpers/negative-rule-audit'
 import * as audit37Food from './_helpers/audit/ae-negative-37-food'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 
 const CARD_ID = 'E053_BoarSpear'
 const E085_ID = 'E085_MasterTanner'
@@ -409,7 +410,7 @@ describe('ae-negative-37-food', () => {
   const { sessions, ok, options, save, setup, source, finish, next, completeRound, take, move, prerequisites, hand, buy, accept, pasture, animalKeep, printed, denyMinor, convertBoar } = audit37Food
   afterEach(() => sessions.splice(0).forEach(s => s.dispose()));
   it('E053 N1 actual printed purchase pays exact cost and excludes unavailable resources', () => { const card = 'E053_BoarSpear', s = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 1, "stone": 1 }); }); const r = buy(s, card); assert.ok(r.state.players[0]!.minorPlayed.includes(card)); assert.equal(printed(r, card), 1); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.stone, 0); save('E053-N1-legal', r); const t = setup(card, 14, st => { hand(st, card); prerequisites(st, 0); Object.assign(st.players[0]!.resources, { "wood": 0, "stone": 1 }); }); denyMinor(t, card); save('E053-N1-short', t.getState()); });
-  it('E053 N2 only newly obtained pigs may be converted and excessive quantities preserve older housed pigs', () => {
+  it('E053 N2 rejects excessive quantities atomically and converts only newly obtained pigs on retry', () => {
       for (const n of [1, 2]) {
           const card = 'E053_BoarSpear', s = setup(card, 14, st => { pasture(st, [{ row: 0, col: 3 }, { row: 0, col: 4 }], 'boar', 2); st.actionSpaces.find(a => a.id === 'pig-market')!.resources.boar = n; });
           const r = convertBoar(s, take(s, 'pig-market'), n, `E053-N2-${n}`);
@@ -436,16 +437,21 @@ describe('ae-negative-37-food', () => {
               const trade = options(r).find(o => o.value.startsWith('trade:'));
               if (trade) {
                   save(`E053-N2-force-before-${n}`, r);
-                  const result = s.resolveChoice(0, `bulk:${trade.value.split(':')[1]}=${n + 1}`);
+                  const result = assertRejectedUnchanged(s, () =>
+                      s.resolveChoice(0, `bulk:${trade.value.split(':')[1]}=${n + 1}`));
                   outcomes.push({ ok: result.ok, food: result.state.players[0]!.resources.food, pig: result.state.players[0]!.resources.boar });
                   save(`E053-N2-force-after-${n}`, result);
+                  const retried = finish(s, ok(s.resolveChoice(0, `bulk:${trade.value.split(':')[1]}=${n}`)));
+                  assert.equal(retried.state.players[0]!.resources.food, 40 + 4 * n);
+                  assert.equal(retried.state.players[0]!.resources.boar, 2);
+                  assert.equal(retried.state.players[0]!.pastures[0]!.animalCount, 2);
                   break;
               }
               r = accept(s, r, 'E053_BoarSpear');
           }
           assert.equal(outcomes.length, n);
       }
-      assert.deepEqual(outcomes, [{ ok: true, food: 44, pig: 2 }, { ok: true, food: 48, pig: 2 }]);
+      assert.deepEqual(outcomes, [{ ok: false, food: 40, pig: 3 }, { ok: false, food: 40, pig: 4 }]);
   });
   it('E053 N3 decline hand opponent unrelated and real breeding cannot convert existing pigs for four food', () => {
       for (const mode of ['decline', 'hand', 'opponent', 'unrelated']) {

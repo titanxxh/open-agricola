@@ -16,6 +16,7 @@ import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 import { PaymentSolver } from '../payment'
 import { animalKeysForState } from '../../contract/animals'
+import { REAL_RESOURCE_KEYS } from '../../contract/resource-keys'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
@@ -543,14 +544,115 @@ const recordCookeryConversion = (
   if (times <= 0) return
   const fromKey = (Object.keys(trade.from)[0] ?? null) as ResourceKey | null
   if (!fromKey) return
-  const perFrom = trade.from[fromKey] ?? 0
-  if (perFrom <= 0) return
-  const totalFrom = perFrom * times
-  incResourceConverted(player, fromKey, totalFrom)
+  for (const resource of REAL_RESOURCE_KEYS) {
+    incResourceConverted(player, resource, (trade.from[resource] ?? 0) * times)
+  }
   const foodOut = (trade.to.food ?? 0) * times
   if (foodOut > 0) {
     addFoodFromConversion(player, fromKey, foodOut)
   }
+}
+
+export type ExchangeBatchEntry = { trade: Trade; count: number }
+
+export type ExchangeRecipeReceipt = {
+  sourceId: string | undefined
+  times: number
+  preResources: Resource
+  paid: Partial<Resource>
+  gained: Partial<Resource>
+}
+
+export type ExchangeBatchResult =
+  | {
+      type: 'ok'
+      resourcesPaid: Partial<Resource>
+      resourcesGained: Partial<Resource>
+      extraData: { exchangeBatch: ExchangeRecipeReceipt[] }
+    }
+  | Extract<ActionExecutionResult, { type: 'fail' }>
+
+/** A batch is validated using recipe credits only, before listeners can award goods. */
+export const executeExchangeBatch = ({
+  state,
+  player,
+  entries,
+  maxTradeTimesBySourceId,
+  harvestExchangeRound,
+  animalPaymentPreference,
+  eventSink,
+  actionHooks,
+}: {
+  state: GameState
+  player: PlayerState
+  entries: readonly ExchangeBatchEntry[]
+  maxTradeTimesBySourceId?: Readonly<Record<string, number>>
+  harvestExchangeRound?: number
+  animalPaymentPreference?: AnimalPaymentPreference
+  eventSink?: EventSink
+  actionHooks?: ActionHookRegistry
+}): ExchangeBatchResult => {
+  const invalid = (): Extract<ExchangeBatchResult, { type: 'fail' }> => ({
+    type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true,
+  })
+  const resources = { ...player.resources }
+  const placedAnimals = getPlacedAnimalsByType(player, state)
+  const recipeUses = new Map<Trade, number>()
+  const sourceUses = new Map<string, number>()
+  for (const { trade, count } of entries) {
+    if (!Number.isSafeInteger(count) || count <= 0 || !isTradeAllowedDuringPhase(trade, state)) return invalid()
+    const used = (recipeUses.get(trade) ?? 0) + count
+    if (used > (trade.max ?? Infinity)) return invalid()
+    recipeUses.set(trade, used)
+    const sourceId = trade.sourceId ?? trade.source
+    if (sourceId) {
+      const sourceUsed = (sourceUses.get(sourceId) ?? 0) + count
+      if (sourceUsed > (maxTradeTimesBySourceId?.[sourceId] ?? Infinity)) return invalid()
+      if (harvestExchangeRound !== undefined && trade.max !== undefined &&
+        sourceUsed > getRemainingHarvestExchangeUses(player, sourceId, trade.max, harvestExchangeRound)) return invalid()
+      sourceUses.set(sourceId, sourceUsed)
+    }
+    for (const resource of REAL_RESOURCE_KEYS) {
+      const amount = (trade.from[resource] ?? 0) * count
+      if (amount > (resources[resource] ?? 0)) return invalid()
+      if (isAnimalResourceKey(resource)) {
+        if (trade.fromFarmyard && amount > (placedAnimals[resource] ?? 0)) return invalid()
+        placedAnimals[resource] = Math.max(0, (placedAnimals[resource] ?? 0) - amount)
+      }
+      resources[resource] = (resources[resource] ?? 0) - amount
+    }
+    for (const resource of REAL_RESOURCE_KEYS) {
+      resources[resource] = (resources[resource] ?? 0) + (trade.to[resource] ?? 0) * count
+    }
+  }
+
+  let paid: Partial<Resource> = {}
+  let gained: Partial<Resource> = {}
+  const receipts: ExchangeRecipeReceipt[] = []
+  for (const { trade, count } of entries) {
+    const preResources = { ...player.resources }
+    const sourceId = trade.sourceId ?? trade.source
+    applyTrade(player, trade, count, animalPaymentPreference, state)
+    recordCookeryConversion(player, trade, count)
+    if (trade.sideEffect) {
+      PaymentSolver.applyTradeSideEffect(state, player, trade.sideEffect, count, sourceId ?? 'unknown')
+    }
+    const exchangeEvent = emitResourceExchanged(eventSink, player, trade, count)
+    dispatchTradeAppliedListener(state, player, trade, count, eventSink,
+      exchangeEvent ? [exchangeEvent] : [], preResources, actionHooks)
+    if (harvestExchangeRound !== undefined && trade.max !== undefined && sourceId) {
+      recordHarvestExchangeUses(player, sourceId, harvestExchangeRound, count)
+    }
+    const receipt = {
+      sourceId, times: count, preResources,
+      paid: scaleResources(trade.from, count), gained: scaleResources(trade.to, count),
+    }
+    receipts.push(receipt)
+    paid = mergePositiveResources(paid, receipt.paid)
+    gained = mergePositiveResources(gained, receipt.gained)
+  }
+  trackWorkPhaseBuildingResources(state, player.id, gained)
+  return { type: 'ok', resourcesPaid: paid, resourcesGained: gained, extraData: { exchangeBatch: receipts } }
 }
 
 const buildExchangeOptions = (
@@ -618,6 +720,8 @@ const resolveExchangeChoice = (
     : undefined
   const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
   const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext, actionHooks)
+  const allowedTrade = (trade: Trade): boolean => isTradeAllowed(trade, state, actionContext)
+    && (!tradeIds?.length || tradeIds.includes(trade.sourceId ?? trade.source ?? ''))
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
@@ -630,51 +734,15 @@ const resolveExchangeChoice = (
       if (parts.length !== 2 || parts[0].trim() === ''
         || !Number.isSafeInteger(index) || index < 0
         || !Number.isSafeInteger(count) || count <= 0
-        || !trade || !isTradeAllowed(trade, state, actionContext)) {
+        || !trade || !allowedTrade(trade)) {
         return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
       }
       requestedTrades.push({ trade, count })
     }
-    let gained: Partial<Resource> = {}
-    let paid: Partial<Resource> = {}
-    for (const { trade, count } of requestedTrades) {
-      const sourceId = trade.sourceId ?? trade.source
-      const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
-      const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity)
-      const times = Math.min(count, max)
-      if (times > 0) {
-        const preResources = { ...player.resources }
-        applyTrade(player, trade, times, animalPaymentPreference, state)
-        recordCookeryConversion(player, trade, times)
-        if (trade.sideEffect) {
-          PaymentSolver.applyTradeSideEffect(
-            state,
-            player,
-            trade.sideEffect,
-            times,
-            trade.sourceId ?? trade.source ?? 'unknown',
-          )
-        }
-        const exchangeEvent = emitResourceExchanged(eventSink, player, trade, times)
-        dispatchTradeAppliedListener(
-          state,
-          player,
-          trade,
-          times,
-          eventSink,
-          exchangeEvent ? [exchangeEvent] : [],
-          preResources,
-          actionHooks,
-        )
-        if (harvestExchangeRound !== undefined && trade.max !== undefined && trade.sourceId) {
-          recordHarvestExchangeUses(player, trade.sourceId, harvestExchangeRound, times)
-        }
-        paid = mergePositiveResources(paid, scaleResources(trade.from, times))
-        gained = mergePositiveResources(gained, scaleResources(trade.to, times))
-      }
-    }
-    trackWorkPhaseBuildingResources(state, player.id, gained)
-    return { type: 'ok', resourcesGained: gained, resourcesPaid: paid }
+    return executeExchangeBatch({
+      state, player, entries: requestedTrades, maxTradeTimesBySourceId,
+      harvestExchangeRound, animalPaymentPreference, eventSink, actionHooks,
+    })
   }
   if (choice.startsWith('trade:')) {
     const parts = choice.split(':')
@@ -684,46 +752,13 @@ const resolveExchangeChoice = (
     if ((parts.length !== 2 && parts.length !== 3) || parts[1].trim() === ''
       || !Number.isSafeInteger(index) || index < 0
       || !Number.isSafeInteger(count) || count <= 0
-      || !trade || !isTradeAllowed(trade, state, actionContext)) {
+      || !trade || !allowedTrade(trade)) {
       return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
     }
-    const max = getMaxTradeTimes(player, trade, state)
-    const sourceId = trade.sourceId ?? trade.source
-    const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
-    const boundedMax = Math.min(max, contextMax ?? Infinity)
-    const times = Math.min(count, boundedMax)
-    if (times > 0) {
-      const preResources = { ...player.resources }
-      applyTrade(player, trade, times, animalPaymentPreference, state)
-      recordCookeryConversion(player, trade, times)
-      if (trade.sideEffect) {
-        PaymentSolver.applyTradeSideEffect(
-          state,
-          player,
-          trade.sideEffect,
-          times,
-          trade.sourceId ?? trade.source ?? 'unknown',
-        )
-      }
-      const exchangeEvent = emitResourceExchanged(eventSink, player, trade, times)
-      dispatchTradeAppliedListener(
-        state,
-        player,
-        trade,
-        times,
-        eventSink,
-        exchangeEvent ? [exchangeEvent] : [],
-        preResources,
-        actionHooks,
-      )
-      if (harvestExchangeRound !== undefined && trade.max !== undefined && trade.sourceId) {
-        recordHarvestExchangeUses(player, trade.sourceId, harvestExchangeRound, times)
-      }
-    }
-    const gained = times > 0 ? scaleResources(trade.to, times) : {}
-    const paid = times > 0 ? scaleResources(trade.from, times) : {}
-    trackWorkPhaseBuildingResources(state, player.id, gained)
-    return { type: 'ok', resourcesGained: gained, resourcesPaid: paid }
+    return executeExchangeBatch({
+      state, player, entries: [{ trade, count }], maxTradeTimesBySourceId,
+      harvestExchangeRound, animalPaymentPreference, eventSink, actionHooks,
+    })
   }
   return { type: 'ok' }
 }
@@ -799,33 +834,10 @@ export const anytimeExchangeAction: ActionDefinition = {
         return { type: 'fail', errorKey: 'log.actionNoExchange' }
       }
       const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
-      const preResources = { ...player.resources }
-      applyTrade(player, directTrade, 1, animalPaymentPreference, state)
-      recordCookeryConversion(player, directTrade, 1)
-      if (directTrade.sideEffect) {
-        PaymentSolver.applyTradeSideEffect(
-          state,
-          player,
-          directTrade.sideEffect,
-          1,
-          directTrade.sourceId ?? directTrade.source ?? 'unknown',
-        )
-      }
-      const exchangeEvent = emitResourceExchanged(eventSink, player, directTrade, 1)
-      dispatchTradeAppliedListener(
-        state,
-        player,
-        directTrade,
-        1,
-        eventSink,
-        exchangeEvent ? [exchangeEvent] : [],
-        preResources,
-        actionHooks,
-      )
-      const gained = scaleResources(directTrade.to, 1)
-      const paid = scaleResources(directTrade.from, 1)
-      trackWorkPhaseBuildingResources(state, player.id, gained)
-      return { type: 'ok' as const, resourcesGained: gained, resourcesPaid: paid }
+      return executeExchangeBatch({
+        state, player, entries: [{ trade: directTrade, count: 1 }],
+        animalPaymentPreference, eventSink, actionHooks,
+      })
     }
     const filterIds = actionContext?.tradeIds as string[] | undefined
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
