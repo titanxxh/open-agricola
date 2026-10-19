@@ -968,8 +968,19 @@ export type BeforeHostContextContribution = {
   value: Record<string, unknown>
 }
 
+/** A transient receipt of one committed farm operation, owned by its action host. */
+export type FarmOperationResult = {
+  kind: 'rooms' | 'stables' | 'plow' | 'fence'
+  playerId: string
+  positions: FarmTilePosition[]
+  sourceCardId?: string
+  newlyUsedTiles: Array<FarmTilePosition & { playerId: string }>
+  before: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures'>
+  after: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures'>
+}
+
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren; beforeHostContributions?: BeforeHostContextContribution[] }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren; beforeHostContributions?: BeforeHostContextContribution[]; farmOperations?: FarmOperationResult[] }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }

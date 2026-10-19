@@ -1,4 +1,4 @@
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
+import { commitFarmOperation } from '../../domain/farm-operations'
 import { requireActionHookRegistry } from '../hooks'
 import type {
   ActionCostAttribution,
@@ -71,8 +71,8 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   PaymentSolver.payResources(player, { wood: stableWoodCost })
-  player.stableTiles.push(next)
-  return { type: 'ok' }
+  const farmOperation = commitFarmOperation(player, { kind: 'stables', positions: [next] })
+  return { type: 'ok', farmOperations: [farmOperation] }
 }
 
 const readCostOverride = (
@@ -285,14 +285,6 @@ const sanitizePayableCost = (
   return payable
 }
 
-const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
-  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
-    if (!(key in source)) {
-      delete (target as Record<string, unknown>)[key as string]
-    }
-  }
-  Object.assign(target, source)
-}
 
 const finalizeStables = (
   ctx: ActionMutationContext,
@@ -323,16 +315,14 @@ const finalizeStables = (
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
-  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
-  nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
   let specialSourceCardId: string | undefined
   if (farmHand) {
     const applied = applySpecialStableAt(ctx.state, nextPlayer, farmHand)
     if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
-  applyPlayerMutation(ctx.player, nextPlayer)
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'stables', positions: stables, preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard })
   const futureStable = findMatureFutureStableEntry(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))
   if (futureStable) futureStable.resources.stable = Math.max(0, (futureStable.resources.stable ?? 0) - totalUnits)
   recordActionCostAttribution(
@@ -362,12 +352,13 @@ const finalizeStables = (
   }
   ctx.eventSink?.emit<'farm.stableBuilt'>({
     type: 'farm.stableBuilt',
-    newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
+    newlyUsedTiles: farmOperation.newlyUsedTiles,
     sourceActionId: ctx.space.id,
     stables: stableItems,
   })
   return {
     type: 'ok',
+    farmOperations: [farmOperation],
     resourcesPaid,
     extraData: { builtStables: stables },
     internalChildren: {

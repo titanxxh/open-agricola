@@ -1,11 +1,10 @@
-import type { ActionDefinition, FutureMeepleResourceMap, GameState, PlayerState, Resource } from '../../contract/types'
+import type { ActionDefinition, FarmOperationResult, FutureMeepleResourceMap, GameState, PlayerState, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { extendedResourceKeyList } from '../../contract/state-constants'
-import { tryAddRoomTile } from '../../domain/farmyard'
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
+import { commitFirstAvailableRoom } from '../../domain/farm-operations'
 
 type FutureReceiveEntry = {
   cardId: string
@@ -117,18 +116,19 @@ export const receiveAction: ActionDefinition = {
       ? new Set(params.futureMeepleIds.filter((id): id is string => typeof id === 'string')) : new Set<string>()
     const scheduled = state.futureMeeples.filter(entry => scheduledIds.has(entry.id)
       && entry.playerId === player.id && entry.round === state.round)
+    const farmOperations: FarmOperationResult[] = []
     const scheduledEntries = scheduled.map(entry => {
       const conditionMet = canReceiveScheduledEntry(player, entry.actionContext?.resourceCondition)
       const resources = conditionMet ? positiveResources(entry.resources) : {}
       if (entry.roomType && player.houseType === entry.roomType) {
         const roomType = entry.roomType
-        const usedBefore = getUsedFarmyardTileKeys(player)
-        const roomCount = player.roomTiles.length
-        if (tryAddRoomTile(player, entry.roomType)) {
+        const farmOperation = commitFirstAvailableRoom(player, entry.cardId)
+        if (farmOperation) {
+          farmOperations.push(farmOperation)
           eventSink?.emit<'farm.roomBuilt'>({
             type: 'farm.roomBuilt', sourceCardId: entry.cardId, targetPlayerId: player.id,
-            rooms: player.roomTiles.slice(roomCount).map(tile => ({ playerId: player.id, ...tile, type: roomType })),
-            newlyUsedTiles: getNewlyUsedFarmyardTiles(player, usedBefore),
+            rooms: farmOperation.positions.map(tile => ({ playerId: player.id, ...tile, type: roomType })),
+            newlyUsedTiles: farmOperation.newlyUsedTiles,
           })
         }
       }
@@ -158,6 +158,6 @@ export const receiveAction: ActionDefinition = {
         if (amount > 0) gained[key] = (gained[key] ?? 0) + amount
       }
     }
-    return { type: 'ok', resourcesGained: gained }
+    return { type: 'ok', resourcesGained: gained, ...(farmOperations.length ? { farmOperations } : {}) }
   },
 }

@@ -1,4 +1,4 @@
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
+import { commitFarmOperation } from '../../domain/farm-operations'
 import type {
   ActionAvailabilityContext,
   ActionCostPreview,
@@ -101,14 +101,6 @@ const canStartConstruct = (
   return farm.selectableTiles.length > 0 && (farm.maxSelections ?? 0) > 0
 }
 
-const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
-  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
-    if (!(key in source)) {
-      delete (target as Record<string, unknown>)[key as string]
-    }
-  }
-  Object.assign(target, source)
-}
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const result: Partial<Resource> = {}
@@ -213,11 +205,7 @@ const finalizeRoom = (
   )
   if (!baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
-  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
-  const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
-  nextPlayer.roomTiles = [...nextPlayer.roomTiles, ...rooms]
-  nextPlayer.rooms = nextPlayer.rooms + rooms.length
-  applyPlayerMutation(ctx.player, nextPlayer)
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'rooms', positions: rooms, sourceCardId: ctx.sourceCard })
 
   if (ctx.sourceCard && rooms.length > 0) {
     const houseType = ctx.player.houseType
@@ -231,7 +219,7 @@ const finalizeRoom = (
   incRoomsBuilt(ctx.player, rooms.length)
   ctx.eventSink?.emit<'farm.roomBuilt'>({
     type: 'farm.roomBuilt',
-    newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
+    newlyUsedTiles: farmOperation.newlyUsedTiles,
     rooms: rooms.map((room) => ({
       playerId: ctx.player.id,
       row: room.row,
@@ -243,6 +231,7 @@ const finalizeRoom = (
 
   return {
     type: 'ok',
+    farmOperations: [farmOperation],
     resourcesPaid,
     extraData: { builtRooms: rooms },
     internalChildren: {
