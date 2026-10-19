@@ -43,17 +43,17 @@ describe('sandboxListenerActions', () => {
   it('白名单恰好是支持的 listener action 集合', () => {
     expect([...sandboxListenerActions].sort()).toEqual(
       [
-        'bake-bread', 'breed', 'collect', 'construct', 'family-growth', 'fence', 'gain',
+        'anytime', 'bake-bread', 'breed', 'collect', 'compute-exchanges', 'construct', 'family-growth', 'fence', 'gain',
         'improvement', 'occupation', 'place-farmer', 'plow', 'reap', 'receive',
         'renovate-house', 'sow', 'stables', 'wish-children',
       ].sort(),
     )
   })
 
-  it('只包含当前 action registry 中存在的 id', () => {
+  it('执行目标存在于 action registry，全局查询有独立身份', () => {
     const runtimeActionIds = new Set(
       [...actionDefinitions, ...internalActionDefinitions].map((action) => action.id),
     )
-    expect(sandboxListenerActions.filter((id) => !runtimeActionIds.has(id))).toEqual([])
+    expect(sandboxListenerActions.filter((id) => !runtimeActionIds.has(id))).toEqual(['anytime', 'compute-exchanges'])
   })
 })

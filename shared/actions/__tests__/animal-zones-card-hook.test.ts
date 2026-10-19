@@ -21,6 +21,7 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
     },
     pastures: [],
     fields: [],
+    fenceSegments: [],
     fences: [],
     palisades: [],
     rooms: 2,

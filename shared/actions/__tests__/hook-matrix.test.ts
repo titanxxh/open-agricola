@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { actionDefinitions } from '../index'
+import { gainAction } from '../effects/gain'
 import { ActionHookRegistry, actionHookPhases } from '../hooks'
 import { buildHookMatrix } from '../hook-matrix'
 import { type ActionHookRegistration } from '../hooks'
@@ -8,6 +8,7 @@ import { CardRegistry } from '../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
 
 const actionHooks = new ActionHookRegistry()
+const matrixActions = [gainAction]
 
 
 describe('hook matrix', () => {
@@ -19,81 +20,89 @@ describe('hook matrix', () => {
   it('collects phases from action hooks only', () => {
     actionHooks.register({
       id: 'test-before-after',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['before', 'after'],
       handler: () => undefined,
     })
-    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
-    const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
-    expect(dayLaborer?.phases).toEqual(['before', 'after'])
+    const matrix = buildHookMatrix(matrixActions, actionHooks.getRegistered())
+    const gainEntry = matrix.find((entry) => entry.actionId === 'gain')
+    expect(gainEntry?.phases).toEqual(['before', 'after'])
   })
 
   it('collects phases from card listeners', () => {
     requireActiveCardRegistry('hook-matrix').registerListener({
       id: 'listener-compute-args',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['computeArgs'],
       handler: () => undefined,
     })
-    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
-    const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
-    expect(dayLaborer?.phases).toEqual(['computeArgs'])
+    const matrix = buildHookMatrix(matrixActions, actionHooks.getRegistered())
+    const gainEntry = matrix.find((entry) => entry.actionId === 'gain')
+    expect(gainEntry?.phases).toEqual(['computeArgs'])
   })
 
   it('does not default to full phase coverage', () => {
-    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
-    const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
-    expect(dayLaborer?.phases).toEqual([])
-    expect(dayLaborer?.phases).not.toEqual(actionHookPhases)
+    const matrix = buildHookMatrix(matrixActions, actionHooks.getRegistered())
+    const gainEntry = matrix.find((entry) => entry.actionId === 'gain')
+    expect(gainEntry?.phases).toEqual([])
+    expect(gainEntry?.phases).not.toEqual(actionHookPhases)
+  })
+
+  it('keeps domain events out of action rows and includes explicit global queries', () => {
+    const registry = requireActiveCardRegistry('hook-matrix')
+    registry.registerListener({ id: 'sown', events: ['farm.sown'], phases: ['after'], handler: () => undefined })
+    expect(buildHookMatrix(matrixActions, [])).toEqual([{ actionId: 'gain', phases: [] }])
+    registry.registerListener({ id: 'global-query', globalQuery: true, phases: ['isDoable'], handler: () => undefined })
+    expect(buildHookMatrix(matrixActions, [])).toEqual([{ actionId: 'gain', phases: ['isDoable'] }])
   })
 
   it('is sensitive to hook removal', () => {
     const hook: ActionHookRegistration = {
       id: 'tmp-before',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['before'],
       handler: () => undefined,
     }
     const listener: CardListenerRegistration = {
       id: 'tmp-after',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['after'],
       handler: () => undefined,
     }
     actionHooks.register(hook)
     requireActiveCardRegistry('hook-matrix').registerListener(listener)
-    const withHooks = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
-    const beforeClear = withHooks.find((entry) => entry.actionId === 'day-laborer')
+    const withHooks = buildHookMatrix(matrixActions, actionHooks.getRegistered())
+    const beforeClear = withHooks.find((entry) => entry.actionId === 'gain')
     expect(beforeClear?.phases).toEqual(['before', 'after'])
 
     actionHooks.clear()
     setActiveCardRegistry(new CardRegistry())
-    const withoutHooks = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
-    const afterClear = withoutHooks.find((entry) => entry.actionId === 'day-laborer')
+    const withoutHooks = buildHookMatrix(matrixActions, actionHooks.getRegistered())
+    const afterClear = withoutHooks.find((entry) => entry.actionId === 'gain')
     expect(afterClear?.phases).toEqual([])
   })
 
   it('keeps deterministic phase order', () => {
     actionHooks.register({
       id: 'order-z',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['after'],
       handler: () => undefined,
     })
     actionHooks.register({
       id: 'order-a',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['before'],
       handler: () => undefined,
     })
     requireActiveCardRegistry('hook-matrix').registerListener({
       id: 'order-listener',
-      actions: ['day-laborer'],
+      actions: ['gain'],
       phases: ['computeArgs'],
       handler: () => undefined,
     })
-    const matrix = buildHookMatrix(actionDefinitions, actionHooks.getRegistered())
-    const dayLaborer = matrix.find((entry) => entry.actionId === 'day-laborer')
-    expect(dayLaborer?.phases).toEqual(['before', 'after', 'computeArgs'])
+    const matrix = buildHookMatrix(matrixActions, actionHooks.getRegistered())
+    const gainEntry = matrix.find((entry) => entry.actionId === 'gain')
+    expect(gainEntry?.phases).toEqual(['before', 'after', 'computeArgs'])
   })
 })
