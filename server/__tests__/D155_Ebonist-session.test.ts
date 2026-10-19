@@ -14,6 +14,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit56Phase from './_helpers/audit/ae-negative-56-phase'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const CARD_ID = 'D155_Ebonist'
 
 describe('D155_Ebonist exchange metadata', () => {
@@ -100,7 +110,7 @@ describe('D155 Ebonist parity', () => {
 
   it('D155 S2: during harvest one wood becomes one food and one grain before feeding', () => {
     const session = setup({ food: 3, harvest: true })
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction).toMatchObject({
       stateId: 'wait', playerIndex: 0, request: { kind: 'feed' },
     })
@@ -115,7 +125,7 @@ describe('D155 Ebonist parity', () => {
 
   it('D155 S3: the harvest exchange may be declined', () => {
     const session = setup({ harvest: true })
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction).toMatchObject({
       stateId: 'wait', playerIndex: 0, request: { kind: 'feed' },
     })
@@ -130,7 +140,10 @@ describe('D155 Ebonist parity', () => {
 
   it('D155 S4: Ebonist is limited to one exchange in a harvest and allows a legal retry', () => {
     const session = setup({ wood: 2, food: 3, harvest: true })
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, request: { kind: 'feed' },
+    })
     const before = session.getState()
 
     response = session.resolveChoice(0, 'confirm', {
@@ -150,7 +163,7 @@ describe('D155 Ebonist parity', () => {
 
   it('allows an earlier harvest exchange to fund a later basic conversion', () => {
     const session = setup({ food: 2, harvest: true })
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction).toMatchObject({
       stateId: 'wait',
       playerIndex: 0,

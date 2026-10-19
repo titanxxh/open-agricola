@@ -12,6 +12,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const CARD_ID = 'C105_BasketCarrier'
 const HOME_BREWER = 'C110_HomeBrewer'
 const SCHNAPPS_DISTILLERY = 'C059_SchnappsDistillery'
@@ -355,7 +365,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     player.occupationPlayed = [CARD_ID]
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
+    let resp = enterFeeding(session)
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' && resp.interaction.request.kind).toBe('feed')
     const before = session.getState()

@@ -126,6 +126,15 @@ describe('harvest reaction flow', () => {
     let resp = session.performRoundEnd()
     resp = resolveCardTrigger(session, resp, 'B101_FurnitureCarpenter')
     resp = acceptOptional(session, resp)
+    while (resp.interaction.stateId === 'wait') {
+      if (session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+      } else {
+        expect(resp.interaction.request.kind).toBe('feed')
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
+      }
+      expect(resp.ok, resp.error).toBe(true)
+    }
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('idle')

@@ -22,6 +22,16 @@ import '../../shared/cards/C/C072_FestivalPlanning'
 import '../../shared/cards/C/C073_SeaweedFertilizer'
 import '../../shared/cards/D/D003_Furrows'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const FILLER = '__test_placeholder__'
 const OCCUPATIONS = ['A125_Priest', 'B121_Geologist', 'C123_Freemason']
 const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
@@ -308,7 +318,8 @@ describe('C059 Schnapps Distillery parity', () => {
   })
   it('C059 S2: feeding converts exactly one vegetable into five food', () => {
     const session = setup({ cardId: 'C059_SchnappsDistillery', round: 4, resources: { vegetable: 2 } }); prepareHarvest(session)
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'feed' } })
     response = session.resolveChoice(0, 'confirm', { selections: [{ sourceId: 'C059_SchnappsDistillery', exchangeIndex: 0, count: 1, sourceName: 'Schnapps Distillery' }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.vegetable).toBe(1)
@@ -317,7 +328,7 @@ describe('C059 Schnapps Distillery parity', () => {
   it('C059 S6: the Schnapps Distillery feeding exchange may be declined', () => {
     const session = setup({ cardId: 'C059_SchnappsDistillery', round: 4, resources: { vegetable: 2 } })
     prepareHarvest(session)
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'feed' } })
     response = session.resolveChoice(0, 'confirm', { selections: [] })
     expect(response.ok, response.error).toBe(true)

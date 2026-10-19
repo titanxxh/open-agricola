@@ -9,6 +9,16 @@ import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
 
+const enterFeeding = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  while (response.interaction.stateId === 'wait'
+    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const CARD_ID = 'E109_BraidMaker'
 const BASKET = 'Major_Basket'
 const FILLER = '__test_placeholder__'
@@ -143,7 +153,7 @@ describe('E109 Braid Maker parity', () => {
 
   it('E109 S6: during harvest one reed may become two food before feeding', () => {
     const session = setup({ harvest: true, reed: 1, stone: 0, food: 2 })
-    let response = session.performRoundEnd()
+    let response = enterFeeding(session)
     expect(response.interaction).toMatchObject({
       stateId: 'wait', playerIndex: 0, request: { kind: 'feed' },
     })
@@ -202,7 +212,9 @@ describe('ae-negative-48-crops', () => {
     for (let n = 0; n < 12 && !(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed'); n++) {
       const i = r.interaction
       assert.ok(i.stateId === 'wait')
-      r = ok(s.resolveChoice(i.playerIndex, 'confirm'))
+      const choice = s.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime'
+        ? '__skip__' : 'confirm'
+      r = ok(s.resolveChoice(i.playerIndex, choice))
     }
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'feed')
     const payload = (count: number) => ({ selections: [{ sourceId: 'E109_BraidMaker', exchangeIndex: 0, count, sourceName: 'Braid Maker' }] })
