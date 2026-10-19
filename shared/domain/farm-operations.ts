@@ -1,4 +1,5 @@
 import type { FarmOperationResult, FarmTilePosition, PlayerState } from '../contract/types'
+import type { EventSink, FarmTerrainChangedEvent } from '../contract/events'
 import { getFarmyardTilePositions, positionKey } from './farmyard-geometry'
 import { getNewlyUsedFarmyardTiles, getUsedFarmyardTileKeys } from './farmyard-usage'
 
@@ -7,6 +8,10 @@ export type FarmOperation = (
   | { kind: 'stables'; positions: readonly FarmTilePosition[]; preparedPlayer?: PlayerState }
   | { kind: 'plow'; position: FarmTilePosition; preparedPlayer: PlayerState }
   | { kind: 'fence'; positions: readonly FarmTilePosition[]; preparedPlayer: PlayerState }
+  | { kind: 'pastures'; positions: readonly FarmTilePosition[]; pastures: PlayerState['pastures'];
+      replacesTerrain?: readonly Pick<FarmTerrainChangedEvent, 'playerId' | 'changes'>[] }
+  | { kind: 'terrain'; positions: readonly FarmTilePosition[]; preparedPlayer: PlayerState;
+      mode: Extract<FarmOperationResult, { kind: 'terrain' }>['terrainMode']; changes: Extract<FarmOperationResult, { kind: 'terrain' }>['terrainChanges'] }
 ) & { sourceCardId?: string }
 
 const copyLayout = (player: PlayerState): FarmOperationResult['before'] => ({
@@ -15,6 +20,8 @@ const copyLayout = (player: PlayerState): FarmOperationResult['before'] => ({
   fields: player.fields.map(field => ({ ...field, stacks: field.stacks.map(stack => ({ ...stack })) })),
   fenceSegments: player.fenceSegments.map(segment => ({ ...segment, source: segment.source ? { ...segment.source } : undefined })),
   pastures: player.pastures.map(pasture => ({ ...pasture, tiles: pasture.tiles?.map(tile => ({ ...tile })) })),
+  ...(player.farmTerrain ? { farmTerrain: player.farmTerrain.map(tile => ({ ...tile })) } : {}),
+  ...(player.farmyardExtensions ? { farmyardExtensions: player.farmyardExtensions.map(extension => ({ ...extension, tiles: extension.tiles.map(tile => ({ ...tile })) })) } : {}),
 })
 
 /** Commit the validated proposal and its payment/animal settlement together.
@@ -30,10 +37,18 @@ const commitPreparedPlayer = (player: PlayerState, prepared: PlayerState): void 
 /** The caller owns validation and the completion phase; this operation owns writes.
  * No hooks run here: its receipt stays with the original host's trailing reactions.
  */
-export function commitFarmOperation(player: PlayerState, operation: FarmOperation): FarmOperationResult {
+export function commitFarmOperation(player: PlayerState, operation: FarmOperation, eventSink?: EventSink): FarmOperationResult {
   const before = copyLayout(player)
   const existingPositions = new Set(getFarmyardTilePositions(player).map(positionKey))
   const previouslyUsed = getUsedFarmyardTileKeys(player)
+  if (operation.kind === 'pastures') {
+    for (const replacement of operation.replacesTerrain ?? []) {
+      if (replacement.playerId !== player.id) continue
+      for (const change of replacement.changes) {
+        if (change.before && !change.after && !change.fieldCreated) previouslyUsed.add(positionKey(change))
+      }
+    }
+  }
   switch (operation.kind) {
     case 'rooms':
       player.roomTiles = [...player.roomTiles, ...operation.positions.map(tile => ({ ...tile }))]
@@ -45,15 +60,18 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
       break
     case 'plow':
     case 'fence':
+    case 'terrain':
       commitPreparedPlayer(player, operation.preparedPlayer)
+      break
+    case 'pastures':
+      player.pastures = operation.pastures
       break
     default: {
       const exhaustive: never = operation
       return exhaustive
     }
   }
-  return {
-    kind: operation.kind,
+  const result = {
     playerId: player.id,
     ...(operation.sourceCardId ? { sourceCardId: operation.sourceCardId } : {}),
     positions: (operation.kind === 'plow' ? [operation.position] : operation.positions).map(tile => ({ ...tile })),
@@ -61,10 +79,17 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
     before,
     after: copyLayout(player),
   }
+  if (result.newlyUsedTiles.length > 0) eventSink?.emit<'farm.spacesUsed'>({
+    type: 'farm.spacesUsed', newlyUsedTiles: result.newlyUsedTiles,
+    ...(operation.sourceCardId ? { sourceCardId: operation.sourceCardId } : {}),
+  })
+  return operation.kind === 'terrain'
+    ? { ...result, kind: 'terrain', terrainMode: operation.mode, terrainChanges: operation.changes }
+    : { ...result, kind: operation.kind }
 }
 
-export function commitFirstAvailableRoom(player: PlayerState, sourceCardId?: string): FarmOperationResult | undefined {
+export function commitFirstAvailableRoom(player: PlayerState, sourceCardId?: string, eventSink?: EventSink): FarmOperationResult | undefined {
   const used = getUsedFarmyardTileKeys(player)
   const position = getFarmyardTilePositions(player).find(tile => !used.has(positionKey(tile)))
-  return position ? commitFarmOperation(player, { kind: 'rooms', positions: [position], sourceCardId }) : undefined
+  return position ? commitFarmOperation(player, { kind: 'rooms', positions: [position], sourceCardId }, eventSink) : undefined
 }

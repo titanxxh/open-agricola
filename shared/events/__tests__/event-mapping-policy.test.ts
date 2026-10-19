@@ -37,6 +37,7 @@ const expectedPublicEventTypes = [
   'farm.sown',
   'farm.spacesUsed',
   'farm.stableBuilt',
+  'farm.terrainChanged',
   'futureMeeple.queued',
   'futureMeeple.removed',
   'futureMeeple.resolved',
@@ -278,6 +279,18 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
 } satisfies Partial<PublicEventFixtureMatrix>
 
 describe('event mapping policy', () => {
+  it('preserves terrain layer changes in replay without duplicate presentation', () => {
+    const event: GameEvent = {
+      ...base, type: 'farm.terrainChanged', playerId: 'p1', operation: 'remove', newlyUsedTiles: [],
+      changes: [{ row: 0, col: 2, before: { kind: 'forest', covered: 'moor' }, after: { kind: 'moor' }, fieldCreated: false }],
+    }
+    expect(isPublicEventReplayable(event)).toBe(true)
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'P1' } })).toEqual([])
+    for (const surface of ['log', 'notification', 'highlight', 'resourceAnimation'] as const) {
+      expect(publicEventMappingPolicy[event.type][surface].mode).toBe('silent')
+    }
+  })
+
   it('preserves committed farmyard usage in replay without duplicate presentation', () => {
     const event: GameEvent = {
       ...base, type: 'farm.spacesUsed', sourceCardId: 'M064_FamilyBurialPlot',

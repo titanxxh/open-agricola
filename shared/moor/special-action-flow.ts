@@ -1,3 +1,5 @@
+import type { DraftGameEvent } from '../contract/events'
+import { assertKnownGameEventShape } from '../events/guards'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type {
   ActionChoiceOption,
@@ -387,6 +389,7 @@ const runAfterSpecialActionListenersNow = (
   terrainCleared?: boolean,
   snapshots?: readonly AfterSpecialActionListenerSnapshot[],
   actionHooks?: ActionHookRegistry,
+  terrainEvent?: DraftGameEvent<'farm.terrainChanged'>,
 ) => {
   const context = {
     actionHooks,
@@ -396,6 +399,7 @@ const runAfterSpecialActionListenersNow = (
     actionId,
     phase: 'after',
     result: { type: 'ok' },
+    actionEvents: terrainEvent ? [terrainEvent] : [],
     extraData: {
       payload,
       ...(terrainCleared === false ? { terrainCleared: false } : {}),
@@ -426,10 +430,11 @@ const afterSpecialActionListenersLeaf = (
   payload: MoorSpecialActionPayload,
   terrainCleared: boolean | undefined,
   snapshots: readonly AfterSpecialActionListenerSnapshot[],
+  terrainEvent?: DraftGameEvent<'farm.terrainChanged'>,
 ): ActionFlow => ({
   type: 'leaf',
   actionId: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
-  actionContext: { actionId, payload, terrainCleared, snapshots },
+  actionContext: { actionId, payload, terrainCleared, snapshots, terrainEvent },
 })
 
 const snapshotAfterSpecialActionListeners = (
@@ -438,6 +443,7 @@ const snapshotAfterSpecialActionListeners = (
   player: PlayerState,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
+  terrainEvent?: DraftGameEvent<'farm.terrainChanged'>,
 ): AfterSpecialActionListenerSnapshot[] =>
   getMatchingListeners({
     actionHooks,
@@ -447,6 +453,7 @@ const snapshotAfterSpecialActionListeners = (
     actionId,
     phase: 'after',
     result: { type: 'ok' },
+    actionEvents: terrainEvent ? [terrainEvent] : [],
     extraData: { payload },
   }).map((entry) => ({
     listenerId: entry.registration.id,
@@ -460,17 +467,17 @@ const runAfterSpecialActionListeners = (
   player: PlayerState,
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload,
-  result: { followUpFlow?: ActionFlow; terrainCleared?: boolean },
+  result: { followUpFlow?: ActionFlow; terrainCleared?: boolean; terrainEvent?: DraftGameEvent<'farm.terrainChanged'> },
   actionHooks?: ActionHookRegistry,
 ) => {
   if (result.followUpFlow) {
-    const snapshots = snapshotAfterSpecialActionListeners(actionHooks, state, player, actionId, payload)
+    const snapshots = snapshotAfterSpecialActionListeners(actionHooks, state, player, actionId, payload, result.terrainEvent)
     return combineFlows([
       result.followUpFlow,
-      afterSpecialActionListenersLeaf(actionId, payload, result.terrainCleared, snapshots),
+      afterSpecialActionListenersLeaf(actionId, payload, result.terrainCleared, snapshots, result.terrainEvent),
     ])
   }
-  return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared, undefined, actionHooks)
+  return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared, undefined, actionHooks, result.terrainEvent)
 }
 
 const buildSpecialActionCardActionFlow = (
@@ -517,6 +524,12 @@ export const moorSpecialActionAfterListenersAction: ActionDefinition = {
     const snapshots = Array.isArray(actionContext?.snapshots)
       ? actionContext.snapshots as AfterSpecialActionListenerSnapshot[]
       : undefined
+    let terrainEvent: DraftGameEvent<'farm.terrainChanged'> | undefined
+    const captured = actionContext?.terrainEvent
+    if (captured && typeof captured === 'object' && 'type' in captured && captured.type === 'farm.terrainChanged') {
+      assertKnownGameEventShape(captured)
+      terrainEvent = captured as DraftGameEvent<'farm.terrainChanged'>
+    }
     const followUpFlow = runAfterSpecialActionListenersNow(
       state,
       player,
@@ -525,6 +538,7 @@ export const moorSpecialActionAfterListenersAction: ActionDefinition = {
       typeof terrainCleared === 'boolean' ? terrainCleared : undefined,
       snapshots,
       actionHooks,
+      terrainEvent,
     )
     return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
   },

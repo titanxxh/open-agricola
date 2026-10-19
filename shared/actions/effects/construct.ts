@@ -205,7 +205,7 @@ const finalizeRoom = (
   )
   if (!baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
-  const farmOperation = commitFarmOperation(ctx.player, { kind: 'rooms', positions: rooms, sourceCardId: ctx.sourceCard })
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'rooms', positions: rooms, sourceCardId: ctx.sourceCard }, ctx.eventSink)
 
   if (ctx.sourceCard && rooms.length > 0) {
     const houseType = ctx.player.houseType

@@ -1,6 +1,17 @@
 import type { FarmyardTileUsage } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
 import { positionKey } from '../../domain/farmyard-geometry'
+import { createEventQuery } from '../../events/query'
+
+/** A returned-flow host keeps its own operation facts, excluding nested children. */
+export const getActionTerrainOperations = (context: Pick<CardListenerContext, 'result' | 'actionEvents'>) => {
+  const operations = context.result?.type === 'ok' || context.result?.type === 'flow'
+    ? context.result.farmOperations : undefined
+  if (operations !== undefined) return operations.flatMap(operation => operation.kind === 'terrain'
+    ? [{ type: 'farm.terrainChanged' as const, playerId: operation.playerId, operation: operation.terrainMode,
+      changes: operation.terrainChanges, newlyUsedTiles: operation.newlyUsedTiles }] : [])
+  return createEventQuery(context.actionEvents ?? []).filter('farm.terrainChanged')
+}
 
 /** Only this host's committed geometry; nested hosts retain separate scopes. */
 export const getActionNewlyUsedTiles = (context: Pick<CardListenerContext, 'actionEvents' | 'player'>) => {

@@ -8,6 +8,8 @@ import type {
   PaymentResourceMap,
   PlayerState,
   Resource,
+  FarmTerrainChange,
+  FarmTerrainOperationMode,
 } from './types'
 import type { ActionDetailParts } from './protocol/game'
 import type { AnimalKey } from './animals'
@@ -123,8 +125,15 @@ export type FarmCropRemovedEvent = GameEventBase<'farm.cropRemoved'> & {
 
 export type FarmyardTileUsage = { playerId: string; row: number; col: number }
 
-/** Existing farmyard spaces made used by a terrain or space-state mutation. */
+/** Existing farmyard spaces made used by a committed farm operation. */
 export type FarmSpacesUsedEvent = GameEventBase<'farm.spacesUsed'> & {
+  newlyUsedTiles: FarmyardTileUsage[]
+}
+
+export type FarmTerrainChangedEvent = GameEventBase<'farm.terrainChanged'> & {
+  playerId: string
+  operation: FarmTerrainOperationMode
+  changes: FarmTerrainChange[]
   newlyUsedTiles: FarmyardTileUsage[]
 }
 
@@ -439,6 +448,7 @@ export type GameEvent =
   | FarmCropRemovedEvent
   | FarmFieldPlowedEvent
   | FarmSpacesUsedEvent
+  | FarmTerrainChangedEvent
   | FarmRoomBuiltEvent
   | FarmRenovatedEvent
   | FarmStableBuiltEvent

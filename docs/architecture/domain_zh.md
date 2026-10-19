@@ -27,11 +27,11 @@ shared/domain/
 
 **农场。**
 
-- `farm-operations.ts` 将建房、建厩、犁地和围栏方案提交到权威玩家状态。校验器只准备投影，由共同操作实际写入。独立的 `FarmOperationResult` 捕获成功坐标及修改前后布局；新增已用格只包含操作前已存在的坐标。结果归属原行动宿主，建局和恢复不派发反应。
+- `farm-operations.ts` 将建房、建厩、犁地、围栏、牧场和地形方案提交到权威玩家状态。校验器只准备投影，由共同操作实际写入。独立的 `FarmOperationResult` 捕获成功坐标及修改前后布局；新增已用格只包含操作前已存在的坐标。结果归属原行动宿主。游戏操作通过该宿主的事件 sink 为新增已用坐标发出 `farm.spacesUsed`；建局和恢复不派发反应。牧场转换续行可通过 `replacesTerrain` 携带原地形变化；操作将被替换坐标纳入临时已用基准，地形连续转牧场不会产生虚假的新增已用事实。独立的后续操作只读取当时几何。
 - 已用 / 未用格只从 `farmyard-usage-core.ts` 读取，包含扩展、地形、封锁格与派生的牧场格；`farmyard-usage.ts` 与 `farm.ts` 只是兼容 facade。卡牌从不手动数格子。房间、地形、田地、马厩与牧场格始终计为已用；`farmyardSpaceStates` 中的条目只有带 `blocksPlacement` 时才计入。
 - 牧场持久化身份、格子与动物安置。`getPastureSize()`、`getPastureStableCount()` 与 `getFencedStableCount()` 派生其余信息；`getPastureViews()` 返回独立视图；序列化的 `size` / `stables` 只用于展示，加载时剥离。
 - 农场与行动格来源使用 source / type metadata：`FenceSegment.type/source`、`WorkerRef.synthetic`、`ActionSpace.blockedBy`、supply token helper、跨人数的行动格类别 helper、预留标记与附件。基础行动定义按 2–6 人过滤；5/6 人专属格单独建模。
-- Farmers of the Moor 地形（[ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)）是 `farmTerrain.kind` 的公开顶层，被覆盖的地形在 `covered`。地形变化走通用 selection leaf，在提交与效果执行时按实时占用重新校验；未来地形 token 复用 `futureMeeples` 条目。围起地形的相邻计算是纯 helper；一次性的相邻规则使用 `adjacencyPolicy` / `allowedTiles` / `fencePolicy`。不支持多层堆叠地形。
+- Farmers of the Moor 地形（[ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)）是 `farmTerrain.kind` 的公开顶层，被覆盖的地形在 `covered`。`planTerrainOperation()` 无写入地验证整份有序选择；坐标、重复项、层、占用或相邻限制中任一非法项都会在选择状态变化前拒绝整批。selection leaf 与特殊行动都通过 `farm-operations.ts` 提交准备好的操作。`farm.terrainChanged` 记录可见层和覆盖层的前后变化及新生成的田；未来地形 token 复用 `futureMeeples` 条目。围起地形的相邻计算是纯 helper；一次性的相邻规则使用 `adjacencyPolicy` / `allowedTiles` / `fencePolicy`。只支持可见层与单层覆盖。整批拒绝、层身份、嵌套收据、恢复与撤销见 `server/__tests__/terrain-operation-session.test.ts`。
 - Farmyard Extension 扩展共享几何；所有农场读取方都使用动态形状。
 
 **动物。**

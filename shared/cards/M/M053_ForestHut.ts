@@ -1,14 +1,15 @@
+import { getActionTerrainOperations } from '../helpers/farmyard-events'
 import { defineMinorCard } from '../card-source'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { registerSelectionEffect, registerSelectionValidator } from '../../actions/helpers/selection-effect-registry'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionHookPhase } from '../../actions/hooks'
-import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import type { CardListenerRegistration } from '../card-listeners'
 import { readCardExtraData, writeCardExtraData, isCardFlagged } from '../helpers/card-state'
 import { inactiveWorkersInSupply } from '../../domain/player'
 import { reserveSupplyWorker } from '../../domain/supply-workers'
 import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import { parsePositionKey } from '../../domain/farm'
-import { getVisibleTerrainTiles } from '../../moor/farm-terrain'
+import { getVisibleTerrainTiles, getVisibleFarmTerrain } from '../../moor/farm-terrain'
 import type { FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -16,43 +17,17 @@ const CARD_ID = 'M053_ForestHut'
 const SELECTION_EFFECT = 'M053-forest-hut-bind'
 const TEMP_WORKER_KEY = 'temporaryWorkerId'
 const BOUND_FOREST_KEY = 'boundForest'
+const BOUND_FOREST_DEPTH_KEY = 'boundForestDepth'
 const FARM_TERRAIN_MARKERS_KEY = 'farmTerrainMarkers'
 const UNLOCK_ACTION = `card_${CARD_ID}_unlock`
 
 const sameTile = (a: FarmTilePosition | undefined, b: FarmTilePosition | undefined) =>
   !!a && !!b && a.row === b.row && a.col === b.col
 
-const selectedTile = (context: CardListenerContext): FarmTilePosition | undefined => {
-  const tile = (context.extraData?.payload as { tile?: { row?: unknown; col?: unknown } } | undefined)?.tile
-  if (!tile) return undefined
-  const row = Number(tile.row)
-  const col = Number(tile.col)
-  return Number.isInteger(row) && Number.isInteger(col) ? { row, col } : undefined
-}
-
-const terrainSelectionTiles = (context: CardListenerContext): FarmTilePosition[] => {
-  const extraData = context.result && context.result.type !== 'fail' ? context.result.extraData : undefined
-  const selected = extraData?.selectedPositions
-  if (!Array.isArray(selected)) return []
-  return selected.flatMap((entry) =>
-    typeof entry === 'string'
-      ? (parsePositionKey(entry) ? [parsePositionKey(entry)!] : [])
-      : [])
-}
-
-const selectedForestRemovalTiles = (context: CardListenerContext): FarmTilePosition[] => {
-  if (context.actionId === 'fell-trees' || context.actionId === 'slash-and-burn') {
-    const tile = selectedTile(context)
-    return tile ? [tile] : []
-  }
-  if (context.actionId !== 'selection') return []
-  const mode = context.actionContext?.terrainMode
-  const removesForest =
-    (mode === 'remove' && context.actionContext?.terrainKind === 'forest') ||
-    ((mode === 'replace-kind' || mode === 'replace-with-field') &&
-      context.actionContext?.terrainFromKind === 'forest')
-  return removesForest ? terrainSelectionTiles(context) : []
-}
+registerSelectionValidator(SELECTION_EFFECT, ({ player, positions }) => {
+  const tile = parsePositionKey(positions[0] ?? '')
+  if (!tile || getVisibleFarmTerrain(player, tile)?.kind !== 'forest') return 'invalid forest selection'
+})
 
 registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
   const tile = parsePositionKey(positions[0] ?? '')
@@ -61,6 +36,7 @@ registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
   if (!worker) return
   writeCardExtraData(player, CARD_ID, TEMP_WORKER_KEY, worker.id)
   writeCardExtraData(player, CARD_ID, BOUND_FOREST_KEY, tile)
+  writeCardExtraData(player, CARD_ID, BOUND_FOREST_DEPTH_KEY, getVisibleFarmTerrain(player, tile)?.covered ? 2 : 1)
   writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [{
     row: tile.row,
     col: tile.col,
@@ -83,6 +59,7 @@ registerAdHocAction({
     if (!worker?.supplyUse || worker.supplyUse.sourceCard !== CARD_ID || worker.supplyUse.status !== 'reserved') return { type: 'ok' }
     worker.supplyUse.returnRound = state.round
     writeCardExtraData(player, CARD_ID, BOUND_FOREST_KEY, undefined)
+    writeCardExtraData(player, CARD_ID, BOUND_FOREST_DEPTH_KEY, undefined)
     writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [])
     return { type: 'ok' }
   },
@@ -92,10 +69,15 @@ const unlockListener: CardListenerRegistration = {
   id: 'M053-forest-hut-after-forest-removed',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees', 'slash-and-burn', 'selection'],
+  events: ['farm.terrainChanged'],
   handler: (context) => {
     const bound = readCardExtraData<FarmTilePosition>(context.player, CARD_ID, BOUND_FOREST_KEY)
-    if (!selectedForestRemovalTiles(context).some((tile) => sameTile(bound, tile))) return
+    const depth = readCardExtraData<number>(context.player, CARD_ID, BOUND_FOREST_DEPTH_KEY)
+    if (!bound || !depth) return
+    const removed = getActionTerrainOperations(context).some(event => event.playerId === context.player.id && event.operation !== 'cover' && event.operation !== 'place'
+      && event.changes.some(change => sameTile(bound, change) && change.before?.kind === 'forest'
+        && (change.before.covered ? 2 : 1) === depth))
+    if (!removed) return
     const workerId = readCardExtraData<string>(context.player, CARD_ID, TEMP_WORKER_KEY)
     if (!workerId) return
     const worker = (context.player.workers ?? []).find((entry) => entry.id === workerId)

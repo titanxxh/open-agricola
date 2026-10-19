@@ -134,6 +134,13 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent(noAnimation),
     replay: 'replayable',
   },
+  'farm.terrainChanged': {
+    log: silent('terrain results accompany the original operation log'),
+    notification: silent('terrain results are rule facts'),
+    highlight: silent('the source operation presents its terrain changes'),
+    resourceAnimation: silent(noAnimation),
+    replay: 'replayable',
+  },
   'farm.fenceConsumed': {
     log: mapped(),
     notification: silent('fence consumption is represented by log only'),

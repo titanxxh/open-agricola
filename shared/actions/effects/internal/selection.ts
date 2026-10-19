@@ -1,4 +1,4 @@
-import type { ActionDefinition, PlayerState } from '../../../contract/types'
+import type { ActionDefinition, FarmOperationResult, PlayerState } from '../../../contract/types'
 import { writeCardExtraData, writePrivateCardData } from '../../../cards/helpers/card-state'
 import {
   buildFarmPositionSelectionRequest,
@@ -102,6 +102,7 @@ export const selectionAction: ActionDefinition = {
     }
 
     const extraData: Record<string, unknown> = { selectedPositions: positions }
+    const farmOperations: FarmOperationResult[] = []
     if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {
       const usedBefore = getUsedFarmyardTileKeys(player)
@@ -115,17 +116,18 @@ export const selectionAction: ActionDefinition = {
         actionContext,
         eventSink,
         reportProtectedObservation,
+        recordFarmOperation: result => farmOperations.push(result),
       })
       const newlyUsedTiles = getNewlyUsedFarmyardTiles(player, usedBefore)
         .filter(tile => existingTiles.has(positionKey(tile)))
-      if (newlyUsedTiles.length > 0) {
+      if (farmOperations.length === 0 && newlyUsedTiles.length > 0) {
         eventSink?.emit<'farm.spacesUsed'>({ type: 'farm.spacesUsed', sourceCardId: sourceCard, newlyUsedTiles })
       }
       if (followup) {
-        return { type: 'flow', flow: followup, extraData }
+        return { type: 'flow', flow: followup, extraData, ...(farmOperations.length ? { farmOperations } : {}) }
       }
     }
 
-    return { type: 'ok', extraData }
+    return { type: 'ok', extraData, ...(farmOperations.length ? { farmOperations } : {}) }
   },
 }
