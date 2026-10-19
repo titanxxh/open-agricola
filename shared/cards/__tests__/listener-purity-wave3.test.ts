@@ -227,7 +227,8 @@ describe('listener purity wave 3', () => {
       listener(M059_NaturesFertilizer_impl.listeners, 'M059-natures-fertilizer-after-terrain-field'),
       context(p, {
         actionId: 'slash-and-burn',
-        extraData: { payload: { tile: { row: 0, col: 0 } } },
+        actionEvents: [{ type: 'farm.terrainChanged', playerId: p.id, operation: 'replace-with-field', newlyUsedTiles: [],
+          changes: [{ row: 0, col: 0, before: { kind: 'forest' }, after: null, fieldCreated: true }] }],
       }),
     )
     expect(leaves(result?.flow).map((leaf) => leaf.actionId)).toEqual(['special-effect', 'sow'])
