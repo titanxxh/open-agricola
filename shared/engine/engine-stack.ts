@@ -173,6 +173,13 @@ export class EngineStack {
     return this.frames
   }
 
+  getActiveAnytimeActivation() {
+    for (let index = this.frames.length - 1; index >= 0; index--) {
+      const activation = this.frames[index]!.engine.getActiveAnytimeActivation()
+      if (activation) return activation
+    }
+  }
+
   getActiveAnytimeActionIds(playerId: string): string[] {
     return this.frames.flatMap((frame) => frame.engine.getActiveAnytimeActionIds(playerId))
   }

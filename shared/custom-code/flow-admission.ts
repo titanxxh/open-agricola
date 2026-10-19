@@ -49,6 +49,7 @@ const GROUP_FIELDS = {
   promptKey: true,
   anytimeWindow: true,
   anytimeActionId: false,
+  anytimeActivation: false,
   optionId: false,
   mode: false,
   triggerSelectOnce: false,

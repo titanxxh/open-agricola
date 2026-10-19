@@ -1,3 +1,4 @@
+import type { AnytimeTurnAffiliation } from '../../contract/anytime-activation'
 import type { ActionHookRegistry } from '../../actions/hooks'
 /**
  * Round-phase mixin extracted from GameCore (S2 Task 10).
@@ -25,10 +26,10 @@ import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID, MOOR_SPECIAL_ACTION_CHOICE_ACTION_
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
-import { endTurnScope, recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
+import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData, readActionSnapshotToken } from '../../cards/helpers/action-snapshot.ts'
 import { collectBeforePlacementFlows, runCardListeners } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
-import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
+import { tagAnytimeTurnFlow, tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
@@ -523,6 +524,21 @@ export const finishCompletedActionTurn = (
   return core.emitResponse()
 }
 
+const captureAnytimeTurn = (core: GameCore, player: PlayerState): AnytimeTurnAffiliation => {
+  const parent = core.getEngineStack().getActiveAnytimeActivation()
+  if (parent?.ownerPlayerId === player.id) return parent.turn
+  if (core.state.roundPhase !== 'work') return { kind: 'outside-turn' }
+  const token = readActionSnapshotToken(player)
+  if (token !== undefined) return { kind: 'inside-turn', token }
+  const frame = core.peekEngineFrame()
+  if (frame?.reason === 'confirm-next-player' && core.state.players[frame.ownerPlayerIndex]?.id === player.id) {
+    const completedToken = readActionSnapshotExtraData<number>(player, 'lastToken')
+    if (completedToken !== undefined) return { kind: 'after-turn', token: completedToken }
+  }
+  return !frame && core.state.players[core.state.currentPlayerIndex]?.id === player.id
+    ? { kind: 'before-turn' } : { kind: 'outside-turn' }
+}
+
 /**
  * Anytime-action entry: prepend the chosen anytime entry's flow onto the
  * currently active engine and drive engine steps. Migrated from
@@ -571,11 +587,16 @@ export const takeAnytimeAction = (
     core.resetActionResultDetails()
     recordActionSnapshot(owner, core.allocActionToken())
   }
+  const owner = core.state.players[playerIndex]!
+  const anytimeTurn = captureAnytimeTurn(core, owner)
+  const parent = core.getEngineStack().getActiveAnytimeActivation()
+  const anytimeActivation = { id: `anytime-${core.allocActionToken()}`, turn: anytimeTurn,
+    ...(parent ? { parentId: parent.id } : {}) }
+  const flow = { ...entry.flow, anytimeActivation, children: entry.flow.children.map(child => tagAnytimeTurnFlow(child, anytimeTurn)) }
   if (engine) {
-    const owner = core.state.players[playerIndex]
-    engine.injectBeforeFlows([tagInjectedAnytimeFlow(entry.flow)], undefined, owner?.id)
+    engine.injectBeforeFlows([tagInjectedAnytimeFlow(flow)], undefined, owner.id)
   } else {
-    const frame = core.buildAdhocEngineFrame(actionId, entry.descriptor.sourceCard, entry.flow, true)
+    const frame = core.buildAdhocEngineFrame(actionId, entry.descriptor.sourceCard, flow, true)
     core.pushEngineFrame({
       ...frame,
       ownerPlayerIndex: playerIndex,

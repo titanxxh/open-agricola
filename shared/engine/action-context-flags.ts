@@ -1,7 +1,7 @@
+import { parseAnytimeTurnAffiliation, type AnytimeTurnAffiliation } from '../contract/anytime-activation'
 import type { ActionExecutionResult, ActionFlow } from '../contract/types'
 
 export const INJECTED_ANYTIME_ACTION_CONTEXT_KEY = '__injectedAnytimeAction' as const
-export const INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY = '__injectedAnytimeCompletion' as const
 export const INJECTED_ANYTIME_RESULT_KEY = '__injectedAnytimeResult' as const
 export const SUPPRESSED_BEFORE_LISTENER_IDS_KEY = '__suppressedBeforeListenerIds' as const
 /**
@@ -38,10 +38,16 @@ export const isInjectedAnytimeActionContext = (
   actionContext: Record<string, unknown> | undefined,
 ) => actionContext?.[INJECTED_ANYTIME_ACTION_CONTEXT_KEY] === true
 
-export const isInjectedAnytimeCompletionContext = (
-  actionContext: Record<string, unknown> | undefined,
-) => isInjectedAnytimeActionContext(actionContext) &&
-  actionContext?.[INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY] === true
+const ANYTIME_TURN_CONTEXT_KEY = '__anytimeTurn'
+
+export const readAnytimeTurn = (actionContext: Record<string, unknown> | undefined): AnytimeTurnAffiliation | undefined => {
+  const value = actionContext?.[ANYTIME_TURN_CONTEXT_KEY]
+  return value === undefined ? undefined : parseAnytimeTurnAffiliation(value)
+}
+
+export const tagAnytimeTurnFlow = (flow: ActionFlow, turn: AnytimeTurnAffiliation): ActionFlow => flow.type === 'leaf'
+  ? { ...flow, actionContext: { ...flow.actionContext, [ANYTIME_TURN_CONTEXT_KEY]: turn } }
+  : { ...flow, children: flow.children.map(child => tagAnytimeTurnFlow(child, turn)) }
 
 export const tagInjectedAnytimeFlow = (flow: ActionFlow): ActionFlow => {
   if (flow.type === 'leaf') {

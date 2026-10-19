@@ -1096,6 +1096,30 @@ export function engineProceed(
   if (leafStep.kind === 'done') {
     node.resolve()
     const result = { type: 'ok' } as const
+    if (node instanceof SequenceNode && node.anytimeActionId && node.anytimeActivation) {
+      const sourceCard = getNodeSourceCard(node)
+      const eventFrame = int.events.beginFrame({ actorPlayerId: context.player.id, sourceActionId: 'anytime', sourceCardId: sourceCard })
+      eventFrame.sink.emit<'anytime.completed'>({
+        type: 'anytime.completed', anytimeActionId: node.anytimeActionId,
+        activationId: node.anytimeActivation.id, turn: node.anytimeActivation.turn,
+        ...(node.anytimeActivation.parentId ? { parentActivationId: node.anytimeActivation.parentId } : {}),
+      })
+      const completed = eventFrame.complete(context.state)
+      recordEventLogDerivation(int, completed, result)
+      const eventContext = currentEventReadContext(int, completed)
+      const executionContext = { ...context, ...eventContext, sourceCard, actionId: 'anytime' }
+      const after = int.hooks.after(executionContext, result)
+      const hookFlows = after.actionHookResults.flatMap(entry => entry.flow
+        ? [buildOwnedFlowNode(int, applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard), context.player.id)] : [])
+      const followUps = after.actionHookResults.flatMap(entry =>
+        (entry.followUpActions ?? []).map(followUp => normalizeFollowUpAction(followUp, entry.sourceCard)))
+      const listeners = buildPhaseTrailingNodes(int, after.matchedListeners, 'after', 'anytime',
+        context.state, buildListenerEvent(executionContext, { result }), context.player.id,
+        eventContext.transactionEvents, completed, undefined, createTriggerSnapshot(context.state))
+      int.tree.insertAfter(node.id, [
+        ...hookFlows, ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state), ...listeners,
+      ])
+    }
     commitIfEngineComplete(int, context, result)
     return { type: 'ok', nodeId: node.id, result }
   }

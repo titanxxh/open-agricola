@@ -464,6 +464,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.children.map((child) => cloneNode(int, child)),
     )
     clone.anytimeActionId = node.anytimeActionId
+    clone.anytimeActivation = node.anytimeActivation
     return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof ParallelNode) {
@@ -946,6 +947,7 @@ function buildFlowNodeContent(
   if (flow.type === 'seq') {
     const sequence = new SequenceNode(nextSequenceId(), children)
     sequence.anytimeActionId = flow.anytimeActionId
+    sequence.anytimeActivation = flow.anytimeActivation
     const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
     return attachCompositeChoiceLabel(node, flow)
   }

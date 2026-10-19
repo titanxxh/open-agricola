@@ -64,6 +64,7 @@ const expectedPublicEventTypes = [
   'worker.promoted',
   'worker.returned',
   'worker.useCompleted',
+  'anytime.completed',
 ] as const satisfies readonly GameEvent['type'][]
 
 type MissingPublicEventType = Exclude<GameEvent['type'], typeof expectedPublicEventTypes[number]>
@@ -305,6 +306,16 @@ describe('event mapping policy', () => {
 
   it('retains person-use facts without a duplicate placement log or visual cue', () => {
     const event: GameEvent = { ...base, type: 'worker.useCompleted', workerId: '3', placementOrdinal: 3 }
+    expect(isPublicEventReplayable(event)).toBe(true)
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'P1' } })).toEqual([])
+    for (const surface of ['log', 'notification', 'highlight', 'resourceAnimation'] as const) {
+      expect(publicEventMappingPolicy[event.type][surface].mode).toBe('silent')
+    }
+  })
+
+  it('keeps full activation completion silent while retaining it for replay', () => {
+    const event: GameEvent = { ...base, type: 'anytime.completed', anytimeActionId: 'exchange',
+      activationId: 'activation-1', turn: { kind: 'after-turn', token: 1 } }
     expect(isPublicEventReplayable(event)).toBe(true)
     expect(eventsToLogEntries([event], { playerNames: { p1: 'P1' } })).toEqual([])
     for (const surface of ['log', 'notification', 'highlight', 'resourceAnimation'] as const) {

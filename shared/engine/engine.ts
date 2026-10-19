@@ -1,3 +1,4 @@
+import { parseAnytimeActivation } from '../contract/anytime-activation'
 import type {
   ActionExecutionResult,
   ProtectedObservation,
@@ -241,6 +242,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
       case 'sequence': {
         const sequence = new SequenceNode(cursor.id, buildChildren())
         sequence.anytimeActionId = typeof data.anytimeActionId === 'string' ? data.anytimeActionId : undefined
+        sequence.anytimeActivation = data.anytimeActivation === undefined ? undefined : parseAnytimeActivation(data.anytimeActivation)
         node = sequence
         break
       }
@@ -726,6 +728,16 @@ export class Engine {
     }
   }
 
+
+  /** @internal The containing activation can belong to another responding player. */
+  getActiveAnytimeActivation() {
+    const node = this.tree.allNodes().filter((candidate): candidate is SequenceNode =>
+      candidate instanceof SequenceNode && candidate.anytimeActionId !== undefined &&
+      !candidate.isResolved() && hasStartedDescendant(candidate),
+    ).at(-1)
+    return node?.anytimeActivation
+      ? { ...node.anytimeActivation, ownerPlayerId: node.ownerPlayerId } : undefined
+  }
 
   getActiveAnytimeActionIds(playerId: string): string[] {
     return this.tree.allNodes().flatMap((node) =>

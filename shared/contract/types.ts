@@ -1,3 +1,4 @@
+import type { AnytimeActivation } from './anytime-activation'
 import type { PersonUseReceipt } from './person-use'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type { RuleOperationPreview } from './rule-operation-previews'
@@ -1040,6 +1041,7 @@ export type ActionFlow = (
       /** Keep the decision open and refresh unselected branches after anytime actions. */
       requiresExplicitChoice?: boolean
       anytimeActionId?: string
+      anytimeActivation?: AnytimeActivation
       promptKey?: PromptKey
       children: ActionFlow[]
       optionId?: string
