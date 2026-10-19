@@ -126,7 +126,7 @@ type ActionDefinition = {
 - 每个已接受命令在现有 `anytimeActionId` 序列上冻结 Turn 归属与 parent activation ID。序列等全部后代及必需的动物整理完成后才发出 `anytime.completed`，包括同一 frame 注入的流程。事实复用已捕获的 `actionEvents` 和普通 `after` trigger-select；嵌套发动的完成不代表父发动完成。身份、归属与父链接随 Session cursor 和撤销恢复；清理 leaf 不携带完成标记。见 `server/__tests__/anytime-completion-session.test.ts`。
 - 替代回合的 anytime 行动（`replacesTurn`）只在工作阶段空闲时可用，完整 flow 和回合结束 hook 结束后才轮转。
 - **兑换批次**：`effects/exchange.ts` 的 `executeExchangeBatch()` 在任何支付前，按原数量和顺序校验配方与来源额度、资源和已安置动物余额。前项配方所得可支付后项，未领取的反应奖励不可预支。任一项非法即拒绝整份提交，不截断次数或部分成交。普通 direct、单项、bulk 和已提交的喂食配方共用该执行器，每项收据记录其支付前库存。引擎先执行批次反应，再执行必要的动物整理。配方可在指定交互类型中禁用 anytime（`blockedAnytimeInteractionKinds`）；繁殖期间动物烹饪配方不可用。`bulk:` 这类紧凑选项值使用请求的 `structuredChoicePrefixes`。
-- **兑换目录**：`getExchangeCatalog()` 按显式窗口解析声明配方与运行时配方。声明查询与收获次数账本位于 `helpers/exchange-recipes.ts`，供普通兑换、收获工坊机会和喂食共用，取消不消耗次数。每个已解析配方持有自身的收获使用轮次，anytime 配方不因外层喂食获得收获限次。`feed` 请求按 `(sourceId, exchangeIndex)` 发布 `exchangeCatalog`；提交同时匹配已提供目录与实时目录。
+- **兑换目录**：`getExchangeCatalog()` 按显式窗口解析声明配方与运行时配方。声明查询与收获次数账本位于 `helpers/exchange-recipes.ts`，供普通兑换、收获工坊机会和喂食共用，取消不消耗次数。每个已解析配方持有自身的收获使用轮次，anytime 配方不因外层喂食获得收获限次。普通 anytime 兑换仅在 feeding phase 或有显式 `harvestExchangeRound` 授权时纳入收获配方；更宽泛的 harvest 大相位本身不授予权限。`feed` 请求按 `(sourceId, exchangeIndex)` 发布 `exchangeCatalog`；提交同时匹配已提供目录与实时目录。
 - 动物整理是系统子流程，从不作为 anytime 条目。工作阶段空闲回合与 `confirm-next-player` 是当前玩家的窗口；`confirm-player-switch` 与阶段 hook 链默认封锁，除非当前节点开启窗口。`computeResourceCommitments()` 的限制在命令边界执行（[ADR 0019](../adr/0019-resource-commitments-preserve-unsettled-trades.md)）。
 
 测试：`shared/session/__tests__/anytime-policy.test.ts`、`server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`。
