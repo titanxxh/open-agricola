@@ -7,7 +7,7 @@ export const listener: CardListenerRegistration = {
   id: 'stub-computeargs-extra-option',
   cardIds: [CARD_ID],
   phases: ['computeArgs'],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context) => {
     observe(context.player, CARD_ID)
     return {

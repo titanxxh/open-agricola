@@ -7,7 +7,7 @@ export const listener: CardListenerRegistration = {
   id: 'stub-isdoable-override',
   cardIds: [CARD_ID],
   phases: ['isDoable'],
-  actions: ['day-laborer'],
+  actions: ['gain'],
   handler: (context) => {
     observe(context.player, CARD_ID)
     return { doable: true }

@@ -337,10 +337,11 @@ describe('listener purity guard: rejected writes', () => {
   })
 
   it('guards deriveCardCostCandidate transforms too', () => {
-    const { context } = makeContext({ phase: 'computeCosts', actionId: 'minor-improvement' })
+    const { context } = makeContext({ phase: 'computeCosts', actionId: 'improvement' })
     const listener: CardListenerRegistration = {
       id: 'purity-guard-test-listener',
       cardIds: [CARD_ID],
+      actions: ['improvement'],
       phases: ['computeCosts'],
       deriveCardCostCandidate: (ctx, candidate) => {
         ctx.player.resources.wood -= 1
@@ -359,7 +360,7 @@ describe('listener purity guard: rejected writes', () => {
     expect((caught as ListenerPurityViolationError).details).toMatchObject({
       invocationKind: 'deriveCardCostCandidate',
       phase: 'computeCosts',
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       violationKind: 'set',
       path: 'player.resources.wood',
     })
@@ -369,10 +370,16 @@ describe('listener purity guard: rejected writes', () => {
 describe('listener purity guard: accepted pure listeners', () => {
   it('lets a listener read state and return a pure query result', () => {
     const { context } = makeContext({ phase: 'computeCosts', actionId: 'construct' })
-    const listener = registration((ctx) => {
-      const rooms = ctx.state.players.filter((entry) => entry.resources.wood > 0).length
-      return rooms > 0 ? { costs: { wood: -1 } } : undefined
-    })
+    const listener: CardListenerRegistration = {
+      id: 'purity-guard-test-listener',
+      cardIds: [CARD_ID],
+      actions: ['construct'],
+      phases: ['computeCosts'],
+      handler: (ctx) => {
+        const rooms = ctx.state.players.filter((entry) => entry.resources.wood > 0).length
+        return rooms > 0 ? { costs: { wood: -1 } } : undefined
+      },
+    }
 
     expect(invokeListenerHandlerUnderGuard(listener, context)).toEqual({ costs: { wood: -1 } })
   })
