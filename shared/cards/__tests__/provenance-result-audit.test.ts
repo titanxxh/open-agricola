@@ -36,6 +36,11 @@ type ShapeCheck = {
 }
 
 const allowedContextResultUses = {
+  'shared/cards/D/D024_BrotherlyLove.ts': {
+    reason: 'reads the frozen successful person-use receipt, not resource facts or a later live worker count',
+    expectedContextResultReferences: 3,
+    expectedResultPaths: ['personUse'],
+  },
   'shared/cards/D/D118_Bonehead.ts': {
     reason: 'reads frozen physical hand origin from a successful improvement result, not resource facts',
     expectedContextResultReferences: 3,
@@ -514,6 +519,19 @@ function hasCallWithStringArg(sourceFile: ts.SourceFile, functionName: string, v
 }
 
 const requiredShapeChecks = {
+  'shared/cards/D/D024_BrotherlyLove.ts': [{
+    label: 'requires a person-use receipt on the completed host result',
+    check: sourceFile => {
+      const aliases = collectAliases(sourceFile)
+      let guarded = false
+      forEachNode(sourceFile, node => {
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.InKeyword
+          && ts.isStringLiteral(node.left) && node.left.text === 'personUse'
+          && isContextResultExpression(node.right, aliases)) guarded = true
+      })
+      return guarded
+    },
+  }],
   'shared/cards/D/D118_Bonehead.ts': [{
     label: 'requires successful hand-play provenance',
     check: sourceFile => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'ok')

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { familySize, setWorkersAtHome } from '../../shared/domain/player'
 import type { Resource } from '../../shared/contract/types'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 
 const setup = (cardId: string, playerCount = 6) => {
   const session = new GameSession(5648, undefined, { playerCount })
@@ -102,7 +103,7 @@ describe('Five-plus action printed-rule audit', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ food: Math.max(0, food - 1), stone: food ? 2 : 0, reed: food ? 2 : 0 })
   })
 
-  it('D172 Putcher Maker rejects another player and caps bulk exchanges at available reed', () => {
+  it('D172 Putcher Maker rejects another player and an excessive batch before accepting the exact reed count', () => {
     const session = setup('D172_PutcherMaker')
     session.state.players[0]!.resources.reed = 3
     const offered = session.takeAnytimeAction(0, 'exchange')
@@ -113,7 +114,8 @@ describe('Five-plus action printed-rule audit', () => {
     const rejected = session.resolveChoice(1, `bulk:${index}=1`)
     expect(rejected.ok).toBe(false)
     expect(rejected.state.players[0]!.resources).toMatchObject({ reed: 3, food: 5 })
-    const result = session.resolveChoice(0, `bulk:${index}=4`)
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, `bulk:${index}=4`))
+    const result = session.resolveChoice(0, `bulk:${index}=3`)
     expect(result.ok).toBe(true)
     expect(result.state.players[0]!.resources).toMatchObject({ reed: 0, food: 11 })
     expect(result.state.actionSpaces.every((space) => space.takenBy.length === 0)).toBe(true)
