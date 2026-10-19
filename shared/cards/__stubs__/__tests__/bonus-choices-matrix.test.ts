@@ -86,7 +86,7 @@ describe('bonus.choices multi-path matrix', () => {
     requireActiveCardRegistry('bonus-choices-matrix').registerListener(stubBonusChoicesListener)
 
     const cost = resolveCardCostForTest(
-      state, player, 'improvement-any', 'Major_TestChoices', { clay: 2, stone: 2 },
+      state, player, 'improvement', 'Major_TestChoices', { clay: 2, stone: 2 },
     ) as ComplexCost
     const solutions = computePaymentOptionsForTest(player, cost)
     // optional: true. Paths: skip {clay:2, stone:2}, ChA {clay:0, stone:2, wood:1},
@@ -132,7 +132,7 @@ describe('bonus.choices multi-path matrix', () => {
     requireActiveCardRegistry('bonus-choices-matrix').registerListener(stubBonusChoicesListener)
 
     const cost = resolveCardCostForTest(
-      state, player, 'improvement-any', 'Major_TestChoices', { clay: 2, stone: 2 },
+      state, player, 'improvement', 'Major_TestChoices', { clay: 2, stone: 2 },
     ) as ComplexCost
     // resolveCardCostWithModifiers never reads costType, so Path-B modifiers
     // should not appear in the resolved cost.

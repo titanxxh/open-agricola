@@ -46,7 +46,7 @@ describe('card listener zones', () => {
     const player = makePlayer({ occupationPlayed: ['X_TestCard', 'X_OldCard'] })
     const context = { state: makeState([player]), player, space: makeSpace(), actionId: 'occupation',
       phase, choice: 'X_TestCard' }
-    const listener: CardListenerRegistration = { id: 'self-play', cardIds: ['X_TestCard', 'X_OldCard'] }
+    const listener: CardListenerRegistration = { id: 'self-play', cardIds: ['X_TestCard', 'X_OldCard'], actions: ['occupation'], phases: [phase] }
     expect(getMatchingListeners(context, [listener])).toMatchObject([{ cardId: 'X_OldCard' }])
   })
 
@@ -54,7 +54,7 @@ describe('card listener zones', () => {
     const player = makePlayer({ minorPlayed: ['X_TestCard'] })
     const context = { state: makeState([player]), player, space: makeSpace(), actionId: 'improvement',
       phase: 'after' as const, choice }
-    expect(getMatchingListeners(context, [{ id: 'self-play', cardIds: ['X_TestCard'] }])).toEqual([])
+    expect(getMatchingListeners(context, [{ id: 'self-play', cardIds: ['X_TestCard'], actions: ['improvement'], phases: ['after'] }])).toEqual([])
   })
 
   it('keeps opponent and any owners eligible when the acting player just played the same card id', () => {
@@ -63,7 +63,7 @@ describe('card listener zones', () => {
     const context = { state: makeState([player, opponent]), player, space: makeSpace(), actionId: 'improvement',
       phase: 'after' as const, choice: 'X_TestCard' }
     for (const scope of ['opponent', 'any'] as const) {
-      expect(getMatchingListeners(context, [{ id: `self-${scope}`, cardIds: ['X_TestCard'], scope }]))
+      expect(getMatchingListeners(context, [{ id: `self-${scope}`, cardIds: ['X_TestCard'], scope, actions: ['improvement'], phases: ['after'] }]))
         .toMatchObject([{ cardId: 'X_TestCard', ownerPlayerId: 'p2' }])
     }
   })
@@ -72,12 +72,12 @@ describe('card listener zones', () => {
     const player = makePlayer({ minorHand: ['X_TestCard'], minorPlayed: ['X_OldCard'] })
     const context = { state: makeState([player]), player, space: makeSpace(), actionId: 'improvement',
       phase: 'after' as const, choice: 'X_TestCard' }
-    expect(getMatchingListeners(context, [{ id: 'hand', cardIds: ['X_TestCard'], zones: ['hand'] }]))
+    expect(getMatchingListeners(context, [{ id: 'hand', cardIds: ['X_TestCard'], zones: ['hand'], actions: ['improvement'], phases: ['after'] }]))
       .toMatchObject([{ ownerCardZone: 'hand' }])
-    expect(getMatchingListeners(context, [{ id: 'global' }])).toHaveLength(1)
+    expect(getMatchingListeners(context, [{ id: 'global', actions: ['improvement'], phases: ['after'] }])).toHaveLength(1)
     player.minorPlayed.push('X_TestCard')
-    expect(getMatchingListeners({ ...context, phase: 'before' }, [{ id: 'before', cardIds: ['X_TestCard'] }])).toHaveLength(1)
-    expect(getMatchingListeners({ ...context, actionId: 'place-farmer' }, [{ id: 'outer', cardIds: ['X_TestCard'] }])).toHaveLength(1)
+    expect(getMatchingListeners({ ...context, phase: 'before' }, [{ id: 'before', cardIds: ['X_TestCard'], actions: ['improvement'], phases: ['before'] }])).toHaveLength(1)
+    expect(getMatchingListeners({ ...context, actionId: 'place-farmer' }, [{ id: 'outer', cardIds: ['X_TestCard'], actions: ['place-farmer'], phases: ['after'] }])).toHaveLength(1)
   })
 
   it('keeps listeners played-only by default', () => {
@@ -86,11 +86,13 @@ describe('card listener zones', () => {
       state: makeState([player]),
       player,
       space: makeSpace(),
-      actionId: 'test-action',
+      actionId: 'plow',
       phase: 'after' as const,
     }
     const listener: CardListenerRegistration = {
       id: 'test-played-only',
+      actions: ['plow'],
+      phases: ['after'],
       cardIds: ['X_TestCard'],
       handler: () => ({ extraData: { seen: true } }),
     }
@@ -113,17 +115,21 @@ describe('card listener zones', () => {
       state: makeState([player, opponent]),
       player,
       space: makeSpace(),
-      actionId: 'test-action',
+      actionId: 'plow',
       phase: 'after' as const,
     }
     const opponentListener: CardListenerRegistration = {
       id: 'test-opponent-played-only',
+      actions: ['plow'],
+      phases: ['after'],
       cardIds: ['X_TestCard'],
       scope: 'opponent',
       handler: () => ({ extraData: { seen: true } }),
     }
     const anyListener: CardListenerRegistration = {
       id: 'test-any-played-only',
+      actions: ['plow'],
+      phases: ['after'],
       cardIds: ['X_TestCard'],
       scope: 'any',
       handler: () => ({ extraData: { seen: true } }),
@@ -157,11 +163,13 @@ describe('card listener zones', () => {
       state,
       player,
       space: makeSpace(),
-      actionId: 'test-action',
+      actionId: 'plow',
       phase: 'after' as const,
     }
     const listener: CardListenerRegistration = {
       id: 'test-skipped-harvest-owner',
+      actions: ['plow'],
+      phases: ['after'],
       cardIds: ['X_TestCard'],
       scope: 'opponent',
     }
@@ -180,11 +188,13 @@ describe('card listener zones', () => {
       state: makeState([player]),
       player,
       space: makeSpace(),
-      actionId: 'test-action',
+      actionId: 'plow',
       phase: 'after' as const,
     }
     const listener: CardListenerRegistration = {
       id: 'test-hand',
+      actions: ['plow'],
+      phases: ['after'],
       cardIds: ['X_TestCard'],
       zones: ['hand'],
       handler: (ctx) => ({
@@ -213,11 +223,13 @@ describe('card listener zones', () => {
       state: makeState([player]),
       player,
       space: makeSpace(),
-      actionId: 'test-action',
+      actionId: 'plow',
       phase: 'after' as const,
     }
     const listener: CardListenerRegistration = {
       id: 'test-played',
+      actions: ['plow'],
+      phases: ['after'],
       cardIds: ['X_TestCard'],
       handler: (ctx) => ({
         extraData: { ownerCardId: ctx.ownerCardId, ownerCardZone: ctx.ownerCardZone },

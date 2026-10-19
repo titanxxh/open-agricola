@@ -114,10 +114,10 @@ const makeBuildRoomAction = (): ActionDefinition => ({
   },
 })
 
-const makeDayLaborerAction = (): ActionDefinition => ({
-  id: 'day-laborer',
-  nameKey: 'actions.dayLaborer.name',
-  descriptionKey: 'actions.dayLaborer.description',
+const makeGainAction = (): ActionDefinition => ({
+  id: 'gain',
+  nameKey: 'actions.gain.name',
+  descriptionKey: 'actions.gain.description',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
@@ -127,8 +127,8 @@ const makeDayLaborerAction = (): ActionDefinition => ({
   },
 })
 
-const makeImprovementAnyAction = (): ActionDefinition => ({
-  id: 'improvement-any',
+const makeImprovementAction = (): ActionDefinition => ({
+  id: 'improvement',
   nameKey: 'actions.improvementAny.name',
   descriptionKey: 'actions.improvementAny.description',
   roundAvailable: 1,
@@ -317,17 +317,17 @@ describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
     registerStubCards()
   })
 
-  it('adds extra option to improvement-any choice', () => {
+  it('adds extra option to improvement choice', () => {
     const player = createPlayer()
     player.minorPlayed = [COMPUTE_ARGS_ID]
-    const action = makeImprovementAnyAction()
+    const action = makeImprovementAction()
     const registry = new ActionRegistry()
     registry.register(action)
     const log = new LogStore()
     const engine = new Engine({
       tree: new EngineTree(
         new SequenceNode('seq', [
-          new ActionNode('a', 'improvement-any'),
+          new ActionNode('a', 'improvement'),
         ]),
       ),
       registry,
@@ -353,11 +353,11 @@ describe('Stub card: Stub_IsDoable_Override', () => {
     registerStubCards()
   })
 
-  it('allows using occupied day-laborer with card', () => {
+  it('allows an otherwise blocked gain with card', () => {
     const player = createPlayer()
     player.minorPlayed = [IS_DOABLE_ID]
     const action: ActionDefinition = {
-      ...makeDayLaborerAction(),
+      ...makeGainAction(),
       canBeExecutedByPlayer: () => false,
     }
     const { engine, space } = buildEngine(action)()
@@ -372,7 +372,7 @@ describe('Stub card: Stub_IsDoable_Override', () => {
   it('does not override for player without card', () => {
     const player = createPlayer()
     const action: ActionDefinition = {
-      ...makeDayLaborerAction(),
+      ...makeGainAction(),
       canBeExecutedByPlayer: () => false,
     }
     const { engine, space } = buildEngine(action)()

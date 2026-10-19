@@ -2,13 +2,13 @@ import type { CardListenerRegistration } from '../card-listeners'
 
 export const STUB_BONUS_CHOICES_CARD = 'Stub_BonusChoices'
 
-// Hook that returns a bonus.choices on improvement-any for a synthetic card id
+// Hook that returns a bonus.choices on improvement for a synthetic card id
 // 'Major_TestChoices'. Construct scenarios in tests that fabricate this cardId.
 export const stubBonusChoicesListener: CardListenerRegistration = {
   id: 'stub-bonus-choices',
   cardIds: [STUB_BONUS_CHOICES_CARD],
   phases: ['computeCosts'],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context) => {
     if (context.cardId !== 'Major_TestChoices') return
     return {
