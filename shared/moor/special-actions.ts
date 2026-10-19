@@ -1,15 +1,15 @@
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../domain/farmyard-usage'
+import { commitFarmOperation } from '../domain/farm-operations'
 import type { ActionHookRegistry } from '../actions/hooks'
-import type { ActionFlow, ActionSpace, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
-import type { EventSink } from '../contract/events'
+import type { ActionFlow, ActionSpace, FarmOperationResult, FarmTilePosition, Field, GameState, PlayerState, Resource } from '../contract/types'
+import type { DraftGameEvent, EventSink } from '../contract/events'
 import { positionKey } from '../domain/farm'
 import { getMoorSpecialActionEffectPlan, moorSpecialActionBorrowCost } from './special-action-plan'
 import { improvementAction } from '../actions/effects/improvement'
 import {
   hasVisibleTerrain,
   hasVisibleTerrainWithoutCovered,
-  removeVisibleTerrain,
-  replaceTerrainWithField,
+  planTerrainOperation,
+  terrainOperationEvent,
 } from './farm-terrain'
 import type { MoorSpecialActionId } from './types'
 
@@ -198,7 +198,7 @@ export const validateMoorTerrainActionEffect = (
 }
 
 export type MoorSpecialActionResult =
-  | { ok: true; followUpFlow?: ActionFlow; terrainCleared?: boolean }
+  | { ok: true; followUpFlow?: ActionFlow; terrainCleared?: boolean; terrainEvent?: DraftGameEvent<'farm.terrainChanged'>; farmOperation?: FarmOperationResult }
   | { ok: false; error: string }
 
 const executeMoorSpecialActionEffect = (
@@ -212,19 +212,25 @@ const executeMoorSpecialActionEffect = (
   const plan = getMoorSpecialActionEffectPlan(state, player, actionId, payload)
   let terrainCleared: boolean | undefined
 
-  if (plan.terrain?.operation === 'remove') {
-    const removed = removeVisibleTerrain(player, plan.terrain.tile, plan.terrain.from)
-    if (!removed.ok) return { ok: false, error: 'terrain unavailable' }
-    terrainCleared = removed.cleared
-  } else if (plan.terrain?.operation === 'replace-with-field') {
+  let terrainEvent: DraftGameEvent<'farm.terrainChanged'> | undefined
+  let farmOperation: FarmOperationResult | undefined
+  if (plan.terrain) {
     if (!plan.terrain.tile) return { ok: false, error: 'terrain unavailable' }
-    const previousUsed = getUsedFarmyardTileKeys(player)
-    const result = replaceTerrainWithField(player, plan.terrain.tile, plan.terrain.from)
-    if (!result.ok) return { ok: false, error: 'terrain unavailable' }
-    eventSink?.emit<'farm.fieldPlowed'>({
-      newlyUsedTiles: getNewlyUsedFarmyardTiles(player, previousUsed),
+    const request: Parameters<typeof planTerrainOperation>[1] = plan.terrain.operation === 'remove'
+      ? { mode: 'remove', positions: [plan.terrain.tile], kind: plan.terrain.from }
+      : { mode: 'replace-with-field', positions: [plan.terrain.tile], fromKind: plan.terrain.from }
+    const prepared = planTerrainOperation(player, request)
+    if (!prepared.ok) return { ok: false, error: 'terrain unavailable' }
+    const receipt = commitFarmOperation(player, prepared.operation, eventSink)
+    if (receipt.kind !== 'terrain') throw new Error('Expected committed terrain operation')
+    farmOperation = receipt
+    terrainEvent = { ...terrainOperationEvent(receipt), sourceActionId: actionId }
+    eventSink?.emit<'farm.terrainChanged'>(terrainEvent)
+    if (plan.terrain.operation === 'remove') terrainCleared = receipt.terrainChanges[0]?.after === null
+    else eventSink?.emit<'farm.fieldPlowed'>({
       type: 'farm.fieldPlowed', actorPlayerId: player.id, sourceActionId: actionId,
-      fields: [{ playerId: player.id, row: plan.terrain.tile.row, col: plan.terrain.tile.col }],
+      newlyUsedTiles: receipt.newlyUsedTiles,
+      fields: receipt.terrainChanges.filter(change => change.fieldCreated).map(({ row, col }) => ({ playerId: player.id, row, col })),
     })
   }
   for (const [raw, amount] of Object.entries(plan.cost)) if (amount && amount > 0) {
@@ -241,6 +247,8 @@ const executeMoorSpecialActionEffect = (
 
   return {
     ok: true,
+    ...(terrainEvent ? { terrainEvent } : {}),
+    ...(farmOperation ? { farmOperation } : {}),
     ...(followUpFlow ? { followUpFlow } : {}),
     ...(terrainCleared !== undefined ? { terrainCleared } : {}),
   }

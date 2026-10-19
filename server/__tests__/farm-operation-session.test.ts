@@ -86,6 +86,9 @@ describe('farm operations at their original host completion', () => {
       newlyUsedTiles: [{ playerId: player.id, row: 0, col: 1 }, { playerId: player.id, row: 1, col: 1 }],
     }])
     expect(response.state.events.filter(event => event.type === 'farm.stableBuilt')).toHaveLength(1)
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toMatchObject([{
+      newlyUsedTiles: [{ playerId: player.id, row: 0, col: 1 }, { playerId: player.id, row: 1, col: 1 }],
+    }])
     expect(response.state.events.filter(event => event.type === 'resource.paid' && event.paymentFor === 'stables'))
       .toEqual([expect.objectContaining({ resources: { wood: 4 } })])
   })

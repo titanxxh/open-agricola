@@ -591,7 +591,7 @@ export const specialEffectAction: ActionDefinition = {
         if (!state || getAvailableStableSupplyCount(state, target) <= 0) return { type: 'ok' }
         const tile = getNextEmptyTileForPlayer(target)
         if (!tile) return { type: 'ok' }
-        const farmOperation = commitFarmOperation(target, { kind: 'stables', positions: [tile], sourceCardId: sourceCard })
+        const farmOperation = commitFarmOperation(target, { kind: 'stables', positions: [tile], sourceCardId: sourceCard }, eventSink)
         eventSink?.emit<'farm.stableBuilt'>({
           type: 'farm.stableBuilt',
           newlyUsedTiles: farmOperation.newlyUsedTiles,

@@ -122,7 +122,7 @@ export const receiveAction: ActionDefinition = {
       const resources = conditionMet ? positiveResources(entry.resources) : {}
       if (entry.roomType && player.houseType === entry.roomType) {
         const roomType = entry.roomType
-        const farmOperation = commitFirstAvailableRoom(player, entry.cardId)
+        const farmOperation = commitFirstAvailableRoom(player, entry.cardId, eventSink)
         if (farmOperation) {
           farmOperations.push(farmOperation)
           eventSink?.emit<'farm.roomBuilt'>({

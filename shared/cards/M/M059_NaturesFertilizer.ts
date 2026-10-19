@@ -1,37 +1,14 @@
+import { getActionTerrainOperations } from '../helpers/farmyard-events'
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
-import { parsePositionKey, positionKey } from '../../domain/farm'
+import { positionKey } from '../../domain/farm'
 import type { FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { majorImprovementCount } from './moor-batch1-helpers'
 
 const CARD_ID = 'M059_NaturesFertilizer'
-
-const isPosition = (value: unknown): value is FarmTilePosition => {
-  if (!value || typeof value !== 'object') return false
-  const pos = value as Partial<FarmTilePosition>
-  return typeof pos.row === 'number' && typeof pos.col === 'number'
-}
-
-const slashAndBurnFields = (context: CardListenerContext): FarmTilePosition[] => {
-  const payload = context.extraData?.payload
-  if (!payload || typeof payload !== 'object') return []
-  const tile = (payload as { tile?: unknown }).tile
-  return isPosition(tile) ? [{ row: tile.row, col: tile.col }] : []
-}
-
-const terrainSelectionFields = (context: CardListenerContext): FarmTilePosition[] => {
-  if (context.actionContext?.terrainMode !== 'replace-with-field') return []
-  const extraData = context.result && context.result.type !== 'fail' ? context.result.extraData : undefined
-  const selected = extraData?.selectedPositions
-  if (!Array.isArray(selected)) return []
-  return selected.flatMap((entry) =>
-    typeof entry === 'string'
-      ? (parsePositionKey(entry) ? [parsePositionKey(entry)!] : [])
-      : [])
-}
 
 const sowFlow = (context: CardListenerContext, fields: FarmTilePosition[]) => {
   if (fields.length === 0) return
@@ -79,14 +56,14 @@ const listener: CardListenerRegistration = {
   id: 'M059-natures-fertilizer-after-terrain-field',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['slash-and-burn', 'selection'],
+  events: ['farm.terrainChanged'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const flow = sowFlow(
-      context,
-      context.actionId === 'slash-and-burn'
-        ? slashAndBurnFields(context)
-        : terrainSelectionFields(context),
-    )
+    const fields = getActionTerrainOperations(context).flatMap(event =>
+      event.playerId === context.player.id
+        ? event.changes.filter(change => change.fieldCreated
+          && (change.before?.kind === 'moor' || context.actionId === 'slash-and-burn'))
+          .map(({ row, col }) => ({ row, col })) : [])
+    const flow = sowFlow(context, fields)
     if (!flow) return
     return { flow, sourceCard: CARD_ID }
   },

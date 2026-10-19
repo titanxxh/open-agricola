@@ -34,6 +34,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.cropRemoved': ['crops', 'reason'],
   'farm.fieldPlowed': ['fields', 'newlyUsedTiles'],
   'farm.spacesUsed': ['newlyUsedTiles'],
+  'farm.terrainChanged': ['playerId', 'operation', 'changes', 'newlyUsedTiles'],
   'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
   'farm.stableBuilt': ['stables', 'newlyUsedTiles'],
@@ -461,6 +462,24 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       return
     case 'farm.spacesUsed':
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
+      return
+    case 'farm.terrainChanged':
+      assertStringField(event.playerId, 'playerId')
+      if (!['place', 'remove', 'replace-kind', 'replace-with-field', 'cover'].includes(String(event.operation))) throw new Error('GameEvent terrain operation is invalid')
+      assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
+      assertBoardPositions(event.changes, 'changes', ['row', 'col', 'before', 'after', 'fieldCreated'])
+      if (!Array.isArray(event.changes)) throw new Error('GameEvent terrain changes must be an array')
+      for (const raw of event.changes) {
+        const change = assertRecord(raw, 'terrain change')
+        for (const layer of [change.before, change.after]) {
+          if (layer === null) continue
+          const record = assertRecord(layer, 'terrain layer')
+          assertOnlyKeys(record, ['kind', 'covered'], 'terrain layer')
+          if (record.kind !== 'forest' && record.kind !== 'moor') throw new Error('GameEvent terrain kind is invalid')
+          if (record.covered !== undefined && record.covered !== 'forest' && record.covered !== 'moor') throw new Error('GameEvent covered terrain kind is invalid')
+        }
+        if (typeof change.fieldCreated !== 'boolean') throw new Error('GameEvent terrain fieldCreated must be boolean')
+      }
       return
     case 'farm.stableBuilt':
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])

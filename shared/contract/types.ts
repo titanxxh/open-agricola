@@ -977,22 +977,32 @@ export type BeforeHostContextContribution = {
   value: Record<string, unknown>
 }
 
+/** The visible and covered layers changed at one coordinate by a terrain commit. */
+export type FarmTerrainChange = FarmTilePosition & {
+  before: Pick<FarmTerrainTile, 'kind' | 'covered'> | null
+  after: Pick<FarmTerrainTile, 'kind' | 'covered'> | null
+  fieldCreated: boolean
+}
+export type FarmTerrainOperationMode = 'place' | 'remove' | 'replace-kind' | 'replace-with-field' | 'cover'
+
 /** A transient receipt of one committed farm operation, owned by its action host. */
 export type FarmOperationResult = {
-  kind: 'rooms' | 'stables' | 'plow' | 'fence'
   playerId: string
   positions: FarmTilePosition[]
   sourceCardId?: string
   newlyUsedTiles: Array<FarmTilePosition & { playerId: string }>
-  before: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures'>
-  after: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures'>
-}
+  before: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures' | 'farmTerrain' | 'farmyardExtensions'>
+  after: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures' | 'farmTerrain' | 'farmyardExtensions'>
+} & (
+  | { kind: 'rooms' | 'stables' | 'plow' | 'fence' | 'pastures' }
+  | { kind: 'terrain'; terrainMode: FarmTerrainOperationMode; terrainChanges: FarmTerrainChange[] }
+)
 
 export type ActionExecutionResult =
   | { type: 'ok'; personUse?: PersonUseReceipt; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren; beforeHostContributions?: BeforeHostContextContribution[]; farmOperations?: FarmOperationResult[] }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
-  | { type: 'flow'; flow: ActionFlow; personUse?: PersonUseReceipt; extraData?: Record<string, unknown> }
+  | { type: 'flow'; flow: ActionFlow; personUse?: PersonUseReceipt; extraData?: Record<string, unknown>; farmOperations?: FarmOperationResult[] }
 /** Permissions for this waiting step; declarations do not flow into nested steps. */
 export type AnytimeWindow = { allowed: true; blockedIds?: string[] } | { allowed: false }
 

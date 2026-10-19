@@ -1,26 +1,24 @@
-import type { ActionFlow, ChoiceEffectPreview, FarmTilePosition, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, ChoiceEffectPreview, FarmTerrainOperationMode, FarmTilePosition, PlayerState, Resource } from '../contract/types'
 import {
-  isWithinFarmyard,
   parsePositionKey,
   positionKey,
 } from '../domain/farm'
-import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage'
+import { commitFarmOperation } from '../domain/farm-operations'
 import { getUnusedFarmyardTilePositions } from '../domain/farmyard-usage-core'
-import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
 import { registerSelectionEffect, registerSelectionValidator } from '../actions/helpers/selection-effect-registry'
 import {
-  coverVisibleTerrain,
   getVisibleFarmTerrain,
   getVisibleTerrainTiles,
   hasVisibleTerrainWithoutCovered,
-  removeVisibleTerrain,
-  replaceTerrainWithField,
+  planTerrainOperation,
+  terrainOperationEvent,
+  type TerrainOperation,
 } from './farm-terrain'
 import type { FarmTerrainKind } from './types'
 
 const TERRAIN_SELECTION_EFFECT = 'moor-terrain-flow'
 
-type TerrainSelectionMode = 'place' | 'remove' | 'replace-kind' | 'replace-with-field' | 'cover'
+type TerrainSelectionMode = FarmTerrainOperationMode
 
 type BuildTerrainSelectionLeafOptions = {
   sourceCard: string
@@ -190,28 +188,6 @@ export const buildRemoveTerrainFlow = (
   })
 }
 
-const removeTerrain = (
-  player: PlayerState,
-  tile: FarmTilePosition,
-  kind: FarmTerrainKind,
-): boolean => {
-  return removeVisibleTerrain(player, tile, kind).ok
-}
-
-const replaceTerrainKind = (
-  player: PlayerState,
-  tile: FarmTilePosition,
-  fromKind: FarmTerrainKind,
-  toKind: FarmTerrainKind,
-): boolean => {
-  const key = positionKey(tile)
-  const entry = (player.farmTerrain ?? []).find((candidate) =>
-    positionKey(candidate) === key && candidate.kind === fromKind)
-  if (!entry || entry.covered !== undefined) return false
-  entry.kind = toKind
-  return true
-}
-
 const addGain = (base: Partial<Resource>, next: Partial<Resource>, count: number): Partial<Resource> => {
   const out = { ...base }
   for (const [key, value] of Object.entries(next)) {
@@ -225,43 +201,34 @@ const addGain = (base: Partial<Resource>, next: Partial<Resource>, count: number
 const repeat = (count: number, factory: () => ActionFlow): ActionFlow[] =>
   Array.from({ length: Math.max(0, count) }, factory)
 
-registerSelectionValidator(TERRAIN_SELECTION_EFFECT, ({ player, positions, actionContext }) => {
-  if (actionContext?.terrainMode !== 'replace-kind' || !isTerrainKind(actionContext.terrainFromKind)) return
-  const kind = actionContext.terrainFromKind
-  if (parsePositions(positions).some((tile) => !hasVisibleTerrainWithoutCovered(player, tile, kind))) {
-    return 'invalid terrain selection'
-  }
-})
-
-registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCard, actionContext }) => {
+const terrainRequest = (positions: string[], actionContext?: Record<string, unknown>, sourceCard?: string): TerrainOperation | undefined => {
+  const selected = parsePositions(positions)
+  if (selected.length !== positions.length) return
   const mode = actionContext?.terrainMode
   const kind = actionContext?.terrainKind
   const fromKind = actionContext?.terrainFromKind
   const toKind = actionContext?.terrainToKind
-  if (typeof mode !== 'string') return
-  const selected = parsePositions(positions)
-  let changed = 0
-  const used = mode === 'place' ? getUsedFarmyardTileKeys(player) : null
-  const blocked = mode === 'place' ? getPlacementBlockedFarmyardSpaceKeys(player) : null
+  const base = { positions: selected, sourceCardId: sourceCard }
+  if ((mode === 'place' || mode === 'remove') && isTerrainKind(kind)) return { ...base, mode, kind }
+  if ((mode === 'replace-kind' || mode === 'cover') && isTerrainKind(fromKind) && isTerrainKind(toKind)) return { ...base, mode, fromKind, toKind }
+  if (mode === 'replace-with-field' && isTerrainKind(fromKind)) return { ...base, mode, fromKind }
+}
 
-  for (const tile of selected) {
-    if (mode === 'place' && isTerrainKind(kind)) {
-      const key = positionKey(tile)
-      if (!isWithinFarmyard(player, tile)) continue
-      if (used?.has(key) || blocked?.has(key)) continue
-      player.farmTerrain = [...(player.farmTerrain ?? []), { ...tile, kind }]
-      used?.add(key)
-      changed += 1
-    } else if (mode === 'remove' && isTerrainKind(kind)) {
-      if (removeTerrain(player, tile, kind)) changed += 1
-    } else if (mode === 'replace-kind' && isTerrainKind(fromKind) && isTerrainKind(toKind)) {
-      if (replaceTerrainKind(player, tile, fromKind, toKind)) changed += 1
-    } else if (mode === 'replace-with-field' && isTerrainKind(fromKind)) {
-      if (replaceTerrainWithField(player, tile, fromKind).ok) changed += 1
-    } else if (mode === 'cover' && isTerrainKind(fromKind) && isTerrainKind(toKind)) {
-      if (coverVisibleTerrain(player, tile, fromKind, toKind)) changed += 1
-    }
-  }
+registerSelectionValidator(TERRAIN_SELECTION_EFFECT, ({ player, positions, actionContext, sourceCard }) => {
+  const request = terrainRequest(positions, actionContext, sourceCard)
+  if (!request || !planTerrainOperation(player, request).ok) return 'invalid terrain selection'
+})
+
+registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCard, actionContext, eventSink, recordFarmOperation }) => {
+  const request = terrainRequest(positions, actionContext, sourceCard)
+  if (!request) return
+  const plan = planTerrainOperation(player, request)
+  if (!plan.ok || plan.operation.changes.length === 0) return
+  const receipt = commitFarmOperation(player, plan.operation, eventSink)
+  if (receipt.kind !== 'terrain') throw new Error('Expected committed terrain operation')
+  recordFarmOperation?.(receipt)
+  eventSink?.emit(terrainOperationEvent(receipt))
+  const changed = receipt.terrainChanges.length
 
   const children: ActionFlow[] = []
   const gain = addGain({}, (actionContext?.gainPerSelection ?? {}) as Partial<Resource>, changed)

@@ -41,15 +41,10 @@ const allowedContextResultUses = {
     expectedContextResultReferences: 3,
     expectedResultPaths: ['extraData', 'extraData.playedFromHand', 'type'],
   },
-  'shared/cards/M/M053_ForestHut.ts': {
-    reason: 'reads selectedPositions from a successful choice result',
+  'shared/cards/helpers/farmyard-events.ts': {
+    reason: 'reads original-host typed farm operation receipts for geometry, excluding nested child facts; never resource results',
     expectedContextResultReferences: 3,
-    expectedResultPaths: ['extraData', 'extraData.selectedPositions', 'type'],
-  },
-  'shared/cards/M/M059_NaturesFertilizer.ts': {
-    reason: 'reads selectedPositions from a successful choice result',
-    expectedContextResultReferences: 3,
-    expectedResultPaths: ['extraData', 'extraData.selectedPositions', 'type'],
+    expectedResultPaths: ['farmOperations', 'type'],
   },
   'shared/cards/A/A094_LazySowman.ts': {
     reason: 'computeArgs request kind guard for extra options',
@@ -525,13 +520,10 @@ const requiredShapeChecks = {
       && hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'flow')
       && hasResultLiteralComparison(sourceFile, 'extraData.playedFromHand', ts.SyntaxKind.ExclamationEqualsEqualsToken, true),
   }],
-  'shared/cards/M/M053_ForestHut.ts': [{
-    label: 'excludes failed selection results',
-    check: (sourceFile) => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
-  }],
-  'shared/cards/M/M059_NaturesFertilizer.ts': [{
-    label: 'excludes failed selection results',
-    check: (sourceFile) => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
+  'shared/cards/helpers/farmyard-events.ts': [{
+    label: 'reads receipts only from successful ok or returned-flow hosts',
+    check: sourceFile => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.EqualsEqualsEqualsToken, 'ok')
+      && hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.EqualsEqualsEqualsToken, 'flow'),
   }],
   'shared/cards/A/A094_LazySowman.ts': [
     {

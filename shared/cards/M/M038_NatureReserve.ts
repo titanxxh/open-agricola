@@ -1,10 +1,14 @@
+import type { DraftGameEvent, EventSink } from '../../contract/events'
+import { assertKnownGameEventShape } from '../../events/guards'
+import { getActionTerrainOperations } from '../helpers/farmyard-events'
 import { defineMinorCard } from '../card-source'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
-import type { ActionDefinition, FarmTilePosition, PlayerState } from '../../contract/types'
+import type { ActionDefinition, FarmOperationResult, FarmTilePosition, PlayerState } from '../../contract/types'
 import { computeFencedRegions } from '../../domain/farmyard'
-import { positionKey } from '../../domain/farm'
+import { parsePositionKey, positionKey } from '../../domain/farm'
+import { commitFarmOperation } from '../../domain/farm-operations'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { getFarmyardFields } from '../helpers/card-field'
@@ -70,7 +74,8 @@ const recordReserveTiles = (player: PlayerState) => {
   writeReserveTiles(player, next)
 }
 
-const activateReserveTiles = (player: PlayerState) => {
+const activateReserveTiles = (player: PlayerState, positions: string[], eventSink: EventSink, terrainReplacements: DraftGameEvent<'farm.terrainChanged'>[]): FarmOperationResult | undefined => {
+  const cleared = new Set(positions)
   const reserves = reserveTiles(player)
   if (reserves.length === 0) return
   const terrainKeys = new Set((player.farmTerrain ?? []).map(positionKey))
@@ -81,7 +86,7 @@ const activateReserveTiles = (player: PlayerState) => {
   const remaining: ReserveTile[] = []
   for (const reserve of reserves) {
     const key = positionKey(reserve)
-    if (terrainKeys.has(key)) {
+    if (!cleared.has(key) || terrainKeys.has(key)) {
       remaining.push(reserve)
       continue
     }
@@ -103,13 +108,16 @@ const activateReserveTiles = (player: PlayerState) => {
     })
     pastureRegions.add(fencedKey)
   }
-  player.pastures = nextPastures
+  const operation = nextPastures.length > player.pastures.length
+    ? commitFarmOperation(player, { kind: 'pastures', positions: positions.flatMap(key => { const tile = parsePositionKey(key); return tile ? [tile] : [] }),
+      pastures: nextPastures, sourceCardId: CARD_ID, replacesTerrain: terrainReplacements }, eventSink) : undefined
   writeReserveTiles(player, remaining)
+  return operation
 }
 
 const reserveAction = (
   id: string,
-  execute: (player: PlayerState) => void,
+  execute: (player: PlayerState, positions: string[], eventSink: EventSink, terrainReplacements: DraftGameEvent<'farm.terrainChanged'>[]) => FarmOperationResult | void,
 ): ActionDefinition => ({
   id,
   nameKey: 'actions.special-effect.name',
@@ -117,9 +125,15 @@ const reserveAction = (
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => player.minorPlayed.includes(CARD_ID),
-  execute: ({ player }) => {
-    execute(player)
-    return { type: 'ok' }
+  execute: ({ player, params, eventSink }) => {
+    const terrainReplacements: DraftGameEvent<'farm.terrainChanged'>[] = []
+    for (const captured of Array.isArray(params?.terrainReplacements) ? params.terrainReplacements : []) {
+      if (!captured || typeof captured !== 'object' || !('type' in captured) || captured.type !== 'farm.terrainChanged') continue
+      assertKnownGameEventShape(captured)
+      terrainReplacements.push(captured as DraftGameEvent<'farm.terrainChanged'>)
+    }
+    const operation = execute(player, Array.isArray(params?.positions) ? params.positions.filter((value): value is string => typeof value === 'string') : [], eventSink, terrainReplacements)
+    return { type: 'ok', ...(operation ? { farmOperations: [operation] } : {}) }
   },
 })
 
@@ -144,11 +158,23 @@ const activateListener: CardListenerRegistration = {
   id: 'M038-nature-reserve-activate-cleared-terrain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees', 'cut-peat', 'selection'],
+  events: ['farm.terrainChanged'],
   handler: (context): ActionHookResult | void => {
-    if (context.actionId === 'selection' && context.actionContext?.terrainMode !== 'remove') return
+    const terrainReplacements = getActionTerrainOperations(context).filter(event => event.playerId === context.player.id)
+      .map(event => ({
+        type: 'farm.terrainChanged' as const, playerId: event.playerId, operation: event.operation,
+        changes: event.changes.map(change => ({ ...change,
+          before: change.before ? { ...change.before } : null,
+          after: change.after ? { ...change.after } : null,
+        })),
+        newlyUsedTiles: event.newlyUsedTiles.map(tile => ({ ...tile })),
+      }))
+    const positions = terrainReplacements.flatMap(event =>
+      event.playerId === context.player.id
+        ? event.changes.filter(change => change.before && !change.after).map(positionKey) : [])
+    if (!positions.some(key => reserveTiles(context.player).some(tile => positionKey(tile) === key))) return
     return {
-      flow: { type: 'leaf', actionId: ACTIVATE_ACTION_ID, sourceCard: CARD_ID },
+      flow: { type: 'leaf', actionId: ACTIVATE_ACTION_ID, sourceCard: CARD_ID, params: { positions, terrainReplacements } },
       sourceCard: CARD_ID,
     }
   },

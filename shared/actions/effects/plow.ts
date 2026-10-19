@@ -204,7 +204,7 @@ const finalizePlow = (
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   PaymentSolver.executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
-  const farmOperation = commitFarmOperation(ctx.player, { kind: 'plow', position: tile, preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard })
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'plow', position: tile, preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
   recordActionCostAttribution(
     ctx.player,
     ctx.costAttribution,

@@ -156,6 +156,7 @@ describe('event guards', () => {
 
   it.each([
     { type: 'farm.spacesUsed' },
+    { type: 'farm.terrainChanged', playerId: 'p1', operation: 'remove', changes: [] },
     { type: 'farm.fieldPlowed', fields: [] },
     { type: 'farm.roomBuilt', rooms: [] },
     { type: 'farm.stableBuilt', stables: [] },
