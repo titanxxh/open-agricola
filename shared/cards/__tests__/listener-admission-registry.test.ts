@@ -32,6 +32,8 @@ describe('listener registration admission', () => {
     { actions: ['take-from-card'] }, { actions: ['pop-card-stack'] }, { actions: ['spend-worker'] },
     { actions: ['special-effect'] }, { actions: ['harvest-feed-conversion'] }, { actions: ['selection'] },
     { actions: ['collect'], phases: [] }, { actions: ['collect'], phases: ['anytime'] },
+    { actions: ['collect'], phases: undefined }, { actions: ['collect'], phases: null },
+    { actions: ['collect'], phases: 3 }, { actions: ['collect'], phases: 'after' },
     { actions: ['place-farmer'], phases: ['immediatelyAfter'] },
     { actions: ['trade-applied'], phases: ['after'] },
     { actions: ['collect'], events: ['farm.sown'] },
