@@ -30,7 +30,7 @@ describe('complete activated schedule collection through fresh two-player sessio
       owner.minorPlayed = [M053]
       owner.farmTerrain = [{ row: 0, col: 0, kind: 'forest' }]
       const worker = reserveSupplyWorker(owner, M053)!
-      owner.cardStates[M053] = { extraData: { temporaryWorkerId: worker.id, boundForest: { row: 0, col: 0 } } }
+      owner.cardStates[M053] = { extraData: { temporaryWorkerId: worker.id, boundForest: { row: 0, col: 0 }, boundForestDepth: 1 } }
     } }))
     expect(session.withCtx(() => collectScheduledEffectPreviews(session.state, session.state.players[0]!, session.actionHooks))).toEqual([])
     const special = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes('fell-trees'))!
