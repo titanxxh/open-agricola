@@ -26,12 +26,12 @@ describe('authoritative command settlement', () => {
       canBeExecutedByPlayer: () => true,
       execute: () => ({
         type: 'flow',
-        flow: { type: 'leaf', actionId: '__TEST_protected_host__' },
+        flow: { type: 'leaf', actionId: 'receive' },
       }),
     }
     const host: ActionDefinition = {
       ...spaceAction,
-      id: '__TEST_protected_host__',
+      id: 'receive',
       canBeExecutedByPlayer: (_state, player) => player.resources.grain > 0,
       execute: ({ player }) => {
         player.resources.wood += 1

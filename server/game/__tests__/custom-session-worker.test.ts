@@ -237,13 +237,12 @@ describe('custom session executor', () => {
     expect(session.cardWarnings).toEqual([expect.stringContaining('finite boom')])
   })
 
-  // An unfiltered listener is bound to the contract's action names, so it no longer
-  // receives action-space identities such as 'forest'.
+  // The query is bound to the public collect operation.
   it.each(['collect'])('rejects a query when a custom-card %s listener emits a warning', async (actionId) => {
     const { session, executor } = setup(card(
       'CUSTOM_QueryFailure',
       `if (context.actionId === '${actionId}') throw new Error('query boom')`,
-      null,
+      actionId,
       '',
       'isDoable',
     ))

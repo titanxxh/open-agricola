@@ -20,7 +20,7 @@ const setup = () => {
     context.player.resources.food >= 3 + (costs?.food ?? 0))
   const leaf: ActionDefinition = {
     ...registry.get('gain')!,
-    id: '__cost_preview_probe__',
+    id: 'receive',
     canBeExecutedByPlayer: baseProbe,
     costPreview: { getBaseCost: () => ({ food: 3 }), canExecute: previewProbe },
   }

@@ -107,10 +107,11 @@ describe('ordinary harvest breeding forbids animal cooking', () => {
     expect(advance(session, 'finished').state.round).toBe(5)
   })
 
-  it.each(['trade:0:1', 'bulk:0=1', 'bulk:3=1,0=3'])('rejects forged cooking %s atomically and accepts a legal nonfood trade', choice => {
+  it.each(['trade:999999:1', 'bulk:999999=1', 'bulk:3=1,999999=3'])('rejects unknown recipe %s atomically during breeding and accepts a legal nonfood trade', choice => {
     const session = setup()
     advance(session)
     const opened = snapshot(ok(session.takeAnytimeAction(0, 'exchange')))
+    expect(cookingOptions(opened)).toEqual([])
     const stone = sessionOptions(opened).find(option => option.effectPreview?.kind === 'resourceExchange' && (option.effectPreview.resourcesGained?.stone ?? 0) > 0)
     expect(stone, JSON.stringify(sessionOptions(opened))).toBeDefined()
     const rejected = session.resolveChoice(0, choice)
@@ -118,6 +119,7 @@ describe('ordinary harvest breeding forbids animal cooking', () => {
     expect(captureStateWithHistory(rejected.state)).toEqual(opened.state)
     expect(rejected.interaction).toEqual(opened.interaction)
     expect(rejected.state.log).toEqual(opened.state.log)
+    expect(rejected.state.players[0]!.resources.sheep).toBe(3)
     const traded = ok(session.resolveChoice(0, `bulk:${stone!.value.split(':')[1]}=1`))
     expect(traded.state.players[0]!.resources).toMatchObject({ sheep: 2, stone: 1 })
     expect(traded.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })

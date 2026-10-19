@@ -126,18 +126,19 @@ describe('Workshop Capability Contract at the Session boundary', () => {
     expect(retried.state.players[0]!.cardStates[CARD_ID]).toEqual(cardStatesBefore[CARD_ID])
   })
 
-  it.each([
-    ['a newly compiled manifest', false],
-    ['a manifest saved without an action filter', true],
-  ])('binds an unfiltered listener to the listed actions for %s', (_label, savedWithoutActions) => {
-    const session = start(sources.unfilteredListener, { savedWithoutActions })
+  it('rejects new listener source without an explicit action filter', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = '${CARD_ID}'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Contract Probe' })
+const CARD_IMPL = {${sources.unfilteredListener}}
+    `, CARD_ID)
+    expect(compiled.valid).toBe(false)
+    expect(compiled.errors).toEqual([expect.stringContaining('declare exactly one actions, events or globalQuery selector')])
+  })
 
-    const response = session.takeAction(0, 'forest')
-
-    // The listener never sees the action-space identity, and still reacts to the listed collect action.
-    expect(response.ok).toBe(true)
-    expect(session.cardWarnings).toEqual([])
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 1 })
+  it('rejects a saved manifest without an action filter at Session admission', () => {
+    expect(() => start(sources.listenerInsideContract, { savedWithoutActions: true }))
+      .toThrow('declare exactly one actions, events or globalQuery selector')
   })
 
   it.each([

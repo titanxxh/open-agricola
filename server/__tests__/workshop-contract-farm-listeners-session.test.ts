@@ -11,7 +11,7 @@ import { COUNT_LEAF_SOURCE, compileContractCard, createRoundTenSession } from '.
  * ADR 0025 fixed behavior tests for the listener actions gain, plow, sow,
  * bake-bread, fence, stables, family-growth, wish-children, receive and reap,
  * and for the opponent listener scope. One custom card listens to
- * each of them in the before, immediatelyAfter and after phases and counts
+ * each leaf in before, immediatelyAfter and after, and wish-children in before, and counts
  * every call on its own card state. Each scenario is a two-player work phase
  * in round 10; player 0 has played the card and takes one action.
  */
@@ -30,7 +30,7 @@ afterEach(() => {
 const start = (configure?: (state: GameState) => void, workers: [number, number] = [2, 0]) => {
   const card = compileContractCard(CARD_ID, `${COUNT_LEAF_SOURCE}
 const CARD_IMPL = { listeners: [
-${ACTIONS.flatMap(action => PHASES.map(phase => `  { cardIds: [CARD_ID], actions: ['${action}'], phases: ['${phase}'],
+${ACTIONS.flatMap(action => (action === 'wish-children' ? ['before'] : PHASES).map(phase => `  { cardIds: [CARD_ID], actions: ['${action}'], phases: ['${phase}'],
     handler: () => ({ sourceCard: CARD_ID, flow: count('${phase}:${action}') }) },`)).join('\n')}
 ] }`)
   const session = createRoundTenSession(card, { workers, configure })

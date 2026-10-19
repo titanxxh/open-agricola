@@ -590,7 +590,7 @@ describe('temporary people at harvest and scoring', () => {
 const setupRuleFlow = (flow: ActionFlow, food = 0) => {
   const session = setup(2, false, (state) => { state.players[0]!.resources.food = food })
   const registry = (session as unknown as { registry: ActionRegistry }).registry
-  registry.register({ ...payAction, id: '__supply_pay__' })
+  registry.register({ ...payAction, id: 'construct' })
   const action = { ...registry.get('forest')!, flow, canBeExecutedByPlayer: () => true }
   registry.register(action)
   Object.assign(session.state.actionSpaces.find((space) => space.id === 'forest')!, action)
@@ -598,7 +598,7 @@ const setupRuleFlow = (flow: ActionFlow, food = 0) => {
 }
 
 const supplyPay = (cost: { food?: number; reed?: number }): ActionFlow => ({
-  type: 'leaf', actionId: '__supply_pay__', params: { cost },
+  type: 'leaf', actionId: 'construct', params: { cost },
 })
 
 describe('supply placement uses existing before and recovery boundaries', () => {
@@ -640,7 +640,7 @@ describe('supply placement uses existing before and recovery boundaries', () => 
     const cardId = '__supply_before__'
     session.state.players[0]!.occupationPlayed = [cardId]
     session.withCtx(() => requireActiveCardRegistry('supply before regression').registerListener({
-      id: cardId, cardIds: [cardId], actions: ['__supply_pay__'], phases: ['before'], mandatory: true,
+      id: cardId, cardIds: [cardId], actions: ['construct'], phases: ['before'], mandatory: true,
       handler: () => ({ sourceCard: cardId, flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } } }),
     }))
     chooseSupplyWorkerTurn(session, GUEST_ROOM)
