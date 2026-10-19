@@ -199,3 +199,104 @@ test('feeding batch reactions survive a pending room reload without repeating th
     expect(publicRoomState(await assertClientsAgree(pages))).toEqual(finished)
   } finally { await Promise.all(pages.map(page => page.close())) }
 })
+
+test('feeding Joinery leaves Plow Builder available through a room reload before settling hunger once', async ({ browser, request }) => {
+  const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
+  try {
+    await joinRoomClients(pages, request)
+    const driver = roomDriver(pages)
+    const fixture = createWorkSession({ seed: 42, configure: state => {
+      state.round = 4
+      for (const player of state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.improvements = []
+        player.cardStates = {}
+        player.farmTerrain = []
+        player.houseAnimals = {}
+        Object.assign(player.resources, { food: 0, wood: 0, sheep: 0, boar: 0, cattle: 0 })
+      }
+      const owner = state.players[0]!
+      owner.improvements = ['Major_Joinery']
+      owner.occupationPlayed = ['E091_PlowBuilder']
+      Object.assign(owner.resources, { food: 3, wood: 1 })
+      state.players[1]!.resources.food = 4
+      const occupied = state.actionSpaces[0]!
+      for (const player of state.players) for (const worker of player.workers) {
+        if (worker.isActive) occupied.takenBy.push({ playerId: player.id, workerId: worker.id })
+      }
+    } })
+    try {
+      await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) })
+    } finally { fixture.dispose() }
+    await driver.command(0, { type: 'roundEnd' })
+    for (let step = 0; step < 16; step++) {
+      const current = await roomSnapshot(pages[0])
+      if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'feed') break
+      if (current.interaction.stateId !== 'wait') throw new Error('Expected harvest preparation')
+      const actor = current.interaction.playerIndex
+      expect(options(await roomSnapshot(pages[actor]!)).some(option => option.value === '__skip__')).toBe(true)
+      await driver.command(actor, { type: 'choice', value: '__skip__' })
+    }
+    let current = await assertClientsAgree(pages)
+    expect(current.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed', foodUsed: 3, remaining: 1 } })
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1, begging: 0 })
+    expect(current.interaction.anytimeActions.map(action => action.id)).not.toContain('E91-plow-builder-anytime')
+    await pages[0].getByTestId('harvest-feed-option-Major_Joinery-ex0').getByRole('button', { name: '+', exact: true }).click()
+    await driver.ui(0, () => pages[0].locator('.exchange-confirm').click())
+    current = await assertClientsAgree(pages)
+    expect(current.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 2, wood: 0, begging: 0 })
+    expect(current.interaction).toMatchObject({ request: { maxTradeTimesBySourceId: { Major_Joinery: 0 } } })
+    expect(current.interaction.anytimeActions.map(action => action.id)).toContain('E91-plow-builder-anytime')
+    expect(current.state.log.filter(entry => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1')).toHaveLength(0)
+    await driver.ui(0, () => pages[0].locator('[data-anytime-action-id="E91-plow-builder-anytime"]').click())
+    current = await assertClientsAgree(pages)
+    expect(current.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, sourceCard: 'E091_PlowBuilder', request: { kind: 'farm-select', farm: { farmType: 'plow' } },
+    })
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, begging: 0 })
+    expect(current.state.players[0]!.fields).toEqual([])
+    expect(current.state.events.filter(event => event.type === 'resource.paid' && event.actorPlayerId === 'p1' && event.paymentFor === 'feeding'))
+      .toHaveLength(0)
+    expect(current.state.log.filter(entry => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1')).toHaveLength(0)
+    await assertReadOnly(pages[1])
+    await expect(pages[1].locator('.farm-tile.selectable, .farm-tile.selected')).toHaveCount(0)
+    const pending = { public: publicRoomState(current), interaction: current.interaction }
+    await driver.reload()
+    current = await assertClientsAgree(pages)
+    expect(publicRoomState(current)).toEqual(pending.public)
+    expect(current.interaction).toEqual(pending.interaction)
+    await assertReadOnly(pages[1])
+    await expect(pages[1].locator('.farm-tile.selectable, .farm-tile.selected')).toHaveCount(0)
+    const tile = pages[0].locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-0"]')
+    await expect(tile).toHaveClass(/selectable/)
+    await tile.click()
+    await driver.ui(0, () => pages[0].locator('.interaction-bar').getByRole('button', { name: 'Confirm plow', exact: true }).click())
+    current = await assertClientsAgree(pages)
+    expect(current.state.players[0]!.fields).toEqual([expect.objectContaining({ row: 0, col: 0 })])
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, begging: 0 })
+    expect(current.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
+    expect(current.interaction.anytimeActions.map(action => action.id)).not.toContain('E91-plow-builder-anytime')
+    await driver.ui(0, () => pages[0].locator('.exchange-confirm').click())
+    current = await assertClientsAgree(pages)
+    expect(current.state.round).toBe(5)
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0, begging: 0 })
+    expect(current.state.players[0]!.fields).toEqual([expect.objectContaining({ row: 0, col: 0 })])
+    expect(current.state.events.filter(event => event.type === 'resource.exchanged' && event.exchangeSource === 'Major_Joinery'))
+      .toEqual([expect.objectContaining({ actorPlayerId: 'p1', paid: { wood: 1 }, gained: { food: 2 }, times: 1 })])
+    expect(current.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === 'E091_PlowBuilder'))
+      .toEqual([expect.objectContaining({ actorPlayerId: 'p1', resources: { food: 1 } })])
+    expect(current.state.events.filter(event => event.type === 'resource.paid' && event.actorPlayerId === 'p1' && event.paymentFor === 'feeding'))
+      .toEqual([expect.objectContaining({ resources: { food: 4, wood: 1 } })])
+    expect(current.state.events.filter(event => event.type === 'farm.fieldPlowed'))
+      .toEqual([expect.objectContaining({ actorPlayerId: 'p1', sourceCardId: 'E091_PlowBuilder', fields: [{ playerId: 'p1', row: 0, col: 0 }] })])
+    expect(current.state.log.filter(entry => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1')).toHaveLength(1)
+    expect(current.scores?.find(score => score.playerId === 'p1')?.total).toBe(-11)
+    const finished = publicRoomState(current)
+    await driver.reload()
+    expect(publicRoomState(await assertClientsAgree(pages))).toEqual(finished)
+  } finally { await Promise.all(pages.map(page => page.close())) }
+})
