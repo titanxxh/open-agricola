@@ -1,4 +1,5 @@
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles, getPastureTileKeys, getNewlyEnclosedPastureTiles } from '../../domain/farmyard-usage'
+import { commitFarmOperation } from '../../domain/farm-operations'
+import { getPastureTileKeys, getNewlyEnclosedPastureTiles } from '../../domain/farmyard-usage'
 import type {
   ActionCostAttribution,
   ActionDefinition,
@@ -420,14 +421,6 @@ type FencePayload = {
   fenceSources?: Record<string, string>
 }
 
-const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
-  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
-    if (!(key in source)) {
-      delete (target as Record<string, unknown>)[key as string]
-    }
-  }
-  Object.assign(target, source)
-}
 
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const result: Partial<Resource> = {}
@@ -625,7 +618,6 @@ const finalizeFence = (
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.fencingFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
-  const previousUsed = getUsedFarmyardTileKeys(ctx.player)
   const previousPasture = getPastureTileKeys(ctx.player)
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   const supplyUsage = isBorrowedFenceSourcePolicy(currentPolicy.sourcePolicy) ? []
@@ -635,7 +627,7 @@ const finalizeFence = (
     const counters = nextPlayer.cardStates[usage.sourceCard]?.counters
     if (counters) counters[usage.counterKey] = (counters[usage.counterKey] ?? 0) - usage.usedCount
   }
-  applyPlayerMutation(ctx.player, nextPlayer)
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'fence', positions: validated.newPastures.flatMap(pasture => pasture.tiles ?? []), preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard })
   const costSources = recordActionCostAttribution(
     ctx.player,
     costAdjustment.costAttribution,
@@ -668,7 +660,7 @@ const finalizeFence = (
   if (builtFences.length > 0) {
     ctx.eventSink?.emit<'farm.fenceBuilt'>({
       type: 'farm.fenceBuilt',
-      newlyUsedTiles: getNewlyUsedFarmyardTiles(ctx.player, previousUsed),
+      newlyUsedTiles: farmOperation.newlyUsedTiles,
       newlyEnclosedPastureTiles: getNewlyEnclosedPastureTiles(ctx.player, previousPasture),
       fences: builtFences,
       newFenceEdges: validated.newFenceEdges,
@@ -690,6 +682,7 @@ const finalizeFence = (
   }
   return {
     type: 'ok',
+    farmOperations: [farmOperation],
     resourcesPaid: paidResources,
     extraData,
     internalChildren: {

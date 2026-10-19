@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../domain/farm-operations'
 import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
 import { resolveActionTargetPlayer } from '../helpers/target-player'
 import { applyCardStorageOperation, previewCardStorageOperation, readCardStorageOperation } from '../card-storage'
@@ -590,15 +591,14 @@ export const specialEffectAction: ActionDefinition = {
         if (!state || getAvailableStableSupplyCount(state, target) <= 0) return { type: 'ok' }
         const tile = getNextEmptyTileForPlayer(target)
         if (!tile) return { type: 'ok' }
-        const previousUsed = getUsedFarmyardTileKeys(target)
-        target.stableTiles.push(tile)
+        const farmOperation = commitFarmOperation(target, { kind: 'stables', positions: [tile], sourceCardId: sourceCard })
         eventSink?.emit<'farm.stableBuilt'>({
           type: 'farm.stableBuilt',
-          newlyUsedTiles: getNewlyUsedFarmyardTiles(target, previousUsed),
+          newlyUsedTiles: farmOperation.newlyUsedTiles,
           sourceCardId: sourceCard,
           stables: [{ playerId: target.id, row: tile.row, col: tile.col }],
         })
-        return { type: 'ok' }
+        return { type: 'ok', farmOperations: [farmOperation] }
       }
       case 'move-resource-between-spaces': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }

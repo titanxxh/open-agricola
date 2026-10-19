@@ -1,3 +1,4 @@
+import { commitFirstAvailableRoom } from './farm-operations'
 import type {
   CropStack,
   FenceSegment,
@@ -16,7 +17,6 @@ import {
   isFarmyardEdge,
   isWithinFarmyard,
   parseEdgeId,
-  positionKey,
 } from '../domain/farm.ts'
 import { ANIMAL_KEYS } from './animal-holder-state.ts'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals.ts'
@@ -1344,21 +1344,7 @@ export const tryAddRoomTile = (
   player: PlayerState,
   _type: 'wood' | 'clay' | 'stone',
 ): boolean => {
-  const used = new Set<string>()
-  for (const tile of player.roomTiles ?? []) used.add(positionKey(tile))
-  for (const tile of player.farmTerrain ?? []) used.add(positionKey(tile))
-  for (const tile of player.stableTiles ?? []) used.add(positionKey(tile))
-  for (const field of player.fields ?? []) used.add(positionKey(field))
-  for (const pasture of player.pastures ?? []) {
-    for (const tile of pasture.tiles ?? []) used.add(positionKey(tile))
-  }
-  for (const pos of getFarmyardTilePositions(player)) {
-    if (used.has(positionKey(pos))) continue
-    player.roomTiles = [...(player.roomTiles ?? []), pos]
-    player.rooms = (player.rooms ?? 0) + 1
-    return true
-  }
-  return false
+  return commitFirstAvailableRoom(player) !== undefined
 }
 
 export type FenceSpec = {

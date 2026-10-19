@@ -25,6 +25,7 @@ shared/domain/
 
 **Farmyard.**
 
+- `farm-operations.ts` commits room, stable, plow and fence proposals to the authoritative player. Validators prepare projections; only the operation applies them. Its detached `FarmOperationResult` captures successful positions and layout before/after, with newly used tiles restricted to coordinates that existed before the operation. The result belongs to the original action host; setup and recovery never dispatch reactions.
 - Used / unused spaces are read only from `farmyard-usage-core.ts`, including extensions, terrain, blocked spaces and derived pasture tiles; `farmyard-usage.ts` and `farm.ts` are compatibility facades. Cards never hand-count a grid. Rooms, terrain, fields, stables and pasture tiles always count as used; a `farmyardSpaceStates` entry joins them only with `blocksPlacement`.
 - Pastures persist identity, tiles and animal assignments. `getPastureSize()`, `getPastureStableCount()` and `getFencedStableCount()` derive the rest; `getPastureViews()` returns detached views; serialized `size` / `stables` are display-only and stripped on load.
 - Farm and action-space provenance uses source / type metadata: `FenceSegment.type/source`, `WorkerRef.synthetic`, `ActionSpace.blockedBy`, supply-token helpers, action-space category helpers across player counts, reservation tokens and attachments. Base action definitions filter player counts 2–6; 5/6-only spaces are separate.

@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../domain/farm-operations'
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { restoreSessionState } from './state-recovery'
@@ -5400,8 +5401,7 @@ export class GameCore {
   private devAddRoomsInContext(playerIndex: number, rooms: FarmTilePosition[]): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    player.roomTiles = [...player.roomTiles, ...rooms]
-    player.rooms = (player.rooms || 0) + rooms.length
+    commitFarmOperation(player, { kind: 'rooms', positions: rooms })
     return this.respond()
   }
 

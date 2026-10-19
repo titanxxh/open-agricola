@@ -29,6 +29,7 @@ anytime                  注册额外的 anytime 行动
 **事件是规则事实的来源。** `EventStore` 为每个公开行动或内部 leaf 开启 transaction，只在成功时提交（失败、取消、回滚和跳过都不追加），按 `state.nextEventSeq` 重新编号，校验可见性、JSON 安全、大小与已知字段，并追加 `publicEvents.committed` 包。`state.log` 是事件 mapper 派生的 UI 缓存。Listener 读取 `transactionEvents` / `eventQuery`，资源事实不读未提交的全局 `state.events` 或 `context.result`。
 
 - 农场修改事件（`farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt`、`farm.fenceBuilt`）携带 `newlyUsedTiles`，在修改前后、尾随反应之前捕获。围栏提交还携带 `newlyEnclosedPastureTiles`。地形放置与封锁状态修改发出 `farm.spacesUsed`。计划领取的房间同样发出 `farm.roomBuilt`。
+- 建房、建厩、犁地和围栏的行动结果在原宿主完成点保留 `farmOperations`。结果与同一宿主的 `actionEvents` 一起经过支付子流程和持久化等待；嵌套行动各自持有结果，父行动不重新交付子操作。反应复用现有 owner/phase trigger-select，操作内部不另设 dispatcher。见 `server/__tests__/farm-operation-session.test.ts`。
 - 消费者通过 `getActionNewlyUsedTiles()` / `getNewlyEnclosedPastureTiles()` 从宿主捕获的 `actionEvents` 读取这些已提交事实并按玩家过滤；不从后来的几何重建差异，不保存行动前缓存，也不回退到更大的 Turn 范围。
 - 印刷的围栏数量与触发只计算普通 `type='fence'` 段（`hasOrdinaryFenceBuiltEvent()`）。
 - 动物兑换经 exchange / trade 路径扣减，使已安置动物保持同步。按 trade 的资源门槛使用 `immediatelyAfter.trade-applied` 与 `extraData.preResources`。
