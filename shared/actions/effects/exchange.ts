@@ -598,7 +598,7 @@ const buildExchangeOptions = (
 ): { options: ActionChoiceOption[]; trades: Trade[]; harvestRounds: Map<number, number> } => {
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
-  const harvestAllowed = state?.roundPhase === 'harvest' || state?.roundPhase === 'feeding' ||
+  const harvestAllowed = state?.roundPhase === 'feeding' ||
     typeof actionContext?.harvestExchangeRound === 'number'
   const catalog = getExchangeCatalog({ player, windows: harvestAllowed ? ['anytime', 'harvest'] : ['anytime'], state, actionHooks })
   const trades: Trade[] = catalog.map((entry) => entry.trade)

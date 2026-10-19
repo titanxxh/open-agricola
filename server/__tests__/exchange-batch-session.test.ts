@@ -92,6 +92,107 @@ const finishFeeding = (session: GameSession, response: SessionResponse) =>
     ? session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] }) : response
 
 describe('authoritative Exchange Batch', () => {
+  it('rejects a feeding-only exchange in post-reap anytime and permits it after the real feeding boundary', () => {
+    const session = createSession((state) => {
+      const player = state.players[0]!
+      player.improvements = []
+      player.resources.sheep = 0
+      player.houseAnimals = {}
+      player.resources.vegetable = 2
+      player.minorPlayed = ['E027_PiggyBank']
+      player.cardStates.E027_PiggyBank = { counters: { food: 6 } }
+      player.occupationPlayed = ['C109_SchnappsDistiller']
+      state.players[1]!.resources.food = 4
+      for (const owner of state.players) markAllWorkersUsed(state, owner)
+    })
+    const postReap = session.performRoundEnd()
+    expect(postReap.ok, postReap.error).toBe(true)
+    expect(postReap.state.roundPhase).toBe('harvest')
+    expect(session.peekEnginePendingEnvelope()?.syntheticKind).toBe('post-reap-anytime')
+    expect(postReap.state.events.some((event) => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'feeding')).toBe(false)
+    expect(postReap.interaction.anytimeActions.map((entry) => entry.id)).toContain('E27-piggy-bank-anytime')
+    const before = {
+      state: captureStateWithHistory(postReap.state), interaction: structuredClone(postReap.interaction),
+      scores: structuredClone(postReap.scores), historyLength: postReap.historyLength,
+      hasActionStartSnapshot: postReap.hasActionStartSnapshot,
+    }
+    const rejected = session.takeAnytimeAction(0, 'exchange')
+    expect(rejected.ok).toBe(false)
+    expect(captureStateWithHistory(rejected.state)).toEqual(before.state)
+    expect(rejected.interaction).toEqual(before.interaction)
+    expect(rejected.scores).toEqual(before.scores)
+    expect(rejected.historyLength).toBe(before.historyLength)
+    expect(rejected.hasActionStartSnapshot).toBe(before.hasActionStartSnapshot)
+    expect(rejected.interaction.anytimeActions.map((entry) => entry.id)).not.toContain('exchange')
+    const feeding = session.resolveChoice(0, '__skip__')
+    expect(feeding.ok, feeding.error).toBe(true)
+    expect(feeding.state.roundPhase).toBe('feeding')
+    expect(feeding.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
+    const exchanged = session.resolveChoice(0, 'confirm', {
+      selections: [feedSelection(feeding, 'C109_SchnappsDistiller', 'vegetable')],
+    })
+    expect(exchanged.ok, exchanged.error).toBe(true)
+    expect(exchanged.interaction).toMatchObject({ request: { maxTradeTimesBySourceId: { C109_SchnappsDistiller: 0 } } })
+    const settled = finishFeeding(session, exchanged)
+    expect(settled.ok, settled.error).toBe(true)
+    expect(settled.state.round).toBe(5)
+    expect(settled.state.players[0]!.resources).toMatchObject({ food: 1, vegetable: 1, begging: 0 })
+    expect(settled.state.events.filter((event) => event.type === 'resource.exchanged' && event.exchangeSource === 'C109_SchnappsDistiller'))
+      .toEqual([expect.objectContaining({ actorPlayerId: 'p1', paid: { vegetable: 1 }, gained: { food: 5 }, times: 1 })])
+    expect(settled.state.events.filter((event) => event.type === 'resource.paid' && event.actorPlayerId === 'p1' && event.paymentFor === 'feeding')).toHaveLength(1)
+    expect(settled.state.log.filter((entry) => entry.key === 'log.harvestFeedDetail' && entry.playerId === 'p1')).toHaveLength(1)
+    expect(bonusScore(settled, 'C109_SchnappsDistiller')).toBe(0)
+    session.dispose()
+  })
+
+  it('preserves an explicitly authorized harvest preparation exchange and its shared feeding limit', () => {
+    const session = createSession((state) => {
+      const player = state.players[0]!
+      player.improvements = []
+      player.resources.sheep = 0
+      player.houseAnimals = {}
+      player.resources.food = 6
+      player.resources.grain = 0
+      player.resources.vegetable = 1
+      player.occupationPlayed = ['C105_BasketCarrier', 'C110_HomeBrewer', 'C109_SchnappsDistiller']
+      state.players[1]!.resources.food = 4
+      for (const owner of state.players) markAllWorkersUsed(state, owner)
+    })
+    const preparation = session.performRoundEnd()
+    expect(preparation.ok, preparation.error).toBe(true)
+    expect(preparation.state.roundPhase).toBe('harvest')
+    expect(preparation.state.events.some((event) => event.type === 'harvest.phaseStarted')).toBe(false)
+    const index = exchangeIndex(preparation, 'C105_BasketCarrier', 'food')
+    const prepared = session.resolveChoice(0, `trade:${index}:1`)
+    expect(prepared.ok, prepared.error).toBe(true)
+    expect(prepared.state.players[0]!.resources).toMatchObject({ food: 4, wood: 1, reed: 1, grain: 1 })
+    if (prepared.interaction.stateId !== 'wait' || prepared.interaction.request.kind !== 'choice') {
+      throw new Error('Expected the real Home Brewer harvest opportunity')
+    }
+    const brew = prepared.interaction.request.options.find((option) => option.effectPreview?.resourcesGained?.food === 3)
+    if (!brew) throw new Error('Expected one grain for three food')
+    const feeding = session.resolveChoice(0, brew.value)
+    expect(feeding.ok, feeding.error).toBe(true)
+    expect(feeding.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, request: { kind: 'feed', maxTradeTimesBySourceId: { C105_BasketCarrier: 0 } },
+    })
+    expect(feeding.state.players[0]!.resources).toMatchObject({ food: 3, wood: 1, reed: 1, grain: 0 })
+    expect(feeding.state.players[0]!.cardStates.C105_BasketCarrier?.extraData?.harvestExchangeUsage).toEqual({ round: 4, count: 1 })
+    assertRejectedUnchanged(session, 'confirm', 0, {
+      selections: [feedSelection(feeding, 'C105_BasketCarrier', 'food')],
+    })
+    const settled = finishFeeding(session, session.getState())
+    expect(settled.ok, settled.error).toBe(true)
+    expect(settled.state.round).toBe(5)
+    expect(settled.state.players[0]!.resources).toMatchObject({ food: 3, wood: 1, reed: 1, grain: 0, vegetable: 1, begging: 0 })
+    const exchanges = settled.state.events.filter((event) => event.type === 'resource.exchanged' && event.exchangeSource === 'C105_BasketCarrier')
+    expect(exchanges).toEqual([expect.objectContaining({ actorPlayerId: 'p1', paid: { food: 2 }, gained: { wood: 1, reed: 1, grain: 1 }, times: 1 })])
+    const feedingStarted = settled.state.events.find((event) => event.type === 'harvest.phaseStarted' && event.harvestPhase === 'feeding')!
+    expect(exchanges[0]!.seq).toBeLessThan(feedingStarted.seq)
+    expect(bonusScore(settled, 'C110_HomeBrewer')).toBe(0)
+    session.dispose()
+  })
+
   it('lets a completed feeding reaction fund a new batch without replaying prepaid food', () => {
     const session = createSession((state) => {
       const player = state.players[0]!
