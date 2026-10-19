@@ -153,7 +153,23 @@ describe('ae-negative-39-native', () => {
       const s = make('D060_LargePottery', st => { if (mode !== 'pottery')
           ownMajor(st, 'Major_Pottery'); Object.assign(st.players[0]!.resources, { clay: mode === 'clay' ? 0 : 1, stone: mode === 'stone' ? 0 : 1 }); }, false);
       save(`D060-N2-${mode}`, rejectBuy(s, 'D060_LargePottery'));
-  } const h = make('D060_LargePottery', st => { st.players[0]!.resources.clay = 1; }, false); assert.equal(h.getState().interaction.anytimeActions.some(x => x.id === 'exchange'), false); save('D060-N2-hand', h.getState()); const s = make('D060_LargePottery', st => { st.players[0]!.resources.clay = 1; }), p = cook(s), o = opts(p).find(o => o.sourceCard === 'D060_LargePottery'); assert.ok(o); const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'bulk:999999=1')), r = finish(s, choose(s, 0, `bulk:${o.value.split(':')[1]}=2`)); resource(r, { clay: 0, food: 102 }); save('D060-N2-overdraw', { p, bad, r }); });
+  }
+    const h = make('D060_LargePottery', st => { st.players[0]!.resources.clay = 1; }, false)
+    assert.equal(h.getState().interaction.anytimeActions.some(x => x.id === 'exchange'), false)
+    save('D060-N2-hand', h.getState())
+    const s = make('D060_LargePottery', st => { st.players[0]!.resources.clay = 1; })
+    const p = cook(s), o = opts(p).find(o => o.sourceCard === 'D060_LargePottery')
+    assert.ok(o)
+    const bad = assertRejectedUnchanged(s, () => s.resolveChoice(0, 'bulk:999999=1'))
+    const over = assertRejectedUnchanged(s, () => s.resolveChoice(0, `bulk:${o.value.split(':')[1]}=2`))
+    assert.equal(bad.historyLength, p.historyLength)
+    assert.equal(over.historyLength, p.historyLength)
+    assert.equal(over.hasActionStartSnapshot, p.hasActionStartSnapshot)
+    resource(over, { clay: 1, food: 100 })
+    const r = finish(s, choose(s, 0, `bulk:${o.value.split(':')[1]}=1`))
+    resource(r, { clay: 0, food: 102 })
+    save('D060-N2-overdraw', { p, bad, over, r })
+  })
   it("D060 N3 actual final scoring uses remaining clay threshold and printed three points", () => { for (const [clay, expected] of [[2, 0], [3, 1], [4, 1], [5, 2], [6, 3], [7, 4], [8, 4]]) {
       const s = make('D060_LargePottery', st => { ownMajor(st, 'Major_Pottery'); Object.assign(st.players[0]!.resources, { clay: clay! + 1, stone: 1 }); }, false, 14), b = purchase(s, 'D060_LargePottery'), r = final(s);
       assert.equal(points(r, 'D060_LargePottery'), 3);
