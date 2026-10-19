@@ -321,7 +321,7 @@ listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家�
 - `compute-exchanges`
 <!-- prompt-sync:end id=listener-actions -->
 
-`sandboxListenerPhases` 是 Workshop listener phase 白名单。AST validator 拒绝新源码中不支持的阶段；已保存的可执行 manifest 在 Session 或 runtime 注册前检查，隔离 Session 工厂先检查原始卡牌，再剥离父进程镜像中的可执行字段。不支持的阶段会在任何卡牌 effect、listener 或 worker 安装前拒绝创建。HTTP 创建对局返回 400、`code: 'unsupported_listener_phase'` 及具体阶段错误；WS 创建在持久化 Room 前返回错误。`during` 不再支持，也不会映射为 `after`；草稿和历史版本仍可读取、编辑。
+`sandboxListenerPhases` 是 Workshop listener phase 白名单。AST validator 拒绝新源码中不支持的阶段；已保存的可执行 manifest 在 Session 或 runtime 注册前检查，隔离 Session 工厂先检查原始卡牌，再剥离父进程镜像中的可执行字段。不支持的订阅会在任何卡牌 effect、listener 或 worker 安装前拒绝创建。HTTP 创建对局返回 400，未知阶段用 `code: 'unsupported_listener_phase'`，非法目标、缺少筛选或错误组合用 `unsupported_listener_subscription`；WS 创建在持久化 Room 前返回错误。`during` 不再支持，也不会映射为 `after`；草稿和历史版本仍可读取、编辑。
 
 
 
