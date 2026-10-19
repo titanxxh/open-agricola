@@ -48,6 +48,23 @@ const setup = (placed = 1, played = true) => {
 const snapshot = (response: SessionResponse): SessionResponse => ({
   ...response, state: captureStateWithHistory(response.state), interaction: structuredClone(response.interaction),
 })
+const expectCancelledActivation = (response: SessionResponse, before: SessionResponse) => {
+  const seq = before.state.nextEventSeq
+  const packetSeq = before.state.nextPublicEventArchivePacketSeq
+  expect(captureStateWithHistory(response.state)).toEqual({
+    ...before.state,
+    nextEventSeq: seq + 1,
+    nextPublicEventArchivePacketSeq: packetSeq + 1,
+    events: [...before.state.events, expect.objectContaining({
+      type: 'anytime.completed', id: String(seq), seq, actorPlayerId: 'p1', anytimeActionId: 'exchange',
+    })],
+    publicEventArchive: [...before.state.publicEventArchive, {
+      schemaVersion: 1, type: 'publicEvents.committed', id: String(packetSeq), packetSeq,
+      eventIds: [String(seq)], eventSeqs: [seq], firstEventSeq: seq, lastEventSeq: seq,
+    }],
+  })
+  expect(response.scores).toEqual(before.scores)
+}
 const sheepWalkerOptions = (response: SessionResponse) => {
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') {
@@ -110,7 +127,7 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     expect(original.interaction.request.zones.some(zone => zone.animalType === 'sheep' && zone.animalCount > 0)).toBe(true)
     const opened = snapshot(session.takeAnytimeAction(0, 'exchange'))
     expect(sheepWalkerOptions(opened)).toEqual([])
-    expect(captureStateWithHistory(session.resolveChoice(0, 'cancel').state)).toEqual(original.state)
+    expectCancelledActivation(session.resolveChoice(0, 'cancel'), original)
   })
 
   it('rejects a mixed batch beyond the placed-sheep budget and accepts an exact retry', () => {
@@ -162,7 +179,7 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     expect(wrongActor.interaction).toEqual(opened.interaction)
     const cancelled = session.resolveChoice(0, 'cancel')
     expectOriginalReorg(session, cancelled, host, original)
-    expect(captureStateWithHistory(cancelled.state)).toEqual(original.state)
+    expectCancelledActivation(cancelled, original)
     const reopened = snapshot(session.takeAnytimeAction(0, 'exchange'))
     session = new GameSession(JSON.parse(JSON.stringify({ state: reopened.state, sessionCursor: session.createSessionPrivateCursor() })))
     sessions.push(session)
