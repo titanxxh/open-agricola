@@ -24,7 +24,7 @@ function setup() {
   return { state, player, context, used, received }
 }
 function invoke(context: CardListenerContextInput) {
-  return executeCardListener(A040_PottersYard_impl.listeners[0]!, context)
+  return executeCardListener(A040_PottersYard_impl.listeners.find(listener => listener.actions?.some(action => action === context.actionId)) ?? A040_PottersYard_impl.listeners[0]!, context)
 }
 
 describe('Potters Yard committed host facts', () => {

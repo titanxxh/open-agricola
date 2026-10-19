@@ -1,3 +1,4 @@
+import { addFarmyardSpaceState, commitFarmOperation } from '../../domain/farm-operations'
 import { defineMinorCard } from '../card-source'
 import { fieldOperationFlow } from '../../actions/plans/field-operation'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -7,7 +8,6 @@ import type { ExtraSowableField } from '../card-effects'
 import { getFarmyardTilePositions, parsePositionKey, positionKey } from '../../domain/farm'
 import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
 import {
-  addFarmyardSpaceState,
   getFarmyardSpaceStates,
   getPlacementBlockedFarmyardSpaceKeys,
 } from '../../domain/farmyard-space-states'
@@ -47,7 +47,7 @@ const reapCropSpaces = (player: PlayerState) => {
       next.push({ ...state, crop: { ...state.crop, remaining } })
     }
   }
-  player.farmyardSpaceStates = next
+  commitFarmOperation(player, { kind: 'space-states', states: next, positions: [], sourceCardId: CARD_ID })
 }
 
 const anytimeListener: CardListenerRegistration = {

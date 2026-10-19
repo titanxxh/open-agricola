@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../domain/farm-operations'
 import type {
   ActionDefinition,
   ActionExecutionContext,
@@ -66,15 +67,6 @@ export const sowCrop = (
   const remaining = sowedAmount(crop)
   emptyField.stacks.push({ kind: crop, remaining })
   return { type: 'ok' }
-}
-
-const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
-  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
-    if (!(key in source)) {
-      delete (target as Record<string, unknown>)[key as string]
-    }
-  }
-  Object.assign(target, source)
 }
 
 export const validateSow = (
@@ -159,7 +151,7 @@ const finalizeSow = (
       }
     }
   }
-  applyPlayerMutation(player, nextPlayer)
+  const farmOperation = commitFarmOperation(player, { kind: 'crops', positions: crops, preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
   ctx.eventSink?.emit<'farm.sown'>({
     type: 'farm.sown',
     sows: crops.map((crop) => ({
@@ -168,7 +160,7 @@ const finalizeSow = (
       added: sowedAmount(crop.crop),
     })),
   })
-  return { type: 'ok' }
+  return { type: 'ok', farmOperations: [farmOperation] }
 }
 
 export const sowAction: ActionDefinition = {

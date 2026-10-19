@@ -1,3 +1,4 @@
+import { addFarmyardSpaceState } from '../../domain/farm-operations'
 import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -6,7 +7,6 @@ import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { DraftGameEvent, FarmCropRemovedEvent, FarmSownEvent } from '../../contract/events'
 import { positionKey } from '../../domain/farm'
 import { hasClaimableFieldGoodsTokens } from '../../domain/farmyard-space-token-claims'
-import { addFarmyardSpaceState } from '../../domain/farmyard-space-states'
 import type { CardImpl } from '../registry'
 import { getLogicalFields, type LogicalField } from '../helpers/card-field'
 

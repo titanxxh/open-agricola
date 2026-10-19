@@ -1,3 +1,4 @@
+import { getActionNewlyUsedTiles, getActionTerrainOperations } from '../helpers/farmyard-events'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow, FarmTilePosition, FarmyardSpaceState, Resource } from '../../contract/types'
@@ -17,16 +18,6 @@ type ClearedSpaceTokenConfig = {
   blocksPlacement?: boolean
   optional?: boolean
   consumeFence?: boolean
-}
-
-const payloadTile = (context: CardListenerContext): FarmTilePosition | undefined => {
-  const payload = context.extraData?.payload
-  if (!payload || typeof payload !== 'object') return undefined
-  const tile = (payload as { tile?: unknown }).tile
-  if (!tile || typeof tile !== 'object') return undefined
-  const { row, col } = tile as FarmTilePosition
-  if (!Number.isFinite(row) || !Number.isFinite(col)) return undefined
-  return { row, col }
 }
 
 const specialEffectLeaf = (
@@ -74,12 +65,13 @@ export const makeClearedSpaceTokenListener = (
   phases: ['after' as ActionHookPhase],
   actions: config.actions,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.extraData?.terrainCleared === false) return
     const player = context.ownerPlayer ?? context.player
     if (config.consumeFence && getOwnOrdinaryFenceReserveCount(player) <= 0) return
-    const tile = payloadTile(context)
-    if (!tile) return
-    const flow = addStateFlow(config, tile)
+    const tiles = getActionTerrainOperations(context).flatMap(event => event.playerId === player.id && event.operation === 'remove'
+      ? event.changes.filter(change => change.before && !change.after && !change.fieldCreated).map(({ row, col }) => ({ row, col })) : [])
+    if (tiles.length === 0) return
+    const children = tiles.map(tile => addStateFlow(config, tile))
+    const flow: ActionFlow = children.length === 1 ? children[0]! : { type: 'seq', children }
     return {
       flow: config.optional ? { type: 'seq', optional: true, children: [flow] } : flow,
       sourceCard: config.cardId,
@@ -93,11 +85,13 @@ export const makeFarmyardGoodsClaimListener = (
   id: `${cardId}-claim-farmyard-goods-token`,
   cardIds: [cardId],
   phases: ['after' as ActionHookPhase],
+  events: ['farm.spacesUsed'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const player = context.ownerPlayer ?? context.player
-    if (!hasClaimableFarmyardGoodsTokens(player, cardId)) return
+    const positions = getActionNewlyUsedTiles(context)
+    if (!hasClaimableFarmyardGoodsTokens(player, cardId, positions)) return
     return {
-      flow: { type: 'leaf', actionId: 'claim-farmyard-goods-tokens', sourceCard: cardId },
+      flow: { type: 'leaf', actionId: 'claim-farmyard-goods-tokens', sourceCard: cardId, params: { positions } },
       sourceCard: cardId,
     }
   },

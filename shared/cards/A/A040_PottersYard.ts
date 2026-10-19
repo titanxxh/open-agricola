@@ -1,9 +1,10 @@
+import { addFarmyardSpaceState } from '../../domain/farm-operations'
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { countUnusedFarmyardSpaces, getFarmyardTilePositions, positionKey } from '../../domain/farm'
 import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
-import { addFarmyardSpaceState, getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
+import { getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
 import { hasClaimableFarmyardGoodsTokens } from '../../domain/farmyard-space-token-claims'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { getActionNewlyUsedTiles } from '../helpers/farmyard-events'
@@ -37,25 +38,13 @@ registerAdHocAction({
   },
 })
 
-const after: CardListenerRegistration = {
+const claim: CardListenerRegistration = {
   id: 'A40-potters-yard-after',
   cardIds: [CARD_ID],
   phases: ['after'],
+  events: ['farm.spacesUsed'],
   handler: context => {
     if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
-    if (context.sourceCard === CARD_ID && context.actionId === 'receive') {
-      const clay = sumResourceMovedToPlayer(context.actionEvents?.filter(event => 'schemaVersion' in event), 'clay', context.player.id,
-        event => event.sourceCardId === CARD_ID && event.from.kind === 'card' && event.from.cardId === CARD_ID)
-      if (clay <= 0) return
-      const children: ActionFlow[] = []
-      for (let count = clay; count > 0; count--) {
-        children.push({ type: 'seq', children: [
-          payLeaf({ cardId: CARD_ID, cost: { clay: count } }),
-          gainLeaf(CARD_ID, { food: 2 * count }),
-        ] })
-      }
-      return { sourceCard: CARD_ID, flow: { type: 'xor', optional: true, children } }
-    }
     const positions = getActionNewlyUsedTiles(context)
     if (!hasClaimableFarmyardGoodsTokens(context.player, CARD_ID, positions)) return
     return {
@@ -65,8 +54,29 @@ const after: CardListenerRegistration = {
   },
 }
 
+const receive: CardListenerRegistration = {
+  id: 'A40-potters-yard-after-receive',
+  cardIds: [CARD_ID],
+  phases: ['after'],
+  actions: ['receive'],
+  handler: context => {
+    if (context.sourceCard !== CARD_ID || !context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
+    const clay = sumResourceMovedToPlayer(context.actionEvents?.filter(event => 'schemaVersion' in event), 'clay', context.player.id,
+      event => event.sourceCardId === CARD_ID && event.from.kind === 'card' && event.from.cardId === CARD_ID)
+    if (clay <= 0) return
+    const children: ActionFlow[] = []
+    for (let count = clay; count > 0; count--) {
+      children.push({ type: 'seq', children: [
+        payLeaf({ cardId: CARD_ID, cost: { clay: count } }),
+        gainLeaf(CARD_ID, { food: 2 * count }),
+      ] })
+    }
+    return { sourceCard: CARD_ID, flow: { type: 'xor', optional: true, children } }
+  },
+}
+
 const cardImpl = {
-  listeners: [after],
+  listeners: [claim, receive],
   effect: {
     id: CARD_ID,
     onBuy: () => ({ type: 'leaf', actionId: PLACE_CLAY, sourceCard: CARD_ID }),

@@ -1,9 +1,17 @@
-import type { FarmOperationResult, FarmTilePosition, PlayerState } from '../contract/types'
+import { planFarmyardExtension } from './farmyard-extensions'
+import type { FarmTerrainKind } from '../moor/types'
+import type { FarmOperationResult, FarmTilePosition, FarmyardExtension, FarmyardSpaceState, PlayerState, Resource } from '../contract/types'
 import type { EventSink, FarmTerrainChangedEvent } from '../contract/events'
-import { getFarmyardTilePositions, positionKey } from './farmyard-geometry'
+import { parsePositionKey, getFarmyardTilePositions, positionKey } from './farmyard-geometry'
+import { normalizeFarmyardSpaceStates, getFarmyardSpaceStates } from './farmyard-space-states'
 import { getNewlyUsedFarmyardTiles, getUsedFarmyardTileKeys } from './farmyard-usage'
 
 export type FarmOperation = (
+  | { kind: 'space-states'; states: FarmyardSpaceState[]; positions: readonly FarmTilePosition[] }
+  | { kind: 'extension'; extension: FarmyardExtension; terrain: PlayerState['farmTerrain']; positions: readonly FarmTilePosition[] }
+  | { kind: 'remove-stables'; positions: readonly FarmTilePosition[] }
+  | { kind: 'remove-fences'; indexes: readonly number[]; positions: readonly FarmTilePosition[] }
+  | { kind: 'crops'; preparedPlayer: PlayerState; positions: readonly FarmTilePosition[] }
   | { kind: 'rooms'; positions: readonly FarmTilePosition[] }
   | { kind: 'stables'; positions: readonly FarmTilePosition[]; preparedPlayer?: PlayerState }
   | { kind: 'plow'; position: FarmTilePosition; preparedPlayer: PlayerState }
@@ -15,13 +23,14 @@ export type FarmOperation = (
 ) & { sourceCardId?: string }
 
 const copyLayout = (player: PlayerState): FarmOperationResult['before'] => ({
-  roomTiles: player.roomTiles.map(tile => ({ ...tile })),
-  stableTiles: player.stableTiles.map(tile => ({ ...tile })),
+  roomTiles: player.roomTiles.map(({ row, col }) => ({ row, col })),
+  stableTiles: player.stableTiles.map(({ row, col }) => ({ row, col })),
   fields: player.fields.map(field => ({ ...field, stacks: field.stacks.map(stack => ({ ...stack })) })),
   fenceSegments: player.fenceSegments.map(segment => ({ ...segment, source: segment.source ? { ...segment.source } : undefined })),
-  pastures: player.pastures.map(pasture => ({ ...pasture, tiles: pasture.tiles?.map(tile => ({ ...tile })) })),
+  pastures: player.pastures.map(pasture => ({ ...pasture, tiles: pasture.tiles?.map(({ row, col }) => ({ row, col })) })),
+  farmyardSpaceStates: (player.farmyardSpaceStates ?? []).map(state => ({ ...state, ...(state.resources ? { resources: { ...state.resources } } : {}), ...(state.crop ? { crop: { ...state.crop } } : {}) })),
   ...(player.farmTerrain ? { farmTerrain: player.farmTerrain.map(tile => ({ ...tile })) } : {}),
-  ...(player.farmyardExtensions ? { farmyardExtensions: player.farmyardExtensions.map(extension => ({ ...extension, tiles: extension.tiles.map(tile => ({ ...tile })) })) } : {}),
+  ...(player.farmyardExtensions ? { farmyardExtensions: player.farmyardExtensions.map(extension => ({ ...extension, tiles: extension.tiles.map(({ row, col }) => ({ row, col })) })) } : {}),
 })
 
 /** Commit the validated proposal and its payment/animal settlement together.
@@ -50,17 +59,33 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
     }
   }
   switch (operation.kind) {
+    case 'space-states':
+      player.farmyardSpaceStates = operation.states
+      break
+    case 'extension':
+      player.farmyardExtensions = [...(player.farmyardExtensions ?? []), operation.extension]
+      if (operation.terrain) player.farmTerrain = operation.terrain
+      break
+    case 'remove-stables': {
+      const removed = new Set(operation.positions.map(positionKey))
+      player.stableTiles = player.stableTiles.filter(tile => !removed.has(positionKey(tile)))
+      break
+    }
+    case 'remove-fences':
+      player.fenceSegments = player.fenceSegments.filter((_, index) => !operation.indexes.includes(index))
+      break
     case 'rooms':
-      player.roomTiles = [...player.roomTiles, ...operation.positions.map(tile => ({ ...tile }))]
+      player.roomTiles = [...player.roomTiles, ...operation.positions.map(({ row, col }) => ({ row, col }))]
       player.rooms += operation.positions.length
       break
     case 'stables':
       if (operation.preparedPlayer) commitPreparedPlayer(player, operation.preparedPlayer)
-      player.stableTiles = [...player.stableTiles, ...operation.positions.map(tile => ({ ...tile }))]
+      player.stableTiles = [...player.stableTiles, ...operation.positions.map(({ row, col }) => ({ row, col }))]
       break
     case 'plow':
     case 'fence':
     case 'terrain':
+    case 'crops':
       commitPreparedPlayer(player, operation.preparedPlayer)
       break
     case 'pastures':
@@ -74,7 +99,7 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
   const result = {
     playerId: player.id,
     ...(operation.sourceCardId ? { sourceCardId: operation.sourceCardId } : {}),
-    positions: (operation.kind === 'plow' ? [operation.position] : operation.positions).map(tile => ({ ...tile })),
+    positions: (operation.kind === 'plow' ? [operation.position] : operation.positions).map(({ row, col }) => ({ row, col })),
     newlyUsedTiles: getNewlyUsedFarmyardTiles(player, previouslyUsed).filter(tile => existingPositions.has(positionKey(tile))),
     before,
     after: copyLayout(player),
@@ -92,4 +117,45 @@ export function commitFirstAvailableRoom(player: PlayerState, sourceCardId?: str
   const used = getUsedFarmyardTileKeys(player)
   const position = getFarmyardTilePositions(player).find(tile => !used.has(positionKey(tile)))
   return position ? commitFarmOperation(player, { kind: 'rooms', positions: [position], sourceCardId }, eventSink) : undefined
+}
+
+export const addFarmyardSpaceState = (
+  player: PlayerState,
+  state: FarmyardSpaceState,
+  eventSink?: EventSink,
+) => {
+  const previous = getFarmyardSpaceStates(player).find((entry) =>
+    entry.spaceKey === state.spaceKey && entry.kind === state.kind && entry.sourceCardId === state.sourceCardId,
+  )
+  const next = normalizeFarmyardSpaceStates([
+    ...getFarmyardSpaceStates(player).filter((entry) =>
+      !(entry.spaceKey === state.spaceKey && entry.kind === state.kind && entry.sourceCardId === state.sourceCardId),
+    ),
+    state,
+  ])
+  const tile = parsePositionKey(state.spaceKey)
+  const operation = commitFarmOperation(player, { kind: 'space-states', states: next, positions: tile ? [tile] : [], sourceCardId: state.sourceCardId }, eventSink)
+  const resources: Partial<Resource> = {}
+  for (const resource of Object.keys(state.resources ?? {}) as Array<keyof Resource>) {
+    const added = (state.resources?.[resource] ?? 0) - (previous?.resources?.[resource] ?? 0)
+    if (added > 0) resources[resource] = added
+  }
+  if (tile && Object.keys(resources).length > 0) {
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved', sourceCardId: state.sourceCardId,
+      resources, from: { kind: 'supply' },
+      to: { kind: 'field', playerId: player.id, ...tile }, reason: 'cardEffect',
+    })
+  }
+  return operation
+}
+
+
+export function addFarmyardExtension(player: PlayerState, sourceCardId: string, tiles: FarmTilePosition[], eventSink?: EventSink, initialTerrain?: FarmTerrainKind): boolean {
+  const extension = planFarmyardExtension(player, sourceCardId, tiles)
+  if (!extension) return false
+  commitFarmOperation(player, { kind: 'extension', extension, positions: extension.tiles, sourceCardId,
+    terrain: initialTerrain ? [...(player.farmTerrain ?? []), ...extension.tiles.map(tile => ({ ...tile, kind: initialTerrain }))] : player.farmTerrain,
+  }, eventSink)
+  return true
 }

@@ -1,7 +1,7 @@
+import { addFarmyardExtension } from '../../domain/farm-operations'
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
 import { registerSelectionEffect, registerSelectionValidator } from '../../actions/helpers/selection-effect-registry'
 import {
-  addFarmyardExtension,
   getFarmyardExtensionCandidates,
   isValidFarmyardExtensionTiles,
 } from '../../domain/farmyard-extensions'
@@ -20,18 +20,10 @@ registerSelectionValidator(SELECTION_EFFECT, ({ player, positions }) => {
   return isValidFarmyardExtensionTiles(player, tiles) ? undefined : 'invalid selection position'
 })
 
-registerSelectionEffect(SELECTION_EFFECT, ({ player, positions, sourceCard, actionContext }) => {
+registerSelectionEffect(SELECTION_EFFECT, ({ player, positions, sourceCard, actionContext, eventSink }) => {
   if (!sourceCard) return
   const tiles = parsePositions(positions)
-  if (!addFarmyardExtension(player, sourceCard, tiles)) return
-  if (actionContext?.placeMoors !== true) return
-  const terrainKeys = new Set((player.farmTerrain ?? []).map(positionKey))
-  for (const tile of tiles) {
-    const key = positionKey(tile)
-    if (terrainKeys.has(key)) continue
-    player.farmTerrain = [...(player.farmTerrain ?? []), { ...tile, kind: 'moor' }]
-    terrainKeys.add(key)
-  }
+  addFarmyardExtension(player, sourceCard, tiles, eventSink, actionContext?.placeMoors === true ? 'moor' : undefined)
 })
 
 export const buildFarmyardExtensionSelectionFlow = (

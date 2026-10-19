@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../../domain/farm-operations'
 import type { ActionDefinition, ActionFlow, Field, PlayerState, Resource } from '../../../contract/types'
 import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { selectionAction } from './selection'
@@ -101,8 +102,8 @@ export const fieldOperationAction: ActionDefinition = {
     if (!Array.isArray(raw) || !raw.every((key): key is string => typeof key === 'string')) return { type: 'fail', errorKey: 'log.actionFail' }
     if (operation.kind === 'discard-crop-spaces') {
       const selected = new Set(raw)
-      context.player.farmyardSpaceStates = getFarmyardSpaceStates(context.player).filter(space => !(space.sourceCardId === context.sourceCard && space.kind === 'non-field-crop-space' && selected.has(space.spaceKey)))
-      return validation
+      const farmOperation = commitFarmOperation(context.player, { kind: 'space-states', positions: [], sourceCardId: context.sourceCard, states: getFarmyardSpaceStates(context.player).filter(space => !(space.sourceCardId === context.sourceCard && space.kind === 'non-field-crop-space' && selected.has(space.spaceKey))) }, context.eventSink)
+      return { ...validation, farmOperations: [farmOperation] }
     }
     const selected = raw.map(key => findField(context.player, key))
     if (selected.some(field => !field)) return { type: 'fail', errorKey: 'log.actionFail' }

@@ -317,8 +317,8 @@ describe('listener purity wave 2b/c', () => {
     const before = stateSnapshot(game)
     const used = [{ playerId: p.id, row: 1, col: 1 }, { playerId: p.id, row: 1, col: 2 }]
     const built: GameEvent = {
-      schemaVersion: 1, type: 'farm.roomBuilt', id: 'built', seq: 1, round: 1, phase: 'work', visibility: 'public',
-      actorPlayerId: p.id, newlyUsedTiles: used, rooms: used.map(tile => ({ ...tile, type: 'wood' })),
+      schemaVersion: 1, type: 'farm.spacesUsed', id: 'built', seq: 1, round: 1, phase: 'work', visibility: 'public',
+      actorPlayerId: p.id, newlyUsedTiles: used,
     }
     const result = listenerById(A073_AgriculturalFertilizers_impl.listeners, 'A73-agri-fert-after')
       .handler(context(p, { state: game, actionId: 'construct', phase: 'after', actionEvents: [built] }))
@@ -444,11 +444,7 @@ describe('listener purity wave 2b/c', () => {
     })
     const game = state([p])
     const used = [{ playerId: p.id, row: 1, col: 1 }]
-    const stable: GameEvent = {
-      schemaVersion: 1, type: 'farm.stableBuilt', id: 'built', seq: 1, round: 3, phase: 'work', visibility: 'public',
-      actorPlayerId: p.id, newlyUsedTiles: used, stables: used,
-    }
-    const built: GameEvent = actionId === 'stables' ? stable : {
+    const built: GameEvent = {
       schemaVersion: 1, type: 'farm.spacesUsed', id: 'used', seq: 1, round: 3, phase: 'work', visibility: 'public',
       actorPlayerId: p.id, newlyUsedTiles: used,
     }

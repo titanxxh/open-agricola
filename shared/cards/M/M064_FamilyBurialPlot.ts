@@ -1,8 +1,9 @@
+import { addFarmyardSpaceState } from '../../domain/farm-operations'
 import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { getFarmyardTilePositions, positionKey } from '../../domain/farm'
 import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
-import { addFarmyardSpaceState, getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
+import { getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -14,16 +15,17 @@ const availableTiles = (player: Parameters<typeof getUsedFarmyardTileKeys>[0]) =
   return getFarmyardTilePositions(player).filter((tile) => !used.has(positionKey(tile)))
 }
 
-registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
+registerSelectionEffect(SELECTION_EFFECT, ({ player, positions, eventSink, recordFarmOperation }) => {
   const spaceKey = positions[0]
   if (!spaceKey) return
-  addFarmyardSpaceState(player, {
+  const operation = addFarmyardSpaceState(player, {
     spaceKey,
     sourceCardId: CARD_ID,
     kind: 'blocked-farmyard-space',
     bonusVp: 1,
     blocksPlacement: true,
-  })
+  }, eventSink)
+  recordFarmOperation?.(operation)
 })
 
 const cardImpl = {

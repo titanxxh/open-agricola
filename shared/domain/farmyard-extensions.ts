@@ -3,7 +3,7 @@ import {
   getAllTilePositions,
   getFarmyardTileKeySet,
   positionKey,
-} from './farm'
+} from './farmyard-geometry'
 
 const directions = [
   { dr: -1, dc: 0 },
@@ -69,21 +69,17 @@ export const getFarmyardExtensionCandidates = (
   return [...groups.values()]
 }
 
-export const addFarmyardExtension = (
+export const planFarmyardExtension = (
   player: PlayerState,
   sourceCardId: string,
   tiles: FarmTilePosition[],
 ) => {
   const normalized = normalizeTwoTiles(tiles)
-  if (!normalized || !isValidFarmyardExtensionTiles(player, normalized)) return false
+  if (!normalized || !isValidFarmyardExtensionTiles(player, normalized)) return undefined
   const index = (player.farmyardExtensions ?? []).length + 1
-  player.farmyardExtensions = [
-    ...(player.farmyardExtensions ?? []),
-    {
+  return {
       id: `${sourceCardId}-${index}`,
       sourceCardId,
       tiles: normalized,
-    },
-  ]
-  return true
+  }
 }

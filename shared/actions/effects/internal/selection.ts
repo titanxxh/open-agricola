@@ -8,8 +8,6 @@ import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selec
 import { buildFarmPositionSelectionInteraction } from '../../../domain/farmyard-interaction'
 import { validateOccupationHandSelection } from '../../../domain/occupation-hand-selection'
 import { describeTerrainSelection } from '../../../moor/terrain-flow'
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../../domain/farmyard-usage'
-import { getFarmyardTilePositions, positionKey } from '../../../domain/farmyard-geometry'
 
 const validateFarmPositions = (
   positions: string[],
@@ -105,8 +103,6 @@ export const selectionAction: ActionDefinition = {
     const farmOperations: FarmOperationResult[] = []
     if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {
-      const usedBefore = getUsedFarmyardTileKeys(player)
-      const existingTiles = new Set(getFarmyardTilePositions(player).map(positionKey))
       const followup = runSelectionEffect(effect, {
         player,
         positions,
@@ -118,11 +114,6 @@ export const selectionAction: ActionDefinition = {
         reportProtectedObservation,
         recordFarmOperation: result => farmOperations.push(result),
       })
-      const newlyUsedTiles = getNewlyUsedFarmyardTiles(player, usedBefore)
-        .filter(tile => existingTiles.has(positionKey(tile)))
-      if (farmOperations.length === 0 && newlyUsedTiles.length > 0) {
-        eventSink?.emit<'farm.spacesUsed'>({ type: 'farm.spacesUsed', sourceCardId: sourceCard, newlyUsedTiles })
-      }
       if (followup) {
         return { type: 'flow', flow: followup, extraData, ...(farmOperations.length ? { farmOperations } : {}) }
       }

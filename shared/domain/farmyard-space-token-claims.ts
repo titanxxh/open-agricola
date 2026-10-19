@@ -1,3 +1,4 @@
+import { commitFarmOperation } from './farm-operations'
 import type { FarmTilePosition, PlayerState, Resource } from '../contract/types'
 import { positionKey } from './farm'
 import { getUsedFarmyardTileKeys } from './farmyard-usage'
@@ -31,7 +32,7 @@ export const claimFarmyardGoodsTokens = (
     addResources(gained, state.resources)
     return false
   })
-  player.farmyardSpaceStates = remaining
+  commitFarmOperation(player, { kind: 'space-states', positions: [], states: remaining, sourceCardId })
   return gained
 }
 
@@ -68,7 +69,7 @@ export const claimFieldGoodsTokens = (
     addResources(gained, state.resources)
     return false
   })
-  player.farmyardSpaceStates = remaining
+  commitFarmOperation(player, { kind: 'space-states', positions: [], states: remaining, sourceCardId })
   return gained
 }
 

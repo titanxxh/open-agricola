@@ -32,7 +32,7 @@ anytime                  注册额外的 anytime 行动
 
 - 农场修改事件（`farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt`、`farm.fenceBuilt`）携带 `newlyUsedTiles`，在修改前后、尾随反应之前捕获。围栏提交还携带 `newlyEnclosedPastureTiles`。每个共同农场操作都为新增已用坐标发出 `farm.spacesUsed`；封锁状态修改使用同一事实。地形操作还发出包含层变化和新田的 `farm.terrainChanged`。计划领取的房间同样发出 `farm.roomBuilt`。
 - 建房、建厩、犁地、围栏和地形的行动结果在原宿主完成点保留 `farmOperations`。结果与同一宿主的 `actionEvents` 一起经过支付子流程和持久化等待；嵌套行动各自持有结果，父行动不重新交付子操作。反应复用现有 owner/phase trigger-select，操作内部不另设 dispatcher。见 `server/__tests__/farm-operation-session.test.ts`。
-- 地形消费者使用 `getActionTerrainOperations()`，先读取原结果收据，再回退到事件，避免返回 flow 的 sibling 将嵌套子操作当作父操作变化。Moor 特殊行动的延迟反应序列化自身捕获的地形事实。已用格消费者通过 `getActionNewlyUsedTiles()` / `getNewlyEnclosedPastureTiles()` 从宿主捕获的 `actionEvents` 读取这些已提交事实并按玩家过滤；不从后来的几何重建差异，不保存行动前缓存，也不回退到更大的 Turn 范围。
+- 地形消费者使用 `getActionTerrainOperations()`，先读取原结果收据，再回退到事件，避免返回 flow 的 sibling 将嵌套子操作当作父操作变化。Moor 特殊行动的延迟反应序列化自身捕获的地形事实。已用格消费者订阅 `farm.spacesUsed`，通过 `getActionNewlyUsedTiles()` 优先读取原结果收据，只回退到本宿主已提交的 `actionEvents`；围栏范围使用 `getNewlyEnclosedPastureTiles()`，均按玩家过滤；不从后来的几何重建差异，不保存行动前缓存，也不回退到更大的 Turn 范围。
 - 印刷的围栏数量与触发只计算普通 `type='fence'` 段（`hasOrdinaryFenceBuiltEvent()`）。
 - 动物兑换经 exchange / trade 路径扣减，使已安置动物保持同步。按 trade 的资源门槛使用 `immediatelyAfter.trade-applied` 与 `extraData.preResources`。
 

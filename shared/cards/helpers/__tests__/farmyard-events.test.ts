@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../../domain/farm-operations'
 import { describe, expect, it } from 'vitest'
 import { createInitialState } from '../../../session/state-bootstrap'
 import type { GameEvent } from '../../../contract/events'
@@ -27,4 +28,14 @@ describe('committed host farmyard usage', () => {
     expect(getActionNewlyUsedTiles(context)).toEqual([])
     expect(getActionNewlyUsedTiles({ ...context, actionEvents: undefined })).toEqual([])
   })
+  it('keeps the original result receipt separate from nested child facts and later live geometry', () => {
+    const owner = structuredClone(player)
+    const outer = commitFarmOperation(owner, { kind: 'stables', positions: [{ row: 0, col: 1 }] })
+    commitFarmOperation(owner, { kind: 'stables', positions: [{ row: 1, col: 3 }] })
+    expect(getActionNewlyUsedTiles({ player: owner, result: { type: 'ok', farmOperations: [outer] }, actionEvents: [used] }))
+      .toEqual([{ playerId: owner.id, row: 0, col: 1 }])
+    expect(getActionNewlyUsedTiles({ player: owner, result: { type: 'flow', flow: { type: 'leaf', actionId: 'gain' }, farmOperations: [] }, actionEvents: [used] }))
+      .toEqual([])
+  })
+
 })

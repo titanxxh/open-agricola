@@ -27,7 +27,7 @@ shared/domain/
 
 **农场。**
 
-- `farm-operations.ts` 将建房、建厩、犁地、围栏、牧场和地形方案提交到权威玩家状态。校验器只准备投影，由共同操作实际写入。独立的 `FarmOperationResult` 捕获成功坐标及修改前后布局；新增已用格只包含操作前已存在的坐标。结果归属原行动宿主。游戏操作通过该宿主的事件 sink 为新增已用坐标发出 `farm.spacesUsed`；建局和恢复不派发反应。牧场转换续行可通过 `replacesTerrain` 携带原地形变化；操作将被替换坐标纳入临时已用基准，地形连续转牧场不会产生虚假的新增已用事实。独立的后续操作只读取当时几何。
+- `farm-operations.ts` 将建房、建厩、犁地、围栏、牧场、地形、扩展、格子状态及作物方案提交到权威玩家状态。校验器只准备投影，由共同操作实际写入，包含移除厩和围栏。`FARM_LAYOUT_KEYS` 定义结构快照与写入边界；格子状态与扩展放置 helper 也经该 owner 提交，扩展初始地形和新增坐标为同一次操作。独立的 `FarmOperationResult` 捕获成功坐标及修改前后布局；新增已用格只包含操作前已存在的坐标。结果归属原行动宿主。游戏操作通过该宿主的事件 sink 为新增已用坐标发出 `farm.spacesUsed`；建局和恢复不派发反应。牧场转换续行可通过 `replacesTerrain` 携带原地形变化；操作将被替换坐标纳入临时已用基准，地形连续转牧场不会产生虚假的新增已用事实。独立的后续操作只读取当时几何。
 - 已用 / 未用格只从 `farmyard-usage-core.ts` 读取，包含扩展、地形、封锁格与派生的牧场格；`farmyard-usage.ts` 与 `farm.ts` 只是兼容 facade。卡牌从不手动数格子。房间、地形、田地、马厩与牧场格始终计为已用；`farmyardSpaceStates` 中的条目只有带 `blocksPlacement` 时才计入。
 - 牧场持久化身份、格子与动物安置。`getPastureSize()`、`getPastureStableCount()` 与 `getFencedStableCount()` 派生其余信息；`getPastureViews()` 返回独立视图；序列化的 `size` / `stables` 只用于展示，加载时剥离。
 - 农场与行动格来源使用 source / type metadata：`FenceSegment.type/source`、`WorkerRef.synthetic`、`ActionSpace.blockedBy`、supply token helper、跨人数的行动格类别 helper、预留标记与附件。基础行动定义按 2–6 人过滤；5/6 人专属格单独建模。

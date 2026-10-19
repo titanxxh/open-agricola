@@ -48,7 +48,7 @@ const allowedContextResultUses = {
   },
   'shared/cards/helpers/farmyard-events.ts': {
     reason: 'reads original-host typed farm operation receipts for geometry, excluding nested child facts; never resource results',
-    expectedContextResultReferences: 3,
+    expectedContextResultReferences: 6,
     expectedResultPaths: ['farmOperations', 'type'],
   },
   'shared/cards/A/A094_LazySowman.ts': {

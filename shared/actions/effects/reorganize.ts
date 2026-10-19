@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../domain/farm-operations'
 import { areZoneOccupancyLimitsSatisfied } from '../../contract/animal-zone-occupancy'
 import { buildAnimalReorgRequest } from '../../domain/animal-reorg'
 import { playerBoard } from '../../domain'
@@ -175,13 +176,13 @@ const applyReorganizeMutate = (
   }
 
   const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
-  player.pastures = player.pastures.map((p) => {
+  commitFarmOperation(player, { kind: 'pastures', positions: [], pastures: player.pastures.map((p) => {
     const a = pastureZones.find((z) => z.id === p.id)
     const animalType = normalizeAnimalType(a?.animalType)
     if (!a || !animalType) return { ...p, animalType: null, animalCount: 0 }
     const count = Math.max(0, Math.min(cap(p.id), a.animalCount))
     return { ...p, animalType: count > 0 ? animalType : null, animalCount: count }
-  })
+  }) })
 
   player.houseAnimals = Object.fromEntries(zones
     .filter(zone => zone.zoneType === 'house' && zone.animalType && zone.animalCount > 0)

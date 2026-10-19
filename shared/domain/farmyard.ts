@@ -386,41 +386,30 @@ const enforcePastureAnimalCapacity = (
       ((player.resources?.[animalType] ?? 0) as number) - (nonPastureTotals[animalType] ?? 0),
     )
   }
-  player.pastures = (player.pastures ?? []).map((pasture) => {
+  for (const pasture of player.pastures ?? []) {
     const capacity = getPastureCapacity(player, pasture)
     if (pasture.animalType) {
       const remaining = totals[pasture.animalType] ?? 0
       const count = Math.min(remaining, capacity)
       totals[pasture.animalType] = remaining - count
-      return {
-        ...pasture,
-        animalCount: count,
-        animalType: count > 0 ? pasture.animalType : null,
-      }
-    }
-    return { ...pasture, animalCount: 0, animalType: null }
-  })
-  const fillPasture = (pasture: Pasture, animalType: Pasture['animalType']) => {
-    if (!animalType) return pasture
-    const capacity = getPastureCapacity(player, pasture)
-    const remaining = totals[animalType] ?? 0
-    if (remaining <= 0) return pasture
-    const count = Math.min(remaining, capacity)
-    totals[animalType] = remaining - count
-    return {
-      ...pasture,
-      animalType,
-      animalCount: count,
+      pasture.animalCount = count
+      if (count === 0) pasture.animalType = null
+    } else {
+      pasture.animalCount = 0
     }
   }
-  player.pastures = player.pastures.map((pasture) => {
-    if (pasture.animalType) return pasture
+  for (const pasture of player.pastures) {
+    if (pasture.animalType) continue
     for (const animalType of animalTypes) {
-      const next = fillPasture(pasture, animalType)
-      if (next.animalType) return next
+      const remaining = totals[animalType] ?? 0
+      if (remaining <= 0) continue
+      const count = Math.min(remaining, getPastureCapacity(player, pasture))
+      totals[animalType] = remaining - count
+      pasture.animalType = animalType
+      pasture.animalCount = count
+      break
     }
-    return pasture
-  })
+  }
   animalTypes.forEach((animalType) => {
     const pastureCount = player.pastures
       .filter((pasture) => pasture.animalType === animalType)
