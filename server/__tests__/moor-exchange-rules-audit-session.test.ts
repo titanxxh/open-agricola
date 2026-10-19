@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { setupMoorAudit, playMoorAuditMinor, startMoorAuditFeeding, advanceMoorAuditToRound, acceptMoorAuditChoice } from './_helpers/moor-rules-audit'
 import { takeMajorImprovementFromSupply, moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 
 describe('Moor exchange printed-rule native audit', () => {
   it.each([
@@ -84,7 +85,7 @@ describe('Moor exchange printed-rule native audit', () => {
     ['Major_Moor_BasketStall', 'reed', 'wood'],
     ['Major_Moor_BasketStall', 'reed', 'clay'],
     ['Major_Moor_BasketStall', 'reed', 'stone'],
-  ] as const)('%s exchanges %s for %s and caps the requested quantity at the available resource', (cardId, from, to) => {
+  ] as const)('%s rejects excess %s for %s quantities and accepts the exact legal retry', (cardId, from, to) => {
     const session = setupMoorAudit()
     session.state.players[0]!.improvements = [cardId]
     session.state.players[0]!.resources[from] = 1
@@ -98,7 +99,8 @@ describe('Moor exchange printed-rule native audit', () => {
     const rejected = session.resolveChoice(1, `bulk:${index}=2`)
     expect(rejected.ok).toBe(false)
     expect(rejected.state.players).toEqual(before)
-    const traded = session.resolveChoice(0, `bulk:${index}=2`)
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, `bulk:${index}=2`))
+    const traded = session.resolveChoice(0, `bulk:${index}=1`)
     expect(traded.ok, traded.error).toBe(true)
     expect(traded.state.players[0]!.resources).toEqual({ ...before[0]!.resources, [from]: 0, [to]: before[0]!.resources[to] + 1 })
     expect(traded.state.players[1]).toEqual(before[1])
