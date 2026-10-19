@@ -6,7 +6,7 @@ import { sumResourcePaid } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D074_RoyalWood'
-const TRACKED_PAIRED_ACTIONS = ['construct']
+const TRACKED_PAIRED_ACTIONS = ['construct'] satisfies NonNullable<CardListenerRegistration['actions']>
 const TRACKED_PAIRED_PURPOSES = new Set(['construct'])
 const TRACKED_PAY_PURPOSES = new Set(['major-improvement', 'minor-improvement', 'stables'])
 

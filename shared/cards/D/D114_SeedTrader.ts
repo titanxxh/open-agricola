@@ -21,6 +21,7 @@ const CARD_ID = 'D114_SeedTrader'
 const anytimeListener: CardListenerRegistration = {
   id: 'D114-seed-trader-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

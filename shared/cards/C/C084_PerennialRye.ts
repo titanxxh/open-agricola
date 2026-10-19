@@ -14,6 +14,7 @@ const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
 const anytimeListener: CardListenerRegistration = {
   id: 'C84-perennial-rye-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return

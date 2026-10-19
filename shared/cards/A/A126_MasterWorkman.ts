@@ -33,6 +33,7 @@ const masterWorkmanBeforeListener: CardListenerRegistration = {
 const masterWorkmanIsDoableListener: CardListenerRegistration = {
   id: 'A126-master-workman-isdoable',
   cardIds: [CARD_ID],
+  globalQuery: true,
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return

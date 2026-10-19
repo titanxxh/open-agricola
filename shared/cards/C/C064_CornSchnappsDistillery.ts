@@ -10,6 +10,7 @@ const CARD_ID = 'C064_CornSchnappsDistillery'
 const anytimeListener: CardListenerRegistration = {
   id: 'C64-corn-schnapps-distillery-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return

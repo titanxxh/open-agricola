@@ -9,6 +9,7 @@ const CARD_ID = 'E062_SourDough'
 const anytimeListener: CardListenerRegistration = {
   id: 'E62-sour-dough-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   replacesTurn: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

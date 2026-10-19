@@ -90,7 +90,7 @@ import {
 } from '../cards/custom-registry.ts'
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { validateFarmChoice, type FarmChoiceType, type FarmChoiceValidation } from './farm-choice-validation.ts'
-import { assertSandboxListenerPhases } from '../custom-code/sandbox-listener-phases.ts'
+import { assertSandboxListenerManifest } from '../custom-code/sandbox-listener-phases.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { withActiveRegistry } from '../cards/active-registry.ts'
 import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
@@ -814,7 +814,7 @@ export class GameCore {
     // Reject incompatible executable snapshots before registration's warning-only
     // fallback can leave a card with missing rules, in either runtime.
     for (const card of customCards ?? []) {
-      if (card.compiledCode && card.codeManifest) assertSandboxListenerPhases(card.cardJson.id, card.codeManifest)
+      if (card.compiledCode && card.codeManifest) assertSandboxListenerManifest(card.cardJson.id, card.codeManifest)
     }
     const isFreshState = stateOrSeed === undefined || typeof stateOrSeed === 'number'
     this.parentSelectionSeed = initialStateOptions?.parentSelectionSeed

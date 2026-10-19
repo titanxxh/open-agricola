@@ -53,6 +53,7 @@ const reapCropSpaces = (player: PlayerState) => {
 const anytimeListener: CardListenerRegistration = {
   id: 'M111-no-till-farming-discard-crops',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const tiles = discardableTiles(context.player)

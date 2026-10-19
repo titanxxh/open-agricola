@@ -55,6 +55,7 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
 const isDoableListener: CardListenerRegistration = {
   id: 'C158-forest-campaigner-isdoable-action-space',
   cardIds: [CARD_ID],
+  globalQuery: true,
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return

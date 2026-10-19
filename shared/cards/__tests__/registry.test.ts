@@ -25,16 +25,16 @@ describe('CardRegistry', () => {
 
   it('selects active-card and global listener candidates', () => {
     const registry = new CardRegistry()
-    const active = { id: 'active', cardIds: ['X1_Test'] } satisfies CardListenerRegistration
-    const inactive = { id: 'inactive', cardIds: ['X2_Test'] } satisfies CardListenerRegistration
-    const global = { id: 'global' } satisfies CardListenerRegistration
+    const active = { id: 'active', cardIds: ['X1_Test'], actions: ['collect'], phases: ['after'] } satisfies CardListenerRegistration
+    const inactive = { id: 'inactive', cardIds: ['X2_Test'], actions: ['collect'], phases: ['after'] } satisfies CardListenerRegistration
+    const global = { id: 'global', actions: ['collect'], phases: ['after'] } satisfies CardListenerRegistration
     registry.loadImpl('X1_Test', { listeners: [active] })
     registry.loadImpl('X2_Test', { listeners: [inactive] })
     registry.loadImpl('X_Global', { listeners: [global] })
 
     expect(registry.getCandidateListeners(['X1_Test'])).toEqual([global, active])
 
-    const added = { id: 'added' } satisfies CardListenerRegistration
+    const added = { id: 'added', actions: ['collect'], phases: ['after'] } satisfies CardListenerRegistration
     registry.addListener('__global__', added)
     expect(registry.getCandidateListeners(['X1_Test'])).toEqual([global, added, active])
   })
@@ -51,11 +51,13 @@ describe('CardRegistry', () => {
     const officialListener: CardListenerRegistration = {
       id: 'official-listener',
       cardIds: ['X1_Test'],
+      actions: ['collect'], phases: ['after'],
       handler: () => undefined,
     }
     const testListener: CardListenerRegistration = {
       id: 'test-listener',
       cardIds: ['X2_Test'],
+      actions: ['collect'], phases: ['after'],
       handler: () => undefined,
     }
     registry.loadImpl('X1_Test', {
@@ -81,6 +83,7 @@ describe('CardRegistry', () => {
     const listener: CardListenerRegistration = {
       id: 'test-listener',
       cardIds: ['X1_Test'],
+      actions: ['collect'], phases: ['after'],
       handler: () => undefined,
     }
     registry.loadImpl('X1_Test', { listeners: [listener] })

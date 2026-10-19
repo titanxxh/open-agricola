@@ -9,6 +9,7 @@ const CARD_ID = 'A170_Hayward'
 const anytimeListener: CardListenerRegistration = {
   id: 'A170-hayward-anytime-fence',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!canStartFencing(context.actionHooks, context.state, context.player)) return

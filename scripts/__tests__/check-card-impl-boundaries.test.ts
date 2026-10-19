@@ -21,6 +21,26 @@ const writeFixture = (root: string, rel: string, content: string): string => {
 }
 
 describe('check-card-impl-boundaries', () => {
+  it.each([
+    {}, { actions: [] }, { actions: ['unknown'] },
+    ...['store-on-card', 'take-from-card', 'pop-card-stack', 'spend-worker', 'special-effect', 'harvest-feed-conversion', 'selection']
+      .map(action => ({ actions: ['collect', action] })),
+    { actions: ['collect'], phases: [] }, { actions: ['collect'], phases: ['anytime'] },
+    { actions: ['trade-applied'], phases: ['after'] },
+    { globalQuery: true, actions: ['collect'] },
+  ])('rejects actual factory/spread-expanded subscriptions %j', filters => {
+    const root = mkdtempSync(path.join(tmpdir(), 'listener-target-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts',
+      "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' }, impl: { listeners: [{...makeListener()}] } })")
+    const makeListener = () => ({ id: 'factory-listener', phases: ['after'], handler: () => undefined, ...filters })
+    const result = checkCardImplBoundaries([file], [{ cardId: 'A001_Shelter', file, listeners: [
+      { id: 'scope', actions: ['collect'], phases: ['after'], handler: () => undefined }, makeListener(),
+    ] }])
+    expect(result.scopeErrors).toEqual([])
+    expect(result.violations).toEqual([expect.objectContaining({ kind: 'listener-subscription-contract' })])
+    expect(cardImplBoundaryExitCode(result)).toBe(1)
+  })
+
   it('fails closed on a missing deck and malformed source', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'card-scope-'))
     expect(() => walkProductionCardFiles(root)).toThrow()
@@ -83,7 +103,7 @@ describe('check-card-impl-boundaries', () => {
     expect(checkCardImplBoundaries([file], [{
       cardId: 'A001_Shelter',
       file,
-      listeners: [{ id: 'resolved-listener', phases: ['after'], handler: () => undefined }],
+      listeners: [{ id: 'resolved-listener', actions: ['collect'], phases: ['after'], handler: () => undefined }],
     }])).toMatchObject({
       filesChecked: 1,
       cardSourcesChecked: 1,
@@ -110,7 +130,7 @@ describe('check-card-impl-boundaries', () => {
       const result = checkCardImplBoundaries([file], [{
         cardId: 'A001_Shelter',
         file,
-        listeners: [{ id: 'resolved-listener', phases: [phase], handler }],
+        listeners: [{ id: 'resolved-listener', actions: ['collect'], phases: [phase], handler }],
       }])
 
       expect(result.violations).toEqual([
@@ -142,8 +162,8 @@ describe('check-card-impl-boundaries', () => {
       cardId: 'A001_Shelter',
       file,
       listeners: [
-        { id: 'before', phases: ['before'], handler: before },
-        { id: 'after', phases: ['after'], handler: after },
+        { id: 'before', actions: ['collect'], phases: ['before'], handler: before },
+        { id: 'after', actions: ['collect'], phases: ['after'], handler: after },
       ],
     }]).violations).toEqual([])
   })
@@ -163,7 +183,7 @@ describe('check-card-impl-boundaries', () => {
     expect(checkCardImplBoundaries([file], [{
       cardId: 'A001_Shelter',
       file,
-      listeners: [{ id: 'after', phases: ['after'], handler }],
+      listeners: [{ id: 'after', actions: ['collect'], phases: ['after'], handler }],
     }]).violations).toEqual([])
   })
 
@@ -203,7 +223,7 @@ describe('check-card-impl-boundaries', () => {
     expect(checkCardImplBoundaries(files, [{
       cardId: 'A001_Shelter',
       file: files[0]!,
-      listeners: [{ id: 'after', phases: ['after'], handler: () => undefined }],
+      listeners: [{ id: 'after', actions: ['collect'], phases: ['after'], handler: () => undefined }],
     }]).scopeErrors).toContain(
       'runtime Card Impl scope mismatch: missing A002_ShiftingCultivation; unexpected none',
     )
@@ -222,7 +242,7 @@ describe('check-card-impl-boundaries', () => {
     const { scopeErrors } = checkCardImplBoundaries([file], [{
       cardId: 'A001_Shelter',
       file,
-      listeners: [{ id: 'native', phases: ['after'], handler: Array.prototype.push }],
+      listeners: [{ id: 'native', actions: ['collect'], phases: ['after'], handler: Array.prototype.push }],
     }])
     expect(scopeErrors).toContain('cannot parse trailing listener A001_Shelter:native')
     expect(scopeErrors).toContain('cannot parse listener handler A001_Shelter:native')
@@ -534,8 +554,8 @@ describe('listener state mutation scan', () => {
       '})',
     ].join('\n'))
     const listener = role === 'handler'
-      ? { id: 'scanned', phases: ['after'], handler: fn }
-      : { id: 'scanned', phases: ['after'], handler: () => undefined, deriveCardCostCandidate: fn }
+      ? { id: 'scanned', actions: ['collect'], phases: ['after'], handler: fn }
+      : { id: 'scanned', actions: ['collect'], phases: ['after'], handler: () => undefined, deriveCardCostCandidate: fn }
     return checkCardImplBoundaries([file], [{ cardId: 'A001_Shelter', file, listeners: [listener] }])
   }
 
@@ -617,8 +637,8 @@ describe('listener state mutation scan', () => {
       cardId: 'A001_Shelter',
       file,
       listeners: [
-        { id: 'costs', phases: ['computeCosts'], handler: () => undefined, deriveCardCostCandidate: (_ctx: unknown, candidate: unknown) => candidate },
-        { id: 'after', phases: ['after'], handler: () => undefined },
+        { id: 'costs', actions: ['collect'], phases: ['computeCosts'], handler: () => undefined, deriveCardCostCandidate: (_ctx: unknown, candidate: unknown) => candidate },
+        { id: 'after', actions: ['collect'], phases: ['after'], handler: () => undefined },
       ],
     }])).toMatchObject({
       listenerHandlersChecked: 2,

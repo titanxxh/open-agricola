@@ -4,13 +4,11 @@ import {
   assertCustomEffectResult, extraHookArguments, isFlowResultHook, normalizeCustomManifest, QUERY_HOOK_RESULT_KINDS,
   registeredEffectMetadata, registeredListenerData, type RawCustomManifest,
 } from '../contract-admission'
-import { sandboxListenerActions } from '../sandbox-listener-actions'
-import { sandboxListenerPhases } from '../sandbox-listener-phases'
 
 const CARD_ID = 'CUSTOM_Admission'
 const manifest = (overrides: Partial<RawCustomManifest>): RawCustomManifest => ({ effectKeys: [], listeners: [], ...overrides })
 const listener = (fields: Partial<RawCustomManifest['listeners'][number]>) =>
-  manifest({ listeners: [{ registrationId: `${CARD_ID}:listener:0`, ...fields }] })
+  manifest({ listeners: [{ registrationId: `${CARD_ID}:listener:0`, actions: ['collect'], phases: ['after'], ...fields }] })
 
 describe('normalizeCustomManifest', () => {
   it.each([
@@ -18,7 +16,7 @@ describe('normalizeCustomManifest', () => {
     { actions: ['collect'], phases: ['anytime'] }, { actions: ['place-farmer'], phases: ['immediatelyAfter'] },
     { actions: ['collect'], phases: ['after'], events: ['farm.sown'] },
   ])('rejects implicit or incompatible listener filters %j', filters => {
-    expect(() => normalizeCustomManifest(listener(filters), CARD_ID)).toThrow()
+    expect(() => normalizeCustomManifest(manifest({ listeners: [{ registrationId: 'invalid', ...filters }] }), CARD_ID)).toThrow()
   })
   it('keeps declared contract values', () => {
     expect(normalizeCustomManifest({
@@ -32,18 +30,15 @@ describe('normalizeCustomManifest', () => {
     })
   })
 
-  it('binds a listener to its own card and omitted filters to the deployed sets', () => {
+  it('binds a listener to its own card and preserves explicit query identities', () => {
     const [bound] = normalizeCustomManifest(listener({}), CARD_ID).listeners
     expect(bound!.cardIds).toEqual([CARD_ID])
-    expect(bound!.phases).toEqual([...sandboxListenerPhases])
-    // The two query phases are dispatched under their own identity, which no card writes.
-    expect(bound!.actions).toEqual([...sandboxListenerActions, 'anytime', 'compute-exchanges'])
-    expect(normalizeCustomManifest(listener({ phases: ['after'] }), CARD_ID).listeners[0]!.actions)
-      .toEqual([...sandboxListenerActions])
-    expect(normalizeCustomManifest(listener({ phases: ['anytime'] }), CARD_ID).listeners[0]!.actions)
-      .toEqual([...sandboxListenerActions, 'anytime'])
-    expect(normalizeCustomManifest(listener({ phases: ['computeExchanges'] }), CARD_ID).listeners[0]!.actions)
-      .toEqual([...sandboxListenerActions, 'compute-exchanges'])
+    expect(bound!.phases).toEqual(['after'])
+    expect(bound!.actions).toEqual(['collect'])
+    expect(normalizeCustomManifest(listener({ actions: ['anytime'], phases: ['anytime'] }), CARD_ID).listeners[0]!.actions)
+      .toEqual(['anytime'])
+    expect(normalizeCustomManifest(listener({ actions: ['compute-exchanges'], phases: ['computeExchanges'] }), CARD_ID).listeners[0]!.actions)
+      .toEqual(['compute-exchanges'])
   })
 
   it.each([
@@ -63,7 +58,7 @@ describe('normalizeCustomManifest', () => {
     }
     const data = { zones: ['hand', 'played'], mandatory: true, preScoring: true, replacesTurn: false, blockedAnytimeInteractionKinds: ['animal-reorg'] }
     const normalized = normalizeCustomManifest({
-      effectKeys: [], effectMetadata: metadata, listeners: [{ registrationId: `${CARD_ID}:listener:0`, phases: ['anytime'], ...data }],
+      effectKeys: [], effectMetadata: metadata, listeners: [{ registrationId: `${CARD_ID}:listener:0`, actions: ['anytime'], phases: ['anytime'], ...data }],
     }, CARD_ID)
 
     expect(normalized.effectMetadata).toEqual(metadata)

@@ -11,6 +11,7 @@ const VALID_FROM_RESOURCES: readonly string[] = ['vegetable', 'sheep', 'boar', '
 const computeExchangesListener: CardListenerRegistration = {
   id: 'C62-cookery-extension-compute-exchanges',
   cardIds: [CARD_ID],
+  actions: ['compute-exchanges'],
   phases: ['computeExchanges' as ActionHookPhase],
   handler: (ctx) => {
     const window = (ctx.extraData as { window?: string } | undefined)?.window

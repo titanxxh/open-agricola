@@ -93,9 +93,12 @@ export class CardRegistry {
 
   /** Append a single listener to a card, preserving existing ones; dedupes by id. */
   addListener(cardId: string, listener: CardListenerRegistration): void {
-    const snapshot = snapshotCardListener(listener)
+    this.addListenerSnapshot(cardId, snapshotCardListener(listener))
+  }
+
+  private addListenerSnapshot(cardId: string, snapshot: CardListenerRegistration): void {
     const existing = this.listenersByCard.get(cardId) ?? []
-    const filtered = existing.filter((l) => l.id !== listener.id)
+    const filtered = existing.filter((l) => l.id !== snapshot.id)
     filtered.push(snapshot)
     this.listenersByCard.set(cardId, filtered)
     this.listenersWithoutCardIds = null
@@ -111,7 +114,7 @@ export class CardRegistry {
     const ids = snapshot.cardIds && snapshot.cardIds.length > 0
       ? snapshot.cardIds
       : ['__global__']
-    for (const id of ids) this.addListener(id, snapshot)
+    for (const id of ids) this.addListenerSnapshot(id, snapshot)
   }
 
   /** Set or replace the effect keyed by its id. */

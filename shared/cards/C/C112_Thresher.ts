@@ -25,7 +25,7 @@ const CARD_ID = 'C112_Thresher'
  *
  * Players: 1+.
  */
-const TRIGGER_SPACE_IDS = ['grain-utilization', 'farmland', 'cultivation']
+const TRIGGER_SPACE_IDS = ['grain-utilization', 'farmland', 'cultivation'] satisfies NonNullable<CardListenerRegistration['actions']>
 
 const beforeListener: CardListenerRegistration = {
   id: 'C112-thresher-before-place-farmer',

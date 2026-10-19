@@ -13,14 +13,14 @@ const valid = (): CardListenerRegistration => ({
 
 describe('listener registration admission', () => {
   it.each(['loadImpl', 'addListener', 'registerListener', 'session'] as const)('%s rejects an internal execution target without installing it', entry => {
-    const listener: CardListenerRegistration = { ...valid(), actions: ['collect', 'special-effect'] }
+    const listener = { ...valid(), actions: ['collect', 'special-effect'] }
     const registry = new CardRegistry()
     const session = new SessionCardContext()
     const register = () => {
-      if (entry === 'loadImpl') registry.loadImpl('TEST_Listener', { listeners: [valid(), listener] })
-      else if (entry === 'addListener') registry.addListener('TEST_Listener', listener)
-      else if (entry === 'registerListener') registry.registerListener(listener)
-      else session.registerListener(listener)
+      if (entry === 'loadImpl') Reflect.apply(registry.loadImpl, registry, ['TEST_Listener', { listeners: [valid(), listener] }])
+      else if (entry === 'addListener') Reflect.apply(registry.addListener, registry, ['TEST_Listener', listener])
+      else if (entry === 'registerListener') Reflect.apply(registry.registerListener, registry, [listener])
+      else Reflect.apply(session.registerListener, session, [listener])
     }
     expect(register).toThrow(/listener|target/i)
     expect(registry.getAllListeners()).toEqual([])
@@ -77,5 +77,18 @@ describe('listener registration admission', () => {
     const state = createInitialState(42, { playerCount: 2 })
     expect(runCardListeners({ actionHooks: undefined, state, player: state.players[0]!, space: state.actionSpaces[0]!,
       actionId: 'grain-utilization', phase: 'isDoable' }, registry.getAllListeners())).toEqual([{ doable: false }])
+  })
+
+  it('dispatches one shared multi-card registration once for each owner card after snapshotting', () => {
+    const registry = new CardRegistry()
+    registry.registerListener({ ...valid(), cardIds: ['TEST_One', 'TEST_Two'] })
+    const state = createInitialState(42, { playerCount: 2 })
+    const player = state.players[0]!
+    player.minorPlayed = ['TEST_One', 'TEST_Two']
+    expect(withActiveRegistry(registry, () => runCardListeners({ actionHooks: undefined, state, player,
+      space: state.actionSpaces[0]!, actionId: 'collect', phase: 'after' }))).toEqual([
+      { flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } },
+      { flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } },
+    ])
   })
 })

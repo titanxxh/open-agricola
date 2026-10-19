@@ -11,6 +11,8 @@ import type { TriggerSnapshot } from './helpers/trigger-snapshot'
 import { validateCustomListenerResult } from '../custom-code/listener-result-validator'
 import { getCardListenerSource } from './card-listener-source'
 import { isPlayerSkippingCurrentHarvest } from './helpers/harvest-skip'
+import type { CardListenerAction, CardListenerEvent } from './listener-contract'
+import { snapshotCardListener } from './listener-contract'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -44,13 +46,22 @@ export type CardListenerScope = 'player' | 'opponent' | 'any'
 export type CardListenerZone = 'played' | 'hand'
 export type CardListenerOwnerZone = CardListenerZone | 'activated'
 
-export type CardListenerRegistration = {
+export type CardListenerRegistration = ({
+  actions: CardListenerAction[]
+  events?: never
+  globalQuery?: never
+} | {
+  events: CardListenerEvent[]
+  actions?: never
+  globalQuery?: never
+} | {
+  globalQuery: true
+  actions?: never
+  events?: never
+}) & {
   id: string
   cardIds?: string[]
-  actions?: string[]
-  events?: GameEvent['type'][]
-  globalQuery?: true
-  phases?: ActionHookPhase[]
+  phases: ActionHookPhase[]
   scope?: CardListenerScope
   zones?: CardListenerZone[]
   mandatory?: boolean
@@ -167,15 +178,16 @@ const matchesListenerAction = (
   contextActionId: string,
 ): boolean => {
   const actions = registration.actions
-  if (!actions) return true
-  return actions.includes(contextActionId)
+  if (!actions) return false
+  return actions.some(action => action === contextActionId)
 }
 
 const matchesListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
 ) => {
-  if (registration.events && !context.actionEvents?.some(event => registration.events?.includes(event.type))) {
+  if (!registration.actions && !registration.events && registration.globalQuery !== true) return false
+  if (registration.events && !context.actionEvents?.some(event => registration.events?.some(target => target === event.type))) {
     return false
   }
   if (registration.actions && !matchesListenerAction(registration, context.actionId)) {
@@ -480,13 +492,13 @@ export const collectBeforeActionSpaceUseFlows = (
   actionContext?: Record<string, unknown>,
 ): ActionFlow[] => collectBeforeSpaceFlows(actionHooks, state, player, space, actionContext, false)
 
-const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => ({
+const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => snapshotCardListener({
   id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId], actions: [phase === 'afterReceive' ? 'receive' : 'collect'], phases: ['after'], mandatory: true,
   handler: context => {
     const flow = timedEventFlow(context, cardId, rules, phase)
     return flow ? { flow, sourceCard: cardId } : undefined
   },
-})
+}, cardId)
 
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
   const active = requireActiveCardRegistry('getListenerById')

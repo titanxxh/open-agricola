@@ -15,6 +15,7 @@ const STACK_ITEMS = ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 
 const anytimeListener: CardListenerRegistration = {
   id: 'A102-grocer-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

@@ -26,6 +26,7 @@ const selectionFlow = (fields: ReturnType<typeof eligibleFields>): ActionFlow =>
 const anytimeListener: CardListenerRegistration = {
   id: ANYTIME_ID,
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const fields = eligibleFields(context.player)

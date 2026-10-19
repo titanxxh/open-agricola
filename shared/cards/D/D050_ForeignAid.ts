@@ -30,6 +30,7 @@ export const getBlockedSpaceIds = (state: { roundActionOrder: (string | null)[] 
 const isDoableListener: CardListenerRegistration = {
   id: 'D50-foreign-aid-isDoable',
   cardIds: [CARD_ID],
+  globalQuery: true,
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!getBlockedSpaceIds(context.state).has(context.actionId)) return

@@ -63,6 +63,7 @@ export const storedFoodCashoutListener = (
 ): CardListenerRegistration => ({
   id: listenerId,
   cardIds: [cardId],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const flow = cashoutFlow(context.player, cardId)

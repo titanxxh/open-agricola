@@ -15,6 +15,7 @@ const FREE_SINGLE_ROOM_CONTEXT = {
 const anytimeListener: CardListenerRegistration = {
   id: 'D87-master-builder-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

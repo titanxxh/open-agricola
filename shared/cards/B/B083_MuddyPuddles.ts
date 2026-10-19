@@ -15,6 +15,7 @@ const STACK_ITEMS = ['boar', 'food', 'cattle', 'food', 'sheep']
 const anytimeListener: CardListenerRegistration = {
   id: 'B83-muddy-puddles-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getCardStack(context.player, CARD_ID)

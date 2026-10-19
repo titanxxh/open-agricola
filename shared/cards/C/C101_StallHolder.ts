@@ -10,6 +10,7 @@ const CARD_ID = 'C101_StallHolder'
 const anytimeListener: CardListenerRegistration = {
   id: 'C101-stall-holder-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

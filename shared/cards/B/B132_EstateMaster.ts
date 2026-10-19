@@ -30,7 +30,7 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
  * exotic SE filled the farm via another path).
  */
 const saturationCheckListener = (
-  actionId: string,
+  actionId: NonNullable<CardListenerRegistration['actions']>[number],
 ): CardListenerRegistration => ({
   id: `B132-saturate-after-${actionId}`,
   cardIds: [CARD_ID],

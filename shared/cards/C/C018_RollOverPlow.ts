@@ -9,6 +9,7 @@ const CARD_ID = 'C018_RollOverPlow'
 const anytimeListener: CardListenerRegistration = {
   id: 'C18-roll-over-plow-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {

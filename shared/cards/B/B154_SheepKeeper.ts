@@ -10,6 +10,7 @@ const CARD_ID = 'B154_SheepKeeper'
 const anytimeListener: CardListenerRegistration = {
   id: 'B154-sheep-keeper-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return

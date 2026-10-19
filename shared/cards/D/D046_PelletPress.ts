@@ -10,6 +10,7 @@ const CARD_ID = 'D046_PelletPress'
 const anytimeListener: CardListenerRegistration = {
   id: 'D46-pellet-press-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return

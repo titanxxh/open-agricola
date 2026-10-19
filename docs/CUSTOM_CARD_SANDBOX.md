@@ -274,7 +274,7 @@ A listener entry declares `handler`, `actions`, `phases`, `scope`, and `cardIds`
 
 A listener always belongs to its own card: it reacts only while that card is in play for the player its `scope` selects, or in that player's hand when `zones` says so. `cardIds` may be omitted; when present, it must be `[CARD_ID]`.
 
-An omitted `actions` or `phases` filter means the lists in this section, with the dispatch identity added for an `anytime` or `computeExchanges` listener. It never matches action-space identities such as `forest`, or native actions and phases outside these lists.
+Every listener requires explicit, nonempty `actions` and `phases`. Every action must support every declared phase; invalid combinations reject the whole registration in source, saved manifests and both executors. `anytime` uses `actions: ['anytime']`; `computeExchanges` uses `actions: ['compute-exchanges']`. `place-farmer` supports `before`, complete-use `after` and placement `computeArgs`, not `immediatelyAfter`. Event subscriptions and global native queries are not part of the Workshop subset.
 
 `actions` accepts only these high-level action IDs. The AST validator rejects an unknown ID:
 
@@ -296,6 +296,8 @@ An omitted `actions` or `phases` filter means the lists in this section, with th
 - `bake-bread`
 - `breed`
 - `reap`
+- `anytime`
+- `compute-exchanges`
 <!-- prompt-sync:end id=listener-actions -->
 
 `sandboxListenerPhases` is the Workshop listener-phase allowlist. The AST validator rejects unsupported phases in new source. Saved executable manifests are checked before session or runtime registration; the isolated session factory checks original cards before stripping executable fields from its parent mirror. An unsupported phase rejects creation before any card effects, listeners, or workers are installed. HTTP game creation returns 400 with `code: 'unsupported_listener_phase'` and the specific phase error; WS creation reports the error before persisting the Room. `during` is unsupported and is never translated to `after`. Saved drafts and versions remain readable for editing.
@@ -538,11 +540,12 @@ To trigger after a player visits a particular action space, listen on `actions: 
 
 ### 5.6 Anytime abilities
 
-There is no separate API. Create a listener with `phases: ['anytime']` and omit `actions`:
+Create a listener with `actions: ['anytime']` and `phases: ['anytime']`:
 
 ```ts
 {
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime'],
   handler: (ctx) => {
     if (ctx.player.cardStates?.[CARD_ID]?.flagged) return

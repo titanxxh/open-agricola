@@ -20,8 +20,8 @@ const collectPhases = (
     ;(hook.phases ?? actionHookPhases).forEach((phase) => phaseSet.add(phase))
   })
   cardListeners.forEach((listener) => {
-    if (listener.actions && !listener.actions.includes(actionId)) return
-    ;(listener.phases ?? actionHookPhases).forEach((phase) => phaseSet.add(phase))
+    if (listener.actions && !listener.actions.some(target => target === actionId)) return
+    listener.phases.forEach((phase) => phaseSet.add(phase))
   })
   return actionHookPhases.filter((phase) => phaseSet.has(phase))
 }

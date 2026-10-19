@@ -52,6 +52,7 @@ const consumeRemovedLyingHorseMarkers = (player: PlayerState, animalType: Animal
 const anytimeListener: CardListenerRegistration = {
   id: 'M084-bog-pony-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (countStandingHorses(context.state, context.player) <= 0) return

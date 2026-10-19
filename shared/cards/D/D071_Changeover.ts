@@ -29,6 +29,7 @@ const eligibleFields = (state: GameState, player: PlayerState) => {
 const anytimeListener: CardListenerRegistration = {
   id: 'D71-changeover-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const fields = eligibleFields(context.state, context.player)

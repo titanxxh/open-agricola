@@ -93,6 +93,7 @@ No entries are open.
 - Do not copy mutable PHP args or in-place cost rewriting; OA keeps structured modifiers and payment enumeration.
 - Derive counter-based infobox text in the owning card's `getStatePresentation`; do not synchronize a second copy through internal storage-action listeners.
 - Subscribe action-space before / complete reactions to the existing `place-farmer` lifecycle and filter `context.space`; do not approximate complete use with wildcard internal-node reactions.
+- Keep listener permission in the shared closed target/phase contract; do not infer it from executable action registration, omit selectors, or mutate registered selector objects.
 - Reference platform status fields such as `banned` and `implemented` must not drive OA product behavior automatically.
 
 ## 6. Cards that use the reference Special Effect

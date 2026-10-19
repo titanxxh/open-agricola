@@ -33,6 +33,7 @@ const canBuildCleanerStable = (context: CardListenerContext) => {
 const anytimeListener: CardListenerRegistration = {
   id: 'C94-stable-cleaner-anytime',
   cardIds: [CARD_ID],
+  actions: ['anytime'],
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
