@@ -423,6 +423,7 @@ const CARD_IMPL = {
     registry.loadImpl('CUSTOM_ExecutorCard', {
       listeners: [{
         id: 'opaque-listener-id',
+        actions: ['construct'], phases: ['computeCosts'],
         handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
       }],
     })
@@ -442,6 +443,7 @@ const CARD_IMPL = {
     registry.loadImpl('CUSTOM_ExecutorCard', {
       listeners: [{
         id: 'opaque-listener-id',
+        actions: ['construct'], phases: ['computeCosts'],
         handler: () => ({
           __proto__: Object.fromEntries([['costs', { wood: -2 }]]),
         }),
@@ -463,6 +465,7 @@ const CARD_IMPL = {
     registry.loadImpl('CUSTOM_ExecutorCard', {
       listeners: [{
         id: 'opaque-listener-id',
+        actions: ['construct'], phases: ['computeCosts'],
         handler: () => ({
           costAttribution: [{ sourceCard: 'CUSTOM_ExecutorCard', costs: { wood: -2 } }],
         } as never),

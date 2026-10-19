@@ -23,7 +23,7 @@ const setup = (flow: ActionFlow, food = 0) => {
   session.state.currentPlayerIndex = 0
   session.state.players[0]!.resources.food = food
   const registry = (session as unknown as { registry: ActionRegistry }).registry
-  registry.register({ ...payAction, id: '__completion_pay__' })
+  registry.register({ ...payAction, id: 'construct' })
   const action: ActionDefinition = { ...registry.get('forest')!, flow, canBeExecutedByPlayer: () => true }
   registry.register(action)
   Object.assign(session.state.actionSpaces.find((space) => space.id === 'forest')!, action, { takenBy: [] })
@@ -52,7 +52,7 @@ const finishChoices = (session: GameSession, response: SessionResponse): Session
   throw new Error('test flow did not finish')
 }
 
-const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: '__completion_pay__', params: { cost: { food } } })
+const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: 'construct', params: { cost: { food } } })
 
 describe('action admission and blocked recovery through public Session commands', () => {
 
@@ -175,7 +175,7 @@ describe('action admission and blocked recovery through public Session commands'
 
   it.each(['reed', 'wood'] as const)('offers anytime before a required payment with no before listener, buying %s', (resource) => {
     const flow: ActionFlow = { type: 'seq', children: [pay(1), {
-      type: 'leaf', actionId: '__completion_pay__', params: { cost: { reed: 1 } },
+      type: 'leaf', actionId: 'construct', params: { cost: { reed: 1 } },
     }] }
     let { session } = setup(flow, 2)
     session.state.players[0]!.occupationPlayed = ['A102_Grocer']
@@ -229,20 +229,20 @@ describe('action admission and blocked recovery through public Session commands'
   })
 
   it.each([false, true])('keeps a legal alternative when the replacement ID is unavailable, nested=%s', (nested) => {
-    const child: ActionFlow = { type: 'leaf', actionId: '__review_original__' }
+    const child: ActionFlow = { type: 'leaf', actionId: 'construct' }
     const { session, registry } = setup(nested ? { type: 'or', children: [child] } : child)
     const forest = session.state.actionSpaces.find((space) => space.id === 'forest')!
-    registry.register({ ...registry.get('forest')!, id: '__review_original__', flow: undefined })
-    registry.register({ ...registry.get('__review_original__')!, id: '__review_unavailable__', canBeExecutedByPlayer: () => false })
+    registry.register({ ...registry.get('forest')!, id: 'construct', flow: undefined })
+    registry.register({ ...registry.get('construct')!, id: '__review_unavailable__', canBeExecutedByPlayer: () => false })
     forest.canBeExecutedByPlayer = deriveCanBeExecutedByFlow()
     initializeFlowDerivedCanBeExecutedByPlayer(forest, (id) => registry.get(id))
     session.actionHooks.register({
-      id: '__review_replace__', actions: ['__review_original__'], phases: ['computeReplace'],
+      id: '__review_replace__', actions: ['construct'], phases: ['computeReplace'],
       handler: () => ({ actionId: '__review_unavailable__' }),
     })
     session.state.players[0]!.occupationPlayed = ['__review_alternative__']
     session.withCtx(() => requireActiveCardRegistry('replacement alternative regression').registerListener({
-      id: '__review_alternative__', cardIds: ['__review_alternative__'], actions: ['__review_original__'], phases: ['computeReplace'],
+      id: '__review_alternative__', cardIds: ['__review_alternative__'], actions: ['construct'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } } }),
     }))
     expect(session.getActionAvailability(0).forest).toBe(true)
@@ -254,11 +254,11 @@ describe('action admission and blocked recovery through public Session commands'
 
   it('allows the player to choose the enabling before order and leaves state and private cursor unchanged while querying', () => {
     const { session } = setup({ type: 'seq', children: [pay(1)] })
-    before(session, '__completion_B__', '__completion_pay__', { type: 'seq', optional: true, children: [
+    before(session, '__completion_B__', 'construct', { type: 'seq', optional: true, children: [
       { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
       { type: 'leaf', actionId: 'gain', params: { food: 1 } },
     ] })
-    before(session, '__completion_A__', '__completion_pay__', { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true })
+    before(session, '__completion_A__', 'construct', { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true })
     const beforeQuery = JSON.stringify({ state: session.state, cursor: session.createSessionPrivateCursor() })
     expect(session.getActionAvailability(0).forest).toBe(true)
     expect(session.getActionAvailability(0).forest).toBe(true)
@@ -270,13 +270,13 @@ describe('action admission and blocked recovery through public Session commands'
   })
 
   it('re-evaluates an initially inapplicable before after another trigger, undo, and reconnect', () => {
-    const flow: ActionFlow = { type: 'leaf', actionId: '__completion_pay__', params: { cost: { food: 1 } } }
+    const flow: ActionFlow = { type: 'leaf', actionId: 'construct', params: { cost: { food: 1 } } }
     const create = () => {
       const { session } = setup(flow)
-      before(session, '__dynamic_A__', '__completion_pay__', { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true })
+      before(session, '__dynamic_A__', 'construct', { type: 'leaf', actionId: 'gain', params: { wood: 1 }, optional: true })
       session.state.players[0]!.occupationPlayed.push('__dynamic_B__')
       session.withCtx(() => requireActiveCardRegistry('dynamic before test').registerListener({
-        id: '__dynamic_B__', cardIds: ['__dynamic_B__'], actions: ['__completion_pay__'], phases: ['before'],
+        id: '__dynamic_B__', cardIds: ['__dynamic_B__'], actions: ['construct'], phases: ['before'],
         handler: ({ player }) => player.resources.wood > 0 ? { sourceCard: '__dynamic_B__', flow: {
           type: 'seq', optional: true, children: [
             { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
@@ -314,7 +314,7 @@ describe('action admission and blocked recovery through public Session commands'
 
   it('does not reuse a consumed before activation to pay a larger mandatory cost', () => {
     const { session } = setup({ type: 'seq', children: [pay(2)] })
-    before(session, '__completion_once__', '__completion_pay__', { type: 'leaf', actionId: 'gain', params: { food: 1 } })
+    before(session, '__completion_once__', 'construct', { type: 'leaf', actionId: 'gain', params: { food: 1 } })
     expect(session.getActionAvailability(0).forest).toBe(true)
     const response = finishChoices(session, session.takeAction(0, 'forest'))
     expect(response.interaction.request.kind).toBe('engine-blocked')
@@ -366,9 +366,9 @@ describe('action admission and blocked recovery through public Session commands'
     session.withCtx(() => requireActiveCardRegistry('completion session test').registerListener({
       id: cardId,
       cardIds: [cardId],
-      actions: ['forest'],
+      globalQuery: true,
       phases: ['isDoable'],
-      handler: () => ({ doable: true }),
+      handler: ({ actionId }) => actionId === 'forest' ? { doable: true } : undefined,
     }))
 
     expect(session.getActionAvailability(0).forest).toBe(true)
@@ -399,7 +399,7 @@ describe('action admission and blocked recovery through public Session commands'
 
   it('includes mandatory before payments even when the original host was initially affordable', () => {
     const { session } = setup({ type: 'seq', children: [pay(1)] }, 1)
-    before(session, '__completion_mandatory__', '__completion_pay__', pay(1), true)
+    before(session, '__completion_mandatory__', 'construct', pay(1), true)
     expect(session.getActionAvailability(0).forest).toBe(true)
     const response = finishChoices(session, session.takeAction(0, 'forest'))
     expect(response.interaction.request.kind).toBe('engine-blocked')
@@ -419,7 +419,7 @@ describe('action admission and blocked recovery through public Session commands'
 
   it.each([false, true])('restores placement and its before benefit only on explicit undo after commit failure, reconnect=%s', (reconnect) => {
     let { session, registry } = setup({ type: 'seq', children: [pay(1), { type: 'leaf', actionId: 'plow' }] })
-    before(session, '__completion_placement__', 'forest', { type: 'leaf', actionId: 'gain', params: { food: 1 } })
+    before(session, '__completion_placement__', 'construct', { type: 'leaf', actionId: 'gain', params: { food: 1 } })
     const workers = JSON.parse(JSON.stringify(session.state.players[0]!.workers))
     const pending = session.takeAction(0, 'forest')
     expect(pending.ok, pending.error).toBe(true)

@@ -93,9 +93,9 @@ describe('Session action availability probes', () => {
     const { session } = setup('leaf', !doable)
     session.withCtx(() => requireActiveCardRegistry('availability probe test').registerListener({
       id: '__availability_override__',
-      actions: ['forest'],
+      globalQuery: true,
       phases: ['isDoable'],
-      handler: () => ({ doable }),
+      handler: ({ actionId }) => actionId === 'forest' ? { doable } : undefined,
     }))
     expect(session.getActionAvailability(0).forest).toBe(doable)
     expect(session.getAvailableActions(0).some(action => action.spaceId === 'forest')).toBe(doable)

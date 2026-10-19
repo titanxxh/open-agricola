@@ -11,7 +11,7 @@ import { createWorkSession } from './_helpers/session-fixtures'
  * ADR 0025 fixed behavior test for the reaction phases before,
  * immediatelyAfter and after, on the listener actions that an ordinary
  * placement round and a Harvest dispatch without any player choice:
- * collect, place-farmer and breed. A seeded two-player game runs rounds 1-4
+ * collect and breed, plus before/after placement. A seeded two-player game runs rounds 1-4
  * and the first Harvest; both players place two workers on accumulation
  * spaces each round. Player 0 has played the card; its listeners keep the
  * default player scope and count themselves on the card state.
@@ -38,7 +38,7 @@ const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Reaction Probe' })
 const count = (key) => ({ type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
   params: { kind: 'increment-counter', key, amount: 1 } })
 const CARD_IMPL = { listeners: [
-${ACTIONS.flatMap(action => PHASES.map(phase => `  { cardIds: [CARD_ID], actions: ['${action}'], phases: ['${phase}'],
+${ACTIONS.flatMap(action => (action === 'place-farmer' ? ['before', 'after'] : PHASES).map(phase => `  { cardIds: [CARD_ID], actions: ['${action}'], phases: ['${phase}'],
     handler: () => ({ sourceCard: CARD_ID, flow: count('${phase}:${action}') }) },`)).join('\n')}
 ] }
     `, CARD_ID)

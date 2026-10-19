@@ -75,7 +75,7 @@ const customOpportunity = (session: GameSession, flow: ActionFlow) => {
 describe('explicit action replacement through GameSession', () => {
   it('blocks a frozen host when only a new replacement becomes doable during before', () => {
     const session = setup()
-    const actionId = '__frozen_host__'
+    const actionId = 'receive'
     const registry = customOpportunity(session, { type: 'leaf', actionId, params: { wood: 1 } })
     registry.register({ ...gainAction, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
     registerListener(session, {
@@ -103,7 +103,7 @@ describe('explicit action replacement through GameSession', () => {
 
   it('cannot skip an enabling before trigger using a replacement that appeared after selection', () => {
     const session = setup()
-    const actionId = '__strict_payment__'
+    const actionId = 'receive'
     const registry = customOpportunity(session, { type: 'leaf', actionId, params: { cost: { food: 2 } } })
     registry.register({ ...registry.get('pay')!, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
     registerListener(session, {
@@ -348,25 +348,25 @@ describe('explicit action replacement through GameSession', () => {
 
   it.each([false, true])('freezes the selected action before its before trigger and internal pending, decline=%s', (decline) => {
     const session = setup()
-    const registry = customOpportunity(session, { type: 'leaf', actionId: '__replacement_original__', params: { food: 10 } })
-    registry.register({ ...gainAction, id: '__replacement_original__' })
+    const registry = customOpportunity(session, { type: 'leaf', actionId: 'receive', params: { food: 10 } })
+    registry.register({ ...gainAction, id: 'receive' })
     registry.register({
-      ...gainAction, id: '__replacement_choice__',
+      ...gainAction, id: 'occupation',
       execute: () => ({ type: 'request', promptKey: 'ui.interactionFieldMerchantChoose', request: {
         kind: 'choice', options: [{ value: 'grain', label: 'Grain' }, { value: 'vegetable', label: 'Vegetable' }],
       } }),
       resolveChoice: (context, choice) => gainAction.execute({ ...context, params: { [choice]: 1 } }),
     })
     registerListener(session, {
-      id: '__replacement_A__', cardIds: ['__replacement_A__'], actions: ['__replacement_original__'], phases: ['computeReplace'],
-      handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: '__replacement_choice__' } }),
+      id: '__replacement_A__', cardIds: ['__replacement_A__'], actions: ['receive'], phases: ['computeReplace'],
+      handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: 'occupation' } }),
     })
     registerListener(session, {
-      id: '__replacement_B__', cardIds: ['__replacement_B__'], actions: ['__replacement_choice__'], phases: ['computeReplace'],
+      id: '__replacement_B__', cardIds: ['__replacement_B__'], actions: ['occupation'], phases: ['computeReplace'],
       handler: ({ player }) => player.resources.food > 0
         ? { decline: true, alternativeFlow: { type: 'leaf', actionId: 'gain', params: { vegetable: 10 } } } : undefined,
     })
-    for (const [actionId, resource] of [['__replacement_original__', 'wood'], ['__replacement_choice__', 'food']] as const) {
+    for (const [actionId, resource] of [['receive', 'wood'], ['occupation', 'food']] as const) {
       registerListener(session, {
         id: `__before_${resource}__`, cardIds: [`__before_${resource}__`], actions: [actionId], phases: ['before'], mandatory: true,
         handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { [resource]: 1 } } }),
@@ -525,8 +525,8 @@ describe('explicit action replacement through GameSession', () => {
 
   it.each(['leaf', 'xor'] as const)('preserves a custom replacement target player and space for a root %s', (kind) => {
     const session = setup()
-    const registry = customOpportunity(session, { type: 'leaf', actionId: '__source_gain__', params: { food: 10 } })
-    registry.register({ ...gainAction, id: '__source_gain__' })
+    const registry = customOpportunity(session, { type: 'leaf', actionId: 'receive', params: { food: 10 } })
+    registry.register({ ...gainAction, id: 'receive' })
     const executed: unknown[] = []
     registry.register({ ...gainAction, execute: (context) => {
       executed.push({ playerId: context.player.id, spaceId: context.space.id, sourceCard: context.sourceCard, trueAction: context.actionContext?.trueAction })
@@ -535,7 +535,7 @@ describe('explicit action replacement through GameSession', () => {
     const targetId = session.state.players[1]!.id
     const child: ActionFlow = { type: 'leaf', actionId: 'gain', params: { wood: 1 }, actionContext: { targetSpaceId: 'day-laborer', trueAction: false } }
     registerListener(session, {
-      id: '__target_replacement__', cardIds: ['__target_replacement__'], actions: ['__source_gain__'], phases: ['computeReplace'],
+      id: '__target_replacement__', cardIds: ['__target_replacement__'], actions: ['receive'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: kind === 'leaf'
         ? { ...child, targetPlayerId: targetId }
         : { type: 'xor', targetPlayerId: targetId, promptKey: 'ui.interactionFieldMerchantChoose', children: [child,
@@ -649,10 +649,10 @@ describe('explicit action replacement through GameSession', () => {
 
   it('offers a replacement whose mandatory before can fund its current payment', () => {
     const session = setup()
-    const registry = customOpportunity(session, { type: 'leaf', actionId: '__original_food__', params: { food: 10 } })
-    registry.register({ ...gainAction, id: '__original_food__' })
+    const registry = customOpportunity(session, { type: 'leaf', actionId: 'receive', params: { food: 10 } })
+    registry.register({ ...gainAction, id: 'receive' })
     registerListener(session, {
-      id: '__enabling_replace__', cardIds: ['__enabling_replace__'], actions: ['__original_food__'], phases: ['computeReplace'],
+      id: '__enabling_replace__', cardIds: ['__enabling_replace__'], actions: ['receive'], phases: ['computeReplace'],
       handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: 'pay', params: { cost: { food: 1 } } } }),
     })
     registerListener(session, {
