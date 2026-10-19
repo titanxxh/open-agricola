@@ -50,7 +50,7 @@ describe('optional metadata passes actionContext to isDoable', () => {
   it('isDoable listener receives actionContext from optional metadata host', () => {
     const actionNode = new ActionNode(
       'action-1',
-      'test-action',
+      'collect',
       'TestCard',       // sourceCard
       undefined,        // params
       undefined,        // choiceLabelKey
@@ -64,7 +64,7 @@ describe('optional metadata passes actionContext to isDoable', () => {
 
     const registry = new ActionRegistry()
     registry.register({
-      id: 'test-action',
+      id: 'collect',
       nameKey: 'test',
       descriptionKey: 'test',
       roundAvailable: 1,
@@ -78,7 +78,7 @@ describe('optional metadata passes actionContext to isDoable', () => {
       id: 'test-isdoable',
       cardIds: ['TestCard'],
       phases: ['isDoable'],
-      actions: ['test-action'],
+      actions: ['collect'],
       handler: (context) => {
         receivedActionContext = context.actionContext as Record<string, unknown> | undefined
         if (context.actionContext?.override) return { doable: true }
@@ -102,7 +102,7 @@ describe('optional metadata passes actionContext to isDoable', () => {
   it('isDoable listener receives sourceCard from optional metadata host', () => {
     const actionNode = new ActionNode(
       'action-1',
-      'test-action',
+      'collect',
       'TestCard',       // sourceCard
     )
     actionNode.optional = true
@@ -112,7 +112,7 @@ describe('optional metadata passes actionContext to isDoable', () => {
 
     const registry = new ActionRegistry()
     registry.register({
-      id: 'test-action',
+      id: 'collect',
       nameKey: 'test',
       descriptionKey: 'test',
       roundAvailable: 1,
@@ -126,7 +126,7 @@ describe('optional metadata passes actionContext to isDoable', () => {
       id: 'test-isdoable-source',
       cardIds: ['TestCard'],
       phases: ['isDoable'],
-      actions: ['test-action'],
+      actions: ['collect'],
       handler: (context) => {
         receivedSourceCard = context.sourceCard
         if (context.sourceCard === 'TestCard') return { doable: true }

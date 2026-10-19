@@ -162,7 +162,7 @@ describe('engine hook event context', () => {
       emitWoodExchange(context, 3)
       return { type: 'ok' }
     })
-    const wrapper = action('wrapper-flow-parent', () => ({
+    const wrapper = action('exchange', () => ({
       type: 'flow' as const,
       flow: { type: 'leaf' as const, actionId: child.id },
     }))
@@ -202,7 +202,7 @@ describe('engine hook event context', () => {
   })
 
   it('exposes current transaction events to card after listeners without eventSink', () => {
-    const exchange = action('card-listener-event-query', (context) => {
+    const exchange = action('exchange', (context) => {
       emitExchange(context)
       return { type: 'ok' }
     })
@@ -249,7 +249,7 @@ describe('engine hook event context', () => {
       return { type: 'ok' }
     })
     const fallback = action('choice-preview-fallback', () => ({ type: 'ok' }))
-    const replaceTarget = action('choice-preview-target', () => ({ type: 'ok' }))
+    const replaceTarget = action('improvement', () => ({ type: 'ok' }))
     const state = makeEventTestState()
     const player = state.players[0]!
     player.improvements.push('Test_Choice_Preview_Card')
@@ -291,7 +291,7 @@ describe('engine hook event context', () => {
       return { type: 'ok' }
     })
     const fallback = action('trigger-preview-fallback', () => ({ type: 'ok' }))
-    const blocked = action('trigger-preview-blocked', () => ({ type: 'ok' }))
+    const blocked = action('construct', () => ({ type: 'ok' }))
     blocked.canBeExecutedByPlayer = (_state, player) => player.resources.wood >= 1
     const state = makeEventTestState()
     const player = state.players[0]!

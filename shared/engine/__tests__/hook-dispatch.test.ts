@@ -61,7 +61,7 @@ const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   }) as PlayerState
 
 const createAction = (): ActionDefinition => ({
-  id: 'test-action',
+  id: 'gain',
   nameKey: 'test',
   descriptionKey: 'test',
   roundAvailable: 1,
@@ -146,7 +146,7 @@ describe('Hook dispatch merge order', () => {
 
     actionHooks.register({
       id: 'action-hook',
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['after'],
       handler: () => {
         order.push('action-hook')
@@ -157,7 +157,7 @@ describe('Hook dispatch merge order', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'card-listener',
       cardIds: ['card-A'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['after'],
       handler: () => {
         order.push('card-listener')
@@ -184,7 +184,7 @@ describe('Hook dispatch merge order', () => {
     const space = createSpace(action)
 
     const engine = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
+      tree: new EngineTree(new ActionNode('a', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -200,14 +200,14 @@ describe('Hook dispatch merge order', () => {
   it('does not let a card opt-in override an action hook veto', () => {
     actionHooks.register({
       id: 'aaa-veto',
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['isDoable'],
       handler: () => ({ doable: false }),
     })
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'zzz-before-opt-in',
       cardIds: ['card-A'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['isDoable'],
       handler: () => ({ doable: true }),
     })
@@ -228,7 +228,7 @@ describe('Hook dispatch merge order', () => {
       state,
       player,
       space: createSpace(action),
-      actionId: 'test-action',
+      actionId: 'gain',
     }, action, false)
 
     expect(doable).toBe(false)
@@ -238,14 +238,14 @@ describe('Hook dispatch merge order', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'aaa-card-veto',
       cardIds: ['card-A'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['isDoable'],
       handler: () => ({ doable: false }),
     })
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'zzz-card-opt-in',
       cardIds: ['card-B'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['isDoable'],
       handler: () => ({ doable: true }),
     })
@@ -266,7 +266,7 @@ describe('Hook dispatch merge order', () => {
       state,
       player,
       space: createSpace(action),
-      actionId: 'test-action',
+      actionId: 'gain',
     }, action, false)
 
     expect(doable).toBe(false)
@@ -275,14 +275,14 @@ describe('Hook dispatch merge order', () => {
   it('does not let a flow-derived child opt-in override a child veto', () => {
     actionHooks.register({
       id: 'aaa-child-veto',
-      actions: ['child-action'],
+      actions: ['collect'],
       phases: ['isDoable'],
       handler: () => ({ doable: false }),
     })
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'zzz-child-opt-in',
       cardIds: ['card-A'],
-      actions: ['child-action'],
+      actions: ['collect'],
       phases: ['isDoable'],
       handler: () => ({ doable: true }),
     })
@@ -291,13 +291,13 @@ describe('Hook dispatch merge order', () => {
     player.minorPlayed = ['card-A']
     const childAction = {
       ...createAction(),
-      id: 'child-action',
+      id: 'collect',
       canBeExecutedByPlayer: () => false,
     }
     const parentAction = {
       ...createAction(),
       id: 'parent-action',
-      flow: { type: 'leaf' as const, actionId: 'child-action' },
+      flow: { type: 'leaf' as const, actionId: 'collect' },
       canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
     }
     const actions = new Map<string, ActionDefinition>([
@@ -322,7 +322,7 @@ describe('Hook dispatch merge order', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'child-before-opt-in',
       cardIds: ['card-A'],
-      actions: ['child-action'],
+      actions: ['collect'],
       phases: ['isDoable'],
       handler: (context) => {
         if (context.actionContext?.skipBeforeTriggers === true) return
@@ -334,13 +334,13 @@ describe('Hook dispatch merge order', () => {
     player.minorPlayed = ['card-A']
     const childAction = {
       ...createAction(),
-      id: 'child-action',
+      id: 'collect',
       canBeExecutedByPlayer: () => false,
     }
     const parentAction = {
       ...createAction(),
       id: 'parent-action',
-      flow: { type: 'leaf' as const, actionId: 'child-action' },
+      flow: { type: 'leaf' as const, actionId: 'collect' },
       canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
     }
     const actions = new Map<string, ActionDefinition>([
@@ -381,7 +381,7 @@ describe('Card listener scope filtering', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-player-test',
       cardIds: ['scope-card'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['after'],
       scope: 'player',
       handler: () => {
@@ -403,7 +403,7 @@ describe('Card listener scope filtering', () => {
     const space = createSpace(action)
 
     const engine1 = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
+      tree: new EngineTree(new ActionNode('a', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -416,7 +416,7 @@ describe('Card listener scope filtering', () => {
 
     triggered = false
     const engine2 = new Engine({
-      tree: new EngineTree(new ActionNode('b', 'test-action')),
+      tree: new EngineTree(new ActionNode('b', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -437,7 +437,7 @@ describe('Card listener scope filtering', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-opponent-test',
       cardIds: ['opp-card'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['after'],
       scope: 'opponent',
       handler: () => {
@@ -459,7 +459,7 @@ describe('Card listener scope filtering', () => {
     const space = createSpace(action)
 
     const engine = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
+      tree: new EngineTree(new ActionNode('a', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -472,7 +472,7 @@ describe('Card listener scope filtering', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-opponent-test2',
       cardIds: ['opp-card'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['after'],
       scope: 'opponent',
       handler: () => {
@@ -481,7 +481,7 @@ describe('Card listener scope filtering', () => {
       },
     })
     const engine2 = new Engine({
-      tree: new EngineTree(new ActionNode('b', 'test-action')),
+      tree: new EngineTree(new ActionNode('b', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -499,7 +499,7 @@ describe('Card listener scope filtering', () => {
     requireActiveCardRegistry('hook-dispatch').registerListener({
       id: 'scope-any-test',
       cardIds: ['any-card'],
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['after'],
       scope: 'any',
       handler: () => {
@@ -521,7 +521,7 @@ describe('Card listener scope filtering', () => {
     const space = createSpace(action)
 
     const engine1 = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
+      tree: new EngineTree(new ActionNode('a', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -533,7 +533,7 @@ describe('Card listener scope filtering', () => {
     expect(count).toBe(1)
 
     const engine2 = new Engine({
-      tree: new EngineTree(new ActionNode('b', 'test-action')),
+      tree: new EngineTree(new ActionNode('b', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
@@ -555,14 +555,14 @@ describe('Multiple hooks overriding doable', () => {
   it('does not let a later hook opt-in override an earlier hook veto', () => {
     actionHooks.register({
       id: 'block-it',
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['isDoable'],
       order: 1,
       handler: () => ({ doable: false }),
     })
     actionHooks.register({
       id: 'allow-it',
-      actions: ['test-action'],
+      actions: ['gain'],
       phases: ['isDoable'],
       order: 2,
       handler: () => ({ doable: true }),
@@ -582,7 +582,7 @@ describe('Multiple hooks overriding doable', () => {
     const space = createSpace(action)
 
     const engine = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
+      tree: new EngineTree(new ActionNode('a', 'gain')),
       registry,
       hooks: new HookDispatcher(actionHooks),
       log: new LogStore(),
