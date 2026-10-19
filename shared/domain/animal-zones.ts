@@ -1,3 +1,4 @@
+import { commitFarmOperation } from './farm-operations'
 import { animalZoneOccupancyGroup, areZoneOccupancyLimitsSatisfied } from '../contract/animal-zone-occupancy'
 import { countRoomAnimals } from './animals'
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
@@ -864,7 +865,7 @@ export const enforceAnimalCapacity = (
     const assignment = player.stableAnimals?.[key]
     if (assignment) stableAnimals[key] = { ...assignment }
   })
-  player.pastures = player.pastures.map((pasture) => {
+  commitFarmOperation(player, { kind: 'pastures', positions: [], pastures: player.pastures.map((pasture) => {
     const capacity = zoneCapacity(pasture.id)
     if (pasture.animalType) {
       const remaining = totals[pasture.animalType] ?? 0
@@ -877,7 +878,7 @@ export const enforceAnimalCapacity = (
       }
     }
     return { ...pasture, animalCount: 0, animalType: null }
-  })
+  }) })
   const houseZones = zones.filter(zone => zone.zoneType === 'house')
   player.houseAnimals = {}
   const assignHouseAnimal = (zone: AnimalZone, animal: AnimalType): boolean => {
@@ -915,14 +916,14 @@ export const enforceAnimalCapacity = (
       animalCount: count,
     }
   }
-  player.pastures = player.pastures.map((pasture) => {
+  commitFarmOperation(player, { kind: 'pastures', positions: [], pastures: player.pastures.map((pasture) => {
     if (pasture.animalType) return pasture
     for (const animalType of animalKeys) {
       const next = fillPasture(pasture, animalType)
       if (next.animalType) return next
     }
     return pasture
-  })
+  }) })
   for (const zone of houseZones) {
     if (player.houseAnimals[zone.id.slice('house:'.length)]) continue
     for (const animal of animalKeys) {

@@ -187,6 +187,42 @@ describe('A040 host action geometry', () => {
     expect(stableFacts(response.state.log)).toEqual(stableFacts(completed.log))
   })
 
+  it.each([0, 1, 2])('claims one two-stable batch and exchanges exactly %i clay after restoration', count => {
+    let session = setup(state => {
+      const player = state.players[0]!
+      player.minorPlayed = [CARD]
+      player.occupationPlayed = []
+      Object.assign(player.resources, { wood: 4, reed: 0 })
+    })
+    session.takeAction(0, 'farm-expansion')
+    let response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 2, food: 20 })
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD
+      && event.to.kind === 'player' && event.resources.clay)).toHaveLength(1)
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toMatchObject([{
+      newlyUsedTiles: [{ playerId: response.state.players[0]!.id, row: 0, col: 0 }, { playerId: response.state.players[0]!.id, row: 0, col: 1 }],
+    }])
+    session = restore(session)
+    const exchange = () => {
+      if (count === 0) return choose(session, session.getState(), '__skip__')
+      const option = options(session.getState()).find(entry => entry.effectPreview?.kind === 'resourceExchange' && entry.effectPreview.resourcesPaid?.clay === count)
+      expect(option, JSON.stringify(session.getState().interaction)).toBeDefined()
+      return choose(session, session.getState(), option!.value)
+    }
+    response = exchange()
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2 - count, food: 20 + 2 * count })
+    expect(response.state.players[0]!.stableTiles).toEqual([{ row: 0, col: 0 }, { row: 0, col: 1 }])
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    if (count === 1) {
+      response = session.undoStep()
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, food: 20 })
+      response = exchange()
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 22 })
+    }
+  })
+
   it.each(['plow', 'construct', 'stables'])('records one newly used tile for %s and can exchange its clay', action => {
     const session = setup(state => {
       const player = state.players[0]!

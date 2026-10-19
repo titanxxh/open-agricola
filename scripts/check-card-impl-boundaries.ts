@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import { checkFarmWriteBoundaries } from './farm-write-boundaries'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,7 +17,7 @@ export type CardImplBoundaryViolation = {
   line?: number
   cardId: string
   referencedCardId?: string
-  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation'
+  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation' | 'farm-layout-write'
   message?: string
 }
 
@@ -530,6 +531,8 @@ async function runCli(): Promise<void> {
     })),
   }))
   const result = checkCardImplBoundaries(files, runtimeCards)
+  const farmWrites = checkFarmWriteBoundaries(repoRoot)
+  result.violations.push(...farmWrites.violations.map(violation => ({ ...violation, cardId: '<farm-write-boundary>', kind: 'farm-layout-write' as const })))
   if (fieldBoundaryFiles.length === 0) result.scopeErrors.push('no production field-boundary files scanned')
   result.violations.push(...checkFieldStorageBoundaries(fieldBoundaryFiles))
   if (result.scopeErrors.length > 0) {
@@ -540,7 +543,7 @@ async function runCli(): Promise<void> {
   if (result.violations.length === 0) {
     console.log(
       `[check-card-impl-boundaries] checked ${result.filesChecked} Card Sources, `
-      + `${fieldBoundaryFiles.length} field-boundary files, ${result.listenerHandlersChecked} listeners, `
+      + `${fieldBoundaryFiles.length} field-boundary files, ${farmWrites.filesChecked} farm-write files, ${result.listenerHandlersChecked} listeners, `
       + `${result.trailingListenerHandlersChecked} trailing listeners, `
       + `${result.listenerFunctionsMutationScanned} listener functions for state mutation; `
       + 'no boundary violations found',

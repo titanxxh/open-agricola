@@ -7,7 +7,7 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { computeAnimalZones, buildCardAnimalZoneId } from '../../shared/domain/animal-zones'
 import { getWorkPhaseBuildingResources } from '../../shared/session/work-phase-resources'
-import { addFarmyardExtension } from '../../shared/domain/farmyard-extensions'
+import { addFarmyardExtension } from '../../shared/domain/farm-operations'
 import { Scoring } from '../../shared/domain/scoring'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 import type { GameState } from '../../shared/contract/types'
@@ -524,7 +524,9 @@ describe('A040 original clay positions', () => {
     for (let step = 0; step < 20 && response.interaction.stateId === 'wait'; step++) {
       const request = response.interaction.request
       if (request.kind === 'feed') response = session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
-      else if (options(response).some(option => option.value === CARD)) response = choose(session, response, CARD)
+      else if (request.kind === 'select-trigger' && options(response).some(option => option.sourceCard === CARD)) {
+        response = choose(session, response, options(response).find(option => option.sourceCard === CARD)!.value)
+      }
       else if (options(response).some(option => option.value === '__skip__')) response = choose(session, response, '__skip__')
       else throw new Error(`Unexpected round interaction: ${JSON.stringify(response.interaction)}`)
       expect(response.ok, response.error).toBe(true)

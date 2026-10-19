@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../domain/farm-operations'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { positionKey } from '../../domain/farm'
 import { collectBuiltSpecialStables, getCardEffect } from '../card-effects'
@@ -12,7 +13,7 @@ const removeStableAtTile = (
     (existing) => positionKey(existing) === targetKey,
   )
   if (index === -1) return false
-  player.stableTiles.splice(index, 1)
+  commitFarmOperation(player, { kind: 'remove-stables', positions: [tile] })
   return true
 }
 

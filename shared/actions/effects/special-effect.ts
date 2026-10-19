@@ -1,5 +1,4 @@
-import { commitFarmOperation } from '../../domain/farm-operations'
-import { getUsedFarmyardTileKeys, getNewlyUsedFarmyardTiles } from '../../domain/farmyard-usage'
+import { addFarmyardSpaceState, commitFarmOperation } from '../../domain/farm-operations'
 import { resolveActionTargetPlayer } from '../helpers/target-player'
 import { applyCardStorageOperation, previewCardStorageOperation, readCardStorageOperation } from '../card-storage'
 import type {
@@ -45,7 +44,7 @@ import {
   canAddScoringReserve,
   normalizeScoringReserveResources,
 } from '../../domain/scoring-reserve'
-import { addFarmyardSpaceState, getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
+import { getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
 import {
   addConsumedSupplyTokenCount,
   getOwnOrdinaryFenceReserveCount,
@@ -308,13 +307,8 @@ export const specialEffectAction: ActionDefinition = {
         })
         return { type: 'ok' }
       case 'add-farmyard-space-state': {
-        const usedBefore = getUsedFarmyardTileKeys(target)
-        addFarmyardSpaceState(target, p.state, eventSink)
-        const newlyUsedTiles = getNewlyUsedFarmyardTiles(target, usedBefore)
-        if (newlyUsedTiles.length > 0) {
-          eventSink?.emit<'farm.spacesUsed'>({ type: 'farm.spacesUsed', sourceCardId: sourceCard, newlyUsedTiles })
-        }
-        return { type: 'ok' }
+        const farmOperation = addFarmyardSpaceState(target, p.state, eventSink)
+        return { type: 'ok', farmOperations: [farmOperation] }
       }
       case 'grow-field-and-non-field-crops': {
         const mutations = mutateLogicalFields(state, target, { sourceCard, eventSink })
@@ -325,7 +319,7 @@ export const specialEffectAction: ActionDefinition = {
           )
           if (slot) mutations.grow({ fieldId: field.id, slot: slot.index })
         }
-        target.farmyardSpaceStates = getFarmyardSpaceStates(target).map((entry) => {
+        const farmOperation = commitFarmOperation(target, { kind: 'space-states', positions: [], sourceCardId: sourceCard, states: getFarmyardSpaceStates(target).map((entry) => {
           if (
             entry.kind !== 'non-field-crop-space' ||
             !entry.crop ||
@@ -338,8 +332,8 @@ export const specialEffectAction: ActionDefinition = {
             ...entry,
             crop: { ...entry.crop, remaining: entry.crop.remaining + 1 },
           }
-        })
-        return { type: 'ok' }
+        }) }, eventSink)
+        return { type: 'ok', farmOperations: [farmOperation] }
       }
       case 'consume-supply-token': {
         const amount = p.amount ?? 1
@@ -523,16 +517,14 @@ export const specialEffectAction: ActionDefinition = {
           return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }
         const indexesToRemove = matchingIndexes.slice(0, count)
-        for (const index of indexesToRemove) {
-          target.fenceSegments.splice(index, 1)
-        }
+        const farmOperation = commitFarmOperation(target, { kind: 'remove-fences', positions: [], indexes: indexesToRemove, sourceCardId: sourceCard }, eventSink)
         eventSink?.emit<'farm.fenceConsumed'>({
           type: 'farm.fenceConsumed',
           sourceCardId: sourceCard,
           count: indexesToRemove.length,
           reason: 'cardEffect',
         })
-        return { type: 'ok' }
+        return { type: 'ok', farmOperations: [farmOperation] }
       }
       case 'add-resource-to-space': {
         if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }

@@ -19,7 +19,7 @@ const qualification: CardListenerRegistration = {
   id: 'C48-farmstead-qualify',
   cardIds: [CARD_ID],
   phases: ['after'],
-  actions: ['plow', 'construct', 'stables', 'fence', 'selection', 'special-effect'],
+  events: ['farm.spacesUsed'],
   handler: context => {
     const token = readActionSnapshotToken(context.player)
     if (token === undefined) return

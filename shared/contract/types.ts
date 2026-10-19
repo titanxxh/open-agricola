@@ -986,16 +986,19 @@ export type FarmTerrainChange = FarmTilePosition & {
 }
 export type FarmTerrainOperationMode = 'place' | 'remove' | 'replace-kind' | 'replace-with-field' | 'cover'
 
+/** Structural farm properties shared by receipts and the production write boundary. */
+export const FARM_LAYOUT_KEYS = ['roomTiles', 'stableTiles', 'fields', 'fenceSegments', 'pastures', 'farmTerrain', 'farmyardExtensions', 'farmyardSpaceStates'] as const satisfies readonly (keyof PlayerState)[]
+
 /** A transient receipt of one committed farm operation, owned by its action host. */
 export type FarmOperationResult = {
   playerId: string
   positions: FarmTilePosition[]
   sourceCardId?: string
   newlyUsedTiles: Array<FarmTilePosition & { playerId: string }>
-  before: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures' | 'farmTerrain' | 'farmyardExtensions'>
-  after: Pick<PlayerState, 'roomTiles' | 'stableTiles' | 'fields' | 'fenceSegments' | 'pastures' | 'farmTerrain' | 'farmyardExtensions'>
+  before: Pick<PlayerState, typeof FARM_LAYOUT_KEYS[number]>
+  after: Pick<PlayerState, typeof FARM_LAYOUT_KEYS[number]>
 } & (
-  | { kind: 'rooms' | 'stables' | 'plow' | 'fence' | 'pastures' }
+  | { kind: 'rooms' | 'stables' | 'plow' | 'fence' | 'pastures' | 'space-states' | 'extension' | 'remove-stables' | 'remove-fences' | 'crops' }
   | { kind: 'terrain'; terrainMode: FarmTerrainOperationMode; terrainChanges: FarmTerrainChange[] }
 )
 
