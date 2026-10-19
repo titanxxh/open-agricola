@@ -11,7 +11,6 @@ import { B021_HayloftBarn_impl } from '../B/B021_HayloftBarn'
 import { B055_MaintenancePremium_impl } from '../B/B055_MaintenancePremium'
 import { D156_RetailDealer_impl } from '../D/D156_RetailDealer'
 import { D157_PartyOrganizer_impl } from '../D/D157_PartyOrganizer'
-import { E027_PiggyBank_impl } from '../E/E027_PiggyBank'
 import { E051_WhaleOil_impl } from '../E/E051_WhaleOil'
 import { E091_PlowBuilder_impl } from '../E/E091_PlowBuilder'
 
@@ -23,7 +22,6 @@ const B21 = 'B021_HayloftBarn'
 const B55 = 'B055_MaintenancePremium'
 const D156 = 'D156_RetailDealer'
 const D157 = 'D157_PartyOrganizer'
-const E27 = 'E027_PiggyBank'
 const E51 = 'E051_WhaleOil'
 const E91 = 'E091_PlowBuilder'
 
@@ -365,26 +363,6 @@ describe('listener purity wave 2a', () => {
         params: { kind: 'set-flag', flag: true },
       },
     ])
-  })
-
-  it('E27 PiggyBank update-infobox listener returns infobox leaf without mutating cardStates', () => {
-    const p = player(E27, {
-      cardStates: { [E27]: { counters: { food: 4 }, infobox: 'stale' } },
-    })
-    const ctx = context(p, { actionId: 'store-on-card' })
-    const before = snapshot(p)
-
-    const result = listenerById(
-      E027_PiggyBank_impl.listeners,
-      'E27-piggy-bank-after-store',
-    ).handler(ctx)
-
-    expectCardStatesUnchanged(p, before, 'E27 owner')
-    expectLeaf(result?.flow, {
-      actionId: 'special-effect',
-      sourceCard: E27,
-      params: { kind: 'set-infobox', text: '4 / 6' },
-    })
   })
 
   it('B124 Trimmer after-fencing listener updates pasture area before gain without mutating cardStates', () => {

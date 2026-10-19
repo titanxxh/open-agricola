@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-10-18. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-10-19. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 ## 1. Open issues by priority
 
@@ -91,6 +91,7 @@ No entries are open.
 - Do not put card names or one-off logic on the action / main path, such as a global Scythe-style flag or C88's stable / fence cost relocation; OA prefers card-local hooks and helpers.
 - The fencing main path must not add card-ID branches for C1 / B30 / E149 or per-card switches such as `noWoodPalisades` / `midnightFencer`; express the differences with `FenceSegment.type` / `source` and the generic `fencePolicy`.
 - Do not copy mutable PHP args or in-place cost rewriting; OA keeps structured modifiers and payment enumeration.
+- Derive counter-based infobox text in the owning card's `getStatePresentation`; do not synchronize a second copy through internal storage-action listeners.
 - Reference platform status fields such as `banned` and `implemented` must not drive OA product behavior automatically.
 
 ## 6. Cards that use the reference Special Effect
