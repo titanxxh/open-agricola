@@ -46,6 +46,7 @@ export type LogPresentationConsumedEventReason =
   | 'cardPayment'
   | 'renovationPayment'
   | 'stablePayment'
+  | 'harvestExchange'
 
 export type LogPresentationSuppressedEventReason = 'futureResourceReceive'
 
@@ -792,18 +793,18 @@ export const buildLogPresentationPlan = (
   events: readonly GameEvent[],
   ctx: EventLogMapperContext,
 ): LogPresentationPlan => {
-  const consumedPaymentSeqs = new Set<number>()
+  const consumedEventSeqs = new Set<number>()
   const consumedEvents: LogPresentationConsumedEvent[] = []
   const suppressedEvents: LogPresentationSuppressedEvent[] = []
-  const consumePayment = (
+  const consumeEvent = (
     consumerEvent: GameEvent,
-    payment: ResourcePaidEvent,
+    consumedEvent: GameEvent,
     reason: LogPresentationConsumedEventReason,
   ): LogPresentationConsumedEvent[] => {
-    if (consumedPaymentSeqs.has(payment.seq)) return []
-    consumedPaymentSeqs.add(payment.seq)
+    if (consumedEventSeqs.has(consumedEvent.seq)) return []
+    consumedEventSeqs.add(consumedEvent.seq)
     const relation = {
-      consumedEventRef: eventRef(payment),
+      consumedEventRef: eventRef(consumedEvent),
       consumerEventRef: eventRef(consumerEvent),
       reason,
     }
@@ -819,7 +820,7 @@ export const buildLogPresentationPlan = (
         return presentationRows(
           event,
           [mapCardPlayed(event, event.payment ?? payment, ctx)],
-          payment ? consumePayment(event, payment, 'cardPayment') : [],
+          payment ? consumeEvent(event, payment, 'cardPayment') : [],
         )
       }
 
@@ -944,6 +945,9 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'harvest.feedConverted') {
+        const exchange = events.find((candidate) => candidate.type === 'resource.exchanged' &&
+          candidate.seq + 1 === event.seq && candidate.sourceActionId === event.sourceActionId &&
+          candidate.actorPlayerId === event.actorPlayerId && candidate.exchangeSource === event.source)
         return presentationRows(event, [{
           key: 'log.harvestFeedConvert',
           playerId: event.playerId,
@@ -953,7 +957,7 @@ export const buildLogPresentationPlan = (
             cost: event.cost,
             food: event.food,
           },
-        }])
+        }], exchange ? consumeEvent(event, exchange, 'harvestExchange') : [])
       }
 
       if (event.type === 'harvest.heated') {
@@ -1034,7 +1038,7 @@ export const buildLogPresentationPlan = (
         return presentationRows(
           event,
           [mapFarmRenovated(event, ctx, payment)],
-          payment ? consumePayment(event, payment, 'renovationPayment') : [],
+          payment ? consumeEvent(event, payment, 'renovationPayment') : [],
         )
       }
 
@@ -1043,7 +1047,7 @@ export const buildLogPresentationPlan = (
         return presentationRows(
           event,
           [mapStableBuilt(events, event, ctx, payment)],
-          payment ? consumePayment(event, payment, 'stablePayment') : [],
+          payment ? consumeEvent(event, payment, 'stablePayment') : [],
         )
       }
 
@@ -1084,6 +1088,7 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'resource.exchanged') {
+        if (consumedEventSeqs.has(event.seq)) return []
         if ((event.paid.grain ?? 0) > 0 && (event.gained.food ?? 0) > 0 && event.exchangeSource) {
           return presentationRows(event, [{
             key: 'log.bakeBread',
@@ -1104,7 +1109,7 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'resource.paid') {
-        if (consumedPaymentSeqs.has(event.seq)) return []
+        if (consumedEventSeqs.has(event.seq)) return []
         if (isNearestFollowingStablePayment(events, event)) return []
         const cost = positiveResources(event.resources)
         if (event.paymentFor === 'feeding' || event.paymentFor === 'begging') {

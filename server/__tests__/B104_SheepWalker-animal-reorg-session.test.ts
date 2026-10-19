@@ -113,12 +113,18 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     expect(captureStateWithHistory(session.resolveChoice(0, 'cancel').state)).toEqual(original.state)
   })
 
-  it('shares the live placed-sheep budget across mixed recipes and repeated exchange', () => {
+  it('rejects a mixed batch beyond the placed-sheep budget and accepts an exact retry', () => {
     const session = setup(2)
     const original = snapshot(session.takeAction(0, 'sheep-market'))
     const host = session.peekEnginePendingEnvelope()?.hostNodeId
-    const opened = session.takeAnytimeAction(0, 'exchange')
-    const response = session.resolveChoice(0, `bulk:${recipe(opened, 'stone')}=1,${recipe(opened, 'vegetable')}=2,${recipe(opened, 'boar')}=1`)
+    const opened = snapshot(session.takeAnytimeAction(0, 'exchange'))
+    const rejected = session.resolveChoice(0, `bulk:${recipe(opened, 'stone')}=1,${recipe(opened, 'vegetable')}=2,${recipe(opened, 'boar')}=1`)
+    expect(rejected.ok).toBe(false)
+    expect(captureStateWithHistory(rejected.state)).toEqual(opened.state)
+    expect(rejected.interaction).toEqual(opened.interaction)
+    expect(rejected.scores).toEqual(opened.scores)
+    expect(rejected.historyLength).toBe(opened.historyLength)
+    const response = session.resolveChoice(0, `bulk:${recipe(opened, 'stone')}=1,${recipe(opened, 'vegetable')}=1`)
     expectOriginalReorg(session, response, host, original)
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, stone: 1, vegetable: 1, boar: 0 })
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(0)

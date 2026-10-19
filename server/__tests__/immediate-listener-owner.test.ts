@@ -12,8 +12,8 @@ const LISTENER = '__immediate_flow_listener__'
 const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
-const setup = (mode: 'trade-applied' | 'harvest-feed-conversion', vetoed: boolean) => {
-  const feeding = mode === 'harvest-feed-conversion'
+const setup = (mode: 'trade-applied' | 'feeding', vetoed: boolean) => {
+  const feeding = mode === 'feeding'
   const session = createWorkSession({ configure(state) {
     const player = state.players[0]!
     player.minorPlayed = [PROVIDER, LISTENER]
@@ -50,7 +50,7 @@ const setup = (mode: 'trade-applied' | 'harvest-feed-conversion', vetoed: boolea
         ? { type: 'leaf', actionId: 'gain', sourceCard: PROVIDER, params: { food: 1 } } : undefined,
     })
     registry.registerListener({
-      id: LISTENER, cardIds: [LISTENER], actions: [mode], phases: ['immediatelyAfter'],
+      id: LISTENER, cardIds: [LISTENER], actions: ['trade-applied'], phases: ['immediatelyAfter'],
       handler: () => ({ flow: { type: 'seq', children: [
         { type: 'parallel', children: [
           { type: 'leaf', actionId: 'special-effect', sourceCard: LISTENER, params: { kind: 'consume-pending-extra-turns' } },
@@ -97,7 +97,7 @@ describe('immediate listener flows retain their owner', () => {
   })
 
   it.each([false, true])('settles harvest feeding and consumes the owner extra turns, veto=%s', vetoed => {
-    const session = setup('harvest-feed-conversion', vetoed)
+    const session = setup('feeding', vetoed)
     const offered = session.performRoundEnd()
     expect(offered.ok, offered.error).toBe(true)
     expect(offered.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })

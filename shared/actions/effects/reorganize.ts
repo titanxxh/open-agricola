@@ -16,6 +16,7 @@ import {
   areRequiredEmptyZoneGroupsSatisfied,
   buildCardAnimalZoneId,
   getAllowedAnimalTypesForZone,
+  getPlacedAnimalsByType,
   normalizeAnimalCountsForZone,
   readAnimalCountsForZoneAssignment,
   syncCardAnimalStorage,
@@ -380,6 +381,12 @@ export const reorganizeAction: ActionDefinition = {
   execute: (ctx): ActionExecutionResult => {
     const trigger = (ctx.actionContext?.trigger as ReorganizeTrigger) ?? 'anytime'
     syncCardAnimalStorage(ctx.state, ctx.player)
+    if (ctx.actionContext?.onlyIfUnplaced === true) {
+      const placed = getPlacedAnimalsByType(ctx.player, ctx.state)
+      if (animalKeysForState(ctx.state).every((animal) =>
+        (ctx.player.resources[animal] ?? 0) <= (placed[animal] ?? 0),
+      )) return { type: 'ok' }
+    }
     return {
       type: 'request',
       request: buildAnimalReorgRequest(ctx.state, ctx.player, ctx.actionContext?.prefill !== false),

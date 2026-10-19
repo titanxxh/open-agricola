@@ -1,6 +1,6 @@
 import type { PersonUseReceipt } from '../contract/person-use'
 import type { Engine } from './engine'
-import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../contract/types'
+import type { ActionChoiceOption, ActionFlow, FeedQueueEntry, InteractionRequest, Resource } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
 import type { EngineNode, PendingCursor, PendingEnvelope, PendingView } from './types'
 import { pendingCursorFromEnvelope, pendingViewFromEnvelope } from './engine-utils'
@@ -39,6 +39,13 @@ export type StageResumeState = {
   extra?: Record<string, unknown>
 }
 
+export type FeedingSettlementResume = {
+  remaining: number
+  foodUsed: number
+  feedQueue: FeedQueueEntry[]
+  resourcesConverted: Partial<Resource>
+}
+
 export type EngineFrame = {
   frameId?: string
   engine: Engine
@@ -55,6 +62,7 @@ export type EngineFrame = {
   } | null
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
+  feedingResume?: FeedingSettlementResume
 }
 
 export type EngineFrameCursor = {
@@ -73,6 +81,7 @@ export type EngineFrameCursor = {
   } | null
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
+  feedingResume?: FeedingSettlementResume
 }
 
 export type EngineStackCursor = {
@@ -230,6 +239,7 @@ export class EngineStack {
         deferredPlayerSwitch: f.deferredPlayerSwitch,
         undoBoundaryOnResolve: f.undoBoundaryOnResolve,
         reason: f.reason,
+        ...(f.feedingResume ? { feedingResume: f.feedingResume } : {}),
       })),
     }
   }
@@ -256,6 +266,7 @@ export class EngineStack {
         deferredPlayerSwitch: fc.deferredPlayerSwitch,
         undoBoundaryOnResolve: fc.undoBoundaryOnResolve,
         reason: fc.reason,
+        ...(fc.feedingResume ? { feedingResume: fc.feedingResume } : {}),
       })
     }
     return stack

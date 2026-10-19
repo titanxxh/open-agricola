@@ -5,7 +5,6 @@ import { readCardExtraData } from '../helpers/card-state'
 import type {
   DraftGameEvent,
   FutureMeepleResolvedEvent,
-  HarvestFeedConvertedEvent,
   ResourceExchangedEvent,
   ResourceMovedEvent,
 } from '../../contract/events'
@@ -22,9 +21,6 @@ type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'
 type QueryableFutureMeepleResolvedEvent =
   | FutureMeepleResolvedEvent
   | DraftGameEvent<'futureMeeple.resolved'>
-type QueryableHarvestFeedConvertedEvent =
-  | HarvestFeedConvertedEvent
-  | DraftGameEvent<'harvest.feedConverted'>
 
 const isResourceMovedEvent = (
   event: CardListenerContext['transactionEvents'][number],
@@ -40,11 +36,6 @@ const isFutureMeepleResolvedEvent = (
   event: CardListenerContext['transactionEvents'][number],
 ): event is QueryableFutureMeepleResolvedEvent =>
   event.type === 'futureMeeple.resolved'
-
-const isHarvestFeedConvertedEvent = (
-  event: CardListenerContext['transactionEvents'][number],
-): event is QueryableHarvestFeedConvertedEvent =>
-  event.type === 'harvest.feedConverted'
 
 const readCount = (
   context: CardListenerContext,
@@ -124,12 +115,7 @@ const hasSheepConvertedToFood = (context: CardListenerContext): boolean => {
         event.gainedTo.playerId === owner.id
       )
     }
-    return (
-      isHarvestFeedConvertedEvent(event) &&
-      event.playerId === owner.id &&
-      (event.cost.sheep ?? 0) > 0 &&
-      (event.food.food ?? 0) > 0
-    )
+    return false
   })
 }
 
@@ -202,21 +188,6 @@ const opponentSheepExchangeConversionListener: CardListenerRegistration = {
   scope: 'opponent',
 }
 
-const afterHarvestSheepConversionListener: CardListenerRegistration = {
-  id: 'D36-breed-registry-after-harvest-sheep-conversion',
-  cardIds: [CARD_ID],
-  zones: ['hand', 'played'],
-  phases: ['immediatelyAfter'],
-  actions: ['harvest-feed-conversion'],
-  handler: sheepConversionHandler,
-}
-
-const opponentHarvestSheepConversionListener: CardListenerRegistration = {
-  ...afterHarvestSheepConversionListener,
-  id: 'D36-breed-registry-after-opponent-harvest-sheep-conversion',
-  scope: 'opponent',
-}
-
 const cardImpl = {
   listeners: [
     afterSheepGainListener,
@@ -225,8 +196,6 @@ const cardImpl = {
     opponentFutureMeepleSheepGainListener,
     afterSheepExchangeConversionListener,
     opponentSheepExchangeConversionListener,
-    afterHarvestSheepConversionListener,
-    opponentHarvestSheepConversionListener,
   ],
   prerequisiteCheck: (player, state) =>
     computeAnimalZones(player, state)

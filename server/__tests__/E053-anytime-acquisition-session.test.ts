@@ -3,6 +3,7 @@ import { afterEach, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -65,7 +66,8 @@ function finish(session: GameSession, response: SessionResponse, convert: boolea
       assert.ok(interaction.request.kind === 'choice' && interaction.request.structuredChoicePrefixes?.includes('bulk:'))
       const index = conversion.value.split(':')[1]
       assert.ok(index)
-      response = ok(session.resolveChoice(interaction.playerIndex, `bulk:${index}=2`))
+      assertRejectedUnchanged(session, () => session.resolveChoice(interaction.playerIndex, `bulk:${index}=2`))
+      response = ok(session.resolveChoice(interaction.playerIndex, `bulk:${index}=1`))
       assert.equal(response.state.players[0]!.resources.food, 44)
       assert.equal(response.state.players[0]!.resources.boar, 1)
       requestExcess = false
@@ -163,7 +165,7 @@ it('E053 declining the new-pig conversion keeps both farm pigs without food', ()
   assert.equal(response.interaction.stateId, 'idle')
 })
 
-it('E053 caps an excessive public bulk conversion at the newly obtained pig and preserves the older pig', () => {
+it('E053 rejects excessive public bulk conversion and preserves the older pig on an exact retry', () => {
   const session = buyBoarSpear()
   const response = finish(session, exchangeSheep(session), true, true)
   assert.equal(response.state.players[0]!.resources.food, 44)
