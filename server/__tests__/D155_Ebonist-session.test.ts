@@ -1,3 +1,4 @@
+import { enterFeeding } from './_helpers/harvest-feeding'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { GameSession } from '../game/authoritative-session'
@@ -13,16 +14,6 @@ import { BASIC_CONVERSION_SOURCE_ID } from '../../shared/cards/basic-conversion'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit56Phase from './_helpers/audit/ae-negative-56-phase'
-
-const enterFeeding = (session: GameSession) => {
-  let response = session.performRoundEnd()
-  while (response.interaction.stateId === 'wait'
-    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-    expect(response.ok, response.error).toBe(true)
-  }
-  return response
-}
 
 const CARD_ID = 'D155_Ebonist'
 

@@ -1,3 +1,4 @@
+import { enterFeeding } from './_helpers/harvest-feeding'
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -10,16 +11,6 @@ import '../../shared/cards/E/E153_StoneSculptor'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit55Phase from './_helpers/audit/ae-negative-55-phase'
-
-const enterFeeding = (session: GameSession) => {
-  let response = session.performRoundEnd()
-  while (response.interaction.stateId === 'wait'
-    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-    expect(response.ok, response.error).toBe(true)
-  }
-  return response
-}
 
 const CARD_ID = 'E153_StoneSculptor'
 

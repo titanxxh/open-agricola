@@ -1,3 +1,4 @@
+import { enterFeeding } from './_helpers/harvest-feeding'
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -8,16 +9,6 @@ import '../../shared/cards/A/A143_Stonecutter'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit48Crops from './_helpers/audit/ae-negative-48-crops'
-
-const enterFeeding = (session: GameSession) => {
-  let response = session.performRoundEnd()
-  while (response.interaction.stateId === 'wait'
-    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-    expect(response.ok, response.error).toBe(true)
-  }
-  return response
-}
 
 const CARD_ID = 'E109_BraidMaker'
 const BASKET = 'Major_Basket'
