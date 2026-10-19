@@ -1,8 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPersonPlacementOrder, recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
-import type { ActionFlow } from '../../shared/contract/types'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../shared/domain/player'
 import { addWorkerRef, removeWorkerRef } from '../../shared/domain/space'
 import { appendImmediateEvents } from '../../shared/events/append'
@@ -321,61 +319,6 @@ describe('D024 Brotherly Love session', () => {
       'day-laborer',
     ])
     expect(choicesOf(response)).not.toContain('__skip__')
-  })
-
-  it('counts a normal temporary worker placement as the third person', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    const temporaryWorker = player.workers.find((worker) => worker.id === '5')!
-    temporaryWorker.removedFromSupply = true
-    const dayLaborer = state.actionSpaces.find((space) => space.id === 'day-laborer')!
-    addWorkerRef(dayLaborer, player.id, temporaryWorker.id)
-    recordRoundPlacement(player, dayLaborer.id, temporaryWorker.id)
-    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
-      (entry) => entry.id === 'D24-brotherly-love-after-place-farmer',
-    )!
-
-    const result = session.withCtx(() => executeCardListener(listener, {
-      state,
-      player,
-      space: dayLaborer,
-      actionId: 'place-farmer',
-      phase: 'after',
-      actionContext: { temporaryFromSupply: true, placedWorkerId: temporaryWorker.id },
-    } as unknown as CardListenerContext))
-
-    expect(result).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(flow.optional).toBe(true)
-    expect(flow.actionContext).toEqual({ brotherlyLoveThirdWorkerId: temporaryWorker.id })
-  })
-
-  it('does not retrigger from a relocation after the third person', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    const dayLaborer = state.actionSpaces.find((space) => space.id === 'day-laborer')!
-    const grainSeeds = state.actionSpaces.find((space) => space.id === 'grain-seeds')!
-    addWorkerRef(dayLaborer, player.id, '3')
-    recordRoundPlacement(player, dayLaborer.id, '3')
-    removeWorkerRef(dayLaborer, player.id, '3')
-    addWorkerRef(grainSeeds, player.id, '3')
-    recordRoundPlacement(player, grainSeeds.id, '3', true)
-    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
-      (entry) => entry.id === 'D24-brotherly-love-after-place-farmer',
-    )!
-
-    const result = session.withCtx(() => executeCardListener(listener, {
-      state,
-      player,
-      space: grainSeeds,
-      actionId: 'place-farmer',
-      phase: 'after',
-      actionContext: { viaCardJump: true, workerId: '3', targetSpaceId: grainSeeds.id },
-    } as unknown as CardListenerContext))
-
-    expect(result).toBeUndefined()
   })
 })
 

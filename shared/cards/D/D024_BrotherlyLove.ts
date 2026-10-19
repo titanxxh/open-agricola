@@ -3,36 +3,50 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
-import { getRoundPersonPlacementDetails } from '../helpers/round-placement'
 import { findActionSpaceByWorker } from '../../domain/space'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import type { PersonUseReceipt } from '../../contract/person-use'
+import { createEventQuery } from '../../events/query'
 
 const CARD_ID = 'D024_BrotherlyLove'
 const THIRD_WORKER_KEY = 'brotherlyLoveThirdWorkerId'
 
+const afterPersonUse = (
+  context: CardListenerContext,
+  personUse: PersonUseReceipt | undefined,
+): ActionHookResult | void => {
+  if (context.state.roundPhase !== 'work') return
+  if (familySize(context.player) !== 4 || workersAvailable(context.state, context.player) === 0) return
+  if (personUse?.placementOrdinal !== 3) return
+  return {
+    flow: {
+      type: 'leaf',
+      actionId: 'place-farmer',
+      optional: true,
+      sourceCard: CARD_ID,
+      actionContext: { [THIRD_WORKER_KEY]: personUse.workerId },
+    },
+    sourceCard: CARD_ID,
+  }
+}
+
 const afterPlacementListener: CardListenerRegistration = {
   id: 'D24-brotherly-love-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer', 'spend-worker'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.roundPhase !== 'work' || context.actionContext?.viaCardJump === true) return
-    if (familySize(context.player) !== 4 || workersAvailable(context.state, context.player) === 0) return
-    const placements = getRoundPersonPlacementDetails(context.player)
-    if (placements.length !== 3) return
-    const third = placements[2]!
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'place-farmer',
-        optional: true,
-        sourceCard: CARD_ID,
-        actionContext: { [THIRD_WORKER_KEY]: third.workerId },
-      },
-      sourceCard: CARD_ID,
-    }
-  },
+  phases: ['after'],
+  actions: ['place-farmer'],
+  handler: context => afterPersonUse(context,
+    context.result && 'personUse' in context.result ? context.result.personUse : undefined),
+}
+
+const afterCardUseListener: CardListenerRegistration = {
+  id: 'D24-brotherly-love-after-card-person-use',
+  cardIds: [CARD_ID],
+  phases: ['after'],
+  events: ['worker.useCompleted'],
+  handler: context => afterPersonUse(context,
+    createEventQuery(context.actionEvents ?? []).find('worker.useCompleted')),
 }
 
 const computeArgsListener: CardListenerRegistration = {
@@ -60,7 +74,7 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterPlacementListener, computeArgsListener],
+  listeners: [afterPlacementListener, afterCardUseListener, computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

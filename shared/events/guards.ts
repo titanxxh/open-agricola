@@ -43,6 +43,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.animalDiscarded': ['animals', 'reason'],
   'farm.animalBred': ['animals', 'source'],
   'worker.placed': ['workerId', 'spaceId', 'viaCardId'],
+  'worker.useCompleted': ['workerId', 'placementOrdinal'],
   'worker.returned': ['workers', 'to'],
   'worker.promoted': ['playerId', 'workerId', 'from', 'to'],
   'action.revealed': ['actionId', 'roundSlot'],
@@ -503,6 +504,12 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.workerId, 'workerId')
       assertStringField(event.spaceId, 'spaceId')
       assertOptionalStringField(event.viaCardId, 'viaCardId')
+      return
+    case 'worker.useCompleted':
+      assertStringField(event.workerId, 'workerId')
+      if (!Number.isSafeInteger(event.placementOrdinal) || Number(event.placementOrdinal) < 1) {
+        throw new Error('Invalid placementOrdinal')
+      }
       return
     case 'worker.promoted':
       assertStringField(event.playerId, 'playerId')

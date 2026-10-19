@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from '../../contract/person-use'
 import type {
   ActionDefinition,
   ActionExecutionResult,
@@ -40,15 +41,15 @@ const placeFarmer = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
-): ActionExecutionResult & { workerId?: string } => {
+): ActionExecutionResult & { workerId?: string; personUse?: PersonUseReceipt } => {
   const worker = selectWorkerForMoorAction(state, player, space.id)
   if (!worker) {
     return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   }
   addWorkerRef(space, player.id, worker.id)
   addLinkedSpaceBlocks(state, space, player.id, worker.id)
-  recordRoundPlacement(player, space.id, worker.id)
-  return { type: 'ok', workerId: worker.id }
+  const personUse = recordRoundPlacement(player, space.id, worker.id)
+  return { type: 'ok', workerId: worker.id, personUse }
 }
 
 const readSupplySource = (
@@ -79,13 +80,13 @@ const placeTemporarySupplyWorker = (
   player: PlayerState,
   space: ActionSpace,
   workerId: string,
-): ActionExecutionResult & { workerId?: string } => {
+): ActionExecutionResult & { workerId?: string; personUse?: PersonUseReceipt } => {
   const alreadyPlaced = findActionSpaceByWorker(state, player.id, workerId) !== undefined
   if (alreadyPlaced) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   addWorkerRef(space, player.id, workerId)
   addLinkedSpaceBlocks(state, space, player.id, workerId)
-  recordRoundPlacement(player, space.id, workerId)
-  return { type: 'ok', workerId }
+  const personUse = recordRoundPlacement(player, space.id, workerId)
+  return { type: 'ok', workerId, personUse }
 }
 
 export const placeFarmerAction: ActionDefinition = {
@@ -304,12 +305,14 @@ export const placeFarmerAction: ActionDefinition = {
           type: 'seq',
           children: [...beforeFlows, targetLeaf],
         },
+        personUse: placeResult.personUse,
         extraData: { actionContextWrite },
       }
     }
     return {
       type: 'flow',
       flow: targetLeaf,
+      personUse: placeResult.personUse,
       extraData: { actionContextWrite },
     }
   },

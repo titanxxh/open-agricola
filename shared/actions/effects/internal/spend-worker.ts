@@ -20,7 +20,7 @@ export const spendWorkerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) => workersAvailable(state, player) > 0,
-  execute: ({ state, player, sourceCard, actionContext }) => {
+  execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     const worker = smallestAvailableWorker(state, player)
     if (!worker) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
@@ -39,7 +39,8 @@ export const spendWorkerAction: ActionDefinition = {
     }
 
     if (roundPlacementId) {
-      recordRoundPlacement(player, roundPlacementId, worker.id)
+      const personUse = recordRoundPlacement(player, roundPlacementId, worker.id)
+      eventSink?.emit<'worker.useCompleted'>({ type: 'worker.useCompleted', ...personUse })
     }
     return { type: 'ok' }
   },

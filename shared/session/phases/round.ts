@@ -198,11 +198,12 @@ export const takeAction = (
   player._activeActionBonusSources = []
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
   core.resetActionResultDetails()
-  applyActionPlacement(state, player, space, worker.id, core.allocActionToken())
+  const personUse = applyActionPlacement(state, player, space, worker.id, core.allocActionToken())
 
   core.pushEngineFrame({
     engine: core.createEngineForSpace(spaceId),
     source: { kind: 'action', actionId: spaceId },
+    personUse,
     spaceId,
     ownerPlayerIndex: playerIndex,
     stageResume: null,

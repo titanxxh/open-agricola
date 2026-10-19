@@ -62,6 +62,7 @@ const expectedPublicEventTypes = [
   'worker.placed',
   'worker.promoted',
   'worker.returned',
+  'worker.useCompleted',
 ] as const satisfies readonly GameEvent['type'][]
 
 type MissingPublicEventType = Exclude<GameEvent['type'], typeof expectedPublicEventTypes[number]>
@@ -282,6 +283,15 @@ describe('event mapping policy', () => {
       ...base, type: 'farm.spacesUsed', sourceCardId: 'M064_FamilyBurialPlot',
       newlyUsedTiles: [{ playerId: 'p1', row: 1, col: 3 }],
     }
+    expect(isPublicEventReplayable(event)).toBe(true)
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'P1' } })).toEqual([])
+    for (const surface of ['log', 'notification', 'highlight', 'resourceAnimation'] as const) {
+      expect(publicEventMappingPolicy[event.type][surface].mode).toBe('silent')
+    }
+  })
+
+  it('retains person-use facts without a duplicate placement log or visual cue', () => {
+    const event: GameEvent = { ...base, type: 'worker.useCompleted', workerId: '3', placementOrdinal: 3 }
     expect(isPublicEventReplayable(event)).toBe(true)
     expect(eventsToLogEntries([event], { playerNames: { p1: 'P1' } })).toEqual([])
     for (const surface of ['log', 'notification', 'highlight', 'resourceAnimation'] as const) {

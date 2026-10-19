@@ -98,6 +98,7 @@ type SessionResponse = {
 - 同一人物的 `jumpLeaf` 跳转与不放人的 `viaCardJump` 使用留在外围 Turn Scope（如有）中；只有 `move-farmer-to-space` 用 `turn-scope` begin / end 包住每次移动。
 - `actionContext.trueAction` 只表示一个效果对 listener 而言是否算作执行了具名行动；它不开启回合，也不开启行动作用域。
 - **人员放置序号**按 Work Placement Chronology 中的正常人员放置计数：同一工人移动不推进；正常放置临时或召回的人物会推进。`isCurrentActionSecondPersonPlacement()` 优先使用当前上下文的 `placedWorkerId`。
+- `recordRoundPlacement()` 从该顺序返回临时 `PersonUseReceipt`，包含实际 worker ID 与序号；搬迁不返回。普通放人将它冻结在可序列化的行动帧中，卡牌授予的放人将它保留在结果中，直到既有整格 `place-farmer.after` 续行。仅在卡上使用人员时，在成功修改处发出 `worker.useCompleted`，使其反应先于后续同级奖励完成。各边界保留自己的完成时点，不维护持久的使用计数。测试：`server/__tests__/person-use-completion-session.test.ts`。
 
 测试：`server/__tests__/{person-placement-order-session,move-farmer-before-placement-session}.test.ts`。
 

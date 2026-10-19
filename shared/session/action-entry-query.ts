@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from '../contract/person-use'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type { ActionSpace, GameState, PlayerState } from '../contract/types'
 import { canEnterSpace, canUseExclusiveSpace, computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability'
@@ -26,7 +27,7 @@ export const applyActionPlacement = (
   space: ActionSpace,
   workerId: string,
   actionToken: number,
-): void => {
+): PersonUseReceipt => {
   player._activeActionBonusSources = []
   recordActionSnapshot(player, actionToken)
   writeActionSnapshotExtraData(player, 'placedWorkerId', workerId)
@@ -36,8 +37,9 @@ export const applyActionPlacement = (
     actorPlayerId: player.id,
     sourceActionId: space.id,
   })
-  recordRoundPlacement(player, space.id, workerId)
+  const personUse = recordRoundPlacement(player, space.id, workerId)
   incPlacedFarmers(player)
+  return personUse
 }
 
 export const canEnterActionSpace = (

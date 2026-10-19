@@ -96,6 +96,7 @@ Rotation opportunity, Turn Scope and action-execution scope are separate lifetim
 - Same-person `jumpLeaf` relocations and worker-less `viaCardJump` uses stay in the surrounding Turn Scope, if any; only `move-farmer-to-space` wraps each move in `turn-scope` begin / end.
 - `actionContext.trueAction` only says whether an effect counts as taking its named action for listeners; it creates no Turn and no action scope.
 - **Person Placement Order** counts normal person placements in the Work Placement Chronology: moving the same worker does not advance it; normally placing a temporary or recalled person does. `isCurrentActionSecondPersonPlacement()` prefers the current context's `placedWorkerId`.
+- `recordRoundPlacement()` returns a transient `PersonUseReceipt` with the actual worker ID and ordinal from that chronology; relocations return no receipt. Ordinary placement freezes it in the serializable action frame, and granted placements retain it in their result until the existing whole-space `place-farmer.after` continuation. A card-only person use emits `worker.useCompleted` at its successful mutation, so its reactions finish before later reward siblings. Each boundary keeps its own completion timing without a persistent use counter. Tests: `server/__tests__/person-use-completion-session.test.ts`.
 
 Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-placement-session}.test.ts`.
 

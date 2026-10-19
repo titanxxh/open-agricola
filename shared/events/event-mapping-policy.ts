@@ -157,6 +157,13 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent('worker placement does not move resources'),
     replay: 'replayable',
   },
+  'worker.useCompleted': {
+    log: silent('person-use completion is a rule timing fact'),
+    notification: silent('person-use completion is a rule timing fact'),
+    highlight: silent('person-use completion has no separate board cue'),
+    resourceAnimation: silent('person-use completion moves no resources'),
+    replay: 'replayable',
+  },
   'worker.returned': silentPublicCues(mapped()),
   'worker.promoted': {
     log: mapped(),

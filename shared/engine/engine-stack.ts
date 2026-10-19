@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from '../contract/person-use'
 import type { Engine } from './engine'
 import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
@@ -43,6 +44,7 @@ export type EngineFrame = {
   engine: Engine
   source: EngineSource
   ownerPlayerIndex: number
+  personUse?: PersonUseReceipt
   spaceId: string
   stageResume: StageResumeState | null
   deferredPlayerSwitch: {
@@ -60,6 +62,7 @@ export type EngineFrameCursor = {
   source: EngineSource
   engineSnapshot: ReturnType<Engine['snapshot']>
   ownerPlayerIndex: number
+  personUse?: PersonUseReceipt
   spaceId: string
   stageResume: StageResumeState | null
   deferredPlayerSwitch: {
@@ -221,6 +224,7 @@ export class EngineStack {
         source: f.source,
         engineSnapshot: f.engine.snapshot(),
         ownerPlayerIndex: f.ownerPlayerIndex,
+        personUse: f.personUse,
         spaceId: f.spaceId,
         stageResume: f.stageResume,
         deferredPlayerSwitch: f.deferredPlayerSwitch,
@@ -246,6 +250,7 @@ export class EngineStack {
         engine,
         source: fc.source,
         ownerPlayerIndex: fc.ownerPlayerIndex,
+        personUse: fc.personUse,
         spaceId: fc.spaceId,
         stageResume: fc.stageResume,
         deferredPlayerSwitch: fc.deferredPlayerSwitch,

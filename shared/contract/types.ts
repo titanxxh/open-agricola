@@ -1,3 +1,4 @@
+import type { PersonUseReceipt } from './person-use'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type { RuleOperationPreview } from './rule-operation-previews'
 import type { PromptKey } from './prompt-keys'
@@ -980,10 +981,10 @@ export type FarmOperationResult = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren; beforeHostContributions?: BeforeHostContextContribution[]; farmOperations?: FarmOperationResult[] }
+  | { type: 'ok'; personUse?: PersonUseReceipt; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren; beforeHostContributions?: BeforeHostContextContribution[]; farmOperations?: FarmOperationResult[] }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
-  | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
+  | { type: 'flow'; flow: ActionFlow; personUse?: PersonUseReceipt; extraData?: Record<string, unknown> }
 /** Permissions for this waiting step; declarations do not flow into nested steps. */
 export type AnytimeWindow = { allowed: true; blockedIds?: string[] } | { allowed: false }
 
