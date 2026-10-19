@@ -1,3 +1,4 @@
+import { enterFeeding } from './_helpers/harvest-feeding'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it, afterEach } from 'vitest'
@@ -10,16 +11,6 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit47Cards from './_helpers/audit/ae-negative-47-cards'
-
-const enterFeeding = (session: GameSession) => {
-  let response = session.performRoundEnd()
-  while (response.interaction.stateId === 'wait'
-    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-    expect(response.ok, response.error).toBe(true)
-  }
-  return response
-}
 
 const CARD_ID = 'C109_SchnappsDistiller'
 

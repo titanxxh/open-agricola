@@ -1,3 +1,4 @@
+import { enterFeeding } from './_helpers/harvest-feeding'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
@@ -21,16 +22,6 @@ import '../../shared/cards/C/C071_Slurry'
 import '../../shared/cards/C/C072_FestivalPlanning'
 import '../../shared/cards/C/C073_SeaweedFertilizer'
 import '../../shared/cards/D/D003_Furrows'
-
-const enterFeeding = (session: GameSession) => {
-  let response = session.performRoundEnd()
-  while (response.interaction.stateId === 'wait'
-    && session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-    expect(response.ok, response.error).toBe(true)
-  }
-  return response
-}
 
 const FILLER = '__test_placeholder__'
 const OCCUPATIONS = ['A125_Priest', 'B121_Geologist', 'C123_Freemason']
