@@ -123,8 +123,8 @@ type ActionDefinition = {
 - 卡牌条目共用当前步骤准入（[当前步骤准入与 blocked 恢复](hooks_zh.md#当前步骤准入与-blocked-恢复)）；根 `optional` 不能绕过，新行动使用自身的来源、参数、费用与执行者。
 - 嵌套 anytime flow 插在当前 pending 树之前；父级以同一个 `PendingEnvelope` 返回。
 - 重入：Anytime Ability 的 sequence 进行中时，该玩家在所有帧中都不能再进入同一条目。`allowAnytimeReentry` 只解除这一限制，目前只有系统 `exchange` 设置它。同一能力内的货物或目标选项共用其条目。
+- 每个已接受命令在现有 `anytimeActionId` 序列上冻结 Turn 归属与 parent activation ID。序列等全部后代及必需的动物整理完成后才发出 `anytime.completed`，包括同一 frame 注入的流程。事实复用已捕获的 `actionEvents` 和普通 `after` trigger-select；嵌套发动的完成不代表父发动完成。身份、归属与父链接随 Session cursor 和撤销恢复；清理 leaf 不携带完成标记。见 `server/__tests__/anytime-completion-session.test.ts`。
 - 替代回合的 anytime 行动（`replacesTurn`）只在工作阶段空闲时可用，完整 flow 和回合结束 hook 结束后才轮转。
-- 完成：必须等完整注入 sequence 结束的终结反应，用 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY` 标记最后一个 leaf，消费者同时要求该标记与引擎的注入标记。
 - **兑换批次**：`effects/exchange.ts` 的 `executeExchangeBatch()` 在任何支付前，按原数量和顺序校验配方与来源额度、资源和已安置动物余额。前项配方所得可支付后项，未领取的反应奖励不可预支。任一项非法即拒绝整份提交，不截断次数或部分成交。普通 direct、单项、bulk 和已提交的喂食配方共用该执行器，每项收据记录其支付前库存。引擎先执行批次反应，再执行必要的动物整理。配方可在指定交互类型中禁用 anytime（`blockedAnytimeInteractionKinds`）；繁殖期间动物烹饪配方不可用。`bulk:` 这类紧凑选项值使用请求的 `structuredChoicePrefixes`。
 - **喂食目录**：每个已解析配方持有自身的收获使用轮次；anytime 配方不会仅因外层是喂食而增加收获限次。`feed` 请求以稳定的 `(sourceId, exchangeIndex)` 发布 `exchangeCatalog`；客户端只按它起草，提交时同时匹配原目录与实时重建的目录。
 - 动物整理是系统子流程，从不作为 anytime 条目。工作阶段空闲回合与 `confirm-next-player` 是当前玩家的窗口；`confirm-player-switch` 与阶段 hook 链默认封锁，除非当前节点开启窗口。`computeResourceCommitments()` 的限制在命令边界执行（[ADR 0019](../adr/0019-resource-commitments-preserve-unsettled-trades.md)）。

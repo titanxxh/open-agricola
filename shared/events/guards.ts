@@ -1,3 +1,4 @@
+import { parseAnytimeTurnAffiliation } from '../contract/anytime-activation'
 import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
 import type { GameEvent } from '../contract/events'
 
@@ -45,6 +46,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.animalBred': ['animals', 'source'],
   'worker.placed': ['workerId', 'spaceId', 'viaCardId'],
   'worker.useCompleted': ['workerId', 'placementOrdinal'],
+  'anytime.completed': ['anytimeActionId', 'activationId', 'parentActivationId', 'turn'],
   'worker.returned': ['workers', 'to'],
   'worker.promoted': ['playerId', 'workerId', 'from', 'to'],
   'action.revealed': ['actionId', 'roundSlot'],
@@ -529,6 +531,12 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       if (!Number.isSafeInteger(event.placementOrdinal) || Number(event.placementOrdinal) < 1) {
         throw new Error('Invalid placementOrdinal')
       }
+      return
+    case 'anytime.completed':
+      assertStringField(event.anytimeActionId, 'anytimeActionId')
+      assertStringField(event.activationId, 'activationId')
+      assertOptionalStringField(event.parentActivationId, 'parentActivationId')
+      parseAnytimeTurnAffiliation(event.turn)
       return
     case 'worker.promoted':
       assertStringField(event.playerId, 'playerId')

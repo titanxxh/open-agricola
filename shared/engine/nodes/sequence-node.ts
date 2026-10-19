@@ -1,9 +1,11 @@
+import type { AnytimeActivation } from '../../contract/anytime-activation'
 import type { EngineNode, EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
 export class SequenceNode extends BaseNode {
   public children: EngineNode[]
   public anytimeActionId?: string
+  public anytimeActivation?: AnytimeActivation
 
   constructor(id: string, children: EngineNode[]) {
     super(id, 'sequence')
@@ -28,6 +30,7 @@ export class SequenceNode extends BaseNode {
     return {
       childrenIds: this.children.map((c) => c.id),
       ...(this.anytimeActionId ? { anytimeActionId: this.anytimeActionId } : {}),
+      ...(this.anytimeActivation ? { anytimeActivation: this.anytimeActivation } : {}),
     }
   }
 }

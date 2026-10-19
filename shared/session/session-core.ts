@@ -1,3 +1,4 @@
+import type { AnytimeActivationFlow } from '../contract/anytime-activation'
 import { commitFarmOperation } from '../domain/farm-operations'
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
@@ -736,7 +737,7 @@ export class GameCore {
     }
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
-  listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow; replacesTurn?: boolean }[] {
+  listAnytimeEntries(): { descriptor: AnytimeAction; flow: AnytimeActivationFlow; replacesTurn?: boolean }[] {
     return this.buildAnytimeEntries()
   }
 
@@ -2221,7 +2222,7 @@ export class GameCore {
     return view?.sourceCard ?? choicesSourceCard(view?.choices ?? [])
   }
 
-  private buildAnytimeEntries(options: { preScoringOnly?: boolean; nestedWindow?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow; replacesTurn?: boolean }[] {
+  private buildAnytimeEntries(options: { preScoringOnly?: boolean; nestedWindow?: boolean } = {}): { descriptor: AnytimeAction; flow: AnytimeActivationFlow; replacesTurn?: boolean }[] {
     if (!this.canInterleaveAnytimeAction()) return []
     if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
@@ -2261,7 +2262,6 @@ export class GameCore {
         flow: { type: 'leaf', actionId: action.id, ...(actionContext ? { actionContext } : {}) },
       })
     }
-    if (preparationWindow) return anytimeEntries
     // Card-sourced anytime actions via CardListener phases:['anytime']
     const anytimeContext: import('../cards/card-listeners').CardListenerDispatchInput = {
       actionHooks: this.actionHooks, state: this.state,
@@ -2272,7 +2272,7 @@ export class GameCore {
       pendingSourceCard,
       actionContext: pendingActionContext,
     }
-    const matchedAnytime = getMatchingListeners(anytimeContext)
+    const matchedAnytime = preparationWindow ? [] : getMatchingListeners(anytimeContext)
     for (const entry of matchedAnytime) {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue

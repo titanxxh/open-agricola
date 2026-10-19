@@ -1,3 +1,4 @@
+import type { AnytimeTurnAffiliation } from './anytime-activation'
 import type { PersonUseReceipt } from './person-use'
 import type {
   CostModifierType,
@@ -207,6 +208,13 @@ export type WorkerPlacedEvent = GameEventBase<'worker.placed'> & {
 }
 
 export type WorkerUseCompletedEvent = GameEventBase<'worker.useCompleted'> & PersonUseReceipt
+
+export type AnytimeCompletedEvent = GameEventBase<'anytime.completed'> & {
+  anytimeActionId: string
+  activationId: string
+  parentActivationId?: string
+  turn: AnytimeTurnAffiliation
+}
 
 export type WorkerReturnedEvent = GameEventBase<'worker.returned'> & {
   workers: Array<{ playerId: string; workerId: string }>
@@ -459,6 +467,7 @@ export type GameEvent =
   | FarmAnimalBredEvent
   | WorkerPlacedEvent
   | WorkerUseCompletedEvent
+  | AnytimeCompletedEvent
   | WorkerReturnedEvent
   | WorkerPromotedEvent
   | ActionRevealedEvent

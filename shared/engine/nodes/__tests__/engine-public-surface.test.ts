@@ -24,6 +24,7 @@ describe('Engine surface guard', () => {
   const PRIVATE_HELPERS = [
     '_internals',
     'getActiveAnytimeActionIds',
+    'getActiveAnytimeActivation',
     'offerBeforeAnytimeWindow',
     'hasPendingChoiceCompositeAncestor',
     'insertFlowAfterPendingChoice',

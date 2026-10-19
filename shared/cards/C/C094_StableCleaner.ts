@@ -5,7 +5,6 @@ import { isCardFlagged } from '../helpers/card-state'
 import { stablesAction } from '../../actions/effects/stables'
 import type { CardImpl } from '../registry'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
-import { INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY } from '../../engine/action-context-flags'
 
 const CARD_ID = 'C094_StableCleaner'
 
@@ -56,7 +55,6 @@ const anytimeListener: CardListenerRegistration = {
             actionId: 'special-effect',
             sourceCard: CARD_ID,
             params: { kind: 'set-flag', flag: false },
-            actionContext: { [INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY]: true },
           },
         ],
       },
