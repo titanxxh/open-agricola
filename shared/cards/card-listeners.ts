@@ -49,6 +49,7 @@ export type CardListenerRegistration = {
   cardIds?: string[]
   actions?: string[]
   events?: GameEvent['type'][]
+  globalQuery?: true
   phases?: ActionHookPhase[]
   scope?: CardListenerScope
   zones?: CardListenerZone[]

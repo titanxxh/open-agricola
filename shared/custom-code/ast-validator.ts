@@ -20,6 +20,7 @@ import { sandboxEffectMetadataKeys, sandboxListenerDataFields } from './sandbox-
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 import { isSandboxListenerScope } from './sandbox-listener-scopes'
+import { listenerContractError } from '../cards/listener-contract'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
 
@@ -901,6 +902,13 @@ function validateListenersArray(
       errors.push(`line ${getLine(element)}: CARD_IMPL listener entries must be object literals`)
       continue
     }
+    const filters = (name: string) => {
+      const declaration = element.properties.find(property => getStaticPropertyName(property, constants) === name)
+      if (!declaration || !ts.isPropertyAssignment(declaration) || !ts.isArrayLiteralExpression(declaration.initializer)) return undefined
+      return declaration.initializer.elements.map(value => ts.isStringLiteral(value) ? value.text : undefined)
+    }
+    const contractError = listenerContractError({ actions: filters('actions'), phases: filters('phases') })
+    if (contractError) errors.push(`line ${getLine(element)}: ${contractError}`)
     const inspectResults = listenerMayComputeCosts(element, constants)
     for (const prop of element.properties) {
       if (ts.isSpreadAssignment(prop)) {

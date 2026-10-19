@@ -12,6 +12,7 @@
  */
 import type { CardEffect } from './card-effects.ts'
 import type { CardListenerRegistration } from './card-listeners.ts'
+import { snapshotCardListener } from './listener-contract'
 import type { CardDefinition } from '../contract/cards'
 import type { CustomCodeManifest } from '../custom-code/types.ts'
 import type { CostModifier } from '../contract/types.ts'
@@ -48,7 +49,8 @@ const displayOnlyCardJson = (cardJson: CustomCardData['cardJson']): CardDefiniti
 
 export class SessionCardContext {
   readonly customEffects = new Map<string, CardEffect>()
-  readonly customListeners: CardListenerRegistration[] = []
+  private readonly listenerEntries: CardListenerRegistration[] = []
+  get customListeners(): CardListenerRegistration[] { return [...this.listenerEntries] }
   readonly customMinors = new Map<string, CardDefinition>()
   readonly customOccupations = new Map<string, CardDefinition>()
   /** Art URLs for custom cards, keyed by card ID. */
@@ -68,7 +70,7 @@ export class SessionCardContext {
   }
 
   registerListener(reg: CardListenerRegistration): void {
-    this.customListeners.push(reg)
+    this.listenerEntries.push(snapshotCardListener(reg))
   }
 
   registerCard(data: CustomCardData): void {
@@ -104,7 +106,7 @@ export class SessionCardContext {
 
   dispose(): void {
     this.customEffects.clear()
-    this.customListeners.length = 0
+    this.listenerEntries.length = 0
     this.customMinors.clear()
     this.customOccupations.clear()
     this.customArtUrls.clear()

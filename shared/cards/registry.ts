@@ -15,7 +15,7 @@ import type { CardListenerRegistration } from './card-listeners'
 import type { CardEffect } from './card-effects'
 import type { CardDefinition } from '../contract/cards'
 import type { ComplexCost, CostModifier, GameState, PaymentResourceMap, PlayerState } from '../contract/types'
-import { setCardListenerSource } from './card-listener-source'
+import { snapshotCardListener } from './listener-contract'
 
 export type PrerequisiteHandler = (player: PlayerState, state?: GameState) => boolean
 export type CardPurchaseBaseCostContext = {
@@ -68,9 +68,9 @@ export class CardRegistry {
   private readonly protectedEffectIds = new Set<string>()
 
   loadImpl(cardId: string, impl: CardImpl, options: CardRegistryLoadOptions = {}): void {
+    const listeners = impl.listeners?.map(listener => snapshotCardListener(listener, cardId))
     if (impl.listeners && impl.listeners.length > 0) {
-      for (const listener of impl.listeners) setCardListenerSource(listener, cardId)
-      this.listenersByCard.set(cardId, impl.listeners)
+      this.listenersByCard.set(cardId, listeners ?? [])
       this.listenersWithoutCardIds = null
       if (options.protected) {
         for (const listener of impl.listeners) this.protectedListenerIds.add(listener.id)
@@ -93,9 +93,10 @@ export class CardRegistry {
 
   /** Append a single listener to a card, preserving existing ones; dedupes by id. */
   addListener(cardId: string, listener: CardListenerRegistration): void {
+    const snapshot = snapshotCardListener(listener)
     const existing = this.listenersByCard.get(cardId) ?? []
     const filtered = existing.filter((l) => l.id !== listener.id)
-    filtered.push(listener)
+    filtered.push(snapshot)
     this.listenersByCard.set(cardId, filtered)
     this.listenersWithoutCardIds = null
   }
@@ -106,10 +107,11 @@ export class CardRegistry {
    * still returns them.
    */
   registerListener(listener: CardListenerRegistration): void {
-    const ids = listener.cardIds && listener.cardIds.length > 0
-      ? listener.cardIds
+    const snapshot = snapshotCardListener(listener)
+    const ids = snapshot.cardIds && snapshot.cardIds.length > 0
+      ? snapshot.cardIds
       : ['__global__']
-    for (const id of ids) this.addListener(id, listener)
+    for (const id of ids) this.addListener(id, snapshot)
   }
 
   /** Set or replace the effect keyed by its id. */
@@ -224,7 +226,7 @@ export class CardRegistry {
   }
 
   getListenersFor(cardId: string): CardListenerRegistration[] {
-    return this.listenersByCard.get(cardId) ?? []
+    return [...(this.listenersByCard.get(cardId) ?? [])]
   }
 
   getCandidateListeners(cardIds: Iterable<string>): CardListenerRegistration[] {

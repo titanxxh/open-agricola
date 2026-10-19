@@ -2,23 +2,18 @@ import { cardEffectHooks, flowCardEffectHooks, isHandCardEffectHook, type CardEf
 import type { ActionHookPhase } from '../actions/hooks'
 import type { CardListenerScope } from '../cards/card-listeners'
 import { admitCustomFlow } from './flow-admission'
-import { isSandboxListenerAction, sandboxListenerActions } from './sandbox-listener-actions'
-import { isSandboxListenerPhase, sandboxListenerPhases } from './sandbox-listener-phases'
+import { isSandboxListenerAction } from './sandbox-listener-actions'
+import { isSandboxListenerPhase } from './sandbox-listener-phases'
 import { isSandboxListenerScope } from './sandbox-listener-scopes'
 import { admitEffectMetadata, admitListenerData } from './sandbox-declarations'
 import type { CustomCodeEffectMetadata, CustomCodeListenerManifest, CustomCodeManifest } from './types'
+import { listenerContractError } from '../cards/listener-contract'
 
 /**
  * Shared admission for both executors (ADR 0025): the manifest extracted from a
  * custom card and the values its effect hooks return must stay inside the
  * Workshop Capability Contract. Anything else throws, never silently narrows.
  */
-
-/** Two phases are dispatched under their own action identity; neither is a listener action name. */
-const PHASE_DISPATCH_IDS: Partial<Record<ActionHookPhase, string>> = {
-  anytime: 'anytime',
-  computeExchanges: 'compute-exchanges',
-}
 
 const FLOW_RESULT_HOOKS = new Set<string>([...flowCardEffectHooks, 'resolveChoice', 'contributeExtraTurn'])
 
@@ -38,16 +33,16 @@ export type RawCustomManifest = {
 const outsideContract = (detail: string): Error =>
   new Error(`${detail} is not in the Workshop Capability Contract`)
 
-/**
- * An omitted filter means the deployed set, not every native action or phase.
- * Registration applies this too, so a manifest saved before ADR 0025 is bound the same way.
- */
+/** Saved manifests and fresh source use the same explicit subset of native subscription permission. */
 export function boundListenerFilters(
-  listener: { actions?: string[]; phases?: ActionHookPhase[] },
+  listener: { actions?: string[]; phases?: ActionHookPhase[]; events?: unknown; globalQuery?: unknown },
 ): { actions: string[]; phases: ActionHookPhase[] } {
-  const phases = listener.phases ?? [...sandboxListenerPhases]
-  const actions = listener.actions
-    ?? [...sandboxListenerActions, ...phases.flatMap(phase => PHASE_DISPATCH_IDS[phase] ?? [])]
+  if (listener.events !== undefined || listener.globalQuery !== undefined) throw outsideContract('listener event/global query selector')
+  const { actions, phases } = listener
+  if (!actions?.length || !phases?.length) throw outsideContract('listener requires explicit nonempty actions and phases')
+  if (!actions.every(isSandboxListenerAction) || !phases.every(isSandboxListenerPhase)) throw outsideContract('listener filters')
+  const error = listenerContractError({ actions, phases })
+  if (error) throw outsideContract(error)
   return { actions, phases }
 }
 
@@ -63,6 +58,7 @@ export function normalizeCustomManifest(raw: RawCustomManifest, cardId: string):
   })
 
   const listeners = raw.listeners.map((listener) => {
+    if (listener.events !== undefined || listener.globalQuery !== undefined) throw outsideContract('listener event/global query selector')
     if (listener.cardIds && !(listener.cardIds.length === 1 && listener.cardIds[0] === cardId)) {
       throw new Error('listener cardIds must be [CARD_ID]')
     }

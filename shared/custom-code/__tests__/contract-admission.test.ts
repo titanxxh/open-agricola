@@ -13,6 +13,13 @@ const listener = (fields: Partial<RawCustomManifest['listeners'][number]>) =>
   manifest({ listeners: [{ registrationId: `${CARD_ID}:listener:0`, ...fields }] })
 
 describe('normalizeCustomManifest', () => {
+  it.each([
+    {}, { actions: [], phases: ['after'] }, { actions: ['collect'], phases: [] },
+    { actions: ['collect'], phases: ['anytime'] }, { actions: ['place-farmer'], phases: ['immediatelyAfter'] },
+    { actions: ['collect'], phases: ['after'], events: ['farm.sown'] },
+  ])('rejects implicit or incompatible listener filters %j', filters => {
+    expect(() => normalizeCustomManifest(listener(filters), CARD_ID)).toThrow()
+  })
   it('keeps declared contract values', () => {
     expect(normalizeCustomManifest({
       effectKeys: ['onRoundStart'],
