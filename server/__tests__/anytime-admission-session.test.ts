@@ -294,7 +294,7 @@ describe('anytime current-step admission', () => {
     session.withCtx(() => requireActiveCardRegistry('anytime admission test').registerListener({
       id: cardId,
       cardIds: [cardId],
-      phases: ['anytime'],
+      actions: ['anytime'], phases: ['anytime'],
       handler: () => ({
         flow: {
           type: 'seq',

@@ -13,7 +13,7 @@ const fixture: CardFixture = {
   id: 'M7-anytime-ability',
   cardId: CARD_ID,
   cardType: 'occupation',
-  // spec §5.1 例外：userMessage 显式提示用 phases: ['anytime'] listener。「任意时机」
+  // spec §5.1 例外：userMessage 显式提示用 actions: ['anytime'] + phases: ['anytime'] listener。「任意时机」
   // 能力到 anytime listener 的映射对小模型非显然，作为 fixture 级最小提示保留——
   // 不是去实现化遗漏，勿删。
   userMessage: [
@@ -22,7 +22,7 @@ const fixture: CardFixture = {
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 木材换食物',
     '- 效果: 任意时机，你可以支付 2 木材，获得 3 食物。整局游戏只能使用一次。',
-    '- 实现提示: 用 listener、phases 设为 [\'anytime\'] 实现这个「任意时机」能力。',
+    '- 实现提示: 用 listener、actions 和 phases 都设为 [\'anytime\'] 实现这个「任意时机」能力。',
   ].join('\n'),
 
   setup(llmCode, options) {

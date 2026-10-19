@@ -66,7 +66,7 @@ describe('collectComputeExchanges', () => {
     const reg = new CardRegistry()
     const listener: CardListenerRegistration = {
       id: 'fake-card-compute-exchanges-listener',
-      phases: ['computeExchanges'],
+      actions: ['compute-exchanges'], phases: ['computeExchanges'],
       handler: (ctx) => {
         const window = (ctx.extraData as { window?: string } | undefined)?.window
         if (window !== 'harvest') return
@@ -116,7 +116,7 @@ describe('getExchangesInWindow with computeExchanges listener', () => {
     const reg = new CardRegistry()
     const listener: CardListenerRegistration = {
       id: 'fake-card-compute-exchanges-listener-2',
-      phases: ['computeExchanges'],
+      actions: ['compute-exchanges'], phases: ['computeExchanges'],
       handler: (ctx) => {
         const window = (ctx.extraData as { window?: string } | undefined)?.window
         if (window !== 'harvest') return

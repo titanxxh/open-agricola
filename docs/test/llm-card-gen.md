@@ -33,7 +33,7 @@ pnpm test:llm:live --model deepseek-flash --diagnose M2-per-action-bonus --runti
 
 `LLM_TEST_SOURCES` 是一个本地 JSON 数组，每项包含 `id`（本次测试名称）、`fixtureId`（已有固定 case 的 ID）和 `sourcePath`（相对 manifest 的 `.ts` 路径）。它只选择源码，不能替换测试断言。缺失文件、未知 case、编译或行为失败都按普通 Vitest 失败处理。生成源码不改 ID、不补元数据、不做代码重写。
 
-`test:llm:record` 是真实浏览器生成命令的别名，结果写入独立的本地批次目录，不覆盖历史 `recordings/`。旧的 `LLM_TEST_MODE=live` / `LLM_TEST_RECORD=1` 入口会拒绝执行，避免绕过浏览器调用和费用限制。
+`test:llm:record` 是真实浏览器生成命令的别名，结果写入独立的本地批次目录，不覆盖历史 `recordings/`。历史 M7 和合成响应显式补齐旧录音缺失的 `actions: ['anytime']`；真实生成源码不做此适配。旧的 `LLM_TEST_MODE=live` / `LLM_TEST_RECORD=1` 入口会拒绝执行，避免绕过浏览器调用和费用限制。
 
 ## CI / Workflow
 
@@ -121,7 +121,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 - `listeners[].actions:` 是 leaf actionId（`place-farmer` / `gain` / `collect` 等），不是行动空间 id
 - `harvest-feed` 不是 listener 动作——喂食阶段开始时的收益用 `onStartHarvestFeedingPhase` effect hook
-- Anytime = `phases: ['anytime']` listener，不用 `actions:` 字段；一次性能力用 `special-effect` 的 `set-flag` + `cardStates.flagged` 闸门
+- Anytime = `actions: ['anytime']` + `phases: ['anytime']` listener；一次性能力用 `special-effect` 的 `set-flag` + `cardStates.flagged` 闸门
 - `futureMeeplesNode` 没注入沙盒，手写 `params.__futureMeepleRequest` leaf
 - `costs` 只用于简单行动费用；跨所有主要/次要改良候选的资源折扣用 `bonuses`，并设置 `capDiscountAtCost: true`、`optional: false`、`sources: [CARD_ID]`
 

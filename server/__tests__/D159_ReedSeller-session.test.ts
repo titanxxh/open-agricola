@@ -244,7 +244,7 @@ describe('D159 Reed Seller', () => {
     player.resources.vegetable = 2
     session.loadState(session.state)
     session.withCtx(() => requireActiveCardRegistry('feed catalog refresh').registerListener({
-      id: cardId, cardIds: [cardId], phases: ['anytime'],
+      id: cardId, cardIds: [cardId], actions: ['anytime'], phases: ['anytime'],
       handler: ({ player: owner }) => owner.improvements.includes('Major_Fireplace1') ? undefined : {
         flow: { type: 'leaf', actionId: 'improvement', sourceCard: cardId, params: { types: ['major'], allowedPurchases: ['Major_Fireplace1'] } },
       },
