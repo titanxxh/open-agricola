@@ -101,6 +101,7 @@ const toRepoPath = (filePath: string): string =>
   path.relative(process.cwd(), filePath).split(path.sep).join('/')
 
 const cardPassedEmitLines = (source: string): number[] => {
+  if (!source.includes('card.passed')) return []
   const file = ts.createSourceFile('events.ts', source, ts.ScriptTarget.Latest, true)
   const lines: number[] = []
   const visit = (node: ts.Node): void => {
