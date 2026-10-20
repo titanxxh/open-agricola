@@ -28,10 +28,13 @@ const setup = (options: {
   minorHand?: string[]
   extraOccupations?: string[]
   spaceResources?: Record<string, Partial<Resource>>
+  enableFarmersOfTheMoor?: boolean
+  sickWorkerIds?: string[]
 } = {}) => {
   const session = new GameSession(42, undefined, {
     playerCount: 5,
     enableThroughTheSeasons: options.enableThroughTheSeasons === true,
+    enableFarmersOfTheMoor: options.enableFarmersOfTheMoor === true,
   } as never)
   const state = session.getState().state as ReturnType<GameSession['getState']>['state'] & SeasonsState
   state.currentPlayerIndex = 0
@@ -59,6 +62,7 @@ const setup = (options: {
   owner.resources.stone = 0
   owner.resources.vegetable = 0
   setActiveWorkerCount(owner, options.workers ?? 3)
+  if (options.sickWorkerIds) owner.sickWorkerIds = [...options.sickWorkerIds]
   for (const id of ['western-quarry', 'eastern-quarry']) {
     const space = state.actionSpaces.find((candidate) => candidate.id === id)!
     space.resources.stone = id === 'western-quarry' ? 2 : 1
@@ -252,5 +256,47 @@ describe('A171 Sidekick session', () => {
     } finally {
       registry.removeListenersWhere((listener) => listener.id === LISTENER_ID)
     }
+  })
+
+  describe('Farmers of the Moor', () => {
+    const sidekickPlacements = (resp: ReturnType<GameSession['getState']>) =>
+      resp.state.events.filter((event) => event.type === 'worker.placed' && event.viaCardId === CARD_ID)
+
+    it('places the next healthy person instead of a sick one', () => {
+      const session = setup({ enableFarmersOfTheMoor: true, sickWorkerIds: ['2'] })
+
+      let resp = session.takeAction(0, 'eastern-quarry')
+      expect(resp.ok, resp.error).toBe(true)
+      expect(resp.state.actionSpaces.find((space) => space.id === 'eastern-quarry')?.takenBy).toEqual([
+        { playerId: resp.state.players[0]!.id, workerId: '1' },
+      ])
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+      const accept = acceptOption(resp)
+      expect(accept).toBeDefined()
+
+      resp = session.resolveChoice(0, accept!.value)
+      expect(resp.ok, resp.error).toBe(true)
+      const owner = resp.state.players[0]!
+      expect(owner.resources).toMatchObject({ food: 1, stone: 1, vegetable: 1 })
+      expect(owner.sickWorkerIds).toEqual(['2'])
+      expect(resp.state.actionSpaces.find((space) => space.id === 'vegetable-seeds')?.takenBy).toEqual([
+        { playerId: owner.id, workerId: '3' },
+      ])
+      expect(sidekickPlacements(resp).map((event) => event.workerId)).toEqual(['3'])
+    })
+
+    it('does not offer the left space when only sick people are at home', () => {
+      const session = setup({ enableFarmersOfTheMoor: true, workers: 2, sickWorkerIds: ['2'] })
+
+      const resp = session.takeAction(0, 'eastern-quarry')
+
+      expect(resp.ok, resp.error).toBe(true)
+      expect(acceptOption(resp)).toBeUndefined()
+      const owner = resp.state.players[0]!
+      expect(owner.resources).toMatchObject({ food: 2, stone: 1, vegetable: 0 })
+      expect(workersAvailable(resp.state, owner)).toBe(1)
+      expect(resp.state.actionSpaces.find((space) => space.id === 'vegetable-seeds')?.takenBy).toEqual([])
+      expect(sidekickPlacements(resp)).toEqual([])
+    })
   })
 })

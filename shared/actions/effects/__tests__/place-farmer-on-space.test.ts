@@ -8,8 +8,14 @@ import { placeFarmerOnSpaceAction } from '../internal/place-farmer-on-space'
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
-const makeCtx = (params: Record<string, unknown>): { session: GameSession; context: ActionExecutionContext } => {
-  const session = new GameSession(undefined, undefined, { playerCount: 4 })
+const makeCtx = (
+  params: Record<string, unknown>,
+  options: { enableFarmersOfTheMoor?: boolean; sickWorkerIds?: string[] } = {},
+): { session: GameSession; context: ActionExecutionContext } => {
+  const session = new GameSession(undefined, undefined, {
+    playerCount: 4,
+    enableFarmersOfTheMoor: options.enableFarmersOfTheMoor === true,
+  })
   sessions.push(session)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -20,6 +26,7 @@ const makeCtx = (params: Record<string, unknown>): { session: GameSession; conte
   const player = state.players[0]!
   const other = state.players[1]!
   setWorkersAtHome(state, player, 2)
+  if (options.sickWorkerIds) player.sickWorkerIds = [...options.sickWorkerIds]
   player.stats = createInitialPlayerStats({ isFirstPlayer: true })
   const market = state.actionSpaces.find((space) => space.id === 'resource-market-4')!
   market.takenBy = [{ playerId: other.id, workerId: '1' }]
@@ -69,7 +76,8 @@ describe('place-farmer-on-space internal action', () => {
     for (const mutate of [
       (space: ActionSpace) => { space.blockedBy = [{ playerId: 'p2', workerId: '1', sourceSpaceId: 'linked' }] },
       (space: ActionSpace) => { space.roundAvailable = 2 },
-      (space: ActionSpace) => { space.canBeExecutedByPlayer = () => false },
+      // Ordinary placement reads a flow space's own condition only when it is strict.
+      (space: ActionSpace) => { space.strictCanExecute = true; space.canBeExecutedByPlayer = () => false },
       (_space: ActionSpace, ctx: ActionExecutionContext) => { setWorkersAtHome(ctx.state, ctx.player, 0) },
     ]) {
       const { session: ruleSession3, context: ctx } = makeCtx({
@@ -85,5 +93,37 @@ describe('place-farmer-on-space internal action', () => {
       expect(result).toMatchObject({ type: 'fail', errorKey: 'log.placeFarmerFail' })
       expect(market.takenBy).toEqual([{ playerId: ctx.state.players[1]!.id, workerId: '1' }])
     }
+  })
+
+  it('places a healthy person under Farmers of the Moor even when a sick one has the lower number', () => {
+    const { session, context: ctx } = makeCtx(
+      { spaceId: 'resource-market-4', allowOccupied: true, sourceCard: 'B178_TagAlong' },
+      { enableFarmersOfTheMoor: true, sickWorkerIds: ['1'] },
+    )
+
+    const result = session.withCtx(() => placeFarmerOnSpaceAction.execute(ctx))
+
+    expect(result.type).toBe('flow')
+    expect(ctx.state.actionSpaces.find((space) => space.id === 'resource-market-4')?.takenBy).toEqual([
+      { playerId: ctx.state.players[1]!.id, workerId: '1' },
+      { playerId: ctx.player.id, workerId: '2' },
+    ])
+    expect(ctx.player.sickWorkerIds).toEqual(['1'])
+  })
+
+  it('fails without placing anyone under Farmers of the Moor when only sick people are at home', () => {
+    const { session, context: ctx } = makeCtx(
+      { spaceId: 'resource-market-4', allowOccupied: true, sourceCard: 'B178_TagAlong' },
+      { enableFarmersOfTheMoor: true, sickWorkerIds: ['1', '2'] },
+    )
+
+    const result = session.withCtx(() => placeFarmerOnSpaceAction.execute(ctx))
+
+    expect(result).toMatchObject({ type: 'fail', errorKey: 'log.placeFarmerFail' })
+    expect(ctx.state.actionSpaces.find((space) => space.id === 'resource-market-4')?.takenBy).toEqual([
+      { playerId: ctx.state.players[1]!.id, workerId: '1' },
+    ])
+    expect(workersAvailable(ctx.state, ctx.player)).toBe(2)
+    expect(ctx.player.stats?.placedFarmers).toBe(0)
   })
 })

@@ -8,6 +8,7 @@ import { requireActionHookRegistry } from '../hooks'
 import { isPlacementActionDoableInFlowContext } from '../flow'
 import { getActionDefinition } from '../action-definition-lookup'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
+import { evaluateWithReservedResources } from '../../cards/helpers/reserved-resources'
 
 export type AllowedPlacement = {
   spaceId: string
@@ -89,19 +90,40 @@ const canExecutePlacementSpace = (
   })
 }
 
+export type WorkerPlacementCheck = PlacementContextOverrides & {
+  /** Relaxes only the occupancy limit; blocking, round availability, worker health and doability still apply. */
+  allowOccupied?: boolean
+  /** Resources the placing card spends first; doability is judged after deducting them. */
+  reserve?: Partial<Resource>
+}
+
+/**
+ * The one admission checklist for placing a person on `space`, shared by
+ * ordinary placement, `place-farmer-on-space` and cards that place a person
+ * themselves, including the Farmers of the Moor healthy-person rule.
+ */
+export const canPlaceWorkerOnSpace = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  check: WorkerPlacementCheck,
+): boolean => {
+  if (!canEnterSpace(space, player, state)) return false
+  if (isSpaceBlocked(space)) return false
+  if (!check.allowOccupied && !canSpaceAcceptWorker(space)) return false
+  if (!check.ignoreWorkerAvailability && !canMoorWorkerEnterSpace(state, player, space.id)) return false
+  if (!check.reserve) return canExecutePlacementSpace(state, player, space, check)
+  return evaluateWithReservedResources(state, player, check.reserve, (nextState, nextPlayer) =>
+    canExecutePlacementSpace(nextState, nextPlayer, space, check))
+}
+
 export function computeAllowedPlacementSpaces(
   state: GameState,
   player: PlayerState,
   contextOverrides: PlacementContextOverrides,
 ): AllowedPlacement[] {
   const base: AllowedPlacement[] = state.actionSpaces
-    .filter((s) => {
-      if (!canEnterSpace(s, player, state)) return false
-      if (isSpaceBlocked(s)) return false
-      if (!canSpaceAcceptWorker(s)) return false
-      if (!contextOverrides.ignoreWorkerAvailability && !canMoorWorkerEnterSpace(state, player, s.id)) return false
-      return canExecutePlacementSpace(state, player, s, contextOverrides)
-    })
+    .filter((s) => canPlaceWorkerOnSpace(state, player, s, contextOverrides))
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
 
   const baseOptions = filterActionSpacesByIds(state, base.map((entry) => entry.spaceId)).map((space) => ({
@@ -149,11 +171,7 @@ export function computeAllowedPlacementSpaces(
       if (!opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) continue
       const spaceId = opt.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
       const space = findActionSpaceById(state, spaceId)
-      if (!space) continue
-      if (!canEnterSpace(space, player, state)) continue
-      if (isSpaceBlocked(space)) continue
-      if (!contextOverrides.ignoreWorkerAvailability && !canMoorWorkerEnterSpace(state, player, space.id)) continue
-      if (!canExecutePlacementSpace(state, player, space, contextOverrides)) continue
+      if (!space || !canPlaceWorkerOnSpace(state, player, space, { ...contextOverrides, allowOccupied: true })) continue
       extra.push({ spaceId, allowOccupied: true, option: opt })
     }
   }

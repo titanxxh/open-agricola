@@ -1,14 +1,9 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isActionDoableInFlowContext } from '../../actions/flow'
-import { canEnterSpace } from '../../actions/helpers/placement-availability'
-import { getActionDefinition } from '../../actions/index'
-import { isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
-import { workersAvailable } from '../../domain/player'
+import { canPlaceWorkerOnSpace } from '../../actions/helpers/placement-availability'
 import { getLeftRoundActionSpaceId } from '../helpers/round-action-topology'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { evaluateWithReservedResources } from '../helpers/reserved-resources'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A171_Sidekick'
@@ -30,26 +25,10 @@ const getLeftTargetSpaceId = (context: CardListenerContext): string | null => {
 
 const canPlaceOnLeftTarget = (context: CardListenerContext, targetSpaceId: string): boolean => {
   const owner = context.ownerPlayer
-  if (!owner) return false
-  if ((owner.resources.food ?? 0) < 1) return false
-  if (workersAvailable(context.state, owner) <= 0) return false
   const targetSpace = context.state.actionSpaces.find((space) => space.id === targetSpaceId)
-  if (!targetSpace) return false
-  if (!canEnterSpace(targetSpace, owner, context.state)) return false
-  if (isSpaceBlocked(targetSpace)) return false
-  if (isSpaceOccupied(targetSpace)) return false
-  return evaluateWithReservedResources(context.state, owner, { food: 1 }, (state, player) => {
-    return isActionDoableInFlowContext({
-      actionHooks: context?.actionHooks,
-      actionSpaceUse: { newPlacement: true },
-      actionId: targetSpace.id,
-      action: targetSpace,
-      state,
-      player,
-      space: targetSpace,
-      sourceCard: CARD_ID,
-      resolveAction: getActionDefinition,
-    })
+  if (!owner || !targetSpace) return false
+  return canPlaceWorkerOnSpace(context.state, owner, targetSpace, {
+    actionHooks: context.actionHooks, sourceCard: CARD_ID, reserve: { food: 1 },
   })
 }
 
