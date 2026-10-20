@@ -3,10 +3,11 @@ import { roundPreparationHooks, type FlowCardEffectHook } from '../contract/card
 import type { FlowEffectContext } from '../cards/card-effects'
 import type { GameEvent } from '../contract/events'
 import type { RuleBody, TimedRule, TimedRulePhase } from '../contract/rule-plans'
-import { readActionSnapshotToken, readActionSnapshotExtraData } from '../cards/helpers/action-snapshot-state'
+import { readActionSnapshotExtraData } from '../cards/helpers/action-snapshot-state'
 import { getStoredResource } from '../cards/helpers/card-storage'
 import { harvestRounds } from '../contract/state-constants'
 import { readCardExtraData, writeCardExtraData, isCardFlagged, setCardFlag } from '../cards/helpers/card-state'
+import { readTurnScopeToken } from '../cards/helpers/turn-token'
 
 const phaseOrder: Partial<Record<TimedRulePhase, number>> = {
   onBeforeStartOfTurn: 0, onAfterRevealAction: 1, onPreparation: 2, onRoundStart: 3,
@@ -57,7 +58,7 @@ export const timedRuleOccurrences = (state: GameState, player: PlayerState, card
       if (typeof round !== 'number' || !Number.isInteger(round) || round < state.round || round > 14) return []
       if (round === state.round && executingPhase !== rule.at.phase && !phaseIsUpcoming(state, rule.at.phase)) return []
       const turn = (target.kind === 'card-flag' || target.kind === 'card-positive') && target.clock === 'current-turn'
-        ? `:${readActionSnapshotToken(player) ?? readActionSnapshotExtraData<number>(player, 'lastToken') ?? 0}` : ''
+        ? `:${readTurnScopeToken(player) ?? readActionSnapshotExtraData<number>(player, 'lastToken') ?? 0}` : ''
       const episode = target.episodeFact ? `:${readCardExtraData<unknown>(player, cardId, target.episodeFact) ?? 0}` : ''
       const identity = `${rule.key}:${round}${turn}${episode}`
       return target.kind !== 'round-window' && consumed.includes(identity) ? [] : [{ rule, round, identity }]
@@ -71,7 +72,7 @@ export const consumeTimedRule = (player: PlayerState, cardId: string, occurrence
   writeCardExtraData(player, cardId, RECEIPTS_KEY, [...receipts, occurrence.identity])
   if (occurrence.rule.consume?.clearFlag) writeCardExtraData(player, cardId, occurrence.rule.consume.clearFlag, false)
   if (occurrence.rule.consume?.clearCardFlag) setCardFlag(player, cardId, false)
-  if (occurrence.rule.consume?.recordTurnFact) writeCardExtraData(player, cardId, occurrence.rule.consume.recordTurnFact, readActionSnapshotToken(player) ?? readActionSnapshotExtraData<number>(player, 'lastToken'))
+  if (occurrence.rule.consume?.recordTurnFact) writeCardExtraData(player, cardId, occurrence.rule.consume.recordTurnFact, readTurnScopeToken(player) ?? readActionSnapshotExtraData<number>(player, 'lastToken'))
 }
 
 export const compileRuleBody = (cardId: string, ruleKey: string, body: RuleBody, path: readonly number[] = []): ActionFlow => {

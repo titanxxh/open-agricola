@@ -25,7 +25,7 @@ import { buildMoorSpecialActionFlow, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
-import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData, readActionSnapshotToken } from '../../cards/helpers/action-snapshot.ts'
+import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData } from '../../cards/helpers/action-snapshot.ts'
 import { collectBeforePlacementFlows } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagAnytimeTurnFlow, tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
@@ -34,6 +34,7 @@ import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
+import { readTurnScopeToken } from '../../cards/helpers/turn-token.ts'
 
 /**
  * Find the next seated player (in turn order) who still has at least one
@@ -500,7 +501,7 @@ const captureAnytimeTurn = (core: GameCore, player: PlayerState): AnytimeTurnAff
   const parent = core.getEngineStack().getActiveAnytimeActivation()
   if (parent?.ownerPlayerId === player.id) return parent.turn
   if (core.state.roundPhase !== 'work') return { kind: 'outside-turn' }
-  const token = readActionSnapshotToken(player)
+  const token = readTurnScopeToken(player)
   if (token !== undefined) return { kind: 'inside-turn', token }
   const frame = core.peekEngineFrame()
   if (frame?.reason === 'confirm-next-player' && core.state.players[frame.ownerPlayerIndex]?.id === player.id) {

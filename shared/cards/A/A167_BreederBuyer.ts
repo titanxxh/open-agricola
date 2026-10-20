@@ -5,14 +5,13 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import {
   getStableTilesBuiltThisAction,
   getRoomsBuiltThisAction,
-  readActionSnapshotToken,
 } from '../helpers/action-snapshot'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { isUsedThisTurn, markUsedThisTurnLeaf, readTurnScopeToken, USED_THIS_TURN_KEY } from '../helpers/turn-token'
 
 const CARD_ID = 'A167_BreederBuyer'
-const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 /**
  * A167 Breeder Buyer:
@@ -37,9 +36,9 @@ const buildLivestockFlow = (
   needStables: boolean,
   needRooms: boolean,
 ): ActionFlow | undefined => {
-  const actionToken = readActionSnapshotToken(player)
-  if (actionToken === undefined) return
-  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+  if (isUsedThisTurn(player, CARD_ID)) return
+  const mark = markUsedThisTurnLeaf(player, CARD_ID)
+  if (!mark) return
 
   const stablesBuilt = getStableTilesBuiltThisAction(player)
   const roomsBuilt = getRoomsBuiltThisAction(player)
@@ -54,12 +53,7 @@ const buildLivestockFlow = (
   return {
     type: 'seq',
     children: [
-      {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
-      },
+      mark,
       gainLeaf(CARD_ID, gain),
     ],
   }
@@ -93,12 +87,11 @@ const cardImpl = {
   id: CARD_ID,
   onBuy: (_state, player) => {
     if (getStableTilesBuiltThisAction(player) < 1 || getRoomsBuiltThisAction(player) < 1) return
-    const actionToken = readActionSnapshotToken(player)
-    if (actionToken === undefined) return
-    if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+    const token = readTurnScopeToken(player)
+    if (token === undefined || isUsedThisTurn(player, CARD_ID)) return
     const gain = GAINS[player.houseType]
     if (!gain) return
-    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
+    writeCardExtraData(player, CARD_ID, USED_THIS_TURN_KEY, token)
     return gainLeaf(CARD_ID, gain)
   },
 },

@@ -4,7 +4,7 @@ import { getFenceCount } from '../../domain/fence-segments'
 import { ensureCardState } from './card-state'
 
 import { ACTION_SNAPSHOT_CARD_ID } from './action-snapshot-state'
-export { readActionSnapshotToken, readActionSnapshotExtraData } from './action-snapshot-state'
+export { readActionSnapshotExtraData } from './action-snapshot-state'
 
 const lastActionToken = (player: PlayerState): number => {
   const extraData = player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData

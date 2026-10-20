@@ -7,12 +7,12 @@ import { canSow, isUnconditionalSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { readActionSnapshotToken } from '../helpers/action-snapshot'
+import { readTurnScopeToken } from '../helpers/turn-token'
 
 const CARD_ID = 'A094_LazySowman'
 const isMeetingPlace = (space: ActionSpace) => space.id === 'meeting-place'
 const isOwnersActiveWorkTurn = (context: CardListenerContext) =>
-  context.state.roundPhase === 'work' && readActionSnapshotToken(context.player) !== undefined
+  context.state.roundPhase === 'work' && readTurnScopeToken(context.player) !== undefined
 const isOwnersWorkTurnPreview = (context: CardListenerContext) =>
   isOwnersActiveWorkTurn(context) || (
     context.state.roundPhase === 'work' &&

@@ -2,10 +2,10 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
-import { readActionSnapshotToken } from '../helpers/action-snapshot-state'
 import { getActionNewlyUsedTiles } from '../helpers/farmyard-events'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { readTurnScopeToken } from '../helpers/turn-token'
 
 const CARD_ID = 'C048_Farmstead'
 const turnReceipt = (key: string, token: number): ActionFlow => ({
@@ -21,7 +21,7 @@ const qualification: CardListenerRegistration = {
   phases: ['after'],
   events: ['farm.spacesUsed'],
   handler: context => {
-    const token = readActionSnapshotToken(context.player)
+    const token = readTurnScopeToken(context.player)
     if (token === undefined) return
     if (!context.triggerSnapshot?.players[context.player.id]?.played.includes(CARD_ID)) return
     if (readCardExtraData(context.player, CARD_ID, 'qualifiedTurnToken') === token
@@ -36,7 +36,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onEndTurn: (_state, player) => {
-      const token = readActionSnapshotToken(player)
+      const token = readTurnScopeToken(player)
       if (token === undefined || readCardExtraData(player, CARD_ID, 'qualifiedTurnToken') !== token
         || readCardExtraData(player, CARD_ID, 'rewardedTurnToken') === token) return
       return {

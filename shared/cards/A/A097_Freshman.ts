@@ -2,18 +2,13 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
-import { readCardExtraData } from '../helpers/card-state'
-import { readActionSnapshotToken } from '../helpers/action-snapshot-state'
 import type { CardImpl } from '../registry'
+import { isUsedThisTurn, markUsedThisTurnLeaf } from '../helpers/turn-token'
 
 const CARD_ID = 'A097_Freshman'
-const usedThisTurn = (context: CardListenerContext) => {
-  const token = readActionSnapshotToken(context.player)
-  return token !== undefined && readCardExtraData<number>(context.player, CARD_ID, 'usedTurnToken') === token
-}
 const canReplaceBake = (context: CardListenerContext) =>
   !context.actionContext?.checkedReplaceAction &&
-  !usedThisTurn(context) &&
+  !isUsedThisTurn(context.player, CARD_ID) &&
   hasPlayableOccupationChoice(context.state, context.player, context.space.id, { exactCost: {} }, context?.actionHooks)
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A97-freshman-replace-bake',
@@ -22,13 +17,14 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!canReplaceBake(context)) return
+    const mark = markUsedThisTurnLeaf(context.player, CARD_ID)
     return {
       decline: true,
       alternativeFlow: {
         type: 'seq',
         promptKey: 'ui.interactionFreshmanOccupation',
         children: [
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-extra-data', key: 'usedTurnToken', value: readActionSnapshotToken(context.player) } },
+          ...(mark ? [mark] : []),
           {
             type: 'leaf',
             actionId: 'occupation',

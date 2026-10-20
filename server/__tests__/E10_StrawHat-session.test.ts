@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -27,6 +26,7 @@ import '../../shared/cards/M/M062_HearthBrush'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit02Reservations from './_helpers/audit/ae-negative-02-reservations'
+import { readTurnScopeToken } from '../../shared/cards/helpers/turn-token'
 
 const CARD_ID = 'E010_StrawHat'
 const A092_ID = 'A092_AdoptiveParents'
@@ -118,7 +118,7 @@ describe('E010_StrawHat session', () => {
     expect(resp.state.events.some(
       (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === A074_ID,
     )).toBe(false)
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
   })
 
   it('choosing move clears Farmland and resolves the target action flow', () => {
@@ -244,7 +244,7 @@ describe('E010_StrawHat session', () => {
     resp = session.commitSelectionChoice(0, { stables: [firstStable] })
 
     expect(resp.interaction.stateId).toBe('wait')
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
     expect(resp.state.events.filter(
       (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === A074_ID,
     )).toHaveLength(1)
@@ -276,7 +276,7 @@ describe('E010_StrawHat session', () => {
     )
     expect(queued).toHaveLength(2)
     expect(queued.every((event) => event.entries.length === 3)).toBe(true)
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
   })
 
   it('moving an A92 extra-turn worker does not lose or duplicate the A92 opportunity', () => {
@@ -477,7 +477,7 @@ describe('D051_Archway session', () => {
       const detailParts = entry.params?.detailParts as { effects?: { buildStables?: number } } | undefined
       return detailParts?.effects?.buildStables === 1
     })).toBe(true)
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
   })
 
   it('runs Royal Wood at the end of the moved-worker turn', () => {
@@ -495,7 +495,7 @@ describe('D051_Archway session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.cardStates?.[D074_ID]?.extraData?.woodSpent).toBe(0)
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
   })
 
   it('runs person-action end hooks after the moved-worker turn', () => {
@@ -511,7 +511,7 @@ describe('D051_Archway session', () => {
     const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
     expect(skip).toBeDefined()
     resp = session.resolveChoice(0, skip!.value)
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
   })
 
   it('does not offer a move when every empty target is blocked by Foreign Aid', () => {

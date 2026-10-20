@@ -344,7 +344,7 @@ _Avoid_: 轮转机会、单个 Rule Action、把所有阶段 / anytime 效果都
 
 **Turn Scope（回合作用域）**:
 一个 Turn 的身份和起点状态。该 Turn 内的所有 Rule Action 共用同一 Turn Scope；新的 Turn 使用新的作用域，并在该 Turn 的所有后置效果与回合结束 hook 结算完后结束。
-_Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
+_Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态、action snapshot、按单次 takeAction 理解“同一回合”
 
 **Rule Action（规则行动）**:
 一次完整使用行动格，或规则明确授予的一次命名行动。Rule Action 可以发生在 Turn 内，也可以在阶段或 anytime 窗口中脱离 Turn 执行；选择和 continuation 只是该行动的结算过程。

@@ -9,13 +9,13 @@ import {
 } from '../../shared/domain/player'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import { executeCardListener, getListenerById } from '../../shared/cards/card-listeners'
-import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import type { ActionDefinition, ActionSpace } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/actions/helpers/placement-constants'
 import '../../shared/cards/A/A092_AdoptiveParents'
 import '../../shared/cards/D/D134_OysterEater'
+import { readTurnScopeToken } from '../../shared/cards/helpers/turn-token'
 
 const A92 = 'A092_AdoptiveParents'
 const D134 = 'D134_OysterEater'
@@ -359,9 +359,9 @@ describe('A92 P2 fixes', () => {
       // takeAction does (recordActionSnapshot). Without it, build/stable/fence
       // stat deltas (getRoomsBuiltThisAction etc.) fall back to absolute counts
       // and over-trigger cards like A23 Toolbox. The snapshot lives in
-      // cardStates['__actionSnapshot__'] (readActionSnapshotToken). RED: token
+      // cardStates['__actionSnapshot__'] (readTurnScopeToken). RED: token
       // is undefined because no recordActionSnapshot ran for the extra turn.
-      expect(readActionSnapshotToken(used.state.players[0]!)).not.toBeUndefined()
+      expect(readTurnScopeToken(used.state.players[0]!)).not.toBeUndefined()
 
       // Resolve the placement onto a real space (use the prompt's own options).
       const placeVal = used.interaction.stateId === 'wait' ? used.interaction.request.options![0]!.value : ''
@@ -388,7 +388,7 @@ describe('A92 P2 fixes', () => {
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
       expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
-      expect(readActionSnapshotToken(p0)).toBeDefined()
+      expect(readTurnScopeToken(p0)).toBeDefined()
     })
 
     it('undoStep removes only the newly placed worker after an occupied target fails', () => {

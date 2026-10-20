@@ -64,7 +64,7 @@ Tests: `server/__tests__/card-state-visibility-session.test.ts`.
 - `pay-gain-node.ts`: pay-then-gain, pay-then-action and return-then-gain templates.
 - `stage-effects.ts`: stage-effect flags and optional once-per-card Harvest exchanges through the existing exchange executor.
 - `card-state.ts`, `round-placement.ts`: one-time state, the raw Work Placement Chronology and Person Placement Order ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
-- `action-snapshot.ts`: the active Turn Scope identity and start snapshot ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
+- `turn-token.ts`: the active Turn Scope identity and a card's once-per-Turn records; `action-snapshot.ts`: the Turn start snapshot ([Turn Scope and Action-Execution Scope](session.md#turn-scope-and-action-execution-scope)).
 - `card-held-workers.ts`, `card-field.ts`: held workers ([Local state in cardStates](#local-state-in-cardstates)) and Card Fields ([Card Fields and the Logical Field seam](#card-fields-and-the-logical-field-seam)).
 
 ## Card Fields and the Logical Field seam
