@@ -11,6 +11,10 @@ import { playerHasCardCapability } from '../helpers/card-type'
 const CARD_ID = 'B146_Illusionist'
 
 const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
+const HANDS = [
+  { prefix: 'occ:', zone: 'occupationHand', kind: 'occupation' },
+  { prefix: 'min:', zone: 'minorHand', kind: 'minor' },
+] as const
 
 const discardFromHandAction: ActionDefinition = {
   id: DISCARD_ACTION_ID,
@@ -20,10 +24,8 @@ const discardFromHandAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ player }) => {
-    const options: ActionChoiceOption[] = [
-      ...player.occupationHand.map((id) => cardIdentityChoice(id, 'occupation', `occ:${id}`)),
-      ...player.minorHand.map((id) => cardIdentityChoice(id, 'minor', `min:${id}`)),
-    ]
+    const options: ActionChoiceOption[] = HANDS.flatMap(({ prefix, zone, kind }) =>
+      player[zone].map((id) => cardIdentityChoice(id, kind, `${prefix}${id}`)))
     if (options.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {
       type: 'request',
@@ -32,37 +34,12 @@ const discardFromHandAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ player, emitPrivateEvent }, choice) => {
-    if (choice.startsWith('occ:')) {
-      const cardId = choice.slice(4)
-      if (!player.occupationHand.includes(cardId)) {
-        return { type: 'fail', errorKey: 'log.actionFail' }
-      }
-      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
-      emitPrivateEvent?.(cardEffectHandChangedEvent(
-        player.id,
-        [cardId],
-        'occupation',
-        CARD_ID,
-        DISCARD_ACTION_ID,
-      ))
-      return { type: 'ok' }
-    }
-    if (choice.startsWith('min:')) {
-      const cardId = choice.slice(4)
-      if (!player.minorHand.includes(cardId)) {
-        return { type: 'fail', errorKey: 'log.actionFail' }
-      }
-      player.minorHand = player.minorHand.filter((id) => id !== cardId)
-      emitPrivateEvent?.(cardEffectHandChangedEvent(
-        player.id,
-        [cardId],
-        'minor',
-        CARD_ID,
-        DISCARD_ACTION_ID,
-      ))
-      return { type: 'ok' }
-    }
-    return { type: 'fail', errorKey: 'log.actionFail' }
+    const hand = HANDS.find(({ prefix }) => choice.startsWith(prefix))
+    const cardId = hand && choice.slice(hand.prefix.length)
+    if (!hand || !cardId || !player[hand.zone].includes(cardId)) return { type: 'fail', errorKey: 'log.actionFail' }
+    player[hand.zone] = player[hand.zone].filter((id) => id !== cardId)
+    emitPrivateEvent?.(cardEffectHandChangedEvent(player.id, [cardId], hand.kind, CARD_ID, DISCARD_ACTION_ID))
+    return { type: 'ok' }
   },
 }
 

@@ -119,6 +119,32 @@ describe('A120 Clay Hut Builder parity', () => {
     expect(clayEntries(response)).toEqual([])
   })
 
+  it('A120 S4b: a renovation after playing it in a clay house adds no second schedule', () => {
+    const session = setup({ houseType: 'clay' })
+    const played = playOccupation(session)
+    expect(clayEntries(played)).toHaveLength(5)
+    confirmNext(session, played)
+    confirmNext(session, session.takeAction(1, 'day-laborer'))
+
+    const response = renovate(session)
+
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(clayEntries(response).map((entry) => entry.round)).toEqual([6, 7, 8, 9, 10])
+  })
+
+  it('A120 S4c: undoing the play removes the schedule and the flag', () => {
+    const session = setup({ houseType: 'clay' })
+    playOccupation(session)
+
+    const undone = session.undoAction()
+
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.occupationHand).toContain(CARD_ID)
+    expect(clayEntries(undone)).toEqual([])
+    expect(undone.state.pendingFutureMeeples).toEqual([])
+    expect(isCardFlagged(undone.state.players[0]!, CARD_ID)).toBe(false)
+  })
+
   it('A120 S5: scheduled clay is received at the next round start', () => {
     const session = setup({ houseType: 'clay' })
     playOccupation(session)

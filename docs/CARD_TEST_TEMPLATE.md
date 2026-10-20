@@ -249,7 +249,6 @@ Assert the following groups after every critical interaction.
 - `state.players[n].fenceSegments`, an array of `FenceSegment`
 - `getFenceCount(player)` / `getPalisadeCount(player)`
 - `countFields(player)` / `countOccupations(player)`, which aggregate owned and card-provided virtual identities for prerequisites
-- `countPeopleOnSpace(state, spaceId)` from `shared/cards/helpers/space-occupancy.ts`, used by cards such as A25
 
 ### 6.2 Global State
 

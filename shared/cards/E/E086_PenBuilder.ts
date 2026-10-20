@@ -2,11 +2,13 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { counterAnimalCapacityFlow, readCounterAnimalCapacity } from '../../actions/plans/counter-animal-capacity'
 import type { CardImpl } from '../registry'
+import type { PlayerState } from '../../contract/types'
 
 const CARD_ID = 'E086_PenBuilder'
 const CAPACITY_RULE = { counter: 'discards', capacityPerUnit: 2 }
+const readCapacity = (player: PlayerState): number =>
+  (player.cardStates?.[CARD_ID]?.counters?.[CAPACITY_RULE.counter] ?? 0) * CAPACITY_RULE.capacityPerUnit
 const anytimeListener: CardListenerRegistration = {
   id: 'E86-pen-builder-anytime',
   cardIds: [CARD_ID],
@@ -19,7 +21,7 @@ const anytimeListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           payLeaf({ cardId: CARD_ID, cost: { wood: 1 } }),
-          counterAnimalCapacityFlow(CARD_ID, CAPACITY_RULE, 1),
+          { type: 'leaf', actionId: 'add-animal-capacity', sourceCard: CARD_ID, params: { ...CAPACITY_RULE, amount: 1 } },
         ],
       },
       sourceCard: CARD_ID,
@@ -32,7 +34,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones, _state) => {
-    const capacity = readCounterAnimalCapacity(player, CARD_ID, CAPACITY_RULE)
+    const capacity = readCapacity(player)
     if (capacity <= 0) return
     zones.push({
       id: `card:${CARD_ID}`,
