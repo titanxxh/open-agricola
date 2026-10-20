@@ -1,8 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
-import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
 
 import '../../shared/cards/B/B107_Manservant'
 import assert from 'node:assert/strict'
@@ -25,54 +23,8 @@ describe('B107_Manservant session', () => {
     return session
   }
 
-  it('onBuy does nothing when player does not live in stone house', () => {
-    const session = setup({ houseType: 'wood' })
-    const state = session.getState().state
-    expect(state.pendingFutureMeeples.length).toBe(0)
-  })
-
-  it('onBuy does nothing in clay house', () => {
-    const session = setup({ houseType: 'clay' })
-    const state = session.getState().state
-    expect(state.pendingFutureMeeples.length).toBe(0)
-  })
-
-  it('onBuy queues food on remaining rounds when player lives in stone house', () => {
-    const session = setup({ houseType: 'stone', round: 5 })
-    const state = session.getState().state
-
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    expect(state.pendingFutureMeeples[0]).toMatchObject({
-      cardId: 'B107_Manservant',
-      playerId: state.players[0]!.id,
-      startRound: 6,
-      count: 14,
-      resources: { food: 3 },
-    })
-
-    resolveFutureMeepleRequests(state)
-    // Rounds 6..14 = 9 rounds (clamped to 14)
-    const entries = state.futureMeeples.filter(
-      (e) => e.cardId === 'B107_Manservant',
-    )
-    expect(entries.length).toBe(9)
-    entries.forEach((entry) => {
-      expect(entry.resources).toEqual({ food: 3 })
-    })
-  })
-
-  it('food is collected at round start', () => {
-    const session = setup({ houseType: 'stone', round: 5 })
-    const state = session.getState().state
-    const player = state.players[0]!
-    const foodBefore = player.resources.food
-
-    resolveFutureMeepleRequests(state)
-    state.round = 6
-    applyFutureMeeples(state)
-
-    expect(player.resources.food).toBe(foodBefore + 3)
-  })
+  // Playing B107 runs its onBuy flow, which devPlayCard does not execute; the
+  // real Lessons plays in ae-negative-26 (N1, N2, N4) cover the onBuy schedule.
 
   it('after renovation to stone, triggers future food placement', () => {
     const session = setup({ houseType: 'clay', round: 5 })

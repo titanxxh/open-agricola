@@ -253,7 +253,6 @@ const opening = createOpeningSession({
 - `state.players[n].fenceSegments`（`FenceSegment[]` 数组）
 - `getFenceCount(player)` / `getPalisadeCount(player)`（fence 计数 helper）
 - `countFields(player)` / `countOccupations(player)`（聚合自有 + 卡牌虚拟身份；用于 prereq）
-- `countPeopleOnSpace(state, spaceId)`（`shared/cards/helpers/space-occupancy.ts`，A25 等卡用到）
 
 ### 6.2 全局状态
 

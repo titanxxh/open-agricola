@@ -1,12 +1,18 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../contract/types'
+import type { ActionFlow, GameState } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
-import { pairedSpaceIdFor } from '../helpers/space-pairing'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C130_OutskirtsDirector'
+const VARIANTS: Record<'grove' | 'hollow', string[]> = {
+  grove: ['grove-56'],
+  hollow: ['hollow-4', 'hollow-56'],
+}
+/** The base space and the larger-player-count variants present on this board. */
+const pairedSpaceIds = (state: GameState, baseId: 'grove' | 'hollow'): string[] =>
+  [baseId, ...VARIANTS[baseId].filter((id) => state.actionSpaces.some((space) => space.id === id))]
 const addReedToSpaceFlow = (spaceId: string): ActionFlow => ({
   type: 'leaf',
   actionId: 'special-effect',
@@ -28,8 +34,8 @@ const listener: CardListenerRegistration = {
     const spaceId = context.space?.id
     if (!spaceId) return
 
-    const groveIds = pairedSpaceIdFor(context.state, 'grove')
-    const hollowIds = pairedSpaceIdFor(context.state, 'hollow')
+    const groveIds = pairedSpaceIds(context.state, 'grove')
+    const hollowIds = pairedSpaceIds(context.state, 'hollow')
 
     let otherSpaceIds: string[]
     if (groveIds.includes(spaceId)) {

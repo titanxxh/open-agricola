@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState } from '../../contract/types'
-import { countPeopleOnSpace } from '../helpers/space-occupancy'
+import { findActionSpaceById } from '../../domain/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 
@@ -33,7 +33,8 @@ const computeArgsListener: CardListenerRegistration = {
     const targetId = findFirstNonAccumSpaceThisWorkPhase(context.state)
     if (!targetId) return
     if (targetId === MEETING_PLACE_ID) return
-    if (countPeopleOnSpace(context.state, targetId) !== 1) return
+    // takenBy holds one WorkerRef per person on the space, newborns included.
+    if ((findActionSpaceById(context.state, targetId)?.takenBy.length ?? 0) !== 1) return
     const space = context.state.actionSpaces.find((s) => s.id === targetId)
     if (!space) return
     if (!space.canBeExecutedByPlayer(context.state, context.player, { actionHooks: context.actionHooks })) return

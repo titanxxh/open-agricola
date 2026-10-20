@@ -2,8 +2,8 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
-import { futureMeeplesNode, queueFutureMeeples } from '../../actions/effects/internal/future-meeples'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A120_ClayHutBuilder'
@@ -12,8 +12,8 @@ const CARD_ID = 'A120_ClayHutBuilder'
  * Once you no longer live in a wooden house, place 2 clay on each of the
  * next 5 round spaces. At the start of these rounds, you get the clay.
  *
- * Rule: onBuy delegates to onPlayerAfterRenovation. The card is flagged
- * after first trigger so it cannot fire twice.
+ * Rule: onBuy returns the same flow as the after-renovation listener. The
+ * flow flags the card first, so the clay is scheduled only once.
  */
 
 const placeClay = (
@@ -43,19 +43,6 @@ const placeClay = (
   }
 }
 
-const placeClayOnBuy = (state: GameState, player: PlayerState) => {
-  if (player.houseType === 'wood' || isCardFlagged(player, CARD_ID)) return
-  setCardFlag(player, CARD_ID, true)
-  queueFutureMeeples(state, {
-    cardId: CARD_ID,
-    playerId: player.id,
-    startRound: state.round + 1,
-    count: 5,
-    resources: { clay: 2 },
-  })
-  return futureMeeplesNode()
-}
-
 const listener: CardListenerRegistration = {
   id: 'A120-clay-hut-builder-after-renovation',
   cardIds: [CARD_ID],
@@ -72,7 +59,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => placeClayOnBuy(state, player),
+  onBuy: (state, player) => placeClay(state, player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
