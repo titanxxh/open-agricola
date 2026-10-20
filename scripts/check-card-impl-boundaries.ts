@@ -2,7 +2,7 @@
 import { checkFarmWriteBoundaries } from './farm-write-boundaries'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { execFileSync } from 'node:child_process'
 import ts from 'typescript'
@@ -503,7 +503,10 @@ const cardDirectories = ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'he
 
 export function walkProductionCardFiles(repoRoot: string): string[] {
   const cardsRoot = path.join(repoRoot, 'shared/cards')
-  for (const directory of cardDirectories) fs.readdirSync(path.join(cardsRoot, directory))
+  for (const directory of cardDirectories) {
+    const root = path.join(cardsRoot, directory)
+    if (!walkSourceFiles(root).some(file => !isTestFile(file))) throw new Error(`empty production source root: ${root}`)
+  }
   return walkSourceFiles(cardsRoot).filter(file => {
     if (isTestFile(file)) return false
     const source = parseSource(file)
@@ -520,19 +523,20 @@ export function walkProductionCardFiles(repoRoot: string): string[] {
 
 export function walkProductionFieldBoundaryFiles(repoRoot: string): string[] {
   const cardsRoot = path.join(repoRoot, 'shared/cards')
-  for (const directory of cardDirectories) fs.readdirSync(path.join(cardsRoot, directory))
+  for (const directory of cardDirectories) {
+    const root = path.join(cardsRoot, directory)
+    if (!walkSourceFiles(root).some(file => !isTestFile(file))) throw new Error(`empty production source root: ${root}`)
+  }
   return walkSourceFiles(cardsRoot).filter(file => !isTestFile(file) && !path.relative(cardsRoot, file).startsWith('__stubs__/'))
 
 }
 
-async function runCli(): Promise<void> {
-  const repoRoot = path.resolve(__dirname, '..')
-  const args = process.argv.slice(2).filter((arg, index) => !(index === 0 && arg === '--'))
-  const { values } = parseArgs({ args, options: { 'warn-only': { type: 'boolean' }, report: { type: 'string' } } })
-  const warnOnly = values['warn-only'] === true
+async function scanCardImplBoundaries(repoRoot: string, options: { report?: string; warnOnly?: boolean }): Promise<void> {
+  const values = options
+  const warnOnly = options.warnOnly === true
   const files = walkProductionCardFiles(repoRoot)
   const fieldBoundaryFiles = walkProductionFieldBoundaryFiles(repoRoot)
-  const { ALL_CARD_IMPLS } = await import('../shared/cards/register-all')
+  const { ALL_CARD_IMPLS }: typeof import('../shared/cards/register-all') = await import(pathToFileURL(path.join(repoRoot, 'shared/cards/register-all.ts')).href)
   const sourceFilesById = new Map<string, string>()
   for (const file of files) {
     const visit = (node: ts.Node): void => {
@@ -569,16 +573,14 @@ async function runCli(): Promise<void> {
   if (fieldBoundaryFiles.length === 0) result.scopeErrors.push('no production field-boundary files scanned')
   result.violations.push(...checkFieldStorageBoundaries(fieldBoundaryFiles))
   if (values.report !== undefined) {
-    const { allMinorImprovementCards, allOccupationCards } = await import('../shared/cards/catalog')
-    const { majorCardDefinitionsList } = await import('../shared/cards/major/generated')
+    const { allMinorImprovementCards, allOccupationCards }: typeof import('../shared/cards/catalog') = await import(pathToFileURL(path.join(repoRoot, 'shared/cards/catalog.ts')).href)
+    const { majorCardDefinitionsList }: typeof import('../shared/cards/major/generated') = await import(pathToFileURL(path.join(repoRoot, 'shared/cards/major/generated.ts')).href)
     const metadata = new Map([...allMinorImprovementCards, ...allOccupationCards, ...majorCardDefinitionsList]
       .map(card => [card.id, { name: card.name, description: card.desc.join(' ') }]))
     const audit = auditCardListeners(runtimeCards, boardIds, metadata)
     const source = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim(), fingerprint: sourceFingerprint(repoRoot) }
     const directory = path.resolve(repoRoot, values.report)
-    fs.mkdirSync(directory, { recursive: true })
-    fs.writeFileSync(path.join(directory, 'audit.json'), JSON.stringify({ source, ...result, ...audit }, null, 2) + '\n')
-    fs.writeFileSync(path.join(directory, 'audit.md'), renderCardListenerAudit(result, audit, source, repoRoot))
+    writeAuditReport(directory, { status: cardImplBoundaryExitCode(result) === 0 ? 'passed' : 'failed', source, ...result, ...audit }, renderCardListenerAudit(result, audit, source, repoRoot))
     console.log(`[check-card-impl-boundaries] full audit report: ${directory}`)
   }
   if (result.scopeErrors.length > 0) {
@@ -609,6 +611,46 @@ async function runCli(): Promise<void> {
   }
   if (warnOnly) console.warn('[check-card-impl-boundaries] warn-only mode enabled')
   process.exitCode = cardImplBoundaryExitCode(result, { warnOnly })
+}
+
+function writeAuditReport(directory: string, report: object, markdown: string): void {
+  fs.mkdirSync(directory, { recursive: true })
+  for (const [file, content] of [['audit.json', JSON.stringify(report, null, 2) + '\n'], ['audit.md', markdown]] satisfies [string, string][]) {
+    const temporary = path.join(directory, `${file}.tmp`)
+    fs.writeFileSync(temporary, content)
+    fs.renameSync(temporary, path.join(directory, file))
+  }
+}
+
+/** Report invalidation covers traversal, parsing, runtime and metadata loading failures. */
+export async function runCardImplBoundaryCheck(repoRoot: string, options: { report?: string; warnOnly?: boolean } = {}): Promise<void> {
+  const directory = options.report === undefined ? undefined : path.resolve(repoRoot, options.report)
+  let source: { head?: string; fingerprint?: string } | undefined
+  if (directory) {
+    // Invalidate success before any operation that can fail, including fingerprinting.
+    writeAuditReport(directory, { status: 'running' }, 'Card listener audit is running.\n')
+  }
+  try {
+    if (directory) {
+      source = {}
+      source.head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+      source.fingerprint = sourceFingerprint(repoRoot)
+    }
+    await scanCardImplBoundaries(repoRoot, options)
+  } catch (error) {
+    if (directory) {
+      const message = error instanceof Error ? error.message : String(error)
+      writeAuditReport(directory, { status: 'failed', source, error: message }, `Card listener audit failed before completion.\n\n${message}\n`)
+    }
+    throw error
+  }
+}
+
+async function runCli(): Promise<void> {
+  const repoRoot = path.resolve(__dirname, '..')
+  const args = process.argv.slice(2).filter((arg, index) => !(index === 0 && arg === '--'))
+  const { values } = parseArgs({ args, options: { 'warn-only': { type: 'boolean' }, report: { type: 'string' } } })
+  await runCardImplBoundaryCheck(repoRoot, { report: values.report, warnOnly: values['warn-only'] })
 }
 
 if (process.argv[1] && process.argv[1].endsWith('check-card-impl-boundaries.ts')) {

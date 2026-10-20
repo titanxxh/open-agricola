@@ -63,8 +63,9 @@ export const makeClearedSpaceTokenListener = (
   id: config.listenerId,
   cardIds: [config.cardId],
   phases: ['after' as ActionHookPhase],
-  actions: config.actions,
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!context.moorAction || !config.actions.includes(context.moorAction.actionId)) return
     const player = context.ownerPlayer ?? context.player
     if (config.consumeFence && getOwnOrdinaryFenceReserveCount(player) <= 0) return
     const tiles = getActionTerrainOperations(context).flatMap(event => event.playerId === player.id && event.operation === 'remove'

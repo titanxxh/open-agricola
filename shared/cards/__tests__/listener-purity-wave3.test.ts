@@ -226,7 +226,8 @@ describe('listener purity wave 3', () => {
     const result = invokePure(
       listener(M059_NaturesFertilizer_impl.listeners, 'M059-natures-fertilizer-after-terrain-field'),
       context(p, {
-        actionId: 'slash-and-burn',
+        actionId: 'moor-action',
+        moorAction: { actionId: 'slash-and-burn', playerId: p.id, payload: {}, phase: 'after', result: { type: 'ok' } },
         actionEvents: [{ type: 'farm.terrainChanged', playerId: p.id, operation: 'replace-with-field', newlyUsedTiles: [],
           changes: [{ row: 0, col: 0, before: { kind: 'forest' }, after: null, fieldCreated: true }] }],
       }),

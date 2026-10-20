@@ -61,7 +61,7 @@ const listener: CardListenerRegistration = {
     const fields = getActionTerrainOperations(context).flatMap(event =>
       event.playerId === context.player.id
         ? event.changes.filter(change => change.fieldCreated
-          && (change.before?.kind === 'moor' || context.actionId === 'slash-and-burn'))
+          && (change.before?.kind === 'moor' || context.moorAction?.actionId === 'slash-and-burn'))
           .map(({ row, col }) => ({ row, col })) : [])
     const flow = sowFlow(context, fields)
     if (!flow) return

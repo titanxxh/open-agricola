@@ -26,7 +26,7 @@ const timberGainFlow = (fuel: number): ActionFlow => {
 }
 
 const shouldTrigger = (context: CardListenerContext) =>
-  context.actionId === 'fell-trees' ||
+  context.moorAction?.actionId === 'fell-trees' ||
   (
     context.actionId === 'collect' &&
     sumActionSpaceMovedToTriggerPlayerFromSpace(context, 'wood') >= 4
@@ -36,7 +36,7 @@ const listener: CardListenerRegistration = {
   id: 'M118-timber-mill-after-wood',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees', 'collect'],
+  actions: ['moor-action', 'collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!shouldTrigger(context)) return
     const player = context.ownerPlayer ?? context.player

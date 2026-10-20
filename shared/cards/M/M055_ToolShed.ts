@@ -7,9 +7,8 @@ import type { CardImpl } from '../registry'
 import { allImprovementCount, setUsageCounterLeaf } from './moor-batch1-helpers'
 
 const CARD_ID = 'M055_ToolShed'
-const TRIGGER_ACTIONS = new Set<MoorSpecialActionId>(['cut-peat', 'slash-and-burn'])
 
-const otherAction = (actionId: string): MoorSpecialActionId | undefined => {
+const otherAction = (actionId: MoorSpecialActionId | undefined): MoorSpecialActionId | undefined => {
   if (actionId === 'cut-peat') return 'slash-and-burn'
   if (actionId === 'slash-and-burn') return 'cut-peat'
   return undefined
@@ -40,10 +39,10 @@ const listener: CardListenerRegistration = {
   id: 'M055-tool-shed-before-after-special-action',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase, 'after' as ActionHookPhase],
-  actions: [...TRIGGER_ACTIONS],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (usedThisRound(context)) return
-    const actionId = otherAction(context.actionId)
+    const actionId = otherAction(context.moorAction?.actionId)
     if (!actionId) return
     const flow = toolShedFlow(context, actionId)
     if (!flow) return

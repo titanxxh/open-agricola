@@ -1,8 +1,9 @@
+import type { MoorActionContext } from '../moor/completion-types'
 import type { ActionExecutionContext } from '../contract/types'
 import { getListenerById, type MatchedCardListener } from '../cards/card-listeners'
 import type { EngineInternals } from './engine-internals'
 import type { EngineNode } from './types'
-import { SequenceNode } from './nodes'
+import { ParallelNode, SequenceNode } from './nodes'
 import { buildPhaseTrailingNodes, combineTrailingReactions } from './engine-utils'
 import { primaryBodyCompleted, primaryBodyChildren } from './primary-body-nodes'
 import { hasStartedDescendant } from './tree'
@@ -52,11 +53,17 @@ export function executeCompletionPhase(int: EngineInternals, gate: SequenceNode,
     else matched.push({ registration, cardId: '', ownerPlayerId: '' })
   }
   const actionEvents = frame.terrainEvent ? [frame.terrainEvent] : []
-  const moorReactions = buildPhaseTrailingNodes(int, matched, phase.phase, frame.actionId, context.state, {
+  const moorAction: MoorActionContext = {
+    actionId: frame.actionId, playerId: frame.playerId, specialActionCardId: frame.specialActionCardId,
+    payload: frame.payload, phase: 'after', result: frame.result, terrainCleared: frame.terrainCleared,
+  }
+  const moorReactions = buildPhaseTrailingNodes(int, matched, phase.phase, 'moor-action', context.state, {
     result: frame.result, actionEvents, transactionEvents: actionEvents,
-    extraData: { payload: frame.payload, ...(frame.terrainCleared === false ? { terrainCleared: false } : {}) },
-  }, frame.playerId, undefined, undefined, undefined, frame.triggerSnapshot)
+  }, frame.playerId, undefined, undefined, undefined, frame.triggerSnapshot, undefined, moorAction)
   const nodes = combineTrailingReactions(int, [...frozenRuleReactions, ...moorReactions], context.state, frame.playerId)
+  for (const node of nodes) {
+    if (node instanceof ParallelNode && node.mode === 'trigger-select') node.autoSelectSoleInitialTrigger = true
+  }
   gate.resolve()
   if (nodes.length) int.tree.insertAfter(gate.id, nodes)
 }

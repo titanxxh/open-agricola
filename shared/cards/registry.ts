@@ -208,12 +208,12 @@ export class CardRegistry {
    * pool without pre-filtering.
    */
   loadByIds(ids: string[], lookup: (id: string) => CardImpl | undefined): void {
+    const staged = new CardRegistry()
     for (const id of ids) {
       const impl = lookup(id)
-      if (impl) {
-        this.loadImpl(id, impl)
-      }
+      if (impl) staged.loadImpl(id, impl)
     }
+    this.mergeFrom(staged)
   }
 
   unload(cardId: string): void {

@@ -651,6 +651,7 @@ const executeActivateCardAction = (
     ...eventReadContext,
     ...event,
     triggerSnapshot: params.triggerSnapshot,
+    moorAction: params.moorAction,
   }
   const result = executeCardListener(listener, listenerContext, {
     ownerPlayerId,
@@ -1074,6 +1075,14 @@ export function engineProceed(
       if (options.length === 0 || evaluation.optionStates.every(entry => !entry.applicable || !entry.doable)) {
         node.resolveRemainingTriggerChildrenForPass()
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
+      if (node.autoSelectSoleInitialTrigger) {
+        node.autoSelectSoleInitialTrigger = false
+        const applicable = evaluation.optionStates.filter(entry => entry.applicable)
+        if (applicable.length === 1 && applicable[0]!.doable) {
+          node.chooseCard(applicable[0]!.child.id)
+          return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+        }
       }
       const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
       const request: InteractionRequest = stepResult.request.kind === 'select-trigger'

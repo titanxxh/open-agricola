@@ -10,8 +10,9 @@ const cutPeatListener: CardListenerRegistration = {
   id: 'M048-forest-swamp-after-cut-peat',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['cut-peat'],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'cut-peat') return
     const round = context.state.round + 4
     if (round > 14) return
     return {

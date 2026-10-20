@@ -31,6 +31,7 @@ import {
   validateMoorSpecialActionEffect,
   type MoorSpecialActionPayload,
 } from './special-actions'
+import type { MoorActionContext } from './completion-types'
 import type { MoorSpecialActionId } from './types'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
 
@@ -379,9 +380,10 @@ export const buildMoorSpecialActionFlow = (entry: {
 } & ({ kind: 'card'; cardId: string } | { kind: 'granted' })): ActionFlow => {
   const { state, player, actionId, payload = {}, actionHooks } = entry
   const cardId = entry.kind === 'card' ? entry.cardId : undefined
+  const moorAction: MoorActionContext = { actionId, playerId: player.id, payload, specialActionCardId: cardId, phase: 'before' }
   const beforeContext = {
     actionHooks, state, player, space: createMoorSpecialActionSpace(actionId),
-    actionId, phase: 'before', extraData: { specialActionCardId: cardId, payload },
+    actionId: 'moor-action', moorAction, phase: 'before',
   } satisfies CardListenerContextInput
   const candidates = getMatchingListeners(beforeContext)
   const matched = candidates.length <= 1 ? candidates : candidates
@@ -397,10 +399,10 @@ export const buildMoorSpecialActionFlow = (entry: {
     const ownerId = entry.ownerPlayerId || player.id
     const params: ActivateCardActionParams = {
       listenerId: entry.registration.id, cardId: entry.cardId,
-      phase: 'before', actionId, triggerPlayerId: player.id,
+      phase: 'before', actionId: 'moor-action', moorAction, triggerPlayerId: player.id,
       ownerPlayerId: entry.ownerPlayerId, ownerCardZone: entry.ownerCardZone,
       mandatory: entry.registration.mandatory === true, triggerSnapshot,
-      event: { extraData: { specialActionCardId: cardId, payload } },
+      event: {},
     }
     const child: ActionFlow = {
       type: 'leaf', actionId: 'activate-card', sourceCard: entry.cardId,
@@ -504,16 +506,21 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
     const completionResult: Extract<ActionExecutionResult, { type: 'ok' }> = {
       type: 'ok', ...(result.farmOperation ? { farmOperations: [result.farmOperation] } : {}),
     }
+    const moorAction: Extract<MoorActionContext, { phase: 'after' }> = {
+      actionId: parsed.actionId, playerId: player.id,
+      specialActionCardId: parsed.kind === 'card' ? parsed.cardId : undefined,
+      payload: parsed.payload, phase: 'after', result: completionResult, terrainCleared: result.terrainCleared,
+    }
     const sources = getMatchingListeners({
       actionHooks, state, player, space: createMoorSpecialActionSpace(parsed.actionId),
-      actionId: parsed.actionId, phase: 'after', result: completionResult,
-      actionEvents: result.terrainEvent ? [result.terrainEvent] : [], extraData: { payload: parsed.payload },
+      actionId: 'moor-action', moorAction, phase: 'after', result: completionResult,
+      actionEvents: result.terrainEvent ? [result.terrainEvent] : [],
     }).map(entry => entry.ownerCardZone
       ? { listenerId: entry.registration.id, ownerPlayerId: entry.ownerPlayerId, cardId: entry.cardId, ownerCardZone: entry.ownerCardZone }
       : { listenerId: entry.registration.id, ownerPlayerId: '' as const, cardId: '' as const })
     return { type: 'flow', flow: {
       type: 'seq', children: result.followUpFlow ? [result.followUpFlow] : [],
-      moorCompletion: { actionId: parsed.actionId, payload: parsed.payload, playerId: player.id,
+      moorCompletion: { actionId: parsed.actionId, specialActionCardId: parsed.kind === 'card' ? parsed.cardId : undefined, payload: parsed.payload, playerId: player.id,
         result: completionResult, terrainCleared: result.terrainCleared, terrainEvent: result.terrainEvent, sources,
         triggerSnapshot: createTriggerSnapshot(state) },
     } }

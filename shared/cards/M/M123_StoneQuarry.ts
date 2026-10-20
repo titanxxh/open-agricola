@@ -11,8 +11,9 @@ const listener: CardListenerRegistration = {
   id: 'M123-stone-quarry-after-hiring-fair',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['hiring-fair'],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'hiring-fair') return
     const player = context.ownerPlayer ?? context.player
     const usage = usageCounters(player, CARD_ID)
     if (usage <= 0) return

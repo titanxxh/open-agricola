@@ -1,3 +1,4 @@
+import { moorSpecialActionCardDefinitions } from '../../moor/special-action-cards'
 import { describe, expect, it } from 'vitest'
 import { findInvalidCostAttributionLines, validateCardCode } from '../ast-validator'
 
@@ -568,6 +569,12 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     `, 'CUSTOM_Test')
 
     expect(result.valid).toBe(false)
+  })
+
+  it.each(['moor-action', ...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))])('rejects native-only Moor target %s', action => {
+    const result = validateCardCode(`const CARD_IMPL = { listeners: [{ actions: ['${action}'], phases: ['after'], handler: () => {} }] }`)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(error => error.includes(action))).toBe(true)
   })
 
   it('rejects unknown listener actions', () => {

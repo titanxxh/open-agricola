@@ -239,11 +239,19 @@ describe('card-granted Moor special-action lifecycle', () => {
       })
       session.withCtx(() => {
         const registry = requireActiveCardRegistry('moor-lifecycle-session')
-        for (const phase of ['before', 'after'] as const) registry.registerListener({
-          id: `test-moor-${phase}-${actionId}`, cardIds: [source], actions: [actionId], phases: [phase], mandatory: true,
+        registry.registerListener({ id: 'test-moor-child-gain-context', cardIds: [source], actions: ['gain'], phases: ['after'],
           handler: context => {
-            expect(context.actionId).toBe(actionId)
-            if (phase === 'before') expect(context.extraData?.payload).toEqual(
+            expect(context.moorAction).toBeUndefined()
+            expect(context.actionContext?.moorAction).toBeUndefined()
+          },
+        })
+        for (const phase of ['before', 'after'] as const) registry.registerListener({
+          id: `test-moor-${phase}-${actionId}`, cardIds: [source], actions: ['moor-action'], phases: [phase], mandatory: true,
+          handler: context => {
+            expect(context.actionId).toBe('moor-action')
+            expect(context.moorAction).toMatchObject({ actionId, playerId: 'p1', specialActionCardId: card.id, payload, phase })
+            expect(context.actionContext?.moorAction).toBeUndefined()
+            if (phase === 'before') expect(context.moorAction?.payload).toEqual(
               actionId === 'cut-peat' ? { tile: MOOR } : actionId === 'fell-trees' || actionId === 'slash-and-burn' ? { tile: FOREST } : {},
             )
             return { flow: { type: 'leaf', actionId: 'gain', sourceCard: source, params: { stone: 1 } } }
@@ -288,6 +296,44 @@ describe('card-granted Moor special-action lifecycle', () => {
     },
   )
 
+  it.each<MoorSpecialActionId>(['cut-peat', 'fell-trees', 'slash-and-burn', 'hiring-fair', 'horse-market', 'black-market', 'illicit-work'])(
+    'M060 sows once after the final body of %s', actionId => {
+      const machine = 'M060_SowingMachine'
+      const session = setup([machine], state => {
+        const p = state.players[0]!
+        p.fields = [{ row: 0, col: 1, stacks: [] }]
+        p.minorHand = ['A032_Manger']
+        Object.assign(p.resources, { grain: 1, horse: 2, food: 1, fuel: 1, wood: 2, clay: 2 })
+        p.pastures = [{ id: 'horses', size: 2, tiles: [{ row: 1, col: 3 }, { row: 1, col: 4 }], stables: 0, animalType: 'horse', animalCount: 2 }]
+      })
+      const card = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes(actionId))!
+      const payload = actionId === 'cut-peat' ? { tile: MOOR } : actionId === 'fell-trees' || actionId === 'slash-and-burn' ? { tile: FOREST } : {}
+      let r = session.takeSpecialAction(0, card.id, actionId, payload)
+      for (let step = 0; step < 10 && r.interaction.sourceCard !== machine; step++) {
+        expect(r.ok, r.error).toBe(true)
+        if (r.interaction.request.kind === 'animal-reorg') {
+          r = session.resolveChoice(0, 'confirm', { zones: [{ id: 'horses', zoneType: 'pasture', animalType: 'horse', animalCount: 3 }] })
+        } else {
+          const option = r.interaction.request.options.find(option => option.value === 'A032_Manger' || option.value === 'Major_Fireplace1')
+            ?? r.interaction.request.options.find(option => option.value !== '__skip__' && option.value !== 'cancel')
+          expect(option, JSON.stringify(r.interaction)).toBeDefined()
+          r = session.resolveChoice(0, option!.value)
+        }
+      }
+      expect(r.interaction).toMatchObject({ stateId: 'wait', sourceCard: machine })
+      if (actionId === 'black-market') expect(r.state.players[0]!.minorPlayed).toContain('A032_Manger')
+      if (actionId === 'illicit-work') expect(r.state.players[0]!.improvements).toContain('Major_Fireplace1')
+      if (actionId === 'horse-market') expect(r.state.players[0]!.resources.horse).toBe(3)
+      r = choose(session, r, machine)
+      expect(r.interaction.request.kind).toBe('farm-select')
+      r = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 1, crop: 'grain' }] })
+      expect(r.ok, r.error).toBe(true)
+      expect(r.state.players[0]!.resources.grain).toBe(0)
+      expect(r.state.players[0]!.fields).toContainEqual({ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] })
+      expect(r.state.events.filter(event => event.type === 'farm.sown' && event.sourceCardId === machine)).toHaveLength(1)
+    },
+  )
+
   it('taking a card alone through M054 leaves the crops, terrain and Moor rewards untouched', () => {
     const implement = 'M054_AgriculturalImplement'
     const session = setup([implement, FERTILIZER])
@@ -323,11 +369,11 @@ describe('card-granted Moor special-action lifecycle', () => {
     session.withCtx(() => {
       const registry = requireActiveCardRegistry('moor-before-payment-session')
       registry.registerListener({
-        id: 'test-moor-before-spend-fee', cardIds: [source], actions: ['horse-market'], phases: ['before'], mandatory: true,
+        id: 'test-moor-before-spend-fee', cardIds: [source], actions: ['moor-action'], phases: ['before'], mandatory: true,
         handler: () => ({ flow: { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: source } }),
       })
       registry.registerListener({
-        id: 'test-moor-after-failed-fee', cardIds: [source], actions: ['horse-market'], phases: ['after'], mandatory: true,
+        id: 'test-moor-after-failed-fee', cardIds: [source], actions: ['moor-action'], phases: ['after'], mandatory: true,
         handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { stone: 1 }, sourceCard: source } }),
       })
     })

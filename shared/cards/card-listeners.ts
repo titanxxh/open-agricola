@@ -1,3 +1,4 @@
+import type { MoorActionContext } from '../moor/completion-types'
 import { timedRuleSources, timedEventFlow } from './timed-rule-obligations'
 import { getCardEffect } from './card-effects'
 import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, InteractionRequest, PlayerState, Resource, Trade } from '../contract/types'
@@ -34,6 +35,7 @@ export type CardListenerContext = ActionExecutionContext & {
   effectPlayer?: PlayerState
   trueAction?: boolean
   triggerSnapshot?: TriggerSnapshot
+  moorAction?: MoorActionContext
 }
 
 export type CardListenerContextInput =

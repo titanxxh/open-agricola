@@ -26,9 +26,9 @@ const listener: CardListenerRegistration = {
   id: 'M127-wheelbarrow-after-building-resources',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['cut-peat', 'collect'],
+  actions: ['moor-action', 'collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.actionId === 'cut-peat') return { flow: cutPeatFlow, sourceCard: CARD_ID }
+    if (context.moorAction?.actionId === 'cut-peat') return { flow: cutPeatFlow, sourceCard: CARD_ID }
     if (context.actionId === 'collect' && tookFourMatchingBuildingResources(context)) {
       return { flow: gainLeaf(CARD_ID, { fuel: 1 }), sourceCard: CARD_ID }
     }

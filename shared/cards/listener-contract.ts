@@ -32,13 +32,7 @@ export const listenerActionContract = {
   'trade-applied': ['immediatelyAfter'],
   anytime: ['anytime'],
   'compute-exchanges': ['computeExchanges'],
-  'black-market': ['before', 'after'],
-  'cut-peat': ['before', 'after'],
-  'fell-trees': ['before', 'after'],
-  'hiring-fair': ['before', 'after'],
-  'horse-market': ['before', 'after'],
-  'illicit-work': ['before', 'after'],
-  'slash-and-burn': ['before', 'after'],
+  'moor-action': ['before', 'after'],
 } as const satisfies Record<string, readonly ActionHookPhase[]>
 
 export type CardListenerAction = keyof typeof listenerActionContract

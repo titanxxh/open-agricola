@@ -12,7 +12,7 @@ const listener: CardListenerRegistration = {
   phases: ['after'],
   actionSpaces: ['day-laborer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.actionId !== 'hiring-fair' && context.space?.id !== 'day-laborer') return
+    if (context.moorAction?.actionId !== 'hiring-fair' && context.space?.id !== 'day-laborer') return
     return { flow: gainLeaf(CARD_ID, { fuel: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -24,7 +24,7 @@ const cardImpl = {
   },
   listeners: [listener, {
     id: 'M083-coal-seam-after-hiring-fair', cardIds: [CARD_ID],
-    actions: ['hiring-fair'], phases: ['after'], handler: listener.handler,
+    actions: ['moor-action'], phases: ['after'], handler: listener.handler,
   }],
   reaches: [] as readonly string[],
 } satisfies CardImpl
