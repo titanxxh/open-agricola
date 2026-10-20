@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   LOCAL_PUBLIC_ASSET_BASE_URL,
@@ -35,8 +36,27 @@ const inventoryFetcher = (
     : JSON.stringify({ version, files })),
 )
 
+const createAssetCheckout = async (files = REQUIRED_FILES) => {
+  const rootDir = await createContract()
+  const directory = path.join(rootDir, 'checkout')
+  await mkdir(path.join(directory, 'assets'), { recursive: true })
+  await Promise.all(files.map(file => writeFile(path.join(directory, file), file)))
+  const git = (...args: string[]): string => execFileSync('git', [
+    '-C', directory, '-c', 'user.name=Public asset test', '-c', 'user.email=assets@example.test',
+    '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args,
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  git('init', '--quiet')
+  git('add', 'assets')
+  git('commit', '--quiet', '-m', 'Asset fixture')
+  const version = git('rev-parse', 'HEAD')
+  await writeFile(path.join(rootDir, 'public-assets.ref'), `${version}\n`)
+  return { rootDir, directory, version }
+}
+
 describe('public asset contract', () => {
+  beforeEach(() => { vi.stubEnv('PUBLIC_ASSET_VALIDATION_DIR', undefined) })
   afterEach(async () => {
+    vi.unstubAllEnvs()
     await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
   })
 
@@ -73,6 +93,39 @@ describe('public asset contract', () => {
     await expect(
       loadPublicAssetConfig({ rootDir, fetcher: inventoryFetcher(['assets/a.png']) }),
     ).rejects.toThrow('missing required file: assets/b.webp')
+  })
+
+  it('validates a pinned clean local checkout without contacting Pages or changing build URLs', async () => {
+    const { rootDir, directory, version } = await createAssetCheckout()
+    const fetcher = vi.fn(() => Promise.reject(new Error('unexpected fetch')))
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { PUBLIC_ASSET_VALIDATION_DIR: directory }, fetcher, allowLocal: false,
+    })).resolves.toEqual({ baseUrl: publicAssetBaseUrl(), version, requiredFiles: REQUIRED_FILES })
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('rejects a local checkout at a different commit', async () => {
+    const { rootDir, directory } = await createAssetCheckout()
+    await writeFile(path.join(rootDir, 'public-assets.ref'), `${VERSION}\n`)
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { PUBLIC_ASSET_VALIDATION_DIR: directory },
+    })).rejects.toThrow('checkout version does not match')
+  })
+
+  it.each(['modified', 'missing', 'untracked'] as const)('rejects %s assets in the local checkout', async mode => {
+    const { rootDir, directory } = await createAssetCheckout()
+    if (mode === 'missing') await rm(path.join(directory, 'assets/a.png'))
+    else await writeFile(path.join(directory, mode === 'modified' ? 'assets/a.png' : 'assets/new.png'), 'changed')
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { PUBLIC_ASSET_VALIDATION_DIR: directory },
+    })).rejects.toThrow('checkout assets must be clean')
+  })
+
+  it('rejects required files absent from the pinned local inventory', async () => {
+    const { rootDir, directory } = await createAssetCheckout(['assets/a.png'])
+    await expect(loadPublicAssetConfig({
+      rootDir, env: { PUBLIC_ASSET_VALIDATION_DIR: directory },
+    })).rejects.toThrow('checkout is missing required file: assets/b.webp')
   })
 
   it('rejects a different Pages deployment version', async () => {

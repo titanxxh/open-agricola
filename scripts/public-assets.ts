@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -129,6 +130,26 @@ export const loadPublicAssetConfig = async ({
   }
 
   if (!validateRemote) {
+    return { baseUrl: publicAssetBaseUrl(), version, requiredFiles }
+  }
+
+  if (env.PUBLIC_ASSET_VALIDATION_DIR) {
+    const directory = path.resolve(rootDir, env.PUBLIC_ASSET_VALIDATION_DIR)
+    const git = (...args: string[]): string => execFileSync('git', ['-C', directory, ...args], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+    if (git('rev-parse', 'HEAD') !== version) {
+      throw new Error(`Public asset checkout version does not match ${version}`)
+    }
+    if (git('status', '--porcelain', '--untracked-files=all', '--', 'assets')) {
+      throw new Error('Public asset checkout assets must be clean')
+    }
+    const available = new Set(git('ls-tree', '-r', '--name-only', 'HEAD', '--', 'assets').split('\n'))
+    for (const file of requiredFiles) {
+      if (!available.has(file) || !(await stat(path.join(directory, file))).isFile()) {
+        throw new Error(`Public asset checkout is missing required file: ${file}`)
+      }
+    }
     return { baseUrl: publicAssetBaseUrl(), version, requiredFiles }
   }
 

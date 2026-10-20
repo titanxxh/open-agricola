@@ -27,7 +27,8 @@ const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, en
 export function sourceFingerprint(cwd: string): string {
   const hash = createHash('sha256')
   hash.update(JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch,
-    environment: ['NODE_ENV', 'NODE_OPTIONS', 'CI', 'TZ', 'VITE_SANDBOX_EXECUTOR', 'APP_INSTANCES']
+    environment: ['NODE_ENV', 'NODE_OPTIONS', 'CI', 'TZ', 'VITE_SANDBOX_EXECUTOR', 'APP_INSTANCES',
+      'PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR']
       .map(key => [key, process.env[key] ?? null]),
   }))
   const files = [...new Set(git(cwd, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])

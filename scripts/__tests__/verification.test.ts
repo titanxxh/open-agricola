@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runVerification, sourceFingerprint, verificationPlan, verificationStatus } from '../verify'
 
 const directories: string[] = []
@@ -20,7 +20,10 @@ const repo = () => {
   git('-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture')
   return cwd
 }
-afterEach(() => directories.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true })))
+afterEach(() => {
+  vi.unstubAllEnvs()
+  directories.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true }))
+})
 
 describe('verification modes and evidence', () => {
   it('runs only selected Vitest files in focus mode, without restarting services', () => {
@@ -125,5 +128,13 @@ describe('verification modes and evidence', () => {
       ['bash', 'scripts/verify.sh'],
       ['bash', 'scripts/verify.sh', 'e2e-tests/example.spec.ts', '--browser=webkit'],
     ])
+  })
+
+  it.each(['PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR'])('invalidates evidence when %s changes', key => {
+    const cwd = repo()
+    vi.stubEnv(key, undefined)
+    runVerification(cwd, verificationPlan(cwd, ['prepush']), () => 0)
+    vi.stubEnv(key, '/local/assets')
+    expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')!.current).toBe(false)
   })
 })
