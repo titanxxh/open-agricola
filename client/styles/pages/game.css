@@ -4266,6 +4266,10 @@
 .action-icon-description {
   line-height: 1;
 }
+.action-icon-description > .text {
+  font-size: 0.5em;
+  line-height: 1.2;
+}
 .action-icon-description .res-icon {
   font-size: inherit;
 }
