@@ -74,6 +74,18 @@ function expectGrowthBeforePeat(response: SessionResponse) {
     .toMatchObject({ quantity: 1, total: 1 })
 }
 
+function expectPeatProvenance(response: SessionResponse, grantingCard: string) {
+  expect(response.state.events.filter(event => event.type === 'farm.terrainChanged' && event.sourceActionId === 'cut-peat'))
+    .toEqual([expect.objectContaining({ sourceCardId: grantingCard, operation: 'remove' })])
+  const gains = response.state.events.filter(event => event.type === 'resource.moved' && event.sourceActionId === 'cut-peat')
+  expect(gains).toEqual([expect.objectContaining({ sourceCardId: grantingCard, resources: { fuel: 3 } })])
+  expect(response.state.log).toContainEqual(expect.objectContaining({
+    key: 'log.actionDetail',
+    params: expect.objectContaining({ action: 'moor.specialActions.cut-peat', detailParts: { gains: { fuel: 3 } } }),
+    sourceEvent: { occurrenceId: gains[0]!.occurrenceId, rowIndex: 0 },
+  }))
+}
+
 function selectTrigger(session: GameSession, response: SessionResponse, cardId: string) {
   expect(response.interaction.request.kind).toBe('select-trigger')
   const option = response.interaction.request.options.find(option => option.sourceCard === cardId)
@@ -96,9 +108,10 @@ function assertRejected(session: GameSession, command: () => SessionResponse) {
   expect(session.getState().scores).toEqual(response.scores)
 }
 
-function restore(session: GameSession) {
+function restore(session: GameSession, install?: (session: GameSession) => void) {
   const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
   sessions.push(restored)
+  install?.(restored)
   expect(restored.getState().interaction).toEqual(session.getState().interaction)
   return restored
 }
@@ -106,6 +119,89 @@ function restore(session: GameSession) {
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
 describe('card-granted Moor special-action lifecycle', () => {
+  it('keeps a dormant before source until its sibling enables it without a phantom initial selector', () => {
+    const first = '__test_before_grain__'
+    const later = '__test_before_needs_grain__'
+    let session = setup([first, later])
+    const install = (target: GameSession) => target.withCtx(() => {
+      const registry = requireActiveCardRegistry('moor-before-live-sources')
+      registry.registerListener({
+        id: 'test-moor-before-grain', cardIds: [first], actions: ['moor-action'], phases: ['before'], mandatory: true,
+        handler: () => ({ flow: { type: 'leaf', actionId: 'gain', sourceCard: first, params: { grain: 1 } } }),
+      })
+      registry.registerListener({
+        id: 'test-moor-before-needs-grain', cardIds: [later], actions: ['moor-action'], phases: ['before'], mandatory: true,
+        handler: context => context.player.resources.grain > 0
+          ? { flow: { type: 'leaf', actionId: 'gain', sourceCard: later, params: { clay: 1 } } } : undefined,
+      })
+    })
+    install(session)
+    let response = session.takeSpecialAction(0, 'moor-special-1-2-market-work', 'hiring-fair')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('select-trigger')
+    expect(response.interaction.request.options.filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([later])
+    expect(response.interaction.request.options.find(option => option.value === '__pass__')?.disabled).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 0, food: 0 })
+    session = restore(session, install)
+    response = selectTrigger(session, session.getState(), later)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, clay: 1, food: 1 })
+    expect(response.state.players[1]!.resources).toMatchObject({ grain: 0, clay: 0, food: 0 })
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && [first, later].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId)).toEqual([first, later])
+    expect(response.state.actionSpaces.every(space => space.takenBy.length === 0)).toBe(true)
+  })
+
+  it('restores before owner groups and evaluates the later owner only after the first owner finishes', () => {
+    const first = '__test_before_first_owner__', always = '__test_before_other_always__', later = '__test_before_other_dormant__'
+    let session = setup([first], state => { state.players[1]!.minorPlayed = [always, later] })
+    const install = (target: GameSession) => target.withCtx(() => {
+      const registry = requireActiveCardRegistry('moor-before-owner-entry')
+      registry.registerListener({ id: first, cardIds: [first], actions: ['moor-action'], phases: ['before'],
+        handler: context => {
+          expect(context.triggerSnapshot).toBeUndefined()
+          return { flow: { type: 'leaf', actionId: 'gain', sourceCard: first, params: { wood: 1 }, optional: true } }
+        } })
+      registry.registerListener({ id: always, cardIds: [always], actions: ['moor-action'], phases: ['before'], scope: 'opponent', mandatory: true,
+        handler: context => {
+          expect(context.triggerSnapshot).toBeUndefined()
+          return { flow: { type: 'leaf', actionId: 'gain', sourceCard: always, params: { food: 1 } } }
+        } })
+      registry.registerListener({ id: later, cardIds: [later], actions: ['moor-action'], phases: ['before'], scope: 'opponent', mandatory: true,
+        handler: context => {
+          expect(context.triggerSnapshot).toBeUndefined()
+          return context.triggerPlayer?.resources.wood === 1
+            ? { flow: { type: 'leaf', actionId: 'gain', sourceCard: later, params: { reed: 1 } } } : undefined
+        } })
+    })
+    install(session)
+    let response = session.takeSpecialAction(0, 'moor-special-1-2-market-work', 'hiring-fair')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: first, request: { kind: 'choice' } })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 0 })
+    session = restore(session, install)
+    response = choose(session, session.getState(), first)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
+    expect(response.interaction.request.kind).toBe('confirm-player-switch')
+    response = session.resolveChoice(0, 'confirm')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'select-trigger' } })
+    session = restore(session, install)
+    response = session.getState()
+    expect(response.interaction.request.options.filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([always, later])
+    const laterOption = response.interaction.request.options.find(option => option.sourceCard === later)!
+    assertRejected(session, () => session.resolveChoice(0, laterOption.value))
+    response = session.resolveChoice(1, laterOption.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[1]!.resources).toMatchObject({ reed: 1, food: 0 })
+    const alwaysOption = response.interaction.request.options.find(option => option.sourceCard === always)!
+    response = session.resolveChoice(1, alwaysOption.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[1]!.resources).toMatchObject({ reed: 1, food: 1 })
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && [first, always, later].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId))
+      .toEqual([first, later, always])
+    expect(response.interaction.request.kind).toBe('confirm-player-switch')
+    response = session.resolveChoice(1, 'confirm')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 1 })
+  })
+
   it('M055 grants Cut Peat with M112 before the terrain commits and uses only the outer card', () => {
     const session = setup([TOOL_SHED, FERTILIZER])
     let response = choose(session, takeSlashAndBurn(session), TOOL_SHED)
@@ -116,6 +212,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     expect(response.state.players[0]!.resources.fuel).toBe(0)
     response = choose(session, response, FERTILIZER)
     expectGrowthBeforePeat(response)
+    expectPeatProvenance(response, TOOL_SHED)
     expect(response.state.players[0]!.cardStates[TOOL_SHED]?.counters?.usage).toBe(7)
     expect(response.state.players[0]!.fields).toContainEqual({ row: 0, col: 0, stacks: [] })
     expect(response.state.farmersOfTheMoor!.specialActionCards.filter(card => card.location.kind !== 'market')).toHaveLength(1)
@@ -123,7 +220,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     expect(response.state.actionSpaces.every(space => space.takenBy.length === 0)).toBe(true)
   })
   it('M056 prepares its due-round action, grows before Cut Peat and consumes the offer once', () => {
-    const session = setup([RIGHTS, FERTILIZER], state => {
+    let session = setup([RIGHTS, FERTILIZER], state => {
       state.round = 5
       state.players[0]!.cardStates[RIGHTS] = { extraData: { scheduledOffers: [{
         id: 'rights-round6', kind: 'moor-special-action', dueRound: 6,
@@ -135,6 +232,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     expect(response.state.round).toBe(6)
     const option = response.interaction.request.options.find(option => option.value.startsWith('offer:') && option.value.endsWith(':cut-peat:2:0'))
     if (!option) throw new Error('Missing scheduled Cut Peat')
+    session = restore(session)
     assertRejected(session, () => session.resolveChoice(1, option.value))
     assertRejected(session, () => session.resolveChoice(0, `${option.value}stale`))
     response = session.resolveChoice(0, option.value)
@@ -143,8 +241,10 @@ describe('card-granted Moor special-action lifecycle', () => {
     expect(response.state.players[0]!.cardStates[RIGHTS]?.extraData?.scheduledOffers).toEqual([
       expect.objectContaining({ consumed: false }),
     ])
-    response = choose(session, response, FERTILIZER)
+    session = restore(session)
+    response = choose(session, session.getState(), FERTILIZER)
     expectGrowthBeforePeat(response)
+    expectPeatProvenance(response, RIGHTS)
     expect(response.state.players[0]!.cardStates[RIGHTS]?.extraData?.scheduledOffers).toEqual([
       expect.objectContaining({ consumed: true, consumedRound: 6 }),
     ])
@@ -211,12 +311,14 @@ describe('card-granted Moor special-action lifecycle', () => {
     assertRejected(session, () => session.resolveChoice(0, 'stale'))
     response = choose(session, session.getState(), FERTILIZER)
     expectGrowthBeforePeat(response)
+    expectPeatProvenance(response, TOOL_SHED)
     response = session.undoStep(0)
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.sourceCard).toBe(FERTILIZER)
     expect(response.state.players[0]!.resources.fuel).toBe(0)
     response = choose(session, response, FERTILIZER)
     expectGrowthBeforePeat(response)
+    expectPeatProvenance(response, TOOL_SHED)
     response = session.undoAction(0)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] }])
@@ -226,6 +328,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     response = session.resolveChoice(0, 'action:cut-peat:2:0')
     response = choose(session, response, FERTILIZER)
     expectGrowthBeforePeat(response)
+    expectPeatProvenance(response, TOOL_SHED)
   })
 
   for (const borrowed of [false, true]) it.each<MoorSpecialActionId>(['cut-peat', 'fell-trees', 'slash-and-burn', 'hiring-fair', 'horse-market', 'black-market', 'illicit-work'])(
@@ -251,6 +354,8 @@ describe('card-granted Moor special-action lifecycle', () => {
             expect(context.actionId).toBe('moor-action')
             expect(context.moorAction).toMatchObject({ actionId, playerId: 'p1', specialActionCardId: card.id, payload, phase })
             expect(context.actionContext?.moorAction).toBeUndefined()
+            if (phase === 'before') expect(context.triggerSnapshot).toBeUndefined()
+            else expect(context.triggerSnapshot?.players).toHaveProperty('p1')
             if (phase === 'before') expect(context.moorAction?.payload).toEqual(
               actionId === 'cut-peat' ? { tile: MOOR } : actionId === 'fell-trees' || actionId === 'slash-and-burn' ? { tile: FOREST } : {},
             )
@@ -275,6 +380,9 @@ describe('card-granted Moor special-action lifecycle', () => {
         }
       }
       expect(response.ok, response.error).toBe(true)
+      const bodyEvents = response.state.events.filter(event => event.sourceActionId === actionId && (event.type === 'resource.moved' || event.type === 'resource.paid' || event.type === 'farm.terrainChanged'))
+      expect(bodyEvents.length).toBeGreaterThan(0)
+      expect(bodyEvents.every(event => event.sourceCardId === undefined)).toBe(true)
       expect(response.state.players[0]!.resources.stone).toBe(2)
       expect(response.state.farmersOfTheMoor!.specialActionCards.find(entry => entry.id === card.id)?.location).toEqual({ kind: borrowed ? 'playerFaceDown' : 'playerFaceUp', playerId: 'p1' })
       expect(response.state.players[1]!.resources).toEqual(otherResources)

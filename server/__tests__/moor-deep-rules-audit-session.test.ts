@@ -277,6 +277,11 @@ describe('Moor clause-level native Session audit', () => {
     expect(response.state.farmersOfTheMoor!.specialActionCards.filter((card) => card.location.kind !== 'market')).toHaveLength(1)
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(2)
     expect(response.interaction.sourceCard).not.toBe('M055_ToolShed')
+    const grantedAction = action === 'cut-peat' ? 'slash-and-burn' : 'cut-peat'
+    const grantedTerrain = response.state.events.filter(event => event.type === 'farm.terrainChanged' && event.sourceActionId === grantedAction)
+    expect(grantedTerrain).toEqual([expect.objectContaining({ sourceCardId: 'M055_ToolShed' })])
+    expect(response.state.events.filter(event => event.type === 'farm.terrainChanged' && event.sourceActionId === action))
+      .toEqual([expect.not.objectContaining({ sourceCardId: 'M055_ToolShed' })])
     const effects = response.state.events.filter((event) => event.type === 'farm.fieldPlowed' || (event.type === 'resource.moved' && event.resources.fuel === 3))
     expect(effects.map((event) => event.type)).toEqual((action === 'cut-peat') === (timing === 'after') ? ['resource.moved', 'farm.fieldPlowed'] : ['farm.fieldPlowed', 'resource.moved'])
   })
