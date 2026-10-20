@@ -8,6 +8,7 @@ import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import { renderDescriptionPreview } from '../interaction/ActionDescription'
+import { ActionSpaceDescription } from './ActionSpaceDescription'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
@@ -837,7 +838,7 @@ export const ActionBoard = ({
                     {accDir && hasGainPerRound(space)
                       ? renderGainDisplay(space)
                       : space.baseDescriptionPreview
-                        ? renderDescriptionPreview(locale, space.baseDescriptionPreview)
+                        ? <ActionSpaceDescription locale={locale} preview={space.baseDescriptionPreview} />
                         : t(locale, space.nameKey)}
                   </div>
                   <div className="action-footer" />
@@ -900,7 +901,7 @@ export const ActionBoard = ({
                         {accDir && hasGainPerRound(action)
                           ? renderGainDisplay(action)
                           : action.baseDescriptionPreview
-                        ? renderDescriptionPreview(locale, action.baseDescriptionPreview)
+                        ? <ActionSpaceDescription locale={locale} preview={action.baseDescriptionPreview} />
                         : t(locale, action.nameKey)}
                       </div>
                       <div className="action-footer" />
@@ -971,7 +972,7 @@ export const ActionBoard = ({
                       <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
                       <div className="action-desc">
                         {space.baseDescriptionPreview
-                        ? renderDescriptionPreview(locale, space.baseDescriptionPreview)
+                        ? <ActionSpaceDescription locale={locale} preview={space.baseDescriptionPreview} />
                         : t(locale, space.nameKey)}
                       </div>
                       <div className="action-footer" />
@@ -1036,9 +1037,12 @@ export const ActionBoard = ({
                 data-action-id={tooltip.actionId}
               >
                 <h4 className="action-header">{translateCardText(locale, tooltip.nameKey!)}</h4>
-                <div className="action-desc">{renderTooltipBody(tooltip)}</div>
+                <div className="action-desc">{tooltip.action.baseDescriptionPreview
+                  ? <ActionSpaceDescription locale={locale} preview={tooltip.action.baseDescriptionPreview} />
+                  : renderTooltipBody(tooltip)}</div>
               </div>
               <div className="tooltip-text">
+                {tooltip.action.baseDescriptionPreview ? <div>{renderTooltipBody(tooltip)}</div> : null}
                 {tooltip.leftActionName && (
                   <p className="tooltip-left-action">
                     {t(locale, 'ui.leftActionSpace', { action: tooltip.leftActionName })}
