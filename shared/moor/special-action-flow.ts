@@ -1,5 +1,5 @@
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
-import { getPlayOrderIndex } from '../engine/matched-trigger'
+import { planListenerOwnerGroups } from '../engine/matched-trigger'
 import type { ActivateCardActionParams } from '../engine/activation-action'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type {
@@ -15,10 +15,8 @@ import type {
 import { improvementAction } from '../actions/effects/improvement'
 import { getMoorSpecialActionEffectPlan, MOOR_SPECIAL_ACTION_BORROW_FOOD, moorSpecialActionBorrowCost } from './special-action-plan'
 import {
-  executeCardListener,
   getMatchingListeners,
   type CardListenerContextInput,
-  listenerOwnerOptions,
 } from '../cards/card-listeners'
 import {
   applyMoorSpecialActionEffect,
@@ -377,6 +375,7 @@ export const buildMoorSpecialActionFlow = (entry: {
   actionId: MoorSpecialActionId
   payload?: MoorSpecialActionPayload
   actionHooks: ActionHookRegistry | undefined
+  sourceCard?: string
 } & ({ kind: 'card'; cardId: string } | { kind: 'granted' })): ActionFlow => {
   const { state, player, actionId, payload = {}, actionHooks } = entry
   const cardId = entry.kind === 'card' ? entry.cardId : undefined
@@ -385,38 +384,25 @@ export const buildMoorSpecialActionFlow = (entry: {
     actionHooks, state, player, space: createMoorSpecialActionSpace(actionId),
     actionId: 'moor-action', moorAction, phase: 'before',
   } satisfies CardListenerContextInput
-  const candidates = getMatchingListeners(beforeContext)
-  const matched = candidates.length <= 1 ? candidates : candidates
-    .filter(entry => executeCardListener(entry.registration, beforeContext, listenerOwnerOptions(entry)))
-  const ownerOrder = (ownerId: string) => !ownerId ? -1 : ownerId === player.id ? 0
-    : state.players.findIndex(candidate => candidate.id === ownerId) + 1
-  matched.sort((a, b) => ownerOrder(a.ownerPlayerId) - ownerOrder(b.ownerPlayerId)
-    || getPlayOrderIndex(findPlayerById(state, a.ownerPlayerId) ?? player, a.cardId)
-      - getPlayOrderIndex(findPlayerById(state, b.ownerPlayerId) ?? player, b.cardId))
-  const groups: { ownerId: string; children: ActionFlow[] }[] = []
-  const triggerSnapshot = createTriggerSnapshot(state)
-  for (const entry of matched) {
-    const ownerId = entry.ownerPlayerId || player.id
-    const params: ActivateCardActionParams = {
-      listenerId: entry.registration.id, cardId: entry.cardId,
-      phase: 'before', actionId: 'moor-action', moorAction, triggerPlayerId: player.id,
-      ownerPlayerId: entry.ownerPlayerId, ownerCardZone: entry.ownerCardZone,
-      mandatory: entry.registration.mandatory === true, triggerSnapshot,
-      event: {},
-    }
-    const child: ActionFlow = {
-      type: 'leaf', actionId: 'activate-card', sourceCard: entry.cardId,
-      targetPlayerId: ownerId, params,
-    }
-    const last = groups.at(-1)
-    if (last?.ownerId === ownerId) last.children.push(child)
-    else groups.push({ ownerId, children: [child] })
-  }
-  const beforeFlows: ActionFlow[] = groups.map(({ ownerId, children }) => children.length === 1 ? children[0]!
-    : { type: 'parallel', mode: 'trigger-select', targetPlayerId: ownerId,
-      children: children.map(child => ({ ...child, optional: child.type === 'leaf' && child.params?.mandatory !== true })) })
+  const groups = planListenerOwnerGroups(getMatchingListeners(beforeContext), state, player.id)
+  const beforeFlows: ActionFlow[] = groups.map(({ ownerPlayerId, listeners }) => {
+    const children: ActionFlow[] = listeners.map(entry => {
+      const params: ActivateCardActionParams = {
+        listenerId: entry.registration.id, cardId: entry.cardId,
+        phase: 'before', actionId: 'moor-action', moorAction, triggerPlayerId: player.id,
+        ownerPlayerId: entry.ownerPlayerId, ownerCardZone: entry.ownerCardZone,
+        mandatory: entry.registration.mandatory === true,
+        event: {},
+      }
+      return { type: 'leaf', actionId: 'activate-card', sourceCard: entry.cardId,
+        targetPlayerId: ownerPlayerId, params }
+    })
+    return children.length === 1 ? children[0]!
+      : { type: 'parallel', mode: 'trigger-select', targetPlayerId: ownerPlayerId,
+        children }
+  })
   const applyFlow: ActionFlow = {
-    type: 'leaf', actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+    type: 'leaf', actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID, sourceCard: entry.sourceCard,
     params: { ...(entry.kind === 'card' ? { cardId: entry.cardId } : { mode: 'effect' }), actionId, payload },
   }
   return combineFlows([...beforeFlows, applyFlow]) ?? applyFlow
@@ -444,7 +430,7 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
       promptKey: 'ui.interactionFlowSelect',
     }
   },
-  resolveChoice: ({ state, player, actionContext, actionHooks }, choice) => {
+  resolveChoice: ({ state, player, actionContext, sourceCard, actionHooks }, choice) => {
     const mode = choiceMode(actionContext)
     if (mode === 'take-card') {
       return takeSpecialActionCard(state, player, choice)
@@ -462,7 +448,7 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
       if (!validation.ok) return { type: 'fail', errorKey: validation.error }
       return {
         type: 'flow',
-        flow: buildMoorSpecialActionFlow({ kind: 'card', state, player, cardId: parsed.cardId, actionId: parsed.actionId, payload: parsed.payload, actionHooks }),
+        flow: buildMoorSpecialActionFlow({ kind: 'card', state, player, cardId: parsed.cardId, actionId: parsed.actionId, payload: parsed.payload, sourceCard, actionHooks }),
       }
     }
     const parsed = parseActionChoice(choice)
@@ -476,7 +462,7 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
     const validation = validateMoorSpecialActionEffect(state, playerIndex, parsed.actionId, parsed.payload, actionHooks)
     if (!validation.ok) return { type: 'fail', errorKey: validation.error }
     return { type: 'flow', flow: buildMoorSpecialActionFlow({
-      kind: 'granted', state, player, actionId: parsed.actionId, payload: parsed.payload, actionHooks,
+      kind: 'granted', state, player, actionId: parsed.actionId, payload: parsed.payload, sourceCard, actionHooks,
     }) }
   },
 }

@@ -333,6 +333,14 @@ describe('M057 Taps', () => {
     resp = acceptOptional(session, resp)
     expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
     expect(resp.state.players[0]!.resources.fuel).toBe(3)
+    expect(resp.state.events.filter(event => event.type === 'farm.terrainChanged' && event.sourceActionId === 'cut-peat'))
+      .toEqual([expect.objectContaining({ sourceCardId: M057, operation: 'remove' })])
+    const gains = resp.state.events.filter(event => event.type === 'resource.moved' && event.sourceActionId === 'cut-peat')
+    expect(gains).toEqual([expect.objectContaining({ sourceCardId: M057, resources: { fuel: 3 } })])
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.actionDetail', params: expect.objectContaining({ action: 'moor.specialActions.cut-peat' }),
+      sourceEvent: { occurrenceId: gains[0]!.occurrenceId, rowIndex: 0 },
+    }))
   })
 
   it('revalidates stale borrowed Taps card actions before before-special-action listeners', () => {
@@ -394,6 +402,10 @@ describe('M057 Taps', () => {
     const chosen = session.resolveChoice(0, optionFor(offer, 'hiring-fair').value)
 
     expect(chosen.ok).toBe(true)
+    expect(chosen.state.events.filter(event => event.type === 'resource.moved' && event.sourceActionId === 'hiring-fair'))
+      .toEqual([expect.objectContaining({ sourceCardId: M057, resources: { food: 1 } })])
+    expect(chosen.state.events.filter(event => event.type === 'resource.paid' && event.sourceActionId === 'hiring-fair'))
+      .toEqual([expect.objectContaining({ sourceCardId: M057, resources: { food: 2 } })])
     expect(chosen.state.players[0]!.resources.food).toBe(1)
     expect(chosen.state.farmersOfTheMoor!.specialActionCards.find((entry) => entry.id === card.id)!.location)
       .toEqual({ kind: 'playerFaceDown', playerId: player.id })

@@ -81,6 +81,15 @@ for (const scheduled of [false, true]) {
     expect(result.state.players[0]!.fields.find(field => field.row === 0 && field.col === 1)?.stacks)
       .toEqual([{ kind: 'grain', remaining: 3 }])
     expect(result.state.players[0]!.resources.fuel).toBe(3)
+    const grantingCard = scheduled ? 'M056_PeatCuttingRights' : 'M055_ToolShed'
+    expect(result.state.events.filter(event => event.type === 'farm.terrainChanged' && event.sourceActionId === 'cut-peat'))
+      .toEqual([expect.objectContaining({ sourceCardId: grantingCard })])
+    const gains = result.state.events.filter(event => event.type === 'resource.moved' && event.sourceActionId === 'cut-peat')
+    expect(gains).toEqual([expect.objectContaining({ sourceCardId: grantingCard, resources: { fuel: 3 } })])
+    expect(result.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.actionDetail', params: expect.objectContaining({ action: 'moor.specialActions.cut-peat' }),
+      sourceEvent: { occurrenceId: gains[0]!.occurrenceId, rowIndex: 0 },
+    }))
     expect(result.state.players[0]!.farmTerrain).not.toContainEqual({ row: 2, col: 0, kind: 'moor' })
     if (scheduled) expect(result.state.players[0]!.cardStates.M056_PeatCuttingRights?.extraData?.scheduledOffers)
       .toEqual([expect.objectContaining({ consumed: true, consumedRound: 6 })])

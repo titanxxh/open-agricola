@@ -35,7 +35,7 @@ import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { applyCardStorageOperation, cardStorageAffectsScore, readCardStorageOperation } from '../actions/card-storage'
 import { getLogicalFields } from '../cards/helpers/card-field'
-import { getPlayOrderIndex } from './matched-trigger'
+import { getPlayOrderIndex, planListenerOwnerGroups } from './matched-trigger'
 import { wrapSpaceUse } from './space-use-nodes'
 import { wrapPrimaryBody } from './primary-body-nodes'
 import { actionSpaceQueryContext } from './space-use-nodes'
@@ -50,7 +50,7 @@ import {
 } from './activation-action'
 import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
-import { findPlayerById, findPlayerIndexById } from '../domain/player'
+import { findPlayerById } from '../domain/player'
 import {
   INJECTED_ANYTIME_ACTION_CONTEXT_KEY,
   isInjectedAnytimeActionContext,
@@ -309,86 +309,50 @@ export function buildPhaseTrailingNodes(
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
-  type Prepared = {
-    ml: MatchedCardListener
-    ownerOrderIndex: number
-    playOrderIndex: number
-    matchedIndex: number
-  }
-
   const activeId = state.players[state.currentPlayerIndex]?.id
   const effectiveTriggerPlayerId = triggerPlayerId ?? activeId
   const eventSourceCard =
     typeof baseEvent.sourceCard === 'string' && baseEvent.sourceCard.length > 0
       ? baseEvent.sourceCard
       : undefined
-  const prepared: Prepared[] = matchedListeners.map((ml, matchedIndex) => {
-    const owner = findPlayerById(state, ml.ownerPlayerId)
-    const ownerSeatIndex = owner ? findPlayerIndexById(state, owner.id) : Number.MAX_SAFE_INTEGER
-    const ownerOrderIndex = ml.ownerPlayerId === ''
-      ? -1
-      : ml.ownerPlayerId === effectiveTriggerPlayerId ? 0 : ownerSeatIndex + 1
-    const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
-    return { ml, ownerOrderIndex, playOrderIndex, matchedIndex }
-  }).sort((a, b) => {
-    const ownerDelta = a.ownerOrderIndex - b.ownerOrderIndex
-    if (ownerDelta !== 0) return ownerDelta
-    const playOrderDelta = a.playOrderIndex - b.playOrderIndex
-    if (playOrderDelta !== 0) return playOrderDelta
-    return a.matchedIndex - b.matchedIndex
-  })
+  return planListenerOwnerGroups(matchedListeners, state, effectiveTriggerPlayerId).map(({ ownerPlayerId, listeners }) => {
+    const group = listeners.map((ml): ActivateCardActionNode => {
+      const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
+      const cardId = ml.cardId || eventSourceCard || ''
+      const params: ActivateCardActionParams = {
+        listenerId: ml.registration.id,
+        cardId,
+        phase,
+        actionId,
+        event: baseEvent,
+        triggerPlayerId: effectiveTriggerPlayerId,
+        ownerPlayerId: ml.ownerPlayerId,
+        ownerCardZone: ml.ownerCardZone,
+        mandatory: ml.registration.mandatory === true,
+        countCardUse:
+          typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
+        transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
+        actionEvents: actionEvents ? [...actionEvents] : undefined,
+        actionEventStartIndex,
+        preservedTransactionEvents: preservedEvents ? [...preservedEvents.transactionEvents] : undefined,
+        preservedActionEvents: preservedEvents?.actionEvents ? [...preservedEvents.actionEvents] : undefined,
+        triggerSnapshot,
+        moorAction,
+      }
+      const node = new ActionNode(
+        nodeId,
+        ACTIVATE_CARD_ACTION_ID,
+        cardId,
+        params,
+      )
+      if (ml.ownerPlayerId) node.ownerPlayerId = ml.ownerPlayerId
+      return node as ActivateCardActionNode
+    })
 
-  const children = prepared.map((p): ActivateCardActionNode => {
-    const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
-    const cardId = p.ml.cardId || eventSourceCard || ''
-    const params: ActivateCardActionParams = {
-      listenerId: p.ml.registration.id,
-      cardId,
-      phase,
-      actionId,
-      event: baseEvent,
-      triggerPlayerId: effectiveTriggerPlayerId,
-      ownerPlayerId: p.ml.ownerPlayerId,
-      ownerCardZone: p.ml.ownerCardZone,
-      mandatory: p.ml.registration.mandatory === true,
-      countCardUse:
-        typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
-      transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
-      actionEvents: actionEvents ? [...actionEvents] : undefined,
-      actionEventStartIndex,
-      preservedTransactionEvents: preservedEvents ? [...preservedEvents.transactionEvents] : undefined,
-      preservedActionEvents: preservedEvents?.actionEvents ? [...preservedEvents.actionEvents] : undefined,
-      triggerSnapshot,
-      moorAction,
-    }
-    const node = new ActionNode(
-      nodeId,
-      ACTIVATE_CARD_ACTION_ID,
-      cardId,
-      params,
-    )
-    if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
-    return node as ActivateCardActionNode
-  })
-
-  const groups: ActivateCardActionNode[][] = []
-  for (const child of children) {
-    const ownerKey = child.params.ownerPlayerId || effectiveTriggerPlayerId || ''
-    const last = groups.at(-1)
-    const lastOwnerKey = last?.[0]?.params.ownerPlayerId || effectiveTriggerPlayerId || ''
-    if (last && lastOwnerKey === ownerKey) {
-      last.push(child)
-    } else {
-      groups.push([child])
-    }
-  }
-
-  return groups.map((group) => {
     if (group.length === 1) {
       if (phase === 'immediatelyAfter' || phase === 'after') group[0]!.reactionPhase = phase
       return group[0]!
     }
-    const ownerPlayerId = group[0]?.params.ownerPlayerId || effectiveTriggerPlayerId
     const ptn = new ParallelNode(
       `parallel-trigger-${phase}-${actionId}-${ownerPlayerId ?? 'global'}-${int.counterRef.value++}`,
       group,
@@ -1026,6 +990,7 @@ function buildFlowNodeContent(
     if (flow.mode === 'trigger-select') {
       parallel.mode = 'trigger-select'
       parallel.resolveAfterSelection = flow.triggerSelectOnce === true
+      parallel.autoSelectSoleInitialTrigger = children.every(child => isActivateCardActionNode(child) && child.params.phase === 'before')
       parallel.triggerOwnerPlayerId = ownerPlayerId
       parallel.triggerChildren = children.map((child, index) => ({
         nodeId: child.id,

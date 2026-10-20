@@ -331,7 +331,7 @@ export const scheduledOfferAction: ActionDefinition = {
         type: 'flow',
         flow: { type: 'seq', children: [
           buildMoorSpecialActionFlow({ kind: 'card', state, player, cardId: moorChoice.cardId,
-            actionId: moorChoice.actionId, payload: moorChoice.payload, actionHooks }),
+            actionId: moorChoice.actionId, payload: moorChoice.payload, sourceCard: cardId, actionHooks }),
           { type: 'leaf', actionId: ACTION_ID, sourceCard: cardId, params: { cardId, offerId: offer.id, consume: true } },
         ] },
       }
