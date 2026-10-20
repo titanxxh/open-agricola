@@ -1,6 +1,6 @@
 # ADR 0032: Unified Moor special-action lifecycle
 
-Status: Accepted design. Implementation pending in [#1293](https://github.com/titanxxh/open-agricola/issues/1293).
+Status: Accepted. Implemented by [PR #1311](https://github.com/titanxxh/open-agricola/pull/1311).
 
 ## Context
 
