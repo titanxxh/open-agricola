@@ -24,7 +24,8 @@ const recordDirectory = 'output/verification'
 const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trimEnd()
 
 /** Includes staged, unstaged, untracked and deleted sources; records never hash themselves. */
-export function sourceFingerprint(cwd: string): string {
+export function sourceFingerprint(cwd: string, options: { excludeFiles?: readonly string[] } = {}): string {
+  const excludedFiles = new Set(options.excludeFiles)
   const hash = createHash('sha256')
   hash.update(JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch,
     environment: ['NODE_ENV', 'NODE_OPTIONS', 'CI', 'TZ', 'VITE_SANDBOX_EXECUTOR', 'APP_INSTANCES',
@@ -34,7 +35,7 @@ export function sourceFingerprint(cwd: string): string {
   const files = [...new Set(git(cwd, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
     .split('\0').filter(Boolean))].sort()
   for (const file of files) {
-    if (file.startsWith(`${recordDirectory}/`)) continue
+    if (file.startsWith(`${recordDirectory}/`) || excludedFiles.has(file)) continue
     hash.update(`${file}\0`)
     const target = join(cwd, file)
     let stat

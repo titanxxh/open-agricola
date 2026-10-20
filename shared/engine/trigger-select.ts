@@ -1,3 +1,4 @@
+import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { ActionChoiceOption, ActionExecutionContext, ActionFlow, PlayerState, Resource, SupplyTokenCounts } from '../contract/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
@@ -148,7 +149,8 @@ const previewContextForChild = (
       triggerPlayer,
       ownerPlayer: effectPlayer,
       effectPlayer,
-      space: typeof targetSpaceId === 'string'
+      space: params.moorAction ? createMoorSpecialActionSpace(params.moorAction.actionId)
+        : typeof targetSpaceId === 'string'
         ? previewState.actionSpaces.find((space) => space.id === targetSpaceId) ?? context.space
         : context.space,
       actionId: params.actionId,

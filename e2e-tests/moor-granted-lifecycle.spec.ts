@@ -48,8 +48,16 @@ async function clickChoice(page: Page) {
   return response
 }
 
-for (const scheduled of [false, true]) {
-  test(`granted Cut Peat opens Peat Ash Fertilizer before clearing, scheduled=${scheduled}`, async ({ page, request }) => {
+async function clickChoiceValue(page: Page, value: string) {
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
+  await page.locator(`.interaction-bar [data-choice-value="${value}"]`).click()
+  const response: SessionResponse = await (await committed).json()
+  expect(response.ok, response.error).toBe(true)
+  return response
+}
+
+for (const scheduled of [false, true]) for (const passGrowth of scheduled ? [false] : [false, true]) {
+  test(`granted Cut Peat opens Peat Ash Fertilizer before clearing, scheduled=${scheduled}, pass=${passGrowth}`, async ({ page, request }) => {
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await prepare(request, scheduled)
     if (scheduled) {
@@ -62,6 +70,10 @@ for (const scheduled of [false, true]) {
       await page.locator('.special-actions-panel').getByRole('button', { name: 'Slash and Burn', exact: true }).click()
       await page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="0-0"]').click()
     }
+    if (!scheduled) {
+      await expect(page.locator('.interaction-bar [data-choice-value="__pass__"]')).toBeVisible()
+      await clickChoiceValue(page, 'M055_ToolShed')
+    }
     const activated = await clickChoice(page)
     expect(activated.interaction.sourceCard).toBe(scheduled ? 'M056_PeatCuttingRights' : 'M055_ToolShed')
     const tile = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="2-0"]')
@@ -73,13 +85,23 @@ for (const scheduled of [false, true]) {
       await page.locator('.interaction-bar [data-choice-value="action:cut-peat:2:0"]').click()
     }
     const before: SessionResponse = await (await selected).json()
-    expect(before.interaction.sourceCard).toBe('M112_PeatAshFertilizer')
+    if (scheduled) expect(before.interaction.sourceCard).toBe('M112_PeatAshFertilizer')
+    else {
+      expect(before.interaction.request.kind).toBe('select-trigger')
+      expect(before.interaction.request.options.filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual(['M112_PeatAshFertilizer'])
+    }
     expect(before.state.players[0]!.resources.fuel).toBe(0)
     await page.reload()
     await expect(page.locator('.interaction-bar')).toContainText('Peat Ash Fertilizer')
-    const result = await clickChoice(page)
+    let result: SessionResponse
+    if (passGrowth) result = await clickChoiceValue(page, '__pass__')
+    else {
+      if (!scheduled) await clickChoiceValue(page, 'M112_PeatAshFertilizer')
+      result = await clickChoice(page)
+    }
     expect(result.state.players[0]!.fields.find(field => field.row === 0 && field.col === 1)?.stacks)
-      .toEqual([{ kind: 'grain', remaining: 3 }])
+      .toEqual([{ kind: 'grain', remaining: passGrowth ? 2 : 3 }])
+    expect(result.state.events.filter(event => event.type === 'farm.cropAdded' && event.sourceCardId === 'M112_PeatAshFertilizer')).toHaveLength(passGrowth ? 0 : 1)
     expect(result.state.players[0]!.resources.fuel).toBe(3)
     const grantingCard = scheduled ? 'M056_PeatCuttingRights' : 'M055_ToolShed'
     expect(result.state.events.filter(event => event.type === 'farm.terrainChanged' && event.sourceActionId === 'cut-peat'))
@@ -94,6 +116,6 @@ for (const scheduled of [false, true]) {
     if (scheduled) expect(result.state.players[0]!.cardStates.M056_PeatCuttingRights?.extraData?.scheduledOffers)
       .toEqual([expect.objectContaining({ consumed: true, consumedRound: 6 })])
     else expect(result.state.players[0]!.cardStates.M055_ToolShed?.counters?.usage).toBe(7)
-    await page.screenshot({ path: `output/playwright/granted-moor-${scheduled ? 'scheduled' : 'tool-shed'}.png` })
+    await page.screenshot({ path: `output/playwright/granted-moor-${scheduled ? 'scheduled' : passGrowth ? 'tool-shed-pass' : 'tool-shed'}.png` })
   })
 }

@@ -2,6 +2,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { sourceFingerprint } from '../verify'
 import { moorSpecialActionCardDefinitions } from '../../shared/moor/special-action-cards'
 import { describe, expect, it } from 'vitest'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'
@@ -189,6 +190,60 @@ describe('check-card-impl-boundaries', () => {
     expect(() => walkProductionCardFiles(root)).toThrow(/empty production source root/)
   })
 
+  it.each(['artifacts/audit', '.', 'shared'])('keeps a nonignored report in %s fresh across completion, reruns and source changes', async reportPath => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-report-fingerprint-'))
+    const previousExitCode = process.exitCode
+    try {
+      execFileSync('git', ['init', '-q', root])
+      execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'fixture'], { cwd: root })
+      const ids = ['A001_Shelter', ...getRegisteredPlayerActionSpaceIds()]
+      for (const id of ids) writeFixture(root, `shared/cards/A/${id}.ts`,
+        `export const ${id} = defineMinorCard({ meta: { id: '${id}' }, impl: {} })`)
+      writeFixture(root, 'shared/cards/register-all.ts', `export const ALL_CARD_IMPLS = {
+        ${ids.map(id => `'${id}': {}`).join(',')},
+        A001_Shelter: { listeners: [{ id: 'fixture', cardIds: ['A001_Shelter'], actions: ['collect'], phases: ['after'],
+          handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } } }) }] }
+      }`)
+      writeFixture(root, 'shared/cards/catalog.ts', `export const allMinorImprovementCards = ${JSON.stringify(ids.map(id => ({ id, name: id, desc: ['Fixture'] })))}; export const allOccupationCards = []`)
+      writeFixture(root, 'shared/cards/major/generated.ts', 'export const majorCardDefinitionsList = []')
+      writeFixture(root, 'shared/domain/farm-operations.ts', `
+        function commitFarmOperation(player: PlayerState) { player.fields = [] }
+        function commitPreparedPlayer(player: PlayerState) { player.roomTiles = [] }
+      `)
+      writeFixture(root, 'shared/session/state-bootstrap.ts', `
+        function normalizeState(player: PlayerState) { player.farmTerrain = [] }
+        function createInitialState(player: PlayerState) { player.stableTiles = [] }
+      `)
+      for (const file of ['farmyard-usage-core', 'farmyard-geometry', 'farmyard-space-states']) {
+        writeFixture(root, `shared/domain/${file}.ts`, 'function geometry(player: PlayerState) { return player.fields }')
+      }
+      writeFixture(root, 'server/query.ts', 'export const query = () => true')
+      const directory = path.join(root, reportPath)
+      const neighboringSource = writeFixture(root, path.join(reportPath, 'source.ts'), 'export const source = 1')
+      const before = sourceFingerprint(root)
+      const report = (): unknown => JSON.parse(readFileSync(path.join(directory, 'audit.json'), 'utf8'))
+      const excludedFiles = ['audit.json', 'audit.md', 'audit.json.tmp', 'audit.md.tmp'].map(file => path.join(reportPath, file))
+      await runCardImplBoundaryCheck(root, { report: directory })
+      expect(process.exitCode).toBe(0)
+      expect(report()).toMatchObject({ status: 'passed', source: { fingerprint: before } })
+      expect(report()).toMatchObject({ source: { excludedFiles } })
+      expect(sourceFingerprint(root, { excludeFiles: excludedFiles })).toBe(before)
+      expect(sourceFingerprint(root)).not.toBe(before)
+      await runCardImplBoundaryCheck(root, { report: directory })
+      expect(report()).toMatchObject({ status: 'passed', source: { fingerprint: before } })
+      writeFileSync(neighboringSource, 'export const source = 2')
+      await runCardImplBoundaryCheck(root, { report: directory })
+      const changed = sourceFingerprint(root, { excludeFiles: excludedFiles })
+      expect(report()).toMatchObject({ status: 'passed', source: { fingerprint: changed } })
+      expect(changed).not.toBe(before)
+      await runCardImplBoundaryCheck(root, { report: directory })
+      expect(report()).toMatchObject({ status: 'passed', source: { fingerprint: changed } })
+    } finally {
+      process.exitCode = previousExitCode
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it.each(['traversal', 'parse', 'runtime-import'] as const)('replaces an old successful report on %s failure', async failure => {
     const root = mkdtempSync(path.join(tmpdir(), 'card-report-failure-'))
     execFileSync('git', ['init', '-q', root])
@@ -205,6 +260,7 @@ describe('check-card-impl-boundaries', () => {
     const failed = JSON.parse(readFileSync(path.join(report, 'audit.json'), 'utf8'))
     expect(failed).toMatchObject({ status: 'failed', source: { head: expect.any(String), fingerprint: expect.any(String) }, error: expect.any(String) })
     expect(failed.source.head).not.toBe('old')
+    expect(failed.source.fingerprint).toBe(sourceFingerprint(root, { excludeFiles: failed.source.excludedFiles }))
     expect(readFileSync(path.join(report, 'audit.md'), 'utf8')).not.toContain('Old success')
     rmSync(root, { recursive: true })
   })

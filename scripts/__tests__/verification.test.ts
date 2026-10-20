@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -115,6 +115,22 @@ describe('verification modes and evidence', () => {
     rmSync(join(cwd, 'new.ts'))
     rmSync(join(cwd, 'source.ts'))
     expect(sourceFingerprint(cwd)).not.toBe(original)
+  })
+
+  it('excludes only explicit report filenames while the default still hashes them', () => {
+    const cwd = repo(), original = sourceFingerprint(cwd)
+    mkdirSync(join(cwd, 'reports'))
+    const options = { excludeFiles: ['reports/audit.json', 'reports/audit.md'] }
+    writeFileSync(join(cwd, 'reports/audit.json'), 'running')
+    expect(sourceFingerprint(cwd, options)).toBe(original)
+    expect(sourceFingerprint(cwd)).not.toBe(original)
+    writeFileSync(join(cwd, 'reports/audit.json'), 'passed')
+    writeFileSync(join(cwd, 'reports/audit.md'), 'Finished')
+    expect(sourceFingerprint(cwd, options)).toBe(original)
+    writeFileSync(join(cwd, 'reports/audit.json.ts'), 'export const source = 2')
+    expect(sourceFingerprint(cwd, options)).not.toBe(original)
+    writeFileSync(join(cwd, 'source.ts'), 'changed')
+    expect(sourceFingerprint(cwd, options)).not.toBe(original)
   })
 
   it('preserves the existing isolated Playwright command and its arguments', () => {
