@@ -28,6 +28,7 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ## Views and local sandbox
 
+- `board/ActionSpaceDescription.tsx` renders action-space symbols from the authoritative `baseDescriptionPreview`; costs and quantities stay in that rule tree. Detailed tooltips and interaction choices use `interaction/ActionDescription.tsx`. The board keeps symbolic presentation without maintaining a second rule table; component and browser coverage is in `ActionBoard.test.tsx` and `action-space-icons.spec.ts`.
 - `client/app/GameContainerApi.tsx` with `useTransportSetup`, `LobbyPage.tsx` and `PageRouter.tsx` orchestrate views and derive interactivity from `viewPlayerId` and `playerIndex`.
 - The default playtest path is backend `POST /api/game/new-sandbox`. With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs in the browser: `LocalGameTransport` implements `GameTransport`, the Worker assembles shared `GameCore` with locally validated custom code, and `server/__tests__/local-sandbox-parity.test.ts` locks behavior to the server executor. A ten-second timeout rebuilds the Worker from the last persisted snapshot, including `engineStackCursor`, and tells the UI it rolled back. One IndexedDB slot persists the game; a mismatched schema is deleted. A playtest pinned to an `exactVersionId` still uses the backend sandbox.
 - `AuthContext` is the site login session (password, GitHub or Google) and stores no Issue-write authorization; `LocaleContext` switches locale.

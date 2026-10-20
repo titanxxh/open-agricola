@@ -107,6 +107,54 @@ const expectActionStyle = (
 }
 
 describe('ActionBoard', () => {
+  it.each(['en', 'zh'] as const)('keeps action symbols on the board in %s', locale => {
+    const state = createInitialState(6069)
+    const describe = createBaseActionDescriber(state)
+    const actions = state.actionSpaces.map(space => ({ ...space, baseDescriptionPreview: describe(space) }))
+    const container = document.createElement('div')
+    container.innerHTML = renderToStaticMarkup(<ActionBoard locale={locale}
+      baseActions={actions.filter(space => !state.roundActionOrder.includes(space.id))}
+      roundSlots={state.roundActionOrder.map((id, index) => ({ round: index + 1, action: actions.find(space => space.id === id) }))}
+      currentPlayer={state.players[0]!} players={state.players} futureMeeples={[]}
+      canTakeAction={() => true} takeAction={vi.fn()} currentRound={14} devMode={false} />)
+    for (const [id, icons] of [
+      ['farmland', ['field']],
+      ['meeting-place', ['first', 'minor']],
+      ['lessons', ['occupation']],
+      ['farm-expansion', ['room-wood', 'room-clay', 'room-stone', 'barn']],
+      ['fencing', ['fence-icon']],
+      ['grain-utilization', ['sow', 'bread']],
+      ['major-improvement', ['major', 'minor']],
+      ['cultivation', ['field', 'sow']],
+      ['wish-children', ['child', 'minor']],
+      ['urgent-wish-children', ['child-free']],
+      ['house-redevelopment', ['upgrade', 'major', 'minor']],
+      ['farm-redevelopment', ['upgrade', 'fence-icon']],
+    ] as const) {
+      const description = container.querySelector(`[data-action-id="${id}"] .action-desc`)
+      expect(description, id).not.toBeNull()
+      for (const icon of icons) expect(description?.querySelector(`.res-icon-${icon}`), `${id}: ${icon}`).not.toBeNull()
+    }
+  })
+
+  it('uses the supplied rule quantities for action icons instead of a separate cost table', () => {
+    const state = createInitialState(6069)
+    const action = {
+      ...createAction('lessons', 'actions.lessons.name'),
+      baseDescriptionPreview: {
+        kind: 'action', labelKey: 'actions.lessons.name',
+        effectPreview: { kind: 'occupationFees', food: [0, 4, 7] },
+      },
+    } satisfies ActionSpace
+    const container = document.createElement('div')
+    container.innerHTML = renderToStaticMarkup(<ActionBoard locale="en" baseActions={[action]} roundSlots={[]}
+      currentPlayer={state.players[0]!} players={state.players} futureMeeples={[]}
+      canTakeAction={() => true} takeAction={vi.fn()} currentRound={1} devMode={false} />)
+    const description = container.querySelector('[data-action-id="lessons"] .action-desc')!
+    expect(description.querySelector('.res-icon-occupation')).not.toBeNull()
+    expect([...description.querySelectorAll('[data-resource="food"]')].map(node => node.getAttribute('data-amount'))).toEqual(['4', '7'])
+  })
+
   it('labels each recorded stable reservation by its actual source', () => {
     const owner = createPlayer('p1', 'Alice', 'red')
     const html = renderToStaticMarkup(<ActionBoard locale="en"

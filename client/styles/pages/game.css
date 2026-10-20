@@ -4254,6 +4254,52 @@
 .action-desc .icon-line .icon-token {
   display: inline-block;
 }
+.action-icon-description,
+.action-icon-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.action-icon-description {
+  line-height: 1;
+}
+.action-icon-description .res-icon {
+  font-size: inherit;
+}
+.action-icon-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 100%;
+}
+.action-icon-operator,
+.action-icon-fees {
+  font-size: 0.7em;
+}
+.action-icon-description .resource-inline-item {
+  flex-direction: row-reverse;
+  padding: 0;
+  font-size: inherit;
+}
+.action-icon-description .resource-inline-amount {
+  font-size: inherit;
+  min-width: 0;
+}
+[data-action-id="farm-supplies-6"] .action-icon-description,
+[data-action-id="resource-trade-6"] .action-icon-description,
+[data-action-id="resource-market"] .action-icon-description {
+  font-size: 0.65em;
+}
+[data-action-id="resource-market-56"] .action-icon-description,
+[data-action-id="resource-market-4"] .action-icon-description,
+[data-action-id="corral-6"] .action-icon-description {
+  font-size: 0.75em;
+}
 /* Farm Expansion: smaller font for its many cost lines */
 [data-action-id="farm-expansion"] .action-desc .icon-line {
   font-size: 0.67em;
