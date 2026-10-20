@@ -13,3 +13,11 @@ export const hasOrdinaryFenceBuiltEvent = (context: CardListenerContext): boolea
     const edges = (event as { newFenceEdges?: unknown }).newFenceEdges
     return Array.isArray(edges) && edges.length > 0
   })
+
+/** Ordinary fence segments the context player built in the current action. */
+export const countNewFenceEdges = (context: CardListenerContext): number =>
+  (context.actionEvents ?? []).reduce((total, event) => {
+    if (!('schemaVersion' in event) || event.type !== 'farm.fenceBuilt'
+      || (event.targetPlayerId ?? event.actorPlayerId) !== context.player.id) return total
+    return total + (event.newFenceEdges?.length ?? 0)
+  }, 0)

@@ -1,8 +1,8 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import type { ActionFlow, PlayerState } from '../../contract/types'
-import { scoringOfferFlow, scoringOfferOption, type ScoringOffer } from '../../actions/plans/scoring-offer'
+import type { PlayerState } from '../../contract/types'
+import { scoringOfferChoice, type ScoringOffer } from '../../actions/plans/scoring-offer'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
 
 const CARD_ID = 'E132_VeggieLover'
@@ -22,6 +22,7 @@ const choiceValue = (pairs: number) => `${CHOICE_PREFIX}${pairs}`
 const scoringOffers = (maxCount: number): ScoringOffer[] => Array.from({ length: maxCount + 1 }, (_, pairs) => ({
   value: choiceValue(pairs), kind: 'pay', resources: { grain: pairs, vegetable: pairs }, score: pairs * 2
 }))
+const scoringChoice = scoringOfferChoice(CARD_ID, player => scoringOffers(maxScoringPairs(player)))
 
 const cardImpl = {
   effect: {
@@ -39,24 +40,10 @@ const cardImpl = {
     },
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state, player) => {
-      const maxPairs = maxScoringPairs(player)
-      if (maxPairs <= 0) return
-      return {
-        type: 'leaf',
-        actionId: 'emit-choice',
-        sourceCard: CARD_ID,
-        targetPlayerId: player.id,
-        actionContext: { targetPlayerId: player.id },
-        params: {
-          promptKey: 'ui.cards.E132_VeggieLover.prompt',
-          options: scoringOffers(maxPairs).map(offer => scoringOfferOption(CARD_ID, offer)),
-        },
-      } satisfies ActionFlow
+      if (maxScoringPairs(player) <= 0) return
+      return scoringChoice.promptLeaf(player, 'ui.cards.E132_VeggieLover.prompt')
     },
-    resolveChoice: (_state, player, choice) => {
-      const offer = scoringOffers(maxScoringPairs(player)).find(candidate => candidate.value === choice)
-      return offer ? scoringOfferFlow(CARD_ID, offer) : undefined
-    },
+    resolveChoice: scoringChoice.resolveChoice,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

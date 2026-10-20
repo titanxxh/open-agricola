@@ -192,7 +192,10 @@ describe('listener purity wave 3', () => {
       listener(E108_BlackberryFarmer_impl.listeners, 'E108-blackberry-farmer-after-fencing'),
       context(p, {
         actionId: 'fence',
-        actionEvents: [{ type: 'farm.fenceBuilt', newFenceEdges: ['a', 'b'] }] as never,
+        actionEvents: [
+          { schemaVersion: 1, type: 'farm.fenceBuilt', actorPlayerId: p.id, newFenceEdges: ['a', 'b'] },
+          { schemaVersion: 1, type: 'farm.fenceBuilt', actorPlayerId: 'other', newFenceEdges: ['c'] },
+        ] as never,
       }),
     )
     expect(leaves(result?.flow)[0]?.params?.__futureMeepleRequest).toMatchObject({ count: 2 })
