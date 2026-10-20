@@ -1,30 +1,11 @@
-import type { ActionHookRegistry } from '../../hooks'
-import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
+import type { ActionDefinition, ActionFlow } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { collectBeforePlacementFlows } from '../../../cards/card-listeners'
-import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../../domain/space'
-import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
+import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById } from '../../../domain/space'
+import { workersAvailable } from '../../../domain/player'
+import { selectWorkerForMoorAction } from '../../../moor/heating'
 import { incPlacedFarmers } from '../../../session/stats'
-import { canEnterSpace } from '../../helpers/placement-availability'
-import { isPlacementActionDoableInFlowContext } from '../../flow'
-import { getActionDefinition } from '../../action-definition-lookup'
-
-const canTargetSpace = (
-  actionHooks: ActionHookRegistry | undefined,
-  state: GameState,
-  player: PlayerState,
-  space: ActionSpace,
-  allowOccupied: boolean,
-): boolean => {
-  if (!canEnterSpace(space, player, state)) return false
-  if (isSpaceBlocked(space)) return false
-  if (!allowOccupied && isSpaceOccupied(space)) return false
-  if (!space.canBeExecutedByPlayer(state, player, { actionHooks })) return false
-  return isPlacementActionDoableInFlowContext({
-    actionHooks, state, player, space, action: space, actionId: space.id,
-    resolveAction: actionId => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
-  })
-}
+import { canPlaceWorkerOnSpace } from '../../helpers/placement-availability'
 
 export const placeFarmerOnSpaceAction: ActionDefinition = {
   id: 'place-farmer-on-space',
@@ -40,11 +21,11 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
     const allowOccupied = params?.allowOccupied === true
-    if (!canTargetSpace(actionHooks, state, player, targetSpace, allowOccupied)) {
+    if (!canPlaceWorkerOnSpace(state, player, targetSpace, { actionHooks, allowOccupied })) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
 
-    const worker = smallestAvailableWorker(state, player)
+    const worker = selectWorkerForMoorAction(state, player, targetSpace.id)
     if (!worker) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
     addWorkerRef(targetSpace, player.id, worker.id)

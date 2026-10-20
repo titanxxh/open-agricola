@@ -18,9 +18,9 @@ afterEach(() => sessions.splice(0).forEach((session) => session.dispose()))
 
 // Payment, cross-player tracking, pending, and rotation require Session tests.
 // Four players exercise this 4+ card and the seat-3 -> seat-0 neighbour wrap.
-const setup = (configure?: (state: GameState) => void) => {
+const setup = (configure?: (state: GameState) => void, options: { enableFarmersOfTheMoor?: boolean } = {}) => {
   const session = createWorkSession({
-    options: { playerCount: 4 },
+    options: { playerCount: 4, ...options },
     configure: state => {
       const owner = state.players[0]!
       owner.occupationPlayed = [CARD_ID]
@@ -55,6 +55,21 @@ const confirmNext = (session: GameSession, response: SessionResponse, next: numb
 }
 
 describe('C150 Parrot Breeder authoritative copy', () => {
+  it('under Farmers of the Moor, copies only with a healthy person and skips a lower-numbered sick one', () => {
+    const sickOnly = setup(state => { state.players[0]!.sickWorkerIds = ['1', '2'] }, { enableFarmersOfTheMoor: true })
+    expect(offered(sickOnly.getState())).toBe(false)
+
+    const session = setup(state => { state.players[0]!.sickWorkerIds = ['1'] }, { enableFarmersOfTheMoor: true })
+    expect(offered(session.getState())).toBe(true)
+    const response = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+    expect(response.state.players[0]!.sickWorkerIds).toEqual(['1'])
+    expect(findActionSpaceById(response.state, 'day-laborer')!.takenBy).toEqual([
+      { playerId: 'p4', workerId: '1' }, { playerId: 'p1', workerId: '2' },
+    ])
+  })
+
   it('pays once and places directly on the sole target, consuming the ordinary turn', () => {
     const session = setup()
     const before = session.getState()

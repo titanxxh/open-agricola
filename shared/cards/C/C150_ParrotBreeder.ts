@@ -8,12 +8,8 @@ import {
 } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
-import { evaluateWithReservedResources } from '../helpers/reserved-resources'
-import { isPlacementActionDoableInFlowContext } from '../../actions/flow'
-import { canEnterSpace } from '../../actions/helpers/placement-availability'
-import { getActionDefinition } from '../../actions/action-definition-lookup'
-import { findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../domain/space'
-import { canMoorWorkerEnterSpace } from '../../moor/heating'
+import { canPlaceWorkerOnSpace } from '../../actions/helpers/placement-availability'
+import { findActionSpaceById, isSpaceOccupied } from '../../domain/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 
@@ -111,19 +107,13 @@ const anytimeListener: CardListenerRegistration = {
     const right = readCardExtraData<string | null>(context.player, CARD_ID, RIGHT_KEY)
     if (typeof right !== 'string' || right === 'meeting-place') return
     const space = findActionSpaceById(context.state, right)
-    if (!space || !isSpaceOccupied(space) || isSpaceBlocked(space)) return
+    if (!space || !isSpaceOccupied(space)) return
     if (space.flow?.type === 'seq' && space.flow.children.every(child =>
       child.type === 'leaf' && child.actionId === 'collect',
     ) && !Object.values(space.resources).some(amount => amount > 0)) return
-    if (!canEnterSpace(space, context.player, context.state)) return
-    if (!canMoorWorkerEnterSpace(context.state, context.player, space.id)) return
-    if (!evaluateWithReservedResources(context.state, context.player, { grain: 1 }, (state, player) =>
-      isPlacementActionDoableInFlowContext({
-      actionHooks: context?.actionHooks,
-        state, player, space, action: space, actionId: space.id, sourceCard: CARD_ID,
-        resolveAction: (actionId) => findActionSpaceById(state, actionId) ?? getActionDefinition(actionId),
-      }),
-    )) return
+    if (!canPlaceWorkerOnSpace(context.state, context.player, space, {
+      actionHooks: context.actionHooks, sourceCard: CARD_ID, allowOccupied: true, reserve: { grain: 1 },
+    })) return
     return {
       flow: {
         type: 'seq',

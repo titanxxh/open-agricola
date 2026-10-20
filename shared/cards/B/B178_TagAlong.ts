@@ -1,9 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import { canEnterSpace } from '../../actions/helpers/placement-availability'
-import { workersAvailable } from '../../domain/player'
-import { isSpaceBlocked } from '../../domain/space'
+import { canPlaceWorkerOnSpace } from '../../actions/helpers/placement-availability'
 import { isResourceMarketSpaceId } from '../helpers/action-space-categories'
 import type { CardImpl } from '../registry'
 
@@ -15,10 +13,9 @@ const canFollow = (context: CardListenerContext): boolean => {
   if (!owner || !space) return false
   if (context.player.id === owner.id) return false
   if (!isResourceMarketSpaceId(space.id)) return false
-  if (workersAvailable(context.state, owner) <= 0) return false
-  if (!canEnterSpace(space, owner, context.state)) return false
-  if (isSpaceBlocked(space)) return false
-  return space.canBeExecutedByPlayer(context.state, owner, { actionHooks: context.actionHooks })
+  return canPlaceWorkerOnSpace(context.state, owner, space, {
+    actionHooks: context.actionHooks, sourceCard: CARD_ID, allowOccupied: true,
+  })
 }
 
 const listener: CardListenerRegistration = {

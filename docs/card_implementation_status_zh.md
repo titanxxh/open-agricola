@@ -78,7 +78,7 @@
 | `A113_HeresyTeacher` | OA 按牌面对全部合格 Logical Field 在底部加菜，包含 Card Field。 |
 | `A169_OffSiter` | 统计 owner 已建 major improvement 与 alsoCountsAs major 小改的 printed wood/clay/reed/stone cost（含 fee cost），总数首次达到 9+ 后锁定提供 1 extra room capacity。 |
 | `A170_Hayward` | owner 可在 fencing legal 时通过 anytime action 触发普通 fence flow，不放置工人；该实现仍保留普通 fence listener 语义。 |
-| `A171_Sidekick` | owner 在行动卡放人后，可选支付 1 food，通过 `place-farmer-on-space` 在紧邻左侧已揭示行动卡放置另一个可用工人；固定版图行动格既不能启动也不能成为连锁目标，不跳过未揭示 round slot；target doability 按预留/支付该 1 food 后的资源判断，并复用 flow child doability 覆盖目标行动的 hook/listener veto，避免付费后目标行动无可执行选项；每步目标用格完成后再激活 cascaded action-space after listener，继续向左检查，停止于无左邻、无 food、无工人、目标 occupied / blocked / 未开放 / 不可执行或 `sidekickChain` 已访问。 |
+| `A171_Sidekick` | owner 在行动卡放人后，可选支付 1 food，通过 `place-farmer-on-space` 在紧邻左侧已揭示行动卡放置另一个可用工人；固定版图行动格既不能启动也不能成为连锁目标，不跳过未揭示 round slot；准入在预留该 1 food 后使用普通放置检查清单（`canPlaceWorkerOnSpace`），覆盖目标行动的 hook/listener veto，Farmers of the Moor 下还要求健康的人，避免付费后目标行动无可执行选项；每步目标用格完成后再激活 cascaded action-space after listener，继续向左检查，停止于无左邻、无 food、无可进入的人、目标 occupied / blocked / 未开放 / 不可执行或 `sidekickChain` 已访问。 |
 | `A173_ClayThief` | round start 资源累积后若 hollow-56 有 clay 且未使用，可选标记 used / 更新 infobox，并收取 hollow-56 当前全部 clay；无 clay 或已 used 不触发。 |
 | `A174_MasterHora` | owner 在六个 5/6 灰色农夫 linked extension spaces 放人前（含 card-granted extra `place-farmer` 目标选择）可选 1 food -> 1 vegetable；共享当前步骤准入允许通过此 before 尝试；宿主随后仍不可用时等待合法 anytime 或进入 blocked，由玩家显式 undo。 |
 | `A177_Middleman` | 打出时在当前 meeple-symbol extension spaces 放置 owner-only 1 stone + 1 food 附件；owner 后续精确使用该行动格时领取并清除该格附件，linked partner 不隐式领取，非 owner 不领取也不消耗；前端仅渲染后端序列化的附件资源和 owner hover 文本。 |
@@ -92,7 +92,7 @@
 | `B173_Sweeper` | owner 使用 meeple-symbol extension space 后通过 shared stored-food cashout helper 在卡上放 1 food；一次性 anytime cashout 取走卡上 food、标记 used，职业仍计为已打出且后续不再累计。 |
 | `B175_FieldOverseer` | harvest field phase 结束时只统计其他玩家 `harvestReapSummary` 中的 grain field 数，3/4/6+ 按最高阈值给 food/grain/vegetable。 |
 | `B176_VillageIdiot` | 打出时丢弃其余职业手牌；通过 hand/played `occupation.isDoable` 与 `providesOccupation` minor 拦截保证其必须是且保持为 lone occupation，并在 opponent 使用 `meeting-place` 后给 owner 1 wood + 1 food。 |
-| `B178_TagAlong` | 对手使用 Resource Market 变体后，owner 可选通过 `place-farmer-on-space` 把可用工人放到同一 occupied action space 并执行该行动；owner 自己使用、非 Resource Market、无可用工人或目标 blocked / 不可执行时不触发。 |
+| `B178_TagAlong` | 对手使用 Resource Market 变体后，owner 可选通过 `place-farmer-on-space` 把可用工人放到同一 occupied action space 并执行该行动；owner 自己使用、非 Resource Market、无可进入的人（Farmers of the Moor 下须为健康的人）或目标 blocked / 不可执行时不触发。 |
 | `B179_WildBoarHunter` | return home 前按实际 `takenBy` 占用统计 wood accumulation spaces，3+ 且 owner 有 wood 时可选 1 wood -> 1 boar。 |
 | `C169_FastMason` | owner collect clay/stone accumulation 后，可选执行匹配材质 renovation：clay collection 只到 clay，stone collection 仅 clay house 到 stone，`exactCost` 去掉 reed。 |
 | `C170_AmateurFencer` | onBuy 时若 owner 无 pasture 且 one-space fence legal，可选执行 B2-style 免费恰好 1 格牧场 non-action fence flow。 |
