@@ -1,3 +1,4 @@
+import { createMoorSpecialActionSpace } from './special-action-space'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { planListenerOwnerGroups } from '../engine/matched-trigger'
 import type { ActivateCardActionParams } from '../engine/activation-action'
@@ -21,7 +22,6 @@ import {
 import {
   applyMoorSpecialActionEffect,
   applyMoorSpecialAction,
-  createMoorSpecialActionSpace,
   isMoorSpecialActionId,
   isMoorSpecialActionCardUsableByPlayer,
   validateMoorTerrainActionEffect,

@@ -1,3 +1,4 @@
+import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import { actionSpaceQueryContext } from './space-use-nodes'
 import { inheritPrimaryBody } from './primary-body-nodes'
 import { captureSpaceUseEvents } from './space-use-runtime'
@@ -644,7 +645,8 @@ const executeActivateCardAction = (
     triggerPlayer,
     ownerPlayer: effectPlayer,
     effectPlayer,
-    space: resolveExecutionSpace(context.state, context.space, actionContext),
+    space: params.moorAction ? createMoorSpecialActionSpace(params.moorAction.actionId)
+      : resolveExecutionSpace(context.state, context.space, actionContext),
     actionId: params.actionId,
     phase: params.phase,
     actionContext,
@@ -1079,7 +1081,8 @@ export function engineProceed(
       if (node.autoSelectSoleInitialTrigger) {
         node.autoSelectSoleInitialTrigger = false
         const applicable = evaluation.optionStates.filter(entry => entry.applicable)
-        if (applicable.length === 1 && applicable[0]!.doable) {
+        if (applicable.length === 1 && applicable[0]!.doable
+          && (node.children.length === 1 || applicable[0]!.mandatory)) {
           node.chooseCard(applicable[0]!.child.id)
           return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
         }

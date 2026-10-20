@@ -578,8 +578,10 @@ async function scanCardImplBoundaries(repoRoot: string, options: { report?: stri
     const metadata = new Map([...allMinorImprovementCards, ...allOccupationCards, ...majorCardDefinitionsList]
       .map(card => [card.id, { name: card.name, description: card.desc.join(' ') }]))
     const audit = auditCardListeners(runtimeCards, boardIds, metadata)
-    const source = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim(), fingerprint: sourceFingerprint(repoRoot) }
     const directory = path.resolve(repoRoot, values.report)
+    const excludedFiles = auditReportExcludedFiles(repoRoot, directory)
+    const source = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim(),
+      fingerprint: sourceFingerprint(repoRoot, { excludeFiles: excludedFiles }), excludedFiles }
     writeAuditReport(directory, { status: cardImplBoundaryExitCode(result) === 0 ? 'passed' : 'failed', source, ...result, ...audit }, renderCardListenerAudit(result, audit, source, repoRoot))
     console.log(`[check-card-impl-boundaries] full audit report: ${directory}`)
   }
@@ -613,6 +615,11 @@ async function scanCardImplBoundaries(repoRoot: string, options: { report?: stri
   process.exitCode = cardImplBoundaryExitCode(result, { warnOnly })
 }
 
+function auditReportExcludedFiles(repoRoot: string, directory: string): string[] {
+  return ['audit.json', 'audit.md', 'audit.json.tmp', 'audit.md.tmp'].map(file =>
+    path.relative(repoRoot, path.join(directory, file)).split(path.sep).join('/'))
+}
+
 function writeAuditReport(directory: string, report: object, markdown: string): void {
   fs.mkdirSync(directory, { recursive: true })
   for (const [file, content] of [['audit.json', JSON.stringify(report, null, 2) + '\n'], ['audit.md', markdown]] satisfies [string, string][]) {
@@ -625,7 +632,7 @@ function writeAuditReport(directory: string, report: object, markdown: string): 
 /** Report invalidation covers traversal, parsing, runtime and metadata loading failures. */
 export async function runCardImplBoundaryCheck(repoRoot: string, options: { report?: string; warnOnly?: boolean } = {}): Promise<void> {
   const directory = options.report === undefined ? undefined : path.resolve(repoRoot, options.report)
-  let source: { head?: string; fingerprint?: string } | undefined
+  let source: { head?: string; fingerprint?: string; excludedFiles?: string[] } | undefined
   if (directory) {
     // Invalidate success before any operation that can fail, including fingerprinting.
     writeAuditReport(directory, { status: 'running' }, 'Card listener audit is running.\n')
@@ -634,7 +641,8 @@ export async function runCardImplBoundaryCheck(repoRoot: string, options: { repo
     if (directory) {
       source = {}
       source.head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-      source.fingerprint = sourceFingerprint(repoRoot)
+      source.excludedFiles = auditReportExcludedFiles(repoRoot, directory)
+      source.fingerprint = sourceFingerprint(repoRoot, { excludeFiles: source.excludedFiles })
     }
     await scanCardImplBoundaries(repoRoot, options)
   } catch (error) {

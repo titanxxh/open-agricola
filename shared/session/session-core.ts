@@ -1,3 +1,4 @@
+import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
 import { commitFarmOperation } from '../domain/farm-operations'
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
@@ -189,7 +190,6 @@ import {
   type SelectionCommitPayload,
 } from './pending-command-resolution'
 import {
-  createMoorSpecialActionSpace,
   isMoorSpecialActionId,
   resetMoorSpecialActionCards,
   type MoorSpecialActionPayload,

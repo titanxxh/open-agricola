@@ -385,7 +385,7 @@ describe('Moor primary body completion', () => {
     expect(r.state.events.filter(event => event.type === 'farm.sown' && event.sourceCardId === MACHINE)).toHaveLength(1)
   })
 
-  it('directly offers the sole applicable source and retains a dormant captured source for its later state', () => {
+  it('keeps Pass for a sole optional applicable source and retains its dormant sibling', () => {
     const later = 'TEST_DormantMoorAfter'
     const session = opening(state => {
       state.players[0]!.minorPlayed = ['M058_PeatFertilizer', later]
@@ -397,7 +397,9 @@ describe('Moor primary body completion', () => {
         ? { sourceCard: later, flow: { type: 'leaf', actionId: 'gain', sourceCard: later, params: { stone: 1 } } } : undefined,
     }))
     let r = session.takeSpecialAction(0, 'moor-special-1-2-terrain', 'cut-peat', { tile: { row: 2, col: 0 } })
-    expect(r.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'M058_PeatFertilizer', request: { kind: 'choice' } })
+    expect(r.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    expect(options(r).filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual(['M058_PeatFertilizer'])
+    expect(options(r).find(option => option.value === '__pass__')?.disabled).not.toBe(true)
     expect(r.state.players[0]!.resources).toMatchObject({ grain: 1, stone: 0 })
     r = accept(session, r, 'M058_PeatFertilizer')
     r = farm(session, r, { crops: [{ row: 0, col: 1, crop: 'grain' }] })
