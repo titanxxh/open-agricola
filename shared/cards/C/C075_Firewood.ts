@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../contract/types'
-import { initCardState } from '../__stubs__/helpers'
+import { initCardState } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { getCardDefinitionById } from '../helpers/card-type'
 

@@ -1,5 +1,5 @@
 import type { CardEffect } from '../card-effects'
-import { incCounter } from './helpers'
+import { incCounter } from '../helpers/card-state'
 
 export const CARD_ID = 'Stub_AfterRoundEnd'
 

@@ -22,10 +22,9 @@ export type CardExchange = {
   triggers?: ExchangeWindow[]
   /**
    * Optional side-effect dispatched via `applyTradeSideEffect` after the
-   * exchange resources are applied. E153 StoneSculptor uses
-   * `{ type: 'bonusVp', amount: 1 }` to write
-   * `cardStates[sourceId].extraData.bonusVpEarned += amount * times` for
-   * later read by `computeBonusScore`.
+   * exchange resources are applied. `{ type: 'bonusVp', amount }` adds
+   * `amount * times` to `cardStates[sourceId].counters.bonusVp`, the same
+   * Card Bonus VP counter the `bonus-vp` leaf writes.
    */
   sideEffect?: TradeSideEffect
 }

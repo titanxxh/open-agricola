@@ -1,10 +1,8 @@
 import { defineMinorCard } from '../card-source'
 /**
- * Rule: 3-grain trade gives +1 bonus VP, 5-grain trade gives +2 bonus VP.
- * Implemented via per-trade `sideEffect: { type: 'bonusVp', amount: N }` —
- * the engine accumulates amount × times into
- * `cardStates[B032_Kettle].extraData.bonusVpEarned` and `computeBonusScore`
- * reads it for the final score (mirrors E153 StoneSculptor pattern).
+ * Rule: 3-grain trade gives +1 bonus VP, 5-grain trade gives +2 bonus VP,
+ * through per-trade `sideEffect: { type: 'bonusVp', amount: N }` on the
+ * card's `bonusVp` counter.
  */
 
 import type { CardImpl } from '../registry'
@@ -12,13 +10,6 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'B032_Kettle'
 
 const cardImpl = {
-  effect: {
-    id: CARD_ID,
-    computeBonusScore: (_state, player): number => {
-      const earned = player.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned
-      return typeof earned === 'number' ? earned : 0
-    },
-  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
@@ -51,6 +42,7 @@ export const B032_Kettle = defineMinorCard({
         },
       ],
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

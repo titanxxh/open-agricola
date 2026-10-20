@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { incCounter } from '../../shared/cards/__stubs__/helpers'
+import { incCounter } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'

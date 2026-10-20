@@ -78,9 +78,16 @@ const returnTurnToKettleOwner = (session: GameSession) => {
   return response
 }
 
-const bonusVp = (response: SessionResponse) =>
-  response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries
-    .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
+// Kettle's Card Bonus VP lives only in its bonusVp counter: one score entry that
+// matches the counter, never a second entry from a parallel store.
+const bonusVp = (response: SessionResponse) => {
+  const entries = response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries
+    .filter((entry) => 'cardId' in entry && entry.cardId === CARD_ID) ?? []
+  expect(entries.length).toBeLessThanOrEqual(1)
+  const score = entries[0]?.score ?? 0
+  expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(score)
+  return score
+}
 
 describe('B032 Kettle parity', () => {
   it('B032 S1: one grain field and one clay play Kettle and pay the clay', () => {

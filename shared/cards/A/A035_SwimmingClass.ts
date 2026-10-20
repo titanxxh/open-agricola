@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import { getReturningPersonPlacements } from '../helpers/round-placement'
 import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A035_SwimmingClass'
 
@@ -13,11 +14,7 @@ const cardImpl = {
     const newborns = newbornCount(player)
     if (newborns <= 0) return
     // 2 bonus VP per newborn
-    const vpChildren: import('../../contract/types').ActionFlow[] = Array.from(
-      { length: newborns * 2 },
-      () => ({ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID }),
-    )
-    return { type: 'seq', children: vpChildren }
+    return bonusVpLeaf(CARD_ID, newborns * 2)
   },
 },
   reaches: [] as readonly string[],

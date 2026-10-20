@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E101_Blighter'
 const SCORE_MAP = [0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]
@@ -23,14 +24,7 @@ const cardImpl = {
       const remainingTurns = Math.max(0, 14 - state.round)
       const bonusVp = SCORE_MAP[remainingTurns] ?? 5
       if (bonusVp <= 0) return
-      return {
-        type: 'seq',
-        children: Array.from({ length: bonusVp }, () => ({
-          type: 'leaf' as const,
-          actionId: 'bonus-vp',
-          sourceCard: CARD_ID,
-        })),
-      }
+      return bonusVpLeaf(CARD_ID, bonusVp)
     },
   },
   listeners: [isDoableListener],

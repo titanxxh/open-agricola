@@ -10,7 +10,7 @@ import { getOwnOrdinaryFenceReserveCount } from '../domain/supply-tokens'
 import { parsePositionKey } from '../domain/farm'
 import { registerSelectionEffect } from './helpers/selection-effect-registry'
 import { evaluateRuleAmount } from './rule-queries'
-import { gainLeaf, payLeaf } from '../cards/helpers/pay-gain-node'
+import { bonusVpLeaf, gainLeaf, payLeaf } from '../cards/helpers/pay-gain-node'
 import { renovateHouseAction } from './effects/renovation'
 import { isActionDoableInFlowContext } from './flow'
 import { getActionDefinition } from './action-definition-lookup'
@@ -60,7 +60,7 @@ const exchange = (cardId: string, operation: Extract<RuleFixedOperation, { kind:
   type: 'seq', children: [
     payLeaf({ cardId, cost: Object.fromEntries(Object.entries(operation.cost).map(([resource, amount]) => [resource, amount * count])) }),
     ...(Object.keys(operation.gain).length ? [gainLeaf(cardId, Object.fromEntries(Object.entries(operation.gain).map(([resource, amount]) => [resource, amount * count])))] : []),
-    ...Array.from({ length: operation.bonusVp * count }, (): ActionFlow => ({ type: 'leaf', actionId: 'bonus-vp', sourceCard: cardId })),
+    ...(operation.bonusVp * count > 0 ? [bonusVpLeaf(cardId, operation.bonusVp * count)] : []),
   ],
 })
 

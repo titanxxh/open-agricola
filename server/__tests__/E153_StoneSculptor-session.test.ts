@@ -2,7 +2,6 @@ import { enterFeeding } from './_helpers/harvest-feeding'
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { FeedSelection } from '../../shared/session/session-core'
@@ -84,32 +83,30 @@ describe('E153_StoneSculptor exchange metadata', () => {
     expect(anytime.find((t) => t.sourceId === CARD_ID)).toBeUndefined()
   })
 
-  it('computeBonusScore reads cardStates.bonusVpEarned', () => {
+  it('scores the bonusVp counter once as Card Bonus VP', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     player.cardStates = {
-      [CARD_ID]: { extraData: { bonusVpEarned: 4 } },
+      [CARD_ID]: { counters: { bonusVp: 4 } },
     }
-    session.loadState(state)
-    const eff = session.withCtx(() => getCardEffect(CARD_ID))
-    expect(eff?.computeBonusScore).toBeDefined()
-    const score = session.withCtx(() => eff!.computeBonusScore!(state, player, {} as never))
-    expect(score).toBe(4)
+    const response = session.loadState(state)
+    const entries = response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries
+      .filter((entry) => 'cardId' in entry && entry.cardId === CARD_ID)
+    expect(entries?.map((entry) => entry.score)).toEqual([4])
   })
 
-  it('computeBonusScore returns 0 when no usage recorded', () => {
+  it('scores nothing when no exchange was recorded', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-    session.loadState(state)
-    const eff = session.withCtx(() => getCardEffect(CARD_ID))!
-    const score = session.withCtx(() => eff.computeBonusScore!(state, player, {} as never))
-    expect(score).toBe(0)
+    state.players[0]!.occupationPlayed.push(CARD_ID)
+    const response = session.loadState(state)
+    const entries = response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries
+      .filter((entry) => 'cardId' in entry && entry.cardId === CARD_ID)
+    expect(entries ?? []).toEqual([])
   })
 })
 
@@ -137,7 +134,7 @@ describe('E153_StoneSculptor harvest integration', () => {
 
     const finalP1 = resp.state.players[0]!
     expect(finalP1.resources.stone).toBe(0)
-    expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBe(1)
+    expect(finalP1.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
   })
 
   it('rejects a count above max without mutating the feeding draft, then accepts count=1', () => {
@@ -179,7 +176,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     const finalP1 = resp.state.players[0]!
     expect(resp.ok).toBe(true)
     expect(finalP1.resources.stone).toBe(4)
-    expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBe(1)
+    expect(finalP1.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
   })
 
   it('two harvests accumulate bonusVp', () => {
@@ -196,7 +193,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     let resp = drainHarvest(session, {
       0: [{ count: 1, sourceId: CARD_ID, exchangeIndex: 0 }],
     })
-    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBe(1)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
 
     // Now jump to round 7 (next harvest) by manipulating state and re-driving.
     const s2 = resp.state
@@ -214,7 +211,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     resp = drainHarvest(session, {
       0: [{ count: 1, sourceId: CARD_ID, exchangeIndex: 0 }],
     })
-    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBe(2)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(2)
   })
 
   it('player without E153: harvest exchange not exposed', () => {
@@ -257,7 +254,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     resp = session.resolveChoice(0, 'confirm', { selections: [] })
     const finalP1 = resp.state.players[0]!
     expect(resp.ok).toBe(true)
-    expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBeUndefined()
+    expect(finalP1.cardStates?.[CARD_ID]?.counters?.bonusVp).toBeUndefined()
   })
 })
 

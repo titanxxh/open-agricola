@@ -1,5 +1,5 @@
 import type { ActionDefinition } from '../../../contract/types'
-import { incCounter } from '../../../cards/__stubs__/helpers'
+import { incCounter } from '../../../cards/helpers/card-state'
 
 export const consumeCardCounterAction: ActionDefinition = {
   id: 'consume-card-counter', nameKey: 'actions.special-effect.name', descriptionKey: 'actions.special-effect.description',

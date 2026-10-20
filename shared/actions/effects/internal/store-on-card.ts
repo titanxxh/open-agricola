@@ -1,5 +1,5 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
-import { initCardState } from '../../../cards/__stubs__/helpers'
+import { initCardState } from '../../../cards/helpers/card-state'
 
 export const storeOnCardAction: ActionDefinition = {
   id: 'store-on-card',

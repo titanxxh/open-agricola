@@ -1,5 +1,5 @@
 import type { Resource, PlayerState } from '../../contract/types'
-import { initCardState } from '../__stubs__/helpers'
+import { initCardState } from './card-state'
 
 export const setStoredResource = (
   player: PlayerState,
