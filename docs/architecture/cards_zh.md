@@ -66,7 +66,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - `pay-gain-node.ts`：先付后得、付后追加行动、退回后获得的模板。
 - `stage-effects.ts`：阶段效果标记，以及经现有兑换执行器的每卡一次可选收获兑换。
 - `card-state.ts`、`round-placement.ts`：一次性状态、原始 Work Placement Chronology 与人员放置序号（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
-- `action-snapshot.ts`：活动 Turn Scope 身份与起点快照（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
+- `turn-token.ts`：活动 Turn Scope 身份与卡牌的“本 Turn 已用”记录；`action-snapshot.ts`：Turn 起点快照（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
 - `card-held-workers.ts`、`card-field.ts`：卡上工人（[cardStates 中的局部状态](#cardstates-中的局部状态)）与 Card Field（[Card Field 与 Logical Field seam](#card-field-与-logical-field-seam)）。
 
 ## Card Field 与 Logical Field seam

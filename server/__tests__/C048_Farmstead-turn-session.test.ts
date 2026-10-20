@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
-import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot-state'
 import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import type { GameState } from '../../shared/contract/types'
+import { readTurnScopeToken } from '../../shared/cards/helpers/turn-token'
 
 const CARD = 'C048_Farmstead'
 const STOCK = 'B094_StockProtector'
@@ -133,7 +133,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.state.players[0]!.resources.food).toBe(3)
     const receipt = response.state.players[0]!.cardStates[CARD]?.extraData
     expect(receipt?.rewardedTurnToken).toBe(receipt?.qualifiedTurnToken)
-    expect(readActionSnapshotToken(response.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(response.state.players[0]!)).toBeUndefined()
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
   })
 
@@ -277,7 +277,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     })
     let response = qualifiedEndWindow(session)
     const originalOptions = options(response).map(option => option.value)
-    const originalTurn = readActionSnapshotToken(response.state.players[0]!)
+    const originalTurn = readTurnScopeToken(response.state.players[0]!)
     response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 19 })
@@ -309,7 +309,7 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ food: 2, wood: 20 })
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.qualifiedTurnToken).toBeUndefined()
     response = qualifiedEndWindow(session)
-    const redoneTurn = readActionSnapshotToken(response.state.players[0]!)
+    const redoneTurn = readTurnScopeToken(response.state.players[0]!)
     response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
     response = choose(session, response, CARD)
     response = choose(session, response, 'B027_Toolbox')
@@ -395,14 +395,14 @@ describe('C048 Farmstead at the true Turn end', () => {
     expect(response.ok, response.error).toBe(true)
     expect(options(response).map(option => option.value)).toContain(CARD)
     expect(response.state.players[0]!.resources.food).toBe(4)
-    expect(readActionSnapshotToken(response.state.players[0]!)).not.toBe(firstToken)
+    expect(readTurnScopeToken(response.state.players[0]!)).not.toBe(firstToken)
     response = choose(session, response, CARD)
     expect(options(response).map(option => option.value)).toEqual(expect.arrayContaining([CARD, 'E093_Motivator']))
     response = choose(session, response, 'E093_Motivator')
     response = choose(session, response, CARD)
     expect(response.state.players[0]!.resources.food).toBe(5)
     expect(response.state.players[0]!.cardStates[CARD]?.extraData?.rewardedTurnToken).not.toBe(firstToken)
-    expect(readActionSnapshotToken(response.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(response.state.players[0]!)).toBeUndefined()
   })
 
 

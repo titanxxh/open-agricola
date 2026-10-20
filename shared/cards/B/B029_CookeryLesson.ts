@@ -1,86 +1,31 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { readActionSnapshotToken } from '../helpers/action-snapshot'
+import { writeCardExtraData } from '../helpers/card-state'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import { getPlayerCookeryCards } from '../helpers/cookery'
 import { hasExchangeGained } from '../helpers/event-provenance'
 import { isAnimalKey } from '../../domain/animal-holder-state'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { isUsedThisTurn, markUsedThisTurnLeaf, readTurnScopeToken, USED_THIS_TURN_KEY } from '../helpers/turn-token'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B029_CookeryLesson'
-const USED_ACTION_TOKEN_KEY = 'usedActionToken'
-
-const COOKED_TOKEN_KEY = 'cookedActionToken'
-
-const LESSONS_TOKEN_KEY = 'lessonsActionToken'
+const COOKED_TURN_KEY = 'cookedTurnToken'
+const LESSONS_TURN_KEY = 'lessonsTurnToken'
 
 /**
- * B29 Cookery Lesson:
- * Each time you use a Lessons action space and a cooking improvement on the
- * SAME TURN (one takeAction), you get 1 bonus VP.
- *
- * Rule: 'on the same turn' = within one takeAction (one farmer placement and
- * its triggered effects), not 'within the same round'. Tracking is per-action
- * via the action snapshot token.
- *
- * - cookedActionToken: written on after-exchange (cooking)
- * - lessonsActionToken: written on after-placeFarmer (Lessons spaces)
- *
- * VP awarded when both tokens equal the current actionToken in the same
- * triggering listener call. USED_ACTION_TOKEN_KEY guards against double-award
- * within the same action (the two listeners can both detect the match).
- *
- * onBeforeStartOfTurn resets all three tokens defensively (action tokens normally
- * monotonically increase across the game so this is mostly cosmetic).
+ * B29 Cookery Lesson: using a Lessons action space and a cooking improvement
+ * in the same Turn awards 1 bonus VP. Each listener records its half of the
+ * pair for the current Turn Scope; whichever half completes the pair awards
+ * the point, and the card's own once-per-Turn record keeps it to one point.
  */
 
-const currentActionToken = (player: PlayerState) =>
-  readActionSnapshotToken(player)
-
-const tokenMatchesCurrent = (
-  player: PlayerState,
-  storedKey: string,
-): boolean => {
-  const cur = currentActionToken(player)
-  if (cur === undefined) return false
-  const stored = readCardExtraData<number>(player, CARD_ID, storedKey)
-  return stored === cur
-}
-
-const currentTokenLeaf = (player: PlayerState, storedKey: string): ActionFlow | undefined => {
-  const cur = currentActionToken(player)
-  if (cur === undefined) return
-  return {
-    type: 'leaf',
-    actionId: 'special-effect',
-    sourceCard: CARD_ID,
-    params: { kind: 'set-extra-data', key: storedKey, value: cur },
-  }
-}
-
 const awardBonusVp = (player: PlayerState): ActionFlow | undefined => {
-  const actionToken = currentActionToken(player)
-  if (actionToken === undefined) return
-  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
-  return {
-    type: 'seq',
-    children: [
-      {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
-      },
-      {
-        type: 'leaf',
-        actionId: 'bonus-vp',
-        sourceCard: CARD_ID,
-      },
-    ],
-  }
+  if (isUsedThisTurn(player, CARD_ID)) return
+  const mark = markUsedThisTurnLeaf(player, CARD_ID)
+  return mark && { type: 'seq', children: [mark, bonusVpLeaf(CARD_ID)] }
 }
 
 const usedCookery = (context: CardListenerContext): boolean => {
@@ -99,9 +44,9 @@ const afterExchangeListener: CardListenerRegistration = {
   actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!usedCookery(context)) return
-    const stamp = currentTokenLeaf(context.player, COOKED_TOKEN_KEY)
+    const stamp = markUsedThisTurnLeaf(context.player, CARD_ID, COOKED_TURN_KEY)
     if (!stamp) return
-    const award = tokenMatchesCurrent(context.player, LESSONS_TOKEN_KEY)
+    const award = isUsedThisTurn(context.player, CARD_ID, LESSONS_TURN_KEY)
       ? awardBonusVp(context.player)
       : undefined
     return {
@@ -118,9 +63,9 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isLessonsSpaceId(context.space?.id)) return
-    const stamp = currentTokenLeaf(context.player, LESSONS_TOKEN_KEY)
+    const stamp = markUsedThisTurnLeaf(context.player, CARD_ID, LESSONS_TURN_KEY)
     if (!stamp) return
-    const award = tokenMatchesCurrent(context.player, COOKED_TOKEN_KEY)
+    const award = isUsedThisTurn(context.player, CARD_ID, COOKED_TURN_KEY)
       ? awardBonusVp(context.player)
       : undefined
     return {
@@ -134,27 +79,13 @@ const cardImpl = {
   listeners: [afterExchangeListener, afterPlaceFarmerListener],
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: () => ({ type: 'seq', children:
-    [COOKED_TOKEN_KEY, LESSONS_TOKEN_KEY, USED_ACTION_TOKEN_KEY].map(key => ({
-      type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID,
-      params: { kind: 'set-extra-data', key, value: -1 },
-    })),
-  }),
   onBuy: (_state, player) => {
-    // onBuy fires within an exchange/lessons triggering action. If both tokens
-    // already match the current action, award VP now.
-    const cur = readActionSnapshotToken(player)
-    if (cur === undefined) return
-    const cookedMatches = readCardExtraData<number>(player, CARD_ID, COOKED_TOKEN_KEY) === cur
-    const lessonsMatches = readCardExtraData<number>(player, CARD_ID, LESSONS_TOKEN_KEY) === cur
-    if (!cookedMatches || !lessonsMatches) return
-    if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === cur) return
-    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, cur)
-    return {
-      type: 'leaf',
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    }
+    // Bought in the same Turn after both halves were recorded.
+    const token = readTurnScopeToken(player)
+    if (token === undefined || isUsedThisTurn(player, CARD_ID)) return
+    if (!isUsedThisTurn(player, CARD_ID, COOKED_TURN_KEY) || !isUsedThisTurn(player, CARD_ID, LESSONS_TURN_KEY)) return
+    writeCardExtraData(player, CARD_ID, USED_THIS_TURN_KEY, token)
+    return bonusVpLeaf(CARD_ID)
   },
 },
   reaches: [] as readonly string[],

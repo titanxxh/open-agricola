@@ -4,14 +4,13 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import {
   getStableTilesBuiltThisAction,
-  readActionSnapshotToken,
 } from '../helpers/action-snapshot'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { isUsedThisTurn, markUsedThisTurnLeaf, readTurnScopeToken, USED_THIS_TURN_KEY } from '../helpers/turn-token'
 
 const CARD_ID = 'D166_StableMilker'
-const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 /**
  * D166 Stable Milker
@@ -27,20 +26,14 @@ const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 const tryGainCattle = (
   player: CardListenerContext['player'],
 ): ActionFlow | undefined => {
-  const actionToken = readActionSnapshotToken(player)
-  if (actionToken === undefined) return
-  if (getStableTilesBuiltThisAction(player) < 2) return
-  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+  if (getStableTilesBuiltThisAction(player) < 2 || isUsedThisTurn(player, CARD_ID)) return
+  const mark = markUsedThisTurnLeaf(player, CARD_ID)
+  if (!mark) return
 
   return {
     type: 'seq',
     children: [
-      {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
-      },
+      mark,
       gainLeaf(CARD_ID, { cattle: 1 }),
     ],
   }
@@ -62,11 +55,9 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const actionToken = readActionSnapshotToken(player)
-    if (actionToken === undefined) return
-    if (getStableTilesBuiltThisAction(player) < 2) return
-    if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
-    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
+    const token = readTurnScopeToken(player)
+    if (token === undefined || getStableTilesBuiltThisAction(player) < 2 || isUsedThisTurn(player, CARD_ID)) return
+    writeCardExtraData(player, CARD_ID, USED_THIS_TURN_KEY, token)
     return gainLeaf(CARD_ID, { cattle: 1 })
   },
 },

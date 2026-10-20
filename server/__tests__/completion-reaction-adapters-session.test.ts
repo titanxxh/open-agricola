@@ -3,8 +3,8 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNext, getChoiceOptions } from './_helpers/session-assertions'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot-state'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { readTurnScopeToken } from '../../shared/cards/helpers/turn-token'
 
 const FRESH = 'A097_Freshman'
 const BUYER = 'D161_CabbageBuyer'
@@ -64,7 +64,7 @@ describe('completion reactions use turn identity and primary receipts', () => {
     sessions.push(session)
     endBake(session)
     let r = source(session, session.takeAction(0, 'grain-utilization'), FRESH)
-    const firstToken = readActionSnapshotToken(r.state.players[0]!)
+    const firstToken = readTurnScopeToken(r.state.players[0]!)
     expect(firstToken).toEqual(expect.any(Number))
     expect(r.state.players[0]!.cardStates[FRESH]?.extraData?.usedTurnToken).toBe(firstToken)
     session = restore(session)

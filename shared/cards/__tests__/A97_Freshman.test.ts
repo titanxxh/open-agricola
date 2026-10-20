@@ -89,6 +89,7 @@ describe('A097_Freshman', () => {
     const listener = findListener('A97-freshman-replace-bake')
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
+    player.cardStates = { __actionSnapshot__: { extraData: { token: 7 } } }
 
     const result = executeCardListener(listener!, {
       actionHooks,
@@ -104,7 +105,7 @@ describe('A097_Freshman', () => {
       type: 'seq',
       promptKey: 'ui.interactionFreshmanOccupation',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A097_Freshman', params: { kind: 'set-extra-data', key: 'usedTurnToken', value: undefined } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A097_Freshman', params: { kind: 'set-extra-data', key: 'usedTurnToken', value: 7 } },
         {
           type: 'leaf',
           actionId: 'occupation',

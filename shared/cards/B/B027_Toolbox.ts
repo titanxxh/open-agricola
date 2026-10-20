@@ -9,12 +9,12 @@ import {
   getRoomsBuiltThisAction,
   getStableTilesBuiltThisAction,
   getFencesBuiltThisAction,
-  readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { hasOrdinaryFenceBuiltEvent } from '../helpers/fence-events'
 import { createEventQuery } from '../../events/query'
 import { readAnytimeTurn } from '../../engine/action-context-flags'
 import type { CardImpl } from '../registry'
+import { readTurnScopeToken } from '../helpers/turn-token'
 
 const CARD_ID = 'B027_Toolbox'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
@@ -27,7 +27,7 @@ const setFlagHandler = (context: CardListenerContext): ActionHookResult | void =
   const affiliation = readAnytimeTurn(context.actionContext)
   const turnToken = affiliation
     ? ('token' in affiliation ? affiliation.token : undefined)
-    : readActionSnapshotToken(context.player)
+    : readTurnScopeToken(context.player)
   if (
     turnToken !== undefined &&
     readCardExtraData<number>(context.player, CARD_ID, WINDOW_OFFERED_TURN_TOKEN_KEY) === turnToken

@@ -6,29 +6,22 @@ import type { GameState, PlayerState } from '../../contract/types'
 import { futureMeeplesNode, queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import {
   getStableTilesBuiltThisAction,
-  readActionSnapshotToken,
 } from '../helpers/action-snapshot'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { isUsedThisTurn, markUsedThisTurnLeaf, readTurnScopeToken, USED_THIS_TURN_KEY } from '../helpers/turn-token'
 
 const CARD_ID = 'A043_FarmyardManure'
-const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 const queueFoodNextThree = (state: GameState, player: PlayerState) => {
-  const actionToken = readActionSnapshotToken(player)
-  if (actionToken === undefined) return
-  if (getStableTilesBuiltThisAction(player) < 1) return
-  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+  if (getStableTilesBuiltThisAction(player) < 1 || isUsedThisTurn(player, CARD_ID)) return
+  const mark = markUsedThisTurnLeaf(player, CARD_ID)
+  if (!mark) return
 
   return {
     type: 'seq' as const,
     children: [
-      {
-        type: 'leaf' as const,
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
-      },
+      mark,
       futureMeeplesNode({
         cardId: CARD_ID,
         playerId: player.id,
@@ -41,11 +34,9 @@ const queueFoodNextThree = (state: GameState, player: PlayerState) => {
 }
 
 const queueFoodNextThreeOnBuy = (state: GameState, player: PlayerState) => {
-  const actionToken = readActionSnapshotToken(player)
-  if (actionToken === undefined) return
-  if (getStableTilesBuiltThisAction(player) < 1) return
-  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
-  writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
+  const token = readTurnScopeToken(player)
+  if (token === undefined || getStableTilesBuiltThisAction(player) < 1 || isUsedThisTurn(player, CARD_ID)) return
+  writeCardExtraData(player, CARD_ID, USED_THIS_TURN_KEY, token)
   return queueFutureMeeplesFlow(state, {
     cardId: CARD_ID,
     playerId: player.id,

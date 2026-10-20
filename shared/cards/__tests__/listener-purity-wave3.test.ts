@@ -203,7 +203,7 @@ describe('listener purity wave 3', () => {
     [A074_StableTree_impl.listeners, 'A74-stable-tree-after-stables', 1, 0, 'wood'],
     [A167_BreederBuyer_impl.listeners, 'A167-breeder-buyer-after-construct', 1, 1, 'sheep'],
     [D166_StableMilker_impl.listeners, 'D166-stable-milker-after-stables', 2, 0, 'cattle'],
-  ])('%s writes its action token through a leaf before the reward', (registrations, id, stableCount, roomCount, reward) => {
+  ])('%s writes its Turn token through a leaf before the reward', (registrations, id, stableCount, roomCount, reward) => {
     const p = player({
       stableTiles: Array.from({ length: stableCount }, (_, col) => ({ row: 0, col })),
       roomTiles: Array.from({ length: roomCount }, (_, col) => ({ row: 1, col })),
@@ -213,7 +213,7 @@ describe('listener purity wave 3', () => {
     const resultLeaves = leaves(result?.flow)
     expect(resultLeaves[0]).toMatchObject({
       actionId: 'special-effect',
-      params: { kind: 'set-extra-data', key: 'usedActionToken', value: 9 },
+      params: { kind: 'set-extra-data', key: 'usedTurnToken', value: 9 },
     })
     expect(JSON.stringify(resultLeaves.slice(1))).toContain(reward)
   })

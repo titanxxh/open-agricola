@@ -31,7 +31,7 @@ const OCCUPATION_ID = 'A123_FrameBuilder'
 const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
   ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
 
-const setActionToken = (ruleOwner: SessionRuleOwner, player: PlayerState, token: number) => {
+const setTurnToken = (ruleOwner: SessionRuleOwner, player: PlayerState, token: number) => {
   const lookupRule1 = () => recordActionSnapshot(player, token)
   ruleOwner.withCtx(lookupRule1)
 }
@@ -164,7 +164,7 @@ describe('B029_CookeryLesson — real Lessons exchange flow', () => {
   })
 })
 
-describe('B029_CookeryLesson — per-action token tracking, not per-round', () => {
+describe('B029_CookeryLesson — per-Turn token tracking, not per-round', () => {
   const setup = () => {
     const session = new GameSession(42)
     const state = session.getState().state
@@ -175,7 +175,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     return { session, state, player }
   }
 
-  it('lessons placement first, then cook in same action → 1 VP awarded on cook', () => {
+  it('lessons placement first, then cook in the same Turn → 1 VP awarded on cook', () => {
 
 
     const { session: ruleSession, state, player } = setup()
@@ -183,7 +183,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
     expect(exchangeListener).toBeDefined()
     expect(placeListener).toBeDefined()
-    setActionToken(ruleSession, player, 100)
+    setTurnToken(ruleSession, player, 100)
 
     // 1) Place farmer on lessons → no VP yet (no cook stamp)
     let result = invokeListener(ruleSession, placeListener!, {
@@ -195,9 +195,9 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       result: { type: 'ok' },
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
-    expect(readCardExtraData<number>(player, CARD_ID, 'lessonsActionToken')).toBe(100)
+    expect(readCardExtraData<number>(player, CARD_ID, 'lessonsTurnToken')).toBe(100)
 
-    // 2) anytime-exchange (cook) in same action → VP
+    // 2) anytime-exchange (cook) in the same Turn → VP
     result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
@@ -211,13 +211,13 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
   })
 
-  it('cook first, then lessons in same action → 1 VP awarded on lessons', () => {
+  it('cook first, then lessons in the same Turn → 1 VP awarded on lessons', () => {
 
 
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
-    setActionToken(ruleSession, player, 200)
+    setTurnToken(ruleSession, player, 200)
 
     let result = invokeListener(ruleSession, exchangeListener!, {
       state,
@@ -241,13 +241,13 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
   })
 
-  it('cook first, then lessons-3 in same action → 1 VP awarded on lessons', () => {
+  it('cook first, then lessons-3 in the same Turn → 1 VP awarded on lessons', () => {
 
 
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
-    setActionToken(ruleSession, player, 201)
+    setTurnToken(ruleSession, player, 201)
 
     let result = invokeListener(ruleSession, exchangeListener!, {
       state,
@@ -271,14 +271,14 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
   })
 
-  it('cook in action 100, lessons in action 101 → NO VP (per-action gating)', () => {
+  it('cook in Turn 100, lessons in Turn 101 → NO VP (per-Turn gating)', () => {
 
 
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
 
-    setActionToken(ruleSession, player, 100)
+    setTurnToken(ruleSession, player, 100)
     invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
@@ -290,7 +290,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
 
     // Action token advances → next farmer placement
-    setActionToken(ruleSession, player, 101)
+    setTurnToken(ruleSession, player, 101)
     const result = invokeListener(ruleSession, placeListener!, {
       state,
       player,
@@ -307,7 +307,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
 
     const { session: ruleSession, state, player } = setup()
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
-    setActionToken(ruleSession, player, 300)
+    setTurnToken(ruleSession, player, 300)
 
     const result = invokeListener(ruleSession, placeListener!, {
       state,
@@ -324,7 +324,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
 
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
-    setActionToken(ruleSession, player, 400)
+    setTurnToken(ruleSession, player, 400)
 
     const result = invokeListener(ruleSession, exchangeListener!, {
       state,
@@ -338,13 +338,13 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
   })
 
-  it('multiple cook calls in same action with lessons stamped → only 1 VP (USED_ACTION_TOKEN dedup)', () => {
+  it('multiple cook calls in the same Turn with lessons stamped → only 1 VP (once-per-Turn dedup)', () => {
 
 
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
-    setActionToken(ruleSession, player, 500)
+    setTurnToken(ruleSession, player, 500)
 
     // First lessons placement (no VP yet)
     invokeListener(ruleSession, placeListener!, {
@@ -356,7 +356,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       result: { type: 'ok' },
     } as CardListenerContext)
 
-    // First cook → VP awarded, USED_ACTION_TOKEN_KEY = 500
+    // First cook → VP awarded, usedTurnToken = 500
     let result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
@@ -368,7 +368,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
 
-    // Second cook in same action → no VP (already used this action)
+    // Second cook in the same Turn → no VP (already used this Turn)
     result = invokeListener(ruleSession, exchangeListener!, {
       state,
       player,
@@ -385,7 +385,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
 
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
-    setActionToken(ruleSession, player, 550)
+    setTurnToken(ruleSession, player, 550)
 
     const result = invokeListener(ruleSession, exchangeListener!, {
       state,
@@ -397,7 +397,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
 
     expect(result).toBeUndefined()
-    expect(readCardExtraData<number>(player, CARD_ID, 'cookedActionToken')).toBeUndefined()
+    expect(readCardExtraData<number>(player, CARD_ID, 'cookedTurnToken')).toBeUndefined()
   })
 
   it('does not stamp cooking for animal-to-food from a non-cookery source', () => {
@@ -405,7 +405,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const { session: ruleSession, state, player } = setup()
     const exchangeListener = findListener(ruleSession, 'B29-cookery-lesson-after-exchange')
     player.minorPlayed.push('B032_Kettle')
-    setActionToken(ruleSession, player, 551)
+    setTurnToken(ruleSession, player, 551)
 
     const result = invokeListener(ruleSession, exchangeListener!, {
       state,
@@ -417,15 +417,15 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
 
     expect(result).toBeUndefined()
-    expect(readCardExtraData<number>(player, CARD_ID, 'cookedActionToken')).toBeUndefined()
+    expect(readCardExtraData<number>(player, CARD_ID, 'cookedTurnToken')).toBeUndefined()
   })
 
-  it('non-lessons place-farmer does not stamp lessonsActionToken', () => {
+  it('non-lessons place-farmer does not stamp lessonsTurnToken', () => {
 
     const { session: ruleSession, state, player } = setup()
     const placeListener = findListener(ruleSession, 'B29-cookery-lesson-after-place-farmer')
-    setActionToken(ruleSession, player, 600)
-    writeCardExtraData(player, CARD_ID, 'lessonsActionToken', -1)
+    setTurnToken(ruleSession, player, 600)
+    writeCardExtraData(player, CARD_ID, 'lessonsTurnToken', -1)
 
     const result = invokeListener(ruleSession, placeListener!, {
       state,
@@ -436,7 +436,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       result: { type: 'ok' },
     } as CardListenerContext)
     expect(result).toBeUndefined()
-    expect(readCardExtraData<number>(player, CARD_ID, 'lessonsActionToken')).toBe(-1)
+    expect(readCardExtraData<number>(player, CARD_ID, 'lessonsTurnToken')).toBe(-1)
   })
 })
 

@@ -3,12 +3,12 @@ import {
   beginTurnScope,
   endTurnScope,
   recordActionSnapshot,
-  readActionSnapshotToken,
   getRoomsBuiltThisAction,
   getStableTilesBuiltThisAction,
   getFencesBuiltThisAction,
 } from '../action-snapshot'
 import type { PlayerState } from '../../../contract/types'
+import { readTurnScopeToken } from '../turn-token'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1',
@@ -49,7 +49,7 @@ describe('action-snapshot', () => {
 
     recordActionSnapshot(player, 7)
 
-    expect(readActionSnapshotToken(player)).toBe(7)
+    expect(readTurnScopeToken(player)).toBe(7)
     expect(player.cardStates['__actionSnapshot__']!.extraData).toMatchObject({
       token: 7,
       stableTiles: 1,
@@ -119,7 +119,7 @@ describe('action-snapshot', () => {
     const player = makePlayer()
     expect(recordActionSnapshot(player, 7)).toBe(7)
     endTurnScope(player)
-    expect(readActionSnapshotToken(player)).toBeUndefined()
+    expect(readTurnScopeToken(player)).toBeUndefined()
     expect(beginTurnScope(player)).toBe(8)
     endTurnScope(player)
     expect(recordActionSnapshot(player, 1)).toBe(9)

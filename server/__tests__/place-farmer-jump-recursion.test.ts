@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
 import { getRoundPlacementDetails } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/A/A130_MummysBoy'
@@ -11,6 +10,7 @@ import '../../shared/cards/D/D075_WoodField'
 import '../../shared/cards/E/E003_TeaTime'
 import '../../shared/cards/E/E116_FirCutter'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { readTurnScopeToken } from '../../shared/cards/helpers/turn-token'
 
 const setup2P = (cardId: string) => {
   const session = new GameSession(42)
@@ -105,7 +105,7 @@ describe('A→A self-jump recursion guard', () => {
   it('A129 listener fires at most once per farmer placement chain (farm-expansion → grain-seeds)', () => {
     const { session, state } = setup2P('A129_Swagman')
     const player = state.players[0]!
-    expect(readActionSnapshotToken(player)).toBeUndefined()
+    expect(readTurnScopeToken(player)).toBeUndefined()
     const placedBefore = player.stats?.placedFarmers ?? 0
 
     let resp = session.takeAction(0, 'farm-expansion')
@@ -140,7 +140,7 @@ describe('A→A self-jump recursion guard', () => {
     expect(farmExpansion.takenBy).toEqual([])
     expect(grainSeeds.takenBy.length).toBe(1)
 
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+    expect(readTurnScopeToken(resp.state.players[0]!)).toBeUndefined()
 
     // placedFarmers +2: one for the entry placement, one for the jump.
     expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 2)

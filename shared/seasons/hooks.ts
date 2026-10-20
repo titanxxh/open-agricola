@@ -3,10 +3,10 @@ import { stablesAction } from '../actions/effects/stables'
 import { PaymentSolver } from '../actions/payment'
 import {
   readActionSnapshotExtraData,
-  readActionSnapshotToken,
   writeActionSnapshotExtraData,
 } from '../cards/helpers/action-snapshot'
 import { isThroughTheSeasonsSeason } from './rules'
+import { readTurnScopeToken } from '../cards/helpers/turn-token'
 
 const SUMMER_DAY_LABORER_USED_KEY = 'throughTheSeasonsSummerDayLaborerUsed'
 
@@ -50,7 +50,7 @@ export const registerThroughTheSeasonsHooks = (actionHooks: ActionHookRegistry):
     handler: (context) => {
       if (!isThroughTheSeasonsSeason(context.state, 'summer')) return
       if (context.space.id !== 'day-laborer') return
-      const actionToken = readActionSnapshotToken(context.player)
+      const actionToken = readTurnScopeToken(context.player)
       if (actionToken !== undefined) {
         if (readActionSnapshotExtraData<boolean>(context.player, SUMMER_DAY_LABORER_USED_KEY)) return
         writeActionSnapshotExtraData(context.player, SUMMER_DAY_LABORER_USED_KEY, true)
