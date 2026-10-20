@@ -130,6 +130,71 @@ describe('atomic terrain operations', () => {
     expect(response.state.events.filter(event => event.type === 'farm.terrainChanged')).toHaveLength(1)
   })
 
+  it('M059 sows the new field from an ordinary M015 purchase without a Moor lifecycle', () => {
+    const session = createWorkSession({ seed: 1293, options: { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 8
+      const player = state.players[0]!
+      player.minorPlayed = ['M059_NaturesFertilizer']
+      player.minorHand = ['M015_PeatBurnOff']
+      player.cardStates = {}
+      player.fields = [{ row: 0, col: 1, stacks: [] }]
+      player.farmTerrain = [{ row: 0, col: 2, kind: 'moor' }]
+      Object.assign(player.resources, { grain: 1, fuel: 0 })
+    } })
+    sessions.push(session)
+    let response = session.takeAction(0, 'major-improvement')
+    for (let step = 0; step < 4 && response.interaction.sourceCard !== 'M015_PeatBurnOff'; step++) {
+      const purchase = options(response).find(option => option.value === 'M015_PeatBurnOff' || option.value.startsWith('action-improvement-'))
+      expect(purchase, JSON.stringify(response.interaction)).toBeDefined()
+      response = choose(session, response, purchase!.value)
+    }
+    expect(response.interaction.sourceCard).toBe('M015_PeatBurnOff')
+    response = choose(session, response, options(response).find(option => option.value !== '__skip__')!.value)
+    response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.sourceCard).toBe('M059_NaturesFertilizer')
+    response = choose(session, response, options(response).find(option => option.value !== '__skip__')!.value)
+    response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, fuel: 1 })
+    expect(response.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }])
+    expect(response.state.players[1]!.minorHand).toContain('M015_PeatBurnOff')
+    expect(response.state.farmersOfTheMoor!.specialActionCards.every(card => card.location.kind === 'market')).toBe(true)
+    expect(response.state.events.filter(event => event.type === 'farm.terrainChanged')).toMatchObject([{ sourceCardId: 'M015_PeatBurnOff', changes: [{ before: { kind: 'moor' }, fieldCreated: true }] }])
+    expect(response.state.events.filter(event => event.type === 'farm.sown' && event.sourceCardId === 'M059_NaturesFertilizer')).toHaveLength(1)
+  })
+
+  it.each(['plow', 'forest-conversion'] as const)('M059 ignores ordinary %s without a Moor trigger', mode => {
+    const session = createWorkSession({ seed: 1293, options: { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 8
+      const player = state.players[0]!
+      player.minorPlayed = [SOURCE, 'M059_NaturesFertilizer']
+      player.cardStates = {}
+      player.fields = [{ row: 0, col: 1, stacks: [] }]
+      player.farmTerrain = mode === 'forest-conversion' ? [{ row: 0, col: 2, kind: 'forest' }] : []
+      player.resources.grain = 1
+    } })
+    sessions.push(session)
+    if (mode === 'forest-conversion') session.withCtx(() => requireActiveCardRegistry('non-moor-forest-field-test').registerListener({
+      id: SOURCE, cardIds: [SOURCE], actions: ['plow'], phases: ['before'], mandatory: true,
+      handler: () => ({ sourceCard: SOURCE, flow: buildTerrainSelectionLeaf({ sourceCard: SOURCE, mode: 'replace-with-field', fromKind: 'forest', selectableTiles: [{ row: 0, col: 2 }] }) }),
+    }))
+    let response = session.takeAction(0, 'farmland')
+    if (mode === 'forest-conversion') {
+      expect(response.interaction.request.kind).toBe('selection')
+      response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(response.interaction.request.kind).toBe('farm-select')
+    expect(response.interaction.sourceCard).not.toBe('M059_NaturesFertilizer')
+    response = session.commitSelectionChoice(0, { tile: { row: 0, col: mode === 'forest-conversion' ? 3 : 2 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+    expect(response.state.events.filter(event => event.type === 'farm.sown')).toHaveLength(0)
+    expect(response.interaction.sourceCard).not.toBe('M059_NaturesFertilizer')
+    if (mode === 'forest-conversion') expect(response.state.events.filter(event => event.type === 'farm.terrainChanged')).toMatchObject([{ sourceCardId: SOURCE, changes: [{ before: { kind: 'forest' }, fieldCreated: true }] }])
+  })
+
   it('keeps nested new-field receipts separate through restored sowing and undo', () => {
     let session = createWorkSession({ options: { enableFarmersOfTheMoor: true }, configure: state => {
       state.round = 5

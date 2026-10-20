@@ -238,6 +238,40 @@ describe('FoM special action listener minors', () => {
     expect(resp.state.players[0]!.resources.fuel).toBe(3)
   })
 
+  it('M083 keeps Day Laborer separate from a granted Cut Peat nested under that space', () => {
+    const source = 'TEST_DayLaborerMoorGrant'
+    const session = createWorkSession({ seed: 1293, options: { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+      state.round = 8
+      for (const player of state.players) {
+        player.resources = baseResources()
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.improvements = []
+        player.cardStates = {}
+        setWorkersAtHome(state, player, 2)
+      }
+      state.players[0]!.minorPlayed = ['M083_CoalSeam', source]
+      state.players[0]!.farmTerrain = [{ row: 2, col: 0, kind: 'moor' }]
+    } })
+    sessions.push(session)
+    session.withCtx(() => requireActiveCardRegistry('day-laborer-moor-source-test').registerListener({
+      id: source, cardIds: [source], actionSpaces: ['day-laborer'], phases: ['after'], mandatory: true,
+      handler: () => ({ sourceCard: source, flow: { type: 'leaf', actionId: 'moor-special-action-choice', sourceCard: source,
+        actionContext: { mode: 'take-action', actionIds: ['cut-peat'] } } }),
+    }))
+    let response = session.takeAction(0, 'day-laborer')
+    expect(response.ok, response.error).toBe(true)
+    response = resolveTriggerIfPresent(session, response, source)
+    const peat = response.interaction.request.options?.find(option => option.value === 'action:cut-peat:2:0')
+    if (peat) response = session.resolveChoice(0, peat.value)
+    response = resolveTriggerIfPresent(session, response, 'M083_CoalSeam')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ fuel: 4, food: 2 })
+    expect(response.state.players[1]!.resources.fuel).toBe(0)
+    expect(response.state.events.filter(event => event.type === 'farm.terrainChanged')).toMatchObject([{ sourceActionId: 'cut-peat' }])
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'M083_CoalSeam')).toHaveLength(1)
+  })
+
   it('M094 and M099 trigger from Infirmary only for their conditions', () => {
     const { session, player } = setup()
     player.minorPlayed.push('M094_PeatBath', 'M099_HealingClay')

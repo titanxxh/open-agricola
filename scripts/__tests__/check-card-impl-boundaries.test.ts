@@ -390,6 +390,17 @@ describe('check-card-impl-boundaries', () => {
     )
   })
 
+  it('fails when a runtime implementation has no declared Card Source', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-unexpected-runtime-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' }, impl: {} })")
+    const listeners = [{ id: 'scope', actions: ['collect'], phases: ['after'], handler: () => undefined }]
+    const result = checkCardImplBoundaries([file], [
+      { cardId: 'A001_Shelter', file, listeners }, { cardId: 'CUSTOM_Unexpected', file, listeners },
+    ])
+    expect(result.scopeErrors).toContain('runtime Card Impl scope mismatch: missing none; unexpected CUSTOM_Unexpected')
+    expect(cardImplBoundaryExitCode(result, { warnOnly: true })).toBe(1)
+  })
+
   it('fails closed when a trailing runtime handler cannot be parsed', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
     const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
