@@ -13,7 +13,7 @@ import { ALL_ANIMAL_KEYS } from '../../../contract/animals'
 import { extendedResourceKeyList } from '../../../contract/state-constants'
 import { payLeaf } from '../../../cards/helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../../../cards/helpers/card-state'
-import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../../moor/special-action-flow'
+import { buildMoorSpecialActionFlow } from '../../../moor/special-action-flow'
 import {
   validateMoorSpecialAction,
   type MoorSpecialActionPayload,
@@ -330,8 +330,8 @@ export const scheduledOfferAction: ActionDefinition = {
       return {
         type: 'flow',
         flow: { type: 'seq', children: [
-          { type: 'leaf', actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID, sourceCard: cardId,
-            params: { cardId: moorChoice.cardId, actionId: moorChoice.actionId, payload: moorChoice.payload } },
+          buildMoorSpecialActionFlow({ kind: 'card', state, player, cardId: moorChoice.cardId,
+            actionId: moorChoice.actionId, payload: moorChoice.payload, actionHooks }),
           { type: 'leaf', actionId: ACTION_ID, sourceCard: cardId, params: { cardId, offerId: offer.id, consume: true } },
         ] },
       }

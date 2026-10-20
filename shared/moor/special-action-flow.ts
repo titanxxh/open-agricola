@@ -1,4 +1,7 @@
 import type { DraftGameEvent } from '../contract/events'
+import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
+import { getPlayOrderIndex } from '../engine/matched-trigger'
+import type { ActivateCardActionParams } from '../engine/activation-action'
 import { assertKnownGameEventShape } from '../events/guards'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type {
@@ -20,6 +23,7 @@ import {
   type CardListenerContextInput,
   type CardListenerOwnerOptions,
   type CardListenerOwnerZone,
+  listenerOwnerOptions,
 } from '../cards/card-listeners'
 import {
   applyMoorSpecialActionEffect,
@@ -63,15 +67,12 @@ type AfterSpecialActionListenerSnapshot = {
 }
 
 const readParams = (params?: Record<string, unknown>) => {
-  const cardId = params?.cardId
   const actionId = params?.actionId
-  if (typeof cardId !== 'string' || typeof actionId !== 'string') return null
-  if (!isMoorSpecialActionId(actionId)) return null
-  return {
-    cardId,
-    actionId,
-    payload: (params?.payload ?? {}) as MoorSpecialActionPayload,
-  }
+  if (typeof actionId !== 'string' || !isMoorSpecialActionId(actionId)) return null
+  const base = { actionId, payload: (params?.payload ?? {}) as MoorSpecialActionPayload }
+  if (params?.mode === 'effect') return { kind: 'granted' as const, ...base }
+  const cardId = params?.cardId
+  return typeof cardId === 'string' ? { kind: 'card' as const, cardId, ...base } : null
 }
 
 const readActionIds = (actionContext?: Record<string, unknown>): MoorSpecialActionId[] => {
@@ -480,29 +481,53 @@ const runAfterSpecialActionListeners = (
   return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared, undefined, actionHooks, result.terrainEvent)
 }
 
-const buildSpecialActionCardActionFlow = (
-  state: GameState,
-  player: PlayerState,
-  cardId: string,
-  actionId: MoorSpecialActionId,
-  payload: MoorSpecialActionPayload,
-  actionHooks?: ActionHookRegistry,
-): ActionFlow => {
-  const beforeFlows = runCardListeners({
-    actionHooks,
-    state,
-    player,
-    space: createMoorSpecialActionSpace(actionId),
-    actionId,
-    phase: 'before',
-    extraData: { specialActionCardId: cardId, payload },
-  }, undefined, { stampFlowOwner: true })
-    .map((entry) => entry.flow)
-    .filter((flow): flow is ActionFlow => !!flow)
+/** Called only after selecting and validating the concrete action and target. */
+export const buildMoorSpecialActionFlow = (entry: {
+  state: GameState
+  player: PlayerState
+  actionId: MoorSpecialActionId
+  payload?: MoorSpecialActionPayload
+  actionHooks: ActionHookRegistry | undefined
+} & ({ kind: 'card'; cardId: string } | { kind: 'granted' })): ActionFlow => {
+  const { state, player, actionId, payload = {}, actionHooks } = entry
+  const cardId = entry.kind === 'card' ? entry.cardId : undefined
+  const beforeContext = {
+    actionHooks, state, player, space: createMoorSpecialActionSpace(actionId),
+    actionId, phase: 'before', extraData: { specialActionCardId: cardId, payload },
+  } satisfies CardListenerContextInput
+  const candidates = getMatchingListeners(beforeContext)
+  const matched = candidates.length <= 1 ? candidates : candidates
+    .filter(entry => executeCardListener(entry.registration, beforeContext, listenerOwnerOptions(entry)))
+  const ownerOrder = (ownerId: string) => !ownerId ? -1 : ownerId === player.id ? 0
+    : state.players.findIndex(candidate => candidate.id === ownerId) + 1
+  matched.sort((a, b) => ownerOrder(a.ownerPlayerId) - ownerOrder(b.ownerPlayerId)
+    || getPlayOrderIndex(findPlayerById(state, a.ownerPlayerId) ?? player, a.cardId)
+      - getPlayOrderIndex(findPlayerById(state, b.ownerPlayerId) ?? player, b.cardId))
+  const groups: { ownerId: string; children: ActionFlow[] }[] = []
+  const triggerSnapshot = createTriggerSnapshot(state)
+  for (const entry of matched) {
+    const ownerId = entry.ownerPlayerId || player.id
+    const params: ActivateCardActionParams = {
+      listenerId: entry.registration.id, cardId: entry.cardId,
+      phase: 'before', actionId, triggerPlayerId: player.id,
+      ownerPlayerId: entry.ownerPlayerId, ownerCardZone: entry.ownerCardZone,
+      mandatory: entry.registration.mandatory === true, triggerSnapshot,
+      event: { extraData: { specialActionCardId: cardId, payload } },
+    }
+    const child: ActionFlow = {
+      type: 'leaf', actionId: 'activate-card', sourceCard: entry.cardId,
+      targetPlayerId: ownerId, params,
+    }
+    const last = groups.at(-1)
+    if (last?.ownerId === ownerId) last.children.push(child)
+    else groups.push({ ownerId, children: [child] })
+  }
+  const beforeFlows: ActionFlow[] = groups.map(({ ownerId, children }) => children.length === 1 ? children[0]!
+    : { type: 'parallel', mode: 'trigger-select', targetPlayerId: ownerId,
+      children: children.map(child => ({ ...child, optional: child.type === 'leaf' && child.params?.mandatory !== true })) })
   const applyFlow: ActionFlow = {
-    type: 'leaf',
-    actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
-    params: { cardId, actionId, payload },
+    type: 'leaf', actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
+    params: { ...(entry.kind === 'card' ? { cardId: entry.cardId } : { mode: 'effect' }), actionId, payload },
   }
   return combineFlows([...beforeFlows, applyFlow]) ?? applyFlow
 }
@@ -566,7 +591,7 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
       promptKey: 'ui.interactionFlowSelect',
     }
   },
-  resolveChoice: ({ state, player, actionContext, eventSink, actionHooks }, choice) => {
+  resolveChoice: ({ state, player, actionContext, actionHooks }, choice) => {
     const mode = choiceMode(actionContext)
     if (mode === 'take-card') {
       return takeSpecialActionCard(state, player, choice)
@@ -584,7 +609,7 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
       if (!validation.ok) return { type: 'fail', errorKey: validation.error }
       return {
         type: 'flow',
-        flow: buildSpecialActionCardActionFlow(state, player, parsed.cardId, parsed.actionId, parsed.payload, actionHooks),
+        flow: buildMoorSpecialActionFlow({ kind: 'card', state, player, cardId: parsed.cardId, actionId: parsed.actionId, payload: parsed.payload, actionHooks }),
       }
     }
     const parsed = parseActionChoice(choice)
@@ -595,10 +620,11 @@ export const moorSpecialActionChoiceAction: ActionDefinition = {
     }
     const playerIndex = state.players.indexOf(player)
     if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
-    const result = applyMoorSpecialActionEffect(state, playerIndex, parsed.actionId, parsed.payload, eventSink, actionHooks)
-    if (!result.ok) return { type: 'fail', errorKey: result.error }
-    const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result, actionHooks)
-    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+    const validation = validateMoorSpecialActionEffect(state, playerIndex, parsed.actionId, parsed.payload, actionHooks)
+    if (!validation.ok) return { type: 'fail', errorKey: validation.error }
+    return { type: 'flow', flow: buildMoorSpecialActionFlow({
+      kind: 'granted', state, player, actionId: parsed.actionId, payload: parsed.payload, actionHooks,
+    }) }
   },
 }
 
@@ -610,7 +636,7 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
   gainPerRound: {},
   previewEffect: ({ state, player, params, previewMode, actionHooks }) => {
     const parsed = readParams(params)
-    return parsed ? { kind: 'rule', description: describeMoorSpecialActionEffect(state, player, parsed.actionId, parsed.payload, parsed.cardId, previewMode, actionHooks) } : undefined
+    return parsed ? { kind: 'rule', description: describeMoorSpecialActionEffect(state, player, parsed.actionId, parsed.payload, parsed.kind === 'card' ? parsed.cardId : undefined, previewMode, actionHooks) } : undefined
   },
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, params, eventSink, actionHooks }) => {
@@ -619,15 +645,9 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
     const playerIndex = findPlayerIndexById(state, player.id)
     if (playerIndex < 0) return { type: 'fail', errorKey: 'special action unavailable' }
 
-    const result = applyMoorSpecialAction(
-      state,
-      playerIndex,
-      parsed.cardId,
-      parsed.actionId,
-      parsed.payload,
-      eventSink,
-      actionHooks,
-    )
+    const result = parsed.kind === 'card'
+      ? applyMoorSpecialAction(state, playerIndex, parsed.cardId, parsed.actionId, parsed.payload, eventSink, actionHooks)
+      : applyMoorSpecialActionEffect(state, playerIndex, parsed.actionId, parsed.payload, eventSink, actionHooks)
     if (!result.ok) return { type: 'fail', errorKey: result.error }
 
     const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result, actionHooks)

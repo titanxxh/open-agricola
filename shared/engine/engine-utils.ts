@@ -1022,9 +1022,9 @@ function buildFlowNodeContent(
       parallel.triggerOwnerPlayerId = ownerPlayerId
       parallel.triggerChildren = children.map((child, index) => ({
         nodeId: child.id,
-        cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
-        listenerId: '',
-        mandatory: flow.children[index]?.optional !== true,
+        cardId: isActivateCardActionNode(child) ? child.params.cardId : flow.children[index]?.sourceCard ?? `child-${index}`,
+        listenerId: isActivateCardActionNode(child) ? child.params.listenerId : '',
+        mandatory: isActivateCardActionNode(child) ? child.params.mandatory === true : flow.children[index]?.optional !== true,
       }))
     }
     const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
