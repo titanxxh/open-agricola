@@ -144,7 +144,7 @@ export class EngineTree {
       if (node.getPending() !== null) {
         return node
       }
-      if (node instanceof SequenceNode && node.spaceUsePhase && node.getState() === 'ready') return node
+      if (node instanceof SequenceNode && node.completionPhase && node.getState() === 'ready') return node
       if (node.optional === true && node.optionalActive === false) {
         return node.getState() === 'resolved' ? null : node
       }

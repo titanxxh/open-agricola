@@ -1,12 +1,11 @@
-import type { DraftGameEvent } from '../contract/events'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { getPlayOrderIndex } from '../engine/matched-trigger'
 import type { ActivateCardActionParams } from '../engine/activation-action'
-import { assertKnownGameEventShape } from '../events/guards'
 import type { ActionHookRegistry } from '../actions/hooks'
 import type {
   ActionChoiceOption,
   ActionDefinition,
+  ActionExecutionResult,
   ActionFlow,
   ChoiceDescriptionPreview,
   GameState,
@@ -17,12 +16,8 @@ import { improvementAction } from '../actions/effects/improvement'
 import { getMoorSpecialActionEffectPlan, MOOR_SPECIAL_ACTION_BORROW_FOOD, moorSpecialActionBorrowCost } from './special-action-plan'
 import {
   executeCardListener,
-  getListenerById,
   getMatchingListeners,
-  runCardListeners,
   type CardListenerContextInput,
-  type CardListenerOwnerOptions,
-  type CardListenerOwnerZone,
   listenerOwnerOptions,
 } from '../cards/card-listeners'
 import {
@@ -41,7 +36,6 @@ import { findPlayerById, findPlayerIndexById } from '../domain/player'
 
 export const MOOR_SPECIAL_ACTION_APPLY_ACTION_ID = 'moor-special-action-apply'
 export const MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID = 'moor-special-action-choice'
-export const MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID = 'moor-special-action-after-listeners'
 
 const MOOR_SPECIAL_ACTION_IDS: MoorSpecialActionId[] = [
   'cut-peat',
@@ -57,13 +51,6 @@ const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
   if (flows.length === 0) return undefined
   if (flows.length === 1) return flows[0]
   return { type: 'seq', children: flows }
-}
-
-type AfterSpecialActionListenerSnapshot = {
-  listenerId: string
-  ownerPlayerId?: string
-  ownerCardId?: string
-  ownerCardZone?: CardListenerOwnerZone
 }
 
 const readParams = (params?: Record<string, unknown>) => {
@@ -382,105 +369,6 @@ const takeSpecialActionCard = (
   return { type: 'ok' as const }
 }
 
-const runAfterSpecialActionListenersNow = (
-  state: GameState,
-  player: PlayerState,
-  actionId: MoorSpecialActionId,
-  payload: MoorSpecialActionPayload,
-  terrainCleared?: boolean,
-  snapshots?: readonly AfterSpecialActionListenerSnapshot[],
-  actionHooks?: ActionHookRegistry,
-  terrainEvent?: DraftGameEvent<'farm.terrainChanged'>,
-) => {
-  const context = {
-    actionHooks,
-    state,
-    player,
-    space: createMoorSpecialActionSpace(actionId),
-    actionId,
-    phase: 'after',
-    result: { type: 'ok' },
-    actionEvents: terrainEvent ? [terrainEvent] : [],
-    extraData: {
-      payload,
-      ...(terrainCleared === false ? { terrainCleared: false } : {}),
-    },
-  } satisfies CardListenerContextInput
-  const listenerFlows = snapshots
-    ? snapshots.flatMap((snapshot) => {
-      const registration = getListenerById(snapshot.listenerId)
-      if (!registration) return []
-      const owner: CardListenerOwnerOptions = {
-        ownerPlayerId: snapshot.ownerPlayerId,
-        ownerCardId: snapshot.ownerCardId,
-        ownerCardZone: snapshot.ownerCardZone,
-      }
-      const flow = executeCardListener(registration, context, owner)?.flow
-      if (!flow) return []
-      return snapshot.ownerPlayerId && !flow.targetPlayerId
-        ? [{ ...flow, targetPlayerId: snapshot.ownerPlayerId }]
-        : [flow]
-    })
-    : runCardListeners(context, undefined, { stampFlowOwner: true }).map((entry) => entry.flow)
-    .filter((flow): flow is ActionFlow => !!flow)
-  return combineFlows(listenerFlows)
-}
-
-const afterSpecialActionListenersLeaf = (
-  actionId: MoorSpecialActionId,
-  payload: MoorSpecialActionPayload,
-  terrainCleared: boolean | undefined,
-  snapshots: readonly AfterSpecialActionListenerSnapshot[],
-  terrainEvent?: DraftGameEvent<'farm.terrainChanged'>,
-): ActionFlow => ({
-  type: 'leaf',
-  actionId: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
-  actionContext: { actionId, payload, terrainCleared, snapshots, terrainEvent },
-})
-
-const snapshotAfterSpecialActionListeners = (
-  actionHooks: ActionHookRegistry | undefined,
-  state: GameState,
-  player: PlayerState,
-  actionId: MoorSpecialActionId,
-  payload: MoorSpecialActionPayload,
-  terrainEvent?: DraftGameEvent<'farm.terrainChanged'>,
-): AfterSpecialActionListenerSnapshot[] =>
-  getMatchingListeners({
-    actionHooks,
-    state,
-    player,
-    space: createMoorSpecialActionSpace(actionId),
-    actionId,
-    phase: 'after',
-    result: { type: 'ok' },
-    actionEvents: terrainEvent ? [terrainEvent] : [],
-    extraData: { payload },
-  }).map((entry) => ({
-    listenerId: entry.registration.id,
-    ...(entry.ownerPlayerId ? { ownerPlayerId: entry.ownerPlayerId } : {}),
-    ...(entry.cardId ? { ownerCardId: entry.cardId } : {}),
-    ...(entry.ownerCardZone ? { ownerCardZone: entry.ownerCardZone } : {}),
-  }))
-
-const runAfterSpecialActionListeners = (
-  state: GameState,
-  player: PlayerState,
-  actionId: MoorSpecialActionId,
-  payload: MoorSpecialActionPayload,
-  result: { followUpFlow?: ActionFlow; terrainCleared?: boolean; terrainEvent?: DraftGameEvent<'farm.terrainChanged'> },
-  actionHooks?: ActionHookRegistry,
-) => {
-  if (result.followUpFlow) {
-    const snapshots = snapshotAfterSpecialActionListeners(actionHooks, state, player, actionId, payload, result.terrainEvent)
-    return combineFlows([
-      result.followUpFlow,
-      afterSpecialActionListenersLeaf(actionId, payload, result.terrainCleared, snapshots, result.terrainEvent),
-    ])
-  }
-  return runAfterSpecialActionListenersNow(state, player, actionId, payload, result.terrainCleared, undefined, actionHooks, result.terrainEvent)
-}
-
 /** Called only after selecting and validating the concrete action and target. */
 export const buildMoorSpecialActionFlow = (entry: {
   state: GameState
@@ -530,43 +418,6 @@ export const buildMoorSpecialActionFlow = (entry: {
     params: { ...(entry.kind === 'card' ? { cardId: entry.cardId } : { mode: 'effect' }), actionId, payload },
   }
   return combineFlows([...beforeFlows, applyFlow]) ?? applyFlow
-}
-
-export const moorSpecialActionAfterListenersAction: ActionDefinition = {
-  id: MOOR_SPECIAL_ACTION_AFTER_LISTENERS_ACTION_ID,
-  nameKey: 'actions.special-effect.name',
-  descriptionKey: 'actions.special-effect.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, actionContext, actionHooks }) => {
-    const actionId = actionContext?.actionId
-    if (typeof actionId !== 'string' || !isMoorSpecialActionId(actionId)) {
-      return { type: 'ok' }
-    }
-    const payload = (actionContext?.payload ?? {}) as MoorSpecialActionPayload
-    const terrainCleared = actionContext?.terrainCleared
-    const snapshots = Array.isArray(actionContext?.snapshots)
-      ? actionContext.snapshots as AfterSpecialActionListenerSnapshot[]
-      : undefined
-    let terrainEvent: DraftGameEvent<'farm.terrainChanged'> | undefined
-    const captured = actionContext?.terrainEvent
-    if (captured && typeof captured === 'object' && 'type' in captured && captured.type === 'farm.terrainChanged') {
-      assertKnownGameEventShape(captured)
-      terrainEvent = captured as DraftGameEvent<'farm.terrainChanged'>
-    }
-    const followUpFlow = runAfterSpecialActionListenersNow(
-      state,
-      player,
-      actionId,
-      payload,
-      typeof terrainCleared === 'boolean' ? terrainCleared : undefined,
-      snapshots,
-      actionHooks,
-      terrainEvent,
-    )
-    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
-  },
 }
 
 export const moorSpecialActionChoiceAction: ActionDefinition = {
@@ -650,7 +501,21 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
       : applyMoorSpecialActionEffect(state, playerIndex, parsed.actionId, parsed.payload, eventSink, actionHooks)
     if (!result.ok) return { type: 'fail', errorKey: result.error }
 
-    const followUpFlow = runAfterSpecialActionListeners(state, player, parsed.actionId, parsed.payload, result, actionHooks)
-    return followUpFlow ? { type: 'flow', flow: followUpFlow } : { type: 'ok' }
+    const completionResult: Extract<ActionExecutionResult, { type: 'ok' }> = {
+      type: 'ok', ...(result.farmOperation ? { farmOperations: [result.farmOperation] } : {}),
+    }
+    const sources = getMatchingListeners({
+      actionHooks, state, player, space: createMoorSpecialActionSpace(parsed.actionId),
+      actionId: parsed.actionId, phase: 'after', result: completionResult,
+      actionEvents: result.terrainEvent ? [result.terrainEvent] : [], extraData: { payload: parsed.payload },
+    }).map(entry => entry.ownerCardZone
+      ? { listenerId: entry.registration.id, ownerPlayerId: entry.ownerPlayerId, cardId: entry.cardId, ownerCardZone: entry.ownerCardZone }
+      : { listenerId: entry.registration.id, ownerPlayerId: '' as const, cardId: '' as const })
+    return { type: 'flow', flow: {
+      type: 'seq', children: result.followUpFlow ? [result.followUpFlow] : [],
+      moorCompletion: { actionId: parsed.actionId, payload: parsed.payload, playerId: player.id,
+        result: completionResult, terrainCleared: result.terrainCleared, terrainEvent: result.terrainEvent, sources,
+        triggerSnapshot: createTriggerSnapshot(state) },
+    } }
   },
 }

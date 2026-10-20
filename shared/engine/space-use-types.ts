@@ -8,12 +8,6 @@ export type SpaceUseState = {
   use: ActionSpaceUseContext
   completePlacement: boolean
   actionContext?: ActionContext
-  bodyId: string
-  immediateId: string
-  afterId: string
-  bodyCompleted: boolean
   succeeded: boolean
   actionEvents: GameEvent[]
 }
-
-export type SpaceUsePhase = { scopeId: string; phase: 'immediatelyAfter' | 'after' }

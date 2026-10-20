@@ -140,7 +140,7 @@ describe('admitCustomFlow', () => {
       expect(admit(leaf('gain', {}, { [field]: 'x' }))).toThrow(`flow: flow field '${field}' is not in the Workshop Capability Contract`)
     })
 
-  it.each(['mode', 'triggerSelectOnce', 'requiresExplicitChoice', 'anytimeActionId', 'anytimeActivation', 'optionId', 'choiceLabelKey', 'choiceLabelParams', 'targetPlayerId'])(
+  it.each(['moorCompletion', 'mode', 'triggerSelectOnce', 'requiresExplicitChoice', 'anytimeActionId', 'anytimeActivation', 'optionId', 'choiceLabelKey', 'choiceLabelParams', 'targetPlayerId'])(
     'rejects the native group field %s', (field) => {
       expect(admit({ type: 'parallel', [field]: 'x', children: [leaf('gain')] }))
         .toThrow(`flow: flow field '${field}' is not in the Workshop Capability Contract`)

@@ -135,7 +135,7 @@ const nextCounterValueFromIds = (nodes: EngineNode[]): number =>
 
 const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>): void => {
   if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
-  if (typeof data.spaceUseBodyId === 'string') node.spaceUseBodyId = data.spaceUseBodyId
+  if (typeof data.primaryBodyId === 'string') node.primaryBodyId = data.primaryBodyId
   if (data.reactionPhase === 'immediatelyAfter' || data.reactionPhase === 'after') node.reactionPhase = data.reactionPhase
   const labeledNode = node as EngineNode & {
     choiceLabelKey?: string
@@ -247,8 +247,8 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         const sequence = new SequenceNode(cursor.id, buildChildren())
         sequence.anytimeActionId = typeof data.anytimeActionId === 'string' ? data.anytimeActionId : undefined
         sequence.anytimeActivation = data.anytimeActivation === undefined ? undefined : parseAnytimeActivation(data.anytimeActivation)
-        sequence.spaceUse = data.spaceUse as SequenceNode['spaceUse']
-        sequence.spaceUsePhase = data.spaceUsePhase as SequenceNode['spaceUsePhase']
+        sequence.completion = data.completion as SequenceNode['completion']
+        sequence.completionPhase = data.completionPhase as SequenceNode['completionPhase']
         node = sequence
         break
       }

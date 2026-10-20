@@ -1,5 +1,7 @@
-import { actionSpaceQueryContext, inheritSpaceUseBody } from './space-use-nodes'
-import { prepareSpaceUseCompletions, executeSpaceUsePhase, captureSpaceUseEvents } from './space-use-runtime'
+import { actionSpaceQueryContext } from './space-use-nodes'
+import { inheritPrimaryBody } from './primary-body-nodes'
+import { captureSpaceUseEvents } from './space-use-runtime'
+import { preparePrimaryCompletions, executeCompletionPhase } from './completion-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext } from '../actions/flow'
 import type {
   ActionExecutionContext,
@@ -420,7 +422,7 @@ const buildInternalActionChildNodes = (
       child.paymentInfoFrom,
     )
     const host = int.tree.findNodeById(hostNodeId)
-    if (host) inheritSpaceUseBody(host, node)
+    if (host) inheritPrimaryBody(host, node)
     if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
     return node
   })
@@ -444,7 +446,7 @@ export const buildDeferredHostNode = (
     hostNode.choiceLabelParams,
     executionContext.actionContext,
   )
-  inheritSpaceUseBody(hostNode, node)
+  inheritPrimaryBody(hostNode, node)
   node.actionSpaceUse = executionContext.actionSpaceUse
   node.ownerPlayerId = hostNode.ownerPlayerId
   node.mandatory = hostNode.mandatory
@@ -477,7 +479,7 @@ const buildDeferredHostContinuationNode = (
     sourceNode.actionContext,
   )
   node.ownerPlayerId = sourceNode.ownerPlayerId
-  inheritSpaceUseBody(sourceNode, node)
+  inheritPrimaryBody(sourceNode, node)
   node.actionSpaceUse = sourceNode.actionSpaceUse
   node.internalHostNodeId = sourceNode.internalHostNodeId
   node.deferredHostResult = result
@@ -866,7 +868,7 @@ const executeDeferredHostAction = (
   }
   if (result.type === 'flow') {
     const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
-    inheritSpaceUseBody(node, flowNode)
+    inheritPrimaryBody(node, flowNode)
     if (node.continuationParentHostNodeId) {
       stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
     }
@@ -900,14 +902,14 @@ export function engineProceed(
 ): EngineStepResult {
   ensureEventState(context.state)
   int.events.ensureTransaction()
-  prepareSpaceUseCompletions(int)
+  preparePrimaryCompletions(int)
   const node = int.tree.nextUnresolved()
   if (!node) {
     commitOpenEventTransaction(int, context, { type: 'ok' })
     return { type: 'done' }
   }
-  if (node instanceof SequenceNode && node.spaceUsePhase) {
-    executeSpaceUsePhase(int, node, context)
+  if (node instanceof SequenceNode && node.completionPhase) {
+    executeCompletionPhase(int, node, context)
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
   }
   if (node.getPending() !== null) {
@@ -1167,7 +1169,7 @@ export function engineProceed(
       ...context, ...currentEventReadContext(int),
     }, node, replaceResult)
     if (replacementNode) {
-      inheritSpaceUseBody(node, replacementNode)
+      inheritPrimaryBody(node, replacementNode)
       int.tree.insertAfter(node.id, [replacementNode])
       node.resolve({ type: 'ok' })
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -1187,7 +1189,7 @@ export function engineProceed(
       const optionId = typeof actionContext?.optionId === 'string' ? actionContext.optionId : undefined
       const expanded = stampOwner(buildFlowNode(int, flow, context.player.id,
         optionId, node.expandFlowIdStyle), context.player.id)
-      inheritSpaceUseBody(node, expanded)
+      inheritPrimaryBody(node, expanded)
       if (node.mandatory) enforceCompositeContinuationMandatory(expanded)
       node.resolve({ type: 'ok' })
       int.tree.insertAfter(node.id, [expanded])
@@ -1511,7 +1513,7 @@ export function engineProceed(
         ? { ...result.flow, optional: undefined }
         : result.flow
       const flowNode = buildOwnedFlowNode(int, committedFlow, context.player.id, executionContext.actionContext)
-      inheritSpaceUseBody(node, flowNode)
+      inheritPrimaryBody(node, flowNode)
       if (node.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

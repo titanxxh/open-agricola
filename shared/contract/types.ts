@@ -1,3 +1,4 @@
+import type { MoorCompletionFrame } from '../moor/completion-types'
 import type { AnytimeActivation } from './anytime-activation'
 import type { PersonUseReceipt } from './person-use'
 import type { ActionHookRegistry } from '../actions/hooks'
@@ -1044,8 +1045,7 @@ export type ActionFlow = (
       /** Native entry; completePlacement supplies the callback when no place-farmer host owns it. */
       spaceUse?: ActionSpaceUseContext & { completePlacement?: true }
     }
-  | {
-      type: 'seq' | 'or' | 'xor' | 'parallel'
+  | ({
       /** Keep the decision open and refresh unselected branches after anytime actions. */
       requiresExplicitChoice?: boolean
       anytimeActionId?: string
@@ -1064,7 +1064,7 @@ export type ActionFlow = (
        * runtime engine. Card-facing flows describe ownership as metadata.
        */
       targetPlayerId?: string
-    }
+    } & ({ type: 'seq'; moorCompletion?: MoorCompletionFrame } | { type: 'or' | 'xor' | 'parallel' }))
  ) & { anytimeWindow?: AnytimeWindow }
 
 export type ActionDefinition = {
