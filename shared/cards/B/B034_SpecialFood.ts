@@ -9,6 +9,7 @@ import {
 } from '../helpers/card-state'
 import { sumActionSpaceMovedToTriggerPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B034_SpecialFood'
 type AnimalType = 'sheep' | 'boar' | 'cattle'
@@ -32,11 +33,7 @@ const buildBonusVpFlow = (count: number) => ({
   type: 'seq' as const,
   children: [
     { type: 'leaf' as const, actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-    ...Array.from({ length: count }, () => ({
-      type: 'leaf' as const,
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    })),
+    bonusVpLeaf(CARD_ID, count),
   ],
 })
 

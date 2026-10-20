@@ -51,7 +51,7 @@ shared/domain/
 
 **计分。**
 
-- `cardBonusVp` 是卡牌产生的非印刷分数的唯一类别，按 `cardId` / `cardType` 归因；卡牌自身的印刷分数留在 `cards`；公开卡牌标记可以计负分。每个奖励来源只进入该类别一次：通用计分已读取 `cardStates[cardId].counters.bonusVp`，因此把分数存进该计数器的卡牌不能再从 `computeBonusScore` 返回它们。旧的 `cardsBonus` / `cardStateBonusVp` / `cardBonus` 形状已删除。
+- `cardBonusVp` 是卡牌产生的非印刷分数的唯一类别，按 `cardId` / `cardType` 归因；卡牌自身的印刷分数留在 `cards`；公开卡牌标记可以计负分。每个奖励来源只进入该类别一次：通用计分已读取 `cardStates[cardId].counters.bonusVp`，因此把分数存进该计数器的卡牌不能再从 `computeBonusScore` 返回它们。`bonus-vp` leaf（`params.amount`，默认 1）和兑换的 `sideEffect: { type: 'bonusVp' }` 都写入这个计数器。旧的 `cardsBonus` / `cardStateBonusVp` / `cardBonus` 形状已删除。
 - Scoring Reserve 是终局计分预留，不是支付，通过 `special-effect` 的 `record-scoring-reserve-bonus` 记录。`computeScores()` 在有费用奖励求解之前从计分副本中扣除每个已选预留，基于资源的大改良计分读取该副本，组合付不起时整组失效。
 
 **大改良供应**（[ADR 0006](../adr/0006-stack-aware-major-improvement-supply.md)、[ADR 0016](../adr/0016-separate-supply-family-from-improvement-identity.md)）：变体模板生成真实卡牌 ID 的供应堆；版图只暴露每堆顶部。购买、归还与交换走供应 helper，生产读取使用供应查询 helper。升级身份使用 `*Identity` metadata，从不使用供应堆的 `familyId`。复制卡保留各自的具体 ID 作为来源与归因。底行规则使用 `isBottomRowMajorImprovement()` / `getAvailableBottomRowMajorImprovementIds()`。

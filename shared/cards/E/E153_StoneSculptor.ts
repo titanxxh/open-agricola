@@ -4,13 +4,6 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'E153_StoneSculptor'
 
 const cardImpl = {
-  effect: {
-    id: CARD_ID,
-    computeBonusScore: (_state, player): number => {
-      const earned = player.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned
-      return typeof earned === 'number' ? earned : 0
-    },
-  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
@@ -37,6 +30,7 @@ export const E153_StoneSculptor = defineOccupationCard({
         },
       ],
   },
+  presentation: { counters: ['bonusVp'] },
   impl: cardImpl,
 })
 

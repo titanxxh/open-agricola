@@ -1,6 +1,5 @@
 import type { ChoiceEffectPreview, GameState, PlayerState } from '../contract/types'
-import { readCardExtraData, writeCardExtraData, popFromCardStack, pushToCardStack } from '../cards/helpers/card-state'
-import { incCounter, initCardState } from '../cards/__stubs__/helpers'
+import { readCardExtraData, writeCardExtraData, popFromCardStack, pushToCardStack, incCounter, initCardState } from '../cards/helpers/card-state'
 import { getCardEffect } from '../cards/card-effects'
 import { computeSourceCardContribution } from '../domain/scoring'
 

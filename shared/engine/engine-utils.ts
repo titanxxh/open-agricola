@@ -34,6 +34,7 @@ import type { PendingCursor, PendingEnvelope, PendingSyntheticKind, PendingView 
 import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { applyCardStorageOperation, cardStorageAffectsScore, readCardStorageOperation } from '../actions/card-storage'
+import { bonusVpAmount } from '../actions/effects/bonus-vp'
 import { getLogicalFields } from '../cards/helpers/card-field'
 import { getPlayOrderIndex, planListenerOwnerGroups } from './matched-trigger'
 import { wrapSpaceUse } from './space-use-nodes'
@@ -663,7 +664,8 @@ export function getActionEffectPreview(node: ActionNode, registry?: ActionRegist
     return { kind: 'resourceExchange', resourcesGained: params }
   }
   if (node.actionId === 'bonus-vp') {
-    return { kind: 'resourceExchange', bonusVp: 1 }
+    const bonusVp = bonusVpAmount(node.params)
+    return bonusVp === undefined ? undefined : { kind: 'resourceExchange', bonusVp }
   }
   const target = context ? getActionFarmTarget(node, context) : undefined
   if (target?.kind === 'logical-field') return {
@@ -716,7 +718,11 @@ export function getSequenceEffectPreview(node: SequenceNode, registry?: ActionRe
   let bonusVp = 0
   for (const action of rewards) {
     if (action.actionId === 'gain') resourcesGained = mergePreviewResources(resourcesGained, action.params)
-    else bonusVp += 1
+    else {
+      const amount = bonusVpAmount(action.params)
+      if (amount === undefined) return undefined
+      bonusVp += amount
+    }
   }
   return {
     kind: 'resourceExchange',

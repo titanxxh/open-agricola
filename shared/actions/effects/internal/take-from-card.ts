@@ -1,6 +1,6 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
 import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
-import { initCardState } from '../../../cards/__stubs__/helpers'
+import { initCardState } from '../../../cards/helpers/card-state'
 import { receiveFromCardLeaf } from '../receive'
 
 const positiveResources = (

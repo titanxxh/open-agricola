@@ -1,7 +1,7 @@
 import type { ActionFlow, PlayerState, Resource } from '../../contract/types'
 import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import { getStableCountForCards } from '../../domain/stables'
-import { initCardState } from '../__stubs__/helpers'
+import { initCardState } from '../helpers/card-state'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 import { collectCardsAs } from '../helpers/card-type'
 import { getLogicalFields } from '../helpers/card-field'

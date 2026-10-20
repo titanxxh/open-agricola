@@ -162,6 +162,22 @@ describe('effects import boundary', () => {
     expect(offenders.sort()).toEqual([])
   })
 
+  it('keeps production code from importing the stub-only helper module', () => {
+    const roots = [
+      path.join(process.cwd(), 'shared'),
+      path.join(process.cwd(), 'server'),
+      path.join(process.cwd(), 'client'),
+    ]
+    const offenders = roots.flatMap((root) => walkTsFiles(root))
+      .filter((file) =>
+        !file.includes(`${path.sep}__tests__${path.sep}`) &&
+        !file.includes(`${path.sep}__stubs__${path.sep}`))
+      .filter((file) => /from ['"][^'"]*__stubs__\/helpers(?:\.ts)?['"]/.test(readFileSync(file, 'utf8')))
+      .map((file) => path.relative(process.cwd(), file))
+
+    expect(offenders.sort()).toEqual([])
+  })
+
   it('keeps non-payment-internal tests from importing payment internals', () => {
     const roots = [
       path.join(process.cwd(), 'shared'),

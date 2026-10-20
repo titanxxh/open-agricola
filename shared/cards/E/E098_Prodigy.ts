@@ -1,5 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E098_Prodigy'
 
@@ -14,16 +15,7 @@ const cardImpl = {
     const improvementCount = player.improvements.length + player.minorPlayed.length
     if (improvementCount <= 0) return
 
-    const bonusVpLeaves = Array.from({ length: improvementCount }, () => ({
-      type: 'leaf' as const,
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    }))
-
-    return {
-      type: 'seq' as const,
-      children: bonusVpLeaves,
-    }
+    return bonusVpLeaf(CARD_ID, improvementCount)
   },
 },
   reaches: [] as readonly string[],

@@ -1,6 +1,7 @@
 import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A039_Chapel'
 
@@ -19,7 +20,7 @@ registerPlayerActionSpace({
     flowFactory: ({ player }) => ({ type: 'seq', children: [
       ...(player.id !== ownerId ? [{ type: 'leaf' as const, actionId: 'gain', sourceCard: CARD_ID,
         params: { grain: 1, recipientPlayerId: ownerId, payerId: player.id } }] : []),
-      ...Array.from({ length: 3 }, () => ({ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID })),
+      bonusVpLeaf(CARD_ID, 3),
     ] }),
   }),
 })

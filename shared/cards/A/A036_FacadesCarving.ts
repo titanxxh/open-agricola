@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A036_FacadesCarving'
 const HARVEST_MAP: Record<number, number> = {
@@ -20,11 +21,6 @@ const cardImpl = {
     // XOR: pay i food → i bonus VP (i from 1 to n)
     const children = Array.from({ length: n }, (_, idx) => {
       const i = idx + 1
-      const bonusVpLeaves = Array.from({ length: i }, () => ({
-        type: 'leaf' as const,
-        actionId: 'bonus-vp',
-        sourceCard: CARD_ID,
-      }))
       return {
         type: 'seq' as const,
         children: [
@@ -34,7 +30,7 @@ const cardImpl = {
             sourceCard: CARD_ID,
             params: { food: i },
           },
-          ...bonusVpLeaves,
+          bonusVpLeaf(CARD_ID, i),
         ],
       }
     })

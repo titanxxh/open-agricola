@@ -115,6 +115,14 @@ export const gainLeaf = (
   }
 }
 
+/** One `bonus-vp` leaf worth `amount` points (see `bonusVpAmount`). */
+export const bonusVpLeaf = (cardId: string, amount = 1): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'bonus-vp',
+  sourceCard: cardId,
+  ...(amount === 1 ? {} : { params: { amount } }),
+})
+
 export const payLeaf = ({
   cardId,
   cost,

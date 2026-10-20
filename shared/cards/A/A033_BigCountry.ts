@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'A033_BigCountry'
 
@@ -10,11 +11,6 @@ const cardImpl = {
   onBuy: (state) => {
     const nb = 14 - state.round
     if (nb <= 0) return
-    const bonusVpLeaves = Array.from({ length: nb }, () => ({
-      type: 'leaf' as const,
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    }))
     return {
       type: 'seq' as const,
       children: [
@@ -24,7 +20,7 @@ const cardImpl = {
           sourceCard: CARD_ID,
           params: { food: 2 * nb },
         },
-        ...bonusVpLeaves,
+        bonusVpLeaf(CARD_ID, nb),
       ],
     }
   },

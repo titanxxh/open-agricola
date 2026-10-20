@@ -55,18 +55,21 @@ describe('applyTradeSideEffect.drainSpace', () => {
 })
 
 describe('applyTradeSideEffect.bonusVp', () => {
-  it('writes amount * times to cardStates[sourceCard].extraData.bonusVpEarned', () => {
+  const bonusVp = (player: PlayerState) => player.cardStates?.E153_StoneSculptor?.counters?.bonusVp
+
+  it('adds amount * times to the card bonusVp counter, not extraData', () => {
     const state = baseState(0)
     const player = makePlayer()
     PaymentSolver.applyTradeSideEffect(state, player, { type: 'bonusVp', amount: 2 }, 3, 'E153_StoneSculptor')
-    expect(player.cardStates?.E153_StoneSculptor?.extraData?.bonusVpEarned).toBe(6)
+    expect(bonusVp(player)).toBe(6)
+    expect(player.cardStates?.E153_StoneSculptor?.extraData?.bonusVpEarned).toBeUndefined()
   })
 
-  it('initializes cardStates / extraData when missing', () => {
+  it('initializes cardStates / counters when missing', () => {
     const state = baseState(0)
     const player = makePlayer({ cardStates: undefined as never })
     PaymentSolver.applyTradeSideEffect(state, player, { type: 'bonusVp', amount: 1 }, 1, 'E153_StoneSculptor')
-    expect(player.cardStates?.E153_StoneSculptor?.extraData?.bonusVpEarned).toBe(1)
+    expect(bonusVp(player)).toBe(1)
   })
 
   it('accumulates across multiple invocations (does not overwrite)', () => {
@@ -74,14 +77,14 @@ describe('applyTradeSideEffect.bonusVp', () => {
     const player = makePlayer()
     PaymentSolver.applyTradeSideEffect(state, player, { type: 'bonusVp', amount: 1 }, 1, 'E153_StoneSculptor')
     PaymentSolver.applyTradeSideEffect(state, player, { type: 'bonusVp', amount: 1 }, 1, 'E153_StoneSculptor')
-    expect(player.cardStates?.E153_StoneSculptor?.extraData?.bonusVpEarned).toBe(2)
+    expect(bonusVp(player)).toBe(2)
   })
 
   it('is no-op when times <= 0', () => {
     const state = baseState(0)
     const player = makePlayer()
     PaymentSolver.applyTradeSideEffect(state, player, { type: 'bonusVp', amount: 5 }, 0, 'E153_StoneSculptor')
-    expect(player.cardStates?.E153_StoneSculptor?.extraData?.bonusVpEarned).toBeUndefined()
+    expect(bonusVp(player)).toBeUndefined()
   })
 })
 

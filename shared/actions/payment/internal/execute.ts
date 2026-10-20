@@ -20,6 +20,7 @@ import type {
   TradeSideEffect,
 } from '../../../contract/types'
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
+import { incCounter } from '../../../cards/helpers/card-state'
 import { payResources, paySupplyTokens } from './affordability'
 import { findActionSpaceById } from '../../../domain/space'
 import { canConsumePaymentResourceProviders } from './provider-backing'
@@ -101,15 +102,9 @@ export const applyTradeSideEffect = (
       space.resources[eff.resource] = Math.max(0, cur - times)
       return
     }
-    case 'bonusVp': {
-      player.cardStates ??= {}
-      player.cardStates[sourceCard] ??= { extraData: {} } as PlayerState['cardStates'][string]
-      const cs = player.cardStates[sourceCard]
-      cs.extraData ??= {}
-      const cur = (cs.extraData.bonusVpEarned as number | undefined) ?? 0
-      cs.extraData.bonusVpEarned = cur + eff.amount * times
+    case 'bonusVp':
+      incCounter(player, sourceCard, 'bonusVp', eff.amount * times)
       return
-    }
     case 'pushExtraDataValue': {
       player.cardStates ??= {}
       player.cardStates[eff.sourceCard] ??= { extraData: {} } as PlayerState['cardStates'][string]

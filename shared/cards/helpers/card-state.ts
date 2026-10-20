@@ -65,6 +65,18 @@ export const ensureCardState = (
   return player.cardStates[cardId]!
 }
 
+/** The card's numeric counters, created on first use. */
+export const initCardState = (player: PlayerState, cardId: string): NonNullable<CardState['counters']> => {
+  const cardState = ensureCardState(player, cardId)
+  cardState.counters ??= {}
+  return cardState.counters
+}
+
+export const incCounter = (player: PlayerState, cardId: string, key: string, delta = 1) => {
+  const counters = initCardState(player, cardId)
+  counters[key] = (counters[key] ?? 0) + delta
+}
+
 export const isCardFlagged = (player: PlayerState, cardId: string) =>
   !!player.cardStates?.[cardId]?.flagged
 

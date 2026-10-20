@@ -198,9 +198,6 @@ const addGain = (base: Partial<Resource>, next: Partial<Resource>, count: number
   return out
 }
 
-const repeat = (count: number, factory: () => ActionFlow): ActionFlow[] =>
-  Array.from({ length: Math.max(0, count) }, factory)
-
 const terrainRequest = (positions: string[], actionContext?: Record<string, unknown>, sourceCard?: string): TerrainOperation | undefined => {
   const selected = parsePositions(positions)
   if (selected.length !== positions.length) return
@@ -235,11 +232,8 @@ registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCa
   if (Object.keys(gain).length > 0) {
     children.push({ type: 'leaf', actionId: 'gain', sourceCard, params: gain })
   }
-  children.push(...repeat(Number(actionContext?.bonusVpPerSelection ?? 0) * changed, () => ({
-    type: 'leaf' as const,
-    actionId: 'bonus-vp',
-    sourceCard,
-  })))
+  const bonusVp = Number(actionContext?.bonusVpPerSelection ?? 0) * changed
+  if (bonusVp > 0) children.push({ type: 'leaf', actionId: 'bonus-vp', sourceCard, params: { amount: bonusVp } })
   if (children.length === 0) return
   return children.length === 1 ? children[0] : { type: 'seq', children }
 })

@@ -1,5 +1,5 @@
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
-import { initCardState } from '../__stubs__/helpers'
+import { initCardState } from './card-state'
 import { getCardExchanges, getRemainingHarvestExchangeUses } from '../../actions/helpers/exchange-recipes'
 import { exchangeToTrade } from '../../actions/helpers/trades'
 import { REAL_RESOURCE_KEYS } from '../../contract/resource-keys'

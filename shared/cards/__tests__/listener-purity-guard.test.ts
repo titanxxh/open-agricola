@@ -7,7 +7,7 @@ import {
   type CardListenerContext,
   type CardListenerRegistration,
 } from '../card-listeners'
-import { incCounter } from '../__stubs__/helpers'
+import { incCounter } from '../helpers/card-state'
 import { ALL_CARD_IMPLS } from '../register-all'
 import { createEventQuery } from '../../events/query'
 import { B048_ForestStone_impl } from '../B/B048_ForestStone'

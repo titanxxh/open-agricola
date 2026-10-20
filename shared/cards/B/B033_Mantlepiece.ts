@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'B033_Mantlepiece'
 
@@ -10,13 +11,7 @@ const cardImpl = {
   onBuy: (state, _player) => {
     const roundsLeft = Math.max(0, 14 - state.round)
     if (roundsLeft <= 0) return
-    // Gain score tokens as food equivalent; TODO: implement bonus-vp leaf for score
-    const children = Array.from({ length: roundsLeft }, () => ({
-      type: 'leaf' as const,
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    }))
-    return { type: 'seq' as const, children }
+    return bonusVpLeaf(CARD_ID, roundsLeft)
   },
 },
   reaches: [] as readonly string[],
