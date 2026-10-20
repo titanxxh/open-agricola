@@ -13,21 +13,20 @@ import type { ActionHookRegistry } from '../../actions/hooks'
  * full inventory.
  */
 
-import type { ActionFlow, GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
+import type { GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones.ts'
 import { findActionSpaceById } from '../../domain/space.ts'
 import {
-  createMoorSpecialActionSpace,
   validateMoorSpecialAction,
   type MoorSpecialActionPayload,
 } from '../../moor/special-actions.ts'
-import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow.ts'
+import { buildMoorSpecialActionFlow, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
 import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData, readActionSnapshotToken } from '../../cards/helpers/action-snapshot.ts'
-import { collectBeforePlacementFlows, runCardListeners } from '../../cards/card-listeners.ts'
+import { collectBeforePlacementFlows } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagAnytimeTurnFlow, tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
@@ -107,12 +106,6 @@ export const nextWorkRotationIdx = (state: GameState, current: number, actionHoo
  */
 export const roundWorkComplete = (state: GameState, actionHooks?: ActionHookRegistry): boolean =>
   state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p, actionHooks))
-
-const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
-  if (flows.length === 0) return undefined
-  if (flows.length === 1) return flows[0]
-  return { type: 'seq', children: flows }
-}
 
 export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
   if (core.engineStackDepth() > 0) return false
@@ -261,28 +254,7 @@ export const takeSpecialAction = (
   core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
 
-  const space = createMoorSpecialActionSpace(actionId)
-  const listenerExtraData = { specialActionCardId: cardId, payload }
-  const beforeFlows = runCardListeners({
-    actionHooks: core.actionHooks,
-    state,
-    player,
-    space,
-    actionId,
-    phase: 'before',
-    extraData: listenerExtraData,
-  }, undefined, { stampFlowOwner: true })
-    .map((entry) => entry.flow)
-    .filter((flow): flow is ActionFlow => !!flow)
-  const applyFlow: ActionFlow = {
-    type: 'leaf',
-    actionId: MOOR_SPECIAL_ACTION_APPLY_ACTION_ID,
-    params: payload ? { cardId, actionId, payload } : { cardId, actionId },
-  }
-  const flow = combineFlows([
-    ...beforeFlows,
-    applyFlow,
-  ]) ?? applyFlow
+  const flow = buildMoorSpecialActionFlow({ kind: 'card', state, player, cardId, actionId, payload, actionHooks: core.actionHooks })
   const frame = core.buildAdhocEngineFrame(actionId, undefined, flow)
   core.pushEngineFrame({
     ...frame,

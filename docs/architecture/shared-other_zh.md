@@ -15,6 +15,7 @@ Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流�
 - **Parent Cards**（[ADR 0005](../adr/0005-parent-cards-dedicated-expansion-runtime.md)）是 `shared/parents/*` 中的结构化数据，素材由 `public-assets.ref` 固定，与 Card Source 投影分离；选择、奖励与支线任务由后端权威裁定，并使用非公开种子。
 - **Through the Seasons** 把四个季节格保留在版图上，只启用当前季节；其 modifier 注册在每个 Core 的 `ActionHookRegistry`，从不写玩家 `cardStates`。新回合编号一提交季节就推进，早于准备阶段；准备阶段先做普通回合增长，再做该季节的累积调整（先 `applyRoundGrowth()`，后 `applySeasonPreparationAdjustments()`），调整结果不低于零。
 - **Farmers of the Moor**（[ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)）通过 [domain](domain_zh.md) 的通用 seam 增加地形、扩展、马、供暖与自己的大改良供应。不使用同时选秀时，`createInitialPlayers()`（`shared/session/state-bootstrap.ts`）给每位玩家发 4 张 FoM 小改良加 3 张已出版小改良；额外、自定义与 Community Deck 小改良只进入已出版部分；只有设置 `allowIncompleteFarmersOfTheMoorMinorDeal` 时，FoM 小改良池不足才会让每位玩家的 FoM 部分等量减少。
+- 真实 Moor 特殊行动共用 `shared/moor/special-action-flow.ts` 的 `buildMoorSpecialActionFlow`：正常与借用取牌行动、卡牌赠送和定时 offer 均先校验选定行动与目标，再进入 before。before 来源按 owner 分组，使用原生 activation 与 trigger-select；主体提交前重新校验。仅取牌不进入该生命周期，也不产生放工或行动格使用。见 [ADR 0032](../adr/0032-unified-moor-special-action-lifecycle.md) 与 `server/__tests__/moor-granted-lifecycle-session.test.ts`。
 - **Snake Opening** 只反转第 1 轮的工作轮转（[轮转、额外回合与供应人物](session_zh.md#轮转额外回合与供应人物)）。
 
 ## `shared/custom-code/`
