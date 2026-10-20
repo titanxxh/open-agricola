@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -15,8 +15,8 @@ const CARD_ID = 'B122_Mineralogist'
 const listener: CardListenerRegistration = {
   id: 'B122-mineralogist-before-collect',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const gainPerRound = context.space?.gainPerRound ?? {}
     const isClay = (gainPerRound.clay ?? 0) > 0

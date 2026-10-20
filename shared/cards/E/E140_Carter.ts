@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { timedEventFlow } from '../timed-rule-obligations'
 import type { RuleBody, TimedRule } from '../../contract/rule-plans'
@@ -13,8 +13,8 @@ const timedRules = [{ retainAfterCardLeaves: true, key: 'next-round-collection-w
 const afterCollectListener: CardListenerRegistration = {
   id: 'E140-carter-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const flow = timedEventFlow(context, CARD_ID, timedRules, 'afterCollect')
     return flow ? { flow, sourceCard: CARD_ID } : undefined

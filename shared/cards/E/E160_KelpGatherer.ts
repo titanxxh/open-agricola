@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -20,8 +20,8 @@ const CARD_ID = 'E160_KelpGatherer'
 const listener: CardListenerRegistration = {
   id: 'E160-kelp-gatherer-opponent-fishing',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return

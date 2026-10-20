@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { EXTENSION_MEEPLE_SPACE_IDS, isExtensionMeepleSpaceId } from '../helpers/action-space-categories'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -10,8 +10,8 @@ const CARD_ID = 'A174_MasterHora'
 const listener: CardListenerRegistration = {
   id: 'A174-master-hora-before-extension-space',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: Array.from(EXTENSION_MEEPLE_SPACE_IDS),
+  phases: ['before'],
+  actionSpaces: Array.from(EXTENSION_MEEPLE_SPACE_IDS),
   requiresNewPlacement: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isExtensionMeepleSpaceId(context.space?.id)) return

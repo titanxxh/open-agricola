@@ -1,6 +1,7 @@
 import { afterEach, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
@@ -117,4 +118,17 @@ it('a full legal farm offers no Steam Plow payment and continues to the next rou
   expect(response.state.players[0]!.fields).toHaveLength(13)
   expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, food: 16 })
   expect(response.state.events.filter(event => event.type === 'worker.placed')).toHaveLength(4)
+})
+
+it('does not offer payment when the actual workerless Farmland use is vetoed', () => {
+  const session = make()
+  const query = 'TEST_WorkerlessFarmlandVeto'
+  session.state.players[0]!.minorPlayed.push(query)
+  session.withCtx(() => requireActiveCardRegistry('workerless-farmland-query').registerListener({
+    id: query, cardIds: [query], actionSpaces: ['farmland'], phases: ['isDoable'],
+    handler: context => context.actionSpaceUse?.newPlacement === false ? { doable: false } : undefined,
+  }))
+  const response = round(session, false, true, CARD)
+  expect(response.state.players[0]!.fields).toEqual([])
+  expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, food: 16 })
 })

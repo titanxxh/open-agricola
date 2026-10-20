@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
@@ -9,8 +9,8 @@ const CARD_ID = 'A095_Angler'
 const listener: CardListenerRegistration = {
   id: 'A95-angler-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
     const foodGained = sumResourceMovedFromActionSpace(

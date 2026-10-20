@@ -20,30 +20,8 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C150_ParrotBreeder'
 const RIGHT_KEY = 'right'
 
-/**
- * C150 Parrot Breeder (Occupation, 4+ players).
- *
- * Rule: on your turn, pay 1 <GRAIN> to use the same action space the player
- * to your right just used (not retroactive; not Meeting Place).
- *
- * State (`cardStates.C150_ParrotBreeder`):
- *   - `flags.flagged` — grain paid within the mandatory copy placement flow.
- *   - `extraData.right: string | null` — the space id the right-neighbour
- *     used on their most recent place-farmer.
- *
- * Four listeners — all card-local, no engine changes:
- *   1. `after:place-farmer` scope `player`  — owner placed → clear tracker + flag.
- *   2. `after:place-farmer` scope `opponent` — any opponent placed → update tracker
- *      (record if they are the right-neighbour, else clear) + unflag.
- *   3. `anytime` scope `player` — replace an idle work turn with payment and
- *      placement on the sole legal target, evaluated after reserving grain.
- *   4. `computeArgs:place-farmer` scope `player` — while flagged with a tracked
- *      non-MeetingPlace right space, inject an `OCCUPIED_SPACE_CHOICE_PREFIX`
- *      extra option so the owner can place on the tracked space even when it
- *      is still occupied by the right-neighbour.
- *
- * Seat order: `state.players` array order is our seat order (same assumption
- * used by other cross-player cards). Right-neighbour is `(i − 1 + n) mod n`.
+/** Tracks the right neighbour's latest actual target, including moves.
+ * Settlement of an enclosing use must not overwrite a later target.
  */
 
 const rightNeighbourIndex = (state: { players: PlayerState[] }, ownerId: string): number => {
@@ -85,8 +63,8 @@ const trackerFlow = (
 const afterPlaceFarmerSelfListener: CardListenerRegistration = {
   id: 'C150-parrot-breeder-after-self-place',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Owner just placed; consume the flag/tracker pairing.
@@ -100,8 +78,8 @@ const afterPlaceFarmerSelfListener: CardListenerRegistration = {
 const afterPlaceFarmerOpponentListener: CardListenerRegistration = {
   id: 'C150-parrot-breeder-after-opponent-place',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const owner = context.ownerPlayer

@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -9,8 +9,8 @@ const CLEANACRE_SPACES = new Set(['farmland', 'cultivation', 'farm-supplies-6'])
 const listener: CardListenerRegistration = {
   id: 'C176-cleanacre-after-action-space',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!CLEANACRE_SPACES.has(context.space?.id ?? '')) return
     return { flow: gainLeaf(CARD_ID, { clay: 2 }), sourceCard: CARD_ID }

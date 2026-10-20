@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
@@ -14,8 +14,8 @@ const NON_WOOD_RESOURCES: (keyof Resource)[] = [
 const listener: CardListenerRegistration = {
   id: 'D143-tree-cutter-after-collect',
   cardIds: [CARD_ID],
-  actions: ['collect'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const events = context.actionEvents ?? context.transactionEvents
     const hasThreePlus = NON_WOOD_RESOURCES.some((res) =>

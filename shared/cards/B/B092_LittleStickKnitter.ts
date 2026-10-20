@@ -1,14 +1,14 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B092_LittleStickKnitter'
 const listener: CardListenerRegistration = {
   id: 'B92-little-stick-knitter-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'sheep-market') return
     if (context.state.round < 5) return

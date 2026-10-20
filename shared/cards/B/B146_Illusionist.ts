@@ -1,7 +1,7 @@
 import { cardIdentityChoice } from '../../actions/helpers/card-choice'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
@@ -109,8 +109,8 @@ const pickAccumulatingResource = (
 const listener: CardListenerRegistration = {
   id: 'B146-illusionist-before-collect',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['before'],
+  actionSpaces: 'all',
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (playerHasCardCapability(context.player, 'preventsHandDiscard')) return

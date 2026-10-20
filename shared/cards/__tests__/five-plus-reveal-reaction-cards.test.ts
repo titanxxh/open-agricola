@@ -249,7 +249,8 @@ describe('5+ reveal and reaction occupation cards', () => {
       player: opponent,
       triggerPlayer: opponent,
       space: houseBuilding,
-      actionId: 'place-farmer',
+      actionId: houseBuilding.id,
+      actionSpaceUse: { newPlacement: true },
       phase: 'after',
     } as unknown as CardListenerContext))
 

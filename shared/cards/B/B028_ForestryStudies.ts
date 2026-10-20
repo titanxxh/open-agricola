@@ -1,14 +1,14 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B028_ForestryStudies'
 const listener: CardListenerRegistration = {
   id: 'B28-forestry-studies-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'forest') return
     return {

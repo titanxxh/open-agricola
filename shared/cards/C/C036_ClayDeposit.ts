@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'C036_ClayDeposit'
 const listener: CardListenerRegistration = {
   id: 'C36-clay-deposit-after-collect',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['immediatelyAfter'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const gainPerRound = context.space?.gainPerRound ?? {}
     if ((gainPerRound.clay ?? 0) <= 0) return

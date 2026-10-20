@@ -112,8 +112,6 @@ import {
 } from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
-import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -677,10 +675,6 @@ export class GameCore {
   /** @internal phase access — deep-clone a player snapshot. */
   cloneSessionPlayer(p: PlayerState): PlayerState { return this.clonePlayer(p) }
 
-  /** @internal phase access — `place-farmer` after-hook injection chain. */
-  invokePlaceFarmerAfterHooks(player: PlayerState, space: ActionSpace): boolean {
-    return this.runPlaceFarmerAfterHooks(player, space)
-  }
   /** @internal phase access — animal-reorg pivot detection used by Harvest/Round. */
   hasPendingAnimalsCheck(player: PlayerState): boolean { return this.hasPendingAnimals(player) }
   /** @internal phase access — start a reorganize sub-flow frame. */
@@ -793,7 +787,10 @@ export class GameCore {
   /** @internal Round phase — onRoundEnd stage hook chain trampoline. */
   invokeRoundEndHooks(): SessionResponse { return this.withCtx(() => this.continueRoundEndHooks()) }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
-  createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
+  createEngineForSpace(actionId: string, personUse?: import('../contract/person-use').PersonUseReceipt): Engine {
+    return Engine.fromActionSpace(actionId, { ...this.engineDeps(), requireRootCompletion: true },
+      this.state.players[this.state.currentPlayerIndex]?.id, { newPlacement: true, personUse })
+  }
   /** @internal phase access — push a synthetic pending-only frame. */
   pushSyntheticPendingFrame(envelope: PendingEnvelope, ownerPlayerIndex: number, reason: SubFlowReason): void {
     this.pushPendingFrame(envelope, ownerPlayerIndex, reason)
@@ -1596,45 +1593,6 @@ export class GameCore {
       hooks: this.hookDispatcher,
       log: this.engineLog,
     }
-  }
-
-  private runPlaceFarmerAfterHooks(
-    player: PlayerState,
-    space: ActionSpace,
-  ): boolean {
-    const context = {
-      actionHooks: this.actionHooks, state: this.state,
-      player,
-      space,
-      actionId: 'place-farmer',
-      phase: 'after' as const,
-      result: { type: 'ok' as const, personUse: this.engineStack.current()?.personUse },
-    }
-    const matched = getMatchingListeners(context)
-    if (matched.length === 0) return false
-
-    const newEngine = Engine.fromBuiltNodes(this.engineDeps(), (internals) =>
-      buildPhaseTrailingNodes(
-        internals,
-        matched,
-        'after',
-        'place-farmer',
-        this.state,
-        { result: context.result },
-        context.player.id,
-        undefined,
-        undefined,
-        undefined,
-        createTriggerSnapshot(this.state),
-      ),
-    )
-    if (!newEngine) return false
-    const frame = this.engineStack.current()
-    if (!frame) return false
-    return this.engineStack.replaceCurrentFrameEngine(newEngine, {
-      kind: 'flow',
-      flow: { type: 'seq', children: [] },
-    })
   }
 
   private createFlowEngine(
@@ -3580,7 +3538,7 @@ export class GameCore {
   }
 
   private runEngineStepsInContext(): void {
-    let frame = this.engineStack.current()
+    const frame = this.engineStack.current()
     if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
     const space = this.getSpaceById(frame.spaceId)
     if (!this.state.players[frame.ownerPlayerIndex] || !space) return
@@ -3613,7 +3571,7 @@ export class GameCore {
 
       if (step.type === 'blocked' || step.type === 'done') {
         // Snapshot the relevant fields from the current frame BEFORE deciding
-        // whether to pop. runPlaceFarmerAfterHooks mutates the same frame's
+        // whether to pop. Completion may mutate the same frame's
         // engine, so we keep the frame on the stack for that branch.
         const visiblePlayerIndex = this.visiblePlayerIndexForFrame(frame)
         const returnTarget = step.type === 'done'
@@ -3631,7 +3589,6 @@ export class GameCore {
           return
         }
         if (step.type === 'done') this.engineStack.clearDeferredPlayerSwitch()
-        const isActionEngine = frame.source.kind === 'action'
         const ownerIdx = frame.ownerPlayerIndex
         if (frame.stageResume && frame.stageResume.hook !== 'onReorganizeComplete') {
           const animalOwnerIndex = this.state.players.findIndex(candidate => this.hasPendingAnimals(candidate))
@@ -3661,12 +3618,6 @@ export class GameCore {
           return
         }
         if (this.stageDispatch.completeFrameIfStage(frame)) return
-        if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
-          // The frame's engine/source were replaced in-place; loop again with
-          // the same frame.
-          frame = this.engineStack.current()!
-          continue
-        }
         if (this.hasPendingAnimals(frameOwnerPlayer)) {
           const originIdx = this.turnOwnerPlayerIndex ?? ownerIdx
           this.engineStack.pop()

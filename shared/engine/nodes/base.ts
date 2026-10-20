@@ -16,6 +16,8 @@ export abstract class BaseNode implements EngineNode {
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, unknown>
   public ownerPlayerId?: string
+  public spaceUseBodyId?: string
+  public reactionPhase?: 'immediatelyAfter' | 'after'
   public optional?: boolean
   public optionalActive?: boolean
   public optionalPromptKey?: PromptKey
@@ -91,6 +93,8 @@ export abstract class BaseNode implements EngineNode {
   private sharedCursorData(): Record<string, unknown> {
     const data: Record<string, unknown> = {}
     if (this.ownerPlayerId !== undefined) data.ownerPlayerId = this.ownerPlayerId
+    if (this.spaceUseBodyId !== undefined) data.spaceUseBodyId = this.spaceUseBodyId
+    if (this.reactionPhase !== undefined) data.reactionPhase = this.reactionPhase
     if (this.choiceLabelKey !== undefined) data.choiceLabelKey = this.choiceLabelKey
     if (this.choiceLabelParams !== undefined) data.choiceLabelParams = this.choiceLabelParams
     if (this.optional !== undefined) data.optional = this.optional

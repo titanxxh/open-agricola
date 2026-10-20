@@ -40,8 +40,8 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C148-mud-wallower-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isAccumulationSpace(context)) return
 

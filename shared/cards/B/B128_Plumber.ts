@@ -12,8 +12,8 @@ const CARD_ID = 'B128_Plumber'
 const triggerListener: CardListenerRegistration = {
   id: 'B128-plumber-after-place-farmer-major-improvement',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'major-improvement') return
     // Only offer if renovation is actually possible

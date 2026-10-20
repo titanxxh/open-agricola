@@ -25,13 +25,13 @@ const CARD_ID = 'C112_Thresher'
  *
  * Players: 1+.
  */
-const TRIGGER_SPACE_IDS = ['grain-utilization', 'farmland', 'cultivation'] satisfies NonNullable<CardListenerRegistration['actions']>
+const TRIGGER_SPACE_IDS = ['grain-utilization', 'farmland', 'cultivation']
 
 const beforeListener: CardListenerRegistration = {
   id: 'C112-thresher-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: TRIGGER_SPACE_IDS,
+  phases: ['before'],
+  actionSpaces: TRIGGER_SPACE_IDS,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if ((context.player.resources.food ?? 0) < 1) return
     return payGainNode({

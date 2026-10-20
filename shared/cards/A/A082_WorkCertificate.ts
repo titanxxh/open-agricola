@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
@@ -49,8 +49,8 @@ const findChoices = (context: CardListenerContext): ActionFlow[] => {
 const listener: CardListenerRegistration = {
   id: 'A82-work-certificate-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choices = findChoices(context)
     if (choices.length === 0) return

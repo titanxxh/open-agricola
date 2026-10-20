@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
@@ -9,8 +9,8 @@ const CARD_ID = 'E038_RodCollection'
 const afterCollectListener: CardListenerRegistration = {
   id: 'E38-rod-collection-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
     const maxWood = Math.min(2, context.player.resources.wood ?? 0)

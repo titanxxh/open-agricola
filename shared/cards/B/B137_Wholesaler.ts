@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -58,8 +58,8 @@ const createSpaceRewardListener = (
 ): CardListenerRegistration => ({
   id: listenerId,
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: [spaceId],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== spaceId) return
     const data = getData(context)

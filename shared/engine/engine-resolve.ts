@@ -1,3 +1,5 @@
+import { actionSpaceQueryContext, inheritSpaceUseBody } from './space-use-nodes'
+import { captureSpaceUseEvents } from './space-use-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext } from '../actions/flow'
 import type {
   ActionExecutionContext,
@@ -330,6 +332,8 @@ const buildInternalActionChildNodes = (
       child.resultKey,
       child.paymentInfoFrom,
     )
+    const host = int.tree.findNodeById(hostNodeId)
+    if (host) inheritSpaceUseBody(host, node)
     if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
     return node
   })
@@ -353,6 +357,8 @@ const buildDeferredHostNode = (
     hostNode.choiceLabelParams,
     executionContext.actionContext,
   )
+  inheritSpaceUseBody(hostNode, node)
+  node.actionSpaceUse = executionContext.actionSpaceUse
   node.ownerPlayerId = hostNode.ownerPlayerId
   node.mandatory = hostNode.mandatory
   node.internalHostNodeId = hostNode.id
@@ -531,7 +537,8 @@ export function engineResolveChoice(
       }
       const actionContext = actionContextForNode(child, int)
       const executionContext: ActionExecutionContext = {
-    actionHooks: int.hooks.actionHooks,
+        ...actionSpaceQueryContext(child),
+        actionHooks: int.hooks.actionHooks,
         state: context.state,
         player: context.player,
         space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -549,11 +556,13 @@ export function engineResolveChoice(
         actionId: child.actionId,
       })
       const actionId = replaceResult.actionId
+      executionContext.actionSpaceUse = actionSpaceQueryContext(child, actionId).actionSpaceUse
       executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
       const flowNode = buildReplacementChoiceNode(int, {
         ...executionContext, ...currentEventReadContext(int),
       }, child, replaceResult)
       if (flowNode) {
+        inheritSpaceUseBody(child, flowNode)
         const targetIndex = node.children.indexOf(targetNode!)
         int.tree.insertAfter(child.id, [flowNode])
         child.resolve({ type: 'ok' })
@@ -742,6 +751,7 @@ export function engineResolveChoice(
       const triggerSnapshot = result.type === 'ok'
         ? createTriggerSnapshot(context.state)
         : undefined
+      captureSpaceUseEvents(int, child, result, eventReadContext.actionEvents)
       const immediatePhase = int.hooks.immediatelyAfter(
         { ...executionContext, ...eventReadContext, actionId, choice },
         result,
@@ -831,6 +841,7 @@ export function engineResolveChoice(
       }
       if (result.type === 'flow') {
         const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
+        inheritSpaceUseBody(child, flowNode)
         if (child.mandatory === true) {
           enforceCompositeContinuationMandatory(flowNode)
         }
@@ -890,6 +901,7 @@ export function engineResolveChoice(
     selectedOption: choice,
   }
   const pendingActionNode = pendingHost instanceof ActionNode ? pendingHost : null
+  executionContext.actionSpaceUse = pendingActionNode ? actionSpaceQueryContext(pendingActionNode).actionSpaceUse : undefined
   if (pendingActionNode?.beforePhaseResolved === true) {
     executionContext.actionContext = {
       ...(executionContext.actionContext ?? {}),
@@ -919,6 +931,7 @@ export function engineResolveChoice(
       actionId,
     })
     committedActionId = replaceResult.actionId
+    executionContext.actionSpaceUse = pendingActionNode ? actionSpaceQueryContext(pendingActionNode, committedActionId).actionSpaceUse : undefined
     executionContext.sourceCard = replaceResult.sourceCard ?? executionContext.sourceCard
     const replacementAction = int.registry.get(committedActionId)
     if (!replacementAction) {
@@ -1130,6 +1143,7 @@ export function engineResolveChoice(
   const triggerSnapshot = result.type === 'ok'
     ? createTriggerSnapshot(context.state)
     : undefined
+  if (pendingActionNode) captureSpaceUseEvents(int, pendingActionNode, result, eventReadContext.actionEvents)
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
@@ -1222,6 +1236,7 @@ export function engineResolveChoice(
     }
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
+      if (pendingActionNode) inheritSpaceUseBody(pendingActionNode, flowNode)
       if (pendingActionNode?.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

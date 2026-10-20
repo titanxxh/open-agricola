@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cardEffectHooks } from '../../cards/card-effects'
+import { assertSandboxListenerManifest } from '../sandbox-listener-phases'
 import {
   assertCustomEffectResult, extraHookArguments, isFlowResultHook, normalizeCustomManifest, QUERY_HOOK_RESULT_KINDS,
   registeredEffectMetadata, registeredListenerData, type RawCustomManifest,
@@ -45,10 +46,19 @@ describe('normalizeCustomManifest', () => {
     [manifest({ effectKeys: ['onSowExtraField'] }), "effect hook 'onSowExtraField'"],
     [manifest({ effectKeys: ['onBuy'], effectMetadata: { handHooks: ['onBuy'] } }), "hand hook 'onBuy'"],
     [listener({ actions: ['forest'] }), "listener action 'forest'"],
+    [listener({ actions: ['wish-children'] }), "listener action 'wish-children'"],
+    [listener({ actionSpaces: ['fishing'] }), 'listener action-space selector'],
     [listener({ phases: ['during'] }), "listener phase 'during'"],
     [listener({ scope: 'everyone' }), "listener scope 'everyone'"],
   ])('rejects a declaration outside the contract', (raw, detail) => {
     expect(() => normalizeCustomManifest(raw, CARD_ID)).toThrow(`${detail} is not in the Workshop Capability Contract`)
+  })
+
+  it.each([['fishing'], undefined, () => ['fishing']])('rejects an unopened native selector in fresh and saved manifests', actionSpaces => {
+    expect(() => normalizeCustomManifest(listener({ actionSpaces }), CARD_ID)).toThrow('listener action-space selector')
+    const saved = { effectHooks: [], listeners: [{ registrationId: 'saved', actions: ['collect'], phases: ['after'], actionSpaces }] }
+    expect(() => Reflect.apply(assertSandboxListenerManifest, undefined, [CARD_ID, saved])).toThrow('unsupported selector')
+    expect(normalizeCustomManifest(listener({}), CARD_ID).listeners[0]).toMatchObject({ actions: ['collect'], phases: ['after'] })
   })
 
   it('keeps the declared effect metadata and listener data fields', () => {

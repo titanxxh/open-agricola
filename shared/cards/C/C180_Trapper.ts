@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 import { payGainNode } from '../helpers/pay-gain-node'
@@ -20,8 +20,8 @@ const occupiedWoodCount = (context: CardListenerContext) =>
 const listener: CardListenerRegistration = {
   id: 'C180-trapper-after-wood',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
     if ((context.player.resources.food ?? 0) < 1) return

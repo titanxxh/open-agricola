@@ -68,6 +68,7 @@ const canExecutePlacementSpace = (
       player,
       {
         actionHooks: contextOverrides.actionHooks,
+        actionSpaceUse: contextOverrides.actionSpaceUse ?? { newPlacement: true },
         sourceCard: contextOverrides.sourceCard,
         actionContext,
       },
@@ -76,6 +77,7 @@ const canExecutePlacementSpace = (
   }
   return isPlacementActionDoableInFlowContext({
     actionHooks: contextOverrides.actionHooks,
+    actionSpaceUse: contextOverrides.actionSpaceUse,
     actionId: space.id,
     action: space,
     state,
@@ -125,6 +127,7 @@ export function computeAllowedPlacementSpaces(
   })
   const listenerContext: CardListenerDispatchInput = {
     ...contextOverrides,
+    actionSpaceUse: undefined,
     actionHooks: contextOverrides.actionHooks,
     state,
     player,

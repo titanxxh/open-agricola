@@ -24,9 +24,12 @@ anytime                  注册额外的 anytime 行动
 
 - `ActionHookContext` 为 `{ actionHooks, state, player, space, actionId, phase, result?, choice?, doable? }`；执行期 `ActionMutationContext.eventSink` 记录事件。`ActionHookResult`（`shared/actions/hooks.ts`）为 `{ doable?, actionId?, extraData?, extraOptions?, extraExchanges?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard?, countCardUse?, labelKey?, labelParams?, decline?, alternativeFlow? }`。`extraExchanges` 注入运行时兑换，`countCardUse` 控制启用计数，`labelKey` / `labelParams` 为这次贡献命名；`computeReplace` 结果带 `decline` + `alternativeFlow` 时，该流程作为原行动旁的备选项提供，而不是替换原行动。顶层 `flow.sourceCard` 会复制给缺少来源的子 leaf。
 - Card listener 默认只匹配已打出卡牌；只有显式 `zones` 才扫描手牌。匹配结果携带 `ownerCardId` / `ownerCardZone`。手牌 listener 同样保持纯函数，按视角序列化时隐藏从隐藏手牌派生的全部信息。
-- `listener-contract.ts` 统一规定订阅目标和阶段。每条注册只能选择显式 `actions`、已提交 host 的 `events`（仅 `after`）或 `globalQuery: true`（仅 `isDoable`），且阶段非空。`anytime` 和 `compute-exchanges` 是显式查询身份。全部注册入口复制并冻结筛选条件，包括 retained timed listener 和工坊 overlay；clone/merge 和 getter 不能改变订阅。架构门禁以相同契约检查完整展开的 `ALL_CARD_IMPLS`。Workshop 在 AST、manifest 和两种 runtime 边界保持独立受测子集。
+- `listener-contract.ts` 统一规定订阅目标和阶段。每条注册只能选择显式 `actions`、`actionSpaces`（`before`、`immediatelyAfter`、`after`、`isDoable` 或 `computeReplace`）、已提交 host 的 `events`（仅 `after`）或 `globalQuery: true`（仅 `isDoable`），且阶段非空。`actionSpaces` 接受非空棋盘格 ID 数组或显式 `'all'`；handler 可筛选格子类别，无需枚举所有卡牌创建的格子。棋盘格 ID 是筛选数据，不是行动订阅身份。`anytime` 和 `compute-exchanges` 是显式查询身份。全部注册入口复制并冻结筛选条件，包括 retained timed listener 和工坊 overlay；clone/merge 和 getter 不能改变订阅。架构门禁以相同契约检查完整展开的 `ALL_CARD_IMPLS`。Workshop 在 AST、manifest 和两种 runtime 边界保持独立受测子集。
 - Listener `scope` 为 `player`、`opponent` 或 `any`。匹配按 listener ID 枚举；尾随节点按 owner 分组（全局、当前玩家、其他玩家），组内按打出顺序稳定排序。反应 listener 进入 trigger-select；compute / query listener 确定性聚合。
-- 行动格使用反应订阅 `place-farmer` 并筛选 `context.space`：`before` 在合法目标确定后、该格费用前运行，`after` 等待完整格子流程及其嵌套反应完成。内部 `collect` / `gain` 完成不代表整格使用完成。整格查询和替换保留各自既有边界。
+- 行动格使用反应选择 `actionSpaces`；规则动作保留 `actions`，包括订阅 `place-farmer` 的人员放置规则。显式用格上下文标识实际进入、查询和整格替换。内部规则动作即使带相同 `space` 或 `targetSpaceId`，也不会打开用格窗口。见 [ADR 0031](../adr/0031-explicit-action-space-use-subscriptions.md)。
+- `before` 在合法目标确定后、费用前运行。`space-use-nodes.ts` 用引擎 sequence 包住一次完整用格，分为主体和完成阶段。普通放人、额外放人、搬迁和无人员用格进入此边界；只放人不执行目标的效果不进入。主体包括支付、选择、替换后代和强制子流程。只有主体事件进入本次用格收据；反应奖励及嵌套用格保留各自身份。
+- 主体最后一步完成时，空间反应和已捕获的规则反应共用既有 owner/trigger-select 调度：所有 `immediatelyAfter` 完成后才进入普通 `after`。多步主体内较早完成的规则动作保留既有顺序。`space-use-runtime.ts` 分别在每个阶段入口捕获空间来源，因此立即反应可为随后 after 阶段引入新来源，但不会重放较早的规则反应。阶段内已捕获来源保持固定，handler 读取实时状态。scope 元数据和收据保存在私有引擎游标，跨 pending、恢复和撤销保留。
+- 真实 `place-farmer` wrapper 保留自己的规则动作完成点，包括带工人和无工人的 jump。顶层放置和 `place-farmer-on-space` 没有该 wrapper，由 scope 仅将放置动作订阅加入共同 after 池。原生 scope 调度信息防止额外放置重复完成。移动不创建放置回调，合成完成点不重派主体事件订阅。每回合限次使用既有 Turn Scope 身份，不依赖某条反应最后被选择。
 - 领域事实订阅显式声明 `events`，只匹配已完成 host 捕获的 `actionEvents`。本次事实缺失或不相关时不匹配，即使更广的 transaction 含有同类事实。它复用既有尾随 owner 和 trigger-select；记录事件不会另建完成边界。
 
 **事件是规则事实的来源。** `EventStore` 为每个公开行动或内部 leaf 开启 transaction，只在成功时提交（失败、取消、回滚和跳过都不追加），按 `state.nextEventSeq` 重新编号，校验可见性、JSON 安全、大小与已知字段，并追加 `publicEvents.committed` 包。`state.log` 是事件 mapper 派生的 UI 缓存。Listener 读取 `transactionEvents` / `eventQuery`，资源事实不读未提交的全局 `state.events` 或 `context.result`。
@@ -57,7 +60,7 @@ anytime                  注册额外的 anytime 行动
 
 复合行动在展开前完成替换选择并保留延迟展开标记，子行动随后各自做替换决定（[ADR 0027](../adr/0027-composite-actions-use-existing-replacement-selection.md)）。`EngineTree.insertBefore()` / `insertAfter()` 保留父级 OR/XOR 的选择。直接 `cancel` 受保护原子行动（`plow`、`sow`、`construct`、`stables`、`fence`、`reorganize`、`selection`）会被可恢复地拒绝；可选性来自 `optional` metadata 与 `__skip__`，撤销来自历史。
 
-测试：`server/__tests__/action-replacement-session.test.ts`、`shared/engine/__tests__/engine-pipeline.test.ts`、`shared/actions/__tests__/flow-replacement-admission.test.ts`。
+测试：`server/__tests__/action-replacement-session.test.ts`、`server/__tests__/space-use-boundaries-session.test.ts`、`server/__tests__/space-use-listener-lifecycle-session.test.ts`、`shared/engine/__tests__/engine-pipeline.test.ts`、`shared/actions/__tests__/flow-replacement-admission.test.ts`。
 
 ### 当前步骤准入与 blocked 恢复
 

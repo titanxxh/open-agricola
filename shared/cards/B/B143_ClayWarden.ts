@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { isHollowSpaceId } from '../helpers/action-space-categories'
@@ -15,8 +15,8 @@ const CARD_ID = 'B143_ClayWarden'
 const listener: CardListenerRegistration = {
   id: 'B143-clay-warden-opponent-hollow',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isHollowSpaceId(context.space?.id)) return

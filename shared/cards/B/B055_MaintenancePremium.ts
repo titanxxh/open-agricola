@@ -29,8 +29,8 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const woodCollectListener: CardListenerRegistration = {
   id: 'B55-maintenance-premium-after-collect-wood',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0

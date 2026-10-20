@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { countTerrain } from './moor-batch1-helpers'
 import type { CardImpl } from '../registry'
@@ -10,8 +10,8 @@ const CARD_ID = 'M094_PeatBath'
 const listener: CardListenerRegistration = {
   id: 'M094-peat-bath-after-infirmary',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'moor-infirmary') return
     const player = context.ownerPlayer ?? context.player

@@ -60,6 +60,7 @@ const selectableSpaces = (
   sourceSpaceId: string | undefined,
 ): ActionSpace[] => {
   const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks,
+    actionSpaceUse: { newPlacement: false },
     sourceCard,
     actionContext,
     ignoreWorkerAvailability: true,
@@ -107,7 +108,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       ?? readString(params?.excludeSpaceId)
     const workerId = readString(actionContext?.moveFarmerWorkerId)
       ?? readString(params?.workerId)
-    const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks, sourceCard, actionContext, ignoreWorkerAvailability: true })
+    const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks, actionSpaceUse: { newPlacement: false }, sourceCard, actionContext, ignoreWorkerAvailability: true })
     if (!isSelectableSpace(targetSpace, sourceSpaceId, allowed)) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
@@ -127,12 +128,13 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       ...(sourceCard ? { viaCardId: sourceCard } : {}),
     })
 
-    const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id }
+    const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id, placedWorkerId: workerId }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
     const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, targetActionContext)
     const targetFlow: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
+      spaceUse: { newPlacement: false },
       expandFlow: true,
       sourceCard,
       actionContext: targetActionContext,

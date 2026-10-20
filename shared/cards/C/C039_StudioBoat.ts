@@ -2,7 +2,7 @@ import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces, definePlayerActionSpaceFlow } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 import { hasCollectableResources } from '../../actions/effects/collect'
 
@@ -32,8 +32,8 @@ const travelingPlayersOwnerVp: CardListenerRegistration = {
   // 1-3p path: traveling-players action space does not exist (see
   // common-traveling-players.ts `players: [4]`), so this listener is dormant
   // and the 1-3p +1 VP is granted by the execute() handler above.
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // context.space is the action space the farmer was placed on (resolved
     // from the engine's activeSpaceId). Only fire on the global Traveling

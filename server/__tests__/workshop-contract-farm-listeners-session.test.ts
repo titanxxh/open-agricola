@@ -9,15 +9,15 @@ import { COUNT_LEAF_SOURCE, compileContractCard, createRoundTenSession } from '.
 
 /**
  * ADR 0025 fixed behavior tests for the listener actions gain, plow, sow,
- * bake-bread, fence, stables, family-growth, wish-children, receive and reap,
+ * bake-bread, fence, stables, family-growth, receive and reap,
  * and for the opponent listener scope. One custom card listens to
- * each leaf in before, immediatelyAfter and after, and wish-children in before, and counts
+ * each leaf in before, immediatelyAfter and after, and counts
  * every call on its own card state. Each scenario is a two-player work phase
  * in round 10; player 0 has played the card and takes one action.
  */
 
 const CARD_ID = 'CUSTOM_FarmProbe'
-const ACTIONS = ['gain', 'receive', 'plow', 'sow', 'fence', 'stables', 'wish-children', 'family-growth', 'bake-bread', 'reap']
+const ACTIONS = ['gain', 'receive', 'plow', 'sow', 'fence', 'stables', 'family-growth', 'bake-bread', 'reap']
 const PHASES = ['before', 'immediatelyAfter', 'after']
 const ONE_CELL_FENCES = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
 
@@ -30,7 +30,7 @@ afterEach(() => {
 const start = (configure?: (state: GameState) => void, workers: [number, number] = [2, 0]) => {
   const card = compileContractCard(CARD_ID, `${COUNT_LEAF_SOURCE}
 const CARD_IMPL = { listeners: [
-${ACTIONS.flatMap(action => (action === 'wish-children' ? ['before'] : PHASES).map(phase => `  { cardIds: [CARD_ID], actions: ['${action}'], phases: ['${phase}'],
+${ACTIONS.flatMap(action => PHASES.map(phase => `  { cardIds: [CARD_ID], actions: ['${action}'], phases: ['${phase}'],
     handler: () => ({ sourceCard: CARD_ID, flow: count('${phase}:${action}') }) },`)).join('\n')}
 ] }`)
   const session = createRoundTenSession(card, { workers, configure })
@@ -159,15 +159,15 @@ describe('Workshop Capability Contract farm and round listeners', () => {
     expect(session.cardWarnings).toEqual([])
   })
 
-  it('reacts to family-growth, and to wish-children before that action space is used', () => {
+  it('reacts to family-growth without subscribing to the board action space', () => {
     const session = start((state) => { state.players[0]!.rooms = 3 })
 
     const grown = session.takeAction(0, 'wish-children')
 
     expect(grown.ok).toBe(true)
     expect(grown.state.players[0]!.workers.filter(worker => worker.isActive)).toHaveLength(3)
-    // wish-children is the action space; only its before phase is dispatched to listeners.
-    expect(counters(session)).toEqual({ 'before:wish-children': 1, ...reactions('family-growth') })
+    // Only the family-growth rule action belongs to the Workshop subscription contract.
+    expect(counters(session)).toEqual(reactions('family-growth'))
     expect(session.cardWarnings).toEqual([])
   })
 

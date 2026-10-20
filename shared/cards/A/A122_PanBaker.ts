@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'A122_PanBaker'
 const gainListener: CardListenerRegistration = {
   id: 'A122-pan-baker-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || context.space.id !== 'grain-utilization') return
     return { flow: gainLeaf(CARD_ID, { clay: 2, wood: 1 }), sourceCard: CARD_ID }
@@ -19,8 +19,8 @@ const gainListener: CardListenerRegistration = {
 const isDoableListener: CardListenerRegistration = {
   id: 'A122-pan-baker-isdoable-grain-utilization',
   cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['grain-utilization'],
+  phases: ['isDoable'],
+  actionSpaces: ['grain-utilization'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return

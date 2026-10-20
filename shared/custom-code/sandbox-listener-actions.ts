@@ -11,7 +11,6 @@ export const sandboxListenerActions = [
   'improvement',
   'occupation',
   'place-farmer',
-  'wish-children',
   'family-growth',
   'bake-bread',
   'breed',

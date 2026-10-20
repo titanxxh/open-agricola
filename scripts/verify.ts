@@ -69,9 +69,10 @@ export function verificationPlan(cwd: string, input: string[]): Plan {
     ] }
   }
   if (mode === 'prepush') {
-    if (args.length) throw new Error('prepush always runs the complete fast suite and lint; it accepts no filters')
+    if (args.length) throw new Error('prepush always runs card boundaries, the complete fast suite and lint; it accepts no filters')
     return { mode, steps: [
       { name: 'test-services', command: process.execPath, args: ['scripts/local-services.mjs', '--test'] },
+      { name: 'card-impl-boundaries', command: 'pnpm', args: ['run', 'check:card-impl-boundaries'] },
       { name: 'fast', command: 'pnpm', args: ['test:fast'] },
       { name: 'lint', command: 'pnpm', args: ['run', 'lint'] },
     ] }

@@ -3,11 +3,16 @@ import { checkFarmWriteBoundaries } from './farm-write-boundaries'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
+import { execFileSync } from 'node:child_process'
 import ts from 'typescript'
 import { walkSourceFiles, parseSource } from './source-files'
 import { isTestFile } from './architecture-policy.mjs'
 import { collectListenerMutationFindings, parseListenerFunction } from './listener-mutation-scan'
-import { listenerContractError } from '../shared/cards/listener-contract'
+import { isCardListenerAction } from '../shared/cards/listener-contract'
+import { getRegisteredPlayerActionSpaceIds } from '../shared/cards/player-action-space'
+import { auditCardListeners, auditListenerContractError, collectBoardActionSpaceIds, renderCardListenerAudit } from './card-listener-audit'
+import { sourceFingerprint } from './verify'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -20,6 +25,9 @@ export type CardImplBoundaryViolation = {
   referencedCardId?: string
   kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation' | 'farm-layout-write' | 'listener-subscription-contract'
   message?: string
+  listenerId?: string
+  phases?: unknown
+  targets?: unknown
 }
 
 const FARMYARD_FIELD_OWNER = path.join('shared', 'cards', 'helpers', 'card-field.ts')
@@ -81,10 +89,11 @@ export type RuntimeCardImpl = {
   file: string
   listeners?: readonly {
     id: string
-    actions?: readonly unknown[]
-    events?: readonly unknown[]
+    actions?: unknown
+    actionSpaces?: unknown
+    events?: unknown
     globalQuery?: unknown
-    phases?: readonly string[]
+    phases?: unknown
     handler?: unknown
     deriveCardCostCandidate?: unknown
   }[]
@@ -348,6 +357,7 @@ function isAllowedNamedPrintedTargetReference(
 export function checkCardImplBoundaries(
   files: string[],
   runtimeCards?: readonly RuntimeCardImpl[],
+  boardIds: ReadonlySet<string> = new Set(collectBoardActionSpaceIds()),
 ): CardImplBoundaryResult {
   const violations: CardImplBoundaryViolation[] = []
   const scopeErrors: string[] = []
@@ -436,8 +446,11 @@ export function checkCardImplBoundaries(
     }
     for (const card of runtimeCards) {
       for (const listener of card.listeners ?? []) {
-        const contractError = listenerContractError(listener)
-        if (contractError) violations.push({ file: card.file, cardId: card.cardId, kind: 'listener-subscription-contract', message: contractError })
+        const contractError = auditListenerContractError(listener, boardIds)
+        if (contractError) violations.push({
+          file: card.file, cardId: card.cardId, kind: 'listener-subscription-contract', message: contractError,
+          listenerId: listener.id, phases: listener.phases, targets: listener.actions ?? listener.actionSpaces ?? listener.events,
+        })
         for (const [role, fn] of [['handler', listener.handler], ['deriveCardCostCandidate', listener.deriveCardCostCandidate]] as const) {
           if (typeof fn !== 'function') continue
           const mutationViolations = collectListenerStateMutationViolations(fn, card.file, card.cardId, listener.id, role)
@@ -450,7 +463,7 @@ export function checkCardImplBoundaries(
         }
         if (typeof listener.handler !== 'function') continue
         listenerHandlersChecked += 1
-        if (listener.phases && !listener.phases.some((phase) => TRAILING_PHASES.has(phase))) continue
+        if (!Array.isArray(listener.phases) || !listener.phases.some((phase) => TRAILING_PHASES.has(phase))) continue
         trailingListenerHandlersChecked += 1
         const handlerViolations = collectTrailingPlayedCountViolations(
           listener.handler,
@@ -514,7 +527,9 @@ export function walkProductionFieldBoundaryFiles(repoRoot: string): string[] {
 
 async function runCli(): Promise<void> {
   const repoRoot = path.resolve(__dirname, '..')
-  const warnOnly = process.argv.includes('--warn-only')
+  const args = process.argv.slice(2).filter((arg, index) => !(index === 0 && arg === '--'))
+  const { values } = parseArgs({ args, options: { 'warn-only': { type: 'boolean' }, report: { type: 'string' } } })
+  const warnOnly = values['warn-only'] === true
   const files = walkProductionCardFiles(repoRoot)
   const fieldBoundaryFiles = walkProductionFieldBoundaryFiles(repoRoot)
   const { ALL_CARD_IMPLS } = await import('../shared/cards/register-all')
@@ -532,6 +547,7 @@ async function runCli(): Promise<void> {
     listeners: impl.listeners?.map((listener) => ({
       id: listener.id,
       actions: listener.actions,
+      actionSpaces: listener.actionSpaces,
       events: listener.events,
       globalQuery: listener.globalQuery,
       phases: listener.phases,
@@ -539,29 +555,52 @@ async function runCli(): Promise<void> {
       deriveCardCostCandidate: listener.deriveCardCostCandidate,
     })),
   }))
-  const result = checkCardImplBoundaries(files, runtimeCards)
+  const boardIds = new Set(collectBoardActionSpaceIds())
+  const result = checkCardImplBoundaries(files, runtimeCards, boardIds)
+  for (const id of boardIds) {
+    if (isCardListenerAction(id)) result.scopeErrors.push(`board action space '${id}' grants actions subscription permission`)
+  }
+  const implIds = new Set(runtimeCards.map(card => card.cardId))
+  for (const id of getRegisteredPlayerActionSpaceIds()) {
+    if (!implIds.has(id)) result.scopeErrors.push(`player action space '${id}' has no scanned Card Impl`)
+  }
   const farmWrites = checkFarmWriteBoundaries(repoRoot)
   result.violations.push(...farmWrites.violations.map(violation => ({ ...violation, cardId: '<farm-write-boundary>', kind: 'farm-layout-write' as const })))
   if (fieldBoundaryFiles.length === 0) result.scopeErrors.push('no production field-boundary files scanned')
   result.violations.push(...checkFieldStorageBoundaries(fieldBoundaryFiles))
+  if (values.report !== undefined) {
+    const { allMinorImprovementCards, allOccupationCards } = await import('../shared/cards/catalog')
+    const { majorCardDefinitionsList } = await import('../shared/cards/major/generated')
+    const metadata = new Map([...allMinorImprovementCards, ...allOccupationCards, ...majorCardDefinitionsList]
+      .map(card => [card.id, { name: card.name, description: card.desc.join(' ') }]))
+    const audit = auditCardListeners(runtimeCards, boardIds, metadata)
+    const source = { head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim(), fingerprint: sourceFingerprint(repoRoot) }
+    const directory = path.resolve(repoRoot, values.report)
+    fs.mkdirSync(directory, { recursive: true })
+    fs.writeFileSync(path.join(directory, 'audit.json'), JSON.stringify({ source, ...result, ...audit }, null, 2) + '\n')
+    fs.writeFileSync(path.join(directory, 'audit.md'), renderCardListenerAudit(result, audit, source, repoRoot))
+    console.log(`[check-card-impl-boundaries] full audit report: ${directory}`)
+  }
   if (result.scopeErrors.length > 0) {
     console.warn('[check-card-impl-boundaries] invalid scan scope:')
     for (const error of result.scopeErrors) console.warn(`  ${error}`)
-    process.exit(1)
+    process.exitCode = 1
+    return
   }
   if (result.violations.length === 0) {
     console.log(
-      `[check-card-impl-boundaries] checked ${result.filesChecked} Card Sources, `
+      `[check-card-impl-boundaries] checked ${result.cardSourcesChecked} Card Sources in ${result.filesChecked} files, `
       + `${fieldBoundaryFiles.length} field-boundary files, ${farmWrites.filesChecked} farm-write files, ${result.listenerHandlersChecked} listeners, `
       + `${result.trailingListenerHandlersChecked} trailing listeners, `
       + `${result.listenerFunctionsMutationScanned} listener functions for state mutation; `
       + 'no boundary violations found',
     )
-    process.exit(0)
+    process.exitCode = 0
+    return
   }
 
   console.warn(`[check-card-impl-boundaries] ${result.violations.length} boundary violation(s):`)
-  for (const violation of result.violations.slice(0, 30)) {
+  for (const violation of result.violations) {
     const file = path.relative(repoRoot, violation.file)
     const location = violation.line === undefined ? file : `${file}:${violation.line}`
     console.warn(
@@ -569,7 +608,7 @@ async function runCli(): Promise<void> {
     )
   }
   if (warnOnly) console.warn('[check-card-impl-boundaries] warn-only mode enabled')
-  process.exit(cardImplBoundaryExitCode(result, { warnOnly }))
+  process.exitCode = cardImplBoundaryExitCode(result, { warnOnly })
 }
 
 if (process.argv[1] && process.argv[1].endsWith('check-card-impl-boundaries.ts')) {

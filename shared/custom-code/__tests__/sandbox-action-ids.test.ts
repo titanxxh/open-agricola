@@ -45,7 +45,7 @@ describe('sandboxListenerActions', () => {
       [
         'anytime', 'bake-bread', 'breed', 'collect', 'compute-exchanges', 'construct', 'family-growth', 'fence', 'gain',
         'improvement', 'occupation', 'place-farmer', 'plow', 'reap', 'receive',
-        'renovate-house', 'sow', 'stables', 'wish-children',
+        'renovate-house', 'sow', 'stables',
       ].sort(),
     )
   })

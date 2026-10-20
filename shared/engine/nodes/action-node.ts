@@ -12,6 +12,7 @@ import { BaseNode } from './base'
 
 export class ActionNode extends BaseNode {
   public actionId: string
+  public actionSpaceUse?: ActionExecutionContext['actionSpaceUse']
   public sourceCard?: string
   public params?: Record<string, unknown>
   public expandFlow?: boolean
@@ -110,6 +111,7 @@ export class ActionNode extends BaseNode {
   protected cursorData() {
     return {
       actionId: this.actionId,
+      actionSpaceUse: this.actionSpaceUse,
       sourceCard: this.sourceCard,
       params: this.params,
       expandFlow: this.expandFlow,

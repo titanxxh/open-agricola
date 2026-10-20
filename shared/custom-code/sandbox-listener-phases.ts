@@ -49,7 +49,7 @@ export const assertSandboxListenerManifest = (cardId: string, manifest: CustomCo
     }
   }
   for (const listener of manifest.listeners) {
-    if ('events' in listener || 'globalQuery' in listener) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, 'unsupported selector')
+    if ('events' in listener || 'globalQuery' in listener || 'actionSpaces' in listener) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, 'unsupported selector')
     const error = listenerContractError({ ...listener, id: listener.registrationId })
     if (error) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, error)
     if (!listener.actions?.every(isSandboxListenerAction)) throw new UnsupportedSandboxListenerError(cardId, listener.registrationId, 'unsupported listener action')

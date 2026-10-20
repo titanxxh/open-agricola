@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -18,8 +18,8 @@ const isRound4ActionSpace = (context: CardListenerContext): boolean => {
 const collectListener: CardListenerRegistration = {
   id: 'D144-water-worker-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
     return { flow: gainLeaf(CARD_ID, { reed: 1 }), sourceCard: CARD_ID }
@@ -29,8 +29,8 @@ const collectListener: CardListenerRegistration = {
 const placeFarmerListener: CardListenerRegistration = {
   id: 'D144-water-worker-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return
     if (TRIGGER_SPACE_IDS.has(context.space.id) || isRound4ActionSpace(context)) {

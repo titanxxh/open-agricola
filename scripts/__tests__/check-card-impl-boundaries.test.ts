@@ -2,6 +2,11 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'
+import { CardRegistry } from '../../shared/cards/registry'
+import { SessionCardContext } from '../../shared/cards/session-card-context'
+import { getRegisteredPlayerActionSpaceIds } from '../../shared/cards/player-action-space'
+import { auditCardListeners, collectBoardActionSpaceIds, renderCardListenerAudit } from '../card-listener-audit'
 import {
   cardImplBoundaryExitCode,
   checkCardImplBoundaries,
@@ -21,8 +26,69 @@ const writeFixture = (root: string, rel: string, content: string): string => {
 }
 
 describe('check-card-impl-boundaries', () => {
+  it.each(['loadImpl', 'addListener', 'registerListener', 'session'] as const)('%s rejects every authoritative board ID in actions', entry => {
+    const ids = collectBoardActionSpaceIds()
+    expect(ids).toEqual(expect.arrayContaining(['fishing', 'lessons-56-variable', 'moor-infirmary', 'season-spring-animal-and-fruit']))
+    for (const id of getRegisteredPlayerActionSpaceIds()) expect(Object.hasOwn(ALL_CARD_IMPLS, id)).toBe(true)
+    for (const id of ids) for (const phase of ['before', 'after', 'immediatelyAfter', 'isDoable', 'computeReplace']) {
+      const valid = { id: 'valid', actions: ['collect'], phases: ['after'] }
+      const listener = { id: 'board', actions: ['collect', id], phases: [phase] }
+      const registry = new CardRegistry(), session = new SessionCardContext()
+      const register = () => {
+        if (entry === 'loadImpl') Reflect.apply(registry.loadImpl, registry, ['TEST_Listener', { listeners: [valid, listener] }])
+        else if (entry === 'addListener') Reflect.apply(registry.addListener, registry, ['TEST_Listener', listener])
+        else if (entry === 'registerListener') Reflect.apply(registry.registerListener, registry, [listener])
+        else Reflect.apply(session.registerListener, session, [listener])
+      }
+      expect(register, `${entry}: ${id}/${phase}`).toThrow(/Listener.*action target/)
+      expect(registry.getAllListeners()).toEqual([])
+      expect(session.customListeners).toEqual([])
+    }
+  })
+
+  it('reports factory-expanded violations separately from legal rule-action review candidates', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'listener-audit-'))
+    const cards = ['A001_Shelter', 'A002_ShiftingCultivation', 'A003_PaperKnife'].map(cardId => ({
+      cardId, file: writeFixture(root, `shared/cards/A/${cardId}.ts`,
+        `export const ${cardId} = defineMinorCard({ meta: { id: '${cardId}' }, impl: {} })`),
+    }))
+    const expanded = Array.from(new Set(['fishing']))
+    const runtime = [
+      { ...cards[0]!, listeners: [{ id: 'factory', actions: ['collect', ...expanded], phases: ['after'], handler: () => undefined }] },
+      { ...cards[1]!, listeners: [{ id: 'rule', actions: ['collect'], phases: ['after'],
+        handler: (context: { space: { id: string } }) => context.space.id === 'fishing' ? {} : undefined }] },
+      cards[2]!,
+    ]
+    const result = checkCardImplBoundaries(cards.map(card => card.file), runtime)
+    const audit = auditCardListeners(runtime, new Set(['fishing']), new Map([
+      ['A002_ShiftingCultivation', { name: 'Fixture', description: 'When you use Fishing.' }],
+    ]))
+    expect(result.scopeErrors).toEqual([])
+    expect(result.violations).toEqual([expect.objectContaining({
+      cardId: 'A001_Shelter', listenerId: 'factory', phases: ['after'], targets: ['collect', 'fishing'],
+    })])
+    expect(audit.cards).toMatchObject([
+      { cardId: 'A001_Shelter', listenerCount: 1 },
+      { cardId: 'A002_ShiftingCultivation', name: 'Fixture', description: 'When you use Fishing.', listenerCount: 1 },
+      { cardId: 'A003_PaperKnife', listenerCount: 0 },
+    ])
+    expect(audit.inventory).toHaveLength(2)
+    expect(audit.reviewCandidates).toMatchObject([{
+      cardId: 'A002_ShiftingCultivation', listenerId: 'rule', actions: ['collect'],
+      reviewReasons: ['board-id-literal', 'space-context'],
+    }])
+    expect(cardImplBoundaryExitCode(result)).toBe(1)
+    const markdown = renderCardListenerAudit(result, audit, { head: 'fixture', fingerprint: 'source' }, root)
+    expect(markdown).toContain('| A001_Shelter | factory | after | collect, fishing |')
+    expect(markdown).toContain('| A002_ShiftingCultivation | rule | after | collect |')
+    expect(markdown).toContain('不是违规或已确认迁移清单')
+  })
+
   it.each([
     {}, { actions: [] }, { actions: ['unknown'] },
+    { actions: 1 }, { actions: 'collect' }, { actions: ['collect'], phases: 'after' },
+    { actionSpaces: ['fishing'], phases: ['computeCosts'] }, { actionSpaces: null },
+    { actionSpaces: '*' }, { actionSpaces: ' all ' },
     ...['store-on-card', 'take-from-card', 'pop-card-stack', 'spend-worker', 'special-effect', 'harvest-feed-conversion', 'selection']
       .map(action => ({ actions: ['collect', action] })),
     { actions: ['collect'], phases: [] }, { actions: ['collect'], phases: ['anytime'] },
@@ -38,6 +104,51 @@ describe('check-card-impl-boundaries', () => {
     ] }])
     expect(result.scopeErrors).toEqual([])
     expect(result.violations).toEqual([expect.objectContaining({ kind: 'listener-subscription-contract' })])
+    expect(cardImplBoundaryExitCode(result)).toBe(1)
+  })
+
+  it('keeps all malformed registrations in the audit report without aborting on their shape', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'listener-malformed-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts',
+      "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' }, impl: {} })")
+    const cards = [{ cardId: 'A001_Shelter', file, listeners: [
+      { id: 'scope', actions: ['collect'], phases: ['after'], handler: () => undefined },
+      { id: 'bad-actions', actions: 42, phases: ['after'] },
+      { id: 'bad-phases', actions: ['collect'], phases: 'after' },
+      { id: 'bad-spaces', actionSpaces: false, phases: ['before'] },
+    ] }]
+    const result = checkCardImplBoundaries([file], cards)
+    expect(result.scopeErrors).toEqual([])
+    expect(result.violations.map(violation => violation.listenerId)).toEqual(['bad-actions', 'bad-phases', 'bad-spaces'])
+    const audit = auditCardListeners(cards, new Set(['fishing']))
+    expect(audit.inventory).toHaveLength(4)
+    expect(audit.reviewCandidates).toEqual([])
+    const markdown = renderCardListenerAudit(result, audit, { head: 'fixture', fingerprint: 'source' }, root)
+    for (const id of ['bad-actions', 'bad-phases', 'bad-spaces']) expect(markdown).toContain(`| A001_Shelter | ${id} |`)
+    expect(cardImplBoundaryExitCode(result)).toBe(1)
+  })
+
+  it.each(['fishing-typo', 'collect', ' fishing ', 'all', '*'])('rejects unknown actionSpaces target %j in both the production gate and report', target => {
+    const root = mkdtempSync(path.join(tmpdir(), 'listener-space-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts',
+      "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' }, impl: {} })")
+    const cards = [{ cardId: 'A001_Shelter', file, listeners: [
+      { id: 'scope', actions: ['collect'], phases: ['after'], handler: () => undefined },
+      { id: 'known-space', actionSpaces: ['fishing'], phases: ['before'], handler: () => undefined },
+      { id: 'all-spaces', actionSpaces: 'all', phases: ['immediatelyAfter', 'after'], handler: () => undefined },
+      { id: 'unknown-space', actionSpaces: ['fishing', target], phases: ['before'], handler: () => undefined },
+    ] }]
+    const result = checkCardImplBoundaries([file], cards)
+    expect(result.scopeErrors).toEqual([])
+    expect(result.violations).toEqual([expect.objectContaining({
+      listenerId: 'unknown-space', targets: ['fishing', target],
+      message: `Listener unknown-space: unknown action space target(s): ${target}`,
+    })])
+    const audit = auditCardListeners(cards, new Set(collectBoardActionSpaceIds()))
+    expect(audit.inventory.find(entry => entry.listenerId === 'known-space')?.error).toBeUndefined()
+    expect(audit.inventory.find(entry => entry.listenerId === 'unknown-space')?.error).toBe(result.violations[0]!.message)
+    expect(renderCardListenerAudit(result, audit, { head: 'fixture', fingerprint: 'source' }, root))
+      .toContain(`unknown action space target(s): ${target}`)
     expect(cardImplBoundaryExitCode(result)).toBe(1)
   })
 

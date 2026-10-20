@@ -11,6 +11,17 @@ import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
 
 const CARD_ID = 'D144_WaterWorker'
 
+function settleWaterWorker(session: GameSession, initial: SessionResponse): SessionResponse {
+  let response = initial
+  for (let step = 0; step < 3 && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger'; step++) {
+    const trigger = response.interaction.request.options.find(option => option.sourceCard === CARD_ID && !option.disabled)
+    if (!trigger) break
+    response = session.resolveChoice(response.interaction.playerIndex, trigger.value)
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
+
 const setup = () => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
@@ -35,7 +46,7 @@ describe('D144_WaterWorker session', () => {
     const initialReed = player.resources.reed
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'day-laborer')
+    const resp = settleWaterWorker(session, session.takeAction(0, 'day-laborer'))
     expect(resp.ok).toBe(true)
 
     const updated = resp.state.players[0]!
@@ -118,11 +129,12 @@ describe('D144 Water Worker parity', () => {
       && response.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
       response = session.resolveChoice(response.interaction.playerIndex, 'clay')
     }
-    return response
+    return settleWaterWorker(session, response)
   }
 
   it('D144 S2: using Fishing gains its food and one additional reed', () => {
-    const response = setup().takeAction(0, 'fishing')
+    const session = setup()
+    const response = settleWaterWorker(session, session.takeAction(0, 'fishing'))
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 2, reed: 1 })

@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, ActionSpace, Resource } from '../../contract/types'
@@ -20,8 +20,8 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C42-ravenous-hunger-after-place-farmer',
   cardIds: [CARD_ID],
   mandatory: true,
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) {
       const gain: Partial<Resource> = {}

@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { isHollowSpaceId } from '../helpers/action-space-categories'
@@ -21,8 +21,8 @@ const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A060_OrientalFir
 const hollowListener: CardListenerRegistration = {
   id: 'A139-hollow-warden-after-hollow',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isHollowSpaceId(context.space?.id)) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }

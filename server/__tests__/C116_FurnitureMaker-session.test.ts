@@ -194,6 +194,10 @@ describe('C116 Furniture Maker after occupation commitment', () => {
     if (response.interaction.stateId !== 'wait') throw new Error('Expected the Beneficiary occupation action')
     const accept = response.interaction.request.options!.find((option) => option.value !== '__skip__')!
     response = choose(restored, response, accept.value)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      const furniture = response.interaction.request.options.find(option => option.sourceCard === CARD_ID)!
+      response = choose(restored, response, furniture.value)
+    }
     expect(response.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, food: 8 })
     const events = response.state.events

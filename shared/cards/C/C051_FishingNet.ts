@@ -12,8 +12,8 @@ const CARD_ID = 'C051_FishingNet'
 const listener: CardListenerRegistration = {
   id: 'C51-fishing-net-opponent-fishing',
   cardIds: [CARD_ID],
-  actions: ['collect'],
-  phases: ['before' as ActionHookPhase],
+  actionSpaces: ['fishing'],
+  phases: ['before'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
@@ -23,6 +23,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'seq',
+        targetPlayerId: ownerId,
         children: [
           {
             type: 'leaf',
@@ -60,7 +61,7 @@ const isDoableListener: CardListenerRegistration = {
   id: 'C51-fishing-net-isDoable',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['collect', 'fishing'],
+  actions: ['collect'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionContext?.skipBeforeTriggers === true) return
@@ -71,7 +72,11 @@ const isDoableListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [listener, isDoableListener],
+  listeners: [listener, isDoableListener, {
+    id: 'C51-fishing-net-space-isDoable',
+    cardIds: [CARD_ID], actionSpaces: ['fishing'], phases: ['isDoable'], scope: 'opponent',
+    handler: isDoableListener.handler,
+  }],
   effect: {
   id: CARD_ID,
   timedRules: [{ retainAfterCardLeaves: true, key: 'return-food-to-fishing', at: { kind: 'card-positive', fact: 'pendingDeposits', clock: 'current-round', phase: 'onReturnHome', episodeFact: 'depositEpisode' }, body: { kind: 'operation', operation: { kind: 'put-on-action-space', spaceId: 'fishing', resources: { food: 2 }, occurrencesFact: 'pendingDeposits' } } }],

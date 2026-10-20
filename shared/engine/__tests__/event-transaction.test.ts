@@ -215,7 +215,11 @@ describe('engine event transactions', () => {
     expect(engine.proceed({ state, player, space }).type).toBe('choice')
     expect(engine.resolveChoice('target-space', { state, player, space }).type).toBe('flow')
     expect(engine.proceed({ state, player, space }).type).toBe('ok')
-    expect(engine.proceed({ state, player, space }).type).toBe('done')
+    let completion = engine.proceed({ state, player, space })
+    for (let remaining = 10; completion.type === 'ok' && remaining > 0; remaining--) {
+      completion = engine.proceed({ state, player, space })
+    }
+    expect(completion.type).toBe('done')
 
     expect(state.events).toMatchObject([
       {

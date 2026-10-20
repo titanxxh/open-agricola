@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { isExtension56AccumulationSpaceId } from '../helpers/action-space-categories'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -9,8 +9,8 @@ const CARD_ID = 'C177_MountainHiker'
 const listener: CardListenerRegistration = {
   id: 'C177-mountain-hiker-after-extension-accumulation',
   cardIds: [CARD_ID],
-  actions: ['collect'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isExtension56AccumulationSpaceId(context.space?.id)) return
     if ((context.ownerPlayer?.resources.food ?? 0) < 1) return

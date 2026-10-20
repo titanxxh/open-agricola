@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -10,8 +10,8 @@ const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 const listener: CardListenerRegistration = {
   id: 'M129-plowhorse-market-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!TRIGGER_SPACES.has(context.space?.id ?? '')) return
     if ((context.player.resources.food ?? 0) < 1) return

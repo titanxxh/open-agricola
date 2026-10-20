@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { parsePositionKey, positionKey } from '../../domain/farm'
 import type { ActionDefinition } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
@@ -55,8 +55,8 @@ registerAdHocAction(growTopCropAction)
 const listener: CardListenerRegistration = {
   id: 'A72-calcium-fertilizers-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return
     if (context.space.id !== 'eastern-quarry' && context.space.id !== 'western-quarry') return

@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -11,8 +11,8 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const mushroomCollectorImmediatelyAfterListener: CardListenerRegistration = {
   id: 'A108-mushroom-collector-immediately-after',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['immediatelyAfter'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
     return returnToSpaceThenGainFlow({

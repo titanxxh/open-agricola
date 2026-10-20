@@ -1,3 +1,5 @@
+import { actionSpaceQueryContext, inheritSpaceUseBody } from './space-use-nodes'
+import { prepareSpaceUseCompletions, executeSpaceUsePhase, captureSpaceUseEvents } from './space-use-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext } from '../actions/flow'
 import type {
   ActionExecutionContext,
@@ -417,6 +419,8 @@ const buildInternalActionChildNodes = (
       child.resultKey,
       child.paymentInfoFrom,
     )
+    const host = int.tree.findNodeById(hostNodeId)
+    if (host) inheritSpaceUseBody(host, node)
     if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
     return node
   })
@@ -426,7 +430,7 @@ export const buildDeferredHostNode = (
   hostNode: ActionNode,
   result: ActionExecutionResult,
   actionId: string,
-  executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'params' | 'actionContext'>,
+  executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'params' | 'actionContext' | 'actionSpaceUse'>,
   transactionEvents: readonly GameEvent[],
   actionEvents: readonly GameEvent[],
   choice?: string,
@@ -440,6 +444,8 @@ export const buildDeferredHostNode = (
     hostNode.choiceLabelParams,
     executionContext.actionContext,
   )
+  inheritSpaceUseBody(hostNode, node)
+  node.actionSpaceUse = executionContext.actionSpaceUse
   node.ownerPlayerId = hostNode.ownerPlayerId
   node.mandatory = hostNode.mandatory
   node.internalHostNodeId = hostNode.id
@@ -471,6 +477,8 @@ const buildDeferredHostContinuationNode = (
     sourceNode.actionContext,
   )
   node.ownerPlayerId = sourceNode.ownerPlayerId
+  inheritSpaceUseBody(sourceNode, node)
+  node.actionSpaceUse = sourceNode.actionSpaceUse
   node.internalHostNodeId = sourceNode.internalHostNodeId
   node.deferredHostResult = result
   node.deferredAfterHostChildren = sourceNode.deferredAfterHostChildren
@@ -511,6 +519,7 @@ const buildOptionalPrompt = (
   }
   const actionContext = actionContextForNode(actionNode, int)
   const executionContext: ActionExecutionContext = {
+    ...actionSpaceQueryContext(actionNode),
     actionHooks: int.hooks.actionHooks,
     state: context.state,
     player: context.player,
@@ -713,6 +722,7 @@ const executeDeferredHostAction = (
   }
   const actionContext = actionContextForNode(node, int)
   const executionContext: ActionExecutionContext = {
+    ...actionSpaceQueryContext(node),
     actionHooks: int.hooks.actionHooks,
     state: context.state,
     player: context.player,
@@ -769,6 +779,7 @@ const executeDeferredHostAction = (
   const triggerSnapshot =
     node.deferredHostTriggerSnapshot ?? createTriggerSnapshot(context.state)
   node.deferredHostTriggerSnapshot = triggerSnapshot
+  captureSpaceUseEvents(int, node, result, eventReadContext.actionEvents)
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
@@ -855,6 +866,7 @@ const executeDeferredHostAction = (
   }
   if (result.type === 'flow') {
     const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
+    inheritSpaceUseBody(node, flowNode)
     if (node.continuationParentHostNodeId) {
       stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
     }
@@ -888,10 +900,15 @@ export function engineProceed(
 ): EngineStepResult {
   ensureEventState(context.state)
   int.events.ensureTransaction()
+  prepareSpaceUseCompletions(int)
   const node = int.tree.nextUnresolved()
   if (!node) {
     commitOpenEventTransaction(int, context, { type: 'ok' })
     return { type: 'done' }
+  }
+  if (node instanceof SequenceNode && node.spaceUsePhase) {
+    executeSpaceUsePhase(int, node, context)
+    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
   }
   if (node.getPending() !== null) {
     const envelope = pendingEnvelopeFromHostNode(node)
@@ -929,7 +946,8 @@ export function engineProceed(
       .map((entry) => {
         const actionContext = actionContextForNode(entry.actionNode, int)
         const executionContext: ActionExecutionContext = {
-    actionHooks: int.hooks.actionHooks,
+          ...actionSpaceQueryContext(entry.actionNode),
+          actionHooks: int.hooks.actionHooks,
           state: context.state,
           player: context.player,
           space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -1135,6 +1153,7 @@ export function engineProceed(
       ? { ...node.resolvedReplacement, alternatives: [] }
       : int.hooks.applyComputeReplace({
       ...context,
+      ...actionSpaceQueryContext(node),
       ...currentEventReadContext(int),
       space: resolveExecutionSpace(context.state, context.space, actionContext),
       params: node.params,
@@ -1148,6 +1167,7 @@ export function engineProceed(
       ...context, ...currentEventReadContext(int),
     }, node, replaceResult)
     if (replacementNode) {
+      inheritSpaceUseBody(node, replacementNode)
       int.tree.insertAfter(node.id, [replacementNode])
       node.resolve({ type: 'ok' })
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -1167,13 +1187,15 @@ export function engineProceed(
       const optionId = typeof actionContext?.optionId === 'string' ? actionContext.optionId : undefined
       const expanded = stampOwner(buildFlowNode(int, flow, context.player.id,
         optionId, node.expandFlowIdStyle), context.player.id)
+      inheritSpaceUseBody(node, expanded)
       if (node.mandatory) enforceCompositeContinuationMandatory(expanded)
       node.resolve({ type: 'ok' })
       int.tree.insertAfter(node.id, [expanded])
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const executionContext: ActionExecutionContext = {
-    actionHooks: int.hooks.actionHooks,
+      ...actionSpaceQueryContext(node),
+      actionHooks: int.hooks.actionHooks,
       state: context.state,
       player: context.player,
       space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -1396,6 +1418,7 @@ export function engineProceed(
     // A leaf selected through OR/XOR keeps that choice even when it runs here
     // after before reactions or an owner handoff.
     const choice = node.selectedBranchChoice
+    captureSpaceUseEvents(int, node, result, eventReadContext.actionEvents)
     const immediatePhase = int.hooks.immediatelyAfter(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId, choice },
       result,
@@ -1488,6 +1511,7 @@ export function engineProceed(
         ? { ...result.flow, optional: undefined }
         : result.flow
       const flowNode = buildOwnedFlowNode(int, committedFlow, context.player.id, executionContext.actionContext)
+      inheritSpaceUseBody(node, flowNode)
       if (node.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

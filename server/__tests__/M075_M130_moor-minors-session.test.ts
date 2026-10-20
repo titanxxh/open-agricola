@@ -1,4 +1,5 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -375,6 +376,29 @@ describe('Moor action listener minors', () => {
     session.loadState(state)
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.state.players[0]!.resources.stone).toBe(1)
+  })
+
+  it.each([
+    { card: 'M120_RiverClay', target: 'grain-seeds', actor: 0 },
+    { card: 'M124_StoneWagon', target: 'grain-seeds', actor: 0 },
+    { card: 'M120_RiverClay', target: 'fishing', actor: 1 },
+    { card: 'M124_StoneWagon', target: 'day-laborer', actor: 1 },
+  ])('$card ignores a non-target or another player use: $target by $actor', example => {
+    const session = createWorkSession({ seed: 374, options: {
+      playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    }, configure: state => {
+      state.currentPlayerIndex = example.actor
+      state.players[0]!.minorPlayed = [example.card]
+      state.players.forEach(player => { player.resources.clay = 0; player.resources.stone = 0 })
+      state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 1
+    } })
+    try {
+      const response = session.takeAction(example.actor, example.target)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 0 })
+      expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === example.card)).toEqual([])
+      expect(response.state.actionSpaces.find(space => space.id === example.target)!.takenBy).toHaveLength(1)
+    } finally { session.dispose() }
   })
 
   it('M129 Plowhorse Market offers food for horse on Farmland and Cultivation only when affordable', () => {

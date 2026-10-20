@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { findTravelingPlayersSpace, isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
@@ -10,8 +10,8 @@ const CARD_ID = 'E166_Roastmaster'
 const listener: CardListenerRegistration = {
   id: 'E166-roastmaster-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const placedSpaceId = context.space?.id
     if (!placedSpaceId) return

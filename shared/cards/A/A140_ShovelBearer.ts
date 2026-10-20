@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { HOLLOW_SPACE_IDS, isHollowSpaceId } from '../helpers/action-space-categories'
@@ -9,8 +9,8 @@ const CARD_ID = 'A140_ShovelBearer'
 const listener: CardListenerRegistration = {
   id: 'A140-shovel-bearer-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (spaceId !== 'clay-pit' && !isHollowSpaceId(spaceId)) return

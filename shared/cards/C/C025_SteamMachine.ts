@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -14,8 +14,8 @@ const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean =>
 const steamMachineListener: CardListenerRegistration = {
   id: 'C25-steam-machine-space-complete',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, space, state } = context
 

@@ -743,7 +743,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result).toEqual({ valid: false, errors: [expect.stringContaining(`unknown effect hook '${key}'`)] })
   })
 
-  it.each(['allowAnytimeReentry', 'monotoneFenceCost', 'cardCostCandidateMandatory', 'order', 'deriveCardCostCandidate'])(
+  it.each(['allowAnytimeReentry', 'monotoneFenceCost', 'cardCostCandidateMandatory', 'order', 'deriveCardCostCandidate', 'actionSpaces'])(
     'rejects the listener field %s instead of dropping it', (field) => {
       const result = validateCardCode(`
         const CARD_IMPL = {

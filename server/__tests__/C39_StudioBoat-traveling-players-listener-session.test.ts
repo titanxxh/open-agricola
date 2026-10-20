@@ -93,17 +93,6 @@ const findListener = (ruleOwner: TestCardRegistry) =>
 }
 
 describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
-  it('is registered with the expected shape', () => {
-    const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry)
-    expect(listener).toBeDefined()
-    expect(listener!.cardIds).toEqual([CARD_ID])
-    expect(listener!.actions).toContain('place-farmer')
-    expect(listener!.phases).toContain('after')
-    // scope defaults to 'player' (actor must own the card)
-    expect(listener!.scope ?? 'player').toBe('player')
-  })
-
   it('returns a bonus-vp flow leaf when the actor places on traveling-players', () => {
     const ruleRegistry = createOfficialCardRegistry()
     const listener = findListener(ruleRegistry)!

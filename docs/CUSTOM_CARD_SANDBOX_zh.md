@@ -312,7 +312,6 @@ listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家�
 - `improvement`
 - `occupation`
 - `place-farmer`
-- `wish-children`
 - `family-growth`
 - `bake-bread`
 - `breed`
@@ -564,7 +563,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 ## 5.5 listener `actions:` 字段（高频踩坑）
 
-`CARD_IMPL.listeners[].actions` 接受的字符串是**触发行动的内部 leaf actionId**（如 `place-farmer`、`gain`、`collect`），**不是**行动空间 ID（如 `forest`、`clay-pit`）。唯一的例外是 `wish-children`：它在清单里，玩家使用“渴望孩子”行动格时，监听它的 listener 会在 `before` 阶段被调用。完整列表由 `shared/custom-code/sandbox-listener-actions.ts` 定义，并进入已部署沙盒契约。
+`CARD_IMPL.listeners[].actions` 接受支持的行动身份，如 `place-farmer`、`gain`、`collect`。行动格 ID，如 `forest`、`clay-pit`、`wish-children`，均被拒绝。完整列表由 `shared/custom-code/sandbox-listener-actions.ts` 定义，并进入已部署沙盒契约。原生 `actionSpaces` selector 不属于 Workshop Capability Contract，源码和已保存 manifest 都会拒绝它。
 
 要在"玩家走某个行动空间"后触发，监听 `actions: ['place-farmer']` 然后在 handler 内用 `context.space?.id === '<空间ID>'` 过滤。
 

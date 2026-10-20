@@ -1,5 +1,5 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { defineMinorCard } from '../card-source'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'E066_BarnShed'
 const listener: CardListenerRegistration = {
   id: 'E66-barn-shed-opponent-forest',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'forest') return

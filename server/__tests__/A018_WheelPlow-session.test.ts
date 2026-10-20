@@ -227,14 +227,16 @@ describe('ae-negative-04-plows', () => {
       assert.equal(fields(r), 2); finished(r)
     })
     it('A018 N6 last free farm tile cannot create phantom bonus fields', () => {
-      const s = setup({ lastPlot: true }); const r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 4 })
+      const s = setup({ lastPlot: true }); let r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 4 })
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') r = choice(s, r, o => o.value === WHEEL)
       assert.equal(fields(r), 13); finished(r)
     })
   })
   it('A018 N7 final plot bonus-first and normal-first paths complete without phantom fields', () => {
     const s = setup({ lastPlot: true }); const normal = turn(s, 0, 'farmland')
     assert.notEqual(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, WHEEL)
-    const r = plow(s, normal, { row: 0, col: 4 })
+    let r = plow(s, normal, { row: 0, col: 4 })
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') r = choice(s, r, o => o.value === WHEEL)
     assert.equal(fields(r), 13); assert.equal(r.state.players[0]!.cardStates[WHEEL]?.flagged, true); finished(r)
   })
 })

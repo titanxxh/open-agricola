@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -11,8 +11,8 @@ const TRIGGER_SPACE_IDS = new Set(['fishing', 'reed-bank'])
 const listener: CardListenerRegistration = {
   id: 'D103-canal-boatman-after-place-farmer',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !TRIGGER_SPACE_IDS.has(context.space.id)) return
     if (workersAvailable(context.state, context.player) <= 0) return

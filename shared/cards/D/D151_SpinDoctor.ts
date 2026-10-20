@@ -12,8 +12,8 @@ const CARD_ID = 'D151_SpinDoctor'
 const listener: CardListenerRegistration = {
   id: 'D151-spin-doctor-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
     if (workersAvailable(context.state, context.player) <= 0) return

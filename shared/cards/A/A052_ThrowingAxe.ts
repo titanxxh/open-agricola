@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -11,8 +11,8 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const listener: CardListenerRegistration = {
   id: 'A52-throwing-axe-before-collect',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
     // Check if there is at least 1 pig on the pig-market space

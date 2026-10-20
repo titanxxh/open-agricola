@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundActionSlot } from '../helpers/round-action-topology'
 import type { CardImpl } from '../registry'
@@ -14,8 +14,8 @@ const CARD_ID = 'D158_BeanCounter'
 const listener: CardListenerRegistration = {
   id: 'D158-bean-counter-place-farmer',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const slot = context.space ? getRoundActionSlot(context.state, context.space.id) : null
     if (!slot || slot.roundNumber > 8) return

@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -11,8 +11,8 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const listener: CardListenerRegistration = {
   id: 'E75-stone-axe-after-collect',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['immediatelyAfter'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
     return {

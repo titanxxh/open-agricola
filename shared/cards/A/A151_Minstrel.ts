@@ -48,6 +48,7 @@ const cardImpl = {
       const targetSpace = state.actionSpaces.find((space) => space.id === targetSpaceId)
       if (!targetSpace || !isActionDoableInFlowContext({
       actionHooks: context?.actionHooks,
+        actionSpaceUse: { newPlacement: false },
         actionId: targetSpaceId,
         action: targetSpace,
         state,

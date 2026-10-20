@@ -37,7 +37,7 @@ const canAffordMinimumSchedule = (context: CardListenerContext) => {
 
 const minimumScheduleListener: CardListenerRegistration = {
   id: 'B93-confidant-isdoable-minimum-schedule',
-  actions: ['occupation', ...LESSONS_SPACE_IDS],
+  actions: ['occupation'],
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) {
@@ -78,7 +78,12 @@ const countChoices = (state: GameState, player: PlayerState): ActionFlow[] => {
 }
 
 const cardImpl = {
-  listeners: [minimumScheduleListener],
+  listeners: [minimumScheduleListener, {
+    id: 'B93-confidant-isdoable-lessons',
+    actionSpaces: [...LESSONS_SPACE_IDS],
+    phases: ['isDoable'],
+    handler: minimumScheduleListener.handler,
+  }],
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

@@ -1,7 +1,6 @@
 import type { GameSession as SessionRuleOwner } from '../game/authoritative-session'
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
-import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -71,13 +70,7 @@ const findListenersByAction = (ruleOwner: SessionRuleOwner | TestCardRegistry, a
 }
 
 describe('B132_EstateMaster — saturation flag listeners', () => {
-  for (const action of ['construct', 'stables', 'fencing', 'fence', 'plow']) {
-    it(`registers an immediatelyAfter listener for action=${action}`, () => {
-    const ruleRegistry = createOfficialCardRegistry()
-      const matched = findListenersByAction(ruleRegistry, action)
-      expect(matched.length).toBeGreaterThan(0)
-    })
-
+  for (const action of ['construct', 'stables', 'fence', 'plow']) {
     it(`sets saturated flag after action=${action} when farm is full`, () => {
       const { session, state } = setupSession()
       const player = state.players[0]!

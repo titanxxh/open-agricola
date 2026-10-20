@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'E141_VegetableVendor'
 const listener: CardListenerRegistration = {
   id: 'E141-vegetable-vendor-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (spaceId === 'major-improvement') {

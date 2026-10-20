@@ -50,6 +50,7 @@ import { isPendingChoiceValueAllowed, pendingEnvelopeChoices } from './pending-v
 import { isProtectedActionCancel } from './protected-action-cancel'
 import { isInjectedAnytimeActionContext, tagInjectedAnytimeFlow } from './action-context-flags'
 import { preserveContinuationEventScopes } from './continuation-events'
+import { wrapSpaceUse } from './space-use-nodes'
 
 type EngineDeps = {
   registry: ActionRegistry
@@ -134,6 +135,8 @@ const nextCounterValueFromIds = (nodes: EngineNode[]): number =>
 
 const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>): void => {
   if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
+  if (typeof data.spaceUseBodyId === 'string') node.spaceUseBodyId = data.spaceUseBodyId
+  if (data.reactionPhase === 'immediatelyAfter' || data.reactionPhase === 'after') node.reactionPhase = data.reactionPhase
   const labeledNode = node as EngineNode & {
     choiceLabelKey?: string
     choiceLabelParams?: Record<string, unknown>
@@ -216,6 +219,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
           }
         }
         action.expandFlow = data.expandFlow === true ? true : undefined
+        action.actionSpaceUse = data.actionSpaceUse as ActionNode['actionSpaceUse']
         if (data.expandFlowIdStyle === 'session' || data.expandFlowIdStyle === 'flow') {
           action.expandFlowIdStyle = data.expandFlowIdStyle
         }
@@ -243,6 +247,8 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         const sequence = new SequenceNode(cursor.id, buildChildren())
         sequence.anytimeActionId = typeof data.anytimeActionId === 'string' ? data.anytimeActionId : undefined
         sequence.anytimeActivation = data.anytimeActivation === undefined ? undefined : parseAnytimeActivation(data.anytimeActivation)
+        sequence.spaceUse = data.spaceUse as SequenceNode['spaceUse']
+        sequence.spaceUsePhase = data.spaceUsePhase as SequenceNode['spaceUsePhase']
         node = sequence
         break
       }
@@ -355,6 +361,14 @@ export class Engine {
       ? new SequenceNode(`seq-${actionId}`, [actionNode])
       : actionNode
     return Engine.fromRoot(root, deps)
+  }
+
+  static fromActionSpace(actionId: string, deps: EngineDeps, ownerPlayerId?: string, use: NonNullable<ActionExecutionContext['actionSpaceUse']> = { newPlacement: true }): Engine {
+    const node = new ActionNode(`action-${actionId}`, actionId)
+    node.expandFlow = true
+    node.expandFlowIdStyle = 'session'
+    node.ownerPlayerId = ownerPlayerId
+    return Engine.fromRoot(wrapSpaceUse(`space-use-${actionId}`, node, actionId, use, ownerPlayerId, undefined, true), deps)
   }
 
   static fromPendingEnvelope(

@@ -751,7 +751,10 @@ export type ProtectedObservation = {
   knownToPlayerIds?: string[]
 }
 
+export type ActionSpaceUseContext = { newPlacement: boolean; personUse?: PersonUseReceipt }
+
 export type ActionExecutionContext = {
+  actionSpaceUse?: ActionSpaceUseContext
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
   actionHooks: ActionHookRegistry | undefined
   completedTransactionEvents?: readonly GameEvent[]
@@ -1038,6 +1041,8 @@ export type ActionFlow = (
        * `ActionNode(actionId)` path.
        */
       expandFlow?: boolean
+      /** Native entry; completePlacement supplies the callback when no place-farmer host owns it. */
+      spaceUse?: ActionSpaceUseContext & { completePlacement?: true }
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'

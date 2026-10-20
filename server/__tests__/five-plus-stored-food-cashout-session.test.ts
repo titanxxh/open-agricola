@@ -117,7 +117,8 @@ describe('5+ stored-food cashout occupations', () => {
     expect(resp.ok).toBe(true)
     resp = completeFirstPlow(session, 1, resp)
     expect(resp.ok).toBe(true)
-    expect(storedFood(session, 'C172_FieldCounter')).toBe(1)
+    // The actor's space reaction precedes the other player's ordinary plow reaction.
+    expect(storedFood(session, 'C172_FieldCounter')).toBe(0)
 
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional extra plow')
     const extraPlow = resp.interaction.request.options?.find(
@@ -129,6 +130,8 @@ describe('5+ stored-food cashout occupations', () => {
     resp = completeFirstPlow(session, 1, resp)
     expect(resp.ok).toBe(true)
     expect(storedFood(session, 'C172_FieldCounter')).toBe(2)
+    expect(resp.state.events.filter(event => event.type === 'farm.fieldPlowed'
+      && event.fields.some(field => field.playerId === opponent.id))).toHaveLength(2)
 
     const ownerPlow = setupOwnerCard('C172_FieldCounter')
     resp = ownerPlow.takeAction(0, 'farmland')

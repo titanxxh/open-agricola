@@ -254,7 +254,7 @@ describe('A066 Feeding Dish ownership before actual market use', () => {
     expect(grainEvents(forged)).toEqual([])
   })
 
-  it('rejects a disabled before reaction without granting its effect or taking the host resources', () => {
+  it('skips an unpayable space-before reward and rejects a forged activation', () => {
     const session = setup(state => {
       const player = state.players[0]!
       player.resources.food = 0
@@ -262,12 +262,12 @@ describe('A066 Feeding Dish ownership before actual market use', () => {
       player.minorPlayed.push('B034_SpecialFood')
     })
     const pending = session.takeAction(0, 'forest')
-    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'select-trigger') throw new Error('Expected before menu')
-    expect(pending.interaction.request.options).toContainEqual(expect.objectContaining({ sourceCard: 'A091_ShiftingCultivator', disabled: true }))
+    expect(pending.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
     const rejected = session.resolveChoice(0, 'A091_ShiftingCultivator')
     expect(rejected.ok).toBe(false)
     expect(rejected.state).toEqual(pending.state)
-    expect(rejected.state.players[0]!.resources).toMatchObject({ wood: 0, food: 0 })
+    expect(rejected.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
     expect(rejected.state.players[0]!.fields).toEqual([])
   })
 

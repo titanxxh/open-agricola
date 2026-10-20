@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, ResourceMovedEvent } from '../../contract/events'
 import type { ActionFlow, Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -110,8 +110,8 @@ const returnThenGainActionFlow = (
 const listener: CardListenerRegistration = {
   id: 'D180-part-time-worker-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const targetSpaceId = collectSourceSpaceId(context)
     if (!targetSpaceId) return

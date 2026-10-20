@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'D174_LoessGardener'
 const listener: CardListenerRegistration = {
   id: 'D174-loess-gardener-after-clay-pit',
   cardIds: [CARD_ID],
-  actions: ['collect'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'clay-pit') return
     if ((context.ownerPlayer?.resources.food ?? 0) < 1) return

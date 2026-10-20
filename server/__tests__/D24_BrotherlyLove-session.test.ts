@@ -300,8 +300,11 @@ describe('D024 Brotherly Love session', () => {
     session.loadState(state)
 
     let response = session.takeAction(0, 'fishing')
-    response = acceptOptional(session, response)
-
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      const canalBoatman = response.interaction.request.options.find(option => option.sourceCard === 'D103_CanalBoatman')
+      expect(canalBoatman).toBeDefined()
+      response = session.resolveChoice(0, canalBoatman!.value)
+    }
     expect(choicesOf(response)).toContain('__skip__')
     response = acceptOptional(session, response)
     expect(choicesOf(response)).toContain('__skip__')

@@ -120,6 +120,7 @@ const applyChildActionDoable = (
     const replaced = resolveAction(replacement.actionId)
     return (!!replaced && applyChildActionDoable(replacement.actionId, replaced, {
       ...context,
+      actionSpaceUse: undefined,
       sourceCard: replacement.sourceCard ?? context.sourceCard,
       actionContext: { ...context.actionContext, checkedReplaceAction: true },
     }, resolveAction, nextSeenActionIds)) || canStartAlternative()
@@ -202,6 +203,7 @@ export const evaluateFlowDoable = (
     }
     const childContext: FlowDoableContext = {
       ...context,
+      actionSpaceUse: flow.spaceUse,
       params: flow.params,
       sourceCard: flow.sourceCard ?? context.sourceCard,
       actionContext: flow.actionContext
@@ -254,6 +256,7 @@ export const isActionVetoedInFlowContext = (context: FlowDoableContext & { actio
 export const isPlacementActionDoableInFlowContext = (
   args: Parameters<typeof isActionDoableInFlowContext>[0] & { baseDoable?: () => boolean },
 ): boolean => {
+  args = { ...args, actionSpaceUse: args.actionSpaceUse ?? { newPlacement: true } }
   const { action, resolveAction, baseDoable, ...context } = args
   if (isActionVetoedInFlowContext(context)) return false
   if (action.strictCanExecute && action.flow && !isFlowDerivedDoable(action.canBeExecutedByPlayer)
@@ -262,7 +265,7 @@ export const isPlacementActionDoableInFlowContext = (
   if (isActionDoableInFlowContext(args)) return true
   if (action.originalActionCondition?.(context) === false) return false
   return new HookDispatcher(requireActionHookRegistry(context.actionHooks)).applyIsDoable(context, action, false, () =>
-    canStartBefore('place-farmer', context, resolveAction))
+    canStartBefore('place-farmer', { ...context, actionSpaceUse: undefined }, resolveAction))
 }
 
 export const initializeFlowDerivedCanBeExecutedByPlayer = (

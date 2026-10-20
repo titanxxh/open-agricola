@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import * as path from 'node:path'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { eventsToLogEntries } from '../log-mapper'
 import { isPublicEventReplayable, privateEventMappingPolicy, publicEventMappingPolicy } from '../event-mapping-policy'
@@ -99,30 +100,36 @@ type PublicEventFixtureMatrix = Record<GameEvent['type'], Partial<Record<PublicC
 const toRepoPath = (filePath: string): string =>
   path.relative(process.cwd(), filePath).split(path.sep).join('/')
 
-const findCardPassedReferences = (): string[] => {
+const cardPassedEmitLines = (source: string): number[] => {
+  const file = ts.createSourceFile('events.ts', source, ts.ScriptTarget.Latest, true)
+  const lines: number[] = []
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'emit') {
+      const namedType = node.typeArguments?.some(type => ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal) && type.literal.text === 'card.passed')
+      const payload = node.arguments[0]
+      const namedPayload = payload && ts.isObjectLiteralExpression(payload) && payload.properties.some(property =>
+        ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === 'type'
+        && ts.isStringLiteral(property.initializer) && property.initializer.text === 'card.passed')
+      if (namedType || namedPayload) lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  return lines
+}
+
+const findCardPassedEmitters = (): string[] => {
   const matches: string[] = []
-  const testFilePath = 'shared/events/__tests__/event-mapping-policy.test.ts'
   const visit = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const fullPath = path.join(directory, entry.name)
-      if (entry.isDirectory()) {
-        visit(fullPath)
-        continue
-      }
+      if (entry.isDirectory()) { visit(fullPath); continue }
       if (!entry.isFile() || (!entry.name.endsWith('.ts') && !entry.name.endsWith('.tsx'))) continue
-
       const repoPath = toRepoPath(fullPath)
-      if (repoPath === testFilePath) continue
-
-      readFileSync(fullPath, 'utf8').split(/\r?\n/).forEach((line, index) => {
-        if (line.includes('card.passed')) matches.push(`${repoPath}:${index + 1}:${line}`)
-      })
+      for (const line of cardPassedEmitLines(readFileSync(fullPath, 'utf8'))) matches.push(`${repoPath}:${line}`)
     }
   }
-
-  for (const root of ['shared', 'server', 'client']) {
-    visit(path.join(process.cwd(), root))
-  }
+  for (const root of ['shared', 'server', 'client']) visit(path.join(process.cwd(), root))
   return matches
 }
 
@@ -384,30 +391,19 @@ describe('event mapping policy', () => {
     }
   })
 
+  it('distinguishes event readers from generic and payload emit calls', () => {
+    expect(cardPassedEmitLines("events.some(event => event.type === 'card.passed')")).toEqual([])
+    expect(cardPassedEmitLines("sink.emit<'card.passed'>({ type: 'card.passed', cardId: 'test' })")).toEqual([1])
+    expect(cardPassedEmitLines("sink.emit({ type: 'card.passed', cardId: 'test' })")).toEqual([1])
+  })
+
   it('card.passed is emitted only by improvement migration branches', () => {
     const allowedFiles = [
-      'shared/contract/events.ts',
-      'shared/events/guards.ts',
-      'shared/events/event-mapping-policy.ts',
-      'shared/events/public-event-presentation.ts',
-      'shared/events/log-mapper.ts',
-      'shared/events/__tests__/log-mapper.test.ts',
       'shared/actions/helpers/improvement-purchase-lifecycle.ts',
-      'shared/actions/helpers/__tests__/improvement-purchase-lifecycle.test.ts',
       'shared/actions/effects/internal/pass-minor-card-to-left.ts',
       'shared/cards/M/M093_FarmhandsQuarters.ts',
-      'server/__tests__/M027_M093_M102_moor-cross-player-markers-session.test.ts',
-      'server/__tests__/passing-mechanism-session.test.ts',
-      'server/__tests__/D118-hand-origin-session.test.ts',
-      'server/__tests__/passing-mechanism-onbuy.test.ts',
-      'server/__tests__/pasture-derived-state-session.test.ts',
-      'server/__tests__/scheduled-terrain-session.test.ts',
-      'shared/events/__tests__/public-event-presentation.test.ts',
-      'client/app/__tests__/public-event-notifications.test.ts',
-      'client/app/__tests__/GameContainerApi.ws.test.ts',
-      'client/components/board/__tests__/ActionLog.test.tsx',
     ]
-    const unexpectedEmitters = findCardPassedReferences()
+    const unexpectedEmitters = findCardPassedEmitters()
       .filter((line) => !allowedFiles.some((path) => line.startsWith(`${path}:`)))
     expect(unexpectedEmitters).toEqual([])
   })

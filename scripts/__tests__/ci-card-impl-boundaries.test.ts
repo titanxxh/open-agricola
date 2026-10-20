@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { verificationPlan } from '../verify'
 
 const repoRoot = path.resolve(__dirname, '../..')
 const workflows = ['ci.yml', 'ci-full.yml']
@@ -45,10 +46,23 @@ describe('canonical architecture verification wiring', () => {
       'server/__tests__/listener-purity-gate-session.test.ts',
       'scripts/__tests__/check-test-rule-environments.test.ts',
       'scripts/__tests__/docs-budget.test.ts',
+      'scripts/__tests__/check-card-impl-boundaries.test.ts',
+      'shared/cards/__tests__/listener-admission-registry.test.ts',
+      'scripts/__tests__/verification.test.ts',
+      'scripts/__tests__/listener-contract-admission.test.ts',
     ]
     expect(pkg.scripts['check:architecture-tests']?.split(' ')).toEqual(['vitest', 'run', ...architectureTests])
     for (const file of architectureTests) expect(fs.existsSync(path.join(repoRoot, file))).toBe(true)
     expect(pkg.scripts['check:reaches']).toBeUndefined()
+  })
+
+  it('uses the production scanner in both architecture and prepush without warn-only', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+    expect(pkg.scripts['check:card-impl-boundaries']).toBe('tsx scripts/check-card-impl-boundaries.ts')
+    const production = verificationPlan(repoRoot, ['prepush']).steps.filter(step => step.args.includes('check:card-impl-boundaries'))
+    expect(production).toEqual([{ name: 'card-impl-boundaries', command: 'pnpm', args: ['run', 'check:card-impl-boundaries'] }])
+    expect(pkg.scripts['check:architecture']?.split(' && ').filter(command => command.includes('check:card-impl-boundaries')))
+      .toEqual(['pnpm run check:card-impl-boundaries'])
   })
 
   it.each(workflows)('%s calls the canonical check once', (name) => {

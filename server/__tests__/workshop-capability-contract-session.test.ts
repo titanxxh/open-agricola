@@ -133,12 +133,12 @@ const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Contract Probe' })
 const CARD_IMPL = {${sources.unfilteredListener}}
     `, CARD_ID)
     expect(compiled.valid).toBe(false)
-    expect(compiled.errors).toEqual([expect.stringContaining('declare exactly one actions, events or globalQuery selector')])
+    expect(compiled.errors).toEqual([expect.stringContaining('declare exactly one actions, actionSpaces, events or globalQuery selector')])
   })
 
   it('rejects a saved manifest without an action filter at Session admission', () => {
     expect(() => start(sources.listenerInsideContract, { savedWithoutActions: true }))
-      .toThrow('declare exactly one actions, events or globalQuery selector')
+      .toThrow('declare exactly one actions, actionSpaces, events or globalQuery selector')
   })
 
   it.each([

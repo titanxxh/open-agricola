@@ -135,7 +135,7 @@ describe('admitCustomFlow', () => {
       .toThrow("flow: flow field 'childs' is not in the Workshop Capability Contract")
   })
 
-  it.each(['optionId', 'choiceLabelKey', 'choiceLabelParams', 'effectPreview', 'targetPlayerId', 'expandFlow'])(
+  it.each(['optionId', 'choiceLabelKey', 'choiceLabelParams', 'effectPreview', 'targetPlayerId', 'expandFlow', 'spaceUse'])(
     'rejects the native leaf field %s', (field) => {
       expect(admit(leaf('gain', {}, { [field]: 'x' }))).toThrow(`flow: flow field '${field}' is not in the Workshop Capability Contract`)
     })

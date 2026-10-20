@@ -10,7 +10,7 @@ import { createWorkSession } from './_helpers/session-fixtures'
 /**
  * ADR 0025 fixed behavior test for the reaction phases before,
  * immediatelyAfter and after, on the listener actions that an ordinary
- * placement round and a Harvest dispatch without any player choice:
+ * placement round and a Harvest dispatch with explicit owner reaction selection:
  * collect and breed, plus before/after placement. A seeded two-player game runs rounds 1-4
  * and the first Harvest; both players place two workers on accumulation
  * spaces each round. Player 0 has played the card; its listeners keep the
@@ -58,6 +58,11 @@ ${ACTIONS.flatMap(action => (action === 'place-farmer' ? ['before', 'after'] : P
         confirmNextPlayer(session)
       } else if (interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch') {
         confirmPlayerSwitch(session)
+      } else if (interaction.stateId === 'wait' && interaction.request.kind === 'select-trigger') {
+        const reaction = interaction.request.options.find(option => option.sourceCard === CARD_ID && !option.disabled)
+        expect(reaction, JSON.stringify(interaction)).toBeDefined()
+        const response = session.resolveChoice(interaction.playerIndex, reaction!.value)
+        expect(response.ok, response.error).toBe(true)
       } else if (interaction.stateId === 'wait') {
         autoAdvanceRoundEnd(session, { initialResponse: session.getState(), maxIterations: 200 })
       } else {

@@ -344,20 +344,22 @@ describe('person placement order after a same-person relocation', () => {
     recordRoundPlacement(player, 'farmland', '1', true)
     const space = state.actionSpaces.find((entry) => entry.id === 'farmland')!
 
-    const placementResults = runCardListeners({
+    const placementResults = session.withCtx(() => runCardListeners({
       state,
       player,
       space,
-      actionId: 'place-farmer',
+      actionId: space.id,
+      actionSpaceUse: { newPlacement: false },
+      actionContext: { workerId: '1' },
       phase: 'after',
-    }, [A018_WheelPlow_impl.listeners[0]!, C091_PlowHero_impl.listeners[0]!])
-    const plowResults = runCardListeners({
+    }, [A018_WheelPlow_impl.listeners[0]!, C091_PlowHero_impl.listeners[0]!]))
+    const plowResults = session.withCtx(() => runCardListeners({
       state,
       player,
       space,
       actionId: 'plow',
       phase: 'after',
-    }, [A018_WheelPlow_impl.listeners[0]!, C091_PlowHero_impl.listeners[0]!])
+    }, [A018_WheelPlow_impl.listeners[0]!, C091_PlowHero_impl.listeners[0]!]))
 
     expect(placementResults.map((result) => result.sourceCard)).toEqual(['C091_PlowHero'])
     expect(plowResults.map((result) => result.sourceCard)).toEqual(['A018_WheelPlow'])

@@ -132,6 +132,10 @@ const previewContextForChild = (
   // Preview reads the same captured scope that activation will execute with.
   const eventReadContext = activationEventReadContext(params, context.transactionEvents ?? [])
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
+  const eventActionContext = params.event.actionContext && typeof params.event.actionContext === 'object'
+    ? params.event.actionContext as Record<string, unknown> : undefined
+  const actionContext = child.actionContext ?? eventActionContext
+  const targetSpaceId = actionContext?.targetSpaceId ?? event.targetSpaceId
   return {
     ownerPlayerId,
     ownerCardZone: params.ownerCardZone,
@@ -144,14 +148,15 @@ const previewContextForChild = (
       triggerPlayer,
       ownerPlayer: effectPlayer,
       effectPlayer,
-      space: typeof event.targetSpaceId === 'string'
-        ? previewState.actionSpaces.find((space) => space.id === event.targetSpaceId) ?? context.space
+      space: typeof targetSpaceId === 'string'
+        ? previewState.actionSpaces.find((space) => space.id === targetSpaceId) ?? context.space
         : context.space,
       actionId: params.actionId,
       phase: params.phase,
       ...eventReadContext,
       triggerSnapshot: params.triggerSnapshot,
       ...event,
+      actionContext,
     },
   }
 }
