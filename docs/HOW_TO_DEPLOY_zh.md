@@ -338,6 +338,14 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 启动前会检查全部必需文件；缺少任一文件即失败，不会混用或回退到远端。该覆盖仅用于本地开发服务器，CI 和生产构建不接受它。
 
+本地验收或构建时，可直接校验固定版本的素材仓，避免联网获取 Pages 元数据：
+
+```bash
+PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush
+```
+
+素材仓 HEAD 必须等于 `public-assets.ref`，`assets/` 必须干净，全部必需文件必须已纳入该提交且实际存在。该设置同样适用于 `pnpm verify` 和 Replay Viewer 构建。构建 URL 仍使用固定版本的 Pages 来源。这证明本地素材内容有效，不代表线上 Pages 已验证；未显式设置时仍检查远端元数据。
+
 更新公共资源时先把 `open-agricola-assets` 发布到图片仓 Pages，等待其 workflow 将所有线上文件与该 commit 逐一校验，再把主仓 `public-assets.ref` 更新为线上 `asset-version.txt`，同步 `public-assets.required.json`，随后走主仓正常 Release。只修改文档的图片仓 commit 也会改变部署版本标记。旧 Viewer Build 保留代码，公共卡图和字体跟随图片站当前文件。
 
 ---
@@ -483,6 +491,7 @@ Game Bug Reports 交付到公开的 `titanxxh/open-agricola` 仓库。将独立 
 | `VITE_API_BASE` | `''`（空=同源） | 后端 API 地址 |
 | `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | 仅本地开发：完整图片仓 checkout；设置后禁止远端混用或回退 |
+| `PUBLIC_ASSET_VALIDATION_DIR` | — | 直接校验 `public-assets.ref` 对应的干净素材仓，替代 Pages 元数据请求；构建 URL 仍使用 Pages 来源 |
 
 ---
 

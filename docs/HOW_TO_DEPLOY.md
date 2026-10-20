@@ -322,6 +322,14 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 Startup verifies every required file. A missing file fails startup; it never mixes local and remote assets or falls back to the remote source. This override is accepted only by the local development server, not CI or production builds.
 
+For local verification or builds without a Pages metadata request, validate the pinned asset checkout directly:
+
+```bash
+PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush
+```
+
+The checkout HEAD must match `public-assets.ref`, its `assets/` tree must be clean, and every required file must be tracked and present. This also works for `pnpm verify` and Replay Viewer builds. Build URLs still use the pinned Pages source. This checks local asset contents; it does not verify the live Pages deployment. Without this explicit setting, builds retain the remote metadata check.
+
 To update public assets, first publish `open-agricola-assets` to its Pages site and wait for its workflow to verify every live file against that commit. Then update `public-assets.ref` to the deployed `asset-version.txt`, synchronize `public-assets.required.json`, and follow the main repository's normal release flow. Asset commits that change only documentation also change the deployment marker. Older Viewer Builds retain their code, while public art/fonts follow the current asset site.
 
 ---
@@ -465,6 +473,7 @@ Changing the target does not transfer existing GitHub Issues or rewrite stored r
 | `VITE_API_BASE` | `''`, meaning same-origin | Backend API URL |
 | `VITE_WS_BASE` | Derived from the API base | WebSocket URL |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | Local development only: a complete asset-repository checkout; remote mixing and fallback are disabled |
+| `PUBLIC_ASSET_VALIDATION_DIR` | — | Validate a clean asset checkout at `public-assets.ref` instead of fetching Pages metadata; build URLs retain the Pages source |
 
 ---
 
