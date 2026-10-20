@@ -28,3 +28,19 @@ export const evaluateWithReservedResources = (
     : state
   return evaluate(nextState, nextPlayer)
 }
+
+/** Evaluates as if `granted` had already arrived, for gains that precede the checked action. */
+export const evaluateWithGrantedResources = (
+  state: GameState,
+  player: PlayerState,
+  granted: Partial<Resource>,
+  evaluate: (state: GameState, player: PlayerState) => boolean,
+): boolean => {
+  const nextPlayer: PlayerState = { ...player, resources: { ...player.resources } }
+  for (const [rawKey, rawAmount] of Object.entries(granted)) {
+    const key = rawKey as keyof Resource
+    nextPlayer.resources[key] = (nextPlayer.resources[key] ?? 0) + (rawAmount ?? 0)
+  }
+  const nextState = { ...state, players: state.players.map((entry) => (entry.id === player.id ? nextPlayer : entry)) }
+  return evaluate(nextState, nextPlayer)
+}

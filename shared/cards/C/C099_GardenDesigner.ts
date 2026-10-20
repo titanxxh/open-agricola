@@ -3,7 +3,7 @@ import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
-import { scoringOfferFlow, scoringOfferOption, type ScoringOffer } from '../../actions/plans/scoring-offer'
+import { scoringOfferChoice, type ScoringOffer } from '../../actions/plans/scoring-offer'
 
 const CARD_ID = 'C099_GardenDesigner'
 
@@ -24,31 +24,21 @@ const scoringOffers = (player: PlayerState): ScoringOffer[] => {
   }
   return [...options.values()]
 }
+const scoringChoice = scoringOfferChoice(CARD_ID, scoringOffers)
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
     projectInteractionRequest: (_state, player, request, actionId) => {
       if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
-      return { ...request, options: scoringOffers(player).map(offer => scoringOfferOption(CARD_ID, offer)) }
+      return { ...request, options: scoringChoice.options(player) }
     },
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state, player) => {
-      const options = scoringOffers(player).map(offer => scoringOfferOption(CARD_ID, offer))
-      if (options.length <= 1) return
-      return {
-        type: 'leaf',
-        actionId: 'emit-choice',
-        anytimeWindow: { allowed: true, blockedIds: ['exchange'] },
-        sourceCard: CARD_ID,
-        targetPlayerId: player.id,
-        params: { promptKey: 'ui.interactionExchangeChoice', options },
-      }
+      if (scoringOffers(player).length <= 1) return
+      return scoringChoice.promptLeaf(player, 'ui.interactionExchangeChoice', { anytimeWindow: { allowed: true, blockedIds: ['exchange'] } })
     },
-    resolveChoice: (_state, player, choice) => {
-      const offer = scoringOffers(player).find(candidate => candidate.value === choice)
-      return offer ? scoringOfferFlow(CARD_ID, offer) : undefined
-    },
+    resolveChoice: scoringChoice.resolveChoice,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

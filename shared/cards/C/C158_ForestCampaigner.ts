@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { evaluateWithGrantedResources } from '../helpers/reserved-resources'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C158_ForestCampaigner'
@@ -62,23 +63,10 @@ const isDoableListener: CardListenerRegistration = {
     if (context.actionId !== context.space.id) return
     if (context.actionContext?.skipBeforeTriggers === true) return
     if (countWoodOnAccumulationSpaces(context.state) < WOOD_THRESHOLD) return
-    const player = {
-      ...context.player,
-      resources: {
-        ...context.player.resources,
-        food: (context.player.resources.food ?? 0) + 1,
-      },
-    }
-    const state = {
-      ...context.state,
-      players: context.state.players.map((entry) => entry.id === player.id ? player : entry),
-    }
-    if (context.space.canBeExecutedByPlayer.call(context.space, state, player, { actionHooks: context.actionHooks,
-      sourceCard: context.sourceCard,
-      actionContext: context.actionContext,
-    })) {
-      return { doable: true }
-    }
+    if (evaluateWithGrantedResources(context.state, context.player, { food: 1 }, (state, player) =>
+      context.space.canBeExecutedByPlayer.call(context.space, state, player, {
+        actionHooks: context.actionHooks, sourceCard: context.sourceCard, actionContext: context.actionContext,
+      }))) return { doable: true }
   },
 }
 

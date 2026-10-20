@@ -143,11 +143,7 @@ export const payLeaf = ({
 
 const bonusVpLeaves = (cardId: string, gain?: CardGain): ActionFlow[] => {
   const { score } = splitCardGain(gain)
-  return Array.from({ length: Math.max(0, score) }, () => ({
-    type: 'leaf',
-    actionId: 'bonus-vp',
-    sourceCard: cardId,
-  }))
+  return score > 0 ? [bonusVpLeaf(cardId, score)] : []
 }
 
 export const payGainActionFlow = ({

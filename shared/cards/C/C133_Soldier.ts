@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import type { ActionFlow, PlayerState, Resource } from '../../contract/types'
-import { scoringOfferFlow, scoringOfferOption, type ScoringOffer } from '../../actions/plans/scoring-offer'
+import type { PlayerState, Resource } from '../../contract/types'
+import { scoringOfferChoice, type ScoringOffer } from '../../actions/plans/scoring-offer'
 import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
 
 const CARD_ID = 'C133_Soldier'
@@ -25,30 +25,17 @@ const reserveForPairs = (pairs: number): Partial<Resource> => ({
 const scoringOffers = (maxCount: number): ScoringOffer[] => Array.from({ length: maxCount + 1 }, (_, pairs) => ({
   value: choiceValue(pairs), kind: 'reserve', resources: reserveForPairs(pairs), score: pairs, cardType: 'occupation'
 }))
+const scoringChoice = scoringOfferChoice(CARD_ID, player => scoringOffers(maxSoldierPairs(player)))
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state, player) => {
-      const maxPairs = maxSoldierPairs(player)
-      if (maxPairs <= 0) return
-      return {
-        type: 'leaf',
-        actionId: 'emit-choice',
-        sourceCard: CARD_ID,
-        targetPlayerId: player.id,
-        actionContext: { targetPlayerId: player.id },
-        params: {
-          promptKey: 'ui.cards.C133_Soldier.prompt',
-          options: scoringOffers(maxPairs).map(offer => scoringOfferOption(CARD_ID, offer)),
-        },
-      } satisfies ActionFlow
+      if (maxSoldierPairs(player) <= 0) return
+      return scoringChoice.promptLeaf(player, 'ui.cards.C133_Soldier.prompt')
     },
-    resolveChoice: (_state, player, choice) => {
-      const offer = scoringOffers(maxSoldierPairs(player)).find(candidate => candidate.value === choice)
-      return offer ? scoringOfferFlow(CARD_ID, offer) : undefined
-    },
+    resolveChoice: scoringChoice.resolveChoice,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

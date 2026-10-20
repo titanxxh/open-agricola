@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { evaluateWithGrantedResources } from '../helpers/reserved-resources'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A122_PanBaker'
@@ -24,24 +25,10 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
-    const player = {
-      ...context.player,
-      resources: {
-        ...context.player.resources,
-        clay: (context.player.resources.clay ?? 0) + 2,
-        wood: (context.player.resources.wood ?? 0) + 1,
-      },
-    }
-    const state = {
-      ...context.state,
-      players: context.state.players.map((entry) => entry.id === player.id ? player : entry),
-    }
-    if (context.space.canBeExecutedByPlayer.call(context.space, state, player, { actionHooks: context.actionHooks,
-      sourceCard: context.sourceCard,
-      actionContext: context.actionContext,
-    })) {
-      return { doable: true }
-    }
+    if (evaluateWithGrantedResources(context.state, context.player, { clay: 2, wood: 1 }, (state, player) =>
+      context.space.canBeExecutedByPlayer.call(context.space, state, player, {
+        actionHooks: context.actionHooks, sourceCard: context.sourceCard, actionContext: context.actionContext,
+      }))) return { doable: true }
   },
 }
 

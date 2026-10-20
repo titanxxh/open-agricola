@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { getLogicalFields } from '../helpers/card-field'
+import { countNewFenceEdges } from '../helpers/fence-events'
 
 const CARD_ID = 'A068_AsparagusGift'
 
@@ -13,12 +14,7 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const fencesBuilt = (context.actionEvents ?? []).reduce((total, event) => {
-      if (!('schemaVersion' in event) || event.type !== 'farm.fenceBuilt'
-        || (event.targetPlayerId ?? event.actorPlayerId) !== context.player.id) return total
-      return total + (event.newFenceEdges?.length ?? 0)
-    }, 0)
-    if (fencesBuilt < context.state.round) return
+    if (countNewFenceEdges(context) < context.state.round) return
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },
 }
