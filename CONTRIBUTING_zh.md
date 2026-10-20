@@ -69,7 +69,7 @@ Session 夹具区分真实开局和预设工作阶段场景，见[卡牌测试�
 - Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文，简洁明了。
 - 永远 rebase main，**禁止 merge commit**。
 - 每次 push 前 rebase main，在最终源码上运行 `pnpm verify prepush`。push 后等待所有相关 GitHub Actions run 结束；失败要修复，skipped 不算成功验证。
-- 卡牌相关改动必须同步 [docs/card_implementation_status_zh.md](docs/card_implementation_status_zh.md)；改动通用扩展点（hook phase、ActionFlow node、协议层）必须同步 [docs/architecture/](docs/architecture/) 中对应的 module 文档。
+- 官方卡牌相关改动必须同步 [docs/card_implementation_status_zh.md](docs/card_implementation_status_zh.md)；改动通用扩展点（hook phase、ActionFlow node、协议层）必须同步 [docs/architecture/](docs/architecture/) 中对应的 module 文档。
 
 ## Issue
 
