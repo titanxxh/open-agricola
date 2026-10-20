@@ -45,7 +45,7 @@ describe('bonus-vp effect', () => {
     expect(events).toEqual([{ type: 'card.stateChanged', cardId: CARD_ID, key: 'bonusVp', targetPlayerId: 'p2' }])
   })
 
-  it.each([0, -1, 1.5, '2'])('fails closed on amount %p without writing or emitting', (amount) => {
+  it.each([0, -1, 1.5, '2', null])('fails closed on amount %p without writing or emitting', (amount) => {
     const { actor, events, context } = setup({ amount })
 
     expect(bonusVpAction.execute(context)).toMatchObject({ type: 'fail' })
@@ -78,6 +78,7 @@ describe('bonus-vp choice preview', () => {
 
   it('does not preview an invalid amount', () => {
     expect(getActionEffectPreview(new ActionNode('bv', 'bonus-vp', CARD_ID, { amount: 0 }))).toBeUndefined()
+    expect(getActionEffectPreview(new ActionNode('bv', 'bonus-vp', CARD_ID, { amount: null }))).toBeUndefined()
     expect(getSequenceEffectPreview(new SequenceNode('seq', [
       new ActionNode('pay', 'pay', CARD_ID, { food: 1 }),
       new ActionNode('bv', 'bonus-vp', CARD_ID, { amount: -1 }),

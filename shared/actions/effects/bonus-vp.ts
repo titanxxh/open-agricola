@@ -3,11 +3,12 @@ import { incCounter } from '../../cards/helpers/card-state'
 import { findPlayerById } from '../../domain/player'
 
 /**
- * Points one `bonus-vp` leaf awards: `params.amount`, default 1. Anything but a
- * positive safe integer is invalid (undefined) and the leaf fails closed.
+ * Points one `bonus-vp` leaf awards: `params.amount`, 1 when absent. Anything
+ * else but a positive safe integer, `null` included, is invalid (undefined) and
+ * the leaf fails closed.
  */
 export const bonusVpAmount = (params: Record<string, unknown> | undefined): number | undefined => {
-  const amount = params?.amount ?? 1
+  const amount = params?.amount === undefined ? 1 : params.amount
   return typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 1 ? amount : undefined
 }
 
