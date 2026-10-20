@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'D139_Chairman'
 const opponentListener: CardListenerRegistration = {
   id: 'D139-chairman-opponent-meeting-place',
   cardIds: [CARD_ID],
-  actions: ['meeting-place'],
-  phases: ['before' as ActionHookPhase],
+  actionSpaces: ['meeting-place'],
+  phases: ['before'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'meeting-place') return
@@ -38,8 +38,8 @@ const opponentListener: CardListenerRegistration = {
 const playerListener: CardListenerRegistration = {
   id: 'D139-chairman-player-meeting-place',
   cardIds: [CARD_ID],
-  actions: ['meeting-place'],
-  phases: ['before' as ActionHookPhase],
+  actionSpaces: ['meeting-place'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'meeting-place') return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }

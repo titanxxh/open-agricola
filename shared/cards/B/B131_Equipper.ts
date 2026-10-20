@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B131_Equipper'
@@ -10,8 +10,8 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const listener: CardListenerRegistration = {
   id: 'B131-equipper-after-collect',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['immediatelyAfter'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
     return {

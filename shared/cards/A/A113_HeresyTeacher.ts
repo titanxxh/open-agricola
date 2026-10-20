@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { parsePositionKey, positionKey } from '../../domain/farm'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { ActionDefinition } from '../../contract/types'
@@ -48,8 +48,8 @@ registerAdHocAction(insertVegetableAction)
 const listener: CardListenerRegistration = {
   id: 'A113-heresy-teacher-after-lessons',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !isLessonsSpaceId(context.space.id)) return
     const positions = getLogicalFields(context.player).flatMap((field) => {

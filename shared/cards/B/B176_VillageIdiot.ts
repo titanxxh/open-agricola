@@ -56,8 +56,8 @@ const loneOccupationListener: CardListenerRegistration = {
 const opponentMeetingPlaceListener: CardListenerRegistration = {
   id: 'B176-village-idiot-opponent-meeting-place',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'meeting-place') return

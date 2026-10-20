@@ -202,7 +202,7 @@ export const takeAction = (
   const personUse = applyActionPlacement(state, player, space, worker.id, core.allocActionToken())
 
   core.pushEngineFrame({
-    engine: core.createEngineForSpace(spaceId),
+    engine: core.createEngineForSpace(spaceId, personUse),
     source: { kind: 'action', actionId: spaceId },
     personUse,
     spaceId,

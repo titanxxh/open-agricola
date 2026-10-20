@@ -1,7 +1,7 @@
 import { readCardExtraData } from '../helpers/card-state'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { consumePlannedTurnSkip } from '../../actions/rule-activated-operation'
 import type { RuleActivatedOperation } from '../../contract/rule-activated-operations'
@@ -31,8 +31,8 @@ const skipOperation = { kind: 'skip-next-turns', countFact: 'skipNextPlacement' 
 const listener: CardListenerRegistration = {
   id: 'D134-oyster-eater-after-fishing',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return

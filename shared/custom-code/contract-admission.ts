@@ -35,8 +35,9 @@ const outsideContract = (detail: string): Error =>
 
 /** Saved manifests and fresh source use the same explicit subset of native subscription permission. */
 export function boundListenerFilters(
-  listener: { actions?: string[]; phases?: ActionHookPhase[]; events?: unknown; globalQuery?: unknown },
+  listener: { actions?: string[]; actionSpaces?: unknown; phases?: ActionHookPhase[]; events?: unknown; globalQuery?: unknown },
 ): { actions: SandboxListenerAction[]; phases: ActionHookPhase[] } {
+  if ('actionSpaces' in listener) throw outsideContract('listener action-space selector')
   if (listener.events !== undefined || listener.globalQuery !== undefined) throw outsideContract('listener event/global query selector')
   const { actions, phases } = listener
   if (!actions?.length || !phases?.length) throw outsideContract('listener requires explicit nonempty actions and phases')
@@ -58,6 +59,7 @@ export function normalizeCustomManifest(raw: RawCustomManifest, cardId: string):
   })
 
   const listeners = raw.listeners.map((listener) => {
+    if ('actionSpaces' in listener) throw outsideContract('listener action-space selector')
     if (listener.events !== undefined || listener.globalQuery !== undefined) throw outsideContract('listener event/global query selector')
     if (listener.cardIds && !(listener.cardIds.length === 1 && listener.cardIds[0] === cardId)) {
       throw new Error('listener cardIds must be [CARD_ID]')

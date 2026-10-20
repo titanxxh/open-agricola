@@ -8,7 +8,7 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'B26-agrarian-fences-replace-grain-utilization',
   cardIds: [CARD_ID],
   phases: ['computeReplace'],
-  actions: ['grain-utilization'],
+  actionSpaces: ['grain-utilization'],
   handler: (context) => {
     if (context.space.id !== 'grain-utilization') return
     return {

@@ -451,6 +451,10 @@ _Avoid_: 在 effect 文件里堆叠多卡特例
 棋盘上的行动格，是可放工人的公开空间，包含行动定义、累积资源、占用工人等。
 _Avoid_: ActionDefinition、ActionNode
 
+**Action Space Use（使用行动格）**:
+玩家按规则使用一个确定的 Action Space，可以通过放入新人员、搬迁已有人员，或规则明确授予的不放人员用格来发生。按行动格触发的卡牌关心该格的使用时点；按 Rule Action 触发的卡牌关心规则动作，两者分别依据牌面判断。
+_Avoid_: 任意来源执行格内某个 Rule Action、把使用行动格等同于放入新人员
+
 **Accumulation Space（累积行动格）**:
 将商品保留到被领取，并在准备阶段按规则补充的 Action Space。没有可领取商品时，固定收益或卡牌附加收益不授予使用资格；明确授权的独立替代行动按自身规则判断。
 _Avoid_: 固定收益行动格、卡牌附加奖励、只按本轮补充的商品类型判断库存
@@ -758,7 +762,7 @@ _Avoid_: listener phase
 _Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 
 **Card Listener**:
-监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。本牌的 played listener 不响应自身 `occupation` / `improvement` 的 `immediatelyAfter` / `after`；该资格排除不改变提交后卡牌数量，也不冻结外层 `place-farmer.after`。
+响应 Rule Action、Action Space Use 或领域事实时点的卡牌反应，触发对象由牌面决定。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。本牌的 played listener 不响应自身 `occupation` / `improvement` 的 `immediatelyAfter` / `after`；该资格排除不改变提交后卡牌数量，也不冻结随后 Action Space Use 阶段的来源。
 _Avoid_: dispatch 阶段直接修改 `GameState`、`PlayerState` 或 `cardStates`
 
 **Reaction Hook**:

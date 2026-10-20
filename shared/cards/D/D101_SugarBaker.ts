@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -8,8 +8,8 @@ const CARD_ID = 'D101_SugarBaker'
 const listener: CardListenerRegistration = {
   id: 'D101-sugar-baker-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-utilization') return
     return payGainNode({
@@ -35,7 +35,7 @@ const collectFood: CardListenerRegistration = {
   id: 'D101-sugar-baker-before-space-use',
   cardIds: [CARD_ID],
   phases: ['before'],
-  actions: ['place-farmer'],
+  actionSpaces: 'all',
   scope: 'any',
   handler: context => {
     if (context.space?.id !== 'grain-utilization' || (context.space.resources.food ?? 0) <= 0) return

@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -43,8 +43,8 @@ const replayFlow = (optionId: AnimalMarketOptionId): ActionFlow => ({
 const listener: CardListenerRegistration = {
   id: 'A180-animal-brander-replay-animal-market',
   cardIds: [CARD_ID],
-  actions: ['gain'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'animal-market-56') return
     if (context.sourceCard === CARD_ID) return

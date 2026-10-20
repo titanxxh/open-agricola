@@ -96,7 +96,7 @@ describe('improvement allowedPurchases', () => {
     let response = session.takeAction(0, 'day-laborer')
 
     expect(response.ok, response.error).toBe(true)
-    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: ['flow-0', '__skip__'] })
+    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: [expect.any(String), '__skip__'] })
     expect(response.state.players[0]!.improvements).toEqual([])
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, wood: 2, stone: 2, food: 2 })
     expect(logs(response, 'log.placeFarmer')).toHaveLength(1)
@@ -104,7 +104,7 @@ describe('improvement allowedPurchases', () => {
     expect(cardPoints(response)).toBe(0)
 
     // Accepting settles the only allowed improvement directly.
-    response = session.resolveChoice(0, 'flow-0')
+    response = session.resolveChoice(0, waiting(response).options![0]!)
 
     expect(response.ok, response.error).toBe(true)
     expect(waiting(response)).toEqual({ kind: 'confirm-next-player', playerIndex: 0, options: undefined })
@@ -127,12 +127,12 @@ describe('improvement allowedPurchases', () => {
     let response = session.takeAction(0, 'day-laborer')
 
     expect(response.ok, response.error).toBe(true)
-    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: ['flow-0', '__skip__'] })
+    expect(waiting(response)).toEqual({ kind: 'choice', playerIndex: 0, options: [expect.any(String), '__skip__'] })
     expect(response.state.players[0]!.minorPlayed).toEqual([CARD])
     expect(logs(response, 'log.placeFarmer')).toHaveLength(1)
     expect(cardPoints(response)).toBe(0)
 
-    response = session.resolveChoice(0, 'flow-0')
+    response = session.resolveChoice(0, waiting(response).options![0]!)
 
     expect(response.ok, response.error).toBe(true)
     // Neither the other hand minor nor the injected major is offered.

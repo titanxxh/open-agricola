@@ -195,7 +195,7 @@ export class HookDispatcher {
     const suppressed = new Set(getSuppressedBeforeListenerIds(context.actionContext))
     return {
       actionHookResults: this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'before' }),
-      matchedListeners: context.actionId === 'place-farmer'
+      matchedListeners: context.actionId === 'place-farmer' || context.actionSpaceUse
         ? []
         : getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'before' })
           .filter((entry) => !suppressed.has(entry.registration.id)),
@@ -210,7 +210,8 @@ export class HookDispatcher {
     if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     return {
       actionHookResults: this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'immediatelyAfter', result, choice }),
-      matchedListeners: getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'immediatelyAfter', result, choice }),
+      matchedListeners: context.actionSpaceUse ? []
+        : getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'immediatelyAfter', result, choice }),
     }
   }
 
@@ -222,7 +223,8 @@ export class HookDispatcher {
     if (areListenerPhasesHostOwned(context.actionContext)) return noEffectPhase()
     return {
       actionHookResults: this.actionHooks.run({ ...context, actionHooks: this.actionHooks, phase: 'after', result, choice }),
-      matchedListeners: getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'after', result, choice }),
+      matchedListeners: context.actionSpaceUse ? []
+        : getMatchingListeners({ ...context, actionHooks: this.actionHooks, phase: 'after', result, choice }),
     }
   }
 }

@@ -94,17 +94,6 @@ const findListener = (ruleOwner: TestCardRegistry) =>
   return withActiveRegistry(ruleOwner, lookupRule1)
 }
 
-describe('B146_Illusionist listener registration', () => {
-  it('is registered on collect before (player scope)', () => {
-    const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry)
-    expect(listener).toBeDefined()
-    expect(listener!.actions).toContain('collect')
-    expect(listener!.phases).toContain('before')
-    expect(listener!.scope).toBe('player')
-  })
-})
-
 describe('B146_Illusionist listener handler', () => {
 
   it('does nothing when hand is empty', () => {

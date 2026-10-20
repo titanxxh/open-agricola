@@ -28,6 +28,7 @@
 |---|---|---|
 | `shared` / `server` / `client` 物理分层 | ESLint `architecture/imports` | 检查导入，不检查运行时归属 |
 | Card Source 范围与跨卡引用 | `pnpm run check:card-impl-boundaries` | 对生产 Card Source 做同文件 AST；`Major_*`、`reaches`、购买与前置候选是例外；不追踪跨文件数据流；范围为空或不匹配时失败 |
+| Listener 订阅 selector | 共用注册契约与 `check:card-impl-boundaries`，`verify prepush` 同样执行 | 检查展开后的生产注册与权威行动格 ID；牌面审查候选单独报告；不从格子筛选推断触发语义 |
 | 运行时依赖环 | `pnpm run check:dependencies` | 任何运行时 SCC（含自环与字面量动态导入）都失败；没有基线；显式 type-only 导入会被擦除，但内联类型说明符仍会加载模块；已跟踪或未被忽略的未归类源码根失败 |
 | 浏览器与 Replay 隔离 | `pnpm run check:browser-boundaries` | 源码图加真实 Vite 模块图 |
 | 编译期架构契约 | `pnpm run check:architecture-types` | 对 `tsconfig.architecture.json` 运行真实的 no-emit 程序 |
@@ -37,7 +38,7 @@
 | 文档预算 | `scripts/__tests__/docs-budget.test.ts` | Workshop 可读的每份文档都不超过 `REFERENCE_LIMITS.fileBytes`；架构索引 ≤ 16 KiB，每份 module 文档 ≤ 32 KiB，不出现卡牌 ID |
 | 生成目录与 Card Source 一致 | `pnpm run check:generated-cards-sync` | 结构相等 |
 | `GameSession` 持有命令 seam | `CONTEXT.md`、ADR 0014、review 与分层错误 | 是归属关系，不是全程序修改证明 |
-| 架构门禁接线 | `pnpm run check:architecture`、`scripts/__tests__/ci-card-impl-boundaries.test.ts` | 两个 CI workflow 各调用一次聚合命令；必需检查遵循 `docs/operations/ci-checks.md` |
+| 架构门禁接线 | `pnpm run check:architecture`、`scripts/__tests__/ci-card-impl-boundaries.test.ts` | 两个 CI workflow 各调用一次聚合命令；prepush 执行同一生产卡牌扫描；契约反例通过 `check:architecture-tests` 执行；必需检查遵循 `docs/operations/ci-checks.md` |
 
 优先使用源码发现、文件清单、导入边界与小型语法检查。扫描器复用 `scripts/source-files.ts`；必需的根缺失或为空、解析错误或不支持的条目都会失败，不再匹配任何已识别写入的具名豁免视为过期。没有具体的仓库用例，不要把检查器扩展成符号或数据流引擎。
 

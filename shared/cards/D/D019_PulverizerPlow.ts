@@ -1,14 +1,14 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D019_PulverizerPlow'
 const listener: CardListenerRegistration = {
   id: 'D19-pulverizer-plow-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const gainPerRound = context.space?.gainPerRound ?? {}
     if ((gainPerRound.clay ?? 0) <= 0) return

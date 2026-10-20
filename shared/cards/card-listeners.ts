@@ -11,7 +11,7 @@ import type { TriggerSnapshot } from './helpers/trigger-snapshot'
 import { validateCustomListenerResult } from '../custom-code/listener-result-validator'
 import { getCardListenerSource } from './card-listener-source'
 import { isPlayerSkippingCurrentHarvest } from './helpers/harvest-skip'
-import type { CardListenerAction, CardListenerEvent } from './listener-contract'
+import type { ActionSpaceListenerPhase, CardListenerAction, CardListenerEvent } from './listener-contract'
 import { snapshotCardListener } from './listener-contract'
 
 export type CardListenerContext = ActionExecutionContext & {
@@ -48,15 +48,24 @@ export type CardListenerOwnerZone = CardListenerZone | 'activated'
 
 export type CardListenerRegistration = ({
   actions: CardListenerAction[]
+  actionSpaces?: never
   events?: never
   globalQuery?: never
 } | {
+  actionSpaces: 'all' | string[]
+  actions?: never
+  events?: never
+  globalQuery?: never
+  phases: ActionSpaceListenerPhase[]
+} | {
   events: CardListenerEvent[]
   actions?: never
+  actionSpaces?: never
   globalQuery?: never
 } | {
   globalQuery: true
   actions?: never
+  actionSpaces?: never
   events?: never
 }) & {
   id: string
@@ -65,7 +74,7 @@ export type CardListenerRegistration = ({
   scope?: CardListenerScope
   zones?: CardListenerZone[]
   mandatory?: boolean
-  /** Before-space listeners that require placing a new worker, rather than using a space. */
+  /** Space listeners that require placing a new worker. */
   requiresNewPlacement?: true
   preScoring?: boolean
   allowAnytimeReentry?: boolean
@@ -186,6 +195,12 @@ const matchesListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
 ) => {
+  if (registration.actionSpaces) {
+    if (!context.actionSpaceUse || registration.requiresNewPlacement && !context.actionSpaceUse.newPlacement) return false
+    if (registration.actionSpaces !== 'all' && !registration.actionSpaces.includes(context.space.id)) return false
+    return registration.phases.includes(context.phase)
+  }
+  if (context.actionSpaceUse && registration.globalQuery !== true) return false
   if (!registration.actions && !registration.events && registration.globalQuery !== true) return false
   if (registration.events && !context.actionEvents?.some(event => registration.events?.some(target => target === event.type))) {
     return false
@@ -411,9 +426,9 @@ export const getMatchingListeners = (
       }
     }
   })
-  if (listenerContext.phase === 'after' && (listenerContext.actionId === 'receive' || listenerContext.actionId === 'collect')) {
+  if (listenerContext.phase === 'after' && (listenerContext.actionSpaceUse || listenerContext.actionId === 'receive')) {
     const owned = new Set([...listenerContext.player.improvements, ...listenerContext.player.minorPlayed, ...listenerContext.player.occupationPlayed])
-    const phase = listenerContext.actionId === 'receive' ? 'afterReceive' : 'afterCollect'
+    const phase = listenerContext.actionSpaceUse ? 'afterCollect' : 'afterReceive'
     for (const source of timedRuleSources(listenerContext.state, listenerContext.player, id => getCardEffect(id)?.timedRules ?? [], listenerContext.transactionEvents)) {
       if (owned.has(source.cardId) || !source.rules.some(rule => rule.at.phase === phase)) continue
       const registration = retainedTimedListener(source.cardId, phase, source.rules)
@@ -452,23 +467,20 @@ const collectBeforeSpaceFlows = (
   actionContext: Record<string, unknown> | undefined,
   newPlacement: boolean,
 ): ActionFlow[] => {
-  const seen = new Set<string>()
   const flows: ActionFlow[] = []
-  for (const actionId of [space.id, 'place-farmer']) {
+  for (const target of ['space', 'placement'] as const) {
     const context = {
       actionHooks,
       state,
       player,
       space,
-      actionId,
+      actionId: target === 'space' ? space.id : 'place-farmer',
+      ...(target === 'space' ? { actionSpaceUse: { newPlacement } } : {}),
       phase: 'before' as const,
       actionContext,
     }
     for (const entry of getMatchingListeners(context)) {
       if (!newPlacement && entry.registration.requiresNewPlacement) continue
-      const key = `${entry.registration.id}\0${entry.cardId}\0${entry.ownerPlayerId}`
-      if (seen.has(key)) continue
-      seen.add(key)
       const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
       if (result?.flow) flows.push(result.flow)
     }
@@ -493,7 +505,9 @@ export const collectBeforeActionSpaceUseFlows = (
 ): ActionFlow[] => collectBeforeSpaceFlows(actionHooks, state, player, space, actionContext, false)
 
 const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => snapshotCardListener({
-  id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId], actions: [phase === 'afterReceive' ? 'receive' : 'collect'], phases: ['after'], mandatory: true,
+  id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId],
+  ...(phase === 'afterReceive' ? { actions: ['receive'] satisfies CardListenerAction[] } : { actionSpaces: 'all' as const }),
+  phases: ['after'], mandatory: true,
   handler: context => {
     const flow = timedEventFlow(context, cardId, rules, phase)
     return flow ? { flow, sourceCard: cardId } : undefined

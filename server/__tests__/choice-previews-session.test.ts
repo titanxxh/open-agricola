@@ -357,7 +357,13 @@ describe('authoritative choice previews', () => {
     player.resources.stone = 0
     session.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 3
     let response = session.takeAction(0, 'clay-pit')
-    for (let step = 0; step < 8; step += 1) {
+    for (let step = 0; step < 12; step += 1) {
+      if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+        const card = response.state.players[0]!.resources.wood > 0 ? 'D180_PartTimeWorker' : 'C093_InnerDistrictsDirector'
+        const trigger = response.interaction.request.options.find(option => option.sourceCard === card)!
+        response = session.resolveChoice(0, trigger.value)
+        continue
+      }
       const options = choices(response)
       if (options.some((option) => effects(option.descriptionPreview).some((effect) => effect.kind === 'resourceMovement'))) break
       const option = options.find((candidate) => candidate.value === 'forest')

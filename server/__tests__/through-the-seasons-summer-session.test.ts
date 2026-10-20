@@ -487,7 +487,8 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.cardStates.A097_Freshman?.extraData?.usedTurnToken).toEqual(expect.any(Number))
   })
 
   it('resolves replacement doability and execution through the complete ad-hoc resolver', () => {

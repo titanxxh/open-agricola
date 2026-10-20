@@ -18,10 +18,10 @@ const listener: CardListenerRegistration = {
   id: 'A66-feeding-dish-before-market-use',
   cardIds: [CARD_ID],
   phases: ['before'],
-  actions: ['sheep-market', 'pig-market', 'cattle-market'],
+  actionSpaces: ['sheep-market', 'pig-market', 'cattle-market'],
   mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const animal = SPACE_TO_ANIMAL[context.actionId]
+    const animal = SPACE_TO_ANIMAL[context.space.id]
     if (!animal) return
     if (getAssignedAnimalsByType(context.player, context.state)[animal] < 1) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }

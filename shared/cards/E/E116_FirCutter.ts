@@ -1,8 +1,8 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
+import { getSpaceUsePersonPlacementOrdinal } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E116_FirCutter'
@@ -27,12 +27,13 @@ const WOOD_BY_PLACEMENT = [0, 1, 1, 2, 2, 3]
 const animalMarketListener: CardListenerRegistration = {
   id: 'E116-fir-cutter-after-animal-market',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: Array.from(ANIMAL_MARKET_SPACES),
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !ANIMAL_MARKET_SPACES.has(context.space.id)) return
 
-    const placedFarmers = getRoundPersonPlacementOrder(context.player).length
+    const placedFarmers = getSpaceUsePersonPlacementOrdinal(context.player, context.actionContext)
+    if (placedFarmers === undefined) return
     const woodAmount = WOOD_BY_PLACEMENT[placedFarmers] ?? WOOD_BY_PLACEMENT[WOOD_BY_PLACEMENT.length - 1]!
     if (!woodAmount || woodAmount <= 0) return
 

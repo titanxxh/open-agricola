@@ -204,7 +204,9 @@ describe('C150 Parrot Breeder authoritative copy', () => {
     const pending = session.takeAction(3, 'day-laborer')
     expect(pending.ok, pending.error).toBe(true)
     expect(pending.interaction).toMatchObject({ stateId: 'wait', playerIndex: 3, sourceCard: 'B152_JuniorArtist' })
-    const moved = session.resolveChoice(3, 'flow-0')
+    const move = pending.interaction.stateId === 'wait' ? pending.interaction.request.options?.find(option => option.value !== '__skip__') : undefined
+    expect(move).toBeDefined()
+    const moved = session.resolveChoice(3, move!.value)
     expect(moved.ok, moved.error).toBe(true)
     expect(right(moved)).toBe('traveling-players')
     expect(findActionSpaceById(moved.state, 'day-laborer')!.takenBy).toEqual([])

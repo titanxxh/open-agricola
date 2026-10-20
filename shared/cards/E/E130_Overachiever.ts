@@ -14,7 +14,7 @@ const beforeWishChildrenListener: CardListenerRegistration = {
   id: 'E130-overachiever-before-wish-children',
   cardIds: [CARD_ID],
   phases: ['before'],
-  actions: ['family-growth'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!WISH_SPACES.has(context.space?.id ?? '')) return
     return {

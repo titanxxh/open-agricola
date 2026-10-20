@@ -2,13 +2,18 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
-import { isCardFlagged } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
+import { readActionSnapshotToken } from '../helpers/action-snapshot-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A097_Freshman'
+const usedThisTurn = (context: CardListenerContext) => {
+  const token = readActionSnapshotToken(context.player)
+  return token !== undefined && readCardExtraData<number>(context.player, CARD_ID, 'usedTurnToken') === token
+}
 const canReplaceBake = (context: CardListenerContext) =>
   !context.actionContext?.checkedReplaceAction &&
-  !isCardFlagged(context.player, CARD_ID) &&
+  !usedThisTurn(context) &&
   hasPlayableOccupationChoice(context.state, context.player, context.space.id, { exactCost: {} }, context?.actionHooks)
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A97-freshman-replace-bake',
@@ -23,7 +28,7 @@ const computeReplaceListener: CardListenerRegistration = {
         type: 'seq',
         promptKey: 'ui.interactionFreshmanOccupation',
         children: [
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-extra-data', key: 'usedTurnToken', value: readActionSnapshotToken(context.player) } },
           {
             type: 'leaf',
             actionId: 'occupation',
@@ -32,20 +37,6 @@ const computeReplaceListener: CardListenerRegistration = {
           },
         ],
       },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-const afterPlaceFarmerListener: CardListenerRegistration = {
-  id: 'A97-freshman-after-place-farmer',
-  cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase, 'after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isCardFlagged(context.player, CARD_ID)) return
-    return {
-      flow: { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
       sourceCard: CARD_ID,
     }
   },
@@ -63,7 +54,7 @@ const isDoableBakeListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [computeReplaceListener, afterPlaceFarmerListener, isDoableBakeListener],
+  listeners: [computeReplaceListener, isDoableBakeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

@@ -1,61 +1,13 @@
-import type { PersonUseReceipt } from '../../../contract/person-use'
 import type { ActionHookRegistry } from '../../hooks'
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
-import { collectBeforePlacementFlows, getMatchingListeners, type MatchedCardListener } from '../../../cards/card-listeners'
+import { collectBeforePlacementFlows } from '../../../cards/card-listeners'
 import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../../domain/space'
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { incPlacedFarmers } from '../../../session/stats'
 import { canEnterSpace } from '../../helpers/placement-availability'
 import { isPlacementActionDoableInFlowContext } from '../../flow'
 import { getActionDefinition } from '../../action-definition-lookup'
-
-const collectAfterPlacementFlows = (
-  actionHooks: ActionHookRegistry | undefined,
-  state: GameState,
-  player: PlayerState,
-  targetSpace: ActionSpace,
-  actionContext: Record<string, unknown> | undefined,
-  personUse: PersonUseReceipt,
-): ActionFlow[] => {
-  const context = {
-    actionHooks,
-    state,
-    player,
-    space: targetSpace,
-    actionId: 'place-farmer',
-    phase: 'after' as const,
-    result: { type: 'ok' as const },
-    actionContext,
-  }
-  return getMatchingListeners(context).map((entry) =>
-    activatePlacementListenerFlow(entry, player.id, actionContext, personUse),
-  )
-}
-
-const activatePlacementListenerFlow = (
-  entry: MatchedCardListener,
-  triggerPlayerId: string,
-  actionContext: Record<string, unknown> | undefined,
-  personUse: PersonUseReceipt,
-): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'activate-card',
-  sourceCard: entry.cardId || undefined,
-  params: {
-    listenerId: entry.registration.id,
-    cardId: entry.cardId,
-    phase: 'after',
-    actionId: 'place-farmer',
-    event: { result: { type: 'ok', personUse } },
-    ownerPlayerId: entry.ownerPlayerId,
-    ownerCardZone: entry.ownerCardZone,
-    triggerPlayerId,
-    mandatory: entry.registration.mandatory === true,
-  },
-  actionContext: actionContext ? { ...actionContext } : undefined,
-  targetPlayerId: entry.ownerPlayerId || undefined,
-})
 
 const canTargetSpace = (
   actionHooks: ActionHookRegistry | undefined,
@@ -124,20 +76,20 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
     const targetLeaf: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
+      spaceUse: { newPlacement: true, personUse, completePlacement: true },
       expandFlow: true,
       sourceCard: cardId,
       actionContext: targetActionContext,
     }
     const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
-    const afterFlows = collectAfterPlacementFlows(actionHooks, state, player, targetSpace, targetActionContext, personUse)
-    if (beforeFlows.length === 0 && afterFlows.length === 0) {
+    if (beforeFlows.length === 0) {
       return { type: 'flow', flow: targetLeaf, extraData: { actionContextWrite } }
     }
     return {
       type: 'flow',
       flow: {
         type: 'seq',
-        children: [...beforeFlows, targetLeaf, ...afterFlows],
+        children: [...beforeFlows, targetLeaf],
       },
       extraData: { actionContextWrite },
     }

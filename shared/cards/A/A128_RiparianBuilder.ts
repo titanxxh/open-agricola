@@ -8,8 +8,8 @@ const CARD_ID = 'A128_RiparianBuilder'
 const triggerBuildListener: CardListenerRegistration = {
   id: 'A128-riparian-builder-after-opponent-reed-bank',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space.id !== 'reed-bank') return

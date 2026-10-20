@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -71,8 +71,8 @@ const hasMatchingPartner = (
 const listener: CardListenerRegistration = {
   id: 'C154-twin-researcher-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (!spaceId) return

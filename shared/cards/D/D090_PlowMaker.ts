@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { getPlowableTiles } from '../../actions/effects/plow'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -9,8 +9,8 @@ const CARD_ID = 'D090_PlowMaker'
 const listener: CardListenerRegistration = {
   id: 'D90-plow-maker-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (spaceId !== 'farmland' && spaceId !== 'cultivation') return

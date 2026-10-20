@@ -180,6 +180,10 @@ describe('B034_SpecialFood action-space provenance', () => {
     let resp = session.takeAction(0, 'reed-bank')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
+      const shepherd = resp.interaction.request.options.find(option => option.sourceCard === 'A137_RiverineShepherd')!
+      resp = session.resolveChoice(0, shepherd.value)
+    }
 
     const acceptOption = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()

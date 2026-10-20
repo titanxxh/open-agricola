@@ -27,6 +27,8 @@ export type EngineNode = {
   choiceLabelParams?: Record<string, unknown>
   type: EngineNodeType
   ownerPlayerId?: string
+  spaceUseBodyId?: string
+  reactionPhase?: 'immediatelyAfter' | 'after'
   optional?: boolean
   optionalActive?: boolean
   optionalPromptKey?: PromptKey

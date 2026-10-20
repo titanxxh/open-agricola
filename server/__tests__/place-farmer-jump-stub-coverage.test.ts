@@ -149,12 +149,12 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
 // Scenario 2: cascade dispatch - third-party listener visibility on the
 // jump destination (the "Y option" in mech-A spec §6.5).
 //
-// Stub observer listens on `place-farmer` after for grain-seeds and gains food.
+// Stub observer listens to complete Grain Seeds use and gains food.
 //   (a) direct placement on grain-seeds: gains 1 food (sanity).
 //   (b) reach grain-seeds via A129 jump from farm-expansion: the standard
 //       ActionNode `after` dispatch is keyed on grain-seeds, so the observer
 //       matches and gains food.
-describe('cascade dispatch - third-party place-farmer after listener fires on jump destination', () => {
+describe('cascade dispatch - third-party space-use after listener fires on jump destination', () => {
   const STUB_OBS_ID = '__test_grain_seeds_observer__'
   const LISTENER_ID = 'stub-grain-seeds-observer-listener'
 
@@ -164,7 +164,7 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
       id: LISTENER_ID,
       cardIds: [STUB_OBS_ID],
       phases: ['after'],
-      actions: ['place-farmer'],
+      actionSpaces: ['grain-seeds'],
       handler: (ctx) => {
         if (ctx.space?.id !== 'grain-seeds') return
         return {

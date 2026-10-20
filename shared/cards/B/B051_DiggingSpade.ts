@@ -2,7 +2,7 @@ import { countRoomAnimals } from '../../domain/animals'
 import { defineMinorCard } from '../card-source'
 import type { PlayerState, Pasture } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -33,8 +33,8 @@ const countBoarInFarmyard = (player: PlayerState): number => {
 const listener: CardListenerRegistration = {
   id: 'B51-digging-spade-before-collect-clay',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const gainPerRound = context.space?.gainPerRound ?? {}
     if ((gainPerRound.clay ?? 0) <= 0) return

@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { isMeepleSymbolSpaceId } from '../helpers/action-space-categories'
 import { storedFoodCashoutListener, storeFoodOnCardFlow } from '../helpers/stored-food-cashout'
@@ -10,8 +10,8 @@ const CARD_ID = 'B173_Sweeper'
 const afterMeepleSpaceListener: CardListenerRegistration = {
   id: 'B173-sweeper-after-meeple-space',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isMeepleSymbolSpaceId(context.space?.id)) return
     const flow = storeFoodOnCardFlow(context.player, CARD_ID)

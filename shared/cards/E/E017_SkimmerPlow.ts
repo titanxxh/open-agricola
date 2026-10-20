@@ -9,8 +9,8 @@ const CARD_ID = 'E017_SkimmerPlow'
 const listener: CardListenerRegistration = {
   id: 'E17-skimmer-plow-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (spaceId !== 'farmland' && spaceId !== 'cultivation') return

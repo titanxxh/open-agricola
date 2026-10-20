@@ -141,7 +141,7 @@ export const placeFarmerAction: ActionDefinition = {
       // Reachability check only applies to worker mode (worker-less is invoked
       // by cards that have already verified the space is unoccupied / valid).
       if (!isWorkerless) {
-        const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks, sourceCard, actionContext, ignoreWorkerAvailability: true })
+        const allowed = computeAllowedPlacementSpaces(state, player, { actionHooks, actionSpaceUse: { newPlacement: false }, sourceCard, actionContext, ignoreWorkerAvailability: true })
         if (!allowed.some(a => a.spaceId === targetSpaceId)) {
           return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
@@ -178,6 +178,7 @@ export const placeFarmerAction: ActionDefinition = {
       const targetLeaf: ActionFlow = {
         type: 'leaf',
         actionId: targetSpaceId,
+        spaceUse: { newPlacement: false },
         expandFlow: true,
         sourceCard,
         actionContext: resetComputeReplaceGuards(actionContext),
@@ -293,6 +294,7 @@ export const placeFarmerAction: ActionDefinition = {
     const targetLeaf: ActionFlow = {
       type: 'leaf',
       actionId: targetSpaceId,
+      spaceUse: { newPlacement: true, personUse: placeResult.personUse },
       expandFlow: true,
       sourceCard,
       actionContext: targetActionContext,

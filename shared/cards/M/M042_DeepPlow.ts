@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { buildMoorToFieldFlow, buildPlaceTerrainFlow } from '../../moor/terrain-flow'
 
@@ -12,8 +12,8 @@ const countImprovements = (player: { improvements: string[]; minorPlayed: string
 const farmlandListener: CardListenerRegistration = {
   id: 'M042-deep-plow-after-farmland',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'farmland' && context.space?.id !== 'cultivation') return
     const flow = buildMoorToFieldFlow(CARD_ID, context.player, true)

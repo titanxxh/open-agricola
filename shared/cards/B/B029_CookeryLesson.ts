@@ -114,8 +114,8 @@ const afterExchangeListener: CardListenerRegistration = {
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isLessonsSpaceId(context.space?.id)) return
     const stamp = currentTokenLeaf(context.player, LESSONS_TOKEN_KEY)

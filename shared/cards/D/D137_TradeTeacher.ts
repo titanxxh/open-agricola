@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
@@ -86,8 +86,8 @@ const buildBuyFlow = (): ActionFlow => {
 const listener: CardListenerRegistration = {
   id: 'D137-trade-teacher-after-lessons',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

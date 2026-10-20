@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A081_InterimStorage'
@@ -14,8 +14,8 @@ const COLLECT_MAP = {
 const collectListener: CardListenerRegistration = {
   id: 'A81-interim-storage-before-collect',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const storedEntry = Object.entries(COLLECT_MAP).find(
       ([resource]) => (context.space.resources?.[resource as keyof typeof context.space.resources] ?? 0) > 0,

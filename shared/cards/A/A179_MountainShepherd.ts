@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -9,8 +9,8 @@ const QUARRY_SPACES = new Set(['eastern-quarry', 'western-quarry'])
 const listener: CardListenerRegistration = {
   id: 'A179-mountain-shepherd-after-quarry',
   cardIds: [CARD_ID],
-  actions: ['collect'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!QUARRY_SPACES.has(context.space?.id ?? '')) return
     return { flow: gainLeaf(CARD_ID, { sheep: 1 }), sourceCard: CARD_ID }

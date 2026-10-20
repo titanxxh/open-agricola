@@ -24,6 +24,8 @@ export const registerPlayerActionSpace = (config: PlayerActionSpaceConfig) => {
 
 export const getPlayerActionSpaceConfig = (cardId: string) => registry.get(cardId)
 
+export const getRegisteredPlayerActionSpaceIds = (): readonly string[] => [...registry.keys()]
+
 const emptyResources: Resource = {
   wood: 0,
   clay: 0,

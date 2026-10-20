@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { canEnterSpace } from '../../actions/helpers/placement-availability'
 import { workersAvailable } from '../../domain/player'
 import { isSpaceBlocked } from '../../domain/space'
@@ -24,8 +24,8 @@ const canFollow = (context: CardListenerContext): boolean => {
 const listener: CardListenerRegistration = {
   id: 'B178-tag-along-after-resource-market',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!canFollow(context)) return

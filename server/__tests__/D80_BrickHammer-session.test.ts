@@ -77,6 +77,10 @@ const playMinor = (session: GameSession, cardId = CARD_ID) => {
     response = session.resolveChoice(response.interaction.playerIndex, next.value)
     response = resolvePayment(session, response)
   }
+  if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+    const hammer = options(response).find(option => option.sourceCard === CARD_ID)
+    if (hammer) response = session.resolveChoice(response.interaction.playerIndex, hammer.value)
+  }
   return response
 }
 

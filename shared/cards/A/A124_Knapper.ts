@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -20,8 +20,8 @@ const isRound5to7ActionSpace = (context: CardListenerContext): boolean => {
 const listener: CardListenerRegistration = {
   id: 'A124-knapper-before-action',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['before' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return
     if (!isRound5to7ActionSpace(context)) return

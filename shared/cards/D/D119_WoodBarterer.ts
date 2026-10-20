@@ -1,7 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -13,8 +13,8 @@ const containsBuildingAction = (flow: ActionFlow): boolean => flow.type === 'lea
 const beforeListener: CardListenerRegistration = {
   id: 'D119-wood-barterer-before-placement',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (!context.space.flow || !containsBuildingAction(context.space.flow)) return

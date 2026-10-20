@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
@@ -14,8 +14,8 @@ const CARD_ID = 'D039_TruffleSlicer'
 const listener: CardListenerRegistration = {
   id: 'D39-truffle-slicer-after-place-farmer',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
     if ((context.player.resources.boar ?? 0) <= 0) return

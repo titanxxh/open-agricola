@@ -35,6 +35,8 @@ import type { ActionRegistry } from './registry'
 import { applyCardStorageOperation, cardStorageAffectsScore, readCardStorageOperation } from '../actions/card-storage'
 import { getLogicalFields } from '../cards/helpers/card-field'
 import { getPlayOrderIndex } from './matched-trigger'
+import { wrapSpaceUse } from './space-use-nodes'
+import { actionSpaceQueryContext } from './space-use-nodes'
 import type { MatchedCardListener } from '../cards/card-listeners'
 import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import type { GameState } from '../contract/types'
@@ -195,6 +197,8 @@ export function markOptional<T extends EngineNode>(
 
 function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineNode {
   target.ownerPlayerId = source.ownerPlayerId
+  target.spaceUseBodyId = source.spaceUseBodyId
+  target.reactionPhase = source.reactionPhase
   target.optional = source.optional
   target.optionalActive = source.optionalActive
   target.optionalPromptKey = source.optionalPromptKey
@@ -266,9 +270,11 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
       ...(node.beforePhaseResolved || context.actionContext?.skipBeforeTriggers === true ? { skipBeforeTriggers: true } : {}),
     }
     const targetSpaceId = actionContext?.targetSpaceId
-    const space = context.state.actionSpaces.find((entry) => entry.id === targetSpaceId) ?? context.space
+    const space = context.state.actionSpaces.find((entry) => entry.id === targetSpaceId)
+      ?? (node.actionSpaceUse ? context.state.actionSpaces.find(entry => entry.id === node.actionId) : undefined)
+      ?? context.space
     return isActionDoableInFlowContext({
-      ...context, actionId, action, player, space,
+      ...context, ...actionSpaceQueryContext(node, actionId), actionId, action, player, space,
       params: node.params, sourceCard: node.resolvedReplacement?.sourceCard ?? node.sourceCard, actionContext,
       resolveAction: (actionId) => int.registry.getRequired(actionId),
     })
@@ -374,7 +380,10 @@ export function buildPhaseTrailingNodes(
   }
 
   return groups.map((group) => {
-    if (group.length === 1) return group[0]!
+    if (group.length === 1) {
+      if (phase === 'immediatelyAfter' || phase === 'after') group[0]!.reactionPhase = phase
+      return group[0]!
+    }
     const ownerPlayerId = group[0]?.params.ownerPlayerId || effectiveTriggerPlayerId
     const ptn = new ParallelNode(
       `parallel-trigger-${phase}-${actionId}-${ownerPlayerId ?? 'global'}-${int.counterRef.value++}`,
@@ -389,8 +398,38 @@ export function buildPhaseTrailingNodes(
       listenerId: child.params.listenerId,
       mandatory: child.params.mandatory === true,
     }))
+    if (phase === 'immediatelyAfter' || phase === 'after') ptn.reactionPhase = phase
     return ptn
   })
+}
+
+export function combineTrailingReactions(int: EngineInternals, nodes: EngineNode[], state: GameState, triggerPlayerId: string): EngineNode[] {
+  const children = nodes.flatMap(node => node instanceof ParallelNode && node.mode === 'trigger-select' ? node.children : [node])
+  const activations = children.filter(isActivateCardActionNode)
+  if (activations.length !== children.length) return nodes
+  const ownerOrder = (node: ActivateCardActionNode) => !node.params.ownerPlayerId ? -1
+    : node.params.ownerPlayerId === triggerPlayerId ? 0
+      : state.players.findIndex(player => player.id === node.params.ownerPlayerId) + 1
+  activations.sort((a, b) => ownerOrder(a) - ownerOrder(b)
+    || getPlayOrderIndex(state.players.find(player => player.id === a.params.ownerPlayerId) ?? state.players.find(player => player.id === triggerPlayerId)!, a.params.cardId)
+      - getPlayOrderIndex(state.players.find(player => player.id === b.params.ownerPlayerId) ?? state.players.find(player => player.id === triggerPlayerId)!, b.params.cardId))
+  const result: EngineNode[] = []
+  for (const child of activations) {
+    const owner = child.params.ownerPlayerId || triggerPlayerId
+    const last = result.at(-1)
+    if (last instanceof ParallelNode && last.triggerOwnerPlayerId === owner) {
+      last.children.push(child)
+      last.triggerChildren.push({ nodeId: child.id, cardId: child.params.cardId, listenerId: child.params.listenerId, mandatory: child.params.mandatory === true })
+    } else {
+      const parallel = new ParallelNode(`space-reactions-${int.counterRef.value++}`, [child])
+      parallel.mode = 'trigger-select'
+      parallel.triggerOwnerPlayerId = owner
+      parallel.ownerPlayerId = owner
+      parallel.triggerChildren = [{ nodeId: child.id, cardId: child.params.cardId, listenerId: child.params.listenerId, mandatory: child.params.mandatory === true }]
+      result.push(parallel)
+    }
+  }
+  return result.map(node => node instanceof ParallelNode && node.children.length === 1 ? node.children[0]! : node)
 }
 
 export function stampContinuationParentHost(node: EngineNode, hostNodeId: string): void {
@@ -450,6 +489,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.effectPreview,
     )
     clone.resolvedReplacement = node.resolvedReplacement
+    clone.actionSpaceUse = node.actionSpaceUse
     clone.expandFlow = node.expandFlow
     clone.expandFlowIdStyle = node.expandFlowIdStyle
     clone.beforePhaseResolved = node.beforePhaseResolved
@@ -465,6 +505,25 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     )
     clone.anytimeActionId = node.anytimeActionId
     clone.anytimeActivation = node.anytimeActivation
+    if (node.spaceUsePhase) clone.spaceUsePhase = { ...node.spaceUsePhase }
+    if (node.spaceUse) {
+      const clonedIds = new Map(node.children.map((child, index) => [child.id, clone.children[index]!.id]))
+      const clonedId = (id: string): string => {
+        const mapped = clonedIds.get(id)
+        if (!mapped) throw new Error(`missing cloned action-space scope child: ${id}`)
+        return mapped
+      }
+      clone.spaceUse = { ...node.spaceUse,
+        bodyId: clonedId(node.spaceUse.bodyId), immediateId: clonedId(node.spaceUse.immediateId), afterId: clonedId(node.spaceUse.afterId),
+        actionEvents: [...node.spaceUse.actionEvents],
+      }
+      const remapScope = (child: EngineNode): void => {
+        if (child.spaceUseBodyId === node.id) child.spaceUseBodyId = clone.id
+        if (child instanceof SequenceNode && child.spaceUsePhase?.scopeId === node.id) child.spaceUsePhase.scopeId = clone.id
+        for (const descendant of getNodeChildren(child)) remapScope(descendant)
+      }
+      clone.children.forEach(remapScope)
+    }
     return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof ParallelNode) {
@@ -915,7 +974,7 @@ function buildFlowNodeContent(
       : attachChoiceLabel(node, source.choiceLabelKey, source.choiceLabelParams)
   if (flow.targetPlayerId) {
     const { targetPlayerId, ...innerFlow } = flow
-    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId, optionId, idStyle)
+    const scopedNode = buildFlowNode(int, innerFlow, targetPlayerId, optionId, idStyle)
     return stampOwner(scopedNode, targetPlayerId)
   }
   if (flow.type === 'leaf') {
@@ -931,6 +990,10 @@ function buildFlowNodeContent(
     )
     actionNode.expandFlow = flow.expandFlow
     actionNode.expandFlowIdStyle = flow.expandFlow ? idStyle : undefined
+    if (flow.spaceUse) {
+      const scope = wrapSpaceUse(nextSequenceId('space-use'), actionNode, flow.actionId, flow.spaceUse, ownerPlayerId, actionNode.actionContext, flow.spaceUse.completePlacement === true)
+      return attachChoiceLabel(flow.optional ? markOptional(scope, flow.promptKey) : scope, flow.choiceLabelKey, flow.choiceLabelParams)
+    }
     // A nonoptional leaf owns its initial request. Optional metadata belongs
     // to the optional prompt, not the action's later selection or continuation.
     if (flow.optional !== true) actionNode.anytimeWindow = flow.anytimeWindow
@@ -1009,6 +1072,7 @@ export function buildReplacementChoiceNode(
   ]))
   const original = node.children.at(-1)!
   const originalAction = findActionNode(original)
+  if (originalAction && replacement.actionId === actionNode.actionId) originalAction.actionSpaceUse = actionNode.actionSpaceUse
   if (originalAction?.expandFlow) originalAction.expandFlowIdStyle = actionNode.expandFlowIdStyle
   const alternatives = node.children.slice(0, -1).filter((child) => canStartNode(int, context, child))
   if (alternatives.length === 0) return undefined

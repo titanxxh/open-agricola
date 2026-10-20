@@ -40,11 +40,72 @@ describe('listener registration admission', () => {
     { events: [] }, { events: ['unknown'] }, { events: ['farm.sown'], phases: ['before'] },
     { globalQuery: false }, { globalQuery: true, phases: ['after'] },
     { globalQuery: true, actions: ['collect'], phases: ['isDoable'] },
+    { actionSpaces: [] }, { actionSpaces: null }, { actionSpaces: 3 }, { actionSpaces: '*' },
+    { actionSpaces: 'fishing' }, { actionSpaces: ' all ' },
+    { actionSpaces: [''] }, { actionSpaces: ['  '] }, { actionSpaces: [3] },
+    { actionSpaces: ['fishing'], actions: ['collect'] },
+    { actionSpaces: ['fishing'], events: ['farm.sown'] },
+    { actionSpaces: ['fishing'], globalQuery: true, phases: ['isDoable'] },
+    ...['computeArgs', 'computeCosts', 'computeChoiceCandidates', 'anytime'].map(phase => ({ actionSpaces: ['fishing'], phases: [phase] })),
+    { actionSpaces: 'all', actions: ['collect'] },
+    { actionSpaces: 'all', events: ['farm.sown'] },
+    { actionSpaces: 'all', globalQuery: true, phases: ['isDoable'] },
   ])('rejects malformed or unsupported subscription %j', declaration => {
     const registry = new CardRegistry()
     expect(() => Reflect.apply(registry.registerListener, registry, [{ id: 'invalid', phases: ['after'], ...declaration }])).toThrow(/Listener/)
     expect(registry.getAllListeners()).toEqual([])
   })
+
+  it('copies and freezes action space selectors through every registration entry and clone/merge', () => {
+    for (const entry of ['loadImpl', 'addListener', 'registerListener', 'session']) {
+      const registry = new CardRegistry(), session = new SessionCardContext()
+      const actionSpaces = ['fishing']
+      const input: CardListenerRegistration = { id: 'space', actionSpaces, phases: ['before'] }
+      if (entry === 'loadImpl') registry.loadImpl('TEST_Listener', { listeners: [input] })
+      else if (entry === 'addListener') registry.addListener('TEST_Listener', input)
+      else if (entry === 'registerListener') registry.registerListener(input)
+      else session.registerListener(input)
+      actionSpaces.push('forest')
+      const merged = new CardRegistry()
+      merged.mergeFrom(registry.clone())
+      const saved = [...registry.getAllListeners(), ...merged.getAllListeners(), ...session.customListeners]
+      expect(saved.map(installed => installed.actionSpaces)).toEqual(entry === 'session' ? [['fishing']] : [['fishing'], ['fishing']])
+      for (const installed of saved) {
+        expect(installed.actionSpaces).toEqual(['fishing'])
+        expect(() => { if (Array.isArray(installed.actionSpaces)) installed.actionSpaces.push('forest') }).toThrow()
+      }
+    }
+  })
+
+  it.each(['before', 'immediatelyAfter', 'after', 'computeReplace', 'isDoable'] as const)('admits explicit IDs and all at the action-space %s boundary', phase => {
+    for (const actionSpaces of ['all', ['fishing']] as const) {
+      const registry = new CardRegistry(), session = new SessionCardContext()
+      const selector = actionSpaces === 'all' ? actionSpaces : [...actionSpaces]
+      const input: CardListenerRegistration = { id: 'space', actionSpaces: selector, phases: [phase] }
+      registry.loadImpl('TEST_Listener', { listeners: [input] })
+      registry.addListener('TEST_Listener', { ...input, id: 'added' })
+      registry.registerListener({ ...input, id: 'registered' })
+      session.registerListener(input)
+      const merged = new CardRegistry()
+      merged.mergeFrom(registry.clone())
+      for (const saved of [...registry.getAllListeners(), ...merged.getAllListeners(), ...session.customListeners]) {
+        expect(saved.actionSpaces).toEqual(selector)
+        expect(saved.phases).toEqual([phase])
+      }
+    }
+  })
+
+  it.each(['black-market', 'cut-peat', 'fell-trees', 'hiring-fair', 'horse-market', 'illicit-work', 'slash-and-burn'] as const)(
+    'preserves %s as a Moor rule action', actionId => {
+      const registry = new CardRegistry()
+      registry.registerListener({ ...valid(), actions: [actionId], phases: ['before'] })
+      const state = createInitialState(42, { playerCount: 2 })
+      state.players[0]!.minorPlayed = ['TEST_Listener']
+      expect(withActiveRegistry(registry, () => runCardListeners({
+        actionHooks: undefined, state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId, phase: 'before',
+      }, registry.getAllListeners()))).toEqual([{ flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } }])
+    },
+  )
 
   it('snapshots input and getter values so mutations cannot change dispatch after clone and merge', () => {
     const registry = new CardRegistry()

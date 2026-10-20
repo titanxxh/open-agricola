@@ -26,8 +26,8 @@ const setStoredFoodFlow = (count: number): ActionFlow[] => [
 const fishingListener: CardListenerRegistration = {
   id: 'E51-whale-oil-after-collect-fishing',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Check if this is the Fishing action space
     if (context.space?.id !== 'fishing') return

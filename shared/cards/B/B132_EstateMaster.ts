@@ -72,7 +72,6 @@ const cardImpl = {
   listeners: [
     saturationCheckListener('construct'),
     saturationCheckListener('stables'),
-    saturationCheckListener('fencing'),
     saturationCheckListener('fence'),
     saturationCheckListener('plow'),
     reapListener,

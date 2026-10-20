@@ -43,15 +43,15 @@ describe('verification modes and evidence', () => {
     const run = (command: string, args: string[]) => { calls.push([command, ...args].join(' ')); return 0 }
     runVerification(cwd, plan, run)
     expect(calls).toEqual([
-      `${process.execPath} scripts/local-services.mjs --test`, 'pnpm test:fast', 'pnpm run lint',
+      `${process.execPath} scripts/local-services.mjs --test`, 'pnpm run check:card-impl-boundaries', 'pnpm test:fast', 'pnpm run lint',
     ])
     expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')).toMatchObject({
       current: true, record: { status: 'passed', steps: [
-        { name: 'test-services', status: 'passed' }, { name: 'fast', status: 'passed' }, { name: 'lint', status: 'passed' },
+        { name: 'test-services', status: 'passed' }, { name: 'card-impl-boundaries', status: 'passed' }, { name: 'fast', status: 'passed' }, { name: 'lint', status: 'passed' },
       ] },
     })
     runVerification(cwd, plan, run)
-    expect(calls).toHaveLength(6)
+    expect(calls).toHaveLength(8)
     expect(() => verificationPlan(cwd, ['prepush', '--project', 'fast-server'])).toThrow('accepts no filters')
   })
 
@@ -67,8 +67,24 @@ describe('verification modes and evidence', () => {
     const result = verificationStatus(cwd).find(entry => entry.mode === 'prepush')!
     expect(result.current).toBe(true)
     expect(result.record).toMatchObject({ status: 'failed', steps: [
-      { name: 'test-services', exitCode: 0 }, { name: 'fast', exitCode: 7 },
+      { name: 'test-services', exitCode: 0 }, { name: 'card-impl-boundaries', exitCode: 0 }, { name: 'fast', exitCode: 7 },
     ] })
+  })
+
+  it('records production scan failure and does not start fast tests or lint', () => {
+    const cwd = repo(), plan = verificationPlan(cwd, ['prepush'])
+    runVerification(cwd, plan, () => 0)
+    const calls: string[] = []
+    expect(() => runVerification(cwd, plan, (_command, args) => {
+      calls.push(args.join(' '))
+      return args.includes('check:card-impl-boundaries') ? 1 : 0
+    })).toThrow('card-impl-boundaries failed (exit 1)')
+    expect(calls).toEqual(['scripts/local-services.mjs --test', 'run check:card-impl-boundaries'])
+    expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')).toMatchObject({
+      current: true, record: { status: 'failed', steps: [
+        { name: 'test-services', exitCode: 0 }, { name: 'card-impl-boundaries', exitCode: 1 },
+      ] },
+    })
   })
 
   it('invalidates a run when a checked source changes during execution', () => {

@@ -3,11 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
-import { D161_CabbageBuyer_impl } from '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A055_JunkRoom'
 import '../../shared/cards/D/D013_Trowel'
-import type { ActionFlow } from '../../shared/contract/types'
-import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import assert from 'node:assert/strict'
 import * as audit57Phase from './_helpers/audit/ae-negative-57-phase'
 
@@ -72,86 +69,6 @@ const setup = (options?: {
 
   session.loadState(state)
   return session
-}
-
-const setupD161DirectListeners = () => {
-  const session = setup()
-  const state = session.getState().state
-  const owner = state.players[0]!
-  const actor = state.players[1]!
-  const open = D161_CabbageBuyer_impl.listeners.find((l) => l.id === 'D161-cabbage-buyer-open-tracker')!
-  const tagImprovement = D161_CabbageBuyer_impl.listeners.find((l) => l.id === 'D161-cabbage-buyer-tag-improvement')!
-  const offer = D161_CabbageBuyer_impl.listeners.find((l) => l.id === 'D161-cabbage-buyer-drain-offer')!
-  return { state, owner, actor, open, tagImprovement, offer }
-}
-
-const getD161OfferCost = (flow: ActionFlow | undefined) => {
-  if (!flow) return undefined
-  if (flow.type === 'leaf') {
-    return flow.actionId === 'pay'
-      ? (flow.params as { food?: number } | undefined)?.food
-      : undefined
-  }
-  if (!('children' in flow)) return undefined
-  return flow.children.map(getD161OfferCost).find((cost) => cost !== undefined)
-}
-
-const applyStateFlow = (
-  flow: ActionFlow | undefined,
-  state: ReturnType<GameSession['getState']>['state'],
-  player: typeof state.players[number],
-) => {
-  if (!flow) return
-  if (flow.type !== 'leaf') {
-    if ('children' in flow) flow.children.forEach((child) => applyStateFlow(child, state, player))
-    return
-  }
-  if (flow.actionId === 'special-effect') {
-    specialEffectAction.execute({
-      state,
-      player,
-      params: flow.params,
-      sourceCard: flow.sourceCard,
-      actionContext: flow.actionContext,
-    } as never)
-  }
-}
-
-const openDirectD161Tracker = (
-  setupResult: ReturnType<typeof setupD161DirectListeners>,
-  options?: { spaceId?: string; food?: number; choice?: string },
-) => {
-  const { state, owner, actor, open, tagImprovement, offer } = setupResult
-  if (options?.food !== undefined) owner.resources.food = options.food
-  const openResult = open.handler({
-    state,
-    player: actor,
-    ownerPlayer: owner,
-    space: { id: options?.spaceId ?? 'house-redevelopment' } as never,
-    actionId: 'renovate-house',
-    phase: 'after',
-  } as never)
-  applyStateFlow(openResult?.flow, state, actor)
-  if (options?.choice) {
-    const tagResult = tagImprovement.handler({
-      state,
-      player: actor,
-      ownerPlayer: owner,
-      actionId: 'improvement',
-      phase: 'after',
-      choice: options.choice,
-    } as never)
-    applyStateFlow(tagResult?.flow, state, actor)
-  }
-  const result = offer.handler({
-    state,
-    player: actor,
-    ownerPlayer: owner,
-    actionId: 'place-farmer',
-    phase: 'after',
-  } as never)
-  applyStateFlow(result?.flow, state, actor)
-  return result
 }
 
 /**
@@ -283,30 +200,6 @@ const walkPlayerSwitch = (session: GameSession, resp: ReturnType<GameSession['ta
 // ─── Test cases ──────────────────────────────────────────────────────────────
 
 describe('D161_CabbageBuyer session', () => {
-  it('direct tracker opens for non-house renovation action spaces', () => {
-    const result = openDirectD161Tracker(setupD161DirectListeners(), {
-      spaceId: 'B001_UpscaleLifestyle',
-    })
-
-    expect(getD161OfferCost(result?.flow)).toBe(3)
-  })
-
-  it.each([
-    ['no improvement', undefined, 3],
-    ['minor improvement', 'A055_JunkRoom', 2],
-    ['major improvement', 'Major_Fireplace1', 1],
-  ] as const)('direct price branch: %s costs %s food', (_label, choice, expectedCost) => {
-    const result = openDirectD161Tracker(setupD161DirectListeners(), { choice })
-
-    expect(getD161OfferCost(result?.flow)).toBe(expectedCost)
-  })
-
-  it('direct price branch: no food emits no offer', () => {
-    const result = openDirectD161Tracker(setupD161DirectListeners(), { food: 0 })
-
-    expect(getD161OfferCost(result?.flow)).toBeUndefined()
-  })
-
   // ── Case 1: no improvement → cost = 3 food ──────────────────────────────
 
   it('T1: no improvement — offer appears with cost=3; accept gives vegetable and costs 3 food', () => {
@@ -595,7 +488,7 @@ describe('ae-negative-57-phase', () => {
   it('D161 N1 real owner or opponent renovation followed by no minor or major improvement buys one vegetable for three two or one food', () => {
     for (const actor of [0, 1]) for (const [improvement, cost] of [['none', 3], ['minor', 2], ['major', 1]] as const) {
       const session = cabbage(actor), result = renovation(session, actor, improvement)
-      assert.equal(result.response.state.players[0]!.resources.food, 10 - cost); assert.equal(result.response.state.players[0]!.resources.vegetable, 1); assert.equal(result.response.state.players[actor]!.houseType, 'clay'); assert.equal(result.response.state.players[0]!.cardStates.D161_CabbageBuyer?.extraData?.inFlight, null)
+      assert.equal(result.response.state.players[0]!.resources.food, 10 - cost); assert.equal(result.response.state.players[0]!.resources.vegetable, 1); assert.equal(result.response.state.players[actor]!.houseType, 'clay'); assert.equal(result.response.state.players[0]!.cardStates.D161_CabbageBuyer?.extraData?.inFlight, undefined)
       save(`D161-N1-${actor}-${improvement}`, result)
     }
   })

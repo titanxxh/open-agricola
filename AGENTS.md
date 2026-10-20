@@ -29,7 +29,7 @@ pnpm test:llm:dry           # 专用本地环境的固定 case 合成浏览器�
 pnpm test:llm:live --model <id> # 已确认模型/预算后的完整浏览器验收，保存独立批次
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
-pnpm verify prepush         # 最终版本的完整 fast + lint，记录源码指纹与结果
+pnpm verify prepush         # 全卡实现边界扫描 + 完整 fast + lint，记录源码指纹与结果
 pnpm verify <file.spec.ts>   # 隔离环境重启应用并跑 Playwright；不传文件则跑全部
 pnpm verify status          # 查看验证记录是否仍对应当前源码
 pnpm run lint               # ESLint（error 必须清零）
@@ -151,7 +151,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 1. 调试用 `pnpm verify focus <file.test.ts>` 验证最小范围。定向 Vitest 及纯测试、工具、文档调试不要求启动应用。
 2. 涉及应用运行行为、UI 或 WS，最终验收必须先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行验证真实行为。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。PR 的浏览器 E2E 在本机执行，通过后把结果写入 PR 描述；GitHub Actions 不在 PR 上跑浏览器 E2E。
-3. 最终源码运行 `pnpm verify prepush`，覆盖完整 fast 和 lint。按风险补 slow Session 或 E2E，定向测试不能替代完整门禁。
+3. 最终源码运行 `pnpm verify prepush`，覆盖全卡实现边界扫描、完整 fast 和 lint。按风险补 slow Session 或 E2E，定向测试不能替代完整门禁。
 4. 修改源码或 rebase 改变文件内容后重新验证。`pnpm verify status` 检查记录是否仍对应当前源码；记录不自动跳过检查。
 
 </important>
@@ -160,7 +160,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 ## Commit and CI workflow
 
-- 永远使用 rebase，禁止 merge。每次 push 前先 rebase main，解决冲突，再在最终源码上运行 `pnpm verify prepush`；失败立即定位修复。prepush 只覆盖 fast 和 lint，本机全量 CI 按 `docs/operations/ci-checks.md` 执行。
+- 永远使用 rebase，禁止 merge。每次 push 前先 rebase main，解决冲突，再在最终源码上运行 `pnpm verify prepush`；失败立即定位修复。prepush 覆盖全卡实现边界扫描、fast 和 lint，本机全量 CI 按 `docs/operations/ci-checks.md` 执行。
 - push 后必须等待相关 GitHub Actions run 结束。运行中或失败时任务不算完成；失败立即定位修复。
 - Commit 标题使用 `feat:` / `fix:` / `refactor:` / `docs:`，英文、简洁。
 - `.env` 已有 `GH_TOKEN`，source 后可调 GitHub API；查 run、失败日志、手动触发 workflow 和 repo variables 的命令见 `docs/operations/ci-checks.md`。

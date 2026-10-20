@@ -9,8 +9,8 @@ const CARD_ID = 'B094_StockProtector'
 const beforeListener: CardListenerRegistration = {
   id: 'B94-stock-protector-before-fencing',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['fence'],
+  phases: ['before'],
+  actionSpaces: ['fencing'],
   mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return

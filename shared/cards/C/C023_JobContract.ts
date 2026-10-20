@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { addSyntheticLinkedOccupancyRef, isSpaceOccupied } from '../../domain/space'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
@@ -84,8 +84,8 @@ const linkedWorkerIdForCurrentPlacement = (context: CardListenerContext): string
 const listener: CardListenerRegistration = {
   id: 'C23-job-contract-after-day-laborer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'day-laborer') return
 

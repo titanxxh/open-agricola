@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import {
   actionSpaceTokenChoiceFlow,
   actionSpaceTokenChoiceRequest,
@@ -28,8 +28,8 @@ const choiceConfig = (state: GameState, player: PlayerState) => ({
 const listener: CardListenerRegistration = {
   id: 'E148-lazybones-opponent-trigger',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

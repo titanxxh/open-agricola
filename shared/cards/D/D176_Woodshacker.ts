@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -14,8 +14,8 @@ const ownerWoodUsesThisRound = (context: CardListenerContext) =>
 const listener: CardListenerRegistration = {
   id: 'D176-woodshacker-after-wood',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
     const count = ownerWoodUsesThisRound(context)

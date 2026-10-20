@@ -373,7 +373,12 @@ describe('E077 Mattock parity', () => {
     const session = setupMinor('E077_Mattock', { played: true })
     session.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed = 2
     session.loadState(session.state)
-    const response = session.takeAction(0, 'reed-bank')
+    let response = session.takeAction(0, 'reed-bank')
+    expect(response.interaction.stateId).toBe('wait')
+    const reaction = response.interaction.request.options?.find(option => option.sourceCard === 'E077_Mattock' && !option.disabled)
+    expect(reaction, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(0, reaction!.value)
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ reed: 2, clay: 1 })
   })
 

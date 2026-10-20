@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { createWorkSession } from './_helpers/session-fixtures'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 const STEAM = 'C025_SteamMachine'
 const COLLECT_REACTION = 'TEST_CollectReaction'
@@ -78,6 +79,9 @@ describe('complete action-space use reactions', () => {
     collectReaction(session)
     let r = session.takeAction(0, 'forest')
     expect(r.ok, r.error).toBe(true)
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') {
+      r = choose(session, r, options(r).find(option => option.sourceCard === COLLECT_REACTION)!.value)
+    }
     expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).toBe(COLLECT_REACTION)
     expect(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === STEAM)).toHaveLength(0)
     session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
@@ -85,6 +89,9 @@ describe('complete action-space use reactions', () => {
     collectReaction(session)
     r = choose(session, session.getState(), options(session.getState()).find(o => o.value !== '__skip__')!.value)
     expect(r.state.players[0]!.resources.food).toBe(1)
+    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') {
+      r = choose(session, r, options(r).find(option => option.sourceCard === STEAM)!.value)
+    }
     expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard, JSON.stringify(r.interaction)).toBe(STEAM)
     r = choose(session, r, options(r).find(o => o.value !== '__skip__')!.value)
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
@@ -93,5 +100,84 @@ describe('complete action-space use reactions', () => {
     expect(r.state.players[0]!.resources).toMatchObject({ grain: 0, food: 3, wood: 1 })
     expect(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === STEAM && 'triggerActionId' in e)).toHaveLength(1)
     expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).not.toBe(STEAM)
+  })
+})
+
+describe('space and rule reaction timing', () => {
+  function opening({ minors = [], occupation = [], hand = ['__test_placeholder__'], wood = 0, clay = 0, playerCount = 2 }: {
+    minors?: string[]; occupation?: string[]; hand?: string[]; wood?: number; clay?: number; playerCount?: number
+  }) {
+    const session = createWorkSession({ seed: 42, options: { playerCount }, configure: state => {
+      state.round = 8
+      for (const player of state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.cardStates = {}
+        for (const resource of Object.keys(player.resources)) Reflect.set(player.resources, resource, 0)
+        setWorkersAtHome(state, player, 2)
+      }
+      for (const space of state.actionSpaces) space.takenBy = []
+      const player = state.players[0]!
+      player.minorPlayed = minors
+      player.occupationPlayed = occupation
+      player.minorHand = hand
+      Object.assign(player.resources, { wood, clay })
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+    } })
+    sessions.push(session)
+    return session
+  }
+  function accept(session: GameSession, response: SessionResponse, card: string) {
+    let current = response
+    if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'select-trigger') {
+      const trigger = options(current).find(option => option.sourceCard === card || option.value === card)
+      expect(trigger, JSON.stringify(current.interaction)).toBeDefined()
+      current = choose(session, current, trigger!.value)
+    }
+    expect(current.interaction.stateId === 'wait' && current.interaction.sourceCard, JSON.stringify(current.interaction)).toBe(card)
+    const offered = options(current).filter(option => option.value !== '__skip__' && !option.disabled)
+    expect(offered).toHaveLength(1)
+    expect(options(current).some(option => option.value === '__skip__')).toBe(true)
+    return choose(session, current, offered[0]!.value)
+  }
+  it('checks Woodcraft before an ordinary obtain-wood reaction changes the inventory', () => {
+    const session = opening({ minors: ['C058_Woodcraft', 'A048_ShavingHorse'], wood: 3 })
+    const beforeScores = session.getState().scores
+    const response = accept(session, session.takeAction(0, 'forest'), 'A048_ShavingHorse')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 5, food: 3 })
+    expect(response.scores).toEqual(beforeScores)
+    expect(response.state.events.filter(event => event.sourceCardId === 'C058_Woodcraft' && event.type === 'resource.moved')).toEqual([])
+    expect(response.state.events.filter(event => event.sourceCardId === 'A048_ShavingHorse' && event.type === 'resource.paid')).toHaveLength(1)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+  })
+  it('spends only the three collected wood at the Bench before Shaving Horse checks the remaining inventory', () => {
+    const session = opening({ minors: ['B015_CarpentersBench', 'A048_ShavingHorse'], wood: 4 })
+    const pending = accept(session, session.takeAction(0, 'forest'), 'B015_CarpentersBench')
+    expect(pending.interaction.stateId === 'wait' && pending.interaction.request.kind).toBe('farm-select')
+    const response = session.commitSelectionChoice(0, {
+      edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], palisadeEdges: [], extraWood: 0,
+    })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, food: 0 })
+    expect(response.state.players[0]!.pastures).toHaveLength(1)
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(response.state.events.filter(event => event.sourceCardId === 'A048_ShavingHorse' && event.type === 'resource.paid')).toEqual([])
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+  })
+  it.each([
+    { card: 'A042_ForestLakeHut', wood: 0, clay: 2, finalWood: 3, finalFood: 1 },
+    { card: 'A048_ShavingHorse', wood: 6, clay: 0, finalWood: 8, finalFood: 0 },
+  ])('discovers new space-after sources without replaying earlier rule reactions: $card', example => {
+    const session = opening({ playerCount: 3, occupation: ['B131_Equipper'], hand: [example.card], wood: example.wood, clay: example.clay })
+    let response = accept(session, session.takeAction(0, 'forest'), 'B131_Equipper')
+    if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'ui.interactionChooseImprovement') {
+      response = choose(session, response, example.card)
+    }
+    expect(response.state.players[0]!.minorPlayed).toContain(example.card)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: example.finalWood, clay: 0, food: example.finalFood })
+    expect(response.state.events.filter(event => event.type === 'card.played' && event.cardId === example.card)).toHaveLength(1)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
   })
 })

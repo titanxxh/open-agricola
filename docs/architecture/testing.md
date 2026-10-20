@@ -26,6 +26,7 @@ Rule correctness is proven at the backend seam with the smallest sufficient laye
 |---|---|---|
 | Physical `shared` / `server` / `client` layering | ESLint `architecture/imports` | Imports, not runtime ownership |
 | Card Source scope and cross-card references | `pnpm run check:card-impl-boundaries` | Same-file AST over production Card Sources; `Major_*`, `reaches`, purchase and prerequisite candidates are exceptions; no cross-file dataflow; empty or mismatched scope fails |
+| Listener subscription selectors | Shared registration contract and `check:card-impl-boundaries`, also run by `verify prepush` | Checks resolved production registrations and authoritative board IDs; reports card-text review candidates separately; does not infer trigger semantics from a space filter |
 | Runtime dependency cycles | `pnpm run check:dependencies` | Every runtime SCC, including self-cycles and literal dynamic imports, fails; no baseline; explicit type-only imports erase but inline type specifiers still load; tracked or non-ignored unclassified source roots fail |
 | Browser and Replay isolation | `pnpm run check:browser-boundaries` | Source graph plus real Vite module graphs |
 | Compile-time architecture contracts | `pnpm run check:architecture-types` | Real no-emit program over `tsconfig.architecture.json` |
@@ -35,7 +36,7 @@ Rule correctness is proven at the backend seam with the smallest sufficient laye
 | Documentation budgets | `scripts/__tests__/docs-budget.test.ts` | Every Workshop-readable doc under `REFERENCE_LIMITS.fileBytes`; architecture index ≤ 16 KiB, each module document ≤ 32 KiB, no card IDs |
 | Generated catalog matches Card Sources | `pnpm run check:generated-cards-sync` | Structural equality |
 | `GameSession` owns the command seam | `CONTEXT.md`, ADR 0014, review and layering errors | Ownership, not a whole-program mutation proof |
-| Canonical architecture wiring | `pnpm run check:architecture`, `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Both CI workflows call the aggregator once; required checks follow `docs/operations/ci-checks.md` |
+| Canonical architecture wiring | `pnpm run check:architecture`, `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Both CI workflows call the aggregator once; prepush runs the same production card scan; contract counterexamples run through `check:architecture-tests`; required checks follow `docs/operations/ci-checks.md` |
 
 Prefer source discovery, file lists, import boundaries and small syntax checks. Scanners reuse `scripts/source-files.ts`; a missing or empty required root, a parse error or an unsupported entry fails, and a named exemption that no longer matches a recognized write is stale. Do not grow checkers into symbol or dataflow engines without a concrete repository case.
 

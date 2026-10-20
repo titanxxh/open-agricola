@@ -11,8 +11,8 @@ const CARD_ID = 'D112_YoungFarmer'
 const beforeListener: CardListenerRegistration = {
   id: 'D112-young-farmer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['before'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'major-improvement') return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
@@ -22,8 +22,8 @@ const beforeListener: CardListenerRegistration = {
 const afterListener: CardListenerRegistration = {
   id: 'D112-young-farmer-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'major-improvement') return
     return {

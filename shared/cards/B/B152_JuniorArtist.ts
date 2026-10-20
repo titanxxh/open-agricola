@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
@@ -13,8 +13,8 @@ const CANDIDATE_TARGETS = ['lessons-4', 'lessons', 'lessons-56-2f', 'lessons-56-
 const listener: CardListenerRegistration = {
   id: 'B152-junior-artist-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isJumpChainContains(context, CARD_ID)) return
 

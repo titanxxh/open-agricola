@@ -72,15 +72,6 @@ const findListener = (ruleOwner: TestCardRegistry) =>
 }
 
 describe('C023_JobContract listener', () => {
-  it('is registered on place-farmer after', () => {
-    const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry)
-    expect(listener).toBeDefined()
-    expect(listener!.actions).toContain('place-farmer')
-    expect(listener!.phases).toContain('after')
-  })
-
-
   it('does nothing when the action is not day-laborer', () => {
     const ruleRegistry = createOfficialCardRegistry()
     const listener = findListener(ruleRegistry)!

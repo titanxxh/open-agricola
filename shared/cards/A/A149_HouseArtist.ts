@@ -9,8 +9,8 @@ const CARD_ID = 'A149_HouseArtist'
 const triggerListener: CardListenerRegistration = {
   id: 'A149-house-artist-after-traveling-players',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['after'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
     return {

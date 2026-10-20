@@ -85,7 +85,7 @@ describe('A097_Freshman', () => {
     expect(grainUtilization.canBeExecutedByPlayer(createState(player), player, { actionHooks })).toBe(true)
   })
 
-  it('returns a committed replacement flow that flags card and plays occupation for free', () => {
+  it('returns a committed replacement flow that records the current turn and plays occupation for free', () => {
     const listener = findListener('A97-freshman-replace-bake')
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
@@ -104,7 +104,7 @@ describe('A097_Freshman', () => {
       type: 'seq',
       promptKey: 'ui.interactionFreshmanOccupation',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A097_Freshman', params: { kind: 'set-flag', flag: true } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'A097_Freshman', params: { kind: 'set-extra-data', key: 'usedTurnToken', value: undefined } },
         {
           type: 'leaf',
           actionId: 'occupation',
@@ -115,32 +115,16 @@ describe('A097_Freshman', () => {
     })
   })
 
-  it('registers reset and isDoable listeners around the replace hook', () => {
-    const resetListener = findListener('A97-freshman-after-place-farmer')
-    const doableListener = findListener('A97-freshman-isdoable-bake')
+  it('does not offer a replacement twice for the same Turn Scope token', () => {
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
-    player.cardStates = { A097_Freshman: { flagged: true } }
-
-    expect(resetListener).toBeDefined()
-    expect(doableListener).toBeDefined()
-
-    const result = executeCardListener(resetListener!, {
-      actionHooks,
-      state: createState(player),
-      player,
-      space: createSpace('place-farmer'),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as unknown as CardListenerContext)
-
-    expect(result?.flow).toEqual({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'A097_Freshman',
-      params: { kind: 'set-flag', flag: false },
-    })
+    player.cardStates = {
+      __actionSnapshot__: { extraData: { token: 7 } },
+      A097_Freshman: { extraData: { usedTurnToken: 7 } },
+    }
+    expect(grainUtilization.canBeExecutedByPlayer(createState(player), player, { actionHooks })).toBe(false)
+    player.cardStates.__actionSnapshot__!.extraData!.token = 8
+    expect(grainUtilization.canBeExecutedByPlayer(createState(player), player, { actionHooks })).toBe(true)
   })
 
   it('lets occupation ignore normal lessons cost when Freshman provides free play', () => {

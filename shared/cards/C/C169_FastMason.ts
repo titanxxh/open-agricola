@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { sumActionSpaceMovedToTriggerPlayerFromSpace } from '../helpers/event-provenance'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { buildRenovationPlan } from '../../actions/effects/renovation'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -25,8 +25,8 @@ const canPayNoReedRenovation = (context: CardListenerContext, material: Renovati
 const listener: CardListenerRegistration = {
   id: 'C169-fast-mason-after-clay-stone-collect',
   cardIds: [CARD_ID],
-  actions: ['collect'],
-  phases: ['after' as ActionHookPhase],
+  actionSpaces: 'all',
+  phases: ['after'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const material = collectedMaterial(context)
     if (!material) return

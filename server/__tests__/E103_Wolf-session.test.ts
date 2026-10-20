@@ -77,7 +77,12 @@ const playOccupation = (session: GameSession) => {
 }
 
 const resolveWolf = (session: GameSession, initial: SessionResponse, count: number) => {
-  const offered = resolveTriggerIfPresent(session, initial, CARD_ID)
+  let current = initial
+  if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'select-trigger'
+    && options(current).some(option => option.sourceCard === BREWERY_POND)) {
+    current = resolveTriggerIfPresent(session, current, BREWERY_POND)
+  }
+  const offered = resolveTriggerIfPresent(session, current, CARD_ID)
   const option = options(offered).find((entry) => count === 0
     ? entry.value === '__skip__'
     : descriptionEffects(entry.descriptionPreview).some(effect => effect.kind === 'resourceExchange' && effect.resourcesGained?.boar === count))

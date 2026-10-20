@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { getPlowableTiles } from '../../actions/effects/plow'
 import type { CardImpl } from '../registry'
 
@@ -9,13 +9,13 @@ const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const shouldTrigger = (context: CardListenerContext) =>
   context.actionId === 'slash-and-burn' ||
-  (context.actionId === 'place-farmer' && TRIGGER_SPACES.has(context.space?.id ?? ''))
+  (context.actionSpaceUse !== undefined && TRIGGER_SPACES.has(context.space?.id ?? ''))
 
 const listener: CardListenerRegistration = {
   id: 'M041-cattle-collar-after-field-action',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer', 'slash-and-burn'],
+  phases: ['after'],
+  actionSpaces: ['farmland', 'cultivation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!shouldTrigger(context)) return
     if ((context.player.resources.cattle ?? 0) < 1) return
@@ -32,7 +32,10 @@ const cardImpl = {
     if (!state) return true
     return state.round >= 8
   },
-  listeners: [listener],
+  listeners: [listener, {
+    id: 'M041-cattle-collar-after-slash-and-burn', cardIds: [CARD_ID],
+    actions: ['slash-and-burn'], phases: ['after'], handler: listener.handler,
+  }],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

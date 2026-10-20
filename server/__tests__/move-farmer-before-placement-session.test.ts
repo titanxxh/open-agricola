@@ -3,6 +3,8 @@ import type { GameSession, SessionResponse } from '../game/authoritative-session
 import { createWorkSession } from './_helpers/session-fixtures'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 
 const ARCHWAY = 'D051_Archway'
 const STRAW_HAT = 'E010_StrawHat'
@@ -98,6 +100,20 @@ function rewardEvents(response: SessionResponse) {
 }
 
 describe('moving a farmer runs target before-placement flows', () => {
+  it('queries move targets as existing-worker uses before offering them', () => {
+    const { session } = setup({ mover: STRAW_HAT })
+    const query = 'TEST_MovingForestVeto'
+    session.state.players[0]!.minorPlayed.push(query)
+    session.withCtx(() => requireActiveCardRegistry('moving-space-query').registerListener({
+      id: query, cardIds: [query], actionSpaces: ['forest'], phases: ['isDoable'],
+      handler: context => context.actionSpaceUse?.newPlacement === false ? { doable: false } : undefined,
+    }))
+    const response = startMove(session, STRAW_HAT)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected target choice')
+    expect(response.interaction.request.options.map(option => option.value)).not.toContain('forest')
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, 'forest'))
+    expect(session.resolveChoice(0, 'day-laborer').ok).toBe(true)
+  })
   it('ordinary Day Laborer gives the three-food before reward and two-food base gain', () => {
     const { session, workerId } = setup()
     const response = session.takeAction(0, 'day-laborer')
@@ -233,6 +249,9 @@ describe('moving an existing worker does not repeat placement-only rewards', () 
   it.each(MOVERS.flatMap(mover => ['copse-56', 'house-building-56'].map(target => ({ mover, target }))))(
     '$mover does not offer A174 for its move to $target', ({ mover, target }) => {
       const { session, workerId } = setup({ mover, placementCard: HORA, prepareMove: false })
+      if (target === 'house-building-56') {
+        Object.assign(session.state.players[0]!.resources, { wood: 5, reed: 2 })
+      }
       placeMoveSource(session, mover)
       startMove(session, mover)
       let response = session.resolveChoice(0, target)

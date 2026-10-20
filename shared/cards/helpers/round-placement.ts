@@ -48,6 +48,19 @@ export const getRoundPersonPlacementDetails = (player: PlayerState): RoundPlacem
 export const getRoundPersonPlacementOrder = (player: PlayerState): string[] =>
   getRoundPersonPlacementDetails(player).map(({ spaceId }) => spaceId)
 
+export const getSpaceUsePersonPlacementOrdinal = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): number | undefined => {
+  const workerId = actionContext?.workerId ?? actionContext?.placedWorkerId
+  if (typeof workerId !== 'string') return undefined
+  const placements = getRoundPersonPlacementDetails(player)
+  for (let index = placements.length - 1; index >= 0; index--) {
+    if (placements[index]!.workerId === workerId) return index + 1
+  }
+  return undefined
+}
+
 export const isCurrentActionSecondPersonPlacement = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,

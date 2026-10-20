@@ -15,7 +15,7 @@ PR 的浏览器 E2E 在本机运行。涉及应用运行行为、UI 或 WS 的�
 pnpm verify focus server/__tests__/session-fixtures.test.ts
 pnpm verify focus server/__tests__/first-round-start-session.test.ts --testNamePattern 'direct deal'
 
-# 最终版本：准备测试依赖，完整 fast，再 lint；任一步失败立即停止
+# 最终版本：准备测试依赖，全卡实现边界扫描，完整 fast，再 lint；任一步失败立即停止
 pnpm verify prepush
 
 # 真实应用行为：隔离 PostgreSQL / S3、端口，调用 restart-local.sh 后跑 Playwright
@@ -35,6 +35,20 @@ pnpm verify status
 `scripts/verify.ts` 在已忽略的 `output/verification/` 分别记录最近一次 focus、prepush 和 E2E：HEAD、源码指纹、Node 版本、起止时间、实际命令及各步退出码。指纹包含 Git 跟踪文件和未忽略的新文件的内容（包括未提交修改、删除及执行权限），以及 Node / 平台和选定运行环境；不包含验证记录本身。运行中源码变化会使记录失效，之后改动则在 `status` 中显示 stale。只有当前源码对应的 prepush 成功记录才能使 `status` 返回 0。
 
 这些记录用于核对本地检查范围，**不会缓存或跳过检查**；不代表被忽略的环境文件、外部服务状态或远端 CI 已验证。每个模式保留最近一次记录，失败不会沿用上次成功。提交或 rebase 后文件内容及运行环境完全相同可保持 current，但仍遵守每次 push 前的检查要求。push 后必须等待相关 Actions 结束，并区分实际成功、失败与 skipped。
+
+## 全卡订阅审计
+
+在迁移卡牌前，用正式边界检查生成诊断报告：
+
+```bash
+pnpm run check:card-impl-boundaries --report output/card-listener-audit
+```
+
+该命令读取全部生产 Card Source 和 `ALL_CARD_IMPLS` 的真实注册，检查扫描范围是否完整，并从棋盘、变体和卡牌格的权威注册派生行动格 ID。`actionSpaces` 为显式 `'all'` 或非空格 ID 数组；数组中的 ID 必须属于该集合，拼写错误和规则动作 ID 均失败。原生注册入口检查订阅形状；完整格 ID 校验在全部卡牌格注册后由生产扫描执行。`audit.json` 保存源码 HEAD、指纹、卡牌目录中的牌面和全部 listener；`audit.md` 分列结构违规和牌面审查候选。扫描完成后发现结构违规或范围错误，仍写报告并返回非零退出码。文件遍历或模块加载失败会直接中止；须检查退出码和报告指纹，不能沿用旧报告。
+
+候选来自同函数语法及牌面关键词，只用于逐张核对触发语义，不自动判定迁移。合法规则动作可以带行动格限定。结构错误用同一订阅契约拒绝；生产扫描、注册入口及反例测试分别证明全卡覆盖、运行时拒绝和诊断行为。
+
+`prepush` 在 fast 前运行相同生产扫描，并将该步骤和退出码写入验证记录。`check:architecture` 保留同一正式入口，执行扫描器、注册入口和验证步骤的反例测试。正式门禁不使用 `--warn-only`。
 
 ## 本机全量 CI
 
