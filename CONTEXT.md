@@ -351,6 +351,10 @@ _Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
 卡牌效果产生同类结果，不必然构成该命名行动；D095 与 E027 的建造主要改良效果不构成 Major Improvement 行动，D127 明确提供该行动。
 _Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择、把所有卡牌建造效果当作命名行动
 
+**Moor Special Action（沼泽特殊行动）**:
+Farmers of the Moor 规则中命名的一次特殊行动，可以通过正常拿牌、借用牌或卡牌明确授予来执行。一次行动包括其必须完成的付款、改良选择和动物安置。正常工作阶段入口需要尚未放置的健康人员，但不放置或消耗该人员；卡牌授予的入口遵循其牌面条件。仅领取特殊行动牌不构成执行该行动。
+_Avoid_: Action Space Use、Anytime Action、单独领取特殊行动牌、把相同资源或地形结果当作执行特殊行动
+
 **Most Recent Action Space（最近使用的行动格）**:
 按实际使用先后确定的最后一个 Action Space。同一个 Turn 使用多个行动格时，C150 Parrot Breeder 的复制目标仍只有最后使用的一格。
 _Avoid_: 最近 Turn 使用过的全部行动格、最后结算的卡牌反应所对应的行动格
