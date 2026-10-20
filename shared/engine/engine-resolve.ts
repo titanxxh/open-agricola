@@ -1,4 +1,5 @@
-import { actionSpaceQueryContext, inheritSpaceUseBody } from './space-use-nodes'
+import { actionSpaceQueryContext } from './space-use-nodes'
+import { inheritPrimaryBody } from './primary-body-nodes'
 import { captureSpaceUseEvents } from './space-use-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext } from '../actions/flow'
 import type {
@@ -333,7 +334,7 @@ const buildInternalActionChildNodes = (
       child.paymentInfoFrom,
     )
     const host = int.tree.findNodeById(hostNodeId)
-    if (host) inheritSpaceUseBody(host, node)
+    if (host) inheritPrimaryBody(host, node)
     if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
     return node
   })
@@ -357,7 +358,7 @@ const buildDeferredHostNode = (
     hostNode.choiceLabelParams,
     executionContext.actionContext,
   )
-  inheritSpaceUseBody(hostNode, node)
+  inheritPrimaryBody(hostNode, node)
   node.actionSpaceUse = executionContext.actionSpaceUse
   node.ownerPlayerId = hostNode.ownerPlayerId
   node.mandatory = hostNode.mandatory
@@ -562,7 +563,7 @@ export function engineResolveChoice(
         ...executionContext, ...currentEventReadContext(int),
       }, child, replaceResult)
       if (flowNode) {
-        inheritSpaceUseBody(child, flowNode)
+        inheritPrimaryBody(child, flowNode)
         const targetIndex = node.children.indexOf(targetNode!)
         int.tree.insertAfter(child.id, [flowNode])
         child.resolve({ type: 'ok' })
@@ -841,7 +842,7 @@ export function engineResolveChoice(
       }
       if (result.type === 'flow') {
         const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
-        inheritSpaceUseBody(child, flowNode)
+        inheritPrimaryBody(child, flowNode)
         if (child.mandatory === true) {
           enforceCompositeContinuationMandatory(flowNode)
         }
@@ -1236,7 +1237,7 @@ export function engineResolveChoice(
     }
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
-      if (pendingActionNode) inheritSpaceUseBody(pendingActionNode, flowNode)
+      if (pendingActionNode) inheritPrimaryBody(pendingActionNode, flowNode)
       if (pendingActionNode?.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

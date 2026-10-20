@@ -36,6 +36,7 @@ import { applyCardStorageOperation, cardStorageAffectsScore, readCardStorageOper
 import { getLogicalFields } from '../cards/helpers/card-field'
 import { getPlayOrderIndex } from './matched-trigger'
 import { wrapSpaceUse } from './space-use-nodes'
+import { wrapPrimaryBody } from './primary-body-nodes'
 import { actionSpaceQueryContext } from './space-use-nodes'
 import type { MatchedCardListener } from '../cards/card-listeners'
 import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
@@ -197,7 +198,7 @@ export function markOptional<T extends EngineNode>(
 
 function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineNode {
   target.ownerPlayerId = source.ownerPlayerId
-  target.spaceUseBodyId = source.spaceUseBodyId
+  target.primaryBodyId = source.primaryBodyId
   target.reactionPhase = source.reactionPhase
   target.optional = source.optional
   target.optionalActive = source.optionalActive
@@ -505,21 +506,20 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     )
     clone.anytimeActionId = node.anytimeActionId
     clone.anytimeActivation = node.anytimeActivation
-    if (node.spaceUsePhase) clone.spaceUsePhase = { ...node.spaceUsePhase }
-    if (node.spaceUse) {
+    if (node.completionPhase) clone.completionPhase = { ...node.completionPhase }
+    if (node.completion) {
       const clonedIds = new Map(node.children.map((child, index) => [child.id, clone.children[index]!.id]))
       const clonedId = (id: string): string => {
         const mapped = clonedIds.get(id)
-        if (!mapped) throw new Error(`missing cloned action-space scope child: ${id}`)
+        if (!mapped) throw new Error(`missing cloned completion scope child: ${id}`)
         return mapped
       }
-      clone.spaceUse = { ...node.spaceUse,
-        bodyId: clonedId(node.spaceUse.bodyId), immediateId: clonedId(node.spaceUse.immediateId), afterId: clonedId(node.spaceUse.afterId),
-        actionEvents: [...node.spaceUse.actionEvents],
+      clone.completion = { ...structuredClone(node.completion),
+        bodyId: clonedId(node.completion.bodyId), immediateId: clonedId(node.completion.immediateId), afterId: clonedId(node.completion.afterId),
       }
       const remapScope = (child: EngineNode): void => {
-        if (child.spaceUseBodyId === node.id) child.spaceUseBodyId = clone.id
-        if (child instanceof SequenceNode && child.spaceUsePhase?.scopeId === node.id) child.spaceUsePhase.scopeId = clone.id
+        if (child.primaryBodyId === node.id) child.primaryBodyId = clone.id
+        if (child instanceof SequenceNode && child.completionPhase?.scopeId === node.id) child.completionPhase.scopeId = clone.id
         for (const descendant of getNodeChildren(child)) remapScope(descendant)
       }
       clone.children.forEach(remapScope)
@@ -1011,7 +1011,10 @@ function buildFlowNodeContent(
     const sequence = new SequenceNode(nextSequenceId(), children)
     sequence.anytimeActionId = flow.anytimeActionId
     sequence.anytimeActivation = flow.anytimeActivation
-    const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
+    const scope = flow.moorCompletion
+      ? wrapPrimaryBody(nextSequenceId('moor-completion'), sequence, { kind: 'moor', frame: flow.moorCompletion }, flow.moorCompletion.playerId)
+      : sequence
+    const node = flow.optional ? markOptional(scope, flow.promptKey) : scope
     return attachCompositeChoiceLabel(node, flow)
   }
   if (flow.type === 'parallel') {

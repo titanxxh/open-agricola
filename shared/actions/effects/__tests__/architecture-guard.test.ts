@@ -125,7 +125,6 @@ describe('effects architecture guard', () => {
       'improvement',
       'individual-food-cost',
       'lie-animal',
-      'moor-special-action-after-listeners',
       'moor-special-action-apply',
       'moor-special-action-choice',
       'moor-wood-to-fuel',
