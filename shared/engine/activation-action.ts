@@ -1,3 +1,4 @@
+import type { MoorActionContext } from '../moor/completion-types'
 import type { ActionHookPhase } from '../actions/hooks'
 import type { CardListenerOwnerZone } from '../cards/card-listeners'
 import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
@@ -24,6 +25,7 @@ export type ActivateCardActionParams = {
   /** Facts committed before a returned-flow reaction runs. */
   preservedTransactionEvents?: GameEvent[]
   preservedActionEvents?: GameEvent[]
+  moorAction?: MoorActionContext
   triggerSnapshot?: TriggerSnapshot
   beforeHostNodeId?: string
 }

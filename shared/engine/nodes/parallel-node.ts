@@ -18,6 +18,7 @@ export class ParallelNode extends BaseNode {
   public mode: ParallelNodeMode = 'all'
   public selectedChildId: string | null = null
   public resolveAfterSelection = false
+  public autoSelectSoleInitialTrigger = false
   public triggerOwnerPlayerId?: string
   public triggerChildren: ParallelTriggerChild[] = []
   public emittedChoices: ActionChoiceOption[] = []
@@ -175,6 +176,7 @@ export class ParallelNode extends BaseNode {
       data.mode = this.mode
       data.selectedChildId = this.selectedChildId
       if (this.resolveAfterSelection) data.resolveAfterSelection = true
+      if (this.autoSelectSoleInitialTrigger) data.autoSelectSoleInitialTrigger = true
       data.triggerOwnerPlayerId = this.triggerOwnerPlayerId
       data.triggerChildren = this.triggerChildren
       data.emittedChoices = this.emittedChoices

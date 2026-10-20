@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { createWorkSession } from './_helpers/session-fixtures'
 import { GameSession } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
 
@@ -163,11 +164,12 @@ describe('FoM special action listener minors', () => {
     const beforeProbe: CardListenerRegistration = {
       id: TEST_BEFORE_LISTENER_ID,
       cardIds: [TEST_PLACE_FARMER_CARD],
-      actions: ['cut-peat'],
+      actions: ['moor-action'],
       phases: ['before'],
       handler: (context) => {
-        expect(context.actionId).toBe('cut-peat')
-        expect(context.extraData?.specialActionCardId).toEqual(expect.any(String))
+        expect(context.actionId).toBe('moor-action')
+        expect(context.moorAction?.actionId).toBe('cut-peat')
+        expect(context.moorAction?.specialActionCardId).toEqual(expect.any(String))
         beforeListenerCalls += 1
         return {
           flow: {
@@ -359,6 +361,44 @@ describe('FoM special action listener minors', () => {
     expect(lowResp.state.players[0]!.resources.wood).toBe(3)
     expect(lowResp.state.players[0]!.resources.fuel).toBe(0)
   })
+
+  it.each([['M118_TimberMill', 5, 1], ['M127_Wheelbarrow', 6, 0]] as const)(
+    'preserves collect ordering with %s first and no initial fuel', (first, wood, fuel) => {
+      const session = createWorkSession({ seed: 1293, options: { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
+        state.round = 8
+        state.currentPlayerIndex = 0
+        for (const player of state.players) {
+          player.resources = baseResources()
+          player.minorPlayed = []
+          player.occupationPlayed = []
+          player.improvements = []
+          player.cardStates = {}
+          setWorkersAtHome(state, player, 2)
+        }
+        state.players[0]!.minorPlayed = ['M118_TimberMill', 'M127_Wheelbarrow']
+        state.actionSpaces.forEach(space => { space.takenBy = [] })
+        state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 4
+      } })
+      sessions.push(session)
+      let response = session.takeAction(0, 'forest')
+      expect(response.interaction.request.kind).toBe('select-trigger')
+      response = resolveTriggerIfPresent(session, response, first)
+      const second = first === 'M118_TimberMill' ? 'M127_Wheelbarrow' : 'M118_TimberMill'
+      response = resolveTriggerIfPresent(session, response, second)
+      if (first === 'M127_Wheelbarrow') {
+        expect(response.interaction.sourceCard).toBe('M118_TimberMill')
+        const upgrade = response.interaction.request.options.find(option => option.effectPreview?.resourcesGained?.wood === 2)
+        expect(upgrade).toBeDefined()
+        response = session.resolveChoice(0, upgrade!.value)
+      }
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ wood, fuel })
+      expect(response.state.players[1]!.resources).toMatchObject({ wood: 0, fuel: 0 })
+      expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'M118_TimberMill')).toHaveLength(1)
+      expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'M127_Wheelbarrow')).toHaveLength(1)
+      expect(response.state.farmersOfTheMoor!.specialActionCards.every(card => card.location.kind === 'market')).toBe(true)
+    },
+  )
 
   it('M121 rewards Hiring Fair only when exactly one worker remains at home and prerequisite is met', () => {
     const { session, player } = setup()

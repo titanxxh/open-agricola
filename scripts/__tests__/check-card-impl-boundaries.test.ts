@@ -1,6 +1,8 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { moorSpecialActionCardDefinitions } from '../../shared/moor/special-action-cards'
 import { describe, expect, it } from 'vitest'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'
 import { CardRegistry } from '../../shared/cards/registry'
@@ -8,6 +10,7 @@ import { SessionCardContext } from '../../shared/cards/session-card-context'
 import { getRegisteredPlayerActionSpaceIds } from '../../shared/cards/player-action-space'
 import { auditCardListeners, collectBoardActionSpaceIds, renderCardListenerAudit } from '../card-listener-audit'
 import {
+  runCardImplBoundaryCheck,
   cardImplBoundaryExitCode,
   checkCardImplBoundaries,
   checkFieldStorageBoundaries,
@@ -17,7 +20,9 @@ import {
 
 const writeFixture = (root: string, rel: string, content: string): string => {
   for (const directory of ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers', '__stubs__']) {
-    mkdirSync(path.join(root, 'shared/cards', directory), { recursive: true })
+    const scope = path.join(root, 'shared/cards', directory)
+    mkdirSync(scope, { recursive: true })
+    writeFileSync(path.join(scope, 'scope.ts'), 'export {}')
   }
   const full = path.join(root, rel)
   mkdirSync(path.dirname(full), { recursive: true })
@@ -85,7 +90,13 @@ describe('check-card-impl-boundaries', () => {
   })
 
   it.each([
-    {}, { actions: [] }, { actions: ['unknown'] },
+    {}, { actions: [] }, { actions: ['unknown'] }, { actions: ['*'] },
+    ...[...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))].flatMap(action => [
+      { actions: Array.from(new Set([action])) }, { actions: ['moor-action', ...Array.from(new Set([action]))] },
+      { actions: ['collect', action] },
+    ]),
+    ...['immediatelyAfter', 'computeArgs', 'computeCosts', 'computeReplace', 'isDoable', 'anytime'].map(phase => ({ actions: ['moor-action', 'collect'], phases: ['after', phase] })),
+    { actions: ['moor-action'], phases: undefined },
     { actions: 1 }, { actions: 'collect' }, { actions: ['collect'], phases: 'after' },
     { actionSpaces: ['fishing'], phases: ['computeCosts'] }, { actionSpaces: null },
     { actionSpaces: '*' }, { actionSpaces: ' all ' },
@@ -105,6 +116,18 @@ describe('check-card-impl-boundaries', () => {
     expect(result.scopeErrors).toEqual([])
     expect(result.violations).toEqual([expect.objectContaining({ kind: 'listener-subscription-contract' })])
     expect(cardImplBoundaryExitCode(result)).toBe(1)
+  })
+
+  it('admits an expanded unified Moor filter mixed with collect and both legal phases', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'listener-unified-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' }, impl: {} })")
+    const listener = { id: 'legal', actions: Array.from(new Set(['moor-action', 'collect'])), phases: ['before', 'after'],
+      handler: (context: { moorAction?: { actionId: string } }) => context.moorAction?.actionId === 'cut-peat' ? {} : undefined }
+    const cards = [{ cardId: 'A001_Shelter', file, listeners: [{ ...listener }] }]
+    const result = checkCardImplBoundaries([file], cards)
+    expect(result.scopeErrors).toEqual([])
+    expect(result.violations).toEqual([])
+    expect(auditCardListeners(cards, new Set()).moorListeners).toMatchObject([{ listenerId: 'legal', actions: ['moor-action', 'collect'] }])
   })
 
   it('keeps all malformed registrations in the audit report without aborting on their shape', () => {
@@ -157,6 +180,33 @@ describe('check-card-impl-boundaries', () => {
     expect(() => walkProductionCardFiles(root)).toThrow()
     const file = writeFixture(root, 'shared/cards/A/A001_Broken.ts', 'export const =')
     expect(() => checkCardImplBoundaries([file])).toThrow()
+  })
+
+  it('rejects an individually empty declared source root', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-empty-root-'))
+    writeFixture(root, 'shared/cards/A/A001_Shelter.ts', "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' } })")
+    rmSync(path.join(root, 'shared/cards/M/scope.ts'))
+    expect(() => walkProductionCardFiles(root)).toThrow(/empty production source root/)
+  })
+
+  it.each(['traversal', 'parse', 'runtime-import'] as const)('replaces an old successful report on %s failure', async failure => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-report-failure-'))
+    execFileSync('git', ['init', '-q', root])
+    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'fixture'], { cwd: root })
+    const report = path.join(root, 'audit')
+    mkdirSync(report)
+    writeFileSync(path.join(report, 'audit.json'), JSON.stringify({ status: 'passed', source: { head: 'old', fingerprint: 'old' } }))
+    writeFileSync(path.join(report, 'audit.md'), 'Old success')
+    if (failure !== 'traversal') {
+      writeFixture(root, 'shared/cards/A/A001_Shelter.ts', failure === 'parse' ? 'export const =' : "export const A001_Shelter = defineMinorCard({ meta: { id: 'A001_Shelter' } })")
+      writeFileSync(path.join(root, 'shared/cards/register-all.ts'), "throw new Error('runtime load failed')")
+    }
+    await expect(runCardImplBoundaryCheck(root, { report })).rejects.toThrow(failure === 'runtime-import' ? 'runtime load failed' : /./)
+    const failed = JSON.parse(readFileSync(path.join(report, 'audit.json'), 'utf8'))
+    expect(failed).toMatchObject({ status: 'failed', source: { head: expect.any(String), fingerprint: expect.any(String) }, error: expect.any(String) })
+    expect(failed.source.head).not.toBe('old')
+    expect(readFileSync(path.join(report, 'audit.md'), 'utf8')).not.toContain('Old success')
+    rmSync(root, { recursive: true })
   })
 
   it('discovers nested, major and community Card Sources independently of filenames', () => {
@@ -618,7 +668,7 @@ describe('check-card-impl-boundaries', () => {
       writeFixture(root, `shared/cards/${dir}/example.ts`, 'export const value = 1'),
     )
 
-    expect(walkProductionFieldBoundaryFiles(root)).toEqual(expected.sort())
+    expect(walkProductionFieldBoundaryFiles(root).filter(file => !file.endsWith('/scope.ts'))).toEqual(expected.sort())
   })
 
   it('has no direct field-storage bypass in production Card Impls', () => {

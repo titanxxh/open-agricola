@@ -1,3 +1,4 @@
+import { moorSpecialActionCardDefinitions } from '../../shared/moor/special-action-cards'
 import { describe, expect, it } from 'vitest'
 import { validateAndCompileCustomCode } from '../../server/custom-code/engine'
 import { validateAndCompileCustomCodeLocal } from '../../client/local-sandbox/browser-executor'
@@ -12,6 +13,11 @@ describe.each([
   ['server', validateAndCompileCustomCode],
   ['browser', validateAndCompileCustomCodeLocal],
 ] as const)('%s Workshop listener admission', (_name, compile) => {
+  it.each(['moor-action', ...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))])('rejects native-only Moor target %s while collect compiles', action => {
+    expect(compile(source, 'CUSTOM_Gate').valid).toBe(true)
+    expect(compile(source.replace("actions: ['collect']", `actions: ['${action}']`), 'CUSTOM_Gate')).toMatchObject({ valid: false })
+  })
+
   it('rejects an unopened native selector while preserving legal rule-action source', () => {
     const valid = compile(source, 'CUSTOM_Gate')
     expect(valid).toMatchObject({ valid: true, manifest: { listeners: [{ actions: ['collect'], phases: ['after'] }] } })

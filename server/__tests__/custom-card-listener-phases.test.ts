@@ -1,3 +1,4 @@
+import { moorSpecialActionCardDefinitions } from '../../shared/moor/special-action-cards'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { createIsolatedGameSession, workerObservation } from '../game/custom-session-executor'
@@ -24,7 +25,8 @@ describe('saved custom-card listener phase admission', () => {
   const error = /CUSTOM_StalePhase.*stale-listener.*unsupported listener phase 'during'/
 
   it.each([
-    {}, { actions: [], phases: ['after'] }, { actions: ['collect'] },
+    {}, { actions: [], phases: ['after'] },
+    ...['moor-action', ...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))].map(action => ({ actions: ['collect', action], phases: ['after'] })), { actions: ['collect'] },
     { actions: ['collect'], phases: 3 }, { actions: ['collect'], phases: null },
     { actions: ['collect'], phases: 'after' },
     ...['store-on-card', 'take-from-card', 'pop-card-stack', 'spend-worker', 'special-effect', 'harvest-feed-conversion', 'selection']
@@ -44,6 +46,9 @@ describe('saved custom-card listener phase admission', () => {
       expect(context.customListeners).toEqual([])
     }
     expect(() => new GameSession(1063, [data], { playerCount: 2 })).toThrow(/listener|Listener/)
+    const workersBefore = workerObservation()
+    expect(() => createIsolatedGameSession(1063, [data], { playerCount: 2 })).toThrow(/listener|Listener/)
+    expect(workerObservation()).toEqual(workersBefore)
   })
 
   it.each([

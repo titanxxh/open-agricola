@@ -28,9 +28,9 @@ it('clones and JSON restores the Moor body, frozen sources, payload and original
   const actionHooks = new ActionHookRegistry()
   const deps = { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }
   requireActiveCardRegistry('clone-moor-test').registerListener({
-    id: card, cardIds: [card], actions: ['cut-peat'], phases: ['after'],
-    handler: context => context.actionId === 'cut-peat'
-      && JSON.stringify(context.extraData?.payload) === '{"tile":{"row":2,"col":0}}'
+    id: card, cardIds: [card], actions: ['moor-action'], phases: ['after'],
+    handler: context => context.actionId === 'moor-action' && context.moorAction?.actionId === 'cut-peat'
+      && JSON.stringify(context.moorAction?.payload) === '{"tile":{"row":2,"col":0}}'
       && context.actionEvents?.some(event => event.type === 'farm.terrainChanged'
         && event.sourceActionId === 'cut-peat' && event.changes.some(change => change.row === 2 && change.col === 0))
       ? { sourceCard: card, flow: { type: 'leaf', actionId: 'gain', sourceCard: card, params: { clay: 1 } } } : undefined,
@@ -75,7 +75,7 @@ it('finishes a nested action-space completion before its enclosing Moor body con
   const actionHooks = new ActionHookRegistry()
   const deps = { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }
   const cards = requireActiveCardRegistry('nested-moor-test')
-  cards.registerListener({ id: outerCard, cardIds: [outerCard], actions: ['hiring-fair'], phases: ['after'],
+  cards.registerListener({ id: outerCard, cardIds: [outerCard], actions: ['moor-action'], phases: ['after'],
     handler: () => ({ sourceCard: outerCard, flow: { type: 'leaf', actionId: 'gain', sourceCard: outerCard, params: { stone: 1 } } }) })
   cards.registerListener({ id: innerCard, cardIds: [innerCard], actionSpaces: ['forest'], phases: ['after'],
     handler: () => ({ sourceCard: innerCard, flow: { type: 'leaf', actionId: 'gain', sourceCard: innerCard, params: { clay: 1 } } }) })

@@ -8,7 +8,7 @@ const CARD_ID = 'M041_CattleCollar'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const shouldTrigger = (context: CardListenerContext) =>
-  context.actionId === 'slash-and-burn' ||
+  context.moorAction?.actionId === 'slash-and-burn' ||
   (context.actionSpaceUse !== undefined && TRIGGER_SPACES.has(context.space?.id ?? ''))
 
 const listener: CardListenerRegistration = {
@@ -34,7 +34,7 @@ const cardImpl = {
   },
   listeners: [listener, {
     id: 'M041-cattle-collar-after-slash-and-burn', cardIds: [CARD_ID],
-    actions: ['slash-and-burn'], phases: ['after'], handler: listener.handler,
+    actions: ['moor-action'], phases: ['after'], handler: listener.handler,
   }],
   reaches: [] as readonly string[],
 } satisfies CardImpl

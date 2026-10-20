@@ -155,6 +155,7 @@ const previewContextForChild = (
       phase: params.phase,
       ...eventReadContext,
       triggerSnapshot: params.triggerSnapshot,
+      moorAction: params.moorAction,
       ...event,
       actionContext,
     },

@@ -11,17 +11,20 @@ const listener: CardListenerRegistration = {
   id: 'M119-alder-swamp-after-fell-trees',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => ({
-    flow: {
-      type: 'xor',
-      children: [
-        gainLeaf(CARD_ID, { wood: 1 }),
-        gainLeaf(CARD_ID, { reed: 1 }),
-      ],
-    },
-    sourceCard: CARD_ID,
-  }),
+  actions: ['moor-action'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'fell-trees') return
+    return {
+      flow: {
+        type: 'xor',
+        children: [
+          gainLeaf(CARD_ID, { wood: 1 }),
+          gainLeaf(CARD_ID, { reed: 1 }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
+  },
 }
 
 const cardImpl = {

@@ -16,8 +16,9 @@ const listener: CardListenerRegistration = {
   id: 'M058-peat-fertilizer-after-cut-peat',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['cut-peat'],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'cut-peat') return
     if (!canSow(context)) return
     return {
       flow: { type: 'leaf', actionId: 'sow', optional: true, sourceCard: CARD_ID },

@@ -1,3 +1,4 @@
+import type { MoorActionContext } from '../moor/completion-types'
 import { requireActionHookRegistry } from '../actions/hooks'
 import { resolveActionTargetPlayer } from '../actions/helpers/target-player'
 import { evaluateFlowDoable, isActionDoableInFlowContext, type FlowDoableContext } from '../actions/flow'
@@ -304,6 +305,7 @@ export function buildPhaseTrailingNodes(
   actionEventStartIndex?: number,
   triggerSnapshot?: TriggerSnapshot,
   preservedEvents?: { transactionEvents: readonly GameEvent[]; actionEvents?: readonly GameEvent[] },
+  moorAction?: MoorActionContext,
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
@@ -357,6 +359,7 @@ export function buildPhaseTrailingNodes(
       preservedTransactionEvents: preservedEvents ? [...preservedEvents.transactionEvents] : undefined,
       preservedActionEvents: preservedEvents?.actionEvents ? [...preservedEvents.actionEvents] : undefined,
       triggerSnapshot,
+      moorAction,
     }
     const node = new ActionNode(
       nodeId,
@@ -534,6 +537,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.mode = node.mode
     clone.selectedChildId = node.selectedChildId
     clone.resolveAfterSelection = node.resolveAfterSelection
+    clone.autoSelectSoleInitialTrigger = node.autoSelectSoleInitialTrigger
     clone.triggerOwnerPlayerId = node.triggerOwnerPlayerId
     clone.triggerChildren = node.triggerChildren.map((entry) => ({ ...entry }))
     clone.emittedChoices = [...node.emittedChoices]

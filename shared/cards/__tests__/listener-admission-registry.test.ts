@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CardRegistry } from '../registry'
+import { CardRegistry, type CardImpl } from '../registry'
+import { moorSpecialActionCardDefinitions } from '../../moor/special-action-cards'
 import { SessionCardContext } from '../session-card-context'
 import type { CardListenerRegistration } from '../card-listeners'
 import { runCardListeners } from '../card-listeners'
@@ -28,7 +29,10 @@ describe('listener registration admission', () => {
   })
 
   it.each([
-    {}, { actions: [] }, { actions: ['unknown'] }, { actions: ['store-on-card'] },
+    {}, { actions: [] }, { actions: ['*'] },
+    ...['immediatelyAfter', 'computeArgs', 'computeCosts', 'isDoable', 'computeReplace', 'anytime'].flatMap(phase => [
+      { actions: ['moor-action'], phases: ['before', phase] }, { actions: ['moor-action', 'collect'], phases: ['after', phase] },
+    ]), { actions: ['unknown'] }, { actions: ['store-on-card'] },
     { actions: ['take-from-card'] }, { actions: ['pop-card-stack'] }, { actions: ['spend-worker'] },
     { actions: ['special-effect'] }, { actions: ['harvest-feed-conversion'] }, { actions: ['selection'] },
     { actions: ['collect'], phases: [] }, { actions: ['collect'], phases: ['anytime'] },
@@ -95,17 +99,68 @@ describe('listener registration admission', () => {
     }
   })
 
-  it.each(['black-market', 'cut-peat', 'fell-trees', 'hiring-fair', 'horse-market', 'illicit-work', 'slash-and-burn'] as const)(
-    'preserves %s as a Moor rule action', actionId => {
+  it.each(['loadImpl', 'addListener', 'registerListener', 'session'] as const)('%s rejects every concrete Moor target, including mixed subscriptions', entry => {
+    const targets = [...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))]
+    for (const target of targets) for (const actions of [[target], ['moor-action', target], ['collect', target]]) {
+      const registry = new CardRegistry(), session = new SessionCardContext()
+      const listener = { ...valid(), actions }
+      const register = () => {
+        if (entry === 'loadImpl') Reflect.apply(registry.loadImpl, registry, ['TEST_Listener', { listeners: [valid(), listener] }])
+        else if (entry === 'addListener') Reflect.apply(registry.addListener, registry, ['TEST_Listener', listener])
+        else if (entry === 'registerListener') Reflect.apply(registry.registerListener, registry, [listener])
+        else Reflect.apply(session.registerListener, session, [listener])
+      }
+      expect(register, `${entry}: ${actions.join(',')}`).toThrow(/unsupported action target/)
+      expect(registry.getAllListeners()).toEqual([])
+      expect(session.customListeners).toEqual([])
+    }
+  })
+
+  it.each(['before', 'after'] as const)('dispatches unified Moor and collect at %s after freezing, clone and merge', phase => {
+    for (const frozen of [false, true]) {
       const registry = new CardRegistry()
-      registry.registerListener({ ...valid(), actions: [actionId], phases: ['before'] })
-      const state = createInitialState(42, { playerCount: 2 })
-      state.players[0]!.minorPlayed = ['TEST_Listener']
-      expect(withActiveRegistry(registry, () => runCardListeners({
-        actionHooks: undefined, state, player: state.players[0]!, space: state.actionSpaces[0]!, actionId, phase: 'before',
-      }, registry.getAllListeners()))).toEqual([{ flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } }])
-    },
-  )
+      const input = { ...valid(), actions: ['moor-action', 'collect'], phases: [phase] }
+      if (frozen) { Object.freeze(input.actions); Object.freeze(input.phases); Object.freeze(input) }
+      Reflect.apply(registry.loadImpl, registry, ['TEST_Listener', { listeners: [input] }])
+      if (frozen) expect(() => input.actions.push('sow')).toThrow()
+      else { input.actions.push('sow'); input.phases.push(phase) }
+      const merged = new CardRegistry()
+      merged.mergeFrom(registry.clone())
+      for (const current of [registry, registry.clone(), merged]) {
+        const state = createInitialState(42, { playerCount: 2 })
+        state.players[0]!.minorPlayed = ['TEST_Listener']
+        expect(() => current.getAllListeners()[0]!.actions?.push('sow')).toThrow()
+        const context = { actionHooks: undefined, state, player: state.players[0]!, space: state.actionSpaces[0]!, phase }
+        for (const actionId of ['moor-action', 'collect']) expect(withActiveRegistry(current, () => runCardListeners({
+          ...context, actionId,
+        }, current.getAllListeners()))).toEqual([{ flow: { type: 'leaf', actionId: 'gain', params: { food: 2 } } }])
+        for (const actionId of moorSpecialActionCardDefinitions.flatMap(card => card.actions)) expect(withActiveRegistry(current, () => runCardListeners({
+          ...context, actionId,
+        }, current.getAllListeners()))).toEqual([])
+      }
+    }
+  })
+
+  it('rejects a late invalid batch without replacing existing listeners, effects or prerequisites', () => {
+    const registry = new CardRegistry()
+    const existing = { listeners: [valid()], effect: { id: 'TEST_Listener', onBuy: () => undefined }, prerequisiteCheck: () => false,
+      getBaseCosts: () => ({ wood: 2 }),
+      modifiers: [{ type: 'trade', cardId: 'TEST_Listener', appliesTo: ['occupation'], from: { wood: 1 }, to: { food: 1 } }],
+    } satisfies CardImpl
+    registry.loadImpl('TEST_Listener', existing)
+    const before = registry.getAllListeners()
+    expect(() => Reflect.apply(registry.loadByIds, registry, [
+      ['TEST_Listener', 'TEST_Invalid'], (id: string) => id === 'TEST_Listener'
+        ? { listeners: [{ ...valid(), id: 'replacement' }] }
+        : { listeners: [{ ...valid(), actions: ['cut-peat'] }] },
+    ])).toThrow(/unsupported action target/)
+    expect(registry.getAllListeners()).toEqual(before)
+    expect(registry.getEffect('TEST_Listener')?.onBuy).toBe(existing.effect.onBuy)
+    expect(registry.getPrerequisiteCheck('TEST_Listener')).toBe(existing.prerequisiteCheck)
+    expect(registry.getModifiers('TEST_Listener')).toEqual(existing.modifiers)
+    expect(registry.getBaseCosts('TEST_Listener')).toBe(existing.getBaseCosts)
+    expect(registry.getListenersFor('TEST_Invalid')).toEqual([])
+  })
 
   it('snapshots input and getter values so mutations cannot change dispatch after clone and merge', () => {
     const registry = new CardRegistry()

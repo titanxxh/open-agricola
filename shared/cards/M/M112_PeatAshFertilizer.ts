@@ -24,8 +24,9 @@ const listener: CardListenerRegistration = {
   id: 'M112-peat-ash-fertilizer-before-cut-peat',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['cut-peat'],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'cut-peat') return
     if (!hasGrowableCrops(context)) return
     return {
       flow: {

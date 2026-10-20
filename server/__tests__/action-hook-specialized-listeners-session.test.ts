@@ -138,7 +138,7 @@ describe('specialized listeners retain the owning generic rules', () => {
 
   it.each(['before', 'after'] as const)('uses the veto for a Moor %s reaction', phase => {
     const session = game({ options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
-    install(session, 'hiring-fair', phase, bonus)
+    install(session, 'moor-action', phase, bonus)
     const card = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes('hiring-fair'))!
     const hired = session.takeSpecialAction(0, card.id, 'hiring-fair')
     expect(hired.ok, hired.error).toBe(true)

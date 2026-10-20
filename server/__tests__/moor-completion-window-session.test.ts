@@ -385,6 +385,32 @@ describe('Moor primary body completion', () => {
     expect(r.state.events.filter(event => event.type === 'farm.sown' && event.sourceCardId === MACHINE)).toHaveLength(1)
   })
 
+  it('directly offers the sole applicable source and retains a dormant captured source for its later state', () => {
+    const later = 'TEST_DormantMoorAfter'
+    const session = opening(state => {
+      state.players[0]!.minorPlayed = ['M058_PeatFertilizer', later]
+      state.players[0]!.resources.grain = 1
+    })
+    session.withCtx(() => requireActiveCardRegistry('moor-dormant-source-test').registerListener({
+      id: later, cardIds: [later], actions: ['moor-action'], phases: ['after'], mandatory: true,
+      handler: context => context.player.resources.grain === 0
+        ? { sourceCard: later, flow: { type: 'leaf', actionId: 'gain', sourceCard: later, params: { stone: 1 } } } : undefined,
+    }))
+    let r = session.takeSpecialAction(0, 'moor-special-1-2-terrain', 'cut-peat', { tile: { row: 2, col: 0 } })
+    expect(r.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'M058_PeatFertilizer', request: { kind: 'choice' } })
+    expect(r.state.players[0]!.resources).toMatchObject({ grain: 1, stone: 0 })
+    r = accept(session, r, 'M058_PeatFertilizer')
+    r = farm(session, r, { crops: [{ row: 0, col: 1, crop: 'grain' }] })
+    expect(r.interaction.request.kind).toBe('select-trigger')
+    expect(options(r).filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([later])
+    expect(options(r).find(option => option.value === '__pass__')?.disabled).toBe(true)
+    reject(session, () => session.resolveChoice(0, '__pass__'))
+    r = choose(session, r, options(r).find(option => option.sourceCard === later)!.value)
+    expect(r.state.players[0]!.resources).toMatchObject({ grain: 0, stone: 1 })
+    expect(r.state.players[0]!.fields).toContainEqual({ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] })
+    expect(r.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === later)).toHaveLength(1)
+  })
+
   it('finishes terminal immediate reactions before opening the shared ordinary after window', () => {
     const immediate = 'TEST_MoorTerminalImmediate'
     const session = opening(state => {
@@ -425,7 +451,7 @@ describe('Moor primary body completion', () => {
       registry.registerListener({ id: rule, cardIds: [rule], actions: ['improvement'], phases: ['after'], scope: 'opponent',
         handler: context => context.ownerPlayer?.id === 'p2' && context.triggerPlayer?.id === 'p1'
           ? { sourceCard: rule, flow: { type: 'leaf', actionId: 'gain', sourceCard: rule, params: { stone: 1 } } } : undefined })
-      registry.registerListener({ id: moor, cardIds: [moor], actions: ['black-market'], phases: ['after'], scope: 'opponent',
+      registry.registerListener({ id: moor, cardIds: [moor], actions: ['moor-action'], phases: ['after'], scope: 'opponent',
         handler: context => context.ownerPlayer?.id === 'p2' && context.triggerPlayer?.id === 'p1'
           ? { sourceCard: moor, flow: { type: 'leaf', actionId: 'gain', sourceCard: moor, params: { reed: 1 } } } : undefined })
     })
@@ -447,11 +473,43 @@ describe('Moor primary body completion', () => {
     expect(r.state.events.filter(event => event.type === 'resource.moved' && [rule, moor].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId)).toEqual([moor, rule])
   })
 
+  it('evaluates a later owner group when it is entered after the first owner changes availability', () => {
+    const first = 'TEST_FirstOwnerMoor', always = 'TEST_LaterOwnerAlways', later = 'TEST_LaterOwnerDormant'
+    const session = opening(state => {
+      state.players[0]!.minorPlayed = [first]
+      state.players[0]!.resources.wood = 0
+      state.players[1]!.minorPlayed = [always, later]
+    })
+    session.withCtx(() => {
+      const registry = requireActiveCardRegistry('moor-owner-entry-test')
+      registry.registerListener({ id: first, cardIds: [first], actions: ['moor-action'], phases: ['after'],
+        handler: () => ({ sourceCard: first, flow: { type: 'leaf', actionId: 'gain', sourceCard: first, params: { wood: 1 }, optional: true } }) })
+      registry.registerListener({ id: always, cardIds: [always], actions: ['moor-action'], phases: ['after'], scope: 'opponent', mandatory: true,
+        handler: () => ({ sourceCard: always, flow: { type: 'leaf', actionId: 'gain', sourceCard: always, params: { food: 1 } } }) })
+      registry.registerListener({ id: later, cardIds: [later], actions: ['moor-action'], phases: ['after'], scope: 'opponent', mandatory: true,
+        handler: context => context.triggerPlayer!.resources.wood === 1
+          ? { sourceCard: later, flow: { type: 'leaf', actionId: 'gain', sourceCard: later, params: { reed: 1 } } } : undefined })
+    })
+    let r = session.takeSpecialAction(0, 'moor-special-1-2-terrain', 'cut-peat', { tile: { row: 2, col: 0 } })
+    r = accept(session, r, first)
+    expect(r.state.players[0]!.resources.wood).toBe(1)
+    expect(r.interaction.request.kind).toBe('confirm-player-switch')
+    r = session.resolveChoice(0, 'confirm')
+    expect(r.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'select-trigger' } })
+    expect(options(r).filter(option => option.sourceCard).map(option => option.sourceCard)).toEqual([always, later])
+    r = session.resolveChoice(1, options(r).find(option => option.sourceCard === later)!.value)
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[1]!.resources).toMatchObject({ reed: 1, food: 0 })
+    r = session.resolveChoice(1, options(r).find(option => option.sourceCard === always)!.value)
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[1]!.resources).toMatchObject({ reed: 1, food: 1 })
+  })
+
   it('keeps Pass disabled while a captured mandatory Moor source can execute', () => {
     const mandatory = 'TEST_MandatoryMoorAfter'
     const session = opening(state => { state.players[0]!.minorPlayed = [MACHINE, mandatory] })
     session.withCtx(() => requireActiveCardRegistry('moor-mandatory-test').registerListener({
-      id: mandatory, cardIds: [mandatory], actions: ['cut-peat'], phases: ['after'], mandatory: true,
+      id: mandatory, cardIds: [mandatory], actions: ['moor-action'], phases: ['after'], mandatory: true,
       handler: () => ({ sourceCard: mandatory, flow: { type: 'leaf', actionId: 'gain', sourceCard: mandatory, params: { stone: 1 } } }),
     }))
     let r = session.takeSpecialAction(0, 'moor-special-1-2-terrain', 'cut-peat', { tile: { row: 2, col: 0 } })
@@ -474,7 +532,7 @@ describe('Moor primary body completion', () => {
           && collectTriggerCardsAs(context, context.player, 'minor').includes('A032_Manger')
           && context.actionEvents?.some(event => event.type === 'card.played' && event.cardId === 'A032_Manger')
           ? { sourceCard: rule, flow: { type: 'leaf', actionId: 'gain', sourceCard: rule, params: { clay: 1 } } } : undefined })
-      registry.registerListener({ id: moor, cardIds: [moor], actions: ['black-market'], phases: ['after'],
+      registry.registerListener({ id: moor, cardIds: [moor], actions: ['moor-action'], phases: ['after'],
         handler: context => !collectTriggerCardsAs(context, context.player, 'minor').includes('A032_Manger')
           && context.actionEvents?.length === 0 && context.result?.type === 'ok'
           ? { sourceCard: moor, flow: { type: 'leaf', actionId: 'gain', sourceCard: moor, params: { stone: 1 } } } : undefined })

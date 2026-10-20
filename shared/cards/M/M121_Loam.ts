@@ -12,8 +12,9 @@ const listener: CardListenerRegistration = {
   id: 'M121-loam-after-hiring-fair',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['hiring-fair'],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'hiring-fair') return
     const player = context.ownerPlayer ?? context.player
     if (context.state.roundPhase !== 'work' || workersAvailable(context.state, player) !== 1) return
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }

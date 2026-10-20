@@ -1,3 +1,4 @@
+import { moorSpecialActionCardDefinitions } from '../../moor/special-action-cards'
 import { describe, expect, it } from 'vitest'
 import { cardEffectHooks } from '../../cards/card-effects'
 import { assertSandboxListenerManifest } from '../sandbox-listener-phases'
@@ -19,6 +20,12 @@ describe('normalizeCustomManifest', () => {
   ])('rejects implicit or incompatible listener filters %j', filters => {
     expect(() => normalizeCustomManifest(manifest({ listeners: [{ registrationId: 'invalid', ...filters }] }), CARD_ID)).toThrow()
   })
+  it.each(['moor-action', ...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))])('rejects native-only Moor target %s in raw and saved manifests', action => {
+    expect(() => normalizeCustomManifest(listener({ actions: ['collect', action] }), CARD_ID)).toThrow(/listener|Listener/)
+    const saved = JSON.parse(JSON.stringify({ effectHooks: [], listeners: [{ registrationId: 'saved', actions: [action], phases: ['after'] }] }))
+    expect(() => assertSandboxListenerManifest(CARD_ID, saved)).toThrow(/listener|Listener/)
+  })
+
   it('keeps declared contract values', () => {
     expect(normalizeCustomManifest({
       effectKeys: ['onRoundStart'],

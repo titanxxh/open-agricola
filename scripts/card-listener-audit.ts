@@ -1,5 +1,6 @@
 import path from 'node:path'
 import ts from 'typescript'
+import { moorSpecialActionCardDefinitions } from '../shared/moor/special-action-cards'
 import { createActionSpaces } from '../shared/actions'
 import { createMoorActionSpaces } from '../shared/moor/action-spaces'
 import { createSeasonActionSpaces } from '../shared/seasons/action-spaces'
@@ -92,7 +93,11 @@ export function auditCardListeners(
       ...(/\b(?:action|accumulation) spaces?\b/i.test(metadata.get(card.cardId)?.description ?? '') ? ['card-text-space' as const] : []),
     ],
   }))).sort((left, right) => left.cardId.localeCompare(right.cardId) || left.listenerId.localeCompare(right.listenerId))
+  const concreteMoorActionIds = [...new Set(moorSpecialActionCardDefinitions.flatMap(card => card.actions))].sort()
   return {
+    concreteMoorActionIds,
+    moorListeners: inventory.filter(entry => Array.isArray(entry.actions) && entry.actions.some(action =>
+      action === 'moor-action' || concreteMoorActionIds.some(id => id === action))),
     boardActionSpaceIds: [...boardIds].sort(),
     cards: cards.map(card => ({
       cardId: card.cardId,

@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-10-19. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-10-20. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 ## 1. Open issues by priority
 
@@ -95,6 +95,7 @@ No entries are open.
 - Subscribe action-space before / complete reactions to the existing `place-farmer` lifecycle and filter `context.space`; do not approximate complete use with wildcard internal-node reactions.
 - Keep listener permission in the shared closed target/phase contract; do not infer it from executable action registration, omit selectors, or mutate registered selector objects.
 - Reference platform status fields such as `banned` and `implemented` must not drive OA product behavior automatically.
+- Moor Special Action reactions use the unified `moor-action` before/after identity and typed native trigger facts; concrete special-action IDs are execution/filter/source data, never listener targets.
 
 ## 6. Cards that use the reference Special Effect
 

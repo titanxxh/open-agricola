@@ -4,18 +4,8 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import type { MoorSpecialActionId } from '../../moor/types'
 
 const CARD_ID = 'M060_SowingMachine'
-const SPECIAL_ACTIONS: MoorSpecialActionId[] = [
-  'cut-peat',
-  'fell-trees',
-  'slash-and-burn',
-  'horse-market',
-  'hiring-fair',
-  'black-market',
-  'illicit-work',
-]
 
 const canSow = (context: CardListenerContext) => {
   if ((context.player.resources.horse ?? 0) < 2) return false
@@ -34,7 +24,7 @@ const listener: CardListenerRegistration = {
   id: 'M060-sowing-machine-after-special-action',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: SPECIAL_ACTIONS,
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!canSow(context)) return
     return {

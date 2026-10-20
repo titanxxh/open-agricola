@@ -61,7 +61,8 @@ describe('E/M Logical Field consumers', () => {
     expect(ruleSession.withCtx(() => M058_PeatFertilizer_impl.listeners![0]!.handler!({
       state,
       player,
-      actionId: 'cut-peat',
+      actionId: 'moor-action',
+        moorAction: { actionId: 'cut-peat', playerId: player.id, payload: {}, phase: 'after', result: { type: 'ok' } },
       phase: 'after',
     } as unknown as CardListenerContext))).toMatchObject({ flow: { actionId: 'sow' } })
     expect(ruleSession.withCtx(() => M111_NoTillFarming_impl.prerequisiteCheck!(player))).toBe(true)

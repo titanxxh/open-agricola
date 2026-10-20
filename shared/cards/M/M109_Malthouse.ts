@@ -10,8 +10,9 @@ const listener: CardListenerRegistration = {
   id: 'M109-malthouse-after-cut-peat',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['cut-peat'],
+  actions: ['moor-action'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'cut-peat') return
     if ((context.player.resources.grain ?? 0) < 1) return
     return {
       flow: {
