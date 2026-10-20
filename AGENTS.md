@@ -125,8 +125,8 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 | Doc | When to update |
 |---|---|
-| `docs/card_implementation_status.md` | 官方卡实现变化，或社区卡出现尚未实现的跨卡缺口时，按下方清单核对；已对齐卡牌不逐条记录 |
-| `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 status 文档 |
+| `docs/card_implementation_status.md` | 官方卡实现变化时，按下方清单核对；只覆盖官方卡，已对齐卡牌不逐条记录 |
+| `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单 |
 | `docs/ARCHITECTURE.md`、`docs/architecture/*.md` | 通用扩展点或模块职责、不变量、seam 变化时，更新对应模块文档；索引只保留设计不变量、拓扑、分层与模块表 |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略或卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 对应议题变化 |
@@ -136,7 +136,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 更新 status 文档时核对：
 
 - Open issues by priority：修复后移除或降级，新增 gap 立即登记。
-- Accepted differences / Source exclusions / Per-card appendix：只登记有意偏离和排除；已对齐的卡不逐条记录。
+- Accepted differences / Source exclusions / Per-card notes：只登记有意偏离和排除；已对齐的卡不逐条记录，类别行已写清的差异不再写单卡备注。
 - Infrastructure backlog：只登记尚未实现的跨卡缺口；实现后删除该条，把通用机制写入 `docs/architecture/` 中对应的模块文档。
 - Reference anti-patterns：新增设计禁令时补充。
 - Hook 归属从 `ALL_CARD_IMPLS` 派生，不在文档中维护副本。
