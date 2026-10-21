@@ -438,4 +438,45 @@ describe('space reaction settlement', () => {
     expect(readCardResourceStats(response.state.players[0]!, 'A165_PigBreeder')?.used ?? 0).toBe(0)
     expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'A165_PigBreeder')).toEqual([expect.objectContaining({ resources: { boar: 1 } })])
   })
+
+  it.each([false, true])('keeps body-food after reactions behind the outer immediate window across restore, local conversion=%s', conversion => {
+    let session = opening(state => {
+      const player = state.players[0]!
+      player.minorPlayed = [HAT, 'C025_SteamMachine', ...(conversion ? ['E053_BoarSpear'] : [])]
+      player.improvements = ['Major_Fireplace1']
+      player.resources.grain = 1
+      state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy = [{ playerId: player.id, workerId: player.workers[1]!.id }]
+      state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
+    })
+    const reaction: CardListenerRegistration = {
+      id: 'test-after-body-food', cardIds: ['TEST_AfterFood'], actions: ['gain'], phases: ['after'],
+      handler: context => context.actionEvents?.some(event => event.type === 'resource.moved' && event.sourceCardId === HAT && event.resources.food === 1)
+        ? { sourceCard: 'TEST_AfterFood', flow: { type: 'leaf', actionId: 'gain', params: { food: 10 } } } : undefined,
+    }
+    listeners(session, [reaction])
+    let response = animals(session, session.takeAction(0, 'pig-market'))
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, grain: 1, boar: 1 })
+    expect(response.interaction.stateId === 'wait' && response.interaction.sourceCard).toBe(conversion ? 'E053_BoarSpear' : 'C025_SteamMachine')
+    session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+    sessions.push(session)
+    session.withCtx(() => requireActiveCardRegistry('body-after-restore').registerListener(reaction))
+    response = session.getState()
+    if (conversion) {
+      response = accept(session, response, 'E053_BoarSpear')
+      const trade = options(response).find(option => option.value.startsWith('trade:'))
+      expect(trade).toBeDefined()
+      response = choose(session, response, trade!.value)
+      expect(response.state.players[0]!.resources).toMatchObject({ food: 5, grain: 1, boar: 0 })
+    }
+    response = accept(session, response, 'C025_SteamMachine')
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      response = choose(session, response, 'TEST_AfterFood')
+    }
+    expect(response.state.players[0]!.resources).toMatchObject({ food: conversion ? 17 : 13, grain: 0, boar: conversion ? 0 : 1 })
+    expect(readCardResourceStats(response.state.players[0]!, HAT).used).toBe(1)
+    expect(readCardResourceStats(response.state.players[0]!, 'TEST_AfterFood').used).toBe(1)
+    const steam = response.state.events.findIndex(event => event.type === 'card.triggered' && event.sourceCardId === 'C025_SteamMachine')
+    const after = response.state.events.findIndex(event => event.type === 'resource.moved' && event.sourceCardId === 'TEST_AfterFood')
+    expect(after).toBeGreaterThan(steam)
+  })
 })

@@ -9,7 +9,7 @@ export function settleHostReactions(int: EngineInternals, host: EngineNode | nul
     const children = nodes.filter(node => node.reactionSettlement === boundary)
     if (!children.length) continue
     const barrier = new SequenceNode(`reaction-${boundary}-${int.counterRef.value++}`, children)
-    barrier.completionBarrier = true
+    if (boundary === 'action') barrier.completionBarrier = true
     if (boundary === 'body' && host) inheritPrimaryBody(host, barrier)
     settled.push(barrier)
   }
