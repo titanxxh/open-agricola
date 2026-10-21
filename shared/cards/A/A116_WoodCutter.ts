@@ -12,10 +12,10 @@ const CARD_ID = 'A116_WoodCutter'
  *
  */
 const listener: CardListenerRegistration = {
-  id: 'A116-wood-cutter-after-wood',
+  id: 'A116-wood-cutter-before-wood',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }

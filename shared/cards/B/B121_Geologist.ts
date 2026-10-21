@@ -14,9 +14,9 @@ const CARD_ID = 'B121_Geologist'
  * (3+ players) 'ClayPit' → onPlayerPlaceFarmer returns gainNode([CLAY => 1]).
  */
 const listener: CardListenerRegistration = {
-  id: 'B121-geologist-after-place-farmer',
+  id: 'B121-geologist-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

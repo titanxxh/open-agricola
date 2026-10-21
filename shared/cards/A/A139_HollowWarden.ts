@@ -19,9 +19,9 @@ const CARD_ID = 'A139_HollowWarden'
 const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A060_OrientalFireplace']
 
 const hollowListener: CardListenerRegistration = {
-  id: 'A139-hollow-warden-after-hollow',
+  id: 'A139-hollow-warden-before-hollow',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isHollowSpaceId(context.space?.id)) return

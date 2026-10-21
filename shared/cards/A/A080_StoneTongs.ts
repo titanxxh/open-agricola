@@ -13,10 +13,10 @@ const CARD_ID = 'A080_StoneTongs'
 const STONE_SPACES = ['eastern-quarry', 'western-quarry']
 
 const listener: CardListenerRegistration = {
-  id: 'A80-stone-tongs-after-stone',
+  id: 'A80-stone-tongs-before-stone',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !STONE_SPACES.includes(context.space.id)) return
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }

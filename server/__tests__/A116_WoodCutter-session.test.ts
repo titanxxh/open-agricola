@@ -8,6 +8,8 @@ import '../../shared/cards/A/A116_WoodCutter'
 import assert from 'node:assert/strict'
 import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit14Spaces from './_helpers/audit/ae-negative-14-spaces'
+import { createWorkSession } from './_helpers/session-fixtures'
+import type { SessionResponse } from '../game/authoritative-session'
 
 describe('A116_WoodCutter session', () => {
   const setup = () => {
@@ -118,4 +120,60 @@ describe('ae-negative-14-spaces', () => {
   it('A116 N1 empty Forest rejects while three and six wood piles add exactly one owner wood',()=>{for(const amount of[0,3,6]){const s=setup(CUTTER,state=>state.actionSpaces.find(a=>a.id==='forest')!.resources.wood=amount);const r=amount===0?assertEmptyAccumulationRejected(s,0,'forest'):turn(s,0,'forest');assert.equal(r.state.players[0]!.resources.wood,amount===0?0:amount+1);assert.equal(r.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,0);save(`A116-N1-${amount}`,r)}})
   it('A116 N2 nonwood accumulation DayLaborer hand and opponent give no additional wood',()=>{for(const[space,played]of[['clay-pit',true],['day-laborer',true],['forest',false]] as const){const s=setup(CUTTER,undefined,played);const r=turn(s,0,space);assert.equal(r.state.players[0]!.resources.wood,space==='forest'?3:0);save(`A116-N2-${space}`,r)}const s=setup(CUTTER);turn(s,0,'grain-seeds');const r=turn(s,1,'forest');assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[1]!.resources.wood,3);save('A116-N2-opponent',r)})
   it('A116 N3 occupied source and invalid actor cannot gain and undo restores source once',()=>{const s=setup(CUTTER);const first=turn(s,0,'forest');assertRejectedUnchanged(s,()=>s.takeAction(0,'forest'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='forest')!.resources.wood,3);assertRejectedUnchanged(s,()=>s.takeAction(1,'forest'));const retry=turn(s,0,'forest');assert.equal(retry.state.players[0]!.resources.wood,4);save('A116-N3',{first,undone,retry})})
+})
+
+describe('A116 before timing (#1321)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  const BASKET = 'A056_Basket'
+  const options = (r: SessionResponse) => r.interaction.stateId === 'wait' ? r.interaction.request.options ?? [] : []
+  const forestWithBasket = (cutter: boolean) => {
+    const session = createWorkSession({ seed: 1321, configure: state => {
+      for (const player of state.players) {
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        for (const resource of Object.keys(player.resources)) Reflect.set(player.resources, resource, 0)
+        setWorkersAtHome(state, player, 2)
+      }
+      for (const space of state.actionSpaces) space.takenBy = []
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 1
+      const owner = state.players[0]!
+      owner.occupationPlayed = cutter ? ['A116_WoodCutter'] : []
+      owner.minorPlayed = [BASKET]
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('adds its wood before the Forest collects, so the immediate Basket exchange can use both woods', () => {
+    const session = forestWithBasket(true)
+    let r = session.takeAction(0, 'forest')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({ wood: 2, food: 0 })
+    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard, JSON.stringify(r.interaction)).toBe(BASKET)
+    const exchange = options(r).find(o => o.value !== '__skip__' && !o.disabled)
+    expect(exchange).toBeDefined()
+    r = session.resolveChoice(0, exchange!.value)
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({ wood: 0, food: 3 })
+    expect(r.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood).toBe(2)
+    expect(r.interaction.stateId === 'wait' && r.interaction.request.kind).toBe('confirm-next-player')
+    const events = r.state.events
+    const cutter = events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === 'A116_WoodCutter')
+    const host = events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === undefined && e.from.kind === 'actionSpace')
+    const basket = events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === BASKET)
+    expect(cutter).toBeGreaterThanOrEqual(0)
+    expect(cutter).toBeLessThan(host)
+    expect(host).toBeLessThan(basket)
+    expect(r.state.log.filter(entry => entry.key === 'log.cardTriggered' && entry.params?.cardId === 'A116_WoodCutter')).toHaveLength(1)
+  })
+
+  it('without Wood Cutter the single collected wood cannot pay the Basket exchange', () => {
+    const session = forestWithBasket(false)
+    const r = session.takeAction(0, 'forest')
+    expect(r.ok, r.error).toBe(true)
+    expect(options(r).some(o => o.sourceCard === BASKET && o.value !== '__skip__' && !o.disabled)).toBe(false)
+    expect(r.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
+    expect(r.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood).toBe(0)
+  })
 })

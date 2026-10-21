@@ -7,9 +7,9 @@ import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A155_Conjurer'
 const listener: CardListenerRegistration = {
-  id: 'A155-conjurer-after-place-farmer',
+  id: 'A155-conjurer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
