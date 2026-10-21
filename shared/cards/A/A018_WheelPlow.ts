@@ -2,7 +2,8 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder, getSpaceUsePersonPlacementOrdinal } from '../helpers/round-placement'
+import { readActionSnapshotExtraData } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A018_WheelPlow'
@@ -19,6 +20,10 @@ const listener: CardListenerRegistration = {
     if (!context.space || !TRIGGER_SPACES.has(context.space.id)) return
     // Must be the first person placed this round (placement count is 1 after placing)
     if (getRoundPersonPlacementOrder(context.player).length !== 1) return
+    const actionContext = context.actionContext ?? (context.actionSpaceUse?.newPlacement
+      ? { placedWorkerId: readActionSnapshotExtraData<string>(context.player, 'placedWorkerId') }
+      : undefined)
+    if (getSpaceUsePersonPlacementOrdinal(context.player, actionContext) !== 1) return
     return {
       flow: {
         type: 'seq',

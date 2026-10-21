@@ -152,6 +152,7 @@ describe('card plows before their space host', () => {
   })
 
   it.each([
+    { card: 'A018_WheelPlow', space: 'farmland' },
     { card: 'C091_PlowHero', space: 'farmland' },
     { card: 'A163_BuildingExpert', space: 'resource-market-4' },
   ])('$card does not borrow the active forest worker snapshot for a nested workerless $space use', scenario => {
@@ -170,7 +171,7 @@ describe('card plows before their space host', () => {
     if (scenario.card === 'A163_BuildingExpert') expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, reed: 1, stone: 1, food: 1 })
     else {
       expect(response.state.players[0]!.fields).toHaveLength(1)
-      expect(response.state.players[0]!.resources.food).toBe(1)
+      expect(response.state.players[0]!.resources.food).toBe(scenario.card === 'C091_PlowHero' ? 1 : 0)
     }
   })
 
