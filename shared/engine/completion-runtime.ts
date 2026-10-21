@@ -14,8 +14,7 @@ export function preparePrimaryCompletions(int: EngineInternals): void {
     if (!(scope instanceof SequenceNode) || !scope.completion || scope.completion.bodyCompleted) continue
     const completion = scope.completion
     const body = int.tree.findNodeById(completion.bodyId)
-    if (!body || !primaryBodyCompleted(body, scope.id)) continue
-    completion.bodyCompleted = true
+    if (!body || !primaryBodyCompleted(body, scope.id, 'effects')) continue
     const collect = (parent: EngineNode): void => {
       const children = primaryBodyChildren(parent)
       for (let index = children.length - 1; index >= 0; index--) {
@@ -31,6 +30,7 @@ export function preparePrimaryCompletions(int: EngineInternals): void {
       }
     }
     collect(body)
+    if (primaryBodyCompleted(body, scope.id)) completion.bodyCompleted = true
   }
 }
 

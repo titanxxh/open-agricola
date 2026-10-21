@@ -34,18 +34,18 @@ export function wrapPrimaryBody(
   return scope
 }
 
-export function primaryBodyCompleted(node: EngineNode, scopeId: string): boolean {
-  if (node.completionBarrier) return node.getState() === 'resolved'
+export function primaryBodyCompleted(node: EngineNode, scopeId: string, mode: 'effects' | 'settlement' = 'settlement'): boolean {
+  if (node.completionBarrier) return mode === 'effects' || node.getState() === 'resolved'
   if (node.primaryBodyId === scopeId) {
     if (node instanceof SequenceNode && node.completion) return node.getState() === 'resolved'
     if (node instanceof OrNode) return node.getState() === 'resolved'
     if (node instanceof XorNode) {
       if (node.getState() === 'resolved') return true
       const selected = node.children.find(child => child.id === node.selectedChildId)
-      return selected !== undefined && primaryBodyCompleted(selected, scopeId)
+      return selected !== undefined && primaryBodyCompleted(selected, scopeId, mode)
     }
     if (node instanceof ActionNode) return node.getState() === 'resolved'
     if (node.getPending() || node.optional && !node.optionalActive && node.getState() !== 'resolved') return false
   }
-  return primaryBodyChildren(node).every(child => primaryBodyCompleted(child, scopeId))
+  return primaryBodyChildren(node).every(child => primaryBodyCompleted(child, scopeId, mode))
 }
