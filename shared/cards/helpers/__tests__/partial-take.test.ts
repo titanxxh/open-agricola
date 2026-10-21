@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createPartialTakeFromSpaceLeaf } from '../partial-take'
+import { collectTakeAmount, createPartialTakeFromSpaceLeaf } from '../partial-take'
+import { mkActionSpace } from '../../__tests__/fixtures'
 
 describe('createPartialTakeFromSpaceLeaf', () => {
   it('creates a collect leaf with partial-take actionContext and display metadata', () => {
@@ -33,5 +34,28 @@ describe('createPartialTakeFromSpaceLeaf', () => {
       kind: 'resourceExchange',
       resourcesGained: { reed: 1 },
     })
+  })
+})
+
+describe('collectTakeAmount', () => {
+  const forest = mkActionSpace({ id: 'forest', resources: { wood: 6, clay: 1 } })
+  const reedBank = mkActionSpace({ id: 'reed-bank', resources: { reed: 3 } })
+  const state = { actionSpaces: [forest, reedBank] }
+
+  it('reads everything on the used space for a whole collect', () => {
+    expect(collectTakeAmount({ state, space: forest }, 'wood')).toBe(6)
+    expect(collectTakeAmount({ state, space: forest }, 'reed')).toBe(0)
+  })
+
+  it('reads only the amount of a partial take', () => {
+    const actionContext = { spaceId: 'forest', resource: 'wood', amount: 3 }
+    expect(collectTakeAmount({ state, space: forest, actionContext }, 'wood')).toBe(3)
+    expect(collectTakeAmount({ state, space: forest, actionContext }, 'clay')).toBe(0)
+  })
+
+  it('reads the hinted space for resource-type takes', () => {
+    const actionContext = { spaceId: 'reed-bank', resourceTypes: ['reed'] }
+    expect(collectTakeAmount({ state, space: forest, actionContext }, 'reed')).toBe(3)
+    expect(collectTakeAmount({ state, space: forest, actionContext }, 'wood')).toBe(0)
   })
 })
