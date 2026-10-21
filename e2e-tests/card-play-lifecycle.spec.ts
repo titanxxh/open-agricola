@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import type { GameState } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
-import { GameSession } from '../server/game/authoritative-session'
+import { GameSession, type SessionResponse } from '../server/game/authoritative-session'
 import { BACKEND_URL } from './fixtures'
 
 const openScenario = async (page: Page, request: APIRequestContext, configure: (state: GameState) => void) => {
@@ -20,7 +20,7 @@ const openScenario = async (page: Page, request: APIRequestContext, configure: (
   try {
     session.loadState(state)
     const loaded = await request.post(`${BACKEND_URL}/api/game/load`, {
-      data: { state: session.withCtx(() => serializeState(session.state, {})) },
+      data: { state: session.withCtx(() => serializeState(session.state, { actionHooks: session.actionHooks })) },
     })
     expect(loaded.ok(), await loaded.text()).toBe(true)
   } finally { session.dispose() }
@@ -28,6 +28,34 @@ const openScenario = async (page: Page, request: APIRequestContext, configure: (
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   await expect(page.locator('.game-layout')).toBeVisible()
 }
+
+test('Wood Cutter before reward appears once in the played-card usage tooltip', async ({ page, request }) => {
+  const cardId = 'A116_WoodCutter'
+  await openScenario(page, request, state => {
+    state.players[0]!.occupationPlayed = [cardId]
+    state.players[0]!.resources.wood = 0
+    state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 1
+  })
+  const played = page.locator('.played-card-slot').filter({ has: page.locator(`[data-card-anchor="${cardId}"]`) })
+  await expect(played).toBeVisible()
+  const forest = page.locator('[data-action-id="forest"] button').first()
+  await expect(forest).toBeEnabled()
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/action') && response.request().method() === 'POST')
+  await forest.click()
+  const http = await committed
+  expect(http.ok()).toBe(true)
+  const result: SessionResponse = await http.json()
+  expect(result.ok, result.error).toBe(true)
+  expect(result.state.players[0]!.resources.wood).toBe(2)
+  expect(result.state.players[0]!.cardStates[cardId]?.extraData?.resourceStats).toMatchObject({ used: 1, gained: { wood: 1 } })
+  await played.locator('.played-card-wrapper.has-stats').hover()
+  const tooltip = played.getByRole('tooltip')
+  await expect(tooltip).toBeVisible()
+  const used = tooltip.locator('.played-card-stats-section').filter({ has: page.locator('.played-card-stats-label', { hasText: /^Used$/ }) })
+  await expect(used.locator('.played-card-stats-value')).toHaveText('1')
+  await expect(tooltip.locator('.played-card-stats-line [data-resource="wood"]')).toHaveAttribute('data-amount', '1')
+  await page.screenshot({ path: 'output/playwright/card-play-before-usage.png' })
+})
 
 for (const card of [
   { id: 'B100_Clutterer', name: 'Clutterer', paid: false, food: 3 },
