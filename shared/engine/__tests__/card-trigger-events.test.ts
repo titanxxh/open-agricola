@@ -44,6 +44,7 @@ describe('emitCardTriggered', () => {
     const sink = { emit: (event: DraftGameEvent) => emitted.push(event) }
 
     emitCardTriggered(internals(), sink, context('activate-card-effect'), 'activate-card-effect')
+    emitCardTriggered(internals(), sink, context('record-card-use'), 'record-card-use')
     emitCardTriggered(internals(), sink, context('pay', { costType: 'minor-improvement' }), 'pay')
 
     expect(emitted).toEqual([])

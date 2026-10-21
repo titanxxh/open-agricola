@@ -484,7 +484,14 @@ const collectBeforeSpaceFlows = (
     for (const entry of getMatchingListeners(context)) {
       if (!newPlacement && entry.registration.requiresNewPlacement) continue
       const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
-      if (result?.flow) flows.push(result.flow)
+      if (!result?.flow) continue
+      flows.push(entry.cardId && result.countCardUse !== false ? {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'record-card-use', params: { cardId: entry.cardId, ownerPlayerId: entry.ownerPlayerId } },
+          result.flow,
+        ],
+      } : result.flow)
     }
   }
   return flows
