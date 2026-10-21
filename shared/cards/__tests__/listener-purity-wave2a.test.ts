@@ -722,7 +722,7 @@ describe('listener purity wave 2a', () => {
 
     const result = listenerById(
       D156_RetailDealer_impl.listeners,
-      'D156-retail-dealer-after-place-farmer',
+      'D156-retail-dealer-before-place-farmer',
     ).handler(ctx)
 
     expectCardStatesUnchanged(p, before, 'D156 owner')

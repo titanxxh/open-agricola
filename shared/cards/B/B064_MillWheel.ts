@@ -7,9 +7,9 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B064_MillWheel'
 const listener: CardListenerRegistration = {
-  id: 'B64-mill-wheel-after-place-farmer',
+  id: 'B64-mill-wheel-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-utilization') return
