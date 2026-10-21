@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
@@ -9,10 +9,10 @@ const CARD_ID = 'A018_WheelPlow'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
-  id: 'A18-wheel-plow-after-plow',
+  id: 'A18-wheel-plow-before-space',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['plow'],
+  phases: ['before'],
+  actionSpaces: ['farmland', 'cultivation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.sourceCard === CARD_ID) return

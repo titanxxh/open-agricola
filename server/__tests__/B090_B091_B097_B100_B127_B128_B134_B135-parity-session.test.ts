@@ -73,8 +73,8 @@ describe('B090 and B091 plowers', () => {
     const state = session.state; const opponent = state.players[1]!
     state.actionSpaces.find((s) => s.id === 'grain-seeds')!.takenBy = [{ playerId: opponent.id, workerId: '1' }]
     session.loadState(state)
-    let r = plow(session, session.takeAction(0, 'farmland'))
-    r = accept(session, r, 'B090_CooperativePlower'); r = plow(session, r)
+    let r = session.takeAction(0, 'farmland')
+    r = accept(session, r, 'B090_CooperativePlower'); r = plow(session, r); r = plow(session, r)
     expect(r.state.players[0]!.fields).toHaveLength(2)
   })
   it('B090 S3: vacant Grain Seeds gives Farmland only its normal plow', () => {
@@ -86,9 +86,10 @@ describe('B090 and B091 plowers', () => {
     const state = session.state; const opponent = state.players[1]!
     state.actionSpaces.find((s) => s.id === 'grain-seeds')!.takenBy = [{ playerId: opponent.id, workerId: '1' }]
     session.loadState(state)
-    let r = plow(session, session.takeAction(0, 'farmland'))
+    let r = session.takeAction(0, 'farmland')
     r = resolveTriggerIfPresent(session, r, 'B090_CooperativePlower')
     if (r.interaction.stateId === 'wait') r = session.resolveChoice(r.interaction.playerIndex, '__skip__')
+    r = plow(session, r)
     expect(r.state.players[0]!.fields).toHaveLength(1)
   })
   it('B091 S1: Assistant Tiller can be played as the first occupation', () => {

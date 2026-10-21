@@ -1,9 +1,9 @@
+import { completePlowUse } from './_helpers/plow-use'
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { commitFirstPlow, setupSowingSession, sowOptions } from './_helpers/batch07-sowing'
+import { setupSowingSession, sowOptions } from './_helpers/batch07-sowing'
 
 import '../../shared/cards/A/A018_WheelPlow'
 import assert from 'node:assert/strict'
@@ -62,29 +62,6 @@ const playMinor = (session: GameSession) => {
   return response
 }
 
-const acceptWheelPlow = (session: GameSession, initial: SessionResponse) => {
-  let response = initial
-  for (let guard = 0; guard < 6; guard += 1) {
-    response = resolveTriggerIfPresent(session, response, CARD_ID)
-    if (response.interaction.stateId !== 'wait'
-      || response.interaction.request.kind === 'farm-select') return response
-    const accept = options(response).find((option) => option.value !== '__skip__')
-    expect(accept, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
-  }
-  return response
-}
-
-const commitPlow = (session: GameSession, response: SessionResponse) => {
-  expect(response.interaction).toMatchObject({
-    stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'plow' } },
-  })
-  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return response
-  return session.commitSelectionChoice(
-    response.interaction.playerIndex, { tile: response.interaction.request.farm.selectableTiles[0]! },
-  )
-}
-
 describe('A018 Wheel Plow parity', () => {
   it('A018 S1: two occupations and two wood allow Wheel Plow to be played', () => {
     const response = playMinor(setup({ played: false }))
@@ -94,33 +71,17 @@ describe('A018 Wheel Plow parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
   })
 
-  it('A018 S2: first-person Farmland plows its normal field before two additional fields in OA', () => {
+  it('A018 S2: first-person Farmland plows two card fields before its normal field', () => {
     const session = setup()
-    let response = commitPlow(session, session.takeAction(0, 'farmland'))
-    response = acceptWheelPlow(session, response)
-    response = commitPlow(session, response)
-    response = acceptWheelPlow(session, response)
-    response = commitPlow(session, response)
-
-    expect(response.ok, response.error).toBe(true)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), CARD_ID, 2)
     expect(response.state.players[0]!.fields).toHaveLength(3)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
+    expect(response.state.events.filter(event => event.type === 'farm.fieldPlowed').map(event => event.sourceCardId)).toEqual([CARD_ID, CARD_ID, undefined])
   })
 
   it('A018 S3: declining the first-person bonus consumes Wheel Plow but keeps the normal plow', () => {
     const session = setup()
-    let response = commitPlow(session, session.takeAction(0, 'farmland'))
-    response = resolveTriggerIfPresent(session, response, CARD_ID)
-    while (response.interaction.stateId === 'wait'
-      && !options(response).some((option) => option.value === '__skip__')) {
-      const confirm = options(response)[0]
-      expect(confirm).toBeDefined()
-      response = session.resolveChoice(response.interaction.playerIndex, confirm!.value)
-      response = resolveTriggerIfPresent(session, response, CARD_ID)
-    }
-    expect(options(response).map((option) => option.value)).toContain('__skip__')
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), CARD_ID, 0)
     expect(response.state.players[0]!.fields).toHaveLength(1)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
   })
@@ -143,30 +104,14 @@ describe('A018 Wheel Plow parity', () => {
     const session = setupSowingSession({ cardId: CARD_ID, grain: 3 })
     session.state.players[0]!.occupationPlayed = OCCUPATIONS
     session.loadState(session.state)
-
-    let response = commitFirstPlow(session, session.takeAction(0, 'cultivation'))
-    response = resolveTriggerIfPresent(session, response, CARD_ID)
-    const accept = sowOptions(response).find((option) => option.value !== '__skip__')
-    expect(accept, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.stateId === 'wait' ? response.interaction.playerIndex : 0, accept!.value)
-    response = commitFirstPlow(session, response)
-    const second = sowOptions(response).find((option) => option.value !== '__skip__')
-    expect(second, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.stateId === 'wait' ? response.interaction.playerIndex : 0, second!.value)
-    response = commitFirstPlow(session, response)
-
+    let response = completePlowUse(session, session.takeAction(0, 'cultivation'), CARD_ID, 2, true)
     expect(response.state.players[0]!.fields).toHaveLength(3)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
-    const sowOption = sowOptions(response).find((option) =>
-      option.value === 'sow' || option.labelKey === 'actions.sow.name')
-    expect(sowOption, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.stateId === 'wait' ? response.interaction.playerIndex : 0, sowOption!.value)
-    const fields = response.state.players[0]!.fields
-    response = session.commitSelectionChoice(0, {
-      crops: fields.map(({ row, col }) => ({ row, col, crop: 'grain' as const })),
-    })
+    const sow = sowOptions(response).find(option => option.labelKey === 'actions.sow.name')
+    expect(sow, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(0, sow!.value)
+    response = session.commitSelectionChoice(0, { crops: response.state.players[0]!.fields.map(({ row, col }) => ({ row, col, crop: 'grain' })) })
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.fields.map((field) => field.stacks[0]?.remaining)).toEqual([3, 3, 3])
+    expect(response.state.players[0]!.fields.map(field => field.stacks[0]?.remaining)).toEqual([3, 3, 3])
     expect(response.state.players[0]!.resources.grain).toBe(0)
   })
 })
@@ -219,7 +164,7 @@ describe('ae-negative-04-plows', () => {
       assert.deepEqual(r.state.players[0]!.fields.map(f => f.stacks[0]?.remaining), [3, 3, 3]); finished(r)
     })
     it('A018 N5 decline consumption is recorded without deciding the optional allowance rule', () => {
-      const s = setup(); let r = plow(s, turn(s, 0, 'farmland')); r = skip(s, r)
+      const s = setup(); let r = skip(s, turn(s, 0, 'farmland')); r = plow(s, r)
       assert.equal(fields(r), 1); finished(r)
       assert.equal(r.state.players[0]!.cardStates[WHEEL]?.flagged, true)
       endRound(s)
@@ -232,11 +177,12 @@ describe('ae-negative-04-plows', () => {
       assert.equal(fields(r), 13); finished(r)
     })
   })
-  it('A018 N7 final plot bonus-first and normal-first paths complete without phantom fields', () => {
+  it('A018 N7 the card can plow the final plot before its satisfied Farmland host without phantom fields', () => {
     const s = setup({ lastPlot: true }); const normal = turn(s, 0, 'farmland')
-    assert.notEqual(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, WHEEL)
+    assert.equal(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, WHEEL)
     let r = plow(s, normal, { row: 0, col: 4 })
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') r = choice(s, r, o => o.value === WHEEL)
     assert.equal(fields(r), 13); assert.equal(r.state.players[0]!.cardStates[WHEEL]?.flagged, true); finished(r)
+    assert.equal(r.state.events.filter(event => event.type === 'farm.fieldPlowed' && event.sourceCardId === WHEEL).length, 1)
   })
 })

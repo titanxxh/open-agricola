@@ -1,3 +1,4 @@
+import { completePlowUse } from './_helpers/plow-use'
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -36,45 +37,9 @@ describe('D020_TurnwrestPlow session', () => {
 
   it('triggers on farmland, accept both plows', () => {
     const session = setup()
-
-    let resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-
-    const tile1 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile1 })
-    expect(resp.ok).toBe(true)
-
-    // First optional plow
-    expect(resp.interaction.stateId).toBe('wait')
-    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(accept1).toBeDefined()
-    resp = session.resolveChoice(0, accept1!.value)
-    expect(resp.ok).toBe(true)
-
-    expect(resp.interaction.stateId).toBe('wait')
-    const tile2 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile2 })
-    expect(resp.ok).toBe(true)
-
-    // Second optional plow
-    expect(resp.interaction.stateId).toBe('wait')
-    const accept2 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(accept2).toBeDefined()
-    resp = session.resolveChoice(0, accept2!.value)
-    expect(resp.ok).toBe(true)
-
-    expect(resp.interaction.stateId).toBe('wait')
-    const tile3 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile3 })
-    expect(resp.ok).toBe(true)
-
-    // Stack should be empty (2 - 2)
-    const stack = getCardStack(resp.state.players[0]!, 'D020_TurnwrestPlow')
-    expect(stack.length).toBe(0)
-
-    // 3 fields (farmland + 2 from card)
-    expect(resp.state.players[0]!.fields.length).toBe(3)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), 'D020_TurnwrestPlow', 2)
+    expect(response.state.players[0]!.fields).toHaveLength(3)
+    expect(getCardStack(response.state.players[0]!, 'D020_TurnwrestPlow')).toHaveLength(0)
   })
 
   it('triggers on cultivation action space', () => {
@@ -126,19 +91,9 @@ describe('D020_TurnwrestPlow session', () => {
 
   it('skip optional plow preserves stack', () => {
     const session = setup()
-
-    let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile1 })
-
-    // Skip optional
-    expect(resp.interaction.stateId).toBe('wait')
-    resp = session.resolveChoice(0, '__skip__')
-    expect(resp.ok).toBe(true)
-
-    const stack = getCardStack(resp.state.players[0]!, 'D020_TurnwrestPlow')
-    expect(stack.length).toBe(2)
-    expect(resp.state.players[0]!.fields.length).toBe(1)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), 'D020_TurnwrestPlow', 0)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(getCardStack(response.state.players[0]!, 'D020_TurnwrestPlow')).toHaveLength(2)
   })
 
   it('does not trigger on other action spaces', () => {
@@ -156,7 +111,7 @@ describe('D020_TurnwrestPlow session', () => {
 })
 
 describe('ae-negative-31-plows', () => {
-  const { sessions, ok, options, actor, save, setup, finish, next, take, hand, buy, noSource, plow, accept, advanceOwner, minorSetup } = audit31Plows
+  const { sessions, ok, options, actor, save, setup, finish, next, take, hand, buy, noSource, plow, advanceOwner, minorSetup } = audit31Plows
   afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
   it('D020 N1 real purchase pays printed cost and enforces missing resource or occupation', () => {
     const card = 'D020_TurnwrestPlow', s = minorSetup(card, 3, 2, 20)
@@ -207,5 +162,5 @@ describe('ae-negative-31-plows', () => {
       save(`D020-N2-${space}`, r)
     }
   })
-  it('D020 N3 decline retains both fields while hand-only and opponent cannot use stock', () => { const card = 'D020_TurnwrestPlow', s = minorSetup(card, 3, 2); advanceOwner(s, buy(s, card)); let r = finish(s, take(s, 'farmland')); assert.equal(r.state.players[0]!.fields.length, 1); assert.equal(getCardStack(r.state.players[0]!, card).length, 2); save('D020-N3-decline', r); const t = setup(card, 14, st => hand(st, card)); r = take(t, 'farmland'); noSource(r, card); r = finish(t, r, true); assert.equal(r.state.players[0]!.fields.length, 1); save('D020-N3-hand', r); const u = minorSetup(card, 3, 2); finish(u, buy(u, card)); next(u); r = take(u, 'farmland'); noSource(r, card); r = finish(u, r, true); assert.equal(r.state.players[1]!.fields.length, 1); assert.equal(getCardStack(r.state.players[0]!, card).length, 2); save('D020-N3-opponent', r); const v = minorSetup(card, 3, 2); advanceOwner(v, buy(v, card)); let partial = plow(v, take(v, 'farmland')); partial = plow(v, accept(v, partial, card)); partial = finish(v, partial); assert.equal(partial.state.players[0]!.fields.length, 2); assert.equal(getCardStack(partial.state.players[0]!, card).length, 1); save('D020-N3-one', partial); })
+  it('D020 N3 decline retains both fields while hand-only and opponent cannot use stock', () => { const card = 'D020_TurnwrestPlow', s = minorSetup(card, 3, 2); advanceOwner(s, buy(s, card)); let r = finish(s, take(s, 'farmland')); assert.equal(r.state.players[0]!.fields.length, 1); assert.equal(getCardStack(r.state.players[0]!, card).length, 2); save('D020-N3-decline', r); const t = setup(card, 14, st => hand(st, card)); r = take(t, 'farmland'); noSource(r, card); r = finish(t, r, true); assert.equal(r.state.players[0]!.fields.length, 1); save('D020-N3-hand', r); const u = minorSetup(card, 3, 2); finish(u, buy(u, card)); next(u); r = take(u, 'farmland'); noSource(r, card); r = finish(u, r, true); assert.equal(r.state.players[1]!.fields.length, 1); assert.equal(getCardStack(r.state.players[0]!, card).length, 2); save('D020-N3-opponent', r); const v = minorSetup(card, 3, 2); advanceOwner(v, buy(v, card)); let partial = plow(v, take(v, 'farmland')); partial = finish(v, partial); assert.equal(partial.state.players[0]!.fields.length, 2); assert.equal(getCardStack(partial.state.players[0]!, card).length, 1); save('D020-N3-one', partial); })
 })

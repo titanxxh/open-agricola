@@ -24,11 +24,10 @@ const listener: CardListenerRegistration = {
   actionSpaces: ['resource-market-4'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || context.space.id !== 'resource-market-4') return
-    const placed = getSpaceUsePersonPlacementOrdinal(context.player, {
-      ...context.actionContext,
-      placedWorkerId: context.actionContext?.placedWorkerId
-        ?? readActionSnapshotExtraData<string>(context.player, 'placedWorkerId'),
-    })
+    const actionContext = context.actionContext ?? (context.actionSpaceUse?.newPlacement
+      ? { placedWorkerId: readActionSnapshotExtraData<string>(context.player, 'placedWorkerId') }
+      : undefined)
+    const placed = getSpaceUsePersonPlacementOrdinal(context.player, actionContext)
     if (placed === undefined) return
     const resource = PLACEMENT_TO_RESOURCE[placed]
     if (!resource) return

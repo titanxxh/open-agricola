@@ -3,19 +3,23 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { getSpaceUsePersonPlacementOrdinal } from '../helpers/round-placement'
+import { readActionSnapshotExtraData } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C091_PlowHero'
 const listener: CardListenerRegistration = {
-  id: 'C91-plow-hero-after-place-farmer',
+  id: 'C91-plow-hero-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const id = context.space?.id
     if (id !== 'farmland' && id !== 'cultivation') return
     // Only triggers for the first farmer placed in the round
-    if (getSpaceUsePersonPlacementOrdinal(context.player, context.actionContext) !== 1) return
+    const actionContext = context.actionContext ?? (context.actionSpaceUse?.newPlacement
+      ? { placedWorkerId: readActionSnapshotExtraData<string>(context.player, 'placedWorkerId') }
+      : undefined)
+    if (getSpaceUsePersonPlacementOrdinal(context.player, actionContext) !== 1) return
     return {
       flow: {
         type: 'seq',

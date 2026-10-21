@@ -8,9 +8,9 @@ const CARD_ID = 'D020_TurnwrestPlow'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
-  id: 'D20-turnwrest-plow-after-place-farmer',
+  id: 'D20-turnwrest-plow-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !TRIGGER_SPACES.has(context.space.id)) return

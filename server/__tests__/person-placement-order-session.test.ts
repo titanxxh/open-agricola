@@ -351,18 +351,18 @@ describe('person placement order after a same-person relocation', () => {
       actionId: space.id,
       actionSpaceUse: { newPlacement: false },
       actionContext: { workerId: '1' },
-      phase: 'after',
+      phase: 'before',
     }, [A018_WheelPlow_impl.listeners[0]!, C091_PlowHero_impl.listeners[0]!]))
     const plowResults = session.withCtx(() => runCardListeners({
       state,
       player,
       space,
       actionId: 'plow',
-      phase: 'after',
+      phase: 'before',
     }, [A018_WheelPlow_impl.listeners[0]!, C091_PlowHero_impl.listeners[0]!]))
 
-    expect(placementResults.map((result) => result.sourceCard)).toEqual(['C091_PlowHero'])
-    expect(plowResults.map((result) => result.sourceCard)).toEqual(['A018_WheelPlow'])
+    expect(placementResults.map((result) => result.sourceCard)).toEqual(['A018_WheelPlow', 'C091_PlowHero'])
+    expect(plowResults.map((result) => result.sourceCard)).toEqual([])
     expect([...placementResults, ...plowResults].every((result) => result.flow !== undefined)).toBe(true)
   })
 })
