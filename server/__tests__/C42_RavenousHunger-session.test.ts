@@ -248,7 +248,7 @@ describe('C042_RavenousHunger', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'immediatelyAfter',
     } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
@@ -273,7 +273,7 @@ describe('C042_RavenousHunger', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'immediatelyAfter',
     } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
@@ -293,7 +293,7 @@ describe('C042_RavenousHunger', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('grain-seeds'),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'immediatelyAfter',
     } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
@@ -311,7 +311,7 @@ describe('C042_RavenousHunger', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('vegetable-seeds'),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'immediatelyAfter',
     } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
@@ -330,7 +330,7 @@ describe('C042_RavenousHunger', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: forest,
-      actionId: 'place-farmer', phase: 'after', sourceCard: CARD_ID,
+      actionId: 'place-farmer', phase: 'immediatelyAfter', sourceCard: CARD_ID,
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
 
@@ -349,7 +349,7 @@ describe('C042_RavenousHunger', () => {
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       actionHooks,
       state, player, space: createSpace('forest', { wood: 3 }),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'immediatelyAfter',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
 

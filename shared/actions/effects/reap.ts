@@ -6,12 +6,12 @@ import { computeHarvestCount } from '../helpers/harvest-count-registry'
 import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
 import {
   defaultReapTrigger,
-  dispatchReapListener,
+  dispatchReapListeners,
   type ReapListenerOptions,
   type ReapTrigger,
 } from '../helpers/reap-listener'
 
-export { dispatchReapListener, type ReapTrigger } from '../helpers/reap-listener'
+export { dispatchReapListeners, type ReapTrigger } from '../helpers/reap-listener'
 
 export type ReapHarvestCount = {
   count: number
@@ -241,12 +241,7 @@ export const reap = (
     }
   }
 
-  for (const crop of ['grain', 'vegetable', 'wood', 'stone'] as const) {
-    const amount = reapedCropAmounts[crop] ?? 0
-    if (amount > 0) {
-      appendReactionFlow(dispatchReapListener(state, player, crop, amount, eventSink, options, actionHooks))
-    }
-  }
+  appendReactionFlow(dispatchReapListeners(state, player, reapedCropAmounts, options, actionHooks))
   for (const ownerCallback of ownerCallbacks) {
     appendReactionFlow(ownerCallback(), ownerReactionChildren)
   }

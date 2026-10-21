@@ -64,7 +64,7 @@ const findListenersByAction = (ruleOwner: SessionRuleOwner | TestCardRegistry, a
     (l) =>
       (l.cardIds ?? []).includes(CARD_ID) &&
       (l.actions ?? []).includes(actionId) &&
-      (l.phases ?? []).includes('immediatelyAfter'),
+      (l.phases ?? []).includes('after'),
   )
   return ruleOwner instanceof TestCardRegistry ? withActiveRegistry(ruleOwner, lookupRule1) : ruleOwner.withCtx(lookupRule1)
 }
@@ -83,7 +83,7 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
       const space = createSpace(action)
       const result = session.withCtx(() => executeCardListener(matched[0]!, {
         state, player, space,
-        actionId: action, phase: 'immediatelyAfter',
+        actionId: action, phase: 'after',
       } as unknown as CardListenerContext))
 
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
@@ -117,7 +117,7 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
       expect(matched.length).toBeGreaterThan(0)
       const result = session.withCtx(() => executeCardListener(matched[0]!, {
         state, player, space: createSpace(action),
-        actionId: action, phase: 'immediatelyAfter',
+        actionId: action, phase: 'after',
       } as unknown as CardListenerContext))
 
       expect(result?.flow).toBeUndefined()

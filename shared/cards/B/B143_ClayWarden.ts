@@ -16,7 +16,7 @@ const listener: CardListenerRegistration = {
   id: 'B143-clay-warden-opponent-hollow',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isHollowSpaceId(context.space?.id)) return

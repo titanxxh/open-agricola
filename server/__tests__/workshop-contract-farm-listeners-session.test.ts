@@ -188,7 +188,7 @@ describe('Workshop Capability Contract farm and round listeners', () => {
     expect(session.cardWarnings).toEqual([])
   })
 
-  it('reacts to reap once for the crop taken from a field at Harvest', () => {
+  it('reacts in both Reap completion phases once per harvested crop', () => {
     const session = start((state) => {
       // Round 4 ends with the first Harvest.
       state.round = 4
@@ -202,8 +202,7 @@ describe('Workshop Capability Contract farm and round listeners', () => {
     expect(state.round).toBe(5)
     expect(state.players[0]!.resources.grain).toBe(1)
     expect(state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
-    // Reaping is dispatched as a single immediatelyAfter call per crop.
-    expect(counters(session)).toEqual({ 'immediatelyAfter:reap': 1 })
+    expect(counters(session)).toEqual({ 'immediatelyAfter:reap': 1, 'after:reap': 1 })
     expect(session.cardWarnings).toEqual([])
   })
 

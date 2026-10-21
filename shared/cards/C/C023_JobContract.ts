@@ -84,7 +84,7 @@ const linkedWorkerIdForCurrentPlacement = (context: CardListenerContext): string
 const listener: CardListenerRegistration = {
   id: 'C23-job-contract-after-day-laborer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'day-laborer') return

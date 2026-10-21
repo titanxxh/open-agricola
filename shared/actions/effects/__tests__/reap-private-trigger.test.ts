@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { internalActionDefinitions } from '../../index'
 import type { GameState, PlayerState, Resource } from '../../../contract/types'
-import * as cardListeners from '../../../cards/card-listeners'
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
 import { makeCardFieldImpl } from '../../../cards/helpers/card-field'
 import '../../../cards/E/E068_CherryOrchard'
 import '../../../cards/E/E072_ArtichokeField'
+
+installOfficialCardRegistry()
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -23,17 +25,13 @@ const emptyResources = (): Resource => ({
 const privateReapContext = { trigger: { phase: 'private-field-phase' } }
 
 describe('reap action private-field-phase trigger', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('reaps ordinary fields with private-field-phase trigger metadata', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
     const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const events: unknown[] = []
     const player = {
       id: 'p1',
+      minorPlayed: [], occupationPlayed: [], improvements: [], cardStates: {},
       resources: emptyResources(),
       fields: [
         { row: 0, col: 0, stacks: [{ kind: 'vegetable' as const, remaining: 1 }] },
@@ -103,7 +101,6 @@ describe('reap action private-field-phase trigger', () => {
   })
 
   it('reaps Card Fields after ordinary fields and returns onReap flow in the same parallel reaction', () => {
-    const listenerSpy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
     const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const events: unknown[] = []
@@ -148,20 +145,6 @@ describe('reap action private-field-phase trigger', () => {
       undefined,
       'card',
     ])
-    expect(listenerSpy.mock.calls.map((call) => call[0].extraData)).toEqual([
-      {
-        crop: 'grain',
-        amount: 1,
-        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
-        sourceCard: 'C072_FestivalPlanning',
-      },
-      {
-        crop: 'wood',
-        amount: 1,
-        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
-        sourceCard: 'C072_FestivalPlanning',
-      },
-    ])
     expect(result).toEqual({
       type: 'flow',
       flow: {
@@ -179,7 +162,6 @@ describe('reap action private-field-phase trigger', () => {
   })
 
   it('reaps only the current player ordinary fields and Card Fields', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
     const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const actor = {
@@ -233,7 +215,6 @@ describe('reap action private-field-phase trigger', () => {
   })
 
   it('passes private-field-phase trigger to Card Field onReap so harvest-only effects can skip', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
     const harvestOnlyCard = 'A999_HarvestOnlyCardField'
     makeCardFieldImpl(harvestOnlyCard, { allowedCrops: ['grain'], capacity: 1 }, {
       onReap: ({ trigger }) =>
@@ -271,7 +252,6 @@ describe('reap action private-field-phase trigger', () => {
   })
 
   it('reaps E72 Artichoke Field in private-field-phase without harvest-only bonus food', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
     const action = internalActionDefinitions.find((entry) => entry.id === 'reap')
     expect(action).toBeDefined()
     const player = {

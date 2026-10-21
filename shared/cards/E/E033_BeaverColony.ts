@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { getFencedStableCount, getPastureStableCount } from '../../domain/pasture'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { playerBoard } from '../../domain'
 import { areRequiredEmptyZoneGroupsSatisfied } from '../../domain/animal-zones'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
@@ -21,7 +21,7 @@ const reedMovedFromActionSpace = (context: CardListenerContext): number => {
 const afterCollectListener: CardListenerRegistration = {
   id: 'E33-beaver-colony-after-collect',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
+  phases: ['after'],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (reedMovedFromActionSpace(context) <= 0) return
@@ -35,7 +35,7 @@ const afterCollectListener: CardListenerRegistration = {
 const afterGainListener: CardListenerRegistration = {
   id: 'E33-beaver-colony-after-gain',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter' as ActionHookPhase],
+  phases: ['after'],
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !REED_ACTION_SPACES.has(context.space.id)) return

@@ -15,7 +15,7 @@ const steamMachineListener: CardListenerRegistration = {
   id: 'C25-steam-machine-space-complete',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, space, state } = context
 

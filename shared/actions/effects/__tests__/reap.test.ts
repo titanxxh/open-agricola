@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { reap } from '../reap'
 import type { DraftGameEvent } from '../../../contract/events'
 import type { GameState, PlayerState, Field } from '../../../contract/types'
-import * as cardListeners from '../../../cards/card-listeners'
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
 import { makeCardFieldImpl } from '../../../cards/helpers/card-field'
 import '../../../cards/B/B068_Beanfield'
 import '../../../cards/D/D075_WoodField'
+
+installOfficialCardRegistry()
 
 const mkState = (): Pick<GameState, 'players'> => ({ players: [] as PlayerState[] })
 
@@ -15,12 +17,7 @@ const mkPlayer = (fields: Field[]): Partial<PlayerState> => ({
 })
 
 describe('reap with stacks', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('harvests top stack only, decrements remaining', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       { stacks: [{ kind: 'grain', remaining: 3 }], row: 0, col: 0 },
     ])
@@ -33,7 +30,6 @@ describe('reap with stacks', () => {
   })
 
   it('records harvested crop details for baseline reap', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       { stacks: [{ kind: 'grain', remaining: 3 }], row: 0, col: 0 },
     ])
@@ -45,7 +41,6 @@ describe('reap with stacks', () => {
   })
 
   it('uses field-scope harvest count to reap multiple crops from one field and keeps field counters distinct from amounts', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       {
         stacks: [
@@ -74,7 +69,6 @@ describe('reap with stacks', () => {
   })
 
   it('continues ordinary harvest count modifiers into the next stack when the top stack is depleted', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const events: DraftGameEvent[] = []
     const p = mkPlayer([
       {
@@ -112,7 +106,6 @@ describe('reap with stacks', () => {
   })
 
   it('does not record fields whose final harvest count is zero', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       { stacks: [{ kind: 'grain', remaining: 2 }], row: 0, col: 0 },
     ])
@@ -129,7 +122,6 @@ describe('reap with stacks', () => {
   })
 
   it('pops empty top stack, exposes buried stack next round', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       {
         stacks: [
@@ -149,7 +141,6 @@ describe('reap with stacks', () => {
   })
 
   it('skips empty fields', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([{ stacks: [], row: 0, col: 0 }])
     const res = reap(mkState(), p)
     expect(res.reapSummary.grainFields).toBe(0)
@@ -157,7 +148,6 @@ describe('reap with stacks', () => {
   })
 
   it('summary counts fields by TOP stack kind', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       {
         stacks: [
@@ -179,14 +169,13 @@ describe('reap with stacks', () => {
   })
 
   it('harvests stone-kind top stack into player.resources.stone', () => {
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       { stacks: [{ kind: 'stone', remaining: 1 }], row: 2, col: 3 },
     ])
-    ;(p.resources as any).stone = 0
+    p.resources!.stone = 0
     const res = reap(mkState(), p)
     expect(res.type).toBe('ok')
-    expect((p.resources as any).stone).toBe(1)
+    expect(p.resources!.stone).toBe(1)
     expect(p.fields![0]!.stacks).toEqual([])
     expect(res.reapSummary.resources.stone).toBe(1)
     expect(res.reapSummary.grainFields).toBe(0)
@@ -194,28 +183,20 @@ describe('reap with stacks', () => {
     expect(res.reapSummary.harvestedPositions).toEqual([{ row: 2, col: 3 }])
   })
 
-  it('dispatches reap listener once per crop kind including stone', () => {
-    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+  it('includes stone and grain in the same harvest summary', () => {
     const p = mkPlayer([
       { stacks: [{ kind: 'grain', remaining: 1 }], row: 0, col: 0 },
       { stacks: [{ kind: 'stone', remaining: 1 }], row: 0, col: 1 },
     ])
-    ;(p.resources as any).stone = 0
-    reap(mkState(), p)
-    const crops = spy.mock.calls.map((c) => (c[0] as { extraData?: { crop?: string } }).extraData?.crop)
-    expect(crops).toContain('grain')
-    expect(crops).toContain('stone')
-    expect(crops).not.toContain('vegetable')
+    p.resources!.stone = 0
+    const result = reap(mkState(), p)
+    expect(result.reapSummary.resources).toEqual({ grain: 1, stone: 1 })
   })
 
-  it('emits crop events and dispatches generic listeners before Card Field owner callbacks', () => {
+  it('emits crop events before building Card Field owner reactions', () => {
     const order: string[] = []
     makeCardFieldImpl('A001_OrderField', { allowedCrops: ['grain'], capacity: 1 }, {
       onReap: () => { order.push('owner') },
-    })
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {
-      order.push('listener')
-      return []
     })
     const player = {
       id: 'p1',
@@ -233,11 +214,10 @@ describe('reap with stacks', () => {
       emitMany: (events) => { order.push(...events.map((event) => event.type)) },
     })
 
-    expect(order).toEqual(['farm.cropRemoved', 'resource.moved', 'listener', 'owner'])
+    expect(order).toEqual(['farm.cropRemoved', 'resource.moved', 'owner'])
   })
 
   it('reaps Farmyard, single-slot, and multi-slot Card Fields through one summary', () => {
-    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
     const events: DraftGameEvent[] = []
     const player = {
       id: 'p1',
@@ -297,10 +277,6 @@ describe('reap with stacks', () => {
     ])
     expect(events.filter((event) => event.type === 'farm.cropRemoved')).toHaveLength(4)
     expect(events.filter((event) => event.type === 'resource.moved')).toHaveLength(4)
-    expect(spy.mock.calls.map((call) => call[0].extraData)).toEqual([
-      expect.objectContaining({ crop: 'grain', amount: 1 }),
-      expect.objectContaining({ crop: 'vegetable', amount: 1 }),
-      expect.objectContaining({ crop: 'wood', amount: 2 }),
-    ])
+
   })
 })
