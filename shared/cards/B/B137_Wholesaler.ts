@@ -47,10 +47,10 @@ const takeRewardFlow = (value: WholesalerData, reward: Parameters<typeof gainLea
 })
 
 export const SPACE_REWARDS = [
-  { listenerId: 'B137-wholesaler-after-vegetable-seeds', spaceId: 'vegetable-seeds', takenKey: 'vegetableTaken', reward: { vegetable: 1 } },
-  { listenerId: 'B137-wholesaler-after-pig-market', spaceId: 'pig-market', takenKey: 'boarTaken', reward: { boar: 1 } },
-  { listenerId: 'B137-wholesaler-after-eastern-quarry', spaceId: 'eastern-quarry', takenKey: 'stoneTaken', reward: { stone: 1 } },
-  { listenerId: 'B137-wholesaler-after-cattle-market', spaceId: 'cattle-market', takenKey: 'cattleTaken', reward: { cattle: 1 } },
+  { listenerId: 'B137-wholesaler-before-vegetable-seeds', spaceId: 'vegetable-seeds', takenKey: 'vegetableTaken', reward: { vegetable: 1 } },
+  { listenerId: 'B137-wholesaler-before-pig-market', spaceId: 'pig-market', takenKey: 'boarTaken', reward: { boar: 1 } },
+  { listenerId: 'B137-wholesaler-before-eastern-quarry', spaceId: 'eastern-quarry', takenKey: 'stoneTaken', reward: { stone: 1 } },
+  { listenerId: 'B137-wholesaler-before-cattle-market', spaceId: 'cattle-market', takenKey: 'cattleTaken', reward: { cattle: 1 } },
 ] as const satisfies readonly WholesalerReward[]
 
 const createSpaceRewardListener = (
@@ -58,8 +58,9 @@ const createSpaceRewardListener = (
 ): CardListenerRegistration => ({
   id: listenerId,
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: [spaceId],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== spaceId) return
     const data = getData(context)

@@ -113,11 +113,11 @@ const invokePure = (
 
 describe('listener purity wave 3', () => {
   it.each([
-    [A046_ClawKnife_impl.listeners, 'A46-claw-knife-after-place-farmer', 'sheep-market', undefined, { count: 2, resources: { food: 1 } }],
-    [B043_Chophouse_impl.listeners, 'B43-chophouse-after-place-farmer', 'grain-seeds', undefined, { count: 3, resources: { food: 1 } }],
-    [B047_HerringPot_impl.listeners, 'B47-herring-pot-after-place-farmer', 'fishing', undefined, { count: 3, resources: { food: 1 } }],
+    [A046_ClawKnife_impl.listeners, 'A46-claw-knife-before-space-use', 'sheep-market', undefined, { count: 2, resources: { food: 1 } }],
+    [B043_Chophouse_impl.listeners, 'B43-chophouse-before-space-use', 'grain-seeds', undefined, { count: 3, resources: { food: 1 } }],
+    [B047_HerringPot_impl.listeners, 'B47-herring-pot-before-space-use', 'fishing', undefined, { count: 3, resources: { food: 1 } }],
     [C043_FarmBuilding_impl.listeners, 'C43-farm-building-after-improvement', 'test-space', 'major:Major_Fireplace1', { count: 3, resources: { food: 1 } }],
-    [C045_Stew_impl.listeners, 'C45-stew-after-place-farmer', 'day-laborer', undefined, { count: 4, resources: { food: 1 } }],
+    [C045_Stew_impl.listeners, 'C45-stew-before-space-use', 'day-laborer', undefined, { count: 4, resources: { food: 1 } }],
     [D111_InteriorDecorator_impl.listeners, 'D111-interior-decorator-after-renovation', 'test-space', undefined, { count: 6, resources: { food: 1 } }],
   ])('%s returns an inline future-meeples request without mutating', (registrations, id, spaceId, choice, expected) => {
     const p = player()

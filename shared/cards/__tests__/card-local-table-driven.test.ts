@@ -111,10 +111,10 @@ describe('card-local table-driven flows', () => {
   it('B137 Wholesaler exports the action-space reward table used by generated listeners', () => {
     const table = (B137Module as unknown as { SPACE_REWARDS?: readonly SpaceReward[] }).SPACE_REWARDS
     expect(table).toEqual([
-      { listenerId: 'B137-wholesaler-after-vegetable-seeds', spaceId: 'vegetable-seeds', takenKey: 'vegetableTaken', reward: { vegetable: 1 } },
-      { listenerId: 'B137-wholesaler-after-pig-market', spaceId: 'pig-market', takenKey: 'boarTaken', reward: { boar: 1 } },
-      { listenerId: 'B137-wholesaler-after-eastern-quarry', spaceId: 'eastern-quarry', takenKey: 'stoneTaken', reward: { stone: 1 } },
-      { listenerId: 'B137-wholesaler-after-cattle-market', spaceId: 'cattle-market', takenKey: 'cattleTaken', reward: { cattle: 1 } },
+      { listenerId: 'B137-wholesaler-before-vegetable-seeds', spaceId: 'vegetable-seeds', takenKey: 'vegetableTaken', reward: { vegetable: 1 } },
+      { listenerId: 'B137-wholesaler-before-pig-market', spaceId: 'pig-market', takenKey: 'boarTaken', reward: { boar: 1 } },
+      { listenerId: 'B137-wholesaler-before-eastern-quarry', spaceId: 'eastern-quarry', takenKey: 'stoneTaken', reward: { stone: 1 } },
+      { listenerId: 'B137-wholesaler-before-cattle-market', spaceId: 'cattle-market', takenKey: 'cattleTaken', reward: { cattle: 1 } },
     ])
     expect(B137_Wholesaler_impl.listeners?.map((listener) => listener.id)).toEqual(table!.map((entry) => entry.listenerId))
 

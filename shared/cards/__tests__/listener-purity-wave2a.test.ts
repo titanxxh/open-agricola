@@ -656,7 +656,7 @@ describe('listener purity wave 2a', () => {
 
     const result = listenerById(
       B137_Wholesaler_impl.listeners,
-      'B137-wholesaler-after-vegetable-seeds',
+      'B137-wholesaler-before-vegetable-seeds',
     ).handler(ctx)
 
     expectCardStatesUnchanged(p, before, 'B137 owner')

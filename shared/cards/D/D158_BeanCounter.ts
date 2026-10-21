@@ -12,10 +12,11 @@ const CARD_ID = 'D158_BeanCounter'
  * place 1 food on this card. When it reaches 3, gain them.
  */
 const listener: CardListenerRegistration = {
-  id: 'D158-bean-counter-place-farmer',
+  id: 'D158-bean-counter-before-space-use',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  mandatory: true,
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const slot = context.space ? getRoundActionSlot(context.state, context.space.id) : null
     if (!slot || slot.roundNumber > 8) return

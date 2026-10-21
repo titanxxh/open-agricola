@@ -15,10 +15,11 @@ const TRIGGER_ROUND_MAP: Record<number, number> = {
 }
 
 const listener: CardListenerRegistration = {
-  id: 'B112-silokeeper-after-place-farmer',
+  id: 'B112-silokeeper-before-space-use',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const currentRound = context.state.round
     const triggerRevealRound = TRIGGER_ROUND_MAP[currentRound] ?? -1
