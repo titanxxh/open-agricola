@@ -7,10 +7,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'M077_DryingField'
 
 const listener: CardListenerRegistration = {
-  id: 'M077-drying-field-after-cut-peat',
+  id: 'M077-drying-field-before-cut-peat',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['moor-action'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'cut-peat') return
     const round = context.state.round + 3

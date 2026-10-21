@@ -9,10 +9,11 @@ import { allImprovementCount } from './moor-batch1-helpers'
 const CARD_ID = 'M121_Loam'
 
 const listener: CardListenerRegistration = {
-  id: 'M121-loam-after-hiring-fair',
+  id: 'M121-loam-before-hiring-fair',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['moor-action'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'hiring-fair') return
     const player = context.ownerPlayer ?? context.player

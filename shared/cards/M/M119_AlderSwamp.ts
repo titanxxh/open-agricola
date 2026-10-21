@@ -8,10 +8,11 @@ import { allImprovementCount } from './moor-batch1-helpers'
 const CARD_ID = 'M119_AlderSwamp'
 
 const listener: CardListenerRegistration = {
-  id: 'M119-alder-swamp-after-fell-trees',
+  id: 'M119-alder-swamp-before-fell-trees',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['moor-action'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'fell-trees') return
     return {

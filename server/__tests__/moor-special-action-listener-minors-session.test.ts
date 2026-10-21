@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorkSession } from './_helpers/session-fixtures'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { gainAction } from '../../shared/actions/effects/gain'
 
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -9,7 +9,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import type { ActionFlow, ActionSpace, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionChoiceOption, ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { M116_MoorBirchTrees } from '../../shared/cards/M/M116_MoorBirchTrees'
 import { M121_Loam } from '../../shared/cards/M/M121_Loam'
 import { M122_WillowBank } from '../../shared/cards/M/M122_WillowBank'
@@ -483,4 +483,250 @@ describe('FoM special action listener minors', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
   })
+})
+
+describe('Moor Special Action extra benefits resolve before the action (#1334)', () => {
+  const TERRAIN_CARD = 'moor-special-1-2-terrain'
+  const MARKET_CARD = 'moor-special-1-2-market-work'
+  const MOOR_TILE = { row: 2, col: 0 }
+  const FOREST_TILE = { row: 0, col: 0 }
+
+  const beforeSession = (cards: string[], configure?: (state: GameState) => void) => {
+    const session = createWorkSession({ seed: 1293, options: {
+      playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    }, configure: state => {
+      state.round = 8
+      state.currentPlayerIndex = 0
+      for (const space of state.actionSpaces) space.takenBy = []
+      for (const player of state.players) {
+        player.resources = baseResources()
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.improvements = []
+        player.cardStates = {}
+        player.rooms = 2
+        player.roomTiles = [{ row: 2, col: 3 }, { row: 2, col: 4 }]
+        player.farmTerrain = [{ ...FOREST_TILE, kind: 'forest' }, { ...MOOR_TILE, kind: 'moor' }]
+        player.fields = []
+        player.pastures = []
+        player.stableTiles = []
+        setWorkersAtHome(state, player, 2)
+      }
+      state.players[0]!.minorPlayed = [...cards]
+      configure?.(state)
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  const special = (session: GameSession, actionId: 'cut-peat' | 'fell-trees' | 'hiring-fair') => {
+    const response = actionId === 'hiring-fair'
+      ? session.takeSpecialAction(0, MARKET_CARD, actionId)
+      : session.takeSpecialAction(0, TERRAIN_CARD, actionId, { tile: actionId === 'cut-peat' ? MOOR_TILE : FOREST_TILE })
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  const cardEventIndex = (state: GameState, cardId: string, type: 'resource.moved' | 'resource.paid' | 'futureMeeple.queued' = 'resource.moved') =>
+    state.events.findIndex(event => event.type === type && event.sourceCardId === cardId)
+  const terrainIndex = (state: GameState, actionId: 'cut-peat' | 'fell-trees') =>
+    state.events.findIndex(event => event.type === 'farm.terrainChanged' && event.sourceActionId === actionId)
+  const hasTile = (player: PlayerState, tile: { row: number; col: number }) =>
+    (player.farmTerrain ?? []).some(entry => entry.row === tile.row && entry.col === tile.col)
+  const choose = (session: GameSession, response: SessionResponse, predicate: (option: ActionChoiceOption) => boolean) => {
+    const option = response.interaction.stateId === 'wait' ? response.interaction.request.options?.find(predicate) : undefined
+    expect(option, JSON.stringify(response.interaction)).toBeDefined()
+    const next = session.resolveChoice(0, option!.value)
+    expect(next.ok, next.error).toBe(true)
+    return next
+  }
+
+  it('M127 grants its building resource before Cut Peat clears the moor; its four-goods clause stays after', () => {
+    const session = beforeSession(['M127_Wheelbarrow'])
+    let response = special(session, 'cut-peat')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'M127_Wheelbarrow', request: { kind: 'choice' } })
+    expect(response.state.players[0]!.resources.fuel).toBe(0)
+    expect(hasTile(response.state.players[0]!, MOOR_TILE)).toBe(true)
+    expect(terrainIndex(response.state, 'cut-peat')).toBe(-1)
+
+    response = choose(session, response, option => option.effectPreview?.resourcesGained?.stone === 1)
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, fuel: 3 })
+    expect(hasTile(response.state.players[0]!, MOOR_TILE)).toBe(false)
+    expect(cardEventIndex(response.state, 'M127_Wheelbarrow')).toBeGreaterThanOrEqual(0)
+    expect(cardEventIndex(response.state, 'M127_Wheelbarrow')).toBeLessThan(terrainIndex(response.state, 'cut-peat'))
+    expect(response.state.players[1]!.resources).toMatchObject({ stone: 0, fuel: 0 })
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+
+    const fell = special(beforeSession(['M127_Wheelbarrow']), 'fell-trees')
+    expect(fell.interaction.request.kind).toBe('confirm-next-player')
+    expect(fell.state.players[0]!.resources).toMatchObject({ wood: 2, fuel: 0, stone: 0 })
+    expect(cardEventIndex(fell.state, 'M127_Wheelbarrow')).toBe(-1)
+
+    const collect = beforeSession(['M127_Wheelbarrow'], state => {
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 4
+    })
+    const collected = collect.takeAction(0, 'forest')
+    expect(collected.ok, collected.error).toBe(true)
+    expect(collected.state.players[0]!.resources).toMatchObject({ wood: 4, fuel: 1 })
+    const taken = collected.state.events.findIndex(event => event.type === 'resource.moved' && event.from.kind === 'actionSpace' && event.from.spaceId === 'forest')
+    expect(taken).toBeGreaterThanOrEqual(0)
+    expect(cardEventIndex(collected.state, 'M127_Wheelbarrow')).toBeGreaterThan(taken)
+  }, 30_000)
+
+  it('M118 pays for its Fell Trees upgrade before the forest is felled; its four-wood clause stays after', () => {
+    const session = beforeSession(['M118_TimberMill'], state => { state.players[0]!.resources.fuel = 1 })
+    let response = special(session, 'fell-trees')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'M118_TimberMill' })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, fuel: 1 })
+    expect(hasTile(response.state.players[0]!, FOREST_TILE)).toBe(true)
+    expect(terrainIndex(response.state, 'fell-trees')).toBe(-1)
+
+    response = choose(session, response, option => option.effectPreview?.resourcesGained?.wood === 2)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, fuel: 0 })
+    expect(hasTile(response.state.players[0]!, FOREST_TILE)).toBe(false)
+    const felled = terrainIndex(response.state, 'fell-trees')
+    expect(cardEventIndex(response.state, 'M118_TimberMill', 'resource.paid')).toBeGreaterThanOrEqual(0)
+    expect(cardEventIndex(response.state, 'M118_TimberMill', 'resource.paid')).toBeLessThan(felled)
+    expect(cardEventIndex(response.state, 'M118_TimberMill')).toBeLessThan(felled)
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+
+    const peat = special(beforeSession(['M118_TimberMill'], state => { state.players[0]!.resources.fuel = 1 }), 'cut-peat')
+    expect(peat.interaction.request.kind).toBe('confirm-next-player')
+    expect(peat.state.players[0]!.resources).toMatchObject({ wood: 0, fuel: 4 })
+    expect(cardEventIndex(peat.state, 'M118_TimberMill')).toBe(-1)
+
+    const collect = beforeSession(['M118_TimberMill'], state => {
+      state.players[0]!.resources.fuel = 1
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 4
+    })
+    let collected = collect.takeAction(0, 'forest')
+    expect(collected.ok, collected.error).toBe(true)
+    expect(collected.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'M118_TimberMill' })
+    expect(collected.state.players[0]!.resources).toMatchObject({ wood: 4, fuel: 1 })
+    collected = choose(collect, collected, option => option.effectPreview?.resourcesGained?.wood === 1)
+    expect(collected.state.players[0]!.resources).toMatchObject({ wood: 5, fuel: 1 })
+  }, 30_000)
+
+  it('M119 and M118 both resolve before Fell Trees in the owner\'s order, without Pass', () => {
+    const session = beforeSession(['M118_TimberMill', 'M119_AlderSwamp', 'M127_Wheelbarrow'])
+    let response = special(session, 'fell-trees')
+    expect(response.interaction.request.kind).toBe('select-trigger')
+    const options = response.interaction.request.options ?? []
+    expect(options.filter(option => option.sourceCard).map(option => option.sourceCard).sort()).toEqual(['M118_TimberMill', 'M119_AlderSwamp'])
+    expect(options.find(option => option.value === '__pass__')?.disabled).toBe(true)
+    expect(hasTile(response.state.players[0]!, FOREST_TILE)).toBe(true)
+
+    response = choose(session, response, option => option.sourceCard === 'M119_AlderSwamp')
+    expect(response.interaction.sourceCard).toBe('M119_AlderSwamp')
+    response = choose(session, response, option => option.effectPreview?.resourcesGained?.reed === 1)
+    response = resolveTriggerIfPresent(session, response, 'M118_TimberMill')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, reed: 1, fuel: 0 })
+    const alder = cardEventIndex(response.state, 'M119_AlderSwamp')
+    const timber = cardEventIndex(response.state, 'M118_TimberMill')
+    expect(alder).toBeGreaterThanOrEqual(0)
+    expect(timber).toBeGreaterThan(alder)
+    expect(terrainIndex(response.state, 'fell-trees')).toBeGreaterThan(timber)
+    expect(cardEventIndex(response.state, 'M127_Wheelbarrow')).toBe(-1)
+  }, 30_000)
+
+  it('M109 turns grain into food before a borrowed Cut Peat pays its food', () => {
+    const borrowed = (grain: number) => beforeSession(['M109_Malthouse'], state => {
+      Object.assign(state.players[0]!.resources, { food: 2, grain })
+      state.farmersOfTheMoor!.specialActionCards.find(card => card.id === TERRAIN_CARD)!.location = { kind: 'playerFaceUp', playerId: state.players[1]!.id }
+    })
+    const session = borrowed(1)
+    let response = special(session, 'cut-peat')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'M109_Malthouse' })
+    expect(response.interaction.request.options?.some(option => option.value === '__skip__')).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, grain: 1, fuel: 0 })
+    expect(hasTile(response.state.players[0]!, MOOR_TILE)).toBe(true)
+
+    response = choose(session, response, option => option.value !== '__skip__')
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 4, grain: 0, fuel: 3 })
+    expect(response.state.farmersOfTheMoor!.specialActionCards.find(card => card.id === TERRAIN_CARD)!.location)
+      .toEqual({ kind: 'playerFaceDown', playerId: response.state.players[0]!.id })
+    const malt = cardEventIndex(response.state, 'M109_Malthouse')
+    const fee = response.state.events.findIndex(event => event.type === 'resource.paid' && event.sourceActionId === 'cut-peat')
+    expect(malt).toBeGreaterThanOrEqual(0)
+    expect(terrainIndex(response.state, 'cut-peat')).toBeGreaterThan(malt)
+    expect(fee).toBeGreaterThan(terrainIndex(response.state, 'cut-peat'))
+    expect(response.state.events[fee]).toMatchObject({ resources: { food: 2 } })
+
+    const noGrain = special(borrowed(0), 'cut-peat')
+    expect(noGrain.interaction.request.kind).toBe('confirm-next-player')
+    expect(noGrain.state.players[0]!.resources).toMatchObject({ food: 0, fuel: 3 })
+    const hiring = special(beforeSession(['M109_Malthouse'], state => { state.players[0]!.resources.grain = 1 }), 'hiring-fair')
+    expect(hiring.interaction.request.kind).toBe('confirm-next-player')
+    expect(hiring.state.players[0]!.resources).toMatchObject({ food: 1, grain: 1 })
+    expect(cardEventIndex(hiring.state, 'M109_Malthouse')).toBe(-1)
+  }, 30_000)
+
+  it('M048 and M077 queue their future goods before Cut Peat clears the moor', () => {
+    const cards = ['M048_ForestSwamp', 'M077_DryingField']
+    const session = beforeSession(cards)
+    let response = special(session, 'cut-peat')
+    expect(response.interaction.request.kind).toBe('select-trigger')
+    const options = response.interaction.request.options ?? []
+    expect(options.filter(option => option.sourceCard).map(option => option.sourceCard).sort()).toEqual(cards)
+    expect(options.find(option => option.value === '__pass__')?.disabled).toBe(true)
+    expect(hasTile(response.state.players[0]!, MOOR_TILE)).toBe(true)
+    expect(response.state.futureMeeples).toEqual([])
+
+    response = resolveTriggerIfPresent(session, response, 'M077_DryingField')
+    response = resolveTriggerIfPresent(session, response, 'M048_ForestSwamp')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources.fuel).toBe(3)
+    expect(response.state.futureMeeples).toEqual(expect.arrayContaining([
+      expect.objectContaining({ cardId: 'M048_ForestSwamp', playerId: 'p1', round: 12, resources: { forest: 1 } }),
+      expect.objectContaining({ cardId: 'M077_DryingField', playerId: 'p1', round: 11, resources: { fuel: 2 } }),
+    ]))
+    const peat = terrainIndex(response.state, 'cut-peat')
+    for (const cardId of cards) {
+      expect(cardEventIndex(response.state, cardId, 'futureMeeple.queued')).toBeGreaterThanOrEqual(0)
+      expect(cardEventIndex(response.state, cardId, 'futureMeeple.queued')).toBeLessThan(peat)
+    }
+
+    const fell = special(beforeSession(cards), 'fell-trees')
+    expect(fell.interaction.request.kind).toBe('confirm-next-player')
+    expect(fell.state.futureMeeples).toEqual([])
+  }, 30_000)
+
+  it('M121 and M123 give their Hiring Fair goods before the Hiring Fair food', () => {
+    const cards = ['M121_Loam', 'M123_StoneQuarry']
+    const hiringSession = (usage: number, atHome: number) => beforeSession(cards, state => {
+      state.players[0]!.cardStates = { M123_StoneQuarry: { counters: { usage } } }
+      setWorkersAtHome(state, state.players[0]!, atHome)
+    })
+    const session = hiringSession(5, 1)
+    let response = special(session, 'hiring-fair')
+    expect(response.interaction.request.kind).toBe('select-trigger')
+    const options = response.interaction.request.options ?? []
+    expect(options.filter(option => option.sourceCard).map(option => option.sourceCard).sort()).toEqual(cards)
+    expect(options.find(option => option.value === '__pass__')?.disabled).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+
+    response = resolveTriggerIfPresent(session, response, 'M123_StoneQuarry')
+    response = resolveTriggerIfPresent(session, response, 'M121_Loam')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, stone: 1, food: 1 })
+    expect(counter(response.state.players[0]!, 'M123_StoneQuarry')).toBe(4)
+    const hiringFood = response.state.events.findIndex(event => event.type === 'resource.moved' && event.sourceActionId === 'hiring-fair')
+    for (const cardId of cards) {
+      expect(cardEventIndex(response.state, cardId)).toBeGreaterThanOrEqual(0)
+      expect(cardEventIndex(response.state, cardId)).toBeLessThan(hiringFood)
+    }
+
+    const idle = special(hiringSession(0, 2), 'hiring-fair')
+    expect(idle.interaction.request.kind).toBe('confirm-next-player')
+    expect(idle.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 0, food: 1 })
+    const peat = special(hiringSession(5, 1), 'cut-peat')
+    expect(peat.interaction.request.kind).toBe('confirm-next-player')
+    expect(peat.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 0, fuel: 3 })
+    expect(counter(peat.state.players[0]!, 'M123_StoneQuarry')).toBe(5)
+  }, 30_000)
 })

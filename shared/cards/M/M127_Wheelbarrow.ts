@@ -22,22 +22,32 @@ const tookFourMatchingBuildingResources = (context: CardListenerContext) =>
     sumActionSpaceMovedToTriggerPlayerFromSpace(context, resource) >= 4,
   )
 
-const listener: CardListenerRegistration = {
-  id: 'M127-wheelbarrow-after-building-resources',
+const cutPeatListener: CardListenerRegistration = {
+  id: 'M127-wheelbarrow-before-cut-peat',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
+  actions: ['moor-action'],
+  mandatory: true,
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.moorAction?.actionId !== 'cut-peat') return
+    return { flow: cutPeatFlow, sourceCard: CARD_ID }
+  },
+}
+
+const collectListener: CardListenerRegistration = {
+  id: 'M127-wheelbarrow-after-collect',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['moor-action', 'collect'],
+  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.moorAction?.actionId === 'cut-peat') return { flow: cutPeatFlow, sourceCard: CARD_ID }
-    if (context.actionId === 'collect' && tookFourMatchingBuildingResources(context)) {
-      return { flow: gainLeaf(CARD_ID, { fuel: 1 }), sourceCard: CARD_ID }
-    }
+    if (!tookFourMatchingBuildingResources(context)) return
+    return { flow: gainLeaf(CARD_ID, { fuel: 1 }), sourceCard: CARD_ID }
   },
 }
 
 const cardImpl = {
   prerequisiteCheck: (player) => majorImprovementCount(player) >= 1,
-  listeners: [listener],
+  listeners: [cutPeatListener, collectListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

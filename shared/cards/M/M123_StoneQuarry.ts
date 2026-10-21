@@ -8,10 +8,11 @@ import { initUsageCounters, setUsageCounterLeaf, usageCounters } from './moor-ba
 const CARD_ID = 'M123_StoneQuarry'
 
 const listener: CardListenerRegistration = {
-  id: 'M123-stone-quarry-after-hiring-fair',
+  id: 'M123-stone-quarry-before-hiring-fair',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['moor-action'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'hiring-fair') return
     const player = context.ownerPlayer ?? context.player
