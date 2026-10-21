@@ -134,7 +134,7 @@ describe('5+ occupied category listener cards', () => {
     const owner = state.players[0]!
     recordRoundPlacement(owner, 'forest', 'extra-forest-use')
     const forest = state.actionSpaces.find((space) => space.id === 'forest')!
-    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'D176-woodshacker-after-wood')!
+    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'D176-woodshacker-before-wood')!
     const result = session.withCtx(() => executeCardListener(listener, {
       state,
       player: owner,
@@ -142,7 +142,7 @@ describe('5+ occupied category listener cards', () => {
       triggerPlayer: owner,
       space: forest,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result?.flow).toMatchObject({

@@ -7,11 +7,12 @@ import { storedFoodCashoutListener, storeFoodOnCardFlow } from '../helpers/store
 
 const CARD_ID = 'B173_Sweeper'
 
-const afterMeepleSpaceListener: CardListenerRegistration = {
-  id: 'B173-sweeper-after-meeple-space',
+const beforeMeepleSpaceListener: CardListenerRegistration = {
+  id: 'B173-sweeper-before-meeple-space',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  mandatory: true,
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isMeepleSymbolSpaceId(context.space?.id)) return
     const flow = storeFoodOnCardFlow(context.player, CARD_ID)
@@ -22,7 +23,7 @@ const afterMeepleSpaceListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [
-    afterMeepleSpaceListener,
+    beforeMeepleSpaceListener,
     storedFoodCashoutListener(CARD_ID, 'B173-sweeper-cashout'),
   ],
   reaches: [] as readonly string[],

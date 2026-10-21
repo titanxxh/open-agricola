@@ -11,7 +11,7 @@ import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-regis
 import '../../shared/cards/A/A113_HeresyTeacher'
 
 const CARD_ID = 'A113_HeresyTeacher'
-const LISTENER_ID = 'A113-heresy-teacher-after-lessons'
+const LISTENER_ID = 'A113-heresy-teacher-before-lessons'
 
 type FieldSeed = Field
 
@@ -71,7 +71,7 @@ const fireListener = (
     player: s.players[0]!,
     space,
     actionId: 'place-farmer',
-    phase: 'after',
+    phase: 'before',
   } as unknown as CardListenerContext))
   if (result?.flow?.type === 'leaf') {
     session.withCtx(() => getAdHocAction(result.flow.actionId)?.execute({

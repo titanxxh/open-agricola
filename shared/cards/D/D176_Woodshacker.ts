@@ -12,10 +12,11 @@ const ownerWoodUsesThisRound = (context: CardListenerContext) =>
   getRoundPlacementDetails(context.player).filter((entry) => isWoodAccumulationSpaceId(entry.spaceId)).length
 
 const listener: CardListenerRegistration = {
-  id: 'D176-woodshacker-after-wood',
+  id: 'D176-woodshacker-before-wood',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
     const count = ownerWoodUsesThisRound(context)

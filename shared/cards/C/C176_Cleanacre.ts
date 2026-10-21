@@ -7,10 +7,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C176_Cleanacre'
 const CLEANACRE_SPACES = new Set(['farmland', 'cultivation', 'farm-supplies-6'])
 const listener: CardListenerRegistration = {
-  id: 'C176-cleanacre-after-action-space',
+  id: 'C176-cleanacre-before-action-space',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  mandatory: true,
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!CLEANACRE_SPACES.has(context.space?.id ?? '')) return
     return { flow: gainLeaf(CARD_ID, { clay: 2 }), sourceCard: CARD_ID }

@@ -7,10 +7,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'A179_MountainShepherd'
 const QUARRY_SPACES = new Set(['eastern-quarry', 'western-quarry'])
 const listener: CardListenerRegistration = {
-  id: 'A179-mountain-shepherd-after-quarry',
+  id: 'A179-mountain-shepherd-before-quarry',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  mandatory: true,
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!QUARRY_SPACES.has(context.space?.id ?? '')) return
     return { flow: gainLeaf(CARD_ID, { sheep: 1 }), sourceCard: CARD_ID }

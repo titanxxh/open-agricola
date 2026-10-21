@@ -45,12 +45,14 @@ describe('OA-only base card printed-rule audit', () => {
   it.each([[2, 'lessons'], [3, 'lessons-3'], [4, 'lessons-4'], [5, 'lessons-56-variable'], [6, 'lessons-56-2f']] as const)(
     'A113 inserts vegetables through a real occupation action in a %i-player game on %s', (players, space) => {
       const session = setup(players)
-      session.state.players[0]!.occupationHand = ['A113_HeresyTeacher']
+      session.state.players[0]!.occupationPlayed = ['A113_HeresyTeacher']
+      session.state.players[0]!.occupationHand = ['A100_Curator']
       session.state.players[0]!.fields = [
         { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
         { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
         { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }, { kind: 'grain', remaining: 4 }] },
       ]
+      session.loadState(session.state)
       const response = session.takeAction(0, space)
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.occupationPlayed).toContain('A113_HeresyTeacher')
@@ -77,8 +79,10 @@ describe('OA-only base card printed-rule audit', () => {
 
   it('A113 harvests the grain before the buried vegetable through four real harvests', () => {
     const session = setup()
-    session.state.players[0]!.occupationHand = ['A113_HeresyTeacher']
+    session.state.players[0]!.occupationPlayed = ['A113_HeresyTeacher']
+    session.state.players[0]!.occupationHand = ['A100_Curator']
     session.state.players[0]!.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] }]
+    session.loadState(session.state)
     expect(session.takeAction(0, 'lessons').ok).toBe(true)
     for (const [index, round] of [4, 7, 9, 11].entries()) {
       const response = harvest(session, round)

@@ -653,13 +653,17 @@ describe('Agricola 5-6 simple occupation cards', () => {
   })
 
   it.each(['western-quarry', 'eastern-quarry'])(
-    'A179 Mountain Shepherd gives sheep after using %s',
+    'A179 Mountain Shepherd gives sheep before using %s',
     (spaceId) => {
       const session = setupActionRewardSession('A179_MountainShepherd', 6)
       setActionSpaceResources(session, spaceId, { stone: 1 })
 
-      const resp = session.takeAction(0, spaceId)
+      let resp = session.takeAction(0, spaceId)
       expect(resp.ok).toBe(true)
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
+        resp = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
+        expect(resp.ok, resp.error).toBe(true)
+      }
 
       expect(resp.state.players[0]!.resources.stone).toBe(1)
       expect(resp.state.players[0]!.resources.sheep).toBe(1)
