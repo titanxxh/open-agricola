@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
@@ -113,10 +113,30 @@ describe('C164_GermanHeathKeeper session', () => {
 describe('ae-negative-57-livestock', () => {
   const { sessions, ok, save, make, pasture, finish, count, collect } = audit57Livestock
   afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const collectKeeper = (session: GameSession, actor: number): SessionResponse => {
+    let response = ok(session.takeAction(actor, 'pig-market'))
+    for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step++) {
+      const interaction = response.interaction
+      if (interaction.request.kind === 'confirm-player-switch') {
+        response = ok(session.resolveChoice(interaction.request.fromPlayerIndex, 'confirm'))
+      } else if (interaction.request.kind === 'animal-reorg') {
+        const player = response.state.players[interaction.playerIndex]!
+        const house = interaction.request.zones.find(zone => zone.zoneType === 'house')
+        const zones = interaction.request.zones.map(zone => ({
+          ...zone,
+          animalType: zone.zoneType === 'pasture' && player.resources.boar > 0 ? 'boar' as const
+            : zone.id === house?.id && player.resources.sheep > 0 ? 'sheep' as const : null,
+          animalCount: zone.zoneType === 'pasture' ? player.resources.boar : zone.id === house?.id ? player.resources.sheep : 0,
+        }))
+        response = ok(session.resolveChoice(interaction.playerIndex, 'confirm', { zones }))
+      } else return finish(session, response)
+    }
+    return finish(session, response)
+  }
   it('C164 N1 real owner or opponent Pig Market grants exactly one owner sheep while retaining the physical pig pile', () => {
     for (const actor of [0, 1]) {
       const session = make('C164_GermanHeathKeeper', state => { state.currentPlayerIndex = actor; pasture(state.players[actor]!); state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 2 }, true, 14)
-      const response = collect(session, actor, 'pig-market')
+      const response = collectKeeper(session, actor)
       assert.equal(response.state.players[0]!.resources.sheep, 1)
       assert.equal(response.state.players[actor]!.resources.boar, 2)
       assert.equal(response.state.players[actor === 0 ? 1 : 0]!.resources.boar, 0)
@@ -132,7 +152,7 @@ describe('ae-negative-57-livestock', () => {
     save('C164-N2', { handResponse, response })
   })
   it('C164 N3 whole owner Pig Market undo restores sheep pigs original pile and occupancy before one replay', () => {
-    const session = make('C164_GermanHeathKeeper', state => { pasture(state.players[0]!); state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 2 }, true, 14), response = collect(session, 0, 'pig-market'), undone = ok(session.undoAction()), replay = collect(session, 0, 'pig-market')
+    const session = make('C164_GermanHeathKeeper', state => { pasture(state.players[0]!); state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 2 }, true, 14), response = collectKeeper(session, 0), undone = ok(session.undoAction()), replay = collectKeeper(session, 0)
     assert.deepEqual(count(undone), [0, 0, 0]); assert.equal(undone.state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar, 2); assert.equal(undone.state.actionSpaces.find(space => space.id === 'pig-market')!.takenBy.length, 0); assert.deepEqual(count(replay), [1, 2, 0])
     save('C164-N3', { response, undone, replay })
   })

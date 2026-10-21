@@ -21,7 +21,7 @@ const listener: CardListenerRegistration = {
   id: 'E160-kelp-gatherer-opponent-fishing',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
@@ -29,6 +29,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'seq',
+        targetPlayerId: context.ownerPlayer?.id ?? context.player.id,
         children: [
           {
             type: 'leaf',

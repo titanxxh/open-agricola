@@ -15,15 +15,15 @@ const listener: CardListenerRegistration = {
   id: 'A50-milk-jug-any-cattle-market',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'cattle-market') return
     // Owner always gets 3 food; every other player gets 1 food.
-    // The flow executes in the context of the owner (PlayerSwitch handles this).
     return {
       flow: {
         type: 'seq',
+        targetPlayerId: context.ownerPlayer?.id ?? context.player.id,
         children: [
           gainLeaf(CARD_ID, { food: 3 }),
           {

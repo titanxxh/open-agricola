@@ -9,11 +9,11 @@ const listener: CardListenerRegistration = {
   id: 'C141-sheep-provider-any-sheep-market',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'sheep-market') return
-    return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
+    return { flow: { ...gainLeaf(CARD_ID, { grain: 1 }), targetPlayerId: context.ownerPlayer?.id ?? context.player.id }, sourceCard: CARD_ID }
   },
 }
 

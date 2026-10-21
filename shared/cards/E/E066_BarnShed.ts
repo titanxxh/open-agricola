@@ -10,10 +10,20 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   actionSpaces: 'all',
   phases: ['after'],
-  scope: 'any',
+  scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'forest') return
-    if (context.state.players.length > 1 && context.triggerPlayer?.id === context.ownerPlayer?.id) return
+    return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
+  },
+}
+
+const soloListener: CardListenerRegistration = {
+  id: 'E66-barn-shed-solo-forest',
+  cardIds: [CARD_ID],
+  actionSpaces: ['forest'],
+  phases: ['before'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.state.players.length !== 1) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -33,7 +43,7 @@ export const E066_BarnShed = defineMinorCard({
     occupationPrerequisites: { min: 3 },
   },
   impl: {
-    listeners: [listener],
+    listeners: [listener, soloListener],
     reaches: [] as readonly string[],
   },
 })
