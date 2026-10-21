@@ -208,7 +208,7 @@ export const takeAction = (
     reason: 'top-level',
   })
 
-  const beforeFlows = collectBeforePlacementFlows(core.actionHooks, state, player, space)
+  const beforeFlows = collectBeforePlacementFlows(core.actionHooks, state, player, space, { targetSpaceId: space.id, placedWorkerId: worker.id })
   if (beforeFlows.length > 0) {
     core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { actionHooks: core.actionHooks, state, player, space })
     core.flushEngineLogPublic()

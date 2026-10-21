@@ -1,5 +1,7 @@
 import { actionSpaceQueryContext } from './space-use-nodes'
 import { inheritPrimaryBody } from './primary-body-nodes'
+import { inheritSpaceEffectSource } from './effect-source'
+import { settleHostReactions } from './reaction-settlement'
 import { captureSpaceUseEvents } from './space-use-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext } from '../actions/flow'
 import type {
@@ -443,7 +445,7 @@ export function engineResolveChoice(
           int.pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
-        const child = node.chooseCard(choice)
+        const child = node.chooseCard(selected.value)
         if (!child) {
           int.pendingNodeIdRef.value = null
           return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
@@ -484,7 +486,7 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
-      const child = node.chooseCard(choice)
+      const child = node.chooseCard(selected.value)
       if (!child) {
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
@@ -832,8 +834,7 @@ export function engineResolveChoice(
       const insertAnchor = node instanceof XorNode ? node.id : child.id
       const trailingHookNodes = [
         ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state, executionContext.actionContext),
-        ...immediateActivateNodes,
-        ...afterActivateNodes,
+        ...settleHostReactions(int, child, [...immediateActivateNodes, ...afterActivateNodes]),
         ...afterHostNodes,
       ]
       if (child.continuationParentHostNodeId) {
@@ -841,7 +842,7 @@ export function engineResolveChoice(
           stampContinuationParentHost(insertedNode, child.continuationParentHostNodeId!))
       }
       if (result.type === 'flow') {
-        const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
+        const flowNode = buildOwnedFlowNode(int, inheritSpaceEffectSource(result.flow, executionContext.actionContext), context.player.id, executionContext.actionContext)
         inheritPrimaryBody(child, flowNode)
         if (child.mandatory === true) {
           enforceCompositeContinuationMandatory(flowNode)
@@ -1227,8 +1228,7 @@ export function engineResolveChoice(
   if (insertionTargetId) {
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state, executionContext.actionContext),
-      ...immediateActivateNodes,
-      ...afterActivateNodes,
+      ...settleHostReactions(int, pendingActionNode, [...immediateActivateNodes, ...afterActivateNodes]),
       ...afterHostNodes,
     ]
     if (pendingActionNode?.continuationParentHostNodeId) {
@@ -1236,7 +1236,7 @@ export function engineResolveChoice(
         stampContinuationParentHost(insertedNode, pendingActionNode.continuationParentHostNodeId!))
     }
     if (result.type === 'flow') {
-      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
+      const flowNode = buildOwnedFlowNode(int, inheritSpaceEffectSource(result.flow, executionContext.actionContext), context.player.id, executionContext.actionContext)
       if (pendingActionNode) inheritPrimaryBody(pendingActionNode, flowNode)
       if (pendingActionNode?.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)

@@ -18,6 +18,8 @@ export abstract class BaseNode implements EngineNode {
   public ownerPlayerId?: string
   public primaryBodyId?: string
   public reactionPhase?: 'immediatelyAfter' | 'after'
+  public reactionSettlement?: import('../../cards/listener-contract').ReactionSettlement
+  public completionBarrier?: boolean
   public optional?: boolean
   public optionalActive?: boolean
   public optionalPromptKey?: PromptKey
@@ -95,6 +97,8 @@ export abstract class BaseNode implements EngineNode {
     if (this.ownerPlayerId !== undefined) data.ownerPlayerId = this.ownerPlayerId
     if (this.primaryBodyId !== undefined) data.primaryBodyId = this.primaryBodyId
     if (this.reactionPhase !== undefined) data.reactionPhase = this.reactionPhase
+    if (this.reactionSettlement !== undefined) data.reactionSettlement = this.reactionSettlement
+    if (this.completionBarrier !== undefined) data.completionBarrier = this.completionBarrier
     if (this.choiceLabelKey !== undefined) data.choiceLabelKey = this.choiceLabelKey
     if (this.choiceLabelParams !== undefined) data.choiceLabelParams = this.choiceLabelParams
     if (this.optional !== undefined) data.optional = this.optional

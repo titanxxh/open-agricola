@@ -86,7 +86,8 @@ function finish(session: GameSession, initial: SessionResponse, preferredCard?: 
       && option.value !== '__skip__' && option.value !== '__pass__')
     const skip = available.find(option => option.value === '__skip__')
     const target = available.find(option => option.value === targetSpace)
-    const choice = target ?? (passReactions ? pass : undefined) ?? preferred ?? skip ?? pass
+    const required = request.kind === 'select-trigger' ? available.find(option => option.sourceCard && option.value !== '__pass__') : undefined
+    const choice = target ?? (passReactions ? pass : undefined) ?? preferred ?? skip ?? pass ?? required
     if (!choice) throw new Error(`No expected option: ${JSON.stringify(request)}`)
     if (choice === preferred) preferredChosen = true
     if (choice === pass) passed = true

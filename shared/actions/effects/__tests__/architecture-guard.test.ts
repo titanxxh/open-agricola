@@ -141,7 +141,6 @@ describe('effects architecture guard', () => {
       'reap',
       'recall-placed-worker',
       'receive',
-      'record-card-use',
       'renovate-house',
       'reorganize',
       'repeat-action',

@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
@@ -11,7 +11,9 @@ const TRACKED_ACTIONS = ['gain', 'collect', 'receive'] as const
 const huntsmansHatListener: CardListenerRegistration = {
   id: 'C52-huntsmans-hat-after-boar-gain',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['after'],
+  settlement: 'body',
+  mandatory: true,
   actions: [...TRACKED_ACTIONS],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!(TRACKED_ACTIONS as readonly string[]).includes(context.actionId)) return

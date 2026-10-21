@@ -29,6 +29,8 @@ export type EngineNode = {
   ownerPlayerId?: string
   primaryBodyId?: string
   reactionPhase?: 'immediatelyAfter' | 'after'
+  reactionSettlement?: import('../cards/listener-contract').ReactionSettlement
+  completionBarrier?: boolean
   optional?: boolean
   optionalActive?: boolean
   optionalPromptKey?: PromptKey

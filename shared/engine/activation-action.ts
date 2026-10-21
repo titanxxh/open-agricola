@@ -1,5 +1,6 @@
 import type { MoorActionContext } from '../moor/completion-types'
 import type { ActionHookPhase } from '../actions/hooks'
+import type { ActionExecutionContext } from '../contract/types'
 import type { CardListenerOwnerZone } from '../cards/card-listeners'
 import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import type { GameEvent } from '../contract/events'
@@ -28,6 +29,8 @@ export type ActivateCardActionParams = {
   moorAction?: MoorActionContext
   triggerSnapshot?: TriggerSnapshot
   beforeHostNodeId?: string
+  beforeSpaceId?: string
+  actionSpaceUse?: ActionExecutionContext['actionSpaceUse']
 }
 
 export type ActivateCardActionNode = ActionNode & {

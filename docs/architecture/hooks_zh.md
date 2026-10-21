@@ -29,6 +29,8 @@ anytime                  注册额外的 anytime 行动
 - 行动格使用反应选择 `actionSpaces`；规则动作保留 `actions`，包括订阅 `place-farmer` 的人员放置规则。显式用格上下文标识实际进入、查询和整格替换。内部规则动作即使带相同 `space` 或 `targetSpaceId`，也不会打开用格窗口。见 [ADR 0031](../adr/0031-explicit-action-space-use-subscriptions.md)。
 - `before` 在合法目标确定后、费用前运行。`space-use-nodes.ts` 用引擎 sequence 包住一次完整用格，分为主体和完成阶段。普通放人、额外放人、搬迁和无人员用格进入此边界；只放人不执行目标的效果不进入。主体包括支付、选择、替换后代和强制子流程。只有主体事件进入本次用格收据；反应奖励及嵌套用格保留各自身份。
 - 主体最后一步完成时，空间反应和已捕获的规则反应共用既有 owner/trigger-select 调度：所有 `immediatelyAfter` 完成后才进入普通 `after`。多步主体内较早完成的规则动作保留既有顺序。`space-use-runtime.ts` 分别在每个阶段入口捕获空间来源，因此立即反应可为随后 after 阶段引入新来源，但不会重放较早的规则反应。阶段内已捕获来源保持固定，handler 读取实时状态。scope 元数据和收据保存在私有引擎游标，跨 pending、恢复和撤销保留。
+- 原生规则 listener 可声明 `settlement`：`body` 是属于主体的强制 `after` 附加效果；`action` 在外层完成前结清宿主内部反应及其完整返回 flow；省略或 `completion` 保留普通完成调度。内部 barrier 跨 pending、复制和游标恢复保留。仅主体附加效果继承主体收据。阶段优先级只在同一边界内生效，普通 `after` 不会仅因嵌套而提前到外层 `immediatelyAfter` 之前。
+- 真实行动格主体以 `actionContext.sourceLocation` 标记行动格来源，卡牌提供的格也一样。静态展开和选择后返回的 flow 保留此商品来源；授予用格的卡仍以 `sourceCard` 单独归因。反应、onBuy 和替代奖励保留卡牌来源。明确重复原格选项时可保留原格来源。`resource.moved.from` 是取得商品的权威事实，共享格上下文和主体归属都不能证明商品来自行动格。
 - 卡牌阶段遵循 [ADR 0033](../adr/0033-card-listener-timing-follows-the-reference.md)。参考实现已实现的卡沿用其 handler 时机：放人与显式 before handler 对应 `before`；宿主变更之后的 handler 对应 after 一类，并保持参考实现中 immediately after / after 的先后。其余卡按牌面写明的时机；牌面未写明时，使用某格或执行 Moor Special Action 的附加收益用 `before`，从累积格拿走至少 N 个或执行某个动作用 `after`。`before` 奖励在同一次宿主内可用。核心当前步骤准入在适用 `before` flow 的第一个可执行步骤能开始时允许使用该格，不模拟奖励，也不保证宿主能够完成。各卡不为此增加准入守卫或重复的 `isDoable` 放宽；误判后可能进入 `engine-blocked`，需要玩家撤销。空累积格保留结构性准入条件。
 - Reap 在移除作物后捕获 listener 来源。`shared/actions/helpers/reap-listener.ts` 只规划按 owner 分组的 `activate-card`，不提前执行 handler。全部逐作物立即反应完成后，才进入一次普通 after 批次。批次收据保留 `reapedCropAmounts` 和 harvest/private-field trigger；激活时读取实时状态，收据跨 pending 和恢复保留。自然收获没有外层 Reap 行动节点，由 helper 负责 after 批次。显式 `reap` 行动只由引擎完成点分发普通 after，并返回相同收据，即使它返回立即反应 flow。空收获不创建手动批次。测试：`server/__tests__/{card-timing-after-order-session,reap-completion-session,private-field-phase-session}.test.ts`。
 - Moor before 发现保留全部匹配来源，不调用 handler。它与规则反应共用 owner 和打出顺序规划；只捕获一个来源时直接展开。多来源分组在首次进入 owner 时只自动进入唯一适用的强制来源；可选来源保留 Pass，休眠来源保留供后续重新判断。before 不携带提交快照。
@@ -146,12 +148,10 @@ anytime                  注册额外的 anytime 行动
 `CardListenerRegistration.handler` 在分发、预览和可执行判断路径上是状态纯的 flow 构造器，对齐参考实现：反应收集只构造激活 leaf，状态修改发生在行动 leaf 中。
 
 - handler 可以读取状态与事件，返回 `ActionHookResult`、`ActionFlow`、费用、可执行性或选项。每次修改，包括写自身 `cardStates[cardId]`，都是返回的 leaf（`gain`、`pay`、`special-effect`、`exchange` 或可复用的内部行动）。
-- 规则动作与 Moor 反应的来源发现构造普通内部 `activate-card` leaf，携带 listener、卡牌、事件、owner 与触发玩家；`event.actionContext` 保留触发时的 `targetSpaceId`。
-- 行动格使用与人员放置的 `before` collector 只求值一次 handler 并构造 flow，不修改状态。除非返回 `countCardUse: false`，每个 flow 前插入 `record-card-use` leaf。该 leaf 给持卡人的 `resourceStats.used` 加一次，不改变原 flow 的行动者，也不发出触发事件。与 `activate-card` 一致，返回效果后即计数，即使随后跳过可选奖励。查询不执行该 leaf；pending 恢复保留完成状态，撤销恢复计数。见 `server/__tests__/stats-card-used-session.test.ts`。
+- 规则动作、用格、放人和 Moor 反应的来源发现均构造普通内部 `activate-card` leaf，携带 listener、卡牌、事件、owner 和触发玩家。用格和放人来源合并到同一个 owner 分组；具体格与用格类型跨选择和恢复保留。发现时固定匹配来源，不求值 handler。激活读取实时状态，返回效果时才给 owner 卡计次，`countCardUse: false` 除外；查询与空结果不计次。pending 保留完成状态，撤销恢复计数。
 - **门禁**：所有会分发 listener 的 Vitest project 都安装 `shared/cards/__tests__/listener-purity-guard.ts`，为每次调用提供深层只读 Proxy，任何写入或返回实时引用都会失败。`pnpm run check:card-impl-boundaries` 静态拒绝所有已解析 handler 与 `deriveCardCostCandidate` 中对 context 的显式写入。没有豁免清单。
 - **Trigger-select**（`ParallelNode`）负责 select、pass、mandatory 与 independent 语义，没有 listener 专用节点。结构暂不适用的 child 本轮隐藏，sibling 执行后重新评估；适用但付不起的 child 保持可见并禁用。`mandatory: true` 只在必选 child 适用且可执行时禁用 Pass。Card listener 的适用性只来自返回结果；阶段卡牌效果仍在克隆上预览。
-- 行动格使用与放置的 `before` collector 只求值一次 handler，按固定顺序执行 flow，不提供玩家排序，也不重新发现先前遗漏的来源。当前步骤准入遵循上文 ADR 0033；各卡不通过 scoped `isDoable` 预判奖励能否使宿主可执行。
-- 规则动作与 Moor 的 `before` 反应捕获 `activate-card` 来源，使用 owner/trigger-select 调度。handler 在选中时读取实时状态，可选反应保留 Pass。已有的规则动作可达性放宽必须在 `skipBeforeTriggers` 下让开；Pass 门禁带该标记检查原行动，再只看通用替换回退。此规则动作契约不要求行动格附加奖励增加准入放宽。
+- 全部 `before` 反应使用已捕获的 `activate-card` 来源和 owner/trigger-select 调度。handler 在选中时读取实时状态，休眠 sibling 保留供重新判断，可选反应保留 Pass。用格和放人 before 保留原 flow 的义务：非可选返回 flow 禁用 Pass，可选根仍可跳过。未指定目标的返回效果归行动者，选序和计次归持卡人。新卡不回填已捕获窗口。规则动作可达性放宽在 `skipBeforeTriggers` 下让开；Pass 带该标记检查真实宿主和行动者，再检查通用替换回退。用格准入保留 ADR 0033 的当前步骤策略。
 - **逐配方分发**：`trade-applied` 执行确定性 `seq` / `parallel` flow 中的非可选 `special-effect` 与 `gain` leaf（`executeImmediateSpecialEffectFlows()`）。完整喂食批次使用普通 `exchange` 反应，支付与交互 flow 完成后才恢复喂食结算。
 - **Owner 与切换**：owner 与触发玩家显式传递；跨玩家确认和撤销边界由运行时负责。`confirm-player-switch` 由交出控制的玩家提交，并建立撤销边界。
 - **暂定续行**（[ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)）：每个修改命令都经过一个结算边界，带规范化身份与检查点；作用域、守卫、受保护观察和失败记忆保存在私有会话游标中。
