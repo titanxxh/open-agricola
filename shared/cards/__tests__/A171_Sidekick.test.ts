@@ -50,7 +50,7 @@ const setupContext = (options: {
     triggerPlayer: owner,
     space,
     actionId: 'place-farmer',
-    phase: 'after' as ActionHookPhase,
+    phase: 'immediatelyAfter' as ActionHookPhase,
     result: { type: 'ok' },
     actionContext: options.actionContext,
   } as CardListenerContext }

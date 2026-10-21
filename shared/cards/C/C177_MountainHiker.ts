@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'C177-mountain-hiker-after-extension-accumulation',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isExtension56AccumulationSpaceId(context.space?.id)) return
     if ((context.ownerPlayer?.resources.food ?? 0) < 1) return

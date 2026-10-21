@@ -37,7 +37,7 @@ const contextFor = (spaceId: string): { session: GameSession; context: CardListe
     effectPlayer: owner,
     space,
     actionId: 'place-farmer',
-    phase: 'after' as ActionHookPhase,
+    phase: 'immediatelyAfter' as ActionHookPhase,
     result: { type: 'ok' },
   } as CardListenerContext }
 }

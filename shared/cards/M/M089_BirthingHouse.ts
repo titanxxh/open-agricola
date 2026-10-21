@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -9,7 +9,7 @@ const CARD_ID = 'M089_BirthingHouse'
 const listener: CardListenerRegistration = {
   id: 'M089-birthing-house-after-family-growth',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['immediatelyAfter'],
   actions: ['family-growth'],
   handler: (_context: CardListenerContext): ActionHookResult => ({
     flow: {

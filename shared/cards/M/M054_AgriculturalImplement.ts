@@ -11,7 +11,7 @@ const choiceContext = { mode: 'take-card' }
 const listener: CardListenerRegistration = {
   id: 'M054-agricultural-implement-after-field-action',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!TRIGGER_SPACES.has(context.space?.id ?? '')) return
