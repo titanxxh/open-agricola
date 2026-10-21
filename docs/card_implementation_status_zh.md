@@ -12,14 +12,22 @@
 
 参考实现 PHP 路径相对参考实现源码树；OA 路径相对本仓库。
 
-当前没有未决条目。
+| 优先级 | Issue | 范围 |
+|---|---|---|
+| P2 | [#1353](https://github.com/titanxxh/open-agricola/issues/1353) | 规则审计线索：混合货物部分拿取按类型拆成多个 collect，后一步可能让 `A107_Catcher` 读取剩余货物而非放人时总量。修改机制前先用 Session 复现。 |
+| P2 | [#1354](https://github.com/titanxxh/open-agricola/issues/1354) | 规则审计线索：`A097_Freshman` 的卡主已是轮转玩家、但尚未打开 Turn 时，放人前第二次 Bake Bread 仍可能再次替代。普通 Turn 和两次 Turn 之间已有覆盖，此执行与查询边界需独立 Session 复现。 |
 
 ## 2. 已接受差异
 
-除非产品方向改变，以下内容不算当前 bug。未在此处或[源码排除项](#5-源码排除项)列出的卡牌均为已对齐，其行为由 `shared/cards/` 下的卡牌文件定义、由相邻测试锁定。已经发现、仍需修复或补测试确认的参考实现差异或高置信行为风险属于未决问题，不是已接受差异。类别行写不下的细节见[单卡备注](#6-单卡备注)。
+除非产品方向改变，以下内容不算当前 bug。没有未决问题、也未在此处或[源码排除项](#5-源码排除项)列出的卡牌均为已对齐，其行为由 `shared/cards/` 下的卡牌文件定义、由相邻测试锁定。已经发现、仍需修复或补测试确认的参考实现差异或高置信行为风险属于未决问题，不是已接受差异。类别行写不下的细节见[单卡备注](#6-单卡备注)。
 
 | 类别 | 卡牌 |
 |---|---|
+| 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
+| 用格 before handler 只捕获一次，flow 按 listener 顺序运行，玩家不能选择先后，也不在同阶段重新评估其他来源。后续窗口设计见 [#1351](https://github.com/titanxxh/open-agricola/issues/1351)。 | 用格及放人 before 来源 |
+| 同一次用格完成时，行动格 immediately-after 先于内部规则 after；参考实现先完成内部规则反应。本次迁移保留，后续设计见 [#1352](https://github.com/titanxxh/open-agricola/issues/1352)。 | 用格完成窗口 |
+| 同一 Turn 内，放人末尾反应再授予 Bake Bread 时不能再次替代，不受参考实现清标记反应顺序影响。维护者裁定见 [#1331](https://github.com/titanxxh/open-agricola/issues/1331)。 | `A097_Freshman` |
+| 1至3人局卡牌行动格的卡主奖励分在收取后发放；最终食物和分数与参考一致，保留现有预览。事件顺序后续见 [#1355](https://github.com/titanxxh/open-agricola/issues/1355)。 | `C039_StudioBoat` |
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
 | Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |
 | 用 schema-up metadata 替代参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
@@ -38,7 +46,8 @@
 
 只登记尚未实现的跨卡机制。机制实现并有测试或门禁覆盖后删除该条，并把新的通用机制写进 `docs/architecture/` 中对应的 module 文档。已完成的工作记录在 PR、ADR 和测试里，不放在这里。
 
-当前没有未决条目。
+- 多类型部分拿取需要跨货物类型保留一次逻辑 collect 的 receipt，见 [#1353](https://github.com/titanxxh/open-agricola/issues/1353)。
+- 放人前的 Turn/gap 资格需要明确区分真实执行与查询，见 [#1354](https://github.com/titanxxh/open-agricola/issues/1354)。
 
 ## 4. 参考实现坏味道：不要照抄
 

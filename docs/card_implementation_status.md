@@ -12,14 +12,22 @@
 
 Reference PHP paths are relative to the reference implementation's source tree; OA paths are relative to this repository.
 
-No entries are open.
+| Priority | Issue | Scope |
+|---|---|---|
+| P2 | [#1353](https://github.com/titanxxh/open-agricola/issues/1353) | Rule Audit Lead: mixed-goods partial takes use one collect per resource type; a later step may make `A107_Catcher` read the remaining goods instead of the placement-time total. Reproduce through a Session before changing the mechanism. |
+| P2 | [#1354](https://github.com/titanxxh/open-agricola/issues/1354) | Rule Audit Lead: `A097_Freshman` may replace a second Bake Bread before placement when its owner is already the rotation player but has no open Turn. The ordinary Turn and between-Turn cases are covered; this execution/query boundary needs its own Session reproduction. |
 
 ## 2. Accepted differences
 
-Unless the product direction changes, the following are not bugs. Every card not listed here or in [Source exclusions](#5-source-exclusions) is aligned; its behavior is defined by its file under `shared/cards/` and locked in by the tests next to it. A known difference or high-confidence behavior risk that still has to be fixed, or confirmed by added tests, is an open issue, not an accepted difference. [Per-card notes](#6-per-card-notes) add detail where a category row is not enough.
+Unless the product direction changes, the following are not bugs. Cards without an open issue or an entry here or in [Source exclusions](#5-source-exclusions) are aligned; their behavior is defined by their files under `shared/cards/` and locked in by the tests next to them. A known difference or high-confidence behavior risk that still has to be fixed, or confirmed by added tests, is an open issue, not an accepted difference. [Per-card notes](#6-per-card-notes) add detail where a category row is not enough.
 
 | Category | Cards |
 |---|---|
+| Maintainer scheme B: a startable before flow may admit a space whose host cannot finish, requiring undo. Admission does not simulate the reward, and cards add no admission guards. | Space-use before benefits; [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
+| Space-use before handlers are captured once and flows run in listener order, without player-selected ordering or sibling reevaluation. A future window design is discussed in [#1351](https://github.com/titanxxh/open-agricola/issues/1351). | Space-use and placement-before sources |
+| At a space-use completion, space immediately-after reactions precede internal rule after reactions; the reference completes the inner rule reactions first. Retained for this timing migration; design follow-up [#1352](https://github.com/titanxxh/open-agricola/issues/1352). | Space-use completion windows |
+| A second Bake Bread granted by a trailing placement reaction cannot replace again within the same Turn, regardless of the reference's flag-reset reaction order. Maintainer ruling in [#1331](https://github.com/titanxxh/open-agricola/issues/1331). | `A097_Freshman` |
+| In the 1–3 player card space, the owner's bonus VP follows collection. Final food and VP match the reference; the existing preview is retained. Event-order follow-up [#1355](https://github.com/titanxxh/open-agricola/issues/1355). | `C039_StudioBoat` |
 | Maintainer ruling for exhausted ordinary decks: a satisfied tier can be completed; each eligible card type independently draws up to three remaining cards and keeps one; an empty type is skipped, completion still succeeds when both are empty, and there is no downgrade, reshuffle or later compensation. This is an OA ruling, not an official FAQ. | `PS03` |
 | Reseller excludes an entire printed-cost candidate that contains a stable or fence component, and keeps its once-per-game opportunity when no supported candidate remains. This does not rule out future component refunds, tracked in [#849](https://github.com/titanxxh/open-agricola/issues/849). | `E146_Reseller` |
 | Schema-up metadata replaces the reference's custom `isBuyable`. | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
@@ -38,7 +46,8 @@ Unless the product direction changes, the following are not bugs. Every card not
 
 Register a cross-card mechanism here only while it is still unimplemented. Remove the entry once the mechanism is implemented and covered by a test or a gate, and record the new generic mechanism in its module document under `docs/architecture/`. Completed work lives in pull requests, ADRs and tests, not here.
 
-No entries are open.
+- A multi-resource partial collect needs one logical collection receipt across its resource types; see [#1353](https://github.com/titanxxh/open-agricola/issues/1353).
+- Turn/gap qualification needs an explicit execution/query distinction at the pre-placement boundary; see [#1354](https://github.com/titanxxh/open-agricola/issues/1354).
 
 ## 4. Reference anti-patterns: do not copy
 
