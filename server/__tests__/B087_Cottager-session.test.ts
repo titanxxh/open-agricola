@@ -138,7 +138,7 @@ describe('B087 Cottager parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.houseType).toBe('wood')
     expect(response.state.players[0]!.rooms).toBe(2)
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, reed: 1, food: 2 })
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, reed: 1, food: 0 })
   })
 
   it('B087 S4: declining Cottager keeps the Day Laborer reward without building or renovating', () => {

@@ -15,9 +15,9 @@ const CARD_ID = 'B108_OvenFiringBoy'
  * return optional bake-bread leaf.
  */
 const listener: CardListenerRegistration = {
-  id: 'B108-oven-firing-boy-after-place-farmer',
+  id: 'B108-oven-firing-boy-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return

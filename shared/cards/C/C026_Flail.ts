@@ -16,16 +16,16 @@ const CARD_ID = 'C026_Flail'
  * action-card events; onPlayerPlaceFarmer offers optional EXCHANGE with
  * trigger=BREAD (a Bake Bread action).
  *
- * In open-agricola: onBuy grants 2 food; after place-farmer on
+ * In open-agricola: onBuy grants 2 food; before using
  * farmland/cultivation, offer an optional bake-bread follow-up.
  */
 
 const TRIGGER_SPACES = ['farmland', 'cultivation']
 
 const listener: CardListenerRegistration = {
-  id: 'C26-flail-after-place-farmer',
+  id: 'C26-flail-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
