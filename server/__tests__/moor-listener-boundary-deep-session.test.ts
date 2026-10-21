@@ -87,7 +87,7 @@ describe('Moor remaining listener clauses', () => {
     expect(response.interaction.request.kind).toBe('confirm-next-player')
   })
 
-  it.each(['wood', 'clay', 'reed', 'stone'] as const)('M127 grants the chosen %s after Cut Peat and checks matching accumulation amounts', (resource) => {
+  it.each(['wood', 'clay', 'reed', 'stone'] as const)('M127 grants the chosen %s on Cut Peat and checks matching accumulation amounts', (resource) => {
     const session = setupMoorAudit()
     session.state.players[0]!.minorPlayed = ['M127_Wheelbarrow']
     const tile = { row: 0, col: 2 }
@@ -113,7 +113,7 @@ describe('Moor remaining listener clauses', () => {
     }
   })
 
-  it.each(['wood', 'reed'] as const)('M119 actually chooses its %s reward after Fell Trees', (resource) => {
+  it.each(['wood', 'reed'] as const)('M119 actually chooses its %s reward on Fell Trees', (resource) => {
     const session = setupMoorAudit()
     session.state.players[0]!.minorPlayed = ['M119_AlderSwamp']
     const tile = { row: 0, col: 2 }

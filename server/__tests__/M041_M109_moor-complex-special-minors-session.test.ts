@@ -393,7 +393,7 @@ describe('Moor complex special-action minors', () => {
     expect(resp.state.players[0]!.resources.grain).toBe(1)
   })
 
-  it('M109 Malthouse optionally pays exactly 1 grain for 4 food after Cut Peat', () => {
+  it('M109 Malthouse optionally pays exactly 1 grain for 4 food before Cut Peat', () => {
     const { session, player } = setup(['M109_Malthouse'])
     player.resources.grain = 1
     session.loadState(session.state)

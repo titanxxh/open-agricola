@@ -7,10 +7,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'M048_ForestSwamp'
 
 const cutPeatListener: CardListenerRegistration = {
-  id: 'M048-forest-swamp-after-cut-peat',
+  id: 'M048-forest-swamp-before-cut-peat',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['moor-action'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'cut-peat') return
     const round = context.state.round + 4
