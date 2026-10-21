@@ -15,7 +15,7 @@ describe('B087_Cottager', () => {
       state,
       player,
       actionId: 'place-farmer',
-      phase: 'after' as ActionHookPhase,
+      phase: 'before' as ActionHookPhase,
       space: { id: 'day-laborer' },
     } as unknown as CardListenerContext)
 

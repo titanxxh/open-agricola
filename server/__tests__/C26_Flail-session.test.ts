@@ -35,11 +35,11 @@ describe('C026_Flail session', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
-  it('after-place-farmer on farmland offers optional bake-bread', () => {
+  it('before-place-farmer on farmland offers optional bake-bread', () => {
 
 
     const session = new GameSession(42)
-    const listener = findListener(session, 'C26-flail-after-place-farmer')!
+    const listener = findListener(session, 'C26-flail-before-place-farmer')!
     expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -53,7 +53,7 @@ describe('C026_Flail session', () => {
       player,
       space,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -63,10 +63,10 @@ describe('C026_Flail session', () => {
     expect(leaf.sourceCard).toBe(CARD_ID)
   })
 
-  it('after-place-farmer on cultivation offers optional bake-bread', () => {
+  it('before-place-farmer on cultivation offers optional bake-bread', () => {
 
     const session = new GameSession(42)
-    const listener = findListener(session, 'C26-flail-after-place-farmer')!
+    const listener = findListener(session, 'C26-flail-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.round = 5 // cultivation available from round 5
@@ -81,7 +81,7 @@ describe('C026_Flail session', () => {
       player,
       space,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('bake-bread')
@@ -90,7 +90,7 @@ describe('C026_Flail session', () => {
   it('does not trigger on non-trigger spaces', () => {
 
     const session = new GameSession(42)
-    const listener = findListener(session, 'C26-flail-after-place-farmer')!
+    const listener = findListener(session, 'C26-flail-before-place-farmer')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -103,7 +103,7 @@ describe('C026_Flail session', () => {
       player,
       space: forest,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })
@@ -167,8 +167,8 @@ describe('C026 Flail parity', () => {
     return session.resolveChoice(response.interaction.playerIndex, card!.value)
   }
 
-  const completeFarmland = (session: GameSession) => {
-    let response = session.takeAction(0, 'farmland')
+  const completeFarmland = (session: GameSession, initial: SessionResponse) => {
+    let response = initial
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return response
@@ -177,8 +177,8 @@ describe('C026 Flail parity', () => {
     return response
   }
 
-  const completeCultivationPlow = (session: GameSession) => {
-    let response = session.takeAction(0, 'cultivation')
+  const completeCultivationPlow = (session: GameSession, initial: SessionResponse) => {
+    let response = initial
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return response
@@ -212,29 +212,30 @@ describe('C026 Flail parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 2 })
   })
 
-  it('C026 S2: after Farmland the optional Bake Bread action may be declined', () => {
+  it('C026 S2: before Farmland the optional Bake Bread action may be declined', () => {
     const session = setup()
-    let response = resolveTriggerIfPresent(session, completeFarmland(session), CARD_ID)
+    let response = session.takeAction(0, 'farmland')
     expect(options(response).map((option) => option.value)).toContain('__skip__')
     response = session.resolveChoice(0, '__skip__')
+    response = completeFarmland(session, response)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(1)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
   })
 
-  it('C026 S3: after Farmland Flail can bake one grain with a Fireplace', () => {
+  it('C026 S3: before Farmland Flail can bake one grain with a Fireplace', () => {
     const session = setup()
-    const response = acceptBake(session, completeFarmland(session))
+    const response = completeFarmland(session, acceptBake(session, session.takeAction(0, 'farmland')))
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(1)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 2 })
   })
 
-  it('C026 S4: after Cultivation Flail can bake one grain with a Fireplace', () => {
+  it('C026 S4: before Cultivation Flail can bake one grain with a Fireplace', () => {
     const session = setup()
-    const response = acceptBake(session, completeCultivationPlow(session))
+    const response = completeCultivationPlow(session, acceptBake(session, session.takeAction(0, 'cultivation')))
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(1)

@@ -7,9 +7,9 @@ import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A149_HouseArtist'
 const triggerListener: CardListenerRegistration = {
-  id: 'A149-house-artist-after-traveling-players',
+  id: 'A149-house-artist-before-traveling-players',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
