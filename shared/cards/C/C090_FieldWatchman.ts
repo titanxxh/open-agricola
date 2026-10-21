@@ -5,9 +5,9 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C090_FieldWatchman'
 const listener: CardListenerRegistration = {
-  id: 'C90-field-watchman-after-place-farmer',
+  id: 'C90-field-watchman-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-seeds') return

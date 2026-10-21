@@ -219,13 +219,13 @@ describe('C019 Swing Plow parity', () => {
     const session = setup({ cardId: 'C019_SwingPlow', occupations: 3 })
     session.state.players[0]!.cardStates.C019_SwingPlow = { stack: ['field', 'field', 'field', 'field'] }
     session.loadState(session.state)
-    let response = commitPlow(session, session.takeAction(0, 'farmland'))
+    let response = session.takeAction(0, 'farmland')
     for (let index = 0; index < take; index++) {
       response = accept(session, response, 'C019_SwingPlow')
       response = commitPlow(session, response)
     }
     if (take < 2) response = decline(session, response, 'C019_SwingPlow')
-    return response
+    return commitPlow(session, response)
   }
   it('C019 S2: Farmland may plow two additional stored fields', () => {
     const response = use(2)
@@ -255,10 +255,10 @@ describe('C020 Mole Plow parity', () => {
   })
   const use = (takeExtra: boolean) => {
     const session = setup({ cardId: 'C020_MolePlow', round: 9 })
-    let response = commitPlow(session, session.takeAction(0, 'farmland'))
+    let response = session.takeAction(0, 'farmland')
     response = takeExtra ? accept(session, response, 'C020_MolePlow') : decline(session, response, 'C020_MolePlow')
     if (takeExtra) response = commitPlow(session, response)
-    return response
+    return commitPlow(session, response)
   }
   it('C020 S3: Farmland may plow one additional field', () => {
     expect(use(true).state.players[0]!.fields).toHaveLength(2)
@@ -268,8 +268,9 @@ describe('C020 Mole Plow parity', () => {
   })
   it('C020 S5: Cultivation may plow one additional field', () => {
     const session = setup({ cardId: 'C020_MolePlow', round: 9 })
-    let response = commitPlow(session, session.takeAction(0, 'cultivation'))
+    let response = session.takeAction(0, 'cultivation')
     response = accept(session, response, 'C020_MolePlow')
+    response = commitPlow(session, response)
     response = commitPlow(session, response)
     expect(response.state.players[0]!.fields).toHaveLength(2)
   })

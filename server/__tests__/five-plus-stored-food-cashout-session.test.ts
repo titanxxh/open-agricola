@@ -1,3 +1,4 @@
+import { completePlowUse } from './_helpers/plow-use'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionChoiceOption, AnytimeAction } from '../../shared/contract/types'
@@ -113,22 +114,10 @@ describe('5+ stored-food cashout occupations', () => {
     opponent.cardStates.B019_MoldboardPlow = { stack: ['field', 'field'] }
     session.loadState(state)
 
-    let resp = session.takeAction(1, 'farmland')
-    expect(resp.ok).toBe(true)
-    resp = completeFirstPlow(session, 1, resp)
-    expect(resp.ok).toBe(true)
-    // The actor's space reaction precedes the other player's ordinary plow reaction.
+    const pending = session.takeAction(1, 'farmland')
+    expect(pending.ok).toBe(true)
     expect(storedFood(session, 'C172_FieldCounter')).toBe(0)
-
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional extra plow')
-    const extraPlow = resp.interaction.request.options?.find(
-      (option: ActionChoiceOption) => option.value !== '__skip__',
-    )
-    expect(extraPlow).toBeDefined()
-    resp = session.resolveChoice(1, extraPlow!.value)
-    expect(resp.ok).toBe(true)
-    resp = completeFirstPlow(session, 1, resp)
-    expect(resp.ok).toBe(true)
+    let resp = completePlowUse(session, pending, 'B019_MoldboardPlow', 1)
     expect(storedFood(session, 'C172_FieldCounter')).toBe(2)
     expect(resp.state.events.filter(event => event.type === 'farm.fieldPlowed'
       && event.fields.some(field => field.playerId === opponent.id))).toHaveLength(2)

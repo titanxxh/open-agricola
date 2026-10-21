@@ -1,11 +1,10 @@
+import { completePlowUse } from './_helpers/plow-use'
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B019_MoldboardPlow'
-import type { ActionChoiceOption } from '../../shared/contract/types'
-import { confirmNextPlayer } from './_helpers/pending-confirms'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/negative-rule-audit'
 import * as audit04Plows from './_helpers/audit/ae-negative-04-plows'
@@ -40,64 +39,17 @@ describe('B019_MoldboardPlow session', () => {
 
   it('using farmland offers optional extra plow, accepting plows from card', () => {
     const session = setup()
-
-    // Take farmland — enters plow tile selection
-    let resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-
-    // Complete the farmland plow
-    const tile1 = resp.interaction.request.farm.selectableTiles[0]
-    expect(tile1).toBeDefined()
-    resp = session.commitSelectionChoice(0, { tile: tile1 })
-    expect(resp.ok).toBe(true)
-
-    // After farmland plow, B19 after-hook offers optional extra plow
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-    const acceptOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(acceptOption).toBeDefined()
-
-    // Accept the optional plow from card
-    resp = session.resolveChoice(0, acceptOption!.value)
-    expect(resp.ok).toBe(true)
-
-    expect(resp.interaction.stateId).toBe('wait')
-    expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(2)
-    const tile2 = resp.interaction.request.farm.selectableTiles[0]
-    expect(tile2).toBeDefined()
-    resp = session.commitSelectionChoice(0, { tile: tile2 })
-    expect(resp.ok).toBe(true)
-
-    // Stack should have 1 field left
-    const stack = getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow')
-    expect(stack.length).toBe(1)
-
-    // Player should have 2 fields (farmland + card plow)
-    expect(resp.state.players[0]!.fields.length).toBe(2)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), 'B019_MoldboardPlow', 1)
+    expect(response.ok, response.error).toBe(true)
+    expect(getCardStack(response.state.players[0]!, 'B019_MoldboardPlow')).toHaveLength(1)
+    expect(response.state.players[0]!.fields).toHaveLength(2)
   })
 
   it('declining optional plow does not consume field tile', () => {
     const session = setup()
-
-    let resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-
-    const tile1 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile1 })
-    expect(resp.ok).toBe(true)
-
-    // Decline the optional extra plow
-    expect(resp.interaction.stateId).toBe('wait')
-    resp = session.resolveChoice(0, '__skip__')
-    expect(resp.ok).toBe(true)
-
-    // Stack should still have 2 fields
-    const stack = getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow')
-    expect(stack.length).toBe(2)
-
-    // Player should have only 1 field (just the farmland plow)
-    expect(resp.state.players[0]!.fields.length).toBe(1)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), 'B019_MoldboardPlow', 0)
+    expect(getCardStack(response.state.players[0]!, 'B019_MoldboardPlow')).toHaveLength(2)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
   })
 
   it('no extra plow offered when stack is empty', () => {
@@ -118,34 +70,14 @@ describe('B019_MoldboardPlow session', () => {
   })
 
   it('stack depletes after using both fields', () => {
-    const session = setup()
-
-    // First farmland action — use 1 field from card
-    let resp = session.takeAction(0, 'farmland')
-    const tile1 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile1 })
-    const accept1 = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    resp = session.resolveChoice(0, accept1!.value)
-    const tile2 = resp.interaction.request.farm.selectableTiles[0]
-    resp = session.commitSelectionChoice(0, { tile: tile2 })
-    expect(resp.ok).toBe(true)
-
-    expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(1)
-
-    // Advance to next turn so player can use farmland again
-    // Player 1 takes an action, then player 0 gets another turn
-    let resp2 = confirmNextPlayer(session)
-    resp2 = session.takeAction(1, 'grain-seeds')
-    if (resp2.interaction.stateId === 'wait') {
-      resp2 = session.resolveChoice(1, '__skip__')
-    }
-    resp2 = confirmNextPlayer(session)
-
-    // Second farmland action — use last field from card
-    // Use cultivation (round 5+ action) instead? No, farmland is always available.
-    // Actually player 0 already used farmland this round. Need round 2.
-    // Let me just check the stack state after first use.
-    expect(getCardStack(resp.state.players[0]!, 'B019_MoldboardPlow').length).toBe(1)
+    const session = audit04Plows.setup({ card: 'B019_MoldboardPlow' })
+    let response = completePlowUse(session, audit04Plows.turn(session, 0, 'farmland'), 'B019_MoldboardPlow', 1)
+    expect(getCardStack(response.state.players[0]!, 'B019_MoldboardPlow')).toHaveLength(1)
+    audit04Plows.endRound(session)
+    response = completePlowUse(session, audit04Plows.turn(session, 0, 'farmland'), 'B019_MoldboardPlow', 1)
+    expect(getCardStack(response.state.players[0]!, 'B019_MoldboardPlow')).toHaveLength(0)
+    expect(response.state.players[0]!.fields).toHaveLength(4)
+    session.dispose()
   })
 })
 
@@ -170,11 +102,11 @@ describe('ae-negative-04-plows', () => {
       r = plow(s, turn(s, 0, 'farmland')); assert.equal(fields(r), 5); assert.equal(stack(r), 0); finished(r)
     })
     it('B019 N3 decline invalid selection and undo preserve the stored field allowance', () => {
-      const declined = setup({ card: MOLD }); const no = skip(declined, plow(declined, turn(declined, 0, 'farmland')))
+      const declined = setup({ card: MOLD }); const no = plow(declined, skip(declined, turn(declined, 0, 'farmland')))
       assert.equal(fields(no), 1); assert.equal(stack(no), 2); finished(no)
       const s = setup({ card: MOLD, existingField: true }); const before = undoRuleSnapshot(s.getState())
       let r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 2 }); farm(s, r); invalidBonus(s)
-      assert.equal(stack(s.getState()), 2)
+      assert.equal(stack(s.getState()), 1)
       r = plow(s, s.getState(), { row: 0, col: 3 }); assert.equal(fields(r), 3); assert.equal(stack(r), 1); finished(r)
       assertUndoRestored(before, s.undoAction())
       r = plow(s, turn(s, 0, 'farmland')); r = plow(s, r); assert.equal(fields(r), 3); assert.equal(stack(r), 1)
@@ -187,18 +119,19 @@ describe('ae-negative-04-plows', () => {
     })
     it('B019 N5 last normal field preserves both declined bonus tiles', () => {
       const s = setup({ card: MOLD, lastPlot: true })
-      const r = plow(s, turn(s, 0, 'farmland'), { row: 0, col: 4 })
+      const r = plow(s, skip(s, turn(s, 0, 'farmland')), { row: 0, col: 4 })
       finished(r)
       assertRejectedUnchanged(s, () => s.resolveChoice(0, MOLD))
       assert.equal(fields(r), 13); assert.equal(stack(r), 2); finished(r)
     })
   })
-  it('B019 N6 final plot bonus-first and normal-first paths complete without phantom fields', () => {
+  it('B019 N6 the stored field can fill the final plot before its satisfied Farmland host', () => {
     const s = setup({ card: MOLD, lastPlot: true }); const normal = turn(s, 0, 'farmland')
-    assert.notEqual(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, MOLD)
+    assert.equal(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, MOLD)
     const r = plow(s, normal, { row: 0, col: 4 })
     finished(r)
     assertRejectedUnchanged(s, () => s.resolveChoice(0, MOLD))
-    assert.equal(fields(r), 13); assert.equal(stack(r), 2); finished(r)
+    assert.equal(fields(r), 13); assert.equal(stack(r), 1); finished(r)
+    assert.equal(r.state.events.filter(event => event.type === 'farm.fieldPlowed' && event.sourceCardId === MOLD).length, 1)
   })
 })

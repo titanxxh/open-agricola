@@ -23,25 +23,18 @@ const setupB19 = () => {
   return session
 }
 
-const takeFarmlandAndPlowBaseField = (session: GameSession) => {
-  let resp = session.takeAction(0, 'farmland')
+const takeFarmlandBeforeBonus = (session: GameSession) => {
+  const resp = session.takeAction(0, 'farmland')
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : null)
-    .toBe('farm-select')
-  expect(resp.interaction.stateId === 'wait'
-    ? resp.interaction.request.options?.map((option) => option.value)
-    : [],
-  ).toEqual(['confirm'])
-
-  resp = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
-  expect(resp.ok).toBe(true)
+    .toBe('choice')
   return resp
 }
 
 describe('action cancel parity session regressions', () => {
   it('B19 optional plow can be skipped through parent __skip__ without popping stack', () => {
     const session = setupB19()
-    const resp = takeFarmlandAndPlowBaseField(session)
+    const resp = takeFarmlandBeforeBonus(session)
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
@@ -50,14 +43,16 @@ describe('action cancel parity session regressions', () => {
 
     const skipped = session.resolveChoice(0, '__skip__')
     expect(skipped.ok).toBe(true)
-    expect(skipped.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
+    const completed = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
+    expect(completed.ok).toBe(true)
+    expect(completed.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
     expect(skipped.state.players[0]!.cardStates.B019_MoldboardPlow?.stack)
       .toEqual(['field', 'field'])
   })
 
   it('B19 accepted optional plow exposes only confirm and rejects direct cancel', () => {
     const session = setupB19()
-    const resp = takeFarmlandAndPlowBaseField(session)
+    const resp = takeFarmlandBeforeBonus(session)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected optional prompt')
     const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
@@ -79,6 +74,8 @@ describe('action cancel parity session regressions', () => {
     expect(rejected.state.players[0]!.cardStates.B019_MoldboardPlow?.stack)
       .toEqual(['field', 'field'])
 
+    const bonus = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
+    expect(bonus.ok).toBe(true)
     const completed = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
     expect(completed.ok).toBe(true)
     expect(completed.state.players[0]!.fields).toEqual([

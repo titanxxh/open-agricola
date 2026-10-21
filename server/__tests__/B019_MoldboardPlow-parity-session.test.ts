@@ -1,3 +1,4 @@
+import { completePlowUse } from './_helpers/plow-use'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -60,31 +61,14 @@ describe('B019 Moldboard Plow parity', () => {
 
   it('B019 S2: accepting the Farmland bonus plows one extra field and consumes one tile', () => {
     const session = setup()
-    let response = normalPlow(session)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-    expect(accept).toBeDefined()
-    response = session.resolveChoice(0, accept!.value)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait' || response.interaction.request.farm.farmType !== 'field') return
-
-    response = session.commitSelectionChoice(0, {
-      tile: response.interaction.request.farm.selectableTiles[0]!,
-    })
-
-    expect(response.ok, response.error).toBe(true)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), CARD_ID, 1)
     expect(response.state.players[0]!.fields).toHaveLength(2)
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toHaveLength(1)
   })
 
   it('B019 S3: declining the Farmland bonus preserves both stored fields', () => {
     const session = setup()
-    let response = normalPlow(session)
-
-    response = session.resolveChoice(0, '__skip__')
-
-    expect(response.ok, response.error).toBe(true)
+    const response = completePlowUse(session, session.takeAction(0, 'farmland'), CARD_ID, 0)
     expect(response.state.players[0]!.fields).toHaveLength(1)
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toHaveLength(2)
   })

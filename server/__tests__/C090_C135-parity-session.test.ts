@@ -1,3 +1,4 @@
+import { completePlowUse } from './_helpers/plow-use'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { familySize, markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
@@ -80,16 +81,14 @@ describe('C091 Plow Hero parity', () => {
   const use = (prior: boolean, take: boolean) => {
     const s = setup({ cardId: 'C091_PlowHero', resources: { food: 1 } }); const p = s.state.players[0]!
     if (prior) s.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy = [{ playerId: p.id, workerId: '1' }]
-    s.loadState(s.state); let r = commitPlow(s, s.takeAction(0, 'farmland')); r = take ? accept(s, r, 'C091_PlowHero') : decline(s, r, 'C091_PlowHero'); if (take) r = commitPlow(s, r); return r
+    s.loadState(s.state); return completePlowUse(s, s.takeAction(0, 'farmland'), 'C091_PlowHero', take ? 1 : 0)
   }
   it('C091 S2: first-person Farmland may pay one food for an additional field', () => { const r = use(false, true); expect(r.state.players[0]!.fields).toHaveLength(2); expect(r.state.players[0]!.resources.food).toBe(0) })
   it('C091 S3: the paid field may be declined', () => expect(use(false, false).state.players[0]!.fields).toHaveLength(1))
   it('C091 S4: second-person Farmland gives no Plow Hero offer', () => expect(JSON.stringify(use(true, false).interaction)).not.toContain('C091_PlowHero'))
   it('C091 S5: first-person Cultivation may pay one food for an additional field', () => {
     const session = setup({ cardId: 'C091_PlowHero', resources: { food: 1 } })
-    let response = commitPlow(session, session.takeAction(0, 'cultivation'))
-    response = accept(session, response, 'C091_PlowHero')
-    response = commitPlow(session, response)
+    const response = completePlowUse(session, session.takeAction(0, 'cultivation'), 'C091_PlowHero', 1)
     expect(response.state.players[0]!.fields).toHaveLength(2)
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
