@@ -29,7 +29,7 @@ const listener: CardListenerRegistration = {
   id: 'E148-lazybones-opponent-trigger',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

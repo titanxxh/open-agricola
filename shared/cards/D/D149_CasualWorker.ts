@@ -11,7 +11,7 @@ const CARD_ID = 'D149_CasualWorker'
  * the card owner can choose: get 1 food OR build 1 free stable.
  *
  * Rule: isListeningTo → PlaceFarmer on EasternQuarry/WesternQuarry.
- *      onOpponentAfterPlaceFarmer → xor: gain 1 food OR stables(max:1, free).
+ *      onOpponentPlaceFarmer → xor: gain 1 food OR stables(max:1, free).
  */
 const QUARRY_SPACES = new Set(['eastern-quarry', 'western-quarry'])
 
@@ -19,7 +19,7 @@ const listener: CardListenerRegistration = {
   id: 'D149-casual-worker-opponent-quarry',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
@@ -28,6 +28,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'xor',
+        targetPlayerId: context.ownerPlayer?.id ?? context.player.id,
         optional: true,
         children: [
           gainLeaf(CARD_ID, { food: 1 }),
