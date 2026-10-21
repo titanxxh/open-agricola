@@ -6,6 +6,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B121_Geologist'
 import assert from 'node:assert/strict'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 import * as audit27Collection from './_helpers/audit/ae-negative-27-collection'
 
 const CARD_ID = 'B121_Geologist'
@@ -154,10 +155,8 @@ describe('B121 before timing (#1321)', () => {
     expect(r.interaction.stateId === 'wait' && r.interaction.request.kind).toBe('confirm-next-player')
     const played = r.state.events.find(e => e.type === 'card.played' && e.cardId === HUT)
     expect(played?.type === 'card.played' && played.payment?.resources).toEqual({ clay: 2 })
-    const clay = r.state.events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === CARD_ID)
-    const host = r.state.events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === undefined && e.from.kind === 'actionSpace')
-    expect(clay).toBeGreaterThanOrEqual(0)
-    expect(clay).toBeLessThan(host)
+    expectCardEffectBeforeHostCollect(r, { cardId: CARD_ID, spaceId: 'forest', type: 'resource.moved' })
+    const host = r.state.events.findIndex(e => e.type === 'resource.moved' && e.reason === 'collect' && e.from.kind === 'actionSpace')
     expect(host).toBeLessThan(r.state.events.indexOf(played!))
     expect(r.state.events.filter(e => e.type === 'resource.moved' && e.sourceCardId === HUT)).toEqual([])
   })

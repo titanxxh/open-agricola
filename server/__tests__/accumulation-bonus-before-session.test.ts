@@ -4,6 +4,7 @@ import type { GameState, Resource } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { confirmNext } from './_helpers/negative-rule-audit'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 /**
  * #1321: bonus goods for using an accumulation space are paid before the space's own collection
@@ -44,10 +45,6 @@ function setup(card: string, { players = 2, round = 1, stock, occupation }: {
 const cardGains = (response: SessionResponse, card: string) =>
   response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === card)
 
-const hostCollectIndex = (response: SessionResponse, spaceId: string) =>
-  response.state.events.findIndex(event => event.type === 'resource.moved' && event.sourceCardId === undefined
-    && event.from.kind === 'actionSpace' && event.from.spaceId === spaceId)
-
 function use(session: GameSession, spaceId: string, actor = 0) {
   const response = session.takeAction(actor, spaceId)
   expect(response.ok, response.error).toBe(true)
@@ -61,9 +58,7 @@ function expectBeforeHost(response: SessionResponse, card: string, spaceId: stri
   expect(gains).toHaveLength(1)
   const gain = gains[0]!
   expect(gain.type === 'resource.moved' && gain.resources).toEqual(reward)
-  const host = hostCollectIndex(response, spaceId)
-  expect(host).toBeGreaterThanOrEqual(0)
-  expect(response.state.events.indexOf(gain)).toBeLessThan(host)
+  expectCardEffectBeforeHostCollect(response, { cardId: card, spaceId, type: 'resource.moved' })
   expect(response.state.events.filter(event => event.type === 'card.triggered' && event.sourceCardId === card)).toHaveLength(1)
   expect(response.state.log.filter(entry => entry.key === 'log.cardTriggered' && entry.params?.cardId === card)).toHaveLength(1)
 }

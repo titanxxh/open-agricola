@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit14Spaces from './_helpers/audit/ae-negative-14-spaces'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 import type { SessionResponse } from '../game/authoritative-session'
 
 describe('A116_WoodCutter session', () => {
@@ -158,13 +159,9 @@ describe('A116 before timing (#1321)', () => {
     expect(r.state.players[0]!.resources).toMatchObject({ wood: 0, food: 3 })
     expect(r.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood).toBe(2)
     expect(r.interaction.stateId === 'wait' && r.interaction.request.kind).toBe('confirm-next-player')
-    const events = r.state.events
-    const cutter = events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === 'A116_WoodCutter')
-    const host = events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === undefined && e.from.kind === 'actionSpace')
-    const basket = events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === BASKET)
-    expect(cutter).toBeGreaterThanOrEqual(0)
-    expect(cutter).toBeLessThan(host)
-    expect(host).toBeLessThan(basket)
+    expectCardEffectBeforeHostCollect(r, { cardId: 'A116_WoodCutter', spaceId: 'forest', type: 'resource.moved' })
+    const host = r.state.events.findIndex(e => e.type === 'resource.moved' && e.reason === 'collect' && e.from.kind === 'actionSpace')
+    expect(host).toBeLessThan(r.state.events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === BASKET))
     expect(r.state.log.filter(entry => entry.key === 'log.cardTriggered' && entry.params?.cardId === 'A116_WoodCutter')).toHaveLength(1)
   })
 
