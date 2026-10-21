@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { readActionSnapshotExtraData } from '../helpers/action-snapshot'
 
 const CARD_ID = 'M099_HealingClay'
 
@@ -10,14 +11,18 @@ const usedSickWorker = (context: CardListenerContext): boolean => {
   const player = context.ownerPlayer ?? context.player
   const sick = new Set(player.sickWorkerIds ?? [])
   const workerId = context.actionContext?.workerId ?? context.actionContext?.placedWorkerId
+    ?? (context.actionSpaceUse?.newPlacement === true
+      ? readActionSnapshotExtraData<string>(player, 'placedWorkerId')
+      : undefined)
   return typeof workerId === 'string' && sick.has(workerId)
 }
 
 const listener: CardListenerRegistration = {
-  id: 'M099-healing-clay-after-infirmary',
+  id: 'M099-healing-clay-before-infirmary',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: ['moor-infirmary'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'moor-infirmary' || !usedSickWorker(context)) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }

@@ -173,7 +173,7 @@ describe('Moor remaining listener clauses', () => {
     session.state.players[0]!.minorPlayed = ['M130_Nosebag']
     let response = session.takeAction(0, 'grain-seeds')
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, horse: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, horse: 1 })
     expect(response.interaction.request.kind).toBe('animal-reorg')
     const before = JSON.stringify(response.state)
     response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 2 }] })
@@ -182,6 +182,7 @@ describe('Moor remaining listener clauses', () => {
     response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
     expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, horse: 1 })
     expect(response.interaction.request.kind).toBe('confirm-next-player')
   })
 

@@ -8,9 +8,9 @@ const CARD_ID = 'M129_PlowhorseMarket'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
-  id: 'M129-plowhorse-market-after-place-farmer',
+  id: 'M129-plowhorse-market-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!TRIGGER_SPACES.has(context.space?.id ?? '')) return
