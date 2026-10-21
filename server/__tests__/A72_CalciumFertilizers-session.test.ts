@@ -10,6 +10,9 @@ import assert from 'node:assert/strict'
 import fs from './_helpers/audit-evidence-fs'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
 import * as audit10FieldSource from './_helpers/audit/ae-negative-10-field-source'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNext } from './_helpers/session-assertions'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'A072_CalciumFertilizers'
 
@@ -502,4 +505,38 @@ describe('ae-negative-10-field-source', () => {
    const other = setup('B006_ExcursiontotheQuarry', { played: false, round: 14 }, state => { const p = state.players[0]!; p.minorPlayed = [CALCIUM]; p.occupationPlayed = ['A125_Priest']; fields(state, [{ kind: 'grain', remaining: 2 }, { kind: 'vegetable', remaining: 1 }]) }); r = buy(other, 'B006_ExcursiontotheQuarry'); assert.deepEqual(board(r), [2, 1]); assert.equal(r.state.players[0]!.resources.stone, 2); assert.equal(r.state.players[0]!.resources.food, 38)
   })
   it('A072 N5 actual quarry undo restores crops supply worker pile logs and score before one retry', () => { const s = calcium(), before = undoRuleSnapshot(s.getState()); turn(s, 0, 'eastern-quarry'); const undone = s.undoAction(); save('A072-N5-undo', { before: JSON.parse(before), response: undone }); assertUndoRestored(before, undone); const r = turn(s, 0, 'eastern-quarry'); assert.deepEqual(board(r), [3, 2, 0]); assert.equal(r.state.players[0]!.resources.stone, 1); save('A072-N5-retry', r) })
+})
+
+describe('A072 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const make = () => {
+    const session = createWorkSession({ seed: 1322072, configure: state => {
+      state.round = 14
+      const owner = state.players[0]!
+      owner.minorPlayed = [CARD_ID]
+      owner.fields = [{ row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] }]
+      Object.assign(owner.resources, { stone: 0 })
+      state.players[1]!.resources.stone = 0
+      for (const id of ['eastern-quarry', 'western-quarry']) state.actionSpaces.find(space => space.id === id)!.resources.stone = 2
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('grows the owner fields before the Quarry stone is collected; an opponent Quarry does not', () => {
+    const session = make()
+    const response = session.takeAction(0, 'eastern-quarry')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+    expect(response.state.players[0]!.resources.stone).toBe(2)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'eastern-quarry', type: 'farm.cropAdded' })
+
+    confirmNext(session, response)
+    const used = session.takeAction(1, 'western-quarry')
+    expect(used.ok, used.error).toBe(true)
+    expect(used.state.players[1]!.resources.stone).toBe(2)
+    expect(used.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+  })
 })

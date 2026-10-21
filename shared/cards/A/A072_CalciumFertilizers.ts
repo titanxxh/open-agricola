@@ -53,9 +53,9 @@ const growTopCropAction: ActionDefinition = {
 registerAdHocAction(growTopCropAction)
 
 const listener: CardListenerRegistration = {
-  id: 'A72-calcium-fertilizers-after-place-farmer',
+  id: 'A72-calcium-fertilizers-before-quarry',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return
