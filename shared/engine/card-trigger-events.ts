@@ -16,6 +16,7 @@ const shouldSkipCardTriggered = (
   actionId: string,
 ): boolean =>
   actionId === 'activate-card-effect' ||
+  actionId === 'record-card-use' ||
   (actionId === 'special-effect' && (
     context.params?.kind === 'emit-card-triggered' ||
     context.params?.kind === 'consume-pending-extra-turns'

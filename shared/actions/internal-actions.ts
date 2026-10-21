@@ -40,6 +40,7 @@ import { claimFieldGoodsTokensAction } from './effects/internal/claim-field-good
 import { pushCardStackAction } from './effects/internal/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { consumeCardCounterAction } from './effects/internal/consume-card-counter'
+import { recordCardUseAction } from './effects/internal/record-card-use'
 import { lieAnimalAction } from './effects/internal/lie-animal'
 import { addAnimalCapacityAction } from './effects/internal/add-animal-capacity'
 import { discardCardStackAction } from './effects/internal/discard-card-stack'
@@ -116,6 +117,7 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   addAnimalCapacityAction,
   lieAnimalAction,
   consumeCardCounterAction,
+  recordCardUseAction,
   activateCardEffectAction,
   activateExtraTurnAction,
   drawOrdinaryCardsAction,
