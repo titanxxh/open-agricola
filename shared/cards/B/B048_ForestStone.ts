@@ -39,9 +39,9 @@ const isStoneAccumulationSpace = (space: CardListenerContext['space']): boolean 
   (space?.gainPerRound?.stone ?? 0) > 0
 
 const woodCollectListener: CardListenerRegistration = {
-  id: 'B48-forest-stone-after-collect-wood',
+  id: 'B48-forest-stone-before-wood-space',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
@@ -62,9 +62,9 @@ const woodCollectListener: CardListenerRegistration = {
 }
 
 const stoneCollectListener: CardListenerRegistration = {
-  id: 'B48-forest-stone-after-collect-stone',
+  id: 'B48-forest-stone-before-stone-space',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isStoneAccumulationSpace(context.space)) return
