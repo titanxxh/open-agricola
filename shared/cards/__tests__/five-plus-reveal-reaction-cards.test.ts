@@ -311,7 +311,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: hollow,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       actionEvents: [{
         type: 'resource.moved',
         resources: { clay: 3 },
@@ -340,7 +340,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: quarry,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       actionEvents: [{
         type: 'resource.moved',
         resources: { stone: 2 },
@@ -375,7 +375,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: hollow,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       actionEvents: [{
         type: 'resource.moved',
         resources: { clay: 3 },
@@ -392,7 +392,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: quarry,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       actionEvents: [{
         type: 'resource.moved',
         resources: { stone: 2 },
@@ -411,7 +411,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: quarry,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       actionEvents: [{
         type: 'resource.moved',
         resources: { stone: 2 },

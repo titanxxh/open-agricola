@@ -26,7 +26,7 @@ const listener: CardListenerRegistration = {
   id: 'C169-fast-mason-after-clay-stone-collect',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const material = collectedMaterial(context)
     if (!material) return

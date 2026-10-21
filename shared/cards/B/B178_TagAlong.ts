@@ -21,7 +21,7 @@ const canFollow = (context: CardListenerContext): boolean => {
 const listener: CardListenerRegistration = {
   id: 'B178-tag-along-after-resource-market',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   actionSpaces: 'all',
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {

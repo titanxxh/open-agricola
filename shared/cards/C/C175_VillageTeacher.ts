@@ -13,7 +13,7 @@ const occupiedLessonsCount = (context: CardListenerContext) =>
 const listener: CardListenerRegistration = {
   id: 'C175-village-teacher-after-lessons',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isLessonsSpaceId(context.space?.id)) return

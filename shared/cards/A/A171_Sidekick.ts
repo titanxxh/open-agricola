@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { canPlaceWorkerOnSpace } from '../../actions/helpers/placement-availability'
 import { getLeftRoundActionSpaceId } from '../helpers/round-action-topology'
 import { payLeaf } from '../helpers/pay-gain-node'
@@ -35,8 +35,9 @@ const canPlaceOnLeftTarget = (context: CardListenerContext, targetSpaceId: strin
 const listener: CardListenerRegistration = {
   id: 'A171-sidekick-after-round-card',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['immediatelyAfter'],
+  actionSpaces: 'all',
+  requiresNewPlacement: true,
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const leftSpaceId = getLeftTargetSpaceId(context)

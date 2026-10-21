@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { countTerrain } from './moor-batch1-helpers'
@@ -10,7 +10,7 @@ const CARD_ID = 'M103_ForestKindergarten'
 const listener: CardListenerRegistration = {
   id: 'M103-forest-kindergarten-after-family-growth',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['immediatelyAfter'],
   actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const food = countTerrain(context.player, 'forest')
