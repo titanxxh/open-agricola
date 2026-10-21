@@ -104,8 +104,8 @@ describe('complete action-space use reactions', () => {
 })
 
 describe('space and rule reaction timing', () => {
-  function opening({ minors = [], occupation = [], hand = ['__test_placeholder__'], wood = 0, clay = 0, playerCount = 2 }: {
-    minors?: string[]; occupation?: string[]; hand?: string[]; wood?: number; clay?: number; playerCount?: number
+  function opening({ minors = [], occupation = [], hand = ['__test_placeholder__'], occupationHand = ['__test_placeholder__'], wood = 0, clay = 0, food = 0, playerCount = 2 }: {
+    minors?: string[]; occupation?: string[]; hand?: string[]; occupationHand?: string[]; wood?: number; clay?: number; food?: number; playerCount?: number
   }) {
     const session = createWorkSession({ seed: 42, options: { playerCount }, configure: state => {
       state.round = 8
@@ -123,7 +123,8 @@ describe('space and rule reaction timing', () => {
       player.minorPlayed = minors
       player.occupationPlayed = occupation
       player.minorHand = hand
-      Object.assign(player.resources, { wood, clay })
+      player.occupationHand = occupationHand
+      Object.assign(player.resources, { wood, clay, food })
       state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
     } })
     sessions.push(session)
@@ -166,18 +167,41 @@ describe('space and rule reaction timing', () => {
     expect(response.state.events.filter(event => event.sourceCardId === 'A048_ShavingHorse' && event.type === 'resource.paid')).toEqual([])
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
   })
-  it.each([
-    { card: 'A042_ForestLakeHut', wood: 0, clay: 2, finalWood: 3, finalFood: 1 },
-    { card: 'A048_ShavingHorse', wood: 6, clay: 0, finalWood: 8, finalFood: 0 },
-  ])('discovers new space-after sources without replaying earlier rule reactions: $card', example => {
-    const session = opening({ playerCount: 3, occupation: ['B131_Equipper'], hand: [example.card], wood: example.wood, clay: example.clay })
+  function playByEquipper(session: GameSession, card: string) {
     let response = accept(session, session.takeAction(0, 'forest'), 'B131_Equipper')
     if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'ui.interactionChooseImprovement') {
-      response = choose(session, response, example.card)
+      response = choose(session, response, card)
     }
-    expect(response.state.players[0]!.minorPlayed).toContain(example.card)
+    expect(response.state.players[0]!.minorPlayed).toContain(card)
+    return response
+  }
+  const playedOnce = (response: SessionResponse, card: string) =>
+    expect(response.state.events.filter(event => event.type === 'card.played' && event.cardId === card)).toHaveLength(1)
+  it.each([
+    // A space before source: this use's before window has already passed when Equipper plays it.
+    { card: 'A042_ForestLakeHut', wood: 0, clay: 2, finalWood: 3, finalFood: 0 },
+    { card: 'A048_ShavingHorse', wood: 6, clay: 0, finalWood: 8, finalFood: 0 },
+  ])('does not replay passed before windows or earlier rule reactions for a card played immediately after: $card', example => {
+    const session = opening({ playerCount: 3, occupation: ['B131_Equipper'], hand: [example.card], wood: example.wood, clay: example.clay })
+    const response = playByEquipper(session, example.card)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: example.finalWood, clay: 0, food: example.finalFood })
-    expect(response.state.events.filter(event => event.type === 'card.played' && event.cardId === example.card)).toHaveLength(1)
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === example.card)).toEqual([])
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    playedOnce(response, example.card)
+  })
+  it('discovers a new space-after source played immediately after and offers it on the same use', () => {
+    const studies = 'B028_ForestryStudies'
+    const occupation = 'A110_Roughcaster'
+    const session = opening({ playerCount: 3, occupation: ['B131_Equipper'], hand: [studies], occupationHand: [occupation], food: 2 })
+    let response = playByEquipper(session, studies)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+    response = accept(session, response, studies)
+    if (options(response).some(option => option.value === occupation)) response = choose(session, response, occupation)
+    expect(response.state.players[0]!.occupationPlayed).toEqual(['B131_Equipper', occupation])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
+    expect(response.state.actionSpaces.find(space => space.id === 'forest')!.resources.wood).toBe(2)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    playedOnce(response, studies)
+    expect(response.state.events.filter(event => event.type === 'card.triggered' && event.sourceCardId === studies)).toHaveLength(1)
   })
 })

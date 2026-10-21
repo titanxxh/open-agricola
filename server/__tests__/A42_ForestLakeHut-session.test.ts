@@ -11,6 +11,8 @@ import '../../shared/cards/A/A006_StorageBarn'
 import assert from 'node:assert/strict'
 import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit07Triggers from './_helpers/audit/ae-negative-07-triggers'
+import { createWorkSession } from './_helpers/session-fixtures'
+import type { SessionResponse } from '../game/authoritative-session'
 
 const CARD_ID = 'A042_ForestLakeHut'
 const FILLER = '__test_placeholder__'
@@ -174,5 +176,62 @@ describe('ae-negative-07-triggers', () => {
   })
   it('A042 N8 occupied Forest rejects a second use before a legal action retry', () => {
     const s=setup(HUT,{resources:{food:0},configure(state){stock(state,'forest','wood',3)}});turn(s,0,'forest');turn(s,1,'grain-seeds');ready(s,0);assertRejectedUnchanged(s,()=>s.takeAction(0,'forest'));const r=turn(s,0,'clay-pit');assert.deepEqual([r.state.players[0]!.resources.wood,r.state.players[0]!.resources.food],[3,1])
+  })
+})
+
+describe('A042 before timing (#1321)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(s => s.dispose()))
+  const PALISADES = 'B030_WoodPalisades'
+  const options = (r: SessionResponse) => r.interaction.stateId === 'wait' ? r.interaction.request.options ?? [] : []
+  // Equipper is a 3+ player card; three players is the smallest game where the same Forest use has an immediate minor action.
+  const equipperForest = (hut: boolean) => {
+    const session = createWorkSession({ seed: 1321, options: { playerCount: 3 }, configure: state => {
+      for (const player of state.players) {
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        for (const resource of Object.keys(player.resources)) Reflect.set(player.resources, resource, 0)
+        setWorkersAtHome(state, player, 2)
+      }
+      for (const space of state.actionSpaces) space.takenBy = []
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      const owner = state.players[0]!
+      owner.occupationPlayed = ['B131_Equipper']
+      owner.minorPlayed = hut ? [CARD_ID] : []
+      owner.minorHand = [PALISADES]
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('pays the Forest food before the immediate Equipper minor action, which spends it on Wood Palisades', () => {
+    const session = equipperForest(true)
+    let r = session.takeAction(0, 'forest')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[0]!.resources).toMatchObject({ wood: 3, food: 1 })
+    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard, JSON.stringify(r.interaction)).toBe('B131_Equipper')
+    const enter = options(r).find(o => o.value !== '__skip__' && !o.disabled)
+    expect(enter).toBeDefined()
+    r = session.resolveChoice(0, enter!.value)
+    if (r.interaction.stateId === 'wait' && options(r).some(o => o.value === PALISADES)) r = session.resolveChoice(0, PALISADES)
+    expect(r.ok, r.error).toBe(true)
+    expect(r.state.players[0]!.minorPlayed).toEqual([CARD_ID, PALISADES])
+    expect(r.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+    const played = r.state.events.find(e => e.type === 'card.played' && e.cardId === PALISADES)
+    expect(played?.type === 'card.played' && played.payment?.resources).toEqual({ food: 1 })
+    const hutFood = r.state.events.findIndex(e => e.type === 'resource.moved' && e.sourceCardId === CARD_ID)
+    expect(hutFood).toBeGreaterThanOrEqual(0)
+    expect(hutFood).toBeLessThan(r.state.events.indexOf(played!))
+    expect(r.state.log.filter(entry => entry.key === 'log.cardTriggered' && entry.params?.cardId === CARD_ID)).toHaveLength(1)
+    expect(r.interaction.stateId === 'wait' && r.interaction.request.kind).toBe('confirm-next-player')
+  })
+
+  it('without Forest Lake Hut the same Forest use cannot afford Wood Palisades', () => {
+    const session = equipperForest(false)
+    const r = session.takeAction(0, 'forest')
+    expect(r.ok, r.error).toBe(true)
+    expect(options(r).some(o => o.value === PALISADES && !o.disabled)).toBe(false)
+    expect(r.state.players[0]!.resources).toMatchObject({ wood: 3, food: 0 })
+    expect(r.state.players[0]!.minorHand).toEqual([PALISADES])
   })
 })
