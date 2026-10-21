@@ -1,3 +1,4 @@
+import { getReapedCropAmount } from '../../actions/helpers/reap-listener'
 import { defineOccupationCard } from '../card-source'
 import {
   readCardExtraData,
@@ -54,9 +55,8 @@ const reapListener: CardListenerRegistration = {
   phases: ['after'],
   handler: (ctx) => {
     const player = ctx.player
-    const crop = ctx.extraData?.crop as string | undefined
-    const amount = ctx.extraData?.amount as number | undefined
-    if (crop !== 'vegetable' || typeof amount !== 'number' || amount <= 0) return
+    const amount = getReapedCropAmount(ctx, 'vegetable')
+    if (amount <= 0) return
     // Rule: bonus VP gated on saturation flag; defensive fallback to live check
     // for paths that bypass the four flag-setting hooks.
     if (!isSaturatedFlagged(player) && !isFarmSaturated(player)) return

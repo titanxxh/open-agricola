@@ -262,6 +262,13 @@ describe('D165 before timing (#1322)', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
+    expect(response.state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep).toBe(1)
+    response = session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'pasture-b', zoneType: 'pasture', animalType: 'boar', animalCount: 1 }],
+    })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
     expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'sheep-market', type: 'resource.moved' })
     response = session.resolveChoice(0, 'confirm', [

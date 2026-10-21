@@ -48,6 +48,8 @@ describe('browser generation prompt and deployed sandbox contract', () => {
   it('chooses listener timing by the card timing rule and shows a space-use bonus as before', () => {
     expect(prompt).toContain('an extra benefit for using a space is place-farmer before')
     expect(prompt).toContain('taking at least N goods from an accumulating space or performing an action is after')
+    expect(prompt).toContain('依赖行动结果的反应，或牌面明确写明 after 的效果')
+    expect(prompt).not.toContain('追加效果、获得额外资源')
     const example = sandbox.split('### 5.5')[1]!.split('### 5.6')[0]!
     expect(example).toContain("actions: ['place-farmer'],\n  phases: ['before'],")
     expect(example).not.toContain("actions: ['place-farmer'],\n  phases: ['after'],")

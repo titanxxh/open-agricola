@@ -617,7 +617,7 @@ describe('listener purity wave 2a', () => {
     const ctx = context(p, {
       actionId: 'reap',
       phase: 'after',
-      extraData: { crop: 'vegetable', amount: 2 },
+      extraData: { reapedCropAmounts: { vegetable: 2 } },
     })
     const before = snapshot(p)
 

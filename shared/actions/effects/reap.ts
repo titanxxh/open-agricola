@@ -9,6 +9,7 @@ import {
   dispatchReapListeners,
   type ReapListenerOptions,
   type ReapTrigger,
+  type ReapReceipt,
 } from '../helpers/reap-listener'
 
 export { dispatchReapListeners, type ReapTrigger } from '../helpers/reap-listener'
@@ -296,17 +297,23 @@ export const reapAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.action' }
     }
 
-    const result = reap(state, player, eventSink, { trigger, sourceCard }, actionHooks)
+    const result = reap(state, player, eventSink, { trigger, sourceCard, afterCompletion: 'action' }, actionHooks)
     const reactionChildren: ActionFlow[] = []
     appendFlowChildren(reactionChildren, result.reactionFlow)
 
+    const extraData = {
+      reapSummary: result.reapSummary,
+      reapedCropAmounts: result.reapSummary.resources,
+      trigger,
+      sourceCard,
+    } satisfies ReapReceipt & { reapSummary: HarvestReapSummary }
     if (reactionChildren.length > 0) {
-      return { type: 'flow', flow: { type: 'parallel', children: reactionChildren } }
+      return { type: 'flow', flow: { type: 'parallel', children: reactionChildren }, extraData }
     }
     return {
       type: 'ok',
       resourcesGained: result.reapSummary.resources,
-      extraData: { reapSummary: result.reapSummary },
+      extraData,
     }
   },
 }

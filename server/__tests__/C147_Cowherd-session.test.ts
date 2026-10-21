@@ -149,10 +149,17 @@ describe('C147 before timing (#1322)', () => {
     return session
   }
 
-  it('adds the cattle before Cattle Market is collected and houses both in one reorganization', () => {
+  it('houses the bonus cattle before collecting and housing Cattle Market cattle', () => {
     const session = make(0)
     let response = session.takeAction(0, 'cattle-market')
 
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.state.players[0]!.resources.cattle).toBe(1)
+    expect(response.state.actionSpaces.find(space => space.id === 'cattle-market')!.resources.cattle).toBe(1)
+    response = session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'owner-pasture', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 }],
+    })
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
     expect(response.state.players[0]!.resources.cattle).toBe(2)
