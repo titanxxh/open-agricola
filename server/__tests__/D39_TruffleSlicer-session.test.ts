@@ -77,7 +77,7 @@ const findListener = (ruleOwner: TestCardRegistry, id: string) =>
 describe('D039_TruffleSlicer', () => {
   it('triggers optional pay 1 food for 1 bonus VP on forest space with boar', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-after-place-farmer')
+    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-before-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -86,7 +86,7 @@ describe('D039_TruffleSlicer', () => {
       player,
       space: createSpace('forest'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
 
@@ -103,14 +103,14 @@ describe('D039_TruffleSlicer', () => {
 
   it('triggers on copse space', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-after-place-farmer')!
+    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-before-place-farmer')!
     const player = createPlayer()
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(player),
       player,
       space: createSpace('copse'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
     expect(result).toBeDefined()
@@ -119,14 +119,14 @@ describe('D039_TruffleSlicer', () => {
 
   it('triggers on grove space', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-after-place-farmer')!
+    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-before-place-farmer')!
     const player = createPlayer()
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(player),
       player,
       space: createSpace('grove'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
     expect(result).toBeDefined()
@@ -135,14 +135,14 @@ describe('D039_TruffleSlicer', () => {
 
   it('does not trigger on non-wood space', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-after-place-farmer')!
+    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-before-place-farmer')!
     const player = createPlayer()
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
       state: createState(player),
       player,
       space: createSpace('reed-bank'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
@@ -150,7 +150,7 @@ describe('D039_TruffleSlicer', () => {
 
   it('does not trigger when player has no boar', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-after-place-farmer')!
+    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-before-place-farmer')!
     const player = createPlayer()
     player.resources.boar = 0
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
@@ -158,7 +158,7 @@ describe('D039_TruffleSlicer', () => {
       player,
       space: createSpace('forest'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
@@ -166,7 +166,7 @@ describe('D039_TruffleSlicer', () => {
 
   it('does not trigger when player has no food', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-after-place-farmer')!
+    const listener = findListener(ruleRegistry, 'D39-truffle-slicer-before-place-farmer')!
     const player = createPlayer()
     player.resources.food = 0
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener, {
@@ -174,7 +174,7 @@ describe('D039_TruffleSlicer', () => {
       player,
       space: createSpace('forest'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       result: { type: 'ok' },
     } as unknown as CardListenerContext))
     expect(result).toBeUndefined()

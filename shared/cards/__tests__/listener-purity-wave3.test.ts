@@ -158,7 +158,7 @@ describe('listener purity wave 3', () => {
   it('B060 only queues after the optional grain payment is accepted', () => {
     const p = player({ resources: { ...resources(), grain: 1 } })
     const result = invokePure(
-      listener(B060_BrewingWater_impl.listeners, 'B60-brewing-water-after-place-farmer'),
+      listener(B060_BrewingWater_impl.listeners, 'B60-brewing-water-before-place-farmer'),
       context(p, { space: { id: 'fishing' } as CardListenerContext['space'] }),
     )
     expect(result?.flow).toMatchObject({ type: 'seq', optional: true })

@@ -80,7 +80,7 @@ describe('A138 Harpooner parity', () => {
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
   })
 
-  it('A138 S2: a two-person family may pay one wood after Fishing for two extra food and one reed', () => {
+  it('A138 S2: a two-person family may pay one wood before Fishing for two extra food and one reed', () => {
     const session = setup()
     const response = acceptHarpooner(session, session.takeAction(0, 'fishing'))
 

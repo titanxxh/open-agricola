@@ -12,10 +12,10 @@ const CARD_ID = 'D039_TruffleSlicer'
  * if player has pigs (boar > 0), can pay 1 food for 1 bonus score.
  */
 const listener: CardListenerRegistration = {
-  id: 'D39-truffle-slicer-after-place-farmer',
+  id: 'D39-truffle-slicer-before-place-farmer',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpaceId(context.space?.id)) return
     if ((context.player.resources.boar ?? 0) <= 0) return
