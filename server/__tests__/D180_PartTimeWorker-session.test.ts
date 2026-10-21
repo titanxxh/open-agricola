@@ -1,147 +1,252 @@
-import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
-import '../../shared/cards/D/D180_PartTimeWorker'
-import '../../shared/cards/A/A108_MushroomCollector'
-import '../../shared/cards/A/A056_Basket'
-import '../../shared/cards/A/A171_Sidekick'
+import assert from 'node:assert/strict'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
+import type { ActionChoiceOption, GameState, Resource } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'D180_PartTimeWorker'
-const MINOR_CARDS = new Set(['A056_Basket'])
+const sessions: GameSession[] = []
+afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
-const setup = (cards: string[], forestResources: Partial<Resource>) => {
-  const session = new GameSession(42, undefined, { playerCount: 5 })
-  const state = session.getState().state
-  state.currentPlayerIndex = 0
-  state.round = 1
-  state.players.forEach((player) => {
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
-  })
-  const player = state.players[0]!
-  player.occupationPlayed = cards.filter((cardId) => !MINOR_CARDS.has(cardId))
-  player.minorPlayed = cards.filter((cardId) => MINOR_CARDS.has(cardId))
-  player.resources.wood = 0
-  player.resources.food = 0
-  player.resources.sheep = 0
-  player.resources.boar = 0
-  player.resources.cattle = 0
-  const forest = state.actionSpaces.find((space) => space.id === 'forest')!
-  forest.resources = { ...forest.resources, ...forestResources }
-  session.loadState(state)
+// Five players satisfy D180's printed 5+ requirement. Fresh round-1 work game,
+// placeholder hands, P0 to act, no goods or animals in P0's supply.
+function setup(forest: Partial<Resource>, configure?: (state: GameState) => void) {
+  const session = createWorkSession({ options: { playerCount: 5 }, configure: state => {
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    Object.assign(player.resources, { wood: 0, clay: 0, stone: 0, food: 0, sheep: 0, boar: 0, cattle: 0 })
+    const space = state.actionSpaces.find(candidate => candidate.id === 'forest')!
+    space.resources = { ...space.resources, wood: 0, ...forest }
+    configure?.(state)
+  } })
+  sessions.push(session)
   return session
 }
 
-const optionFrom = (resp: ReturnType<GameSession['getState']>, sourceCard: string) => {
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') return undefined
-  return resp.interaction.request.options?.find((option: ActionChoiceOption) =>
-    option.sourceCard === sourceCard && option.value !== '__skip__',
-  )
-}
+const options = (response: SessionResponse): ActionChoiceOption[] =>
+  response.interaction.stateId === 'wait' ? response.interaction.request.options ?? [] : []
 
-const chooseFrom = (session: GameSession, resp: ReturnType<GameSession['getState']>, sourceCard: string) => {
-  const wasTriggerSelect = resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger'
-  const option = optionFrom(resp, sourceCard)
-  expect(option).toBeDefined()
-  let next = session.resolveChoice(0, option!.value)
-  if (!wasTriggerSelect) return next
-  const nested = optionFrom(next, sourceCard)
-  if (!nested) return next
-  next = session.resolveChoice(0, nested.value)
+const spaceResources = (response: SessionResponse, spaceId: string) =>
+  response.state.actionSpaces.find(space => space.id === spaceId)!.resources
+
+/** Keeps the proposed housing when the new animal opens a reorganization. */
+const settleAnimals = (session: GameSession, response: SessionResponse) => {
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') return response
+  const zones = response.interaction.request.zones.map(({ id, zoneType, animalType, animalCount }) =>
+    ({ id, zoneType, animalType, animalCount }))
+  const next = session.resolveChoice(response.interaction.playerIndex, 'confirm', zones as unknown as Record<string, unknown>)
+  assert.equal(next.ok, true, next.error)
   return next
 }
 
+const choose = (session: GameSession, response: SessionResponse, option: ActionChoiceOption | undefined) => {
+  assert.ok(option, JSON.stringify(response.interaction))
+  const next = session.resolveChoice(response.interaction.playerIndex, option.value)
+  assert.equal(next.ok, true, next.error)
+  return settleAnimals(session, next)
+}
+
+const chooseCard = (session: GameSession, response: SessionResponse) =>
+  choose(session, response, options(response).find(option => option.sourceCard === CARD_ID))
+
+const chooseOriginal = (session: GameSession, response: SessionResponse) =>
+  choose(session, response, options(response).find(option => option.sourceCard !== CARD_ID && !option.value.startsWith('__')))
+
+const isWait = (response: SessionResponse, kind: string) =>
+  response.interaction.stateId === 'wait' && response.interaction.request.kind === kind
+
+/** Take a card's offer through an optional select-trigger and its own optional prompt. */
+const acceptCard = (session: GameSession, response: SessionResponse, cardId: string) => {
+  for (let step = 0; step < 3; step += 1) {
+    const option = options(response).find(candidate => candidate.sourceCard === cardId && !candidate.value.startsWith('__'))
+      ?? options(response).find(candidate => candidate.value === cardId)
+    if (!option) return response
+    response = choose(session, response, option)
+  }
+  return response
+}
+
+const collectEvents = (response: SessionResponse, spaceId = 'forest') => response.state.events.filter(event =>
+  event.type === 'resource.moved' && event.reason === 'collect'
+  && event.from.kind === 'actionSpace' && event.from.spaceId === spaceId)
+
 describe('D180 Part-Time Worker session', () => {
-  it.each([[4, 2, 'boar'], [6, 3, 'cattle']] as const)('leaves %i goods as the printed half and gains %s', (total, returned, animal) => {
-    const session = setup([CARD_ID], { wood: total })
-    const response = chooseFrom(session, session.takeAction(0, 'forest'), CARD_ID)
-    expect(response.ok).toBe(true)
-    expect(response.state.players[0]!.resources.wood).toBe(total - returned)
-    expect(response.state.players[0]!.resources[animal]).toBe(1)
-    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(returned)
+  it.each([[2, 'sheep'], [4, 'boar'], [6, 'cattle']] as const)(
+    'decides before taking: %i wood leave half on Forest and give 1 %s',
+    (total, animal) => {
+      const session = setup({ wood: total })
+
+      let response = session.takeAction(0, 'forest')
+      expect(response.ok, response.error).toBe(true)
+      expect(options(response).some(option => option.sourceCard === CARD_ID)).toBe(true)
+      expect(spaceResources(response, 'forest').wood).toBe(total)
+      expect(response.state.players[0]!.resources.wood).toBe(0)
+
+      response = chooseCard(session, response)
+
+      const player = response.state.players[0]!
+      expect(player.resources.wood).toBe(total / 2)
+      expect(player.resources[animal]).toBe(1)
+      expect(spaceResources(response, 'forest').wood).toBe(total / 2)
+      expect(collectEvents(response)).toEqual([
+        expect.objectContaining({ resources: { wood: total / 2 }, to: { kind: 'player', playerId: player.id } }),
+      ])
+      expect(response.state.events.some(event => event.type === 'resource.moved' && event.reason === 'return')).toBe(false)
+    },
+  )
+
+  it('keeps the original collect when the owner declines', () => {
+    const session = setup({ wood: 2 })
+
+    const response = chooseOriginal(session, session.takeAction(0, 'forest'))
+
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, sheep: 0, boar: 0, cattle: 0 })
+    expect(spaceResources(response, 'forest').wood).toBe(0)
+    expect(collectEvents(response)).toEqual([expect.objectContaining({ resources: { wood: 2 } })])
   })
 
-  it('accepts exact two goods by returning one good and gaining a sheep', () => {
-    const session = setup([CARD_ID], { wood: 2 })
+  it('undo restores the goods and offers the same choice again', () => {
+    const session = setup({ wood: 6 })
+    const first = chooseCard(session, session.takeAction(0, 'forest'))
+    expect(first.state.players[0]!.resources).toMatchObject({ wood: 3, cattle: 1 })
 
-    let resp = session.takeAction(0, 'forest')
-    resp = chooseFrom(session, resp, CARD_ID)
+    const undone = session.undoAction()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.resources).toMatchObject({ wood: 0, cattle: 0 })
+    expect(spaceResources(undone, 'forest').wood).toBe(6)
 
-    const player = resp.state.players[0]!
-    const forest = resp.state.actionSpaces.find((space) => space.id === 'forest')!
-    expect(player.resources).toMatchObject({ wood: 1, sheep: 1 })
-    expect(forest.resources.wood).toBe(1)
+    const retried = chooseCard(session, session.takeAction(0, 'forest'))
+    expect(retried.state.players[0]!.resources).toMatchObject({ wood: 3, cattle: 1 })
+    expect(spaceResources(retried, 'forest').wood).toBe(3)
   })
 
-  it('declines without returning goods or gaining an animal', () => {
-    const session = setup([CARD_ID], { wood: 2 })
+  it('offers every way to leave mixed goods and takes only the rest', () => {
+    const session = setup({ wood: 2, clay: 2 })
 
-    let resp = session.takeAction(0, 'forest')
-    expect(optionFrom(resp, CARD_ID)).toBeDefined()
-    resp = session.resolveChoice(0, '__skip__')
+    let response = chooseCard(session, session.takeAction(0, 'forest'))
+    const takes = options(response).map(option => (option.descriptionPreview?.kind === 'group'
+      ? option.descriptionPreview.parts.flatMap(part => part.kind === 'action' && part.effectPreview?.kind === 'resourceExchange'
+        ? [part.effectPreview.resourcesGained] : [])
+      : []))
+    expect(takes).toEqual([
+      [{ wood: 2 }, { boar: 1 }],
+      [{ wood: 1 }, { clay: 1 }, { boar: 1 }],
+      [{ clay: 2 }, { boar: 1 }],
+    ])
+    expect(spaceResources(response, 'forest')).toMatchObject({ wood: 2, clay: 2 })
 
-    const player = resp.state.players[0]!
-    const forest = resp.state.actionSpaces.find((space) => space.id === 'forest')!
-    expect(player.resources).toMatchObject({ wood: 2, sheep: 0, boar: 0, cattle: 0 })
-    expect(forest.resources.wood).toBe(0)
+    response = choose(session, response, options(response)[1])
+
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1, boar: 1 })
+    expect(spaceResources(response, 'forest')).toMatchObject({ wood: 1, clay: 1 })
   })
 
-  it('does not trigger for non-matching totals', () => {
-    const session = setup([CARD_ID], { wood: 3 })
+  it('left goods do not count for take-at-least-N cards; taking everything still does', () => {
+    const configure = (state: GameState) => {
+      const [owner, opponent] = state.players
+      owner!.occupationPlayed = [CARD_ID, 'D140_Loudmouth']
+      owner!.resources.food = 2
+      opponent!.occupationPlayed = ['D169_Plowsmith', 'B138_ForestGuardian']
+      opponent!.resources.food = 1
+    }
 
-    const resp = session.takeAction(0, 'forest')
+    const leave = setup({ wood: 6 }, configure)
+    const left = chooseCard(leave, leave.takeAction(0, 'forest'))
+    expect(left.state.players[0]!.resources).toMatchObject({ wood: 3, cattle: 1, food: 2 })
+    expect(left.state.players[1]!.resources.food).toBe(1)
+    expect(spaceResources(left, 'forest').wood).toBe(3)
+    expect(isWait(left, 'confirm-player-switch')).toBe(false)
+    expect(left.state.events.filter(event => event.type === 'card.triggered').map(event => event.cardId))
+      .not.toEqual(expect.arrayContaining([expect.stringMatching(/D140|D169|B138/)]))
 
-    expect(optionFrom(resp, CARD_ID)).toBeUndefined()
-    expect(resp.state.players[0]!.resources.wood).toBe(3)
+    const take = setup({ wood: 6 }, configure)
+    let taken = chooseOriginal(take, take.takeAction(0, 'forest'))
+    for (let step = 0; step < 4 && isWait(taken, 'confirm-player-switch'); step += 1) taken = confirmPlayerSwitch(take)
+    taken = acceptCard(take, taken, 'D140_Loudmouth')
+    for (let step = 0; step < 4 && isWait(taken, 'confirm-player-switch'); step += 1) taken = confirmPlayerSwitch(take)
+    expect(taken.state.players[0]!.resources).toMatchObject({ wood: 6, cattle: 0, food: 2 })
+    expect(taken.state.players[1]!.resources.food).toBe(2)
+    expect(taken.interaction.playerIndex).toBe(1)
+    expect(options(taken).some(option => option.sourceCard === 'D169_Plowsmith')).toBe(true)
+  }, 30_000)
+
+  it.each([[6, 3, 1], [4, 2, 0]] as const)(
+    'take-at-least-N cards count the goods actually taken (%i stone, take %i)',
+    (onSpace, taken, corfStone) => {
+      const session = setup({}, state => {
+        state.round = 3
+        state.roundActionOrder = state.roundActionOrder.map(() => null)
+        state.roundActionOrder[0] = 'western-quarry'
+        state.players[0]!.minorPlayed = ['B079_Corf']
+        state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone = onSpace
+      })
+
+      const response = chooseCard(session, session.takeAction(0, 'western-quarry'))
+
+      expect(collectEvents(response, 'western-quarry')).toEqual([expect.objectContaining({ resources: { stone: taken } })])
+      expect(response.state.players[0]!.resources.stone).toBe(taken + corfStone)
+      expect(spaceResources(response, 'western-quarry').stone).toBe(onSpace - taken)
+    },
+  )
+
+  it('does not offer the card for other totals, non-accumulation spaces or a card partial take', () => {
+    const three = setup({ wood: 3 })
+    const collected = three.takeAction(0, 'forest')
+    expect(options(collected).some(option => option.sourceCard === CARD_ID)).toBe(false)
+    expect(collected.state.players[0]!.resources.wood).toBe(3)
+
+    const partial = setup({ wood: 4 }, state => { state.players[0]!.minorPlayed = ['A082_WorkCertificate'] })
+    let response = partial.takeAction(0, 'day-laborer')
+    expect(options(response).some(option => option.sourceCard === CARD_ID)).toBe(false)
+    for (let step = 0; step < 3; step += 1) {
+      const take = options(response).find(option => option.labelKey === 'ui.interactionTakeFromSpace'
+        && option.labelParams?.spaceId === 'forest' && option.labelParams?.resource === 'wood')
+      response = choose(partial, response, take ?? options(response).find(option => option.sourceCard === 'A082_WorkCertificate'))
+      if (take) break
+    }
+    expect(options(response).some(option => option.sourceCard === CARD_ID)).toBe(false)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(spaceResources(response, 'forest').wood).toBe(3)
   })
 
-  it('coexists with two other return-to-space optional cards in the same collect sequence', () => {
-    const session = setup(['A108_MushroomCollector', 'A056_Basket', CARD_ID], { wood: 6 })
-
-    let resp = session.takeAction(0, 'forest')
-    resp = chooseFrom(session, resp, 'A108_MushroomCollector')
-    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 5, food: 2 })
-    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(1)
-
-    resp = chooseFrom(session, resp, 'A056_Basket')
-    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 3, food: 5 })
-    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(3)
-
-    resp = chooseFrom(session, resp, CARD_ID)
-    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, cattle: 1 })
-    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(6)
-  })
-
-  it('returns goods to the collected target space when a card placement collects a different space', () => {
-    const session = new GameSession(42, undefined, { playerCount: 5 })
-    const state = session.getState().state
-    state.currentPlayerIndex = 0
-    state.round = 3
-    state.roundActionOrder = state.roundActionOrder.map(() => null)
-    state.roundActionOrder[0] = 'western-quarry'
-    state.roundActionOrder[1] = 'eastern-quarry'
-    state.players.forEach((player) => {
-      player.minorHand = ['__test_placeholder__']
-      player.occupationHand = ['__test_placeholder__']
+  it('offers the card at the collect of a space reached through a card placement', () => {
+    const session = setup({}, state => {
+      state.round = 3
+      state.roundActionOrder = state.roundActionOrder.map(() => null)
+      state.roundActionOrder[0] = 'western-quarry'
+      state.roundActionOrder[1] = 'eastern-quarry'
+      const player = state.players[0]!
+      player.occupationPlayed = ['A171_Sidekick', CARD_ID]
+      player.resources.food = 2
+      state.actionSpaces.find(space => space.id === 'western-quarry')!.resources.stone = 2
+      state.actionSpaces.find(space => space.id === 'eastern-quarry')!.resources.stone = 1
     })
-    const player = state.players[0]!
-    player.occupationPlayed = ['A171_Sidekick', CARD_ID]
-    player.resources.food = 2
-    player.resources.stone = 0
-    player.resources.sheep = 0
-    const western = state.actionSpaces.find((space) => space.id === 'western-quarry')!
-    const eastern = state.actionSpaces.find((space) => space.id === 'eastern-quarry')!
-    western.resources.stone = 2
-    eastern.resources.stone = 1
-    session.loadState(state)
 
-    let resp = session.takeAction(0, 'eastern-quarry')
-    resp = chooseFrom(session, resp, 'A171_Sidekick')
-    resp = chooseFrom(session, resp, CARD_ID)
+    let response = acceptCard(session, session.takeAction(0, 'eastern-quarry'), 'A171_Sidekick')
+    expect(spaceResources(response, 'western-quarry').stone).toBe(2)
+    response = chooseCard(session, response)
 
-    expect(resp.state.players[0]!.resources).toMatchObject({ stone: 2, sheep: 1 })
-    expect(resp.state.actionSpaces.find((space) => space.id === 'western-quarry')!.resources.stone).toBe(1)
-    expect(resp.state.actionSpaces.find((space) => space.id === 'eastern-quarry')!.resources.stone).toBe(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 2, sheep: 1, food: 1 })
+    expect(spaceResources(response, 'western-quarry').stone).toBe(1)
+    expect(spaceResources(response, 'eastern-quarry').stone).toBe(0)
+    expect(collectEvents(response, 'western-quarry')).toEqual([expect.objectContaining({ resources: { stone: 1 } })])
+  })
+
+  it('leaves the taken goods available to immediate return-to-space cards', () => {
+    const session = setup({ wood: 6 }, state => {
+      const player = state.players[0]!
+      player.occupationPlayed = ['A108_MushroomCollector', CARD_ID]
+      player.minorPlayed = ['A056_Basket']
+    })
+
+    let response = chooseCard(session, session.takeAction(0, 'forest'))
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, cattle: 1 })
+    response = acceptCard(session, response, 'A108_MushroomCollector')
+    response = acceptCard(session, response, 'A056_Basket')
+
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 5, cattle: 1 })
+    expect(spaceResources(response, 'forest').wood).toBe(6)
   })
 })
