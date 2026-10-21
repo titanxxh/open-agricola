@@ -8,9 +8,9 @@ import { LESSONS_SPACE_IDS } from '../helpers/lessons-spaces'
 const CARD_ID = 'C131_PrivateTeacher'
 
 const listener: CardListenerRegistration = {
-  id: 'C131-private-teacher-after-place-farmer',
+  id: 'C131-private-teacher-before-space-use',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-seeds') return
