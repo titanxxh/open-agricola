@@ -15,7 +15,7 @@ const listener: CardListenerRegistration = {
   id: 'E82-profiteering-day-laborer',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'day-laborer') return
     const children = BUILDING_RESOURCES

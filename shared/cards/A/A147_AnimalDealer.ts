@@ -14,9 +14,9 @@ const SPACE_TO_ANIMAL: Record<string, AnimalKey> = {
 }
 
 const listener: CardListenerRegistration = {
-  id: 'A147-animal-dealer-after-place-farmer',
+  id: 'A147-animal-dealer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id ?? ''

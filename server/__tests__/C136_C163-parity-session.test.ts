@@ -92,6 +92,13 @@ describe('C138 Animal Feeder parity', () => {
     const session = setup({ cardId: 'C138_AnimalFeeder', playerCount: 3, resources: { food: cost } })
     session.state.players[0]!.pastures = [{ id: 'p', size: 3, tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }], stables: 1, animalType: null, animalCount: 0 }]; session.loadState(session.state)
     let response = session.takeAction(0, 'day-laborer'); response = resolveTriggerIfPresent(session, response, 'C138_AnimalFeeder'); response = choose(session, response, (option) => JSON.stringify(option).toLowerCase().includes(resource));
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
+      const zones = response.interaction.request.zones.map(zone => ({ ...zone,
+        animalType: zone.id === 'p' ? resource : null,
+        animalCount: zone.id === 'p' ? 1 : 0,
+      }))
+      response = session.resolveChoice(response.interaction.playerIndex, 'confirm', { zones })
+    }
     expect(response.state.players[0]!.resources[resource]).toBe(1); expect(response.state.players[0]!.resources.food).toBe(2)
   })
 })
