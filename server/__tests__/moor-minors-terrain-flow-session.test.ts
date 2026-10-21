@@ -213,7 +213,7 @@ describe('Farmers of the Moor terrain minor cards', () => {
     expect(resp.state.players[0]!.farmTerrain).toEqual([])
   })
 
-  it('M042 Deep Plow places a moor on buy and replaces a moor after Farmland', () => {
+  it('M042 Deep Plow places a moor on buy and replaces a moor before Farmland', () => {
     const placedMoor = { row: 1, col: 4 }
     const session = setup('M042_DeepPlow', (player) => {
       player.improvements = ['Major_Well', 'Major_Joinery']
@@ -231,11 +231,11 @@ describe('Farmers of the Moor terrain minor cards', () => {
 
     resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
+    resp = acceptOptional(session, resp)
+    resp = commitTerrain(session, resp, [terrain.moorA])
     const field = resp.interaction.stateId === 'wait' ? resp.interaction.request.farm?.selectableTiles[0] : undefined
     expect(field).toBeDefined()
     resp = session.commitSelectionChoice(0, { tile: field })
-    resp = acceptOptional(session, resp)
-    resp = commitTerrain(session, resp, [terrain.moorA])
 
     expect(resp.state.players[0]!.fields).toContainEqual({ row: terrain.moorA.row, col: terrain.moorA.col, stacks: [] })
   })

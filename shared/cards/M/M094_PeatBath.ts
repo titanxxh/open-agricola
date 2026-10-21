@@ -8,10 +8,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'M094_PeatBath'
 
 const listener: CardListenerRegistration = {
-  id: 'M094-peat-bath-after-infirmary',
+  id: 'M094-peat-bath-before-infirmary',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'moor-infirmary') return
     const player = context.ownerPlayer ?? context.player

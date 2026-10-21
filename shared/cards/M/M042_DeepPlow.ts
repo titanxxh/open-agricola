@@ -10,10 +10,10 @@ const countImprovements = (player: { improvements: string[]; minorPlayed: string
   player.improvements.length + player.minorPlayed.length
 
 const farmlandListener: CardListenerRegistration = {
-  id: 'M042-deep-plow-after-farmland',
+  id: 'M042-deep-plow-before-farmland',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'farmland' && context.space?.id !== 'cultivation') return
     const flow = buildMoorToFieldFlow(CARD_ID, context.player, true)

@@ -404,7 +404,7 @@ describe('Moor action listener minors', () => {
   it('M129 Plowhorse Market offers food for horse on Farmland and Cultivation only when affordable', () => {
 
     const { session: ruleSession, state, player } = setup()
-    const listener = findListener(ruleSession, 'M129-plowhorse-market-after-place-farmer')
+    const listener = findListener(ruleSession, 'M129-plowhorse-market-before-place-farmer')
     player.minorPlayed.push('M129_PlowhorseMarket')
     player.resources.food = 1
     const farmland = ruleSession.withCtx(() => executeCardListener(listener, {
@@ -412,7 +412,7 @@ describe('Moor action listener minors', () => {
       player,
       space: space('farmland'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as CardListenerContext))
     expect(farmland?.flow).toMatchObject({ type: 'seq', optional: true })
 
@@ -421,7 +421,7 @@ describe('Moor action listener minors', () => {
       player,
       space: space('cultivation'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as CardListenerContext))
     expect(cultivation?.flow).toMatchObject({ type: 'seq', optional: true })
 
@@ -430,7 +430,7 @@ describe('Moor action listener minors', () => {
       player,
       space: space('grain-seeds'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as CardListenerContext))
     expect(nonTrigger).toBeUndefined()
 
@@ -440,7 +440,7 @@ describe('Moor action listener minors', () => {
       player,
       space: space('farmland'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as CardListenerContext))
     expect(noFood).toBeUndefined()
   })

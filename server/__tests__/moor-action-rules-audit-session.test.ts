@@ -135,32 +135,35 @@ describe('Moor action printed-rule native audit', () => {
     }
   })
 
-  it.each(['farmland', 'cultivation'])('M129 buys at most one horse after completing %s and allows declining', (spaceId) => {
+  it.each(['farmland', 'cultivation'])('M129 buys at most one horse before completing %s and allows declining', (spaceId) => {
     for (const mode of ['accept', 'decline', 'no-food']) {
       const session = setupMoorAudit(2, 14)
       session.state.players[0]!.minorPlayed = ['M129_PlowhorseMarket']
       session.state.players[0]!.resources.food = mode === 'no-food' ? 0 : 1
       let response = session.takeAction(0, spaceId)
       expect(response.ok, response.error).toBe(true)
+      if (mode === 'no-food') expect(response.interaction.sourceCard).not.toBe('M129_PlowhorseMarket')
+      else {
+        expect(response.interaction.sourceCard).toBe('M129_PlowhorseMarket')
+        response = mode === 'accept' ? acceptMoorAuditChoice(session, response) : session.resolveChoice(0, '__skip__')
+        expect(response.ok, response.error).toBe(true)
+        if (mode === 'accept') {
+          expect(response.interaction.request.kind).toBe('animal-reorg')
+          response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+          expect(response.ok, response.error).toBe(true)
+        }
+      }
       if (response.interaction.request.kind === 'choice') response = acceptMoorAuditChoice(session, response)
       expect(response.interaction.request.farm.farmType).toBe('plow')
       const tile = response.interaction.request.farm.selectableTiles[0]!
       response = session.commitSelectionChoice(0, { tile })
       expect(response.ok, response.error).toBe(true)
-      if (mode === 'no-food') expect(response.interaction.sourceCard).not.toBe('M129_PlowhorseMarket')
-      else {
-        expect(response.interaction.sourceCard).toBe('M129_PlowhorseMarket')
-        response = mode === 'accept' ? acceptMoorAuditChoice(session, response) : session.resolveChoice(0, '__skip__')
-      }
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources.horse).toBe(mode === 'accept' ? 1 : 0)
       expect(response.state.players[0]!.resources.food).toBe(mode === 'decline' ? 1 : 0)
       expect(response.state.players[0]!.fields).toContainEqual({ ...tile, stacks: [] })
       if (mode === 'accept') {
-        expect(response.interaction.request.kind).toBe('animal-reorg')
-        const placed = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
-        expect(placed.ok, placed.error).toBe(true)
-        expect(Object.values(placed.state.players[0]!.houseAnimals).length).toBe(1)
+        expect(Object.values(response.state.players[0]!.houseAnimals).length).toBe(1)
       }
     }
   })

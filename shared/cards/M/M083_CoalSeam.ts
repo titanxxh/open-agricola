@@ -7,10 +7,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'M083_CoalSeam'
 
 const listener: CardListenerRegistration = {
-  id: 'M083-coal-seam-after-work',
+  id: 'M083-coal-seam-before-work',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: ['day-laborer'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.moorAction?.actionId !== 'hiring-fair'
       && !(context.actionSpaceUse && context.space?.id === 'day-laborer')) return
@@ -24,8 +25,8 @@ const cardImpl = {
     onBuy: () => gainLeaf(CARD_ID, { fuel: 1 }),
   },
   listeners: [listener, {
-    id: 'M083-coal-seam-after-hiring-fair', cardIds: [CARD_ID],
-    actions: ['moor-action'], phases: ['after'], handler: listener.handler,
+    id: 'M083-coal-seam-before-hiring-fair', cardIds: [CARD_ID],
+    actions: ['moor-action'], mandatory: true, phases: ['before'], handler: listener.handler,
   }],
   reaches: [] as readonly string[],
 } satisfies CardImpl

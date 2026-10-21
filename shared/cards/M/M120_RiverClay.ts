@@ -7,10 +7,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'M120_RiverClay'
 
 const listener: CardListenerRegistration = {
-  id: 'M120-river-clay-after-place-farmer',
+  id: 'M120-river-clay-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
     return { flow: gainLeaf(CARD_ID, { clay: 2 }), sourceCard: CARD_ID }

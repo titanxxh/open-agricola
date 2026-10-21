@@ -234,7 +234,7 @@ describe('Moor room and future terrain clause audit', () => {
     }
   })
 
-  it.each(['farmland', 'cultivation'] as const)('M042 can convert an adjacent moor after %s and may decline', (spaceId) => {
+  it.each(['farmland', 'cultivation'] as const)('M042 can convert an adjacent moor before %s and may decline', (spaceId) => {
     for (const accept of [false, true]) {
       const session = setupMoorAudit(2, 14)
       session.state.players[0]!.minorPlayed = ['M042_DeepPlow']
@@ -242,14 +242,14 @@ describe('Moor room and future terrain clause audit', () => {
       session.loadState(session.state)
       let response = session.takeAction(0, spaceId)
       expect(response.ok, response.error).toBe(true)
-      if (response.interaction.request.kind !== 'farm-select') acceptMoorAuditChoice(session, response)
-      response = session.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })
-      expect(response.ok, response.error).toBe(true)
       expect(response.interaction.sourceCard).toBe('M042_DeepPlow')
       if (accept) {
         acceptMoorAuditChoice(session, response)
         response = session.commitSelectionChoice(0, { positions: [{ row: 1, col: 2 }] })
       } else response = session.resolveChoice(0, '__skip__')
+      expect(response.ok, response.error).toBe(true)
+      if (response.interaction.request.kind !== 'farm-select') acceptMoorAuditChoice(session, response)
+      response = session.commitSelectionChoice(0, { tile: { row: 0, col: 2 } })
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.fields).toHaveLength(accept ? 2 : 1)
       expect(response.state.players[0]!.farmTerrain).toHaveLength(accept ? 0 : 1)
