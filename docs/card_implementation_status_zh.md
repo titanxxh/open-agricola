@@ -16,6 +16,7 @@
 |---|---|---|
 | P2 | [#1353](https://github.com/titanxxh/open-agricola/issues/1353) | 规则审计线索：混合货物部分拿取按类型拆成多个 collect，后一步可能让 `A107_Catcher` 读取剩余货物而非放人时总量。修改机制前先用 Session 复现。 |
 | P2 | [#1354](https://github.com/titanxxh/open-agricola/issues/1354) | 规则审计线索：`A097_Freshman` 的卡主已是轮转玩家、但尚未打开 Turn 时，放人前第二次 Bake Bread 仍可能再次替代。普通 Turn 和两次 Turn 之间已有覆盖，此执行与查询边界需独立 Session 复现。 |
+| P2 | [#1356](https://github.com/titanxxh/open-agricola/issues/1356) | 规则审计线索：`D176_Woodshacker` 通过人员放置记录计算木材格使用次数，漏掉无工人使用。公开 Session seam 在本次时机迁移前后复现相同结果；修复前需核对产品来源和用格计数语义。 |
 
 ## 2. 已接受差异
 

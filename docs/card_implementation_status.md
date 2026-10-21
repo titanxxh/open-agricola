@@ -16,6 +16,7 @@ Reference PHP paths are relative to the reference implementation's source tree; 
 |---|---|---|
 | P2 | [#1353](https://github.com/titanxxh/open-agricola/issues/1353) | Rule Audit Lead: mixed-goods partial takes use one collect per resource type; a later step may make `A107_Catcher` read the remaining goods instead of the placement-time total. Reproduce through a Session before changing the mechanism. |
 | P2 | [#1354](https://github.com/titanxxh/open-agricola/issues/1354) | Rule Audit Lead: `A097_Freshman` may replace a second Bake Bread before placement when its owner is already the rotation player but has no open Turn. The ordinary Turn and between-Turn cases are covered; this execution/query boundary needs its own Session reproduction. |
+| P2 | [#1356](https://github.com/titanxxh/open-agricola/issues/1356) | Rule Audit Lead: `D176_Woodshacker` counts wood-space uses through person-placement records, omitting workerless uses. A public Session seam reproduces the same result before and after this timing migration; verify the product source and use-count semantics before fixing it. |
 
 ## 2. Accepted differences
 

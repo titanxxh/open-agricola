@@ -147,6 +147,11 @@ describe('reap action private-field-phase trigger', () => {
     ])
     expect(result).toEqual({
       type: 'flow',
+      extraData: expect.objectContaining({
+        reapedCropAmounts: { grain: 1, wood: 1 },
+        trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
+        sourceCard: 'C072_FestivalPlanning',
+      }),
       flow: {
         type: 'parallel',
         children: [{

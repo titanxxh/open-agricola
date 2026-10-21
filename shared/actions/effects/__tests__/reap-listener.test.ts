@@ -45,8 +45,7 @@ describe('Reap reaction planning', () => {
     expect(receipt).toEqual([
       { card: IMMEDIATE, action: 'activate-card', phase: 'immediatelyAfter', event: { extraData: { crop: 'grain', amount: 1, trigger: { phase: 'harvest' } } }, target: player.id },
       { card: IMMEDIATE, action: 'activate-card', phase: 'immediatelyAfter', event: { extraData: { crop: 'vegetable', amount: 2, trigger: { phase: 'harvest' } } }, target: player.id },
-      { card: AFTER, action: 'activate-card', phase: 'after', event: { extraData: { crop: 'grain', amount: 1, trigger: { phase: 'harvest' } } }, target: player.id },
-      { card: AFTER, action: 'activate-card', phase: 'after', event: { extraData: { crop: 'vegetable', amount: 2, trigger: { phase: 'harvest' } } }, target: player.id },
+      { card: AFTER, action: 'activate-card', phase: 'after', event: { extraData: { reapedCropAmounts: { grain: 1, vegetable: 2 }, trigger: { phase: 'harvest' } } }, target: player.id },
     ])
   })
 
@@ -60,9 +59,17 @@ describe('Reap reaction planning', () => {
       type: 'leaf', targetPlayerId: owner.id, actionId: 'activate-card',
       params: {
         ownerPlayerId: owner.id, triggerPlayerId: player.id, phase: 'after',
-        event: { extraData: { crop: 'vegetable', amount: 2, sourceCard: 'C072_FestivalPlanning', trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' } } },
+        event: { extraData: { reapedCropAmounts: { vegetable: 2 }, sourceCard: 'C072_FestivalPlanning', trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' } } },
       },
     })
+  })
+
+  it('leaves ordinary after reactions to the enclosing action completion', () => {
+    const { state, player } = setup()
+    const flow = dispatchReapListeners(state, player, { grain: 1, vegetable: 2 }, { afterCompletion: 'action' })
+    expect(activations(flow).map(leaf => leaf.type === 'leaf' ? leaf.params?.phase : undefined)).toEqual([
+      'immediatelyAfter', 'immediatelyAfter',
+    ])
   })
 
   it('plans reactions from the actual harvested crop amounts while removing those crops', () => {
@@ -78,6 +85,6 @@ describe('Reap reaction planning', () => {
     expect(result.reapSummary.resources).toEqual({ grain: 1, vegetable: 2 })
     expect(player.resources).toMatchObject({ grain: 1, vegetable: 2 })
     expect(player.fields.map(field => field.stacks)).toEqual([[{ kind: 'grain', remaining: 1 }], [], []])
-    expect(activations(result.reactionFlow)).toHaveLength(4)
+    expect(activations(result.reactionFlow)).toHaveLength(3)
   })
 })

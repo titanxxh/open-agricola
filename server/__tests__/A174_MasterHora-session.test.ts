@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { placeFarmerAction } from '../../shared/actions/effects/place-farmer'
-import type { ActionExecutionContext } from '../../shared/contract/types'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 
 const CARD_ID = 'A174_MasterHora'
 
@@ -102,34 +101,30 @@ describe('A174 Master Hora', () => {
 
   it('offers the vegetable purchase before resolving an extra place-farmer target on an extension space', () => {
     const session = setup()
+    const grant = 'TEST_EXTRA_PLACEMENT'
     const state = session.getState().state
-    const player = state.players[0]!
-    const host = state.actionSpaces.find((space) => space.id === 'day-laborer')!
-
-    const result = session.withCtx(() => placeFarmerAction.resolveChoice!({
-      actionHooks: session.actionHooks,
-      state,
-      player,
-      space: host,
-      sourceCard: 'TEST_EXTRA_PLACEMENT',
-      actionContext: { constraints: ['copse-56'] },
-    } as unknown as ActionExecutionContext, 'copse-56'))
-
-    expect(result.type).toBe('flow')
-    if (result.type !== 'flow') return
-    expect(result.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          type: 'seq',
-          children: [
-            { actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
-            { actionId: 'gain', params: { vegetable: 1 }, sourceCard: CARD_ID },
-          ],
-        },
-        { actionId: 'copse-56', expandFlow: true },
-      ],
-    })
+    state.players[0]!.minorPlayed.push(grant)
+    session.loadState(state)
+    session.withCtx(() => requireActiveCardRegistry('A174-extra-placement').registerListener({
+      id: grant, cardIds: [grant], actions: ['anytime'], phases: ['anytime'],
+      handler: () => ({ sourceCard: grant, flow: {
+        type: 'leaf', actionId: 'place-farmer', sourceCard: grant,
+        actionContext: { constraints: ['copse-56'] },
+      } }),
+    }))
+    let response = session.takeAnytimeAction(0, grant)
+    expect(response.ok, response.error).toBe(true)
+    if (!findA174Option(response)) response = session.resolveChoice(0, 'copse-56')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, vegetable: 0, wood: 0 })
+    expect(response.state.actionSpaces.find(space => space.id === 'copse-56')!.resources.wood).toBe(1)
+    const purchase = findA174Option(response)
+    expect(purchase).toBeDefined()
+    response = session.resolveChoice(0, purchase!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, vegetable: 1, wood: 1 })
+    expect(response.state.actionSpaces.find(space => space.id === 'copse-56')!.takenBy).toHaveLength(1)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.resourceStats).toMatchObject({ used: 1 })
   })
 
   it('allows the before attempt and restores an unavailable host through explicit undo', () => {

@@ -6,6 +6,7 @@ import type { CardListenerRegistration } from '../../shared/cards/card-listeners
 import type { GameState } from '../../shared/contract/types'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import { getReapedCropAmount } from '../../shared/actions/helpers/reap-listener'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 const AFTER = 'TEST_1330_After'
@@ -370,8 +371,9 @@ describe('Reap phase batches', () => {
       registry.registerListener({
         id: after, cardIds: [after], actions: ['reap'], phases: ['after'],
         handler: context => {
-          const trigger = context.extraData?.trigger
-          if (context.extraData?.crop !== 'grain' || context.extraData?.amount !== 2
+          const data = context.result && 'extraData' in context.result ? context.result.extraData : context.extraData
+          const trigger = data?.trigger
+          if (getReapedCropAmount(context, 'grain') !== 2
             || !trigger || typeof trigger !== 'object' || !('phase' in trigger) || trigger.phase !== phase
             || context.player.resources.food < 3) return
           return { sourceCard: after, flow: { type: 'seq', optional: true, children: [

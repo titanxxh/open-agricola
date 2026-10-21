@@ -64,7 +64,7 @@ export const assertSandboxListenerManifest = (cardId: string, manifest: CustomCo
 export const sandboxListenerPhaseMeta: Record<SandboxListenerPhase, { desc: string; usage: string }> = {
   before: { desc: '行动执行前', usage: '提前获得资源' },
   immediatelyAfter: { desc: '行动刚完成', usage: '立即追加效果' },
-  after: { desc: '行动完成后', usage: '追加效果、获得额外资源' },
+  after: { desc: '行动完成后', usage: '依赖行动结果的反应，或牌面明确写明 after 的效果' },
   computeCosts: { desc: '计算费用时', usage: '费用折扣' },
   computeArgs: { desc: '计算行动参数时', usage: '调整参数' },
   computeChoiceCandidates: { desc: '计算可选项时', usage: '修改选项列表' },
