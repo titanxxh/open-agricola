@@ -1,141 +1,93 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import type { DraftGameEvent, ResourceMovedEvent } from '../../contract/events'
 import type { ActionFlow, Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { createPartialTakeFromSpaceLeaf, isPartialTake } from '../helpers/partial-take'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D180_PartTimeWorker'
 
-const RESOURCE_KEYS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
+const GOODS = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
+type Good = (typeof GOODS)[number]
 
-const REWARD_BY_COLLECTED_TOTAL: Record<number, { leave: number; gain: Partial<Resource> }> = {
+const REWARD_BY_GOODS_ON_SPACE: Record<number, { leave: number; gain: Partial<Resource> }> = {
   2: { leave: 1, gain: { sheep: 1 } },
   4: { leave: 2, gain: { boar: 1 } },
   6: { leave: 3, gain: { cattle: 1 } },
 }
 
-type QueryableResourceMovedEvent = ResourceMovedEvent | DraftGameEvent<'resource.moved'>
-
-const isResourceMovedEvent = (
-  event: CardListenerContext['transactionEvents'][number],
-): event is QueryableResourceMovedEvent =>
-  event.type === 'resource.moved'
-
-const isAccumulationSpace = (context: CardListenerContext, spaceId: string): boolean => {
-  const space = context.state.actionSpaces.find((candidate) => candidate.id === spaceId)
-  return Object.values(space?.gainPerRound ?? {}).some((amount) => (amount ?? 0) > 0)
-}
-
-const addResource = (resources: Partial<Resource>, resource: keyof Resource, amount: number) => {
-  if (amount <= 0) return
-  resources[resource] = (resources[resource] ?? 0) + amount
-}
-
-const collectSourceSpaceId = (context: CardListenerContext): string | undefined => {
-  const playerId = (context.triggerPlayer ?? context.player).id
-  for (const event of context.actionEvents ?? context.transactionEvents) {
-    if (!isResourceMovedEvent(event)) continue
-    if (event.reason !== 'collect') continue
-    if (event.from.kind !== 'actionSpace') continue
-    if (event.to.kind !== 'player' || event.to.playerId !== playerId) continue
-    return event.from.spaceId
-  }
-}
-
-const collectedFromSpace = (context: CardListenerContext, spaceId: string): Partial<Resource> => {
-  const playerId = (context.triggerPlayer ?? context.player).id
-  const out: Partial<Resource> = {}
-  for (const event of context.actionEvents ?? context.transactionEvents) {
-    if (!isResourceMovedEvent(event)) continue
-    if (event.reason !== 'collect') continue
-    if (event.from.kind !== 'actionSpace' || event.from.spaceId !== spaceId) continue
-    if (event.to.kind !== 'player' || event.to.playerId !== playerId) continue
-    for (const resource of RESOURCE_KEYS) {
-      addResource(out, resource, event.resources[resource] ?? 0)
-    }
-  }
-  return out
-}
-
-const totalResources = (resources: Partial<Resource>): number =>
-  RESOURCE_KEYS.reduce((total, resource) => total + (resources[resource] ?? 0), 0)
-
-const positiveResourceKeys = (resources: Partial<Resource>): (typeof RESOURCE_KEYS)[number][] =>
-  RESOURCE_KEYS.filter((resource) => (resources[resource] ?? 0) > 0)
-
-const enumerateReturnMaps = (
-  resources: Partial<Resource>,
-  amount: number,
-): Partial<Resource>[] => {
-  const keys = positiveResourceKeys(resources)
-  const out: Partial<Resource>[] = []
-  const walk = (index: number, remaining: number, current: Partial<Resource>) => {
+/** Every way to leave exactly `amount` of the goods on the space. */
+const enumerateLeaveMaps = (goods: Partial<Record<Good, number>>, amount: number): Partial<Record<Good, number>>[] => {
+  const keys = GOODS.filter(good => (goods[good] ?? 0) > 0)
+  const out: Partial<Record<Good, number>>[] = []
+  const walk = (index: number, remaining: number, current: Partial<Record<Good, number>>) => {
     if (index === keys.length) {
       if (remaining === 0) out.push({ ...current })
       return
     }
     const key = keys[index]!
-    const max = Math.min(resources[key] ?? 0, remaining)
-    for (let count = 0; count <= max; count += 1) {
-      if (count > 0) current[key] = count
-      else delete current[key]
-      walk(index + 1, remaining - count, current)
+    for (let count = 0; count <= Math.min(goods[key] ?? 0, remaining); count += 1) {
+      walk(index + 1, remaining - count, count > 0 ? { ...current, [key]: count } : current)
     }
-    delete current[key]
   }
   walk(0, amount, {})
   return out
 }
 
-const returnThenGainActionFlow = (
-  cost: Partial<Resource>,
+/** Take everything except the left goods, then get the animal. Left goods never move. */
+const takeRestFlow = (
+  context: CardListenerContext,
+  goods: Partial<Record<Good, number>>,
+  leave: Partial<Record<Good, number>>,
   gain: Partial<Resource>,
-  targetSpaceId: string,
 ): ActionFlow => ({
   type: 'seq',
   children: [
-    {
-      type: 'leaf',
-      actionId: 'return-to-space',
-      params: cost,
-      sourceCard: CARD_ID,
-      actionContext: { targetSpaceId },
-    },
+    ...GOODS.flatMap(good => {
+      const amount = (goods[good] ?? 0) - (leave[good] ?? 0)
+      return amount > 0 ? [createPartialTakeFromSpaceLeaf({
+        sourceCard: CARD_ID,
+        spaceId: context.space.id,
+        spaceName: context.space.nameKey,
+        resource: good,
+        amount,
+        includeEffectPreview: true,
+        targetSpaceId: context.space.id,
+      })] : []
+    }),
     gainLeaf(CARD_ID, gain),
   ],
 })
 
+const isAccumulationSpace = (context: CardListenerContext): boolean =>
+  Object.values(context.space?.gainPerRound ?? {}).some(amount => (amount ?? 0) > 0)
+
+// Each time you use an accumulation space with exactly 2/4/6 goods on it, you can
+// leave 1/2/3 goods on it. Decided at the collect step, before anything is taken,
+// as an alternative to the collect (D138 Pet Lover model).
 const listener: CardListenerRegistration = {
-  id: 'D180-part-time-worker-after-collect',
+  id: 'D180-part-time-worker-replace-collect',
   cardIds: [CARD_ID],
-  phases: ['after'],
-  actionSpaces: 'all',
+  phases: ['computeReplace'],
+  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const targetSpaceId = collectSourceSpaceId(context)
-    if (!targetSpaceId) return
-    if (!isAccumulationSpace(context, targetSpaceId)) return
-    const collected = collectedFromSpace(context, targetSpaceId)
-    const reward = REWARD_BY_COLLECTED_TOTAL[totalResources(collected)]
-    if (!reward) return
-    const returnMaps = enumerateReturnMaps(collected, reward.leave)
-    if (returnMaps.length === 0) return
-    if (returnMaps.length === 1) {
-      return {
-        flow: {
-          ...returnThenGainActionFlow(returnMaps[0]!, reward.gain, targetSpaceId),
-          optional: true,
-        },
-        sourceCard: CARD_ID,
-      }
+    // A card's partial take is not a use of the space.
+    if (context.actionContext?.checkedReplaceAction || isPartialTake(context.actionContext)) return
+    if (!context.space || !isAccumulationSpace(context)) return
+    const goods: Partial<Record<Good, number>> = {}
+    for (const good of GOODS) {
+      const amount = context.space.resources[good] ?? 0
+      if (amount > 0) goods[good] = amount
     }
+    const reward = REWARD_BY_GOODS_ON_SPACE[Object.values(goods).reduce((total, amount) => total + amount, 0)]
+    if (!reward) return
+    const branches = enumerateLeaveMaps(goods, reward.leave).map(leave => takeRestFlow(context, goods, leave, reward.gain))
     return {
-      flow: {
-        type: 'xor',
-        optional: true,
-        children: returnMaps.map((cost) => returnThenGainActionFlow(cost, reward.gain, targetSpaceId)),
-      },
+      decline: true,
+      alternativeFlow: branches.length === 1
+        ? branches[0]!
+        : { type: 'xor', choiceLabelKey: `cards.${CARD_ID}.name`, children: branches },
       sourceCard: CARD_ID,
     }
   },

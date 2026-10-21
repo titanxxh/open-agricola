@@ -1,102 +1,46 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../../../server/game/authoritative-session'
-import type { ActionHookPhase } from '../../actions/hooks'
-import type { DraftGameEvent } from '../../contract/events'
-import type { Resource } from '../../contract/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import { D180_PartTimeWorker_impl } from '../D/D180_PartTimeWorker'
 import type { CardListenerContext } from '../card-listeners'
+import { mkActionSpace } from './fixtures'
 
-const CARD_ID = 'D180_PartTimeWorker'
-
-const moved = (
+const run = (
   resources: Partial<Resource>,
-  playerId: string,
-  spaceId = 'forest',
-): DraftGameEvent<'resource.moved'> => ({
-  type: 'resource.moved',
-  resources,
-  from: { kind: 'actionSpace', spaceId },
-  to: { kind: 'player', playerId },
-  reason: 'collect',
-})
-
-const setupContext = (resources: Partial<Resource>, options: {
-  spaceId?: string
-  gainPerRound?: Partial<Resource>
-  extraEvents?: DraftGameEvent<'resource.moved'>[]
-  transactionExtraEvents?: DraftGameEvent<'resource.moved'>[]
-} = {}): CardListenerContext => {
-  const session = new GameSession(42, undefined, { playerCount: 5 })
-  const state = session.getState().state
-  const player = state.players[0]!
-  player.occupationPlayed.push(CARD_ID)
-  const spaceId = options.spaceId ?? 'forest'
-  const space = state.actionSpaces.find((candidate) => candidate.id === spaceId)!
-  space.gainPerRound = options.gainPerRound ?? { wood: 1 }
-  const events = [moved(resources, player.id, spaceId), ...(options.extraEvents ?? [])]
-  const transactionEvents = [...events, ...(options.transactionExtraEvents ?? [])]
-  return {
-    state,
-    player,
-    ownerPlayer: player,
-    triggerPlayer: player,
-    effectPlayer: player,
+  { gainPerRound = { wood: 1 }, actionContext }: { gainPerRound?: Partial<Resource>; actionContext?: Record<string, unknown> } = {},
+) => {
+  const space = mkActionSpace({ id: 'forest', resources: resources as Resource, gainPerRound })
+  return D180_PartTimeWorker_impl.listeners[0]!.handler!({
+    state: { actionSpaces: [space] },
     space,
     actionId: 'collect',
-    phase: 'after' as ActionHookPhase,
-    result: { type: 'ok', resourcesGained: resources },
-    transactionEvents,
-    actionEvents: events,
-  } as CardListenerContext
+    phase: 'computeReplace',
+    actionContext,
+    transactionEvents: [],
+  } as unknown as CardListenerContext)
 }
 
-const run = (context: CardListenerContext) =>
-  D180_PartTimeWorker_impl.listeners[0]!.handler!(context)
+/** What each offered branch takes from the space (left goods are the rest). */
+const takes = (flow: ActionFlow | undefined): Partial<Resource>[] => {
+  const branches = flow?.type === 'xor' ? flow.children : flow ? [flow] : []
+  return branches.map(branch => Object.fromEntries((branch.type === 'seq' ? branch.children : [])
+    .filter(leaf => leaf.type === 'leaf' && leaf.actionId === 'collect')
+    .map(leaf => [leaf.actionContext!.resource, leaf.actionContext!.amount])))
+}
 
-describe('D180 Part-Time Worker listener', () => {
-  it('uses the return-to-space plus gain shape for a single-resource exact total', () => {
-    expect(run(setupContext({ wood: 2 }))).toMatchObject({
-      sourceCard: CARD_ID,
-      flow: {
-        type: 'seq',
-        optional: true,
-        children: [
-          {
-            actionId: 'return-to-space',
-            params: { wood: 1 },
-            sourceCard: CARD_ID,
-            actionContext: { targetSpaceId: 'forest' },
-          },
-          { actionId: 'gain', params: { sheep: 1 }, sourceCard: CARD_ID },
-        ],
-      },
-    })
+describe('D180 Part-Time Worker collect replacement', () => {
+  it('offers to take all but 1/2/3 goods from 2/4/6 goods as an alternative to the collect', () => {
+    expect(run({ wood: 2 })).toMatchObject({ decline: true, sourceCard: 'D180_PartTimeWorker' })
+    expect(takes(run({ wood: 2 })?.alternativeFlow)).toEqual([{ wood: 1 }])
+    expect(takes(run({ wood: 6 })?.alternativeFlow)).toEqual([{ wood: 3 }])
+    expect(takes(run({ wood: 2, clay: 2 })?.alternativeFlow)).toEqual([{ wood: 2 }, { wood: 1, clay: 1 }, { clay: 2 }])
   })
 
-  it('enumerates mixed-resource return maps for exact four goods', () => {
-    const result = run(setupContext({ wood: 2, clay: 2 }))
-    expect(result).toMatchObject({ sourceCard: CARD_ID, flow: { type: 'xor', optional: true } })
-    const flow = result!.flow
-    if (!flow || flow.type !== 'xor') return
-    const costs = flow.children.map((child) => {
-      expect(child.type).toBe('seq')
-      if (child.type !== 'seq') return {}
-      expect(child.children[0]!.actionContext).toEqual({ targetSpaceId: 'forest' })
-      return child.children[0]!.params
-    })
-    expect(costs).toEqual([
-      { clay: 2 },
-      { wood: 1, clay: 1 },
-      { wood: 2 },
-    ])
-    expect(flow.children).toHaveLength(3)
-  })
-
-  it('does not trigger for other totals, non-accumulation spaces, or stale later events', () => {
-    expect(run(setupContext({ wood: 3 }))).toBeUndefined()
-    expect(run(setupContext({ wood: 2 }, { gainPerRound: {} }))).toBeUndefined()
-    expect(run(setupContext({ wood: 1 }, {
-      transactionExtraEvents: [moved({ wood: 1 }, 'p1', 'forest')],
-    }))).toBeUndefined()
+  it('ignores other totals, non-accumulation spaces, card partial takes and the declined original', () => {
+    expect(run({ wood: 3 })).toBeUndefined()
+    expect(run({ wood: 5, clay: 0 })).toBeUndefined()
+    expect(run({ wood: 2 }, { gainPerRound: {} })).toBeUndefined()
+    expect(run({ wood: 4 }, { actionContext: { spaceId: 'forest', resource: 'wood', amount: 1 } })).toBeUndefined()
+    expect(run({ wood: 4 }, { actionContext: { spaceId: 'forest', resourceTypes: ['wood'] } })).toBeUndefined()
+    expect(run({ wood: 4 }, { actionContext: { checkedReplaceAction: true } })).toBeUndefined()
   })
 })

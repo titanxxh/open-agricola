@@ -349,7 +349,7 @@ describe('authoritative choice previews', () => {
     expect(resolved.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 1, reed: 1 })
     expect(resolved.state.log).toContainEqual(expect.objectContaining({ key: 'log.playMinorImprovement', params: expect.objectContaining({ improvements: 'C040_CanvasSack' }) }))
   })
-  it('shows distinct legal mixed-resource returns to the collected Forest', () => {
+  it('shows distinct legal mixed-resource takes that leave goods on the collected Forest', () => {
     const session = setup('D180_PartTimeWorker', 1, false, 5)
     const player = session.state.players[0]!
     player.occupationPlayed = ['D180_PartTimeWorker', 'C093_InnerDistrictsDirector']
@@ -359,29 +359,34 @@ describe('authoritative choice previews', () => {
     let response = session.takeAction(0, 'clay-pit')
     for (let step = 0; step < 12; step += 1) {
       if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
-        const card = response.state.players[0]!.resources.wood > 0 ? 'D180_PartTimeWorker' : 'C093_InnerDistrictsDirector'
-        const trigger = response.interaction.request.options.find(option => option.sourceCard === card)!
+        const trigger = response.interaction.request.options.find(option => option.sourceCard === 'C093_InnerDistrictsDirector')!
         response = session.resolveChoice(0, trigger.value)
         continue
       }
       const options = choices(response)
-      if (options.some((option) => effects(option.descriptionPreview).some((effect) => effect.kind === 'resourceMovement'))) break
+      const partTimeWorker = options.find((candidate) => candidate.sourceCard === 'D180_PartTimeWorker')
+      if (partTimeWorker) {
+        expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources).toMatchObject({ wood: 3, stone: 1 })
+        response = session.resolveChoice(0, partTimeWorker.value)
+        break
+      }
       const option = options.find((candidate) => candidate.value === 'forest')
         ?? options.find((candidate) => candidate.sourceCard === 'C093_InnerDistrictsDirector' && candidate.value !== '__skip__')
       if (!option) throw new Error(`Expected director placement: ${JSON.stringify(options)}`)
       response = session.resolveChoice(0, option.value)
     }
-    const options = choices(response).filter((option) => option.value !== '__skip__')
+    const options = choices(response)
     expect(options).toHaveLength(2)
-    expect(options.map((option) => effects(option.descriptionPreview)[0])).toMatchObject([
-      { kind: 'resourceMovement', resources: { wood: 1, stone: 1 }, from: { kind: 'player' }, to: { kind: 'actionSpace', spaceId: 'forest', nameKey: 'actions.forest.name' } },
-      { kind: 'resourceMovement', resources: { wood: 2 }, from: { kind: 'player' }, to: { kind: 'actionSpace', spaceId: 'forest', nameKey: 'actions.forest.name' } },
+    expect(options.map((option) => effects(option.descriptionPreview))).toEqual([
+      [{ kind: 'resourceExchange', resourcesGained: { wood: 2 } }, { kind: 'resourceExchange', resourcesGained: { boar: 1 } }],
+      [{ kind: 'resourceExchange', resourcesGained: { wood: 1 } }, { kind: 'resourceExchange', resourcesGained: { stone: 1 } }, { kind: 'resourceExchange', resourcesGained: { boar: 1 } }],
     ])
     const resolved = session.resolveChoice(0, options[0]!.value)
     expect(resolved.ok).toBe(true)
     expect(resolved.state.players[0]!.resources).toMatchObject({ wood: 2, stone: 0, boar: 1 })
     expect(resolved.state.actionSpaces.find((space) => space.id === 'forest')!.resources).toMatchObject({ wood: 1, stone: 1 })
-    expect(resolved.state.events).toContainEqual(expect.objectContaining({ type: 'resource.moved', reason: 'return', resources: { wood: 1, stone: 1 } }))
+    expect(resolved.state.events).toContainEqual(expect.objectContaining({ type: 'resource.moved', reason: 'collect', resources: { wood: 2 } }))
+    expect(resolved.state.events.some((event) => event.type === 'resource.moved' && event.reason === 'return')).toBe(false)
   })
   it("describes Cooperative Store usage cost and omits stone rewards", () => {
     const session = setup('M126_CooperativeStore', 1, true)
