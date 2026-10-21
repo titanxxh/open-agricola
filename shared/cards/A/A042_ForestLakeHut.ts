@@ -6,9 +6,9 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A042_ForestLakeHut'
 const listener: CardListenerRegistration = {
-  id: 'A42-forest-lake-hut-after-place-farmer',
+  id: 'A42-forest-lake-hut-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
