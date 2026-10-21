@@ -12,10 +12,11 @@ const getOpenRound = (state: GameState, spaceId: string) => {
 }
 
 const listener: CardListenerRegistration = {
-  id: 'D55-new-market-after-place-farmer',
+  id: 'D55-new-market-before-space-use',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (!spaceId) return

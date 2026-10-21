@@ -11,11 +11,12 @@ const CARD_ID = 'E040_BeeStatue'
  */
 const STACK_ITEMS = ['vegetable', 'stone', 'grain', 'stone', 'grain']
 
-const afterPlaceFarmerListener: CardListenerRegistration = {
-  id: 'E40-bee-statue-after-place-farmer',
+const beforeSpaceUseListener: CardListenerRegistration = {
+  id: 'E40-bee-statue-before-space-use',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'day-laborer') return
     const stack = getCardStack(context.player, CARD_ID)
@@ -28,7 +29,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterPlaceFarmerListener],
+  listeners: [beforeSpaceUseListener],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {

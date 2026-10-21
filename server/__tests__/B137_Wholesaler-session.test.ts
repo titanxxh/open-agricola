@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
@@ -7,6 +7,16 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B137_Wholesaler'
 import assert from 'node:assert/strict'
 import * as audit29Timing from './_helpers/audit/ae-negative-29-timing'
+
+const finishAnimals = (session: GameSession, response: SessionResponse, animal: 'boar' | 'cattle') => {
+  for (let step = 0; step < 2 && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg'; step++) {
+    response = session.resolveChoice(0, 'confirm', { zones: [{
+      id: 'p1', zoneType: 'pasture', animalType: animal, animalCount: response.state.players[0]!.resources[animal],
+    }] })
+    expect(response.ok, response.error).toBe(true)
+  }
+  return response
+}
 
 describe('B137_Wholesaler session', () => {
   /**
@@ -135,21 +145,7 @@ describe('B137_Wholesaler session', () => {
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
 
-    // pig-market is accumulating — triggers animalReorg
-    expect(resp.interaction.stateId).toBe('wait')
-    // Place all boar (2 from pig-market) into pasture p1
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
-    ])
-    resp = resolveTriggerIfPresent(session, resp, 'B137_Wholesaler')
-
-    // After reorg, card after-hook fires and gives +1 boar
-    // This may trigger another animalReorg
-    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(0, 'confirm', [
-        { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
-      ])
-    }
+    resp = finishAnimals(session, resp, 'boar')
 
     const p = resp.state.players[0]!
     // pig-market accumulated 2 boar + 1 extra from card = 3
@@ -190,20 +186,7 @@ describe('B137_Wholesaler session', () => {
     let resp = session.takeAction(0, 'cattle-market')
     expect(resp.ok).toBe(true)
 
-    // cattle-market triggers animalReorg
-    expect(resp.interaction.stateId).toBe('wait')
-    // Place all cattle (2 from cattle-market) into pasture p2
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 2 },
-    ])
-    resp = resolveTriggerIfPresent(session, resp, 'B137_Wholesaler')
-
-    // After reorg, card after-hook fires and gives +1 cattle
-    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(0, 'confirm', [
-        { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 3 },
-      ])
-    }
+    resp = finishAnimals(session, resp, 'cattle')
 
     const p = resp.state.players[0]!
     // cattle-market accumulated 2 cattle + 1 from card = 3

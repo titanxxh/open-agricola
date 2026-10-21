@@ -837,7 +837,7 @@ describe('listener purity wave 2b/c', () => {
     })
     const before = stateSnapshot(game)
 
-    const result = listenerById(D158_BeanCounter_impl.listeners, 'D158-bean-counter-place-farmer')
+    const result = listenerById(D158_BeanCounter_impl.listeners, 'D158-bean-counter-before-space-use')
       .handler(context(p, {
         state: game,
         actionId: 'place-farmer',
@@ -871,7 +871,7 @@ describe('listener purity wave 2b/c', () => {
     })
     const before = stateSnapshot(game)
 
-    const result = listenerById(D158_BeanCounter_impl.listeners, 'D158-bean-counter-place-farmer')
+    const result = listenerById(D158_BeanCounter_impl.listeners, 'D158-bean-counter-before-space-use')
       .handler(context(p, {
         state: game,
         actionId: 'place-farmer',
