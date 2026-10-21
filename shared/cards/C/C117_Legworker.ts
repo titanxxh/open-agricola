@@ -105,10 +105,11 @@ export const hasAdjacentWorker = (
 }
 
 const listener: CardListenerRegistration = {
-  id: 'C117-legworker-after-place-farmer',
+  id: 'C117-legworker-before-space-use',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (!spaceId) return

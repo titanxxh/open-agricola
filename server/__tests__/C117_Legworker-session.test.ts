@@ -4,6 +4,8 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNext } from './_helpers/session-assertions'
 
 import '../../shared/cards/C/C117_Legworker'
 import { hasAdjacentWorker } from '../../shared/cards/C/C117_Legworker'
@@ -14,6 +16,65 @@ import * as audit49Work from './_helpers/audit/ae-negative-49-work'
 
 const CARD_ID = 'C117_Legworker'
 const FILLER = '__test_placeholder__'
+
+describe('Legworker before the host action', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+  function buildingSession({ played = true, adjacent = true } = {}) {
+    const session = createWorkSession({ configure: state => {
+      const player = state.players[0]!
+      player.occupationPlayed = played ? [CARD_ID] : []
+      Object.assign(player.resources, { wood: 1, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0 })
+      setWorkersAtHome(state, player, 2)
+      if (adjacent) {
+        const worker = player.workers[0]!
+        state.actionSpaces.find(space => space.id === 'meeting-place')!.takenBy = [{ playerId: player.id, workerId: worker.id }]
+      }
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('makes Farm Expansion available and pays for a stable with the adjacent-space wood', () => {
+    const session = buildingSession()
+    expect(session.getActionAvailability(0)['farm-expansion']).toBe(true)
+
+    let response = session.takeAction(0, 'farm-expansion')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(2)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
+      throw new Error('Expected stable selection')
+    }
+    expect(response.interaction.request.farm.farmType).toBe('stable')
+
+    response = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }] })
+    expect(response.ok, response.error).toBe(true)
+    response = confirmNext(session, response)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.players[0]!.stableTiles).toEqual([{ row: 0, col: 0 }])
+    expect(response.interaction.stateId).toBe('idle')
+    const gain = response.state.events.findIndex(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)
+    const pay = response.state.events.findIndex(event => event.type === 'resource.paid' && event.paymentFor === 'stables')
+    expect(gain).toBeGreaterThanOrEqual(0)
+    expect(pay).toBeGreaterThan(gain)
+    expect(response.state.log.some(entry => entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID)).toBe(true)
+    expect(response.scores).toHaveLength(2)
+  }, 30_000)
+
+  it.each([{ played: false, adjacent: true }, { played: true, adjacent: false }])(
+    'does not admit Farm Expansion without its reward: %j', scenario => {
+      const session = buildingSession(scenario)
+      expect(session.getActionAvailability(0)['farm-expansion']).toBe(false)
+      const response = session.takeAction(0, 'farm-expansion')
+      expect(response.ok).toBe(false)
+      expect(response.interaction.stateId).toBe('idle')
+      expect(response.state.players[0]!.resources.wood).toBe(1)
+      expect(response.state.players[0]!.stableTiles).toEqual([])
+    }, 30_000,
+  )
+})
 
 const findListener = (ruleOwner: SessionRuleOwner, id: string) =>
   ruleOwner.withCtx(() => getRegisteredCardListeners()).find((l) => l.id === id)
@@ -105,11 +166,11 @@ describe('C117_Legworker session', () => {
     expect(hasAdjacentWorker(state, state.players[0]!.id, 'farmland')).toBe(false)
   })
 
-  it('after-place-farmer gains 1 wood when adjacent to own worker', () => {
+  it('before-space-use gains 1 wood when adjacent to own worker', () => {
 
 
     const session = new GameSession(42)
-    const listener = findListener(session, 'C117-legworker-after-place-farmer')!
+    const listener = findListener(session, 'C117-legworker-before-space-use')!
     expect(listener).toBeDefined()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -126,7 +187,7 @@ describe('C117_Legworker session', () => {
       player,
       space: farmland,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -138,7 +199,7 @@ describe('C117_Legworker session', () => {
   it('does not trigger when no adjacent worker', () => {
 
     const session = new GameSession(42)
-    const listener = findListener(session, 'C117-legworker-after-place-farmer')!
+    const listener = findListener(session, 'C117-legworker-before-space-use')!
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
@@ -151,7 +212,7 @@ describe('C117_Legworker session', () => {
       player,
       space: farmland,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
     expect(result).toBeUndefined()
   })

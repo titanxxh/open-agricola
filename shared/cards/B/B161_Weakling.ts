@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { ActionSpace, Resource } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -19,12 +19,9 @@ const CARD_ID = 'B161_Weakling'
  * We approximate by scanning state.actionSpaces for spaces with non-empty
  * gainPerRound (i.e. accumulating spaces) and totalling their resources.
  *
- * The reference also has `onPlayerComputeArgsPlaceFarmer` which adds
- * `ignoreResources: true` to all visible action cards so the player can
- * place onto resource-restricted spaces. We don't currently honor this
- * flag in placement-availability (sprint-7a fallback per spec §220 — flagged
- * for sprint-7b). Listed in docs/card_implementation_status.md as a
- * deliberate divergence.
+ * The before reward is available to the space's own actions. Shared before
+ * admission makes an otherwise unavailable space selectable when this
+ * gain can start, without a card-specific doability override.
  */
 const isAccumulationSpace = (space: ActionSpace): boolean => {
   const gpr = space.gainPerRound ?? {}
@@ -37,10 +34,11 @@ const totalResources = (res?: Partial<Resource>): number => {
 }
 
 const listener: CardListenerRegistration = {
-  id: 'B161-weakling-after-place-farmer',
+  id: 'B161-weakling-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before'],
   actions: ['place-farmer'],
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.state.roundPhase !== 'work') return
     if (
