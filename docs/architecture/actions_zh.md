@@ -70,7 +70,7 @@ type ActionDefinition = {
 
 | 行动 | 契约 |
 |---|---|
-| `collect` | 从累积格取物的唯一入口，部分领取和跨格领取通过 `actionContext: { spaceId?, resource?, amount? }`。卡牌提供的累积格声明 `gainPerRound`，货物存于 `ActionSpace.resources`。 |
+| `collect` | 从累积格取物的唯一入口，部分领取和跨格领取通过 `actionContext: { spaceId?, resource?, amount? }`。卡牌提供的累积格声明 `gainPerRound`，货物存于 `ActionSpace.resources`。留在格上的货物从不被领取：少拿的卡牌用部分领取替代 collect，因此判断本次拿取量的 `before` listener 读取 `collectTakeAmount()`（`shared/cards/helpers/partial-take.ts`），不读格上货物数。 |
 | `gain` | 结算前先确定接收者。付款方出资的 gain 先校验完整转账再移动资源，事件保留付款方来源。显式资源参数与行动格配置的基础收益分开识别。 |
 | `return-to-space` | 把货物返还到 `actionContext.targetSpaceId` 指定的格；支付与移动事件使用同一目标。 |
 | `place-farmer-on-space` | 在固定目标上额外放一名工人，通常随后展开目标 flow；`params.executeTarget: false` 只放工人、不展开目标。`allowOccupied` 只放宽占用，不绕过封锁、轮次开放、可执行性或工人供应。准入使用 `shared/actions/helpers/placement-availability.ts` 的 `canPlaceWorkerOnSpace`，与普通放置是同一份检查清单；放哪个人由 `selectWorkerForMoorAction` 决定，所以 Farmers of the Moor 的病人留在家中。自行放人的卡牌也用同一个函数检查准入。卡牌不在 handler 里写 `ActionSpace.takenBy`。 |

@@ -110,4 +110,4 @@
 | `D176_Woodshacker` | work phase 中 owner 本回合第 1/2 次使用 wood accumulation 额外给 1/2 clay，按本轮实际使用次数计数（同一空间重复使用也计次），随回家重置。 |
 | `D178_SubstituteTeacher` | 注册 owner-only action space，三个可见 Lessons 格都实际 occupied 后可用，奖励为 1 building resource 或 grain+vegetable。 |
 | `D179_Bullcatcher` | 注册 owner-only action space，round slot 3 与 round slot 6 对应行动格都 occupied 且 owner 仍有可用工人时可用，使用后获得 1 cattle + 2 food。 |
-| `D180_PartTimeWorker` | after collect 读取本次从该 accumulation space 移到玩家的 `resource.moved` goods map，exact 2/4/6 分别可选返还 1/2/3 goods 到该格并获得 sheep/boar/cattle；`return-to-space` leaf 从 `resource.moved.from.spaceId` 派生并显式携带被收取格的 `targetSpaceId`，card-granted placement 收取非外层行动格时也返还到正确格；混合资源枚举所有合法返还组合，且与其他 `return-to-space` optional flow 串行共存，不把后续返还资源计入触发。 |
+| `D180_PartTimeWorker` | 收取格上正好有 2/4/6 个货物的累积格时，`computeReplace` 替代方案提供只拿走其余货物、留下 1/2/3 个（混合货物时列出所有合法组合）并获得 sheep/boar/cattle。留下的货物从不进入玩家供给，"拿走至少 N 个"类卡只按实际拿走数判断。卡牌的部分拿取不算使用该格，不提供此选项。混合货物时每种拿走的货物是一次单独的部分拿取。 |
