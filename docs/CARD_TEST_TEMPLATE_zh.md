@@ -97,7 +97,9 @@
 - `cardId`
 - 卡牌名称
 - 卡牌类型：职业 / 小改良 / 大改良附带效果
-- 触发时机
+- 触发时机，listener 阶段按 [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) 选择：
+  - `before`：断言奖励在同一次宿主行动内可用，例如用于支付该行动或使其可执行。
+  - `immediatelyAfter` / `after`：断言与同一完成点其他反应的先后；所有 `immediatelyAfter` 反应先于普通 `after` 完成。
 - 生效对象：自己 / 对手 / 任意玩家
 - 是否会产生等待交互
 - 是否会修改 `cardStates`
@@ -514,7 +516,7 @@ import { describe, it, expect } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 describe('CXX_SomeCard', () => {
-  it('在 fishing 后给玩家额外 1 食物', () => {
+  it('使用 fishing 时给玩家额外 1 食物', () => {
     const session = createWorkSession({
       configure: state => {
         state.players[0].resources.wood = 0

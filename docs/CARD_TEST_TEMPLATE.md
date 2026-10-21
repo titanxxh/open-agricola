@@ -92,7 +92,9 @@ A card test description must explicitly provide the following information.
 - `cardId`
 - Card name
 - Card type: occupation, minor improvement, or an effect attached to a major improvement
-- Trigger timing
+- Trigger timing, with the listener phase chosen by [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md):
+  - `before`: assert that the reward is usable inside the same host action, for example to pay for or enable it.
+  - `immediatelyAfter` / `after`: assert the order relative to other reactions at the same completion; every `immediatelyAfter` reaction completes before ordinary `after`.
 - Affected player: self, opponent, or any player
 - Whether the card creates a waiting interaction
 - Whether the card modifies `cardStates`
@@ -499,7 +501,7 @@ import { describe, it, expect } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 describe('CXX_SomeCard', () => {
-  it('gives the player 1 additional food after fishing', () => {
+  it('gives the player 1 additional food for using Fishing', () => {
     const session = createWorkSession({
       configure: state => {
         state.players[0].resources.wood = 0
