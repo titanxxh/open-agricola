@@ -53,8 +53,12 @@ describe('Five-plus action printed-rule audit', () => {
   it.each(actionRewards)('%s on %s with %j produces %j', (cardId, spaceId, accumulated, expected) => {
     const session = setup(cardId)
     Object.assign(session.state.actionSpaces.find((space) => space.id === spaceId)!.resources, accumulated)
-    const response = session.takeAction(0, spaceId)
+    let response = session.takeAction(0, spaceId)
     expect(response.ok).toBe(true)
+    if (cardId === 'A179_MountainShepherd' && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
+      response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
+      expect(response.ok, response.error).toBe(true)
+    }
     expect(response.state.players[0]!.resources).toMatchObject(expected)
     expect(response.state.actionSpaces.find((space) => space.id === spaceId)!.takenBy).toHaveLength(1)
     expect(response.state.log.some((entry) => entry.key === 'log.placeFarmer')).toBe(true)

@@ -6,10 +6,10 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D174_LoessGardener'
 const listener: CardListenerRegistration = {
-  id: 'D174-loess-gardener-after-clay-pit',
+  id: 'D174-loess-gardener-before-clay-pit',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'clay-pit') return
     if ((context.ownerPlayer?.resources.food ?? 0) < 1) return

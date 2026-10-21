@@ -6,10 +6,11 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C173_TopOuter'
 
 const listener: CardListenerRegistration = {
-  id: 'C173-top-outer-after-house-building-56',
+  id: 'C173-top-outer-before-house-building-56',
   cardIds: [CARD_ID],
   actionSpaces: 'all',
-  phases: ['after'],
+  mandatory: true,
+  phases: ['before'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'house-building-56') return

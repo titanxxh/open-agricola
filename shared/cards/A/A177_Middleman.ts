@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { MEEPLE_SYMBOL_SPACE_IDS } from '../helpers/action-space-categories'
@@ -33,11 +33,13 @@ const buildInitialAttachments = (
 const placementKey = (round: number, placementCount: number, spaceId: string): string =>
   `${round}:${placementCount}:${spaceId}`
 
-const afterOwnerUsesAttachedSpace: CardListenerRegistration = {
-  id: 'A177-middleman-after-owner-attached-space',
+const beforeOwnerUsesAttachedSpace: CardListenerRegistration = {
+  id: 'A177-middleman-before-owner-attached-space',
   cardIds: [CARD_ID],
   actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  requiresNewPlacement: true,
+  mandatory: true,
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (!spaceId) return
@@ -78,7 +80,7 @@ const afterOwnerUsesAttachedSpace: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterOwnerUsesAttachedSpace],
+  listeners: [beforeOwnerUsesAttachedSpace],
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {

@@ -46,10 +46,11 @@ const insertVegetableAction: ActionDefinition = {
 registerAdHocAction(insertVegetableAction)
 
 const listener: CardListenerRegistration = {
-  id: 'A113-heresy-teacher-after-lessons',
+  id: 'A113-heresy-teacher-before-lessons',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !isLessonsSpaceId(context.space.id)) return
     const positions = getLogicalFields(context.player).flatMap((field) => {

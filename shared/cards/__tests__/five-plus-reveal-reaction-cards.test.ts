@@ -206,7 +206,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     expect(session.withCtx(() => runCardEffectHook(state, owner, 'C170_AmateurFencer', 'onBuy', undefined, { actionHooks: session.actionHooks }))).toBeNull()
   })
 
-  it('C173 Top-Outer collects all food from Traveling Players 5/6 after House Building 5/6 is used', () => {
+  it('C173 Top-Outer collects all food from Traveling Players 5/6 before House Building 5/6 is used', () => {
     const session = setupOwner('C173_TopOuter')
     const state = session.getState().state
     const owner = state.players[0]!
@@ -214,7 +214,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const traveling = state.actionSpaces.find((space) => space.id === 'traveling-players-56')!
     traveling.resources.food = 4
 
-    const result = session.withCtx(() => executeCardListener(listener(session, 'C173-top-outer-after-house-building-56'), {
+    const result = session.withCtx(() => executeCardListener(listener(session, 'C173-top-outer-before-house-building-56'), {
       actionHooks: session.actionHooks,
       state,
       player: owner,
@@ -222,7 +222,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: houseBuilding,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result?.flow).toMatchObject({
@@ -251,7 +251,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       space: houseBuilding,
       actionId: houseBuilding.id,
       actionSpaceUse: { newPlacement: true },
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result?.flow).toMatchObject({
@@ -269,7 +269,7 @@ describe('5+ reveal and reaction occupation cards', () => {
     const traveling = state.actionSpaces.find((space) => space.id === 'traveling-players-56')!
     traveling.resources.food = 0
 
-    const topOuter = listener(session, 'C173-top-outer-after-house-building-56')
+    const topOuter = listener(session, 'C173-top-outer-before-house-building-56')
     expect(session.withCtx(() => executeCardListener(topOuter, {
       actionHooks: session.actionHooks,
       state,
@@ -278,7 +278,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: houseBuilding,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))).toBeUndefined()
 
     traveling.resources.food = 3
@@ -290,7 +290,7 @@ describe('5+ reveal and reaction occupation cards', () => {
       triggerPlayer: owner,
       space: state.actionSpaces.find((space) => space.id === 'traveling-players-56')!,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))).toBeUndefined()
   })
 

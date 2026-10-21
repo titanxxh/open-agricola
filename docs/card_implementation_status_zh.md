@@ -89,16 +89,16 @@
 | `B085_FarmHand` | FarmHand stable 通过 Farm Expansion 的 `stables` leaf wrapper（`actionContext.farmHand`）进入共享 stables 付费 / `farm.stableBuilt` 事件 / after-stables listener 链路，cost = 2 wood 并随 C88 等折扣统一生效；OA 允许同一次 stables leaf 混合建造普通 stable 与 FarmHand 特殊 stable。差异：FarmHand 位置不进 `stableTiles`（不计入动物 zone / loose stable 容量），仅经 `computeExtraRoomCapacity` +1 住房，stable count 口径由 `shared/domain/stables.ts` 单独派生。`farm.stableBuilt` item 带 `kind: 'normal' \| 'special'`，special 带 `sourceCardId`。Return-stable（D102 / E76 经 `stable-removal` helper）从通用聚合结果列出特殊 stable，并调用来源卡的 `returnSpecialStable` 归还；FarmHand 清 `extraData.position`、释放 1 个 stable supply、住房容量回 0，但保留 `flagged`（每局一次，回收后不再提供），不产生动物重整 flow。已建特殊 stable 经通用 `getBuiltSpecialStables(player)` hook 以 `SerializedPlayerState.specialStables` 投影给客户端；前端不读 `cardStates['B085_FarmHand']`，也不 import `shared/cards`。 |
 | `B170_CorralBuilder` | Pig Market / Cattle Market reveal 的 round start 独立触发，可选执行 B2-style 免费恰好 1 格牧场 non-action fence flow；若一格牧场非法则不补偿。 |
 | `B171_GreenhouseBuilder` | 注册 owner-only dynamic action space，只按当前 round 之前已 reveal 且 owner 可执行的 `fencing` / `house-redevelopment` / `vegetable-seeds` printed spaces 暴露对应分支。 |
-| `B173_Sweeper` | owner 使用 meeple-symbol extension space 后通过 shared stored-food cashout helper 在卡上放 1 food；一次性 anytime cashout 取走卡上 food、标记 used，职业仍计为已打出且后续不再累计。 |
+| `B173_Sweeper` | owner 使用 meeple-symbol extension space 前通过 shared stored-food cashout helper 在卡上放 1 food；一次性 anytime cashout 取走卡上 food、标记 used，职业仍计为已打出且后续不再累计。 |
 | `B175_FieldOverseer` | harvest field phase 结束时只统计其他玩家 `harvestReapSummary` 中的 grain field 数，3/4/6+ 按最高阈值给 food/grain/vegetable。 |
-| `B176_VillageIdiot` | 打出时丢弃其余职业手牌；通过 hand/played `occupation.isDoable` 与 `providesOccupation` minor 拦截保证其必须是且保持为 lone occupation，并在 opponent 使用 `meeting-place` 后给 owner 1 wood + 1 food。 |
+| `B176_VillageIdiot` | 打出时丢弃其余职业手牌；通过 hand/played `occupation.isDoable` 与 `providesOccupation` minor 拦截保证其必须是且保持为 lone occupation，并在 opponent 使用 `meeting-place` 前给 owner 1 wood + 1 food。 |
 | `B178_TagAlong` | 对手使用 Resource Market 变体后，owner 可立即选择通过 `place-farmer-on-space` 把可用工人放到同一 occupied action space 并执行该行动；owner 自己使用、非 Resource Market、无可进入的人（Farmers of the Moor 下须为健康的人）或目标 blocked / 不可执行时不触发。 |
 | `B179_WildBoarHunter` | return home 前按实际 `takenBy` 占用统计 wood accumulation spaces，3+ 且 owner 有 wood 时可选 1 wood -> 1 boar。 |
 | `C169_FastMason` | owner collect clay/stone accumulation 后，可立即选择执行匹配材质 renovation：clay collection 只到 clay，stone collection 仅 clay house 到 stone，`exactCost` 去掉 reed。 |
 | `C170_AmateurFencer` | onBuy 时若 owner 无 pasture 且 one-space fence legal，可选执行 B2-style 免费恰好 1 格牧场 non-action fence flow。 |
 | `C171_YoungArtist` | returning home phase owner 有 food 且至少一个分支可行时，可选付 1 food 后执行无工人 Minor Improvement action，或直接从 ordinary minor deck 抽最多 2 张小改良入手；Minor Improvement 分支按预留/支付该 1 food 后的资源判断，不会展示付费后无可买牌的分支；不可行分支隐藏，不走 keep-one 选择。 |
 | `C172_FieldCounter` | opponent 每 plow 1 field 在卡上放 1 food，按 `farm.fieldPlowed.fields` 数量累计；owner 自己 plow 不触发；cashout 复用 shared stored-food helper。 |
-| `C173_TopOuter` | 任意玩家使用 house-building-56 后，owner 收取 linked traveling-players-56 当前全部 food；空 food 或非 house-building-56 不触发。 |
+| `C173_TopOuter` | 任意玩家使用 house-building-56 前，owner 收取 linked traveling-players-56 当前全部 food；空 food 或非 house-building-56 不触发。 |
 | `C175_VillageTeacher` | owner 使用 Lessons 后立即按当前回合实际 occupied Lessons 数量 1/2/3 给 food/grain/vegetable；linked blocked 格不计数。 |
 | `C180_Trapper` | owner 使用 wood accumulation 后，若实际 occupied wood accumulation 数量为 2/3/4，可选 1 food 购买 sheep/boar/cattle。 |
 | `D074_RoyalWood` | stables 支付因 afterHost slot 通过 after-pay provenance 统计 |
