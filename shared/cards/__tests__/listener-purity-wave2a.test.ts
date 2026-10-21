@@ -684,15 +684,15 @@ describe('listener purity wave 2a', () => {
       cardStates: { [B55]: { extraData: { foodCount: 3 }, infobox: '3 Food' } },
     })
     const ctx = context(p, {
-      actionId: 'collect',
+      phase: 'before',
       space: space('forest', { gainPerRound: { wood: 3 } }),
-      result: { type: 'ok', resourcesGained: { wood: 3 } },
+      result: undefined,
     })
     const before = snapshot(p)
 
     const result = listenerById(
       B055_MaintenancePremium_impl.listeners,
-      'B55-maintenance-premium-after-collect-wood',
+      'B55-maintenance-premium-before-wood-space',
     ).handler(ctx)
 
     expectCardStatesUnchanged(p, before, 'B55 owner')

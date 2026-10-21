@@ -27,9 +27,9 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
   (space?.gainPerRound?.wood ?? 0) > 0
 
 const woodCollectListener: CardListenerRegistration = {
-  id: 'B55-maintenance-premium-after-collect-wood',
+  id: 'B55-maintenance-premium-before-wood-space',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return

@@ -8,6 +8,9 @@ import '../../shared/cards/B/B055_MaintenancePremium'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit21Maintenance from './_helpers/audit/ae-negative-21-maintenance'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNext } from './_helpers/session-assertions'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'B055_MaintenancePremium'
 
@@ -118,4 +121,35 @@ describe('ae-negative-21-maintenance', () => {
   it('B055 N3 actual renovation restocks a partly depleted or empty card to three rather than adding three food',()=>{for(const uses of[1,3]){const s=setup(CARD,state=>{state.players[0]!.resources.clay=2;state.players[0]!.resources.reed=1},5);buy(s,CARD);for(let n=0;n<uses;n++){if(n)reach(s,5+n);owner(s);turn(s,0,'forest')}reach(s,8);const before=owner(s),r=turn(s,0,'house-redevelopment');assert.equal(r.state.players[0]!.houseType,'clay');assert.equal(stored(r),3);assert.equal(r.state.players[0]!.resources.clay,before.state.players[0]!.resources.clay-2);assert.equal(r.state.players[0]!.resources.reed,0);assert.equal(r.state.players[0]!.resources.food,before.state.players[0]!.resources.food);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.houseType,'wood');assert.equal(stored(undone),3-uses);assert.equal(undone.state.players[0]!.resources.clay,before.state.players[0]!.resources.clay);assert.equal(undone.state.players[0]!.resources.reed,1);const retry=turn(s,0,'house-redevelopment');assert.equal(stored(retry),3);save(`B055-N3-${uses}`,{before,r,undone,retry})}})
   it('B055 N4 quarry unrelated collection opponent Forest and hand card cannot consume or restock stored food',()=>{const h=turn(setup(CARD),0,'forest');assert.equal(stored(h),0);const s=setup(CARD);buy(s,CARD);const other=turn(s,1,'forest'),unrelated=turn(s,0,'reed-bank');assert.equal(stored(other),3);assert.equal(stored(unrelated),3);reach(s,9);const before=owner(s),quarry=turn(s,0,'western-quarry');assert.equal(stored(quarry),3);assert.equal(quarry.state.players[0]!.resources.food,before.state.players[0]!.resources.food);save('B055-N4',{h,other,unrelated,before,quarry})})
   it('B055 N5 whole purchase and actual Forest undo restore stored food and one legal replay grants only once',()=>{const s=setup(CARD),r=buy(s,CARD).r,undone=ok(s.undoAction());assert.equal(stored(undone),0);assert.ok(undone.state.players[0]!.minorHand.includes(CARD));buy(s,CARD);const before=owner(s),wood=turn(s,0,'forest'),u=ok(s.undoAction());assert.equal(stored(u),3);assert.equal(u.state.players[0]!.resources.food,before.state.players[0]!.resources.food);const retry=turn(s,0,'forest');assert.equal(stored(retry),2);assert.equal(retry.state.players[0]!.resources.food,before.state.players[0]!.resources.food+1);save('B055-N5',{r,undone,before,wood,u,retry})})
+})
+
+describe('B055 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+  it('gives card food before Forest is collected and nothing on Clay Pit', () => {
+    const session = createWorkSession({ seed: 1322055, configure: state => {
+      state.round = 14
+      state.players.forEach(player => Object.assign(player.resources, { food: 10, wood: 0, clay: 0 }))
+      const owner = state.players[0]!
+      owner.minorPlayed = [CARD_ID]
+      owner.cardStates[CARD_ID] = { extraData: { foodCount: 3 }, infobox: '3 Food' }
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      state.actionSpaces.find(space => space.id === 'clay-pit')!.resources.clay = 2
+    } })
+    sessions.push(session)
+
+    let response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 11, wood: 3 })
+    expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'foodCount')).toBe(2)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'forest', type: 'resource.moved' })
+    confirmNext(session, response)
+    confirmNext(session, session.takeAction(1, 'day-laborer'))
+
+    response = session.takeAction(0, 'clay-pit')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 11, clay: 2 })
+    expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'foodCount')).toBe(2)
+  })
 })
