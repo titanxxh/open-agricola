@@ -766,8 +766,8 @@ _Avoid_: listener phase
 _Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 
 **Card Listener**:
-响应 Rule Action、Action Space Use 或领域事实时点的卡牌反应，触发对象由牌面决定。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。本牌的 played listener 不响应自身 `occupation` / `improvement` 的 `immediatelyAfter` / `after`；该资格排除不改变提交后卡牌数量，也不冻结随后 Action Space Use 阶段的来源。
-_Avoid_: dispatch 阶段直接修改 `GameState`、`PlayerState` 或 `cardStates`
+响应 Rule Action、Action Space Use 或领域事实时点的卡牌反应，触发对象由牌面决定。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。本牌的 played listener 不响应自身 `occupation` / `improvement` 的 `immediatelyAfter` / `after`；该资格排除不改变提交后卡牌数量，也不冻结随后 Action Space Use 阶段的来源。触发时机遵循 ADR 0033：BGA 已实现的卡沿用 BGA handler 的时机，BGA 在宿主之前结算的（放人时或显式 Before）用 `before`，宿主变更之后的用 after 一类，BGA 的 ImmediatelyAfter 与 After 先后对应 `immediatelyAfter` 与 `after`。BGA 未实现的卡（含 Moor 卡）按牌面写明的时机；牌面未写明时，使用某格的附加收益（also get / can buy / can exchange，与行动结果无关）和 Moor Special Action 的附加收益用 `before`，从累积格拿走至少 N 个或做某个动作（犁地、建造、翻修、围栏、播种、家庭成长、换食物）用 `after`。`before` 奖励在同一次宿主行动内可用。
+_Avoid_: dispatch 阶段直接修改 `GameState`、`PlayerState` 或 `cardStates`；把 BGA 在宿主之前结算的用格奖励放到 `after`
 
 **Reaction Hook**:
 同一时机可能有多张卡可触发、且玩家应能决定触发顺序的卡牌反应。OA 用 `ParallelNode(mode='trigger-select')`：先显示可触发卡牌，玩家选择一张后执行该卡 activation，剩余同组 reaction 继续由引擎重算。
