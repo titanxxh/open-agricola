@@ -15,9 +15,9 @@ const getAccumulatedTypes = (space: ActionSpace): ResourceType[] =>
   RESOURCE_TYPES.filter((r) => (space.gainPerRound?.[r] ?? 0) > 0)
 
 const listener: CardListenerRegistration = {
-  id: 'A161-patch-caretaker-after-place-farmer',
+  id: 'A161-patch-caretaker-before-accumulation-space',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return

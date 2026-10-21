@@ -22,9 +22,9 @@ const CARD_ID = 'A137_RiverineShepherd'
  * preserving action-space provenance for listeners that care about the source.
  */
 const listener: CardListenerRegistration = {
-  id: 'A137-riverine-shepherd-after-place-farmer',
+  id: 'A137-riverine-shepherd-before-market-or-reed-bank',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space) return

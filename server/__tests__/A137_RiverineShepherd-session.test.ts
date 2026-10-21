@@ -8,6 +8,9 @@ import '../../shared/cards/A/A137_RiverineShepherd'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit15Spaces from './_helpers/audit/ae-negative-15-spaces'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { getChoiceOptions } from './_helpers/session-assertions'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'A137_RiverineShepherd'
 const FILLER = '__test_placeholder__'
@@ -180,4 +183,52 @@ describe('ae-negative-15-spaces', () => {
   it('A137 N3 empty other pile and decline cannot create reserve reed',()=>{const zeroS=shepherd(0);const zero=finishOptional(zeroS,turn(zeroS,0,'sheep-market'),false);assert.equal(zero.state.players[0]!.resources.reed,0);const s=shepherd(4);const declined=finishOptional(s,turn(s,0,'sheep-market'),false);assert.equal(declined.state.players[0]!.resources.reed,0);assert.equal(declined.state.actionSpaces.find(a=>a.id==='reed-bank')!.resources.reed,4);save('A137-N3',{zero,declined})})
   it('A137 N4 hand unrelated and actual opponent cannot collect owner other pile',()=>{const hs=shepherd(4,false);const hand=finishOptional(hs,turn(hs,0,'sheep-market'),false);assert.equal(hand.state.players[0]!.resources.reed,0);const s=shepherd(4);const unrelated=turn(s,0,'day-laborer');const other=turn(s,1,'sheep-market');assert.equal(other.state.players[0]!.resources.reed,0);assert.equal(other.state.players[1]!.resources.reed,0);save('A137-N4',{hand,unrelated,other})})
   it('A137 N5 invalid choice rejects and whole undo returns source and animals before retry',()=>{const s=shepherd(4);const pending=turn(s,0,'sheep-market');assertRejectedUnchanged(s,()=>s.resolveChoice(0,'take-five'));const first=finishOptional(s,pending,true);const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.sheep,0);assert.equal(undone.state.players[0]!.resources.reed,0);assert.equal(undone.state.actionSpaces.find(a=>a.id==='reed-bank')!.resources.reed,4);const retry=finishOptional(s,turn(s,0,'sheep-market'),true);assert.equal(retry.state.players[0]!.resources.reed,1);save('A137-N5',{first,undone,retry})})
+})
+
+describe('A137 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const make = (actor: number) => {
+    const session = createWorkSession({ seed: 1322137, options: { playerCount: 3 }, configure: state => {
+      state.round = 14
+      state.currentPlayerIndex = actor
+      state.players.forEach(player => Object.assign(player.resources, { reed: 0, sheep: 0 }))
+      const owner = state.players[0]!
+      owner.occupationPlayed = [CARD_ID]
+      owner.pastures = [{ id: 'riverine-pasture', tiles: [{ row: 0, col: 1 }], animalType: null, animalCount: 0 }]
+      state.actionSpaces.find(space => space.id === 'reed-bank')!.resources.reed = 2
+      state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep = 2
+    } })
+    sessions.push(session)
+    return session
+  }
+  const pile = (response: SessionResponse, id: string, type: 'reed' | 'sheep') =>
+    response.state.actionSpaces.find(space => space.id === id)!.resources[type]
+
+  it('offers the Sheep Market sheep while the Reed Bank reed is still on the space', () => {
+    const session = make(0)
+    const offered = session.takeAction(0, 'reed-bank')
+
+    expect(offered.ok, offered.error).toBe(true)
+    const option = getChoiceOptions(offered).find(candidate => candidate.sourceCard === CARD_ID && candidate.value !== '__skip__')
+    expect(option, JSON.stringify(offered.interaction)).toBeDefined()
+    expect(offered.state.players[0]!.resources.reed).toBe(0)
+    expect(pile(offered, 'reed-bank', 'reed')).toBe(2)
+
+    const response = placeSheep(session, session.resolveChoice(0, option!.value))
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ reed: 2, sheep: 1 })
+    expect(pile(response, 'sheep-market', 'sheep')).toBe(1)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'reed-bank', type: 'resource.moved' })
+  })
+
+  it('does not offer the owner card when an opponent uses Reed Bank', () => {
+    const response = make(1).takeAction(1, 'reed-bank')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(getChoiceOptions(response).some(option => option.sourceCard === CARD_ID)).toBe(false)
+    expect(response.state.players[1]!.resources.reed).toBe(2)
+    expect(pile(response, 'sheep-market', 'sheep')).toBe(2)
+  })
 })

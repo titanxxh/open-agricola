@@ -6,6 +6,9 @@ import '../../shared/cards/A/A161_PatchCaretaker'
 import assert from 'node:assert/strict'
 import { assertEmptyAccumulationRejected, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit17Sequence from './_helpers/audit/ae-negative-17-sequence'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNext } from './_helpers/session-assertions'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'A161_PatchCaretaker'
 
@@ -127,4 +130,34 @@ describe('ae-negative-17-sequence', () => {
   it('A161 N2 different goods non accumulation earlier action and hand cannot grant vegetable',()=>{for(const[first,second,played]of[['forest','clay-pit',true],['grain-seeds','grove',true],['forest','grove',false]]as const){const s=setup(PATCH,undefined,played);const initial=turn(s,0,first);for(const[actor,space]of[[1,'reed-bank'],[2,'day-laborer'],[3,'fishing']]as const)turn(s,actor,space);const r=turn(s,0,second);assert.equal(r.state.players[0]!.resources.vegetable,0);save(`A161-N2-${first}-${played}`,{initial,r})}})
   it('A161 N3 actual opponent earlier wood never counts for owners first wood action',()=>{const s=setup(PATCH);turn(s,0,'grain-seeds');const opponent=turn(s,1,'forest');turn(s,2,'day-laborer');turn(s,3,'fishing');const r=turn(s,0,'grove');assert.equal(r.state.players[0]!.resources.vegetable,0);save('A161-N3',{opponent,r})})
   it('A161 N4 whole second action undo restores vegetable and one retry grants only once',()=>{const {s,r}=patch('forest','grove');assertRejectedUnchanged(s,()=>s.takeAction(0,'grove'));const undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.vegetable,0);const retry=turn(s,0,'grove');assert.equal(retry.state.players[0]!.resources.vegetable,1);save('A161-N4',{r,undone,retry})})
+})
+
+describe('A161 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+  it('gains the vegetable before the second wood space is collected, not on the first', () => {
+    const session = createWorkSession({ seed: 1322161, options: { playerCount: 4 }, configure: state => {
+      state.round = 14
+      state.players.forEach(player => { player.resources.vegetable = 0 })
+      state.players[0]!.occupationPlayed = [CARD_ID]
+      for (const [id, type] of [['forest', 'wood'], ['grove', 'wood'], ['clay-pit', 'clay'], ['fishing', 'food']] as const) {
+        state.actionSpaces.find(space => space.id === id)!.resources[type] = 1
+      }
+    } })
+    sessions.push(session)
+
+    const first = session.takeAction(0, 'forest')
+    expect(first.ok, first.error).toBe(true)
+    expect(first.state.players[0]!.resources.vegetable).toBe(0)
+    confirmNext(session, first)
+    for (const [actor, space] of [[1, 'clay-pit'], [2, 'day-laborer'], [3, 'fishing']] as const) {
+      confirmNext(session, session.takeAction(actor, space))
+    }
+
+    const response = session.takeAction(0, 'grove')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.vegetable).toBe(1)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'grove', type: 'resource.moved' })
+  })
 })
