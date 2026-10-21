@@ -35,10 +35,10 @@ An inventory of decks A–E against the reference found a consistent split among
 
 ## Consequences
 
-A `before` reward is usable within the same host action. When the host can only execute with that reward, which the reference allows by relaxing admission, the card's own `isDoable` listener evaluates the host as if the reward had already arrived. It uses the shared granted-resource helper; core admission is not relaxed for individual cards.
+A `before` reward is usable within the same host action. Core current-step admission also permits a space when the first executable step of an applicable `before` flow can start, even if the host cannot currently execute. It does not simulate the reward or prove that the host will become executable. Per the maintainer decision of 2026-10-21, cards add no admission guard or redundant `isDoable` override for this case. A false positive can enter `engine-blocked`, and the player must undo it. Empty accumulation spaces retain their structural entry condition.
 
 Card tests assert what each phase promises. For `before` they show that the reward is usable inside the same host action. For `immediatelyAfter` and `after` they show the order relative to other reactions at the same completion. Both also cover the cases that must not trigger.
 
 Rule authority stays with card text, official rulings and recorded maintainer decisions. This decision adopts the reference's timing as the rule for unspecified timing; other reference platform fields still do not drive OA behavior.
 
-The phase semantics and the granted-resource seam are in [Hooks, stage dispatch and listener purity](../architecture/hooks.md). Test expectations are in the [card testing template](../CARD_TEST_TEMPLATE.md), and Workshop guidance is in section 5.5 of the [custom card sandbox reference](../CUSTOM_CARD_SANDBOX.md).
+The phase semantics and current-step admission are in [Hooks, stage dispatch and listener purity](../architecture/hooks.md). Test expectations are in the [card testing template](../CARD_TEST_TEMPLATE.md), and Workshop guidance is in section 5.5 of the [custom card sandbox reference](../CUSTOM_CARD_SANDBOX.md).

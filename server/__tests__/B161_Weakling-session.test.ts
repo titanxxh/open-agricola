@@ -10,18 +10,103 @@ import {
 } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { confirmNext } from './_helpers/session-assertions'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { jumpLeaf } from '../../shared/cards/helpers/jump-leaf'
 import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/B/B161_Weakling'
 import * as audit30Native from './_helpers/audit/ae-negative-30-native'
 
 const CARD_ID = 'B161_Weakling'
 const SWAGMAN_ID = 'A129_Swagman'
-const LISTENER_ID = 'B161-weakling-after-place-farmer'
+const LISTENER_ID = 'B161-weakling-before-place-farmer'
 
 const weaklingGainCount = (resp: SessionResponse): number =>
   resp.state.log.filter((entry) =>
     entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
   ).length
+
+describe('Weakling before the host action', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+  function sowingSession({ played = true, pile = 5 } = {}) {
+    const session = createWorkSession({ options: { playerCount: 4 }, configure: state => {
+      state.roundActionOrder[0] = 'grain-utilization'
+      for (const space of state.actionSpaces) {
+        space.takenBy = []
+        space.resources = {}
+      }
+      state.actionSpaces.find(space => space.id === 'forest')!.resources = { wood: pile }
+      const player = state.players[0]!
+      player.occupationPlayed = played ? [CARD_ID] : []
+      Object.assign(player.resources, { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0 })
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
+      setWorkersAtHome(state, player, 2)
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('makes Grain Utilization available and sows its vegetable in that same space use', () => {
+    const session = sowingSession()
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(true)
+
+    let response = session.takeAction(0, 'grain-utilization')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.vegetable).toBe(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
+      throw new Error('Expected sow selection')
+    }
+    expect(response.interaction.request.farm.farmType).toBe('sow')
+
+    response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'vegetable' }] })
+    expect(response.ok, response.error).toBe(true)
+    response = confirmNext(session, response)
+    expect(response.state.players[0]!.resources.vegetable).toBe(0)
+    expect(response.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] }])
+    expect(response.interaction.stateId).toBe('idle')
+    expect(weaklingGainCount(response)).toBe(1)
+    const gain = response.state.events.findIndex(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)
+    const sow = response.state.events.findIndex(event => event.type === 'farm.sown')
+    expect(gain).toBeGreaterThanOrEqual(0)
+    expect(sow).toBeGreaterThan(gain)
+    expect(response.scores).toHaveLength(4)
+  }, 30_000)
+
+  it.each([{ played: false, pile: 5 }, { played: true, pile: 4 }])(
+    'does not admit Grain Utilization without its reward: %j', scenario => {
+      const session = sowingSession(scenario)
+      expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+      const response = session.takeAction(0, 'grain-utilization')
+      expect(response.ok).toBe(false)
+      expect(response.interaction.stateId).toBe('idle')
+      expect(response.state.players[0]!.resources.vegetable).toBe(0)
+      expect(weaklingGainCount(response)).toBe(0)
+    }, 30_000,
+  )
+
+  it('does not reward a workerless space use during work', () => {
+    const session = sowingSession()
+    const source = 'TEST_WorkerlessUse'
+    session.state.players[0]!.minorPlayed.push(source)
+    session.withCtx(() => requireActiveCardRegistry('weakling-workerless-test').registerListener({
+      id: 'test-workerless-use', cardIds: [source], actions: ['anytime'], phases: ['anytime'],
+      handler: () => ({ sourceCard: source, flow: jumpLeaf({ sourceCard: source, targetSpaceId: 'day-laborer' }) }),
+    }))
+
+    const response = session.takeAnytimeAction(0, 'test-workerless-use')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, vegetable: 0 })
+    expect(response.state.actionSpaces.find(space => space.id === 'day-laborer')!.takenBy).toEqual([])
+    expect(response.state.events.filter(event => event.type === 'worker.placed')).toEqual([])
+    expect(weaklingGainCount(response)).toBe(0)
+  }, 30_000)
+})
 
 describe('B161_Weakling session', () => {
   const setup = () => {
@@ -120,7 +205,7 @@ describe('B161_Weakling session', () => {
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'day-laborer')!,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       actionContext: { workerId: player.workers[0]!.id },
     } as unknown as CardListenerContext))
 
@@ -138,7 +223,7 @@ describe('B161_Weakling session', () => {
       player,
       space: state.actionSpaces.find((entry) => entry.id === 'day-laborer')!,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
       actionContext: { viaCardJump: true, targetSpaceId: 'day-laborer' },
     } as unknown as CardListenerContext))
 

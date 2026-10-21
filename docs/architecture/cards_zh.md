@@ -64,6 +64,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 ## `shared/cards/helpers/` 中的 helper
 
 - `pay-gain-node.ts`：先付后得、付后追加行动、退回后获得的模板。
+- `reserved-resources.ts`：`evaluateWithReservedResources()` 在扣除资源预留后判断行动；`evaluateWithGrantedResources()` 在加入先行奖励后判断行动。两者向 evaluator 传入玩家副本和对应状态视图，不改变已存储资源。
 - `stage-effects.ts`：阶段效果标记，以及经现有兑换执行器的每卡一次可选收获兑换。
 - `card-state.ts`、`round-placement.ts`：一次性状态、原始 Work Placement Chronology 与人员放置序号（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
 - `turn-token.ts`：活动 Turn Scope 身份与卡牌的“本 Turn 已用”记录。`isUsedThisTurnOrGap` / `markUsedThisTurnOrGapLeaf` 另把玩家两次自己 Turn 之间的间隔（其他玩家的 Turn、收获、回合结束与开始）视为单独一份记录；工作阶段中，轮转玩家在其 Turn 开启前的查询把即将开启的 Turn 视为未使用。`action-snapshot.ts`：Turn 起点快照（[Turn Scope 与行动执行作用域](session_zh.md#turn-scope-与行动执行作用域)）。
