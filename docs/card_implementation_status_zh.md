@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-10-20。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-10-21。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 > 本文只覆盖官方卡牌。Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
@@ -12,9 +12,7 @@
 
 参考实现 PHP 路径相对参考实现源码树；OA 路径相对本仓库。
 
-| 优先级 | 范围 | 待处理事项 |
-|---|---|---|
-| 已暂缓 | `C131_PrivateTeacher` [#1175](https://github.com/titanxxh/open-agricola/issues/1175) | 本次不修改；新职业能否在同一次 Grain Seeds 立即触发仍待规则确认。 |
+当前没有未决条目。
 
 ## 2. 已接受差异
 
@@ -25,7 +23,8 @@
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
 | Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |
 | 用 schema-up metadata 替代参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
-| 参考实现未实现，但 OA 有产品扩展/重写。编号 169–180 的卡是 5+ 扩展。 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D159_ReedSeller`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
+| 参考实现未实现，但 OA 有产品扩展/重写。编号 169–180 的卡是 5+ 扩展。 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A172_BoatPainter`, `A173_ClayThief`, `A174_MasterHora`, `A175_HollowGardener`, `A176_Wheelmaker`, `A177_Middleman`, `A178_CarpentersBoy`, `A179_MountainShepherd`, `A180_AnimalBrander`, `B169_LivestockSustainer`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B172_CattleCaregiver`, `B173_Sweeper`, `B174_RiverbankGardener`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B177_StoneClawer`, `B178_TagAlong`, `B179_WildBoarHunter`, `B180_GameTeaser`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C174_StoneCustodian`, `C175_VillageTeacher`, `C176_Cleanacre`, `C177_MountainHiker`, `C178_OnSiteReverend`, `C179_BovinePioneer`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D159_ReedSeller`, `D169_Plowsmith`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D172_PutcherMaker`, `D173_TownClerk`, `D174_LoessGardener`, `D175_Countryman`, `D176_Woodshacker`, `D177_Graduate`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
+| 反应窗口内新打出的牌不加入该窗口，同一阶段内不会为本次宿主提供它的反应。参考实现可以在手牌打出后激活其节点。维护者 2026-10-20 决定；机制讨论在 [#1181](https://github.com/titanxxh/open-agricola/issues/1181) 继续。 | 在反应窗口内打出卡牌的卡，例如 `C131_PrivateTeacher` 在 Grain Seeds 中打出 `B142_Greengrocer` 时本次不得蔬菜 |
 | 参考实现 banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
 | 参考实现 stable / FarmHand 模型差异 | `B085_FarmHand` |
 | 卡牌驱动的工人移动复用普通放人合法性；即使牌面写着“未占用”，容量或 modifier 允许的已占用目标仍可选择，目标行动的普通 `isDoable` 否决仍然生效。E010 在 Farmland 上的每个工人分别选择获得 1 food 或精确移动该工人。D051 的移动以及 E010 每名实际移动的工人各自开启新的规则 Turn Scope，但不增加轮转机会；E010 的食物分支不开启 Turn。 | `D051_Archway`, `E010_StrawHat` |
@@ -53,6 +52,7 @@
 - fencing 主路径不得为 C1 / B30 / E149 增加卡牌 id 分支或 `noWoodPalisades` / `midnightFencer` 一类单卡开关；用 `FenceSegment.type` / `source` 与通用 `fencePolicy` 表达差异。
 - 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
 - 可从权威计数派生的 infobox 使用卡牌自己的 `getStatePresentation`，不要用内部存取动作 listener 维护同步副本。
+- 不要把参考实现在宿主之前结算的用格奖励放到 `after`。listener 阶段按 [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) 选择，使 `before` 奖励在同一次行动内可用。
 - 行动格使用前 / 完整结束后的反应订阅既有 `place-farmer` 生命周期并筛选 `context.space`，不得用内部节点通配反应近似整格完成。
 - listener 资格由共享的封闭目标 / 阶段契约规定，不得从可执行动作注册推断，不得省略筛选条件或修改已注册的筛选对象。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
