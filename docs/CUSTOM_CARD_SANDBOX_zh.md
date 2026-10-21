@@ -565,22 +565,28 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 `CARD_IMPL.listeners[].actions` 接受支持的行动身份，如 `place-farmer`、`gain`、`collect`。行动格 ID，如 `forest`、`clay-pit`、`wish-children`，均被拒绝。完整列表由 `shared/custom-code/sandbox-listener-actions.ts` 定义，并进入已部署沙盒契约。原生 `actionSpaces` selector 不属于 Workshop Capability Contract，源码和已保存 manifest 都会拒绝它。
 
-要在"玩家走某个行动空间"后触发，监听 `actions: ['place-farmer']` 然后在 handler 内用 `context.space?.id === '<空间ID>'` 过滤。
+要在玩家使用某个行动格时触发，监听 `actions: ['place-farmer']`，然后在 handler 内用 `context.space?.id === '<空间ID>'` 过滤。“每次使用 Forest 时额外获得 1 木”是使用该格的附加收益，因此用 `before`，玩家在同一次行动内就能使用这 1 木：
 
 ```ts
 // ✗ 错误：'forest' 不是 leaf actionId，listener 永不触发
-{ actions: ['forest'], phases: ['after'], handler: (ctx) => ({ flow: ... }) }
+{ actions: ['forest'], phases: ['before'], handler: (ctx) => ({ flow: ... }) }
 
 // ✓ 正确：监听 place-farmer，handler 内过滤空间 id
 {
   actions: ['place-farmer'],
-  phases: ['after'],
+  phases: ['before'],
   handler: (ctx) => {
     if (ctx.space?.id !== 'forest') return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
 ```
+
+阶段按牌面选择（[ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md)）。牌面写明 “immediately before” 或 “before” 用 `before`，“immediately after” 用 `immediatelyAfter`，“after” 用 `after`。牌面未写明时：
+
+- 使用某格时的附加收益（额外获得货物、可以购买或兑换），与该格产出无关，用 `place-farmer` 的 `before`。
+- 从累积格拿走至少 N 个货物，用 `collect` 的 `after`，读取实际拿走的货物。
+- 执行某个动作，例如犁地、建造、翻修、围栏、播种或家庭成长，用该动作的 `after`。
 
 特殊行动名 `harvest-feed` **不是** listener 可监听项 —— 收获阶段的 feeding 走直接资源 mutation，不进 listener pipeline。要在喂食阶段开始时补食物，用 `onStartHarvestFeedingPhase` 返回 `gainLeaf(CARD_ID, { food: N })`；flow 在进入 feeding 阶段后、实际扣除食物前完成。`onHarvest` 更早，在收割后的 anytime 窗口之前执行。
 
@@ -877,6 +883,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-21 | §5.5 的用格示例改为 `before`，并在该节和已部署的生成指引中加入 ADR 0033 的 listener 时机规则。 |
 | 2026-10-10 | 开放 issue #1079 的候选能力，每项都有固定 Session 测试：7 个查询类 hook 及其需要的第四、第五个 hook 参数，6 项 effect 元数据，5 个 listener 数据字段，`computeExchanges` 阶段，16 个执行原生农场、卡牌和先手行动的 leaf action（只能作为 flow 的 leaf，可用 `actionContext.trueAction` 标明只是卡牌给予的行动），以及 `special-effect` 的 `pop-card-stack-top` 和 `remove-future-meeples` 两个 kind。 |
 | 2026-10-10 | 契约改为收紧执行（ADR 0025）：源码校验和两个执行器强制执行 action ID 与 `special-effect` kind，拒绝不支持的 listener 字段和未写入文档的 `beforeEndGameScope` / `beforeEndGameMandatory` 元数据，每个 listener 和返回的节点绑定到自己的卡，省略的 listener 过滤绑定到已列出的集合，拒绝未开放的原生节点字段、未写入文档的行动参数键、类型不符的 `special-effect` 字段和顶层类型不符的查询结果，并写明 hook 出错时的行为。 |
 | 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐并收窄 `handHooks` manifest、要求 effect 使用无 accessor 的直接对象字面量并在宿主侧过滤、统一 `positionKey({row,col})`，移除无法完整结算的 Workshop candidate/settlement hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
