@@ -235,6 +235,10 @@ describe('moving an existing worker does not repeat placement-only rewards', () 
     const { session, workerId } = setup({ placementCard: HORA })
     let response = session.takeAction(0, 'copse-56')
     expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      const source = response.interaction.request.options.find(option => option.sourceCard === HORA)!
+      response = session.resolveChoice(0, source.value)
+    }
     const purchase = horaPurchase(response)
     if (!purchase) throw new Error('Expected ordinary placement vegetable purchase')
     response = session.resolveChoice(0, purchase.value)

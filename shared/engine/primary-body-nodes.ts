@@ -35,6 +35,7 @@ export function wrapPrimaryBody(
 }
 
 export function primaryBodyCompleted(node: EngineNode, scopeId: string): boolean {
+  if (node.completionBarrier) return node.getState() === 'resolved'
   if (node.primaryBodyId === scopeId) {
     if (node instanceof SequenceNode && node.completion) return node.getState() === 'resolved'
     if (node instanceof OrNode) return node.getState() === 'resolved'

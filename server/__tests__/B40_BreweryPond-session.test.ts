@@ -67,9 +67,10 @@ const printedVp = (session: GameSession, response: SessionResponse) => {
 
 const takeSpace = (session: GameSession, playerIndex: number, spaceId: string) => {
   let response = session.takeAction(playerIndex, spaceId)
-  if (response.interaction.stateId === 'wait'
+  while (response.interaction.stateId === 'wait'
     && response.interaction.request.kind === 'select-trigger') {
     const trigger = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+      ?? response.interaction.request.options?.find((option) => !option.disabled && option.value !== '__pass__')
     expect(trigger).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, trigger!.value)
   }

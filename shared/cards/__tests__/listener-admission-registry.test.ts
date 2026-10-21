@@ -54,6 +54,14 @@ describe('listener registration admission', () => {
     { actionSpaces: 'all', actions: ['collect'] },
     { actionSpaces: 'all', events: ['farm.sown'] },
     { actionSpaces: 'all', globalQuery: true, phases: ['isDoable'] },
+    { actions: ['collect'], settlement: 'unknown' },
+    { actions: ['collect'], settlement: ['body'] },
+    { actions: ['collect'], settlement: { toString: () => 'action' } },
+    { actions: ['collect'], settlement: 'action', phases: ['before'] },
+    { actions: ['collect'], settlement: 'body' },
+    { actions: ['collect'], settlement: 'body', mandatory: true, phases: ['immediatelyAfter'] },
+    { actionSpaces: ['fishing'], settlement: 'action' },
+    { events: ['farm.sown'], settlement: 'body', mandatory: true },
   ])('rejects malformed or unsupported subscription %j', declaration => {
     const registry = new CardRegistry()
     expect(() => Reflect.apply(registry.registerListener, registry, [{ id: 'invalid', phases: ['after'], ...declaration }])).toThrow(/Listener/)
@@ -79,6 +87,14 @@ describe('listener registration admission', () => {
         expect(() => { if (Array.isArray(installed.actionSpaces)) installed.actionSpaces.push('forest') }).toThrow()
       }
     }
+  })
+
+  it.each(['action', 'body', 'completion'] as const)('retains the %s settlement boundary through clone and merge', settlement => {
+    const registry = new CardRegistry()
+    registry.registerListener({ ...valid(), settlement, mandatory: true, phases: ['after'] })
+    const merged = new CardRegistry()
+    merged.mergeFrom(registry.clone())
+    expect(merged.getAllListeners()[0]?.settlement).toBe(settlement)
   })
 
   it.each(['before', 'immediatelyAfter', 'after', 'computeReplace', 'isDoable'] as const)('admits explicit IDs and all at the action-space %s boundary', phase => {

@@ -126,7 +126,11 @@ describe('ae-negative-04-plows', () => {
     })
   })
   it('B019 N6 the stored field can fill the final plot before its satisfied Farmland host', () => {
-    const s = setup({ card: MOLD, lastPlot: true }); const normal = turn(s, 0, 'farmland')
+    const s = setup({ card: MOLD, lastPlot: true }); let normal = turn(s, 0, 'farmland')
+    if (normal.interaction.stateId === 'wait' && normal.interaction.request.kind === 'select-trigger') {
+      const source = normal.interaction.request.options.find(option => option.sourceCard === MOLD)!
+      normal = s.resolveChoice(0, source.value)
+    }
     assert.equal(normal.interaction.stateId === 'wait' ? normal.interaction.sourceCard : undefined, MOLD)
     const r = plow(s, normal, { row: 0, col: 4 })
     finished(r)

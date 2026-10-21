@@ -89,7 +89,8 @@ const obtainListener: CardListenerRegistration = {
   id: 'E53-boar-spear-after-obtain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: [...TRACKED_ACTIONS],
+  actions: ['gain', 'collect', 'receive'],
+  settlement: 'action',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!(TRACKED_ACTIONS as readonly string[]).includes(context.actionId)) return
 
@@ -116,7 +117,7 @@ const obtainListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [obtainListener],
+  listeners: [obtainListener, { ...obtainListener, id: 'E53-boar-spear-after-exchange', actions: ['exchange'], settlement: 'completion' }],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

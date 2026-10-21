@@ -141,7 +141,7 @@ const previewContextForChild = (
     ownerPlayerId,
     ownerCardZone: params.ownerCardZone,
     previewState,
-    effectPlayer,
+    effectPlayer: params.beforeSpaceId ? triggerPlayer : effectPlayer,
     listenerContext: {
       actionHooks: context.actionHooks,
       state: previewState,
@@ -158,6 +158,7 @@ const previewContextForChild = (
       ...eventReadContext,
       triggerSnapshot: params.triggerSnapshot,
       moorAction: params.moorAction,
+      actionSpaceUse: params.actionSpaceUse,
       ...event,
       actionContext,
     },
@@ -249,12 +250,13 @@ const triggerResultMandatory = (
   metadataMandatory: boolean,
   phase: string,
   result: ActionHookResult | undefined,
+  spaceBefore: boolean,
 ): boolean => {
   if (metadataMandatory) return true
   if (typeof result?.extraData?.beforeEndGameMandatory === 'boolean') {
     return result.extraData.beforeEndGameMandatory
   }
-  if (phase === 'before') return false
+  if (phase === 'before') return spaceBefore && Boolean(result?.flow) && result?.flow?.optional !== true
   if (!resultHasApplicabilitySignal(result)) return false
   return result?.flow?.optional !== true
 }
@@ -396,7 +398,8 @@ export const evaluateTriggerSelect = (
       child,
       cardId: entry.cardId,
       listenerId: entry.listenerId,
-      mandatory: applicable ? triggerResultMandatory(entry.mandatory, phase, result) : entry.mandatory,
+      mandatory: applicable ? triggerResultMandatory(entry.mandatory, phase, result,
+        isActivateCardActionNode(child) && child.params.beforeSpaceId !== undefined) : entry.mandatory,
       applicable,
       doable,
       actionId,

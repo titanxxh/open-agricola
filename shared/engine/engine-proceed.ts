@@ -1,6 +1,8 @@
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import { actionSpaceQueryContext } from './space-use-nodes'
 import { inheritPrimaryBody } from './primary-body-nodes'
+import { inheritSpaceEffectSource } from './effect-source'
+import { settleHostReactions } from './reaction-settlement'
 import { captureSpaceUseEvents } from './space-use-runtime'
 import { preparePrimaryCompletions, executeCompletionPhase } from './completion-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext } from '../actions/flow'
@@ -654,6 +656,7 @@ const executeActivateCardAction = (
     ...event,
     triggerSnapshot: params.triggerSnapshot,
     moorAction: params.moorAction,
+    ...(params.actionSpaceUse ? { actionSpaceUse: params.actionSpaceUse } : {}),
   }
   const result = executeCardListener(listener, listenerContext, {
     ownerPlayerId,
@@ -676,12 +679,13 @@ const executeActivateCardAction = (
   )
   if (result?.flow || normalizedFollowUps.length > 0) {
     const insertedNodes: EngineNode[] = []
+    const flowPlayer = params.beforeSpaceId ? triggerPlayer : effectPlayer
     if (result?.flow) {
       const flow = applyDefaultSourceCardToFlow(result.flow, result.sourceCard)
-      recordGrantedActionsFromFlow(int, flow, effectPlayer, context.state, flowSourceCard(flow) ?? result.sourceCard)
-      insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id, actionContext))
+      recordGrantedActionsFromFlow(int, flow, flowPlayer, context.state, flowSourceCard(flow) ?? result.sourceCard)
+      insertedNodes.push(buildOwnedFlowNode(int, flow, flowPlayer.id, actionContext))
     }
-    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state, actionContext))
+    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, flowPlayer, context.state, actionContext))
     const continuationParentHostNodeId = params.phase === 'before'
       ? params.beforeHostNodeId
       : node.continuationParentHostNodeId
@@ -703,6 +707,7 @@ const executeActivateCardAction = (
       insertedNodes.forEach(enforceCompositeContinuationMandatory)
     }
     if (insertedNodes.length > 0) {
+      insertedNodes.forEach(inserted => inheritPrimaryBody(node, inserted))
       int.tree.insertAfter(node.id, insertedNodes)
     }
   }
@@ -858,8 +863,7 @@ const executeDeferredHostAction = (
   )
   const trailingHookNodes = [
     ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state, executionContext.actionContext),
-    ...immediateActivateNodes,
-    ...afterActivateNodes,
+    ...settleHostReactions(int, node, [...immediateActivateNodes, ...afterActivateNodes]),
     ...afterHostNodes,
   ]
   const leadingNodes = [
@@ -870,7 +874,7 @@ const executeDeferredHostAction = (
       stampContinuationParentHost(insertedNode, node.continuationParentHostNodeId!))
   }
   if (result.type === 'flow') {
-    const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
+    const flowNode = buildOwnedFlowNode(int, inheritSpaceEffectSource(result.flow, executionContext.actionContext), context.player.id, executionContext.actionContext)
     inheritPrimaryBody(node, flowNode)
     if (node.continuationParentHostNodeId) {
       stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
@@ -1509,8 +1513,7 @@ export function engineProceed(
     // insertAfter), and trailing hooks AFTER the flow.
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state, executionContext.actionContext),
-      ...immediateActivateNodes,
-      ...afterActivateNodes,
+      ...settleHostReactions(int, node, [...immediateActivateNodes, ...afterActivateNodes]),
       ...afterHostNodes,
     ]
     const leadingNodes = [
@@ -1524,7 +1527,7 @@ export function engineProceed(
       const committedFlow = node.actionContext?.commitOnTriggerSelection === true
         ? { ...result.flow, optional: undefined }
         : result.flow
-      const flowNode = buildOwnedFlowNode(int, committedFlow, context.player.id, executionContext.actionContext)
+      const flowNode = buildOwnedFlowNode(int, inheritSpaceEffectSource(committedFlow, executionContext.actionContext), context.player.id, executionContext.actionContext)
       inheritPrimaryBody(node, flowNode)
       if (node.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)

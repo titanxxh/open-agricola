@@ -20,7 +20,7 @@ export function preparePrimaryCompletions(int: EngineInternals): void {
       const children = primaryBodyChildren(parent)
       for (let index = children.length - 1; index >= 0; index--) {
         const child = children[index]!
-        if (child instanceof SequenceNode && child.completion) continue
+        if (child.completionBarrier || child instanceof SequenceNode && child.completion) continue
         if (child.reactionPhase && child.getState() === 'ready' && !hasStartedDescendant(child)) {
           const gate = int.tree.findNodeById(child.reactionPhase === 'after' ? completion.afterId : completion.immediateId)
           if (gate instanceof SequenceNode) {

@@ -14,6 +14,8 @@ import { getCardListenerSource } from './card-listener-source'
 import { isPlayerSkippingCurrentHarvest } from './helpers/harvest-skip'
 import type { ActionSpaceListenerPhase, CardListenerAction, CardListenerEvent } from './listener-contract'
 import { snapshotCardListener } from './listener-contract'
+import { planListenerOwnerGroups } from '../engine/matched-trigger'
+import type { ActivateCardActionParams } from '../engine/activation-action'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -53,22 +55,25 @@ export type CardListenerRegistration = ({
   actionSpaces?: never
   events?: never
   globalQuery?: never
-} | {
+} & ({ settlement?: 'action' | 'completion' } | { settlement: 'body'; mandatory: true; phases: ['after'] }) | {
   actionSpaces: 'all' | string[]
   actions?: never
   events?: never
   globalQuery?: never
   phases: ActionSpaceListenerPhase[]
+  settlement?: never
 } | {
   events: CardListenerEvent[]
   actions?: never
   actionSpaces?: never
   globalQuery?: never
+  settlement?: never
 } | {
   globalQuery: true
   actions?: never
   actionSpaces?: never
   events?: never
+  settlement?: never
 }) & {
   id: string
   cardIds?: string[]
@@ -469,7 +474,7 @@ const collectBeforeSpaceFlows = (
   actionContext: Record<string, unknown> | undefined,
   newPlacement: boolean,
 ): ActionFlow[] => {
-  const flows: ActionFlow[] = []
+  const sources: Array<MatchedCardListener & Pick<ActivateCardActionParams, 'actionId' | 'actionSpaceUse'>> = []
   for (const target of ['space', 'placement'] as const) {
     const context = {
       actionHooks,
@@ -483,18 +488,24 @@ const collectBeforeSpaceFlows = (
     }
     for (const entry of getMatchingListeners(context)) {
       if (!newPlacement && entry.registration.requiresNewPlacement) continue
-      const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
-      if (!result?.flow) continue
-      flows.push(entry.cardId && result.countCardUse !== false ? {
-        type: 'seq',
-        children: [
-          { type: 'leaf', actionId: 'record-card-use', params: { cardId: entry.cardId, ownerPlayerId: entry.ownerPlayerId } },
-          result.flow,
-        ],
-      } : result.flow)
+      sources.push({ ...entry, actionId: context.actionId, actionSpaceUse: context.actionSpaceUse })
     }
   }
-  return flows
+  return planListenerOwnerGroups(sources, state, player.id).map(({ ownerPlayerId, listeners }): ActionFlow => {
+    const children: ActionFlow[] = listeners.map(entry => {
+      const params: ActivateCardActionParams = {
+        listenerId: entry.registration.id, cardId: entry.cardId,
+        phase: 'before', actionId: entry.actionId, actionSpaceUse: entry.actionSpaceUse,
+        beforeSpaceId: space.id, triggerPlayerId: player.id,
+        ownerPlayerId: entry.ownerPlayerId, ownerCardZone: entry.ownerCardZone,
+        mandatory: entry.registration.mandatory === true,
+        event: { actionContext: { ...actionContext, targetSpaceId: space.id } },
+      }
+      return { type: 'leaf', actionId: 'activate-card', sourceCard: entry.cardId, targetPlayerId: ownerPlayerId, params }
+    })
+    return children.length === 1 ? children[0]!
+      : { type: 'parallel', mode: 'trigger-select', targetPlayerId: ownerPlayerId, children }
+  })
 }
 
 export const collectBeforePlacementFlows = (

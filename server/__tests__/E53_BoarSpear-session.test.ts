@@ -321,6 +321,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
     const placeUnheldBoar = () => {
+      resp = resolveTriggerIfPresent(session, resp, B137_ID)
       expect(resp.state.players[0]!.resources.boar).toBe(2)
       if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'animal-reorg') {
         throw new Error('Expected placement for one newly acquired boar')

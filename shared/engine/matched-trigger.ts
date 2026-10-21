@@ -22,11 +22,11 @@ export function getPlayOrderIndex(player: PlayerState, cardId: string): number {
   return Number.MAX_SAFE_INTEGER
 }
 
-export function planListenerOwnerGroups(
-  matched: MatchedCardListener[],
+export function planListenerOwnerGroups<T extends MatchedCardListener>(
+  matched: T[],
   state: GameState,
   triggerPlayerId: string | undefined,
-): { ownerPlayerId: string | undefined; listeners: MatchedCardListener[] }[] {
+): { ownerPlayerId: string | undefined; listeners: T[] }[] {
   const ordered = matched.map((listener, index) => {
     const owner = findPlayerById(state, listener.ownerPlayerId)
     const ownerOrder = !listener.ownerPlayerId ? -1 : listener.ownerPlayerId === triggerPlayerId ? 0
@@ -34,7 +34,7 @@ export function planListenerOwnerGroups(
     const playOrder = owner ? getPlayOrderIndex(owner, listener.cardId) : Number.MAX_SAFE_INTEGER
     return { listener, ownerOrder, playOrder, index }
   }).sort((a, b) => a.ownerOrder - b.ownerOrder || a.playOrder - b.playOrder || a.index - b.index)
-  const groups: { ownerPlayerId: string | undefined; listeners: MatchedCardListener[] }[] = []
+  const groups: { ownerPlayerId: string | undefined; listeners: T[] }[] = []
   for (const { listener } of ordered) {
     const ownerPlayerId = listener.ownerPlayerId || triggerPlayerId
     const last = groups.at(-1)
