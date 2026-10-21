@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-10-20. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-10-21. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -12,9 +12,7 @@
 
 Reference PHP paths are relative to the reference implementation's source tree; OA paths are relative to this repository.
 
-| Priority | Scope | Open work |
-|---|---|---|
-| Deferred by maintainer | `C131_PrivateTeacher` [#1175](https://github.com/titanxxh/open-agricola/issues/1175) | Unchanged until a ruling confirms whether a newly played occupation can trigger in the same Grain Seeds use. |
+No entries are open.
 
 ## 2. Accepted differences
 
@@ -25,7 +23,8 @@ Unless the product direction changes, the following are not bugs. Every card not
 | Maintainer ruling for exhausted ordinary decks: a satisfied tier can be completed; each eligible card type independently draws up to three remaining cards and keeps one; an empty type is skipped, completion still succeeds when both are empty, and there is no downgrade, reshuffle or later compensation. This is an OA ruling, not an official FAQ. | `PS03` |
 | Reseller excludes an entire printed-cost candidate that contains a stable or fence component, and keeps its once-per-game opportunity when no supported candidate remains. This does not rule out future component refunds, tracked in [#849](https://github.com/titanxxh/open-agricola/issues/849). | `E146_Reseller` |
 | Schema-up metadata replaces the reference's custom `isBuyable`. | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
-| Not implemented by the reference; OA implements or extends them as product features. Cards numbered 169–180 are 5+ extensions. | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D159_ReedSeller`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
+| Not implemented by the reference; OA implements or extends them as product features. Cards numbered 169–180 are 5+ extensions. | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A172_BoatPainter`, `A173_ClayThief`, `A174_MasterHora`, `A175_HollowGardener`, `A176_Wheelmaker`, `A177_Middleman`, `A178_CarpentersBoy`, `A179_MountainShepherd`, `A180_AnimalBrander`, `B169_LivestockSustainer`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B172_CattleCaregiver`, `B173_Sweeper`, `B174_RiverbankGardener`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B177_StoneClawer`, `B178_TagAlong`, `B179_WildBoarHunter`, `B180_GameTeaser`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C174_StoneCustodian`, `C175_VillageTeacher`, `C176_Cleanacre`, `C177_MountainHiker`, `C178_OnSiteReverend`, `C179_BovinePioneer`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D159_ReedSeller`, `D169_Plowsmith`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D172_PutcherMaker`, `D173_TownClerk`, `D174_LoessGardener`, `D175_Countryman`, `D176_Woodshacker`, `D177_Graduate`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
+| A card played inside a reaction window does not join that window, so its reaction in the same phase is not offered for the current host. The reference can activate such a hand card once it is played. Maintainer decision of 2026-10-20; the mechanism discussion continues in [#1181](https://github.com/titanxxh/open-agricola/issues/1181). | Cards that play a card inside a reaction window, such as `C131_PrivateTeacher` playing `B142_Greengrocer` during Grain Seeds, which gives no vegetable that time |
 | Banned by the reference; OA keeps them. | `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
 | Stable / FarmHand model differs from the reference. | `B085_FarmHand` |
 | Card-driven worker moves reuse ordinary placement legality, including occupied targets allowed by capacity or a modifier despite the printed "unoccupied"; ordinary target `isDoable` vetoes still apply. Each E010 worker on Farmland independently chooses 1 food or an exact move of that worker. A D051 move and each worker actually moved by E010 open a fresh rules Turn Scope without adding a rotation opportunity; E010's food branch opens no Turn. | `D051_Archway`, `E010_StrawHat` |
@@ -53,6 +52,7 @@ No entries are open.
 - The fencing main path must not add card-ID branches for C1 / B30 / E149 or per-card switches such as `noWoodPalisades` / `midnightFencer`; express the differences with `FenceSegment.type` / `source` and the generic `fencePolicy`.
 - Do not copy mutable PHP args or in-place cost rewriting; OA keeps structured modifiers and payment enumeration.
 - Derive counter-based infobox text in the owning card's `getStatePresentation`; do not synchronize a second copy through internal storage-action listeners.
+- Do not put a space-use reward that the reference resolves before its host on `after`. Choose the listener phase by [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md), so a `before` reward is usable within that same action.
 - Subscribe action-space before / complete reactions to the existing `place-farmer` lifecycle and filter `context.space`; do not approximate complete use with wildcard internal-node reactions.
 - Keep listener permission in the shared closed target/phase contract; do not infer it from executable action registration, omit selectors, or mutate registered selector objects.
 - Reference platform status fields such as `banned` and `implemented` must not drive OA product behavior automatically.
