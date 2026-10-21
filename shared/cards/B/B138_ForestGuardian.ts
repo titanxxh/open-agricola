@@ -4,16 +4,17 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
+import { collectTakeAmount } from '../helpers/partial-take'
 
 const CARD_ID = 'B138_ForestGuardian'
 /**
  * B138 Forest Guardian:
  * onBuy: gain 2 wood.
- * Before an opponent collects from a wood accumulation space with 5+ wood,
+ * Before an opponent's collect takes 5+ wood from a wood accumulation space,
  * the opponent must pay 1 food to the card owner.
  *
  * Wood accumulation spaces: forest, copse, grove.
- * Triggers on 'before' phase of 'collect' action when space has 5+ wood.
+ * Triggers on 'before' phase of 'collect' action when that collect takes 5+ wood.
  */
 
 const collectListener: CardListenerRegistration = {
@@ -27,9 +28,8 @@ const collectListener: CardListenerRegistration = {
     const spaceId = context.space?.id
     if (!isWoodAccumulationSpaceId(spaceId)) return
 
-    // Check if 5+ wood on the space
-    const woodOnSpace = context.space?.resources?.wood ?? 0
-    if (woodOnSpace < 5) return
+    // Takes at least 5 wood: a partial take counts only the goods it takes.
+    if (collectTakeAmount(context, 'wood') < 5) return
 
     const ownerId = context.ownerPlayer?.id
     if (!ownerId) return
