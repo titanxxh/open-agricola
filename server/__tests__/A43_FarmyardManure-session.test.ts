@@ -74,7 +74,7 @@ describe('A043_FarmyardManure session', () => {
     expect(resp.ok).toBe(true)
 
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)
-    // still only 3 entries (not 6) because the card fires once per action
+    // Still only 3 entries (not 6) because the card fires once per Turn.
     expect(entries).toHaveLength(3)
   })
 
