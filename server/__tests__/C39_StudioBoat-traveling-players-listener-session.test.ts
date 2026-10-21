@@ -1,7 +1,7 @@
 import { CardRegistry as TestCardRegistry } from '../../shared/cards/registry'
 import { withActiveRegistry } from '../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-environment'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   getRegisteredCardListeners,
   executeCardListener,
@@ -12,6 +12,8 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C039_StudioBoat'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'C039_StudioBoat'
 const LISTENER_ID = 'C39-studio-boat-traveling-players-vp'
@@ -105,7 +107,7 @@ describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
       player: owner,
       space: travelingPlayers,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
@@ -129,7 +131,7 @@ describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
       player: owner,
       space: otherSpace,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
@@ -146,7 +148,7 @@ describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
       player: owner,
       space: undefined,
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result).toBeUndefined()
@@ -176,5 +178,39 @@ describe('C039 Studio Boat four-player session', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
+  })
+})
+
+describe('C039 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const make = (actor: number) => {
+    const session = createWorkSession({ seed: 1322039, options: { playerCount: 4 }, configure: state => {
+      state.round = 14
+      state.currentPlayerIndex = actor
+      state.players[0]!.minorPlayed = [CARD_ID]
+      state.actionSpaces.find(space => space.id === 'traveling-players')!.resources.food = 2
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('scores the bonus point before the Traveling Players food is collected', () => {
+    const session = make(0)
+    const food = session.state.players[0]!.resources.food
+    const response = session.takeAction(0, 'traveling-players')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
+    expect(response.state.players[0]!.resources.food).toBe(food + 2)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'traveling-players', type: 'card.stateChanged' })
+  })
+
+  it('gives the owner nothing when an opponent uses Traveling Players', () => {
+    const response = make(1).takeAction(1, 'traveling-players')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
+    expect(response.state.events.some(event => event.type === 'card.stateChanged' && event.cardId === CARD_ID)).toBe(false)
   })
 })

@@ -7,6 +7,8 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/C/C147_Cowherd'
 import assert from 'node:assert/strict'
 import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'C147_Cowherd'
 
@@ -127,5 +129,48 @@ describe('ae-negative-54-resources', () => {
       assert.equal(r.state.players[0]!.resources.cattle, mode === 'hand' ? 1 : 0)
       save(`C147-N2-${mode}`, r)
     }
+  })
+})
+
+describe('C147 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const make = (actor: number) => {
+    const session = createWorkSession({ seed: 1322147, options: { playerCount: 3 }, configure: state => {
+      state.round = 14
+      state.currentPlayerIndex = actor
+      state.players.forEach(player => { player.resources.cattle = 0 })
+      const owner = state.players[0]!
+      owner.occupationPlayed = [CARD_ID]
+      owner.pastures = [{ id: 'owner-pasture', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 }]
+      state.actionSpaces.find(space => space.id === 'cattle-market')!.resources.cattle = 1
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('adds the cattle before Cattle Market is collected and houses both in one reorganization', () => {
+    const session = make(0)
+    let response = session.takeAction(0, 'cattle-market')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.state.players[0]!.resources.cattle).toBe(2)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'cattle-market', type: 'resource.moved' })
+    response = session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'owner-pasture', zoneType: 'pasture', animalType: 'cattle', animalCount: 2 }],
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'cattle', animalCount: 2 })
+  })
+
+  it('gives the owner nothing when an opponent uses Cattle Market', () => {
+    const response = make(1).takeAction(1, 'cattle-market')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.cattle).toBe(0)
+    expect(response.state.events.some(event => event.sourceCardId === CARD_ID)).toBe(false)
   })
 })

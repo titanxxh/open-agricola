@@ -33,7 +33,7 @@ const travelingPlayersOwnerVp: CardListenerRegistration = {
   // common-traveling-players.ts `players: [4]`), so this listener is dormant
   // and the 1-3p +1 VP is granted by the execute() handler above.
   actionSpaces: 'all',
-  phases: ['after'],
+  phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // context.space is the action space the farmer was placed on (resolved
     // from the engine's activeSpaceId). Only fire on the global Traveling
