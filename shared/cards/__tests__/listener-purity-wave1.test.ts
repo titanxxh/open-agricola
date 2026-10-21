@@ -35,9 +35,8 @@ const makeB48Context = (
     ownerPlayer: player,
     effectPlayer: player,
     space: { id: 'forest', gainPerRound } as never,
-    actionId: 'collect',
-    phase: 'after',
-    result: { type: 'ok', resourcesGained: { wood: 3 } },
+    actionId: 'place-farmer',
+    phase: 'before',
   }
 }
 
@@ -102,14 +101,13 @@ const makeC148Context = (
     effectPlayer: player,
     space: { id: 'forest', gainPerRound } as never,
     actionId: 'place-farmer',
-    phase: 'after',
-    result: { type: 'ok' },
+    phase: 'before',
   }
 }
 
-const mudWallowerAfterPlaceFarmerListener = () =>
+const mudWallowerBeforeSpaceListener = () =>
   C148_MudWallower_impl.listeners!.find(
-    (entry) => entry.id === 'C148-mud-wallower-after-place-farmer',
+    (entry) => entry.id === 'C148-mud-wallower-before-accumulation-space',
   )!
 
 const makeE103Context = (
@@ -307,7 +305,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('C148 handler returns boar flow without resetting counters immediately', () => {
-    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
+    const listener = guardedListener(mudWallowerBeforeSpaceListener())
     const ctx = makeC148Context(3, 0)
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -319,7 +317,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('C148 handler returns no flow and no mutation for non-accumulation spaces', () => {
-    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
+    const listener = guardedListener(mudWallowerBeforeSpaceListener())
     const ctx = makeC148Context(0, 0, {})
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -334,7 +332,7 @@ describe('listener purity wave 1', () => {
     [1, 2],
     [2, 3],
   ])('C148 handler returns counter %i -> %i flow without mutating immediately', (counter, nextCounter) => {
-    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
+    const listener = guardedListener(mudWallowerBeforeSpaceListener())
     const ctx = makeC148Context(counter, 2)
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -361,7 +359,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('C148 handler returns reset, held, infobox, and boar flow on every fourth accumulation space', () => {
-    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
+    const listener = guardedListener(mudWallowerBeforeSpaceListener())
     const ctx = makeC148Context(3, 2)
     const before = JSON.stringify(ctx.player.cardStates)
 

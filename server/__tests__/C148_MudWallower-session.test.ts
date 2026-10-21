@@ -19,6 +19,8 @@ import '../../shared/cards/C/C148_MudWallower'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit54Resources from './_helpers/audit/ae-negative-54-resources'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'C148_MudWallower'
 
@@ -143,7 +145,7 @@ describe('C148_MudWallower', () => {
 
   it('returns counter increment flow on accumulation space use', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-place-farmer')
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-before-accumulation-space')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -154,7 +156,7 @@ describe('C148_MudWallower', () => {
     // Place farmer on an accumulation space (wood: 3 per round)
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result?.flow).toEqual({
@@ -179,7 +181,7 @@ describe('C148_MudWallower', () => {
 
   it('returns reset, held increment, and pig gain flow on 4th accumulation space use', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-place-farmer')
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-before-accumulation-space')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -194,7 +196,7 @@ describe('C148_MudWallower', () => {
     // 4th placement
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'before',
     } as unknown as CardListenerContext))
 
     expect(result).toBeDefined()
@@ -237,7 +239,7 @@ describe('C148_MudWallower', () => {
 
   it('does not trigger on non-accumulation spaces', () => {
     const ruleRegistry = createOfficialCardRegistry()
-    const listener = findListener(ruleRegistry, 'C148-mud-wallower-after-place-farmer')
+    const listener = findListener(ruleRegistry, 'C148-mud-wallower-before-accumulation-space')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
@@ -248,7 +250,7 @@ describe('C148_MudWallower', () => {
 
     const result = withActiveRegistry(ruleRegistry, () => executeCardListener(listener!, {
       state, player, space: createSpace('farmland', {}),
-      actionId: 'place-farmer', phase: 'after',
+      actionId: 'place-farmer', phase: 'before',
     } as unknown as CardListenerContext))
 
     // Counter should not increment
@@ -532,5 +534,62 @@ describe('ae-negative-54-resources', () => {
     assert.equal(r.state.players[0]!.cardStates['C148_MudWallower']?.counters?.held, 0)
     assert.equal(r.state.players[0]!.resources.boar, 4)
     save('C148-N3', r)
+  })
+})
+
+describe('C148 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const make = (counter: number) => {
+    const session = createWorkSession({ seed: 1322148, options: { playerCount: 4 }, configure: state => {
+      state.round = 14
+      const owner = state.players[0]!
+      owner.resources.boar = 0
+      owner.occupationPlayed = [CARD_ID]
+      owner.cardStates[CARD_ID] = { counters: { counter, held: 0 }, infobox: `${counter} / 4` }
+      owner.pastures = [{ id: 'pasture-1', tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], animalType: null, animalCount: 0 }]
+      state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('counts the fourth use and houses the held pig before Pig Market is collected', () => {
+    const session = make(3)
+    let response = session.takeAction(0, 'pig-market')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.state.players[0]!.resources.boar).toBe(1)
+    expect(response.state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar).toBe(1)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters).toEqual({ counter: 0, held: 1 })
+    response = session.resolveChoice(0, 'confirm', [
+      { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.state.players[0]!.resources.boar).toBe(2)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'pig-market', type: 'resource.moved' })
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
+      { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources.boar).toBe(2)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters).toEqual({ counter: 0, held: 1 })
+  })
+
+  it('only advances the counter on an earlier use', () => {
+    const response = make(1).takeAction(0, 'forest')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ boar: 0, wood: expect.any(Number) })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters).toEqual({ counter: 2, held: 0 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.infobox).toBe('2 / 4')
+    expect(response.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toBe(false)
   })
 })

@@ -13,13 +13,13 @@ const CARD_ID = 'C148_MudWallower'
  * C148 Mud Wallower:
  * Every fourth time you use an accumulation space, you get 1 PIG, held by this card.
  *
- * Rule: Tracks a counter and held pig count. On every farmer placement on an
- * accumulation space, increments counter. At 4, gains 1 pig and resets.
+ * Rule: Tracks a counter and held pig count. Each use of an accumulation space
+ * increments the counter before the space is collected. At 4, gains 1 pig and resets.
  * The card acts as an animal holder zone for pigs.
  *
  * Implementation:
  * - onBuy: initialize counter to 0, held to 0
- * - after place-farmer on accumulation space: increment counter, if >=4 gain pig
+ * - before an accumulation space is collected: increment counter, if >=4 gain pig
  * - onComputeAnimalZones: provide pig holder zone with capacity = held count
  */
 
@@ -36,10 +36,10 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
   params,
 })
 
-const afterPlaceFarmerListener: CardListenerRegistration = {
-  id: 'C148-mud-wallower-after-place-farmer',
+const beforeAccumulationSpaceListener: CardListenerRegistration = {
+  id: 'C148-mud-wallower-before-accumulation-space',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isAccumulationSpace(context)) return
@@ -151,7 +151,7 @@ const afterPaySyncListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, afterPaySyncListener, afterReorgSyncListener],
+  listeners: [beforeAccumulationSpaceListener, afterExchangeSyncListener, afterPaySyncListener, afterReorgSyncListener],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
