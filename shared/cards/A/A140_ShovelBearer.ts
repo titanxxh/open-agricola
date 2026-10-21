@@ -7,9 +7,9 @@ import { HOLLOW_SPACE_IDS, isHollowSpaceId } from '../helpers/action-space-categ
 
 const CARD_ID = 'A140_ShovelBearer'
 const listener: CardListenerRegistration = {
-  id: 'A140-shovel-bearer-after-place-farmer',
+  id: 'A140-shovel-bearer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

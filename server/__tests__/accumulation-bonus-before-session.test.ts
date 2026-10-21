@@ -73,6 +73,19 @@ const ZERO = { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0 }
 const triggerCases = [
   { card: 'A042_ForestLakeHut', space: 'forest', stock: { forest: { wood: 3 } }, reward: { food: 1 }, total: { wood: 3, food: 1 } },
   { card: 'A042_ForestLakeHut', space: 'fishing', stock: { fishing: { food: 2 } }, reward: { wood: 1 }, total: { wood: 1, food: 2 } },
+  { card: 'A051_DriftNetBoat', space: 'fishing', stock: { fishing: { food: 2 } }, reward: { food: 2 }, total: { food: 4 } },
+  { card: 'A078_Canoe', space: 'fishing', stock: { fishing: { food: 2 } }, reward: { reed: 1, food: 1 }, total: { reed: 1, food: 3 } },
+  { card: 'A080_StoneTongs', space: 'western-quarry', round: 5, stock: { 'western-quarry': { stone: 2 } }, reward: { stone: 1 }, total: { stone: 3 } },
+  { card: 'A116_WoodCutter', occupation: true, space: 'forest', stock: { forest: { wood: 3 } }, reward: { wood: 1 }, total: { wood: 4 } },
+  { card: 'A139_HollowWarden', occupation: true, players: 3, space: 'hollow', stock: { hollow: { clay: 2 } }, reward: { food: 1 }, total: { clay: 2, food: 1 } },
+  { card: 'A140_ShovelBearer', occupation: true, players: 3, space: 'clay-pit', stock: { 'clay-pit': { clay: 1 }, hollow: { clay: 2 } }, reward: { food: 2 }, total: { clay: 1, food: 2 } },
+  { card: 'A140_ShovelBearer', occupation: true, players: 3, space: 'hollow', stock: { 'clay-pit': { clay: 3 }, hollow: { clay: 2 } }, reward: { food: 3 }, total: { clay: 2, food: 3 } },
+  { card: 'A155_Conjurer', occupation: true, players: 4, space: 'traveling-players', stock: { 'traveling-players': { food: 2 } }, reward: { wood: 1, grain: 1 }, total: { wood: 1, grain: 1, food: 2 } },
+  { card: 'B040_BreweryPond', space: 'fishing', stock: { fishing: { food: 2 } }, reward: { grain: 1, wood: 1 }, total: { grain: 1, wood: 1, food: 2 } },
+  { card: 'B040_BreweryPond', space: 'reed-bank', stock: { 'reed-bank': { reed: 1 } }, reward: { grain: 1, wood: 1 }, total: { grain: 1, wood: 1, reed: 1 } },
+  { card: 'B121_Geologist', occupation: true, space: 'forest', stock: { forest: { wood: 3 } }, reward: { clay: 1 }, total: { wood: 3, clay: 1 } },
+  { card: 'B121_Geologist', occupation: true, space: 'reed-bank', stock: { 'reed-bank': { reed: 1 } }, reward: { clay: 1 }, total: { reed: 1, clay: 1 } },
+  { card: 'B121_Geologist', occupation: true, players: 3, space: 'clay-pit', stock: { 'clay-pit': { clay: 1 } }, reward: { clay: 1 }, total: { clay: 2 } },
 ] as Array<{
   card: string; space: string; stock: Stock; reward: Partial<Resource>; total: Partial<Resource>
   players?: number; round?: number; occupation?: boolean
@@ -80,6 +93,15 @@ const triggerCases = [
 
 const quietCases = [
   { card: 'A042_ForestLakeHut', space: 'day-laborer', stock: {}, total: { food: 2 } },
+  { card: 'A051_DriftNetBoat', space: 'forest', stock: { forest: { wood: 3 } }, total: { wood: 3 } },
+  { card: 'A078_Canoe', space: 'forest', stock: { forest: { wood: 3 } }, total: { wood: 3 } },
+  { card: 'A080_StoneTongs', space: 'clay-pit', round: 5, stock: { 'clay-pit': { clay: 1 } }, total: { clay: 1 } },
+  { card: 'A116_WoodCutter', occupation: true, space: 'clay-pit', stock: { 'clay-pit': { clay: 1 } }, total: { clay: 1 } },
+  { card: 'A139_HollowWarden', occupation: true, players: 3, space: 'clay-pit', stock: { 'clay-pit': { clay: 1 } }, total: { clay: 1 } },
+  { card: 'A140_ShovelBearer', occupation: true, players: 3, space: 'clay-pit', stock: { 'clay-pit': { clay: 1 } }, total: { clay: 1 } },
+  { card: 'A155_Conjurer', occupation: true, players: 4, space: 'fishing', stock: { fishing: { food: 2 } }, total: { food: 2 } },
+  { card: 'B040_BreweryPond', space: 'forest', stock: { forest: { wood: 3 } }, total: { wood: 3 } },
+  { card: 'B121_Geologist', occupation: true, space: 'clay-pit', stock: { 'clay-pit': { clay: 1 } }, total: { clay: 1 } },
 ] as Array<{ card: string; space: string; stock: Stock; total: Partial<Resource>; players?: number; round?: number; occupation?: boolean }>
 
 describe('accumulation-space bonus goods before the host collection', () => {
@@ -91,7 +113,10 @@ describe('accumulation-space bonus goods before the host collection', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ ...ZERO, ...example.total })
     expect(Object.values(response.state.actionSpaces.find(space => space.id === example.space)!.resources).every(n => n === 0)).toBe(true)
     expect(response.state.players[1]!.resources).toMatchObject(ZERO)
-    expect(response.scores).toEqual(baseline)
+    // Only the owner's grain score can move (Conjurer and Brewery Pond give grain).
+    const withoutGrain = (scores: typeof baseline) => scores.map(player => player.categories.filter(category => category.key !== 'grains'))
+    expect(withoutGrain(response.scores)).toEqual(withoutGrain(baseline))
+    expect(response.scores[0]!.categories.find(category => category.key === 'grains')?.quantity).toBe(example.total.grain ?? 0)
   })
 
   it.each(quietCases)('$card gives nothing on $space', example => {
