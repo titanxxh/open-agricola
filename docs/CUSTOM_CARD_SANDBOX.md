@@ -518,22 +518,28 @@ It also checks that `CARD_IMPL.effect` keys belong to `cardEffectHooks` plus all
 
 `CARD_IMPL.listeners[].actions` contains a supported action identity, such as `place-farmer`, `gain`, or `collect`. Action-space IDs such as `forest`, `clay-pit`, and `wish-children` are rejected. Section 3.2 has the complete list. The native `actionSpaces` selector is outside the Workshop Capability Contract and is rejected in source and saved manifests.
 
-To trigger after a player visits a particular action space, listen on `actions: ['place-farmer']` and filter with `context.space?.id === '<space-id>'`:
+To react when a player uses a particular action space, listen on `actions: ['place-farmer']` and filter with `context.space?.id === '<space-id>'`. "Each time you use the Forest, you also get 1 wood" is an extra benefit for using the space, so it runs `before` and the player can spend the wood within that same action:
 
 ```ts
 // Wrong: forest is not a leaf action ID, so this listener never fires
-{ actions: ['forest'], phases: ['after'], handler: (ctx) => ({ flow: ... }) }
+{ actions: ['forest'], phases: ['before'], handler: (ctx) => ({ flow: ... }) }
 
 // Correct: listen on place-farmer and filter by space ID
 {
   actions: ['place-farmer'],
-  phases: ['after'],
+  phases: ['before'],
   handler: (ctx) => {
     if (ctx.space?.id !== 'forest') return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
 ```
+
+Choose the phase from the card text ([ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md)). Printed "immediately before" or "before" is `before`, "immediately after" is `immediatelyAfter` and "after" is `after`. Without printed timing:
+
+- An extra benefit for using a space, such as also getting goods or being able to buy or exchange, that does not depend on what the space yields, is `place-farmer` `before`.
+- Taking at least N goods from an accumulating space is `collect` `after`, which reads the goods actually taken.
+- Performing an action, such as plowing, building, renovating, fencing, sowing or family growth, is `after` on that action.
 
 `harvest-feed` is not a listenable action. Harvest feeding performs direct resource mutation outside the listener pipeline. For food granted at the start of feeding, return `gainLeaf(CARD_ID, { food: N })` from `onStartHarvestFeedingPhase`. Its flow completes after the feeding phase starts and before food is consumed. `onHarvest` runs earlier, before the post-reap anytime window.
 
@@ -826,6 +832,7 @@ Admission serves honest authors and model mistakes. It does not bound adversaria
 
 | Date | Change |
 |---|---|
+| 2026-10-21 | Changed the section 5.5 space-use example to `before` and added the listener timing rule of ADR 0033 to that section and to the deployed generation guidance. |
 | 2026-10-10 | Opened the candidate capabilities of issue #1079, each with a fixed Session test: seven query hooks and the fourth and fifth hook arguments they need, six effect metadata keys, five listener data fields, the `computeExchanges` phase, sixteen leaf actions that run native farm, card and turn-order actions (flow leaves only, with `actionContext.trueAction` to mark a granted action), and the `special-effect` kinds `pop-card-stack-top` and `remove-future-meeples`. |
 | 2026-10-10 | Made the contract fail-closed (ADR 0025): enforced action IDs and `special-effect` kinds in source validation and both executors, rejected unsupported listener fields and the undocumented `beforeEndGameScope` / `beforeEndGameMandatory` metadata, bound every listener and returned node to its own card and omitted listener filters to the listed sets, rejected unopened native node fields, undocumented action parameter keys, malformed `special-effect` fields and query results of the wrong top-level type, and documented the hook-failure behavior. |
 | 2026-08-04 | Made discounts across all improvement candidates mandatory capped bonuses; completed and narrowed the `handHooks` manifest; required a direct accessor-free effect object literal plus host filtering; unified `positionKey({row,col})`; removed Workshop candidate-and-settlement hooks that cannot settle completely; added semantic contracts and M11 live, record, and replay guards. |

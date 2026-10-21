@@ -45,6 +45,14 @@ describe('browser generation prompt and deployed sandbox contract', () => {
     expect(prompt).not.toContain('build-stone-room')
   })
 
+  it('chooses listener timing by the card timing rule and shows a space-use bonus as before', () => {
+    expect(prompt).toContain('an extra benefit for using a space is place-farmer before')
+    expect(prompt).toContain('taking at least N goods from an accumulating space or performing an action is after')
+    const example = sandbox.split('### 5.5')[1]!.split('### 5.6')[0]!
+    expect(example).toContain("actions: ['place-farmer'],\n  phases: ['before'],")
+    expect(example).not.toContain("actions: ['place-farmer'],\n  phases: ['after'],")
+  })
+
   it('keeps payment guidance on the mandatory capped and attributed runtime paths', () => {
     expect(prompt).toContain('improvement purchase discounts listen to improvement')
     expect(prompt).toContain('capDiscountAtCost: true, optional: false, sources: [CARD_ID]')
