@@ -36,6 +36,11 @@ type ShapeCheck = {
 }
 
 const allowedContextResultUses = {
+  'shared/cards/helpers/construction-events.ts': {
+    reason: 'reads successful original-host construction receipts for the builder, never resource result fields or enclosing events',
+    expectedContextResultReferences: 1,
+    expectedResultPaths: ['farmOperations', 'type'],
+  },
   'shared/cards/D/D024_BrotherlyLove.ts': {
     reason: 'reads the frozen successful person-use receipt, not resource facts or a later live worker count',
     expectedContextResultReferences: 3,
@@ -519,6 +524,11 @@ function hasCallWithStringArg(sourceFile: ts.SourceFile, functionName: string, v
 }
 
 const requiredShapeChecks = {
+  'shared/cards/helpers/construction-events.ts': [{
+    label: 'reads receipts only from successful ok or returned-flow hosts',
+    check: sourceFile => hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.EqualsEqualsEqualsToken, 'ok')
+      && hasResultLiteralComparison(sourceFile, 'type', ts.SyntaxKind.EqualsEqualsEqualsToken, 'flow'),
+  }],
   'shared/cards/D/D024_BrotherlyLove.ts': [{
     label: 'requires a person-use receipt on the completed host result',
     check: sourceFile => {

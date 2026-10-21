@@ -2,8 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
-import { getStableCountForCards } from '../../domain/stables'
+import { getActionStableConstructions } from '../helpers/construction-events'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -14,12 +13,8 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const builtThisAction = getStableTilesBuiltThisAction(context.player)
-    if (builtThisAction <= 0) return
-    const nAfter = getStableCountForCards(context.player)
-    const nBefore = nAfter - builtThisAction
     const gains: Partial<Resource> = {}
-    for (let i = nBefore + 1; i <= nAfter; i++) {
+    for (const { ordinal: i } of getActionStableConstructions(context)) {
       if (i === 1 || i === 2) gains.grain = (gains.grain ?? 0) + 1
       if (i === 3 || i === 4) gains.vegetable = (gains.vegetable ?? 0) + 1
     }

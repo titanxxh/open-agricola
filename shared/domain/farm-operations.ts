@@ -1,10 +1,11 @@
 import { planFarmyardExtension } from './farmyard-extensions'
 import type { FarmTerrainKind } from '../moor/types'
-import type { FarmOperationResult, FarmTilePosition, FarmyardExtension, FarmyardSpaceState, PlayerState, Resource } from '../contract/types'
+import type { FarmOperationResult, FarmTilePosition, FarmyardExtension, FarmyardSpaceState, PlayerState, Resource, StableConstruction } from '../contract/types'
 import type { EventSink, FarmTerrainChangedEvent } from '../contract/events'
 import { parsePositionKey, getFarmyardTilePositions, positionKey } from './farmyard-geometry'
 import { normalizeFarmyardSpaceStates, getFarmyardSpaceStates } from './farmyard-space-states'
 import { getNewlyUsedFarmyardTiles, getUsedFarmyardTileKeys } from './farmyard-usage'
+import { assignStablePieceIds, getOrdinaryStableCount } from './stable-pieces'
 
 export type FarmOperation = (
   | { kind: 'space-states'; states: FarmyardSpaceState[]; positions: readonly FarmTilePosition[] }
@@ -13,7 +14,8 @@ export type FarmOperation = (
   | { kind: 'remove-fences'; indexes: readonly number[]; positions: readonly FarmTilePosition[] }
   | { kind: 'crops'; preparedPlayer: PlayerState; positions: readonly FarmTilePosition[] }
   | { kind: 'rooms'; positions: readonly FarmTilePosition[] }
-  | { kind: 'stables'; positions: readonly FarmTilePosition[]; preparedPlayer?: PlayerState }
+  | { kind: 'stables'; positions: readonly FarmTilePosition[]; preparedPlayer?: PlayerState;
+      standingSpecialStableCount: number; specialStables?: Array<FarmTilePosition & { sourceCardId: string }> }
   | { kind: 'plow'; position: FarmTilePosition; preparedPlayer: PlayerState }
   | { kind: 'fence'; positions: readonly FarmTilePosition[]; preparedPlayer: PlayerState }
   | { kind: 'pastures'; positions: readonly FarmTilePosition[]; pastures: PlayerState['pastures'];
@@ -47,7 +49,9 @@ const commitPreparedPlayer = (player: PlayerState, prepared: PlayerState): void 
  * No hooks run here: its receipt stays with the original host's trailing reactions.
  */
 export function commitFarmOperation(player: PlayerState, operation: FarmOperation, eventSink?: EventSink): FarmOperationResult {
+  if (operation.kind === 'stables' || operation.kind === 'remove-stables') assignStablePieceIds(player)
   const before = copyLayout(player)
+  const stablePieces = { ...player.stablePieceIds }
   const existingPositions = new Set(getFarmyardTilePositions(player).map(positionKey))
   const previouslyUsed = getUsedFarmyardTileKeys(player)
   if (operation.kind === 'pastures') {
@@ -69,6 +73,7 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
     case 'remove-stables': {
       const removed = new Set(operation.positions.map(positionKey))
       player.stableTiles = player.stableTiles.filter(tile => !removed.has(positionKey(tile)))
+      assignStablePieceIds(player)
       break
     }
     case 'remove-fences':
@@ -80,7 +85,9 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
       break
     case 'stables':
       if (operation.preparedPlayer) commitPreparedPlayer(player, operation.preparedPlayer)
+      player.stablePieceIds = stablePieces
       player.stableTiles = [...player.stableTiles, ...operation.positions.map(({ row, col }) => ({ row, col }))]
+      assignStablePieceIds(player)
       break
     case 'plow':
     case 'fence':
@@ -108,6 +115,30 @@ export function commitFarmOperation(player: PlayerState, operation: FarmOperatio
     type: 'farm.spacesUsed', newlyUsedTiles: result.newlyUsedTiles,
     ...(operation.sourceCardId ? { sourceCardId: operation.sourceCardId } : {}),
   })
+  if (operation.kind === 'rooms') {
+    if (operation.positions.length > 0 && player.turnConstruction) player.turnConstruction.roomType = player.houseType
+    return { ...result, kind: 'rooms', roomType: player.houseType }
+  }
+  if (operation.kind === 'stables') {
+    const pieces = player.stablePieceIds ?? {}
+    const firstOrdinal = getOrdinaryStableCount(before) + operation.standingSpecialStableCount + 1
+    const stables: StableConstruction[] = operation.positions.map((tile, index) => ({
+      ...tile, kind: 'normal', pieceId: pieces[positionKey(tile)]!, ordinal: firstOrdinal + index,
+    }))
+    for (const special of operation.specialStables ?? []) {
+      stables.push({ ...special, kind: 'special', ordinal: firstOrdinal + stables.length })
+    }
+    if (player.turnConstruction) {
+      const built = new Set(player.turnConstruction.stablePieces)
+      for (const stable of stables) built.add(stable.kind === 'normal' ? `normal:${stable.pieceId}` : `special:${stable.sourceCardId}`)
+      player.turnConstruction.stablePieces = [...built]
+    }
+    return { ...result, kind: 'stables', stables }
+  }
+  if (operation.kind === 'fence' && player.turnConstruction) {
+    const previous = new Set(before.fenceSegments.filter(segment => segment.type === 'fence').map(segment => segment.edge))
+    if (player.fenceSegments.some(segment => segment.type === 'fence' && !previous.has(segment.edge))) player.turnConstruction.fenceBuilt = true
+  }
   return operation.kind === 'terrain'
     ? { ...result, kind: 'terrain', terrainMode: operation.mode, terrainChanges: operation.changes }
     : { ...result, kind: operation.kind }

@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, bonusVpLeaf } from '../helpers/pay-gain-node'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getActionRoomConstructions } from '../helpers/construction-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B111_Rustic'
@@ -12,8 +12,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'clay') return
-    const roomsBuilt = getRoomsBuiltThisAction(context.player)
+    const roomsBuilt = getActionRoomConstructions(context).filter(operation => operation.roomType === 'clay').reduce((count, operation) => count + operation.positions.length, 0)
     if (roomsBuilt <= 0) return
     return {
       flow: {

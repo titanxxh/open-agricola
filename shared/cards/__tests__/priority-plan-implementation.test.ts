@@ -5,7 +5,7 @@ installOfficialCardRegistry()
 import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import { recordActionSnapshot } from '../helpers/action-snapshot'
+import { commitFarmOperation } from '../../domain/farm-operations'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 
 import '../A/A029_AleBenches'
@@ -114,8 +114,7 @@ describe('priority plan implementations', () => {
     const listener = findListener('E52-cubbyhole-after-construct')
     const player = createPlayer()
     player.minorPlayed = ['E052_Cubbyhole']
-    recordActionSnapshot(player, 1)
-    player.roomTiles = [{ row: 0, col: 2 }, { row: 1, col: 2 }] as any
+    const construction = commitFarmOperation(player, { kind: 'rooms', positions: [{ row: 0, col: 2 }, { row: 1, col: 2 }] })
 
     const result = executeCardListener(listener!, {
       state: createState(player),
@@ -123,6 +122,7 @@ describe('priority plan implementations', () => {
       space: createSpace('construct'),
       actionId: 'construct',
       phase: 'after',
+      result: { type: 'ok', farmOperations: [construction] },
     } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({

@@ -8,7 +8,6 @@ import {
 } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { workersAvailable, setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption, ActionFlow, GameState, PlayerState, Resource, SessionResponse } from '../../shared/contract/types'
@@ -205,27 +204,6 @@ describe('M036 Peat Moss', () => {
 })
 
 describe('M037 Building Plan', () => {
-  it('only offers free stables after at least two rooms are built', () => {
-    const session = setup()
-    const state = session.state
-    const player = state.players[0]!
-    player.minorPlayed = ['M037_BuildingPlan']
-    session.withCtx(() => recordActionSnapshot(player, 1))
-    player.roomTiles.push({ row: 0, col: 1 })
-    const oneRoom = session.withCtx(() => executeCardListener(listenerById(session, 'M037-building-plan-after-construct'), context('M037_BuildingPlan', 'construct', player, state)))
-    expect(oneRoom).toBeUndefined()
-
-    player.roomTiles.push({ row: 0, col: 2 })
-    const twoRooms = session.withCtx(() => executeCardListener(listenerById(session, 'M037-building-plan-after-construct'), context('M037_BuildingPlan', 'construct', player, state)))
-    expect(twoRooms?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'stables',
-      optional: true,
-      sourceCard: 'M037_BuildingPlan',
-      actionContext: { max: 2, exactCost: { wood: 0, max: 2 }, trueAction: false },
-    })
-  })
-
   it('places up to two free stables after a two-room build', () => {
     const session = setup()
     const player = session.state.players[0]!

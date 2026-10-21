@@ -82,7 +82,7 @@ type SessionResponse = {
 
 ## Turn Scope 与行动执行作用域
 
-轮转机会、Turn Scope 与行动执行作用域是三种独立的生命周期。“在你的回合”与“同一回合”读取 Turn Scope；“实际建造 / 犁 / 播了什么”读取当前行动的作用域或 transaction。
+轮转机会、Turn Scope 与行动执行作用域是三种独立的生命周期。“在你的回合”与“同一回合”读取 Turn Scope；“实际建造 / 犁 / 播了什么”读取当前行动已提交的回执。
 
 | 规则情形 | 轮转机会 | Turn Scope | 行动执行作用域 |
 |---|---|---|---|
@@ -95,7 +95,8 @@ type SessionResponse = {
 
 - Turn Scope 在放人、沼泽特殊行动或卡牌驱动的行动格使用之前开始，覆盖该回合的每个规则行动、尾随效果、必需的整理和回合结束 hook，之后清除活动快照。显式的 after-turn 发动只保留捕获的身份，不重新开启作用域或快照。移动工人产生的回合把普通人员行动的触发身份传给这些 hook，并在选择下一名工人前关闭。
 - 执行“在你的回合”效果需要 owner 的活动作用域；可执行性查询可以投影当前轮转玩家即将开启的作用域。
-- 同一回合的多个规则行动共享 Turn Scope，各用独立的行动作用域。按行动的差值使用行动 transaction。
+- 同一回合的多个规则行动共享 Turn Scope，各用独立的行动作用域。按行动的建造数量读取该宿主的回执。
+- `recordActionSnapshot()` 开启有类型的 `turnConstruction` 事实，由 `endTurnScope()` 清除。成功的农场提交记录建过的不同棚棋子、最后一次建房的材质和普通围栏建造。返还、翻修、序列化及撤销均保留或恢复对应作用域的事实，不从布局净差推断建造；卡牌 helper 区分“建过棚”的布尔条件和不同棋子的数量门槛。
 - Anytime 接受时捕获当前 Turn token；只有原玩家交棒窗口能捕获刚结束的 token，否则显式标为 before-turn/outside-turn。空栈的新玩家不继承 `lastToken`；回合前形成的资格等下一真实 Turn 结束。后代继承冻结的归属，每 Turn 的消费者据此判定，不从后来的状态猜测。
 - 同一人物的 `jumpLeaf` 跳转与不放人的 `viaCardJump` 使用留在外围 Turn Scope（如有）中；只有 `move-farmer-to-space` 用 `turn-scope` begin / end 包住每次移动。
 - `actionContext.trueAction` 只表示一个效果对 listener 而言是否算作执行了具名行动；它不开启回合，也不开启行动作用域。

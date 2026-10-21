@@ -4,7 +4,7 @@ import { join, relative } from 'node:path'
 
 const repoRoot = process.cwd()
 const scannedRoots = ['shared/cards', 'shared/domain']
-const allowList = new Set(['shared/domain/stables.ts'])
+const allowList = new Set(['shared/domain/stable-pieces.ts'])
 const ignoredParts = new Set(['__tests__', 'node_modules', 'dist', 'coverage'])
 
 const collectSourceFiles = (dir: string): string[] => {

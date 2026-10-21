@@ -3,8 +3,7 @@ import type { Resource, TradeModifier } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
-import { getStableCountForCards } from '../../domain/stables'
+import { getActionStableConstructions } from '../helpers/construction-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C056_FeedFence'
@@ -28,11 +27,9 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const built = getStableTilesBuiltThisAction(context.player)
-    if (built <= 0) return
-    // +2 bonus for 4th stable (when player now has exactly 4 stables)
-    const bonusFood = getStableCountForCards(context.player) === 4 ? 2 : 0
-    const totalFood = built + bonusFood
+    const stables = getActionStableConstructions(context)
+    const totalFood = stables.reduce((food, stable) => food + (stable.ordinal === 4 ? 3 : 1), 0)
+    if (totalFood === 0) return
     return { flow: gainLeaf(CARD_ID, { food: totalFood }), sourceCard: CARD_ID }
   },
 }

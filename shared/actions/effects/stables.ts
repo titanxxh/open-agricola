@@ -1,3 +1,4 @@
+import { getStandingSpecialStableCount } from '../../domain/stables'
 import { commitFarmOperation } from '../../domain/farm-operations'
 import { requireActionHookRegistry } from '../hooks'
 import type {
@@ -71,7 +72,7 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   PaymentSolver.payResources(player, { wood: stableWoodCost })
-  const farmOperation = commitFarmOperation(player, { kind: 'stables', positions: [next] })
+  const farmOperation = commitFarmOperation(player, { kind: 'stables', positions: [next], standingSpecialStableCount: getStandingSpecialStableCount(player) })
   return { type: 'ok', farmOperations: [farmOperation] }
 }
 
@@ -322,7 +323,7 @@ const finalizeStables = (
     if (!applied) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
     specialSourceCardId = applied.sourceCardId
   }
-  const farmOperation = commitFarmOperation(ctx.player, { kind: 'stables', positions: stables, preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
+  const farmOperation = commitFarmOperation(ctx.player, { kind: 'stables', positions: stables, standingSpecialStableCount: getStandingSpecialStableCount(ctx.player), specialStables: farmHand && specialSourceCardId ? [{ ...farmHand, sourceCardId: specialSourceCardId }] : [], preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
   const futureStable = findMatureFutureStableEntry(ctx.state, ctx.player, readFutureStableId(ctx.actionContext))
   if (futureStable) futureStable.resources.stable = Math.max(0, (futureStable.resources.stable ?? 0) - totalUnits)
   recordActionCostAttribution(

@@ -3,30 +3,18 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import {
-  getStableTilesBuiltThisAction,
+  countDistinctStablesBuiltThisTurn,
 } from '../helpers/action-snapshot'
-import { writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { isUsedThisTurn, markUsedThisTurnLeaf, readTurnScopeToken, USED_THIS_TURN_KEY } from '../helpers/turn-token'
+import { isUsedThisTurn, markUsedThisTurnLeaf } from '../helpers/turn-token'
 
 const CARD_ID = 'D166_StableMilker'
-
-/**
- * D166 Stable Milker
- * Each time you build at least 2 stables on the same turn, you also get 1 cattle.
- *
- * Rule: tracks stables built per turn via numStablesBuiltThisTurn.
- * Uses setUsedOnTurnId / usableThisTurn to fire only once per turn.
- *
- * In open-agricola we use getStableTilesBuiltThisAction from action-snapshot
- * and track used action token so it fires only once per action.
- */
 
 const tryGainCattle = (
   player: CardListenerContext['player'],
 ): ActionFlow | undefined => {
-  if (getStableTilesBuiltThisAction(player) < 2 || isUsedThisTurn(player, CARD_ID)) return
+  if (countDistinctStablesBuiltThisTurn(player) < 2 || isUsedThisTurn(player, CARD_ID)) return
   const mark = markUsedThisTurnLeaf(player, CARD_ID)
   if (!mark) return
 
@@ -54,12 +42,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
-  onBuy: (_state, player) => {
-    const token = readTurnScopeToken(player)
-    if (token === undefined || getStableTilesBuiltThisAction(player) < 2 || isUsedThisTurn(player, CARD_ID)) return
-    writeCardExtraData(player, CARD_ID, USED_THIS_TURN_KEY, token)
-    return gainLeaf(CARD_ID, { cattle: 1 })
-  },
+  onBuy: (_state, player) => tryGainCattle(player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

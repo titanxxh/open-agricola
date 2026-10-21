@@ -1,12 +1,11 @@
 import type { PlayerState } from '../contract/types'
 import { getLooseStableKeys } from './animal-zones'
 import { collectBuiltSpecialStables } from '../cards/card-effects'
+import { getOrdinaryStableCount } from './stable-pieces'
+export { getOrdinaryStableCount } from './stable-pieces'
 
 export const getStandingSpecialStableCount = (player: PlayerState): number =>
   collectBuiltSpecialStables(player).length
-
-export const getOrdinaryStableCount = (player: PlayerState): number =>
-  player.stableTiles.length
 
 export const getStableCountForCards = (player: PlayerState): number =>
   getOrdinaryStableCount(player) + getStandingSpecialStableCount(player)

@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getRoomsBuiltThisAction } from '../helpers/construction-events'
 import { getStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
 
@@ -12,7 +12,7 @@ const constructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const roomCount = getRoomsBuiltThisAction(context.player)
+    const roomCount = getRoomsBuiltThisAction(context)
     if (roomCount <= 0) return
     return {
       flow: {
