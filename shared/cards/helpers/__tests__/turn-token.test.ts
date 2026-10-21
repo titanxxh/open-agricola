@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { PlayerState } from '../../../contract/types'
+import type { ActionFlow, GameState, PlayerState } from '../../../contract/types'
 import { beginTurnScope, endTurnScope } from '../action-snapshot'
 import { writeCardExtraData } from '../card-state'
-import { isUsedThisTurn, markUsedThisTurnLeaf, readTurnScopeToken, USED_THIS_TURN_KEY } from '../turn-token'
+import {
+  isUsedThisTurn, isUsedThisTurnOrGap, markUsedThisTurnLeaf, markUsedThisTurnOrGapLeaf, readTurnScopeToken, USED_THIS_TURN_KEY,
+} from '../turn-token'
 
 const CARD_ID = 'A043_FarmyardManure'
+const FRESHMAN = 'A097_Freshman'
 const player = () => ({ id: 'p1', cardStates: {}, stableTiles: [], roomTiles: [], fenceSegments: [] }) as unknown as PlayerState
 
 describe('turn-token', () => {
@@ -32,5 +35,32 @@ describe('turn-token', () => {
     expect(isUsedThisTurn(p, CARD_ID)).toBe(false)
     beginTurnScope(p)
     expect(isUsedThisTurn(p, CARD_ID)).toBe(false)
+  })
+
+  it('gives the gap between two of the player\'s Turns its own single record', () => {
+    const p = player(), other = player()
+    other.id = 'p2'
+    const at = (roundPhase: GameState['roundPhase'], current: PlayerState) =>
+      ({ roundPhase, currentPlayerIndex: current === p ? 0 : 1, players: [p, other] }) as unknown as GameState
+    const used = (state = at('harvest', other)) => isUsedThisTurnOrGap(state, p, FRESHMAN)
+    const record = () => {
+      const leaf = markUsedThisTurnOrGapLeaf(p, FRESHMAN) as Extract<ActionFlow, { type: 'leaf' }>
+      writeCardExtraData(p, FRESHMAN, USED_THIS_TURN_KEY, leaf.params?.value)
+    }
+
+    record()
+    expect(used()).toBe(true)
+    beginTurnScope(p)
+    expect(used()).toBe(false)
+    record()
+    expect(used()).toBe(true)
+    endTurnScope(p)
+    expect(used()).toBe(false)
+    record()
+    expect(used()).toBe(true)
+    expect(used(at('work', other))).toBe(true)
+    expect(used(at('work', p))).toBe(false)
+    beginTurnScope(p)
+    expect(used(at('work', p))).toBe(false)
   })
 })
