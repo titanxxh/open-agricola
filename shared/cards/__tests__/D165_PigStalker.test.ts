@@ -70,14 +70,14 @@ describe('D165_PigStalker', () => {
       gameOver: false, workPhaseObtainedResources: {},
     } as unknown as GameState
 
-    const listener = findListener('D165-pig-stalker-after-place-farmer')
+    const listener = findListener('D165-pig-stalker-before-animal-market')
     expect(listener).toBeDefined()
     const result = executeCardListener(listener!, {
       state,
       player,
       space: createSpace('sheep-market'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     })
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -107,13 +107,13 @@ describe('D165_PigStalker', () => {
       gameOver: false, workPhaseObtainedResources: {},
     } as unknown as GameState
 
-    const listener = findListener('D165-pig-stalker-after-place-farmer')
+    const listener = findListener('D165-pig-stalker-before-animal-market')
     const result = executeCardListener(listener!, {
       state,
       player,
       space: createSpace('sheep-market'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     })
     expect(result).toBeUndefined()
   })
@@ -131,13 +131,13 @@ describe('D165_PigStalker', () => {
       gameOver: false, workPhaseObtainedResources: {},
     } as unknown as GameState
 
-    const listener = findListener('D165-pig-stalker-after-place-farmer')
+    const listener = findListener('D165-pig-stalker-before-animal-market')
     const result = executeCardListener(listener!, {
       state,
       player,
       space: createSpace('day-laborer'),
       actionId: 'place-farmer',
-      phase: 'after',
+      phase: 'before',
     })
     expect(result).toBeUndefined()
   })

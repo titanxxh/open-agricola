@@ -11,6 +11,8 @@ import '../../shared/cards/E/E038_RodCollection'
 import assert from 'node:assert/strict'
 import { assertRuleOutcome, assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit35Education from './_helpers/audit/ae-negative-35-education'
+import { getChoiceOptions } from './_helpers/session-assertions'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'E038_RodCollection'
 
@@ -177,4 +179,45 @@ describe('ae-negative-35-education', () => {
       save('E038-N3', { bought, opponent, rows });
       assertRuleOutcome({ stored: rodWood(last), bonus: bonus(last, 'E038_RodCollection') }, { stored: 13, bonus: 9 });
   });
+})
+
+describe('E038 before timing (#1322)', () => {
+  const make = (actor: number) => {
+    const session = createWorkSession({ seed: 1322038, configure: state => {
+      state.round = 14
+      state.currentPlayerIndex = actor
+      state.players.forEach(player => Object.assign(player.resources, { food: 5, wood: 2 }))
+      state.players[0]!.minorPlayed = [CARD_ID]
+      state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 2
+    } })
+    onTestFinished(() => session.dispose())
+    return session
+  }
+
+  it('stores wood while the Fishing food is still on the space', () => {
+    const session = make(0)
+    const offered = session.takeAction(0, 'fishing')
+
+    expect(offered.ok, offered.error).toBe(true)
+    const woodPaid = (preview: unknown) => (preview as { resourcesPaid?: { wood?: number } } | undefined)?.resourcesPaid?.wood
+    const twoWood = getChoiceOptions(offered).find(option => woodPaid(option.effectPreview) === 2)
+    expect(twoWood, JSON.stringify(offered.interaction)).toBeDefined()
+    expect(offered.state.players[0]!.resources.food).toBe(5)
+    expect(offered.state.actionSpaces.find(space => space.id === 'fishing')!.resources.food).toBe(2)
+
+    const response = session.resolveChoice(0, twoWood!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 7, wood: 0 })
+    expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'woodCount')).toBe(2)
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'fishing', type: 'resource.paid' })
+  })
+
+  it('does not offer the owner card when an opponent uses Fishing', () => {
+    const response = make(1).takeAction(1, 'fishing')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(getChoiceOptions(response).some(option => option.sourceCard === CARD_ID)).toBe(false)
+    expect(response.state.players[1]!.resources).toMatchObject({ food: 7, wood: 2 })
+    expect(response.state.players[0]!.resources.wood).toBe(2)
+  })
 })

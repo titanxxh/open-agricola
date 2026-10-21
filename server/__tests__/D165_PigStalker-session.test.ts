@@ -7,6 +7,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/D/D165_PigStalker'
 import assert from 'node:assert/strict'
 import * as audit57Livestock from './_helpers/audit/ae-negative-57-livestock'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { expectCardEffectBeforeHostCollect } from './_helpers/space-use-order'
 
 const CARD_ID = 'D165_PigStalker'
 const FILLER = '__test_placeholder__'
@@ -228,5 +230,55 @@ describe('ae-negative-57-livestock', () => {
       assert.deepEqual(count(response), [0, 1, 0])
       save(`D165-N2-${mode}`, response)
     }
+  })
+})
+
+describe('D165 before timing (#1322)', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+  const make = (neighbourOwner: number) => {
+    const session = createWorkSession({ seed: 1322165, options: { playerCount: 4 }, configure: state => {
+      state.round = 14
+      state.players.forEach(player => Object.assign(player.resources, { sheep: 0, boar: 0 }))
+      const owner = state.players[0]!
+      owner.occupationPlayed = [CARD_ID]
+      owner.pastures = [
+        { id: 'pasture-a', tiles: [{ row: 0, col: 1 }], animalType: null, animalCount: 0 },
+        { id: 'pasture-b', tiles: [{ row: 0, col: 2 }], animalType: null, animalCount: 0 },
+      ]
+      moveRoundActionTo(state.roundActionOrder, 'sheep-market', 1)
+      state.actionSpaces.find(space => space.id === 'sheep-market')!.resources.sheep = 1
+      const neighbour = state.actionSpaces.find(space => space.id === state.roundActionOrder[1])!
+      const occupant = state.players[neighbourOwner]!
+      neighbour.takenBy = [{ playerId: occupant.id, workerId: occupant.workers[0]!.id }]
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it('reads the neighbouring worker and adds the boar before Sheep Market is collected', () => {
+    const session = make(0)
+    let response = session.takeAction(0, 'sheep-market')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
+    expectCardEffectBeforeHostCollect(response, { cardId: CARD_ID, spaceId: 'sheep-market', type: 'resource.moved' })
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'pasture-a', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+      { id: 'pasture-b', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
+  })
+
+  it('gives no boar when an opponent holds the neighbouring space', () => {
+    const response = make(1).takeAction(0, 'sheep-market')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0 })
+    expect(response.state.events.some(event => event.sourceCardId === CARD_ID)).toBe(false)
   })
 })

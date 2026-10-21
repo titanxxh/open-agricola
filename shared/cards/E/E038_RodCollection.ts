@@ -6,10 +6,10 @@ import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E038_RodCollection'
-const afterCollectListener: CardListenerRegistration = {
-  id: 'E38-rod-collection-after-collect',
+const beforeFishingListener: CardListenerRegistration = {
+  id: 'E38-rod-collection-before-fishing',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
@@ -44,7 +44,7 @@ const afterCollectListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterCollectListener],
+  listeners: [beforeFishingListener],
   effect: {
     id: CARD_ID,
     computeBonusScore: (_state, player) => {

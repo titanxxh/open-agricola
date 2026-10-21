@@ -20,9 +20,9 @@ const ADJACENCY_MAP: Record<number, number[]> = {
 }
 
 const listener: CardListenerRegistration = {
-  id: 'D165-pig-stalker-after-place-farmer',
+  id: 'D165-pig-stalker-before-animal-market',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
