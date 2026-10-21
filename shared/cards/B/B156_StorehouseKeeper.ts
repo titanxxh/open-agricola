@@ -18,9 +18,9 @@ const RESOURCE_MARKET_SPACES = new Set([
  * returns a NODE_XOR of gainNode([CLAY => 1]) / gainNode([GRAIN => 1]).
  */
 const listener: CardListenerRegistration = {
-  id: 'B156-storehouse-keeper-after-place-farmer',
+  id: 'B156-storehouse-keeper-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

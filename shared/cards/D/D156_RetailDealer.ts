@@ -15,9 +15,9 @@ const setRemainingLeaf = (value: number): ActionFlow => ({
 })
 
 const listener: CardListenerRegistration = {
-  id: 'D156-retail-dealer-after-place-farmer',
+  id: 'D156-retail-dealer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'resource-market-4') return

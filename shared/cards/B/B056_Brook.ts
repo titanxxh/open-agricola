@@ -8,9 +8,9 @@ const CARD_ID = 'B056_Brook'
 const FIXED_BROOK_SPACES = new Set(['forest', 'clay-pit', 'reed-bank'])
 
 const listener: CardListenerRegistration = {
-  id: 'B56-brook-after-place-farmer',
+  id: 'B56-brook-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id

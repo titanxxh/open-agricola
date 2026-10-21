@@ -6,13 +6,13 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C142_MarketCrier'
 /**
- * After placing farmer on Grain Seeds: optionally gain 1 grain + 1 vegetable,
+ * Before the Grain Seeds action: optionally gain 1 grain + 1 vegetable,
  * and if you do, each other player gets 1 grain.
  */
 const listener: CardListenerRegistration = {
-  id: 'C142-market-crier-after-grain-seeds',
+  id: 'C142-market-crier-before-grain-seeds',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-seeds') return

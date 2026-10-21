@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getSpaceUsePersonPlacementOrdinal } from '../helpers/round-placement'
+import { readActionSnapshotExtraData } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A163_BuildingExpert'
@@ -17,13 +18,17 @@ const PLACEMENT_TO_RESOURCE: Record<number, ResourceKey> = {
 }
 
 const listener: CardListenerRegistration = {
-  id: 'A163-building-expert-after-place-farmer',
+  id: 'A163-building-expert-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after'],
+  phases: ['before'],
   actionSpaces: ['resource-market-4'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || context.space.id !== 'resource-market-4') return
-    const placed = getSpaceUsePersonPlacementOrdinal(context.player, context.actionContext)
+    const placed = getSpaceUsePersonPlacementOrdinal(context.player, {
+      ...context.actionContext,
+      placedWorkerId: context.actionContext?.placedWorkerId
+        ?? readActionSnapshotExtraData<string>(context.player, 'placedWorkerId'),
+    })
     if (placed === undefined) return
     const resource = PLACEMENT_TO_RESOURCE[placed]
     if (!resource) return
