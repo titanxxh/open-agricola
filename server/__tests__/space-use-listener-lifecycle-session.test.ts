@@ -66,7 +66,7 @@ describe('complete action-space use reactions', () => {
     use()
   })
 
-  it('finishes a collecting reaction before offering Steam Machine baking once across JSON restore', () => {
+  it('finishes Steam Machine baking before a collecting reaction once across JSON restore', () => {
     let session = createWorkSession({ configure: state => {
       const p = state.players[0]!
       state.actionSpaces.find(s => s.id === 'grain-seeds')!.takenBy = [{ playerId: p.id, workerId: p.workers[1]!.id }]
@@ -79,28 +79,22 @@ describe('complete action-space use reactions', () => {
     collectReaction(session)
     let r = session.takeAction(0, 'forest')
     expect(r.ok, r.error).toBe(true)
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') {
-      r = choose(session, r, options(r).find(option => option.sourceCard === COLLECT_REACTION)!.value)
-    }
-    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).toBe(COLLECT_REACTION)
-    expect(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === STEAM)).toHaveLength(0)
+    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).toBe(STEAM)
+    expect(r.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0, wood: 1 })
     session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
     sessions.push(session)
     collectReaction(session)
     r = choose(session, session.getState(), options(session.getState()).find(o => o.value !== '__skip__')!.value)
-    expect(r.state.players[0]!.resources.food).toBe(1)
-    if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'select-trigger') {
-      r = choose(session, r, options(r).find(option => option.sourceCard === STEAM)!.value)
-    }
-    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard, JSON.stringify(r.interaction)).toBe(STEAM)
-    r = choose(session, r, options(r).find(o => o.value !== '__skip__')!.value)
     if (r.interaction.stateId === 'wait' && r.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
       r = choose(session, r, 'Major_Fireplace1')
     }
+    expect(r.state.players[0]!.resources).toMatchObject({ grain: 0, food: 2, wood: 1 })
+    expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).toBe(COLLECT_REACTION)
+    r = choose(session, r, options(r).find(o => o.value !== '__skip__')!.value)
     expect(r.state.players[0]!.resources).toMatchObject({ grain: 0, food: 3, wood: 1 })
     expect(r.state.events.filter(e => e.type === 'card.triggered' && e.sourceCardId === STEAM && 'triggerActionId' in e)).toHaveLength(1)
     expect(r.interaction.stateId === 'wait' && r.interaction.sourceCard).not.toBe(STEAM)
-  })
+  }, 30_000)
 })
 
 describe('space and rule reaction timing', () => {

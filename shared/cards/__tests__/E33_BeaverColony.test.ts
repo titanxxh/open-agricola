@@ -162,7 +162,7 @@ describe('E033_BeaverColony reed bonus VP', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player,
       space: createSpace('reed-bank'),
-      actionId: 'collect', phase: 'immediatelyAfter',
+      actionId: 'collect', phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
       transactionEvents: [reedMoved(2, player.id)],
       actionEvents: [reedMoved(2, player.id)],
@@ -180,7 +180,7 @@ describe('E033_BeaverColony reed bonus VP', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player,
       space: createSpace('reed-bank'),
-      actionId: 'collect', phase: 'immediatelyAfter',
+      actionId: 'collect', phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 3 } },
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
@@ -195,7 +195,7 @@ describe('E033_BeaverColony reed bonus VP', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player,
       space: createSpace('resource-market-4'),
-      actionId: 'gain', phase: 'immediatelyAfter',
+      actionId: 'gain', phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 1, stone: 1, food: 1 } },
       transactionEvents: [reedMoved(1, player.id, 'resource-market-4')],
       actionEvents: [reedMoved(1, player.id, 'resource-market-4')],
@@ -213,7 +213,7 @@ describe('E033_BeaverColony reed bonus VP', () => {
     const result = executeCardListener(listener, {
       state: createState(player), player,
       space: createSpace('day-laborer'),
-      actionId: 'gain', phase: 'immediatelyAfter',
+      actionId: 'gain', phase: 'after',
       result: { type: 'ok', resourcesGained: { food: 1 } },
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()

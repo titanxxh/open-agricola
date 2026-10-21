@@ -8,7 +8,7 @@ const CARD_ID = 'C036_ClayDeposit'
 const listener: CardListenerRegistration = {
   id: 'C36-clay-deposit-after-collect',
   cardIds: [CARD_ID],
-  phases: ['immediatelyAfter'],
+  phases: ['after'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const gainPerRound = context.space?.gainPerRound ?? {}

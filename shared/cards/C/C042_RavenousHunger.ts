@@ -20,7 +20,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C42-ravenous-hunger-after-place-farmer',
   cardIds: [CARD_ID],
   mandatory: true,
-  phases: ['after'],
+  phases: ['immediatelyAfter'],
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) {

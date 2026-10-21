@@ -1,169 +1,83 @@
-import { describe, expect, it, vi, afterEach } from 'vitest'
-import type { GameState, PlayerState } from '../../../contract/types'
-import { reap, dispatchReapListener } from '../reap'
-import * as cardListeners from '../../../cards/card-listeners'
+import { describe, expect, it } from 'vitest'
+import { reap, dispatchReapListeners } from '../reap'
+import { installOfficialCardRegistry } from '../../../cards/__tests__/card-environment'
+import { requireActiveCardRegistry } from '../../../cards/active-registry'
+import { createInitialState } from '../../../session/state-bootstrap'
+import type { ActionFlow } from '../../../contract/types'
 
-// Import card catalog to ensure listeners are registered
-import '../../../cards/catalog'
+installOfficialCardRegistry()
 
-describe('dispatchReapListener', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
+const IMMEDIATE = 'TEST_ReapImmediate'
+const AFTER = 'TEST_ReapAfter'
+const activations = (flow: ActionFlow | undefined): ActionFlow[] => {
+  if (!flow) return []
+  return flow.type === 'leaf' ? [flow] : flow.children.flatMap(activations)
+}
+function setup(opponent = false) {
+  const state = createInitialState(1330, { playerCount: 2 })
+  const player = state.players[0]!
+  const owner = state.players[opponent ? 1 : 0]!
+  owner.minorPlayed = [IMMEDIATE, AFTER]
+  const registry = requireActiveCardRegistry('reap-listener-test')
+  for (const [cardId, phase] of [[IMMEDIATE, 'immediatelyAfter'], [AFTER, 'after']] as const) {
+    registry.registerListener({
+      id: cardId, cardIds: [cardId], actions: ['reap'], phases: [phase], scope: opponent ? 'opponent' : 'player',
+      handler: () => { throw new Error('Reap planning must not evaluate handlers before their phase runs') },
+    })
+  }
+  return { state, player, owner }
+}
+
+describe('Reap reaction planning', () => {
+  it('does not create reactions when no crop was harvested', () => {
+    const { state, player } = setup()
+    expect(dispatchReapListeners(state, player, { grain: 0, vegetable: 0 })).toBeUndefined()
   })
 
-  it('calls runCardListeners with actionId=reap and crop/amount/trigger in extraData', () => {
-    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
-    const state = { players: [] } as unknown as GameState
-    const player = { id: 'p1' } as unknown as PlayerState
-
-    dispatchReapListener(state, player, 'vegetable', 2)
-
-    expect(spy).toHaveBeenCalledTimes(1)
-    const ctx = spy.mock.calls[0]![0]
-    expect(ctx.actionId).toBe('reap')
-    expect(ctx.phase).toBe('immediatelyAfter')
-    expect(ctx.extraData).toEqual({ crop: 'vegetable', amount: 2, trigger: { phase: 'harvest' } })
-    expect(ctx.state).toBe(state)
-    expect(ctx.player).toBe(player)
-    spy.mockRestore()
+  it('captures all crop receipts without running handlers and finishes all immediate phases first', () => {
+    const { state, player } = setup()
+    const flow = dispatchReapListeners(state, player, { grain: 1, vegetable: 2 })
+    const receipt = activations(flow).map(leaf => leaf.type === 'leaf' ? {
+      card: leaf.sourceCard, action: leaf.actionId, phase: leaf.params?.phase,
+      event: leaf.params?.event, target: leaf.targetPlayerId,
+    } : undefined)
+    expect(flow?.type).toBe('seq')
+    expect(receipt).toEqual([
+      { card: IMMEDIATE, action: 'activate-card', phase: 'immediatelyAfter', event: { extraData: { crop: 'grain', amount: 1, trigger: { phase: 'harvest' } } }, target: player.id },
+      { card: IMMEDIATE, action: 'activate-card', phase: 'immediatelyAfter', event: { extraData: { crop: 'vegetable', amount: 2, trigger: { phase: 'harvest' } } }, target: player.id },
+      { card: AFTER, action: 'activate-card', phase: 'after', event: { extraData: { crop: 'grain', amount: 1, trigger: { phase: 'harvest' } } }, target: player.id },
+      { card: AFTER, action: 'activate-card', phase: 'after', event: { extraData: { crop: 'vegetable', amount: 2, trigger: { phase: 'harvest' } } }, target: player.id },
+    ])
   })
 
-  it('does not call runCardListeners when amount <= 0', () => {
-    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
-    const state = { players: [] } as unknown as GameState
-    const player = { id: 'p1' } as unknown as PlayerState
-
-    dispatchReapListener(state, player, 'grain', 0)
-
-    expect(spy).not.toHaveBeenCalled()
-    spy.mockRestore()
-  })
-
-  it('returns mandatory special-effect listener flows instead of committing them immediately', () => {
-    const followUp = {
-      type: 'leaf' as const,
-      actionId: 'special-effect',
-      sourceCard: 'Test_ReapCard',
-      params: { kind: 'set-extra-data', key: 'count', value: 1 },
-    }
-    vi.spyOn(cardListeners, 'runCardListeners').mockReturnValue([{
-      flow: followUp,
-    }])
-    const player = {
-      id: 'p1',
-      cardStates: {},
-    } as unknown as PlayerState
-    const state = {
-      round: 3,
-      roundPhase: 'field',
-      players: [player],
-      actionSpaces: [],
-    } as unknown as GameState
-
-    const flow = dispatchReapListener(state, player, 'grain', 1)
-
-    expect(flow).toEqual({ type: 'parallel', children: [followUp] })
-    expect(state.events).toBeUndefined()
-    expect(state.nextEventSeq).toBeUndefined()
-  })
-
-  it('returns listener follow-up flows wrapped in a normal parallel node', () => {
-    const followUp = {
-      type: 'leaf' as const,
-      actionId: 'special-effect',
-      sourceCard: 'Test_ReapCard',
-      params: { kind: 'gain-resource', resources: { food: 1 } },
-    }
-    vi.spyOn(cardListeners, 'runCardListeners').mockReturnValue([{ flow: followUp }])
-    const state = { players: [] } as unknown as GameState
-    const player = { id: 'p1' } as unknown as PlayerState
-
-    const flow = dispatchReapListener(state, player, 'grain', 1)
-
-    expect(flow).toEqual({
-      type: 'parallel',
-      children: [followUp],
+  it('preserves the reacting owner, harvesting player and private-field trigger', () => {
+    const { state, player, owner } = setup(true)
+    const flow = dispatchReapListeners(state, player, { vegetable: 2 }, {
+      sourceCard: 'C072_FestivalPlanning', trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' },
+    })
+    expect(activations(flow)).toHaveLength(2)
+    expect(activations(flow)[1]).toMatchObject({
+      type: 'leaf', targetPlayerId: owner.id, actionId: 'activate-card',
+      params: {
+        ownerPlayerId: owner.id, triggerPlayerId: player.id, phase: 'after',
+        event: { extraData: { crop: 'vegetable', amount: 2, sourceCard: 'C072_FestivalPlanning', trigger: { phase: 'private-field-phase', cardId: 'C072_FestivalPlanning' } } },
+      },
     })
   })
-})
 
-describe('reap dispatches listener', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('dispatches reap listener for grain and vegetable separately', () => {
-    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
-    const state = { players: [] } as unknown as GameState
-    const player = {
-      id: 'p1',
-      resources: { grain: 0, vegetable: 0 },
-      fields: [
-        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
-        { row: 1, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
-        { row: 1, col: 3, stacks: [{ kind: 'vegetable', remaining: 1 }] },
-      ],
-    } as unknown as PlayerState
-
-    reap(state, player)
-
-    // Should have dispatched twice: once for grain(1), once for vegetable(2)
-    expect(spy).toHaveBeenCalledTimes(2)
-    const calls = spy.mock.calls.map((c) => c[0].extraData)
-    expect(calls).toContainEqual({ crop: 'grain', amount: 1, trigger: { phase: 'harvest' } })
-    expect(calls).toContainEqual({ crop: 'vegetable', amount: 2, trigger: { phase: 'harvest' } })
-  })
-
-  it('returns one parallel reaction flow for listener follow-ups produced during Reap', () => {
-    const grainFollowUp = {
-      type: 'leaf' as const,
-      actionId: 'special-effect',
-      sourceCard: 'Grain_ReapCard',
-      params: { kind: 'gain-resource', resources: { food: 1 } },
-    }
-    const vegetableFollowUp = {
-      type: 'leaf' as const,
-      actionId: 'special-effect',
-      sourceCard: 'Vegetable_ReapCard',
-      params: { kind: 'gain-resource', resources: { food: 2 } },
-    }
-    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation((ctx) => {
-      if (ctx.extraData?.crop === 'grain') return [{ flow: grainFollowUp }]
-      if (ctx.extraData?.crop === 'vegetable') return [{ flow: vegetableFollowUp }]
-      return []
-    })
-    const state = { players: [] } as unknown as GameState
-    const player = {
-      id: 'p1',
-      resources: { grain: 0, vegetable: 0 },
-      fields: [
-        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
-        { row: 1, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
-      ],
-    } as unknown as PlayerState
-
+  it('plans reactions from the actual harvested crop amounts while removing those crops', () => {
+    const { state, player } = setup()
+    player.resources.grain = 0
+    player.resources.vegetable = 0
+    player.fields = [
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 2, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+      { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+    ]
     const result = reap(state, player)
-
-    expect(result.reactionFlow).toEqual({
-      type: 'parallel',
-      children: [grainFollowUp, vegetableFollowUp],
-    })
-  })
-
-  it('does not dispatch for crops with 0 reap', () => {
-    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
-    const state = { players: [] } as unknown as GameState
-    const player = {
-      id: 'p1',
-      resources: { grain: 0, vegetable: 0 },
-      fields: [
-        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
-      ],
-    } as unknown as PlayerState
-
-    reap(state, player)
-
-    expect(spy).toHaveBeenCalledTimes(1)
-    expect(spy.mock.calls[0]![0].extraData).toEqual({ crop: 'grain', amount: 1, trigger: { phase: 'harvest' } })
+    expect(result.reapSummary.resources).toEqual({ grain: 1, vegetable: 2 })
+    expect(player.resources).toMatchObject({ grain: 1, vegetable: 2 })
+    expect(player.fields.map(field => field.stacks)).toEqual([[{ kind: 'grain', remaining: 1 }], [], []])
+    expect(activations(result.reactionFlow)).toHaveLength(4)
   })
 })

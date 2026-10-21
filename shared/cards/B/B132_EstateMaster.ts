@@ -6,7 +6,6 @@ import type { ActionFlow, PlayerState } from '../../contract/types'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase } from '../../actions/hooks'
 
 const CARD_ID = 'B132_EstateMaster'
 
@@ -35,7 +34,7 @@ const saturationCheckListener = (
   id: `B132-saturate-after-${actionId}`,
   cardIds: [CARD_ID],
   actions: [actionId],
-  phases: ['immediatelyAfter' as ActionHookPhase],
+  phases: ['after'],
   scope: 'player',
   handler: (ctx) => {
     if (isSaturatedFlagged(ctx.player)) return
@@ -52,7 +51,7 @@ const reapListener: CardListenerRegistration = {
   id: 'B132-estate-master-reap',
   cardIds: [CARD_ID],
   actions: ['reap'],
-  phases: ['immediatelyAfter' as ActionHookPhase],
+  phases: ['after'],
   handler: (ctx) => {
     const player = ctx.player
     const crop = ctx.extraData?.crop as string | undefined

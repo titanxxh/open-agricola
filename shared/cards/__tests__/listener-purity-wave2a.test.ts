@@ -567,7 +567,7 @@ describe('listener purity wave 2a', () => {
         col: index % 5,
       })),
     })
-    const ctx = context(p, { actionId: 'construct', phase: 'immediatelyAfter' })
+    const ctx = context(p, { actionId: 'construct', phase: 'after' })
     const before = snapshot(p)
 
     const result = listenerById(
@@ -598,7 +598,7 @@ describe('listener purity wave 2a', () => {
         ],
       }],
     })
-    const ctx = context(p, { actionId: 'construct', phase: 'immediatelyAfter' })
+    const ctx = context(p, { actionId: 'construct', phase: 'after' })
     const before = snapshot(p)
 
     const result = listenerById(
@@ -616,7 +616,7 @@ describe('listener purity wave 2a', () => {
     })
     const ctx = context(p, {
       actionId: 'reap',
-      phase: 'immediatelyAfter',
+      phase: 'after',
       extraData: { crop: 'vegetable', amount: 2 },
     })
     const before = snapshot(p)
