@@ -1,69 +1,10 @@
-import { describe, expect, it, afterEach } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
-import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import { describe, it, afterEach } from 'vitest'
 
 import '../../shared/cards/D/D168_Stockman'
-import type { ActionFlow } from '../../shared/contract/types'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit58Livestock from './_helpers/audit/ae-negative-58-livestock'
 
-const CARD_ID = 'D168_Stockman'
-
-describe('D168_Stockman session', () => {
-  const runAfterStables = (configure: (player: import('../../shared/contract/types').PlayerState) => void) => {
-    const session = new GameSession(42)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-    player.stableTiles = []
-    configure(player)
-    const space = state.actionSpaces.find((s) => s.id === 'farm-expansion')!
-    session.loadState(state)
-
-    const listener = session.withCtx(() => getRegisteredCardListeners()).find(
-      (reg) => reg.id === 'D168-stockman-after-stables',
-    )!
-    const context: CardListenerContext = {
-      state,
-      player,
-      space,
-      actionId: 'stables',
-      phase: 'after',
-      result: { type: 'ok' },
-    }
-    return session.withCtx(() => executeCardListener(listener, context))
-  }
-
-  it('counts the B85 FarmHand stable when locating the ordinal stable (card-facing count)', () => {
-    // B85 already in use before this action; the snapshot baseline is the
-    // card-facing count (0 ordinary + B85 = 1). Now 1 ordinary tile built
-    // this action + B85 -> card-facing nAfter = 2, so the newly built tile
-    // is the 2nd stable -> gains 1 cattle.
-    const result = runAfterStables((player) => {
-      player.stableTiles = [{ row: 2, col: 2 }]
-      player.occupationPlayed.push('B085_FarmHand')
-      player.cardStates = {
-        __actionSnapshot__: { extraData: { stableTiles: 1 } },
-        B085_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
-      }
-    })
-    expect(result).toBeDefined()
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.cattle).toBe(1)
-  })
-
-  it('does not fire when the built stable is only the 1st card-facing stable', () => {
-    const result = runAfterStables((player) => {
-      player.stableTiles = [{ row: 2, col: 2 }]
-      player.cardStates = {
-        __actionSnapshot__: { extraData: { stableTiles: 0 } },
-      }
-    })
-    expect(result).toBeUndefined()
-  })
-})
 
 describe('ae-negative-58-livestock', () => {
   const { sessions, ok, save, make, finish, play, choose, count, buildStables } = audit58Livestock

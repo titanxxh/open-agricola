@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getActionRoomConstructions } from '../helpers/construction-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D123_RenovationPreparer'
@@ -12,14 +12,12 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const roomsBuilt = getRoomsBuiltThisAction(context.player)
-    if (roomsBuilt <= 0) return
-    const houseType = context.player.houseType
-    if (houseType === 'wood') {
-      return { flow: gainLeaf(CARD_ID, { clay: 2 * roomsBuilt }), sourceCard: CARD_ID }
-    } else if (houseType === 'clay') {
-      return { flow: gainLeaf(CARD_ID, { stone: 2 * roomsBuilt }), sourceCard: CARD_ID }
+    const gains = { clay: 0, stone: 0 }
+    for (const operation of getActionRoomConstructions(context)) {
+      if (operation.roomType === 'wood') gains.clay += 2 * operation.positions.length
+      if (operation.roomType === 'clay') gains.stone += 2 * operation.positions.length
     }
+    if (gains.clay + gains.stone > 0) return { flow: gainLeaf(CARD_ID, gains), sourceCard: CARD_ID }
   },
 }
 

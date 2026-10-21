@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getRoomsBuiltThisAction } from '../helpers/construction-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D128_BuildingTycoon'
@@ -12,7 +12,6 @@ const CARD_ID = 'D128_BuildingTycoon'
  * Players 4+.
  *
  * Trigger: opponent's construct action completes (after phase).
- * We detect room building by checking rooms built this action via snapshot.
  */
 const listener: CardListenerRegistration = {
   id: 'D128-building-tycoon-opponent-construct',
@@ -21,9 +20,8 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Check the opponent actually built rooms
     const triggerPlayer = context.triggerPlayer ?? context.player
-    const roomsBuilt = getRoomsBuiltThisAction(triggerPlayer)
+    const roomsBuilt = getRoomsBuiltThisAction(context)
     if (roomsBuilt <= 0) return
     const triggerPlayerId = triggerPlayer.id
     return {

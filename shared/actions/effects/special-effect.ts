@@ -1,3 +1,4 @@
+import { getStandingSpecialStableCount } from '../../domain/stables'
 import { addFarmyardSpaceState, commitFarmOperation } from '../../domain/farm-operations'
 import { resolveActionTargetPlayer } from '../helpers/target-player'
 import { applyCardStorageOperation, previewCardStorageOperation, readCardStorageOperation } from '../card-storage'
@@ -575,7 +576,7 @@ export const specialEffectAction: ActionDefinition = {
         if (!state || getAvailableStableSupplyCount(state, target) <= 0) return { type: 'ok' }
         const tile = getNextEmptyTileForPlayer(target)
         if (!tile) return { type: 'ok' }
-        const farmOperation = commitFarmOperation(target, { kind: 'stables', positions: [tile], sourceCardId: sourceCard }, eventSink)
+        const farmOperation = commitFarmOperation(target, { kind: 'stables', positions: [tile], standingSpecialStableCount: getStandingSpecialStableCount(target), sourceCardId: sourceCard }, eventSink)
         eventSink?.emit<'farm.stableBuilt'>({
           type: 'farm.stableBuilt',
           newlyUsedTiles: farmOperation.newlyUsedTiles,

@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getRoomsBuiltThisAction } from '../helpers/construction-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A093_BedMaker'
@@ -11,7 +11,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const roomsBuilt = getRoomsBuiltThisAction(context.player)
+    const roomsBuilt = getRoomsBuiltThisAction(context)
     if (roomsBuilt <= 0) return
     return {
       flow: {

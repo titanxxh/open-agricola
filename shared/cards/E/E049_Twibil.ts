@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getActionRoomConstructions } from '../helpers/construction-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E049_Twibil'
@@ -24,10 +24,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const builder = context.triggerPlayer ?? context.player
-    const roomsBuilt = getRoomsBuiltThisAction(builder)
-    if (roomsBuilt <= 0) return
-    if (builder.houseType !== 'wood') return
+    if (!getActionRoomConstructions(context).some(operation => operation.roomType === 'wood' && operation.positions.length > 0)) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }

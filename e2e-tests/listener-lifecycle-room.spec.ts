@@ -300,3 +300,48 @@ test('feeding Joinery leaves Plow Builder available through a room reload before
     expect(publicRoomState(await assertClientsAgree(pages))).toEqual(finished)
   } finally { await Promise.all(pages.map(page => page.close())) }
 })
+
+test('Shed Builder counts nested and enclosing stable builds once across a room reload', async ({ browser, request }) => {
+  const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
+  try {
+    await joinRoomClients(pages, request)
+    const driver = roomDriver(pages)
+    const fixture = createWorkSession({ seed: 4242, configure: state => {
+      state.round = 5
+      for (const player of state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+        player.minorPlayed = []
+        player.occupationPlayed = []
+        player.cardStates = {}
+        player.stableTiles = []
+        Object.assign(player.resources, { food: 10, wood: 10, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0 })
+      }
+      state.players[0]!.occupationPlayed = [CLEANER, 'E114_ShedBuilder']
+    } })
+    try {
+      await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) })
+    } finally { fixture.dispose() }
+    await driver.command(0, { type: 'action', spaceId: 'farm-expansion' })
+    let current = await roomSnapshot(pages[0])
+    if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'choice') {
+      const stable = options(current).find(option => option.labelKey === 'actions.stables.name')
+      if (!stable) throw new Error('Expected the stable construction option')
+      await driver.command(0, { type: 'choice', value: stable.value })
+    }
+    await driver.command(0, { type: 'anytime', actionId: 'C94-stable-cleaner-anytime' })
+    await driver.command(0, { type: 'commitSelection', playerIndex: 0, payload: { stables: [{ row: 0, col: 0 }] } })
+    current = await assertClientsAgree(pages)
+    expect(current.state.players[0]!.resources.grain).toBe(1)
+    expect(current.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'stable' } } })
+    await driver.reload()
+    await driver.command(0, { type: 'commitSelection', playerIndex: 0, payload: { stables: [{ row: 0, col: 1 }] } })
+    current = await assertClientsAgree(pages)
+    expect(current.state.players[0]!.resources).toMatchObject({ grain: 2, vegetable: 0, wood: 7, food: 9 })
+    expect(current.state.players[0]!.stableTiles).toEqual([{ row: 0, col: 0 }, { row: 0, col: 1 }])
+    expect(current.state.events.filter(event => event.type === 'farm.stableBuilt')).toHaveLength(2)
+    await assertReadOnly(pages[1])
+  } finally {
+    await Promise.all(pages.map(page => page.close()))
+  }
+})

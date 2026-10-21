@@ -6,9 +6,9 @@ import type { RuleBody } from '../../contract/rule-plans'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { isCardFlagged, readCardExtraData, setCardFlag } from '../helpers/card-state'
 import {
-  getRoomsBuiltThisAction,
-  getStableTilesBuiltThisAction,
-  getFencesBuiltThisAction,
+  roomTypeBuiltThisTurn,
+  hasBuiltStableThisTurn,
+  hasBuiltFenceThisTurn,
 } from '../helpers/action-snapshot'
 import { hasOrdinaryFenceBuiltEvent } from '../helpers/fence-events'
 import { createEventQuery } from '../../events/query'
@@ -70,10 +70,10 @@ const setFlagListeners: CardListenerRegistration[] = [
   { id: 'B27-window-after-anytime-completed', cardIds: [CARD_ID], phases: ['after'], events: ['anytime.completed'], handler: finishAnytimeHandler },
 ]
 
-const builtSomethingThisAction = (player: PlayerState): boolean =>
-  getRoomsBuiltThisAction(player) > 0 ||
-  getStableTilesBuiltThisAction(player) > 0 ||
-  getFencesBuiltThisAction(player) > 0
+const builtSomethingThisTurn = (player: PlayerState): boolean =>
+  roomTypeBuiltThisTurn(player) !== undefined ||
+  hasBuiltStableThisTurn(player) ||
+  hasBuiltFenceThisTurn(player)
 
 const toolboxBody = {
   kind: 'optional', promptKey: 'ui.interactionToolboxImprovement', body: { kind: 'action', actionId: 'improvement', params: { allowedPurchases: ALLOWED_MAJORS, trueAction: false }, policy: { trueAction: false } },
@@ -105,7 +105,7 @@ const cardImpl = {
     id: CARD_ID,
     onBuy: (state, player) => {
       if (state.roundPhase !== 'work') return
-      setCardFlag(player, CARD_ID, builtSomethingThisAction(player))
+      setCardFlag(player, CARD_ID, builtSomethingThisTurn(player))
     },
     timedRules: [{ retainAfterCardLeaves: true, key: 'toolbox-window', at: { kind: 'card-flag', clock: 'current-turn', phase: 'onEndTurn' }, consume: { clearCardFlag: true, recordTurnFact: WINDOW_OFFERED_TURN_TOKEN_KEY }, body: toolboxBody }],
   },

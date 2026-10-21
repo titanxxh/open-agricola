@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getRoomsBuiltThisAction } from '../helpers/construction-events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -13,7 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const roomsBuilt = getRoomsBuiltThisAction(context.triggerPlayer ?? context.player)
+    const roomsBuilt = getRoomsBuiltThisAction(context)
     if (roomsBuilt <= 0) return
     return { flow: gainLeaf(CARD_ID, { wood: roomsBuilt }), sourceCard: CARD_ID }
   },

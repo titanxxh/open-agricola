@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getRoomsBuiltThisAction } from '../helpers/construction-events'
 
 const CARD_ID = 'M037_BuildingPlan'
 
@@ -12,7 +12,7 @@ const listener: CardListenerRegistration = {
   actions: ['construct'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (getRoomsBuiltThisAction(context.player) < 2) return
+    if (getRoomsBuiltThisAction(context) < 2) return
     return {
       flow: {
         type: 'leaf',

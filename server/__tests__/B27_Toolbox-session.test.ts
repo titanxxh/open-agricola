@@ -1,3 +1,4 @@
+import { commitFarmOperation } from '../../shared/domain/farm-operations'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { type SessionResponse } from '../game/authoritative-session'
 
@@ -277,9 +278,9 @@ describe('B27 Toolbox session', () => {
     const player = state.players[0]!
     player.minorPlayed = player.minorPlayed.filter(id => id !== CARD_ID)
     player.minorHand.push(CARD_ID)
-    // 模拟"本 turn 已造过 1 个房间"：先快照后增加 roomTiles
+    // Commit a room in an open Turn before exercising the public onBuy effect.
     session.withCtx(() => recordActionSnapshot(player, 1))
-    player.roomTiles = [...(player.roomTiles ?? []), { row: 0, col: 0 }] as typeof player.roomTiles
+    commitFarmOperation(player, { kind: 'rooms', positions: [{ row: 0, col: 0 }] })
     session.loadState(state)
 
     // 直接调用 effect.onBuy

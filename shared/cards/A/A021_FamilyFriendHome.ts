@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
+import { getActionRoomConstructions } from '../helpers/construction-events'
 import { familySize as getFamilySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -14,10 +14,9 @@ const listener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
-    const roomsBuilt = getRoomsBuiltThisAction(context.player)
-    if (roomsBuilt <= 0) return
-    // Rooms before action = current rooms - rooms built
-    const oldRoomCount = context.player.rooms - roomsBuilt
+    const construction = getActionRoomConstructions(context).find(operation => operation.positions.length > 0)
+    if (!construction) return
+    const oldRoomCount = construction.before.roomTiles.length
     const familySize = getFamilySize(context.player)
     // Only trigger if there were more rooms than people BEFORE building
     if (oldRoomCount <= familySize) return

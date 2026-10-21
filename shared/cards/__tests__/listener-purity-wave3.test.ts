@@ -210,7 +210,9 @@ describe('listener purity wave 3', () => {
     const p = player({
       stableTiles: Array.from({ length: stableCount }, (_, col) => ({ row: 0, col })),
       roomTiles: Array.from({ length: roomCount }, (_, col) => ({ row: 1, col })),
-      cardStates: { __actionSnapshot__: { extraData: { token: 9, stableTiles: 0, roomTiles: 0 } } },
+      cardStates: { __actionSnapshot__: { extraData: { token: 9 } } },
+      turnConstruction: { stablePieces: Array.from({ length: stableCount }, (_, i) => `normal:${i}`),
+        ...(roomCount > 0 ? { roomType: 'wood' } : {}), fenceBuilt: false },
     })
     const result = invokePure(listener(registrations, id), context(p))
     const resultLeaves = leaves(result?.flow)

@@ -80,7 +80,7 @@ Tests: `server/__tests__/{supply-workers-session,snake-opening-session}.test.ts`
 
 ## Turn Scope and Action-Execution Scope
 
-Rotation opportunity, Turn Scope and action-execution scope are separate lifetimes. "On your turn" and "in the same turn" read the Turn Scope; "what was actually built / plowed / sown" reads the current action's scope or transaction.
+Rotation opportunity, Turn Scope and action-execution scope are separate lifetimes. "On your turn" and "in the same turn" read the Turn Scope; "what was actually built / plowed / sown" reads the current action's committed receipt.
 
 | Rule situation | Rotation opportunity | Turn Scope | Action-execution scope |
 |---|---|---|---|
@@ -92,8 +92,9 @@ Rotation opportunity, Turn Scope and action-execution scope are separate lifetim
 | A raw gain, payment, choice or listener activation | No new opportunity | Inherit if one exists | Stay in the surrounding scope |
 
 - A Turn Scope begins before its placement, Moor special action or card-driven space use and lasts through every Rule Action, trailing effect, required reorganization and end-of-turn hook of that Turn; then its active snapshot clears. An explicit after-turn activation retains only the captured identity without reopening the scope or snapshot. A moved worker's Turn passes the ordinary person-action trigger to those hooks and closes before the next worker is chosen.
+- `recordActionSnapshot()` opens typed `turnConstruction` facts, cleared by `endTurnScope()`. Successful farm commits record distinct built stable identities, the last constructed room material and ordinary fence construction. These facts survive returns, renovation, serialization and undo within the scope; they do not infer construction from net layout changes. Card helpers distinguish a boolean stable-built condition from a distinct-piece threshold.
 - Executing an "on your turn" effect requires the owner's active scope; a doability query may project the scope the current rotation player is about to open.
-- Multiple Rule Actions in one Turn share the Turn Scope and use separate action scopes. Per-action deltas use the action transaction.
+- Multiple Rule Actions in one Turn share the Turn Scope and use separate action scopes. Per-action construction counts use the host receipt.
 - Anytime acceptance captures an active Turn token, the just-ended token only in the original player's handoff window, or an explicit before-turn/outside-turn affiliation. An idle next player never inherits `lastToken`; before-turn qualification waits for their next real Turn end. Descendants inherit the frozen affiliation, and per-Turn consumers use it rather than guessing from later state.
 - Same-person `jumpLeaf` relocations and worker-less `viaCardJump` uses stay in the surrounding Turn Scope, if any; only `move-farmer-to-space` wraps each move in `turn-scope` begin / end.
 - `actionContext.trueAction` only says whether an effect counts as taking its named action for listeners; it creates no Turn and no action scope.

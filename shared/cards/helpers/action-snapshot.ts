@@ -1,6 +1,4 @@
 import type { PlayerState } from '../../contract/types'
-import { getStableCountForCards } from '../../domain/stables'
-import { getFenceCount } from '../../domain/fence-segments'
 import { ensureCardState } from './card-state'
 
 import { ACTION_SNAPSHOT_CARD_ID } from './action-snapshot-state'
@@ -21,10 +19,8 @@ export const recordActionSnapshot = (
   cardState.extraData = {
     lastToken: nextToken,
     token: nextToken,
-    stableTiles: getStableCountForCards(player),
-    roomTiles: player.roomTiles.length,
-    fenceSegments: getFenceCount(player),
   }
+  player.turnConstruction = { stablePieces: [], fenceBuilt: false }
   return nextToken
 }
 
@@ -32,6 +28,7 @@ export const beginTurnScope = (player: PlayerState): number =>
   recordActionSnapshot(player, 1)
 
 export const endTurnScope = (player: PlayerState): void => {
+  delete player.turnConstruction
   const cardState = player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]
   if (!cardState) return
   const lastToken = lastActionToken(player)
@@ -50,23 +47,7 @@ export const writeActionSnapshotExtraData = (
   }
 }
 
-export const getStableTilesBuiltThisAction = (player: PlayerState) => {
-  const before =
-    player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.stableTiles as number | undefined
-  if (typeof before !== 'number') return 0
-  return Math.max(0, getStableCountForCards(player) - before)
-}
-
-export const getRoomsBuiltThisAction = (player: PlayerState) => {
-  const before =
-    player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.roomTiles as number | undefined
-  if (typeof before !== 'number') return 0
-  return Math.max(0, player.roomTiles.length - before)
-}
-
-export const getFencesBuiltThisAction = (player: PlayerState) => {
-  const before =
-    player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.fenceSegments as number | undefined
-  if (typeof before !== 'number') return 0
-  return Math.max(0, getFenceCount(player) - before)
-}
+export const countDistinctStablesBuiltThisTurn = (player: PlayerState): number => player.turnConstruction?.stablePieces.length ?? 0
+export const hasBuiltStableThisTurn = (player: PlayerState): boolean => countDistinctStablesBuiltThisTurn(player) > 0
+export const roomTypeBuiltThisTurn = (player: PlayerState): PlayerState['houseType'] | undefined => player.turnConstruction?.roomType
+export const hasBuiltFenceThisTurn = (player: PlayerState): boolean => player.turnConstruction?.fenceBuilt ?? false

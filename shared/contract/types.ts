@@ -376,6 +376,14 @@ export type PlayerState = {
   fields: Field[]
   roomTiles: FarmTilePosition[]
   stableTiles: FarmTilePosition[]
+  /** Ordinary stable token identities, keyed by their current farm position. */
+  stablePieceIds?: Record<string, number>
+  /** Construction facts retained only while this player's Turn scope is open. */
+  turnConstruction?: {
+    stablePieces: string[]
+    roomType?: PlayerState['houseType']
+    fenceBuilt: boolean
+  }
   improvements: string[]
   minorHand: string[]
   minorPlayed: string[]
@@ -990,6 +998,11 @@ export type FarmTerrainChange = FarmTilePosition & {
 }
 export type FarmTerrainOperationMode = 'place' | 'remove' | 'replace-kind' | 'replace-with-field' | 'cover'
 
+export type StableConstruction = FarmTilePosition & { ordinal: number } & (
+  | { kind: 'normal'; pieceId: number }
+  | { kind: 'special'; sourceCardId: string }
+)
+
 /** Structural farm properties shared by receipts and the production write boundary. */
 export const FARM_LAYOUT_KEYS = ['roomTiles', 'stableTiles', 'fields', 'fenceSegments', 'pastures', 'farmTerrain', 'farmyardExtensions', 'farmyardSpaceStates'] as const satisfies readonly (keyof PlayerState)[]
 
@@ -1002,7 +1015,9 @@ export type FarmOperationResult = {
   before: Pick<PlayerState, typeof FARM_LAYOUT_KEYS[number]>
   after: Pick<PlayerState, typeof FARM_LAYOUT_KEYS[number]>
 } & (
-  | { kind: 'rooms' | 'stables' | 'plow' | 'fence' | 'pastures' | 'space-states' | 'extension' | 'remove-stables' | 'remove-fences' | 'crops' }
+  | { kind: 'rooms'; roomType: PlayerState['houseType'] }
+  | { kind: 'stables'; stables: StableConstruction[] }
+  | { kind: 'plow' | 'fence' | 'pastures' | 'space-states' | 'extension' | 'remove-stables' | 'remove-fences' | 'crops' }
   | { kind: 'terrain'; terrainMode: FarmTerrainOperationMode; terrainChanges: FarmTerrainChange[] }
 )
 

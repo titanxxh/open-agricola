@@ -30,8 +30,8 @@ describe('committed host farmyard usage', () => {
   })
   it('keeps the original result receipt separate from nested child facts and later live geometry', () => {
     const owner = structuredClone(player)
-    const outer = commitFarmOperation(owner, { kind: 'stables', positions: [{ row: 0, col: 1 }] })
-    commitFarmOperation(owner, { kind: 'stables', positions: [{ row: 1, col: 3 }] })
+    const outer = commitFarmOperation(owner, { kind: 'stables', standingSpecialStableCount: 0, positions: [{ row: 0, col: 1 }] })
+    commitFarmOperation(owner, { kind: 'stables', standingSpecialStableCount: 0, positions: [{ row: 1, col: 3 }] })
     expect(getActionNewlyUsedTiles({ player: owner, result: { type: 'ok', farmOperations: [outer] }, actionEvents: [used] }))
       .toEqual([{ playerId: owner.id, row: 0, col: 1 }])
     expect(getActionNewlyUsedTiles({ player: owner, result: { type: 'flow', flow: { type: 'leaf', actionId: 'gain' }, farmOperations: [] }, actionEvents: [used] }))
