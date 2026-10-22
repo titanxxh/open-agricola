@@ -112,7 +112,7 @@ const houseBonusBoar = (session: GameSession) => {
   expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
   expect(response.state.players[0]!.resources.wood).toBe(4)
   const housed = session.resolveChoice(0, 'confirm', {
-    zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
+    zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
   })
   expect(housed.ok, housed.error).toBe(true)
   expect(housed.interaction.stateId === 'wait' && housed.interaction.request.kind).toBe('farm-select')

@@ -82,7 +82,7 @@ const houseAnimals = (session: GameSession, response: SessionResponse, lastAnima
   expect(response.interaction.request.kind).toBe('animal-reorg')
   return session.resolveChoice(0, 'confirm', {
     zones: [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       { id: 'stable:0-1', zoneType: 'stable', animalType: 'boar', animalCount: 1 },
       { id: 'stable:0-2', zoneType: 'stable', animalType: lastAnimal, animalCount: 1 },
     ],

@@ -110,7 +110,7 @@ describe('B104 placed-sheep exchanges during animal reorganization', () => {
     }))
     const completed = session.resolveChoice(0, 'confirm', { zones: [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-      ...(resource === 'boar' ? [{ id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }] : []),
+      ...(resource === 'boar' ? [{ id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }] : []),
     ] })
     expect(completed.ok, completed.error).toBe(true)
     expect(completed.interaction.stateId === 'wait' && completed.interaction.request.kind).toBe('confirm-next-player')

@@ -107,7 +107,7 @@ describe('D011_LawnFertilizer session', () => {
 
     response = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 4 },
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(4)
@@ -141,7 +141,7 @@ describe('D011_LawnFertilizer session', () => {
 
     response = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(2)

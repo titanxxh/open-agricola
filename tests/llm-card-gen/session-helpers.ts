@@ -21,12 +21,11 @@ import {
   clearCustomCards,
   type CustomCardData,
 } from '../../shared/cards/custom-registry'
-import type { GameState, InteractionAnimalReorgZone, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
+import type { GameState, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
 import { adaptHistoricalCardSource } from './extract'
 import { workshopCardJsonFromDefinition } from '../../server/workshop-draft-validation'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
-import { getPastureCapacity } from '../../shared/domain/pasture'
 import {
   setWorkersAtHome,
   markAllWorkersUsed,
@@ -283,74 +282,6 @@ export interface AutoAdvanceOptions {
   ) => SessionResponse | undefined
 }
 
-/**
- * Build a zone list that preserves all of `player.resources.{sheep,boar,cattle}`
- * by greedily packing them into existing pastures (preferring same-type),
- * then the house tile, then loose stables. Used by autoAdvanceRoundEnd to
- * resolve animalReorg pendings without destroying animals — passing zones=[]
- * to confirmAnimalReorg zeroes resources.{sheep,boar,cattle}.
- *
- * Limitations: greedy single-type-per-pasture; may drop animals that don't
- * fit any zone (no extra zones synthesized). Sufficient for fixtures whose
- * pasture layout matches their animal counts.
- */
-function buildPreservingZones(
-  player: PlayerState,
-  availableZones: readonly InteractionAnimalReorgZone[],
-): { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] {
-  const remaining: Record<'sheep' | 'boar' | 'cattle', number> = {
-    sheep: player.resources?.sheep ?? 0,
-    boar: player.resources?.boar ?? 0,
-    cattle: player.resources?.cattle ?? 0,
-  }
-  const zones: { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] = []
-  // Pasture zones: prefer existing animalType, else pick any species with >0.
-  for (const pasture of player.pastures ?? []) {
-    const cap = getPastureCapacity(player, pasture)
-    const preferred = pasture.animalType === 'horse' ? null : pasture.animalType
-    let chosen: 'sheep' | 'boar' | 'cattle' | null = null
-    if (preferred && remaining[preferred] > 0) chosen = preferred
-    else {
-      for (const k of ['cattle', 'boar', 'sheep'] as const) {
-        if (remaining[k] > 0) { chosen = k; break }
-      }
-    }
-    if (chosen) {
-      const count = Math.min(cap, remaining[chosen])
-      zones.push({ id: pasture.id, zoneType: 'pasture', animalType: chosen, animalCount: count })
-      remaining[chosen] -= count
-    } else {
-      zones.push({ id: pasture.id, zoneType: 'pasture', animalType: null, animalCount: 0 })
-    }
-  }
-  for (const tile of player.roomTiles) {
-    const key = `${tile.row}-${tile.col}`
-    const animal = player.houseAnimals[key]
-    if (animal && animal !== 'horse' && remaining[animal] > 0) {
-      zones.push({ id: `house:${key}`, zoneType: 'house', animalType: animal, animalCount: 1 })
-      remaining[animal] -= 1
-    } else {
-      zones.push({ id: `house:${key}`, zoneType: 'house', animalType: null, animalCount: 0 })
-    }
-  }
-  // Use backend holder entities and capacities, including empty stables.
-  for (const stable of availableZones.filter(zone => zone.zoneType === 'stable')) {
-    const key = stable.id.slice('stable:'.length)
-    let chosen: 'sheep' | 'boar' | 'cattle' | null = null
-    for (const k of ['cattle', 'boar', 'sheep'] as const) {
-      if (remaining[k] > 0) { chosen = k; break }
-    }
-    if (chosen) {
-      const count = Math.min(stable.capacity, remaining[chosen])
-      zones.push({ id: `stable:${key}`, zoneType: 'stable', animalType: chosen, animalCount: count })
-      remaining[chosen] -= count
-    } else {
-      zones.push({ id: `stable:${key}`, zoneType: 'stable', animalType: null, animalCount: 0 })
-    }
-  }
-  return zones
-}
-
 export function autoAdvanceRoundEnd(
   session: GameSession,
   opts: AutoAdvanceOptions = {},
@@ -381,12 +312,8 @@ export function autoAdvanceRoundEnd(
       continue
     }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
-      // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
-      // build a zone list that preserves all current animals.
-      const pi = resp.interaction.playerIndex
-      const player = session.getState().state.players[pi]
-      const zones = player ? buildPreservingZones(player, resp.interaction.request.zones) : []
-      resp = session.resolveChoice(pi, 'confirm', { zones })
+      // Confirm the server's legal draft, including room permissions and card holders.
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { zones: resp.interaction.request.zones })
       continue
     }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {

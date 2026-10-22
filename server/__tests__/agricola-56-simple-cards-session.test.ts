@@ -661,7 +661,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
       let resp = session.takeAction(0, spaceId)
       expect(resp.ok).toBe(true)
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
-        resp = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
+        resp = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
         expect(resp.ok, resp.error).toBe(true)
       }
 

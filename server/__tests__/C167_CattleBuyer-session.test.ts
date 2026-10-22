@@ -102,7 +102,7 @@ const chooseAnimal = (session: GameSession, initial: SessionResponse, animal: An
   if (response.interaction.stateId === 'wait'
     && response.interaction.request.kind === 'animal-reorg') {
     response = session.resolveChoice(response.interaction.playerIndex, 'confirm', {
-      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: 1 }],
+      zones: [{ id: 'house:2-0', zoneType: 'house', animalType: animal, animalCount: 1 }],
     })
   }
   return response

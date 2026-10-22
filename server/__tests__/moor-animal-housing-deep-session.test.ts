@@ -25,7 +25,7 @@ describe('Moor animal housing clause audit', () => {
     response = session.resolveChoice(animalOwner, 'confirm', { zones: [assignment] })
     expect(response.ok).toBe(false)
     expect(JSON.stringify(response.state)).toBe(before)
-    response = session.resolveChoice(animalOwner, 'confirm', { zones: [{ ...assignment, animalCount: capacity }, { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
+    response = session.resolveChoice(animalOwner, 'confirm', { zones: [{ ...assignment, animalCount: capacity }, { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[animalOwner]!.resources.sheep).toBe(capacity + 1)
     expect(response.state.players[1 - animalOwner]!.resources.sheep).toBe(0)
@@ -71,7 +71,7 @@ describe('Moor animal housing clause audit', () => {
     response = session.resolveChoice(0, 'confirm', { zones: [{ id: zones[0]!.id, zoneType: 'card', cardId: HOME, animalType: animal, animalCount: 2 }] })
     expect(response.ok).toBe(false)
     expect(JSON.stringify(response.state)).toBe(before)
-    response = session.resolveChoice(0, 'confirm', { zones: [...zones.map((zone) => ({ id: zone.id, zoneType: 'card', cardId: HOME, animalType: animal, animalCount: 1 })), { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
+    response = session.resolveChoice(0, 'confirm', { zones: [...zones.map((zone) => ({ id: zone.id, zoneType: 'card', cardId: HOME, animalType: animal, animalCount: 1 })), { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources[animal]).toBe(2)
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(0)
@@ -97,7 +97,7 @@ describe('Moor animal housing clause audit', () => {
       expect(response.ok).toBe(false)
       expect(JSON.stringify(response.state)).toBe(before)
     }
-    response = session.resolveChoice(0, 'confirm', { zones: [assignment(zones[1]!.id, 2), { id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+    response = session.resolveChoice(0, 'confirm', { zones: [assignment(zones[1]!.id, 2), { id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.horse).toBe(3)
     expect(countUnusedFarmyardSpaces(response.state.players[0]!)).toBe(unused)
@@ -109,7 +109,7 @@ describe('Moor animal housing clause audit', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.request.zones.find((zone) => zone.id === zones[1]!.id)?.animalCount).toBe(2)
     response = session.resolveChoice(0, 'confirm', { zones: [assignment(zones[0]!.id, 2),
-      { id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 },
       { id: 'p', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
     ] })
     expect(response.ok, response.error).toBe(true)

@@ -49,7 +49,7 @@ const houseAnimal = (session: GameSession, animal: 'sheep' | 'boar' | 'cattle') 
   const response = session.getState()
   expect(response.interaction.request.kind).toBe('animal-reorg')
   const placed = session.resolveChoice(0, 'confirm', { zones: [
-    { id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: 1 },
+    { id: 'house:2-0', zoneType: 'house', animalType: animal, animalCount: 1 },
   ] })
   expect(placed.ok, placed.error).toBe(true)
   expect(Object.values(placed.state.players[0]!.houseAnimals).length).toBe(1)

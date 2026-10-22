@@ -91,7 +91,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
 
     const before = session.getState()
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
@@ -101,14 +101,14 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(response.interaction).toEqual(before.interaction)
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!).toMatchObject({
       resources: { boar: 1 },
-      houseAnimals: { '1-0': 'sheep' },
+      houseAnimals: { '2-0': 'sheep' },
     })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(1)
   })
@@ -128,7 +128,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(response.interaction.request.zones.some((zone) => zone.id === `card:${CARD_ID}`)).toBe(false)
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
@@ -173,7 +173,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0 },
+      { id: 'house:2-0', zoneType: 'house', animalType: null, animalCount: 0 },
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)

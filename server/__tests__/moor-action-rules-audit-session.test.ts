@@ -149,7 +149,7 @@ describe('Moor action printed-rule native audit', () => {
         expect(response.ok, response.error).toBe(true)
         if (mode === 'accept') {
           expect(response.interaction.request.kind).toBe('animal-reorg')
-          response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+          response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
           expect(response.ok, response.error).toBe(true)
         }
       }

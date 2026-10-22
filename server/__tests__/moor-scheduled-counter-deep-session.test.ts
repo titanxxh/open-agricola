@@ -159,7 +159,7 @@ describe('Moor scheduled and counter clause audit', () => {
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources.food).toBe(food - 1)
       expect(response.interaction.request.kind).toBe('animal-reorg')
-      response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: 1 }] })
+      response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: animal, animalCount: 1 }] })
       expect(response.ok, response.error).toBe(true)
       expect((Object.values(response.state.players[0]!.houseAnimals)[0] ?? null)).toBe(animal)
       expect(response.state.players[0]!.resources[animal]).toBe(1)
@@ -185,7 +185,7 @@ describe('Moor scheduled and counter clause audit', () => {
       expect(response.state.futureMeeples.some((entry) => entry.cardId === cardId && entry.round === round)).toBe(false)
       if (resource === 'horse') {
         expect(response.interaction.request.kind).toBe('animal-reorg')
-        response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+        response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
         expect(response.ok, response.error).toBe(true)
         expect(response.state.players[0]!.resources.horse).toBe(1)
       }

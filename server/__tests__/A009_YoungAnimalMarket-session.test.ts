@@ -65,11 +65,11 @@ describe('A009 Young Animal Market parity', () => {
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
 
     response = session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 }],
+      zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 }],
     })
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]).toMatchObject({ houseAnimals: { '1-0': 'cattle' }, })
+    expect(response.state.players[0]).toMatchObject({ houseAnimals: { '2-0': 'cattle' }, })
   })
 
   it('A009 S2: no sheep keeps Young Animal Market unavailable and preserves state', () => {

@@ -445,14 +445,14 @@ describe('C148 Mud Wallower public session', () => {
     })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 2 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(3)
     expect(response.state.players[0]!).toMatchObject({
-      houseAnimals: { '1-0': 'boar' },
+      houseAnimals: { '2-0': 'boar' },
     })
     expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(2)
   })

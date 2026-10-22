@@ -54,7 +54,7 @@ const useCattleMarket = (session: GameSession, playerIndex: number) => {
     response = session.resolveChoice(playerIndex, 'confirm', {
       zones: playerIndex === 0
         ? [{ id: 'owner-pasture', zoneType: 'pasture', animalType: 'cattle', animalCount: cattle }]
-        : [{ id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: cattle }],
+        : [{ id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: cattle }],
     })
   }
   return response

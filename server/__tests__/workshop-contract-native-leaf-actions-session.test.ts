@@ -319,11 +319,11 @@ describe('Workshop Capability Contract native leaf actions', () => {
     expect(pending.interaction).toMatchObject({ promptKey: 'ui.interactionAnimalReorg', request: { kind: 'animal-reorg' } })
     const moved = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: null, animalCount: 0 },
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expectSettled(session, moved)
-    expect(moved.state.players[0]!).toMatchObject({ houseAnimals: { '1-0': 'sheep' }, })
+    expect(moved.state.players[0]!).toMatchObject({ houseAnimals: { '2-0': 'sheep' }, })
     expect(moved.state.players[0]!.pastures[0]!.animalCount).toBe(0)
   })
 

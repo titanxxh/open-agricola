@@ -123,7 +123,7 @@ describe('Moor prerequisite printed-rule audit', () => {
       const stable = response.interaction.request.zones.find((zone) => zone.zoneType === 'stable')!
       expect(stable).toBeDefined()
       response = session.resolveChoice(0, 'confirm', { zones: [
-        { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+        { id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
         { id: stable.id, zoneType: 'stable', animalType: count >= 6 ? 'horse' : null, animalCount: count >= 6 ? 1 : 0 },
       ] })
       expect(response.ok, response.error).toBe(true)

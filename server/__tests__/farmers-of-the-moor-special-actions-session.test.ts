@@ -202,7 +202,7 @@ describe('Farmers of the Moor special actions', () => {
     expect(resp.interaction.request.kind).toBe('animal-reorg')
 
     const placed = session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
+      zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }],
     })
 
     expect((Object.values(placed.state.players[0]!.houseAnimals)[0] ?? null)).toBe('horse')
