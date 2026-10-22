@@ -57,6 +57,8 @@ shared/engine/
 
 测试：`shared/engine/__tests__/{engine,engine-flow,tree-selected-branch,restore-regressions,optional-node-context,resolve-choice-continuations,space-use-clone,moor-completion-clone}.test.ts`。
 
+修改回调在 `execute`、显式 `resolveChoice` 和单选项自动处理时均收到 `completedTransactionEvents`，包含 Session 尚未刷出的已完成事实。该共享读取上下文不替代当前宿主自身的收据。回归测试：`shared/engine/__tests__/event-transaction.test.ts`。
+
 ## EngineStack
 
 `engine-stack.ts` 中的 `EngineStack` 持有 `EngineFrame[]`：

@@ -1180,7 +1180,7 @@ export function maybeBuildChoiceCandidates(
       actionId,
     })
     applyComputeCostResults(executionContext, selectedCostResults)
-    return action.resolveChoice({ ...executionContext, eventSink }, value, undefined)
+    return action.resolveChoice({ ...executionContext, completedTransactionEvents: int.events.currentTransactionEvents(), eventSink }, value, undefined)
   }
   return {
     type: 'request',

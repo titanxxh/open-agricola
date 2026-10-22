@@ -997,6 +997,7 @@ export function engineResolveChoice(
     result = applyBeforeHostContributions(int, pendingActionNode ?? undefined, withInjectedAnytimeResultFlag(
       committedAction.resolveChoice({
         ...executionContext,
+        completedTransactionEvents: pendingEventReadContext().transactionEvents,
         eventSink: eventBuffer.sink,
       }, choice, payload),
       executionContext.actionContext,
