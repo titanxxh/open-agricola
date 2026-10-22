@@ -1,6 +1,7 @@
+import { reconcileOrdinaryHousePet } from '../domain/animal-zones'
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
-import { commitFarmOperation } from '../domain/farm-operations'
+import { commitRoomConstruction } from '../domain/room-construction'
 import { buildAnimalReorgRequest } from '../domain/animal-reorg'
 import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { restoreSessionState } from './state-recovery'
@@ -942,6 +943,7 @@ export class GameCore {
     if (stateOrSeed && typeof stateOrSeed === 'object') {
       if (isStateWithCursor(stateOrSeed)) {
         this.state = this.withCtx(() => rebuildActiveModifiers(restoreSessionState(stateOrSeed.state, id => this.registry.get(id))))
+        this.withCtx(() => this.reconcileRoomAnimals())
         this.syncDynamicActionSpaces()
         const cursor = stateOrSeed.sessionCursor
         if (cursor) this.withCtx(() => this.restoreSessionPrivateCursor(cursor))
@@ -958,6 +960,7 @@ export class GameCore {
         extraOccupationIds,
       }, [], 'defer'))
     }
+    this.withCtx(() => this.reconcileRoomAnimals())
     this.syncDynamicActionSpaces()
     if (isFreshState) this.withCtx(() => this.startFirstRoundAfterSetup())
   }
@@ -2580,8 +2583,13 @@ export class GameCore {
     }
   }
 
+  private reconcileRoomAnimals(): void {
+    for (const player of this.state.players) reconcileOrdinaryHousePet(player, this.state)
+  }
+
   private restoreHistory(entry: HistoryEntry) {
     this.state = preservePlayerDisplayNames(this.state, restoreSessionState(entry.state, id => this.registry.get(id)))
+    this.reconcileRoomAnimals()
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
@@ -4695,6 +4703,7 @@ export class GameCore {
       nextState = raw as GameState
     }
     this.state = rebuildActiveModifiers(restoreSessionState(nextState, id => this.registry.get(id)))
+    this.reconcileRoomAnimals()
     this.syncDynamicActionSpaces()
     this.engineStack.clear()
     this.history = []
@@ -5252,7 +5261,7 @@ export class GameCore {
   private devAddRoomsInContext(playerIndex: number, rooms: FarmTilePosition[]): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    commitFarmOperation(player, { kind: 'rooms', positions: rooms })
+    commitRoomConstruction(this.state, player, rooms)
     return this.respond()
   }
 

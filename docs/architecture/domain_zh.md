@@ -37,7 +37,7 @@ shared/domain/
 
 **动物。**
 
-- 每个真实房间拥有容量为一的 Room Animal Holder 身份（`house:<positionKey>`）；`PlayerState.houseAnimals` 是唯一可写的房间安置（[ADR 0026](../adr/0026-each-room-is-an-animal-holder.md)）。普通宠物只能安置在房屋最左列最下方的房间，卡牌可开放更多房间。恢复与建房会把已有普通宠物自动移到当前合法房间，动物总量不变，也不记录为新安置。`roomAnimalZones` 是加载时剥离的展示投影。占用组与 `occupiedZoneLimit` 通过纯查询 `shared/contract/animal-zone-occupancy.ts` 约束房间与卡牌区域中被占用的 holder 数。
+- 每个真实房间拥有容量为一的 Room Animal Holder 身份（`house:<positionKey>`）；`PlayerState.houseAnimals` 是唯一可写的房间安置（[ADR 0026](../adr/0026-each-room-is-an-animal-holder.md)）。普通宠物只能安置在房屋最左列最下方的房间，卡牌可开放更多房间。恢复与建房会把已有普通宠物自动移到当前合法房间，动物总量不变，也不记录为新安置。`shared/domain/room-construction.ts` 在触发建房后续规则前提交房间与普通宠物位置；Session 恢复也使用同一位置校正。`roomAnimalZones` 是加载时剥离的展示投影。占用组与 `occupiedZoneLimit` 通过纯查询 `shared/contract/animal-zone-occupancy.ts` 约束房间与卡牌区域中被占用的 holder 数。
 - 无围栏马厩按农场位置保存 `{ animalType, animalCount }`（[ADR 0029](../adr/0029-loose-stables-retain-animal-species-and-count.md)）；空马厩没有条目，但仍在 `stableTiles` 中。动物数量规则累加数量；占用格、存在性与不同物种规则保持各自语义。
 - 每个“能否容纳”的问题都使用 `canAccommodateAnimalTotals()` 或 `canAccommodateAllAnimals()`，它们搜索合法的最终安置（允许之后的系统 `reorganize`），并遵守 `occupiedZoneLimit` 与必空组（`requiredEmptyZoneGroupIds`：每组至少一个被标记区域为空）。卡牌从不在局部测试单个区域。会永久降低 holder 容量的候选按支付后的容量过滤。
 - `onComputeAnimalZones(player, zones, state)` 添加区域；`computePastureCapacityModifiers(player, state)` 按打出顺序先返回替换再返回叠加 modifier；`onComputeSharedAnimalZones()` 贡献 Hosted Card Animal Zone，存于卡牌 owner 的 `animalCountsByZone`，但按 `animalOwnerPlayerId`（繁殖时按 `breedingOwnerPlayerId`）结算。每个 holder 写入方都持久化 `cardId`、`ownerPlayerId` 与 `animalOwnerPlayerId`；改写与跨玩家扣减只触及当前 Animal Owner 的条目。`computeAnimalZones` 为缺少 `cardId` 的卡牌区域补上它。固定物种用 `allowedAnimalType`；`animalType` 只表示当前占用。
