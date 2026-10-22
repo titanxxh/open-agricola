@@ -111,7 +111,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 ### 末回合 scoring（M4 模式）
 
-`autoAdvanceRoundEnd(session, { maxIterations })` helper 用 `performRoundEnd` 和 `resolveChoice` 消化 feed / animal-reorg / confirm-next-player / confirm-player-switch 等等待交互，直到 `gameOver`。**会自动把 supply 里的动物放到 pasture/house/stable**（贪心 greedy），保证 `cattle` / `sheep` / `boar` 不被丢失。
+`autoAdvanceRoundEnd(session, { maxIterations })` helper 用 `performRoundEnd` 和 `resolveChoice` 处理 feed、animal-reorg、confirm-next-player 和 confirm-player-switch 等等待交互，完成当前轮末或进入 `gameOver` 时返回。动物重整直接确认服务端提供的合法预填草稿 `request.zones`，由服务端规则决定房间、牧场、马厩和卡牌容纳区。草稿无法容纳的动物按正常确认流程丢弃，不保证保留所有库存动物。
 
 读 per-card bonus VP 要用 `getBonusBreakdownForSession(session, playerIndex)`（wraps `runBonusSolver` in `withCtx`）——直接跑 `computeScores(state).categories.cardStateBonusVp` 只拿到总和，丢失 cardId。
 
