@@ -2,11 +2,9 @@ import { extendedResourceKeyList, resourceKeyList, roundCardActionIds } from '..
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/contract/placement-constants'
 import { seasonActionIds } from '../../shared/projections/season-actions'
 import type { ActionChoiceOption, ActionSpace, FarmTilePosition, GameState, PlayerState, Resource } from '../../shared/contract/types'
-import type { PlayerScoreSummary } from '../../shared/domain/scoring'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import { isMoorSpecialActionId } from '../../shared/projections/moor-special-actions'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
-import type { PlayerScoreRow } from '../components/board/ScorePanel'
 import type { WsStatus } from './ws-status'
 
 export type { WsStatus } from './ws-status'
@@ -88,47 +86,6 @@ export const farmCommitErrorMessageKey = (
   return (error && error in typeMap)
     ? typeMap[error as keyof typeof typeMap]
     : `ui.${farmType}ErrorUnknown`
-}
-
-type CompactScorePlayer = {
-  id: string
-  name: string
-}
-
-export const buildCompactScoreRows = (
-  state: { players: readonly CompactScorePlayer[] } | null | undefined,
-  scores: readonly PlayerScoreSummary[] | null | undefined,
-  selfPlayerId: string | null | undefined,
-): PlayerScoreRow[] => {
-  if (!state) return []
-  const summaryById = new Map((scores ?? []).map((score) => [score.playerId, score]))
-  const myId = selfPlayerId ?? null
-  return state.players.map((player) => {
-    const summary = summaryById.get(player.id)
-    const catTotal = (key: string): number =>
-      summary?.categories.find((category) => category.key === key)?.total ?? 0
-    return {
-      id: player.id,
-      name: player.name,
-      isYou: myId !== null && player.id === myId,
-      total: summary?.total ?? 0,
-      breakdown: {
-        fields:
-          catTotal('fields') +
-          catTotal('grains') +
-          catTotal('vegetables') +
-          catTotal('pastures'),
-        animals:
-          catTotal('sheeps') +
-          catTotal('boars') +
-          catTotal('cattles') +
-          catTotal('stables'),
-        cardBonusVp: catTotal('cardBonusVp'),
-        family: catTotal('farmers') + catTotal('clayRooms') + catTotal('stoneRooms'),
-        cards: catTotal('cards'),
-      },
-    }
-  })
 }
 
 const roomNeighborKeys = (key: string) => {

@@ -16,6 +16,7 @@ type LocaleScenario = {
   score: string
   log: string
   expand: string
+  close: string
   scoreBreakdown: string[]
   plowPrompt: string
   plowConfirm: string
@@ -32,7 +33,8 @@ const ENGLISH: LocaleScenario = {
   score: 'Scoring Pad',
   log: 'Action Log',
   expand: 'expand',
-  scoreBreakdown: ['Fields', 'Animals', 'Card bonus VP', 'Family members', 'Cards'],
+  close: 'Close',
+  scoreBreakdown: ['Fields', 'Pastures', 'Grain', 'Vegetables', 'Family members', 'Cards', 'Card bonus'],
   plowPrompt: 'Select a tile to plow',
   plowConfirm: 'Confirm plow',
 }
@@ -43,7 +45,8 @@ const CHINESE: LocaleScenario = {
   score: '计分板',
   log: '行动记录',
   expand: '展开',
-  scoreBreakdown: ['田地', '动物', '卡牌加分', '家庭成员', '卡牌分'],
+  close: '关闭',
+  scoreBreakdown: ['田地', '圈地', '谷物', '蔬菜', '家庭成员', '卡牌分', '卡牌加分'],
   plowPrompt: '选择要开垦的田地',
   plowConfirm: '确认开垦',
 }
@@ -260,26 +263,26 @@ const inspectMobileInformation = async (
   await expect(page.locator('.farm-grid')).toBeVisible()
 
   const information = page.locator('.game-layout__right')
-  const scoreSection = information.locator('.section', {
-    has: page.locator('.section__title', { hasText: locale.score }),
-  })
   const logSection = information.locator('.section', {
     has: page.locator('.section__title', { hasText: locale.log }),
   })
-  await scoreSection.getByRole('button', { name: locale.expand }).click()
-  await logSection.getByRole('button', { name: locale.expand }).click()
-  await expect(scoreSection.locator('.score-panel__row')).toHaveCount(playerCount)
+  const board = await openScoringBoard(page, locale)
+  await expect(board.locator('.scoring-header-row .scoring-player-name')).toHaveCount(playerCount)
   for (const label of locale.scoreBreakdown) {
-    await expect(scoreSection).toContainText(label)
+    await expect(board.getByText(label, { exact: true })).toBeVisible()
   }
+  await board.getByRole('button', { name: locale.close, exact: true }).click()
+  await logSection.getByRole('button', { name: locale.expand }).click()
   await expect(logSection.locator('.action-log__entry').first()).toBeVisible()
 }
 
-const expandScorePanel = async (page: Page, locale: LocaleScenario) => {
-  const section = page.locator('.game-layout__right .section', {
-    has: page.locator('.section__title', { hasText: locale.score }),
-  })
-  await section.getByRole('button', { name: locale.expand }).click()
+const openScoringBoard = async (page: Page, locale: LocaleScenario) => {
+  const sidebar = page.locator('.game-layout__right')
+  await expect(sidebar.locator('.score-panel')).toHaveCount(0)
+  await sidebar.getByRole('button', { name: locale.score, exact: true }).click()
+  const board = page.locator('.scoring-pad')
+  await expect(board).toBeVisible()
+  return board
 }
 
 const GAMEPLAY_VIEWPORTS = [
@@ -326,11 +329,14 @@ for (const viewport of GAMEPLAY_VIEWPORTS) {
     } else {
       if (viewport.width >= 1101) {
         await expect(page.locator('.desktop-player-overview')).toBeVisible()
-        await expandScorePanel(page, ENGLISH)
       }
-      await expect(page.locator('.score-panel')).toBeVisible()
       await expect(page.locator('.action-log')).toBeVisible()
     }
+
+    const board = await openScoringBoard(page, ENGLISH)
+    await expect(board.locator('.scoring-header-row .scoring-player-name')).toHaveCount(2)
+    await expect(board.getByText('Pastures', { exact: true })).toBeVisible()
+    await board.getByRole('button', { name: 'Close', exact: true }).click()
 
     await expect.poll(() =>
       page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
@@ -489,8 +495,9 @@ test('real WebSocket 6-player boundary locks p6 identity and observes p1 farm in
     await expect(p6.locator('.action-card-holder.taken')).toHaveCount(1)
     await inspectMobileInformation(p1, ENGLISH, 6)
     await expect(p6.locator('.desktop-player-overview__player')).toHaveCount(6)
-    await expandScorePanel(p6, ENGLISH)
-    await expect(p6.locator('.score-panel__row')).toHaveCount(6)
+    const board = await openScoringBoard(p6, ENGLISH)
+    await expect(board.locator('.scoring-header-row .scoring-player-name')).toHaveCount(6)
+    await board.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(p6.locator('.action-log__entry').first()).toBeVisible()
   } finally {
     await resetFixedRoom(p1, 55_006).catch(() => {})

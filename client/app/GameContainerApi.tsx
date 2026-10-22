@@ -32,7 +32,6 @@ import { MajorImprovements } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
-import { ScorePanel } from '../components/board/ScorePanel'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
@@ -54,7 +53,6 @@ import { useExchangeDraftPresentation } from './exchange-draft-presentation'
 import { useFarmSelectionDraftPresentation } from './farm-selection-draft-presentation'
 import { getCardMeta } from '../services/card-meta'
 import {
-  buildCompactScoreRows,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
   buildSelectableMajorIds,
@@ -1230,12 +1228,6 @@ export const GameContainerApi = () => {
     return rec
   }, [locale, state])
 
-  const scoreRows = useMemo(
-    () => buildCompactScoreRows(state, scores, selfPlayer?.id ?? null)
-      .map((row) => ({ ...row, name: playerNames[row.id] })),
-    [state, scores, selfPlayer?.id, playerNames],
-  )
-
   const resourceKeys = devResourceKeysForState(state)
 
   const applyDevResource = useCallback(async () => {
@@ -1805,7 +1797,7 @@ export const GameContainerApi = () => {
         id: p.id,
         name: playerNames[p.id],
         // PlayerState has no score field; use the live score projection.
-        score: scoreRows.find((r) => r.id === p.id)?.total ?? 0,
+        score: scores?.find((summary) => summary.playerId === p.id)?.total ?? 0,
         color: p.color,
         isYou: selfPlayer ? p.id === selfPlayer.id : false,
         isCurrent: i === state.currentPlayerIndex,
@@ -1986,17 +1978,17 @@ export const GameContainerApi = () => {
               locale={locale}
               players={state.players}
               playerNames={playerNames}
-              scores={scoreRows}
+              scores={scores ?? []}
               viewedPlayerId={displayPlayer.id}
               currentPlayerId={currentPlayer.id}
               onViewPlayer={setViewPlayerIdSafe}
             />
           ) : null}
+          <button type="button" className="btn-secondary scoring-pad-button" onClick={showScoring}>
+            {t(locale, 'ui.scoringPadButton')}
+          </button>
           {isMobile ? (
             <>
-              <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
-                <ScorePanel locale={locale} rows={scoreRows} />
-              </Section>
               <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.actionLog')} variant="parchment">
                 <ActionLog
                   locale={locale}
@@ -2020,11 +2012,6 @@ export const GameContainerApi = () => {
             </>
           ) : (
             <>
-              {isDesktopTable ? (
-                <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.scoringPadTitle')} variant="parchment">
-                  <ScorePanel locale={locale} rows={scoreRows} />
-                </Section>
-              ) : <ScorePanel locale={locale} rows={scoreRows} />}
               <ActionLog
                 locale={locale}
                 log={roomHistory.log}
