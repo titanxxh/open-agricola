@@ -694,6 +694,7 @@ export class GameCore {
   applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: () => boolean): boolean {
     return isPlacementActionDoableInFlowContext({
       actionHooks: this.actionHooks, actionId: space.id, action: space, state: this.state, player, space, baseDoable,
+      turnScopeProjection: { kind: 'next-turn', playerId: player.id },
       resolveAction: (actionId) => this.registry.get(actionId),
     })
   }
@@ -787,9 +788,9 @@ export class GameCore {
   /** @internal Round phase — onRoundEnd stage hook chain trampoline. */
   invokeRoundEndHooks(): SessionResponse { return this.withCtx(() => this.continueRoundEndHooks()) }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
-  createEngineForSpace(actionId: string, personUse?: import('../contract/person-use').PersonUseReceipt): Engine {
+  createEngineForSpace(actionId: string, use: NonNullable<ActionExecutionContext['actionSpaceUse']>): Engine {
     return Engine.fromActionSpace(actionId, { ...this.engineDeps(), requireRootCompletion: true },
-      this.state.players[this.state.currentPlayerIndex]?.id, { newPlacement: true, personUse })
+      this.state.players[this.state.currentPlayerIndex]?.id, use)
   }
   /** @internal phase access — push a synthetic pending-only frame. */
   pushSyntheticPendingFrame(envelope: PendingEnvelope, ownerPlayerIndex: number, reason: SubFlowReason): void {
@@ -4430,6 +4431,7 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
+    appendImmediateEvents(this.state, [{ type: 'work.ended' }])
     recordReturnHomePlacements(this.state)
     for (const returned of returnSupplyWorkers(this.state)) {
       appendImmediateEvents(this.state, [{

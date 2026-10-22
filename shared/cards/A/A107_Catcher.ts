@@ -1,8 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A107_Catcher'
@@ -19,14 +18,14 @@ const countBuildingResources = (space: CardListenerContext['space']): number =>
   (space.resources?.stone ?? 0)
 
 const listener: CardListenerRegistration = {
-  id: 'A107-catcher-before-collect',
+  id: 'A107-catcher-before-space',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['collect'],
+  phases: ['before'],
+  actionSpaces: 'all',
+  requiresNewPlacement: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isBuildingResourceSpace(context.space)) return
-    // Includes the current person placement (after place-farmer).
-    const placed = getRoundPersonPlacementOrder(context.player).length
+    const placed = context.actionSpaceUse?.personUse?.placementOrdinal
     const n = countBuildingResources(context.space)
     if (
       (placed === 1 && n === 5) ||

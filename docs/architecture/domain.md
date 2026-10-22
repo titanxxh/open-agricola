@@ -57,3 +57,10 @@ shared/domain/
 
 Tests: `shared/domain/__tests__/`, `shared/actions/__tests__/animals.test.ts`, `shared/actions/effects/__tests__/reorganize-engine.test.ts`.
 
+
+## Action-space use facts
+
+`domain/action-space-use.ts` records `actionSpace.useStarted` after a destination is accepted and before reactions. The fact freezes use identity, accumulation metadata, work qualification and any person receipt. Before and completion contexts share that identity. History queries combine committed and current-transaction facts, deduplicate identities and stop at the triggering entry, so nested uses cannot change its ordinal. Queries and placement-only effects record nothing; blocked uses remain accepted until undo.
+
+`work.ended` closes work qualification after `onBeforeReturnHome` completes, before the return-position snapshot and temporary-worker return. End-work and before-return uses still qualify even when the displayed `roundPhase` is already `returning-home`; later return-home uses do not. This fact does not reorder stage hooks. Coverage: `server/__tests__/action-space-use-history-session.test.ts`.
+

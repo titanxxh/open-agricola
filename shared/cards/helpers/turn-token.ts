@@ -1,4 +1,4 @@
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState, TurnScopeProjection } from '../../contract/types'
 import { ACTION_SNAPSHOT_CARD_ID, readActionSnapshotExtraData } from './action-snapshot-state'
 
 /** Card State key a card uses for its once-per-Turn record unless it needs several. */
@@ -30,11 +30,10 @@ const readTurnOrGapToken = (player: PlayerState): number | string =>
 
 /**
  * Whether `cardId` recorded `key` in the player's current Turn or in the gap since their last Turn.
- * A work-phase query for the rotation player before their Turn opens previews that Turn as unused.
+ * Only an explicit next-Turn admission projection can ignore the current gap record.
  */
-export const isUsedThisTurnOrGap = (state: GameState, player: PlayerState, cardId: string, key = USED_THIS_TURN_KEY): boolean => {
-  const previewsNextTurn = readTurnScopeToken(player) === undefined && state.roundPhase === 'work'
-    && state.players[state.currentPlayerIndex]?.id === player.id
+export const isUsedThisTurnOrGap = (player: PlayerState, cardId: string, projection?: TurnScopeProjection, key = USED_THIS_TURN_KEY): boolean => {
+  const previewsNextTurn = readTurnScopeToken(player) === undefined && projection?.playerId === player.id
   return !previewsNextTurn && player.cardStates?.[cardId]?.extraData?.[key] === readTurnOrGapToken(player)
 }
 

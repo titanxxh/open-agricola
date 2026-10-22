@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionFlow, GameState, PlayerState } from '../../../contract/types'
+import type { ActionFlow, PlayerState } from '../../../contract/types'
 import { beginTurnScope, endTurnScope } from '../action-snapshot'
 import { writeCardExtraData } from '../card-state'
 import {
@@ -40,9 +40,7 @@ describe('turn-token', () => {
   it('gives the gap between two of the player\'s Turns its own single record', () => {
     const p = player(), other = player()
     other.id = 'p2'
-    const at = (roundPhase: GameState['roundPhase'], current: PlayerState) =>
-      ({ roundPhase, currentPlayerIndex: current === p ? 0 : 1, players: [p, other] }) as unknown as GameState
-    const used = (state = at('harvest', other)) => isUsedThisTurnOrGap(state, p, FRESHMAN)
+    const used = () => isUsedThisTurnOrGap(p, FRESHMAN)
     const record = () => {
       const leaf = markUsedThisTurnOrGapLeaf(p, FRESHMAN) as Extract<ActionFlow, { type: 'leaf' }>
       writeCardExtraData(p, FRESHMAN, USED_THIS_TURN_KEY, leaf.params?.value)
@@ -58,9 +56,10 @@ describe('turn-token', () => {
     expect(used()).toBe(false)
     record()
     expect(used()).toBe(true)
-    expect(used(at('work', other))).toBe(true)
-    expect(used(at('work', p))).toBe(false)
+    expect(used()).toBe(true)
+    expect(isUsedThisTurnOrGap(p, FRESHMAN, { kind: 'next-turn', playerId: p.id })).toBe(false)
+    expect(isUsedThisTurnOrGap(p, FRESHMAN, { kind: 'next-turn', playerId: other.id })).toBe(true)
     beginTurnScope(p)
-    expect(used(at('work', p))).toBe(false)
+    expect(used()).toBe(false)
   })
 })

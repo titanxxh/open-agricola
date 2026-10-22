@@ -356,7 +356,7 @@ describe('player action spaces share runtime plans with full previews', () => {
     const studio = setup('C039_StudioBoat')
     studio.state.actionSpaces.find(space => space.id === 'C039_StudioBoat')!.resources.food = 3
     expect(JSON.stringify(preview(studio, 'C039_StudioBoat', 0))).toContain('"food":3')
-    expect(JSON.stringify(preview(studio, 'C039_StudioBoat', 0))).toContain('"bonusVp":1')
+    expect(JSON.stringify(preview(studio, 'C039_StudioBoat', 0))).not.toContain('"bonusVp"')
     const collected = studio.takeAction(0, 'C039_StudioBoat')
     expect(collected.ok, collected.error).toBe(true)
     expect(collected.state.players[0]!.resources.food).toBe(3)

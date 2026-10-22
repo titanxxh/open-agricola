@@ -234,13 +234,25 @@ describe('engine event transactions', () => {
       {
         seq: 2,
         id: '2',
+        type: 'actionSpace.useStarted',
+        actorPlayerId: 'p1',
+        sourceActionId: targetSpace.id,
+        spaceId: 'target-space',
+        newPlacement: true,
+        personUse: { workerId: 'w1', placementOrdinal: 1 },
+        accumulation: {},
+        workPhase: true,
+      },
+      {
+        seq: 3,
+        id: '3',
         actorPlayerId: 'p1',
         sourceActionId: targetSpace.id,
         type: 'resource.moved',
         resources: { wood: 4 },
       },
     ])
-    expect(state.nextEventSeq).toBe(3)
+    expect(state.nextEventSeq).toBe(4)
   })
 
   it('restores pending event transaction and derived log state across snapshot roundtrip', () => {

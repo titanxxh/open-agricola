@@ -26,7 +26,8 @@ import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
 import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData } from '../../cards/helpers/action-snapshot.ts'
-import { collectBeforePlacementFlows } from '../../cards/card-listeners.ts'
+import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners.ts'
+import { recordActionSpaceUse } from '../../domain/action-space-use'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagAnytimeTurnFlow, tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
@@ -194,9 +195,10 @@ export const takeAction = (
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
   core.resetActionResultDetails()
   const personUse = applyActionPlacement(state, player, space, worker.id, core.allocActionToken())
+  const use = recordActionSpaceUse({ state, player, space }, { newPlacement: true, personUse })
 
   core.pushEngineFrame({
-    engine: core.createEngineForSpace(spaceId, personUse),
+    engine: core.createEngineForSpace(spaceId, use),
     source: { kind: 'action', actionId: spaceId },
     personUse,
     spaceId,
@@ -208,7 +210,7 @@ export const takeAction = (
     reason: 'top-level',
   })
 
-  const beforeFlows = collectBeforePlacementFlows(core.actionHooks, state, player, space, { targetSpaceId: space.id, placedWorkerId: worker.id })
+  const beforeFlows = collectBeforeActionSpaceUseFlows(core.actionHooks, state, player, space, use, { targetSpaceId: space.id, placedWorkerId: worker.id })
   if (beforeFlows.length > 0) {
     core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { actionHooks: core.actionHooks, state, player, space })
     core.flushEngineLogPublic()

@@ -1,15 +1,11 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import { isWoodAccumulationSpaceId } from '../helpers/action-space-categories'
-import { getRoundPlacementDetails } from '../helpers/round-placement'
+import { getRoundActionSpaceUses } from '../../domain/action-space-use'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D176_Woodshacker'
-
-const ownerWoodUsesThisRound = (context: CardListenerContext) =>
-  getRoundPlacementDetails(context.player).filter((entry) => isWoodAccumulationSpaceId(entry.spaceId)).length
 
 const listener: CardListenerRegistration = {
   id: 'D176-woodshacker-before-wood',
@@ -18,8 +14,10 @@ const listener: CardListenerRegistration = {
   actionSpaces: 'all',
   mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isWoodAccumulationSpaceId(context.space?.id)) return
-    const count = ownerWoodUsesThisRound(context)
+    const uses = getRoundActionSpaceUses(context.state, context.player.id, context.actionSpaceUse?.useId, context.transactionEvents)
+    const current = uses.at(-1)
+    if (!current?.workPhase || (current.accumulation.wood ?? 0) <= 0) return
+    const count = uses.filter(use => use.workPhase && (use.accumulation.wood ?? 0) > 0).length
     if (count === 1) return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
     if (count === 2) return { flow: gainLeaf(CARD_ID, { clay: 2 }), sourceCard: CARD_ID }
   },

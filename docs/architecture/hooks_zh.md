@@ -28,6 +28,7 @@ anytime                  注册额外的 anytime 行动
 - Listener `scope` 为 `player`、`opponent` 或 `any`。匹配按 listener ID 枚举；尾随节点按 owner 分组（全局、当前玩家、其他玩家），组内按打出顺序稳定排序。反应 listener 进入 trigger-select；compute / query listener 确定性聚合。
 - 行动格使用反应选择 `actionSpaces`；规则动作保留 `actions`，包括订阅 `place-farmer` 的人员放置规则。显式用格上下文标识实际进入、查询和整格替换。内部规则动作即使带相同 `space` 或 `targetSpaceId`，也不会打开用格窗口。见 [ADR 0031](../adr/0031-explicit-action-space-use-subscriptions.md)。
 - `before` 在合法目标确定后、费用前运行。`space-use-nodes.ts` 用引擎 sequence 包住一次完整用格，分为主体和完成阶段。普通放人、额外放人、搬迁和无人员用格进入此边界；只放人不执行目标的效果不进入。主体包括支付、选择、替换后代和强制子流程。只有主体事件进入本次用格收据；反应奖励及嵌套用格保留各自身份。
+- 已接受用格的历史与工作阶段资格见[领域事实](domain_zh.md#行动格使用事实)。
 - 主体最后一步完成时，空间反应和已捕获的规则反应共用既有 owner/trigger-select 调度：所有 `immediatelyAfter` 完成后才进入普通 `after`。多步主体内较早完成的规则动作保留既有顺序。`space-use-runtime.ts` 分别在每个阶段入口捕获空间来源，因此立即反应可为随后 after 阶段引入新来源，但不会重放较早的规则反应。阶段内已捕获来源保持固定，handler 读取实时状态。scope 元数据和收据保存在私有引擎游标，跨 pending、恢复和撤销保留。
 - 原生规则 listener 可声明 `settlement`：`body` 是属于主体的强制 `after` 附加效果；`action` 在外层完成前结清宿主内部反应及其完整返回 flow；省略或 `completion` 保留普通完成调度。内部 barrier 跨 pending、复制和游标恢复保留。仅主体附加效果继承主体收据。主体附加效果保留遍历能力，其未开始的终点完成反应仍进入外层阶段 gate；仅内部行动 barrier 隔离完整反应子树。阶段优先级只在同一边界内生效，普通 `after` 不会仅因嵌套而提前到外层 `immediatelyAfter` 之前。
 - 真实行动格主体以 `actionContext.sourceLocation` 标记行动格来源，卡牌提供的格也一样。静态展开和选择后返回的 flow 保留此商品来源；授予用格的卡仍以 `sourceCard` 单独归因。反应、onBuy 和替代奖励保留卡牌来源。明确重复原格选项时可保留原格来源。`resource.moved.from` 是取得商品的权威事实，共享格上下文和主体归属都不能证明商品来自行动格。
@@ -59,7 +60,7 @@ anytime                  注册额外的 anytime 行动
 
 1. `computeReplace` 最先执行，此前 `actionContext.targetSpaceId` 已解析出 `context.space`。只改 `actionId` 时，后续所有阶段沿用新 ID。
 2. 每个匹配的 `decline + alternativeFlow` 贡献一棵完整子树。`buildReplacementChoiceNode()` 在原行动的可选提示前插入普通 XOR，并设 `requiresExplicitChoice=true`，即使只有一个替换也等待玩家选择；原分支保留其可选性，提供菜单时任何分支的 `before` 都不执行。选中的分支重新进入本管线，跳过自身 producer 以及从外层替换继承的所有 producer 守卫；原分支携带 `checkedReplaceAction`，只有分发器解读它。`resolvedReplacement` 让决定跨恢复保持；放人或移动授予新机会时重置 producer 守卫。
-3. `before` listener 编译为原 leaf 之前的 `activate-card` leaf，按 owner 进入 trigger-select。使用前资格在实际使用行动格时收集一次（`collectBeforePlacementFlows`、`collectBeforeActionSpaceUseFlows`）；`requiresNewPlacement` 排除工人移动。
+3. `before` listener 编译为原 leaf 之前的 `activate-card` leaf，按 owner 进入 trigger-select。使用前资格在实际使用行动格时收集一次（`collectBeforeActionSpaceUseFlows`）；`requiresNewPlacement` 排除工人移动。
 4. Strict `isDoable` 读取真实 `before` 修改后的状态：基础 `canBeExecutedByPlayer`、费用预览、hook 与 listener 的 `isDoable`。失败时，只有已接受的必选续行可以通过 `isAlreadySatisfied` 按同一 transaction 中先前的事实结算，此时本体与尾随 listener 不执行。选项级 listener 同样过滤职业手牌选项，`reserveResources` 传入支付 leaf。
 5. `computeCosts` 填充 `executionContext.costs`、`costTrades`、`costBonuses`、`paymentResourceProviders` 与 `costAttribution`。
 6. 执行本体（`getBaseChoiceOptions` 或 `execute()`）；`resolveChoice` 继续前重新校验可执行性与费用。
@@ -101,7 +102,8 @@ anytime                  注册额外的 anytime 行动
 准备阶段: onBeforeStartOfTurn → 增轮 / action.revealed → onAfterRevealAction → onPreparation
   → 累积格补充 → onRoundStart（StartOfTurn）→ onEndPreparation → onBeforeWork → onWorkStart → work.started
 工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
-回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
+回家:    onBeforeReturnHome → work.ended → 归还临时人员 → onStartReturnHome
+  → onReturnHome → 归还普通人员
 回合结束: onRoundEnd → onAfterRoundEnd
 收获（第 4/7/9/11/13/14 轮）:
   onBeforeHarvest → harvestPrepWindow → onStartHarvest

@@ -466,13 +466,13 @@ export const executeCardListener = (
   return result ?? undefined
 }
 
-const collectBeforeSpaceFlows = (
+export const collectBeforeActionSpaceUseFlows = (
   actionHooks: ActionHookRegistry | undefined,
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
+  use: NonNullable<ActionExecutionContext['actionSpaceUse']>,
   actionContext: Record<string, unknown> | undefined,
-  newPlacement: boolean,
 ): ActionFlow[] => {
   const sources: Array<MatchedCardListener & Pick<ActivateCardActionParams, 'actionId' | 'actionSpaceUse'>> = []
   for (const target of ['space', 'placement'] as const) {
@@ -482,12 +482,12 @@ const collectBeforeSpaceFlows = (
       player,
       space,
       actionId: target === 'space' ? space.id : 'place-farmer',
-      ...(target === 'space' ? { actionSpaceUse: { newPlacement } } : {}),
+      ...(target === 'space' ? { actionSpaceUse: use } : {}),
       phase: 'before' as const,
       actionContext,
     }
     for (const entry of getMatchingListeners(context)) {
-      if (!newPlacement && entry.registration.requiresNewPlacement) continue
+      if (!use.newPlacement && entry.registration.requiresNewPlacement) continue
       sources.push({ ...entry, actionId: context.actionId, actionSpaceUse: context.actionSpaceUse })
     }
   }
@@ -507,22 +507,6 @@ const collectBeforeSpaceFlows = (
       : { type: 'parallel', mode: 'trigger-select', targetPlayerId: ownerPlayerId, children }
   })
 }
-
-export const collectBeforePlacementFlows = (
-  actionHooks: ActionHookRegistry | undefined,
-  state: GameState,
-  player: PlayerState,
-  space: ActionSpace,
-  actionContext?: Record<string, unknown>,
-): ActionFlow[] => collectBeforeSpaceFlows(actionHooks, state, player, space, actionContext, true)
-
-export const collectBeforeActionSpaceUseFlows = (
-  actionHooks: ActionHookRegistry | undefined,
-  state: GameState,
-  player: PlayerState,
-  space: ActionSpace,
-  actionContext?: Record<string, unknown>,
-): ActionFlow[] => collectBeforeSpaceFlows(actionHooks, state, player, space, actionContext, false)
 
 const retainedTimedListener = (cardId: string, phase: 'afterReceive' | 'afterCollect', rules: readonly import('../contract/rule-plans').TimedRule[]): CardListenerRegistration => snapshotCardListener({
   id: `activated-timed:${phase}:${cardId}`, cardIds: [cardId],

@@ -3,6 +3,7 @@ import type { GameState } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'
 import { GameSession, type SessionResponse } from '../server/game/authoritative-session'
+import { createPlayerActionSpaces } from '../shared/cards/player-action-space'
 import { BACKEND_URL } from './fixtures'
 
 const openScenario = async (page: Page, request: APIRequestContext, configure: (state: GameState) => void) => {
@@ -55,6 +56,34 @@ test('Wood Cutter before reward appears once in the played-card usage tooltip', 
   await expect(used.locator('.played-card-stats-value')).toHaveText('1')
   await expect(tooltip.locator('.played-card-stats-line [data-resource="wood"]')).toHaveAttribute('data-amount', '1')
   await page.screenshot({ path: 'output/playwright/card-play-before-usage.png' })
+})
+
+test('Studio Boat keeps its card-owner point before collection while its space preview shows collection', async ({ page, request }) => {
+  const cardId = 'C039_StudioBoat'
+  await openScenario(page, request, state => {
+    state.players[0]!.minorPlayed = [cardId]
+    state.players[0]!.resources.food = 0
+    state.actionSpaces.push(...createPlayerActionSpaces(state))
+    state.actionSpaces.find(space => space.id === cardId)!.resources.food = 2
+  })
+  const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  const preview = before.state.actionSpaces.find(space => space.id === cardId)?.baseDescriptionPreview
+  expect(JSON.stringify(preview)).toContain('collection')
+  expect(JSON.stringify(preview)).not.toContain('bonusVp')
+  const space = page.locator(`.player-action-cards-row [data-action-id="${cardId}"]`)
+  await expect(space).toBeVisible()
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/action') && response.request().method() === 'POST')
+  await space.locator('[data-card-anchor]').click()
+  const result: SessionResponse = await (await committed).json()
+  expect(result.ok, result.error).toBe(true)
+  expect(result.state.players[0]!.resources.food).toBe(2)
+  expect(result.state.players[0]!.cardStates[cardId]?.counters?.bonusVp).toBe(1)
+  const point = result.state.events.findIndex(event => event.type === 'card.stateChanged' && event.cardId === cardId && event.key === 'bonusVp')
+  const collect = result.state.events.findIndex(event => event.type === 'resource.moved' && event.reason === 'collect' && event.from.kind === 'actionSpace' && event.from.spaceId === cardId)
+  expect(point).toBeGreaterThanOrEqual(0)
+  expect(collect).toBeGreaterThan(point)
+  await expect(space.locator('.player-card')).toHaveClass(/taken/)
+  await page.screenshot({ path: 'output/playwright/studio-boat-before-collection.png' })
 })
 
 for (const card of [

@@ -59,3 +59,10 @@ shared/domain/
 
 测试：`shared/domain/__tests__/`、`shared/actions/__tests__/animals.test.ts`、`shared/actions/effects/__tests__/reorganize-engine.test.ts`。
 
+
+## 行动格使用事实
+
+`domain/action-space-use.ts` 在实际接受目标后、反应前记录 `actionSpace.useStarted`，冻结用格身份、累积属性、工作阶段资格和人员凭据。before 与完成上下文共用该身份。历史查询合并已提交与当前 transaction 的事实，按身份去重并停在触发条目，嵌套用格不会改变原用格序号。查询与只放人不执行目标的效果不登记；blocked 用格在撤销前仍是已接受事实。
+
+`work.ended` 在 `onBeforeReturnHome` 完成后、归家位置快照及临时人员归还前关闭工作阶段资格。工作末尾和回家前的用格仍符合资格，即使显示的 `roundPhase` 已是 `returning-home`；之后的归家用格不符合。该事实不改变阶段 hook 顺序。覆盖：`server/__tests__/action-space-use-history-session.test.ts`。
+

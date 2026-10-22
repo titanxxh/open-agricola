@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { recordRoundPlacement, resetRoundPlacements } from '../../shared/cards/helpers/round-placement'
-import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 const placeholderHands = (session: GameSession) => {
   const state = session.getState().state
@@ -95,60 +93,6 @@ describe('5+ occupied category listener cards', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(1)
-  })
-
-  it('D176 Woodshacker gives 2 clay on the second owner wood use and resets when workers return', () => {
-    const session = setupCardOwner('D176_Woodshacker')
-
-    let resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-
-    let state = resp.state
-    state.currentPlayerIndex = 0
-    session.loadState(state)
-    resp = session.takeAction(0, 'copse-56')
-
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.clay).toBe(3)
-
-    state = resp.state
-    state.currentPlayerIndex = 0
-    state.actionSpaces.forEach((space) => {
-      space.takenBy = []
-    })
-    resetRoundPlacements(state.players[0]!)
-    session.loadState(state)
-    resp = session.takeAction(0, 'grove-56')
-
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.clay).toBe(4)
-  })
-
-  it('D176 Woodshacker counts repeated wood uses on the same space', () => {
-    const session = setupCardOwner('D176_Woodshacker')
-
-    const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-
-    const state = resp.state
-    const owner = state.players[0]!
-    recordRoundPlacement(owner, 'forest', 'extra-forest-use')
-    const forest = state.actionSpaces.find((space) => space.id === 'forest')!
-    const listener = session.withCtx(() => getRegisteredCardListeners()).find((entry) => entry.id === 'D176-woodshacker-before-wood')!
-    const result = session.withCtx(() => executeCardListener(listener, {
-      state,
-      player: owner,
-      ownerPlayer: owner,
-      triggerPlayer: owner,
-      space: forest,
-      actionId: 'place-farmer',
-      phase: 'before',
-    } as unknown as CardListenerContext))
-
-    expect(result?.flow).toMatchObject({
-      actionId: 'gain',
-      params: { clay: 2 },
-    })
   })
 
   it('D176 Woodshacker ignores non-wood action spaces', () => {

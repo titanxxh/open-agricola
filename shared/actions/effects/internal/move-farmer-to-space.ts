@@ -1,6 +1,7 @@
 import type { ActionHookRegistry } from '../../hooks'
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { collectBeforeActionSpaceUseFlows } from '../../../cards/card-listeners'
+import { recordActionSpaceUse } from '../../../domain/action-space-use'
 import {
   addLinkedSpaceBlocks,
   addWorkerRef,
@@ -101,7 +102,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       promptKey: 'ui.interactionMoveFarmerToSpace',
     }
   },
-  resolveChoice: ({ actionHooks, state, player, space, params, sourceCard, actionContext, eventSink }, choice) => {
+  resolveChoice: ({ actionHooks, state, player, space, params, sourceCard, actionContext, eventSink, completedTransactionEvents }, choice) => {
     const targetSpace = findActionSpaceById(state, choice)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     const sourceSpaceId = readString(actionContext?.moveFarmerSourceSpaceId)
@@ -130,11 +131,12 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
 
     const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id, placedWorkerId: workerId }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
-    const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, targetActionContext)
+    const use = recordActionSpaceUse({ state, player, space: targetSpace, eventSink, sourceCard, completedTransactionEvents }, { newPlacement: false })
+    const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, use, targetActionContext)
     const targetFlow: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
-      spaceUse: { newPlacement: false },
+      spaceUse: use,
       expandFlow: true,
       sourceCard,
       actionContext: targetActionContext,
