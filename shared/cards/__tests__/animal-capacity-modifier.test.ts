@@ -52,11 +52,10 @@ describe('computeAnimalZones', () => {
       stableTiles: [{ row: 2, col: 2 }],
     })
     const zones = computeAnimalZones(player)
-    expect(zones.length).toBe(4)
+    expect(zones).toHaveLength(3)
     expect(zones[0]).toMatchObject({ id: 'p1', zoneType: 'pasture', capacity: 4 })
     expect(zones[1]).toMatchObject({ id: 'p2', zoneType: 'pasture', capacity: 4 })
-    expect(zones[2]).toMatchObject({ id: 'house:1-0', zoneType: 'house', capacity: 1, occupiedZoneLimit: 1 })
-    expect(zones[3]).toMatchObject({ id: 'house:2-0', zoneType: 'house', capacity: 1, occupiedZoneLimit: 1 })
+    expect(zones[2]).toMatchObject({ id: 'house:2-0', zoneType: 'house', capacity: 1, occupiedZoneLimit: 1 })
   })
 
   it('includes loose stables', () => {
@@ -64,8 +63,9 @@ describe('computeAnimalZones', () => {
       stableTiles: [{ row: 0, col: 0 }],
     })
     const zones = computeAnimalZones(player)
-    expect(zones.length).toBe(3)
-    expect(zones[2]).toMatchObject({ zoneType: 'stable', capacity: 1 })
+    expect(zones).toHaveLength(2)
+    expect(zones[0]).toMatchObject({ id: 'house:2-0', zoneType: 'house', capacity: 1 })
+    expect(zones[1]).toMatchObject({ id: 'stable:0-0', zoneType: 'stable', capacity: 1 })
   })
 
   it('keeps E033_BeaverColony stabled-pasture capacity', () => {
