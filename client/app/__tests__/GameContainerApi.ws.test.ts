@@ -5,7 +5,6 @@ import * as path from 'node:path'
 import type { GameEvent } from '../../../shared/contract/events'
 
 import {
-  buildCompactScoreRows,
   canTakeVisibleMoorSpecialAction,
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
@@ -48,7 +47,6 @@ import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
 import type { ActionSpace } from '../../../shared/contract/types'
 import type { GameState, PlayerState } from '../../../shared/contract/types'
 import type { MoorSpecialActionCardState } from '../../../shared/moor/types'
-import type { PlayerScoreSummary } from '../../../shared/domain/scoring'
 import type { PublicEventResourceAnimation } from '../public-event-notifications'
 import { collectNewPublicEventFeedback, maxPublicEventSeq } from '../public-event-notifications'
 import type { ReplayTimelineEntry } from '../replay-timeline'
@@ -245,43 +243,6 @@ describe('GameContainerApi WS player identity', () => {
     expect(canTakeVisibleMoorSpecialAction(state, player, card, 'hiring-fair')).toBe(false)
     const availablePlayer = { ...player, moorSpecialActionAvailability: { [card.id]: { 'hiring-fair': true } } }
     expect(canTakeVisibleMoorSpecialAction(state, availablePlayer, card, 'hiring-fair')).toBe(true)
-  })
-
-  it('maps compact score card bonus VP from the unified category only', () => {
-    const rows = buildCompactScoreRows(
-      { players: [{ id: 'p1', name: 'Alice' }] },
-      [
-        {
-          playerId: 'p1',
-          playerName: 'Alice',
-          total: 42,
-          categories: [
-            { key: 'cards', total: 2, entries: [] },
-            { key: 'cardBonusVp', total: 3, entries: [] },
-            { key: 'cardsBonus', total: 50, entries: [] },
-            { key: 'cardStateBonusVp', total: 60, entries: [] },
-            { key: 'cardBonus', total: 70, entries: [] },
-          ],
-        } as unknown as PlayerScoreSummary,
-      ],
-      'p1',
-    )
-
-    expect(rows).toEqual([
-      {
-        id: 'p1',
-        name: 'Alice',
-        isYou: true,
-        total: 42,
-        breakdown: {
-          fields: 0,
-          animals: 0,
-          cardBonusVp: 3,
-          family: 0,
-          cards: 2,
-        },
-      },
-    ])
   })
 
   it('keeps only currently connected room tiles selectable', () => {

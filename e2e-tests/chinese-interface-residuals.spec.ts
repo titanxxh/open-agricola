@@ -84,7 +84,7 @@ for (const displayName of ['录制玩家', 'PlayerF', 'Player 6']) {
     await expect(tabs.first()).toContainText(displayName)
     for (let index = 1; index < 6; index++) await expect(tabs.nth(index)).toContainText(`玩家 ${index + 1}`)
     if (displayName === '录制玩家') await expect(page.locator('.game-layout')).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
-    await page.getByRole('button', { name: '计分板', exact: true }).click()
+    await page.locator('.game-layout__right').getByRole('button', { name: '计分板', exact: true }).click()
     await expect(page.locator('.scoring-pad .scoring-player-name').last()).toHaveText('玩家 6')
     await page.locator('.scoring-pad').getByRole('button', { name: '关闭', exact: true }).click()
     await page.locator('.action-card-holder[data-action-id="forest"]').click()

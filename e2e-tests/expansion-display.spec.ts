@@ -33,7 +33,7 @@ test.describe('Expansion display', () => {
         await expect(tabs.nth(index)).toContainText(`${locale === 'zh' ? '玩家' : 'Player'} ${index + 1}`)
       }
       if (locale === 'zh') await expect(page.locator('.game-layout')).not.toContainText(/Player \d/)
-      await page.getByRole('button', { name: locale === 'zh' ? '计分板' : 'Scoring Pad', exact: true }).click()
+      await page.locator('.game-layout__right').getByRole('button', { name: locale === 'zh' ? '计分板' : 'Scoring Pad', exact: true }).click()
       await expect(page.locator('.scoring-pad .scoring-player-name').last())
         .toHaveText(`${locale === 'zh' ? '玩家' : 'Player'} 6`)
     })
@@ -100,7 +100,7 @@ test.describe('Expansion display', () => {
         ? '在第 7 回合格上放置 1 野猪'
         : 'Place 1 wild boar on round space 7')
 
-      await page.getByRole('button', { name: locale === 'zh' ? '计分板' : 'Scoring Pad', exact: true }).click()
+      await page.locator('.game-layout__right').getByRole('button', { name: locale === 'zh' ? '计分板' : 'Scoring Pad', exact: true }).click()
       const pad = page.locator('.scoring-pad')
       await expect(pad).toBeVisible()
       await expect(pad.getByText('-15.9', { exact: true })).toBeVisible()

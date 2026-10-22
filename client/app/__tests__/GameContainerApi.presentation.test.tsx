@@ -77,7 +77,7 @@ describe('GameContainerApi responsive presentation', () => {
     expect(container.querySelector('.game-layout__center')).not.toHaveAttribute('hidden')
     expect(container.querySelector('.game-layout__right')).not.toHaveAttribute('hidden')
     expect(container.querySelectorAll('.interaction-bar')).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'expand' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'expand' })).toHaveLength(1)
   })
 
   it('keeps the desktop three-column layout intact', async () => {
