@@ -1904,8 +1904,8 @@ export const GameContainerApi = () => {
             confirmHarvestFeed,
           }}
         />
-        {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
       </div>
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
       {shouldShowDevPanel({ devMode: devMode && !isPublicFarmView, hasGameView }) ? (
         <DevPanel
           locale={locale} players={state.players}
