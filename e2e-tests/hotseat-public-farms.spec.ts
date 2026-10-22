@@ -57,6 +57,18 @@ const browse = async (page: Page, name: string, mobile: boolean) => {
   }
 }
 
+const inspectPublicScoring = async (page: Page, names: string[]) => {
+  await page.locator('.game-layout__right').getByRole('button', { name: 'Scoring Pad', exact: true }).click()
+  const board = page.locator('.scoring-pad')
+  await expect(board).toBeVisible()
+  await expect(board.locator('.scoring-header-row .scoring-player-name')).toHaveText(names)
+  await expect(board.getByText('Total', { exact: true })).toBeVisible()
+  await expect(board.getByText('Pastures', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-hand-anchor]')).toHaveCount(0)
+  await board.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(board).toHaveCount(0)
+}
+
 // Reach harvesting by legal public resource actions, avoiding random hand effects.
 const reachCrossPlayerFeed = async (page: Page, names: string[]) => {
   let confirmedPlayerIndex = 0
@@ -183,9 +195,12 @@ test('real hotseat public farms stay read-only on desktop/mobile, across reconne
     await page.locator('[data-farm-tile-player="p2"][data-farm-tile-key="0-2"]').click()
     expect(await ruleCommands(page)).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+    await inspectPublicScoring(page, names)
+    expect(await ruleCommands(page)).toEqual([])
     await page.screenshot({ path: testInfo.outputPath(mobile ? 'public-farm-mobile.png' : 'public-farm-desktop.png') })
     await page.getByRole('button', { name: `Return to ${names[0]} to continue` }).click()
     await expect(page.locator('[data-hand-anchor="p1"]')).toBeVisible()
+    await expect(page.locator('.scoring-pad')).toHaveCount(0)
   }
 
   await page.setViewportSize({ width: 1440, height: 1000 })
@@ -232,6 +247,8 @@ test('real hotseat public farms stay read-only on desktop/mobile, across reconne
   await expect(page.locator('[data-hand-anchor]')).toHaveCount(0)
   await expect(page.locator('.exchange-overlay')).toBeHidden()
   await expect(page.locator('.interaction-bar')).toBeHidden()
+  await inspectPublicScoring(page, names)
+  await expect(page.locator('.exchange-overlay')).toBeHidden()
   expect(await ruleCommands(page)).toEqual([])
   await page.getByRole('button', { name: `Return to ${names[responder]} to continue` }).click()
   await expect(page.locator('.exchange-overlay')).toBeVisible()
