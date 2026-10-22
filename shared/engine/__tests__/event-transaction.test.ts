@@ -255,6 +255,45 @@ describe('engine event transactions', () => {
     expect(state.nextEventSeq).toBe(4)
   })
 
+  it.each([false, true])('keeps two selected space uses distinct before their transaction is flushed, automatic=%s', automatic => {
+    const first = action('first-space', context => { emitWoodGain(context); return { type: 'ok' } })
+    const second = action('second-space', context => { emitWoodGain(context); return { type: 'ok' } })
+    const repeatedPlacement = action('two-placements', () => ({ type: 'flow', flow: { type: 'seq', children: [
+      { type: 'leaf', actionId: 'place-farmer' },
+      { type: 'leaf', actionId: 'place-farmer' },
+    ] } }))
+    const state = makeEventTestState()
+    const player = state.players[0]!
+    player.workers.push({ id: 'w2', isActive: true, isNewborn: false })
+    state.actionSpaces = [asActionSpace(first), asActionSpace(second)]
+    const placement: ActionDefinition = automatic ? {
+      ...placeFarmerAction,
+      getBaseChoiceOptions: ({ state }) => state.actionSpaces.filter(space => space.takenBy.length === 0).slice(0, 1)
+        .map(space => ({ value: space.id, labelKey: space.nameKey })),
+    } : placeFarmerAction
+    const { engine } = makeEventTestEngine([repeatedPlacement, placement, first, second])
+    const context = { state, player, space: asActionSpace(repeatedPlacement) }
+    const proceedToChoiceOrDone = () => {
+      for (let step = 0; step < 30; step++) {
+        const result = engine.proceed(context)
+        if (result.type === 'choice' || result.type === 'done') return result.type
+        expect(['ok', 'flow']).toContain(result.type)
+      }
+      throw new Error('Engine did not reach its next choice or completion')
+    }
+    if (!automatic) {
+      expect(proceedToChoiceOrDone()).toBe('choice')
+      expect(engine.resolveChoice(first.id, context).type).toBe('flow')
+      expect(proceedToChoiceOrDone()).toBe('choice')
+      expect(state.events).toEqual([])
+      expect(engine.resolveChoice(second.id, context).type).toBe('flow')
+    }
+    expect(proceedToChoiceOrDone()).toBe('done')
+    const uses = state.events.filter(event => event.type === 'actionSpace.useStarted')
+    expect(uses.map(event => event.spaceId)).toEqual(['first-space', 'second-space'])
+    expect(new Set(uses.map(event => event.useId)).size).toBe(2)
+  })
+
   it('restores pending event transaction and derived log state across snapshot roundtrip', () => {
     const first = action('snapshot-first-event', (context) => {
       emitWoodGain(context)

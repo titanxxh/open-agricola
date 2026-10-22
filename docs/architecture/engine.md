@@ -53,6 +53,8 @@ shared/engine/
 
 `GameCore.engineDeps()` and every engine `proceed` share `syncDynamicActionSpaces()`, which registers board spaces whose definitions are missing from the execution directory; cards create spaces through public mechanisms and never touch the Session registry. A missing definition is an internal invariant error that rolls back the authoritative command.
 
+Mutation callbacks receive `completedTransactionEvents` in `execute`, explicit `resolveChoice` and single-option resolution, including facts not yet flushed by Session. This shared read context does not replace the current host's own receipt. Regression: `shared/engine/__tests__/event-transaction.test.ts`.
+
 Tests: `shared/engine/__tests__/{engine,engine-flow,tree-selected-branch,restore-regressions,optional-node-context,resolve-choice-continuations,space-use-clone,moor-completion-clone}.test.ts`.
 
 ## EngineStack

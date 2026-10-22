@@ -73,6 +73,25 @@ const uses = (response: SessionResponse, playerIndex = 0) => response.state.even
   event.type === 'actionSpace.useStarted' && event.actorPlayerId === response.state.players[playerIndex]!.id && event.round === response.state.round)
 
 describe('accepted action-space use facts', () => {
+  it('counts two automatically selected extra placements within one command separately', () => {
+    const session = opening(state => {
+      state.players[0]!.occupationPlayed = [WOOD]
+      state.players[0]!.minorPlayed = [PROBE]
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
+      state.actionSpaces.find(space => space.id === 'copse-56')!.resources.wood = 2
+    })
+    installAnytime(session, { type: 'seq', children: ['forest', 'copse-56'].map(target => ({
+      type: 'leaf', actionId: 'place-farmer', sourceCard: PROBE, actionContext: { constraints: [target] },
+    })) })
+    const response = ok(session.takeAnytimeAction(0, 'test-use-history'))
+    assert.equal(response.state.players[0]!.resources.wood, 5)
+    assert.equal(response.state.players[0]!.resources.clay, 3)
+    assert.deepEqual(getRoundPersonPlacementOrder(response.state.players[0]!), ['forest', 'copse-56'])
+    const entries = uses(response)
+    assert.equal(entries.length, 2)
+    assert.equal(new Set(entries.map(event => event.type === 'actionSpace.useStarted' ? event.useId : undefined)).size, 2)
+  })
+
   it.each([
     { card: 'D116_TreeInspector', firstWood: 2, firstClay: 1, totalClay: 3 },
     { card: 'C162_ForestOwner', firstWood: 4, firstClay: 0, totalClay: 1 },
@@ -178,6 +197,27 @@ describe('accepted action-space use facts', () => {
 })
 
 describe('before reactions retain the triggering use identity', () => {
+  it.each([1, 2, 3])('Catcher rewards person %s for exactly 5/4/3 building resources', ordinal => {
+    const session = opening(state => {
+      state.players[0]!.occupationPlayed = [CATCH]
+      for (const player of state.players) {
+        player.workers.push({ id: '3', isActive: true, isNewborn: false })
+        player.rooms = 3
+        player.roomTiles.push({ row: 0, col: 0 })
+      }
+      state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 6 - ordinal
+    }, 2)
+    for (let previous = 0; previous < ordinal - 1; previous++) {
+      ok(session.takeAction(0, previous === 0 ? 'grain-seeds' : 'reed-bank'))
+      advanceToOwner(session)
+    }
+    const food = session.state.players[0]!.resources.food
+    const response = ok(session.takeAction(0, 'forest'))
+    assert.equal(response.state.players[0]!.resources.food - food, 1)
+    assert.equal(response.state.players[0]!.resources.wood, 6 - ordinal)
+    assert.equal(getRoundPersonPlacementOrder(response.state.players[0]!).length, ordinal)
+  })
+
   function installNested(session: GameSession, actionId: string, target: string) {
     session.withCtx(() => requireActiveCardRegistry('nested-use-test').registerListener({
       id: 'test-nested-before', cardIds: [PROBE], actionSpaces: [actionId], phases: ['before'],
@@ -211,7 +251,7 @@ describe('before reactions retain the triggering use identity', () => {
   })
 
   it('freezes Woodshacker use order across a nested second wood use', () => {
-    const session = opening(state => {
+    let session = opening(state => {
       state.players[0]!.occupationPlayed = [WOOD]
       state.players[0]!.minorPlayed = [PROBE]
       state.actionSpaces.find(space => space.id === 'forest')!.resources.wood = 3
@@ -219,6 +259,9 @@ describe('before reactions retain the triggering use identity', () => {
     })
     installNested(session, 'forest', 'copse-56')
     let response = ok(session.takeAction(0, 'forest'))
+    session = restore(session)
+    installNested(session, 'forest', 'copse-56')
+    response = session.getState()
     response = choose(session, response, option => option.sourceCard === PROBE)
     if (options(response).some(option => option.sourceCard === WOOD)) response = choose(session, response, option => option.sourceCard === WOOD)
     assert.equal(response.state.players[0]!.resources.clay, 3)
