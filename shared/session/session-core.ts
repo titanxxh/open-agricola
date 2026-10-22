@@ -1037,6 +1037,7 @@ export class GameCore {
           space.resolveChoice ??= definition.resolveChoice
           space.flow ??= definition.flow
         }
+        this.reconcileRoomAnimals()
         this.syncDynamicActionSpaces()
       }
       this.engineStack.clear()

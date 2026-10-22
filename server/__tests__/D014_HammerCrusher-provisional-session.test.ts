@@ -234,6 +234,48 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     expect(retry.interaction.stateId).toBe('wait')
   })
 
+  it('keeps a recovered ordinary pet in its legal room after a provisional continuation rolls back', () => {
+    const original = setup()
+    original.state.players[0]!.resources.sheep = 1
+    original.state.players[0]!.houseAnimals = { '2-0': 'sheep' }
+    original.loadState(original.state)
+    let restored: GameSession | undefined
+    try {
+      let response = advanceSwitches(original, original.takeAction(0, 'house-redevelopment'))
+      if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected Construct choice')
+      const construct = response.interaction.request.options.find(option => option.value !== '__skip__')
+      if (!construct) throw new Error('expected Construct option')
+      response = original.resolveChoice(0, construct.value)
+      if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') throw new Error('expected room selection')
+      const room = response.interaction.request.farm.selectableTiles[0]!
+      response = advanceSwitches(original, original.commitSelectionChoice(0, { rooms: [room] }))
+      expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).toBe('D128_BuildingTycoon')
+
+      const input = rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original))))
+      // The saved game and its genuine continuation checkpoints contain the reported upper-room pet.
+      input.state.players[0]!.houseAnimals = { '1-0': 'sheep' }
+      const scopes = input.sessionCursor?.provisionalContinuationScopes
+      expect(scopes?.length).toBeGreaterThan(0)
+      for (const scope of scopes ?? []) {
+        expect(scope.checkpoint.state.players[0]!.resources.sheep).toBe(1)
+        scope.checkpoint.state.players[0]!.houseAnimals = { '1-0': 'sheep' }
+      }
+      restored = new GameSession(input)
+      expect(restored.getState().state.players[0]!.houseAnimals).toEqual({ '2-0': 'sheep' })
+      response = advanceSwitches(restored, restored.resolveChoice(1, '__skip__'))
+      expect(response.ok).toBe(true)
+      expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+      expect(response.state.players[0]!.houseAnimals).toEqual({ '2-0': 'sheep' })
+      expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, clay: 5, reed: 2, stone: 2 })
+      expect(response.state.events.filter(event => event.type === 'farm.animalMoved')).toEqual([])
+      expect(response.state.log.filter(entry => entry.key === 'log.provisionalContinuationRollback')).toHaveLength(1)
+      expect(response.scores).toHaveLength(3)
+    } finally {
+      original.dispose()
+      restored?.dispose()
+    }
+  })
+
   it('opens a scope before a direct cross-player animal reorganization', () => {
     const session = setup({ buildingTycoon: false })
     const helperPlayerIndex = registerDirectReorgHelper(session)

@@ -117,7 +117,7 @@ type SessionResponse = {
 
 见 [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md)。新局创建负责初始发牌。加载或恢复 Session 时保留现有的空手牌、已存的卡牌身份、缺失的可选规则字段、动物安置与历史；从不重新发牌，非法的必需输入会被拒绝，而不是转成新局。`rehydrateState()` 只解码数据；所属 Core 随后重建已知的可执行定义与引擎游标，不替换捕获的数据。撤销、命令检查点、暂定检查点与进程恢复共用这一契约。
 
-ADR 0026 明确规定的普通宠物位置是安置数据的例外。Core 恢复规则后，把已有普通宠物移到合法房间，不改变动物总量，也不发出新安置事件。未完成的动物重整区域根据恢复后的状态重新投影。
+ADR 0026 明确规定的普通宠物位置是安置数据的例外。Core 恢复规则或命令检查点后，把已有普通宠物移到合法房间，不改变动物总量，也不发出新安置事件。未完成的动物重整区域根据恢复后的状态重新投影。
 
 测试：`server/__tests__/session-recovery-data.test.ts`、`server/__tests__/room-animal-holders-session.test.ts`。
 
