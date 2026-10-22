@@ -4,7 +4,7 @@ import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { addResourcesFromCards } from '../../session/stats'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { extendedResourceKeyList } from '../../contract/state-constants'
-import { commitFirstAvailableRoom } from '../../domain/farm-operations'
+import { commitFirstAvailableRoomConstruction } from '../../domain/room-construction'
 
 type FutureReceiveEntry = {
   cardId: string
@@ -122,7 +122,7 @@ export const receiveAction: ActionDefinition = {
       const resources = conditionMet ? positiveResources(entry.resources) : {}
       if (entry.roomType && player.houseType === entry.roomType) {
         const roomType = entry.roomType
-        const farmOperation = commitFirstAvailableRoom(player, entry.cardId, eventSink)
+        const farmOperation = commitFirstAvailableRoomConstruction(state, player, entry.cardId, eventSink)
         if (farmOperation) {
           farmOperations.push(farmOperation)
           eventSink?.emit<'farm.roomBuilt'>({

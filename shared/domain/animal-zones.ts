@@ -551,8 +551,33 @@ export const computeAnimalZones = (
       zone.capacity = 0
     }
   })
+  const roomZones = zones.filter(zone => zone.zoneType === 'house')
+  const roomLimit = Math.min(...roomZones.map(zone => zone.occupiedZoneLimit ?? Infinity))
+  if (roomLimit === 1) {
+    const anchor = player.roomTiles.reduce<typeof player.roomTiles[number] | undefined>((bottomLeft, tile) =>
+      !bottomLeft || tile.col < bottomLeft.col || (tile.col === bottomLeft.col && tile.row > bottomLeft.row)
+        ? tile : bottomLeft, undefined)
+    for (let i = zones.length - 1; i >= 0; i -= 1) {
+      const zone = zones[i]!
+      if (zone.zoneType === 'house' && (!anchor || zone.id !== `house:${positionKey(anchor)}`)) zones.splice(i, 1)
+    }
+  }
   rehydrateAnimalHolderZones(state, player, zones)
   return zones
+}
+
+/** Canonicalize an existing ordinary pet at an authoritative write boundary.
+ * This is a move of its room identity, not a new animal placement.
+ */
+export const reconcileOrdinaryHousePet = (player: PlayerState, state: GameState): void => {
+  const animals = Object.values(player.houseAnimals ?? {})
+  const animal = animals[0]
+  if (animals.length !== 1 || !animal) return
+  const rooms = computeAnimalZones(player, state).filter(zone => zone.zoneType === 'house')
+  const room = rooms[0]
+  if (rooms.length !== 1 || !room || room.occupiedZoneLimit !== 1 || room.capacity < 1 || room.blocked || !room.farmPosition) return
+  const key = positionKey(room.farmPosition)
+  if (player.houseAnimals?.[key] !== animal) player.houseAnimals = { [key]: animal }
 }
 
 /** Total assigned animal count across pastures + house + loose stables. */

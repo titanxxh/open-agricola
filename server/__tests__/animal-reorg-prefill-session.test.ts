@@ -29,7 +29,7 @@ const setup = () => {
   }
   const player = state.players[0]!
   Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 1 })
-  player.houseAnimals = { '1-0': 'cattle' }
+  player.houseAnimals = { '2-0': 'cattle' }
   player.pastures = [{ id: 'p', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: null, animalCount: 0 }]
   session.loadState(state)
   return session
@@ -106,7 +106,7 @@ describe('Animal Reorg Prefill', () => {
     const confirmed = session.resolveChoice(0, 'confirm', draft)
     expect(confirmed.ok, confirmed.error).toBe(true)
     expect(confirmed.state.players[0]!.pastures[0]!).toMatchObject({ animalType: 'sheep', animalCount: 4 })
-    expect(confirmed.state.players[0]!).toMatchObject({ houseAnimals: { '1-0': 'cattle' }, })
+    expect(confirmed.state.players[0]!).toMatchObject({ houseAnimals: { '2-0': 'cattle' }, })
     expect(confirmed.state.log.some((entry) => entry.key === 'log.reorganizeDiscard')).toBe(false)
     expect(confirmed.interaction.stateId === 'wait' && confirmed.interaction.request.kind).toBe('confirm-next-player')
   })
@@ -143,7 +143,7 @@ describe('Animal Reorg Prefill', () => {
     // The player can still explicitly replace the proposed layout.
     const confirmed = session.resolveChoice(0, 'confirm', [
       { id: 'p', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(confirmed.ok, confirmed.error).toBe(true)
     expect(confirmed.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 2 })

@@ -115,5 +115,7 @@ Tests: `server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-co
 
 See [ADR 0028](../adr/0028-session-recovery-preserves-authoritative-snapshot-data.md). New-game creation owns initial dealing. Loading or restoring a Session preserves present empty hands, stored card identities, missing optional rule fields, animal assignments and history; it never re-deals, and it rejects invalid required input instead of converting it into a new game. `rehydrateState()` only decodes data; the owning Core then rebuilds known executable definitions and engine cursors without replacing the captured data. Undo, command checkpoints, provisional checkpoints and process recovery share this contract.
 
-Tests: `server/__tests__/session-recovery-data.test.ts`.
+The explicit ordinary-pet rule in ADR 0026 is the assignment exception. After restoring its rules, the Core reconciles an existing ordinary pet to the legal room without changing animal totals or emitting placement events. Pending animal-reorganization zones are projected again from the restored state.
+
+Tests: `server/__tests__/session-recovery-data.test.ts`, `server/__tests__/room-animal-holders-session.test.ts`.
 

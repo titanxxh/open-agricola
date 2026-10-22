@@ -1,4 +1,4 @@
-import { commitFarmOperation } from '../../domain/farm-operations'
+import { commitRoomConstruction } from '../../domain/room-construction'
 import type {
   ActionAvailabilityContext,
   ActionCostPreview,
@@ -205,7 +205,7 @@ const finalizeRoom = (
   )
   if (!baseCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
-  const farmOperation = commitFarmOperation(ctx.player, { kind: 'rooms', positions: rooms, sourceCardId: ctx.sourceCard }, ctx.eventSink)
+  const farmOperation = commitRoomConstruction(ctx.state, ctx.player, rooms, ctx.sourceCard, ctx.eventSink)
 
   if (ctx.sourceCard && rooms.length > 0) {
     const houseType = ctx.player.houseType

@@ -13,6 +13,7 @@ Issues #1258 and #1270. Ordinary undo restored a captured state through the norm
 - Required invalid input is rejected at its input boundary instead of being repaired by a new deal.
 - Pure data capture is separate from Session-owned rule-definition rehydration. The Session rebuilds executable definitions and engine cursors from its own registry, including known dynamic spaces and card-held worker locations, and never replaces captured resources, hands, assignments, occupancy, pending data or history.
 - Ordinary undo, command checkpoints, provisional checkpoints and process recovery share this preservation contract without bootstrap side effects.
+- The explicit ordinary-pet rule in [ADR 0026](0026-each-room-is-an-animal-holder.md) is the assignment exception. The owning Session moves a single existing ordinary pet to the bottom room of the leftmost room column after restoring rules. It preserves the animal's type and total, resources, scores, logs and events; it does not record a new placement.
 - Public-event cancellation and archive behavior, display-name projection, Protected Observation boundaries and durable failure memory keep their own contracts. Exact preservation covers the authoritative data of that recovery point; undo does not erase its cancellation archive or a player's later display name.
 
 ## Consequences
