@@ -1060,7 +1060,7 @@ describe('Cross expansions batch 4 triple-expansion restoration audit', () => {
     const before = auditClone(session.state)
     const zones = [
       { id: 'pen-0', zoneType: 'pasture', animalType: 'horse', animalCount: 1 },
-      { id: 'house:1-0', zoneType: 'house', animalType: mode === 'house' ? 'boar' : 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: mode === 'house' ? 'boar' : 'sheep', animalCount: 1 },
     ]
     expect(session.resolveChoice(1, 'confirm', { zones }).ok).toBe(false)
     expect(auditClone(session.state)).toEqual(before)

@@ -61,12 +61,12 @@ describe('Moor exchange printed-rule native audit', () => {
         expect(response.state.players[1]!.minorHand).toContain('M030_FarmAnimalMarket')
         const before = structuredClone(response.state.players[0])
         const rejected = session.resolveChoice(0, 'confirm', { zones: [
-          { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
+          { id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
         ] })
         expect(rejected.ok).toBe(false)
         expect(rejected.state.players[0]).toEqual(before)
         response = session.resolveChoice(0, 'confirm', { zones: [
-          { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+          { id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
           { id: 'sheep', zoneType: 'pasture', animalType: sheep === 2 ? null : 'sheep', animalCount: sheep - 2 },
           { id: 'horse', zoneType: 'pasture', animalType: 'horse', animalCount: 1 },
         ] })
@@ -256,7 +256,7 @@ describe('Moor exchange printed-rule native audit', () => {
       if (to === 'sheep') {
         expect(traded.interaction.request.kind).toBe('animal-reorg')
         traded = session.resolveChoice(0, 'confirm', { zones: [
-          { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+          { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
         ] })
         expect(traded.ok, traded.error).toBe(true)
       }

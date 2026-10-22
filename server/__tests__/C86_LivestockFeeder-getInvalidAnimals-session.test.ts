@@ -152,7 +152,7 @@ describe('C086 Livestock Feeder parity', () => {
     expect(rejected.interaction).toEqual(pending.interaction)
     const response = session.resolveChoice(0, 'confirm', [
       assignToCard(pending, { sheep: 1 }),
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(2)
@@ -174,7 +174,7 @@ describe('C086 Livestock Feeder parity', () => {
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     expect(cardZone(response)).toBeUndefined()
     const result = session.resolveChoice(0, 'confirm', { zones: keep
-      ? [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
+      ? [{ id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
       : [] })
     expect(result.ok, result.error).toBe(true)
     expect(result.state.players[0]!.resources.sheep).toBe(keep ? 1 : 0)

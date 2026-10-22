@@ -181,11 +181,11 @@ describe('D164 Pet Grower parity', () => {
     const response = takeMarket(
       setup(),
       'sheep',
-      [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }],
+      [{ id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }],
     )
 
     expect(response.state.players[0]!).toMatchObject({
-      resources: { sheep: 1 }, houseAnimals: { '1-0': 'sheep' },
+      resources: { sheep: 1 }, houseAnimals: { '2-0': 'sheep' },
     })
   })
 
@@ -194,7 +194,7 @@ describe('D164 Pet Grower parity', () => {
       setup({ houseAnimal: 'sheep', marketAnimal: 'boar' }),
       'boar',
       [
-        { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
         { id: 'pasture-0-a', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
       ],
     )

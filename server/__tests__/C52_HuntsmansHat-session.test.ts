@@ -59,7 +59,7 @@ describe('C052_HuntsmansHat server session', () => {
 
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
-        { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+        { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ] as unknown as Record<string, unknown>)
     }
 
@@ -97,7 +97,7 @@ describe('C052_HuntsmansHat server session', () => {
       expect(resp.ok).toBe(true)
       if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(0, 'confirm', [
-          { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+          { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
         ] as unknown as Record<string, unknown>)
       }
       expect(resp.state.players[0]!.resources.food).toBe(2)

@@ -366,7 +366,7 @@ describe('pending choice types + undo regression', () => {
       const takeResp = session.takeAction(0, 'sheep-market')
       if (!takeResp.ok || takeResp.interaction.stateId !== 'wait' || takeResp.interaction.promptKey !== 'ui.interactionAnimalReorg') return
 
-      const zones = [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
+      const zones = [{ id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
       const resp = session.resolveChoice(0, 'confirm', zones as unknown as Record<string, unknown>)
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')

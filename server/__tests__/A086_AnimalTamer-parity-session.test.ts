@@ -102,7 +102,7 @@ describe('A086 Animal Tamer parity', () => {
     const pending = animalReorg(session.takeAction(0, 'sheep-market'))
 
     const response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)

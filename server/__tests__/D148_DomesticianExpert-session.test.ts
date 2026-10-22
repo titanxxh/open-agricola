@@ -246,7 +246,7 @@ describe('D148 Domestician Expert parity', () => {
     expect(rejected.state).toEqual(pending.state)
 
     const response = session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
+      zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
     })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(1)
@@ -282,7 +282,7 @@ describe('ae-negative-54-resources', () => {
       assert.ok(z)
       assert.equal(z.capacity, cap)
       assertRejectedUnchanged(s, () => s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap + 1, animalCounts: { sheep: cap + 1 } }] }))
-      r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap, animalCounts: { sheep: cap } }, { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] }))
+      r = ok(s.resolveChoice(0, 'confirm', { zones: [{ ...z, animalType: 'sheep', animalCount: cap, animalCounts: { sheep: cap } }, { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }] }))
       assert.equal(r.state.players[0]!.resources.sheep, cap + 1)
       assert.equal(r.state.players[0]!.cardStates['D148_DomesticianExpert']?.extraData?.held, cap)
       save(`D148-N1-${rooms}`, r)

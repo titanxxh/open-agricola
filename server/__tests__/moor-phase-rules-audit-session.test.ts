@@ -342,7 +342,7 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     expect(response.state.players[0]!.resources.horse).toBe(1)
     expect(response.interaction.request.kind).toBe('animal-reorg')
     const placed = session.resolveChoice(0, 'confirm', { zones: [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 },
     ] })
     expect(placed.ok, placed.error).toBe(true)
     expect((Object.values(placed.state.players[0]!.houseAnimals)[0] ?? null)).toBe('horse')

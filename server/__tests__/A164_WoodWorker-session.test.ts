@@ -79,7 +79,7 @@ const keepSheepInHouse = (session: GameSession, response: SessionResponse) => {
   const house = response.interaction.request.zones.find((zone) => zone.zoneType === 'house')
   expect(house?.capacity).toBeGreaterThanOrEqual(1)
   return session.resolveChoice(0, 'confirm', [{
-    id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
+    id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
   }] as unknown as Record<string, unknown>)
 }
 

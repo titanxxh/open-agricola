@@ -113,10 +113,10 @@ const restore = (session: GameSession) => {
 const house = (session: GameSession, animal: 'sheep' | 'boar' | 'cattle') => {
   expect(session.getState().interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'animal-reorg' } })
   const response = session.resolveChoice(0, 'confirm', { zones: [
-    { id: 'house:1-0', zoneType: 'house', animalType: animal, animalCount: 1 },
+    { id: 'house:2-0', zoneType: 'house', animalType: animal, animalCount: 1 },
   ] })
   expect(response.ok, response.error).toBe(true)
-  expect(response.state.players[0]).toMatchObject({ houseAnimals: { '1-0': animal }, })
+  expect(response.state.players[0]).toMatchObject({ houseAnimals: { '2-0': animal }, })
   return response
 }
 
@@ -364,7 +364,7 @@ describe('Parents batch 1 mother printed-rule audit', () => {
       const prompt = enterRound(session, round)
       expect(prompt.interaction).toMatchObject({ playerIndex: 0, request: { kind: 'animal-reorg' } })
       const before = snapshot(prompt.state)
-      const zones = [{ id: 'house:1-0', zoneType: 'house', animalType: resident, animalCount: 1 }]
+      const zones = [{ id: 'house:2-0', zoneType: 'house', animalType: resident, animalCount: 1 }]
       expect(session.resolveChoice(1, 'confirm', { zones }).ok).toBe(false)
       expect(snapshot(session.state)).toEqual(before)
       const response = session.resolveChoice(0, 'confirm', { zones })

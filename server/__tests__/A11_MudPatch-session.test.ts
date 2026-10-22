@@ -125,7 +125,7 @@ describe('A011 Mud Patch parity', () => {
     expect(mudPatchZone(response)).toMatchObject({ capacity: 1, allowedAnimalType: 'boar' })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
@@ -139,7 +139,7 @@ describe('A011 Mud Patch parity', () => {
     expect(mudPatchZone(response)).toMatchObject({ capacity: 1, allowedAnimalType: 'boar' })
 
     response = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)

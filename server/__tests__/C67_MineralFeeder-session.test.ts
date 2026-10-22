@@ -146,7 +146,7 @@ describe('C067_MineralFeeder session', () => {
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-      { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0 },
+      { id: 'house:2-0', zoneType: 'house', animalType: null, animalCount: 0 },
     ])
     expect(resp.state.players[0]!.resources.grain).toBe(1)
     expect(resp.state.players[0]!.pastures[0]!.animalType).toBe('sheep')

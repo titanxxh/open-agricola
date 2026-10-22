@@ -148,7 +148,7 @@ describe('E036_HerbalGarden session', () => {
     const pasture = zones.find((zone) => zone.id === 'pasture-1')!
     pasture.animalType = null
     pasture.animalCount = 0
-    const house = zones.find((zone) => zone.id === 'house:1-0')!
+    const house = zones.find((zone) => zone.id === 'house:2-0')!
     house.animalType = 'sheep'
     house.animalCount = 1
 
@@ -157,7 +157,7 @@ describe('E036_HerbalGarden session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!).toMatchObject({
       resources: { sheep: 1 },
-      houseAnimals: { '1-0': 'sheep' },
+      houseAnimals: { '2-0': 'sheep' },
       pastures: [expect.objectContaining({ animalType: null, animalCount: 0 })],
     })
   })

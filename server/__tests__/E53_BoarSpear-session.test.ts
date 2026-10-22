@@ -94,7 +94,7 @@ const driveToCompletion = (
   if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
     const p = resp.state.players[0]!
     const zones: AnimalZone[] = [
-      { id: 'house:1-0', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
       ...p.pastures.map((pasture) => ({
         id: pasture.id,
         zoneType: 'pasture' as const,
@@ -223,7 +223,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
       .toBe('ui.interactionAnimalReorg')
 
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${C148_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
@@ -281,7 +281,7 @@ describe('E053_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       c148BoarZone(1),
     ] as unknown as Record<string, unknown>)
 

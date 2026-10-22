@@ -168,7 +168,7 @@ describe('Stage animal gains settle before continuation', () => {
     const session = setup(PROVIDER, 4, state => {
       const owner = state.players[0]!
       owner.resources.sheep = 1
-      owner.houseAnimals = { '1-0': 'sheep' }
+      owner.houseAnimals = { '2-0': 'sheep' }
       owner.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] }]
     })
     drive(session, 'selection', 5)
@@ -176,7 +176,7 @@ describe('Stage animal gains settle before continuation', () => {
     const interaction = acquired.interaction
     if (interaction.stateId !== 'wait' || interaction.request.kind !== 'animal-reorg') throw new Error('Expected animal disposal')
     ok(session.resolveChoice(0, 'confirm', { zones: interaction.request.zones.map(zone => ({ ...zone,
-      animalType: zone.id === 'house:1-0' ? 'sheep' : null, animalCount: zone.id === 'house:1-0' ? 1 : 0,
+      animalType: zone.id === 'house:2-0' ? 'sheep' : null, animalCount: zone.id === 'house:2-0' ? 1 : 0,
     })) }))
     const completed = drive(session, 'round', 5)
     expect(completed.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0 })

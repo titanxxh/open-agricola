@@ -50,7 +50,7 @@ function rewardTests(card: string, space: string, expected: Partial<Resource>, c
       let response = session.takeAction(0, space)
       expect(response.ok, response.error).toBe(true)
       if (horse && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
-        response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+        response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
         expect(response.ok, response.error).toBe(true)
       }
       expect(response.state.players[0]!.resources).toMatchObject(expected)
@@ -169,7 +169,7 @@ describe('M129_PlowhorseMarket before Farmland', () => {
     if (accept) {
       expect(response.state.players[0]!.resources).toMatchObject({ food: 0, horse: 1 })
       expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
-      response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
+      response = session.resolveChoice(0, 'confirm', { zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'horse', animalCount: 1 }] })
       expect(response.ok, response.error).toBe(true)
     }
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'plow' } } })

@@ -74,7 +74,6 @@ describe('shared/session/serialization', () => {
         expect(specialStables).toEqual([])
         expect(roomAnimalZones).toEqual([
           { id: 'house:2-0', zoneType: 'house', capacity: 1, animalType: null, animalCount: 0, farmPosition: { row: 2, col: 0 }, occupancyGroup: `house:${serializedPlayer.id}`, occupiedZoneLimit: 1 },
-          { id: 'house:1-0', zoneType: 'house', capacity: 1, animalType: null, animalCount: 0, farmPosition: { row: 1, col: 0 }, occupancyGroup: `house:${serializedPlayer.id}`, occupiedZoneLimit: 1 },
         ])
         expect(playedCardAnimalZones).toEqual([])
         expect(farmCardAnimalZones).toEqual([])

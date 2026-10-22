@@ -12,7 +12,7 @@ const farm = (state: GameState, animal: 'sheep' | 'boar' | 'cattle', mode: 'past
   p.stableTiles = [{ row: 0, col: 1 }]
   p.resources[animal] = 2
   if (mode === 'mixed') {
-    p.houseAnimals = { '1-0': animal }
+    p.houseAnimals = { '2-0': animal }
     p.stableTiles.push({ row: 0, col: 3 })
     p.stableAnimals = { '0-3': { animalType: animal, animalCount: 1 } }
     p.resources[animal] = 4
@@ -53,7 +53,7 @@ describe('E138 counts owned placed farm animals exactly once', () => {
     const zones = reward.interaction.request.zones.map(zone => ({
       ...zone,
       animalType: 'sheep',
-      animalCount: zone.id === 'livestock' ? 6 : ['house:1-0','stable:0-3'].includes(zone.id) ? 1 : 0,
+      animalCount: zone.id === 'livestock' ? 6 : ['house:2-0','stable:0-3'].includes(zone.id) ? 1 : 0,
     }))
     const placed = session.resolveChoice(0,'confirm',{zones})
     expect(placed.ok,placed.error).toBe(true)

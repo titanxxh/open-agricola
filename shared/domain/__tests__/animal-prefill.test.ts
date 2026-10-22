@@ -107,7 +107,7 @@ describe('fixed-layout animal prefill', () => {
     const { session: ruleSession, state, player } = setup()
     player.resources.sheep = 1
     expect(ruleSession.withCtx(() => buildAnimalReorgRequest(state, player, false))).toMatchObject({
-      prefill: false, zones: [expect.objectContaining({ id: 'house:2-0', animalCount: 0 }), expect.objectContaining({ id: 'house:1-0', animalCount: 0 })],
+      prefill: false, zones: [expect.objectContaining({ id: 'house:2-0', animalCount: 0 })],
     })
     expect(ruleSession.withCtx(() => buildAnimalReorgRequest(state, player)).zones[0]).toMatchObject({ id: 'house:2-0', animalType: 'sheep', animalCount: 1 })
     expect(Object.values(player.houseAnimals).length).toBe(0)

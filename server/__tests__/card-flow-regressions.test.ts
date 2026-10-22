@@ -36,7 +36,7 @@ describe('card flow regressions', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     resp = resolveTriggerIfPresent(session, resp, 'A017_ReclamationPlow')
     expect(resp.interaction.stateId).toBe('wait')
@@ -75,7 +75,7 @@ describe('card flow regressions', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     resp = resolveTriggerIfPresent(session, resp, 'A017_ReclamationPlow')
     expect(resp.interaction.stateId).toBe('wait')

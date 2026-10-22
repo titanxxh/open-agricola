@@ -179,14 +179,14 @@ describe('B104 Sheep Walker parity', () => {
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
     response = session.resolveChoice(0, 'confirm', { zones: [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: gained.boar },
-      { id: 'house:1-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
     ] })
     expect(response.ok, response.error).toBe(true)
     if (before.interaction.stateId !== 'wait' || response.interaction.stateId !== 'wait') throw new Error('expected plow')
     expect(response.interaction.request).toEqual(before.interaction.request)
     expect(response.interaction.playerIndex).toBe(0)
     expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: gained.boar })
-    expect(response.state.players[0]!).toMatchObject({ houseAnimals: { '1-0': 'cattle' }, })
+    expect(response.state.players[0]!).toMatchObject({ houseAnimals: { '2-0': 'cattle' }, })
     response = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fields).toHaveLength(1)

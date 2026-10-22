@@ -121,7 +121,7 @@ describe('A017_ReclamationPlow session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
 
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
@@ -153,7 +153,7 @@ describe('A017_ReclamationPlow session', () => {
 
     let resp = session.takeAction(0, 'sheep-market')
     resp = session.resolveChoice(0, 'confirm', [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
@@ -186,7 +186,7 @@ describe('A017_ReclamationPlow session', () => {
     let response = session.takeAction(0, 'sheep-market')
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     response = session.resolveChoice(0, 'confirm', { zones: [
-      { id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       { id: 'one-space', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
     ] })
 

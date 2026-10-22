@@ -220,7 +220,7 @@ describe('M031_LivestockMarket session', () => {
     resp = session.resolveChoice(0, 'confirm', {
       zones: [
         { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 4 },
-        { id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+        { id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ],
     })
     expect(resp.ok).toBe(true)

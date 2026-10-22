@@ -320,7 +320,7 @@ describe('B140 Farmyard Worker parity', () => {
     response = session.takeAction(0, actionId)
     if (actionId === 'sheep-market') {
       response = session.resolveChoice(0, 'confirm', { zones: [{
-        id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
+        id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1,
       }] })
       response = settleFarmyardWorker(session, response)
     }

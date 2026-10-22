@@ -321,7 +321,7 @@ describe('anytime reentry', () => {
     expect(request(resumed).kind).toBe('animal-reorg')
     expect(offered(resumed, cardId)).toBe(false)
     const completed = session.resolveChoice(0, 'confirm', {
-      zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }],
+      zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'sheep', animalCount: 1 }],
     })
     expect(completed.ok).toBe(true)
     expect(completed.state.players[0]!.resources.sheep).toBe(1)

@@ -84,7 +84,7 @@ describe('one completion per Reap batch', () => {
       expect(response.ok, response.error).toBe(true)
       expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('animal-reorg')
       response = session.resolveChoice(0, 'confirm', {
-        zones: [{ id: 'house:1-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
+        zones: [{ id: 'house:2-0', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
       })
       expect(response.ok, response.error).toBe(true)
       expect(response.state.players[0]!.resources.boar).toBe(1)
