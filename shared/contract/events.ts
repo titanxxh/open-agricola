@@ -209,6 +209,15 @@ export type WorkerPlacedEvent = GameEventBase<'worker.placed'> & {
 
 export type WorkerUseCompletedEvent = GameEventBase<'worker.useCompleted'> & PersonUseReceipt
 
+export type ActionSpaceUseStartedEvent = GameEventBase<'actionSpace.useStarted'> & {
+  useId: string
+  spaceId: string
+  newPlacement: boolean
+  personUse?: PersonUseReceipt
+  accumulation: Partial<Resource>
+  workPhase: boolean
+}
+
 export type AnytimeCompletedEvent = GameEventBase<'anytime.completed'> & {
   anytimeActionId: string
   activationId: string
@@ -376,6 +385,7 @@ export type WorkStartedEvent = GameEventBase<'work.started'>
 export type SnakeOpeningReversedEvent = GameEventBase<'snakeOpening.reversed'>
 
 export type ReturnHomeStartedEvent = GameEventBase<'returnHome.started'>
+export type WorkEndedEvent = GameEventBase<'work.ended'>
 
 export type HarvestStartedEvent = GameEventBase<'harvest.started'>
 
@@ -467,6 +477,8 @@ export type GameEvent =
   | FarmAnimalBredEvent
   | WorkerPlacedEvent
   | WorkerUseCompletedEvent
+  | ActionSpaceUseStartedEvent
+  | WorkEndedEvent
   | AnytimeCompletedEvent
   | WorkerReturnedEvent
   | WorkerPromotedEvent

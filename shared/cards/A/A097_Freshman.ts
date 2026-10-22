@@ -8,7 +8,7 @@ import { isUsedThisTurnOrGap, markUsedThisTurnOrGapLeaf } from '../helpers/turn-
 const CARD_ID = 'A097_Freshman'
 const canReplaceBake = (context: CardListenerContext) =>
   !context.actionContext?.checkedReplaceAction &&
-  !isUsedThisTurnOrGap(context.state, context.player, CARD_ID) &&
+  !isUsedThisTurnOrGap(context.player, CARD_ID, context.turnScopeProjection) &&
   hasPlayableOccupationChoice(context.state, context.player, context.space.id, { exactCost: {} }, context?.actionHooks)
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A97-freshman-replace-bake',

@@ -1,6 +1,7 @@
 import type { ActionDefinition, ActionFlow } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
-import { collectBeforePlacementFlows } from '../../../cards/card-listeners'
+import { collectBeforeActionSpaceUseFlows } from '../../../cards/card-listeners'
+import { recordActionSpaceUse } from '../../../domain/action-space-use'
 import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById } from '../../../domain/space'
 import { workersAvailable } from '../../../domain/player'
 import { selectWorkerForMoorAction } from '../../../moor/heating'
@@ -14,7 +15,7 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) => workersAvailable(state, player) > 0,
-  execute: ({ actionHooks, state, player, params, sourceCard, actionContext, eventSink }) => {
+  execute: ({ actionHooks, state, player, params, sourceCard, actionContext, eventSink, completedTransactionEvents }) => {
     const targetSpaceId = typeof params?.spaceId === 'string' ? params.spaceId : undefined
     if (!targetSpaceId) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     const targetSpace = findActionSpaceById(state, targetSpaceId)
@@ -54,15 +55,16 @@ export const placeFarmerOnSpaceAction: ActionDefinition = {
       return { type: 'ok', extraData: { actionContextWrite } }
     }
 
+    const use = recordActionSpaceUse({ state, player, space: targetSpace, eventSink, sourceCard: cardId, completedTransactionEvents }, { newPlacement: true, personUse })
     const targetLeaf: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
-      spaceUse: { newPlacement: true, personUse, completePlacement: true },
+      spaceUse: { ...use, completePlacement: true },
       expandFlow: true,
       sourceCard: cardId,
       actionContext: targetActionContext,
     }
-    const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
+    const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, use, targetActionContext)
     if (beforeFlows.length === 0) {
       return { type: 'flow', flow: targetLeaf, extraData: { actionContextWrite } }
     }

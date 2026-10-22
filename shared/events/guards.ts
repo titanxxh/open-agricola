@@ -46,6 +46,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.animalBred': ['animals', 'source'],
   'worker.placed': ['workerId', 'spaceId', 'viaCardId'],
   'worker.useCompleted': ['workerId', 'placementOrdinal'],
+  'actionSpace.useStarted': ['useId', 'spaceId', 'newPlacement', 'personUse', 'accumulation', 'workPhase'],
   'anytime.completed': ['anytimeActionId', 'activationId', 'parentActivationId', 'turn'],
   'worker.returned': ['workers', 'to'],
   'worker.promoted': ['playerId', 'workerId', 'from', 'to'],
@@ -73,6 +74,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'parent.motherScheduled': ['playerId', 'cardId', 'targetRound', 'reward'],
   'round.started': ['round'],
   'work.started': [],
+  'work.ended': [],
   'snakeOpening.reversed': [],
   'returnHome.started': [],
   'harvest.started': [],
@@ -532,6 +534,19 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
         throw new Error('Invalid placementOrdinal')
       }
       return
+    case 'actionSpace.useStarted': {
+      assertStringField(event.useId, 'useId')
+      assertStringField(event.spaceId, 'spaceId')
+      if (typeof event.newPlacement !== 'boolean' || typeof event.workPhase !== 'boolean') throw new Error('Invalid space-use qualification')
+      assertResourceMap(event.accumulation, 'accumulation')
+      if (event.personUse !== undefined) {
+        const receipt = assertRecord(event.personUse, 'personUse')
+        assertOnlyKeys(receipt, ['workerId', 'placementOrdinal'], 'personUse')
+        assertStringField(receipt.workerId, 'personUse.workerId')
+        if (!event.newPlacement || !Number.isSafeInteger(receipt.placementOrdinal) || Number(receipt.placementOrdinal) < 1) throw new Error('Invalid person-use receipt')
+      }
+      return
+    }
     case 'anytime.completed':
       assertStringField(event.anytimeActionId, 'anytimeActionId')
       assertStringField(event.activationId, 'activationId')

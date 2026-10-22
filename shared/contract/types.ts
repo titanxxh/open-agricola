@@ -704,6 +704,7 @@ export type GameState = {
 }
 
 export type CanBeExecutedByPlayerContext = {
+  turnScopeProjection?: TurnScopeProjection
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
   actionHooks: ActionHookRegistry | undefined
   params?: Record<string, unknown>
@@ -760,10 +761,14 @@ export type ProtectedObservation = {
   knownToPlayerIds?: string[]
 }
 
-export type ActionSpaceUseContext = { newPlacement: boolean; personUse?: PersonUseReceipt }
+export type ActionSpaceUseContext = { newPlacement: boolean; personUse?: PersonUseReceipt; useId?: string }
+
+/** A pure admission query for the Turn that ordinary placement will open. */
+export type TurnScopeProjection = { kind: 'next-turn'; playerId: string }
 
 export type ActionExecutionContext = {
   actionSpaceUse?: ActionSpaceUseContext
+  turnScopeProjection?: TurnScopeProjection
   /** Session-owned runtime dependency; never part of action metadata or snapshots. */
   actionHooks: ActionHookRegistry | undefined
   completedTransactionEvents?: readonly GameEvent[]

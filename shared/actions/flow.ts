@@ -44,6 +44,7 @@ const canAccessActionSpace = (actionId: string, context: FlowDoableContext): boo
 
 const childCanBeExecutedContext = (context: FlowDoableContext): CanBeExecutedByPlayerContext => ({
   actionHooks: context.actionHooks,
+  turnScopeProjection: context.turnScopeProjection,
   sourceCard: context.sourceCard,
   actionContext: context.actionContext,
   params: context.params,
@@ -287,6 +288,7 @@ export const initializeFlowDerivedCanBeExecutedByPlayer = (
       action.flow!,
       {
         actionHooks: context?.actionHooks,
+        turnScopeProjection: context?.turnScopeProjection,
         state,
         player,
         space,

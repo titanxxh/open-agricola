@@ -12,33 +12,23 @@ registerPlayerActionSpace({
   access: 'all',
   gainPerRound: { food: 1 },
   shouldRegister: (state) => state.players.length < 4,
-  createDefinition: (ownerId) => definePlayerActionSpaceFlow({
+  createDefinition: () => definePlayerActionSpaceFlow({
     id: CARD_ID,
     nameKey: 'cards.C039_StudioBoat.name',
     descriptionKey: 'cards.C039_StudioBoat.desc',
     canBeExecutedByPlayer: () => true,
     originalActionCondition: context => hasCollectableResources({ ...context, actionContext: undefined }),
-    flowFactory: ({ player }) => ({ type: 'seq', children: [
-      { type: 'leaf', actionId: 'collect', sourceCard: CARD_ID },
-      ...(player.id === ownerId ? [{ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID }] : []),
-    ] }),
+    flowFactory: () => ({ type: 'leaf', actionId: 'collect', sourceCard: CARD_ID }),
   }),
 })
 
 const travelingPlayersOwnerVp: CardListenerRegistration = {
   id: 'C39-studio-boat-traveling-players-vp',
   cardIds: [CARD_ID],
-  // scope defaults to 'player' — actor must own C39 for the listener to fire.
-  // 1-3p path: traveling-players action space does not exist (see
-  // common-traveling-players.ts `players: [4]`), so this listener is dormant
-  // and the 1-3p +1 VP is granted by the execute() handler above.
   actionSpaces: 'all',
   phases: ['before'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // context.space is the action space the farmer was placed on (resolved
-    // from the engine's activeSpaceId). Only fire on the global Traveling
-    // Players accumulation space, which exists only in 4-player games.
-    if (!isTravelingPlayersSpaceId(context.space?.id)) return
+    if (context.space?.id !== CARD_ID && !isTravelingPlayersSpaceId(context.space?.id)) return
     return {
       flow: {
         type: 'leaf',

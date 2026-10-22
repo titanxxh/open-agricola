@@ -16,7 +16,7 @@ const isOwnersActiveWorkTurn = (context: CardListenerContext) =>
 const isOwnersWorkTurnPreview = (context: CardListenerContext) =>
   isOwnersActiveWorkTurn(context) || (
     context.state.roundPhase === 'work' &&
-    context.state.players[context.state.currentPlayerIndex]?.id === context.player.id
+    context.turnScopeProjection?.playerId === context.player.id
   )
 
 const getOpenRound = (state: GameState, space: ActionSpace) => {

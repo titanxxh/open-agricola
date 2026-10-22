@@ -171,6 +171,20 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent('person-use completion moves no resources'),
     replay: 'replayable',
   },
+  'actionSpace.useStarted': {
+    log: silent('space-use entry is a rule fact'),
+    notification: silent('space-use entry is a rule fact'),
+    highlight: silent('space-use entry has no separate board cue'),
+    resourceAnimation: silent('space-use entry moves no resources'),
+    replay: 'replayable',
+  },
+  'work.ended': {
+    log: silent('work qualification ends without changing the displayed stage'),
+    notification: silent('return-home already presents the phase transition'),
+    highlight: silent('work qualification has no board target'),
+    resourceAnimation: silent('work qualification moves no resources'),
+    replay: 'replayable',
+  },
   'anytime.completed': {
     log: silent('activation completion is a rule timing fact'),
     notification: silent('activation completion is a rule timing fact'),

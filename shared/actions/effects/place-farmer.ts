@@ -25,7 +25,8 @@ import type { SupplyWorkerSource } from '../../contract/types'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
-import { collectBeforeActionSpaceUseFlows, collectBeforePlacementFlows } from '../../cards/card-listeners'
+import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners'
+import { recordActionSpaceUse } from '../../domain/action-space-use'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 
@@ -111,7 +112,7 @@ export const placeFarmerAction: ActionDefinition = {
     const target = state.actionSpaces.find((space) => space.id === (actionContext?.targetSpaceId ?? fixedTarget))
     return target ? { kind: 'actionSpace', spaceId: target.id, nameKey: target.nameKey } : undefined
   },
-  execute: ({ actionHooks, state, player, sourceCard, actionContext, eventSink }) => {
+  execute: ({ actionHooks, state, player, sourceCard, actionContext, eventSink, completedTransactionEvents }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.
     if (actionContext?.viaCardJump) {
@@ -175,15 +176,16 @@ export const placeFarmerAction: ActionDefinition = {
       // the engine falls back to the standard ActionNode path. This mirrors
       // the `createEngine(actionId)` semantics used when the player triggers
       // the action directly via takeAction.
+      const use = recordActionSpaceUse({ state, player, space: targetSpace, eventSink, sourceCard, completedTransactionEvents }, { newPlacement: false })
       const targetLeaf: ActionFlow = {
         type: 'leaf',
         actionId: targetSpaceId,
-        spaceUse: { newPlacement: false },
+        spaceUse: use,
         expandFlow: true,
         sourceCard,
         actionContext: resetComputeReplaceGuards(actionContext),
       }
-      const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, resetComputeReplaceGuards(actionContext))
+      const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, use, resetComputeReplaceGuards(actionContext))
       if (beforeFlows.length > 0) {
         return {
           type: 'flow',
@@ -242,7 +244,7 @@ export const placeFarmerAction: ActionDefinition = {
       promptKey: 'ui.interactionPlaceFarmerExtra',
     }
   },
-  resolveChoice: ({ actionHooks, state, player, sourceCard, actionContext, eventSink }, choice) => {
+  resolveChoice: ({ actionHooks, state, player, sourceCard, actionContext, eventSink, completedTransactionEvents }, choice) => {
     const allowOccupied = choice.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)
     const targetSpaceId = allowOccupied
       ? choice.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
@@ -291,15 +293,16 @@ export const placeFarmerAction: ActionDefinition = {
       actionContext.targetSpaceId = targetSpaceId
       actionContext.placedWorkerId = placeResult.workerId
     }
+    const use = recordActionSpaceUse({ state, player, space: targetSpace, eventSink, sourceCard, completedTransactionEvents }, { newPlacement: true, personUse: placeResult.personUse })
     const targetLeaf: ActionFlow = {
       type: 'leaf',
       actionId: targetSpaceId,
-      spaceUse: { newPlacement: true, personUse: placeResult.personUse },
+      spaceUse: use,
       expandFlow: true,
       sourceCard,
       actionContext: targetActionContext,
     }
-    const beforeFlows = collectBeforePlacementFlows(actionHooks, state, player, targetSpace, targetActionContext)
+    const beforeFlows = collectBeforeActionSpaceUseFlows(actionHooks, state, player, targetSpace, use, targetActionContext)
     if (beforeFlows.length > 0) {
       return {
         type: 'flow',
