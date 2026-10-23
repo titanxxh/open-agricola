@@ -1,0 +1,76 @@
+@media (max-width: 1100px) {
+  .app:has(.game-layout) { background: #f3f0df; }
+  .game-layout__players .desktop-player-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .game-layout__players .desktop-player-overview__player {
+    padding: 8px;
+    border-color: #baaa7d;
+    background: #faf3d9;
+  }
+  .game-layout__players .desktop-player-overview__name {
+    min-height: 36px;
+    padding-bottom: 6px;
+    font-size: 13px;
+    touch-action: manipulation;
+  }
+  .game-layout__players .desktop-player-overview__resources {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px 2px;
+    font-size: 12px;
+  }
+  .game-layout__players .desktop-player-overview__resources > span { gap: 2px; }
+  .game-layout__players .res-icon { font-size: 16px; }
+  .game-layout__right {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    overflow: visible;
+  }
+  .game-layout__right .action-log { max-height: 480px; }
+  .game-layout .played-cards,
+  .game-layout .hand-cards {
+    padding: 8px 0;
+    margin-bottom: 8px;
+    background: transparent;
+  }
+  .game-layout .played-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .game-layout .played-row > * { width: 100%; max-width: none; }
+  .game-layout .played-cards .player-card:not(.player-card-preview-body) {
+    width: 100%;
+    max-width: none;
+    aspect-ratio: 1;
+  }
+  .game-layout .played-cards .player-card-inner { height: 235px; overflow: hidden; }
+  .game-layout .played-cards .card-frame { background-size: 300% 366px; }
+  .game-layout .played-cards .card-title { font-size: 19px; line-height: 21px; }
+  .game-layout .played-cards .card-desc { display: none; }
+  .game-layout .hand-section { padding: 8px; }
+  .game-layout .hand-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .game-layout .hand-row > * { width: 100%; max-width: none; }
+  .game-layout .hand-row .player-card { max-width: none; }
+  .game-layout .parent-cards-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .game-layout .parent-card-tile { width: calc((100% - 8px) / 2); max-width: 188px; }
+  .game-layout .special-actions-panel__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .game-layout .special-action-card__action-label { font-size: 13px; }
+  .game-layout .special-action-card__diagram { gap: 2px; }
+  .game-layout .special-action-card__diagram .resource-inline-item { gap: 2px; }
+  .game-layout .moor-action-spaces .player-action-card-wrapper { width: calc((100% - 10px) / 2); }
+  .game-layout .board-seasons,
+  .game-layout .board-special-actions { min-width: 0; }
+  .game-layout .desktop-public-farms__grid { grid-template-columns: minmax(0, 1fr); }
+
+  @media (min-width: 640px) {
+    .game-layout .played-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .game-layout .hand-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  }
+}

@@ -139,7 +139,7 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
   state.phase = 'playing'
   state.parentSelection = null
   state.players[0].parentCards = { mother: 'PR01', father: 'PS01' }
-  state.players[0].cardStates.PS01 = { counters: { fatherCompletedTier: 1 }, infobox: 'Completed' }
+  state.players[0].cardStates.PS01 = { extraData: { fatherCompletedTier: 1 }, infobox: 'Completed' }
   for (const player of state.players) {
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
@@ -155,6 +155,13 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   await page.goto(sandboxUrl)
   await expect(page.locator('.parent-card-infobox')).toHaveText('已完成')
+  const father = page.locator('.parent-card-face--father').first()
+  await father.screenshot({ path: 'output/playwright/completed-parent.png' })
+  const completionSize = await father.evaluate(element => ({
+    card: element.getBoundingClientRect().height,
+    badge: element.querySelector('.parent-card-infobox')!.getBoundingClientRect().height,
+  }))
+  expect(completionSize.badge).toBeLessThan(completionSize.card / 4)
   const infirmaryCard = page.locator('[data-action-id="moor-infirmary"]')
   const restriction = infirmaryCard.getByText('病人只能来此；健康工人也可使用', { exact: true })
   await expect(restriction).toBeVisible()

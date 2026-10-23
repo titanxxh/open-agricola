@@ -16,7 +16,7 @@ const expectFarmRequestWithoutNavigation = async (surface: Page | FrameLocator) 
 
   await expect(surface.locator('.farm-tile.selectable').first()).toBeVisible()
   await expect(actionBoard).toBeVisible()
-  await expect(surface.locator('.farm-grid')).toBeVisible()
+  await expect(surface.locator('.game-layout__center .farm-grid')).toBeVisible()
   await expect(surface.getByRole('navigation', { name: 'Game presentation' })).toHaveCount(0)
   await expect(surface.locator('.game-presentation-status')).toHaveCount(0)
 }

@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 
-test('mobile farm and cards keep seven-card rows and zoom behavior', async ({ page }) => {
+test('mobile farm and cards keep readable card rows and zoom behavior', async ({ page }) => {
   const styles = await Promise.all([
     readFile('client/styles/tokens.css', 'utf8'),
     readFile('client/styles/base.css', 'utf8'),
     readFile('client/styles/card-sprite.css', 'utf8'),
     readFile('client/styles/pages/game.css', 'utf8'),
+    readFile('client/styles/pages/mobile-table.css', 'utf8'),
   ])
 
   await page.setViewportSize({ width: 320, height: 640 })
@@ -14,7 +15,7 @@ test('mobile farm and cards keep seven-card rows and zoom behavior', async ({ pa
     <html>
       <head><style>${styles.join('\n')} html, body { margin: 0; }</style></head>
       <body>
-        <main class="center">
+        <main class="game-layout"><div class="center">
           <div class="player-resources-compact">
             <span class="res-compact-group">
               <span class="res-compact-item is-nonzero"><span class="res-icon res-icon-wood"></span><span class="res-compact-num">2</span></span>
@@ -46,7 +47,7 @@ test('mobile farm and cards keep seven-card rows and zoom behavior', async ({ pa
               </div>
             </div>
           </div>
-        </main>
+        </div></main>
       </body>
     </html>
   `)
@@ -78,10 +79,11 @@ test('mobile farm and cards keep seven-card rows and zoom behavior', async ({ pa
     }
   })
 
+  expect(layout.played.firstRowCards).toBe(4)
+  expect(layout.hand.firstRowCards).toBe(3)
   for (const row of [layout.played, layout.hand]) {
-    expect(row.firstRowCards).toBe(7)
     expect(row.eighthTop).toBeGreaterThan(row.firstTop)
-    expect(row.maxCardWidth).toBeLessThan(50)
+    expect(row.maxCardWidth).toBeGreaterThanOrEqual(60)
     expect(row.horizontalOverflow).toBeLessThanOrEqual(0)
   }
   expect(layout.minResourceWidth).toBeGreaterThanOrEqual(40)

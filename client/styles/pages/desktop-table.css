@@ -109,52 +109,6 @@
   .app--desktop-table .hand-row .card-title { font-size: 16px; }
   .app--desktop-table .hand-row .card-desc { font-size: 14px; line-height: 16px; }
 
-  .desktop-player-overview { display: grid; gap: 10px; }
-  .desktop-player-overview__player {
-    padding: 10px;
-    background: #faf7e7;
-    border: 1px solid #d9cfb7;
-    border-radius: 8px;
-  }
-  .desktop-player-overview__name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 0 0 8px;
-    border: 0;
-    background: transparent;
-    color: var(--color-text);
-    text-align: left;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .desktop-player-overview__name > span:first-child { overflow-wrap: anywhere; }
-  .desktop-player-overview__name[aria-pressed="true"] { color: var(--color-primary); }
-  .desktop-player-overview__score { margin-left: auto; font-variant-numeric: tabular-nums; }
-  .desktop-player-overview__turn { color: #ab442e; }
-  .desktop-player-overview__resources {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px 4px;
-    font-size: 14px;
-  }
-  .desktop-player-overview__resources > span {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    font-variant-numeric: tabular-nums;
-  }
-  .desktop-public-farms > h2 { margin: 0 0 12px; font-size: 16px; }
-  .desktop-public-farms__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(600px, 100%), 1fr));
-    gap: 16px;
-    align-items: start;
-  }
-  .desktop-public-farm { min-width: 0; max-width: 740px; }
 
   @media (max-width: 1759px) {
     .app--desktop-table .game-layout {

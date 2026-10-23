@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
@@ -242,6 +243,7 @@ type Props = {
   actionSpaceAttachments?: ReadonlyMap<string, ActionSpaceAttachmentDisplay[]>
   leftActionNames?: ReadonlyMap<string, string>
   enablePrecisionMode?: boolean
+  actionSpaceOutlets?: ReadonlyMap<string, HTMLElement>
 }
 
 type TooltipInfo = ({
@@ -454,6 +456,7 @@ export const ActionBoard = ({
   actionSpaceAttachments = new Map<string, ActionSpaceAttachmentDisplay[]>(),
   leftActionNames = new Map<string, string>(),
   enablePrecisionMode = false,
+  actionSpaceOutlets = new Map<string, HTMLElement>(),
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -777,6 +780,86 @@ export const ActionBoard = ({
     </div>
   ) : null
 
+  const additionalActions = baseActions.filter(space => !basePositions[space.id])
+  const localAdditionalActions = additionalActions.filter(space => !actionSpaceOutlets.has(space.id))
+  const renderAdditionalAction = (space: ActionSpace) => {
+    const canTake = canTakeAction(space, currentPlayer)
+    const meta = getCardMeta(space.id)
+    if (!meta) {
+      return (
+        <div
+          key={space.id}
+          className={[
+            'player-action-card-wrapper',
+            actionSpaceSelectionActive && canTake && 'choice-available',
+            actionSpaceSelectionActive && !canTake && 'choice-unavailable',
+          ].filter(Boolean).join(' ')}
+          data-action-id={space.id}
+          style={{ height: 150 }}
+          onMouseEnter={(e) => showTooltip(e, space)}
+          onMouseLeave={hideTooltip}
+          onFocus={(e) => showTooltip(e, space)}
+          onBlur={hideTooltip}
+        >
+          <button
+            className="action-card player-action-space-card"
+            aria-label={translateCardText(locale, space.nameKey)}
+            onClick={() => takeAction(space)}
+            disabled={!canTake}
+          >
+            <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
+            <div className="action-desc">
+              {space.baseDescriptionPreview
+              ? <ActionSpaceDescription locale={locale} preview={space.baseDescriptionPreview} />
+              : t(locale, space.nameKey)}
+            </div>
+            <div className="action-footer" />
+          </button>
+          {renderFarmerHolder(space)}
+          {renderExclusiveUseMarker(space)}
+          {renderBlockedMarker(space)}
+        </div>
+      )
+    }
+    let cardType: 'occupation' | 'minor'
+    if (meta?.type === 'playerAction') {
+      cardType = meta.playerActionCardType ?? 'minor'
+    } else {
+      cardType = meta?.type === 'occupation' ? 'occupation' : 'minor'
+    }
+    const owner = players.find((p) =>
+      p.minorPlayed.includes(space.id) || p.occupationPlayed.includes(space.id)
+    )
+    return (
+      <div
+        key={space.id}
+        className={[
+          'player-action-card-wrapper',
+          actionSpaceSelectionActive && canTake && 'choice-available',
+          actionSpaceSelectionActive && !canTake && 'choice-unavailable',
+        ].filter(Boolean).join(' ')}
+        data-action-id={space.id}
+      >
+        <PlayerCard
+          locale={locale}
+          cardId={space.id}
+          cardType={cardType}
+          onClick={() => canTake && takeAction(space)}
+          disabled={!canTake}
+          usable={canTake && space.takenBy.length === 0}
+          className={space.takenBy.length > 0 ? 'taken' : ''}
+        />
+        {renderFarmerHolder(space)}
+        {renderExclusiveUseMarker(space)}
+        {owner && (
+          <div className="player-action-card-owner" data-player-color={owner.color}>
+            {playerDisplayName(owner)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <section className="actions" aria-label={t(locale, 'ui.actionArea')}>
       <h2>{t(locale, 'ui.actionArea')}</h2>
@@ -939,91 +1022,16 @@ export const ActionBoard = ({
         </div>
       </div>
 
-      {/* Dynamic PlayerActionCard action spaces — rendered as cards */}
-      {baseActions.filter((s) => !basePositions[s.id]).length > 0 && (
+      {localAdditionalActions.length > 0 ? (
         <div className="player-action-cards-row">
           <h3>{t(locale, 'ui.playerActionCards')}</h3>
-          <div className="hand-row">
-            {baseActions.filter((s) => !basePositions[s.id]).map((space) => {
-              const canTake = canTakeAction(space, currentPlayer)
-              const meta = getCardMeta(space.id)
-              if (!meta) {
-                return (
-                  <div
-                    key={space.id}
-                    className={[
-                      'player-action-card-wrapper',
-                      actionSpaceSelectionActive && canTake && 'choice-available',
-                      actionSpaceSelectionActive && !canTake && 'choice-unavailable',
-                    ].filter(Boolean).join(' ')}
-                    data-action-id={space.id}
-                    style={{ height: 150 }}
-                    onMouseEnter={(e) => showTooltip(e, space)}
-                    onMouseLeave={hideTooltip}
-                    onFocus={(e) => showTooltip(e, space)}
-                    onBlur={hideTooltip}
-                  >
-                    <button
-                      className="action-card player-action-space-card"
-                      aria-label={translateCardText(locale, space.nameKey)}
-                      onClick={() => takeAction(space)}
-                      disabled={!canTake}
-                    >
-                      <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
-                      <div className="action-desc">
-                        {space.baseDescriptionPreview
-                        ? <ActionSpaceDescription locale={locale} preview={space.baseDescriptionPreview} />
-                        : t(locale, space.nameKey)}
-                      </div>
-                      <div className="action-footer" />
-                    </button>
-                    {renderFarmerHolder(space)}
-                    {renderExclusiveUseMarker(space)}
-                    {renderBlockedMarker(space)}
-                  </div>
-                )
-              }
-              let cardType: 'occupation' | 'minor'
-              if (meta?.type === 'playerAction') {
-                cardType = meta.playerActionCardType ?? 'minor'
-              } else {
-                cardType = meta?.type === 'occupation' ? 'occupation' : 'minor'
-              }
-              const owner = players.find((p) =>
-                p.minorPlayed.includes(space.id) || p.occupationPlayed.includes(space.id)
-              )
-              return (
-                <div
-                  key={space.id}
-                  className={[
-                    'player-action-card-wrapper',
-                    actionSpaceSelectionActive && canTake && 'choice-available',
-                    actionSpaceSelectionActive && !canTake && 'choice-unavailable',
-                  ].filter(Boolean).join(' ')}
-                  data-action-id={space.id}
-                >
-                  <PlayerCard
-                    locale={locale}
-                    cardId={space.id}
-                    cardType={cardType}
-                    onClick={() => canTake && takeAction(space)}
-                    disabled={!canTake}
-                    usable={canTake && space.takenBy.length === 0}
-                    className={space.takenBy.length > 0 ? 'taken' : ''}
-                  />
-                  {renderFarmerHolder(space)}
-                  {renderExclusiveUseMarker(space)}
-                  {owner && (
-                    <div className="player-action-card-owner" data-player-color={owner.color}>
-                      {playerDisplayName(owner)}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <div className="hand-row">{localAdditionalActions.map(renderAdditionalAction)}</div>
         </div>
-      )}
+      ) : null}
+      {additionalActions.map(space => {
+        const outlet = actionSpaceOutlets.get(space.id)
+        return outlet ? createPortal(renderAdditionalAction(space), outlet, space.id) : null
+      })}
 
       {tooltip && (
         <div

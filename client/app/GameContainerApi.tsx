@@ -41,7 +41,6 @@ import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
 import { buildActionBoardProjection, buildFarmBoardProjection } from './farm-board-projection'
 import { buildFarmTargetChoiceBindings, getFarmTargetChoices } from './farm-target-choice'
-import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
@@ -383,6 +382,7 @@ export const GameContainerApi = () => {
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
+  const [moorActionOutlet, setMoorActionOutlet] = useState<HTMLDivElement | null>(null)
   const [isMobile, setIsMobile] = useState(getIsMobileViewport)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
@@ -1823,27 +1823,32 @@ export const GameContainerApi = () => {
       devMode={devMode}
     />
   )
+  const playerOverviewPresentation = (
+    <DesktopPlayerOverview
+      locale={locale}
+      players={state.players}
+      playerNames={playerNames}
+      scores={scores ?? []}
+      viewedPlayerId={displayPlayer.id}
+      currentPlayerId={currentPlayer.id}
+      onViewPlayer={setViewPlayerIdSafe}
+    />
+  )
+  const actionSpaceOutlets = new Map<string, HTMLElement>(
+    moorActionOutlet
+      ? baseActions.filter(space => space.id.startsWith('moor-')).map(space => [space.id, moorActionOutlet])
+      : [],
+  )
   const actionBoardOverview = (
     <section className="board-panel board-action">
-      <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} scheduledEffects={state.players.flatMap(player => (player.scheduledEffects ?? []).map(effect => ({ ...effect, playerId: player.id })))} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={!isPublicFarmView && placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} enablePrecisionMode={isMobile} />
+      <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} scheduledEffects={state.players.flatMap(player => (player.scheduledEffects ?? []).map(effect => ({ ...effect, playerId: player.id })))} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={!isPublicFarmView && placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} enablePrecisionMode={isMobile} actionSpaceOutlets={actionSpaceOutlets} />
     </section>
   )
   const expansionActionBoards = (
     <>
-      {state.enableThroughTheSeasons && state.throughTheSeasons ? (
-        <section className="board-panel board-seasons">
-          <SeasonsBoard
-            locale={locale}
-            throughTheSeasons={state.throughTheSeasons}
-            seasonActions={seasonActions}
-            players={state.players}
-            canTakeAction={(space) => canTakeActionForBoard(space, currentPlayer)}
-            takeAction={takeSeasonAction}
-          />
-        </section>
-      ) : null}
       {state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? (
         <section className="board-panel board-special-actions">
+          <div className="moor-action-spaces" ref={setMoorActionOutlet} />
           <SpecialActionsPanel
             locale={locale}
             playerCount={state.players.length}
@@ -1853,6 +1858,18 @@ export const GameContainerApi = () => {
             canTakeSpecialAction={canTakeSpecialAction}
             selected={isPublicFarmView ? null : selectedSpecialAction}
             onTakeAction={takeSpecialAction}
+          />
+        </section>
+      ) : null}
+      {state.enableThroughTheSeasons && state.throughTheSeasons ? (
+        <section className="board-panel board-seasons">
+          <SeasonsBoard
+            locale={locale}
+            throughTheSeasons={state.throughTheSeasons}
+            seasonActions={seasonActions}
+            players={state.players}
+            canTakeAction={(space) => canTakeActionForBoard(space, currentPlayer)}
+            takeAction={takeSeasonAction}
           />
         </section>
       ) : null}
@@ -1935,22 +1952,21 @@ export const GameContainerApi = () => {
         />
       </div>
 
-      {majorImprovementsPresentation}
+      {isDesktopTable ? majorImprovementsPresentation : null}
 
       <div
         className="game-layout"
         data-player-count={state.players.length}
         style={{ '--game-header-height': `${headerHeight}px` } as CSSProperties}
       >
-        {isDesktopTable ? (
-          <div className="game-layout__stage"><StageBar currentRound={state.round ?? 1} locale={locale} /></div>
-        ) : null}
+        {!isDesktopTable ? <div className="game-layout__players">{playerOverviewPresentation}</div> : null}
+        <div className="game-layout__stage"><StageBar currentRound={state.round ?? 1} locale={locale} /></div>
         <div className="game-layout__left">
           {actionBoardOverview}
           {expansionActionBoards}
+          {!isDesktopTable ? majorImprovementsPresentation : null}
         </div>
         <div className="game-layout__center">
-          {isDesktopTable ? null : <StageBar currentRound={state.round ?? 1} locale={locale} />}
           {isPublicFarmView && activePlayer ? (
             <div className="hotseat-public-farm" role="status">
               <span>{t(locale, 'ui.hotseatPublicFarm', { player: playerNames[displayPlayer.id] })}</span>
@@ -1972,76 +1988,37 @@ export const GameContainerApi = () => {
           </section>
         </div>
         {isDesktopTable ? <div className="game-layout__hand" ref={setHandOutlet} /> : null}
+        <DesktopPublicFarms
+          state={state}
+          viewedPlayerId={displayPlayer.id}
+          pastureCapacities={pastureCapacities}
+          view={farmBoardView}
+          actions={farmBoardActions}
+        />
         <div className="game-layout__right">
-          {isDesktopTable ? (
-            <DesktopPlayerOverview
-              locale={locale}
-              players={state.players}
-              playerNames={playerNames}
-              scores={scores ?? []}
-              viewedPlayerId={displayPlayer.id}
-              currentPlayerId={currentPlayer.id}
-              onViewPlayer={setViewPlayerIdSafe}
-            />
-          ) : null}
+          {isDesktopTable ? playerOverviewPresentation : null}
           <button type="button" className="btn-secondary scoring-pad-button" onClick={showScoring}>
             {t(locale, 'ui.scoringPadButton')}
           </button>
-          {isMobile ? (
-            <>
-              <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.actionLog')} variant="parchment">
-                <ActionLog
-                  locale={locale}
-                  log={roomHistory.log}
-                  history={historyWindow ? roomHistory : undefined}
-                  limit={historyWindow ? Number.MAX_SAFE_INTEGER : undefined}
-                  playerNames={playerNames}
-                  currentRound={state.round ?? 1}
-                  timelineBuckets={actionLogTimelineBuckets}
-                  selectedReplayKey={selectedReplayKey}
-                  replayFilter={replayFilter}
-                  replaySummary={replaySummary}
-                  onReplayFilterChange={setReplayFilter}
-                  onSelectReplayEntry={handleSelectReplayEntry}
-                  onReplayStep={handleReplayStep}
-                  onReplayPlayPause={handleReplayPlayPause}
-                  onReplayLatest={handleReplayLatest}
-                  isReplayPlaying={isReplayPlaying}
-                />
-              </Section>
-            </>
-          ) : (
-            <>
-              <ActionLog
-                locale={locale}
-                log={roomHistory.log}
-                  history={historyWindow ? roomHistory : undefined}
-                  limit={historyWindow ? Number.MAX_SAFE_INTEGER : undefined}
-                playerNames={playerNames}
-                currentRound={state.round ?? 1}
-                timelineBuckets={actionLogTimelineBuckets}
-                selectedReplayKey={selectedReplayKey}
-                replayFilter={replayFilter}
-                replaySummary={replaySummary}
-                onReplayFilterChange={setReplayFilter}
-                onSelectReplayEntry={handleSelectReplayEntry}
-                onReplayStep={handleReplayStep}
-                onReplayPlayPause={handleReplayPlayPause}
-                onReplayLatest={handleReplayLatest}
-                isReplayPlaying={isReplayPlaying}
-              />
-            </>
-          )}
-        </div>
-        {isDesktopTable ? (
-          <DesktopPublicFarms
-            state={state}
-            viewedPlayerId={displayPlayer.id}
-            pastureCapacities={pastureCapacities}
-            view={farmBoardView}
-            actions={farmBoardActions}
+          <ActionLog
+            locale={locale}
+            log={roomHistory.log}
+            history={historyWindow ? roomHistory : undefined}
+            limit={historyWindow ? Number.MAX_SAFE_INTEGER : undefined}
+            playerNames={playerNames}
+            currentRound={state.round ?? 1}
+            timelineBuckets={actionLogTimelineBuckets}
+            selectedReplayKey={selectedReplayKey}
+            replayFilter={replayFilter}
+            replaySummary={replaySummary}
+            onReplayFilterChange={setReplayFilter}
+            onSelectReplayEntry={handleSelectReplayEntry}
+            onReplayStep={handleReplayStep}
+            onReplayPlayPause={handleReplayPlayPause}
+            onReplayLatest={handleReplayLatest}
+            isReplayPlaying={isReplayPlaying}
           />
-        ) : null}
+        </div>
       </div>
 
       {bugReportBar}
