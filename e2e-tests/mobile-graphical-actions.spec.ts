@@ -80,7 +80,7 @@ test('workshop sandbox submits a base action from the graphical board', async ({
 
   await expect(sandbox.getByLabel(`Food: ${foodBefore + 2}`)).toBeVisible()
   await expect(sandbox.locator('.action-board')).toBeVisible()
-  await expect(sandbox.locator('.farm-grid')).toBeVisible()
+  await expect(sandbox.locator('.game-layout__center .farm-grid')).toBeVisible()
   await expect(sandbox.locator('.major-improvements')).toBeVisible()
   await expect(sandbox.locator('.mobile-actions-panel')).toHaveCount(0)
 })
@@ -132,7 +132,7 @@ test('workshop variants expose every action family as graphical boards', async (
   await expect(combinedSandbox.locator('[aria-label="Seasons Board"]')).toBeVisible()
   await expect(combinedSandbox.locator('[aria-label="Special Actions"]')).toBeVisible()
   await expect(combinedSandbox.locator('[data-action-id="meeting-place"]')).toBeVisible()
-  await expect(combinedSandbox.locator('.farm-grid')).toBeVisible()
+  await expect(combinedSandbox.locator('.game-layout__center .farm-grid')).toBeVisible()
   await expect(combinedSandbox.locator('.major-improvements')).toBeVisible()
 })
 

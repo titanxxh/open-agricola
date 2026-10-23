@@ -4,6 +4,17 @@ import type { SerializedPlayerState } from '../../../shared/session/serializatio
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
 import { moorSpecialActionBaseResources } from '../../../shared/domain/moor-special-action-values'
 import { ResourceLine } from '../common/ResourceLine'
+import { publicAssetUrl } from '../../utils/public-asset-url'
+
+const actionArtwork: Record<MoorSpecialActionId, { image: string; top: number }> = {
+  'fell-trees': { image: 'moor-special-1-2-terrain', top: 76 },
+  'slash-and-burn': { image: 'moor-special-1-2-terrain', top: 176 },
+  'cut-peat': { image: 'moor-special-1-2-terrain', top: 275 },
+  'horse-market': { image: 'moor-special-1-2-market-work', top: 76 },
+  'hiring-fair': { image: 'moor-special-1-2-market-work', top: 176 },
+  'black-market': { image: 'moor-special-1-2-market-work', top: 275 },
+  'illicit-work': { image: 'moor-special-1-2-market-work', top: 372 },
+}
 
 type SelectedSpecialAction = {
   cardId: string
@@ -102,6 +113,7 @@ export function SpecialActionsPanel({
                   const available = cardUsable && canTakeSpecialAction(card, actionId)
                   const isSelected = selected?.cardId === card.id && selected.actionId === actionId
                   const effectId = `${card.id}-${actionId}-effect`
+                  const artwork = actionArtwork[actionId]
                   return (
                     <button
                       key={`${card.id}:${actionId}`}
@@ -114,7 +126,13 @@ export function SpecialActionsPanel({
                       title={label}
                       onClick={() => onTakeAction(card.id, actionId)}
                     >
-                      <span className="special-action-card__action-label">{label}</span>
+                      <span className="special-action-card__heading">
+                        <span className="special-action-card__action-icon" aria-hidden="true" style={{
+                          backgroundImage: `url("${publicAssetUrl(`/assets/moor/special-action-card/${artwork.image}.webp`)}")`,
+                          backgroundPosition: `-18px -${artwork.top / 2}px`,
+                        }} />
+                        <span className="special-action-card__action-label">{label}</span>
+                      </span>
                       <SpecialActionEffect locale={locale} actionId={actionId} playerCount={playerCount} id={effectId} />
                       {(actionId === 'black-market' || actionId === 'illicit-work') && (
                         <span className="special-action-card__note">{t(locale, 'moor.specialActions.improvementCost')}</span>

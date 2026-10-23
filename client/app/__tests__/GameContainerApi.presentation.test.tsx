@@ -77,7 +77,9 @@ describe('GameContainerApi responsive presentation', () => {
     expect(container.querySelector('.game-layout__center')).not.toHaveAttribute('hidden')
     expect(container.querySelector('.game-layout__right')).not.toHaveAttribute('hidden')
     expect(container.querySelectorAll('.interaction-bar')).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'expand' })).toHaveLength(1)
+    expect(container.querySelector('.action-log')).toBeVisible()
+    expect(container.querySelector('.scoring-pad')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.game-layout__players .desktop-player-overview__player')).toHaveLength(2)
   })
 
   it('keeps the desktop three-column layout intact', async () => {
