@@ -1,0 +1,44 @@
+.card-details {
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #f7f3e9;
+  color: #29251d;
+  box-shadow: 0 8px 32px #0006;
+}
+.card-details::backdrop { background: #0008; }
+.card-details__layout {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 24px);
+}
+.card-details__header,
+.card-details__footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.card-details button {
+  min-height: 44px;
+  padding: 8px 16px;
+  touch-action: manipulation;
+}
+.card-details__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 12px 12px;
+}
+.card-details__body .player-card.player-card-preview-body {
+  width: 100%;
+  max-width: none;
+}
+.card-details__footer { justify-content: stretch; }
+.card-details__footer button { flex: 1; }

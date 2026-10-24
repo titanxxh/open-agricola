@@ -667,6 +667,8 @@ export const zh = {
     devTargetHint: '↓ 以下操作针对该玩家',
     cardCopy: '复制ID',
     cardCopied: '已复制!',
+    cardDetails: '卡牌详情',
+    cardPlay: '打出此牌',
     choiceFuturefield: '可选择耕种 {amount} 块田',
     choiceFuturestable: '可选择建造 {amount} 个畜棚',
     choiceFutureforest: '可选择放置 {amount} 块森林',

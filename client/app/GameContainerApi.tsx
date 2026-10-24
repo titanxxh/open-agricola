@@ -13,6 +13,7 @@ import {
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
 import { useInteractionFocus } from './interaction-focus'
+import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import { isHotseatSetupQuery, parseDraftParamsFromQuery } from './game-setup-query'
@@ -776,6 +777,9 @@ export const GameContainerApi = () => {
       .resolveChoice(interactionPresentationPlan.pendingChoice.playerIndex, value)
       .catch((e) => console.error(e))
   }, [interaction, interactionPresentationPlan, currentPlayer, animalReorgSubmitDraft, farmSelectionDraft.submitDraft, transport, isInteractive, runInteractionSubmitCommand])
+
+  const cardPlayRequestKey = JSON.stringify([interaction, historyLength, state?.events.at(-1)?.id])
+  const playCardChoice = useCardPlayChoice(cardPlayRequestKey, resolveChoice)
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
@@ -1629,6 +1633,7 @@ export const GameContainerApi = () => {
     futureCardResources,
     devMode: !isPublicFarmView && devMode,
     isInteractive,
+    cardPlayRequestKey,
     occupationHandSelection: occupationHandInteraction ?? undefined,
     highlightedHandCardId,
     highlightedFarmTileKeys,
@@ -1647,6 +1652,7 @@ export const GameContainerApi = () => {
     cancelAnimalDiscardPrompt,
     setViewPlayerId: setViewPlayerIdSafe,
     resolveChoice,
+    playCardChoice,
     onConfirmOccupationHandSelection: (ids: string[]) => {
       if (!isInteractive) return
       const submitCommand = buildInteractionSubmitCommand(interaction, {
@@ -1824,7 +1830,8 @@ export const GameContainerApi = () => {
       isSelectingMajor={isSelectingImprovementAny && !isPublicFarmView}
       selectableMajorIds={isPublicFarmView ? new Set<string>() : selectableMajorIds}
       cardAvailability={isPublicFarmView ? {} : cardAvailability}
-      resolveChoice={resolveChoice}
+      resolveChoice={playCardChoice}
+      cardPlayRequestKey={cardPlayRequestKey}
       futureCardResources={futureCardResources}
       isInteractive={isInteractive}
       devMode={devMode}

@@ -7,7 +7,7 @@ import { emptyResources } from '../../../shared/contract/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
 import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { publicAssetUrl } from '../../utils/public-asset-url'
-import { CardWithCopy } from './CardWithCopy'
+import { CardWithCopy, type CardTouchInteraction } from './CardWithCopy'
 import { ResourceText } from './ResourceText'
 import { getCardDisplayText, type CardType } from './cardText'
 
@@ -45,6 +45,7 @@ type PlayerCardProps = {
   infobox?: string
   devMode?: boolean
   onClick?: () => void
+  touchInteraction?: CardTouchInteraction
   disabled?: boolean
   selectable?: boolean
   selected?: boolean
@@ -176,6 +177,7 @@ export const PlayerCard = ({
   infobox,
   devMode = false,
   onClick,
+  touchInteraction,
   disabled = false,
   selectable = false,
   selected = false,
@@ -350,6 +352,7 @@ export const PlayerCard = ({
       cardId={cardId}
       devMode={devMode}
       onClick={disabled ? undefined : onClick}
+      touchInteraction={touchInteraction}
       disabled={disabled}
       className={classes}
       enablePreview={enablePreview}

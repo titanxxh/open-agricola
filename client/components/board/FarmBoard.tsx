@@ -498,6 +498,7 @@ export type FarmBoardView = {
     }[]
   >
   isInteractive: boolean
+  cardPlayRequestKey?: string
   occupationHandSelection?: {
     kind: 'occupation-hand'
     selectableCards: string[]
@@ -527,6 +528,7 @@ export type FarmBoardActions = {
   cancelAnimalDiscardPrompt: () => void
   setViewPlayerId: (value: string) => void
   resolveChoice: (value: string) => void
+  playCardChoice?: (value: string) => void
   onConfirmOccupationHandSelection?: (cardIds: string[]) => void
   isOccupationHandSelectionRejected?: (cardIds: string[]) => boolean
 }
@@ -908,6 +910,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     futureCardResources,
     devMode,
     isInteractive,
+    cardPlayRequestKey,
     occupationHandSelection,
     highlightedHandCardId,
     infirmaryWorkerCount,
@@ -930,6 +933,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
+  const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
   const gridColumns = Math.max(1, farmGridColumns)
   const farmGridRows = Math.max(1, Math.ceil(farmCells.length / gridColumns))
@@ -1080,7 +1084,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                       devMode={devMode}
                       onClick={() => {
                         if (isSelectingOccupation && canInteract) {
-                          resolveChoice(cardId)
+                          playCardChoice(cardId)
                         }
                       }}
                       disabled={
@@ -1089,6 +1093,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                           : !canInteractHand || !canPlay || !isOptionSelectable
                       }
                       selectable={isSelectingOccupation && canInteract}
+                      touchInteraction={isSelectingOccupation && cardPlayRequestKey
+                        ? { kind: 'play', requestKey: cardPlayRequestKey }
+                        : { kind: 'inspect' }}
                       selected={highlightedHandCardId === cardId}
                     />
                   )
@@ -1142,7 +1149,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                       devMode={devMode}
                       onClick={() => {
                         if (canSelect) {
-                          resolveChoice(cardId)
+                          playCardChoice(cardId)
                         }
                       }}
                       disabled={
@@ -1151,6 +1158,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                           : !canInteractHand || !canPlay || !isOptionSelectable
                       }
                       selectable={canSelect}
+                      touchInteraction={isSelectingThisHand && cardPlayRequestKey
+                        ? { kind: 'play', requestKey: cardPlayRequestKey }
+                        : { kind: 'inspect' }}
                       selected={highlightedHandCardId === cardId}
                     />
                   )

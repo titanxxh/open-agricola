@@ -15,6 +15,7 @@ type Props = {
   selectableMajorIds: Set<string>
   cardAvailability: Record<string, boolean>
   isInteractive: boolean
+  cardPlayRequestKey?: string
   resolveChoice: (value: string) => void
   futureCardResources: Record<
     string,
@@ -36,6 +37,7 @@ export const MajorImprovements = ({
   selectableMajorIds,
   cardAvailability,
   isInteractive,
+  cardPlayRequestKey,
   resolveChoice,
   futureCardResources,
   devMode,
@@ -90,6 +92,7 @@ export const MajorImprovements = ({
                       cardType="major"
                       devMode={devMode}
                       className="major-stack-card major-stack-card-covered"
+                      touchInteraction={{ kind: 'inspect' }}
                     />
                   ))}
                   <PlayerCard
@@ -102,8 +105,11 @@ export const MajorImprovements = ({
                         resolveChoice(cardId)
                       }
                     }}
-                    disabled={isDisabled}
+                    disabled={isDisabled || !isInteractive}
                     selectable={isSelectingMajor && isPendingSelectable}
+                    touchInteraction={isSelectingMajor && cardPlayRequestKey
+                      ? { kind: 'play', requestKey: cardPlayRequestKey }
+                      : { kind: 'inspect' }}
                     className={`${isDisabled ? 'disabled ' : ''}major-stack-card major-stack-card-top`}
                   />
                 </div>
