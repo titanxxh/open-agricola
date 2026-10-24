@@ -320,6 +320,9 @@ const buildChoiceSubtitles = (
 ): InteractionBarText[] => {
   const { farm } = input
   const out: InteractionBarText[] = []
+  if (farm.selecting.fences) {
+    out.push(textKey('ui.interactionFenceSelectSubtitle', { selected: farm.pendingFenceEdgesLength }))
+  }
   if (choice.promptKey === 'ui.interactionRoomSelect') {
     out.push(textKey('ui.interactionRoomSelectSubtitle', {
       selected: farm.pendingRoomTilesLength,

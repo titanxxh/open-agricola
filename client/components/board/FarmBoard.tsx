@@ -18,7 +18,7 @@ import type { ParentCardId } from '../../../shared/parents'
 import type {
   PlayerPanelSupplySummary,
 } from '../../../shared/domain/player-panel-summary'
-import { isFarmyardBorderEdge, positionKey } from '../../../shared/domain/farm'
+import { isFarmyardBorderEdge, parseEdgeId, positionKey } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsFormat'
@@ -939,8 +939,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const summary = playerPanelSummary
   const gridColumns = Math.max(1, farmGridColumns)
   const farmGridRows = Math.max(1, Math.ceil(farmCells.length / gridColumns))
-  const farmGridStyle: CSSProperties & { '--farm-grid-ratio': string } = {
+  const farmGridStyle: CSSProperties & { '--farm-grid-ratio': string; '--farm-grid-row-ratio': string } = {
     '--farm-grid-ratio': `${Math.floor(gridColumns / 2) + Math.ceil(gridColumns / 2) * 18 / 110}`,
+    '--farm-grid-row-ratio': `${Math.floor(farmGridRows / 2) + Math.ceil(farmGridRows / 2) * 18 / 110}`,
     gridTemplateColumns: Array.from({ length: gridColumns }, (_, index) =>
       index % 2 === 0 ? 'var(--fence)' : 'var(--tile)',
     ).join(' '),
@@ -1294,7 +1295,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         </div>
       </div>
     </div>
-    <div className="farm-grid" style={farmGridStyle}>
+    <div className="farm-grid" style={farmGridStyle} data-interaction-focus="farm" data-focus-player={displayPlayer.id}>
       {farmCells.map((cell) => {
         if (cell.type === 'void') {
           return <div key={cell.key} className="farm-cell farm-void" />
@@ -1677,6 +1678,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         }
         if (cell.type === 'fence-h' || cell.type === 'fence-v') {
           const edgeId = cell.fenceId ?? ''
+          const edgePosition = parseEdgeId(edgeId)
           const isExisting = edgeId && existingFenceSet.has(edgeId)
           const isPendingFence = isInteractive && edgeId && pendingFenceSet.has(edgeId)
           const isPendingPalisade =
@@ -1723,12 +1725,20 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
               data-player-color={sourcePlayerColor}
               data-color={fenceColor(sourcePlayerColor)}
-              onClick={() => {
-                if (isSelectable && edgeId) {
-                  toggleFenceEdge(edgeId)
-                }
-              }}
-            />
+              data-fence-edge={edgeId}
+              data-fence-player={displayPlayer.id}
+            >
+              {(isSelectable || isPending) && edgePosition ? <button
+                type="button"
+                className="farm-fence-hit"
+                aria-label={t(locale, cell.type === 'fence-h' ? 'ui.farmFenceHorizontal' : 'ui.farmFenceVertical', {
+                  row: edgePosition.row + 1, col: edgePosition.col + 1,
+                })}
+                aria-pressed={!!isPending}
+                disabled={!isSelectable}
+                onClick={() => toggleFenceEdge(edgeId)}
+              /> : null}
+            </div>
           )
         }
         if (cell.type === 'post') {

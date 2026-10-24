@@ -2,7 +2,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
-import { useInteractionFocus } from '../interaction-focus'
+import type { InteractionRequest } from '../../../shared/contract/types'
+import { getInteractionFocusTarget, useInteractionFocus } from '../interaction-focus'
 
 const occupation: ClientInteractionState = {
   stateId: 'wait', playerIndex: 0, spaceId: 'lessons',
@@ -11,15 +12,18 @@ const occupation: ClientInteractionState = {
 }
 const idle: ClientInteractionState = { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] }
 
-const Harness = ({ interaction = occupation, permitted = true }: {
+const Harness = ({ interaction = occupation, permitted = true, terrain = false }: {
   interaction?: ClientInteractionState
   permitted?: boolean
+  terrain?: boolean
 }) => {
-  const focus = useInteractionFocus({ interaction, canFocus: permitted, playerId: 'p1', onViewPlayer: () => {} })
+  const focus = useInteractionFocus({ interaction, canFocus: permitted, playerId: 'p1', onViewPlayer: () => {},
+    localRequest: terrain ? { key: 'selected-terrain', target: 'farm' } : undefined })
   return <div className="app">
     <div data-interaction-focus="actions">Action spaces</div>
     <div data-interaction-focus="occupation-hand" data-focus-player="p1">Occupations</div>
     <div data-interaction-focus="controls">Payment controls</div>
+    <div data-interaction-focus="farm" data-focus-player="p1">Farm targets</div>
     {focus.hasTarget && <button onClick={focus.returnToTarget}>Return to current action</button>}
   </div>
 }
@@ -34,6 +38,32 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('Interaction Focus', () => {
+  it('focuses a locally selected terrain target before a server command and keeps repeated idle snapshots still', async () => {
+    const view = render(<Harness interaction={idle} />)
+    view.rerender(<Harness interaction={idle} terrain />)
+    await waitFor(() => expect(document.querySelector('[data-interaction-focus="farm"]')).toHaveAttribute('data-interaction-focused', 'true'))
+    const calls = vi.mocked(window.scrollBy).mock.calls.length
+    view.rerender(<Harness interaction={structuredClone(idle)} terrain />)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
+    expect(window.scrollBy).toHaveBeenCalledTimes(calls)
+    view.rerender(<Harness interaction={idle} />)
+    await waitFor(() => expect(document.querySelector('[data-interaction-focus="actions"]')).toHaveAttribute('data-interaction-focused', 'true'))
+  })
+
+  it.each([
+    { label: 'room', request: { kind: 'farm-select', farm: { farmType: 'room', selectableTiles: [{ row: 0, col: 1 }], maxSelections: 1 } } },
+    { label: 'stable', request: { kind: 'farm-select', farm: { farmType: 'stable', selectableTiles: [{ row: 0, col: 1 }], maxSelections: 1 } } },
+    { label: 'fence', request: { kind: 'farm-select', farm: { farmType: 'fence', selectableEdges: ['H:0:1'] } } },
+    { label: 'plow', request: { kind: 'farm-select', farm: { farmType: 'plow', selectableTiles: [{ row: 0, col: 1 }] } } },
+    { label: 'sow', request: { kind: 'farm-select', farm: { farmType: 'sow', selectableFields: [{ tile: { row: 0, col: 1 }, allowedCrops: ['grain'] }] } } },
+    { label: 'position', request: { kind: 'selection', selection: { kind: 'farm-position', selectablePositions: [{ row: 0, col: 1 }], maxSelections: 1 } } },
+    { label: 'animal', request: { kind: 'animal-reorg', zones: [] } },
+    { label: 'spatial choice', request: { kind: 'choice', options: [{ value: 'opaque-target', labelKey: 'ui.interactionConfirmButton', target: { kind: 'farm-cell', playerId: 'p1', positions: [{ row: 0, col: 1 }] } }] } },
+  ] satisfies Array<{ label: string; request: InteractionRequest }>)('focuses the actual $label request on the farm, regardless of action-space or prompt name', ({ request }) => {
+    expect(getInteractionFocusTarget({ stateId: 'wait', playerIndex: 0, spaceId: 'lessons',
+      allowedCommands: ['commitSelection'], anytimeActions: [], request })).toBe('farm')
+  })
+
   it('reveals the occupation hand once and leaves manual browsing alone until the shortcut is used', async () => {
     const view = render(<Harness />)
     await waitFor(() => expect(window.scrollBy).toHaveBeenCalledOnce())

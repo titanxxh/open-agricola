@@ -14,6 +14,8 @@ import {
 import { useGameSync } from '../hooks/useGameSync'
 import { interactionFocusRequestKey, useInteractionFocus } from './interaction-focus'
 import { getImprovementSelection } from './improvement-selection'
+import { useFenceSelectionQuote } from './fence-selection-quote'
+import { buildFenceCommitPayload } from './farm-commit-ui'
 import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
@@ -548,6 +550,9 @@ export const GameContainerApi = () => {
       (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey) &&
       (!isWs || isHotseat || activePlayer?.id === selfPlayer?.id),
     onViewPlayer: setViewPlayerId,
+    localRequest: selectedSpecialAction && isMoorTerrainAction(selectedSpecialAction.actionId)
+      ? { key: `terrain:${selectedSpecialAction.cardId}:${selectedSpecialAction.actionId}`, target: 'farm' }
+      : undefined,
   })
   const highlightedHandCardId =
     isInteractive && interaction.stateId === 'wait' && typeof interaction.promptParams?.cardId === 'string'
@@ -573,6 +578,15 @@ export const GameContainerApi = () => {
   const setFarmDraftCommitError = farmSelectionDraft.setCommitError
   const setFarmDraftSubmitError = farmSelectionDraft.setSubmitError
   const resetFarmSelectionDraft = farmSelectionDraft.reset
+  const fenceQuoteRequest = useMemo(() => {
+    if (!isInteractive || interaction.stateId !== 'wait' || !interaction.requestKey ||
+      interaction.request.kind !== 'farm-select' || interaction.request.farm.farmType !== 'fence') return null
+    const draft = farmSelectionDraft.submitDraft
+    return { playerIndex: interaction.playerIndex, requestKey: interaction.requestKey,
+      payload: buildFenceCommitPayload([...(draft.fenceEdges ?? [])], [...(draft.palisadeEdges ?? [])],
+        interaction.request.farm.extraWood ?? 0, interaction.request.farm.fenceSource, draft.fenceSources ?? {}) }
+  }, [farmSelectionDraft.submitDraft, interaction, isInteractive])
+  const fenceQuote = useFenceSelectionQuote({ snapshot: state, request: fenceQuoteRequest, transport })
   const pendingAnimalReorg = useMemo(
     () =>
       interactionPresentationPlan.kind === 'animal-reorg'
@@ -1079,14 +1093,19 @@ export const GameContainerApi = () => {
     resolveChoice('cancel')
   }, [isAnytimeExchange, pendingChoice, resolveChoice])
 
+  const draftRequestKey = useRef<string | null>(null)
   const handleSnapshot = useCallback((payload: GameSyncPayload, roomId?: string) => {
     if (roomId) setRoomInUrl(roomId)
     applySnapshot(payload)
     applySnapshotPublicEventCancellations(payload)
     syncAnimalReorgFromInteraction(payload.interaction, payload.state)
     if (payload.ok) {
-      setSelectedSpecialAction(null)
-      resetFarmSelectionDraft()
+      const nextRequestKey = interactionFocusRequestKey(payload.interaction)
+      if (draftRequestKey.current !== nextRequestKey) {
+        setSelectedSpecialAction(null)
+        resetFarmSelectionDraft()
+      }
+      draftRequestKey.current = nextRequestKey
       resetExchangeDraft()
     }
   }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
@@ -2046,6 +2065,9 @@ export const GameContainerApi = () => {
       {/* Keep local panel drafts mounted, but neither visible nor actionable while browsing. */}
       <div hidden={isPublicFarmView} inert={isPublicFarmView}>
         <InteractionBar model={interactionBarModel} actions={interactionBarActions}
+          fenceQuote={fenceQuote}
+          prioritizeTask={!!farmInteraction || selectionInteraction?.kind === 'farm-position' || isReorgActive ||
+            !!(selectedSpecialAction && isMoorTerrainAction(selectedSpecialAction.actionId)) || farmChoiceOptions.some(option => !!option.target)}
           onReturnToTarget={interactionFocus.hasTarget ? interactionFocus.returnToTarget : undefined} />
       </div>
     </div>

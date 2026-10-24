@@ -21,6 +21,7 @@ import type {
   InteractionBarModel,
   InteractionBarText,
 } from '../../app/interaction-bar-presentation'
+import type { FenceSelectionQuoteState } from '../../app/fence-selection-quote'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: PaymentResourceMap
@@ -425,12 +426,16 @@ type Props = {
   model: InteractionBarModel
   actions: InteractionBarActions
   onReturnToTarget?: () => void
+  prioritizeTask?: boolean
+  fenceQuote?: FenceSelectionQuoteState
 }
 
 export const InteractionBar = ({
   model,
   actions,
   onReturnToTarget,
+  prioritizeTask = false,
+  fenceQuote,
 }: Props) => {
   const barRef = useRef<HTMLDivElement>(null)
   const { locale, isInteractive } = model
@@ -487,7 +492,7 @@ export const InteractionBar = ({
   }, [])
 
   return (
-    <div ref={barRef} className="interaction-bar" data-interaction-focus="controls">
+    <div ref={barRef} className={`interaction-bar${prioritizeTask ? ' interaction-bar--farm' : ''}`} data-interaction-focus="controls">
       <div className="interaction-bar__top">
         <div className="interaction-bar__controls">
           {onReturnToTarget ? <button type="button" onClick={onReturnToTarget}>
@@ -632,6 +637,12 @@ export const InteractionBar = ({
                   {renderInteractionText(locale, subtitle)}
                 </div>
               ))}
+              {model.farm.selecting.fences && fenceQuote && fenceQuote.kind !== 'idle' ? (
+                <div className="interaction-fence-cost" data-testid="fence-selection-cost" role="status">
+                  {fenceQuote.kind === 'ready' ? t(locale, 'ui.fenceSelectionCost', { wood: fenceQuote.quote.woodCost })
+                    : t(locale, fenceQuote.kind === 'pending' ? 'ui.fenceSelectionCostPending' : 'ui.fenceSelectionCostUnavailable')}
+                </div>
+              ) : null}
               {choiceModel.borrowedFenceControlsVisible && borrowedFenceSources ? (
                 <div className="borrowed-fence-source-controls">
                   <div className="borrowed-fence-source-title">

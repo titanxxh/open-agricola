@@ -20,6 +20,20 @@ const pendingChoice = {
 }
 
 describe('useFarmSelectionDraftPresentation', () => {
+  it('retains legal room choices across refreshed snapshots and removes withdrawn targets', () => {
+    const initial: InteractionPresentationPlan = { kind: 'farm-room-selection', pendingChoice,
+      farm: { farmType: 'room', selectableTiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], maxSelections: 2 } }
+    const { result, rerender } = renderHook(({ plan }) => useFarmSelectionDraftPresentation({
+      interactionPresentationPlan: plan, locale: 'en', displayPlayer: player('p1'),
+    }), { initialProps: { plan: initial } })
+    act(() => result.current.controls.toggleRoomTile({ row: 0, col: 1 }))
+    act(() => result.current.controls.toggleRoomTile({ row: 0, col: 2 }))
+    rerender({ plan: structuredClone(initial) })
+    expect(result.current.submitDraft.roomTiles).toEqual([{ row: 0, col: 1 }, { row: 0, col: 2 }])
+    rerender({ plan: { ...initial, farm: { farmType: 'room', selectableTiles: [{ row: 0, col: 2 }], maxSelections: 1 } } })
+    expect(result.current.submitDraft.roomTiles).toEqual([{ row: 0, col: 2 }])
+  })
+
   it('localizes generated fence donors and updates them when the language changes', () => {
     const plan: InteractionPresentationPlan = { kind: 'farm-fence-selection', pendingChoice,
       farm: { farmType: 'fence', selectableEdges: ['H-0-0'],

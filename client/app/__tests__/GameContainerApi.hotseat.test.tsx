@@ -241,8 +241,8 @@ describe('hotseat public farm browsing', () => {
     expect(ruleCommands()).toEqual([])
 
     act(() => GameSocket.snapshot())
-    expect(cutPeat).toHaveAttribute('aria-pressed', 'false')
-    expect(cutPeat).not.toHaveClass('selected')
+    expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
+    expect(cutPeat).toHaveClass('selected')
   })
 
   it('hides private improvement candidates and affordability hints in the public supply, then restores them on return', async () => {
@@ -340,6 +340,8 @@ describe('hotseat public farm browsing', () => {
     await confirmAlice(user)
     const selectedTile = () => container.querySelector('[data-farm-tile-player="p1"][data-farm-tile-key="0-2"]')!
     await user.click(selectedTile())
+    expect(selectedTile()).toHaveClass('selected')
+    act(() => GameSocket.snapshot())
     expect(selectedTile()).toHaveClass('selected')
     await selectBob(user)
     expect(container.querySelector('.farm-tile.selectable, .farm-tile.selected')).not.toBeInTheDocument()
