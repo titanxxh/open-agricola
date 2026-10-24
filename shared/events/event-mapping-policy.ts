@@ -208,7 +208,7 @@ export const publicEventMappingPolicy = {
     replay: 'replayable',
   },
   'action.accumulated': {
-    log: conditional(positiveResources, 'empty accumulation does not produce an action log row'),
+    log: conditional('positive net resources or a nonzero seasonal adjustment', 'empty accumulation without a seasonal effect does not produce an action log row'),
     notification: conditional(positiveResources, 'empty accumulation does not notify'),
     highlight: conditional(positiveResources, 'empty accumulation has no visible action-space change'),
     resourceAnimation: conditional(positiveResources, 'empty accumulation does not animate'),

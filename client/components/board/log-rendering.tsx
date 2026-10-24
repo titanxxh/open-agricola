@@ -323,6 +323,24 @@ const cardDisplayParamKeys = ['cardId', 'fromCardId', 'toCardId'] as const
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const accumulationSeasonDetails = (locale: Locale, params: Record<string, unknown>): ReactNode[] => {
+  if (!Array.isArray(params.seasonalAdjustments)) return []
+  return params.seasonalAdjustments.flatMap((adjustment, index) => {
+    if (!isRecord(adjustment) || !isRecord(adjustment.resources) || typeof adjustment.season !== 'string') return []
+    const changes = Object.entries(adjustment.resources).flatMap(([resource, amount]) => {
+      if (typeof amount !== 'number' || amount === 0) return []
+      return [<Fragment key={resource}>
+        {amount > 0 ? '+' : '−'}<ResourceLine locale={locale} resources={{ [resource]: Math.abs(amount) }} />
+      </Fragment>]
+    })
+    if (changes.length === 0) return []
+    return [<Fragment key={`season-${index}`}>
+      {index > 0 ? (locale === 'zh' ? '，' : ', ') : null}
+      {t(locale, `ui.seasons.${adjustment.season}`)} {changes}
+    </Fragment>]
+  })
+}
+
 export const prepareLogEntry = (
   entry: GameState['log'][number],
   locale: Locale,
@@ -534,7 +552,8 @@ export const prepareLogEntry = (
     richResourceParamKeys.forEach((key) => {
       if (isRecord(params[key])) {
         richParams[key] = (
-          <ResourceLine locale={locale} resources={params[key] as Partial<Resource>} />
+          <ResourceLine locale={locale} resources={params[key] as Partial<Resource>}
+            emptyLabel={entry.key === 'log.actionAccumulated' && Array.isArray(params.seasonalAdjustments) ? '0' : undefined} />
         )
       }
     })
@@ -716,6 +735,17 @@ export const prepareLogEntry = (
       ) as Record<string, string | number>)
     : undefined
   const parts = renderRichTemplate(locale, entry.key, textParams ?? {}, richParams)
+  if (entry.key === 'log.actionAccumulated' && params) {
+    const seasonalDetails = accumulationSeasonDetails(locale, params)
+    if (seasonalDetails.length > 0) {
+      const normal = isRecord(params.normalResources)
+        ? Object.fromEntries(Object.entries(params.normalResources).filter((entry): entry is [string, number] => typeof entry[1] === 'number')) : {}
+      parts.push(...renderRichTemplate(locale, 'log.seasonalAccumulationDetail', {}, {
+        normal: <ResourceLine locale={locale} resources={normal} emptyLabel="0" />,
+        adjustments: <>{seasonalDetails}</>,
+      }))
+    }
+  }
   const plainText = t(locale, entry.key, stringifyParams(entry.params))
   return { parts, cardRefs, plainText }
 }

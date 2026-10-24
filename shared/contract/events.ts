@@ -15,6 +15,7 @@ import type {
 } from './types'
 import type { ActionDetailParts } from './protocol/game'
 import type { AnimalKey } from './animals'
+import type { SeasonalAdjustment } from './seasonal-adjustments'
 
 export type GameEventBase<T extends string> = {
   schemaVersion: 1
@@ -248,6 +249,8 @@ export type ActionRevealedEvent = GameEventBase<'action.revealed'> & {
 export type ActionAccumulatedEvent = GameEventBase<'action.accumulated'> & {
   spaceId: string
   resources: Partial<Resource>
+  normalResources?: Partial<Resource>
+  seasonalAdjustments?: SeasonalAdjustment[]
 }
 
 export type ActionExclusiveUseSetEvent = GameEventBase<'action.exclusiveUseSet'> & {

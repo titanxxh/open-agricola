@@ -253,7 +253,7 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
   },
   'action.accumulated': {
     log: {
-      mapped: { ...base, type: 'action.accumulated', spaceId: 'forest', resources: { wood: 1 } },
+      mapped: { ...base, type: 'action.accumulated', spaceId: 'reed-bank', resources: {}, normalResources: { reed: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { reed: -1 } }] },
       silent: { ...base, id: 'action-accumulated-empty-log', seq: 2, type: 'action.accumulated', spaceId: 'forest', resources: {} },
     },
     notification: {

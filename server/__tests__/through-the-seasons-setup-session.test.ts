@@ -131,7 +131,7 @@ describe('Seasons batch 3 setup audit', () => {
         expect(spaceOf(session, id).resources[resource], id).toBe(retained + amount)
         expect(spaceOf(session, id).resources.vegetable).toBe(0)
         const events = response.state.events.filter((event) => event.type === 'action.accumulated' && event.round === round && event.spaceId === id)
-        if (amount > 0) expect(events).toEqual([expect.objectContaining({ resources: { [resource]: amount } })])
+        if (opened) expect(events).toEqual([expect.objectContaining({ resources: amount > 0 ? { [resource]: amount } : {} })])
         else expect(events).toHaveLength(0)
       }
       expect(response.state.players.map((player) => player.resources)).toEqual([{ ...emptyResources, food: 50 }, { ...emptyResources, food: 50 }])

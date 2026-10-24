@@ -3341,20 +3341,34 @@ export class GameCore {
       }
     }
     applyRoundGrowth(this.state)
+    const actionSpaceResourcesAfterGrowth = new Map(
+      this.state.actionSpaces.map(space => [space.id, { ...space.resources }]),
+    )
     applySeasonPreparationAdjustments(this.state)
     const accumulatedActionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
       if (!openActionSpaceIds.has(space.id)) return []
       const before = actionSpaceResourcesBefore.get(space.id) ?? emptyResources
+      const afterGrowth = actionSpaceResourcesAfterGrowth.get(space.id) ?? before
       const resources: Partial<Resource> = {}
+      const normalResources: Partial<Resource> = {}
+      const seasonalResources: Partial<Resource> = {}
       resourceKeyList.forEach((key) => {
         const delta = (space.resources[key] ?? 0) - (before[key] ?? 0)
         if (delta > 0) resources[key] = delta
+        const normalDelta = (afterGrowth[key] ?? 0) - (before[key] ?? 0)
+        if (normalDelta !== 0) normalResources[key] = normalDelta
+        const seasonalDelta = (space.resources[key] ?? 0) - (afterGrowth[key] ?? 0)
+        if (seasonalDelta !== 0) seasonalResources[key] = seasonalDelta
       })
-      if (Object.keys(resources).length === 0) return []
+      const season = this.state.enableThroughTheSeasons ? this.state.throughTheSeasons?.currentSeason : undefined
+      const seasonalAdjustments = season && Object.keys(seasonalResources).length > 0
+        ? [{ season, resources: seasonalResources }] : undefined
+      if (Object.keys(resources).length === 0 && !seasonalAdjustments) return []
       return [{
         type: 'action.accumulated',
         spaceId: space.id,
         resources,
+        ...(seasonalAdjustments ? { normalResources, seasonalAdjustments } : {}),
       }]
     })
     appendImmediateEvents(this.state, accumulatedActionEvents)

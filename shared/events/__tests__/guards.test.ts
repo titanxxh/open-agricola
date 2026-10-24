@@ -17,6 +17,19 @@ describe('event guards', () => {
     visibility: 'public',
   } as const
 
+  it('accepts seasonal accumulation facts with signed actual adjustments', () => {
+    expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'action.accumulated', spaceId: 'reed-bank', resources: {}, normalResources: { reed: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { reed: -1 } }] })).not.toThrow()
+  })
+
+  it.each([
+    { seasonalAdjustments: [{ season: 'monsoon', resources: { reed: -1 } }] },
+    { seasonalAdjustments: [{ season: 'winter', resources: { reed: Number.NaN } }] },
+    { seasonalAdjustments: [{ season: 'winter', resources: { reed: -1 }, cardId: 'not-a-card' }] },
+    { seasonalAdjustments: { season: 'winter', resources: { reed: -1 } } },
+  ])('rejects malformed seasonal accumulation provenance %j', ({ seasonalAdjustments }) => {
+    expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'action.accumulated', spaceId: 'reed-bank', resources: {}, seasonalAdjustments })).toThrow()
+  })
+
   it('accepts public json-safe events under size limit', () => {
     const event = {
       ...baseEvent,

@@ -1459,6 +1459,7 @@ export const en = {
     actionDetail: '{player} takes {action}{detail}',
     actionRevealed: 'Round {roundSlot} action revealed: {action}',
     actionAccumulated: '{action} accumulates {resources}',
+    seasonalAccumulationDetail: ' (normal {normal}, {adjustments})',
     resourceAccumulated: '{target} accumulates {resources}',
     actionExclusiveUseSet: '{player} reserves {action} via {cardId}',
     actionExclusiveUseCleared: "{player}'s reservation on {action} ends",
