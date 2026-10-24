@@ -2788,7 +2788,8 @@
   color: #2a1a00;
   margin-bottom: 4px;
 }
-.tooltip-text p {
+.tooltip-text p,
+.tooltip-text .tooltip-description {
   margin: 0 0 7px;
   color: #5a5042;
 }
@@ -2807,7 +2808,8 @@
   font-size: 12px;
   margin-bottom: 2px;
 }
-.tooltip-text p:last-child {
+.tooltip-text p:last-child,
+.tooltip-text .tooltip-description:last-child {
   margin-bottom: 0;
 }
 /* --- Harvest markers --- */

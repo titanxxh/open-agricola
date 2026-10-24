@@ -1068,7 +1068,7 @@ export const ActionBoard = ({
                 </p>
               )}
               {(tooltip.kind === 'action' || tooltip.description) && (
-                <p>{tooltip.kind === 'action' ? renderTooltipBody(tooltip) : tooltip.description}</p>
+                <div className="tooltip-description">{tooltip.kind === 'action' ? renderTooltipBody(tooltip) : tooltip.description}</div>
               )}
               {tooltip.kind === 'action' && renderSupplementalRules(tooltip.action)}
             </div>
