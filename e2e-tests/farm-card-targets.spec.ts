@@ -49,6 +49,21 @@ async function visibleTargets(page: Page) {
     return bounds.top >= 0 && bounds.bottom <= bar.top
   })).toBe(true)
 }
+async function visibleFarmAnimalControls(page: Page) {
+  const buttons = farm(page).locator('.pasture-controls button')
+  await expect(buttons).not.toHaveCount(0)
+  await expect.poll(() => buttons.evaluateAll(nodes => {
+    const bar = document.querySelector('.interaction-bar')!.getBoundingClientRect()
+    return nodes.flatMap(node => {
+      const bounds = node.getBoundingClientRect()
+      const enabled = node instanceof HTMLButtonElement && !node.disabled
+      const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+      return bounds.top >= 0 && bounds.bottom <= bar.top && bounds.left >= 0 && bounds.right <= window.innerWidth && (!enabled || (hit && node.contains(hit)))
+        ? []
+        : [{ text: node.textContent, top: bounds.top, bottom: bounds.bottom, left: bounds.left, right: bounds.right }]
+    })
+  })).toEqual([])
+}
 async function action(page: Page, id: string): Promise<SessionResponse> {
   const committed = page.waitForResponse(response => response.url().endsWith('/api/game/action'))
   await page.locator(`[data-action-id="${id}"] button`).first().click()
@@ -110,6 +125,17 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     const collected = await action(page, 'sheep-market')
     expect(collected.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     await visibleTargets(page)
+    await visibleFarmAnimalControls(page)
+    const pastureSheep = farm(page).locator('[data-farm-tile-key="0-2"] .pasture-control-row').filter({ hasText: 'Sheep' })
+    await pastureSheep.getByRole('button', { name: '-', exact: true }).click()
+    await expect(pastureSheep.locator('.pasture-control-value')).toHaveText('1')
+    await pastureSheep.getByRole('button', { name: '+', exact: true }).click()
+    await expect(pastureSheep.locator('.pasture-control-value')).toHaveText('2')
+    const houseCattle = farm(page).getByTestId('room-animal-2-0').locator('.pasture-control-row').filter({ hasText: 'Cattle' })
+    await houseCattle.getByRole('button', { name: '-', exact: true }).click()
+    await expect(houseCattle.locator('.pasture-control-value')).toHaveText('0')
+    await houseCattle.getByRole('button', { name: '+', exact: true }).click()
+    await expect(houseCattle.locator('.pasture-control-value')).toHaveText('1')
     const nearby = tray(page).locator('[data-card-animal-zone="card:C011_WildlifeReserve"]')
     const body = page.locator('.played-card-slot[data-played-card-key="minor:C011_WildlifeReserve"]')
     await nearby.getByRole('button', { name: 'Remove Sheep' }).click()
@@ -118,6 +144,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }
     await expect(nearby.getByRole('button', { name: 'Remove Sheep' })).toBeEnabled()
     await page.getByRole('button', { name: 'Return to current action' }).click()
     await visibleTargets(page)
+    await visibleFarmAnimalControls(page)
     const before: SessionResponse = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
     expect(before.state.players[0]!.pastures[0]!.animalCount).toBe(1)
     expect(before.state.players[0]!.cardStates.C011_WildlifeReserve?.extraData?.animalCounts).toEqual({ boar: 1 })
