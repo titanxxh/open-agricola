@@ -542,13 +542,14 @@ export const GameContainerApi = () => {
     [interaction],
   )
   const improvementSelection = getImprovementSelection(interaction, activePlayer?.minorHand ?? [], state?.availableMajorImprovements ?? [])
+  const canPresentInteractionFocus = hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
+    (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey)
   const interactionFocus = useInteractionFocus({
     interaction,
     targetOverride: improvementSelection?.target,
     playerId: activePlayer?.id ?? '',
-    canFocus: hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
-      (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey) &&
-      (!isWs || isHotseat || activePlayer?.id === selfPlayer?.id),
+    canFocus: canPresentInteractionFocus && (!isWs || isHotseat || activePlayer?.id === selfPlayer?.id),
+    canReturnToActions: canPresentInteractionFocus,
     onViewPlayer: setViewPlayerId,
     localRequest: selectedSpecialAction && isMoorTerrainAction(selectedSpecialAction.actionId)
       ? { key: `terrain:${selectedSpecialAction.cardId}:${selectedSpecialAction.actionId}`, target: 'farm' }

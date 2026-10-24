@@ -47,9 +47,10 @@ const revealTarget = (target: InteractionFocusTarget, playerId: string): boolean
   return true
 }
 
-export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPlayer, targetOverride, localRequest }: {
+export const useInteractionFocus = ({ interaction, canFocus, canReturnToActions = canFocus, playerId, onViewPlayer, targetOverride, localRequest }: {
   interaction: ClientInteractionState
   canFocus: boolean
+  canReturnToActions?: boolean
   playerId: string
   onViewPlayer: (playerId: string) => void
   targetOverride?: InteractionFocusTarget | null
@@ -59,11 +60,13 @@ export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPla
   const lastFocusedRequest = useRef<string | null>(null)
   const requestKey = interactionFocusRequestKey(interaction) + (localRequest ? `:${localRequest.key}` : '')
   const requestedTarget = localRequest?.target ?? targetOverride ?? getInteractionFocusTarget(interaction)
-  const complete = !localRequest && (interaction.stateId === 'idle' || (interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player'))
+  const complete = !localRequest && (interaction.stateId === 'idle' || (interaction.stateId === 'wait' &&
+    (interaction.request.kind === 'confirm-next-player' ||
+      (interaction.request.kind === 'private-prompt' && interaction.request.promptKind === 'confirm-next-player'))))
   const target = requestedTarget ?? (followingAction && !complete ? 'controls' : null)
 
   useEffect(() => {
-    if (!canFocus || lastFocusedRequest.current === requestKey) return
+    if ((!canFocus && !(followingAction && complete && canReturnToActions)) || lastFocusedRequest.current === requestKey) return
     if (!requestedTarget && !followingAction) return
     const nextTarget = complete ? 'actions' : target
     if (!nextTarget) return
@@ -74,7 +77,7 @@ export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPla
       setFollowingAction(!complete)
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [canFocus, complete, followingAction, onViewPlayer, playerId, requestKey, requestedTarget, target])
+  }, [canFocus, canReturnToActions, complete, followingAction, onViewPlayer, playerId, requestKey, requestedTarget, target])
 
   const returnToTarget = useCallback(() => {
     if (!canFocus || !target) return
