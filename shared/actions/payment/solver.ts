@@ -90,6 +90,7 @@ const receiptForSolution = (
       .map((entry) => entry.trade.sourceId)
       .filter((source): source is string => Boolean(source)),
   ])]
+  const seasonalAdjustments = [...(ctx.seasonalAdjustments ?? []), ...(metadata?.seasonalAdjustments ?? [])]
   return {
     solution,
     resourcesPaid: solution.resourcesPaid,
@@ -100,7 +101,7 @@ const receiptForSolution = (
     ...(metadata?.originalFeeIndex !== undefined ? { originalFeeIndex: metadata.originalFeeIndex } : {}),
     ...(paymentSources.length > 0 ? { candidateSources: paymentSources } : {}),
     ...(metadata?.costAttribution ? { costAttribution: metadata.costAttribution } : {}),
-    ...(ctx.seasonalAdjustments?.length ? { seasonalAdjustments: ctx.seasonalAdjustments } : {}),
+    ...(seasonalAdjustments.length ? { seasonalAdjustments } : {}),
     ...(solutionPaymentResourceProviders(cost, ctx)
       ? { paymentResourceProviders: solutionPaymentResourceProviders(cost, ctx) }
       : {}),

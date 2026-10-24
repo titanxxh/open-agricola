@@ -38,6 +38,7 @@ const majorCostListener: CardListenerRegistration = {
         resources,
         originalFeeIndex: candidate.originalFeeIndex,
         sources: [...candidate.sources, CARD_ID],
+        ...(candidate.seasonalAdjustments ? { seasonalAdjustments: candidate.seasonalAdjustments } : {}),
       })
     }
     return derived.length > 0 ? derived : null

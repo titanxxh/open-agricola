@@ -1,4 +1,4 @@
-import type { CardCostCandidate, PaymentResourceKey, PaymentResourceMap } from '../contract/types'
+import type { CardCostCandidate, PaymentResourceMap } from '../contract/types'
 import type { CardListenerRegistration } from '../cards/card-listeners'
 import type { CardRegistry } from '../cards/registry'
 import { isMajorCardId } from '../cards/helpers/card-type'
@@ -11,7 +11,7 @@ const discountOneBuildingResource = (
   candidate: CardCostCandidate,
   resource: typeof buildingResources[number],
 ): CardCostCandidate | null => {
-  const key = resource as PaymentResourceKey
+  const key = resource
   const amount = candidate.resources[key] ?? 0
   if (amount <= 0) return null
   const resources: PaymentResourceMap = { ...candidate.resources }
@@ -26,6 +26,10 @@ const discountOneBuildingResource = (
     sources: candidate.sources.includes(autumnSource)
       ? [...candidate.sources]
       : [...candidate.sources, autumnSource],
+    seasonalAdjustments: [
+      ...(candidate.seasonalAdjustments ?? []),
+      { season: 'autumn', resources: { [resource]: -1 } },
+    ],
   }
 }
 

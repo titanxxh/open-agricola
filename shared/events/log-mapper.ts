@@ -727,6 +727,7 @@ const mapCardPlayed = (
       costResources: positiveResources(payment?.resources ?? {}),
       ...(payment?.returnedCardId ? { returnedCards: [payment.returnedCardId] } : {}),
       ...(payment?.bonusSources?.length ? { bonusSources: payment.bonusSources } : {}),
+      ...(payment?.seasonalAdjustments?.length ? { seasonalAdjustments: payment.seasonalAdjustments } : {}),
     },
   }
 }
