@@ -1,3 +1,4 @@
+import { parseFenceSelectionPayload } from '../../shared/contract/protocol/farm-selection'
 /**
  * Testable core of the local-sandbox engine worker: owns the `GameCore`
  * instance and maps transport method calls onto it. `worker.ts` is a thin
@@ -23,7 +24,7 @@ import {
   type InitialStateOptions,
 } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
-import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
+import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type {
   FarmChoiceType,
   FarmChoiceValidation,
@@ -134,6 +135,10 @@ export class LocalSandboxCore {
     return this.respond(core.withCtx(() => this.dispatch(core, method, args)), viewer)
   }
 
+  quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): FenceSelectionQuote {
+    return this.requireCore().quoteFenceSelection(playerIndex, requestKey, payload)
+  }
+
   validateFarmChoice(type: FarmChoiceType, playerId: string, payload: Record<string, unknown>): FarmChoiceValidation {
     return this.requireCore().validateFarmChoice(type, playerId, payload)
   }
@@ -223,6 +228,11 @@ export const handleLocalSandboxRequest = (
   request: LocalSandboxRequest,
 ): LocalSandboxResponse => {
   try {
+    if (request.kind === 'call' && request.method === 'quoteFenceSelection') {
+      const [playerIndex, requestKey, payload] = request.args
+      if (typeof playerIndex !== 'number' || typeof requestKey !== 'string') throw new Error('Invalid fence quote request')
+      return { kind: 'result', id: request.id, ok: true, raw: core.quoteFenceSelection(playerIndex, requestKey, parseFenceSelectionPayload(payload)) }
+    }
     if (request.kind === 'call' && request.method === 'validateFarmChoice') {
       const [type, playerId, payload] = request.args as [FarmChoiceType, string, Record<string, unknown>]
       return { kind: 'result', id: request.id, ok: true, raw: core.validateFarmChoice(type, playerId, payload) }

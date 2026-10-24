@@ -1,3 +1,5 @@
+import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
+import { quoteFenceSelection } from '../actions/effects/fencing'
 import { reconcileOrdinaryHousePet } from '../domain/animal-zones'
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
@@ -4745,6 +4747,25 @@ export class GameCore {
 
   getStateForRead(): Readonly<GameState> {
     return this.state
+  }
+
+  quoteFenceSelection(
+    playerIndex: number,
+    requestKey: string,
+    payload: FenceSelectionPayload,
+  ): FenceSelectionQuote {
+    return this.withCtx(() => {
+      const interaction = this.buildInteraction()
+      if (typeof requestKey !== 'string' || interaction.stateId !== 'wait' || interaction.requestKey !== requestKey
+        || interaction.playerIndex !== playerIndex || interaction.request.kind !== 'farm-select'
+        || interaction.request.farm.farmType !== 'fence') {
+        throw new Error('Fence selection is no longer current')
+      }
+      const player = this.state.players[playerIndex]!
+      return quoteFenceSelection({ state: this.state, player, actionHooks: this.actionHooks,
+        space: this.getSpaceById(this.activeSpaceId) ?? undefined, actionContext: this.getActionContextFromTopFrame() },
+      requestKey, payload)
+    })
   }
 
   validateFarmChoice(

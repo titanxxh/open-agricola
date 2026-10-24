@@ -1,3 +1,4 @@
+import { createWorkSession } from './_helpers/session-fixtures'
 import type { PostgresDatabase } from '../database/postgres'
 import { createTestDatabase } from './_helpers/postgres'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
@@ -133,6 +134,40 @@ afterEach(async () => {
 })
 
 describe('custom session routes', () => {
+  it('serves a read-only sandbox fence quote for its current pending actor', async () => {
+    const db = await createTestDatabase()
+    databases.push(db)
+    await addUser(db, 'fence-author', 'fence-token')
+    vi.spyOn(database, 'getDb').mockReturnValue(db)
+    const { handleGameRoute, disposeSandboxSessionsForUser } = await import('../game-router')
+    const prepared = createWorkSession({ configure: state => {
+      state.round = 14
+      state.actionSpaces.find(space => space.id === 'fencing')!.roundAvailable = 1
+      state.players[0]!.resources.wood = 10
+    } })
+    try {
+      const load = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/load', { state: prepared.state }, 'fence-token'), load)
+      expect(load.statusCode).toBe(200)
+      const select = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/action', { playerIndex: 0, spaceId: 'fencing' }, 'fence-token'), select)
+      const pending = JSON.parse(select.body)
+      expect(pending.ok).toBe(true)
+      const requestKey = pending.interaction.requestKey
+      const payload = { edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'] }
+      const quote = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/fence-quote', { playerIndex: 0, requestKey, payload }, 'fence-token'), quote)
+      expect(quote.statusCode).toBe(200)
+      expect(JSON.parse(quote.body)).toEqual({ requestKey, woodCost: 4, affordable: true, valid: true, error: null })
+      const after = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'fence-token'), after)
+      expect(JSON.parse(after.body)).toEqual(pending)
+      const wrong = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/fence-quote', { playerIndex: 1, requestKey, payload }, 'fence-token'), wrong)
+      expect(wrong.statusCode).toBe(400)
+    } finally { prepared.dispose(); disposeSandboxSessionsForUser('fence-author') }
+  })
+
   it.each(['/api/game/new', '/api/game/new-sandbox'].flatMap(url =>
     [false, true].flatMap(guarded => ['phase', 'target'].map(invalid => ({ url, guarded, invalid }))),
   ))('rejects unsupported saved $invalid in $url (authority=$guarded) without replacing the game', async ({ url, guarded, invalid }) => {

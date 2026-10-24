@@ -37,6 +37,14 @@ loadState(raw)
 undoStep() / undoAction()
 ```
 
+## 农场选择的只读费用查询
+
+`quoteFenceSelection(playerIndex, requestKey, payload)` 将草稿绑定到当前 Interaction Player 和围栏等待步骤，复用结算使用的几何费用 hook、贡献、季节与策略计算。尚未闭合的边可以有费用，但不会因此变为合法提交。查询保持 state、cursor、历史与事件不变。
+
+房间客户端通过带座位校验和当前 Room 版本的只读 WebSocket 查询调用；传输层拒绝新快照之后到达的旧回复，调用方还须丢弃草稿或交互变化后的回复。HTTP 沙盒和浏览器本地 worker 提供相同查询。查询不授权提交；普通命令仍须按实时状态校验与结算。
+
+测试：`server/__tests__/fence-selection-quote-session.test.ts`、`server/connection/__tests__/fence-selection-quote.test.ts`。
+
 ## 统一的 SessionResponse
 
 ```ts

@@ -21,6 +21,21 @@ export type CustomCardDef = {
   artUrl?: string | null
 }
 
+export type FenceSelectionPayload = {
+  edges: string[]
+  palisadeEdges?: string[]
+  extraWood?: number
+  fenceSources?: Record<string, string>
+}
+
+export type FenceSelectionQuote = {
+  requestKey: string
+  woodCost: number
+  affordable: boolean
+  valid: boolean
+  error: string | null
+}
+
 export type ActionDetailEffects = {
   buildRoom?: number
   buildStables?: number

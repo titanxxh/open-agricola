@@ -8,7 +8,8 @@
  * `persist` snapshot — the game rolls back to the previous step instead of
  * freezing the tab or losing the session.
  */
-import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
+import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-selection'
+import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { ParentSelectionSubmission } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
@@ -130,6 +131,12 @@ export class LocalGameTransport implements GameTransport {
   draftSubmit(playerId: string, pick: DraftPickPayload) { return this.call('draftSubmit', [playerId, pick]) }
   parentSubmit(playerIndex: number, selection: ParentSelectionSubmission) {
     return this.call('parentSubmit', [playerIndex, selection])
+  }
+
+  async quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote> {
+    const response = await this.request({ kind: 'call', method: 'quoteFenceSelection',
+      args: [playerIndex, requestKey, payload], viewer: this.viewer })
+    return parseFenceSelectionQuote('raw' in response ? response.raw : undefined)
   }
 
   async validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult> {

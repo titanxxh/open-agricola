@@ -56,6 +56,34 @@ describe('LocalGameTransport', () => {
     }
   })
 
+  it('quotes a fence draft through the worker without publishing or persisting a new snapshot', async () => {
+    const transport = new LocalGameTransport(CONFIG, { workerFactory: () => new FakeWorker(), viewer: { viewerPlayerId: 'p1', mode: 'viewer' } })
+    const snapshots: GameSyncPayload[] = []
+    transport.onSnapshot(payload => snapshots.push(payload))
+    try {
+      const initial = await transport.start()
+      initial.state.round = 14
+      for (const player of initial.state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+      }
+      initial.state.players[0]!.resources.wood = 10
+      initial.state.actionSpaces.find(space => space.id === 'fencing')!.roundAvailable = 1
+      await transport.loadGame(initial.state)
+      const pending = await transport.takeAction(0, 'fencing')
+      expect(pending.ok, pending.error).toBe(true)
+      if (pending.interaction.stateId !== 'wait' || !pending.interaction.requestKey) throw new Error('Expected fence request')
+      const requestKey = pending.interaction.requestKey
+      const count = snapshots.length
+      const edges = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+      expect(await transport.quoteFenceSelection(0, requestKey, { edges })).toEqual({
+        requestKey, woodCost: 4, affordable: true, valid: true, error: null,
+      })
+      expect(snapshots).toHaveLength(count)
+      expect((await transport.commitSelection(0, { edges })).state.players[0]!.resources.wood).toBe(6)
+    } finally { transport.destroy() }
+  })
+
   it('starts a game and dispatches calls through the worker', async () => {
     const transport = new LocalGameTransport(CONFIG, { workerFactory: () => new FakeWorker() })
     const snapshots: GameSyncPayload[] = []

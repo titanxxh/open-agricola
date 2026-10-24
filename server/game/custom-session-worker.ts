@@ -1,3 +1,4 @@
+import { parseFenceSelectionPayload } from '../../shared/contract/protocol/farm-selection'
 import { applyHistoryWindow } from '../../shared/session/history-window'
 import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { parentPort } from 'node:worker_threads'
@@ -71,6 +72,11 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
     return {
       response: session.resolveChoice(idx, 'confirm'),
     }
+  }
+  if (method === 'quoteFenceSelection') {
+    const [playerIndex, requestKey, payload] = args
+    if (typeof playerIndex !== 'number' || typeof requestKey !== 'string') throw new Error('Invalid fence quote request')
+    return { response: session.getState(), raw: session.quoteFenceSelection(playerIndex, requestKey, parseFenceSelectionPayload(payload)) }
   }
   if (method === 'validateFarmChoice') {
     const [type, playerId, payload] = args as [FarmChoiceType, string, Record<string, unknown>]

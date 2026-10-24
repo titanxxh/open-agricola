@@ -109,6 +109,27 @@ describe('custom session executor', () => {
     }
   })
 
+  it('quotes selected fences inside the executable worker without mutating its persisted cursor', async () => {
+    const { session, executor } = setup(card('CUSTOM_FenceQuote'))
+    try {
+      session.state.round = 14
+      session.state.players[0]!.resources.wood = 10
+      session.state.actionSpaces.find(space => space.id === 'fencing')!.roundAvailable = 1
+      await executor.execute('loadState', [session.state])
+      const pending = await executor.execute('takeAction', [0, 'fencing'])
+      expect(pending.ok, pending.error).toBe(true)
+      if (pending.interaction.stateId !== 'wait' || !pending.interaction.requestKey) throw new Error('Expected fence request')
+      const requestKey = pending.interaction.requestKey
+      const edges = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+      const before = JSON.stringify(executor.serializedStateForPersistence())
+      expect(await executor.query('quoteFenceSelection', [0, requestKey, { edges }])).toEqual({
+        requestKey, woodCost: 4, affordable: true, valid: true, error: null,
+      })
+      expect(JSON.stringify(executor.serializedStateForPersistence())).toBe(before)
+      expect((await executor.execute('commitSelectionChoice', [0, { edges }])).state.players[0]!.resources.wood).toBe(6)
+    } finally { session.dispose() }
+  })
+
   it('keeps chosen player colors before and after Worker initialization', async () => {
     const { session, executor } = setup(card('CUSTOM_PlayerColors'))
     await executor.updatePlayerColors([[0, 'purple'], [1, 'green']])

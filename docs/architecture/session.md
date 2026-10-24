@@ -35,6 +35,14 @@ loadState(raw)
 undoStep() / undoAction()
 ```
 
+## Read-only farm selection quotes
+
+`quoteFenceSelection(playerIndex, requestKey, payload)` binds a draft to the current Interaction Player and pending fence request. It reuses settlement's geometry-sensitive cost hooks, contribution, season and policy calculation; incomplete geometry can have a quoted cost without becoming a legal submission. Reads preserve state, cursor, history and events.
+
+Room clients use a seat-bound read-only WebSocket query with the current Room version. The transport rejects replies after a newer snapshot; callers also discard a reply when the draft or interaction changes. HTTP sandbox and browser-local workers expose the same query. Quotes do not authorize a commit; the ordinary command still validates and settles the live selection.
+
+Tests: `server/__tests__/fence-selection-quote-session.test.ts`, `server/connection/__tests__/fence-selection-quote.test.ts`.
+
 ## Unified SessionResponse
 
 ```ts

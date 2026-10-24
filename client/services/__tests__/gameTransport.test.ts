@@ -77,6 +77,27 @@ describe('WsGameTransport request correlation', () => {
     vi.resetModules()
   })
 
+  it('correlates read-only fence quotes and rejects replies after a newer snapshot', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await transport.connect()
+    const socket = FakeWebSocket.instances[0]!
+    socket.emit(buildEnvelope('initial', 4))
+    const quote = { requestKey: 'fence-1', woodCost: 3, affordable: true, valid: true, error: null }
+    const first = transport.quoteFenceSelection(0, 'fence-1', { edges: ['H-0-0'] })
+    const sent = socket.sent.at(-1)!
+    expect(sent).toMatchObject({ type: 'quoteFenceSelection', expectedVersion: 4, requestKey: 'fence-1' })
+    expect(sent.commandContext).toBeUndefined()
+    socket.emit({ type: 'fenceSelectionQuote', requestId: sent.requestId, roomId: 'room-1', version: 4, quote })
+    await expect(first).resolves.toEqual(quote)
+    const second = transport.quoteFenceSelection(0, 'fence-1', { edges: ['H-0-0'] })
+    const secondRequest = socket.sent.at(-1)!
+    socket.emit(buildEnvelope('next', 5))
+    socket.emit({ type: 'fenceSelectionQuote', requestId: secondRequest.requestId, roomId: 'room-1', version: 4, quote })
+    await expect(second).rejects.toThrow('Fence quote is stale')
+    transport.destroy()
+  })
+
   it('sends request ids and only resolves the matching pending command', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })

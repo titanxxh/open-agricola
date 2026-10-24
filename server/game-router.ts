@@ -1,3 +1,5 @@
+import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
+import type { FenceSelectionQuote } from '../shared/contract/protocol/game'
 import { randomUUID } from 'node:crypto'
 import type { SandboxAuthority } from './game/sandbox-authority'
 import { ExecutionRevokedError, type ExecutionStamp } from './game/execution-access'
@@ -608,6 +610,27 @@ const handleAuthorizedGameRoute = async (
       s => s.startDevFenceSelect(body.playerIndex!),
     )
     await sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
+  if (req.method === 'POST' && req.url === '/api/game/fence-quote') {
+    const body: unknown = JSON.parse(await readBody(req))
+    try {
+      if (typeof body !== 'object' || body === null || !('playerIndex' in body) || typeof body.playerIndex !== 'number'
+        || !('requestKey' in body) || typeof body.requestKey !== 'string' || !('payload' in body)) {
+        throw new Error('Invalid fence quote request')
+      }
+      const payload = parseFenceSelectionPayload(body.payload)
+      const session = await getSessionForRequest(req)
+      if (!await enforceSeatBinding(req, res, body.playerIndex)) return true
+      const executor = sessionExecutors.get(await getSessionKey(req))
+      const quote = executor
+        ? await executor.query<FenceSelectionQuote>('quoteFenceSelection', [body.playerIndex, body.requestKey, payload])
+        : session.quoteFenceSelection(body.playerIndex, body.requestKey, payload)
+      await sendJson(res, 200, quote)
+    } catch (error) {
+      await sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
     return true
   }
 

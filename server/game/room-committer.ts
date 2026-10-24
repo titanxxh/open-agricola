@@ -116,6 +116,7 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
     case 'dissolveRoom':
     case 'getState':
     case 'getHistory':
+    case 'quoteFenceSelection':
     case 'newGame':
       return null
     case 'action':
