@@ -1,3 +1,4 @@
+import { playerColorOptions } from '../../shared/contract/state-constants'
 import { measure, measureRule, observeCommand, commandOutcome, roundTag, startObservation, rejectObservedCommand, captureCommandOutcome } from '../observability/metrics'
 import { ExecutionAccess, ExecutionRevokedError } from '../game/execution-access'
 import { RoomOwnershipError } from '../game/room-directory'
@@ -23,7 +24,7 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
-import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import type { ClientCommand, ServerEvent, RoomColorErrorCode } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import type {
   GameContextErrorCode,
@@ -186,7 +187,7 @@ const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
-  code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required',
+  code?: RoomColorErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required',
   lifecycle?: GameContextLifecycle,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
@@ -213,6 +214,22 @@ const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
     return null
   }
   return ctx.currentRoom
+}
+
+const waitingRoomEvent = (room: Room): Extract<ServerEvent, { type: 'roomWaiting' }> => {
+  const players = [...new Set([
+    ...room.players.map((player) => player.playerIndex),
+    ...(room.seatOwners ?? []).map((owner) => owner.playerIndex),
+  ])]
+    .sort((left, right) => left - right)
+    .map((playerIndex) => ({
+      playerIndex,
+      connected: room.players.some(player => player.playerIndex === playerIndex),
+      name: room.players.find((player) => player.playerIndex === playerIndex)?.name
+        ?? room.session.state.players[playerIndex]?.name
+        ?? `Player ${playerIndex + 1}`,
+    }))
+  return { type: 'roomWaiting', roomId: room.id, players, maxPlayers: room.maxPlayers, playerColors: room.session.state.players.map(player => player.color) }
 }
 
 const requireWritableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
@@ -838,18 +855,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
-  const players = [...new Set([
-    ...room.players.map((player) => player.playerIndex),
-    ...(room.seatOwners ?? []).map((owner) => owner.playerIndex),
-  ])]
-    .sort((left, right) => left - right)
-    .map((playerIndex) => ({
-      playerIndex,
-      connected: room.players.some(player => player.playerIndex === playerIndex),
-      name: room.players.find((player) => player.playerIndex === playerIndex)?.name
-        ?? room.session.state.players[playerIndex]?.name
-        ?? `Player ${playerIndex + 1}`,
-    }))
+  const { players } = waitingRoomEvent(room)
   const publishJoin = async (): Promise<void> => {
     await detachPreviousRoom(ctx, room, previousCtxRoom)
     publishSeatReplacement()
@@ -917,6 +923,48 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   return updated instanceof Promise
     ? updated.then((response) => finishJoin(starting ? response : undefined))
     : finishJoin()
+}
+
+async function handleSetPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'setPlayerColor' }>): Promise<void> {
+  const room = requireRoom(ctx, msg.requestId)
+  if (!room) return
+  if (room.status !== 'waiting') {
+    sendCommandError(ctx, 'Colors are locked after the game starts', msg.requestId, 'color_locked')
+    return
+  }
+  if (!playerColorOptions.includes(msg.color)) {
+    sendCommandError(ctx, 'Invalid player color', msg.requestId, 'invalid_color')
+    return
+  }
+  const occupied = new Set([...room.players, ...(room.seatOwners ?? [])].map(player => player.playerIndex))
+  const colorIndex = room.session.state.players.findIndex(player => player.color === msg.color)
+  if (colorIndex !== ctx.currentPlayerIndex && occupied.has(colorIndex)) {
+    sendCommandError(ctx, 'Another player already chose this color', msg.requestId, 'color_unavailable')
+    return
+  }
+  const previous = room.session.state.players.map((player, index): [number, typeof player.color] => [index, player.color])
+  const colors: Parameters<Room['session']['updatePlayerColors']>[0] = [[ctx.currentPlayerIndex, msg.color]]
+  if (colorIndex >= 0 && colorIndex !== ctx.currentPlayerIndex) colors.push([colorIndex, room.session.state.players[ctx.currentPlayerIndex]!.color])
+  const update = async (next: typeof colors): Promise<void> => {
+    if (room.customSessionExecutor) {
+      const response = await room.customSessionExecutor.updatePlayerColors(next)
+      if (!response.ok) throw new Error(response.error ?? 'Unable to update colors')
+    } else room.session.updatePlayerColors(next)
+  }
+  try {
+    const blocked = ctx.committer?.blockedError(room.id)
+    if (blocked) throw new Error(blocked)
+    await update(colors)
+    await ctx.checkpoint.recordMeta(room, ctx.activeCommand ? { receipt: {
+      request: ctx.activeCommand.request,
+      outcome: { ok: true, roomId: room.id, roomVersion: room.version, playerIndex: ctx.currentPlayerIndex },
+    } } : undefined)
+  } catch {
+    await update(previous)
+    sendCommandError(ctx, 'Could not save the selected color', msg.requestId, 'color_save_failed')
+    return
+  }
+  await ctx.broadcaster.broadcastEvent(room, waitingRoomEvent(room))
 }
 
 async function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'dissolveRoom' }>): Promise<Awaited<void>> {
@@ -1221,12 +1269,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: nextRoomId, roomVersion: 0, playerIndex: ctx.currentPlayerIndex } } } : {}),
       })
       await adopt()
-      await ctx.broadcaster.broadcastEvent(room, {
-        type: 'roomWaiting', roomId: room.id,
-        players: room.players.map(({ playerIndex, name }) => ({ playerIndex, name, connected: true })),
-        maxPlayers: room.maxPlayers,
-        playerColors: room.session.state.players.map(player => player.color),
-      })
+      await ctx.broadcaster.broadcastEvent(room, waitingRoomEvent(room))
       await ctx.broadcaster.broadcastCommitted(room, resp, 'reconnect', msg.requestId)
     },
   ))
@@ -1340,6 +1383,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   createRoom: handleCreateRoom,
   joinRoom: handleJoinRoom,
   dissolveRoom: handleDissolveRoom,
+  setPlayerColor: handleSetPlayerColor,
   getState: handleGetState,
   getHistory: handleGetHistory,
   action: handleAction,
@@ -1402,7 +1446,11 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
         if (reservation.kind === 'completed') {
           commandOutcome('duplicate')
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: reservation.receipt, requestId: msg.requestId })
-          if (ctx.currentRoom?.id === reservation.receipt.outcome.roomId) await handleGetState(ctx, { type: 'getState', requestId: msg.requestId })
+          const currentRoom = ctx.currentRoom
+          if (currentRoom && currentRoom.id === reservation.receipt.outcome.roomId) {
+            if (currentRoom.status === 'waiting') await ctx.broadcaster.sendRoomEvent(ctx.ws, currentRoom, waitingRoomEvent(currentRoom))
+            else await handleGetState(ctx, { type: 'getState', requestId: msg.requestId })
+          }
           return
         }
         request = reservation.request

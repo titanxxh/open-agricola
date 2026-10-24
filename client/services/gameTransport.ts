@@ -6,7 +6,7 @@ import type { RoomHistoryPage } from '../../shared/contract/protocol/history'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
-import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
+import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 
 export type ValidateResult = {
@@ -777,6 +777,7 @@ export class WsGameTransport implements GameTransport {
     name?: string
     requestedPlayerIndex?: number
   }): void
+  sendRoomCommand(type: 'setPlayerColor', opts: { color: PlayerState['color'] }): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: string, opts?: Record<string, unknown>): void {
     if (!this.connected) throw new Error('WebSocket reconnecting')

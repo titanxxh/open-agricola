@@ -2578,6 +2578,16 @@
   -webkit-mask-position: 75% 0%;
   mask-position: 75% 0%;
 }
+.action-farmer-green {
+  background: linear-gradient(135deg, #8fd4a5 0%, #168a4a 48%, #14532d 100%);
+  -webkit-mask-position: 100% 0%;
+  mask-position: 100% 0%;
+}
+.action-farmer-purple {
+  background: linear-gradient(135deg, #c4b5fd 0%, #7c3aed 48%, #4c1d95 100%);
+  -webkit-mask-position: 100% 0%;
+  mask-position: 100% 0%;
+}
 /* --- Held-worker overlay on a played card --- */
 .held-worker-marker {
   position: absolute;
@@ -2870,6 +2880,8 @@
 .meeple-black {
   background: #1f2937;
 }
+.meeple-green { background: #168a4a; }
+.meeple-purple { background: #7c3aed; }
 .meeple-text {
   white-space: nowrap;
 }
@@ -3423,6 +3435,12 @@
 .stable-barn-icon[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
 .stable-barn-icon[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
 .stable-barn-icon[data-player-color="green"] .res-icon-barn { background-position-x: 100%; }
+:is(.stable-barn-icon, .lazybones-stable-marker)[data-player-color="purple"] .res-icon-barn {
+  background-image: none;
+  background-color: #7c3aed;
+  -webkit-mask: url('/assets/revised/stables.png') 100% 0 / 500% 100% no-repeat;
+  mask: url('/assets/revised/stables.png') 100% 0 / 500% 100% no-repeat;
+}
 .farm-terrain-marker-person {
   left: 50%;
   right: auto;

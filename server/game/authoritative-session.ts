@@ -33,6 +33,10 @@ export class GameSession extends GameCore {
     })
   }
 
+  updatePlayerColors(colors: Array<[number, GameState['players'][number]['color']]>): void {
+    for (const [playerIndex, color] of colors) this.state.players[playerIndex]!.color = color
+  }
+
   buildSyncPayload(
     resp: CoreSessionResponse,
     viewerPlayerId: string | null,

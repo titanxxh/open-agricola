@@ -51,6 +51,10 @@ const restore = (
 
 const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: SessionResponse; raw?: unknown } => {
   if (!session) throw new Error('custom session worker is not initialized')
+  if (method === 'updatePlayerColors') {
+    session.updatePlayerColors(args[0] as Parameters<GameSession['updatePlayerColors']>[0])
+    return { response: session.getState() }
+  }
   if (method === 'updatePlayerNames') {
     for (const [playerIndex, name] of args[0] as Array<[number, string]>) {
       session.updatePlayerName(playerIndex, name)

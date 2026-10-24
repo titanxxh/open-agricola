@@ -1,10 +1,19 @@
+import { playerColorOptions } from '../../shared/contract/state-constants'
+import type { PlayerState } from '../../shared/contract/types'
+import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
 import { useLocale } from '../contexts/LocaleContext'
 import { getPlayerDisplayName } from '../utils/player-name'
 import type { WsStatus } from './ws-status'
 
 type Waiting = Extract<WsStatus, { phase: 'waiting' }>
 
-export function WaitingRoomPlayers({ players, playerColors }: Pick<Waiting, 'players' | 'playerColors'>) {
+type Props = Pick<Waiting, 'players' | 'playerColors'> & {
+  playerIndex: number | undefined
+  onColorChange: (color: PlayerState['color']) => void
+  colorError: RoomColorErrorCode | null
+}
+
+export function WaitingRoomPlayers({ players, playerColors, playerIndex, onColorChange, colorError }: Props) {
   const { locale, t } = useLocale()
   return (
     <section className="ws-waiting-seats" aria-label={t('platform.roomSeats')}>
@@ -26,6 +35,25 @@ export function WaitingRoomPlayers({ players, playerColors }: Pick<Waiting, 'pla
           )
         })}
       </ol>
+      {playerIndex !== undefined && (
+        <fieldset className="ws-color-picker">
+          <legend>{t('platform.yourColor')}</legend>
+          <div className="ws-color-options">
+            {playerColorOptions.map(color => {
+              const taken = players.some(player => player.playerIndex !== playerIndex && playerColors[player.playerIndex] === color)
+              return (
+                <button key={color} type="button" className="ws-color-option" data-player-color={color}
+                  aria-pressed={playerColors[playerIndex] === color} disabled={taken}
+                  onClick={() => onColorChange(color)}>
+                  <span className="ws-seat-color" aria-hidden="true" />
+                  {t(`platform.playerColors.${color}`)}
+                </button>
+              )
+            })}
+          </div>
+          {colorError && <p className="ws-color-error" role="alert">{t(`platform.colorErrors.${colorError}`)}</p>}
+        </fieldset>
+      )}
     </section>
   )
 }

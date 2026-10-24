@@ -2009,6 +2009,13 @@ export const en = {
     playersJoined: '{current} / {max} players joined',
     emptySeat: 'Waiting for a player',
     seatOffline: 'Offline',
+    yourColor: 'Your color',
+    colorErrors: {
+      color_unavailable: 'Another player has chosen this color. Choose a different one.',
+      color_locked: 'Colors are locked after the game starts.',
+      invalid_color: 'Choose one of the available colors.',
+      color_save_failed: 'Could not save your color. Try again.',
+    },
     playerColors: { red: 'Red', blue: 'Blue', black: 'Black', yellow: 'Yellow', green: 'Green', purple: 'Purple' },
     inviteLabel: 'Share this link to invite opponents:',
     copy: 'Copy',

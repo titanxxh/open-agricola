@@ -89,10 +89,13 @@ type ClientCommandBody =
       name?: string
       requestedPlayerIndex?: number
     }
+  | { type: 'setPlayerColor'; color: PlayerState['color'] }
   | { type: 'dissolveRoom' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
 
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
+
+export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed'
 
 export type ServerEvent =
   | { type: 'commandScope'; scope: CommandScope; requestId?: string }
@@ -103,7 +106,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required'
+      code?: RoomColorErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

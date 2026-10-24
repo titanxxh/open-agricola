@@ -2784,6 +2784,13 @@ export const zh = {
     playersJoined: '已加入 {current} / {max} 人',
     emptySeat: '等待玩家加入',
     seatOffline: '离线',
+    yourColor: '你的颜色',
+    colorErrors: {
+      color_unavailable: '这个颜色已被其他玩家选择，请换一个。',
+      color_locked: '游戏已开始，不能再更改颜色。',
+      invalid_color: '请选择可用的颜色。',
+      color_save_failed: '颜色保存失败，请重试。',
+    },
     playerColors: { red: '红色', blue: '蓝色', black: '黑色', yellow: '黄色', green: '绿色', purple: '紫色' },
     inviteLabel: '分享此链接邀请对手加入：',
     copy: '复制',
