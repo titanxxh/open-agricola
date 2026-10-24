@@ -1,5 +1,6 @@
 import type { ActionDefinition, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { EventSink, ResourceLocation } from '../../contract/events'
+import { readSeasonalGrant, type SeasonalGrant } from '../../contract/seasonal-grant'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../gain-config'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
@@ -35,11 +36,15 @@ const emitGainEvent = (
   eventSink: EventSink | undefined,
   recipient: PlayerState,
   resources: Partial<Resource>,
-  sourceCard?: string,
-  actorPlayerId?: string,
-  payer?: { playerId: string; resources: Partial<Resource> },
-  sourceLocation?: ResourceLocation,
+  provenance: {
+    sourceCard?: string
+    actorPlayerId?: string
+    payer?: { playerId: string; resources: Partial<Resource> }
+    sourceLocation?: ResourceLocation
+    seasonalGrant?: SeasonalGrant
+  } = {},
 ) => {
+  const { sourceCard, actorPlayerId, payer, sourceLocation, seasonalGrant } = provenance
   const gained = positiveResources(resources)
   const paid = payer ? positiveResources(payer.resources) : {}
   const usePayer = payer !== undefined && Object.keys(paid).length > 0
@@ -58,6 +63,7 @@ const emitGainEvent = (
     to: { kind: 'player', playerId: recipient.id },
     reason: !usePayer && sourceLocation?.kind === 'actionSpace' ? 'gain' : sourceCard ? 'cardEffect' : 'gain',
     ...(sourceCard ? { sourceCardId: sourceCard } : {}),
+    ...(seasonalGrant ? { seasonalGrant } : {}),
   })
 }
 
@@ -125,10 +131,12 @@ export const gainAction: ActionDefinition = {
         eventSink,
         recipient,
         gained,
-        sourceCard,
-        player.id,
-        payerId ? { playerId: payerId, resources: gained } : undefined,
-        sourceLocation,
+        {
+          sourceCard,
+          actorPlayerId: player.id,
+          payer: payerId ? { playerId: payerId, resources: gained } : undefined,
+          sourceLocation,
+        },
       )
       if (recipient.id === player.id) {
         trackWorkPhaseBuildingResources(state, recipient.id, gained)
@@ -172,11 +180,11 @@ const createBonusAction = (
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, eventSink }) => {
+  execute: ({ state, player, eventSink, actionContext }) => {
     gainResources(player, gain)
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addResourcesFromBoard(player, gain)
-    emitGainEvent(eventSink, player, gain)
+    emitGainEvent(eventSink, player, gain, { seasonalGrant: readSeasonalGrant(actionContext?.seasonalGrant) })
     return { type: 'ok', resourcesGained: gain }
   },
 })

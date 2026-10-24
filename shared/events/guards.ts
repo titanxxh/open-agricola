@@ -1,4 +1,5 @@
 import { parseAnytimeTurnAffiliation } from '../contract/anytime-activation'
+import { readSeasonalGrant } from '../contract/seasonal-grant'
 import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
 import type { GameEvent } from '../contract/events'
 
@@ -26,7 +27,7 @@ const baseEventKeys = new Set([
 ])
 
 const eventKeysByType: Record<string, readonly string[]> = {
-  'resource.moved': ['resources', 'from', 'to', 'reason'],
+  'resource.moved': ['resources', 'from', 'to', 'reason', 'seasonalGrant'],
   'resource.exchanged': ['paid', 'gained', 'paidFrom', 'paidTo', 'gainedFrom', 'gainedTo', 'exchangeSource', 'times'],
   'resource.accumulated': ['resources', 'to', 'silent'],
   'resource.paid': ['paymentId', 'resources', 'to', 'paymentFor', 'paymentSources', 'bonusSources', 'bonusChoiceIndex', 'returnedCardId'],
@@ -38,7 +39,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.terrainChanged': ['playerId', 'operation', 'changes', 'newlyUsedTiles'],
   'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
-  'farm.stableBuilt': ['stables', 'newlyUsedTiles'],
+  'farm.stableBuilt': ['stables', 'newlyUsedTiles', 'seasonalGrant'],
   'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures', 'newlyUsedTiles', 'newlyEnclosedPastureTiles'],
   'farm.fenceConsumed': ['count', 'reason'],
   'farm.animalMoved': ['animals', 'from', 'to', 'newlyPlacedOnFarmyard'],
@@ -392,9 +393,17 @@ const assertActionDetailEffects = (value: unknown): void => {
   }
 }
 
+const assertSeasonalGrant = (value: unknown): void => {
+  if (value === undefined) return
+  const grant = assertRecord(value, 'seasonalGrant')
+  assertOnlyKeys(grant, ['season'], 'seasonalGrant')
+  if (!readSeasonalGrant(grant)) throw new Error('GameEvent seasonalGrant must name a season')
+}
+
 const assertActionDetailParts = (value: unknown): void => {
   const detailParts = assertRecord(value, 'detailParts')
-  assertOnlyKeys(detailParts, ['gains', 'costs', 'effects', 'bonusSources'], 'detailParts')
+  assertOnlyKeys(detailParts, ['gains', 'costs', 'effects', 'bonusSources', 'seasonalGrant'], 'detailParts')
+  assertSeasonalGrant(detailParts.seasonalGrant)
   if (detailParts.gains !== undefined) assertResourceMap(detailParts.gains, 'detailParts.gains')
   if (detailParts.costs !== undefined) assertResourceMap(detailParts.costs, 'detailParts.costs')
   assertActionDetailEffects(detailParts.effects)
@@ -404,6 +413,7 @@ const assertActionDetailParts = (value: unknown): void => {
 const assertKnownEventDetails = (type: string, event: Record<string, unknown>): void => {
   switch (type) {
     case 'resource.moved':
+      assertSeasonalGrant(event.seasonalGrant)
       assertResourceMap(event.resources, 'resources')
       assertResourceLocation(event.from, 'from')
       assertResourceLocation(event.to, 'to')
@@ -486,6 +496,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       }
       return
     case 'farm.stableBuilt':
+      assertSeasonalGrant(event.seasonalGrant)
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       assertStableBuiltPositions(event.stables, 'stables')
       return

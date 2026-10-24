@@ -7,6 +7,38 @@ import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { buildActionLogTimelineRows } from '../../../app/action-log-timeline'
 import { ActionLog } from '../ActionLog'
 
+it.each(['zh', 'en'] as const)('renders summer grain provenance in its single result row in %s', locale => {
+  const event: GameEvent = {
+    schemaVersion: 1, id: 'summer-grain', occurrenceId: 'summer-grain', seq: 1,
+    round: 1, phase: 'work', visibility: 'public', actorPlayerId: 'p1',
+    type: 'resource.moved', sourceActionId: 'bonus-grain', resources: { grain: 1 },
+    from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain',
+    seasonalGrant: { season: 'summer' },
+  }
+  const log = eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })
+  const { container } = render(<ActionLog locale={locale} log={log} currentRound={4} />)
+  expect(container.querySelectorAll('li')).toHaveLength(1)
+  expect(container).toHaveTextContent(locale === 'zh' ? '夏季额外获得' : 'Summer extra gain')
+  expect(container.querySelectorAll('[data-resource="grain"][data-amount="1"]')).toHaveLength(1)
+  expect(container).not.toHaveTextContent('through-the-seasons')
+})
+
+it.each(['zh', 'en'] as const)('renders the actual free summer stables once in %s', locale => {
+  const event: GameEvent = {
+    schemaVersion: 1, id: 'summer-stables', occurrenceId: 'summer-stables', seq: 1,
+    round: 1, phase: 'work', visibility: 'public', actorPlayerId: 'p1',
+    type: 'farm.stableBuilt', sourceActionId: 'farm-expansion', newlyUsedTiles: [],
+    stables: [{ playerId: 'p1', row: 0, col: 0 }, { playerId: 'p1', row: 0, col: 1 }],
+    seasonalGrant: { season: 'summer' },
+  }
+  const log = eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })
+  const { container } = render(<ActionLog locale={locale} log={log} currentRound={4} />)
+  expect(container.querySelectorAll('li')).toHaveLength(1)
+  expect(container).toHaveTextContent(locale === 'zh' ? '夏季赠送 2 个畜栏' : 'Summer grants 2 free stable(s)')
+  expect(container).not.toHaveTextContent(locale === 'zh' ? '支付' : 'Pays')
+  expect(container).not.toHaveTextContent('through-the-seasons')
+})
+
 it.each([
   ['zh', 'sow', 'D175_Countryman', '播种'],
   ['en', 'sow', 'D175_Countryman', 'Sow'],

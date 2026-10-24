@@ -1,4 +1,5 @@
 import type { InputWindow } from './commands'
+import type { SeasonalGrant } from '../seasonal-grant'
 import type { HistoryWindow } from './history'
 import type { InteractionState, PlayerState, Resource } from '../../contract/types'
 import type { SerializedGameState } from '../../session/serialization'
@@ -36,6 +37,7 @@ export type ActionDetailEffects = {
 }
 
 export type ActionDetailParts = {
+  seasonalGrant?: SeasonalGrant
   gains?: Partial<Resource>
   costs?: Partial<Resource>
   effects?: ActionDetailEffects

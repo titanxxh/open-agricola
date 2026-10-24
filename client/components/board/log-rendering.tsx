@@ -546,13 +546,18 @@ export const prepareLogEntry = (
   }
   if (params && params.detailParts && entry.key === 'log.actionDetail') {
     const detailParts = params.detailParts as ActionDetailParts
+    const grantSeason = detailParts.seasonalGrant
+      ? t(locale, `ui.seasons.${detailParts.seasonalGrant.season}`) : undefined
     const effects: ReactNode[] = []
     const effectData = detailParts.effects ?? {}
     if (effectData.buildRoom) {
       effects.push(t(locale, 'log.effectBuildRoom', { count: effectData.buildRoom }))
     }
     if (effectData.buildStables) {
-      effects.push(t(locale, 'log.effectBuildStables', { count: effectData.buildStables }))
+      effects.push(t(locale, grantSeason ? 'log.seasonalStables' : 'log.effectBuildStables', {
+        count: effectData.buildStables,
+        ...(grantSeason ? { season: grantSeason } : {}),
+      }))
     }
     if (effectData.growFamily) {
       effects.push(t(locale, 'log.effectGrowFamily', { count: effectData.growFamily }))
@@ -634,8 +639,8 @@ export const prepareLogEntry = (
       segments.push(
         ...renderRichTemplate(
           locale,
-          'log.gains',
-          {},
+          grantSeason ? 'log.seasonalGains' : 'log.gains',
+          grantSeason ? { season: grantSeason } : {},
           { resources: <ResourceLine locale={locale} resources={detailParts.gains} /> },
         ),
       )
