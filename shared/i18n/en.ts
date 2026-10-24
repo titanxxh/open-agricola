@@ -1440,6 +1440,7 @@ export const en = {
     harvestFeedConvert: '{player} uses {source}: {cost} → {food}',
     harvestFeedDetail: '{player} feeds {resources}',
     harvestHeatingDetail: '{player} heats home: pays {fuelUsed}/{required} fuel, converts {woodToFuel} wood, sick workers {sickWorkers}',
+    harvestHeatingWaived: '{player} heats home: {season} waives {waived} fuel requirement (normally {normalRequired})',
     harvestBreedDetail: '{player} breeds {resources}',
     animalBred: '{player} breeds {resources}',
     animalBredFromSource: '{player} breeds {resources} via {cardId}',

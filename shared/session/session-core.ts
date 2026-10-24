@@ -40,6 +40,7 @@ import { internalActionDefinitions } from '../actions/index.ts'
 import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
 import { registerThroughTheSeasonsCardListeners } from '../seasons/card-listeners.ts'
 import { registerThroughTheSeasonsHooks } from '../seasons/hooks.ts'
+import { isThroughTheSeasonsSeason } from '../seasons/rules.ts'
 import {
   advanceThroughTheSeasons,
   applySeasonPreparationAdjustments,
@@ -199,6 +200,7 @@ import type { MoorSpecialActionId } from '../moor/types'
 import {
   applyHeatingPayment,
   computeHeatingRequirement,
+  computeHeatingRequirementBeforeSeason,
   recoverInfirmaryWorkers,
   type HeatingPaymentPayload,
 } from '../moor/heating'
@@ -3230,7 +3232,17 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.continueHarvestFeedingQueue(feedQueue)
     const required = computeHeatingRequirement(this.state, player)
-    if (required <= 0) return this.continueHarvestFeedingQueue(feedQueue)
+    if (required <= 0) {
+      const normalRequired = computeHeatingRequirementBeforeSeason(this.state, player)
+      if (normalRequired > 0 && isThroughTheSeasonsSeason(this.state, 'summer')) {
+        appendImmediateEvents(this.state, [{
+          type: 'harvest.heated', actorPlayerId: player.id, playerId: player.id,
+          required: 0, fuelUsed: 0, woodToFuel: 0, sickWorkerIds: [],
+          seasonalWaiver: { season: 'summer', normalRequired, waived: normalRequired },
+        }])
+      }
+      return this.continueHarvestFeedingQueue(feedQueue)
+    }
     this.startHeatingSubFlow(playerIndex, required, feedQueue)
     return this.respond()
   }

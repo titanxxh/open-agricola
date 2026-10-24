@@ -404,7 +404,7 @@ const mapHarvestPhaseStarted = (event: HarvestPhaseStartedEvent): LogEntry => {
 }
 
 const mapHarvestHeated = (event: HarvestHeatedEvent, ctx: EventLogMapperContext): LogEntry => ({
-  key: 'log.harvestHeatingDetail',
+  key: event.seasonalWaiver ? 'log.harvestHeatingWaived' : 'log.harvestHeatingDetail',
   playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
@@ -413,6 +413,7 @@ const mapHarvestHeated = (event: HarvestHeatedEvent, ctx: EventLogMapperContext)
     woodToFuel: event.woodToFuel,
     sickWorkers: event.sickWorkerIds.length,
     sickWorkerIds: event.sickWorkerIds,
+    ...(event.seasonalWaiver ?? {}),
   },
 })
 

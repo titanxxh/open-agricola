@@ -49,13 +49,12 @@ const hasHeatingMetadata = (player: PlayerState, card: CardDefinition): boolean 
 const playedHeatingCards = (player: PlayerState): CardDefinition[] =>
   getPlayedCardDefinitions(player).filter((card) => hasHeatingMetadata(player, card))
 
-export const computeHeatingRequirement = (
+export const computeHeatingRequirementBeforeSeason = (
   state: GameState,
   player: PlayerState,
   context: HeatingRequirementContext = {},
 ): number => {
   if (state.enableFarmersOfTheMoor !== true) return 0
-  if (isThroughTheSeasonsSeason(state, 'summer')) return 0
   const rooms = player.roomTiles?.length ?? player.rooms ?? 0
   const houseDiscount = player.houseType === 'stone' ? 2 : player.houseType === 'clay' ? 1 : 0
   const heatingCards = playedHeatingCards(player)
@@ -75,6 +74,13 @@ export const computeHeatingRequirement = (
   const baseRequirement = Math.max(0, rooms - houseDiscount - cardDiscount)
   return caps.length > 0 ? Math.min(baseRequirement, ...caps) : baseRequirement
 }
+
+export const computeHeatingRequirement = (
+  state: GameState,
+  player: PlayerState,
+  context: HeatingRequirementContext = {},
+): number => isThroughTheSeasonsSeason(state, 'summer')
+  ? 0 : computeHeatingRequirementBeforeSeason(state, player, context)
 
 export const healthyWorkersAtHome = (
   state: GameState,

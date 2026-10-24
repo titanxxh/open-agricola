@@ -84,7 +84,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'harvest.reapSkipped': ['playerId'],
   'harvest.reapNothing': ['playerId'],
   'harvest.feedConverted': ['playerId', 'source', 'cost', 'food'],
-  'harvest.heated': ['playerId', 'required', 'fuelUsed', 'woodToFuel', 'sickWorkerIds'],
+  'harvest.heated': ['playerId', 'required', 'fuelUsed', 'woodToFuel', 'sickWorkerIds', 'seasonalWaiver'],
   'game.started': [],
   'game.ended': [],
   'continuation.restored': ['reason'],
@@ -741,6 +741,18 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertResourceMap(event.food, 'food')
       return
     case 'harvest.heated':
+      if (event.seasonalWaiver !== undefined) {
+        const waiver = assertRecord(event.seasonalWaiver, 'seasonalWaiver')
+        assertOnlyKeys(waiver, ['season', 'normalRequired', 'waived'], 'seasonalWaiver')
+        if (typeof waiver.season !== 'string' || !['winter', 'spring', 'summer', 'autumn'].includes(waiver.season)) {
+          throw new Error('GameEvent seasonalWaiver.season must be a season')
+        }
+        if (typeof waiver.normalRequired !== 'number' || !Number.isFinite(waiver.normalRequired) ||
+          typeof waiver.waived !== 'number' || !Number.isFinite(waiver.waived) ||
+          waiver.waived <= 0 || waiver.normalRequired - waiver.waived !== event.required) {
+          throw new Error('GameEvent seasonalWaiver must match the actual heating reduction')
+        }
+      }
       assertStringField(event.playerId, 'playerId')
       assertFiniteNumberField(event.required, 'required')
       assertFiniteNumberField(event.fuelUsed, 'fuelUsed')

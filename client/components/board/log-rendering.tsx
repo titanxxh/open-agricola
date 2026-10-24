@@ -510,6 +510,9 @@ export const prepareLogEntry = (
       params.source = ` ${t(locale, 'log.bakeBreadSourceAction', { action })}`
     }
   }
+  if (params && entry.key === 'log.harvestHeatingWaived' && typeof params.season === 'string') {
+    params.season = t(locale, `ui.seasons.${params.season}`)
+  }
   if (params && entry.key === 'log.cardEffectBonusVp') {
     richParams.bonusVp = <ResourceLine locale={locale} resources={{}} bonusVp={1} />
   }
