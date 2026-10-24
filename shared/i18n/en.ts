@@ -682,6 +682,8 @@ export const en = {
     cardCopied: 'Copied!',
     cardDetails: 'Card details',
     cardPlay: 'Play this card',
+    showMajorImprovements: 'Show major improvements ({count})',
+    hideMajorImprovements: 'Hide major improvements',
     choiceFuturefield: 'Optional: plow {amount} field(s)',
     choiceFuturestable: 'Optional: build {amount} stable(s)',
     choiceFutureforest: 'Optional: place {amount} forest tile(s)',

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EngineStack } from '../../../shared/engine'
 import type { GameSyncPayload } from '../../../shared/contract/protocol/game'
@@ -23,6 +23,7 @@ const payload: GameSyncPayload = {
 }
 
 const setupViewport = (isMobile: boolean, response = payload) => {
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
   vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
     matches: isMobile && query === '(max-width: 900px)',
     media: query,
@@ -56,6 +57,60 @@ afterEach(() => {
 })
 
 describe('GameContainerApi responsive presentation', () => {
+  it.each([
+    { name: 'only legal majors', minorDisabled: true, majorDisabled: false, target: 'major-supply', near: true },
+    { name: 'only legal minors', minorDisabled: false, majorDisabled: true, target: 'minor-hand', near: false },
+    { name: 'no legal cards', minorDisabled: true, majorDisabled: true, target: 'controls', near: false },
+  ])('focuses $name without offering unavailable major purchases', async ({ minorDisabled, majorDisabled, target, near }) => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    const response = structuredClone(payload)
+    response.state.players[0]!.minorHand = ['A076_Cob']
+    response.interaction = {
+      stateId: 'wait', requestKey: 'improvements', playerIndex: 0,
+      allowedCommands: ['resolveChoice'], anytimeActions: [], promptKey: 'ui.interactionChooseImprovement',
+      request: { kind: 'choice', options: [
+        { value: 'minor:A076_Cob', labelKey: 'minors.A076_Cob.name', disabled: minorDisabled },
+        { value: 'major:Major_Well', labelKey: 'improvements.Major_Well.name', disabled: majorDisabled },
+      ] },
+    }
+    setupViewport(true, response)
+    const { container } = renderGame()
+    await waitFor(() => expect(container.querySelector(`[data-interaction-focus="${target}"]`)).toHaveAttribute('data-interaction-focused', 'true'))
+    const nearSupply = container.querySelector('.hand-section.minor .major-improvements')
+    expect(nearSupply !== null).toBe(near)
+    if (near) expect(nearSupply).toHaveClass('expanded')
+    else expect(screen.queryByRole('button', { name: /^Show major improvements/ })).toBeNull()
+    expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
+  })
+
+  it('focuses mixed improvement selection on the minor hand beside one collapsible major supply', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    const response = structuredClone(payload)
+    response.state.players[0]!.minorHand = ['A076_Cob']
+    response.interaction = {
+      stateId: 'wait', requestKey: 'mixed-improvements', playerIndex: 0,
+      allowedCommands: ['resolveChoice'], anytimeActions: [], promptKey: 'ui.interactionChooseImprovement',
+      request: { kind: 'choice', options: [
+        { value: 'minor:A076_Cob', labelKey: 'minors.A076_Cob.name' },
+        { value: 'major:Major_Well', labelKey: 'improvements.Major_Well.name' },
+      ] },
+    }
+    setupViewport(true, response)
+    const { container } = renderGame()
+    const toggle = await screen.findByRole('button', { name: 'Show major improvements (1)' })
+    const hand = container.querySelector('[data-interaction-focus="minor-hand"]')
+    expect(hand).toContainElement(toggle)
+    await waitFor(() => expect(hand).toHaveAttribute('data-interaction-focused', 'true'))
+    expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
+    expect(container.querySelector('.major-row')).toBeNull()
+    fireEvent.click(toggle)
+    expect(hand?.querySelector('[data-card-anchor="Major_Well"]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide major improvements' }))
+    expect(container.querySelector('.major-row')).toBeNull()
+  })
+
   it('focuses the local Interaction Player occupation hand even when that player differs from the worker owner', async () => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&devMode=1')

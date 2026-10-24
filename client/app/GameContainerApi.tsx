@@ -12,7 +12,8 @@ import {
   positionKey,
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
-import { useInteractionFocus } from './interaction-focus'
+import { interactionFocusRequestKey, useInteractionFocus } from './interaction-focus'
+import { getImprovementSelection } from './improvement-selection'
 import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
@@ -59,8 +60,6 @@ import { getCardMeta } from '../services/card-meta'
 import {
   buildPendingMoorSpecialActionChoiceMaps,
   buildPlaceFarmerChoiceMap,
-  buildSelectableMajorIds,
-  buildSelectableMinorIds,
   buildSelectableOccupationIds,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   canTakeVisibleMoorSpecialAction,
@@ -539,8 +538,10 @@ export const GameContainerApi = () => {
     () => buildInteractionPresentationPlan(interaction),
     [interaction],
   )
+  const improvementSelection = getImprovementSelection(interaction, activePlayer?.minorHand ?? [], state?.availableMajorImprovements ?? [])
   const interactionFocus = useInteractionFocus({
     interaction,
+    targetOverride: improvementSelection?.target,
     playerId: activePlayer?.id ?? '',
     canFocus: hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
       (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey) &&
@@ -778,8 +779,15 @@ export const GameContainerApi = () => {
       .catch((e) => console.error(e))
   }, [interaction, interactionPresentationPlan, currentPlayer, animalReorgSubmitDraft, farmSelectionDraft.submitDraft, transport, isInteractive, runInteractionSubmitCommand])
 
-  const cardPlayRequestKey = JSON.stringify([interaction, historyLength, state?.events.at(-1)?.id])
-  const playCardChoice = useCardPlayChoice(cardPlayRequestKey, resolveChoice)
+  const cardPlayRequestKey = interactionFocusRequestKey(interaction)
+  const playCardChoice = useCardPlayChoice(cardPlayRequestKey, async value => {
+    if (!isInteractive || !isDomainWaitInteraction(interaction) || !interaction.allowedCommands.includes('resolveChoice')) return false
+    const option = interactionChoiceOptions(interaction).find(option => !option.disabled &&
+      (option.value === value || option.value === `minor:${value}` || option.value === `major:${value}`))
+    if (!option) return false
+    const response = await transport.resolveChoice(interaction.playerIndex, option.value)
+    return response.ok
+  })
 
   const confirmNextPlayer = useCallback(() => {
     if (!isInteractive) return
@@ -900,7 +908,6 @@ export const GameContainerApi = () => {
 
   const actionSpaces = state?.actionSpaces
   const roundActionOrder = state?.roundActionOrder
-  const availableMajorImprovements = state?.availableMajorImprovements
   const actionMap = useMemo(() => {
     if (!actionSpaces) return new Map<string, ActionSpace>()
     return new Map(actionSpaces.map((s) => [s.id, s]))
@@ -1025,17 +1032,13 @@ export const GameContainerApi = () => {
   const isSelectingImprovementAny = pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
   const pendingChoiceOptions = pendingChoice?.options
   const selectableMinorIds =
-    pendingChoiceOptions && isSelectingMinor
-      ? buildSelectableMinorIds(pendingChoiceOptions)
-      : new Set<string>()
+    improvementSelection?.minorIds ?? new Set<string>()
   const selectableOccupationIds =
     pendingChoiceOptions && isSelectingOccupation
       ? buildSelectableOccupationIds(pendingChoiceOptions)
       : new Set<string>()
   const selectableMajorIds =
-    pendingChoiceOptions && isSelectingImprovementAny
-      ? buildSelectableMajorIds(pendingChoiceOptions, availableMajorImprovements)
-      : new Set<string>()
+    improvementSelection?.majorIds ?? new Set<string>()
 
   const cardLabel = useCallback((id: string) => {
     const improvementName = t(locale, `improvements.${id}.name`)
@@ -1822,12 +1825,15 @@ export const GameContainerApi = () => {
   const hasHotseatExchangeOverlay = isHotseat && !isPublicFarmView && (
     isBakeExchange || isAnytimeExchange || (!!harvestPending && exchangeDraft.harvestFeed.options.length > 0)
   )
+  const nearbyMajorSupply = isInteractive && !isPublicFarmView && !!improvementSelection && selectableMajorIds.size > 0
   const majorImprovementsPresentation = (
     <MajorImprovements
       locale={locale}
       availableMajorImprovements={state.availableMajorImprovements}
       majorImprovementSupply={state.majorImprovementSupply}
-      isSelectingMajor={isSelectingImprovementAny && !isPublicFarmView}
+      isSelectingMajor={nearbyMajorSupply}
+      minorChoiceCount={selectableMinorIds.size}
+      selectionRequestKey={improvementSelection?.requestKey}
       selectableMajorIds={isPublicFarmView ? new Set<string>() : selectableMajorIds}
       cardAvailability={isPublicFarmView ? {} : cardAvailability}
       resolveChoice={playCardChoice}
@@ -1966,7 +1972,7 @@ export const GameContainerApi = () => {
         />
       </div>
 
-      {isDesktopTable ? majorImprovementsPresentation : null}
+      {isDesktopTable && !nearbyMajorSupply ? majorImprovementsPresentation : null}
 
       <div
         className="game-layout"
@@ -1978,7 +1984,7 @@ export const GameContainerApi = () => {
         <div className="game-layout__left">
           {actionBoardOverview}
           {expansionActionBoards}
-          {!isDesktopTable ? majorImprovementsPresentation : null}
+          {!isDesktopTable && !nearbyMajorSupply ? majorImprovementsPresentation : null}
         </div>
         <div className="game-layout__center">
           {isPublicFarmView && activePlayer ? (
@@ -1998,6 +2004,7 @@ export const GameContainerApi = () => {
               actions={farmBoardActions}
               inlineCardStats={isMobile}
               handOutlet={isDesktopTable ? handOutlet : null}
+              improvementSupply={nearbyMajorSupply ? majorImprovementsPresentation : null}
             />
           </section>
         </div>

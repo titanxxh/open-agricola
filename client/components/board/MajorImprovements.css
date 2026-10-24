@@ -1,0 +1,16 @@
+.major-supply-toggle {
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hand-section .major-improvements {
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+}

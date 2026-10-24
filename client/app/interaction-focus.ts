@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
 
-export type InteractionFocusTarget = 'occupation-hand' | 'actions' | 'controls'
+export type InteractionFocusTarget = 'occupation-hand' | 'minor-hand' | 'major-supply' | 'actions' | 'controls'
 
 export const interactionFocusRequestKey = (interaction: ClientInteractionState): string =>
   interaction.stateId === 'wait'
@@ -42,16 +42,17 @@ const revealTarget = (target: InteractionFocusTarget, playerId: string): boolean
   return true
 }
 
-export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPlayer }: {
+export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPlayer, targetOverride }: {
   interaction: ClientInteractionState
   canFocus: boolean
   playerId: string
   onViewPlayer: (playerId: string) => void
+  targetOverride?: InteractionFocusTarget | null
 }) => {
   const [followingAction, setFollowingAction] = useState(false)
   const lastFocusedRequest = useRef<string | null>(null)
   const requestKey = interactionFocusRequestKey(interaction)
-  const requestedTarget = getInteractionFocusTarget(interaction)
+  const requestedTarget = targetOverride ?? getInteractionFocusTarget(interaction)
   const complete = interaction.stateId === 'idle' || (interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player')
   const target = requestedTarget ?? (followingAction && !complete ? 'controls' : null)
 

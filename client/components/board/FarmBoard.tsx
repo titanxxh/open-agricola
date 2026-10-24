@@ -1,6 +1,7 @@
 import type { CardStatePresentation } from '../../../shared/contract/card-state'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -528,7 +529,7 @@ export type FarmBoardActions = {
   cancelAnimalDiscardPrompt: () => void
   setViewPlayerId: (value: string) => void
   resolveChoice: (value: string) => void
-  playCardChoice?: (value: string) => void
+  playCardChoice?: (value: string) => CardPlayOutcome
   onConfirmOccupationHandSelection?: (cardIds: string[]) => void
   isOccupationHandSelectionRejected?: (cardIds: string[]) => boolean
 }
@@ -538,6 +539,7 @@ export type FarmBoardProps = {
   actions: FarmBoardActions
   inlineCardStats?: boolean
   handOutlet?: HTMLElement | null
+  improvementSupply?: ReactNode
   showHand?: boolean
 }
 
@@ -860,7 +862,7 @@ const ParentCardTile = ({
   )
 }
 
-export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, showHand = true }: FarmBoardProps) => {
+export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, improvementSupply, showHand = true }: FarmBoardProps) => {
   const {
     locale,
     players,
@@ -1084,7 +1086,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                       devMode={devMode}
                       onClick={() => {
                         if (isSelectingOccupation && canInteract) {
-                          playCardChoice(cardId)
+                          return playCardChoice(cardId)
                         }
                       }}
                       disabled={
@@ -1122,8 +1124,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               </div>
             )}
           </div>
-          <div className="hand-section minor">
+          <div className="hand-section minor" data-interaction-focus="minor-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.minorCards')}</div>
+            {improvementSupply}
             <div className="hand-row">
               {displayPlayer.minorHand.length === 0 ? (
                 <div className="hand-empty">{t(locale, 'ui.noHandCards')}</div>
@@ -1149,7 +1152,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                       devMode={devMode}
                       onClick={() => {
                         if (canSelect) {
-                          playCardChoice(cardId)
+                          return playCardChoice(cardId)
                         }
                       }}
                       disabled={

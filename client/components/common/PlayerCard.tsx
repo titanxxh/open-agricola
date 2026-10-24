@@ -8,6 +8,7 @@ import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/car
 import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy, type CardTouchInteraction } from './CardWithCopy'
+import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
 import { ResourceText } from './ResourceText'
 import { getCardDisplayText, type CardType } from './cardText'
 
@@ -44,7 +45,7 @@ type PlayerCardProps = {
   cardType: CardType
   infobox?: string
   devMode?: boolean
-  onClick?: () => void
+  onClick?: () => CardPlayOutcome
   touchInteraction?: CardTouchInteraction
   disabled?: boolean
   selectable?: boolean

@@ -4,24 +4,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
 import { MajorImprovements } from '../MajorImprovements'
 
-vi.mock('../../common/PlayerCard', () => ({
-  PlayerCard: ({
-    cardId,
-    onClick,
-    disabled,
-    className,
-  }: {
-    cardId: string
-    onClick?: () => void
-    disabled?: boolean
-    className?: string
-  }) => (
-    <button className={className} data-card-anchor={cardId} disabled={disabled} onClick={onClick}>
-      {cardId}
-    </button>
-  ),
-}))
-
 const baseProps = {
   locale: 'en' as const,
   availableMajorImprovements: ['Major_Well'],
@@ -61,6 +43,23 @@ describe('MajorImprovements', () => {
     expect(resolveChoice).not.toHaveBeenCalled()
     fireEvent.click(visible!)
     expect(resolveChoice).toHaveBeenCalledWith('Major_Well')
+  })
+
+  it('starts mixed selection collapsed and preserves an explicit collapse through repeated snapshots', () => {
+    const resolveChoice = vi.fn()
+    const props = { ...baseProps, minorChoiceCount: 1, selectionRequestKey: 'mixed-1', resolveChoice }
+    const { container, getByRole, rerender } = render(<MajorImprovements {...props} />)
+    expect(container.querySelector('.major-row')).toBeNull()
+    const toggle = getByRole('button', { name: 'Show major improvements (1)' })
+    fireEvent.click(toggle)
+    expect(container.querySelector('[data-card-anchor="Major_Well"]')).not.toBeNull()
+    fireEvent.click(getByRole('button', { name: 'Hide major improvements' }))
+    rerender(<MajorImprovements {...props} selectableMajorIds={new Set(['Major_Well'])} />)
+    expect(container.querySelector('.major-row')).toBeNull()
+    rerender(<MajorImprovements {...props} minorChoiceCount={0} />)
+    expect(container.querySelector('.major-row')).toBeNull()
+    rerender(<MajorImprovements {...props} minorChoiceCount={0} selectionRequestKey="major-only-2" />)
+    expect(container.querySelector('[data-card-anchor="Major_Well"]')).not.toBeNull()
   })
 
   it('preserves flat fallback when stack supply is absent', () => {
