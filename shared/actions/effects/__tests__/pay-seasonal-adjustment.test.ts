@@ -12,7 +12,8 @@ describe('seasonal payment settlement', () => {
     const frame = events.beginFrame({ actorPlayerId: player.id })
     const result = payAction.execute({
       state, player, space: state.actionSpaces[0]!, actionHooks: undefined, eventSink: frame.sink,
-      params: { cost: {}, costType: 'fencing', seasonalAdjustments: [{ season: 'spring', resources: { wood } }] },
+      params: { cost: {}, costType: 'fencing', paymentId: 'reserved-spring-payment',
+        seasonalAdjustments: [{ season: 'spring', resources: { wood } }] },
     })
     expect(result.type).toBe('ok')
     expect(player).toEqual(before)
@@ -22,8 +23,10 @@ describe('seasonal payment settlement', () => {
       expect(result.type === 'ok' && result.extraData?.publicPayment).toEqual({ resources: {} })
     } else {
       expect(settled).toEqual([expect.objectContaining({ type: 'resource.paid', resources: {},
+        paymentId: 'reserved-spring-payment',
         seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }] })])
       expect(result.type === 'ok' && result.extraData?.publicPayment).toMatchObject({
+        paymentId: 'reserved-spring-payment',
         resources: {}, seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }],
       })
     }

@@ -41,7 +41,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
   'farm.stableBuilt': ['stables', 'newlyUsedTiles', 'seasonalGrant'],
-  'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures', 'newlyUsedTiles', 'newlyEnclosedPastureTiles'],
+  'farm.fenceBuilt': ['fences', 'paymentId', 'newFenceEdges', 'newPastures', 'newlyUsedTiles', 'newlyEnclosedPastureTiles'],
   'farm.fenceConsumed': ['count', 'reason'],
   'farm.animalMoved': ['animals', 'from', 'to', 'newlyPlacedOnFarmyard'],
   'farm.animalDiscarded': ['animals', 'reason'],
@@ -524,6 +524,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStableBuiltPositions(event.stables, 'stables')
       return
     case 'farm.fenceBuilt':
+      assertOptionalStringField(event.paymentId, 'paymentId')
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       assertBoardPositions(event.newlyEnclosedPastureTiles, 'newlyEnclosedPastureTiles', ['playerId', 'row', 'col'])
       if (!Array.isArray(event.fences)) throw new Error('GameEvent fences must be an array')
@@ -601,17 +602,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.spaceId, 'spaceId')
       assertResourceMap(event.resources, 'resources')
       if (event.normalResources !== undefined) assertResourceMap(event.normalResources, 'normalResources')
-      if (event.seasonalAdjustments !== undefined) {
-        if (!Array.isArray(event.seasonalAdjustments)) throw new Error('GameEvent seasonalAdjustments must be an array')
-        event.seasonalAdjustments.forEach((value, index) => {
-          const adjustment = assertRecord(value, `seasonalAdjustments[${index}]`)
-          assertOnlyKeys(adjustment, ['season', 'resources'], `seasonalAdjustments[${index}]`)
-          if (typeof adjustment.season !== 'string' || !['winter', 'spring', 'summer', 'autumn'].includes(adjustment.season)) {
-            throw new Error(`GameEvent seasonalAdjustments[${index}].season must be a season`)
-          }
-          assertResourceMap(adjustment.resources, `seasonalAdjustments[${index}].resources`)
-        })
-      }
+      assertSeasonalAdjustments(event.seasonalAdjustments, 'seasonalAdjustments')
       return
     case 'action.exclusiveUseSet':
       assertStringField(event.actionId, 'actionId')

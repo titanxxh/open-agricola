@@ -46,6 +46,7 @@ export type LogPresentationConsumedEventReason =
   | 'cardPayment'
   | 'renovationPayment'
   | 'stablePayment'
+  | 'fencePayment'
   | 'harvestExchange'
 
 export type LogPresentationSuppressedEventReason = 'futureResourceReceive'
@@ -382,19 +383,30 @@ const mapWorkerPlaced = (event: WorkerPlacedEvent, ctx: EventLogMapperContext): 
   }
 }
 
-const mapFenceBuilt = (event: FarmFenceBuiltEvent, ctx: EventLogMapperContext): LogEntry | null => {
+const mapFenceBuilt = (
+  event: FarmFenceBuiltEvent,
+  ctx: EventLogMapperContext,
+  payment: ResourcePaidEvent | undefined,
+): LogEntry | null => {
   const fences = event.fences.filter((fence): fence is { type: string } =>
     typeof fence === 'object' && fence !== null && 'type' in fence,
   )
   const fencing = fences.filter((fence) => fence.type === 'fence').length
   const palisading = fences.filter((fence) => fence.type === 'palisade').length
   if (fencing === 0 && palisading === 0) return null
+  const bonusSources = [...new Set([
+    ...(payment?.bonusSources ?? []),
+    ...(payment?.sourceCardId ? [payment.sourceCardId] : []),
+  ])]
   return actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'fence', {
+    ...(payment ? { costs: positiveResources(payment.resources) } : {}),
+    ...(payment?.seasonalAdjustments?.length ? { seasonalAdjustments: payment.seasonalAdjustments } : {}),
+    ...(bonusSources.length ? { bonusSources } : {}),
     effects: {
       ...(fencing > 0 ? { fencing } : {}),
       ...(palisading > 0 ? { palisading } : {}),
     },
-  })
+  }, { ...(payment?.bonusChoiceIndex ? { bonusChoiceIndex: payment.bonusChoiceIndex } : {}) })
 }
 
 const mapHarvestPhaseStarted = (event: HarvestPhaseStartedEvent): LogEntry => {
@@ -700,6 +712,18 @@ const isNearestFollowingStablePayment = (
     candidate.actorPlayerId === event.actorPlayerId &&
     stablePaymentForEvent(events, candidate)?.seq === event.seq
   )
+
+const fencePaymentForEvent = (
+  events: readonly GameEvent[],
+  fence: FarmFenceBuiltEvent,
+): ResourcePaidEvent | undefined =>
+  fence.paymentId ? events.find((event): event is ResourcePaidEvent =>
+    event.type === 'resource.paid' && event.paymentId === fence.paymentId &&
+    event.actorPlayerId === fence.actorPlayerId && event.paymentFor === 'fencing',
+  ) : undefined
+
+const isOwnedFencePayment = (events: readonly GameEvent[], payment: ResourcePaidEvent): boolean =>
+  events.some(event => event.type === 'farm.fenceBuilt' && fencePaymentForEvent(events, event)?.seq === payment.seq)
 
 const mapCardPlayed = (
   event: CardPlayedEvent,
@@ -1062,8 +1086,9 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'farm.fenceBuilt') {
-        const entry = mapFenceBuilt(event, ctx)
-        return entry ? presentationRows(event, [entry]) : []
+        const payment = fencePaymentForEvent(events, event)
+        const entry = mapFenceBuilt(event, ctx, payment)
+        return entry ? presentationRows(event, [entry], payment ? consumeEvent(event, payment, 'fencePayment') : []) : []
       }
 
       if (event.type === 'farm.fenceConsumed') {
@@ -1125,6 +1150,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'resource.paid') {
         if (consumedEventSeqs.has(event.seq)) return []
         if (isNearestFollowingStablePayment(events, event)) return []
+        if (isOwnedFencePayment(events, event)) return []
         const cost = positiveResources(event.resources)
         if (event.paymentFor === 'feeding' || event.paymentFor === 'begging') {
           return presentationRows(event, [{

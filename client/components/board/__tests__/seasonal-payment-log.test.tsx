@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
-import type { CardPlayedEvent, ResourcePaidEvent } from '../../../../shared/contract/events'
+import type { CardPlayedEvent, FarmFenceBuiltEvent, ResourcePaidEvent } from '../../../../shared/contract/events'
 import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { ActionLog } from '../ActionLog'
 
@@ -12,6 +12,29 @@ const payment: ResourcePaidEvent = {
 }
 
 describe('seasonal payment log', () => {
+  it.each(['zh', 'en'] as const)('renders construction, actual payment and spring saving in one fence row in %s', locale => {
+    for (const free of [false, true]) {
+      const count = free ? 4 : 7
+      const fence: FarmFenceBuiltEvent = {
+        schemaVersion: 1, id: 'fence', seq: 1, round: 7, phase: 'work', visibility: 'public',
+        actorPlayerId: 'p1', type: 'farm.fenceBuilt', sourceActionId: 'fence', paymentId: 'fence-payment',
+        newlyUsedTiles: [], newlyEnclosedPastureTiles: [],
+        fences: Array.from({ length: count }, () => ({ type: 'fence' })),
+      }
+      const log = eventsToLogEntries([fence, { ...payment, paymentId: 'fence-payment', resources: free ? {} : { wood: 5 } }],
+        { playerNames: { p1: 'Alice' } })
+      const view = render(<ActionLog locale={locale} log={log} currentRound={7} />)
+      const row = view.container.querySelector('li')!
+      expect(view.container.querySelectorAll('li')).toHaveLength(1)
+      expect(row).toHaveTextContent(locale === 'zh' ? `建造 ${count} 段围栏` : `Build ${count} fence(s)`)
+      expect(row).toHaveTextContent(new RegExp(`${locale === 'zh' ? '支付' : 'Pays'}.*${free ? 0 : 5}`))
+      expect(row).toHaveTextContent(locale === 'zh' ? '春季减免' : 'Spring: costs')
+      expect(row.querySelectorAll('[data-resource="wood"][data-amount="2"]')).toHaveLength(1)
+      expect(row.querySelectorAll('[data-resource="wood"][data-amount="5"]')).toHaveLength(free ? 0 : 1)
+      view.unmount()
+    }
+  })
+
   it.each(['zh', 'en'] as const)('keeps an autumn major saving in its owning purchase row in %s', locale => {
     const purchase: CardPlayedEvent = {
       schemaVersion: 1, id: 'autumn-purchase', seq: 3, round: 7, phase: 'work', visibility: 'public',

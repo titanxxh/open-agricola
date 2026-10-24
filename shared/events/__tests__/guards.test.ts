@@ -17,6 +17,14 @@ describe('event guards', () => {
     visibility: 'public',
   } as const
 
+  it('accepts a reserved fence payment identity and rejects malformed identities', () => {
+    const fence = { ...baseEvent, type: 'farm.fenceBuilt', fences: [], newlyUsedTiles: [], newlyEnclosedPastureTiles: [] }
+    expect(() => assertKnownGameEventShape({ ...fence, paymentId: 'fence-payment' })).not.toThrow()
+    for (const paymentId of ['', 1, null, {}]) {
+      expect(() => assertKnownGameEventShape({ ...fence, paymentId })).toThrow(/paymentId/)
+    }
+  })
+
   it('accepts an actual summer heating waiver on the owning settlement', () => {
     expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'harvest.heated', playerId: 'p1', required: 0, fuelUsed: 0,
       woodToFuel: 0, sickWorkerIds: [], seasonalWaiver: { season: 'summer', normalRequired: 2, waived: 2 } })).not.toThrow()

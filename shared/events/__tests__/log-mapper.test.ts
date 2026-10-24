@@ -5,6 +5,33 @@ import type { GameEvent } from '../../contract/events'
 import { buildLogPresentationPlan, eventsToLogEntries } from '../log-mapper'
 
 describe('eventsToLogEntries', () => {
+  it('merges only the identified fence payment without assigning later or other-player costs to a free operation', () => {
+    const base = { schemaVersion: 1, round: 7, phase: 'work', visibility: 'public', actorPlayerId: 'p1' } as const
+    const fence = {
+      ...base, type: 'farm.fenceBuilt', fences: [{ type: 'fence' }], newlyUsedTiles: [], newlyEnclosedPastureTiles: [],
+    } as const
+    const events = [
+      { ...fence, fences: [...fence.fences], id: 'free-fence', seq: 1, paymentId: 'free' },
+      { ...base, type: 'resource.paid', id: 'other-player', seq: 2, actorPlayerId: 'p2', paymentId: 'free',
+        resources: { wood: 2 }, paymentFor: 'fencing' },
+      { ...base, type: 'resource.paid', id: 'unrelated', seq: 3, paymentId: 'unrelated',
+        resources: { wood: 8 }, paymentFor: 'fencing' },
+      { ...fence, fences: [...fence.fences], id: 'paid-fence', seq: 4, paymentId: 'paid' },
+      { ...base, type: 'resource.paid', id: 'owned-payment', seq: 5, paymentId: 'paid', resources: { wood: 5 },
+        paymentFor: 'fencing', seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }] },
+    ] satisfies GameEvent[]
+    const plan = buildLogPresentationPlan(events, { playerNames: { p1: 'Alice', p2: 'Bob' } })
+    expect(plan.rows).toHaveLength(4)
+    expect(plan.consumedEvents).toEqual([{
+      consumedEventRef: { id: 'owned-payment', seq: 5, type: 'resource.paid' },
+      consumerEventRef: { id: 'paid-fence', seq: 4, type: 'farm.fenceBuilt' }, reason: 'fencePayment',
+    }])
+    expect(plan.rows.find(row => row.sourceEventRef.id === 'free-fence')?.logEntry.params?.detailParts).toEqual({ effects: { fencing: 1 } })
+    expect(plan.rows.find(row => row.sourceEventRef.id === 'paid-fence')?.logEntry.params?.detailParts).toEqual({
+      effects: { fencing: 1 }, costs: { wood: 5 }, seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }],
+    })
+  })
+
   it.each(['through-the-seasons:spring', 'A165_PigBreeder', undefined])('maps actual non-harvest newborns with source %s', sourceCardId => {
     const event = {
       schemaVersion: 1, id: 'birth', occurrenceId: 'birth-occurrence', seq: 1, round: 1, phase: 'work',

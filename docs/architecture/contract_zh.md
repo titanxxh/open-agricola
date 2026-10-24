@@ -53,7 +53,7 @@
 - `events` 是公开的结构化规则事件流。后端规则写 `GameEvent`；mapper 派生文本日志、通知、高亮、动画、审计与 Replay。`log` 是缓存，不是规则来源，只有具名缓存边界写入（`appendImmediateEvents()`、`GameCore.flushEngineLog()`），由 `pnpm run check:direct-session-log` 强制。
 - 每个公开 `GameEvent['type']` 都登记在 `shared/events/event-mapping-policy.ts`，按消费者标记为已映射、条件映射或刻意静默。新增事件类型时同时补 policy、mapper fixture 和文档。`eventsToLogEntries()` 不写通用兜底行。
 - 结算事件以类型明确的 `SeasonalAdjustment` 单独记录季节事实，不写卡牌统计。`action.accumulated.resources` 保留净增量；受影响的事件另保留 `normalResources` 与实际、有符号的季节差值，包括最终为零的结算。原事件只生成一条含说明的日志；notification 和资源动画仍只使用净资源。见 [ADR 0034](../adr/0034-seasonal-adjustments-belong-to-settlement-events.md)。
-- `buildLogPresentationPlan()` 是 Action Log 关系的唯一来源（`rows`、`consumedEvents`、`suppressedEvents`）；客户端不从名字、数量或卡牌 ID 推断关系。喂食转换行消费对应的兑换事实，两种规则事实只产生一条转换日志。
+- `buildLogPresentationPlan()` 是 Action Log 关系的唯一来源（`rows`、`consumedEvents`、`suppressedEvents`）；客户端不从名字、数量或卡牌 ID 推断关系。喂食转换行消费对应的兑换事实。围栏建造通过共用 `paymentId` 消费其实际付款，把建造数、付款及季节调整保留在同一行；不从相邻事实猜补缺失付款。
 - `EventStore` 为每个新事件分配不透明的 `occurrenceId`，在快照、rebase、取消和投影中保持不变。派生日志行携带 `LogEntry.sourceEvent = { occurrenceId, rowIndex }`；缓存匹配使用它加日志 key，没有这些字段的旧记录保留按参数计数匹配。
 - 购卡把 `PaymentInfo.publicPayment` 带入 `card.played.payment`，其 `paymentId` 与对应的 `resource.paid` 事件共享；免费打出携带显式空收据。
 - 季节赠送在原有 `resource.moved` 或 `farm.stableBuilt` 结果及派生的 `ActionDetailParts` 上携带 `seasonalGrant: { season }`。实际数量取自所属事实；展示不从当前季节反推来源，也不把季节当成卡牌。
