@@ -9,6 +9,9 @@ export const isThroughTheSeasonsSeason = (
   state.enableThroughTheSeasons === true &&
   state.throughTheSeasons?.currentSeason === season
 
+export const winterPlowFoodCost = (state: GameState): number =>
+  isThroughTheSeasonsSeason(state, 'winter') ? 1 : 0
+
 export const remainingHarvestCount = (state: GameState): number =>
   harvestRounds.filter((round) => round >= state.round).length
 

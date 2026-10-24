@@ -35,7 +35,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.sown': ['sows', 'placementOnly'],
   'farm.cropAdded': ['crops', 'reason'],
   'farm.cropRemoved': ['crops', 'reason'],
-  'farm.fieldPlowed': ['fields', 'newlyUsedTiles'],
+  'farm.fieldPlowed': ['fields', 'newlyUsedTiles', 'payment'],
   'farm.spacesUsed': ['newlyUsedTiles'],
   'farm.terrainChanged': ['playerId', 'operation', 'changes', 'newlyUsedTiles'],
   'farm.roomBuilt': ['rooms', 'newlyUsedTiles'],
@@ -480,6 +480,12 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
     case 'farm.fieldPlowed':
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])
       assertBoardPositions(event.fields, 'fields', ['playerId', 'row', 'col'])
+      if (event.payment !== undefined) {
+        const payment = assertRecord(event.payment, 'payment')
+        assertOnlyKeys(payment, ['resources', 'seasonalAdjustments'], 'payment')
+        assertPaymentResourceMap(payment.resources, 'payment.resources')
+        assertSeasonalAdjustments(payment.seasonalAdjustments, 'payment.seasonalAdjustments')
+      }
       return
     case 'farm.roomBuilt':
       assertBoardPositions(event.newlyUsedTiles, 'newlyUsedTiles', ['playerId', 'row', 'col'])

@@ -16,6 +16,8 @@ import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained, recordActionCostAttribution } from '../../cards/helpers/card-state'
 import { PaymentSolver } from '../payment'
+import { winterPlowFoodCost } from '../../seasons/rules'
+import type { CardPayment } from '../../contract/events'
 
 const getOccupiedKeys = (player: PlayerState) => {
   const keys = new Set<string>()
@@ -204,6 +206,16 @@ const finalizePlow = (
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   PaymentSolver.executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
+  const resourcesPaid = sanitizePayableCost(payment.solution.resourcesPaid)
+  const winterFood = winterPlowFoodCost(ctx.state)
+  const withoutWinter = resolvePlowCost(ctx.actionContext, {
+    ...ctx.costs, food: (ctx.costs?.food ?? 0) - winterFood,
+  })
+  const addedFood = Math.max(0, (plowCost.food ?? 0) - (withoutWinter?.food ?? 0))
+  const publicPayment: CardPayment = {
+    resources: resourcesPaid,
+    ...(addedFood > 0 ? { seasonalAdjustments: [{ season: 'winter', resources: { food: addedFood } }] } : {}),
+  }
   const farmOperation = commitFarmOperation(ctx.player, { kind: 'plow', position: tile, preparedPlayer: nextPlayer, sourceCardId: ctx.sourceCard }, ctx.eventSink)
   recordActionCostAttribution(
     ctx.player,
@@ -216,13 +228,15 @@ const finalizePlow = (
   }
   ctx.eventSink?.emit<'farm.fieldPlowed'>({
     type: 'farm.fieldPlowed',
+    sourceActionId: ctx.space.id,
     newlyUsedTiles: farmOperation.newlyUsedTiles,
     fields: [{ playerId: ctx.player.id, row: tile.row, col: tile.col }],
+    ...(Object.keys(resourcesPaid).length > 0 || addedFood > 0 ? { payment: publicPayment } : {}),
   })
   return {
     type: 'ok',
     farmOperations: [farmOperation],
-    resourcesPaid: sanitizePayableCost(payment.solution.resourcesPaid),
+    resourcesPaid,
     extraData: { plowedTile: tile },
   }
 }

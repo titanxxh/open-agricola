@@ -197,7 +197,18 @@ describe('Seasons batch 3 winter audit', () => {
     expect(session.state.players[0]!.resources.food).toBe(0)
     expect(session.state.players[0]!.resources.grain).toBe(order === 'plow' ? 1 : 0)
     expect(session.state.players[0]!.fields).toHaveLength(order === 'sow' ? 1 : 2)
-    expect(session.state.events.filter((event) => event.type === 'farm.fieldPlowed')).toHaveLength(order === 'sow' ? 0 : 1)
+    const plowed = session.state.events.filter((event) => event.type === 'farm.fieldPlowed')
+    expect(plowed).toHaveLength(order === 'sow' ? 0 : 1)
+    if (order !== 'sow') {
+      expect(plowed[0]).toMatchObject({ sourceActionId: 'cultivation', payment: {
+        resources: { food: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { food: 1 } }],
+      } })
+      expect(session.state.log.filter(entry => entry.key === 'log.actionDetail' && entry.params?.detailParts?.effects?.plow)).toEqual([
+        expect.objectContaining({ params: expect.objectContaining({ detailParts: {
+          costs: { food: 1 }, effects: { plow: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { food: 1 } }],
+        } }) }),
+      ])
+    }
     expect(session.state.events.filter((event) => event.type === 'farm.sown')).toHaveLength(order === 'plow' ? 0 : 1)
     expect(session.state.players[1]!.resources).toEqual({ ...emptyResources, food: 50 })
   })
@@ -220,7 +231,12 @@ describe('Seasons batch 3 winter audit', () => {
     expect(done.state.players[0]!.resources.food).toBe(0)
     expect(done.state.players[0]!.fields).toEqual([{ ...tile, stacks: [] }])
     expect(done.state.players[1]).toEqual(before.players[1])
-    expect(done.state.events.filter((event) => event.type === 'action.detailLogged' && event.actionId === 'farmland')).toEqual([expect.objectContaining({ actorPlayerId: 'p1', detailParts: { costs: { food: 1 }, effects: { plow: 1 } } })])
+    expect(done.state.events.filter((event) => event.type === 'action.detailLogged' && event.actionId === 'farmland')).toHaveLength(0)
+    expect(done.state.events.filter((event) => event.type === 'farm.fieldPlowed')).toEqual([expect.objectContaining({
+      actorPlayerId: 'p1', sourceActionId: 'farmland', payment: {
+        resources: { food: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { food: 1 } }],
+      },
+    })])
     auditSettle(session)
     session.state.round = 14
     session.state.players[0]!.resources.food = 50

@@ -81,6 +81,14 @@ describe('event guards', () => {
       resources: {}, paymentFor: 'fencing', seasonalAdjustments: [adjustment] })).toThrow(/seasonalAdjustments/)
   })
 
+  it('accepts a field settlement receipt and rejects hidden or malformed payment metadata', () => {
+    const field = { ...baseEvent, type: 'farm.fieldPlowed', fields: [], newlyUsedTiles: [] }
+    const payment = { resources: { food: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { food: 1 } }] }
+    expect(() => assertKnownGameEventShape({ ...field, payment })).not.toThrow()
+    expect(() => assertKnownGameEventShape({ ...field, payment: { ...payment, internalChoice: 'private' } })).toThrow()
+    expect(() => assertKnownGameEventShape({ ...field, payment: { ...payment, resources: { food: Number.NaN } } })).toThrow()
+  })
+
   it.each(['', null, 1, {}])('rejects invalid occurrence identity %j', occurrenceId => {
     expect(() => assertGameEventEnvelope({ ...baseEvent, type: 'game.started', occurrenceId }))
       .toThrow(/occurrenceId/)

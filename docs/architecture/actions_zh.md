@@ -97,6 +97,7 @@ type ActionDefinition = {
 
 - **房间**（`construct.ts`）：`room-payment.ts` 展开逐房间费用变体；印刷的“每间房”折扣使用 `scope:'unit'`。屋内动物按真实房间保存在 `houseAnimals`。
 - **马厩 / 犁地**（`stables.ts`、`plow.ts`）：typed-flat 支付；马厩定价由默认价、`exactCost` 或 `costOverride` 与一次完整的农场选择查询得出单价。`plow.actionContext.allowedTiles` / `adjacencyPolicy` 只影响本次犁地。
+- **犁地结算**：`farm.fieldPlowed.payment` 保留选中的 typed-flat 实付与实际季节附加费用。`sourceActionId` 标识宿主行动格，因此完整田地事件替代宿主的后备明细日志，不另产生支付事实；卡牌来源继续由 `sourceCardId` 保留。测试：`server/__tests__/seasonal-plow-payment-session.test.ts`、`server/__tests__/future-meeple-action-session.test.ts`。
 - **围栏**（`fencing.ts`）：校验边、来源、连通性与区域；通过农场选择的 `computeCosts` pass 计算费用；把 trade、bonus、provider 与预算传入 `pay:fence:*`。`before` 贡献按来源写回宿主：木材折扣不增加实体，卡上围栏由玩家显式选择，只为本次新建的普通围栏消耗。
 - **播种**（`sow.ts`）：没有支付组合。`maxSelections` 计算 Logical Field，`maxSeedSelections` 限制作物槽；行动作物许可与田地 owner 的许可取交集；`isUnconditionalSow` 保留显式限制。
 

@@ -126,6 +126,12 @@ describe('future meeple round-start actions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.fields).toHaveLength(1)
     expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.events.filter(event => event.type === 'farm.fieldPlowed')).toEqual([
+      expect.objectContaining({ sourceCardId: 'D091_Plowman', payment: { resources: { food: 1 } } }),
+    ])
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.actionDetail', params: expect.objectContaining({ detailParts: { costs: { food: 1 }, effects: { plow: 1 } } }),
+    }))
   })
 
   it('can exchange before a paid future field action is checked', () => {
