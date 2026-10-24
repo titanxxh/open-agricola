@@ -1307,11 +1307,17 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
       data-interaction-focus="farm" data-focus-player={displayPlayer.id}>
     <div className="farm-operation-grid">
     <div className="farm-grid" style={farmGridStyle}>
-      {farmCells.map((cell) => {
+      {farmCells.map((cell, cellIndex) => {
         if (cell.type === 'void') {
           return <div key={cell.key} className="farm-cell farm-void" />
         }
         if (cell.type === 'tile') {
+          const gridRow = Math.floor(cellIndex / gridColumns)
+          const gridCol = cellIndex % gridColumns
+          const holderBoundsStyle: CSSProperties & { '--farm-holder-space-above': string; '--farm-holder-space-left': string } = {
+            '--farm-holder-space-above': `calc(var(--tile) * ${Math.ceil(gridRow / 2)} + var(--fence) * ${Math.ceil((gridRow + 1) / 2)} - var(--tile) * 0.04)`,
+            '--farm-holder-space-left': `calc(var(--tile) * ${Math.ceil(gridCol / 2)} + var(--fence) * ${Math.ceil((gridCol + 1) / 2)} - var(--tile) * 0.04)`,
+          }
           const tileRow = cell.tileRow ?? 0
           const tileCol = cell.tileCol ?? 0
           const tileKey = cell.tileKey ?? `${tileRow}-${tileCol}`
@@ -1413,6 +1419,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               key={cell.key}
               data-farm-tile-key={tileKey}
               data-farm-tile-player={displayPlayer.id}
+              style={holderBoundsStyle}
               className={`farm-cell farm-tile${
                 isRoom
                   ? ' room'

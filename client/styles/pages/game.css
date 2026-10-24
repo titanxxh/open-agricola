@@ -3742,6 +3742,13 @@
   padding: 4px 6px;
   border-radius: 8px;
 }
+.farm-grid .pasture-info:has(.pasture-controls) {
+  transform: translate(
+    max(0px, calc(100% - var(--farm-holder-space-left))),
+    max(0px, calc(100% - var(--farm-holder-space-above)))
+  );
+  z-index: 3;
+}
 .pasture-count {
   /* Scale with tile size so the badge stays proportional on narrow boards. */
   font-size: clamp(8px, calc(var(--tile, 60px) * 0.16), 14px);
