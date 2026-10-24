@@ -2,6 +2,8 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
 
+test.use({ hasTouch: true })
+
 async function prepareExpansions(request: APIRequestContext) {
   expect((await postJson(request, `${BACKEND_URL}/api/game/new`, {
     seed: 931, maxPlayers: 2, enableParentCards: true, enableThroughTheSeasons: true,
@@ -61,6 +63,17 @@ for (const width of [320, 390, 768, 1920]) {
       const card = await played.boundingBox()
       expect(card!.width).toBeGreaterThanOrEqual(60)
       expect(card!.height).toBeCloseTo(card!.width, 0)
+      expect(await played.ariaSnapshot()).toContain('将当前回合数加2')
+      await played.tap()
+      await expect(page.locator('.card-hover-preview')).toHaveCount(0)
+      await page.keyboard.press('Tab')
+      await page.keyboard.press('Shift+Tab')
+      await expect(played).toBeFocused()
+      await expect(page.locator('.card-hover-preview')).toHaveCount(1)
+      await expect(page.locator('.card-hover-preview .card-desc')).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(page.locator('.card-hover-preview')).toHaveCount(0)
+      await played.evaluate(element => element.blur())
       const hand = page.locator('.game-layout__center .hand-row .player-card').first()
       expect((await hand.boundingBox())!.width).toBeGreaterThanOrEqual(65)
       await expect(page.locator('.action-log')).toBeVisible()

@@ -194,8 +194,7 @@ export const CardWithCopy = ({
     onClick?.()
   }, [onClick])
 
-  const keyboardPreview = enablePreview && !!previewCard && typeof window !== 'undefined'
-    && (window.matchMedia?.('(min-width: 1101px)').matches ?? false)
+  const keyboardPreview = enablePreview && !!previewCard
 
   return (
     <>
@@ -211,8 +210,8 @@ export const CardWithCopy = ({
         onPointerCancel={handlePointerUp}
         aria-disabled={disabled}
         tabIndex={keyboardPreview ? 0 : undefined}
-        onFocus={() => {
-          if (!keyboardPreview || !rootRef.current) return
+        onFocus={(event) => {
+          if (!keyboardPreview || !rootRef.current || !event.currentTarget.matches(':focus-visible')) return
           stateRef.current.card = true
           setAnchor(rootRef.current.getBoundingClientRect())
         }}
