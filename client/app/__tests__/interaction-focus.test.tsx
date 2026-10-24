@@ -12,12 +12,14 @@ const occupation: ClientInteractionState = {
 }
 const idle: ClientInteractionState = { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] }
 
-const Harness = ({ interaction = occupation, permitted = true, terrain = false }: {
+const Harness = ({ interaction = occupation, permitted = true, terrain = false, canReturnToActions }: {
   interaction?: ClientInteractionState
   permitted?: boolean
   terrain?: boolean
+  canReturnToActions?: boolean
 }) => {
   const focus = useInteractionFocus({ interaction, canFocus: permitted, playerId: 'p1', onViewPlayer: () => {},
+    canReturnToActions,
     localRequest: terrain ? { key: 'selected-terrain', target: 'farm' } : undefined })
   return <div className="app">
     <div data-interaction-focus="actions">Action spaces</div>
@@ -103,6 +105,31 @@ describe('Interaction Focus', () => {
     view.rerender(<Harness permitted={false} interaction={idle} />)
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
     expect(window.scrollBy).toHaveBeenCalledOnce()
+    expect(document.querySelector('[data-interaction-focus="actions"]')).not.toHaveAttribute('data-interaction-focused')
+  })
+
+  it('returns a followed online action once after a foreign continuation finishes without focusing that player', async () => {
+    const view = render(<Harness canReturnToActions />)
+    await waitFor(() => expect(window.scrollBy).toHaveBeenCalledOnce())
+    const foreign: ClientInteractionState = { ...occupation, playerIndex: 1, requestKey: 'foreign-choice' }
+    view.rerender(<Harness interaction={foreign} permitted={false} canReturnToActions />)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
+    expect(window.scrollBy).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-interaction-focus="actions"]')).not.toHaveAttribute('data-interaction-focused')
+
+    const complete: ClientInteractionState = { stateId: 'wait', playerIndex: 1,
+      allowedCommands: [], anytimeActions: [],
+      request: { kind: 'private-prompt', playerIndex: 1, promptKind: 'confirm-next-player' } }
+    view.rerender(<Harness interaction={complete} permitted={false} canReturnToActions />)
+    await waitFor(() => expect(document.querySelector('[data-interaction-focus="actions"]')).toHaveAttribute('data-interaction-focused', 'true'))
+    const calls = vi.mocked(window.scrollBy).mock.calls.length
+    view.rerender(<Harness interaction={idle} canReturnToActions />)
+    view.rerender(<Harness interaction={{ ...foreign, requestKey: 'next-foreign-choice' }} permitted={false} canReturnToActions />)
+    view.rerender(<Harness interaction={{ ...complete, requestKey: 'next-foreign-complete' }} permitted={false} canReturnToActions />)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)) })
+    expect(window.scrollBy).toHaveBeenCalledTimes(calls)
+    expect(document.querySelector('[data-interaction-focus="actions"]')).toHaveAttribute('data-interaction-focused', 'true')
   })
 
   it('highlights a fully visible occupation hand without scrolling', async () => {
