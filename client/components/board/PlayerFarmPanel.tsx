@@ -1,4 +1,5 @@
 import type { ClientGameState } from '../../services/rehydrate'
+import type { ReactNode } from 'react'
 import {
   FarmBoard,
   type FarmBoardActions,
@@ -15,6 +16,7 @@ export interface PlayerFarmPanelProps {
   actions: FarmBoardActions
   inlineCardStats?: boolean
   handOutlet?: HTMLElement | null
+  improvementSupply?: ReactNode
   showHand?: boolean
 }
 
@@ -25,6 +27,7 @@ export function PlayerFarmPanel({
   actions,
   inlineCardStats,
   handOutlet,
+  improvementSupply,
   showHand,
 }: PlayerFarmPanelProps) {
   const currentPlayer = state.players[state.currentPlayerIndex]
@@ -52,6 +55,7 @@ export function PlayerFarmPanel({
         actions={actions}
         inlineCardStats={inlineCardStats}
         handOutlet={handOutlet}
+        improvementSupply={improvementSupply}
         showHand={showHand}
       />
       {/* occupations CardCarousel — added in Task 6 */}

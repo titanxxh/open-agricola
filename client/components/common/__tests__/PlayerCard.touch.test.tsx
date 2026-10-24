@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { PlayerCard } from '../PlayerCard'
 import { useCardPlayChoice } from '../../../hooks/useCardPlayChoice'
@@ -16,6 +16,25 @@ beforeAll(() => {
 })
 
 describe('touch card play', () => {
+  it('keeps failed card details open and permits retry after transport settlement', async () => {
+    const submit = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    const Selection = () => {
+      const play = useCardPlayChoice('same-live-request', submit)
+      return <PlayerCard locale="en" cardId="A116_WoodCutter" cardType="occupation"
+        onClick={() => play('A116_WoodCutter')}
+        touchInteraction={{ kind: 'play', requestKey: 'same-live-request' }} />
+    }
+    const { container } = render(<Selection />)
+    touch(container.querySelector('[data-card-anchor]')!)
+    const play = screen.getByRole('button', { name: 'Play this card' })
+    fireEvent.click(play)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Play this card' })).toBeEnabled())
+    expect(screen.getByRole('dialog')).toBeVisible()
+    fireEvent.click(play)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(submit).toHaveBeenCalledTimes(2)
+  })
+
   it('opens occupation details on a tap and submits only through the play button', () => {
     const onClick = vi.fn()
     const { container } = render(

@@ -100,6 +100,8 @@ test('touch major supply reads an unavailable card and plays only after confirma
   })
   await page.locator('[data-action-id="major-improvement"] button').first().tap()
   const supply = page.locator('.major-improvements')
+  const expand = supply.getByRole('button', { name: /^Show major improvements/ })
+  if (await expand.isVisible()) await expand.tap()
   await supply.locator('[data-card-anchor="Major_Well"]').tap()
   const unavailable = await expectDialogFits(page)
   await expect(unavailable.getByRole('button', { name: 'Play this card' })).toBeDisabled()
@@ -113,4 +115,25 @@ test('touch major supply reads an unavailable card and plays only after confirma
   const result = await (await committed).json()
   expect(result.ok, JSON.stringify(result)).toBe(true)
   expect(result.state.players[0].improvements).toContain('Major_Fireplace1')
+})
+
+test('a failed transport submission can retry the same live card request', async ({ page, request }) => {
+  await openGame(page, request, state => {
+    state.players[0]!.occupationHand = ['A116_WoodCutter', 'A124_Knapper']
+  })
+  await page.locator('[data-action-id="lessons"] button').first().tap()
+  await page.locator('.hand-cards [data-card-anchor="A116_WoodCutter"]').tap()
+  const play = page.getByRole('dialog', { name: 'Card details' }).getByRole('button', { name: 'Play this card' })
+  await page.route('**/api/game/choice', route => route.abort('failed'), { times: 1 })
+  const failed = page.waitForEvent('requestfailed', req => req.url().endsWith('/api/game/choice'))
+  await play.tap()
+  await failed
+  await expect(play).toBeEnabled()
+  const before = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+  expect(before.state.players[0].occupationPlayed).not.toContain('A116_WoodCutter')
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
+  await play.tap()
+  const result = await (await committed).json()
+  expect(result.ok, JSON.stringify(result)).toBe(true)
+  expect(result.state.players[0].occupationPlayed).toContain('A116_WoodCutter')
 })

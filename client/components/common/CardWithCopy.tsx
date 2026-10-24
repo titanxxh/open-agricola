@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { CardHoverPreview } from './CardHoverPreview'
 import { CardDetails } from './CardDetails'
+import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
 
 export type CardTouchInteraction = { kind: 'inspect' } | { kind: 'play'; requestKey: string }
 
@@ -10,7 +11,7 @@ type Props = {
   cardId: string
   children: ReactNode
   className?: string
-  onClick?: () => void
+  onClick?: () => CardPlayOutcome
   disabled?: boolean
   touchInteraction?: CardTouchInteraction
   devMode?: boolean
@@ -287,8 +288,22 @@ export const CardWithCopy = ({
               if (!canPlayDetails || touchInteraction?.kind !== 'play' || submittedRequestRef.current === touchInteraction.requestKey) return
               submittedRequestRef.current = touchInteraction.requestKey
               setSubmittedRequest(touchInteraction.requestKey)
-              onClick?.()
-              closeDetails()
+              const submittedKey = touchInteraction.requestKey
+              const settle = (accepted: boolean) => {
+                if (submittedRequestRef.current !== submittedKey) return
+                if (accepted) closeDetails()
+                else {
+                  submittedRequestRef.current = null
+                  setSubmittedRequest(null)
+                }
+              }
+              try {
+                const result = onClick?.()
+                if (result instanceof Promise) void result.then(settle, () => settle(false))
+                else settle(result !== false)
+              } catch {
+                settle(false)
+              }
             },
           }}
         />
