@@ -1441,6 +1441,8 @@ export const en = {
     harvestFeedDetail: '{player} feeds {resources}',
     harvestHeatingDetail: '{player} heats home: pays {fuelUsed}/{required} fuel, converts {woodToFuel} wood, sick workers {sickWorkers}',
     harvestBreedDetail: '{player} breeds {resources}',
+    animalBred: '{player} breeds {resources}',
+    animalBredFromSource: '{player} breeds {resources} via {cardId}',
     startPlayer: '{player} becomes start player',
     plow: '{player} plows 1 field',
     plowFail: '{player} failed to plow a field',

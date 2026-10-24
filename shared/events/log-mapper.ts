@@ -1071,13 +1071,17 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'farm.animalBred') {
-        if (event.source !== 'harvest') return []
+        const resources = positiveResources(event.animals)
+        const isHarvest = event.source === 'harvest'
+        if (!isHarvest && Object.keys(resources).length === 0) return []
         return presentationRows(event, [{
-          key: 'log.harvestBreedDetail',
+          key: isHarvest ? 'log.harvestBreedDetail'
+            : event.sourceCardId ? 'log.animalBredFromSource' : 'log.animalBred',
           playerId: event.actorPlayerId,
           params: {
             player: playerName(ctx, event.actorPlayerId),
-            resources: positiveResources(event.animals),
+            resources,
+            ...(!isHarvest && event.sourceCardId ? { cardId: event.sourceCardId } : {}),
           },
         }])
       }

@@ -2216,6 +2216,8 @@ export const zh = {
     harvestFeedDetail: '{player} 喂养 {resources}',
     harvestHeatingDetail: '{player} 供暖：支付 {fuelUsed}/{required} 燃料，转换 {woodToFuel} 木材，生病工人 {sickWorkers}',
     harvestBreedDetail: '{player} 繁殖 {resources}',
+    animalBred: '{player} 新生 {resources}',
+    animalBredFromSource: '{player} 通过 {cardId} 新生 {resources}',
     startPlayer: '{player} 成为起始玩家',
     plow: '{player} 开垦 1 块田地',
     plowFail: '{player} 开垦失败',

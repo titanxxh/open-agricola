@@ -113,17 +113,24 @@ const replayEntryForEvent = (
 })
 
 describe('buildActionLogTimelineRows', () => {
-  it('omits non-harvest breeding metadata from the Chinese action log', () => {
+  it.each(['zh', 'en'] as const)('shows one non-harvest birth from the event and cached log in %s', locale => {
     const event: GameEvent = {
-      schemaVersion: 1, id: 'spring-breed', seq: 4, round: 1, phase: 'work',
+      schemaVersion: 1, id: 'spring-breed', occurrenceId: 'spring-birth', seq: 4, round: 1, phase: 'work',
       visibility: 'public', type: 'farm.animalBred', actorPlayerId: 'p1',
       sourceActionId: 'breed', sourceCardId: 'through-the-seasons:spring',
       source: 'cardEffect', animals: { sheep: 1 },
     }
-    expect(buildActionLogTimelineRows({
-      entries: [replayEntryForEvent(event, 1)], stateLog: [], currentRound: 1,
-      locale: 'zh', playerNames: { p1: '玩家 1' },
-    })).toEqual([])
+    const rows = buildActionLogTimelineRows({
+      entries: [replayEntryForEvent(event, 1)], stateLog: [{
+        key: 'log.animalBredFromSource', playerId: 'p1',
+        params: { player: '玩家 1', cardId: 'through-the-seasons:spring', resources: { sheep: 1 } },
+        sourceEvent: { occurrenceId: 'spring-birth', rowIndex: 0 },
+      }], currentRound: 1, locale, playerNames: { p1: '玩家 1' },
+    }).flatMap(bucket => bucket.rows)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ kind: 'event', status: 'active',
+      logEntry: { key: 'log.animalBredFromSource', params: { resources: { sheep: 1 }, cardId: 'through-the-seasons:spring' } },
+    })
   })
 
   it('does not keep timeline-local state log identity rules', () => {

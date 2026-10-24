@@ -156,7 +156,7 @@ export const publicEventMappingPolicy = {
     replay: 'replayable',
   },
   'farm.animalDiscarded': silentPublicCues(mapped()),
-  'farm.animalBred': silentPublicCues(conditional("source === 'harvest'", 'non-harvest breeding is card-effect metadata and stays out of the action log')),
+  'farm.animalBred': silentPublicCues(conditional("source === 'harvest' || positive newborn animals", 'non-harvest events without actual newborns have no birth result')),
   'worker.placed': {
     log: mapped(),
     notification: silent('worker placement is frequent and already visible on board'),

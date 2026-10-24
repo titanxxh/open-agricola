@@ -41,16 +41,19 @@ describe('Pig Breeder due breeding', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(count)
     expect(response.state.events.some(event => event.type === 'farm.animalBred' && event.sourceCardId === CARD_ID)).toBe(false)
+    expect(response.state.log.some(entry => entry.key === 'log.animalBredFromSource')).toBe(false)
   })
   it('a full pasture does not receive an extra animal', () => {
     const response = setup(12, 5).performRoundEnd()
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(5)
+    expect(response.state.log.some(entry => entry.key === 'log.animalBredFromSource')).toBe(false)
   })
   it('round ten has no extra breeding', () => {
     const response = setup(10, 2).performRoundEnd()
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(2)
+    expect(response.state.log.some(entry => entry.key === 'log.animalBredFromSource')).toBe(false)
   })
 })
 
