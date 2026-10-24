@@ -98,6 +98,12 @@ const auditAnimals = (session: GameSession) => {
   expect(done.ok, done.error).toBe(true)
   return done
 }
+const auditBirthResources = (session: GameSession) => session.state.log
+  .filter(entry => entry.key === 'log.animalBredFromSource')
+  .map(entry => {
+    expect(entry.params?.cardId).toBe('through-the-seasons:spring')
+    return entry.params?.resources
+  })
 
 describe('Seasons batch 3 spring audit', () => {
   it.each([0, 1, 2, 3])('spring breeding with %i sheep uses current pairs and never harvests the other player', (count) => {
@@ -108,7 +114,11 @@ describe('Seasons batch 3 spring audit', () => {
     const before = auditClone(session.state)
     const response = session.takeAction(0, springActionId)
     expect(response.ok).toBe(count >= 2)
-    if (count < 2) { expect(auditClone(session.state)).toEqual(before); return }
+    if (count < 2) {
+      expect(auditClone(session.state)).toEqual(before)
+      expect(auditBirthResources(session)).toEqual([])
+      return
+    }
     session = auditRestore(session)
     auditAnimals(session)
     expect(session.state.players[0]!.resources).toEqual({ ...before.players[0]!.resources, sheep: count + 1 })
@@ -116,7 +126,7 @@ describe('Seasons batch 3 spring audit', () => {
     expect(session.state.players[1]).toEqual(before.players[1])
     expect(session.state.harvestBreedSummary).toBeUndefined()
     expect(session.state.events.filter((event) => event.type === 'farm.animalBred')).toEqual([expect.objectContaining({ actorPlayerId: 'p1', animals: { sheep: 1 } })])
-    expect(session.state.log.length).toBeGreaterThan(before.log.length)
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
   })
 
   it.each(['breed', 'sow', 'breed-sow', 'sow-breed'] as const)('Animal and Fruit %s completes only the selected branches in order after restore', (order) => {
@@ -153,6 +163,7 @@ describe('Seasons batch 3 spring audit', () => {
     expect(session.state.harvestBreedSummary).toBeUndefined()
     const eventOrder = session.state.events.filter((event) => event.type === 'farm.animalBred' || event.type === 'farm.sown').map((event) => event.type)
     expect(eventOrder).toEqual(order.split('-').map((action) => action === 'breed' ? 'farm.animalBred' : 'farm.sown'))
+    expect(auditBirthResources(session)).toEqual(order.includes('breed') ? [{ sheep: 1 }] : [])
   })
 
   it.each(['release', 'cook'] as const)('spring newborns can be handled by %s without another breeding or field phase', (mode) => {
@@ -183,6 +194,7 @@ describe('Seasons batch 3 spring audit', () => {
     expect(session.state.players[0]!.resources).toEqual({ ...before.players[0]!.resources, food: mode === 'cook' ? 52 : 50 })
     expect(session.state.players[1]).toEqual(before.players[1])
     expect(session.state.events.filter((event) => event.type === 'farm.animalBred')).toHaveLength(1)
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
     expect(session.state.harvestBreedSummary).toBeUndefined()
   })
 
@@ -241,6 +253,7 @@ describe('Seasons batch 3 spring audit', () => {
     if (response.interaction.request.kind === 'animal-reorg') expect(session.resolveChoice(0, 'confirm', { zones: player.pastures.map((pen) => ({ id: pen.id, zoneType: 'pasture', animalType: pen.animalType, animalCount: 3 })) }).ok).toBe(true)
     expect(session.state.players[0]!.resources).toEqual({ ...emptyResources, food: 50, sheep: 3, boar: 3, cattle: 3 })
     expect(session.state.events.filter((event) => event.type === 'farm.animalBred')).toEqual([expect.objectContaining({ animals: { sheep: 1, boar: 1, cattle: 1 } })])
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1, boar: 1, cattle: 1 }])
   })
 
   it('spring sow-only branch rejects empty selection and unowned seed then permits retry', () => {
@@ -295,6 +308,8 @@ describe('Seasons batch 3 spring audit', () => {
     expect(response.state.round).toBe(5)
     expect(response.state.players.map((player) => player.resources.sheep)).toEqual([4, 3])
     expect(response.state.players.map((player) => player.resources.food)).toEqual([46, 46])
+    expect(auditBirthResources(session)).toEqual([{ sheep: 1 }])
+    expect(response.state.log.filter(entry => entry.key === 'log.harvestBreedDetail')).toHaveLength(2)
   })
 })
 

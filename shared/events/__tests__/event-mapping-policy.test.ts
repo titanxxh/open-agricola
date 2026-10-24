@@ -247,8 +247,8 @@ const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
   },
   'farm.animalBred': {
     log: {
-      mapped: { ...base, type: 'farm.animalBred', animals: { sheep: 1 }, source: 'harvest' },
-      silent: { ...base, id: 'animal-bred-card-effect', seq: 2, type: 'farm.animalBred', animals: { sheep: 1 }, source: 'cardEffect' },
+      mapped: { ...base, type: 'farm.animalBred', animals: { sheep: 1 }, source: 'cardEffect', sourceCardId: 'through-the-seasons:spring' },
+      silent: { ...base, id: 'animal-bred-empty', seq: 2, type: 'farm.animalBred', animals: {}, source: 'cardEffect' },
     },
   },
   'action.accumulated': {

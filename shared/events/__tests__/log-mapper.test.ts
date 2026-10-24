@@ -5,6 +5,34 @@ import type { GameEvent } from '../../contract/events'
 import { buildLogPresentationPlan, eventsToLogEntries } from '../log-mapper'
 
 describe('eventsToLogEntries', () => {
+  it.each(['through-the-seasons:spring', 'A165_PigBreeder', undefined])('maps actual non-harvest newborns with source %s', sourceCardId => {
+    const event = {
+      schemaVersion: 1, id: 'birth', occurrenceId: 'birth-occurrence', seq: 1, round: 1, phase: 'work',
+      visibility: 'public', type: 'farm.animalBred', actorPlayerId: 'p1', source: 'cardEffect',
+      sourceCardId, animals: { sheep: 1, boar: 0, cattle: 1 },
+    } satisfies GameEvent
+    const plan = buildLogPresentationPlan([event], { playerNames: { p1: 'Alice' } })
+    expect(plan.rows).toEqual([expect.objectContaining({
+      sourceEventRef: { id: 'birth', seq: 1, type: 'farm.animalBred' },
+      logEntry: {
+        key: sourceCardId ? 'log.animalBredFromSource' : 'log.animalBred', playerId: 'p1',
+        params: { player: 'Alice', resources: { sheep: 1, cattle: 1 }, ...(sourceCardId ? { cardId: sourceCardId } : {}) },
+        sourceEvent: { occurrenceId: 'birth-occurrence', rowIndex: 0 },
+      },
+    })])
+    expect(plan.consumedEvents).toEqual([])
+    expect(plan.suppressedEvents).toEqual([])
+  })
+
+  it('omits non-harvest birth results when no animal was born', () => {
+    const event = {
+      schemaVersion: 1, id: 'empty-birth', seq: 1, round: 1, phase: 'work',
+      visibility: 'public', type: 'farm.animalBred', source: 'cardEffect',
+      sourceCardId: 'A165_PigBreeder', animals: { boar: 0 },
+    } satisfies GameEvent
+    expect(eventsToLogEntries([event], { playerNames: {} })).toEqual([])
+  })
+
   it('keeps actor and recipient identities distinct when their display names collide', () => {
     const events = [{ schemaVersion: 1, id: 'pay-recipient', seq: 1, round: 1, phase: 'work', type: 'resource.paid', visibility: 'public', actorPlayerId: 'p1', paidFrom: { kind: 'player', playerId: 'p2' }, resources: { wood: 1 }, paymentFor: 'card-effect', sourceCardId: 'A075_LumberMill' },
       { schemaVersion: 1, id: 'target-pairs', seq: 2, round: 1, phase: 'work', type: 'card.resourcePairsStored', visibility: 'public', actorPlayerId: 'p1', targetPlayerId: 'p2', cardId: 'D036_BreedRegistry', pairs: [{ wood: 1 }] },
