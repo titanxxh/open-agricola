@@ -31,6 +31,7 @@ class WaitingRoomWebSocket {
   static readonly OPEN = 1
   static sent: Array<Record<string, unknown>> = []
   static joinStatus: 'waiting' | 'playing' = 'waiting'
+  static joinedPlayerIndex = 0
   static respondToGetState = true
   static statePayload = playingPayload(1)
   static latest: WaitingRoomWebSocket | null = null
@@ -82,12 +83,13 @@ class WaitingRoomWebSocket {
         WaitingRoomWebSocket.emit({
           type: 'roomJoined',
           roomId: 'room-1',
-          playerIndex: typeof message.requestedPlayerIndex === 'number' ? message.requestedPlayerIndex : 0,
+          playerIndex: WaitingRoomWebSocket.joinedPlayerIndex,
           status: WaitingRoomWebSocket.joinStatus,
           players: playing
-            ? [{ playerIndex: 0, name: 'Host' }, { playerIndex: 1, name: 'Guest' }]
-            : [{ playerIndex: 0, name: 'Host' }],
+            ? [{ playerIndex: 0, name: 'Host', connected: true }, { playerIndex: 1, name: 'Guest', connected: true }]
+            : [{ playerIndex: 0, name: 'Host', connected: true }],
           maxPlayers: playing ? 2 : 4,
+          playerColors: playing ? ['red', 'blue'] : ['red', 'blue', 'black', 'yellow'],
         })
         if (playing) WaitingRoomWebSocket.emit({ type: 'stateUpdate', roomId: 'room-1', version: 1, sync: 'snapshot', cause: 'reconnect', payload: WaitingRoomWebSocket.statePayload, emittedAt: Date.now() })
       })
@@ -112,7 +114,7 @@ class WaitingRoomWebSocket {
     if (message.type !== 'createRoom') return
     queueMicrotask(() => {
       const event = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'roomCreated', roomId: 'room-1', playerIndex: 0, maxPlayers: 2 }),
+        data: JSON.stringify({ type: 'roomCreated', roomId: 'room-1', playerIndex: 0, maxPlayers: 2, playerColors: ['red', 'blue'] }),
       })
       this.onmessage?.(event)
       this.messageListeners.forEach(listener => listener(event))
@@ -202,6 +204,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
   WaitingRoomWebSocket.sent = []
   WaitingRoomWebSocket.joinStatus = 'waiting'
+  WaitingRoomWebSocket.joinedPlayerIndex = 0
   WaitingRoomWebSocket.respondToGetState = true
   WaitingRoomWebSocket.statePayload = playingPayload(1)
   WaitingRoomWebSocket.latest = null
@@ -264,8 +267,8 @@ describe('waiting room presentation', () => {
       </LocaleProvider>,
     )
 
-    expect(await screen.findByText('Room room-1 — Waiting for players (1/4)')).toBeVisible()
-    expect(screen.getByText('Player 1: Host')).toBeVisible()
+    expect(await screen.findByText('1 / 4 players joined')).toBeVisible()
+    expect(screen.getByText('Host')).toBeVisible()
     expect(WaitingRoomWebSocket.sent).not.toContainEqual(expect.objectContaining({
       type: 'getState',
     }))
@@ -304,13 +307,14 @@ describe('waiting room presentation', () => {
       WaitingRoomWebSocket.emit({
         type: 'roomWaiting',
         roomId: 'room-2',
-        players: [{ playerIndex: 0, name: 'Host' }],
+        players: [{ playerIndex: 0, name: 'Host', connected: true }],
         maxPlayers: 2,
+        playerColors: ['red', 'blue'],
       })
     })
 
-    expect(await screen.findByText('Room room-2 — Waiting for players (1/2)')).toBeVisible()
-    expect(screen.getByText('Player 1: Host')).toBeVisible()
+    expect(await screen.findByText('1 / 2 players joined')).toBeVisible()
+    expect(screen.getByText('Host')).toBeVisible()
     expect(document.querySelector('.game-layout')).toBeNull()
 
     WaitingRoomWebSocket.respondToGetState = false
@@ -346,8 +350,9 @@ describe('waiting room presentation', () => {
     }
     WaitingRoomWebSocket.joinStatus = 'playing'
     WaitingRoomWebSocket.statePayload = payload
+    WaitingRoomWebSocket.joinedPlayerIndex = 1
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
-    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1&player=p2')
+    window.history.replaceState(null, '', '/?room=room-1')
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect() {}
@@ -403,7 +408,7 @@ describe('waiting room presentation', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Copy' }))
 
-    expect(writeText).toHaveBeenCalledWith('http://localhost:3000/?page=game&transport=ws&room=room-1')
+    expect(writeText).toHaveBeenCalledWith('http://localhost:3000/?room=room-1')
     expect(await screen.findByRole('status')).toHaveTextContent('Invite link copied.')
   })
 

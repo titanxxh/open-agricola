@@ -126,7 +126,7 @@ test('active pinned evidence opens beside the live game', async ({
   )
 
   await page.goto(
-    `${FRONTEND_URL}/?context=${roomId}&step=5&frame=${frameHash}`
+    `${FRONTEND_URL}/?room=${roomId}&step=5&frame=${frameHash}`
       + '&perspective=open&player=p1&devMode=1',
   )
 
@@ -263,7 +263,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
     await route.continue()
   })
 
-  await page.goto(`/?context=${fixture.roomId}`)
+  await page.goto(`/?room=${fixture.roomId}`)
   await page.getByRole('button', { name: 'Report a bug' }).click()
   await page.getByLabel('Describe what happened in one sentence')
     .fill('The final score is wrong')
@@ -334,7 +334,7 @@ for (const locale of ['en', 'zh'] as const) {
         await route.fulfill({ json: { ok: true, authorizationUrl: authorizationUrl.toString() } })
       })
 
-      await page.goto(`/?context=${fixture.roomId}&bugReport=${submissionId}`)
+      await page.goto(`/?room=${fixture.roomId}&bugReport=${submissionId}`)
       await page.getByRole('button', { name: copy.continue, exact: true }).click()
       await page.getByRole('button', { name: copy.continue, exact: true }).click()
       const connect = page.getByRole('button', { name: copy.connectGithub, exact: true })

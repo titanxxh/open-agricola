@@ -136,6 +136,7 @@ describe('handleCreateRoom', () => {
     expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
       type: 'roomCreated',
       maxPlayers: 6,
+      playerColors: ['red', 'blue', 'black', 'yellow', 'green', 'purple'],
     }))
   })
 
@@ -471,8 +472,9 @@ describe('handleCreateRoom', () => {
     expect(sentMessagesOf(host)).toContainEqual({
       type: 'roomWaiting',
       roomId: host.currentRoom!.id,
-      players: [{ playerIndex: 0, name: '' }],
+      players: [{ playerIndex: 0, name: '', connected: true }],
       maxPlayers: 2,
+      playerColors: ['red', 'blue'],
     })
     const replacement = newCtx(deps)
     replacement.currentUserId = 'u3'
@@ -741,8 +743,9 @@ describe('active room recovery', () => {
       roomId,
       playerIndex: 0,
       status: 'waiting',
-      players: [{ playerIndex: 0, name: 'Alice' }],
+      players: [{ playerIndex: 0, name: 'Alice', connected: true }],
       maxPlayers: 4,
+      playerColors: ['red', 'blue', 'black', 'yellow'],
     })
   })
 

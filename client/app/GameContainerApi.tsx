@@ -1,3 +1,5 @@
+import { WaitingRoomPlayers } from './WaitingRoomPlayers'
+import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -113,16 +115,7 @@ const httpTransportSingleton = new HttpGameTransport()
 /** Update browser URL to include room= so the link can be shared; same room id = same game. */
 const setRoomInUrl = (roomId: string) => {
   if (typeof window === 'undefined') return
-  const params = new URLSearchParams(window.location.search)
-  params.delete('card')
-  if (params.has('context')) {
-    params.set('context', roomId)
-    params.delete('room')
-  } else {
-    params.set('room', roomId)
-  }
-  const newSearch = params.toString()
-  const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash || ''}`
+  const newUrl = `${window.location.pathname}${buildRoomSearch(roomId, window.location.search)}${window.location.hash || ''}`
   window.history.replaceState(null, '', newUrl)
 }
 
@@ -217,7 +210,7 @@ const useTransportSetup = (
     initRef.current = true
     const params = new URLSearchParams(window.location.search)
     const contextRoomId = params.get('context')
-    const roomId = contextRoomId ?? params.get('room')
+    const roomId = roomIdFromQuery(window.location.search)
     const developmentSlot = !contextRoomId && isDevModeAllowedFromQuery(window.location.search) && /^dev[2-6]$/.test(roomId ?? '')
     const ws = new WsGameTransport(undefined, roomId ?? undefined, toRequestedPlayerIndex(playerParam), { developmentSlot })
     const hadPendingCommands = ws.recoveringCommands
@@ -253,7 +246,7 @@ const useTransportSetup = (
         playerIndexRef.current = msg.playerIndex
         hotseat = msg.hotseat === true
         if (msg.type === 'roomCreated' || msg.status === 'waiting') {
-          waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.type === 'roomCreated' ? [{ playerIndex: msg.playerIndex, name: displayName ?? '' }] : msg.players, maxPlayers: msg.maxPlayers }
+          waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.type === 'roomCreated' ? [{ playerIndex: msg.playerIndex, name: displayName ?? '', connected: true }] : msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors }
           setWsReady(false)
           setWsStatus(waiting)
         } else {
@@ -262,11 +255,14 @@ const useTransportSetup = (
         }
       } else if (msg.type === 'roomWaiting') {
         setRoomInUrl(msg.roomId)
-        waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers }
+        waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors }
         setWsReady(false)
         setWsStatus(waiting)
       } else if (msg.type === 'playerJoined' && waiting) {
-        waiting = { ...waiting, players: [...waiting.players.filter(player => player.playerIndex !== msg.playerIndex), { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex), maxPlayers: msg.maxPlayers }
+        waiting = { ...waiting, players: [...waiting.players.filter(player => player.playerIndex !== msg.playerIndex), { playerIndex: msg.playerIndex, name: msg.name, connected: true }].sort((a, b) => a.playerIndex - b.playerIndex), maxPlayers: msg.maxPlayers }
+        setWsStatus(waiting)
+      } else if (msg.type === 'playerDisconnected' && waiting) {
+        waiting = { ...waiting, players: waiting.players.map(player => player.playerIndex === msg.playerIndex ? { ...player, connected: false } : player) }
         setWsStatus(waiting)
       } else if (msg.type === 'gameStarted') {
         waiting = undefined
@@ -278,7 +274,7 @@ const useTransportSetup = (
         setRoomInUrl(msg.roomId)
         if (ws.connected) ready()
       } else if (msg.type === 'error' && !ws.connected) {
-        if (contextRoomId && (msg.code === 'context_changed' || msg.code === 'not_participant')) window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
+        if (roomId && (msg.code === 'context_changed' || msg.code === 'not_participant')) window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
         if (msg.code !== 'command_pending') setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
       } else if (msg.type === 'error' && !receivedRoom) {
         setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
@@ -331,18 +327,18 @@ const getIsMobileViewport = () =>
 export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
-  const contextRoomId = currentUrlParams.get('context')
+  const roomId = roomIdFromQuery(window.location.search)
   // Gate on the configured executor too, so flipping VITE_SANDBOX_EXECUTOR back
   // to 'server' is an effective kill switch: a reload of an already-open
   // localSandbox=1 tab (new bundle) no longer runs custom code in the browser.
   const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
-  const isWsMode = !isLocalMode && (contextRoomId !== null || currentUrlParams.get('transport') === 'ws')
+  const isWsMode = !isLocalMode && (roomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
   // Confirmation is scoped to this room and the seat holding the shared device.
   const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
 
   const requestedPlayerId = useMemo(() => requestedWsPlayerIdFromQuery(window.location.search), [])
-  const lockedViewPlayerId = contextRoomId === null ? requestedPlayerId : null
+  const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
   const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice } = useTransportSetup(
@@ -1351,7 +1347,7 @@ export const GameContainerApi = () => {
     const statusText = wsStatus.phase === 'reconnecting'
       ? t(locale, 'platform.roomReconnecting')
       : wsStatus.phase === 'waiting'
-      ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
+      ? t(locale, 'platform.waitingForPlayers')
       : wsStatus.phase === 'error'
         ? wsStatus.message === 'roomDissolved'
           ? t(locale, 'platform.roomDissolved')
@@ -1363,7 +1359,7 @@ export const GameContainerApi = () => {
         : ''
 
     const inviteUrl = wsStatus.phase === 'waiting'
-      ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
+      ? `${window.location.origin}${window.location.pathname}${buildRoomSearch(wsStatus.roomId)}`
       : null
 
     const handleCopyInvite = async () => {
@@ -1432,13 +1428,7 @@ export const GameContainerApi = () => {
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              <div className="ws-invite-players">
-                {wsStatus.players.map(p => (
-                  <div key={p.playerIndex} className="ws-invite-player">
-                    {t(locale, 'platform.playerLabel', { index: String(p.playerIndex + 1), name: getPlayerDisplayName(locale, p.name, p.playerIndex) })}
-                  </div>
-                ))}
-              </div>
+              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} />
               <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
               </button>

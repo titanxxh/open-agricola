@@ -113,6 +113,8 @@ type ClientCommand = (
 
 ## ServerEvent 与 StateUpdateEnvelope
 
+候场事件携带权威玩家状态中的 `playerColors`；名单包含 `connected`，玩家断线后仍显示其保留座位和姓名。
+
 ```ts
 type ServerEvent =
   | StateUpdateEnvelope
@@ -120,8 +122,8 @@ type ServerEvent =
   | { type: 'authOk'; userId; username }
   | { type: 'roomCreated' | 'gameStarted'
       | 'playerJoined' | 'playerDisconnected' | 'roomDissolved'; ... }
-  | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers }
-  | { type: 'roomWaiting'; roomId; players; maxPlayers }
+  | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers; playerColors }
+  | { type: 'roomWaiting'; roomId; players; maxPlayers; playerColors }
 
 type StateUpdateEnvelope = {
   type: 'stateUpdate'

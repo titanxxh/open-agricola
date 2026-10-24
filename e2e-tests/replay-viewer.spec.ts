@@ -18,7 +18,7 @@ for (const recordReplay of [true, false]) {
     const response = await request.post(`${backend}/api/test/replays/completed?defaultNames=1&recordReplay=${recordReplay ? 1 : 0}`)
     expect(response.status()).toBe(201)
     const { roomId } = await response.json() as { roomId: string }
-    await page.goto(`/?context=${roomId}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`/?room=${roomId}`, { waitUntil: 'domcontentloaded' })
     const results = page.locator(recordReplay ? '.replay-results li' : '.ws-status-card li')
     await expect(results.nth(0)).toContainText('Player 2')
     await expect(results.nth(1)).toContainText('玩家 2')
@@ -41,7 +41,7 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   request,
 }) => {
   const fixture = await createReplay(request)
-  await page.goto(`/?context=${fixture.roomId}`)
+  await page.goto(`/?room=${fixture.roomId}`)
 
   await expect(page.locator('iframe')).toHaveCount(0)
   const alicePerspective = page.getByRole('button', { name: /Alice/ })
@@ -109,11 +109,11 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   expect(mismatch.status()).toBe(409)
 
   await page.goto(
-    `/?context=${fixture.roomId}&step=0&frame=${fixture.firstStepHash}`,
+    `/?room=${fixture.roomId}&step=0&frame=${fixture.firstStepHash}`,
   )
   await expect(page.getByRole('button', { name: /Alice/ })).toBeVisible()
   await page.goto(
-    `/?context=${fixture.roomId}&step=0&frame=${'0'.repeat(64)}`,
+    `/?room=${fixture.roomId}&step=0&frame=${'0'.repeat(64)}`,
   )
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.locator('iframe')).toHaveCount(0)
@@ -128,7 +128,7 @@ test('mobile replay defaults to board first and preserves an explicit toggle', a
 }) => {
   const fixture = await createReplay(request)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`/?context=${fixture.roomId}`)
+  await page.goto(`/?room=${fixture.roomId}`)
   await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => (
     document.documentElement.scrollWidth <= document.documentElement.clientWidth

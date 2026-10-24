@@ -118,7 +118,7 @@ describe('PageRouter auth routes', () => {
     window.history.replaceState(
       null,
       '',
-      '/?page=login&context=completed-room&step=4&frame=hash'
+      '/?page=login&room=completed-room&step=4&frame=hash'
         + '&perspective=p1&bugReport=draft-1',
     )
 
@@ -127,7 +127,7 @@ describe('PageRouter auth routes', () => {
     await waitFor(() => {
       expect(Object.fromEntries(new URLSearchParams(window.location.search)))
         .toEqual({
-          context: 'completed-room',
+          room: 'completed-room',
           step: '4',
           frame: 'hash',
           perspective: 'p1',

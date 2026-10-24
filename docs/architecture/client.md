@@ -23,6 +23,7 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 - `client/hooks/useGameSync.ts` replaces `state`, `pending`, `interaction` and `scores` as a unit on every `stateUpdate`. There are no optimistic commits: a click sends a command, and game UI changes only after the snapshot arrives. Local ephemeral state (hover, drafts, inputs) is separate and invalid selections clear on a new snapshot.
 - Reconnect runs `joinRoom` → `roomJoined(status, …)`: `waiting` restores the waiting page and only `playing` continues to `getState`; a `roomWaiting` broadcast after `newGame` hides the old board.
 - The client consumes public events by `occurrenceId` for transient notifications, highlights and animations; an initial snapshot initializes the cursor without replaying history. The Action Log reads `publicEventArchive` as a read-only timeline.
+- Waiting-room messages provide authoritative seat colors and connection status. `WaitingRoomPlayers` renders every seat, including vacancies, and keeps disconnected participants visible because their seats remain reserved.
 - Player names localize through `client/utils/player-name.ts` from generated-name provenance and seat index; supplied names render literally.
 - `llm/generation/`: the browser owns generation attempts, the provider tool protocol and bounded GitHub reads pinned to one main SHA. The LLM credential goes only to the configured provider. `server/workshop-references.ts` serves authenticated tree metadata with project credentials and accepts no caller URL or model credential; the browser fetches pinned raw text anonymously and verifies blob hashes. `GET /api/workshop/sandbox-contract` supplies the deployed contract the prompt is built from; references cannot widen it. `POST /api/workshop/cards/validate-code` binds validation to source and sandbox identities, and only separately verified provider / endpoint / model tuples are admitted. See [Platform design](../PLATFORM_DESIGN.md) and [`docs/test/llm-card-gen.md`](../test/llm-card-gen.md).
 
@@ -45,8 +46,9 @@ GameContextRouter
   └─ removed -> Replay Tombstone page
 ```
 
-- `?context=<roomId>` is parsed before the card manifest and login gate; an unauthenticated active context keeps the complete `returnTo`, and non-active contexts load no authentication dependency.
-- Active recovery joins with `intent:'resume'`; the server restores only the original seat. During a save pause every online seat sees the same status and new-command controls are disabled.
+- `game-room-url.ts` generates ordinary game links with only `room`; connection and seat selection come from the Room and authenticated account. Development links retain explicit seat controls.
+- `?room=<roomId>` is parsed before the card manifest and login gate; an unauthenticated active context keeps the complete `returnTo`, and non-active contexts load no authentication dependency.
+- Room links join over WebSocket without a client-selected seat; the server restores an account's existing seat or admits a new player to an available waiting seat. During a save pause every online seat sees the same status and new-command controls are disabled.
 - `ReplayShell` validates the Replay header and content-addressed Viewer manifest and creates a `credentialless`, `sandbox="allow-scripts"` iframe only after a perspective is chosen. The historical Viewer never calls authenticated APIs; retained evidence is passed by `postMessage`.
 - A corrupt Segment marks an unavailable interval and resumes at the next checkpoint; it is never silently repaired.
 - Bug Report saves a server draft before GitHub OAuth, resumes the same `submissionId` after cancellation and polls status after submission; a lost submission response rereads the authoritative status, so a report is never created twice. An active Reporter anchors the latest committed Step; a completed-game Reporter must be an original participant and anchors the displayed Step.

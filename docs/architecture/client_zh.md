@@ -23,6 +23,7 @@
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
 - `card-meta.ts` 拉取 `GET /cards-manifest.json`；`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
+- 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。
 - 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
 - 客户端按 `occurrenceId` 消费公开事件，用于临时通知、高亮与动画；首个快照初始化游标，不重放历史。Action Log 把 `publicEventArchive` 当作只读时间线读取。
 - 玩家名通过 `client/utils/player-name.ts` 按生成名来源与座位号本地化；玩家提供的名字原样显示。
@@ -47,8 +48,9 @@ GameContextRouter
   └─ removed → Replay Tombstone 页面
 ```
 
-- `?context=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
-- 活动恢复以 `intent:'resume'` 加入；服务端只恢复原座位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
+- `game-room-url.ts` 生成的普通对局链接只需 `room`；连接方式和座位来自 Room 与登录账号。开发链接保留显式座位控制。
+- `?room=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
+- 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。

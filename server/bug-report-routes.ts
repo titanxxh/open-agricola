@@ -204,7 +204,7 @@ const connectionReturnTo = (
   const base = publicAppOrigin()
   if (!base) throw new BugReportError('bug_report_unavailable', 503)
   const url = new URL(base)
-  url.searchParams.set('context', report.roomId)
+  url.searchParams.set('room', report.roomId)
   url.searchParams.set('step', String(report.stepNo))
   url.searchParams.set('frame', report.frameHash)
   url.searchParams.set('perspective', `p${report.playerIndex + 1}`)

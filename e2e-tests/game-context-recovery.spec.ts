@@ -32,13 +32,14 @@ const authenticate = async (
   context: BrowserContext,
   request: APIRequestContext,
   username: string,
+  displayName = username,
 ): Promise<void> => {
   const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
     data: {
       providerUserId: `context-${username}`,
       providerLogin: username,
       email: `${username}@example.com`,
-      displayName: username,
+      displayName,
     },
   })
   expect(oauth.ok()).toBe(true)
@@ -46,7 +47,7 @@ const authenticate = async (
     headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
     data: {
       username,
-      displayName: username,
+      displayName,
       password: 'context-pass-550',
       confirmPassword: 'context-pass-550',
     },
@@ -93,7 +94,9 @@ test('two original players recover their own seats without hidden-info leakage',
   await firstPage.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`)
   const roomId = await firstPage.locator('.ws-invite-roomid strong').textContent()
   expect(roomId).toBeTruthy()
-  await secondPage.goto(`${FRONTEND_URL}/?transport=ws&room=${roomId}`)
+  expect(new URL(firstPage.url()).search).toBe(`?room=${roomId}`)
+  await expect(firstPage.locator('.ws-invite-url')).toHaveText(`${FRONTEND_URL}/?room=${roomId}`)
+  await secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`)
   await expect(firstPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
 
@@ -105,13 +108,19 @@ test('two original players recover their own seats without hidden-info leakage',
   const firstStates = collectStates(firstPage)
   const secondStates = collectStates(secondPage)
   await Promise.all([
-    firstPage.goto(`${FRONTEND_URL}/?context=${roomId}&player=p2&perspective=open`),
-    secondPage.goto(`${FRONTEND_URL}/?context=${roomId}&player=p1&perspective=open`),
+    firstPage.goto(`${FRONTEND_URL}/?room=${roomId}`),
+    secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`),
   ])
   await expect(firstPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   await expect.poll(() => firstStates.length).toBeGreaterThan(0)
   await expect.poll(() => secondStates.length).toBeGreaterThan(0)
+
+  expect(new URL(firstPage.url()).search).toBe(`?room=${roomId}`)
+  expect(new URL(secondPage.url()).search).toBe(`?room=${roomId}`)
+  await secondPage.reload()
+  await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
+  expect(new URL(secondPage.url()).search).toBe(`?room=${roomId}`)
 
   const first = latestState(firstStates)
   const second = latestState(secondStates)
@@ -142,4 +151,53 @@ test('two original players recover their own seats without hidden-info leakage',
   await outsiderContext.close()
   await firstContext.close()
   await secondContext.close()
+})
+
+
+test('waiting room shows every seat, authoritative colors, names, and reconnections', async ({ browser, request }) => {
+  const suffix = Date.now().toString(36)
+  const hostContext = await browser.newContext({ viewport: { width: 320, height: 844 } })
+  const guestContext = await browser.newContext()
+  const hostName = '候场房主'
+  const guestName = '名字很长的玩家 Waiting room guest'
+  try {
+    await authenticate(hostContext, request, `waiting_host_${suffix}`, hostName)
+    await authenticate(guestContext, request, `waiting_guest_${suffix}`, guestName)
+    const host = await hostContext.newPage()
+    await host.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=6`)
+    const roomId = await host.locator('.ws-invite-roomid strong').textContent()
+    expect(roomId).toBeTruthy()
+    expect(new URL(host.url()).search).toBe(`?room=${roomId}`)
+    const seats = host.locator('.ws-invite-player')
+    await expect(seats).toHaveCount(6)
+    expect(await seats.evaluateAll(elements => elements.map(element => element.getAttribute('data-player-color'))))
+      .toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])
+    await expect(seats.nth(0)).toContainText(hostName)
+    await expect(host.locator('.ws-waiting-count')).toContainText('1 / 6')
+    await expect(host.locator('.ws-invite-player.is-empty')).toHaveCount(5)
+    await expect(seats.locator('[role="img"]')).toHaveCount(6)
+
+    let guest = await guestContext.newPage()
+    await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
+    await expect(host.locator('.ws-waiting-count')).toContainText('2 / 6')
+    await expect(seats.nth(1)).toContainText(guestName)
+    await expect(guest.locator('.ws-invite-player').nth(0)).toContainText(hostName)
+    await expect(host.locator('.ws-invite-player.is-empty')).toHaveCount(4)
+    expect(await host.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await host.screenshot({ path: 'output/waiting-room-mobile.png', fullPage: true })
+
+    await guest.close()
+    await expect(seats.nth(1).locator('.ws-seat-offline')).toBeVisible()
+    await expect(seats.nth(1)).toContainText(guestName)
+    guest = await guestContext.newPage()
+    await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
+    await expect(guest.locator('.ws-invite-player').nth(1)).toContainText(guestName)
+    await expect(seats.nth(1).locator('.ws-seat-offline')).toHaveCount(0)
+    await expect(host.locator('.ws-waiting-count')).toContainText('2 / 6')
+    expect(new URL(guest.url()).search).toBe(`?room=${roomId}`)
+    await guest.screenshot({ path: 'output/waiting-room-desktop.png', fullPage: true })
+  } finally {
+    await hostContext.close()
+    await guestContext.close()
+  }
 })

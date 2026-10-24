@@ -11,14 +11,15 @@ With one game per `roomId` (ADR 0009), public Replays (ADR 0010) and delta archi
 
 **Permanent link and lifecycle.**
 
-- The canonical link is `${PUBLIC_APP_ORIGIN}?context=<roomId>`, optionally with a paired `step=<stepNo>&frame=<sha256>` and a completed-game `perspective=pN|open`. It never carries transport, seat, site `userId` or credentials.
+- The canonical link is `${PUBLIC_APP_ORIGIN}?room=<roomId>`, optionally with a paired `step=<stepNo>&frame=<sha256>` and a completed-game `perspective=pN|open`. It never carries transport, seat, site `userId` or credentials.
 - Every created Room keeps a minimal Game Context Record forever. Lifecycles are `active` (phases `waiting`, `playing`), `completed`, `expired` and `removed`; only never-created IDs are `unknown_context`.
 - A waiting Room is retained 30 minutes and a playing Room 7 days after everyone disconnects; any reconnection resets the timer. Expiry, dissolution, deletion and unfinished rematches delete only the recoverable snapshot and mark the context `expired`. Removed Replay payloads resolve as `removed` with a Tombstone (ADR 0010). Old Rooms never redirect to a rematch.
 
 **HTTP and WebSocket contract.**
 
 - The frontend first calls `GET /api/v1/game-contexts/:roomId` and routes by the discriminated descriptor; this resolver is the single entry for permanent links.
-- Recovery reuses WebSocket `joinRoom` with `intent: "resume"`. The server binds only the persisted site `userId → playerIndex`, ignoring client-declared seats; a link never fills an empty seat or spectates an active game (Room Invites stay separate). A new connection for a seat replaces the old one, which receives `seat_replaced`.
+- Waiting-room links also allow authenticated players to join an available seat through WebSocket `joinRoom` with `intent: "join"`; the server still enforces seat ownership. The `context` query key remains an alias for participant-only recovery.
+- Participant-only recovery through the `context` alias reuses WebSocket `joinRoom` with `intent: "resume"`. Room links use `intent: "join"` and restore the account's existing seat when present. The client omits seat hints for ordinary Rooms, and the server binds the persisted site `userId → playerIndex`; an in-progress game does not expose another player's seat or hidden information. A new connection for a seat replaces the old one, which receives `seat_replaced`.
 - Completed games are read over HTTP: manifest (or `legacy_no_replay` status) and Segments from a checkpoint. The outer app selects the Viewer Build from the manifest and runs it in a credentialless iframe.
 - An exact retained Anchor of an active or expired unfinished game is read through the evidence endpoint; seated players get only their own masked read-only Frame, with no enumeration.
 - Maintainers inspect evidence only from a submitted Bug Report: the reporter's seat by default, all-open only with a non-empty reason, always audited permanently, never beyond the Anchor.
