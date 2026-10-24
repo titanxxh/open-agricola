@@ -13,7 +13,7 @@ import {
 } from '../../client/app/farm-board-projection'
 import { splitBoardActionSpaces } from '../../client/app/game-container-helpers'
 import { ActionBoard } from '../../client/components/board/ActionBoard'
-import { MajorImprovements } from '../../client/components/board/MajorImprovements'
+import { MajorImprovements, type MajorSupplyExpansion } from '../../client/components/board/MajorImprovements'
 import { PlayerFarmPanel } from '../../client/components/board/PlayerFarmPanel'
 import { PlayerTabs } from '../../client/components/board/PlayerTabs'
 import { SeasonsBoard } from '../../client/components/board/SeasonsBoard'
@@ -206,6 +206,7 @@ export function ReplayBoard({
   const [viewedPlayerId, setViewedPlayerId] = useState(
     perspectivePlayerId ?? state.players[0]?.id ?? '',
   )
+  const [majorSupplyExpansion, setMajorSupplyExpansion] = useState<MajorSupplyExpansion>(null)
 
   useEffect(() => {
     setViewedPlayerId((current) =>
@@ -354,6 +355,8 @@ export function ReplayBoard({
       ) : null}
       <MajorImprovements
         locale={locale}
+        expansion={majorSupplyExpansion}
+        onExpansionChange={setMajorSupplyExpansion}
         availableMajorImprovements={state.availableMajorImprovements}
         majorImprovementSupply={state.majorImprovementSupply}
         isSelectingMajor={false}

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ReplayBoard } from '../../../replay-viewer/src/ReplayBoard'
 import { frameForPerspective } from '../../../replay-viewer/src/model'
@@ -13,6 +13,37 @@ afterEach(() => {
 })
 
 describe('replay setup phases', () => {
+  it('keeps read-only major supply browsing open across replay frames', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const state = createInitialState(42, { playerCount: 2 })
+    const frame = serializeState(state, { engineStack: new EngineStack() })
+    const view = render(
+      <ReplayBoard frame={frameForPerspective(frame, 'open')} locale="en" perspective="open" />,
+    )
+    const toggle = () => screen.getByRole('button', { name: /^Major Improvements/ })
+
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Well')).not.toBeInTheDocument()
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Well')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Play this card' })).not.toBeInTheDocument()
+
+    state.round = 2
+    const nextFrame = serializeState(state, { engineStack: new EngineStack() })
+    view.rerender(
+      <ReplayBoard frame={frameForPerspective(nextFrame, 'p1')} locale="en" perspective="p1" />,
+    )
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Well')).toBeVisible()
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Well')).not.toBeInTheDocument()
+  })
+
   it('renders draft pools and submissions with perspective filtering', () => {
     const state = createInitialState(42, { playerCount: 2, playerNames: ['Player 2'] })
     const p1 = state.players[0]!.id
