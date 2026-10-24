@@ -48,6 +48,8 @@ test('touch occupation details preserve the hand position until explicit play', 
     state.players[0]!.occupationHand = ['A116_WoodCutter', 'A124_Knapper']
   })
   await page.locator('[data-action-id="lessons"] button').first().tap()
+  await expect(page.locator('[data-interaction-focus="occupation-hand"][data-focus-player="p1"]'))
+    .toHaveAttribute('data-interaction-focused', 'true')
   const card = page.locator('.hand-cards [data-card-anchor="A116_WoodCutter"]')
   await card.scrollIntoViewIfNeeded()
   const scrollBefore = await page.evaluate(() => window.scrollY)
@@ -77,6 +79,8 @@ test('short landscape reads unavailable minor details and confirms a legal minor
   })
   await page.locator('[data-action-id="meeting-place"] button').first().tap()
   await page.locator('.interaction-bar').getByRole('button', { name: /^Optional:/ }).tap()
+  await expect(page.locator('[data-interaction-focus="minor-hand"][data-focus-player="p1"]'))
+    .toHaveAttribute('data-interaction-focused', 'true')
   await page.locator('.hand-cards [data-card-anchor="D060_LargePottery"]').tap()
   const unavailable = await expectDialogFits(page)
   await expect(unavailable.getByRole('button', { name: 'Play this card' })).toBeDisabled()
@@ -92,6 +96,32 @@ test('short landscape reads unavailable minor details and confirms a legal minor
   expect(result.state.players[0].minorPlayed).toContain('A076_Cob')
 })
 
+test('details opened before a delayed choice stay read-only until the card is reopened', async ({ page, request }) => {
+  await openGame(page, request, state => {
+    state.players[0]!.minorHand = ['A076_Cob', 'A007_GardenersKnife', 'D060_LargePottery']
+    state.players[0]!.resources.food = 3
+    state.players[0]!.resources.wood = 3
+  })
+  await page.locator('[data-action-id="meeting-place"] button').first().tap()
+  await page.route('**/api/game/choice', async route => {
+    const response = await route.fetch()
+    await page.getByRole('dialog', { name: 'Card details' }).waitFor({ state: 'visible' })
+    await route.fulfill({ response })
+  }, { times: 1 })
+  await page.locator('.interaction-bar').getByRole('button', { name: /^Optional:/ }).tap()
+  const card = page.locator('.hand-cards [data-card-anchor="D060_LargePottery"]')
+  await card.tap()
+  const dialog = page.getByRole('dialog', { name: 'Card details' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Play this card' })).toHaveCount(0)
+  await expect(page.locator('[data-interaction-focus="minor-hand"][data-focus-player="p1"]'))
+    .toHaveAttribute('data-interaction-focused', 'true')
+  await expect(dialog.getByRole('button', { name: 'Play this card' })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Close', exact: true }).tap()
+  await card.tap()
+  await expect(dialog.getByRole('button', { name: 'Play this card' })).toBeDisabled()
+})
+
 test('touch major supply reads an unavailable card and plays only after confirmation', async ({ page, request }) => {
   await openGame(page, request, state => {
     state.round = 4
@@ -102,6 +132,7 @@ test('touch major supply reads an unavailable card and plays only after confirma
   })
   await page.locator('[data-action-id="major-improvement"] button').first().tap()
   const supply = page.locator('.major-improvements')
+  await expect(supply).toHaveAttribute('data-interaction-focused', 'true')
   const expand = supply.getByRole('button', { name: /^Show major improvements/ })
   if (await expand.isVisible()) await expand.tap()
   await supply.locator('[data-card-anchor="Major_Well"]').tap()
@@ -125,6 +156,8 @@ test('a failed transport submission can retry the same live card request', async
     state.players[0]!.occupationHand = ['A116_WoodCutter', 'A124_Knapper']
   })
   await page.locator('[data-action-id="lessons"] button').first().tap()
+  await expect(page.locator('[data-interaction-focus="occupation-hand"][data-focus-player="p1"]'))
+    .toHaveAttribute('data-interaction-focused', 'true')
   await page.locator('.hand-cards [data-card-anchor="A116_WoodCutter"]').tap()
   const play = page.getByRole('dialog', { name: 'Card details' }).getByRole('button', { name: 'Play this card' })
   await page.route('**/api/game/choice', route => route.abort('failed'), { times: 1 })
