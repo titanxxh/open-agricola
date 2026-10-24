@@ -621,6 +621,7 @@ const finalizeFence = (
     return { type: 'fail', errorKey: 'log.fencingFail', recoverable: payment.type === 'fail' && payment.recoverable === true }
   }
   const previousPasture = getPastureTileKeys(ctx.player)
+  const paymentId = crypto.randomUUID()
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   const supplyUsage = isBorrowedFenceSourcePolicy(currentPolicy.sourcePolicy) ? []
     : settleFenceContributions(nextPlayer, ctx.actionContext, validated.newFenceEdges.length,
@@ -662,6 +663,7 @@ const finalizeFence = (
   if (builtFences.length > 0) {
     ctx.eventSink?.emit<'farm.fenceBuilt'>({
       type: 'farm.fenceBuilt',
+      paymentId,
       newlyUsedTiles: farmOperation.newlyUsedTiles,
       newlyEnclosedPastureTiles: getNewlyEnclosedPastureTiles(ctx.player, previousPasture),
       fences: builtFences,
@@ -694,6 +696,7 @@ const finalizeFence = (
           costType: 'fencing',
           optionPrefix: 'pay:fence',
           paymentChoice,
+          paymentId,
           sourceCard: ctx.sourceCard,
           sourceActionId: ctx.space.id,
           candidateMetadataByFeeIndex: { 0: { originalFeeIndex: 0, sources: costSources } },

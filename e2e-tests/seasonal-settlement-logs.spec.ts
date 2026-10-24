@@ -188,36 +188,42 @@ for (const locale of ['en', 'zh'] as const) {
     } finally { await Promise.all(pages.map(page => page.close())) }
   })
 
-  test(`spring fence payment explains two saved wood in ${locale}`, async ({ browser, request }, testInfo) => {
-    const { pages, driver } = await openRoom(browser, request, locale, state => {
-      state.round = 3
-      state.roundActionOrder[0] = 'fencing'
-      state.throughTheSeasons = { startSeason: 'spring', currentSeason: 'spring' }
-      state.players[0]!.resources.wood = 10
+  for (const free of [false, true]) {
+    test(`spring fence payment ${free ? 0 : 5} explains construction and two saved wood in ${locale}`, async ({ browser, request }, testInfo) => {
+      const { pages, driver } = await openRoom(browser, request, locale, state => {
+        state.round = 3
+        state.roundActionOrder[0] = 'fencing'
+        state.throughTheSeasons = { startSeason: 'spring', currentSeason: 'spring' }
+        state.players[0]!.resources.wood = 10
+        if (free) state.players[0]!.occupationPlayed = ['A088_HedgeKeeper']
+      })
+      try {
+        await driver.ui(0, () => pages[0].locator('[data-action-id="fencing"] button').first().click())
+        await driver.command(0, { type: 'commitSelection', playerIndex: 0, payload: {
+          edges: free ? ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+            : ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2'], extraWood: 0,
+        } })
+        const current = await roomSnapshot(pages[0])
+        expect(current.state.players[0]!.resources.wood).toBe(free ? 10 : 5)
+        expect(current.state.players[0]!.fenceSegments).toHaveLength(free ? 4 : 7)
+        expect(publicRoomState(await roomSnapshot(pages[1]))).toEqual(publicRoomState(current))
+        const explanation = locale === 'zh' ? /春季/ : /Spring/i
+        for (const page of pages) {
+          const row = page.locator('.action-log__text').filter({ hasText: explanation })
+          await expect(row).toHaveCount(1)
+          await expect(row).toContainText(locale === 'zh' ? `建造 ${free ? 4 : 7} 段围栏` : `Build ${free ? 4 : 7} fence(s)`)
+          await expect(row).toContainText(new RegExp(`${locale === 'zh' ? '支付' : 'Pays'}.*${free ? 0 : 5}`))
+          await expect(row.locator('[data-resource="wood"][data-amount="2"]')).toHaveCount(1)
+          await expect(row.locator('[data-resource="wood"][data-amount="5"]')).toHaveCount(free ? 0 : 1)
+        }
+        const screenshot = `output/playwright/seasonal-ws-fence-${locale}${free ? '-free' : ''}.png`
+        await pages[0].locator('.action-log').screenshot({ path: screenshot })
+        await testInfo.attach(`spring-fence-${locale}${free ? '-free' : ''}`, { path: screenshot, contentType: 'image/png' })
+        await driver.reload()
+        expect(publicRoomState(await roomSnapshot(pages[0]))).toEqual(publicRoomState(current))
+      } finally { await Promise.all(pages.map(page => page.close())) }
     })
-    try {
-      await driver.ui(0, () => pages[0].locator('[data-action-id="fencing"] button').first().click())
-      await driver.command(0, { type: 'commitSelection', playerIndex: 0, payload: {
-        edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2'], extraWood: 0,
-      } })
-      const current = await roomSnapshot(pages[0])
-      expect(current.state.players[0]!.resources.wood).toBe(5)
-      expect(current.state.players[0]!.fenceSegments).toHaveLength(7)
-      expect(publicRoomState(await roomSnapshot(pages[1]))).toEqual(publicRoomState(current))
-      const explanation = locale === 'zh' ? /春季/ : /Spring/i
-      for (const page of pages) {
-        const row = page.locator('.action-log__text').filter({ hasText: explanation })
-        await expect(row).toHaveCount(1)
-        await expect(row).toContainText('5')
-        await expect(row).toContainText('2')
-      }
-      const screenshot = `output/playwright/seasonal-ws-fence-${locale}.png`
-      await pages[0].screenshot({ path: screenshot })
-      await testInfo.attach(`spring-fence-${locale}`, { path: screenshot, contentType: 'image/png' })
-      await driver.reload()
-      expect(publicRoomState(await roomSnapshot(pages[0]))).toEqual(publicRoomState(current))
-    } finally { await Promise.all(pages.map(page => page.close())) }
-  })
+  }
 
   test(`winter plow logs the actual food surcharge in ${locale}`, async ({ browser, request }) => {
     const { pages, driver } = await openRoom(browser, request, locale, state => {

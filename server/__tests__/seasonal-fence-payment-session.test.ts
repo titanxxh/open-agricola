@@ -67,13 +67,19 @@ describe('spring fence payment explanation', () => {
         seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }],
       }),
     ])
+    const fence = done.state.events.find(event => event.type === 'farm.fenceBuilt')
+    const payment = done.state.events.find(event => event.type === 'resource.paid')
+    expect(fence?.type === 'farm.fenceBuilt' && fence.paymentId).toEqual(expect.any(String))
+    expect(payment?.paymentId).toBe(fence?.type === 'farm.fenceBuilt' && fence.paymentId)
     expect(done.state.log).toContainEqual(expect.objectContaining({
       key: 'log.actionDetail',
       params: expect.objectContaining({ detailParts: {
         costs: { wood: 5 },
+        effects: { fencing: 7 },
         seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }],
       } }),
     }))
+    expect(done.state.log.filter(entry => entry.key === 'log.actionDetail')).toHaveLength(1)
     expect(Object.keys(done.state.players[0]!.cardStates)).not.toContain('through-the-seasons:spring')
     expect(done.scores).toEqual(session.getState().scores)
   })
@@ -130,6 +136,11 @@ describe('spring fence payment explanation', () => {
       expect.objectContaining({ resources: {}, seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }] }),
     ])
     expect(done.state.events.filter(event => event.type === 'resource.moved')).toHaveLength(0)
+    expect(done.state.log.filter(entry => entry.key === 'log.actionDetail')).toEqual([
+      expect.objectContaining({ params: expect.objectContaining({ detailParts: expect.objectContaining({
+        costs: {}, effects: { fencing: 4 }, seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }],
+      }) }) }),
+    ])
     expect(done.state.players.every(player => !Object.keys(player.cardStates).some(id => id.startsWith('through-the-seasons:')))).toBe(true)
   })
 

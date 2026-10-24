@@ -48,8 +48,8 @@ for (const locale of ['zh', 'en'] as const) {
       await expect(payment.locator('[data-resource="wood"][data-amount="2"]')).toHaveCount(1)
       if (free) await expect(payment).toContainText('0')
       else await expect(payment.locator('[data-resource="wood"][data-amount="5"]')).toHaveCount(1)
-      await expect(page.locator('.action-log')).toContainText(locale === 'zh' ? `建造 ${free ? 4 : 7} 段围栏` : `Build ${free ? 4 : 7} fence(s)`)
-      await page.screenshot({ path: `output/playwright/seasonal-fence-${locale}-${free ? 'free' : 'paid'}.png` })
+      await expect(payment).toContainText(locale === 'zh' ? `建造 ${free ? 4 : 7} 段围栏` : `Build ${free ? 4 : 7} fence(s)`)
+      await page.locator('.action-log').screenshot({ path: `output/playwright/seasonal-fence-${locale}-${free ? 'free' : 'paid'}.png` })
     })
   }
 }

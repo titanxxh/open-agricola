@@ -17,6 +17,7 @@ export type PayChildOptions = {
   costType?: CostModifierType
   optionPrefix?: string
   paymentChoice?: string
+  paymentId?: string
   sourceCard?: string
   actionContext?: Record<string, unknown>
   playedCards?: string[]

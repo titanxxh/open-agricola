@@ -34,6 +34,7 @@ export type PayParams = {
   costType?: CostModifierType
   optionPrefix?: string
   paymentChoice?: string
+  paymentId?: string
   sourceActionId?: string
   includeReturnedCard?: boolean
   playedCards?: string[]
@@ -68,6 +69,7 @@ const PAY_PARAM_KEYS = new Set([
   'costType',
   'optionPrefix',
   'paymentChoice',
+  'paymentId',
   'sourceActionId',
   'includeReturnedCard',
   'playedCards',
@@ -172,6 +174,7 @@ const emitPaidEvent = (
   sourceCard: string | undefined,
   sourceActionId: string | undefined,
   provenance: {
+    paymentId?: string
     bonusUsed?: string
     bonusChoiceIndex?: Record<string, number>
     returnedCardId?: string
@@ -201,7 +204,7 @@ const emitPaidEvent = (
     !provenance.bonusChoiceIndex &&
     !provenance.returnedCardId
   ) return summary
-  const paymentId = crypto.randomUUID()
+  const paymentId = provenance.paymentId ?? crypto.randomUUID()
   eventSink?.emit<'resource.paid'>({
     type: 'resource.paid',
     paymentId,
@@ -228,6 +231,7 @@ const buildSelectedResult = (
   eventSink?: EventSink,
   sourceActionId?: string,
   trackSourceCardPaymentStats = costType === undefined,
+  paymentId?: string,
 ): ActionExecutionResult => {
   if (receipt.returnedCardId) {
     returnCardToBoard(player, receipt.returnedCardId, state)
@@ -237,6 +241,7 @@ const buildSelectedResult = (
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
   const publicPayment = emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
+    paymentId,
     bonusUsed: receipt.bonusUsed,
     bonusChoiceIndex: receipt.bonusChoiceIndex,
     returnedCardId: receipt.returnedCardId,
@@ -348,6 +353,7 @@ export const payAction: ActionDefinition = {
       eventSink,
       p.sourceActionId,
       shouldTrackSourceCardPaymentStats(p),
+      p.paymentId,
     )
   },
   // Multi-solution payments emit a `prompt.selectPayment` choice from
@@ -397,6 +403,7 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
         shouldTrackSourceCardPaymentStats(p),
+        p.paymentId,
       )
     }
     if (!PaymentSolver.isComplexCost(p.cost)) {
@@ -440,6 +447,7 @@ export const payAction: ActionDefinition = {
       eventSink,
       p.sourceActionId,
       shouldTrackSourceCardPaymentStats(p),
+      p.paymentId,
     )
   },
 }

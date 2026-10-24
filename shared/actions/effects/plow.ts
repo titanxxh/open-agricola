@@ -255,7 +255,6 @@ export const plowAction: ActionDefinition = {
   isAlreadySatisfied: ({ player, transactionEvents }) =>
     transactionEvents.some((event) =>
       event.type === 'farm.fieldPlowed'
-      && event.sourceActionId === 'plow'
       && event.fields.some((field) => field.playerId === player.id),
     ),
   costPreview: plowCostPreview,
