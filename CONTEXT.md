@@ -495,6 +495,10 @@ _Avoid_: 前端按钮、虚拟卡牌、Blocked Action Space
 Through the Seasons 这类游戏变体注册的会话级规则监听器。它可复用 card-purchase Cost Candidate 管线或 Action Hook，但必须由 `GameState.enableThroughTheSeasons` / `currentSeason` 明确门控；它不是已打出的卡牌，也不应写入玩家 `cardStates`。
 _Avoid_: Card Listener from played card、虚拟 source card、前端折扣
 
+**Seasonal Adjustment（季节调整）**:
+Through the Seasons 的当前季节对一次结算实际产生的增减、赠送或豁免。它描述季节对结果的贡献，最终结算为零时仍可能存在；与卡牌成本归因和真实资源转移分别表达。
+_Avoid_: 印刷规则中的最大优惠、卡牌统计、另一笔资源收支
+
 **Food Accumulation Space（食物累计格）**:
 印有食物累积的行动格。卡牌提到从食物累计格拿食物时，只指从该类行动格本身取得的食物，不包括同一行动中来自卡牌、兑换或其他奖励来源的食物。
 _Avoid_: 任意给食物的行动、卡牌奖励、兑换收益
