@@ -1430,6 +1430,8 @@ export type InteractionState =
   | (InteractionBase & { stateId: 'idle' })
   | (InteractionBase & {
       stateId: 'wait'
+      /** Opaque identity of the pending step, stable when its candidates refresh. */
+      requestKey?: string
       playerIndex: number
       spaceId?: string
       promptKey?: PromptKey

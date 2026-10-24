@@ -82,6 +82,36 @@ const selectionPendingStack = (): EngineStack => {
 }
 
 describe('Interaction State Adapter', () => {
+  it('publishes an opaque stable waiting-step identity, changes it for the next frame, and withholds it from other viewers', () => {
+    const state = createInitialState(1)
+    const stack = selectionPendingStack()
+    const derive = () => deriveInteractionState({
+      state, engineStack: stack, getAnytimeEntries: () => [],
+      getAnytimePolicy: () => ({ allowed: false, reason: 'selection-window' }),
+      filterUndoCommands: commands => [...commands], winnerIds: () => [], scoreSummary: () => [],
+      effectiveOwnerIndexForFrame: frame => frame.ownerPlayerIndex,
+      projectPendingRequest: ({ request }) => request,
+    })
+    const first = derive()
+    if (first.stateId !== 'wait') throw new Error('Expected waiting step')
+    expect(first.requestKey).toMatch(/^[a-f0-9]{16}$/)
+    const host = stack.peekPendingHost()
+    const pending = stack.peekPendingEnvelope()
+    if (!(host instanceof ActionNode) || !pending) throw new Error('Expected pending action')
+    host.setPending({ ...pending, choices: [{ value: 'changed-candidate', labelKey: 'ui.interactionConfirmButton' }] })
+    const updated = derive()
+    if (updated.stateId !== 'wait') throw new Error('Expected refreshed waiting step')
+    expect(updated.requestKey).toBe(first.requestKey)
+    expect(redactInteractionForViewer(updated, ['p1', 'p2'], 'p2')).not.toHaveProperty('requestKey')
+    const frame = selectionPendingStack().current()
+    if (!frame) throw new Error('Expected next frame')
+    stack.push({ ...frame, frameId: undefined })
+    const next = derive()
+    if (next.stateId !== 'wait') throw new Error('Expected next waiting step')
+    expect(next.requestKey).toBeTypeOf('string')
+    expect(next.requestKey).not.toBe(first.requestKey)
+  })
+
   it('derives a public wait from EngineStack without caller-owned cursor reads', () => {
     const state = createInitialState(1)
     const interaction = deriveInteractionState({

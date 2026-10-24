@@ -31,6 +31,8 @@
 
 ## 视图与本地沙盒
 
+- `interaction-focus.ts` 将本机 Interaction Player 的权威请求映射到显示目标。职业选择在接机确认后定位私有手牌，支付等后续步骤保留行动聚焦，完成后返回行动区。Session 交互适配器仅向响应者发布不透明的等待步骤 `requestKey`，候选刷新及 cursor 恢复均保留其身份，玩家手动浏览不会再次触发滚动。共享目标锚点与返回快捷入口供后续农场和发展选择复用。
+
 - `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。

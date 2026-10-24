@@ -156,6 +156,31 @@ afterEach(() => {
 })
 
 describe('hotseat public farm browsing', () => {
+  it('waits for the confirmed seat before focusing its occupation hand and preserves manual browsing on repeated snapshots', async () => {
+    const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+    const user = userEvent.setup()
+    GameSocket.payload = {
+      ...workPayload(),
+      interaction: {
+        stateId: 'wait', playerIndex: 0, allowedCommands: ['resolveChoice'], anytimeActions: [],
+        promptKey: 'ui.interactionChooseOccupation',
+        request: { kind: 'choice', options: [{ value: '__private_occupation_p1__', labelKey: 'Private occupation' }] },
+      },
+    }
+    const { container } = renderGame()
+    await screen.findByRole('dialog', { name: 'Hotseat handoff' })
+    expect(container.querySelector('[data-interaction-focus="occupation-hand"]')).not.toBeInTheDocument()
+    expect(scroll).not.toHaveBeenCalled()
+    await confirmAlice(user)
+    await waitFor(() => expect(container.querySelector('[data-interaction-focus="occupation-hand"]')).toHaveAttribute('data-interaction-focused', 'true'))
+    expect(scroll).toHaveBeenCalledOnce()
+    await selectBob(user)
+    act(() => GameSocket.snapshot())
+    expect(scroll).toHaveBeenCalledOnce()
+    expect(container.querySelector('[data-hand-anchor]')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Bob/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
   it.each([
     { mobile: false, waiting: false },
     { mobile: true, waiting: false },

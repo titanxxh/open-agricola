@@ -16,6 +16,17 @@ import { hasPendingOrdinaryCardDrawChoice } from './ordinary-card-draw'
 
 type AnytimeEntry = { descriptor: AnytimeAction }
 
+const waitingStepKey = (frame: EngineFrame, hostNodeId: string): string => {
+  const value = JSON.stringify([frame.frameId, hostNodeId])
+  let first = 0x811c9dc5
+  let second = 0x050c5d1f
+  for (let index = 0; index < value.length; index++) {
+    first = Math.imul(first ^ value.charCodeAt(index), 0x01000193)
+    second = Math.imul(second ^ value.charCodeAt(index), 0x01000193)
+  }
+  return (first >>> 0).toString(16).padStart(8, '0') + (second >>> 0).toString(16).padStart(8, '0')
+}
+
 export type PendingInteractionProjectionInput = {
   request: InteractionRequest
   player: PlayerState | undefined
@@ -176,6 +187,7 @@ export const deriveInteractionState = ({
   if (request.kind === 'engine-blocked') {
     return {
       stateId: 'wait',
+      requestKey: waitingStepKey(frame, cursor.hostNodeId),
       playerIndex,
       spaceId,
       promptKey: request.reasonKey ?? promptKey ?? 'ui.interactionEngineBlocked',
@@ -189,6 +201,7 @@ export const deriveInteractionState = ({
 
   return {
     stateId: 'wait',
+    requestKey: waitingStepKey(frame, cursor.hostNodeId),
     playerIndex,
     spaceId,
     promptKey,
