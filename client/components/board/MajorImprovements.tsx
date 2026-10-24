@@ -105,9 +105,9 @@ export const MajorImprovements = ({
                         resolveChoice(cardId)
                       }
                     }}
-                    disabled={isDisabled || !isInteractive}
+                    disabled={isDisabled}
                     selectable={isSelectingMajor && isPendingSelectable}
-                    touchInteraction={isSelectingMajor && cardPlayRequestKey
+                    touchInteraction={isSelectingMajor && isInteractive && cardPlayRequestKey
                       ? { kind: 'play', requestKey: cardPlayRequestKey }
                       : { kind: 'inspect' }}
                     className={`${isDisabled ? 'disabled ' : ''}major-stack-card major-stack-card-top`}
