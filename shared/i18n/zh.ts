@@ -2246,6 +2246,8 @@ export const zh = {
     seasonalGains: '{season}额外获得 {resources}',
     seasonalStables: '{season}赠送 {count} 个畜栏',
     costs: '支付 {resources}',
+    seasonalCostReduction: '{season}减免 {resources}',
+    seasonalCostIncrease: '{season}额外支付 {resources}',
     effects: '效果：{effects}',
     effectPlow: '开垦 {count} 块田地',
     effectBuildRoom: '建造 {count} 间房',

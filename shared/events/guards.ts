@@ -2,6 +2,7 @@ import { parseAnytimeTurnAffiliation } from '../contract/anytime-activation'
 import { readSeasonalGrant } from '../contract/seasonal-grant'
 import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS, isPaymentResourceKey } from '../contract/resource-keys'
 import type { GameEvent } from '../contract/events'
+import { seasonIds } from '../seasons/types'
 
 export const assertPublicGameEvent = (event: unknown): void => {
   const visibility = (event as { visibility?: unknown } | null)?.visibility
@@ -30,7 +31,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'resource.moved': ['resources', 'from', 'to', 'reason', 'seasonalGrant'],
   'resource.exchanged': ['paid', 'gained', 'paidFrom', 'paidTo', 'gainedFrom', 'gainedTo', 'exchangeSource', 'times'],
   'resource.accumulated': ['resources', 'to', 'silent'],
-  'resource.paid': ['paymentId', 'resources', 'to', 'paymentFor', 'paymentSources', 'bonusSources', 'bonusChoiceIndex', 'returnedCardId'],
+  'resource.paid': ['paymentId', 'resources', 'to', 'paymentFor', 'paymentSources', 'bonusSources', 'bonusChoiceIndex', 'returnedCardId', 'seasonalAdjustments'],
   'farm.sown': ['sows', 'placementOnly'],
   'farm.cropAdded': ['crops', 'reason'],
   'farm.cropRemoved': ['crops', 'reason'],
@@ -402,12 +403,27 @@ const assertSeasonalGrant = (value: unknown): void => {
 
 const assertActionDetailParts = (value: unknown): void => {
   const detailParts = assertRecord(value, 'detailParts')
-  assertOnlyKeys(detailParts, ['gains', 'costs', 'effects', 'bonusSources', 'seasonalGrant'], 'detailParts')
+  assertOnlyKeys(detailParts, ['gains', 'costs', 'effects', 'bonusSources', 'seasonalGrant', 'seasonalAdjustments'], 'detailParts')
   assertSeasonalGrant(detailParts.seasonalGrant)
   if (detailParts.gains !== undefined) assertResourceMap(detailParts.gains, 'detailParts.gains')
   if (detailParts.costs !== undefined) assertResourceMap(detailParts.costs, 'detailParts.costs')
   assertActionDetailEffects(detailParts.effects)
   if (detailParts.bonusSources !== undefined) assertStringArray(detailParts.bonusSources, 'detailParts.bonusSources')
+  assertSeasonalAdjustments(detailParts.seasonalAdjustments, 'detailParts.seasonalAdjustments')
+}
+
+const assertSeasonalAdjustments = (value: unknown, path: string): void => {
+  if (value === undefined) return
+  if (!Array.isArray(value)) throw new Error(`GameEvent ${path} must be an array`)
+  value.forEach((entry, index) => {
+    const itemPath = `${path}[${index}]`
+    const adjustment = assertRecord(entry, itemPath)
+    assertOnlyKeys(adjustment, ['season', 'resources'], itemPath)
+    if (!seasonIds.some(season => season === adjustment.season)) {
+      throw new Error(`GameEvent ${itemPath}.season must be a season id`)
+    }
+    assertResourceMap(adjustment.resources, `${itemPath}.resources`)
+  })
 }
 
 const assertKnownEventDetails = (type: string, event: Record<string, unknown>): void => {
@@ -437,6 +453,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.paymentFor, 'paymentFor')
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
       assertPaymentSources(event.paymentSources)
+      assertSeasonalAdjustments(event.seasonalAdjustments, 'seasonalAdjustments')
       return
     case 'farm.sown':
       if (!Array.isArray(event.sows)) throw new Error('GameEvent sows must be an array')
@@ -623,11 +640,12 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.cardType, 'cardType')
       if (event.payment !== undefined) {
         const payment = assertRecord(event.payment, 'payment')
-        assertOnlyKeys(payment, ['resources', 'paymentId', 'bonusSources', 'returnedCardId'], 'payment')
+        assertOnlyKeys(payment, ['resources', 'paymentId', 'bonusSources', 'returnedCardId', 'seasonalAdjustments'], 'payment')
         assertPaymentResourceMap(payment.resources, 'payment.resources')
         assertOptionalStringField(payment.paymentId, 'payment.paymentId')
         assertOptionalStringField(payment.returnedCardId, 'payment.returnedCardId')
         if (payment.bonusSources !== undefined) assertStringArray(payment.bonusSources, 'payment.bonusSources')
+        assertSeasonalAdjustments(payment.seasonalAdjustments, 'payment.seasonalAdjustments')
       }
       return
     case 'card.triggered':

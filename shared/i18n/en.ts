@@ -1471,6 +1471,8 @@ export const en = {
     seasonalGains: '{season} extra gain {resources}',
     seasonalStables: '{season} grants {count} free stable(s)',
     costs: 'Pays {resources}',
+    seasonalCostReduction: '{season}: costs {resources} less',
+    seasonalCostIncrease: '{season}: extra cost {resources}',
     effects: 'Effect: {effects}',
     effectPlow: 'Plow {count} field(s)',
     effectBuildRoom: 'Build {count} room(s)',

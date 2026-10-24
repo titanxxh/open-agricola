@@ -87,6 +87,7 @@ export type CardPayment = {
   paymentId?: string
   bonusSources?: string[]
   returnedCardId?: string
+  seasonalAdjustments?: SeasonalAdjustment[]
 }
 
 export type ResourcePaidEvent = GameEventBase<'resource.paid'> & {
@@ -98,6 +99,7 @@ export type ResourcePaidEvent = GameEventBase<'resource.paid'> & {
   bonusSources?: string[]
   bonusChoiceIndex?: Record<string, number>
   returnedCardId?: string
+  seasonalAdjustments?: SeasonalAdjustment[]
 }
 
 export type FarmSownEvent = GameEventBase<'farm.sown'> & {

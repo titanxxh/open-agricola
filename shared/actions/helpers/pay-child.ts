@@ -10,6 +10,7 @@ import type {
 } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import type { CardPayment } from '../../contract/events'
+import type { SeasonalAdjustment } from '../../contract/seasonal-adjustments'
 
 export type PayChildOptions = {
   cost: PaymentResourceMap | ComplexCost
@@ -23,6 +24,7 @@ export type PayChildOptions = {
   includeReturnedCard?: boolean
   sourceActionId?: string
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+  seasonalAdjustments?: SeasonalAdjustment[]
 }
 
 export const buildPayChild = (options: PayChildOptions): ActionFlow => {

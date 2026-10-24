@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PaymentResourceMap, PlayerState, Resource } from '../../../shared/contract/types'
 import type { ActionDetailParts } from '../../../shared/contract/protocol/game'
+import type { SeasonalAdjustment } from '../../../shared/contract/seasonal-adjustments'
 import { PlayerCard } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
@@ -113,6 +114,29 @@ const renderRichTemplate = (
       return part
     })
 }
+
+const renderSeasonalCostAdjustments = (
+  locale: Locale,
+  adjustments: SeasonalAdjustment[] | undefined,
+): ReactNode[] => (adjustments ?? []).flatMap(({ season, resources }) => {
+  const reductions: Partial<Resource> = {}
+  const increases: Partial<Resource> = {}
+  for (const [key, amount] of Object.entries(resources)) {
+    if (amount < 0) reductions[key as keyof Resource] = -amount
+    if (amount > 0) increases[key as keyof Resource] = amount
+  }
+  return [
+    { key: 'log.seasonalCostReduction', resources: reductions },
+    { key: 'log.seasonalCostIncrease', resources: increases },
+  ].filter(adjustment => Object.keys(adjustment.resources).length > 0)
+    .map(adjustment => (
+      <Fragment key={`${season}-${adjustment.key}`}>
+        {renderRichTemplate(locale, adjustment.key, { season: t(locale, `ui.seasons.${season}`) }, {
+          resources: <ResourceLine locale={locale} resources={adjustment.resources} />,
+        })}
+      </Fragment>
+    ))
+})
 
 export const LogCardLink = ({
   locale,
@@ -465,8 +489,13 @@ export const prepareLogEntry = (
     )
   }
   if (params && entry.key === 'log.cardEffectPay' && typeof params.cost === 'object') {
+    const seasonalParts = renderSeasonalCostAdjustments(locale, params.seasonalAdjustments as SeasonalAdjustment[] | undefined)
     richParams.cost = (
-      <ResourceLine locale={locale} mode="payment" resources={params.cost as PaymentResourceMap} />
+      <>
+        <ResourceLine locale={locale} mode="payment" resources={params.cost as PaymentResourceMap}
+          emptyLabel={seasonalParts.length ? '0' : undefined} />
+        {seasonalParts.map((part, index) => <Fragment key={index}>{' · '}{part}</Fragment>)}
+      </>
     )
   }
   if (params && entry.key === 'log.bakeBread') {
@@ -651,6 +680,7 @@ export const prepareLogEntry = (
       .map((id) => resolveCardRef(locale, id))
       .filter((ref): ref is CardRef => ref !== null)
     const segments: ReactNode[] = []
+    const seasonalParts = renderSeasonalCostAdjustments(locale, detailParts.seasonalAdjustments)
     if (
       detailParts.gains &&
       Object.values(detailParts.gains).some((value) => (value ?? 0) > 0)
@@ -666,17 +696,18 @@ export const prepareLogEntry = (
     }
     if (
       detailParts.costs &&
-      Object.values(detailParts.costs).some((value) => (value ?? 0) > 0)
+      (Object.values(detailParts.costs).some((value) => (value ?? 0) > 0) || seasonalParts.length > 0)
     ) {
       segments.push(
         ...renderRichTemplate(
           locale,
           'log.costs',
           {},
-          { resources: <ResourceLine locale={locale} mode="payment" resources={detailParts.costs} /> },
+          { resources: <ResourceLine locale={locale} mode="payment" resources={detailParts.costs} emptyLabel="0" /> },
         ),
       )
     }
+    segments.push(...seasonalParts)
     if (effects.length > 0) {
       segments.push(
         ...renderRichTemplate(

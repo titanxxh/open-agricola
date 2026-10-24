@@ -1133,6 +1133,7 @@ export const buildLogPresentationPlan = (
             actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? event.paymentFor, {
               costs: cost,
               ...(event.bonusSources?.length ? { bonusSources: event.bonusSources } : {}),
+              ...(event.seasonalAdjustments?.length ? { seasonalAdjustments: event.seasonalAdjustments } : {}),
             }, {
               ...(event.bonusChoiceIndex ? { bonusChoiceIndex: event.bonusChoiceIndex } : {}),
             }),
@@ -1147,6 +1148,7 @@ export const buildLogPresentationPlan = (
               player: playerName(ctx, event.actorPlayerId),
               cost,
               cardId: event.sourceCardId,
+              ...(event.seasonalAdjustments?.length ? { seasonalAdjustments: event.seasonalAdjustments } : {}),
             },
           },
         ])

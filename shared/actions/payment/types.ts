@@ -8,6 +8,7 @@ import type {
   PaymentSolution,
   Resource,
 } from '../../contract/types'
+import type { SeasonalAdjustment } from '../../contract/seasonal-adjustments'
 
 export type Cost = PaymentResourceMap | ComplexCost
 
@@ -24,6 +25,7 @@ export type PaymentCtx = {
   includeReturnedCard?: boolean
   reserveResources?: Partial<Resource>
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+  seasonalAdjustments?: SeasonalAdjustment[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
 }
 
@@ -41,6 +43,7 @@ export type PaymentReceipt = {
   originalFeeIndex?: number
   candidateSources?: readonly string[]
   costAttribution?: CardCostCandidateMetadata['costAttribution']
+  seasonalAdjustments?: SeasonalAdjustment[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
 }
 
