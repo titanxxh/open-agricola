@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { MajorSupplyStack, PlayerState, Resource } from '../../../shared/contract/types'
@@ -8,6 +7,8 @@ import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard } from '../common/PlayerCard'
 import './MajorImprovements.css'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
+
+export type MajorSupplyExpansion = { requestKey: string; expanded: boolean } | null
 
 type Props = {
   locale: Locale
@@ -20,6 +21,8 @@ type Props = {
   cardPlayRequestKey?: string
   selectionRequestKey?: string
   minorChoiceCount?: number
+  expansion: MajorSupplyExpansion
+  onExpansionChange: (expansion: Exclude<MajorSupplyExpansion, null>) => void
   resolveChoice: (value: string) => CardPlayOutcome
   futureCardResources: Record<
     string,
@@ -44,12 +47,13 @@ export const MajorImprovements = ({
   cardPlayRequestKey,
   selectionRequestKey,
   minorChoiceCount = 0,
+  expansion,
+  onExpansionChange,
   resolveChoice,
   futureCardResources,
   devMode,
 }: Props) => {
   const requestKey = isSelectingMajor ? selectionRequestKey ?? cardPlayRequestKey ?? 'selection' : 'browse'
-  const [expansion, setExpansion] = useState<{ requestKey: string; expanded: boolean } | null>(null)
   const shouldExpand = expansion?.requestKey === requestKey
     ? expansion.expanded
     : isSelectingMajor && minorChoiceCount === 0 && selectableMajorIds.size > 0
@@ -67,7 +71,7 @@ export const MajorImprovements = ({
       data-interaction-focus="major-supply">
       <h2>
         <button type="button" aria-expanded={shouldExpand} className="major-supply-toggle"
-          onClick={() => setExpansion({ requestKey, expanded: !shouldExpand })}>
+          onClick={() => onExpansionChange({ requestKey, expanded: !shouldExpand })}>
           {isSelectingMajor
             ? t(locale, shouldExpand ? 'ui.hideMajorImprovements' : 'ui.showMajorImprovements', { count: selectableMajorIds.size })
             : `${t(locale, 'ui.majorImprovements')} ${shouldExpand ? '▼' : `▶ (${collapsedCount})`}`}

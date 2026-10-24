@@ -36,7 +36,7 @@ import { PlayerFarmPanel } from '../components/board/PlayerFarmPanel'
 import { DesktopPlayerOverview } from '../components/board/DesktopPlayerOverview'
 import { DesktopPublicFarms } from './DesktopPublicFarms'
 import { SpecialActionsPanel } from '../components/board/SpecialActionsPanel'
-import { MajorImprovements } from '../components/board/MajorImprovements'
+import { MajorImprovements, type MajorSupplyExpansion } from '../components/board/MajorImprovements'
 import { ScoringPad } from '../components/board/ScoringPad'
 import { StageBar } from '../components/board/StageBar'
 import { PlayerTabs } from '../components/board/PlayerTabs'
@@ -383,6 +383,7 @@ export const GameContainerApi = () => {
   const [devRound, setDevRound] = useState(1)
   const [isDesktopTable, setIsDesktopTable] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1101px)').matches || false)
   const [handOutlet, setHandOutlet] = useState<HTMLDivElement | null>(null)
+  const [majorSupplyExpansion, setMajorSupplyExpansion] = useState<MajorSupplyExpansion>(null)
   useEffect(() => {
     const query = window.matchMedia?.('(min-width: 1101px)')
     if (!query) return
@@ -1853,6 +1854,8 @@ export const GameContainerApi = () => {
       majorImprovementSupply={state.majorImprovementSupply}
       isSelectingMajor={nearbyMajorSupply}
       minorChoiceCount={selectableMinorIds.size}
+      expansion={majorSupplyExpansion}
+      onExpansionChange={setMajorSupplyExpansion}
       selectionRequestKey={improvementSelection?.requestKey}
       selectableMajorIds={isPublicFarmView ? new Set<string>() : selectableMajorIds}
       cardAvailability={isPublicFarmView ? {} : cardAvailability}

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EngineStack } from '../../../shared/engine'
 import type { GameSyncPayload } from '../../../shared/contract/protocol/game'
@@ -57,6 +57,51 @@ afterEach(() => {
 })
 
 describe('GameContainerApi responsive presentation', () => {
+  it('preserves explicit supply expansion when the hand moves between desktop and mobile hosts', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    const response = structuredClone(payload)
+    response.state.players[0]!.minorHand = ['A076_Cob']
+    response.interaction = {
+      stateId: 'wait', requestKey: 'same-improvement-request', playerIndex: 0,
+      allowedCommands: ['resolveChoice'], anytimeActions: [], promptKey: 'ui.interactionChooseImprovement',
+      request: { kind: 'choice', options: [
+        { value: 'minor:A076_Cob', labelKey: 'minors.A076_Cob.name' },
+        { value: 'major:Major_Well', labelKey: 'improvements.Major_Well.name' },
+      ] },
+    }
+    setupViewport(false, response)
+    let desktop = true
+    const targets = new Map<string, EventTarget>()
+    const matches = (query: string) => query === '(min-width: 1101px)' ? desktop : query === '(max-width: 900px)' && !desktop
+    vi.mocked(window.matchMedia).mockImplementation(query => {
+      const target = targets.get(query) ?? new EventTarget()
+      targets.set(query, target)
+      return {
+        get matches() { return matches(query) }, media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: target.addEventListener.bind(target),
+        removeEventListener: target.removeEventListener.bind(target),
+        dispatchEvent: target.dispatchEvent.bind(target),
+      }
+    })
+    const { container } = renderGame()
+    fireEvent.click(await screen.findByRole('button', { name: 'Show major improvements (1)' }))
+    expect(container.querySelector('.game-layout__hand .major-row')).toBeVisible()
+    const resize = async (next: boolean) => act(async () => {
+      desktop = next
+      targets.forEach((target, query) => target.dispatchEvent(Object.assign(new Event('change'), { matches: matches(query) })))
+    })
+    await resize(false)
+    expect(container.querySelector('.game-layout__center .major-row')).toBeVisible()
+    await resize(true)
+    expect(container.querySelector('.game-layout__hand .major-row')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide major improvements' }))
+    await resize(false)
+    await resize(true)
+    expect(container.querySelector('.major-row')).toBeNull()
+  })
+
   it('opens every authoritative alternative for a nearby Card Field before submitting one', async () => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')

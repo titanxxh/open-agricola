@@ -1,12 +1,14 @@
 import { useCallback, useRef } from 'react'
+import { useRequestActivation, type RequestActivation } from './useRequestActivation'
 
 export type CardPlayOutcome = void | boolean | Promise<boolean>
 
 export const useCardPlayChoice = (requestKey: string, resolveChoice: (value: string) => CardPlayOutcome) => {
-  const submittedRequestRef = useRef<{ requestKey: string } | null>(null)
+  const activation = useRequestActivation(requestKey)
+  const submittedRequestRef = useRef<{ activation: RequestActivation } | null>(null)
   return useCallback((cardId: string) => {
-    if (submittedRequestRef.current?.requestKey === requestKey) return false
-    const attempt = { requestKey }
+    if (submittedRequestRef.current?.activation === activation) return false
+    const attempt = { activation }
     submittedRequestRef.current = attempt
     const settle = (accepted: boolean) => {
       if (!accepted && submittedRequestRef.current === attempt) submittedRequestRef.current = null
@@ -20,5 +22,5 @@ export const useCardPlayChoice = (requestKey: string, resolveChoice: (value: str
     } catch {
       return settle(false)
     }
-  }, [requestKey, resolveChoice])
+  }, [activation, resolveChoice])
 }

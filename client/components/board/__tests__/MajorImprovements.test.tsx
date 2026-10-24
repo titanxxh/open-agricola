@@ -2,7 +2,13 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
-import { MajorImprovements } from '../MajorImprovements'
+import { useState, type ComponentProps } from 'react'
+import { MajorImprovements, type MajorSupplyExpansion } from '../MajorImprovements'
+
+const Supply = (props: Omit<ComponentProps<typeof MajorImprovements>, 'expansion' | 'onExpansionChange'>) => {
+  const [expansion, setExpansion] = useState<MajorSupplyExpansion>(null)
+  return <MajorImprovements {...props} expansion={expansion} onExpansionChange={setExpansion} />
+}
 
 const baseProps = {
   locale: 'en' as const,
@@ -19,7 +25,7 @@ describe('MajorImprovements', () => {
   it('renders stacked cards and selects only the visible top card', () => {
     const resolveChoice = vi.fn()
     const { container, getByTestId } = render(
-      <MajorImprovements
+      <Supply
         {...baseProps}
         resolveChoice={resolveChoice}
         majorImprovementSupply={[
@@ -48,24 +54,24 @@ describe('MajorImprovements', () => {
   it('starts mixed selection collapsed and preserves an explicit collapse through repeated snapshots', () => {
     const resolveChoice = vi.fn()
     const props = { ...baseProps, minorChoiceCount: 1, selectionRequestKey: 'mixed-1', resolveChoice }
-    const { container, getByRole, rerender } = render(<MajorImprovements {...props} />)
+    const { container, getByRole, rerender } = render(<Supply {...props} />)
     expect(container.querySelector('.major-row')).toBeNull()
     const toggle = getByRole('button', { name: 'Show major improvements (1)' })
     fireEvent.click(toggle)
     expect(container.querySelector('[data-card-anchor="Major_Well"]')).not.toBeNull()
     fireEvent.click(getByRole('button', { name: 'Hide major improvements' }))
-    rerender(<MajorImprovements {...props} selectableMajorIds={new Set(['Major_Well'])} />)
+    rerender(<Supply {...props} selectableMajorIds={new Set(['Major_Well'])} />)
     expect(container.querySelector('.major-row')).toBeNull()
-    rerender(<MajorImprovements {...props} minorChoiceCount={0} />)
+    rerender(<Supply {...props} minorChoiceCount={0} />)
     expect(container.querySelector('.major-row')).toBeNull()
-    rerender(<MajorImprovements {...props} minorChoiceCount={0} selectionRequestKey="major-only-2" />)
+    rerender(<Supply {...props} minorChoiceCount={0} selectionRequestKey="major-only-2" />)
     expect(container.querySelector('[data-card-anchor="Major_Well"]')).not.toBeNull()
   })
 
   it('preserves flat fallback when stack supply is absent', () => {
     const resolveChoice = vi.fn()
     const { container, queryByTestId } = render(
-      <MajorImprovements
+      <Supply
         {...baseProps}
         resolveChoice={resolveChoice}
       />,
