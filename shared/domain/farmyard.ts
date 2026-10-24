@@ -742,6 +742,19 @@ export const validateStableSelection = (
   return { ok: true, selectedKeys: selectedSet }
 }
 
+export const computeFenceWoodCost = ({
+  fenceCount, palisadeCount, extraWood = 0, freeFences = 0, costPolicy,
+}: {
+  fenceCount: number
+  palisadeCount: number
+  extraWood?: number
+  freeFences?: number
+  costPolicy?: FenceCostPolicy
+}): number =>
+  Math.max(0, fenceCount - freeFences) * (costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence)
+  + palisadeCount * (costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade)
+  + Math.max(0, extraWood) + Math.max(0, costPolicy?.fixedWood ?? 0)
+
 export const validateFenceSelection = <T extends PlayerFarmState>(
   player: T,
   edges: string[],
@@ -966,19 +979,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const payableFenceCount = Math.max(
-    0,
-    newFenceEdges.length - freeFenceCount,
-  )
-  const fenceWoodCost = options.costPolicy?.fence?.wood
-  const payableFenceWoodCost =
-    fenceWoodCost === undefined
-      ? payableFenceCount * defaultFenceWoodCosts.fence
-      : payableFenceCount * fenceWoodCost
-  const palisadeWoodCost = options.costPolicy?.palisade?.wood ?? defaultFenceWoodCosts.palisade
-  const fixedWoodCost = Math.max(0, options.costPolicy?.fixedWood ?? 0)
-  const payableWoodCost =
-    payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost + fixedWoodCost
+  const payableWoodCost = computeFenceWoodCost({
+    fenceCount: newFenceEdges.length, palisadeCount: newPalisadeEdges.length,
+    extraWood: extraCost, freeFences: freeFenceCount, costPolicy: options.costPolicy,
+  })
 
   const existingFenceCount = borrowedSourcePolicy
     ? 0

@@ -1,3 +1,4 @@
+import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
 import { playerColorOptions } from '../../shared/contract/state-constants'
 import { measure, measureRule, observeCommand, commandOutcome, roundTag, startObservation, rejectObservedCommand, captureCommandOutcome } from '../observability/metrics'
 import { ExecutionAccess, ExecutionRevokedError } from '../game/execution-access'
@@ -998,6 +999,26 @@ async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   }
 }
 
+async function handleFenceQuote(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'quoteFenceSelection' }>): Promise<void> {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const blocked = ctx.committer?.blockedError(room.id)
+  if (blocked) { sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId); return }
+  if (msg.expectedVersion !== room.version) {
+    sendCommandError(ctx, 'Fence quote is stale', msg.requestId); return
+  }
+  try {
+    const quote = room.customSessionExecutor
+      ? await room.customSessionExecutor.query<FenceSelectionQuote>('quoteFenceSelection', [msg.playerIndex, msg.requestKey, msg.payload])
+      : room.session.quoteFenceSelection(msg.playerIndex, msg.requestKey, msg.payload)
+    await ctx.broadcaster.sendRoomEvent(ctx.ws, room, {
+      type: 'fenceSelectionQuote', roomId: room.id, version: room.version, requestId: msg.requestId, quote,
+    })
+  } catch (error) {
+    sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId)
+  }
+}
+
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void | Promise<void> {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   if (msg.unredacted && !assertDevCommandAllowed(ctx, room, msg.requestId)) return
@@ -1386,6 +1407,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   setPlayerColor: handleSetPlayerColor,
   getState: handleGetState,
   getHistory: handleGetHistory,
+  quoteFenceSelection: handleFenceQuote,
   action: handleAction,
   specialAction: handleSpecialAction,
   choice: handleChoice,
@@ -1427,7 +1449,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
     const commands = ctx.commands
     try {
       if (ctx.sessionToken && !(await validateSession(ctx.sessionToken))) { commandOutcome('canceled'); ctx.ws.close(1008, 'session revoked'); return }
-      const writes = !['auth', 'joinRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)
+      const writes = !['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)
       if (writes) {
         if (!commands || !msg.commandContext) throw new CommandError('command_identity_required', 'A stable command identity is required')
         const targetRoomId = msg.type === 'createRoom' ? null : msg.commandContext.roomId ?? null

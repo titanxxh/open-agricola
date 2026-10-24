@@ -1,6 +1,6 @@
 import type { CommandIdentity, CommandInput, CommandScope, CommandReceipt, CommandErrorCode } from './commands'
 import type { RoomHistoryPage } from './history'
-import type { StateUpdateEnvelope } from './game'
+import type { FenceSelectionPayload, FenceSelectionQuote, StateUpdateEnvelope } from './game'
 import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../types'
@@ -54,6 +54,7 @@ type ClientCommandBody =
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState'; unredacted?: boolean }
   | { type: 'getHistory'; cursor?: string }
+  | { type: 'quoteFenceSelection'; playerIndex: number; requestKey: string; payload: FenceSelectionPayload; expectedVersion: number }
   | {
       type: 'createRoom'
       maxPlayers?: number
@@ -101,6 +102,7 @@ export type ServerEvent =
   | { type: 'commandScope'; scope: CommandScope; requestId?: string }
   | { type: 'commandReceipt'; status: 'completed'; receipt: CommandReceipt; requestId?: string }
   | { type: 'commandReceipt'; status: 'pending' | 'unknown'; identity: CommandIdentity; requestId?: string }
+  | { type: 'fenceSelectionQuote'; roomId: string; version: number; quote: FenceSelectionQuote; requestId?: string }
   | { type: 'historyPage'; roomId: string; page: RoomHistoryPage; requestId?: string }
   | StateUpdateEnvelope
   | {

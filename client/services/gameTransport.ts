@@ -3,7 +3,8 @@ import type { RoomDiscoveryResponse } from '../../shared/contract/protocol/routi
 import { RoomCommandJournal } from './room-command-journal'
 import type { CommandScope, InputWindow, CommandOutcome } from '../../shared/contract/protocol/commands'
 import type { RoomHistoryPage } from '../../shared/contract/protocol/history'
-import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-selection'
+import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
@@ -42,6 +43,7 @@ type MoorSpecialActionPayload = {
 export interface GameTransport {
   getState(options?: GetStateOptions): Promise<GameSyncPayload>
   getHistory?(cursor?: string): Promise<RoomHistoryPage>
+  quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
   takeSpecialAction(
     playerIndex: number,
@@ -124,6 +126,15 @@ export class HttpGameTransport implements GameTransport {
     const payload = await get('/api/game/state')
     this.emit(payload)
     return payload
+  }
+
+  async quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote> {
+    const response = await fetch(`${API_BASE}/api/game/fence-quote`, {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerIndex, requestKey, payload }),
+    })
+    if (!response.ok) throw new Error('Fence quote is unavailable')
+    return parseFenceSelectionQuote(await response.json())
   }
 
   takeAction(playerIndex: number, spaceId: string) {
@@ -261,7 +272,7 @@ export type RoomConnectionOptions = {
 type ReceiptEvent = Extract<ServerEvent, { type: 'commandReceipt' }>
 type PendingEvent = { match: (event: ServerEvent) => boolean; resolve: (event: ServerEvent) => void; reject: (error: Error) => void }
 const readOnlyCommand = (command: ClientCommand): boolean =>
-  ['auth', 'joinRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(command.type)
+  ['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt'].includes(command.type)
 const terminalCode = (code?: string): boolean => !!code && [
   'seat_replaced', 'login_required', 'not_participant', 'unknown_context', 'context_changed',
   'context_expired', 'context_removed', 'command_scope_expired',
@@ -281,6 +292,7 @@ export class WsGameTransport implements GameTransport {
     commandId?: string
   }>()
   private pendingHistoryResolvers = new Map<string, { resolve: (page: RoomHistoryPage) => void; reject: (error: Error) => void }>()
+  private pendingFenceQuoteResolvers = new Map<string, { resolve: (quote: FenceSelectionQuote) => void; reject: (error: Error) => void; version: number; roomId: string }>()
   private eventWaiters = new Set<PendingEvent>()
   private commandScope?: CommandScope
   private committedVersion = 0
@@ -510,6 +522,19 @@ export class WsGameTransport implements GameTransport {
         this.journal.playerIndex = msg.playerIndex
       }
       this.setRoom(msg.roomId)
+    } else if (msg.type === 'fenceSelectionQuote') {
+      const pending = msg.requestId ? this.pendingFenceQuoteResolvers.get(msg.requestId) : undefined
+      if (msg.requestId) this.pendingFenceQuoteResolvers.delete(msg.requestId)
+      if (pending) {
+        if (msg.roomId !== pending.roomId || msg.roomId !== this.roomId
+          || msg.version !== pending.version || msg.version !== this.committedVersion) {
+          pending.reject(new Error('Fence quote is stale'))
+        } else {
+          try { pending.resolve(parseFenceSelectionQuote(msg.quote)) } catch (error) {
+            pending.reject(error instanceof Error ? error : new Error(String(error)))
+          }
+        }
+      }
     } else if (msg.type === 'historyPage') {
       if (msg.requestId) { this.pendingHistoryResolvers.get(msg.requestId)?.resolve(msg.page); this.pendingHistoryResolvers.delete(msg.requestId) }
     } else if (msg.type === 'stateUpdate') {
@@ -533,6 +558,7 @@ export class WsGameTransport implements GameTransport {
     } else if (msg.type === 'error') {
       const error = Object.assign(new Error(msg.error), { code: msg.code })
       if (msg.requestId) {
+        this.pendingFenceQuoteResolvers.get(msg.requestId)?.reject(error); this.pendingFenceQuoteResolvers.delete(msg.requestId)
         this.pendingHistoryResolvers.get(msg.requestId)?.reject(error); this.pendingHistoryResolvers.delete(msg.requestId)
         this.pendingResolvers.get(msg.requestId)?.reject(error); this.pendingResolvers.delete(msg.requestId)
       }
@@ -613,6 +639,7 @@ export class WsGameTransport implements GameTransport {
   }
   private rejectReads(error: Error): void {
     for (const [id, pending] of this.pendingResolvers) if (!pending.commandId) { pending.reject(error); this.pendingResolvers.delete(id) }
+    this.pendingFenceQuoteResolvers.forEach(pending => pending.reject(error)); this.pendingFenceQuoteResolvers.clear()
     this.pendingHistoryResolvers.forEach(pending => pending.reject(error)); this.pendingHistoryResolvers.clear()
   }
   private rejectPending(error: Error): void {
@@ -630,6 +657,15 @@ export class WsGameTransport implements GameTransport {
       const requestId = commandUuid()
       this.pendingHistoryResolvers.set(requestId, { resolve, reject })
       this.sendRaw({ type: 'getHistory', cursor, requestId })
+    })
+  }
+  quoteFenceSelection(playerIndex: number, requestKey: string, payload: FenceSelectionPayload): Promise<FenceSelectionQuote> {
+    return new Promise((resolve, reject) => {
+      if (!this.connected) { reject(new Error('WebSocket reconnecting')); return }
+      const requestId = commandUuid()
+      const version = this.committedVersion
+      this.pendingFenceQuoteResolvers.set(requestId, { resolve, reject, version, roomId: this.roomId })
+      this.sendRaw({ type: 'quoteFenceSelection', playerIndex, requestKey, payload, expectedVersion: version, requestId })
     })
   }
   private sendCommand(cmd: ClientCommand): Promise<GameSyncPayload> {

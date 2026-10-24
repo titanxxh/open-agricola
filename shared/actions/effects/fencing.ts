@@ -1,3 +1,5 @@
+import { parseFenceSelectionPayload } from '../../contract/protocol/farm-selection'
+import type { FenceSelectionPayload, FenceSelectionQuote } from '../../contract/protocol/game'
 import { commitFarmOperation } from '../../domain/farm-operations'
 import { getPastureTileKeys, getNewlyEnclosedPastureTiles } from '../../domain/farmyard-usage'
 import type {
@@ -27,6 +29,7 @@ import {
   getFarmyardTileCount,
   getFarmyardTilePositions,
   isFarmyardBorderEdge,
+  isFarmyardEdge,
 } from '../../domain/farm'
 import type {
   FenceCostPolicy,
@@ -37,6 +40,7 @@ import type {
 } from '../../domain/farmyard'
 import {
   defaultFenceWoodCosts,
+  computeFenceWoodCost,
   borrowedFenceDonorCapTotal,
   isBorrowedFenceSourcePolicy,
 } from '../../domain/farmyard'
@@ -528,6 +532,41 @@ const canAffordFencePayment = (
   state: GameState,
 ): boolean =>
   PaymentSolver.canAffordTypedFlatCost(player, paymentCost, 'fencing', state)
+
+export const quoteFenceSelection = (
+  ctx: Pick<ActionExecutionContext, 'state' | 'player' | 'actionHooks' | 'actionContext'> & { space?: ActionSpace },
+  requestKey: string,
+  payload: FenceSelectionPayload,
+): FenceSelectionQuote => {
+  payload = parseFenceSelectionPayload(payload)
+  const policy = borrowedPolicyWithCurrentCaps(ctx.state, ctx.player, readFenceActionPolicy(ctx.actionContext))
+  const player = normalizePlayerFarm(ctx.player)
+  const edges = [...new Set(payload.edges)]
+  const palisadeEdges = [...new Set(payload.palisadeEdges ?? [])]
+  if ([...edges, ...palisadeEdges].some(edge => !isFarmyardEdge(player, edge))) {
+    throw new Error('Invalid fence edge')
+  }
+  const existing = new Set((player.fenceSegments ?? []).map(segment => segment.edge))
+  const newFenceEdges = edges.filter(edge => !existing.has(edge))
+  const newPalisadeEdges = palisadeEdges.filter(edge => !existing.has(edge))
+  const adjustment = computeFenceCostAdjustment(requireActionHookRegistry(ctx.actionHooks),
+    ctx.state, player, newFenceEdges, newPalisadeEdges, ctx.space, policy, ctx.actionContext)
+  const extraWood = (payload.extraWood ?? 0) + adjustment.extraWood
+  const woodCost = computeFenceWoodCost({
+    fenceCount: newFenceEdges.length, palisadeCount: newPalisadeEdges.length,
+    extraWood, freeFences: adjustment.freeFences, costPolicy: policy.costPolicy,
+  })
+  const validated = playerBoard(ctx.state, ctx.state.players.indexOf(ctx.player)).farmyard.canBuildFence({
+    edges, palisadeEdges, extraWood, freeFences: adjustment.freeFences,
+    options: fenceValidationOptions(player, playerCanBuildPalisades(player), policy,
+      payload.fenceSources, ctx.actionContext),
+    lockedKeys: collectLockedFarmTileKeys(ctx.player),
+  })
+  const affordable = canAffordFencePayment(validated.ok ? validated.player : player,
+    buildFencePaymentCost(woodCost, adjustment, policy), ctx.state)
+  return { requestKey, woodCost, affordable, valid: validated.ok && affordable,
+    error: !validated.ok ? validated.error?.code ?? 'log.fencingFail' : affordable ? null : 'NOT_ENOUGH_WOOD' }
+}
 
 const countBorrowedFenceSources = (
   policy: FenceActionPolicy,

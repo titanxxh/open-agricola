@@ -60,6 +60,7 @@ export type CustomSessionMethod =
   | 'submitDraftPick'
   | 'getAvailableActions'
   | 'validateFarmChoice'
+  | 'quoteFenceSelection'
   | 'confirmCurrentPlayer'
   | 'updatePlayerNames'
   | 'updatePlayerColors'
@@ -208,7 +209,7 @@ export class CustomSessionExecutor {
     return this.lastScores
   }
 
-  async query<T>(method: 'getAvailableActions' | 'validateFarmChoice', args: unknown[]): Promise<T> {
+  async query<T>(method: 'getAvailableActions' | 'validateFarmChoice' | 'quoteFenceSelection', args: unknown[]): Promise<T> {
     return this.enqueue(async () => {
       const message = await this.request(method, args)
       if (!message.ok) {
