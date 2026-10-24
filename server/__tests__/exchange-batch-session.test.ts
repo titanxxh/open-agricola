@@ -604,7 +604,15 @@ describe('authoritative Exchange Batch', () => {
     expect(undone.interaction).toEqual(opportunity.interaction)
     expect(undone.state.players[0]!.resources).toMatchObject({ boar: 0, food: 2, wood: 1, fuel: 1, begging: 0 })
     const reheated = finishFeeding(restored, undone)
-    expect(reheated.interaction).toEqual(heating.interaction)
+    if (heating.interaction.stateId !== 'wait' || reheated.interaction.stateId !== 'wait') {
+      throw new Error('Expected both original and repeated heating requests')
+    }
+    const { requestKey: originalKey, ...originalRequest } = heating.interaction
+    const { requestKey: repeatedKey, ...repeatedRequest } = reheated.interaction
+    expect(repeatedRequest).toEqual(originalRequest)
+    expect(originalKey).toBeTypeOf('string')
+    expect(repeatedKey).toBeTypeOf('string')
+    expect(repeatedKey).not.toBe(originalKey)
     const settled = restored.resolveChoice(0, 'confirm', { fuelUsed: 2, woodToFuel: 1 })
     expect(settled.ok, settled.error).toBe(true)
     expect(settled.state.players[0]!.resources).toMatchObject({ boar: 0, food: 0, wood: 0, fuel: 0, begging: 0 })
