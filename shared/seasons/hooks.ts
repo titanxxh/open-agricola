@@ -5,7 +5,7 @@ import {
   readActionSnapshotExtraData,
   writeActionSnapshotExtraData,
 } from '../cards/helpers/action-snapshot'
-import { isThroughTheSeasonsSeason } from './rules'
+import { isThroughTheSeasonsSeason, winterPlowFoodCost } from './rules'
 import { readTurnScopeToken } from '../cards/helpers/turn-token'
 
 const SUMMER_DAY_LABORER_USED_KEY = 'throughTheSeasonsSummerDayLaborerUsed'
@@ -27,8 +27,9 @@ export const registerThroughTheSeasonsHooks = (actionHooks: ActionHookRegistry):
     actions: ['plow'],
     phases: ['computeCosts'],
     handler: (context) => {
-      if (!isThroughTheSeasonsSeason(context.state, 'winter')) return
-      return { costs: { food: 1 } }
+      const food = winterPlowFoodCost(context.state)
+      if (food === 0) return
+      return { costs: { food } }
     },
   })
 

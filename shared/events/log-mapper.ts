@@ -1031,6 +1031,8 @@ export const buildLogPresentationPlan = (
       if (event.type === 'farm.fieldPlowed') {
         return presentationRows(event, [actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? 'plow', {
           effects: { plow: event.fields.length },
+          ...(event.payment ? { costs: positiveResources(event.payment.resources) } : {}),
+          ...(event.payment?.seasonalAdjustments?.length ? { seasonalAdjustments: event.payment.seasonalAdjustments } : {}),
         })])
       }
 

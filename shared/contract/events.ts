@@ -148,6 +148,7 @@ export type FarmFieldPlowedEvent = GameEventBase<'farm.fieldPlowed'> & {
   /** Tiles made used by this mutation, captured before its trailing reactions. */
   newlyUsedTiles: FarmyardTileUsage[]
   fields: Array<{ playerId: string; row: number; col: number }>
+  payment?: Pick<CardPayment, 'resources' | 'seasonalAdjustments'>
 }
 
 export type FarmRoomBuiltEvent = GameEventBase<'farm.roomBuilt'> & {
