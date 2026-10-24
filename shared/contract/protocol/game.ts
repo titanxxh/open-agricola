@@ -6,6 +6,7 @@ import type { SerializedGameState } from '../../session/serialization'
 import type { PlayerScoreSummary } from '../../domain'
 import type { CardDefinition } from '../cards'
 import type { PrivateGameEvent as RuntimePrivateGameEvent } from '../private-events'
+import type { SeasonalAdjustment } from '../seasonal-adjustments'
 
 export type {
   PrivateDraftUpdatedEvent,
@@ -47,6 +48,7 @@ export type ActionDetailParts = {
    * entry so the player can see which card caused a cost reduction.
    */
   bonusSources?: string[]
+  seasonalAdjustments?: SeasonalAdjustment[]
 }
 
 export type PublicEventCancellation = {

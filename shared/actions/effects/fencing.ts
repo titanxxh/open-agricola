@@ -444,6 +444,7 @@ const computeFenceCostAdjustment = (
   baseFreeFences: number
   freeFences: number
   extraWood: number
+  springWoodSaved: number
   costAttribution: ActionCostAttribution[]
   trades: Trade[]
   bonuses: Bonus[]
@@ -473,6 +474,7 @@ const computeFenceCostAdjustment = (
       : computeSpringFreeFences(state, player, newFenceEdges, policy, 0, 0),
     freeFences: contributedFreeFences + hookFreeFences + springFreeFences,
     extraWood: Math.max(0, hookWood),
+    springWoodSaved: springFreeFences * (policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence),
     costAttribution: [...settleFenceContributions(player, actionContext, newFenceEdges.length,
       policy.costPolicy?.fence?.wood ?? defaultFenceWoodCosts.fence).costAttribution, ...fenceOverride.costAttribution],
     trades: fenceOverride.trades,
@@ -695,6 +697,9 @@ const finalizeFence = (
           sourceCard: ctx.sourceCard,
           sourceActionId: ctx.space.id,
           candidateMetadataByFeeIndex: { 0: { originalFeeIndex: 0, sources: costSources } },
+          ...(costAdjustment.springWoodSaved > 0 ? {
+            seasonalAdjustments: [{ season: 'spring', resources: { wood: -costAdjustment.springWoodSaved } }],
+          } : {}),
         }),
       ],
     },

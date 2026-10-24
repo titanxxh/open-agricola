@@ -15,6 +15,7 @@ This module centralizes the shapes shared by the frontend, backend and sandbox, 
 | `contract/cards.ts` | `CardDefinition`, the public card shape |
 | `contract/prompt-keys.ts` | `PromptKey` enum used as the i18n anchor |
 | `contract/state-constants.ts` | Action-space and board constants without rule code |
+| `contract/seasonal-adjustments.ts` | Typed season identity and signed actual settlement adjustments |
 | `session/serialization.ts` | `SerializedGameState`, `serializeState`, and `rehydrateState` |
 
 ## GameState: Domain Truth
@@ -54,6 +55,7 @@ Selected fields:
 - `EventStore` gives each new event an opaque `occurrenceId`, kept through snapshots, rebasing, cancellation and projection. Derived log rows carry `LogEntry.sourceEvent = { occurrenceId, rowIndex }`; cache matching uses it plus the log key, and older records without these fields keep parameter-count matching.
 - Card purchases carry `PaymentInfo.publicPayment` into `card.played.payment` with a `paymentId` shared by the exact `resource.paid` event; a free play carries an explicit empty receipt.
 - Seasonal grants carry `seasonalGrant: { season }` on the existing `resource.moved` or `farm.stableBuilt` result and its derived `ActionDetailParts`. The owning fact supplies the actual quantity; presentation never infers the source from the current season or treats it as a card.
+- Seasonal cost explanations belong to `resource.paid.seasonalAdjustments` and its public receipt, with the signed actual cost change carried into `ActionDetailParts` ([ADR 0034](../adr/0034-seasonal-adjustments-belong-to-settlement-events.md)). Mappers and the client preserve the fact even when the paid total is zero; they never infer missing historical provenance or route seasons through card statistics. Tests: `server/__tests__/seasonal-fence-payment-session.test.ts`, `client/components/board/__tests__/seasonal-payment-log.test.tsx`.
 - `publicEventArchive` is append-only metadata: `publicEvents.committed` and `publicEvents.canceled` packets, validated before writing. Rules and listeners never read it. Runtime `publicEventCancellations` are restoration-response metadata only, filtered and remapped per viewer like the archive; reconnect and `getState` never replay them.
 - Only `visibility: 'public'` events enter `GameState.events`. `privateEvents` is a per-viewer synchronization layer for private prompts and hand or draft changes; it never enters Replay or rules.
 

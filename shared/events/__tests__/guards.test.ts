@@ -46,6 +46,25 @@ describe('event guards', () => {
     expect(() => assertEventSizeUnderLimit(event, 4096)).not.toThrow()
   })
 
+  it('accepts signed seasonal costs in payment facts, card receipts and action details', () => {
+    const seasonalAdjustments = [{ season: 'spring', resources: { wood: -2 } }]
+    for (const payload of [
+      { type: 'resource.paid', resources: {}, paymentFor: 'fencing', seasonalAdjustments },
+      { type: 'card.played', cardId: 'Major_Fireplace1', cardType: 'major', payment: { resources: {}, seasonalAdjustments } },
+      { type: 'action.detailLogged', playerId: 'p1', actionId: 'fencing', detailParts: { costs: {}, seasonalAdjustments } },
+    ]) expect(() => assertKnownGameEventShape({ ...baseEvent, ...payload })).not.toThrow()
+  })
+
+  it.each([
+    { season: 'unknown', resources: { wood: -2 } },
+    { season: 'spring', resources: { wood: Number.NaN } },
+    { season: 'spring', resources: { unknown: 1 } },
+    { season: 'spring', resources: { wood: -2 }, sourceCard: 'fake-season-card' },
+  ])('rejects malformed seasonal payment metadata %j', adjustment => {
+    expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'resource.paid',
+      resources: {}, paymentFor: 'fencing', seasonalAdjustments: [adjustment] })).toThrow(/seasonalAdjustments/)
+  })
+
   it.each(['', null, 1, {}])('rejects invalid occurrence identity %j', occurrenceId => {
     expect(() => assertGameEventEnvelope({ ...baseEvent, type: 'game.started', occurrenceId }))
       .toThrow(/occurrenceId/)

@@ -17,6 +17,7 @@ import { PaymentSolver } from '../payment'
 import type { PaymentCtx, PaymentExecuteError, PaymentReceipt } from '../payment'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { isPaymentResourceKey } from '../../contract/resource-keys'
+import type { SeasonalAdjustment } from '../../contract/seasonal-adjustments'
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by
@@ -38,6 +39,7 @@ export type PayParams = {
   playedCards?: string[]
   reserveResources?: Partial<Resource>
   candidateMetadataByFeeIndex?: Record<number, CardCostCandidateMetadata>
+  seasonalAdjustments?: SeasonalAdjustment[]
   trackSourceCardPaymentStats?: boolean
 }
 
@@ -71,6 +73,7 @@ const PAY_PARAM_KEYS = new Set([
   'playedCards',
   'reserveResources',
   'candidateMetadataByFeeIndex',
+  'seasonalAdjustments',
   'trackSourceCardPaymentStats',
 ])
 
@@ -155,6 +158,7 @@ const buildPaymentCtx = (
   includeReturnedCard: p.includeReturnedCard,
   reserveResources: p.reserveResources,
   candidateMetadataByFeeIndex: p.candidateMetadataByFeeIndex,
+  seasonalAdjustments: p.seasonalAdjustments,
   paymentResourceProviders: PaymentSolver.isComplexCost(p.cost)
     ? p.cost.paymentResourceProviders
     : undefined,
@@ -174,9 +178,13 @@ const emitPaidEvent = (
     /** Cost Candidate sources of the selected row (rendered as log "via"). */
     candidateSources?: readonly string[]
     paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
+    seasonalAdjustments?: SeasonalAdjustment[]
   } = {},
 ): CardPayment => {
   const paid = positiveResources(resources)
+  const seasonalAdjustments = provenance.seasonalAdjustments?.filter(adjustment =>
+    Object.values(adjustment.resources).some(amount => amount !== 0),
+  )
   const bonusSources = [...new Set([
     ...splitSourceIds(provenance.bonusUsed),
     ...(provenance.candidateSources ?? []),
@@ -184,10 +192,12 @@ const emitPaidEvent = (
   const summary: CardPayment = { resources: paid,
     ...(bonusSources.length ? { bonusSources } : {}),
     ...(provenance.returnedCardId ? { returnedCardId: provenance.returnedCardId } : {}),
+    ...(seasonalAdjustments?.length ? { seasonalAdjustments } : {}),
   }
   if (
     Object.keys(paid).length === 0 &&
     bonusSources.length === 0 &&
+    !seasonalAdjustments?.length &&
     !provenance.bonusChoiceIndex &&
     !provenance.returnedCardId
   ) return summary
@@ -204,6 +214,7 @@ const emitPaidEvent = (
     ...(bonusSources.length > 0 ? { bonusSources } : {}),
     ...(provenance.bonusChoiceIndex ? { bonusChoiceIndex: provenance.bonusChoiceIndex } : {}),
     ...(provenance.returnedCardId ? { returnedCardId: provenance.returnedCardId } : {}),
+    ...(seasonalAdjustments?.length ? { seasonalAdjustments } : {}),
   })
   return { ...summary, paymentId }
 }
@@ -230,6 +241,7 @@ const buildSelectedResult = (
     bonusChoiceIndex: receipt.bonusChoiceIndex,
     returnedCardId: receipt.returnedCardId,
     candidateSources: receipt.candidateSources,
+    seasonalAdjustments: receipt.seasonalAdjustments,
     paymentResourceProviders: receipt.paymentResourceProviders as CardProvidedPaymentResourceProvider[] | undefined,
   })
   recordCardCostAttribution(player, receipt.costAttribution)

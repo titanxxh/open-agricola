@@ -100,6 +100,7 @@ const receiptForSolution = (
     ...(metadata?.originalFeeIndex !== undefined ? { originalFeeIndex: metadata.originalFeeIndex } : {}),
     ...(paymentSources.length > 0 ? { candidateSources: paymentSources } : {}),
     ...(metadata?.costAttribution ? { costAttribution: metadata.costAttribution } : {}),
+    ...(ctx.seasonalAdjustments?.length ? { seasonalAdjustments: ctx.seasonalAdjustments } : {}),
     ...(solutionPaymentResourceProviders(cost, ctx)
       ? { paymentResourceProviders: solutionPaymentResourceProviders(cost, ctx) }
       : {}),
