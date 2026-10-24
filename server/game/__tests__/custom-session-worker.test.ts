@@ -109,6 +109,18 @@ describe('custom session executor', () => {
     }
   })
 
+  it('keeps chosen player colors before and after Worker initialization', async () => {
+    const { session, executor } = setup(card('CUSTOM_PlayerColors'))
+    await executor.updatePlayerColors([[0, 'purple'], [1, 'green']])
+    const initial = await executor.execute('getState', [])
+    expect(initial.state.players.map(player => player.color)).toEqual(['purple', 'green'])
+    await executor.updatePlayerColors([[0, 'blue']])
+    const next = await executor.execute('getState', [])
+    expect(next.state.players.map(player => player.color)).toEqual(['blue', 'green'])
+    expect(session.state.players.map(player => player.color)).toEqual(['blue', 'green'])
+    expect(executor.serializedStateForPersistence()!.frame.players.map(player => player.color)).toEqual(['blue', 'green'])
+  })
+
   it('keeps cached Worker payloads authoritative while projecting current Room names', async () => {
     const { session, executor } = setup(card('CUSTOM_HistoryNames'))
     session.state.players.forEach(player => { player.name = 'Recorded name' })

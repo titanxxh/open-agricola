@@ -1174,3 +1174,92 @@ describe('authenticated Room history reads', () => {
     expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({ type: 'error', code: 'seat_replaced', requestId: 'replaced' }))
   })
 })
+
+
+describe('waiting room player colors', () => {
+  it('saves a first arrival’s color, restores it after restart, and uses it when two players start', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'Host' })
+    const roomId = host.currentRoom!.id
+    await dispatch(host, { type: 'setPlayerColor', color: 'blue' })
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['blue', 'red'])
+    expect(sentMessagesOf(host)).toContainEqual(expect.objectContaining({ type: 'roomWaiting', playerColors: ['blue', 'red'] }))
+
+    const snapshot = (await deps.persistence.load(roomId))!
+    const restarted = newDeps()
+    restarted.registry.set(snapshotToRoom(snapshot))
+    const returned = newCtx(restarted)
+    returned.currentUserId = 'u1'
+    await dispatch(returned, { type: 'joinRoom', roomId, intent: 'resume' })
+    expect(returned.currentRoom!.status).toBe('waiting')
+    expect(returned.currentRoom!.session.state.players.map(player => player.color)).toEqual(['blue', 'red'])
+    const guest = newCtx(restarted)
+    guest.currentUserId = 'u2'
+    await dispatch(guest, { type: 'joinRoom', roomId, name: 'Guest' })
+    expect(returned.currentRoom!.status).toBe('playing')
+    expect(returned.currentRoom!.session.state.players.map(player => player.color)).toEqual(['blue', 'red'])
+    await dispatch(returned, { type: 'setPlayerColor', color: 'green' })
+    expect(sentMessagesOf(returned)).toContainEqual(expect.objectContaining({ type: 'error', code: 'color_locked' }))
+    expect(returned.currentRoom!.session.state.players.map(player => player.color)).toEqual(['blue', 'red'])
+  })
+
+  it('changes only the sender’s seat and serializes two requests for the same free color', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps), guest = newCtx(deps)
+    host.currentUserId = 'u1'
+    guest.currentUserId = 'u2'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 3 })
+    await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    await dispatch(guest, { type: 'setPlayerColor', color: 'red' })
+    expect(sentMessagesOf(guest)).toContainEqual(expect.objectContaining({ type: 'error', code: 'color_unavailable' }))
+    await Promise.all([
+      dispatch(host, { type: 'setPlayerColor', color: 'green' }),
+      dispatch(guest, { type: 'setPlayerColor', color: 'green' }),
+    ])
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['green', 'blue', 'black'])
+    expect(sentMessagesOf(guest).filter(message => message.type === 'error' && message.code === 'color_unavailable')).toHaveLength(2)
+    const ownSelection = { type: 'setPlayerColor', color: 'purple', playerIndex: 0 } as const
+    await dispatch(guest, ownSelection)
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['green', 'purple', 'black'])
+    host.currentRoom!.players = host.currentRoom!.players.filter(player => player.playerIndex !== 1)
+    await dispatch(host, { type: 'setPlayerColor', color: 'purple' })
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['green', 'purple', 'black'])
+    expect(sentMessagesOf(host)).toContainEqual(expect.objectContaining({ type: 'error', code: 'color_unavailable' }))
+  })
+
+  it('replays a saved color receipt without changing colors again or exposing a board before start', async () => {
+    const host = newCtx()
+    host.currentUserId = 'u1'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2 })
+    const scope = await host.commands!.issueScope('user:u1')
+    const choice = {
+      type: 'setPlayerColor', color: 'blue',
+      commandContext: { scopeId: scope.scopeId, commandId: '01800000-0000-4000-8000-000000000002', roomId: host.currentRoom!.id, expectedVersion: 0 },
+    } as const
+    const save = vi.spyOn(host.checkpoint, 'recordMeta')
+    await dispatch(host, choice)
+    await dispatch(host, choice)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['blue', 'red'])
+    expect(sentTypesOf(host).filter(type => type === 'roomWaiting')).toHaveLength(2)
+    expect(sentTypesOf(host)).not.toContain('stateUpdate')
+  })
+
+  it('rejects invalid colors and rolls back both swapped seats when saving fails', async () => {
+    const host = newCtx()
+    host.currentUserId = 'u1'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2 })
+    // @ts-expect-error Exercise the untrusted WebSocket payload boundary.
+    await dispatch(host, { type: 'setPlayerColor', color: 'orange' })
+    expect(sentMessagesOf(host)).toContainEqual(expect.objectContaining({ type: 'error', code: 'invalid_color' }))
+    vi.spyOn(host.checkpoint, 'recordMeta').mockRejectedValueOnce(new Error('storage unavailable'))
+    await dispatch(host, { type: 'setPlayerColor', color: 'blue' })
+    expect(sentMessagesOf(host)).toContainEqual(expect.objectContaining({ type: 'error', code: 'color_save_failed' }))
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['red', 'blue'])
+    const restored = snapshotToRoom((await host.persistence.load(host.currentRoom!.id))!)
+    expect(restored.session.state.players.map(player => player.color)).toEqual(['red', 'blue'])
+    restored.session.dispose()
+  })
+})

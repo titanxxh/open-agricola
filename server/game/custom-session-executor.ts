@@ -62,6 +62,7 @@ export type CustomSessionMethod =
   | 'validateFarmChoice'
   | 'confirmCurrentPlayer'
   | 'updatePlayerNames'
+  | 'updatePlayerColors'
 
 type WorkerRequest = {
   id: number
@@ -188,6 +189,13 @@ export class CustomSessionExecutor {
   updatePlayerNames(names: Array<[number, string]>): SessionResponse | Promise<SessionResponse> {
     if (this.workerInitialized) return this.execute('updatePlayerNames', [names])
     for (const [playerIndex, name] of names) this.session.updatePlayerName(playerIndex, name)
+    this.lastSnapshot = null
+    return this.session.withCtx(() => this.session.getState())
+  }
+
+  updatePlayerColors(colors: Parameters<GameSession['updatePlayerColors']>[0]): SessionResponse | Promise<SessionResponse> {
+    if (this.workerInitialized) return this.execute('updatePlayerColors', [colors])
+    this.session.updatePlayerColors(colors)
     this.lastSnapshot = null
     return this.session.withCtx(() => this.session.getState())
   }

@@ -1,3 +1,4 @@
+import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
 import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -145,6 +146,7 @@ const useTransportSetup = (
 
   const initRef = useRef(false)
   const [recoveryNotice, setRecoveryNotice] = useState(false)
+  const [roomColorError, setRoomColorError] = useState<RoomColorErrorCode | null>(null)
   const playerIndexRef = useRef(0)
 
   useEffect(() => {
@@ -254,6 +256,7 @@ const useTransportSetup = (
           setWsStatus({ phase: 'joining', roomId: msg.roomId })
         }
       } else if (msg.type === 'roomWaiting') {
+        setRoomColorError(null)
         setRoomInUrl(msg.roomId)
         waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors }
         setWsReady(false)
@@ -273,6 +276,8 @@ const useTransportSetup = (
         snapshotRoomId = msg.roomId
         setRoomInUrl(msg.roomId)
         if (ws.connected) ready()
+      } else if (msg.type === 'error' && (msg.code === 'color_unavailable' || msg.code === 'color_locked' || msg.code === 'invalid_color' || msg.code === 'color_save_failed')) {
+        setRoomColorError(msg.code)
       } else if (msg.type === 'error' && !ws.connected) {
         if (roomId && (msg.code === 'context_changed' || msg.code === 'not_participant')) window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
         if (msg.code !== 'command_pending') setWsStatus({ phase: 'error', message: msg.error, code: msg.code })
@@ -316,7 +321,10 @@ const useTransportSetup = (
     ? (localTransport ?? httpTransportSingleton)
     : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
-  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false) }
+  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
+    setRoomColorError(null)
+    try { wsTransport?.sendRoomCommand('setPlayerColor', { color }) } catch { setRoomColorError('color_save_failed') }
+  } }
 }
 
 const getIsMobileViewport = () =>
@@ -341,7 +349,7 @@ export const GameContainerApi = () => {
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice } = useTransportSetup(
+  const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
@@ -1428,7 +1436,7 @@ export const GameContainerApi = () => {
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} />
+              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex} onColorChange={changePlayerColor} colorError={roomColorError} />
               <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
               </button>

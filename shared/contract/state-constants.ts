@@ -8,7 +8,9 @@
 // `shared/utils/*`, `shared/domain/*`, or session/runtime modules must live
 // in `shared/session/state-constants.ts` instead.
 
-import type { Resource } from './types'
+import type { PlayerState, Resource } from './types'
+
+export const playerColorOptions: readonly PlayerState['color'][] = ['red', 'blue', 'black', 'yellow', 'green', 'purple']
 
 export const emptyResources: Resource = {
   wood: 0,

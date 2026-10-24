@@ -111,6 +111,8 @@ type ClientCommand = (
 
 ## ServerEvent and StateUpdateEnvelope
 
+`setPlayerColor { color }` is an authenticated, journaled waiting-room command with no client-supplied seat. It changes the caller's color only, persists before publication, and creates no Replay Step.
+
 Waiting-room events carry `playerColors` from the authoritative player state; roster entries include `connected` so reserved seats retain their names when a player disconnects.
 
 ```ts

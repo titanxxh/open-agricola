@@ -113,6 +113,8 @@ type ClientCommand = (
 
 ## ServerEvent 与 StateUpdateEnvelope
 
+`setPlayerColor { color }` 是需认证、记入命令账本的候场命令，不接受客户端指定座位。它只修改调用者颜色，持久化后才发布，不生成 Replay Step。
+
 候场事件携带权威玩家状态中的 `playerColors`；名单包含 `connected`，玩家断线后仍显示其保留座位和姓名。
 
 ```ts
