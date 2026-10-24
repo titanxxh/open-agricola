@@ -88,8 +88,8 @@ describe('GameContextRouter', () => {
     expect(window.location.search).toContain('context=completed-room')
   })
 
-  it('routes active contexts through the authenticated app', async () => {
-    window.history.replaceState(null, '', '/?context=active-room')
+  it.each(['room', 'context'])('routes active %s links through the authenticated app', async (key) => {
+    window.history.replaceState(null, '', `/?${key}=active-room`)
     stubResponse({
       ok: true,
       roomId: 'active-room',
@@ -107,6 +107,28 @@ describe('GameContextRouter', () => {
       '/api/v1/game-contexts/active-room',
       expect.objectContaining({ credentials: 'include' }),
     )
+  })
+
+  it('lets a room link use the authenticated app to join an available seat', async () => {
+    window.history.replaceState(null, '', '/?room=waiting-room')
+    stubResponse({ ok: false, code: 'not_participant', lifecycle: 'active', message: 'Only original participants can resume this game' }, 403)
+
+    render(<GameContextRouter><div>join app</div></GameContextRouter>)
+
+    expect(await screen.findByText('join app')).toBeVisible()
+  })
+
+  it('leaves development rooms and other platform pages to their own routes', () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    window.history.replaceState(null, '', '/?room=dev2&player=p2&devMode=1')
+    const view = render(<GameContextRouter><div>development app</div></GameContextRouter>)
+    expect(screen.getByText('development app')).toBeVisible()
+    view.unmount()
+    window.history.replaceState(null, '', '/?page=settings&room=stale')
+    render(<GameContextRouter><div>settings app</div></GameContextRouter>)
+    expect(screen.getByText('settings app')).toBeVisible()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('opens pinned active evidence without replacing the live game', async () => {
@@ -235,7 +257,7 @@ describe('GameContextRouter', () => {
 
   it('shows completed results without mounting the active app', async () => {
     localeContext.locale = 'zh'
-    window.history.replaceState(null, '', '/?context=completed-room')
+    window.history.replaceState(null, '', '/?room=completed-room')
     stubResponse({
       ok: true,
       roomId: 'completed-room',
@@ -542,7 +564,7 @@ describe('GameContextRouter', () => {
       'platform.gameContext.notParticipantTitle',
     ],
   ])('shows the lifecycle status page for %j', async (body, title) => {
-    window.history.replaceState(null, '', '/?context=room')
+    window.history.replaceState(null, '', body.ok ? '/?room=room' : '/?context=room')
     stubResponse(body)
 
     render(<GameContextRouter><div>active app</div></GameContextRouter>)

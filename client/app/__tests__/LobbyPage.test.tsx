@@ -98,6 +98,8 @@ describe('LobbyPage my active games', () => {
     expect(within(items[0]!).getByText('Your turn')).toBeInTheDocument()
     expect(within(items[1]!).queryByText('Your turn')).toBeNull()
     expect(within(items[1]!).getByText('Playing')).toBeInTheDocument()
+    fireEvent.click(within(items[0]!).getByRole('button', { name: 'Resume' }))
+    expect(setPage).toHaveBeenCalledWith('game', { room: 'room-a' })
   })
 })
 

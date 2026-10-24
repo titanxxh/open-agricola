@@ -1418,7 +1418,7 @@ const code = (value: string | number): string =>
 const contextUrl = (report: ReportRow, appOrigin: string): string => {
   try {
     const url = new URL(appOrigin)
-    url.searchParams.set('context', report.room_id)
+    url.searchParams.set('room', report.room_id)
     url.searchParams.set('step', String(report.step_no))
     url.searchParams.set('frame', report.frame_hash)
     url.searchParams.set('perspective', `p${report.player_index + 1}`)

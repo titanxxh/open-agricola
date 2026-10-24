@@ -84,7 +84,7 @@ function currentReturnTo(): string | undefined {
   const page = params.get('page')
   if (page === 'onboarding') return undefined
   if (page === 'login') {
-    if (!params.has('context')) return undefined
+    if (!params.has('room') && !params.has('context')) return undefined
     params.delete('page')
     const search = params.toString()
     return `${stripBasePath(window.location.pathname)}${search ? `?${search}` : ''}${window.location.hash}`

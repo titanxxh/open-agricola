@@ -8,6 +8,6 @@ export type WsStatus =
   | { phase: 'reconnecting' }
   | { phase: 'creating' }
   | { phase: 'joining'; roomId: string }
-  | { phase: 'waiting'; roomId: string; players: Array<{ playerIndex: number; name: string }>; maxPlayers: number }
+  | { phase: 'waiting'; roomId: string; players: Extract<ServerEvent, { type: 'roomJoined' }>['players']; maxPlayers: number; playerColors: Extract<ServerEvent, { type: 'roomJoined' }>['playerColors'] }
   | { phase: 'ready'; roomId: string; playerIndex: number; hotseat?: boolean }
   | { phase: 'error'; message: string; code?: WsErrorCode }

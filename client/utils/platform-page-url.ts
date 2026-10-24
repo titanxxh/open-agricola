@@ -1,3 +1,5 @@
+import { buildRoomSearch } from './game-room-url'
+
 export type PlatformPage = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding' | 'operations'
 
 const PAGE_SCOPED_QUERY_KEYS = [
@@ -40,6 +42,8 @@ export function buildPlatformPageUrl(
   if (page === 'lobby') params.delete('page')
   else params.set('page', page)
   for (const [key, value] of Object.entries(extraParams ?? {})) params.set(key, value)
+  const roomId = params.get('room')
+  if (page === 'game' && roomId) return `${window.location.pathname}${buildRoomSearch(roomId, params.toString())}`
   const search = params.toString()
   return `${window.location.pathname}${search ? `?${search}` : ''}`
 }

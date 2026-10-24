@@ -155,12 +155,11 @@ export function LobbyPage() {
   const handleJoinRoom = () => {
     const id = joinRoomId.trim()
     if (!id) { setError(t('platform.pleaseEnterRoomId')); return }
-    setPage('game', { transport: 'ws', room: id })
+    setPage('game', { room: id })
   }
 
-  const handleJoinExisting = (roomId: string) => setPage('game', { transport: 'ws', room: roomId })
-  const handleResumeRoom = (roomId: string, playerIndex: number) =>
-    setPage('game', { transport: 'ws', room: roomId, player: `p${playerIndex + 1}` })
+  const handleJoinExisting = (roomId: string) => setPage('game', { room: roomId })
+  const handleResumeRoom = (roomId: string) => setPage('game', { room: roomId })
   const handleDissolveRoom = async (roomId: string) => {
     if (!user) return
     if (!window.confirm(t('platform.dissolveConfirm'))) return
@@ -471,7 +470,7 @@ export function LobbyPage() {
                 <button
                   type="button"
                   className="btn-small"
-                  onClick={() => handleResumeRoom(r.id, r.player_index)}
+                  onClick={() => handleResumeRoom(r.id)}
                 >
                   {t('platform.resume')}
                 </button>

@@ -59,6 +59,7 @@ describe('resolveGameLoadPhase', () => {
           roomId: 'r1',
           players: [],
           maxPlayers: 2,
+          playerColors: ['red', 'blue'],
         },
       }),
     ).toBeNull()

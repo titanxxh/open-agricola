@@ -1342,7 +1342,7 @@
 .ws-status-card {
   background: #fff;
   border-radius: 16px;
-  padding: 40px;
+  padding: clamp(20px, 5vw, 40px);
   box-shadow: 0 4px 24px rgba(90,58,32,0.12);
   width: 100%;
   max-width: 520px;
@@ -1408,20 +1408,79 @@
   color: var(--color-danger);
 }
 .ws-invite-roomid {
+  overflow-wrap: anywhere;
   font-size: 13px;
   color: var(--color-text-muted);
   text-align: center;
 }
-.ws-invite-players {
+.ws-waiting-seats {
   margin-top: 8px;
-  padding: 8px 12px;
-  background: #f5f0e8;
-  border-radius: 6px;
-  font-size: 14px;
-  color: var(--color-text-secondary);
+  min-width: 0;
+}
+.ws-waiting-count {
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.ws-invite-players {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 .ws-invite-player {
-  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+}
+.ws-invite-player.is-empty {
+  background: transparent;
+  border-style: dashed;
+}
+.ws-seat-color {
+  flex: 0 0 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
+}
+.ws-invite-player[data-player-color="red"] .ws-seat-color { background: var(--color-danger); }
+.ws-invite-player[data-player-color="blue"] .ws-seat-color { background: #3f6ee8; }
+.ws-invite-player[data-player-color="black"] .ws-seat-color { background: #1f2937; }
+.ws-invite-player[data-player-color="yellow"] .ws-seat-color { background: #d6b332; }
+.ws-invite-player[data-player-color="green"] .ws-seat-color { background: #168a4a; }
+.ws-invite-player[data-player-color="purple"] .ws-seat-color { background: #7c3aed; }
+.ws-seat-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.ws-seat-label,
+.ws-seat-offline {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.ws-seat-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.is-empty .ws-seat-name {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+.ws-seat-offline {
+  flex-shrink: 0;
 }
 .ws-dissolve-btn {
   margin-top: 8px;

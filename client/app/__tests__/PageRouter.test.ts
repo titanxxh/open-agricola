@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { buildRoomSearch } from '../../utils/game-room-url'
 import { setPage } from '../../utils/platform-page-url'
 
 describe('setPage URL hygiene', () => {
@@ -31,9 +32,7 @@ describe('setPage URL hygiene', () => {
 
     expect(window.location.pathname).toBe('/open-agricola/')
     expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
-      page: 'game',
       bg: 'winter',
-      transport: 'ws',
       room: 'room-1',
     })
   })
@@ -116,5 +115,22 @@ describe('setPage URL hygiene', () => {
     setPage('lobby')
     expect(window.location.pathname + window.location.search)
       .toBe('/open-agricola/?bugReport=draft-1')
+  })
+})
+
+describe('room links', () => {
+  it('discards creation and seat parameters after a room is assigned', () => {
+    expect(buildRoomSearch('room-1', '?page=game&transport=ws&player=p2&maxPlayers=4&draftMode=simultaneous&hotseat=1&enableSnakeOpening=true'))
+      .toBe('?room=room-1')
+  })
+
+  it('keeps a reported frame and saved draft when shortening a room link', () => {
+    expect(buildRoomSearch('room-1', '?context=room-1&step=4&frame=hash&perspective=p1&bugReport=draft-1'))
+      .toBe('?room=room-1&step=4&frame=hash&perspective=p1&bugReport=draft-1')
+  })
+
+  it('preserves explicit development seats for multi-browser testing', () => {
+    expect(buildRoomSearch('dev2', '?transport=ws&player=p2&devMode=1'))
+      .toBe('?transport=ws&player=p2&devMode=1&room=dev2')
   })
 })

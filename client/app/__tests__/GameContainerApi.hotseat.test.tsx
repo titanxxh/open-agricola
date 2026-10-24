@@ -77,8 +77,8 @@ class GameSocket {
         } })
       } else if (message.type === 'joinRoom') {
         GameSocket.emit({ type: 'roomJoined', roomId: 'room-1098', playerIndex: 0,
-          hotseat: GameSocket.hotseat, status: 'playing', maxPlayers: 2,
-          players: [{ playerIndex: 0, name: 'Alice' }, { playerIndex: 1, name: 'Bob' }] })
+          hotseat: GameSocket.hotseat, status: 'playing', maxPlayers: 2, playerColors: ['red', 'blue'],
+          players: [{ playerIndex: 0, name: 'Alice', connected: true }, { playerIndex: 1, name: 'Bob', connected: true }] })
         GameSocket.snapshot()
       } else if (message.type === 'getState') {
         GameSocket.emit({ type: 'stateUpdate', roomId: 'room-1098', version: GameSocket.version,

@@ -3,7 +3,7 @@ import type { RoomHistoryPage } from './history'
 import type { StateUpdateEnvelope } from './game'
 import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
-import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../types'
+import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
 
 type CommitSelectionPayload = {
@@ -108,22 +108,24 @@ export type ServerEvent =
       requestId?: string
     }
   | { type: 'authOk'; userId: string; username: string }
-  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number; hotseat?: boolean }
+  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number; playerColors: PlayerState['color'][]; hotseat?: boolean }
   | {
       type: 'roomJoined'
       roomId: string
       playerIndex: number
       status: 'waiting' | 'playing'
-      players: Array<{ playerIndex: number; name: string }>
+      players: Array<{ playerIndex: number; name: string; connected: boolean }>
       maxPlayers: number
+      playerColors: PlayerState['color'][]
       /** One device plays every seat; the client may act for any of them. */
       hotseat?: boolean
     }
   | {
       type: 'roomWaiting'
       roomId: string
-      players: Array<{ playerIndex: number; name: string }>
+      players: Array<{ playerIndex: number; name: string; connected: boolean }>
       maxPlayers: number
+      playerColors: PlayerState['color'][]
     }
   | { type: 'gameStarted' }
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }

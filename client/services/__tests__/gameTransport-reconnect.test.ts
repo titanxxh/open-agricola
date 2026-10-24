@@ -27,7 +27,7 @@ const snapshot = (version = 1, roomId = 'room-1'): ServerEvent => ({
   type: 'stateUpdate', roomId, version, sync: 'snapshot', cause: 'reconnect', emittedAt: Date.now(),
   payload: { state: serializeState(createInitialState(42), { engineStack: new EngineStack() }), interaction: { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] }, scores: null, historyLength: version, hasActionStartSnapshot: false, ok: true },
 })
-const joined = (roomId = 'room-1'): ServerEvent => ({ type: 'roomJoined', roomId, playerIndex: 1, status: 'playing', players: [], maxPlayers: 2 })
+const joined = (roomId = 'room-1'): ServerEvent => ({ type: 'roomJoined', roomId, playerIndex: 1, status: 'playing', players: [], maxPlayers: 2, playerColors: ['red', 'blue'] })
 const tick = async () => { await vi.waitFor(() => expect(Socket.all).toHaveLength(2)) }
 
 describe('Room reconnect and durable commands', () => {
@@ -199,7 +199,7 @@ describe('Room reconnect and durable commands', () => {
     await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('getCommandReceipt'))
     next.emit({ type: 'commandReceipt', status: 'completed', receipt: { ...command.commandContext, outcome: { ok: true, roomId: 'created-room', playerIndex: 0 } }, requestId: next.sent.at(-1)!.requestId })
     await vi.waitFor(() => expect(next.sent.at(-1)).toMatchObject({ type: 'joinRoom', roomId: 'created-room', intent: 'resume' }))
-    next.emit({ type: 'roomJoined', roomId: 'created-room', playerIndex: 0, status: 'waiting', players: [], maxPlayers: 2 })
+    next.emit({ type: 'roomJoined', roomId: 'created-room', playerIndex: 0, status: 'waiting', players: [], maxPlayers: 2, playerColors: ['red', 'blue'] })
     await vi.waitFor(() => expect(transport.connected).toBe(true))
     expect(transport.roomId).toBe('created-room')
     expect(next.sent.filter(msg => msg.type === 'createRoom')).toEqual([])

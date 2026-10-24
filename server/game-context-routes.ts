@@ -33,7 +33,7 @@ const errorStatus = (error: GameContextError): number => {
 }
 
 const contextReturnTo = (roomId: string): string => {
-  const params = new URLSearchParams({ context: roomId })
+  const params = new URLSearchParams({ room: roomId })
   const configured = process.env.PUBLIC_APP_ORIGIN?.trim()
   if (!configured) return `/?${params.toString()}`
   try {

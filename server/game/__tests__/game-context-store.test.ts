@@ -239,7 +239,7 @@ describe('GameContextStore', () => {
     expect(loginRequired.status).toBe(401)
     expect(JSON.parse(loginRequired.body)).toMatchObject({
       code: 'login_required',
-      returnTo: '/open-agricola/?context=active-room',
+      returnTo: '/open-agricola/?room=active-room',
     })
     expect(loginRequired.headers['Cache-Control']).toBe('no-store')
 

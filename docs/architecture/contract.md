@@ -111,6 +111,8 @@ type ClientCommand = (
 
 ## ServerEvent and StateUpdateEnvelope
 
+Waiting-room events carry `playerColors` from the authoritative player state; roster entries include `connected` so reserved seats retain their names when a player disconnects.
+
 ```ts
 type ServerEvent =
   | StateUpdateEnvelope
@@ -118,8 +120,8 @@ type ServerEvent =
   | { type: 'authOk'; userId; username }
   | { type: 'roomCreated' | 'gameStarted'
       | 'playerJoined' | 'playerDisconnected' | 'roomDissolved'; ... }
-  | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers }
-  | { type: 'roomWaiting'; roomId; players; maxPlayers }
+  | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers; playerColors }
+  | { type: 'roomWaiting'; roomId; players; maxPlayers; playerColors }
 
 type StateUpdateEnvelope = {
   type: 'stateUpdate'

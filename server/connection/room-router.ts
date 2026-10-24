@@ -623,6 +623,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
       roomId,
       playerIndex: 0,
       maxPlayers,
+      playerColors: room.session.state.players.map(player => player.color),
       ...(setup.hotseat ? { hotseat: true } : {}),
     })
   }
@@ -844,6 +845,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     .sort((left, right) => left - right)
     .map((playerIndex) => ({
       playerIndex,
+      connected: room.players.some(player => player.playerIndex === playerIndex),
       name: room.players.find((player) => player.playerIndex === playerIndex)?.name
         ?? room.session.state.players[playerIndex]?.name
         ?? `Player ${playerIndex + 1}`,
@@ -858,6 +860,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
       status: room.status === 'waiting' ? 'waiting' : 'playing',
       players,
       maxPlayers: room.maxPlayers,
+      playerColors: room.session.state.players.map(player => player.color),
       ...(room.hotseat ? { hotseat: true } : {}),
     })
     await ctx.broadcaster.broadcastEvent(room, {
@@ -1220,8 +1223,9 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       await adopt()
       await ctx.broadcaster.broadcastEvent(room, {
         type: 'roomWaiting', roomId: room.id,
-        players: room.players.map(({ playerIndex, name }) => ({ playerIndex, name })),
+        players: room.players.map(({ playerIndex, name }) => ({ playerIndex, name, connected: true })),
         maxPlayers: room.maxPlayers,
+        playerColors: room.session.state.players.map(player => player.color),
       })
       await ctx.broadcaster.broadcastCommitted(room, resp, 'reconnect', msg.requestId)
     },

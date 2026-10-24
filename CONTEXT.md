@@ -105,7 +105,7 @@ _Avoid_: PlayerState
 _Avoid_: 可复用房间号、GameState、Room Invite
 
 **Game Context Link**:
-定位一个 Game Context 的永久链接，可额外固定 Bug Report Anchor 和 Replay Perspective。它不是邀请、座位凭据或活动对局的观看权限。
+定位一个 Game Context 的永久链接，可额外固定 Bug Report Anchor 和 Replay Perspective。等待中的 Room 可通过同一链接加入空座；已开局的 Room 按账号恢复既有座位。链接不携带座位凭据，也不授予活动对局的观看权限。
 _Avoid_: Room Invite Link、登录回调、恢复令牌
 
 **Active Game Recovery**:

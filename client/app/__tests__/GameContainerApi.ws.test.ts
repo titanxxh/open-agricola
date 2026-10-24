@@ -77,6 +77,8 @@ describe('GameContainerApi WS player identity', () => {
   it('ignores player hints for ordinary contexts regardless of secondary dev parameters', () => {
     expect(requestedWsPlayerIdFromQuery('?context=ordinary&room=dev2&player=p2&devMode=1')).toBeNull()
     expect(requestedWsPlayerIdFromQuery('?context=dev2-not-a-uuid&player=p2')).toBeNull()
+    expect(requestedWsPlayerIdFromQuery('?room=ordinary&player=p2')).toBeNull()
+    expect(requestedWsPlayerIdFromQuery('?room=dev2&player=p2&devMode=1')).toBe('p2')
   })
   it('keeps option string prefix parsing inside interaction helpers', () => {
     const allowed = new Set([

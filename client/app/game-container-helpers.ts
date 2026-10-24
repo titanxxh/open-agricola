@@ -1,3 +1,4 @@
+import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
 import { extendedResourceKeyList, resourceKeyList, roundCardActionIds } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/contract/placement-constants'
 import { seasonActionIds } from '../../shared/projections/season-actions'
@@ -292,20 +293,10 @@ export const shouldSuppressPendingChoiceOptionsInInteractionBar = (
     parsePendingMoorSpecialActionChoice(option) !== null,
   )
 
-const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4', 'dev5', 'dev6'])
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const isDevRoomId = (roomId: string): boolean => {
-  for (const id of FIXED_DEV_ROOM_IDS) {
-    if (roomId === id) return true
-    if (roomId.startsWith(`${id}-`) && UUID_PATTERN.test(roomId.slice(id.length + 1))) return true
-  }
-  return false
-}
-
 export const requestedWsPlayerIdFromQuery = (search: string): string | null => {
   const params = new URLSearchParams(search)
-  if (params.has('context') && !isDevRoomId(params.get('context')!)) return null
+  const roomId = roomIdFromQuery(search)
+  if (roomId !== null && !isDevRoomId(roomId)) return null
   const raw = params.get('player') ?? params.get('playerId')
   if (!raw) return null
   if (/^p[1-6]$/.test(raw)) return raw

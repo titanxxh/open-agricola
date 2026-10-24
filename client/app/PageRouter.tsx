@@ -47,7 +47,7 @@ export function PageRouter() {
     if (loading || !user) return
     if (page === 'login') {
       const params = new URLSearchParams(window.location.search)
-      if (params.has('context')) {
+      if (params.has('room') || params.has('context')) {
         params.delete('page')
         const search = params.toString()
         window.history.replaceState(

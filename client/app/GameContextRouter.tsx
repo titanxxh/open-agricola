@@ -1,3 +1,4 @@
+import { isDevRoomId, roomIdFromQuery } from '../utils/game-room-url'
 import {
   useCallback,
   useEffect,
@@ -325,8 +326,9 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   const [locationVersion, setLocationVersion] = useState(0)
   const [closedEvidenceKey, setClosedEvidenceKey] = useState<string | null>(null)
   const params = new URLSearchParams(window.location.search)
-  const hasContext = params.has('context') && params.get('page') !== 'login'
-  const roomId = params.get('context') ?? ''
+  const roomId = roomIdFromQuery(window.location.search) ?? ''
+  const hasContext = (params.has('context') || params.has('room'))
+    && !isDevRoomId(roomId) && (!params.has('page') || params.get('page') === 'game')
   const resolutionKey = `${locationVersion}:${roomId}`
   const [resolution, setResolution] = useState<{
     key: string
@@ -460,6 +462,9 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     && response.code === 'login_required'
     && response.lifecycle === 'active'
   ) {
+    return children
+  }
+  if (!response.ok && response.code === 'not_participant' && !params.has('context')) {
     return children
   }
   return <PublicContext response={response} />
