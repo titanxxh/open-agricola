@@ -326,9 +326,41 @@ test.describe('Platform: auth', () => {
     }
   })
 
-  test('non-fixed devMode url cannot bypass auth', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/?page=game&transport=ws&room=abc123&player=p1&devMode=1`, { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('#username')).toBeVisible({ timeout: 10000 })
+  test('non-fixed devMode url cannot bypass auth', async ({ page, browser, request }) => {
+    const auth = await createUserViaOAuth(request, `e2e_dev_auth_${RUN_ID}`)
+    const ownerContext = await browser.newContext()
+    try {
+      await ownerContext.addCookies(auth.cookies)
+      const ownerPage = await ownerContext.newPage()
+      await ownerPage.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`)
+      const roomId = await ownerPage.locator('.ws-invite-roomid strong').textContent()
+      expect(roomId).toBeTruthy()
+
+      for (const search of [
+        `?room=${roomId}&player=p1&devMode=1`,
+        `?page=game&transport=ws&room=${roomId}&player=p1&devMode=1`,
+      ]) {
+        const resolution = page.waitForResponse(`${BACKEND_URL}/api/v1/game-contexts/${roomId}`)
+        await page.goto(`${FRONTEND_URL}/${search}`, { waitUntil: 'domcontentloaded' })
+        const response = await resolution
+        expect(response.status()).toBe(401)
+        expect(await response.json()).toMatchObject({ ok: false, code: 'login_required', lifecycle: 'active' })
+        await expect(page.locator('#username')).toBeVisible({ timeout: 10000 })
+        await expect(page.locator('.game-layout, .ws-invite-roomid')).toHaveCount(0)
+      }
+    } finally {
+      await ownerContext.close()
+    }
+  })
+
+  test('unknown room devMode url shows the public missing-game notice', async ({ page }) => {
+    const resolution = page.waitForResponse(`${BACKEND_URL}/api/v1/game-contexts/abc123`)
+    await page.goto(`${FRONTEND_URL}/?room=abc123&player=p1&devMode=1`, { waitUntil: 'domcontentloaded' })
+    const response = await resolution
+    expect(response.status()).toBe(404)
+    expect(await response.json()).toMatchObject({ ok: false, code: 'unknown_context' })
+    await expect(page.getByRole('heading', { name: '找不到这局', exact: true })).toBeVisible()
+    await expect(page.locator('.game-layout, .ws-invite-roomid')).toHaveCount(0)
   })
 })
 
