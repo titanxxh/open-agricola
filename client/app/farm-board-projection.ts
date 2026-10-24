@@ -6,6 +6,7 @@ import type {
   CropStack,
   ChoiceFarmTarget,
   FarmTilePosition,
+  FarmPositionSelectionTarget,
   FutureMeepleResourceMap,
   GameState,
   InteractionAnimalReorgZone,
@@ -87,6 +88,10 @@ export type FarmBoardProjectionPlayedCardDisplay = {
   resourceGroups: NonNullable<CardStatePresentation['resourceGroups']>
   animalMarkers: NonNullable<CardStatePresentation['animalMarkers']>
 }
+export type FarmBoardProjectionCardFieldTarget = {
+  tile: FarmPositionSelectionTarget
+  stacks: CropStack[]
+}
 export type FarmBoardProjectionTerrainMarker = {
   row: number
   col: number
@@ -129,6 +134,7 @@ export type FarmBoardProjection = {
   positionSelectableSet: Set<string>
   sowSelectableMap: Map<string, PendingSowCrop[]>
   extraSowTargets: ExtraSowTarget[]
+  cardFieldTargets: FarmBoardProjectionCardFieldTarget[]
   existingFenceSet: Set<string>
   fenceSelectableSet: Set<string>
   pastureTiles: Map<string, FarmBoardProjectionPastureTile>
@@ -251,6 +257,29 @@ const buildPlayedCardDisplays = (
       animalMarkers: facts?.animalMarkers ?? [],
     }
   })
+}
+
+const buildCardFieldTargets = (
+  player: FarmBoardProjectionInput['displayPlayer'],
+  selection: InteractionSelection | null | undefined,
+  choiceTargets: readonly ChoiceFarmTarget[],
+): FarmBoardProjectionCardFieldTarget[] => {
+  if (!player) return []
+  const positions = [
+    ...(selection?.kind === 'farm-position' ? selection.selectablePositions : []),
+    ...choiceTargets.filter(target => target.playerId === player.id).flatMap(target => target.positions),
+  ]
+  const targets = new Map<string, FarmBoardProjectionCardFieldTarget>()
+  for (const tile of positions) {
+    if (!tile.sourceCard) continue
+    const key = positionKey(tile)
+    if (targets.has(key)) continue
+    const stacks = (cardPresentation(player)[tile.sourceCard]?.cropLayers ?? [])
+      .filter(layer => (layer.slotIndex ?? 0) === (tile.cardFieldSlot ?? 0))
+      .map(layer => layer.stack)
+    targets.set(key, { tile, stacks })
+  }
+  return [...targets.values()]
 }
 
 const zoneAnimalCounts = (zone: InteractionAnimalReorgZone) => {
@@ -670,6 +699,7 @@ export const buildFarmBoardProjection = ({
       ? selectionInteraction
       : null
   const playedCardDisplays = buildPlayedCardDisplays(displayPlayer, activeSelection, farmChoiceTargets)
+  const cardFieldTargets = buildCardFieldTargets(displayPlayer, activeSelection, farmChoiceTargets)
   if (!displayPlayer) {
     return {
       farmCells: [],
@@ -687,6 +717,7 @@ export const buildFarmBoardProjection = ({
       positionSelectableSet,
       sowSelectableMap,
       extraSowTargets,
+      cardFieldTargets,
       existingFenceSet,
       fenceSelectableSet,
       pastureTiles,
@@ -737,6 +768,7 @@ export const buildFarmBoardProjection = ({
     positionSelectableSet,
     sowSelectableMap,
     extraSowTargets,
+    cardFieldTargets,
     existingFenceSet,
     fenceSelectableSet,
     pastureTiles,
