@@ -52,7 +52,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'worker.returned': ['workers', 'to'],
   'worker.promoted': ['playerId', 'workerId', 'from', 'to'],
   'action.revealed': ['actionId', 'roundSlot'],
-  'action.accumulated': ['spaceId', 'resources'],
+  'action.accumulated': ['spaceId', 'resources', 'normalResources', 'seasonalAdjustments'],
   'action.exclusiveUseSet': ['actionId', 'playerId', 'sourceCardId', 'untilRound'],
   'action.exclusiveUseCleared': ['actionId', 'playerId', 'sourceCardId'],
   'action.detailLogged': ['playerId', 'actionId', 'detailParts'],
@@ -577,6 +577,18 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
     case 'action.accumulated':
       assertStringField(event.spaceId, 'spaceId')
       assertResourceMap(event.resources, 'resources')
+      if (event.normalResources !== undefined) assertResourceMap(event.normalResources, 'normalResources')
+      if (event.seasonalAdjustments !== undefined) {
+        if (!Array.isArray(event.seasonalAdjustments)) throw new Error('GameEvent seasonalAdjustments must be an array')
+        event.seasonalAdjustments.forEach((value, index) => {
+          const adjustment = assertRecord(value, `seasonalAdjustments[${index}]`)
+          assertOnlyKeys(adjustment, ['season', 'resources'], `seasonalAdjustments[${index}]`)
+          if (typeof adjustment.season !== 'string' || !['winter', 'spring', 'summer', 'autumn'].includes(adjustment.season)) {
+            throw new Error(`GameEvent seasonalAdjustments[${index}].season must be a season`)
+          }
+          assertResourceMap(adjustment.resources, `seasonalAdjustments[${index}].resources`)
+        })
+      }
       return
     case 'action.exclusiveUseSet':
       assertStringField(event.actionId, 'actionId')

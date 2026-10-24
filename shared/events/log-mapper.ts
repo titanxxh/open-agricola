@@ -191,12 +191,16 @@ const mapActionAccumulated = (
   ctx: EventLogMapperContext,
 ): LogEntry | null => {
   const resources = positiveResources(event.resources)
-  if (Object.keys(resources).length === 0) return null
+  const seasonalAdjustments = event.seasonalAdjustments?.filter(adjustment =>
+    Object.values(adjustment.resources).some(amount => amount !== 0),
+  )
+  if (Object.keys(resources).length === 0 && !seasonalAdjustments?.length) return null
   return {
     key: 'log.actionAccumulated',
     params: {
       action: actionName(ctx, event.spaceId),
       resources,
+      ...(seasonalAdjustments?.length ? { normalResources: event.normalResources, seasonalAdjustments } : {}),
     },
   }
 }
