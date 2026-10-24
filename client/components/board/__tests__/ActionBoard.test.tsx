@@ -398,6 +398,26 @@ describe('ActionBoard', () => {
     expect(screen.getByText('Left: Grain Seeds')).toBeTruthy()
   })
 
+  it('renders accumulation tooltip contents with valid block markup', () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const player = createPlayer('p1', 'PlayerA', 'red')
+      const action = { ...createAction('test-accumulation', 'actions.forest.name'), gainPerRound: { wood: 1 } }
+      const { container } = render(<ActionBoard locale="en" baseActions={[action]} roundSlots={[]}
+        currentPlayer={player} players={[player]} futureMeeples={[]} canTakeAction={() => true}
+        takeAction={() => {}} currentRound={1} devMode={false} />)
+      const holder = container.querySelector('[data-action-id="test-accumulation"]')
+      if (!holder) throw new Error('Expected accumulation action')
+      fireEvent.mouseEnter(holder)
+      const gains = container.querySelector('.round-action-tooltip .gain-display')
+      expect(gains).toBeVisible()
+      expect(gains).toHaveTextContent('1')
+      expect(gains?.closest('p')).toBeNull()
+      expect(error).not.toHaveBeenCalled()
+    } finally { error.mockRestore() }
+  })
+
   it('adds player-count-specific board classes', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
