@@ -6,6 +6,11 @@
  * inlays, not as a frosted SaaS toolbar. Primary buttons sit as gold emboss
  * tiles; utility buttons sit as parchment chips so the visual hierarchy
  * matches the action priority. */
+[data-interaction-focused="true"] {
+  outline: 3px solid var(--color-accent-strong);
+  outline-offset: 4px;
+}
+
 .interaction-bar {
   position: fixed;
   bottom: 0;

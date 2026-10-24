@@ -29,6 +29,8 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ## Views and local sandbox
 
+- `interaction-focus.ts` maps the local Interaction Player's authoritative request to a display target. Occupation selection reveals the private hand after seat confirmation; payment continuations retain the action focus, and completion returns to Action Spaces. The Session interaction adapter publishes an opaque waiting-step `requestKey` to its responder, stable across candidate refreshes and cursor restoration; manual browsing does not trigger another scroll. The shared target anchors and return shortcut support subsequent farm and improvement selection paths.
+
 - `board/ActionSpaceDescription.tsx` renders action-space symbols from the authoritative `baseDescriptionPreview`; costs and quantities stay in that rule tree. Detailed tooltips and interaction choices use `interaction/ActionDescription.tsx`. The board keeps symbolic presentation without maintaining a second rule table; component and browser coverage is in `ActionBoard.test.tsx` and `action-space-icons.spec.ts`.
 - `client/app/GameContainerApi.tsx` with `useTransportSetup`, `LobbyPage.tsx` and `PageRouter.tsx` orchestrate views and derive interactivity from `viewPlayerId` and `playerIndex`.
 - Game layouts share the player overview and read-only public farms. Narrow screens put the overview first and the expanded Action Log last; detailed scoring opens on demand. `ActionBoard.actionSpaceOutlets` moves existing action-space views into expansion panels without duplicating availability or worker markers. Layout coverage is in `mobile-table-layout.spec.ts`, `mobile-game-layout.spec.ts` and `desktop-table-layout.spec.ts`.

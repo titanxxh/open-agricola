@@ -1039,7 +1039,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
       <h3>{t(locale, 'ui.handCards')}</h3>
       {displayPlayer.id === activeFarmPlayerId || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
-          <div className="hand-section occupation">
+          <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
             <div className="hand-row">
               {displayPlayer.occupationHand.length === 0 ? (

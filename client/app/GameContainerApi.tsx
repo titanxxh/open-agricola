@@ -12,6 +12,7 @@ import {
   positionKey,
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
+import { useInteractionFocus } from './interaction-focus'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import { isHotseatSetupQuery, parseDraftParamsFromQuery } from './game-setup-query'
@@ -450,13 +451,13 @@ export const GameContainerApi = () => {
       : currentPlayer
   // In WS mode, selfPlayer is locked to the URL ?player= param.
   // If the URL omits ?player=, use the seat assigned by the join/create handshake.
-  // In HTTP mode (sandbox/single-player), selfPlayer follows the current player.
+  // One-device HTTP play follows the Interaction Player, including reactions.
   const selfPlayer = isWs && localPlayerId && !isHotseat
     ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
-    : isHotseat ? activePlayer : currentPlayer
+    : activePlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   // Browsing a public farm never changes the interaction or confirmed seat.
-  // HTTP sandbox still follows the current player rather than a browsing preference.
+  // HTTP sandbox follows the responder rather than a browsing preference.
   const displayPlayer = isWs
     ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
     : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
@@ -537,6 +538,14 @@ export const GameContainerApi = () => {
     () => buildInteractionPresentationPlan(interaction),
     [interaction],
   )
+  const interactionFocus = useInteractionFocus({
+    interaction,
+    playerId: activePlayer?.id ?? '',
+    canFocus: hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
+      (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey) &&
+      (!isWs || isHotseat || activePlayer?.id === selfPlayer?.id),
+    onViewPlayer: setViewPlayerId,
+  })
   const highlightedHandCardId =
     isInteractive && interaction.stateId === 'wait' && typeof interaction.promptParams?.cardId === 'string'
       ? interaction.promptParams.cardId
@@ -1838,7 +1847,7 @@ export const GameContainerApi = () => {
       : [],
   )
   const actionBoardOverview = (
-    <section className="board-panel board-action">
+    <section className="board-panel board-action" data-interaction-focus="actions">
       <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} scheduledEffects={state.players.flatMap(player => (player.scheduledEffects ?? []).map(effect => ({ ...effect, playerId: player.id })))} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} actionSpaceSelectionActive={!isPublicFarmView && placeFarmerChoiceBySpaceId.size > 0} actionSpaceReservations={actionBoardProjection.actionSpaceReservations} actionSpaceAttachments={actionBoardProjection.actionSpaceAttachments} leftActionNames={actionBoardProjection.leftActionNames} enablePrecisionMode={isMobile} actionSpaceOutlets={actionSpaceOutlets} />
     </section>
   )
@@ -2022,7 +2031,8 @@ export const GameContainerApi = () => {
       {bugReportBar}
       {/* Keep local panel drafts mounted, but neither visible nor actionable while browsing. */}
       <div hidden={isPublicFarmView} inert={isPublicFarmView}>
-        <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
+        <InteractionBar model={interactionBarModel} actions={interactionBarActions}
+          onReturnToTarget={interactionFocus.hasTarget ? interactionFocus.returnToTarget : undefined} />
       </div>
     </div>
   )

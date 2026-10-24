@@ -22,7 +22,7 @@ const payload: GameSyncPayload = {
   ok: true,
 }
 
-const setupViewport = (isMobile: boolean) => {
+const setupViewport = (isMobile: boolean, response = payload) => {
   vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
     matches: isMobile && query === '(max-width: 900px)',
     media: query,
@@ -37,7 +37,7 @@ const setupViewport = (isMobile: boolean) => {
     observe() {}
     disconnect() {}
   })
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload))))
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(response))))
 }
 
 const renderGame = () => render(
@@ -56,6 +56,23 @@ afterEach(() => {
 })
 
 describe('GameContainerApi responsive presentation', () => {
+  it('focuses the local Interaction Player occupation hand even when that player differs from the worker owner', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&devMode=1')
+    const response = structuredClone(payload)
+    response.state.players[1]!.occupationHand = ['A116_WoodCutter']
+    response.interaction = {
+      stateId: 'wait', playerIndex: 1, allowedCommands: ['resolveChoice'], anytimeActions: [],
+      promptKey: 'ui.interactionChooseOccupation',
+      request: { kind: 'choice', options: [{ value: 'A116_WoodCutter', labelKey: 'occupations.A116_WoodCutter.name' }] },
+    }
+    setupViewport(true, response)
+    renderGame()
+    expect(await screen.findByRole('button', { name: 'Return to current action' })).toBeVisible()
+    expect(document.querySelector('[data-interaction-focus="occupation-hand"][data-focus-player="p2"]')).toBeVisible()
+    expect(document.querySelector('[data-hand-anchor="p1"]')).not.toBeInTheDocument()
+  })
+
   it('shows one continuous graphical game layout on mobile', async () => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')

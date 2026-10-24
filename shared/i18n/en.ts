@@ -158,6 +158,7 @@ export const en = {
     noHandCards: 'No cards in hand',
     handHidden: 'Hand cards are hidden',
     occupationCards: 'Occupations',
+    interactionReturnToTarget: 'Return to current action',
     noOccupationCards: 'No occupations in hand',
     occupationHidden: 'Occupation cards are hidden',
     handCost: 'Cost: {cost}',

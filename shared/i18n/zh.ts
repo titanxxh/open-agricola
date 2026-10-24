@@ -158,6 +158,7 @@ export const zh = {
     noHandCards: '没有手牌',
     handHidden: '手牌对其他玩家不可见',
     occupationCards: '职业',
+    interactionReturnToTarget: '回到当前操作',
     noOccupationCards: '没有职业手牌',
     occupationHidden: '职业手牌对其他玩家不可见',
     handCost: '花费：{cost}',

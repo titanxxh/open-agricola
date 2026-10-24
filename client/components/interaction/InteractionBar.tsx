@@ -424,11 +424,13 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
 type Props = {
   model: InteractionBarModel
   actions: InteractionBarActions
+  onReturnToTarget?: () => void
 }
 
 export const InteractionBar = ({
   model,
   actions,
+  onReturnToTarget,
 }: Props) => {
   const barRef = useRef<HTMLDivElement>(null)
   const { locale, isInteractive } = model
@@ -485,9 +487,12 @@ export const InteractionBar = ({
   }, [])
 
   return (
-    <div ref={barRef} className="interaction-bar">
+    <div ref={barRef} className="interaction-bar" data-interaction-focus="controls">
       <div className="interaction-bar__top">
         <div className="interaction-bar__controls">
+          {onReturnToTarget ? <button type="button" onClick={onReturnToTarget}>
+            {t(locale, 'ui.interactionReturnToTarget')}
+          </button> : null}
           <button onClick={onUndo} disabled={!isInteractive || historyLength === 0 || !canUndoStep}>
             {t(locale, 'ui.undoStep')}
           </button>
