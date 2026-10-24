@@ -59,6 +59,7 @@
 - 季节赠送在原有 `resource.moved` 或 `farm.stableBuilt` 结果及派生的 `ActionDetailParts` 上携带 `seasonalGrant: { season }`。实际数量取自所属事实；展示不从当前季节反推来源，也不把季节当成卡牌。
 - 季节费用解释属于 `resource.paid.seasonalAdjustments` 及公开收据，有符号的实际成本变化随 `ActionDetailParts` 传递（[ADR 0034](../adr/0034-seasonal-adjustments-belong-to-settlement-events.md)）。mapper 和客户端保留最终支付为零的事实，不猜补旧历史归因，也不把季节写入卡牌统计。测试：`server/__tests__/seasonal-fence-payment-session.test.ts`、`client/components/board/__tests__/seasonal-payment-log.test.tsx`。
 - `farm.animalBred.animals` 记录实际新生数量，与后续整理、烹饪或释放分开。非收获出生从记录的季节或卡牌来源生成一条结果日志；正常收获出生保留现有汇总行。出生事件身份同时确定日志关联，在撤销、恢复及 Replay 中保持一致。
+- `harvest.heated.seasonalWaiver` 在玩家的供暖结算事实中冻结季节、正常需求和实际豁免需求。豁免不增加支付或生病事实；正常需求为零时不声称存在季节收益。
 - `publicEventArchive` 是只追加的 metadata：`publicEvents.committed` 与 `publicEvents.canceled` 包，写入前校验。规则和 listener 从不读取它。运行时 `publicEventCancellations` 只是恢复响应的 metadata，与归档一样按视角过滤和重映射；重连与 `getState` 从不重放它们。
 - 只有 `visibility: 'public'` 的事件进入 `GameState.events`。`privateEvents` 是按视角同步私有提示和手牌 / 选秀变化的层，从不进入 Replay 或规则。
 

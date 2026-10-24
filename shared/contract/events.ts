@@ -16,6 +16,7 @@ import type {
 import type { ActionDetailParts } from './protocol/game'
 import type { AnimalKey } from './animals'
 import type { SeasonalAdjustment } from './seasonal-adjustments'
+import type { SeasonId } from '../seasons/types'
 
 export type GameEventBase<T extends string> = {
   schemaVersion: 1
@@ -417,6 +418,7 @@ export type HarvestFeedConvertedEvent = GameEventBase<'harvest.feedConverted'> &
 }
 
 export type HarvestHeatedEvent = GameEventBase<'harvest.heated'> & {
+  seasonalWaiver?: { season: SeasonId; normalRequired: number; waived: number }
   playerId: string
   required: number
   fuelUsed: number

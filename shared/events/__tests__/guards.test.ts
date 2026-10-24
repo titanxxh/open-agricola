@@ -17,6 +17,22 @@ describe('event guards', () => {
     visibility: 'public',
   } as const
 
+  it('accepts an actual summer heating waiver on the owning settlement', () => {
+    expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'harvest.heated', playerId: 'p1', required: 0, fuelUsed: 0,
+      woodToFuel: 0, sickWorkerIds: [], seasonalWaiver: { season: 'summer', normalRequired: 2, waived: 2 } })).not.toThrow()
+  })
+
+  it.each([
+    { season: 'monsoon', normalRequired: 2, waived: 2 },
+    { season: 'summer', normalRequired: Number.NaN, waived: 2 },
+    { season: 'summer', normalRequired: 2, waived: 1 },
+    { season: 'summer', normalRequired: 0, waived: 0 },
+    { season: 'summer', normalRequired: 2, waived: 2, cardId: 'not-a-card' },
+  ])('rejects malformed or ineffective heating waivers %j', seasonalWaiver => {
+    expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'harvest.heated', playerId: 'p1', required: 0, fuelUsed: 0,
+      woodToFuel: 0, sickWorkerIds: [], seasonalWaiver })).toThrow()
+  })
+
   it('accepts seasonal accumulation facts with signed actual adjustments', () => {
     expect(() => assertKnownGameEventShape({ ...baseEvent, type: 'action.accumulated', spaceId: 'reed-bank', resources: {}, normalResources: { reed: 1 }, seasonalAdjustments: [{ season: 'winter', resources: { reed: -1 } }] })).not.toThrow()
   })

@@ -2215,6 +2215,7 @@ export const zh = {
     harvestFeedConvert: '{player} 使用 {source}：{cost} → {food}',
     harvestFeedDetail: '{player} 喂养 {resources}',
     harvestHeatingDetail: '{player} 供暖：支付 {fuelUsed}/{required} 燃料，转换 {woodToFuel} 木材，生病工人 {sickWorkers}',
+    harvestHeatingWaived: '{player} 供暖：{season}豁免 {waived} 燃料需求（原需 {normalRequired}）',
     harvestBreedDetail: '{player} 繁殖 {resources}',
     animalBred: '{player} 新生 {resources}',
     animalBredFromSource: '{player} 通过 {cardId} 新生 {resources}',
