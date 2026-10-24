@@ -67,6 +67,56 @@ afterAll(() => {
 
 afterEach(() => cleanup())
 
+describe('nearby card targets', () => {
+  it('shares position selection with the chronological card without moving that card', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['D075_WoodField']
+    const tile = { row: -1, col: 4075, sourceCard: 'D075_WoodField', cardFieldSlot: 0 }
+    const togglePositionSelection = vi.fn()
+    const props = createFarmBoardProps(player, {
+      cardFieldTargets: [{ tile, stacks: [{ kind: 'wood', remaining: 2 }] }],
+      pendingPositionSelections: new Set(['-1-4075']),
+    }, { togglePositionSelection })
+    const { container, rerender } = render(<FarmBoard {...props} />)
+    const tray = screen.getByRole('region', { name: 'Card targets' })
+    const target = within(tray).getByRole('button', { name: /Wood 2/ })
+    expect(target).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(target)
+    expect(togglePositionSelection).toHaveBeenCalledExactlyOnceWith(tile)
+    rerender(<FarmBoard {...props} view={{ ...props.view, pendingPositionSelections: new Set() }} />)
+    expect(target).toHaveAttribute('aria-pressed', 'false')
+    expect(Array.from(container.querySelectorAll('[data-played-card-key]')).map(node => node.getAttribute('data-played-card-key')))
+      .toEqual(['minor:D075_WoodField'])
+  })
+
+  it('retains distinct same-card and borrowed animal zone IDs, and hides all controls in public views', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['C011_WildlifeReserve']
+    const zones: InteractionAnimalReorgZone[] = [
+      { id: 'card:one', zoneType: 'card', cardId: 'C011_WildlifeReserve', capacity: 2, animalType: null, animalCount: 0, allowedAnimalType: null },
+      { id: 'card:two', zoneType: 'card', cardId: 'C011_WildlifeReserve', capacity: 1, animalType: 'sheep', animalCount: 1, allowedAnimalType: 'sheep' },
+      { id: 'card:borrowed', zoneType: 'card', cardId: 'A102_Grocer', ownerPlayerId: 'p2', animalOwnerPlayerId: 'p1', displaySource: 'borrowed-played-card', capacity: 1, animalType: null, animalCount: 0 },
+    ]
+    const adjustReorgAnimal = vi.fn()
+    const props = createFarmBoardProps(player, {
+      isReorgActive: true, animalReorg: { zones, confirmDiscard: false },
+      reorgRemaining: { sheep: 2, boar: 0, cattle: 0, horse: 0 },
+    }, { adjustReorgAnimal })
+    const { container, rerender } = render(<FarmBoard {...props} />)
+    const tray = screen.getByRole('region', { name: 'Card targets' })
+    const controls = tray.querySelectorAll('[data-card-animal-zone]')
+    expect(Array.from(controls).map(node => node.getAttribute('data-card-animal-zone'))).toEqual(['card:one', 'card:two', 'card:borrowed'])
+    expect(Array.from(container.querySelectorAll('[data-card-animal-draft-zone]')).map(node => node.getAttribute('data-card-animal-draft-zone')))
+      .toEqual(['card:one', 'card:two'])
+    const borrowed = tray.querySelector<HTMLElement>('[data-card-animal-zone="card:borrowed"]')
+    if (!borrowed) throw new Error('Expected borrowed zone')
+    fireEvent.click(within(borrowed).getByRole('button', { name: 'Add Sheep' }))
+    expect(adjustReorgAnimal).toHaveBeenCalledExactlyOnceWith('card:borrowed', 'sheep', 1)
+    rerender(<FarmBoard {...props} view={{ ...props.view, isInteractive: false }} />)
+    expect(screen.queryByRole('region', { name: 'Card targets' })).toBeNull()
+  })
+})
+
 import { getPlayerPanelSupplySummary } from '../../../../shared/domain/player-panel-summary'
 
 const resources = (): Resource => ({
@@ -639,9 +689,9 @@ describe('FarmBoard', () => {
       />,
     )
 
-    expect(html).toContain(
-      '<span class="pasture-control-label">Sheep</span><button>-</button><span class="pasture-control-value">1</span><button disabled="">+</button>',
-    )
+    const markup = document.createElement('div')
+    markup.innerHTML = html
+    expect(within(markup).getByRole('button', { name: 'Add Sheep' })).toBeDisabled()
   })
 
   it('renders farm-position card animal zones on the farm tile instead of the played card', () => {
@@ -1113,9 +1163,9 @@ describe('FarmBoard', () => {
     expect(html).toContain('played-cards-by-others')
     expect(html).toContain('played-card-reorg')
     expect(html).toContain('res-icon-horse')
-    expect(html).toContain(
-      '<span class="pasture-control-label">Horse</span><button>-</button><span class="pasture-control-value">1</span>',
-    )
+    const markup = document.createElement('div')
+    markup.innerHTML = html
+    expect(within(markup).getByRole('button', { name: 'Remove Horse' })).toBeEnabled()
   })
 
   it('renders M084 lying horses as read-only played-card state', () => {

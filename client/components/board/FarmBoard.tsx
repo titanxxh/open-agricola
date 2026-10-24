@@ -25,6 +25,8 @@ import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsForm
 import { CardWithCopy } from '../common/CardWithCopy'
 import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
+import { getAnyCardDisplayName } from '../common/cardText'
+import type { FarmBoardProjectionCardFieldTarget } from '../../app/farm-board-projection'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
@@ -332,19 +334,6 @@ type FarmCell = FarmCellTileRenderState & {
   fenceId?: string
 }
 
-const humanizeSourceCard = (sourceCard: string) => {
-  const displayId = sourceCard.includes('_')
-    ? sourceCard.split('_').slice(1).join('_')
-    : sourceCard
-  return displayId
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .trim()
-}
-
-const getExtraSowTargetLabel = (sourceCard: string | undefined, tileKey: string) =>
-  sourceCard ? humanizeSourceCard(sourceCard) || sourceCard : tileKey
-
 const EMPTY_SLOT_VARIANTS = [
   [4, 0, 1, 2, 6],
   [5, 1, 6, 5, 4],
@@ -454,6 +443,7 @@ export type FarmBoardView = {
   sowRemaining: Record<PendingSowCrop, number>
   sowSelectableMap: Map<string, PendingSowCrop[]>
   extraSowTargets: ExtraSowTarget[]
+  cardFieldTargets?: FarmBoardProjectionCardFieldTarget[]
   pastureTiles: Map<string, { pastureId: string; isCorner: boolean }>
   pastureDisplayMap: Map<
     string,
@@ -883,6 +873,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     pendingSowSelections,
     sowRemaining,
     extraSowTargets,
+    cardFieldTargets = [],
     pastureTiles,
     pastureDisplayMap,
     pastureCapacityMap,
@@ -1001,7 +992,11 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         capacity={cardDisplay.capacity}
       />
       <div className="pasture-controls">
-        {ANIMAL_CONTROL_TYPES.map((animalType) => {
+        {ANIMAL_CONTROL_TYPES.filter(animalType =>
+          (!cardDisplay.allowedAnimalType || cardDisplay.allowedAnimalType === animalType) &&
+          (!cardDisplay.allowedAnimalTypes || cardDisplay.allowedAnimalTypes.includes(animalType)) ||
+          (cardDisplay.animalCounts?.[animalType] ?? (cardDisplay.animalType === animalType ? cardDisplay.animalCount : 0)) > 0,
+        ).map((animalType) => {
           const cardAnimalCounts = cardDisplay.animalCounts ?? {}
           const count =
             cardAnimalCounts[animalType] ??
@@ -1011,13 +1006,19 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
           const canIncrease =
             (reorgRemaining?.[animalType] ?? 0) > 0 &&
             cardDisplay.capacity > 0 &&
-            totalCount < cardDisplay.capacity
+            totalCount < cardDisplay.capacity &&
+            (!cardDisplay.allowedAnimalType || cardDisplay.allowedAnimalType === animalType) &&
+            (!cardDisplay.allowedAnimalTypes || cardDisplay.allowedAnimalTypes.includes(animalType)) &&
+            (cardDisplay.allowedAnimalType === null || !cardDisplay.animalType || cardDisplay.animalType === animalType) &&
+            !wouldExceedZoneOccupancyLimit(animalReorg?.zones ?? [], cardDisplay.zoneId)
           return (
             <div key={animalType} className="pasture-control-row">
               <span className="pasture-control-label">
                 {t(locale, `resources.${animalType}`)}
               </span>
               <button
+                type="button"
+                aria-label={t(locale, 'ui.reorgRemoveAnimal', { animal: t(locale, `resources.${animalType}`) })}
                 onClick={() =>
                   adjustReorgAnimal(cardDisplay.zoneId, animalType, -1)
                 }
@@ -1027,6 +1028,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               </button>
               <span className="pasture-control-value">{count}</span>
               <button
+                type="button"
+                aria-label={t(locale, 'ui.reorgAddAnimal', { animal: t(locale, `resources.${animalType}`) })}
                 onClick={() =>
                   adjustReorgAnimal(cardDisplay.zoneId, animalType, 1)
                 }
@@ -1040,6 +1043,11 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
       </div>
     </div>
   )
+
+  const nearbyAnimalZones = isInteractive && isReorgActive ? (animalReorg?.zones ?? []).filter(zone =>
+    zone.zoneType === 'card' && !zone.farmPosition && (!zone.animalOwnerPlayerId || zone.animalOwnerPlayerId === displayPlayer.id),
+  ) : []
+  const hasCardTargets = isInteractive && (extraSowTargets.length > 0 || cardFieldTargets.length > 0 || nearbyAnimalZones.length > 0)
 
   const handPanel = (
     <div className="hand-cards">
@@ -1295,7 +1303,10 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         </div>
       </div>
     </div>
-    <div className="farm-grid" style={farmGridStyle} data-interaction-focus="farm" data-focus-player={displayPlayer.id}>
+    <div className={`farm-operation-area${hasCardTargets ? ' farm-operation-area--with-card-targets' : ''}`}
+      data-interaction-focus="farm" data-focus-player={displayPlayer.id}>
+    <div className="farm-operation-grid">
+    <div className="farm-grid" style={farmGridStyle}>
       {farmCells.map((cell) => {
         if (cell.type === 'void') {
           return <div key={cell.key} className="farm-cell farm-void" />
@@ -1785,7 +1796,11 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         return <div key={cell.key} className={`farm-cell farm-${cell.type}`} />
       })}
     </div>
-    {isInteractive && extraSowTargets.length > 0 ? (
+    </div>
+    {hasCardTargets ? (
+      <section className="farm-card-target-tray" aria-label={t(locale, 'ui.cardTargets')}>
+        <h3>{t(locale, 'ui.cardTargets')}</h3>
+    {extraSowTargets.length > 0 ? (
       <div className="extra-sow-tray" aria-label="extra-sow-tray">
         <div className="extra-sow-targets">
           {(() => {
@@ -1800,7 +1815,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               const idx = (seen.get(src) ?? 0) + 1
               seen.set(src, idx)
               const total = counts.get(src) ?? 1
-              const baseLabel = getExtraSowTargetLabel(target.sourceCard, target.key)
+              const baseLabel = target.sourceCard ? getAnyCardDisplayName(locale, target.sourceCard) : target.key
               const label = total > 1 ? `${baseLabel} (${idx}/${total})` : baseLabel
               const currentSowChoice = isInteractive ? (pendingSowSelections[target.key] ?? '') : ''
               const availableGrain =
@@ -1834,6 +1849,30 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         </div>
       </div>
     ) : null}
+        {cardFieldTargets.map(({ tile, stacks }) => (
+          <div key={positionKey(tile)} className="farm-card-field-target" data-card-field-target={positionKey(tile)}>
+            <span className="farm-card-target-source">{tile.sourceCard ? getAnyCardDisplayName(locale, tile.sourceCard) : t(locale, 'ui.fields')}</span>
+            {stacks.length > 0 ? <FieldCropStack locale={locale} stacks={stacks}
+              selectionTiles={stacks.map((_, index) => index === stacks.length - 1 ? tile : null)}
+              selectedPositionKeys={pendingPositionSelections} onToggle={togglePositionSelection} /> : (
+              <button type="button" aria-pressed={pendingPositionSelections.has(positionKey(tile))}
+                data-card-field-position={positionKey(tile)} onClick={() => togglePositionSelection(tile)}>
+                {t(locale, 'ui.fieldEmpty')}
+              </button>
+            )}
+          </div>
+        ))}
+        {nearbyAnimalZones.map(zone => (
+          <div key={zone.id} className="farm-card-animal-target" data-card-animal-zone={zone.id}>
+            <div className="farm-card-target-source">{getAnyCardDisplayName(locale, zone.cardId ?? zone.id.replace(/^card:/, ''))}
+              {zone.ownerPlayerId && zone.ownerPlayerId !== displayPlayer.id ? <span className="farm-card-target-owner">{players.find(player => player.id === zone.ownerPlayerId)?.name ?? zone.displayOwnerName}</span> : null}
+            </div>
+            {renderPlayedCardReorg({ ...zone, zoneId: zone.id, isReorgDraft: true })}
+          </div>
+        ))}
+      </section>
+    ) : null}
+    </div>
     <div className="played-cards">
       <h3>{t(locale, 'ui.playedCards')}</h3>
       {parentCardDisplays.length > 0 ? (
@@ -1855,6 +1894,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
           const { rawId, cardType } = card
           const futureEntries = futureCardResources[rawId] ?? []
           const cardDisplay = cardDisplayMap.get(rawId)
+          const cardDraftZones = nearbyAnimalZones.filter(zone => zone.cardId === rawId && zone.displaySource !== 'borrowed-played-card')
 
           return (
             <div key={card.cardId} className="played-card-slot" data-played-card-key={card.cardId}>
@@ -1884,7 +1924,11 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                   <span>{marker.count}</span>
                 </div>
               ))}
-              {cardDisplay
+              {cardDraftZones.length > 0 ? cardDraftZones.map(zone => (
+                <div key={zone.id} data-card-animal-draft-zone={zone.id}>
+                  {renderPlayedCardReorg({ ...zone, zoneId: zone.id, isReorgDraft: true })}
+                </div>
+              )) : cardDisplay
                 ? cardDisplay.isReorgDraft
                   ? renderPlayedCardReorg(cardDisplay)
                   : (

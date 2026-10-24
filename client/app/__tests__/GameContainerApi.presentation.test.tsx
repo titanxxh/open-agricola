@@ -57,6 +57,37 @@ afterEach(() => {
 })
 
 describe('GameContainerApi responsive presentation', () => {
+  it('opens every authoritative alternative for a nearby Card Field before submitting one', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
+    const response = structuredClone(payload)
+    const player = response.state.players[0]!
+    player.occupationPlayed = ['B113_PatchCaregiver']
+    player.playedCardChronology = ['occupation:B113_PatchCaregiver']
+    player.cardStatePresentation.B113_PatchCaregiver = {
+      cropLayers: [{ slotIndex: 0, top: true, stack: { kind: 'grain', remaining: 3 } }],
+    }
+    const target = { kind: 'logical-field' as const, playerId: player.id, fieldId: 'card:B113_PatchCaregiver',
+      positions: [{ row: -1, col: 2113, sourceCard: 'B113_PatchCaregiver', cardFieldSlot: 0 }], resources: { grain: 3 } }
+    response.interaction = { stateId: 'wait', requestKey: 'two-field-choices', playerIndex: 0,
+      request: { kind: 'choice', options: [
+        { value: 'opaque-first', labelKey: 'ui.fields', target },
+        { value: 'opaque-second', labelKey: 'ui.fieldEmpty', target },
+      ] }, allowedCommands: ['resolveChoice'], anytimeActions: [] }
+    setupViewport(true, response)
+    const { container } = renderGame()
+    const tray = await screen.findByRole('region', { name: 'Card targets' })
+    const choicesSent = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/api/game/choice'))
+    expect(container.querySelector('[data-choice-value="opaque-first"]')).toBeNull()
+    fireEvent.click(tray.querySelector('button')!)
+    expect(choicesSent()).toHaveLength(0)
+    await waitFor(() => expect(container.querySelector('[data-choice-value="opaque-first"]')).toBeVisible())
+    expect(container.querySelector('[data-choice-value="opaque-second"]')).toBeVisible()
+    fireEvent.click(container.querySelector('[data-choice-value="opaque-second"]')!)
+    await waitFor(() => expect(choicesSent()).toHaveLength(1))
+    expect(choicesSent()[0]?.[1]?.body).toContain('opaque-second')
+  })
+
   it.each([
     { name: 'only legal majors', minorDisabled: true, majorDisabled: false, target: 'major-supply', near: true },
     { name: 'only legal minors', minorDisabled: false, majorDisabled: true, target: 'minor-hand', near: false },

@@ -3207,7 +3207,7 @@
   box-sizing: border-box;
   overflow: visible;
 }
-.farm-grid[data-interaction-focused="true"] {
+.farm-operation-area[data-interaction-focused="true"] .farm-grid {
   --tile: clamp(36px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
 }
 .farm-fence-hit {
@@ -3567,6 +3567,91 @@
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid #e2d3b7;
+}
+.farm-operation-grid {
+  container-type: inline-size;
+  min-width: 0;
+}
+.farm-operation-area--with-card-targets {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.farm-operation-area--with-card-targets .farm-grid {
+  margin-bottom: 0;
+}
+.farm-operation-area--with-card-targets[data-interaction-focused="true"] .farm-grid {
+  --tile: clamp(36px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 210px) / var(--farm-grid-row-ratio))), 110px);
+}
+.farm-card-target-tray {
+  padding: 8px;
+  border: 1px solid #e2c892;
+  border-radius: 12px;
+  background: #fffaf0;
+  max-height: 164px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.farm-card-target-tray h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.farm-card-target-tray .extra-sow-tray {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+}
+.farm-card-target-source {
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.farm-card-target-owner {
+  margin-left: 6px;
+  font-weight: 400;
+}
+.farm-card-field-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+}
+.farm-card-field-target .field-crop {
+  position: static;
+  display: flex;
+}
+.farm-card-field-target .card-field-selection {
+  min-height: 36px;
+  min-width: 44px;
+}
+.farm-card-animal-target + .farm-card-animal-target {
+  border-top: 1px solid #e2d3b7;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.farm-card-target-tray .pasture-control-row button {
+  min-width: 36px;
+  min-height: 32px;
+  touch-action: manipulation;
+}
+.farm-card-target-tray .pasture-controls {
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 6px;
+}
+@media (min-width: 600px) and (max-height: 600px) {
+  .farm-operation-area--with-card-targets {
+    grid-template-columns: minmax(0, 1.25fr) minmax(220px, 1fr);
+    align-items: start;
+  }
+  .farm-operation-area--with-card-targets[data-interaction-focused="true"] .farm-grid {
+    --tile: clamp(30px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
+  }
+  .farm-card-target-tray {
+    max-height: calc(100dvh - var(--interaction-bar-height, 0px) - 36px);
+  }
 }
 .extra-sow-targets {
   display: flex;
