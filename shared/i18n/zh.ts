@@ -2242,6 +2242,8 @@ export const zh = {
     parentMotherRewardStable: '畜栏',
     reorganizeDiscard: '{player} 丢弃 {resources}',
     gains: '获得 {resources}',
+    seasonalGains: '{season}额外获得 {resources}',
+    seasonalStables: '{season}赠送 {count} 个畜栏',
     costs: '支付 {resources}',
     effects: '效果：{effects}',
     effectPlow: '开垦 {count} 块田地',

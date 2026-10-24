@@ -1,4 +1,5 @@
 import type { AnytimeTurnAffiliation } from './anytime-activation'
+import type { SeasonalGrant } from './seasonal-grant'
 import type { PersonUseReceipt } from './person-use'
 import type {
   CostModifierType,
@@ -53,6 +54,7 @@ export type PaymentPurpose =
   | 'begging'
 
 export type ResourceMovedEvent = GameEventBase<'resource.moved'> & {
+  seasonalGrant?: SeasonalGrant
   resources: Partial<Resource>
   from: ResourceLocation
   to: ResourceLocation
@@ -158,6 +160,7 @@ export type FarmRenovatedEvent = GameEventBase<'farm.renovated'> & {
 }
 
 export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
+  seasonalGrant?: SeasonalGrant
   /** Tiles made used by this mutation, captured before its trailing reactions. */
   newlyUsedTiles: FarmyardTileUsage[]
   stables: Array<{

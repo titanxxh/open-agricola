@@ -354,6 +354,7 @@ const mapResourceMoved = (
       : event.sourceActionId ?? event.reason,
     {
       gains: gain,
+      ...(event.seasonalGrant ? { seasonalGrant: event.seasonalGrant } : {}),
       ...(Object.keys(costs).length ? { costs } : {}),
     },
   )
@@ -749,6 +750,7 @@ const mapStableBuilt = (
     {
       costs: positiveResources(payment?.resources ?? {}),
       effects: { buildStables: event.stables.length },
+      ...(event.seasonalGrant ? { seasonalGrant: event.seasonalGrant } : {}),
     },
   )
 

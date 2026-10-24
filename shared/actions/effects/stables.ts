@@ -15,6 +15,7 @@ import type {
   Resource,
 } from '../../contract/types'
 import type { FarmStableBuiltEvent } from '../../contract/events'
+import { readSeasonalGrant } from '../../contract/seasonal-grant'
 import { getNextEmptyTileForPlayer, positionKey } from '../../domain/farm'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
@@ -351,11 +352,13 @@ const finalizeStables = (
       sourceCardId: specialSourceCardId,
     })
   }
+  const seasonalGrant = readSeasonalGrant(ctx.actionContext?.seasonalGrant)
   ctx.eventSink?.emit<'farm.stableBuilt'>({
     type: 'farm.stableBuilt',
     newlyUsedTiles: farmOperation.newlyUsedTiles,
     sourceActionId: ctx.space.id,
     stables: stableItems,
+    ...(seasonalGrant ? { seasonalGrant } : {}),
   })
   return {
     type: 'ok',

@@ -55,7 +55,7 @@ export const registerThroughTheSeasonsHooks = (actionHooks: ActionHookRegistry):
         if (readActionSnapshotExtraData<boolean>(context.player, SUMMER_DAY_LABORER_USED_KEY)) return
         writeActionSnapshotExtraData(context.player, SUMMER_DAY_LABORER_USED_KEY, true)
       }
-      return { flow: { type: 'leaf', actionId: 'bonus-grain' } }
+      return { flow: { type: 'leaf', actionId: 'bonus-grain', actionContext: { seasonalGrant: { season: 'summer' } } } }
     },
   })
 
@@ -71,6 +71,7 @@ export const registerThroughTheSeasonsHooks = (actionHooks: ActionHookRegistry):
       const builtRooms = extraData?.builtRooms
       if (!Array.isArray(builtRooms) || builtRooms.length === 0) return
       const actionContext = {
+        seasonalGrant: { season: 'summer' },
         exactCost: { max: builtRooms.length },
         max: builtRooms.length,
         trueAction: false,

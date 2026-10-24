@@ -1467,6 +1467,8 @@ export const en = {
     parentMotherRewardStable: 'Stable',
     reorganizeDiscard: '{player} discards {resources}',
     gains: 'Gains {resources}',
+    seasonalGains: '{season} extra gain {resources}',
+    seasonalStables: '{season} grants {count} free stable(s)',
     costs: 'Pays {resources}',
     effects: 'Effect: {effects}',
     effectPlow: 'Plow {count} field(s)',
