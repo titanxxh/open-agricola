@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { CardHoverPreview } from './CardHoverPreview'
 import { CardDetails } from './CardDetails'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
+import { useRequestActivation, type RequestActivation } from '../../hooks/useRequestActivation'
 
 export type CardTouchInteraction = { kind: 'inspect' } | { kind: 'play'; requestKey: string }
 
@@ -59,9 +60,10 @@ export const CardWithCopy = ({
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const [touchPinned, setTouchPinned] = useState(false)
   const touchGestureRef = useRef<{ x: number; y: number; moved: boolean } | null>(null)
-  const submittedRequestRef = useRef<string | null>(null)
-  const [details, setDetails] = useState<{ requestKey: string | null } | null>(null)
-  const [submittedRequest, setSubmittedRequest] = useState<string | null>(null)
+  const activation = useRequestActivation(touchInteraction?.kind === 'play' ? touchInteraction.requestKey : null)
+  const submittedRequestRef = useRef<RequestActivation | null>(null)
+  const [details, setDetails] = useState<{ activation: RequestActivation } | null>(null)
+  const [submittedRequest, setSubmittedRequest] = useState<RequestActivation | null>(null)
 
   const clearShowTimer = () => {
     if (showTimerRef.current !== null) {
@@ -213,7 +215,7 @@ export const CardWithCopy = ({
         clearShowTimer()
         clearHideTimer()
         setAnchor(null)
-        setDetails({ requestKey: touchInteraction.kind === 'play' ? touchInteraction.requestKey : null })
+        setDetails({ activation })
       }
       return
     }
@@ -228,9 +230,8 @@ export const CardWithCopy = ({
     setDetails(null)
     rootRef.current?.focus({ preventScroll: true })
   }
-  const canPlayDetails = details?.requestKey !== null && touchInteraction?.kind === 'play' &&
-    details?.requestKey === touchInteraction.requestKey && !disabled && !!onClick &&
-    submittedRequest !== touchInteraction.requestKey
+  const canPlayDetails = details?.activation === activation && touchInteraction?.kind === 'play' &&
+    !disabled && !!onClick && submittedRequest !== activation
 
   const keyboardPreview = enablePreview && !!previewCard
 
@@ -282,16 +283,16 @@ export const CardWithCopy = ({
           locale={locale}
           card={previewCard}
           onClose={closeDetails}
-          play={details.requestKey === null ? undefined : {
+          play={details.activation.requestKey === null ? undefined : {
             disabled: !canPlayDetails,
             onPlay: () => {
-              if (!canPlayDetails || touchInteraction?.kind !== 'play' || submittedRequestRef.current === touchInteraction.requestKey) return
-              submittedRequestRef.current = touchInteraction.requestKey
-              setSubmittedRequest(touchInteraction.requestKey)
-              const submittedKey = touchInteraction.requestKey
+              if (!canPlayDetails || touchInteraction?.kind !== 'play' || submittedRequestRef.current === activation) return
+              submittedRequestRef.current = activation
+              setSubmittedRequest(activation)
+              const submittedActivation = activation
               const settle = (accepted: boolean) => {
-                if (submittedRequestRef.current !== submittedKey) return
-                if (accepted) closeDetails()
+                if (submittedRequestRef.current !== submittedActivation) return
+                if (accepted) setDetails(current => current?.activation === submittedActivation ? null : current)
                 else {
                   submittedRequestRef.current = null
                   setSubmittedRequest(null)
