@@ -16,6 +16,7 @@ import {
   enableSnakeOpeningFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
+  findEnabledCardChoiceValue,
   getCurrentlySelectableRoomKeys,
   isDevModeAllowedFromQuery,
   maxPlayersFromQuery,
@@ -87,6 +88,8 @@ describe('GameContainerApi WS player identity', () => {
       '__tests__/interaction-presentation.test.ts',
       // Snapshot chronology fixtures contain type-prefixed card keys, not choice parsing.
       '__tests__/farm-board-projection.test.ts',
+      // Responsive interaction fixtures contain authoritative choice values.
+      '__tests__/GameContainerApi.presentation.test.tsx',
     ])
     const offenders = listAppSourceFiles(appDir).flatMap((file) => {
       const rel = path.relative(appDir, file).split(path.sep).join('/')
@@ -349,6 +352,20 @@ describe('GameContainerApi WS player identity', () => {
       'major:Major_Fireplace',
       'G001_PlowDriver',
     ]))
+  })
+
+  it('submits the current enabled card option value without dropping its type prefix', () => {
+    const options = [
+      { value: 'minor:E001_ClayPipe', labelKey: 'improvements.E001_ClayPipe.name' },
+      { value: 'major:Major_Fireplace', labelKey: 'improvements.Major_Fireplace.name' },
+      { value: 'G001_PlowDriver', labelKey: 'occupations.G001_PlowDriver.name' },
+      { value: 'minor:A076_Cob', labelKey: 'minors.A076_Cob.name', disabled: true },
+    ]
+    expect(findEnabledCardChoiceValue(options, 'E001_ClayPipe')).toBe('minor:E001_ClayPipe')
+    expect(findEnabledCardChoiceValue(options, 'Major_Fireplace')).toBe('major:Major_Fireplace')
+    expect(findEnabledCardChoiceValue(options, 'G001_PlowDriver')).toBe('G001_PlowDriver')
+    expect(findEnabledCardChoiceValue(options, 'A076_Cob')).toBeUndefined()
+    expect(findEnabledCardChoiceValue(options, 'missing')).toBeUndefined()
   })
 
   it('parses pending Moor special action card choices', () => {

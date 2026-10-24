@@ -55,6 +55,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 
     expect(geometry.bottom).toBeLessThanOrEqual(geometry.limit)
     await expand.click()
     await expect(hand.locator('.major-row')).toBeVisible()
+    await page.screenshot({ path: `output/playwright/improvement-selection-mixed-open-${viewport.width}x${viewport.height}.png`, fullPage: true })
     await hand.getByRole('button', { name: 'Hide major improvements' }).click()
     await expect(page.locator('.major-row')).toHaveCount(0)
     await page.evaluate(() => window.scrollTo(0, 0))

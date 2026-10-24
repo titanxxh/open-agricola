@@ -261,19 +261,21 @@ describe('hotseat public farm browsing', () => {
     GameSocket.payload = payload
     const { container } = renderGame()
     await confirmAlice(user)
-    const supply = container.querySelector('.major-improvements')!
-    const card = (id: string) => supply.querySelector(`[data-id="${id}"]`)!.closest('.player-card')!
-    expect(supply).toHaveClass('expanded')
+    const supply = () => container.querySelector('.major-improvements')!
+    const card = (id: string) => supply().querySelector(`[data-id="${id}"]`)!.closest('.player-card')!
+    expect(supply()).toHaveClass('expanded')
     expect(card(candidate)).toHaveClass('selectable')
     expect(card(unavailable)).toHaveClass('unselectable')
 
     await selectBob(user)
-    expect(supply).toHaveClass('collapsed')
-    await user.click(within(supply).getByRole('heading'))
-    expect(supply.querySelector('.selectable, .unselectable, .disabled')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
+    expect(supply()).toHaveClass('collapsed')
+    await user.click(within(supply()).getByRole('button'))
+    expect(supply().querySelector('.selectable, .unselectable, .disabled')).not.toBeInTheDocument()
     await user.click(card(candidate))
     expect(ruleCommands()).toEqual([])
     await user.click(screen.getByRole('button', { name: 'Return to Alice to continue' }))
+    expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
     expect(card(candidate)).toHaveClass('selectable')
     expect(card(unavailable)).toHaveClass('unselectable')
   })
