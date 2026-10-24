@@ -43,6 +43,14 @@
   z-index: 1;
   background: linear-gradient(180deg, rgba(58, 90, 44, 0.98), rgba(58, 90, 44, 0.92));
 }
+.interaction-bar--farm .interaction-bar__body {
+  order: -1;
+  border-top: 0;
+  padding-top: 0;
+}
+.interaction-bar--farm .interaction-bar__top {
+  position: static;
+}
 .interaction-bar__controls {
   display: flex;
   flex-wrap: wrap;
@@ -3197,6 +3205,38 @@
   box-sizing: border-box;
   overflow: visible;
 }
+.farm-grid[data-interaction-focused="true"] {
+  --tile: clamp(36px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
+}
+.farm-fence-hit {
+  position: absolute;
+  z-index: 4;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+  clip-path: polygon(0 50%, 50% 0, 100% 50%, 50% 100%);
+}
+.farm-fence-h .farm-fence-hit {
+  width: 100%;
+  height: min(44px, var(--tile));
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+.farm-fence-v .farm-fence-hit {
+  width: min(44px, var(--tile));
+  height: 100%;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.farm-fence-hit:focus-visible,
+.farm-fence-hit[aria-pressed="true"] {
+  background: rgba(255, 225, 90, 0.3);
+}
 .farm-cell {
   width: 100%;
   height: 100%;
@@ -3688,6 +3728,7 @@
 }
 .farm-fence-h,
 .farm-fence-v {
+  position: relative;
   background: transparent;
   display: flex;
   align-items: center;

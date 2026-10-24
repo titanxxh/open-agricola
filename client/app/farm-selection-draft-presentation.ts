@@ -111,6 +111,45 @@ export const useFarmSelectionDraftPresentation = ({
   } = farmDraft
   const farmInteraction = farmInteractionFromPlan(interactionPresentationPlan)
   const selectionInteraction = selectionInteractionFromPlan(interactionPresentationPlan)
+  useEffect(() => {
+    const retainTiles = (selected: FarmTilePosition[], allowed: readonly FarmTilePosition[], max = Infinity) => {
+      const keys = new Set(allowed.map(positionKey))
+      const next = selected.filter(tile => keys.has(positionKey(tile))).slice(0, max)
+      return next.length === selected.length ? selected : next
+    }
+    if (farmInteraction?.farmType === 'room') {
+      setPendingRoomTiles(selected => retainTiles(selected, farmInteraction.selectableTiles, farmInteraction.maxSelections))
+    } else if (farmInteraction?.farmType === 'stable') {
+      setPendingStableTiles(selected => retainTiles(selected, farmInteraction.selectableTiles, farmInteraction.maxSelections))
+      const keys = new Set(farmInteraction.farmHandPositions?.map(positionKey))
+      setPendingFarmHand(selected => selected && keys.has(positionKey(selected)) ? selected : null)
+    } else if (farmInteraction?.farmType === 'plow') {
+      const keys = new Set(farmInteraction.selectableTiles.map(positionKey))
+      setPendingPlowTile(selected => selected && keys.has(positionKey(selected)) ? selected : null)
+    } else if (farmInteraction?.farmType === 'fence') {
+      const keys = new Set(farmInteraction.selectableEdges)
+      const retainEdges = (selected: string[]) => {
+        const next = selected.filter(edge => keys.has(edge))
+        return next.length === selected.length ? selected : next
+      }
+      setPendingFenceEdges(retainEdges)
+      setPendingPalisadeEdges(retainEdges)
+    } else if (farmInteraction?.farmType === 'sow') {
+      const crops = new Map(farmInteraction.selectableFields.map(field => [positionKey(field.tile), field.allowedCrops]))
+      setPendingSowSelections(selected => {
+        const next = Object.fromEntries(Object.entries(selected).filter(([key, crop]) => crops.get(key)?.includes(crop)))
+        return Object.keys(next).length === Object.keys(selected).length ? selected : next
+      })
+    }
+    if (selectionInteraction?.kind === 'farm-position') {
+      const keys = new Set(selectionInteraction.selectablePositions.map(positionKey))
+      setPendingPositionSelections(selected => {
+        const next = [...selected].filter(key => keys.has(key)).slice(0, selectionInteraction.maxSelections)
+        return next.length === selected.size ? selected : new Set(next)
+      })
+    }
+  }, [farmInteraction, selectionInteraction, setPendingRoomTiles, setPendingStableTiles, setPendingFarmHand,
+    setPendingPlowTile, setPendingFenceEdges, setPendingPalisadeEdges, setPendingSowSelections, setPendingPositionSelections])
   const borrowedFenceSource =
     farmInteraction?.farmType === 'fence' ? farmInteraction.fenceSource : undefined
   const isBorrowedFenceSelection = borrowedFenceSource?.kind === 'borrowed'

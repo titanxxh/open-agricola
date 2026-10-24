@@ -212,6 +212,26 @@ const createFarmBoardProps = (
 }
 
 describe('FarmBoard', () => {
+  it('exposes separate keyboard and touch controls for fence edges with selected feedback', () => {
+    const toggleFenceEdge = vi.fn()
+    const props = createFarmBoardProps(createPlayer('p1', 'Player 1', 'red'), {
+      farmCells: [{ key: '0-1', type: 'fence-h', fenceId: 'H-0-0' }, { key: '1-0', type: 'fence-v', fenceId: 'V-0-0' }],
+      fenceSelectableSet: new Set(['H-0-0', 'V-0-0']),
+    }, { toggleFenceEdge })
+    const view = render(<FarmBoard {...props} />)
+    const horizontal = screen.getByRole('button', { name: 'Horizontal fence at row 1, column 1' })
+    const vertical = screen.getByRole('button', { name: 'Vertical fence at row 1, column 1' })
+    expect(horizontal).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(horizontal)
+    expect(toggleFenceEdge).toHaveBeenCalledExactlyOnceWith('H-0-0')
+    fireEvent.click(vertical)
+    expect(toggleFenceEdge).toHaveBeenLastCalledWith('V-0-0')
+    view.rerender(<FarmBoard {...props} view={{ ...props.view, pendingFenceSet: new Set(['H-0-0']) }} />)
+    expect(horizontal).toHaveAttribute('aria-pressed', 'true')
+    view.rerender(<FarmBoard {...props} view={{ ...props.view, isInteractive: false }} />)
+    expect(screen.queryByRole('button', { name: 'Horizontal fence at row 1, column 1' })).not.toBeInTheDocument()
+  })
+
   it('highlights only the hand card named by the interaction', () => {
     const player = createPlayer('p1', 'Player 1', 'red')
     player.occupationHand = ['A102_Grocer', 'A105_BarrowPusher']

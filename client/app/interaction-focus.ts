@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
+import { parsePendingMoorSpecialActionChoice } from './game-container-helpers'
 
-export type InteractionFocusTarget = 'occupation-hand' | 'minor-hand' | 'major-supply' | 'actions' | 'controls'
+export type InteractionFocusTarget = 'occupation-hand' | 'minor-hand' | 'major-supply' | 'actions' | 'controls' | 'farm'
 
 export const interactionFocusRequestKey = (interaction: ClientInteractionState): string =>
   interaction.stateId === 'wait'
@@ -13,6 +14,10 @@ export const getInteractionFocusTarget = (
   interaction: ClientInteractionState,
 ): InteractionFocusTarget | null => {
   if (interaction.stateId !== 'wait' || interaction.request.kind === 'private-prompt') return null
+  if (interaction.request.kind === 'farm-select' || interaction.request.kind === 'animal-reorg' ||
+    (interaction.request.kind === 'selection' && interaction.request.selection.kind === 'farm-position')) return 'farm'
+  if (interaction.request.kind === 'choice' && interaction.request.options.some(option => !option.disabled &&
+    (option.target || parsePendingMoorSpecialActionChoice(option)?.tile))) return 'farm'
   if (interaction.request.kind === 'selection' && interaction.request.selection.kind === 'occupation-hand') {
     return 'occupation-hand'
   }
@@ -42,18 +47,19 @@ const revealTarget = (target: InteractionFocusTarget, playerId: string): boolean
   return true
 }
 
-export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPlayer, targetOverride }: {
+export const useInteractionFocus = ({ interaction, canFocus, playerId, onViewPlayer, targetOverride, localRequest }: {
   interaction: ClientInteractionState
   canFocus: boolean
   playerId: string
   onViewPlayer: (playerId: string) => void
   targetOverride?: InteractionFocusTarget | null
+  localRequest?: { key: string; target: InteractionFocusTarget }
 }) => {
   const [followingAction, setFollowingAction] = useState(false)
   const lastFocusedRequest = useRef<string | null>(null)
-  const requestKey = interactionFocusRequestKey(interaction)
-  const requestedTarget = targetOverride ?? getInteractionFocusTarget(interaction)
-  const complete = interaction.stateId === 'idle' || (interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player')
+  const requestKey = interactionFocusRequestKey(interaction) + (localRequest ? `:${localRequest.key}` : '')
+  const requestedTarget = localRequest?.target ?? targetOverride ?? getInteractionFocusTarget(interaction)
+  const complete = !localRequest && (interaction.stateId === 'idle' || (interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player'))
   const target = requestedTarget ?? (followingAction && !complete ? 'controls' : null)
 
   useEffect(() => {
