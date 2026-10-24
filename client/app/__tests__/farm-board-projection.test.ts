@@ -16,7 +16,7 @@ import {
   type FarmBoardProjectionInput,
 } from '../farm-board-projection'
 
-import type { CardStatePresentation } from '../../../shared/contract/card-state'
+import type { SerializedPlayerState } from '../../../shared/session/serialization'
 
 const resources = (overrides: Partial<Resource> = {}): Resource => ({
   wood: 0,
@@ -33,9 +33,12 @@ const resources = (overrides: Partial<Resource> = {}): Resource => ({
   ...overrides,
 })
 
-const createPlayer = (overrides: Partial<PlayerState & { lockedFarmTileKeys: string[]; cardStatePresentation: Record<string, CardStatePresentation> }> = {}): PlayerState & { lockedFarmTileKeys: string[]; cardStatePresentation: Record<string, CardStatePresentation> } => ({
+type TestPlayer = PlayerState & Pick<SerializedPlayerState, 'lockedFarmTileKeys' | 'cardStatePresentation' | 'playedCardChronology'>
+
+const createPlayer = (overrides: Partial<TestPlayer> = {}): TestPlayer => ({
   lockedFarmTileKeys: [],
   cardStatePresentation: {},
+  playedCardChronology: [],
   id: 'p1',
   name: 'Player 1',
   color: 'red',
@@ -236,6 +239,7 @@ describe('buildFarmBoardProjection', () => {
   it.each([false, true])('projects card-field selection without expanding the farm, with buried crops: %s', (buried) => {
     const player = createPlayer({
       minorPlayed: ['D075_WoodField'],
+      playedCardChronology: ['minor:D075_WoodField'],
       cardStatePresentation: {
         D075_WoodField: { cropLayers: buried ? [
           { stack: { kind: 'vegetable', remaining: 1 }, slotIndex: 1, top: false },
@@ -487,6 +491,7 @@ describe('buildFarmBoardProjection', () => {
       id: 'owner',
       name: 'Owner',
       occupationPlayed: ['O001_Test'],
+      playedCardChronology: ['occupation:O001_Test'],
     })
     const zones: InteractionAnimalReorgZone[] = [
       {
@@ -601,6 +606,7 @@ describe('buildFarmBoardProjection', () => {
       parentCards: { mother: 'PR01', father: 'PS01' },
       minorPlayed: ['M084_BogPony', 'C146_WorkshopAssistant'],
       occupationPlayed: ['C022_BasketChair'],
+      playedCardChronology: ['occupation:C022_BasketChair', 'minor:M084_BogPony', 'minor:C146_WorkshopAssistant'],
       cardStates: { C146_WorkshopAssistant: { extraData: { sentinel: 'INTERNAL_ONLY' } } },
       cardStatePresentation: {
         PR01: { infobox: 'Mother ready' },
@@ -633,9 +639,9 @@ describe('buildFarmBoardProjection', () => {
       { id: 'PS01', infobox: 'Father tier 2', completedTier: 2 },
     ])
     expect(projection.playedCardDisplays.map((card) => card.rawId)).toEqual([
+      'C022_BasketChair',
       'M084_BogPony',
       'C146_WorkshopAssistant',
-      'C022_BasketChair',
     ])
     expect(projection.playedCardDisplays.find((card) => card.rawId === 'M084_BogPony')?.animalMarkers).toEqual([{ animal: 'horse', count: 2, pose: 'lying' }])
     expect(projection.playedCardDisplays.find((card) => card.rawId === 'C146_WorkshopAssistant')).toMatchObject({

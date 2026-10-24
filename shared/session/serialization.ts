@@ -6,6 +6,7 @@ import { collectCardStatePresentation } from '../cards/card-state-presentation'
 import { projectParentCardState } from '../parents/father-completion'
 import type { RecoveryHistoryCatalog } from './recovery-catalog'
 import { captureStateWithHistory } from './history-streams'
+import { projectPlayedCardChronology } from '../projections/played-card-chronology'
 import { isPersistedGameEvent } from '../events/guards'
 import type {
   ActionSpace,
@@ -55,6 +56,7 @@ export type SerializedPlayerState = Omit<PlayerState, 'pastures'> & {
   borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
   pastureCapacities: Record<string, number>
   scheduledEffects: ScheduledEffectPreview[]
+  playedCardChronology: string[]
 }
 
 export type SerializedParentSelectionCandidates = {
@@ -208,6 +210,7 @@ const serializePlayerDisplayFields = (
     borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(zones),
     pastureCapacities: collectPastureCapacities(zones),
     scheduledEffects: collectScheduledEffectPreviews(state, player, actionHooks),
+    playedCardChronology: projectPlayedCardChronology(state, player),
   }
 }
 
@@ -329,6 +332,7 @@ export const rehydrateState = (
       borrowedPlayedCardAnimalZones: _borrowedPlayedCardAnimalZones,
       pastureCapacities: _pastureCapacities,
       scheduledEffects: _scheduledEffects,
+      playedCardChronology: _playedCardChronology,
       ...player
     }) => {
       if (persisted) return player
