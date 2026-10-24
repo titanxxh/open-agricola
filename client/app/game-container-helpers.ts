@@ -133,6 +133,18 @@ const MAJOR_IMPROVEMENT_CHOICE_PREFIX = 'major:'
 const stripChoicePrefix = (value: string, prefix: string): string =>
   value.startsWith(prefix) ? value.slice(prefix.length) : value
 
+export const findEnabledCardChoiceValue = (
+  options: readonly ActionChoiceOption[],
+  cardId: string,
+): string | undefined => {
+  const values = new Set([
+    cardId,
+    `${MINOR_IMPROVEMENT_CHOICE_PREFIX}${cardId}`,
+    `${MAJOR_IMPROVEMENT_CHOICE_PREFIX}${cardId}`,
+  ])
+  return options.find(option => !option.disabled && values.has(option.value))?.value
+}
+
 export const buildSelectableMinorIds = (
   options: readonly ActionChoiceOption[] | undefined,
 ): Set<string> =>

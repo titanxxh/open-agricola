@@ -67,6 +67,7 @@ import {
   enableSnakeOpeningFromQuery,
   enableThroughTheSeasonsFromQuery,
   devResourceKeysForState,
+  findEnabledCardChoiceValue,
   getPendingMoorSpecialActionChoice,
   getPendingMoorSpecialActionTileChoice,
   getPendingMoorSpecialActionTileKeys,
@@ -782,10 +783,9 @@ export const GameContainerApi = () => {
   const cardPlayRequestKey = interactionFocusRequestKey(interaction)
   const playCardChoice = useCardPlayChoice(cardPlayRequestKey, async value => {
     if (!isInteractive || !isDomainWaitInteraction(interaction) || !interaction.allowedCommands.includes('resolveChoice')) return false
-    const option = interactionChoiceOptions(interaction).find(option => !option.disabled &&
-      (option.value === value || option.value === `minor:${value}` || option.value === `major:${value}`))
-    if (!option) return false
-    const response = await transport.resolveChoice(interaction.playerIndex, option.value)
+    const choiceValue = findEnabledCardChoiceValue(interactionChoiceOptions(interaction), value)
+    if (!choiceValue) return false
+    const response = await transport.resolveChoice(interaction.playerIndex, choiceValue)
     return response.ok
   })
 
