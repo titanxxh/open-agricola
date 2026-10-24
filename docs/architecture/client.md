@@ -35,6 +35,21 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 - The default playtest path is backend `POST /api/game/new-sandbox`. With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs in the browser: `LocalGameTransport` implements `GameTransport`, the Worker assembles shared `GameCore` with locally validated custom code, and `server/__tests__/local-sandbox-parity.test.ts` locks behavior to the server executor. A ten-second timeout rebuilds the Worker from the last persisted snapshot, including `engineStackCursor`, and tells the UI it rolled back. One IndexedDB slot persists the game; a mismatched schema is deleted. A playtest pinned to an `exactVersionId` still uses the backend sandbox.
 - `AuthContext` is the site login session (password, GitHub or Google) and stores no Issue-write authorization; `LocaleContext` switches locale.
 
+### Agreed interaction design, pending implementation
+
+The following requirements were agreed during UI design. They describe the target behavior, not completed implementation.
+
+- Interaction Focus follows the authoritative request for the local Interaction Player and respects the existing hotseat privacy boundary. Occupation selection focuses the occupation hand. Minor improvement selection focuses the minor hand.
+- Room construction, fencing, stable construction, plowing, sowing, position selection, and animal reorganization focus the farm operation area. The target follows the requested input rather than the action-space name. When an operation also permits Card Field or card-owned animal slots, their controls appear beside the farm and share the same authoritative targets and local draft. The cards themselves retain their chronological positions.
+- The major improvement supply opens beside the improvement hand and remains a single view of the authoritative supply. Mixed improvement selection starts at the minor hand with an explicit major-supply control. A request with only legal major improvements focuses the open supply directly. A minor-only request exposes no major-purchase control.
+- On touch devices, a card tap opens its details. An explicit play control submits the choice. Closing details preserves the player's place in the hand.
+- Focus follows payment and other subsequent requests. It returns to the action area only after the entire action completes. Automatic focus runs once when a new request needs local input. Repeated snapshots do not interrupt manual browsing, and other players' actions do not move this player's viewport. A target already fully visible on desktop receives a highlight without extra scrolling.
+- Played occupations and improvements share one display ordered from earliest to latest by Played Card Chronology. New entries append at the end, from left to right and then top to bottom. Departed cards disappear. Replayed cards and cards newly acquired through upgrades or exchanges append at their new entry time. Ability triggers and card-state updates retain their positions. Undo restores the prior order, and reconnect preserves the current order. Parent Cards retain their separate area.
+- Chronology uses complete effective authoritative history at the snapshot projection boundary, before History Window trimming. The client does not infer order from grouped card arrays or snapshot arrival times.
+- Narrow screens retain the continuous page. Fixed controls must not cover operation targets or required controls. Fencing provides larger touch hit areas, visible edge selection, and a selected-edge count with its authoritative cost. Card details fit short viewports, and the operation bar prioritizes the current task with a shortcut back to its target.
+
+Verification covers mixed card chronology, departure and re-entry, upgrades, exchanges, undo, and reconnect after events leave the History Window. Interaction coverage includes consecutive card plays, payment continuations, farm and card-owned targets, and repeated snapshots. Mobile acceptance checks actual target visibility above fixed controls, fence touch targets, and detail dismissal with preserved scroll position on narrow portrait and short landscape screens. Touch behavior requires a real-device check.
+
 ## Game Context, Replay Viewer and Bug Report
 
 ```text
