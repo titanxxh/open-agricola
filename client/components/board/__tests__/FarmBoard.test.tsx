@@ -21,6 +21,7 @@ import { withActiveRegistry } from '../../../../shared/cards/active-registry'
 import { collectCardStatePresentation } from '../../../../shared/cards/card-state-presentation'
 import { projectParentCardState } from '../../../../shared/parents/father-completion'
 import { buildFarmBoardProjection } from '../../../app/farm-board-projection'
+import { getPlayedCardKeys } from '../../../../shared/domain/player'
 import { publicAssetUrl } from '../../../utils/public-asset-url'
 
 const manifestEntry = (
@@ -126,7 +127,7 @@ const createFarmBoardProps = (
   viewOverrides: Partial<FarmBoardProps['view']> = {},
   actionOverrides: Partial<FarmBoardProps['actions']> = {},
 ): FarmBoardProps => {
-  const displayPlayer = { ...player, cardStatePresentation: recordedPresentation(player) }
+  const displayPlayer = { ...player, playedCardChronology: getPlayedCardKeys(player), cardStatePresentation: recordedPresentation(player) }
   const projected = buildFarmBoardProjection({
     displayPlayer,
     interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
@@ -1593,7 +1594,7 @@ describe('FarmBoard', () => {
       anytimeActions: [],
     }
     const projection = buildFarmBoardProjection({
-      displayPlayer: { ...player, cardStatePresentation: recordedPresentation(player) },
+      displayPlayer: { ...player, playedCardChronology: ['minor:D075_WoodField'], cardStatePresentation: recordedPresentation(player) },
       interaction,
       selectionInteraction: interaction.request.selection,
       players: [player],

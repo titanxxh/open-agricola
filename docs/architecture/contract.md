@@ -66,6 +66,8 @@ Selected fields:
 
 **Persistence shapes.** `SerializedGameState` is the public network and Replay representation; its `engineStack` is always empty. `PersistedSessionSnapshot` stores authoritative `state`, public `frame` and a server-private `sessionCursor` (engine restoration data, history, provisional continuation metadata) that never reaches a viewer. Synchronization versions and connections are not part of `GameState`.
 
+**Played Card Chronology.** Snapshot players expose `playedCardChronology` as type-prefixed card keys in display order. Serialization derives each currently played card's latest entry from complete effective `card.played` and `card.swappedWithBoard` history before applying the History Window. Current played zones determine presence; state changes and ability triggers retain position. Live viewers and the Replay Board use this same projection. It is stripped during authoritative rehydration, and undo/recovery derive it again from restored effective history. Dev/setup cards with no entry event remain visible as an undated prefix; that prefix supplies no temporal evidence. Parent Cards remain separate. Tests: `server/__tests__/played-card-chronology-session.test.ts`, `e2e-tests/played-card-chronology.spec.ts`.
+
 Tests: `shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`, `shared/session/__tests__/{serialization-filter,serialization-archive-projection}.test.ts`.
 
 ## PlayerState by Responsibility

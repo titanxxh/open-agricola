@@ -1828,13 +1828,13 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         </div>
       ) : null}
       <div className="played-row">
-        {playedCardDisplays.map((card, index) => {
+        {playedCardDisplays.map((card) => {
           const { rawId, cardType } = card
           const futureEntries = futureCardResources[rawId] ?? []
           const cardDisplay = cardDisplayMap.get(rawId)
 
           return (
-            <div key={`played-${card.cardId}-${index}`} className="played-card-slot">
+            <div key={card.cardId} className="played-card-slot" data-played-card-key={card.cardId}>
               <PlayedCardStats
                 locale={locale}
                 rawId={rawId}

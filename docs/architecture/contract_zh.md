@@ -68,6 +68,8 @@
 
 **持久化形状。** `SerializedGameState` 是公开的网络与 Replay 表示，其 `engineStack` 永远为空。`PersistedSessionSnapshot` 保存权威 `state`、公开 `frame` 和服务端私有的 `sessionCursor`（引擎恢复数据、历史、暂定续行 metadata），后者从不发给任何视角。同步版本和连接不属于 `GameState`。
 
+**Played Card Chronology。** 快照玩家通过 `playedCardChronology` 按展示顺序提供带类型的卡牌 key。序列化在应用 History Window 之前，从完整有效的 `card.played` 和 `card.swappedWithBoard` 历史提取当前在场牌最近一次入场。是否在场以当前已打出区为准；牌上状态变化与能力触发不改变顺序。实时各视角和 Replay Board 读取同一投影。权威 rehydration 移除该字段，撤销与恢复后从有效历史重新生成。开发或测试预置且没有入场事件的牌保留在未定时前缀中，该前缀不能证明时间顺序。父母卡保持独立区域。测试：`server/__tests__/played-card-chronology-session.test.ts`、`e2e-tests/played-card-chronology.spec.ts`。
+
 测试：`shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`、`shared/session/__tests__/{serialization-filter,serialization-archive-projection}.test.ts`。
 
 ## PlayerState 按职责划分

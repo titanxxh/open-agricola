@@ -23,7 +23,6 @@ import {
   parsePositionKey,
   positionKey,
 } from '../../shared/domain/farm'
-import { getPlayedCardKeys } from '../../shared/domain/player'
 import type { CardStatePresentation, PublicCardMarker } from '../../shared/contract/card-state'
 import { getLeftBoardActionSpaceId } from '../../shared/cards/helpers/round-action-topology'
 import type { ParentCardId } from '../../shared/parents'
@@ -149,7 +148,7 @@ export type FarmBoardProjection = {
 }
 
 export type FarmBoardProjectionInput = {
-  displayPlayer: (PlayerState & { lockedFarmTileKeys?: readonly string[] }) | null | undefined
+  displayPlayer: (PlayerState & { lockedFarmTileKeys?: readonly string[]; playedCardChronology?: readonly string[] }) | null | undefined
   interaction: ClientInteractionState
   farmInteraction?: InteractionFarmSelection | null
   selectionInteraction: InteractionSelection | null | undefined
@@ -222,12 +221,12 @@ const buildParentCardDisplays = (
 }
 
 const buildPlayedCardDisplays = (
-  displayPlayer: PlayerState | null | undefined,
+  displayPlayer: FarmBoardProjectionInput['displayPlayer'],
   selectionInteraction: InteractionSelection | null | undefined,
   farmChoiceTargets: readonly ChoiceFarmTarget[],
 ): FarmBoardProjectionPlayedCardDisplay[] => {
   if (!displayPlayer) return []
-  return getPlayedCardKeys(displayPlayer).map((cardId) => {
+  return (displayPlayer.playedCardChronology ?? []).map((cardId) => {
     const { rawId, cardType } = splitPlayedCardKey(cardId)
     const facts = cardPresentation(displayPlayer)[rawId]
     const cardStacks = facts?.cropLayers?.map((layer) => layer.stack) ?? null
