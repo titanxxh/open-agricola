@@ -19,7 +19,7 @@ const cookie = (response: APIResponse, name: string) => {
   return header.value.split(';')[0]!.slice(name.length + 1)
 }
 
-export async function joinRoomClients(pages: [Page, Page], request: APIRequestContext) {
+export async function joinRoomClients(pages: [Page, Page], request: APIRequestContext, locale: 'en' | 'zh' = 'en') {
   const suffix = crypto.randomUUID().slice(0, 8)
   for (const [index, page] of pages.entries()) {
     const username = `lifecycle_${suffix}_${index}`
@@ -33,8 +33,8 @@ export async function joinRoomClients(pages: [Page, Page], request: APIRequestCo
     })
     expect(account.ok()).toBe(true)
     await page.context().addCookies([{ name: 'oa_session', value: cookie(account, 'oa_session'), url: FRONTEND_URL }])
-    await page.addInitScript(() => {
-      localStorage.setItem('open-agricola-locale-v2', 'en')
+    await page.addInitScript(locale => {
+      localStorage.setItem('open-agricola-locale-v2', locale)
       window.lifecycleMessages = []
       const NativeWebSocket = window.WebSocket
       window.WebSocket = class extends NativeWebSocket {
@@ -48,7 +48,7 @@ export async function joinRoomClients(pages: [Page, Page], request: APIRequestCo
           })
         }
       }
-    })
+    }, locale)
     await page.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
     await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
     await expect.poll(() => page.evaluate(() => window.lifecycleUpdate?.payload.state.players.length)).toBe(2)
