@@ -10,6 +10,7 @@ import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { ThroughTheSeasonsState } from '../seasons/types'
 import type { FarmersOfTheMoorState, FarmTerrainTile } from '../moor/types'
 import type { AnimalKey } from './animals'
+import type { SeasonalAdjustment } from './seasonal-adjustments'
 
 export type Resource = {
   wood: number
@@ -269,6 +270,7 @@ export type CardCostCandidateMetadata = {
   originalFeeIndex: number
   sources: string[]
   costAttribution?: CostAttributionBySource
+  seasonalAdjustments?: SeasonalAdjustment[]
 }
 
 export type CardCostCandidate = CardCostCandidateMetadata & {

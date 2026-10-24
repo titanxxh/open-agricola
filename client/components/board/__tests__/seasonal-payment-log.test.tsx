@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
-import type { ResourcePaidEvent } from '../../../../shared/contract/events'
+import type { CardPlayedEvent, ResourcePaidEvent } from '../../../../shared/contract/events'
 import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { ActionLog } from '../ActionLog'
 
@@ -12,6 +12,55 @@ const payment: ResourcePaidEvent = {
 }
 
 describe('seasonal payment log', () => {
+  it.each(['zh', 'en'] as const)('keeps an autumn major saving in its owning purchase row in %s', locale => {
+    const purchase: CardPlayedEvent = {
+      schemaVersion: 1, id: 'autumn-purchase', seq: 3, round: 7, phase: 'work', visibility: 'public',
+      actorPlayerId: 'p1', type: 'card.played', cardId: 'Major_Fireplace1', cardType: 'major',
+      payment: { resources: { clay: 1 }, paymentId: 'autumn-payment',
+        bonusSources: ['through-the-seasons:autumn'],
+        seasonalAdjustments: [{ season: 'autumn', resources: { clay: -1 } }] },
+    }
+    const log = eventsToLogEntries([
+      { ...payment, id: 'autumn-payment', paymentId: 'autumn-payment', paymentFor: 'major-improvement',
+        resources: { clay: 1 }, seasonalAdjustments: [{ season: 'autumn', resources: { clay: -1 } }] },
+      purchase,
+    ], { playerNames: { p1: 'Alice' } })
+    const { container } = render(<ActionLog locale={locale} log={log} currentRound={7} />)
+    expect(container.querySelectorAll('li')).toHaveLength(1)
+    expect(container).toHaveTextContent(locale === 'zh' ? '秋季减免' : 'Autumn: costs')
+    expect(container.querySelectorAll('[data-resource="clay"][data-amount="1"]')).toHaveLength(2)
+    expect(container).not.toHaveTextContent('through-the-seasons')
+  })
+
+  it.each(['zh', 'en'] as const)('explains a zero-price major without hiding its autumn saving in %s', locale => {
+    const purchase: CardPlayedEvent = {
+      schemaVersion: 1, id: 'autumn-free-purchase', seq: 3, round: 7, phase: 'work', visibility: 'public',
+      actorPlayerId: 'p1', type: 'card.played', cardId: 'Major_Fireplace1', cardType: 'major',
+      payment: { resources: {}, bonusSources: ['C122_Bricklayer', 'through-the-seasons:autumn'],
+        seasonalAdjustments: [{ season: 'autumn', resources: { clay: -1 } }] },
+    }
+    const log = eventsToLogEntries([purchase], { playerNames: { p1: 'Alice' } })
+    const { container } = render(<ActionLog locale={locale} log={log} currentRound={7} />)
+    const row = container.querySelector('li')!
+    expect(row).toHaveTextContent(locale === 'zh' ? '支付 0' : 'Pays 0')
+    expect(row).toHaveTextContent(locale === 'zh' ? '秋季减免' : 'Autumn: costs')
+    expect(row.querySelectorAll('[data-resource="clay"][data-amount="1"]')).toHaveLength(1)
+    expect(row).toHaveTextContent(locale === 'zh' ? '砌砖工' : 'Bricklayer')
+    expect(row).not.toHaveTextContent('through-the-seasons')
+  })
+
+  it('does not infer an autumn amount from an older purchase source string', () => {
+    const purchase: CardPlayedEvent = {
+      schemaVersion: 1, id: 'old-autumn-purchase', seq: 3, round: 7, phase: 'work', visibility: 'public',
+      actorPlayerId: 'p1', type: 'card.played', cardId: 'Major_Fireplace1', cardType: 'major',
+      payment: { resources: { clay: 1 }, bonusSources: ['through-the-seasons:autumn'] },
+    }
+    const log = eventsToLogEntries([purchase], { playerNames: { p1: 'Alice' } })
+    const { container } = render(<ActionLog locale="en" log={log} currentRound={7} />)
+    expect(container).not.toHaveTextContent('Autumn')
+    expect(container.querySelectorAll('[data-resource="clay"]')).toHaveLength(1)
+  })
+
   it.each([
     ['zh', '支付', '春季减免'],
     ['en', 'Pays', 'Spring: costs'],

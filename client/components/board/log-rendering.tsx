@@ -417,6 +417,7 @@ export const prepareLogEntry = (
     params.returned = ''
     params.via = ''
     const costResources = params.costResources as PaymentResourceMap | undefined
+    const seasonalParts = renderSeasonalCostAdjustments(locale, params.seasonalAdjustments as SeasonalAdjustment[] | undefined)
     if (costResources && typeof costResources === 'object') {
       richParams.cost = (
         <>
@@ -425,8 +426,10 @@ export const prepareLogEntry = (
             locale,
             'log.costs',
             {},
-            { resources: <ResourceLine locale={locale} mode="payment" resources={costResources} /> },
+            { resources: <ResourceLine locale={locale} mode="payment" resources={costResources}
+              emptyLabel={seasonalParts.length ? '0' : undefined} /> },
           )}
+          {seasonalParts.map((part, index) => <Fragment key={index}>{' · '}{part}</Fragment>)}
         </>
       )
     } else {

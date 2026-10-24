@@ -10,9 +10,12 @@ import type {
   Resource,
 } from '../../../contract/types'
 import { PAYMENT_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import type { SeasonalAdjustment } from '../../../contract/seasonal-adjustments'
 import { isComplexCost } from './affordability'
 
 const cloneResources = (resources: PaymentResourceMap): PaymentResourceMap => ({ ...resources })
+const cloneSeasonalAdjustments = (adjustments: SeasonalAdjustment[]): SeasonalAdjustment[] =>
+  adjustments.map(adjustment => ({ ...adjustment, resources: { ...adjustment.resources } }))
 
 const hasPositiveResources = (resources: PaymentResourceMap | undefined): boolean =>
   Object.values(resources ?? {}).some((amount) => typeof amount === 'number' && amount > 0)
@@ -38,6 +41,9 @@ const cloneCandidate = (candidate: CardCostCandidate): CardCostCandidate => ({
   ...(candidate.costAttribution
     ? { costAttribution: cloneCostAttribution(candidate.costAttribution) }
     : {}),
+  ...(candidate.seasonalAdjustments?.length
+    ? { seasonalAdjustments: cloneSeasonalAdjustments(candidate.seasonalAdjustments) }
+    : {}),
 })
 
 const candidateKey = (candidate: CardCostCandidate) =>
@@ -49,6 +55,7 @@ const candidateKey = (candidate: CardCostCandidate) =>
     // Sources are an unordered contribution set: closure derivation chains
     // may append the same cards in different orders.
     sources: [...candidate.sources].sort(),
+    ...(candidate.seasonalAdjustments?.length ? { seasonalAdjustments: candidate.seasonalAdjustments } : {}),
   })
 
 /** Dedupe key used by the candidate closure over card cost candidates. */
@@ -133,8 +140,7 @@ export const addCardCostCandidateAttribution = (
 ): CardCostCandidate => {
   const costAttribution = mergeCostAttribution(candidate.costAttribution, source, delta)
   return {
-    resources: cloneResources(candidate.resources),
-    originalFeeIndex: candidate.originalFeeIndex,
+    ...cloneCandidate(candidate),
     sources: appendSource(candidate.sources, source),
     ...(costAttribution ? { costAttribution } : {}),
   }
@@ -226,6 +232,9 @@ export const buildCandidateMetadataByFeeIndex = (
       sources: [...candidate.sources],
       ...(candidate.costAttribution
         ? { costAttribution: cloneCostAttribution(candidate.costAttribution) }
+        : {}),
+      ...(candidate.seasonalAdjustments?.length
+        ? { seasonalAdjustments: cloneSeasonalAdjustments(candidate.seasonalAdjustments) }
         : {}),
     }
   })
