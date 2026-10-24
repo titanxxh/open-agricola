@@ -15,7 +15,6 @@ type LocaleScenario = {
   actionArea: string
   score: string
   log: string
-  expand: string
   close: string
   scoreBreakdown: string[]
   plowPrompt: string
@@ -32,7 +31,6 @@ const ENGLISH: LocaleScenario = {
   actionArea: 'Action Spaces',
   score: 'Scoring Pad',
   log: 'Action Log',
-  expand: 'expand',
   close: 'Close',
   scoreBreakdown: ['Fields', 'Pastures', 'Grain', 'Vegetables', 'Family members', 'Cards', 'Card bonus'],
   plowPrompt: 'Select a tile to plow',
@@ -44,7 +42,6 @@ const CHINESE: LocaleScenario = {
   actionArea: '行动区',
   score: '计分板',
   log: '行动记录',
-  expand: '展开',
   close: '关闭',
   scoreBreakdown: ['田地', '圈地', '谷物', '蔬菜', '家庭成员', '卡牌分', '卡牌加分'],
   plowPrompt: '选择要开垦的田地',
@@ -244,7 +241,7 @@ const completePlowInteraction = async (page: Page, locale: LocaleScenario) => {
   await expectTouchTarget(farmland)
   await farmland.click()
   await expect(page.locator('.action-board')).toBeVisible()
-  await expect(page.locator('.farm-grid')).toBeVisible()
+  await expect(page.locator('.game-layout__center .farm-grid')).toBeVisible()
   await expect(page.locator('.interaction-bar__body')).toContainText(locale.plowPrompt)
   const tile = page.locator('.farm-tile.selectable').first()
   await expectTouchTarget(tile)
@@ -260,20 +257,18 @@ const inspectMobileInformation = async (
   locale: LocaleScenario,
   playerCount: number,
 ) => {
-  await expect(page.locator('.farm-grid')).toBeVisible()
+  await expect(page.locator('.game-layout__center .farm-grid')).toBeVisible()
 
   const information = page.locator('.game-layout__right')
-  const logSection = information.locator('.section', {
-    has: page.locator('.section__title', { hasText: locale.log }),
-  })
+  const log = information.locator('.action-log')
+  await expect(log).toBeVisible()
   const board = await openScoringBoard(page, locale)
   await expect(board.locator('.scoring-header-row .scoring-player-name')).toHaveCount(playerCount)
   for (const label of locale.scoreBreakdown) {
     await expect(board.getByText(label, { exact: true })).toBeVisible()
   }
   await board.getByRole('button', { name: locale.close, exact: true }).click()
-  await logSection.getByRole('button', { name: locale.expand }).click()
-  await expect(logSection.locator('.action-log__entry').first()).toBeVisible()
+  await expect(log.locator('.action-log__entry').first()).toBeVisible()
 }
 
 const openScoringBoard = async (page: Page, locale: LocaleScenario) => {
@@ -362,7 +357,7 @@ for (const variants of WORKSHOP_VARIANTS) {
       variants.moor ? 1 : 0,
     )
 
-    await expect(sandbox.locator('.farm-grid')).toBeVisible()
+    await expect(sandbox.locator('.game-layout__center .farm-grid')).toBeVisible()
     await expect(sandbox.locator('.game-layout__right')).toBeVisible()
   })
 }
@@ -435,7 +430,7 @@ test.describe('iOS Safari browser smoke @webkit @ios-safari', () => {
     await page.locator('.action-board-precision-toggle').click()
     await page.locator('[data-action-id="farmland"] button').first().click()
     await expect(page.locator('.action-board')).toBeVisible()
-    await expect(page.locator('.farm-grid')).toBeVisible()
+    await expect(page.locator('.game-layout__center .farm-grid')).toBeVisible()
     await expect(page.locator('.interaction-bar__body')).toContainText(ENGLISH.plowPrompt)
     expect(await page.locator('.interaction-bar').evaluate(element =>
       Number.parseFloat(getComputedStyle(element).paddingBottom),
