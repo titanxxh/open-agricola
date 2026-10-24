@@ -4828,6 +4828,47 @@
   color: #7a5a3a;
   text-align: right;
 }
+@media (max-width: 1100px) {
+  .scoring-overlay {
+    --scoring-label-min-width: 0px;
+    --scoring-player-min-width: 0px;
+    padding: 16px 8px;
+  }
+  .scoring-pad { width: 100%; }
+  .scoring-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+  .scoring-title { font-size: 16px; }
+  .scoring-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .scoring-header button { padding: 8px 10px; }
+  .scoring-content { padding: 8px 8px 16px; }
+  .scoring-row {
+    gap: 4px;
+    padding: 8px 6px;
+    font-size: 14px;
+  }
+  .scoring-header-row {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .scoring-cell {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .scoring-player-name { text-align: right; }
+  .scoring-cell-resources {
+    max-width: 100%;
+    justify-content: flex-end;
+  }
+  .scoring-cell-resources .resource-inline-item { padding-inline: 0; }
+}
 .exchange-overlay {
   position: fixed;
   inset: 0;

@@ -169,7 +169,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     }
   })
 
-  const gridTemplateColumns = `minmax(160px, 1.3fr) repeat(${scores.length}, minmax(120px, 1fr))`
+  const gridTemplateColumns = `minmax(var(--scoring-label-min-width, 160px), 1.3fr) repeat(${scores.length}, minmax(var(--scoring-player-min-width, 120px), 1fr))`
 
   return (
     <div className="scoring-overlay">
@@ -347,7 +347,7 @@ const STATS_ROWS: StatRow[] = [
 ]
 
 const StatsTab = ({ locale, players }: { locale: Locale; players: PlayerState[] }) => {
-  const gridTemplateColumns = `minmax(180px, 1.3fr) repeat(${players.length}, minmax(120px, 1fr))`
+  const gridTemplateColumns = `minmax(var(--scoring-label-min-width, 180px), 1.3fr) repeat(${players.length}, minmax(var(--scoring-player-min-width, 120px), 1fr))`
   return (
     <div className="scoring-content scoring-stats-tab">
       <div className="scoring-grid">
