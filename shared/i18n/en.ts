@@ -680,6 +680,8 @@ export const en = {
     devTargetHint: '↓ Actions below target this player',
     cardCopy: 'Copy ID',
     cardCopied: 'Copied!',
+    cardDetails: 'Card details',
+    cardPlay: 'Play this card',
     choiceFuturefield: 'Optional: plow {amount} field(s)',
     choiceFuturestable: 'Optional: build {amount} stable(s)',
     choiceFutureforest: 'Optional: place {amount} forest tile(s)',

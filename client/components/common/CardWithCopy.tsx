@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { CardHoverPreview } from './CardHoverPreview'
+import { CardDetails } from './CardDetails'
+
+export type CardTouchInteraction = { kind: 'inspect' } | { kind: 'play'; requestKey: string }
 
 type Props = {
   locale: Locale
@@ -9,6 +12,7 @@ type Props = {
   className?: string
   onClick?: () => void
   disabled?: boolean
+  touchInteraction?: CardTouchInteraction
   devMode?: boolean
   enablePreview?: boolean
   previewCard?: ReactNode
@@ -31,6 +35,7 @@ export const CardWithCopy = ({
   className = '',
   onClick,
   disabled,
+  touchInteraction,
   devMode = false,
   enablePreview = true,
   previewCard,
@@ -52,6 +57,10 @@ export const CardWithCopy = ({
   })
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const [touchPinned, setTouchPinned] = useState(false)
+  const touchGestureRef = useRef<{ x: number; y: number; moved: boolean } | null>(null)
+  const submittedRequestRef = useRef<string | null>(null)
+  const [details, setDetails] = useState<{ requestKey: string | null } | null>(null)
+  const [submittedRequest, setSubmittedRequest] = useState<string | null>(null)
 
   const clearShowTimer = () => {
     if (showTimerRef.current !== null) {
@@ -156,7 +165,12 @@ export const CardWithCopy = ({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     longPressFiredRef.current = false
+    touchGestureRef.current = null
     if (e.pointerType === 'mouse') return
+    if (touchInteraction && enablePreview && previewCard) {
+      touchGestureRef.current = { x: e.clientX, y: e.clientY, moved: false }
+      return
+    }
     if (!enablePreview || !previewCard) return
     clearLongPressTimer()
     pressStartRef.current = { x: e.clientX, y: e.clientY }
@@ -173,6 +187,10 @@ export const CardWithCopy = ({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse') return
+    const gesture = touchGestureRef.current
+    if (gesture && (e.clientX - gesture.x) ** 2 + (e.clientY - gesture.y) ** 2 > LONG_PRESS_MOVE_THRESHOLD_SQ) {
+      gesture.moved = true
+    }
     const start = pressStartRef.current
     if (!start) return
     const dx = e.clientX - start.x
@@ -186,13 +204,32 @@ export const CardWithCopy = ({
     if (e.pointerType !== 'mouse') clearLongPressTimer()
   }
 
-  const handleClick = useCallback(() => {
+  const handleClick = () => {
+    const gesture = touchGestureRef.current
+    touchGestureRef.current = null
+    if (gesture && touchInteraction && previewCard) {
+      if (!gesture.moved) {
+        clearShowTimer()
+        clearHideTimer()
+        setAnchor(null)
+        setDetails({ requestKey: touchInteraction.kind === 'play' ? touchInteraction.requestKey : null })
+      }
+      return
+    }
     if (longPressFiredRef.current) {
       longPressFiredRef.current = false
       return
     }
-    onClick?.()
-  }, [onClick])
+    if (!disabled) onClick?.()
+  }
+
+  const closeDetails = () => {
+    setDetails(null)
+    rootRef.current?.focus({ preventScroll: true })
+  }
+  const canPlayDetails = details?.requestKey !== null && touchInteraction?.kind === 'play' &&
+    details?.requestKey === touchInteraction.requestKey && !disabled && !!onClick &&
+    submittedRequest !== touchInteraction.requestKey
 
   const keyboardPreview = enablePreview && !!previewCard
 
@@ -207,7 +244,10 @@ export const CardWithCopy = ({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={(event) => {
+          if (touchGestureRef.current) touchGestureRef.current.moved = true
+          handlePointerUp(event)
+        }}
         aria-disabled={disabled}
         tabIndex={keyboardPreview ? 0 : undefined}
         onFocus={(event) => {
@@ -221,6 +261,10 @@ export const CardWithCopy = ({
           evaluate()
         }}
         onKeyDown={(event) => {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ') && onClick && !disabled) {
+            event.preventDefault()
+            onClick()
+          }
           if (event.key === 'Escape') {
             clearShowTimer()
             clearHideTimer()
@@ -232,6 +276,23 @@ export const CardWithCopy = ({
       >
         {children}
       </div>
+      {details && previewCard && (
+        <CardDetails
+          locale={locale}
+          card={previewCard}
+          onClose={closeDetails}
+          play={details.requestKey === null ? undefined : {
+            disabled: !canPlayDetails,
+            onPlay: () => {
+              if (!canPlayDetails || touchInteraction?.kind !== 'play' || submittedRequestRef.current === touchInteraction.requestKey) return
+              submittedRequestRef.current = touchInteraction.requestKey
+              setSubmittedRequest(touchInteraction.requestKey)
+              onClick?.()
+              closeDetails()
+            },
+          }}
+        />
+      )}
       {anchor && previewCard && (
         <CardHoverPreview
           locale={locale}
