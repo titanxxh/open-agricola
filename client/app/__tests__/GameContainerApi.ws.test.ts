@@ -85,6 +85,8 @@ describe('GameContainerApi WS player identity', () => {
       'game-container-helpers.ts',
       '__tests__/GameContainerApi.ws.test.ts',
       '__tests__/interaction-presentation.test.ts',
+      // Snapshot chronology fixtures contain type-prefixed card keys, not choice parsing.
+      '__tests__/farm-board-projection.test.ts',
     ])
     const offenders = listAppSourceFiles(appDir).flatMap((file) => {
       const rel = path.relative(appDir, file).split(path.sep).join('/')
