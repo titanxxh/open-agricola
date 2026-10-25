@@ -13,6 +13,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { glob } from 'glob'
 import { extractReferencesFromFiles, type StaticRef, type DynamicRef } from './i18n/extract-references'
+import { prepareLanguagePacks } from './prepare-language-packs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -72,6 +73,7 @@ export function computeAuditResult(
 }
 
 async function main() {
+  await prepareLanguagePacks(REPO_ROOT)
   const args = process.argv.slice(2)
   const writeJson = args.includes('--json')
   const noFail = args.includes('--no-fail')

@@ -1,5 +1,6 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config.ts'
+import { prepareLanguagePacks } from './scripts/prepare-language-packs.ts'
 import {
   BASE_EXCLUDE,
   FAST_CARD_RUNTIME_INCLUDE,
@@ -16,6 +17,8 @@ import {
   SHARED_EXCLUDE,
   SLOW_INCLUDE,
 } from './scripts/test-project-globs.ts'
+
+await prepareLanguagePacks()
 
 // React component tests under client/ that touch the DOM (use @testing-library/react's
 // `render()`, expect `document`/`window`, etc.) MUST opt in to jsdom by adding this pragma
