@@ -28,7 +28,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
     ]
     expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-    const anytime = page.locator('.anytime-bar button').filter({ hasText: scenario.locale === 'en' ? 'Whisky Distiller' : '威士忌酿酒师' })
+    const anytime = page.locator('.anytime-bar button').filter({ hasText: scenario.locale === 'en' ? 'Whisky Distiller' : '威士忌蒸馏师' })
     await expect(anytime).toHaveCount(1)
     await expect(anytime.locator('[data-resource="food"]')).toHaveAttribute('data-amount', '4')
     await expect(anytime.locator('[data-resource="grain"]')).toHaveAttribute('data-amount', '1')
