@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
-import { getPlayerDisplayName } from '../client/utils/player-name'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening } from './fixtures'
 
 type HotseatProbe = { socket: WebSocket; payload?: GameSyncPayload; sent: Array<{ type: string }> }
@@ -48,9 +47,9 @@ const confirmHandoff = async (page: Page, name: string) => {
 }
 const browse = async (page: Page, name: string, mobile: boolean) => {
   if (mobile) {
-    await page.getByRole('button', { name: '切换玩家视角' }).click()
+    await page.getByRole('button', { name: 'Switch player view' }).click()
     await page.getByRole('listbox').getByRole('option', { name: new RegExp(name) }).click()
-    await expect(page.getByRole('button', { name: '切换玩家视角' })).toContainText(name)
+    await expect(page.getByRole('button', { name: 'Switch player view' })).toContainText(name)
   } else {
     await page.getByRole('tab', { name: new RegExp(name) }).click()
     await expect(page.getByRole('tab', { name: new RegExp(name) })).toHaveAttribute('aria-selected', 'true')
@@ -120,7 +119,7 @@ test('real hotseat Moor drafts stay private during public browsing and remain us
   await finishHotseatOpening(page)
   const initial = await snapshot(page)
   expect(initial.state.players).toHaveLength(2)
-  const names = initial.state.players.map((player, index) => getPlayerDisplayName('en', player.name, index, player.nameIsDefault))
+  const names = ['Alice', 'Player 2']
   const cutPeat = page.locator('[data-card-id="moor-special-1-2-terrain"]').getByRole('button', { name: 'Cut Peat', exact: true })
   await expect(cutPeat).toBeEnabled()
   await page.evaluate(() => { window.hotseatProbe.sent = [] })
@@ -179,7 +178,7 @@ test('real hotseat public farms stay read-only on desktop/mobile, across reconne
   await finishHotseatOpening(page)
   const initial = await snapshot(page)
   expect(initial.state.players).toHaveLength(2)
-  const names = initial.state.players.map((player, index) => getPlayerDisplayName('en', player.name, index, player.nameIsDefault))
+  const names = ['Alice', 'Player 2']
   await expect(page.locator('[data-hand-anchor="p1"]')).toBeVisible()
 
   for (const mobile of [false, true]) {
