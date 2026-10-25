@@ -41,14 +41,13 @@ const readInitialStep = (manifest: ReplayManifest): number => {
     : manifest.firstStepNo
 }
 
-function ReportedEvidenceViewer() {
+function ReportedEvidenceViewer({ locale }: { locale: Locale }) {
   const params = new URLSearchParams(window.location.search)
   const roomId = params.get('room') ?? ''
   const viewerBuildId = params.get('viewer') ?? ''
   const perspective = params.get('perspective') ?? ''
   const stepNo = Number(params.get('step'))
   const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
-  const locale: Locale = params.get('locale') ?? 'zh'
   const text = labels(locale)
   const [evidence, setEvidence] = useState<ReportedEvidence | null>(null)
   let parentOrigin = ''
@@ -114,11 +113,10 @@ function ReportedEvidenceViewer() {
   )
 }
 
-function ArchiveReplayViewer() {
+function ArchiveReplayViewer({ locale }: { locale: Locale }) {
   const params = new URLSearchParams(window.location.search)
   const roomId = params.get('room') ?? ''
   const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
-  const locale: Locale = params.get('locale') ?? 'zh'
   const text = labels(locale)
   const [manifest, setManifest] = useState<ReplayManifest | null>(null)
   const [error, setError] = useState<ReplayUnavailableError | null>(null)
@@ -470,8 +468,8 @@ function ArchiveReplayViewer() {
   )
 }
 
-export function ReplayViewer() {
+export function ReplayViewer({ locale }: { locale: Locale }) {
   return new URLSearchParams(window.location.search).get('mode') === 'reported-evidence'
-    ? <ReportedEvidenceViewer />
-    : <ArchiveReplayViewer />
+    ? <ReportedEvidenceViewer locale={locale} />
+    : <ArchiveReplayViewer locale={locale} />
 }

@@ -346,6 +346,7 @@ export function ReplayBoard({
       <section className="replay-board__farm" aria-label="Player farm">
         <StageBar currentRound={state.round} locale={locale} />
         <PlayerTabs
+          locale={locale}
           players={state.players.map((player, index) => ({
             id: player.id,
             name: getPlayerDisplayName(locale, player.name, index, player.nameIsDefault),

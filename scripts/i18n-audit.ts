@@ -26,6 +26,8 @@ const SCAN_GLOBS = [
   'src/**/*.tsx',
   'client/**/*.ts',
   'client/**/*.tsx',
+  'replay-viewer/src/**/*.ts',
+  'replay-viewer/src/**/*.tsx',
 ]
 
 const EXCLUDE_PATTERNS = [

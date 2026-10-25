@@ -102,7 +102,7 @@ describe('ReplayViewer recovery', () => {
       }],
     }
 
-    render(<ReplayViewer />)
+    render(<ReplayViewer locale="en" />)
     fireEvent(window, new MessageEvent('message', {
       source: window.parent,
       origin: parentOrigin,
@@ -141,7 +141,7 @@ describe('ReplayViewer recovery', () => {
       .mockImplementationOnce(() => response(unavailable))
       .mockImplementationOnce(() => response(unavailable))
 
-    render(<ReplayViewer />)
+    render(<ReplayViewer locale="en" />)
     await screen.findByText('replay_segment_unavailable')
     fireEvent.click(screen.getByText('000').closest('button')!)
 
@@ -172,7 +172,7 @@ describe('ReplayViewer recovery', () => {
         steps: [{ ...first, frame: { players: [] } }],
       }))
 
-    render(<ReplayViewer />)
+    render(<ReplayViewer locale="en" />)
     await screen.findByText('visible replay frame')
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
@@ -221,7 +221,7 @@ describe('ReplayViewer recovery', () => {
         }],
       }))
 
-    render(<ReplayViewer />)
+    render(<ReplayViewer locale="en" />)
     await screen.findByText('Scoring Pad')
     expect(screen.getByText('+12')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))

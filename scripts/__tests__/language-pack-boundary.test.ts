@@ -9,7 +9,7 @@ describe('external language package boundary', () => {
   it('keeps translated application copy outside the game source repository', () => {
     expect(globSync('shared/i18n/**/*.{json,json5}')).toEqual([])
     const embedded: string[] = []
-    for (const file of globSync('client/**/*.{ts,tsx}', { ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'] })) {
+    for (const file of globSync(['client/**/*.{ts,tsx}', 'replay-viewer/src/**/*.{ts,tsx}', 'shared/events/public-event-presentation.ts'], { ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'] })) {
       const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
       const visit = (node: ts.Node) => {
         if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node) || ts.isJsxText(node))

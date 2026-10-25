@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../../contract/events'
+import { registerLanguagePack } from '../../i18n'
 import * as publicEventPresentation from '../public-event-presentation'
 import { collectPublicEventFeedback } from '../public-event-presentation'
 
@@ -14,6 +15,26 @@ const base = {
 } as const
 
 describe('public event presentation', () => {
+  it('uses a third language package for public notifications and accumulation targets', () => {
+    registerLanguagePack({ version: 1, locale: 'fr-public-events', messages: {
+      'resources.wood': 'bois',
+      'resources.clay': 'argile',
+      'ui.publicEvents.resourceSeparator': ' et ',
+      'ui.publicEvents.resourcesPaid': 'Ressources payées : {paid}',
+      'ui.publicEvents.roundTarget': 'manche {round}',
+      'ui.publicEvents.resourceAccumulated': 'Ressources accumulées : {target} + {resources}',
+    } })
+    const events = [
+      { ...base, type: 'resource.paid', resources: { wood: 1, clay: 2 }, paymentFor: 'bonus' },
+      { ...base, id: 'evt-accumulated', seq: 2, type: 'resource.accumulated', resources: { wood: 2 }, to: { kind: 'roundCard', round: 3 } },
+    ] satisfies GameEvent[]
+
+    expect(collectPublicEventFeedback(events, 'fr-public-events').notifications).toEqual([
+      { id: 'evt', kind: 'payment', message: 'Ressources payées : 1 bois et 2 argile' },
+      { id: 'evt-accumulated', kind: 'resource', message: 'Ressources accumulées : manche 3 + 2 bois' },
+    ])
+  })
+
   it('keeps detailed cue collectors behind the public feedback entrypoint', () => {
     expect(Object.keys(publicEventPresentation).sort()).toEqual([
       'collectNewPublicEventFeedback',

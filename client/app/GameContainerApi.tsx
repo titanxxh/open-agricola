@@ -1820,6 +1820,7 @@ export const GameContainerApi = () => {
   })
   const playerTabsPresentation = (
     <PlayerTabs
+      locale={locale}
       players={state.players.map((p, i) => ({
         id: p.id,
         name: playerNames[p.id],
