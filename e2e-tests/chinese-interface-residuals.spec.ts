@@ -99,7 +99,14 @@ for (const { label, desc, expected } of [
   { label: 'complete locale', desc: ['建造房间时，费用减少 2 木材。'], expected: '建造房间时，费用减少 2 木材。' },
   { label: 'partial locale', desc: [], expected: 'When you build a room, the cost is reduced by 2 wood.' },
 ]) {
-  test(`workshop ${label} preview and actual sandbox preserve visible card text and localized default names`, async ({ page, request }) => {
+  test(`workshop ${label} preview and actual sandbox preserve visible card text and localized default names`, async ({ page, request }, testInfo) => {
+    const invalidCardArtRequests: string[] = []
+    page.on('request', observed => {
+      const path = new URL(observed.url()).pathname
+      if (/\/assets\/(?:revised|moor|player56)\/(?:[^/]+\/)*(?:O\d+|CUSTOM_[^/]+)\.(?:png|webp|jpe?g|svg)$/i.test(path)) {
+        invalidCardArtRequests.push(observed.url())
+      }
+    })
     await page.addInitScript(() => {
       localStorage.setItem('open-agricola-locale-v2', 'zh')
       const url = new URL(location.href)
@@ -138,6 +145,9 @@ for (const { label, desc, expected } of [
       label === 'complete locale' ? '中文补充规则。' : 'Source supplemental ruling.',
     )
     if (label === 'complete locale') await expect(preview).not.toContainText('When you build a room')
+    await expect(preview.locator('.card-icon')).toHaveCSS('background-image', 'none')
+    expect(invalidCardArtRequests).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath('workshop-without-card-art.png'), fullPage: false })
     await page.locator('.aicw-stage-rail button').filter({ hasText: '本地化' }).click()
     await page.getByRole('button', { name: label === 'complete locale' ? '检查本地化' : '开始本地化', exact: true }).click()
     const localization = page.getByRole('dialog', { name: '本地化', exact: true })
@@ -168,6 +178,7 @@ for (const { label, desc, expected } of [
     await expect(game.locator('.game-layout')).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
     await expect(game.getByRole('button', { name: '设置回合号', exact: true })).toBeVisible()
     await expect(game.locator('.dev-panel')).toContainText('仅修改回合号，不收回工人、不补充累积资源、不执行收获。')
+    expect(invalidCardArtRequests).toEqual([])
   })
 }
 
