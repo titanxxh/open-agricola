@@ -597,7 +597,7 @@ describe('authoritative Exchange Batch', () => {
     const heating = finishFeeding(restored, restored.getState())
     expect(heating.ok, heating.error).toBe(true)
     expect(heating.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0,
-      request: { kind: 'heating', required: 2, maxWoodConvertibleToFuel: 1 } })
+      request: { kind: 'heating', required: 2 } })
     expect(heating.state.players[0]!.resources).toMatchObject({ boar: 0, food: 0, wood: 1, fuel: 1, begging: 0 })
     const undone = restored.undoStep()
     expect(undone.ok, undone.error).toBe(true)
@@ -613,7 +613,7 @@ describe('authoritative Exchange Batch', () => {
     expect(originalKey).toBeTypeOf('string')
     expect(repeatedKey).toBeTypeOf('string')
     expect(repeatedKey).not.toBe(originalKey)
-    const settled = restored.resolveChoice(0, 'confirm', { fuelUsed: 2, woodToFuel: 1 })
+    const settled = restored.resolveChoice(0, 'confirm', { fuelUsed: 2, selections: [{ sourceId: '__basic__', exchangeIndex: 2, count: 1 }] })
     expect(settled.ok, settled.error).toBe(true)
     expect(settled.state.players[0]!.resources).toMatchObject({ boar: 0, food: 0, wood: 0, fuel: 0, begging: 0 })
     expect(settled.state.players[0]!.sickWorkerIds ?? []).toEqual([])

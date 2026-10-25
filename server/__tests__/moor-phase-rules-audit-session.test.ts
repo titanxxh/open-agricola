@@ -123,6 +123,11 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     }
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.farmTerrain).toEqual(mode === 'accept' ? [{ row: 2, col: 3, kind: 'forest' }] : [])
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      expect(response.interaction.request.options).toContainEqual(expect.objectContaining({ labelKey: 'actions.exchange.name' }))
+      response = session.resolveChoice(response.interaction.playerIndex, '__pass__')
+      expect(response.ok, response.error).toBe(true)
+    }
     expect(response.state.futureMeeples.some((entry) => entry.cardId === 'M048_ForestSwamp')).toBe(false)
     const delivered = structuredClone(response.state.players[0]!.farmTerrain)
     response = advanceMoorAuditToRound(session, 10)
@@ -259,7 +264,7 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     }
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.request).toMatchObject({ kind: 'heating', required: 2 })
-    response = session.resolveChoice(0, 'confirm', { fuelUsed: 2 - woodToFuel, woodToFuel })
+    response = session.resolveChoice(0, 'confirm', { fuelUsed: 2 - woodToFuel, selections: woodToFuel > 0 ? [{ sourceId: '__basic__', exchangeIndex: 2, count: woodToFuel }] : [] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 19 - woodToFuel, fuel: 19 + woodToFuel * 2 })
     expect(response.state.players[0]!.sickWorkerIds ?? []).toEqual([])

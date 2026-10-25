@@ -74,6 +74,28 @@ const tradeOption = (
 })
 
 describe('useExchangeDraftPresentation', () => {
+  it('uses shared counters for heating and updates fuel payment and sickness after wood conversion', () => {
+    const player = mkPlayer({ resources: { ...emptyResources, wood: 2, fuel: 1 } })
+    const { result } = renderHook(() => useExchangeDraftPresentation({
+      state: { players: [player] }, pendingChoice: null,
+      interactionPresentationPlan: {
+        kind: 'heating', playerIndex: 0, playerId: 'p1', required: 2, requiredWithWoodConversion: 2,
+        maxNewSickWorkers: 2, placedAnimals: {}, exchangeCatalog: [
+          { sourceId: '__basic__', exchangeIndex: 2, from: { wood: 1 }, to: { fuel: 1 } },
+        ],
+      }, locale: 'en', cardLabel: id => id, getCardMeta: () => undefined,
+    }))
+    expect(result.current.harvest.heating).toMatchObject({ fuelUsed: 1, sickWorkers: 1 })
+    act(() => result.current.harvest.updateCount('__basic__-ex2', 1))
+    expect(result.current.harvest.heating).toMatchObject({ fuelUsed: 2, sickWorkers: 0 })
+    expect(result.current.harvest.selections).toEqual([expect.objectContaining({ sourceId: '__basic__', exchangeIndex: 2, count: 1 })])
+    act(() => result.current.harvest.heating?.updatePayment(-1))
+    expect(result.current.harvest.heating).toMatchObject({ fuelUsed: 1, sickWorkers: 1 })
+    act(() => result.current.harvest.reset())
+    expect(result.current.harvest.heating).toMatchObject({ fuelUsed: 1, sickWorkers: 1 })
+    expect(result.current.harvest.selections).toEqual([])
+  })
+
   it('includes food received during a nested trade when returning to feeding', () => {
     const player = mkPlayer({ resources: { ...emptyResources, food: 2 } })
     const { result } = renderHook(() => useExchangeDraftPresentation({
@@ -81,8 +103,8 @@ describe('useExchangeDraftPresentation', () => {
       interactionPresentationPlan: { kind: 'harvest-feed', playerIndex: 0, remaining: 3, foodUsed: 1 },
       locale: 'en', cardLabel: (id: string) => id, getCardMeta: () => undefined,
     }))
-    expect(result.current.harvestFeed.begging).toBe(1)
-    expect(result.current.harvestFeed.convertedFood).toBe(2)
+    expect(result.current.harvest.begging).toBe(1)
+    expect(result.current.harvest.convertedFood).toBe(2)
   })
 
   it('updates farmyard-only limits in the selected feeding order', () => {
@@ -102,13 +124,13 @@ describe('useExchangeDraftPresentation', () => {
       cardLabel: (id: string) => id,
       getCardMeta: () => undefined,
     }))
-    act(() => result.current.harvestFeed.updateCount('Major_Fireplace1-ex0', 1))
-    act(() => result.current.harvestFeed.updateCount('B104_SheepWalker-ex0', 1))
-    expect(result.current.harvestFeed.selections.map((selection) => selection.sourceId)).toEqual(['Major_Fireplace1'])
-    act(() => result.current.harvestFeed.reset())
-    act(() => result.current.harvestFeed.updateCount('B104_SheepWalker-ex0', 1))
-    act(() => result.current.harvestFeed.updateCount('Major_Fireplace1-ex0', 1))
-    expect(result.current.harvestFeed.selections.map((selection) => selection.sourceId)).toEqual(['B104_SheepWalker', 'Major_Fireplace1'])
+    act(() => result.current.harvest.updateCount('Major_Fireplace1-ex0', 1))
+    act(() => result.current.harvest.updateCount('B104_SheepWalker-ex0', 1))
+    expect(result.current.harvest.selections.map((selection) => selection.sourceId)).toEqual(['Major_Fireplace1'])
+    act(() => result.current.harvest.reset())
+    act(() => result.current.harvest.updateCount('B104_SheepWalker-ex0', 1))
+    act(() => result.current.harvest.updateCount('Major_Fireplace1-ex0', 1))
+    expect(result.current.harvest.selections.map((selection) => selection.sourceId)).toEqual(['B104_SheepWalker', 'Major_Fireplace1'])
   })
 
   it('owns bake, anytime exchange, and harvest feed draft counts and payloads', () => {
@@ -209,8 +231,8 @@ describe('useExchangeDraftPresentation', () => {
       })
     })
 
-    act(() => result.current.harvestFeed.updateCount('__basic__-ex0', 2))
-    expect(result.current.harvestFeed.selections).toEqual([
+    act(() => result.current.harvest.updateCount('__basic__-ex0', 2))
+    expect(result.current.harvest.selections).toEqual([
       {
         count: 2,
         sourceName: 'Basic conversion',
@@ -220,18 +242,18 @@ describe('useExchangeDraftPresentation', () => {
         to: { food: 1 },
       },
     ])
-    expect(result.current.harvestFeed.summary.food).toBe(4)
-    expect(result.current.harvestFeed.summary.grain).toBe(2)
-    expect(result.current.harvestFeed.begging).toBe(0)
+    expect(result.current.harvest.summary.food).toBe(4)
+    expect(result.current.harvest.summary.grain).toBe(2)
+    expect(result.current.harvest.begging).toBe(0)
 
-    act(() => result.current.harvestFeed.reset())
-    act(() => result.current.harvestFeed.updateCount('C059_SchnappsDistillery-ex0', 1))
-    act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
-    expect(result.current.harvestFeed.convertedFood).toBe(3)
-    expect(result.current.harvestFeed.begging).toBe(0)
-    expect(result.current.harvestFeed.summary.food).toBe(6)
+    act(() => result.current.harvest.reset())
+    act(() => result.current.harvest.updateCount('C059_SchnappsDistillery-ex0', 1))
+    act(() => result.current.harvest.updateCount('C105_BasketCarrier-ex0', 1))
+    expect(result.current.harvest.convertedFood).toBe(3)
+    expect(result.current.harvest.begging).toBe(0)
+    expect(result.current.harvest.summary.food).toBe(6)
 
-    act(() => result.current.harvestFeed.reset())
+    act(() => result.current.harvest.reset())
     act(() => {
       rerender({
         plan: {
@@ -243,15 +265,15 @@ describe('useExchangeDraftPresentation', () => {
         options: [],
       })
     })
-    act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
-    expect(result.current.harvestFeed.convertedFood).toBe(0)
-    expect(result.current.harvestFeed.begging).toBe(0)
+    act(() => result.current.harvest.updateCount('C105_BasketCarrier-ex0', 1))
+    expect(result.current.harvest.convertedFood).toBe(0)
+    expect(result.current.harvest.begging).toBe(0)
 
     act(() => result.current.reset())
     expect(result.current.bake.counts).toEqual({})
     expect(result.current.anytime.counts).toEqual({})
-    expect(result.current.harvestFeed.counts['__basic__-ex0']).toBe(0)
-    expect(Object.values(result.current.harvestFeed.counts).every((count) => count === 0)).toBe(true)
+    expect(result.current.harvest.counts['__basic__-ex0']).toBe(0)
+    expect(Object.values(result.current.harvest.counts).every((count) => count === 0)).toBe(true)
   })
 
   it('submits harvest exchanges in the order selected by the player', () => {
@@ -273,17 +295,17 @@ describe('useExchangeDraftPresentation', () => {
       getCardMeta: () => undefined,
     }))
 
-    act(() => result.current.harvestFeed.updateCount('C109_SchnappsDistiller-ex0', 1))
-    act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
+    act(() => result.current.harvest.updateCount('C109_SchnappsDistiller-ex0', 1))
+    act(() => result.current.harvest.updateCount('C105_BasketCarrier-ex0', 1))
 
-    expect(result.current.harvestFeed.counts['C105_BasketCarrier-ex0']).toBe(1)
-    expect(result.current.harvestFeed.selections.map((selection) => selection.sourceId)).toEqual([
+    expect(result.current.harvest.counts['C105_BasketCarrier-ex0']).toBe(1)
+    expect(result.current.harvest.selections.map((selection) => selection.sourceId)).toEqual([
       'C109_SchnappsDistiller',
       'C105_BasketCarrier',
     ])
 
-    act(() => result.current.harvestFeed.updateCount('C109_SchnappsDistiller-ex0', -1))
-    expect(result.current.harvestFeed.counts['C109_SchnappsDistiller-ex0']).toBe(1)
-    expect(result.current.harvestFeed.counts['C105_BasketCarrier-ex0']).toBe(1)
+    act(() => result.current.harvest.updateCount('C109_SchnappsDistiller-ex0', -1))
+    expect(result.current.harvest.counts['C109_SchnappsDistiller-ex0']).toBe(1)
+    expect(result.current.harvest.counts['C105_BasketCarrier-ex0']).toBe(1)
   })
 })

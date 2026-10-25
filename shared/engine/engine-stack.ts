@@ -39,11 +39,17 @@ export type StageResumeState = {
   extra?: Record<string, unknown>
 }
 
-export type FeedingSettlementResume = {
+export type HarvestSettlementResume = {
+  kind: 'feed'
   remaining: number
   foodUsed: number
   feedQueue: FeedQueueEntry[]
   resourcesConverted: Partial<Resource>
+} | {
+  kind: 'heating'
+  fuelUsed: number
+  woodToFuel: number
+  feedQueue: FeedQueueEntry[]
 }
 
 export type EngineFrame = {
@@ -62,7 +68,7 @@ export type EngineFrame = {
   } | null
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
-  feedingResume?: FeedingSettlementResume
+  harvestSettlementResume?: HarvestSettlementResume
 }
 
 export type EngineFrameCursor = {
@@ -81,7 +87,7 @@ export type EngineFrameCursor = {
   } | null
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
-  feedingResume?: FeedingSettlementResume
+  harvestSettlementResume?: HarvestSettlementResume
 }
 
 export type EngineStackCursor = {
@@ -246,7 +252,7 @@ export class EngineStack {
         deferredPlayerSwitch: f.deferredPlayerSwitch,
         undoBoundaryOnResolve: f.undoBoundaryOnResolve,
         reason: f.reason,
-        ...(f.feedingResume ? { feedingResume: f.feedingResume } : {}),
+        ...(f.harvestSettlementResume ? { harvestSettlementResume: f.harvestSettlementResume } : {}),
       })),
     }
   }
@@ -273,7 +279,7 @@ export class EngineStack {
         deferredPlayerSwitch: fc.deferredPlayerSwitch,
         undoBoundaryOnResolve: fc.undoBoundaryOnResolve,
         reason: fc.reason,
-        ...(fc.feedingResume ? { feedingResume: fc.feedingResume } : {}),
+        ...(fc.harvestSettlementResume ? { harvestSettlementResume: fc.harvestSettlementResume } : {}),
       })
     }
     return stack

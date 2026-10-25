@@ -11,7 +11,7 @@ Farmers of the Moor adds special actions, heating, horses, farm terrain and its 
 
 - Farmers of the Moor is a Game Variant with explicit runtime paths. Player state that takes part in existing rules (`farmTerrain`, `sickWorkerIds`, `fuel`, `horse`) lives on `PlayerState`, not under a nested variant object.
 - Special actions use the dedicated `takeSpecialAction` command. They are work-phase turn actions, neither action spaces nor anytime actions: they need an unplaced healthy worker, do not consume or place it, and trigger no place-farmer or action-space hooks.
-- Heating is a dedicated `heating` interaction after each player's feeding; it owns fuel payment, voluntary underpayment and wood-to-fuel conversion, and does not extend the frozen `feed` request.
+- Heating is a dedicated `heating` interaction after each player's feeding; it owns fuel payment and voluntary underpayment without extending the frozen `feed` request. Feeding and heating share the Exchange Center and batch executor; wood-to-fuel conversion is a variant-gated recipe in the ordinary anytime exchange catalog, never a separate action.
 - Horses join the shared animal and resource types but are gated by `enableFarmersOfTheMoor`; when the variant is disabled a horse stays at zero, is hidden and takes no part in reorganization, breeding, exchanges or scoring. When it is enabled, generic animal semantics include horses, while cards naming sheep, boar and cattle keep that wording.
 - Major supply selection uses the variant registry and stack-aware helpers (ADR 0006).
 - Reserved rule terms keep one meaning for every Moor card:

@@ -14,7 +14,7 @@ import type { ActionHookRegistry } from '../../actions/hooks'
  */
 
 import type { GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
-import { workersAvailable } from '../../domain/player.ts'
+import { workersAvailable, workersAtHome } from '../../domain/player.ts'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones.ts'
 import { findActionSpaceById } from '../../domain/space.ts'
 import {
@@ -23,7 +23,7 @@ import {
 } from '../../moor/special-actions.ts'
 import { buildMoorSpecialActionFlow, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
-import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
+import { computeHeatingRequirement, hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
 import { endTurnScope, recordActionSnapshot, readActionSnapshotExtraData } from '../../cards/helpers/action-snapshot.ts'
 import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners.ts'
@@ -35,6 +35,7 @@ import { hasPendingOrdinaryCardDrawChoice } from '../ordinary-card-draw.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
+import { getExchangeCatalog } from '../../actions/effects/exchange'
 import { readTurnScopeToken } from '../../cards/helpers/turn-token.ts'
 
 /**
@@ -360,8 +361,11 @@ export const startHeatingSubFlow = (
       kind: 'heating',
       playerId: player.id,
       required,
-      maxFuelPayable: Math.min(player.resources.fuel ?? 0, required),
-      maxWoodConvertibleToFuel: player.resources.wood,
+      maxNewSickWorkers: workersAtHome(core.state, player).filter(worker => !player.sickWorkerIds?.includes(worker.id)).length,
+      requiredWithWoodConversion: computeHeatingRequirement(core.state, player, { woodToFuel: 1 }),
+      exchangeCatalog: getExchangeCatalog({ player, state: core.state, actionHooks: core.actionHooks, windows: ['anytime'], includeBasicConversions: true })
+        .map(({ trade: _trade, window: _window, ...entry }) => entry),
+      placedAnimals: getPlacedAnimalsByType(player, core.state),
       feedQueue,
     },
     choices: options,

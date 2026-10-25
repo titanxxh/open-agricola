@@ -29,9 +29,6 @@ export type BorrowedFenceSourceControls = {
 export type HeatingPending = {
   playerName: string
   required: number
-  maxFuelPayable: number
-  maxWoodConvertibleToFuel: number
-  isConfirmDisabled?: (payload: { fuelUsed: number; woodToFuel: number }) => boolean
 }
 
 export type InteractionBarResourceQuantitySelect = {
@@ -189,7 +186,7 @@ export type InteractionBarActionInput = {
   confirmNextPlayer: () => void
   confirmPlayerSwitch: () => void
   confirmHarvestFeed: () => void
-  confirmHeating: (payload: { fuelUsed: number; woodToFuel: number }) => void
+  confirmHeating: () => void
   undoStep: () => void
   undoAction: () => void
   showScoring: () => void

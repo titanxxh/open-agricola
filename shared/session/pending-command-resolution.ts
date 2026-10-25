@@ -59,7 +59,7 @@ export type ResolveChoiceSubmissionPlan =
   | { ok: true; kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { ok: true; kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }
   | { ok: true; kind: 'feed'; selections: FeedSelections }
-  | { ok: true; kind: 'heating'; payload: Record<string, unknown> | undefined }
+  | { ok: true; kind: 'heating'; selections: FeedSelections; fuelUsed: number }
   | { ok: true; kind: 'post-reap-anytime' }
   | { ok: true; kind: 'engine-choice' }
 
@@ -134,7 +134,8 @@ export const planResolveChoiceSubmission = (
     case 'feed':
       return { ok: true, kind: 'feed', selections: feedSelectionsFromPayload(payload) }
     case 'heating':
-      return { ok: true, kind: 'heating', payload: payload as Record<string, unknown> | undefined }
+      return { ok: true, kind: 'heating', selections: feedSelectionsFromPayload(payload),
+        fuelUsed: payload && 'fuelUsed' in payload && typeof payload.fuelUsed === 'number' ? payload.fuelUsed : 0 }
     case 'animal-reorg':
     case 'choice':
     case 'select-trigger':

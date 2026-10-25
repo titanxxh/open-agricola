@@ -34,11 +34,12 @@ export type ExchangeOverlayDraft = {
     hasSummary: boolean
     updateCount: (id: string, delta: number) => void
   }
-  harvestFeed: {
+  harvest: {
     isActive: boolean
     options: readonly HarvestFeedOption[]
     counts: Record<string, number>
     limitById: Record<string, number>
+    heating: { required: number; minimum: number; maximum: number; fuelUsed: number; sickWorkers: number; updatePayment: (delta: number) => void } | null
     convertedFood: number
     begging: number
     summary: Resource
@@ -59,6 +60,7 @@ type ExchangeOverlayActions = {
   confirmAnytimeExchange: () => void
   cancelAnytimeExchange: () => void
   confirmHarvestFeed: () => void
+  confirmHeating: () => void
 }
 
 type ExchangeOverlayPresentationProps = {
@@ -66,6 +68,8 @@ type ExchangeOverlayPresentationProps = {
   isInteractive: boolean
   pendingChoice: PendingChoice | null
   harvestPending: HarvestPending
+  heatingPending?: { playerName: string; required: number } | null
+  heatingConfirmDisabled?: boolean
   harvestFeedConfirmDisabled?: boolean
   draft: ExchangeOverlayDraft
   cardLabel: (id: string) => string
@@ -187,48 +191,60 @@ export const ExchangeOverlayPresentation = ({
   isInteractive,
   pendingChoice,
   harvestPending,
+  heatingPending,
+  heatingConfirmDisabled,
   harvestFeedConfirmDisabled,
   draft,
   cardLabel,
   actions,
   navigation,
 }: ExchangeOverlayPresentationProps) => {
-  if (draft.harvestFeed.isActive && harvestPending && draft.harvestFeed.options.length > 0 && isInteractive) {
+  const heating = draft.harvest.heating
+  const settlementPlayer = heating ? heatingPending : harvestPending
+  if (draft.harvest.isActive && settlementPlayer && isInteractive) {
     return (
       <ExchangeModal
         title={t(locale, 'ui.exchangeCenterTitle')}
-        subtitle={t(locale, 'ui.harvestFeedSubtitle', {
-          player: harvestPending.playerName,
-          count: harvestPending.remaining,
+        subtitle={t(locale, heating ? 'ui.harvestHeatingSubtitle' : 'ui.harvestFeedSubtitle', {
+          player: settlementPlayer.playerName,
+          count: heating?.required ?? harvestPending?.remaining ?? 0,
         })}
         navigation={navigation}
       >
         <div className="exchange-options">
-          {draft.harvestFeed.options.map((option) => (
+          {draft.harvest.options.map((option) => (
             <ResourceExchangeRow
               key={option.id}
               locale={locale}
               option={option}
-              current={draft.harvestFeed.counts[option.id] ?? 0}
-              limit={draft.harvestFeed.limitById[option.id] ?? 0}
-              testId={`harvest-feed-option-${option.sourceId}-ex${option.exchangeIndex}`}
-              onChange={draft.harvestFeed.updateCount}
+              current={draft.harvest.counts[option.id] ?? 0}
+              limit={draft.harvest.limitById[option.id] ?? 0}
+              testId={`${heating ? 'heating' : 'harvest-feed'}-option-${option.sourceId}-ex${option.exchangeIndex}`}
+              onChange={draft.harvest.updateCount}
             />
           ))}
         </div>
+        {heating ? <div className="exchange-row" data-testid="heating-fuel-payment">
+          <div className="exchange-name">{t(locale, 'ui.harvestHeatingFuelUsed')}</div>
+          <ResourceLine locale={locale} resources={{ fuel: heating.fuelUsed }} hideZero />
+          <ExchangeStepControl current={heating.fuelUsed} canAdd={heating.fuelUsed < heating.maximum}
+            canSubtract={heating.fuelUsed > heating.minimum} onChange={heating.updatePayment} />
+        </div> : null}
         <div className="exchange-footer">
           <div className="exchange-summary">
-            <div className="interaction-subtitle">
-              {t(locale, 'ui.harvestFeedProgress', {
-                fed: (harvestPending.foodUsed ?? 0) + draft.harvestFeed.convertedFood,
-                required: (harvestPending.foodUsed ?? 0) + harvestPending.remaining,
-                begging: draft.harvestFeed.begging,
+            <div className="exchange-progress">
+              {heating ? t(locale, 'ui.harvestHeatingProgress', {
+                paid: heating.fuelUsed, required: heating.required, sick: heating.sickWorkers,
+              }) : t(locale, 'ui.harvestFeedProgress', {
+                fed: (harvestPending?.foodUsed ?? 0) + draft.harvest.convertedFood,
+                required: (harvestPending?.foodUsed ?? 0) + (harvestPending?.remaining ?? 0),
+                begging: draft.harvest.begging,
               })}
             </div>
-            {draft.harvestFeed.hasSummary ? (
+            {draft.harvest.hasSummary ? (
               <ResourceLine
                 locale={locale}
-                resources={draft.harvestFeed.summary}
+                resources={draft.harvest.summary}
                 emptyLabel={t(locale, 'ui.noResources')}
               />
             ) : (
@@ -239,15 +255,15 @@ export const ExchangeOverlayPresentation = ({
             <button
               type="button"
               className="exchange-cancel"
-              onClick={draft.harvestFeed.reset}
+              onClick={draft.harvest.reset}
             >
               {t(locale, 'ui.exchangeReset')}
             </button>
             <button
               type="button"
               className="exchange-confirm"
-              onClick={actions.confirmHarvestFeed}
-              disabled={harvestFeedConfirmDisabled}
+              onClick={heating ? actions.confirmHeating : actions.confirmHarvestFeed}
+              disabled={heating ? heatingConfirmDisabled : harvestFeedConfirmDisabled}
             >
               {t(locale, 'ui.interactionConfirmButton')}
             </button>

@@ -405,37 +405,15 @@ describe('InteractionBar', () => {
     fireEvent.click(button)
     expect(resolveChoice).toHaveBeenCalledWith(value)
   })
-  it('confirms heating with selected fuel and wood conversion', () => {
+  it('keeps only a confirmation entry for the heating exchange center', () => {
     const confirmHeating = vi.fn()
-    renderBar((input) => {
-      input.pending.heating = {
-        playerName: 'P1',
-        required: 2,
-        maxFuelPayable: 1,
-        maxWoodConvertibleToFuel: 1,
-      }
-    }, { confirmHeating })
-
-    fireEvent.change(screen.getByLabelText('Wood to convert'), { target: { value: '1' } })
-    fireEvent.change(screen.getByLabelText('Fuel to pay'), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm heating' }))
-
-    expect(confirmHeating).toHaveBeenCalledWith({ woodToFuel: 1, fuelUsed: 2 })
+    renderBar(input => { input.pending.heating = { playerName: 'P1', required: 2 } }, { confirmHeating })
+    expect(screen.queryByRole('spinbutton')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(confirmHeating).toHaveBeenCalledWith()
   })
 
   it('disables rejected specialized confirmations', () => {
-    const heating = renderBar((input) => {
-      input.pending.heating = {
-        playerName: 'P1',
-        required: 1,
-        maxFuelPayable: 1,
-        maxWoodConvertibleToFuel: 0,
-        isConfirmDisabled: () => true,
-      }
-    })
-    expect(screen.getByRole('button', { name: 'Confirm heating' })).toBeDisabled()
-    heating.unmount()
-
     const reorg = renderBar((input) => {
       input.pending.animalReorg = { playerIndex: 0, spaceId: 'space' }
       input.animalReorg.confirmDisabled = true

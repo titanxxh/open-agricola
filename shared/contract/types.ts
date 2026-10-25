@@ -1240,8 +1240,10 @@ export type InteractionRequest = (
       kind: 'heating'
       playerId: string
       required: number
-      maxFuelPayable: number
-      maxWoodConvertibleToFuel: number
+      requiredWithWoodConversion: number
+      maxNewSickWorkers: number
+      exchangeCatalog: FeedExchangeCatalogEntry[]
+      placedAnimals: Partial<Pick<Resource, AnimalKey>>
       feedQueue?: FeedQueueEntry[]
     }
   | {

@@ -4,11 +4,11 @@ import { getPlayedCardDefinitions } from '../cards/helpers/card-type'
 import { availableWorkers, workersAtHome, smallestAvailableWorker } from '../domain/player'
 import { findActionSpaceById } from '../domain/space'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
+import { projectHeatingPayment } from '../domain/heating-payment'
 import { getMoorWorkerPlacementPolicy } from './worker-placement'
 
 export type HeatingPaymentPayload = {
   fuelUsed?: number
-  woodToFuel?: number
 }
 
 export type HeatingPaymentResult = {
@@ -129,21 +129,15 @@ export const applyHeatingPayment = (
   state: GameState,
   player: PlayerState,
   payload: HeatingPaymentPayload,
+  convertedWood = 0,
 ): HeatingPaymentResult => {
-  const requestedWoodToFuel = Math.min(wholeNonNegative(payload.woodToFuel), player.resources.wood)
-  const preDiscountRequired = computeHeatingRequirement(state, player)
-  const required = computeHeatingRequirement(state, player, { woodToFuel: requestedWoodToFuel })
-  const minWoodToActivateDiscount = requestedWoodToFuel > 0 && required < preDiscountRequired ? 1 : 0
-  const woodToFuel = Math.min(requestedWoodToFuel, Math.max(required, minWoodToActivateDiscount))
-  const storedFuelUsed = Math.min(
-    Math.max(0, wholeNonNegative(payload.fuelUsed) - woodToFuel),
-    Math.max(0, required - woodToFuel),
-    player.resources.fuel ?? 0,
-  )
-  const fuelUsed = woodToFuel + storedFuelUsed
-
-  player.resources.wood -= woodToFuel
-  player.resources.fuel = (player.resources.fuel ?? 0) - storedFuelUsed
+  const { required, fuelUsed, woodToFuel } = projectHeatingPayment({
+    required: computeHeatingRequirement(state, player),
+    requiredWithWoodConversion: computeHeatingRequirement(state, player, { woodToFuel: convertedWood }),
+    convertedWood, availableFuel: player.resources.fuel ?? 0,
+    fuelUsed: wholeNonNegative(payload.fuelUsed),
+  })
+  player.resources.fuel = (player.resources.fuel ?? 0) - fuelUsed
 
   const deficit = Math.max(0, required - fuelUsed)
   const sick = sickSet(player)

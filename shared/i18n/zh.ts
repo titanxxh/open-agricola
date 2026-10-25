@@ -873,7 +873,7 @@ export const zh = {
     harvestHeatingTitle: '供暖',
     harvestHeatingSubtitle: '{player} 需要 {count} 燃料',
     harvestHeatingFuelUsed: '支付燃料',
-    harvestHeatingWoodToFuel: '转换木材',
+    harvestHeatingProgress: '{paid}/{required} 燃料 · 新增生病 {sick}',
     harvestHeatingConfirm: '确认供暖',
     heldWorkerOnCard: '工人寄存在卡上',
       interactionExchangeChoice: '选择兑换',
@@ -960,7 +960,6 @@ export const zh = {
     'day-laborer': { name: '打零工', description: '立即获得 2 食物' },
     'moor-infirmary': { name: '医务室', description: '获得 1 食物。病床人物只能使用这里。' },
     'moor-resource-market-12': { name: '资源市场', description: '获得 1 食物和 1 石料' },
-    'moor-wood-to-fuel': { name: '木材换燃料', description: '将 1 木材转换为 1 燃料' },
     'moor-special-action-apply': { name: '沼泽特殊行动', description: '结算沼泽农夫特殊行动' },
     'meeting-place': {
       name: '集会所',

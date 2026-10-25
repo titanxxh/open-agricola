@@ -23,7 +23,7 @@ import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resour
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import type { ExchangeWindow } from '../../contract/cards'
 import { collectComputeExchanges } from '../../cards/card-listeners'
-import { BASIC_CONVERSION_SOURCE_ID, basicConversionExchanges } from '../../cards/basic-conversion'
+import { BASIC_CONVERSION_SOURCE_ID, getBasicConversionExchanges, WOOD_TO_FUEL_EXCHANGE_INDEX } from '../../cards/basic-conversion'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones'
@@ -365,7 +365,7 @@ export const getExchangeCatalog = ({
       max: trade.max, fromFarmyard: trade.fromFarmyard, trade, window })
   }
   if (includeBasicConversions && windows.includes('anytime')) {
-    basicConversionExchanges.forEach((exchange, index) =>
+    getBasicConversionExchanges(state).forEach((exchange, index) =>
       add(exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID), index, 'anytime'))
   }
   for (const cardId of playedCardIds(player)) {
@@ -390,6 +390,10 @@ export const getExchangeCatalog = ({
         add(trade, exchangeIndex, window)
       }
     }
+  }
+  if (!includeBasicConversions && windows.includes('anytime')) {
+    const woodConversion = getBasicConversionExchanges(state)[WOOD_TO_FUEL_EXCHANGE_INDEX]
+    if (woodConversion) add(exchangeToTrade(woodConversion, BASIC_CONVERSION_SOURCE_ID), WOOD_TO_FUEL_EXCHANGE_INDEX, 'anytime')
   }
   return entries.filter((entry) => isTradeAllowedDuringPhase(entry.trade, state))
 }
@@ -607,7 +611,7 @@ const buildExchangeOptions = (
     if (entry.window === 'harvest') harvestRounds.set(index, state.round)
   })
   if (actionContext?.includeBasicConversions === true) {
-    trades.push(...basicConversionExchanges.map(exchange => exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)))
+    trades.push(...getBasicConversionExchanges().map(exchange => exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)))
   }
   if (tradeIds && tradeIds.length > 0) {
     const seen = new Set<string>()
