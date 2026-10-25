@@ -73,7 +73,7 @@ type EngineFrame = {
 ```
 
 - Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendingHost` and `toCursor`. `push` / `pop` create and leave nested frames (subflows and confirmations); hook and anytime flows enter the current frame through `Engine.injectBeforeFlows()`, and a farm action's `farm-select` request stays a pending envelope on its action node in the current frame. Nothing mutates `pending` directly.
-- A feeding frame keeps its payment continuation in `feedingResume`; it survives reaction choices and reorganization, transfers to any subsequent feeding opportunity, and is consumed only when that opportunity closes.
+- A feeding or heating frame keeps its typed payment continuation in `harvestSettlementResume` through reaction choices and animal reorganization. Feeding opportunities inherit that continuation. Heating settles after its batch completes. The continuation is consumed only when settlement closes.
 - `EngineStackCursor` is serialized into `PersistedSessionSnapshot.sessionCursor.engineStackCursor`; public and Replay `SerializedGameState.engineStack` stays empty.
 - Undo history stores a detached cursor of the complete stack (every frame, its identity, reason, stage continuation, deferred switch and resolve boundary); `undoStep()` / `undoAction()` rebuild it without advancing.
 - `SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection` or `card-draft`. Synthetic windows such as `post-reap-anytime` appear in both `SubFlowReason` and `PendingSyntheticKind`.

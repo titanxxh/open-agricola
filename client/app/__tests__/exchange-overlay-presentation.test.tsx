@@ -29,11 +29,12 @@ const baseDraft = (): ExchangeOverlayDraft => ({
     hasSummary: false,
     updateCount: vi.fn(),
   },
-  harvestFeed: {
+  harvest: {
     isActive: false,
     options: [],
     counts: {},
     limitById: {},
+    heating: null,
     convertedFood: 0,
     begging: 0,
     summary: { ...emptyResources },
@@ -61,12 +62,28 @@ const renderOverlay = (
       confirmAnytimeExchange: vi.fn(),
       cancelAnytimeExchange: vi.fn(),
       confirmHarvestFeed: vi.fn(),
+      confirmHeating: vi.fn(),
       ...actions,
     }}
   />,
 )
 
 describe('ExchangeOverlayPresentation', () => {
+  it('renders heating inside the exchange center with payment and sickness preview', () => {
+    const draft = baseDraft()
+    draft.harvest.isActive = true
+    draft.harvest.heating = { required: 2, fuelUsed: 1, minimum: 0, maximum: 2, sickWorkers: 1, updatePayment: vi.fn() }
+    const confirmHeating = vi.fn()
+    const { container } = renderOverlay(draft, { confirmHeating }, { heatingPending: { playerName: 'P1', required: 2 } })
+    expect(screen.getByText('Exchange Center')).toBeTruthy()
+    expect(screen.getByText('P1 needs 2 fuel')).toBeTruthy()
+    expect(screen.getByText('1/2 fuel · Newly sick 1')).toBeTruthy()
+    expect(container.querySelectorAll('.exchange-overlay')).toHaveLength(1)
+    expect(screen.queryByRole('spinbutton')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(confirmHeating).toHaveBeenCalledTimes(1)
+  })
+
   it('renders bake-bread overlay rows and actions', () => {
     const draft = baseDraft()
     const confirmBakeExchange = vi.fn()
@@ -115,8 +132,8 @@ describe('ExchangeOverlayPresentation', () => {
   it('renders harvest-feed overlay progress and confirm action', () => {
     const draft = baseDraft()
     const confirmHarvestFeed = vi.fn()
-    draft.harvestFeed.isActive = true
-    draft.harvestFeed.options = [{
+    draft.harvest.isActive = true
+    draft.harvest.options = [{
       id: '__basic__-ex0',
       sourceId: '__basic__',
       sourceName: 'Basic conversion',
@@ -125,12 +142,12 @@ describe('ExchangeOverlayPresentation', () => {
       to: { food: 1 },
       maxTimes: 3,
     }]
-    draft.harvestFeed.counts = { '__basic__-ex0': 1 }
-    draft.harvestFeed.limitById = { '__basic__-ex0': 3 }
-    draft.harvestFeed.convertedFood = 1
-    draft.harvestFeed.begging = 1
-    draft.harvestFeed.summary = { ...emptyResources, food: 2, grain: 1, begging: 1 }
-    draft.harvestFeed.hasSummary = true
+    draft.harvest.counts = { '__basic__-ex0': 1 }
+    draft.harvest.limitById = { '__basic__-ex0': 3 }
+    draft.harvest.convertedFood = 1
+    draft.harvest.begging = 1
+    draft.harvest.summary = { ...emptyResources, food: 2, grain: 1, begging: 1 }
+    draft.harvest.hasSummary = true
 
     renderOverlay(draft, { confirmHarvestFeed })
 
@@ -142,8 +159,8 @@ describe('ExchangeOverlayPresentation', () => {
 
   it('disables a rejected harvest-feed submission', () => {
     const draft = baseDraft()
-    draft.harvestFeed.isActive = true
-    draft.harvestFeed.options = [{
+    draft.harvest.isActive = true
+    draft.harvest.options = [{
       id: '__basic__-ex0',
       sourceId: '__basic__',
       sourceName: 'Basic conversion',

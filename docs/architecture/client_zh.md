@@ -31,6 +31,8 @@
 
 ## 视图与本地沙盒
 
+- `exchange-overlay-presentation.tsx` 与 `exchange-draft-presentation.ts` 承载普通兑换、喂养和供暖共用的交换中心。供暖复用配方行、顺序数量控件和重置路径，并展示燃料支付行与生病预览；`InteractionBar` 只保留确认入口。覆盖见 `heating-exchange.spec.ts`。
+
 - `interaction-focus.ts` 将本机 Interaction Player 的权威请求映射到显示目标。职业选择在接机确认后定位私有手牌，支付等后续步骤保留行动聚焦，完成后返回行动区。Session 交互适配器仅向响应者发布不透明的等待步骤 `requestKey`，候选刷新及 cursor 恢复均保留其身份，玩家手动浏览不会再次触发滚动。共享目标锚点与返回快捷入口覆盖手牌、供应区和农场选择。
 - 农场选择、空间目标选择、动物整理及本机选中的 Moor 地形操作使用农场目标。格盘根据有效视口和固定操作栏调整尺寸，也支持扩展农场。围栏控件扩大命中范围，并以收窄端点区分相邻边。同一步的重复快照保留草稿，只移除撤回的合法目标。`fence-selection-quote.ts` 显示权威选择费用，在快照、请求或草稿改变后丢弃旧回复；费用查询不决定是否允许提交。验收见 `farm-interaction-focus.spec.ts` 及聚焦、农场草稿和费用组件测试。
 

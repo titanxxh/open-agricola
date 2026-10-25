@@ -129,8 +129,6 @@ describe('Interaction Bar Presentation', () => {
     input.pending.heating = {
       playerName: 'P1',
       required: 2,
-      maxFuelPayable: 1,
-      maxWoodConvertibleToFuel: 1,
     }
 
     const model = buildInteractionBarModel(input)
@@ -152,8 +150,8 @@ describe('Interaction Bar Presentation', () => {
     expect(model.farm.errors.fence).toBe('')
     expect(model.controls.canUndoStep).toBe(false)
 
-    actions.confirmHeating({ fuelUsed: 2, woodToFuel: 1 })
-    expect(confirmHeating).toHaveBeenCalledWith({ fuelUsed: 2, woodToFuel: 1 })
+    actions.confirmHeating()
+    expect(confirmHeating).toHaveBeenCalledWith()
   })
 
   it('derives body priority before rendering', () => {
@@ -161,8 +159,6 @@ describe('Interaction Bar Presentation', () => {
     input.pending.heating = {
       playerName: 'P1',
       required: 2,
-      maxFuelPayable: 1,
-      maxWoodConvertibleToFuel: 1,
     }
     input.pending.harvestFeedPlayerName = 'P2'
     expect(buildInteractionBarModel(input).body.kind).toBe('heating')
@@ -351,8 +347,6 @@ describe('Interaction Bar Presentation', () => {
     input.pending.heating = {
       playerName: 'P1',
       required: 2,
-      maxFuelPayable: 1,
-      maxWoodConvertibleToFuel: 1,
     }
     model = buildInteractionBarModel(input)
     expect(model.body).toMatchObject({

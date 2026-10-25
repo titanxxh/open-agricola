@@ -22,6 +22,8 @@ import {
   computeHarvestFeedCounterMax,
 } from './hooks/use-harvest-feed-counter'
 import type { InteractionFeedSelection, InteractionPresentationPlan } from './interaction-presentation'
+import { projectHeatingPayment } from '../../shared/domain/heating-payment'
+import { BASIC_CONVERSION_SOURCE_ID, WOOD_TO_FUEL_EXCHANGE_INDEX } from '../../shared/cards/basic-conversion'
 import type { PendingChoice } from '../types/ui'
 
 type ExchangeDraftState = {
@@ -100,8 +102,9 @@ export const useExchangeDraftPresentation = ({
   getCardMeta,
 }: ExchangeDraftInput) => {
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
-  const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
-  const [harvestFeedSelectionOrder, setHarvestFeedSelectionOrder] = useState<string[]>([])
+  const [harvestExchangeCounts, setHarvestExchangeCounts] = useState<Record<string, number>>({})
+  const [harvestExchangeSelectionOrder, setHarvestExchangeSelectionOrder] = useState<string[]>([])
+  const [heatingFuelUsed, setHeatingFuelUsed] = useState<number | undefined>()
   const [anytimeExchangeCounts, setAnytimeExchangeCounts] = useState<Record<string, number>>({})
 
   const isBakeExchange = pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
@@ -259,12 +262,12 @@ export const useExchangeDraftPresentation = ({
     [anytimeExchangeSelections],
   )
 
-  const isHarvestFeedExchange = interactionPresentationPlan.kind === 'harvest-feed'
-  const harvestFeedPlacedAnimals = interactionPresentationPlan.kind === 'harvest-feed'
+  const isHarvestSettlement = interactionPresentationPlan.kind === 'harvest-feed' || interactionPresentationPlan.kind === 'heating'
+  const harvestFeedPlacedAnimals = isHarvestSettlement
     ? interactionPresentationPlan.placedAnimals
     : undefined
   const harvestFeedPlayer =
-    isHarvestFeedExchange && state && interactionPresentationPlan.kind === 'harvest-feed'
+    isHarvestSettlement && state
       ? state.players[interactionPresentationPlan.playerIndex] ?? null
       : null
   const harvestFeedOptions = useMemo(
@@ -277,28 +280,28 @@ export const useExchangeDraftPresentation = ({
             interactionPresentationPlan.kind === 'harvest-feed'
               ? interactionPresentationPlan.maxTradeTimesBySourceId
               : undefined,
-            interactionPresentationPlan.kind === 'harvest-feed'
+            isHarvestSettlement
               ? interactionPresentationPlan.exchangeCatalog
               : undefined,
           )
         : [],
-    [harvestFeedPlayer, locale, cardLabel, interactionPresentationPlan],
+    [harvestFeedPlayer, locale, cardLabel, interactionPresentationPlan, isHarvestSettlement],
   )
   const harvestFeedOptionIds = useMemo(
     () => harvestFeedOptions.map((option) => option.id),
     [harvestFeedOptions],
   )
   const activeHarvestFeedCounts = useMemo(
-    () => activeCountsFor(harvestFeedOptionIds, harvestFeedCounts),
-    [harvestFeedCounts, harvestFeedOptionIds],
+    () => activeCountsFor(harvestFeedOptionIds, harvestExchangeCounts),
+    [harvestExchangeCounts, harvestFeedOptionIds],
   )
   const orderedHarvestFeedOptions = useMemo(() => {
-    const order = new Map(harvestFeedSelectionOrder.map((id, index) => [id, index]))
+    const order = new Map(harvestExchangeSelectionOrder.map((id, index) => [id, index]))
     return [...harvestFeedOptions].sort(
       (a, b) => (order.get(a.id) ?? Number.POSITIVE_INFINITY)
         - (order.get(b.id) ?? Number.POSITIVE_INFINITY),
     )
-  }, [harvestFeedOptions, harvestFeedSelectionOrder])
+  }, [harvestFeedOptions, harvestExchangeSelectionOrder])
   const harvestFeedLimitById = useMemo(() => {
     const limits: Record<string, number> = {}
     orderedHarvestFeedOptions.forEach((option) => {
@@ -334,20 +337,22 @@ export const useExchangeDraftPresentation = ({
       harvestFeedPlayer.resources,
       harvestFeedPlacedAnimals,
     )) return
-    setHarvestFeedCounts(nextCounts)
-    setHarvestFeedSelectionOrder((prev) => current === 0
+    setHarvestExchangeCounts(nextCounts)
+    setHeatingFuelUsed(undefined)
+    setHarvestExchangeSelectionOrder((prev) => current === 0
       ? [...prev, id]
       : nextValue === 0
         ? prev.filter((entry) => entry !== id)
         : prev)
   }, [activeHarvestFeedCounts, harvestFeedOptions, harvestFeedPlayer, harvestFeedPlacedAnimals, orderedHarvestFeedOptions])
-  const resetHarvestFeedCounts = useCallback(() => {
+  const resetHarvestExchangeCounts = useCallback(() => {
     const nextCounts: Record<string, number> = {}
     harvestFeedOptionIds.forEach((id) => {
       nextCounts[id] = 0
     })
-    setHarvestFeedCounts(nextCounts)
-    setHarvestFeedSelectionOrder([])
+    setHarvestExchangeCounts(nextCounts)
+    setHeatingFuelUsed(undefined)
+    setHarvestExchangeSelectionOrder([])
   }, [harvestFeedOptionIds])
   const harvestFeedSelections = useMemo(
     () =>
@@ -388,11 +393,30 @@ export const useExchangeDraftPresentation = ({
     [harvestFeedBegging, harvestFeedConvertedFood, harvestFeedSelections, harvestPending?.foodUsed],
   )
 
+  const heatingPlan = interactionPresentationPlan.kind === 'heating' ? interactionPresentationPlan : null
+  const convertedWood = harvestFeedSelections.reduce((sum, entry) => sum + (
+    entry.sourceId === BASIC_CONVERSION_SOURCE_ID && entry.exchangeIndex === WOOD_TO_FUEL_EXCHANGE_INDEX ? entry.count : 0
+  ), 0)
+  const availableFuel = Math.max(0, (harvestFeedPlayer?.resources.fuel ?? 0) + harvestFeedSelections.reduce(
+    (sum, entry) => sum + entry.count * ((entry.to.fuel ?? 0) - (entry.from.fuel ?? 0)), 0,
+  ))
+  const heating = heatingPlan ? {
+    ...projectHeatingPayment({ required: heatingPlan.required, requiredWithWoodConversion: heatingPlan.requiredWithWoodConversion,
+      convertedWood, availableFuel, fuelUsed: heatingFuelUsed }),
+    updatePayment: (delta: number) => setHeatingFuelUsed(previous => {
+      const current = projectHeatingPayment({ required: heatingPlan.required, requiredWithWoodConversion: heatingPlan.requiredWithWoodConversion,
+        convertedWood, availableFuel, fuelUsed: previous })
+      return Math.max(current.minimum, Math.min(current.maximum, current.fuelUsed + delta))
+    }),
+  } : null
+  const settlementSummary = heating ? buildAnytimeExchangeSummary(harvestFeedSelections) : harvestFeedSummary
+
   const reset = useCallback(() => {
     setBakeExchangeCounts({})
     setAnytimeExchangeCounts({})
-    setHarvestFeedCounts({})
-    setHarvestFeedSelectionOrder([])
+    setHarvestExchangeCounts({})
+    setHeatingFuelUsed(undefined)
+    setHarvestExchangeSelectionOrder([])
   }, [])
 
   return {
@@ -425,19 +449,20 @@ export const useExchangeDraftPresentation = ({
       choice: buildAnytimeExchangeBulkChoice(activeAnytimeExchangeCounts, anytimeExchangeOptions),
       updateCount: updateAnytimeExchangeCount,
     },
-    harvestFeed: {
-      isActive: isHarvestFeedExchange,
+    harvest: {
+      isActive: isHarvestSettlement,
       player: harvestFeedPlayer,
       options: harvestFeedOptions as HarvestFeedOption[],
       counts: activeHarvestFeedCounts,
       limitById: harvestFeedLimitById,
       selections: harvestFeedSelections as InteractionFeedSelection[],
+      heating: heating ? { ...heating, sickWorkers: Math.min(heatingPlan?.maxNewSickWorkers ?? 0, Math.max(0, heating.required - heating.fuelUsed)) } : null,
       convertedFood: harvestFeedConvertedFood,
       begging: harvestFeedBegging,
-      summary: harvestFeedSummary,
-      hasSummary: hasAnyResource(harvestFeedSummary),
+      summary: settlementSummary,
+      hasSummary: hasAnyResource(settlementSummary),
       updateCount: updateHarvestFeedCount,
-      reset: resetHarvestFeedCounts,
+      reset: resetHarvestExchangeCounts,
     },
   }
 }

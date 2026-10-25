@@ -886,7 +886,7 @@ export const en = {
     harvestHeatingTitle: 'Heat Home',
     harvestHeatingSubtitle: '{player} needs {count} fuel',
     harvestHeatingFuelUsed: 'Fuel to pay',
-    harvestHeatingWoodToFuel: 'Wood to convert',
+    harvestHeatingProgress: '{paid}/{required} fuel · Newly sick {sick}',
     harvestHeatingConfirm: 'Confirm heating',
     heldWorkerOnCard: 'Worker on card',
       interactionExchangeChoice: 'Choose exchange',
@@ -973,7 +973,6 @@ export const en = {
     'day-laborer': { name: 'Day Laborer', description: 'Gain 2 food' },
     'moor-infirmary': { name: 'Infirmary', description: 'Gain 1 food. Sick workers may only use this space.' },
     'moor-resource-market-12': { name: 'Resource Market', description: 'Gain 1 food and 1 stone' },
-    'moor-wood-to-fuel': { name: 'Convert wood to fuel', description: 'Convert 1 wood to 1 fuel' },
     'moor-special-action-apply': { name: 'Moor special action', description: 'Resolve a Farmers of the Moor special action' },
     'meeting-place': {
       name: 'Meeting Place',

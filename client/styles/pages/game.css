@@ -5131,6 +5131,11 @@
   justify-content: space-between;
   gap: 12px;
 }
+.exchange-progress {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
 .exchange-summary {
   color: var(--color-text-secondary);
   font-weight: 600;

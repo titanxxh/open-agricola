@@ -127,7 +127,6 @@ describe('effects architecture guard', () => {
       'lie-animal',
       'moor-special-action-apply',
       'moor-special-action-choice',
-      'moor-wood-to-fuel',
       'move-farmer-to-space',
       'occupation',
       'occupation-gate',

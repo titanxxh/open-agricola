@@ -901,16 +901,9 @@ export const GameContainerApi = () => {
         ? {
             playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex, state.players[interactionPresentationPlan.playerIndex]?.nameIsDefault),
             required: interactionPresentationPlan.required,
-            maxFuelPayable: interactionPresentationPlan.maxFuelPayable,
-            maxWoodConvertibleToFuel: interactionPresentationPlan.maxWoodConvertibleToFuel,
-            isConfirmDisabled: (payload: { fuelUsed: number; woodToFuel: number }) =>
-              isInteractionSubmitDraftRejected({
-                value: 'confirm',
-                heatingPayment: payload,
-              }),
           }
         : null,
-    [interactionPresentationPlan, isInteractionSubmitDraftRejected, locale, state],
+    [interactionPresentationPlan, locale, state],
   )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
@@ -1057,6 +1050,7 @@ export const GameContainerApi = () => {
     improvementSelection?.majorIds ?? new Set<string>()
 
   const cardLabel = useCallback((id: string) => {
+    if (id === '__basic__') return t(locale, 'ui.harvestFeedBasicSource')
     const improvementName = t(locale, `improvements.${id}.name`)
     if (improvementName !== `improvements.${id}.name`) {
       return improvementName.replace(/\s*[（(].*$/, '')
@@ -1075,7 +1069,7 @@ export const GameContainerApi = () => {
   const resetExchangeDraft = exchangeDraft.reset
   const isBakeExchange = exchangeDraft.bake.isActive
   const isAnytimeExchange = exchangeDraft.anytime.isActive
-  const harvestFeedSelections = exchangeDraft.harvestFeed.selections
+  const harvestFeedSelections = exchangeDraft.harvest.selections
   const harvestFeedConfirmDisabled = isInteractionSubmitDraftRejected({
     value: 'confirm',
     feedSelections: harvestFeedSelections,
@@ -1137,18 +1131,14 @@ export const GameContainerApi = () => {
       .confirmFeed(interactionPresentationPlan.playerIndex, harvestFeedSelections)
       .catch((e) => console.error(e))
   }, [interaction, interactionPresentationPlan, transport, isInteractive, harvestFeedSelections, runInteractionSubmitCommand])
-  const confirmHeating = useCallback((payload: { fuelUsed: number; woodToFuel: number }) => {
-    if (!isInteractive) return
-    if (interactionPresentationPlan.kind !== 'heating') return
-    const submitCommand = buildInteractionSubmitCommand(interaction, {
+  const confirmHeating = useCallback(() => {
+    if (!isInteractive || interactionPresentationPlan.kind !== 'heating' || !exchangeDraft.harvest.heating) return
+    const command = buildInteractionSubmitCommand(interaction, {
       value: 'confirm',
-      heatingPayment: payload,
+      heatingPayment: { fuelUsed: exchangeDraft.harvest.heating.fuelUsed, selections: exchangeDraft.harvest.selections },
     })
-    if (runInteractionSubmitCommand(submitCommand)) return
-    void transport
-      .resolveChoice(interactionPresentationPlan.playerIndex, 'confirm', payload)
-      .catch((e) => console.error(e))
-  }, [interaction, interactionPresentationPlan, transport, isInteractive, runInteractionSubmitCommand])
+    runInteractionSubmitCommand(command)
+  }, [interaction, interactionPresentationPlan, isInteractive, runInteractionSubmitCommand, exchangeDraft.harvest])
 
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
   const specialTerrainSelectableSet = useMemo(() => {
@@ -1844,7 +1834,7 @@ export const GameContainerApi = () => {
     />
   )
   const hasHotseatExchangeOverlay = isHotseat && !isPublicFarmView && (
-    isBakeExchange || isAnytimeExchange || (!!harvestPending && exchangeDraft.harvestFeed.options.length > 0)
+    isBakeExchange || isAnytimeExchange || exchangeDraft.harvest.isActive
   )
   const nearbyMajorSupply = isInteractive && !isPublicFarmView && !!improvementSelection && selectableMajorIds.size > 0
   const majorImprovementsPresentation = (
@@ -1953,6 +1943,10 @@ export const GameContainerApi = () => {
           isInteractive={isInteractive}
           pendingChoice={pendingChoice}
           harvestPending={harvestPending}
+          heatingPending={heatingPending}
+          heatingConfirmDisabled={isInteractionSubmitDraftRejected({ value: 'confirm', heatingPayment: {
+            fuelUsed: exchangeDraft.harvest.heating?.fuelUsed ?? 0, selections: exchangeDraft.harvest.selections,
+          } })}
           harvestFeedConfirmDisabled={harvestFeedConfirmDisabled}
           draft={exchangeDraft}
           cardLabel={cardLabel}
@@ -1962,6 +1956,7 @@ export const GameContainerApi = () => {
             confirmAnytimeExchange,
             cancelAnytimeExchange,
             confirmHarvestFeed,
+            confirmHeating,
           }}
         />
       </div>

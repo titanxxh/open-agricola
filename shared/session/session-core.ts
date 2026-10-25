@@ -136,9 +136,11 @@ import {
   getMaxTradeTimes,
   getExchangesInWindow,
   getFeedExchangeCatalog,
+  getExchangeCatalog,
   validateExchangeBatch,
   type ExchangeBatchEntry,
 } from '../actions/effects/exchange.ts'
+import { BASIC_CONVERSION_SOURCE_ID } from '../cards/basic-conversion'
 import { getRemainingHarvestExchangeUses } from '../actions/helpers/exchange-recipes'
 import {
   getAvailableMajorImprovementIds,
@@ -204,7 +206,6 @@ import {
   computeHeatingRequirement,
   computeHeatingRequirementBeforeSeason,
   recoverInfirmaryWorkers,
-  type HeatingPaymentPayload,
 } from '../moor/heating'
 
 export type { FeedSelection, FeedSelections } from './pending-command-resolution'
@@ -1842,7 +1843,7 @@ export class GameCore {
           || player.occupationPlayed.includes(sourceId))
     })
     return harvestExchange || getExchangesInWindow(player, 'anytime', this.state, this.actionHooks).some((trade) =>
-      canAffordTrade(player, trade, 1, this.state),
+      (trade.sourceId ?? trade.source) !== BASIC_CONVERSION_SOURCE_ID && canAffordTrade(player, trade, 1, this.state),
     )
   }
 
@@ -3638,7 +3639,7 @@ export class GameCore {
             return
           }
         }
-        if (frame.feedingResume) {
+        if (frame.harvestSettlementResume) {
           const animalOwnerIndex = this.state.players.findIndex(candidate => this.hasPendingAnimals(candidate))
           if (animalOwnerIndex !== -1) {
             this.startReorganizeSubFlow(animalOwnerIndex, 'anytime')
@@ -3646,13 +3647,17 @@ export class GameCore {
           }
           this.finalizeActionLog(frameOwnerPlayer)
           this.engineStack.pop()
-          this.startFeedSubFlow(ownerIdx, frame.feedingResume.remaining,
-            frame.feedingResume.foodUsed, frame.feedingResume.feedQueue)
-          const feedingFrame = this.engineStack.current()!
-          feedingFrame.feedingResume = frame.feedingResume
-          if (this.buildAnytimeEntries().length > 0) return
-          this.engineStack.pop()
-          this.finishFeedingSettlement(ownerIdx, frame.feedingResume)
+          if (frame.harvestSettlementResume.kind === 'heating') {
+            this.finishHeatingSettlement(ownerIdx, frame.harvestSettlementResume)
+          } else {
+            this.startFeedSubFlow(ownerIdx, frame.harvestSettlementResume.remaining,
+              frame.harvestSettlementResume.foodUsed, frame.harvestSettlementResume.feedQueue)
+            const feedingFrame = this.engineStack.current()!
+            feedingFrame.harvestSettlementResume = frame.harvestSettlementResume
+            if (this.buildAnytimeEntries().length > 0) return
+            this.engineStack.pop()
+            this.finishFeedingSettlement(ownerIdx, frame.harvestSettlementResume)
+          }
           return
         }
         if (this.stageDispatch.completeFrameIfStage(frame)) return
@@ -4258,7 +4263,7 @@ export class GameCore {
         case 'feed':
           return this.handleFeedResolved(playerIndex, plan.selections)
         case 'heating':
-          return this.handleHeatingResolved(playerIndex, plan.payload as HeatingPaymentPayload | undefined)
+          return this.handleHeatingResolved(playerIndex, plan.selections, plan.fuelUsed)
         case 'post-reap-anytime':
           return this.handlePostReapAnytimeResolved(playerIndex)
         case 'engine-choice':
@@ -4310,6 +4315,35 @@ export class GameCore {
     return this.respond()
   }
 
+  private resolveHarvestExchangeBatch(
+    player: PlayerState,
+    selections: FeedSelections,
+    offeredCatalog: readonly { sourceId: string; exchangeIndex: number }[],
+    currentCatalog: ReturnType<typeof getExchangeCatalog>,
+  ): ExchangeBatchEntry[] | undefined {
+    const entries: ExchangeBatchEntry[] = []
+    for (const selection of selections) {
+      if (!selection.sourceId || !Number.isSafeInteger(selection.exchangeIndex) ||
+        !Number.isSafeInteger(selection.count) || selection.count <= 0) {
+        return undefined
+      }
+      const offered = offeredCatalog.some((entry) => entry.sourceId === selection.sourceId &&
+        entry.exchangeIndex === selection.exchangeIndex)
+      const resolved = offered ? currentCatalog.find((entry) => entry.sourceId === selection.sourceId &&
+        entry.exchangeIndex === selection.exchangeIndex) : undefined
+      if (!resolved) return undefined
+      entries.push({
+        trade: resolved.trade, count: selection.count,
+        ...(resolved.window === 'harvest' ? { harvestRound: this.state.round } : {}),
+      })
+    }
+    if (!validateExchangeBatch({ state: this.state, player, entries })) {
+      return undefined
+    }
+
+    return entries
+  }
+
   private handleFeedResolved(
     playerIndex: number,
     selections: FeedSelections,
@@ -4324,54 +4358,38 @@ export class GameCore {
     if (!player) return this.rejectInput('invalid player')
     const currentCatalog = getFeedExchangeCatalog(player, this.state, this.actionHooks)
     const offeredCatalog = request.exchangeCatalog ?? []
-    const entries: ExchangeBatchEntry[] = []
-    for (const selection of selections) {
-      if (!selection.sourceId || !Number.isSafeInteger(selection.exchangeIndex) ||
-        !Number.isSafeInteger(selection.count) || selection.count <= 0) {
-        return this.rejectInput('invalid harvest feed selections')
-      }
-      const offered = offeredCatalog.some((entry) => entry.sourceId === selection.sourceId &&
-        entry.exchangeIndex === selection.exchangeIndex)
-      const resolved = offered ? currentCatalog.find((entry) => entry.sourceId === selection.sourceId &&
-        entry.exchangeIndex === selection.exchangeIndex) : undefined
-      if (!resolved) return this.rejectInput('invalid harvest feed selections')
-      entries.push({
-        trade: resolved.trade, count: selection.count,
-        ...(resolved.window === 'harvest' ? { harvestRound: this.state.round } : {}),
-      })
-    }
-    if (!validateExchangeBatch({ state: this.state, player, entries })) {
-      return this.rejectInput('invalid harvest feed selections')
-    }
+    const entries = this.resolveHarvestExchangeBatch(player, selections, offeredCatalog, currentCatalog)
+    if (!entries) return this.rejectInput('invalid harvest feed selections')
 
     this.pushHistory()
-    const resourcesConverted: Partial<Resource> = { ...frame.feedingResume?.resourcesConverted }
+    const resourcesConverted: Partial<Resource> = { ...(frame.harvestSettlementResume?.kind === 'feed' ? frame.harvestSettlementResume.resourcesConverted : {}) }
     for (const { trade, count } of entries) {
       for (const resource of REAL_RESOURCE_KEYS) {
         const amount = (trade.from[resource] ?? 0) * count
         if (amount > 0) resourcesConverted[resource] = (resourcesConverted[resource] ?? 0) + amount
       }
     }
-    const feedingResume = {
+    const harvestSettlementResume = {
+      kind: 'feed' as const,
       remaining: request.remaining, foodUsed: request.foodUsed,
       feedQueue: request.feedQueue ?? [], resourcesConverted,
     }
     if (entries.length === 0) {
       this.engineStack.pop()
-      this.finishFeedingSettlement(playerIndex, feedingResume)
+      this.finishFeedingSettlement(playerIndex, harvestSettlementResume)
       return this.respond()
     }
     const flow: ActionFlow = {
       type: 'leaf', actionId: 'exchange',
       actionContext: { submittedExchangeBatch: entries, harvestFeed: true },
     }
-    frame.feedingResume = feedingResume
+    frame.harvestSettlementResume = harvestSettlementResume
     this.engineStack.replaceCurrentFrameEngine(this.createFlowEngine(flow, playerIndex), { kind: 'flow', flow })
     this.runEngineSteps()
     return this.respond()
   }
 
-  private finishFeedingSettlement(playerIndex: number, resume: NonNullable<EngineFrame['feedingResume']>): void {
+  private finishFeedingSettlement(playerIndex: number, resume: Extract<NonNullable<EngineFrame['harvestSettlementResume']>, { kind: 'feed' }>): void {
     const player = this.state.players[playerIndex]
     if (!player) return
     const usedResources: Partial<Resource> = {
@@ -4392,21 +4410,44 @@ export class GameCore {
 
   private handleHeatingResolved(
     playerIndex: number,
-    payload: HeatingPaymentPayload = {},
+    selections: FeedSelections,
+    fuelUsed: number,
   ): SessionResponse {
     const request = this.engineStack.peekPendingView()?.request
     const frame = this.engineStack.current()
-    if (
-      request?.kind !== 'heating' ||
-      frame?.ownerPlayerIndex !== playerIndex
-    ) {
-      return this.respond(false, 'no pending heating')
-    }
-    this.pushHistory()
     const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
+    if (request?.kind !== 'heating' || frame?.ownerPlayerIndex !== playerIndex || !player) {
+      return this.rejectInput('no pending heating')
+    }
+    if (!Number.isSafeInteger(fuelUsed) || fuelUsed < 0) return this.rejectInput('invalid heating payment')
+    const catalog = getExchangeCatalog({ player, state: this.state, actionHooks: this.actionHooks,
+      windows: ['anytime'], includeBasicConversions: true })
+    const entries = this.resolveHarvestExchangeBatch(player, selections, request.exchangeCatalog, catalog)
+    if (!entries) return this.rejectInput('invalid heating exchange selections')
+    const woodToFuel = entries.reduce((sum, { trade, count }) => sum + (
+      trade.sourceId === BASIC_CONVERSION_SOURCE_ID && trade.from.wood === 1 && trade.to.fuel === 1 ? count : 0
+    ), 0)
+    const resume = { kind: 'heating' as const, fuelUsed, woodToFuel, feedQueue: request.feedQueue ?? [] }
+    this.pushHistory()
+    if (entries.length === 0) {
+      this.engineStack.pop()
+      this.finishHeatingSettlement(playerIndex, resume)
+    } else {
+      const flow: ActionFlow = { type: 'leaf', actionId: 'exchange', actionContext: { submittedExchangeBatch: entries } }
+      frame.harvestSettlementResume = resume
+      this.engineStack.replaceCurrentFrameEngine(this.createFlowEngine(flow, playerIndex), { kind: 'flow', flow })
+      this.runEngineSteps()
+    }
+    return this.respond()
+  }
 
-    const result = applyHeatingPayment(this.state, player, payload)
+  private finishHeatingSettlement(
+    playerIndex: number,
+    resume: Extract<NonNullable<EngineFrame['harvestSettlementResume']>, { kind: 'heating' }>,
+  ): void {
+    const player = this.state.players[playerIndex]
+    if (!player) return
+    const result = applyHeatingPayment(this.state, player, { fuelUsed: resume.fuelUsed }, resume.woodToFuel)
     appendImmediateEvents(this.state, [{
       type: 'harvest.heated',
       actorPlayerId: player.id,
@@ -4417,9 +4458,7 @@ export class GameCore {
       sickWorkerIds: result.sickWorkerIds,
     }])
 
-    const top = this.engineStack.current()
-    if (top?.reason === 'heating') this.engineStack.pop()
-    return this.continueHarvestFeedingQueue(request.feedQueue ?? [])
+    this.continueHarvestFeedingQueue(resume.feedQueue)
   }
 
   private handlePostReapAnytimeResolved(playerIndex: number): SessionResponse {

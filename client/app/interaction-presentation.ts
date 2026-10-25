@@ -95,8 +95,10 @@ export type InteractionPresentationPlan =
       playerIndex: number
       playerId: string
       required: number
-      maxFuelPayable: number
-      maxWoodConvertibleToFuel: number
+      requiredWithWoodConversion: number
+      maxNewSickWorkers: number
+      exchangeCatalog: Extract<InteractionRequest, { kind: 'heating' }>['exchangeCatalog']
+      placedAnimals: Extract<InteractionRequest, { kind: 'heating' }>['placedAnimals']
     }
   | {
       kind: 'engine-blocked'
@@ -157,7 +159,7 @@ export type InteractionFeedSelection = {
 
 export type HeatingPayment = {
   fuelUsed: number
-  woodToFuel: number
+  selections: readonly InteractionFeedSelection[]
 }
 
 export type InteractionSubmitCommand =
@@ -330,8 +332,10 @@ export const buildInteractionPresentationPlan = (
       playerIndex: interaction.playerIndex,
       playerId: interaction.request.playerId,
       required: interaction.request.required,
-      maxFuelPayable: interaction.request.maxFuelPayable,
-      maxWoodConvertibleToFuel: interaction.request.maxWoodConvertibleToFuel,
+      requiredWithWoodConversion: interaction.request.requiredWithWoodConversion,
+      maxNewSickWorkers: interaction.request.maxNewSickWorkers,
+      exchangeCatalog: interaction.request.exchangeCatalog,
+      placedAnimals: interaction.request.placedAnimals,
     }
   }
   if (interaction.request.kind === 'engine-blocked') {

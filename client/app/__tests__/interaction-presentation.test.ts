@@ -119,8 +119,10 @@ const waitHeating = (): InteractionState => ({
     kind: 'heating',
     playerId: 'p1',
     required: 2,
-    maxFuelPayable: 1,
-    maxWoodConvertibleToFuel: 1,
+    requiredWithWoodConversion: 2,
+    maxNewSickWorkers: 2,
+    exchangeCatalog: [],
+    placedAnimals: {},
   },
   allowedCommands: ['resolveChoice', 'undoStep'],
   anytimeActions: [],
@@ -469,12 +471,12 @@ describe('Interaction Presentation', () => {
 
     expect(buildInteractionSubmitCommand(waitHeating(), {
       value: 'confirm',
-      heatingPayment: { fuelUsed: 2, woodToFuel: 1 },
+      heatingPayment: { fuelUsed: 2, selections: [{ sourceId: '__basic__', exchangeIndex: 2, count: 1 }] },
     })).toEqual({
       kind: 'resolveChoice',
       playerIndex: 0,
       value: 'confirm',
-      payload: { fuelUsed: 2, woodToFuel: 1 },
+      payload: { fuelUsed: 2, selections: [{ sourceId: '__basic__', exchangeIndex: 2, count: 1 }] },
     })
   })
 

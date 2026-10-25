@@ -29,13 +29,8 @@ type ResourceExchangeLabelParams = {
   bonusVp?: number
 }
 
-type HeatingPending = NonNullable<InteractionBarModel['pending']['heating']>
-
 const emptyAnimalCounts: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0, horse: 0 }
 const animalCountOrder: AnimalKey[] = ['sheep', 'boar', 'cattle', 'horse']
-
-const clampWhole = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)))
 
 const renderInteractionText = (locale: Locale, text: InteractionBarText): string => {
   if (text.text !== undefined) return text.text
@@ -64,80 +59,6 @@ const AnimalCountLine = ({
       })}
   </span>
 )
-
-const HeatingPanel = ({
-  locale,
-  pending,
-  title,
-  subtitle,
-  isInteractive,
-  onConfirm,
-}: {
-  locale: Locale
-  pending: HeatingPending
-  title?: InteractionBarText
-  subtitle?: InteractionBarText
-  isInteractive: boolean
-  onConfirm: (payload: { fuelUsed: number; woodToFuel: number }) => void
-}) => {
-  const [woodToFuel, setWoodToFuel] = useState(0)
-  const [fuelUsed, setFuelUsed] = useState(Math.min(pending.required, pending.maxFuelPayable))
-  const maxWood = pending.maxWoodConvertibleToFuel
-  const maxFuel = Math.min(pending.required, pending.maxFuelPayable + woodToFuel)
-  const payload = {
-    woodToFuel: clampWhole(woodToFuel, 0, maxWood),
-    fuelUsed: clampWhole(fuelUsed, 0, maxFuel),
-  }
-  const commit = () => onConfirm(payload)
-  return (
-    <>
-      <div className="interaction-title">
-        {title ? renderInteractionText(locale, title) : t(locale, 'ui.harvestHeatingTitle')}
-      </div>
-      <div className="interaction-subtitle">
-        {subtitle ? renderInteractionText(locale, subtitle) : t(locale, 'ui.harvestHeatingSubtitle', {
-          player: pending.playerName,
-          count: pending.required,
-        })}
-      </div>
-      <div className="interaction-resource-quantity-panel">
-        <div className="resource-quantity-grid">
-          <label className="resource-quantity-row">
-            <span className="resource-quantity-label">
-              {t(locale, 'ui.harvestHeatingWoodToFuel')}
-            </span>
-            <input
-              type="number"
-              min={0}
-              max={maxWood}
-              value={woodToFuel}
-              disabled={!isInteractive || maxWood <= 0}
-              onChange={(event) => setWoodToFuel(clampWhole(Number(event.target.value), 0, maxWood))}
-            />
-          </label>
-          <label className="resource-quantity-row">
-            <span className="resource-quantity-label">
-              {t(locale, 'ui.harvestHeatingFuelUsed')}
-            </span>
-            <input
-              type="number"
-              min={0}
-              max={maxFuel}
-              value={fuelUsed}
-              disabled={!isInteractive || maxFuel <= 0}
-              onChange={(event) => setFuelUsed(clampWhole(Number(event.target.value), 0, maxFuel))}
-            />
-          </label>
-        </div>
-        <div className="interaction-actions resource-quantity-actions">
-          <button onClick={commit} disabled={!isInteractive || pending.isConfirmDisabled?.(payload)}>
-            {t(locale, 'ui.harvestHeatingConfirm')}
-          </button>
-        </div>
-      </div>
-    </>
-  )
-}
 
 const isResourceExchangeLabelParams = (
   value: unknown,
@@ -441,7 +362,6 @@ export const InteractionBar = ({
   const { locale, isInteractive } = model
   const body = model.body
   const choiceModel = model.choice
-  const heatingPending = model.pending.heating
   const resourceQuantitySelect = model.pending.resourceQuantitySelect
   const resourceBatchExchangeSelect = model.pending.resourceBatchExchangeSelect
   const fencePlacementMode = model.farm.fence.placementMode
@@ -586,17 +506,7 @@ export const InteractionBar = ({
               onConfirm={resourceQuantitySelect.onConfirm}
               onCancel={resourceQuantitySelect.onCancel}
             />
-          ) : body.kind === 'heating' && heatingPending ? (
-            <HeatingPanel
-              key={`${heatingPending.playerName}:${heatingPending.required}:${heatingPending.maxFuelPayable}:${heatingPending.maxWoodConvertibleToFuel}`}
-              locale={locale}
-              pending={heatingPending}
-              title={body.title}
-              subtitle={body.subtitle}
-              isInteractive={isInteractive}
-              onConfirm={confirmHeating}
-            />
-          ) : body.kind === 'harvestFeed' ? (
+          ) : body.kind === 'harvestFeed' || body.kind === 'heating' ? (
             <>
               <div className="interaction-title">
                 {body.title ? renderInteractionText(locale, body.title) : null}
@@ -605,7 +515,7 @@ export const InteractionBar = ({
                 {body.subtitle ? renderInteractionText(locale, body.subtitle) : null}
               </div>
               <div className="interaction-actions">
-                <button onClick={confirmHarvestFeed} disabled={!isInteractive || model.pending.harvestFeedConfirmDisabled}>
+                <button onClick={() => body.kind === 'heating' ? confirmHeating() : confirmHarvestFeed()} disabled={!isInteractive || (body.kind === 'harvestFeed' && model.pending.harvestFeedConfirmDisabled)}>
                   {t(locale, 'ui.interactionConfirmButton')}
                 </button>
               </div>

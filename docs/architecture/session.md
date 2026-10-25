@@ -113,13 +113,15 @@ Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-plac
 
 ## Player Feeding Settlement
 
-`handleFeedResolved()` resolves the offered and live recipe catalogs and validates the complete batch before replacing its pending frame with an ordinary Exchange flow. Its private `feedingResume` stores remaining demand, prepaid food, conversion costs and the player queue. Every batch reaction and required animal reorganization completes before remaining food payment, begging and heating. Snapshot recovery and undo restore that continuation with the engine cursor, so completed exchange and prepaid food never replay.
+`handleFeedResolved()` resolves the offered and live recipe catalogs and validates the complete batch before replacing its pending frame with an ordinary Exchange flow. Its private `harvestSettlementResume` stores remaining demand, prepaid food, conversion costs and the player queue. Every batch reaction and required animal reorganization completes before remaining food payment, begging and heating. Snapshot recovery and undo restore that continuation with the engine cursor, so completed exchange and prepaid food never replay.
 
 `startHeatingOrContinue()` settles each participating player after their feeding continuation. `computeHeatingRequirementBeforeSeason()` in `shared/moor/heating.ts` is the pure requirement query that retains house and active card discounts and caps; the ordinary query then applies the season. A summer waiver with a positive normal requirement emits the existing `harvest.heated` fact without a payment interaction. It reads the player's current card state at this seam and never changes the season to reconstruct a hypothetical payment. Tests: `server/__tests__/season-heating-log-session.test.ts`.
 
 If a legal anytime action remains after a batch, a new feed pending keeps the same continuation. An empty submission closes that opportunity; another batch adds conversion costs without repaying prepaid food. With no available anytime action, settlement continues automatically. This lets reaction rewards fund a new batch and card actions complete before the remaining food is paid.
 
 Tests: `server/__tests__/{exchange-batch-session,harvest-session,harvest-feed-conversion-listener-session}.test.ts`.
+
+`handleHeatingResolved()` uses the same validation of offered and live catalogs and Exchange batch executor as feeding. The typed `harvestSettlementResume` retains the selected fuel payment and converted wood through reactions and animal reorganization; `finishHeatingSettlement()` then applies payment and sickness once. `shared/domain/heating-payment.ts` projects server-quoted requirements and payment bounds for both settlement and the Exchange Center. Wood conversion credits fuel through an ordinary exchange before heating spends it. Tests: `server/__tests__/heating-exchange-session.test.ts`.
 
 ## Snapshot data and executable-rule recovery
 
