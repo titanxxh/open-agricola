@@ -268,6 +268,10 @@ export const SeasonsBoard = ({
           const isCurrent = currentSeason === season
           const occupantRef = action?.takenBy[0]
           const occupant = occupantRef ? playerById.get(occupantRef.playerId) : undefined
+          const occupantName = occupant
+            ? getPlayerDisplayName(locale, occupant.name, players.indexOf(occupant), occupant.nameIsDefault)
+            : undefined
+          const occupyingWorker = occupant?.workers.find(worker => worker.id === occupantRef?.workerId)
           const isOccupied = !!occupantRef
           const available = !!action && !isOccupied && canTakeAction(action)
           const status = isOccupied ? 'occupied' : available ? 'current' : 'locked'
@@ -298,8 +302,10 @@ export const SeasonsBoard = ({
                 {isOccupied ? t(locale, 'ui.seasons.occupied') : available ? t(locale, 'ui.seasons.open') : t(locale, 'ui.seasons.locked')}
               </span>
               {occupant ? (
-                <span className="seasons-board__worker" data-player-color={occupant.color}>
-                  {getPlayerDisplayName(locale, occupant.name, players.indexOf(occupant), occupant.nameIsDefault)}
+                <span className="seasons-board__worker" data-player-color={occupant.color}
+                  role="img" aria-label={occupantName} title={occupantName}>
+                  <span className={`action-farmer action-farmer-${occupant.color}${occupyingWorker?.isNewborn ? ' child' : ''}`}
+                    aria-hidden="true" />
                 </span>
               ) : null}
             </button>

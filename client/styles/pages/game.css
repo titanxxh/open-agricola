@@ -1920,25 +1920,9 @@
   z-index: 3;
   right: 8px;
   bottom: 32px;
-  max-width: 112px;
-  overflow: hidden;
-  padding: 5px 8px;
-  border-radius: 999px;
-  color: #ffffff;
-  background: #445d9c;
-  box-shadow: 0 2px 5px rgba(32, 22, 12, 0.35);
-  font-size: 0.68rem;
-  font-weight: 850;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: 30px;
+  height: 40px;
 }
-
-.seasons-board__worker[data-player-color="red"] { background: #c74736; }
-.seasons-board__worker[data-player-color="yellow"] { background: #d1a92d; color: #211805; }
-.seasons-board__worker[data-player-color="blue"] { background: #416ec2; }
-.seasons-board__worker[data-player-color="black"] { background: #252525; }
-.seasons-board__worker[data-player-color="green"] { background: #3c7f39; }
-.seasons-board__worker[data-player-color="purple"] { background: #7251a3; }
 
 .seasons-board__token {
   position: absolute;
@@ -1979,10 +1963,16 @@
 }
 
 @media (max-width: 900px) {
-  .seasons-board__badge,
-  .seasons-board__worker {
+  .seasons-board__badge {
     max-width: 86px;
     font-size: 0.6rem;
+  }
+
+  .seasons-board__worker {
+    right: 5%;
+    bottom: 12%;
+    transform: scale(0.65);
+    transform-origin: right bottom;
   }
 }
 
