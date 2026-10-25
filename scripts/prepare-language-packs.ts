@@ -1,11 +1,27 @@
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseLanguageManifest, parseLanguagePack } from '../shared/i18n'
 
 type LanguageRef = { repository: string; revision: string; manifestSha256: string }
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
+const isMissingFile = (error: unknown) => error instanceof Error && 'code' in error && error.code === 'ENOENT'
+
+function publishCache(path: string, content: string) {
+  try {
+    if (readFileSync(path, 'utf8') === content) return
+  } catch (error) {
+    if (!isMissingFile(error)) throw error
+  }
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    writeFileSync(temporary, content, { flag: 'wx' })
+    renameSync(temporary, path)
+  } finally {
+    rmSync(temporary, { force: true })
+  }
+}
 
 export async function prepareLanguagePacks(root = resolve('.')) {
   const ref: LanguageRef = JSON.parse(readFileSync(resolve(root, 'i18n.ref'), 'utf8'))
@@ -41,18 +57,21 @@ export async function prepareLanguagePacks(root = resolve('.')) {
     if (sha256(pack) !== language.sha256) throw new Error(`Language checksum mismatch: ${language.id}`)
     const parsed = parseLanguagePack(JSON.parse(pack))
     if (parsed.locale !== language.id) throw new Error('Language identity mismatch')
-    writeFileSync(resolve(output, language.file), pack)
+    publishCache(resolve(output, language.file), pack)
     // Authoring data is an ignored build cache for translation checks, never imported by the app.
     const sourcePath = resolve(root, `output/i18n/locales/${language.id}.json`)
     mkdirSync(dirname(sourcePath), { recursive: true })
     const source = await read(`locales/${language.id}.json`, language.sourceSha256)
     if (sha256(source) !== language.sourceSha256) throw new Error(`Language source checksum mismatch: ${language.id}`)
-    writeFileSync(sourcePath, source)
+    publishCache(sourcePath, source)
   }
-  writeFileSync(resolve(output, 'manifest.json'), raw)
+  publishCache(resolve(output, 'manifest.json'), raw)
   const files = new Set(manifest.languages.map(language => language.file))
   for (const file of readdirSync(output)) {
-    if (/^[a-z0-9-]+\.[a-f0-9]{16}\.json$/.test(file) && !files.has(file)) unlinkSync(resolve(output, file))
+    if (/^[a-z0-9-]+\.[a-f0-9]{16}\.json$/.test(file) && !files.has(file)) {
+      try { unlinkSync(resolve(output, file)) }
+      catch (error) { if (!isMissingFile(error)) throw error }
+    }
   }
   console.log(`[prepare-language-packs] verified ${manifest.languages.length} packs from ${ref.repository}@${ref.revision.slice(0, 12)}`)
   return manifest
