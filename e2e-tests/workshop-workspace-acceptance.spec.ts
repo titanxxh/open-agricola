@@ -1231,11 +1231,17 @@ const scenarioHandoff = async ({
   ), 503)
   const proposalPage = await page.context().newPage()
   await proposalPage.goto(`${FRONTEND_URL}/?page=workshop&card=${encodeURIComponent(workspace.id)}`)
-  await proposalPage.getByRole('button',{name:'投稿记录与恢复'}).click()
-  await expect(proposalPage.getByText('工坊机器人将把你采用的卡牌内容', {exact:false})).toBeVisible()
-  await proposalPage.getByRole('checkbox').check()
-  await proposalPage.getByRole('button',{name:'发起 PR',exact:true}).click()
-  await expect(proposalPage.getByRole('link',{name:'查看审核 PR'})).toHaveAttribute('href','/mock-workshop-pr/1')
+  await proposalPage.getByRole('button', { name: text(variant.locale, '投稿记录与恢复', 'Submissions and recovery') }).click()
+  await expect(proposalPage.getByText(text(variant.locale,
+    '工坊机器人将把你采用的卡牌内容',
+    'The Workshop bot will submit your adopted card content',
+  ), { exact: false })).toBeVisible()
+  await proposalPage.getByRole('checkbox', { name: text(variant.locale,
+    '我确认公开投稿，并保留设计者署名',
+    'I agree to publish this submission with designer credit',
+  ) }).check()
+  await proposalPage.getByRole('button', { name: text(variant.locale, '发起 PR', 'Open PR'), exact: true }).click()
+  await expect(proposalPage.getByRole('link', { name: text(variant.locale, '查看审核 PR', 'View review PR') })).toHaveAttribute('href', '/mock-workshop-pr/1')
   await proposalPage.screenshot({path:test.info().outputPath('workshop-app-submission.png')})
   await proposalPage.close()
   const proposed = await responseJson<{ prUrl: string; prNumber: number }>(
