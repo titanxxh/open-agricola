@@ -21,6 +21,7 @@ COPY --from=build /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/viewer-builds ./viewer-builds
+COPY --from=build --chown=node:node /app/public/i18n ./public/i18n
 COPY --chown=node:node package.json pnpm-lock.yaml tsconfig*.json ./
 COPY --chown=node:node shared/ ./shared/
 COPY --chown=node:node server/ ./server/
