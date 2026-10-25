@@ -7,8 +7,8 @@ import {
 } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
-import en from '../output/i18n/locales/en.json'
-import zh from '../output/i18n/locales/zh.json'
+import en from '../output/i18n/locales/en.json' with { type: 'json' }
+import zh from '../output/i18n/locales/zh.json' with { type: 'json' }
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find(({ name: headerName, value }) =>
