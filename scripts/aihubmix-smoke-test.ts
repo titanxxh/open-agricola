@@ -4,6 +4,7 @@
  *   pnpm run smoke:aihubmix
  *   pnpm run smoke:aihubmix:image
  *   pnpm run smoke:gemini:image
+ *   pnpm run smoke:aihubmix:image --dry-run  # validate prompts without calling APIs
  *
  * Reads test API keys from .env (do NOT commit the key — .env is gitignored).
  * Performs real network calls:
@@ -18,6 +19,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildCardArtPrompt } from '../client/services/llm/card-utils.ts'
+import { prepareLanguagePacks } from './prepare-language-packs.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WORKTREE_ROOT = path.resolve(__dirname, '..')
@@ -47,7 +49,6 @@ function resolveRepoRoot(): string {
 }
 
 const REPO_ROOT = resolveRepoRoot()
-const ENV_TEXT = loadEnvText()
 
 function loadEnvText(): string {
   const envPath = path.join(REPO_ROOT, '.env')
@@ -59,10 +60,11 @@ function loadEnvText(): string {
 }
 
 function loadKey(envNames: string[]): string {
+  const envText = loadEnvText()
   for (const envName of envNames) {
     const processValue = process.env[envName]
     if (processValue) return processValue
-    const line = ENV_TEXT.split('\n').find(l => l.startsWith(`${envName}=`))
+    const line = envText.split('\n').find(l => l.startsWith(`${envName}=`))
     if (line) return line.slice(envName.length + 1).trim().replace(/^["']|["']$/g, '')
   }
   console.error(`❌ Missing API key env: ${envNames.join(' or ')}`)
@@ -96,8 +98,6 @@ const SMOKE_IMAGE_CARDS: SmokeCard[] = [
   },
 ]
 
-const AIHUBMIX_KEY = loadKey(['AIHUBMIX_API_KEY', 'MY_TEST_AIHUBMIX_APIKEY'])
-
 function ensureOutputDir(): void {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true })
 }
@@ -124,7 +124,7 @@ async function smokeChat(model: string): Promise<void> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${AIHUBMIX_KEY}`,
+      Authorization: `Bearer ${loadKey(['AIHUBMIX_API_KEY', 'MY_TEST_AIHUBMIX_APIKEY'])}`,
     },
     body: JSON.stringify({
       model,
@@ -174,8 +174,16 @@ async function smokeChat(model: string): Promise<void> {
   console.log(`  ↳ saved code output: ${path.relative(REPO_ROOT, outPath)}`)
 }
 
-async function smokeImage(provider: ImageProvider, model: string, card: SmokeCard): Promise<void> {
+function imagePrompt(card: SmokeCard): string {
   const prompt = buildCardArtPrompt(card.artSubject, card.type, 'zh')
+  if (!prompt.includes(card.artSubject) || prompt.startsWith('ui.copy.')) {
+    throw new Error(`Image prompt is unavailable for ${card.id}`)
+  }
+  return prompt
+}
+
+async function smokeImage(provider: ImageProvider, model: string, card: SmokeCard): Promise<void> {
+  const prompt = imagePrompt(card)
   const promptPath = path.join(OUTPUT_DIR, `${card.id}-${provider}-${safeModelName(model)}-prompt.txt`)
   fs.writeFileSync(promptPath, prompt, 'utf8')
 
@@ -198,7 +206,7 @@ async function generateAiHubMixImage(model: string, prompt: string): Promise<{ d
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${AIHUBMIX_KEY}`,
+      Authorization: `Bearer ${loadKey(['AIHUBMIX_API_KEY', 'MY_TEST_AIHUBMIX_APIKEY'])}`,
     },
     body: JSON.stringify({
       model,
@@ -277,6 +285,15 @@ function parseImageModel(provider: ImageProvider): string {
 
 async function main(): Promise<void> {
   const mode = parseMode()
+  const dryRun = process.argv.includes('--dry-run')
+  if (mode !== 'code' || dryRun) {
+    await prepareLanguagePacks(WORKTREE_ROOT)
+    await import('../server/language-packs.ts')
+  }
+  if (dryRun) {
+    console.log(JSON.stringify(SMOKE_IMAGE_CARDS.map(card => ({ id: card.id, prompt: imagePrompt(card) }))))
+    return
+  }
   const imageProvider = parseImageProvider()
   const imageModel = parseImageModel(imageProvider)
   ensureOutputDir()
