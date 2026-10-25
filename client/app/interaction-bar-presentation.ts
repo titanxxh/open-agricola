@@ -9,7 +9,7 @@ import type {
 import type { Locale } from '../../shared/i18n'
 import { t } from '../../shared/i18n'
 import { getPlayerDisplayName } from '../utils/player-name'
-import { getAnyCardDisplayName, translateCardText } from '../components/common/cardText'
+import { getCardDisplayName, translateCardText } from '../components/common/cardText'
 import { getParentFatherOptionText } from '../components/common/parentCardText'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../types/ui'
 
@@ -397,7 +397,7 @@ const buildChoiceModel = (
     : undefined
   const optionalActionName = getOptionalActionName(locale, optionalActionOption)
   const triggerCardName = choice.sourceCard
-    ? getAnyCardDisplayName(locale, choice.sourceCard)
+    ? getCardDisplayName(locale, choice.sourceCard)
     : null
   const promptHintKey =
     typeof choice.promptParams?.hintKey === 'string'
@@ -454,7 +454,7 @@ const buildChoiceModel = (
         : textKey(
             choice.promptKey ?? 'ui.interactionChooseOne',
             promptCardId
-              ? { ...titleParams, card: getAnyCardDisplayName(locale, promptCardId) }
+              ? { ...titleParams, card: getCardDisplayName(locale, promptCardId) }
               : titleParams,
           ),
     triggerSubtitle: triggerCardName

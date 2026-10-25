@@ -5,7 +5,8 @@ import { PageRouter } from '../PageRouter'
 import { AuthProvider } from '../../contexts/AuthContext'
 
 vi.mock('../../contexts/LocaleContext', () => ({
-  useLocale: () => ({
+  useCurrentLocale: () => 'zh',
+    useLocale: () => ({
     locale: 'zh',
     setLocale: vi.fn(),
     t: (key: string) => key,

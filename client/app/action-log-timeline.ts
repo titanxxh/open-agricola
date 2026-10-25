@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../shared/i18n'
 import type { GameEvent } from '../../shared/contract/events'
 import type { LogEntry } from '../../shared/contract/types'
 import { resolveLogPlayerNames } from '../../shared/events/log-player-names'
@@ -190,7 +191,7 @@ const eventLabel = (
   locale: Locale,
   contextualLogRow?: LogPresentationRow,
 ): { logEntry: LogEntry | null; label: string } => {
-  if (!entry.event) return { logEntry: null, label: locale === 'zh' ? 'archive 缺口' : 'Archive gap' }
+  if (!entry.event) return { logEntry: null, label: translateMessage(locale, "ui.copy.app_action_log_timeline.archive_gap_1d8586") }
 
   if (contextualLogRow) return { logEntry: contextualLogRow.logEntry, label: '' }
 

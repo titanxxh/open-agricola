@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
@@ -12,15 +13,6 @@ import { getPlayerDisplayName } from '../../utils/player-name'
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
 
-const PHASE_LABELS: Record<RoundPhase, Record<Locale, string>> = {
-  'preparation':    { en: 'Preparation',    zh: '准备' },
-  'work':           { en: 'Work',           zh: '工作' },
-  'returning-home': { en: 'Returning Home', zh: '回家' },
-  'harvest':        { en: 'Harvest',        zh: '收获' },
-  'field':          { en: 'Field',          zh: '收割' },
-  'feeding':        { en: 'Feeding',        zh: '喂食' },
-  'breeding':       { en: 'Breeding',       zh: '繁殖' },
-}
 
 type Props = {
   locale: Locale
@@ -90,7 +82,7 @@ export const GameHeader = ({
         <span className="header-phase-pills">
           {phases.map((phase) => (
             <span key={phase} className={`header-phase-pill${phase === state.roundPhase ? ' active' : ''}`}>
-              {PHASE_LABELS[phase][locale]}
+              {t(locale, `ui.phases.${phase}`)}
             </span>
           ))}
         </span>
@@ -117,7 +109,7 @@ export const GameHeader = ({
         {state.gameOver ? (
           <span className="status-badge game-over">{t(locale, 'ui.statusGameOver')}</span>
         ) : isMyTurn ? (
-          <span className="status-badge your-turn">{locale === 'zh' ? '你的回合' : 'Your Turn'}</span>
+          <span className="status-badge your-turn">{translateMessage(locale, "ui.copy.components_header_GameHeader.your_turn_a14e9a")}</span>
         ) : (
           <span className="status-badge waiting-turn" data-player-color={currentPlayer.color} style={{ backgroundColor: currentPlayer.color }}>
             {t(locale, 'ui.waitingForPlayerAction', {
@@ -150,7 +142,7 @@ export const GameHeader = ({
                 </label>
               ) : null}
               {myPlayerName && (
-                <div className="header-menu-item header-menu-identity">{locale === 'zh' ? `你是 ${myPlayerName}` : `You are ${myPlayerName}`}</div>
+                <div className="header-menu-item header-menu-identity">{translateMessage(locale, "ui.copy.components_header_GameHeader.you_are_8f0fa0", { value0: myPlayerName })}</div>
               )}
             </div>
           )}

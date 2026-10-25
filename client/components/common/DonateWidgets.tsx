@@ -1,3 +1,5 @@
+import { t as translateMessage } from '../../../shared/i18n'
+import { useCurrentLocale } from '../../contexts/LocaleContext'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
 const KOFI_SCRIPT_SRC = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'
@@ -58,6 +60,7 @@ function useDonateVisible(sentinelRef: RefObject<HTMLElement | null>) {
 }
 
 export function DonateWidgets() {
+  const locale = useCurrentLocale()
   const sentinelRef = useRef<HTMLSpanElement>(null)
   const visible = useDonateVisible(sentinelRef)
 
@@ -94,7 +97,7 @@ export function DonateWidgets() {
         rel="noreferrer"
       >
         <img className="afdian-float-btn__icon" src={AFDIAN_ICON_SRC} alt="" />
-        <span>支持titanxxh</span>
+        <span>{translateMessage(locale, "ui.copy.client_components_common_DonateWidgets_tsx.support_titanxxh_870fb0")}</span>
       </a>
     </>
   )

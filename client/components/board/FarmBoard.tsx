@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import type { CardStatePresentation } from '../../../shared/contract/card-state'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -25,7 +26,7 @@ import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsForm
 import { CardWithCopy } from '../common/CardWithCopy'
 import { ParentCardFace } from '../common/ParentCardFace'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
-import { getAnyCardDisplayName } from '../common/cardText'
+import { getCardDisplayName } from '../common/cardText'
 import type { FarmBoardProjectionCardFieldTarget } from '../../app/farm-board-projection'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
@@ -942,25 +943,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     maxWidth: `calc(var(--tile) * ${Math.floor(gridColumns / 2)} + var(--fence) * ${Math.ceil(gridColumns / 2)} + 2px)`,
   }
   const roomIconClass = `res-icon-room-${displayPlayer.houseType}`
-  const compactLabels = locale === 'zh'
-    ? {
-        family: '家庭成员容量',
-        rooms: '房间',
-        housing: '住房容量',
-        fields: '田地',
-        fence: '栅栏容量',
-        stable: '畜栏供给',
-        infirmary: '病房工人',
-      }
-    : {
-        family: 'Family capacity',
-        rooms: 'Rooms',
-        housing: 'Housing capacity',
-        fields: 'Fields',
-        fence: 'Fence capacity',
-        stable: 'Stable supply',
-        infirmary: 'Infirmary workers',
-      }
+  const compactLabels = { "family": translateMessage(locale, "ui.copy.components_board_FarmBoard.family_capacity_cba19b"), "rooms": translateMessage(locale, "ui.copy.components_board_FarmBoard.rooms_ab0d1a"), "housing": translateMessage(locale, "ui.copy.components_board_FarmBoard.housing_capacity_9ccd49"), "fields": translateMessage(locale, "ui.copy.components_board_FarmBoard.fields_839fcb"), "fence": translateMessage(locale, "ui.copy.components_board_FarmBoard.fence_capacity_fc820c"), "stable": translateMessage(locale, "ui.copy.components_board_FarmBoard.stable_supply_516fd2"), "infirmary": translateMessage(locale, "ui.copy.components_board_FarmBoard.infirmary_workers_e1198a") }
 
   // Multi-select state for occupation-hand selection interaction
   const isMultiOccupationSelect = !!occupationHandSelection
@@ -1822,7 +1805,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
               const idx = (seen.get(src) ?? 0) + 1
               seen.set(src, idx)
               const total = counts.get(src) ?? 1
-              const baseLabel = target.sourceCard ? getAnyCardDisplayName(locale, target.sourceCard) : target.key
+              const baseLabel = target.sourceCard ? getCardDisplayName(locale, target.sourceCard) : target.key
               const label = total > 1 ? `${baseLabel} (${idx}/${total})` : baseLabel
               const currentSowChoice = isInteractive ? (pendingSowSelections[target.key] ?? '') : ''
               const availableGrain =
@@ -1858,7 +1841,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     ) : null}
         {cardFieldTargets.map(({ tile, stacks }) => (
           <div key={positionKey(tile)} className="farm-card-field-target" data-card-field-target={positionKey(tile)}>
-            <span className="farm-card-target-source">{tile.sourceCard ? getAnyCardDisplayName(locale, tile.sourceCard) : t(locale, 'ui.fields')}</span>
+            <span className="farm-card-target-source">{tile.sourceCard ? getCardDisplayName(locale, tile.sourceCard) : t(locale, 'ui.fields')}</span>
             {stacks.length > 0 ? <FieldCropStack locale={locale} stacks={stacks}
               selectionTiles={stacks.map((_, index) => index === stacks.length - 1 ? tile : null)}
               selectedPositionKeys={pendingPositionSelections} onToggle={togglePositionSelection} /> : (
@@ -1871,7 +1854,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
         ))}
         {nearbyAnimalZones.map(zone => (
           <div key={zone.id} className="farm-card-animal-target" data-card-animal-zone={zone.id}>
-            <div className="farm-card-target-source">{getAnyCardDisplayName(locale, zone.cardId ?? zone.id.replace(/^card:/, ''))}
+            <div className="farm-card-target-source">{getCardDisplayName(locale, zone.cardId ?? zone.id.replace(/^card:/, ''))}
               {zone.ownerPlayerId && zone.ownerPlayerId !== displayPlayer.id ? <span className="farm-card-target-owner">{players.find(player => player.id === zone.ownerPlayerId)?.name ?? zone.displayOwnerName}</span> : null}
             </div>
             {renderPlayedCardReorg({ ...zone, zoneId: zone.id, isReorgDraft: true })}

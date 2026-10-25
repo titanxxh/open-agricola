@@ -28,7 +28,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - `scripts/build-cards-manifest.ts` 用 TypeScript AST 静态提取 `meta`，运行时从不导入 Card Source；`meta` 只含 JSON 类字面量和同文件的简单常量。
 - `definePlayerActionCard` 声明 `playerActionCardType`；发牌池与 UI 据此区分，不靠卡号或 i18n 猜测。
 - 生产卡牌描述中的资源、动物、地形和分数通过 `ResourceText` token 渲染为图标；`__…__` 只标记精确的卡名、行动名和行动格名。`scripts/__tests__/card-description-icons.test.ts` 与 `card-description-double-underscore.test.ts` 负责门禁。
-- 卡面、触发标签、日志预览和 Replay 共用 `client/components/common/cardText.ts`：每个名字或文字字段各自依次回退到规范翻译、`meta.locales[locale]`（跳过空值）、源 metadata，名字还接受旧的 `cards.<id>.name` 别名，卡牌自有的提示用 `{card:<id>}` 引用卡名。玩家名按 `client/utils/player-name.ts` 中的生成名来源处理（[client](client_zh.md)）。
+- 卡面、触发标签、日志预览和 Replay 共用 `client/components/common/cardText.ts`：官方名字和文字字段读取已加载的语言包；自定义预览/房间/回放 metadata 由共享 catalog 按字段归一化，跳过空译文，卡牌自有的提示用 `{card:<id>}` 引用卡名。玩家名按 `client/utils/player-name.ts` 中的生成名来源处理（[client](client_zh.md)）。
 
 测试：`shared/cards/__tests__/card-source-representatives.test.ts`、`scripts/check-generated-cards-sync.ts`。
 

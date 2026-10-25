@@ -57,3 +57,6 @@ docs/superpowers/
 
 # LLM run reports are local artifacts, not source fixtures
 tests/llm-card-gen/acceptance/evidence/
+
+# Generated standalone language catalogs
+public/i18n/

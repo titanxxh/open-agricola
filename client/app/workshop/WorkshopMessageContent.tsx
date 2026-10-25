@@ -1,6 +1,9 @@
+import { t as translateMessage } from '../../../shared/i18n'
+import { useCurrentLocale } from '../../contexts/LocaleContext'
 import { useState } from 'react'
 
 function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const locale = useCurrentLocale()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
@@ -15,7 +18,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
       <div className="ai-code-header">
         {lang && <span className="ai-code-lang">{lang}</span>}
         <button type="button" className="ai-code-copy" onClick={handleCopy}>
-          {copied ? '✓' : '复制'}
+          {copied ? '✓' : translateMessage(locale, "ui.copy.client_app_workshop_WorkshopMessageContent_tsx.copy_d6e965")}
         </button>
       </div>
       <pre tabIndex={0}><code>{code}</code></pre>

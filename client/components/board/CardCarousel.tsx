@@ -1,3 +1,5 @@
+import { t as translateMessage } from '../../../shared/i18n'
+import { useCurrentLocale } from '../../contexts/LocaleContext'
 import { useRef, type ReactNode } from 'react'
 
 interface Props {
@@ -7,6 +9,7 @@ interface Props {
 }
 
 export function CardCarousel({ title, cards, emptyState }: Props) {
+  const locale = useCurrentLocale()
   const trackRef = useRef<HTMLDivElement>(null)
 
   function scroll(dir: -1 | 1) {
@@ -25,7 +28,7 @@ export function CardCarousel({ title, cards, emptyState }: Props) {
         )}
       </div>
       {cards.length === 0 ? (
-        <p className="card-carousel__empty">{emptyState ?? '无'}</p>
+        <p className="card-carousel__empty">{emptyState ?? translateMessage(locale, "ui.copy.client_components_board_CardCarousel_tsx.none_2d0077")}</p>
       ) : (
         <div className="card-carousel__track" ref={trackRef}>
           {cards.map((c, i) => (

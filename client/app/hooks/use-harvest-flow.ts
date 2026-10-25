@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import type { FeedExchangeCatalogEntry, PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
 import type { HarvestSummary } from '../../../shared/session/harvest-summary'
@@ -57,7 +58,7 @@ export const buildHarvestFeedOptions = (
   exchangeCatalog?: readonly FeedExchangeCatalogEntry[],
 ): HarvestFeedOption[] => {
   const options: HarvestFeedOption[] = []
-  const basicSourceName = locale === 'zh' ? '基础转化' : 'Basic conversion'
+  const basicSourceName = translateMessage(locale, "ui.copy.app_hooks_use_harvest_flow.basic_conversion_347cd5")
   if (exchangeCatalog) {
     return exchangeCatalog.flatMap((entry) => {
       const sourceMax = maxTradeTimesBySourceId?.[entry.sourceId]

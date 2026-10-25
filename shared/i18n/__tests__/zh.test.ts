@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { t } from '..'
-import { en } from '../en'
-import { zh } from '../zh'
+import en from '../../../output/i18n/locales/en.json'
+import zh from '../../../output/i18n/locales/zh.json'
 import { catalogCardDefinitions } from '../../cards/catalog.generated'
 
 describe('zh platform translations', () => {

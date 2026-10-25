@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { en } from '../../shared/i18n/en'
-import { zh } from '../../shared/i18n/zh'
+import en from '../../output/i18n/locales/en.json'
+import zh from '../../output/i18n/locales/zh.json'
 import { buildCardsManifest } from '../build-cards-manifest'
 
 const strings = (node: unknown, path = ''): Array<[string, string]> => {

@@ -48,12 +48,12 @@ export const geminiProvider: ProviderDef = {
     },
     {
       id: 'gemini-3.1-flash-image-preview',
-      label: 'Gemini 3.1 Flash Image (图片生成)',
+      label: 'Gemini 3.1 Flash Image', labelKey: "llm.models.gemini.gemini-3.1-flash-image-preview",
       capabilities: { chat: false, image: true },
     },
     {
       id: 'gemini-2.5-flash-image',
-      label: 'Gemini 2.5 Flash Image (图片生成)',
+      label: 'Gemini 2.5 Flash Image', labelKey: "llm.models.gemini.gemini-2.5-flash-image",
       capabilities: { chat: false, image: true },
     },
   ],

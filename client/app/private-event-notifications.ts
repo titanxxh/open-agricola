@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../shared/i18n'
 import type { PrivateGameEvent } from '../../shared/contract/protocol/game'
 import type { Locale } from '../../shared/i18n'
 
@@ -8,16 +9,7 @@ export type PrivateEventNotification = {
   message: string
 }
 
-const cardTypeLabel = (cardType: 'minor' | 'occupation' | 'mixed', locale: Locale): string => {
-  if (locale === 'zh') {
-    if (cardType === 'occupation') return '职业'
-    if (cardType === 'minor') return '小改良'
-    return '卡牌'
-  }
-  if (cardType === 'occupation') return 'occupation'
-  if (cardType === 'minor') return 'minor improvement'
-  return 'card'
-}
+const cardTypeLabel = (cardType: 'minor' | 'occupation' | 'mixed', locale: Locale): string => translateMessage(locale, `ui.private.cardType.${cardType}`)
 
 export const privateEventSignature = (event: PrivateGameEvent): string => {
   if (event.type === 'private.handChanged') {
@@ -56,20 +48,17 @@ const messageForPrivateEvent = (event: PrivateGameEvent, locale: Locale): Privat
   if (event.type === 'private.handChanged') {
     const count = event.cardIds.length
     const cardType = cardTypeLabel(event.cardType, locale)
-    if (locale === 'zh') return `手牌已更新：${count} 张${cardType}`
-    return `Hand updated: ${count} ${cardType}${count === 1 ? '' : 's'}`
+    return translateMessage(locale, 'ui.private.handUpdated', { count, cardType, plural: count === 1 ? '' : 's' })
   }
   if (event.type === 'private.draftUpdated') {
-    if (event.finished) return locale === 'zh' ? '轮抽完成，手牌已更新' : 'Draft finished. Your hand was updated.'
-    if (event.advanced) return locale === 'zh' ? `轮抽进入第 ${event.round + 1} 轮` : `Draft advanced to round ${event.round + 1}.`
-    return locale === 'zh' ? '本轮选择已提交' : 'Draft pick submitted.'
+    if (event.finished) return translateMessage(locale, "ui.copy.app_private_event_notifications.draft_finished_your_hand_was_updated_1dae3a")
+    if (event.advanced) return translateMessage(locale, "ui.copy.app_private_event_notifications.draft_advanced_to_round_cbfbec", { value0: event.round + 1 })
+    return translateMessage(locale, "ui.copy.app_private_event_notifications.draft_pick_submitted_8a4d26")
   }
   if (event.sourceCard) {
-    return locale === 'zh'
-      ? `需要处理 ${event.sourceCard} 的私有提示`
-      : `Private prompt from ${event.sourceCard}.`
+    return translateMessage(locale, "ui.copy.app_private_event_notifications.private_prompt_from_bdeb1d", { value0: event.sourceCard })
   }
-  return locale === 'zh' ? '需要处理私有提示' : 'Private prompt needs your response.'
+  return translateMessage(locale, "ui.copy.app_private_event_notifications.private_prompt_needs_your_response_cb8048")
 }
 
 const kindForPrivateEvent = (event: PrivateGameEvent): PrivateEventNotification['kind'] => {

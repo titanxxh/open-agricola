@@ -31,6 +31,7 @@ export type Capabilities = { chat: boolean; image: boolean }
 export type ModelDef = {
   id: string
   label: string
+  labelKey?: string
   /** Per-model capability override. Falls back to provider-level when omitted. */
   capabilities?: Partial<Capabilities>
 }

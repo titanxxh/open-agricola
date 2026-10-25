@@ -180,7 +180,7 @@ describe('ScoringPad', () => {
     render(<ScoringPad locale="en" scores={mockScores} players={players} onClose={() => {}} showDraftHistory />)
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
 
-    // Alice's two picks should appear (rendered by getAnyCardDisplayName)
+    // Alice's two picks should appear (rendered by getCardDisplayName)
     expect(screen.getByText(/Adoptive Parents/)).toBeTruthy()
     expect(screen.getByText(/Corf/)).toBeTruthy()
     // Discarded section appears for Alice

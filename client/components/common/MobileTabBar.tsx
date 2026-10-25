@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import { useContext } from 'react'
 import { LocaleContext } from '../../contexts/LocaleContext'
 
@@ -8,11 +9,6 @@ interface Props {
   onNavigate: (t: Tab) => void
 }
 
-const FALLBACK_LABELS: Record<Tab, string> = {
-  lobby: '大厅',
-  workshop: '工坊',
-  settings: '设置',
-}
 
 const TABS: { key: Tab; i18nKey: string }[] = [
   { key: 'lobby', i18nKey: 'platform.tabLobby' },
@@ -45,13 +41,10 @@ function TabIcon({ tab }: { tab: Tab }) {
 
 export function MobileTabBar({ current, onNavigate }: Props) {
   const ctx = useContext(LocaleContext)
-  const navigationLabel = ctx?.t('platform.mainNavigation') ?? '主导航'
-  const labelFor = (tab: Tab, key: string): string => {
-    if (!ctx) return FALLBACK_LABELS[tab]
-    const translated = ctx.t(key)
-    // If translation key is not found, t() returns the key itself; fall back to zh.
-    return translated === key ? FALLBACK_LABELS[tab] : translated
-  }
+  const locale = ctx?.locale ?? 'zh'
+  const navigationLabel = translateMessage(locale, 'platform.mainNavigation')
+  const labelFor = (_tab: Tab, key: string): string => translateMessage(locale, key)
+
   return (
     <nav className="mobile-tab-bar" aria-label={navigationLabel}>
       {TABS.map((tab) => {

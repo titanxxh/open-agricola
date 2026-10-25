@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateDisplayFile } from '../code-gen'
+import { generateDisplayFile, generateLanguagePatch } from '../code-gen'
 
 describe('generateDisplayFile', () => {
   it('emits a minor Card Source file', () => {
@@ -46,7 +46,7 @@ const CARD_IMPL = {}
     expect(out).not.toContain(`import { defineMinorCard }`)
   })
 
-  it('injects locales from card_json into CARD_DEF', () => {
+  it('exports locales separately and keeps CARD_DEF free of translations', () => {
     const wcard = {
       id: 'wc-loc',
       card_id: 'CUSTOM_LocalisedCard',
@@ -70,14 +70,15 @@ const CARD_IMPL = {}
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
-    expect(out).toContain('本地化卡')
-    expect(out).toContain('中文描述。')
-    expect(out).toContain('中文规则补充。')
+    expect(generateLanguagePatch(wcard)).toEqual({ zh: { minorImprovements: { CUSTOM_LocalisedCard: { name: '本地化卡', description: '中文描述。', rules: '中文规则补充。' } } } })
+    expect(out).not.toContain('本地化卡')
+    expect(out).not.toContain('中文描述。')
+    expect(out).not.toContain('中文规则补充。')
     expect(out).toContain(`deck: "community"`)
     expect(out).toContain(`impl: cardImpl`)
   })
 
-  it('injects locales into object-literal Card Source metadata', () => {
+  it('strips embedded locales from object-literal Card Source metadata', () => {
     const wcard = {
       id: 'wc-loc-object',
       card_id: 'CUSTOM_ObjectLocalisedCard',
@@ -107,8 +108,8 @@ const CARD_IMPL = {}
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
-    expect(out).toContain('新名称')
-    expect(out).toContain('新描述。')
+    expect(out).not.toContain('新名称')
+    expect(out).not.toContain('新描述。')
     expect(out).not.toContain('旧名称')
     expect(out).not.toContain('旧描述。')
     expect(out).toContain(`deck: "community"`)
@@ -142,7 +143,7 @@ const CARD_IMPL = {}
 
     expect(out).toContain(`export const CUSTOM_FactoryCard = defineMinorCard({`)
     expect(out).toContain(`cost: { wood: 1 }`)
-    expect(out).toContain('工厂卡')
-    expect(out).toContain('工厂说明。')
+    expect(out).not.toContain('工厂卡')
+    expect(out).not.toContain('工厂说明。')
   })
 })

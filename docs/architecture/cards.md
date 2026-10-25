@@ -26,7 +26,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - `scripts/build-cards-manifest.ts` extracts `meta` statically with the TypeScript AST and never imports a Card Source at runtime; `meta` contains only JSON-like literals and simple same-file constants.
 - `definePlayerActionCard` declares `playerActionCardType`; the deal pool and UI use it rather than card numbers or i18n.
 - Production descriptions render resources, animals, terrain and points as `ResourceText` icon tokens; `__…__` marks exact card, action and space names. `scripts/__tests__/card-description-icons.test.ts` and `card-description-double-underscore.test.ts` gate this.
-- Card faces, trigger labels, log previews and Replay share `client/components/common/cardText.ts`: each name or text field falls back on its own from the canonical translation to `meta.locales[locale]` (empty values skipped) to source metadata, names also accept legacy `cards.<id>.name` aliases, and card-owned prompts reference names with `{card:<id>}`. Player names follow the generated-name provenance in `client/utils/player-name.ts` ([client](client.md)).
+- Card faces, trigger labels, log previews and Replay share `client/components/common/cardText.ts`: official names and text fields come from the loaded language package; custom preview/room/replay metadata is normalized by the shared catalog per field, skipping empty authored translations, and card-owned prompts reference names with `{card:<id>}`. Player names follow the generated-name provenance in `client/utils/player-name.ts` ([client](client.md)).
 
 Tests: `shared/cards/__tests__/card-source-representatives.test.ts`, `scripts/check-generated-cards-sync.ts`.
 

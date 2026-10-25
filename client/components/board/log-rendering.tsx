@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
@@ -13,7 +14,7 @@ import { resolveLogPlayerNames } from '../../../shared/events/log-player-names'
 import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
-  locale === 'zh' ? names.join('、') : names.join(', ')
+  names.join(translateMessage(locale, 'ui.listSeparator'))
 
 const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
   const translated = translateCardText(locale, value)
@@ -52,22 +53,21 @@ const resolveAccumulationTarget = (
     const cardId = typeof params.cardId === 'string' ? params.cardId : ''
     const cardName = cardId ? resolveCardDisplayName(locale, cardId) : ''
     const player = typeof params.player === 'string' ? params.player : ''
-    if (locale === 'zh') return player ? `${player} 的 ${cardName}` : cardName
-    return player ? `${player}'s ${cardName}` : cardName
+    return player ? translateMessage(locale, 'ui.cardOwner', { player, cardName }) : cardName
   }
   if (params.target === 'roundCard') {
     const round = Number(params.round)
     if (!Number.isInteger(round) || round < 1 || round > 14) {
-      return locale === 'zh' ? '回合牌' : 'round card'
+      return translateMessage(locale, "ui.copy.components_board_log_rendering.round_card_1af5ae")
     }
-    return locale === 'zh' ? `第 ${round} 回合牌` : `Round ${round} card`
+    return translateMessage(locale, "ui.copy.components_board_log_rendering.round_card_229f44", { value0: round })
   }
   return String(params.target ?? '')
 }
 
 const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   const meta = getCardMeta(ref.id)
-  return meta ? getCardDisplayText(locale, ref.type, ref.id, meta).description : ''
+  return meta ? getCardDisplayText(locale, ref.id, meta).description : ''
 }
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -76,7 +76,7 @@ const joinCardRefs = (locale: Locale, refs: CardRef[]) => (
   <>
     {refs.map((ref, index) => (
       <Fragment key={ref.id}>
-        {index > 0 ? (locale === 'zh' ? '、' : ', ') : null}
+        {index > 0 ? (translateMessage(locale, "ui.copy.components_board_log_rendering.separator_9dcfea")) : null}
         <LogCardLink locale={locale} cardRef={ref}>
           {ref.name}
         </LogCardLink>
@@ -359,7 +359,7 @@ const accumulationSeasonDetails = (locale: Locale, params: Record<string, unknow
     })
     if (changes.length === 0) return []
     return [<Fragment key={`season-${index}`}>
-      {index > 0 ? (locale === 'zh' ? '，' : ', ') : null}
+      {index > 0 ? (translateMessage(locale, "ui.copy.components_board_log_rendering.separator_ea2772")) : null}
       {t(locale, `ui.seasons.${adjustment.season}`)} {changes}
     </Fragment>]
   })
@@ -384,7 +384,7 @@ export const prepareLogEntry = (
     if (params.replacement === true) details.push(t(locale, 'log.cardTriggerReplacement'))
     if (params.optional === true) details.push(t(locale, 'log.cardTriggerOptional'))
     if (params.declined === true) details.push(t(locale, 'log.cardTriggerDeclined'))
-    params.detail = details.length ? ` (${details.join(locale === 'zh' ? '，' : ', ')})` : ''
+    params.detail = details.length ? ` (${details.join(translateMessage(locale, "ui.copy.components_board_log_rendering.separator_ea2772"))})` : ''
   }
   if (params && entry.key === 'log.futureMeepleResolved') {
     if (params.roomType === 'wood' || params.roomType === 'clay' || params.roomType === 'stone') {

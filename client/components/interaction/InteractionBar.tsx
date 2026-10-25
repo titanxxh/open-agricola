@@ -12,7 +12,7 @@ import type {
   Resource,
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
-import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
+import { getCardDisplayName, translateCardText } from '../common/cardText'
 import { getParentFatherOptionText } from '../common/parentCardText'
 import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
@@ -101,7 +101,7 @@ const renderOptionLabel = (
         {!!option.labelParams.cardUsed && (
           <span className="payment-option-card">
             {' '}
-            ({t(locale, 'ui.interactionPaymentReturn')} {getAnyCardDisplayName(locale, option.labelParams.cardUsed as string)})
+            ({t(locale, 'ui.interactionPaymentReturn')} {getCardDisplayName(locale, option.labelParams.cardUsed as string)})
           </span>
         )}
         {renderPaymentSourceCards(

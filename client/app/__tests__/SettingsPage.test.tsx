@@ -93,6 +93,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 
 vi.mock('../../contexts/LocaleContext', () => {
   return {
+    useCurrentLocale: () => 'zh',
     useLocale: () => ({
       locale: 'zh',
       setLocale: vi.fn(),

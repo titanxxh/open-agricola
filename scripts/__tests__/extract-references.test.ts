@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { extractReferencesFromSource } from '../i18n/extract-references'
 
 describe('extractReferencesFromSource', () => {
+  it('extracts an imported translator alias', () => {
+    const source = "import { t as translateMessage } from './i18n'; translateMessage(locale, 'ui.title')"
+    expect(extractReferencesFromSource('ui.ts', source).static.map(ref => ref.key)).toEqual(['ui.title'])
+  })
   it('extracts t() with single string arg', () => {
     const src = `import { t } from './i18n'\nconst x = t('ui.gameTitle')`
     const r = extractReferencesFromSource('foo.ts', src)

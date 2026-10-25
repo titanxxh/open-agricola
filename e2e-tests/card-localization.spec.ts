@@ -1,5 +1,41 @@
 import { expect, test } from '@playwright/test'
+import { createHash } from 'node:crypto'
 import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
+
+test('discovers a new JSON-only language and downloads just that language', async ({ page, request }) => {
+  const list = await (await request.get(`${FRONTEND_URL}/i18n/manifest.json`)).json()
+  const english = list.languages.find((language: { id: string }) => language.id === 'en')
+  const base = await (await request.get(`${FRONTEND_URL}/i18n/${english.file}`)).json()
+  const raw = JSON.stringify({ ...base, locale: 'fr', messages: {
+    ...base.messages, 'cardFaces.C112_Thresher.name': 'Batteur', 'ui.languageSelectLabel': 'Choisir la langue',
+  } })
+  const sha256 = createHash('sha256').update(raw).digest('hex')
+  const file = `fr.${sha256.slice(0, 16)}.json`
+  await page.route('**/i18n/manifest.json', route => route.fulfill({ json: {
+    ...list, languages: [...list.languages, { id: 'fr', name: 'Français', file, sha256, sourceSha256: sha256 }],
+  } }))
+  await page.route(`**/i18n/${file}`, route => route.fulfill({ body: raw, contentType: 'application/json' }))
+  const downloads: string[] = []
+  page.on('request', request => {
+    if (/\/i18n\/(?!manifest)[^/]+\.json$/.test(request.url())) downloads.push(request.url())
+  })
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'fr'))
+  await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 7, maxPlayers: 2 })
+  const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
+  state.phase = 'playing'
+  state.currentPlayerIndex = 0
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  state.players[0].occupationPlayed = ['C112_Thresher']
+  await postJson(request, `${BACKEND_URL}/api/game/load`, { state })
+  await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)
+  await expect(page.locator('[data-id="C112_Thresher"] .card-title').first()).toHaveText('Batteur')
+  const switcher = page.getByRole('button', { name: 'Choisir la langue' })
+  await expect(switcher).toContainText('Français')
+  expect(downloads).toEqual([`${FRONTEND_URL}/i18n/${file}`])
+})
 
 for (const locale of ['zh', 'en'] as const) {
   test(`${locale} shows the Thresher face, resource icons and before-action source`, async ({ page, request }) => {

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ChoiceDescriptionPreview, ChoiceEffectPreview, PlayerState, ScheduledEffectPreview } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import { getAnyCardDisplayName } from '../common/cardText'
+import { getCardDisplayName } from '../common/cardText'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import { ResourceLine } from '../common/ResourceLine'
 import { renderDescriptionPreview } from '../interaction/ActionDescription'
@@ -76,7 +76,7 @@ export function FutureEffectMarkers({ locale, effects, players }: Props) {
   return <div className="future-meeple-holder" onClick={event => event.stopPropagation()}>
     <button ref={toggle} type="button" className="future-effects-toggle" aria-label={t(locale, 'ui.scheduledEffects')} aria-expanded={open} onClick={() => setOpen(!open)}>
       {owners.map(player => <span key={player.id} className="future-effect-owner" data-owner-player={player.id} data-player-color={player.color} title={ownerName(player)}>
-        {effects.filter(effect => effect.playerId === player.id).map((effect, index) => <span key={index} className="future-effect-marker" data-source-card={effect.sourceCard} title={getAnyCardDisplayName(locale, effect.sourceCard)}>
+        {effects.filter(effect => effect.playerId === player.id).map((effect, index) => <span key={index} className="future-effect-marker" data-source-card={effect.sourceCard} title={getCardDisplayName(locale, effect.sourceCard)}>
           {descriptionMarkers(locale, effect.description, effect.count)}
           {effect.count > 1 ? <span className="future-effect-count">{t(locale, 'ui.effectOccurrences', { count: effect.count })}</span> : null}
         </span>)}
@@ -87,7 +87,7 @@ export function FutureEffectMarkers({ locale, effects, players }: Props) {
       {owners.map(player => <section key={player.id} className="future-effect-owner-list" data-player-color={player.color}>
         <strong>{ownerName(player)}</strong>
         <ul>{effects.filter(effect => effect.playerId === player.id).map((effect, index) => <li key={index}>
-          <strong>{getAnyCardDisplayName(locale, effect.sourceCard)}{effect.count > 1 ? ` ×${effect.count}` : ''}</strong>
+          <strong>{getCardDisplayName(locale, effect.sourceCard)}{effect.count > 1 ? ` ×${effect.count}` : ''}</strong>
           {effect.timing ? <div>{t(locale, `ui.timedEffectPhases.${effect.timing}`)}</div> : null}
           <div>{renderDescriptionPreview(locale, effect.description)}</div>
         </li>)}</ul>
