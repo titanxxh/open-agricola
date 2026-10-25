@@ -74,8 +74,8 @@
     "nanoid": "^6.0.2",
     "pg": "^8.23.1",
     "@prometheus-io/client": "0.16.1",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "ws": "^8.22.0"
