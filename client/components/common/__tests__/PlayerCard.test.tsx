@@ -66,13 +66,13 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   })
 
   it('resolves the Hammer Crusher prompt from the same card name as the face', () => {
-    expect(translateCardText('zh', 'ui.interactionHammerCrusherBuild')).toBe('锤碎机：建造房间？')
+    expect(translateCardText('zh', 'ui.interactionHammerCrusherBuild')).toBe('碎石锤：建造房间？')
     expect(translateCardText('en', 'ui.interactionHammerCrusherBuild')).toBe('Hammer Crusher: Build rooms?')
   })
 
   it.each([
-    ['D023_PioneeringSpirit', '开拓精神'],
-    ['A039_Chapel', '小教堂'],
+    ['D023_PioneeringSpirit', '先驱精神'],
+    ['A039_Chapel', '礼拜堂'],
   ])('uses the canonical name instead of the old cards namespace alias for %s', (id, name) => {
     expect(translateCardText('zh', `cards.${id}.name`)).toBe(name)
     expect(getAnyCardDisplayName('zh', id)).toBe(name)
@@ -183,8 +183,8 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(english).toContain('Rules')
     expect(english).toContain('cannot be placed on')
 
-    expect(chinese).toContain('每当你在回合中拒绝一次无条件')
-    expect(chinese).toContain('即使被占用')
+    expect(chinese).toContain('每次你主动放弃1次无附加条件')
+    expect(chinese).toContain('即使是已被占用的行动格')
     expect(chinese).toContain('class="card-rules"')
     expect(chinese).toContain('规则补充')
     expect(chinese).toContain('此次额外放人不能选择')

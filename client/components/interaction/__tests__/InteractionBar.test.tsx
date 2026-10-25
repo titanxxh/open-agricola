@@ -249,7 +249,7 @@ describe('InteractionBar', () => {
     expect(trader.takeAction(0, 'farmland').ok).toBe(true)
     const movementHtml = html(trader.takeAnytimeAction(0, 'D114-seed-trader-anytime'))
     expect(movementHtml).toContain(locale === 'en' ? 'Take from' : '从')
-    expect(movementHtml).toContain(locale === 'en' ? 'Seed Trader' : '种子商人')
+    expect(movementHtml).toContain(locale === 'en' ? 'Seed Trader' : '种子商贩')
     expect(movementHtml).toContain('data-resource="grain"')
     expect(movementHtml).toContain('data-resource="vegetable"')
     const artist = make('B152_JuniorArtist')
@@ -266,8 +266,8 @@ describe('InteractionBar', () => {
     illusionist.state.players[0]!.occupationHand = ['A116_WoodCutter']
     const trigger = illusionist.takeAction(0, 'forest')
     const handHtml = html(illusionist.resolveChoice(0, options(trigger).find((option) => option.value !== '__skip__')!.value))
-    expect(handHtml).toContain(locale === 'en' ? 'Handplow' : '手犁')
-    expect(handHtml).toContain(locale === 'en' ? 'Wood Cutter' : '樵夫')
+    expect(handHtml).toContain(locale === 'en' ? 'Handplow' : '手推犁')
+    expect(handHtml).toContain(locale === 'en' ? 'Wood Cutter' : '伐木工')
     expect(handHtml).not.toContain('minorImprovements.')
     const rod = make('E038_RodCollection')
     rod.state.players[0]!.minorPlayed = ['E038_RodCollection']
@@ -353,8 +353,8 @@ describe('InteractionBar', () => {
       }
       input.controls.anytimeActions = [{ id: 'mandoline', labelKey: 'cards.C046_Mandoline.anytime' }]
     })
-    expect(html).toContain(locale === 'zh' ? '锤碎机：建造房间？' : 'Hammer Crusher: Build rooms?')
-    expect(html).toContain(locale === 'zh' ? '多功能切菜器' : 'Mandoline')
+    expect(html).toContain(locale === 'zh' ? '碎石锤：建造房间？' : 'Hammer Crusher: Build rooms?')
+    expect(html).toContain(locale === 'zh' ? '刨刀' : 'Mandoline')
     expect(html).not.toContain('碎锤')
     expect(html).not.toContain('{card:')
   })

@@ -31,3 +31,5 @@ Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-contract-*-se
 
 `shared/i18n/` holds UI copy keys and resources; `PromptKey` lives in `shared/contract/prompt-keys.ts`. `shared/utils/` holds generic helpers with no business rules; `rng.ts` owns the Explicit Seed generator and the HMAC-SHA256 wide-seed streams.
 
+`scripts/import-bga-card-translations.ts` imports a supplied BGA Chinese dictionary into existing card-face keys. It checks English source text, title collisions, icons, quantities and placeholders, aligns named references with the current UI, and reports retained fields. Existing references and imported references use separate name maps. It changes string literals only; it never imports card rules. Tests: `scripts/__tests__/import-bga-card-translations.test.ts` and `shared/i18n/__tests__/zh.test.ts`.
+

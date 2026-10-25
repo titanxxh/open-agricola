@@ -31,7 +31,7 @@ describe('non-harvest birth results in Action Log', () => {
     const log = eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })
     const { container } = render(<ActionLog locale={locale} log={log} currentRound={12} />)
     expect(container.querySelectorAll('li')).toHaveLength(1)
-    expect(container).toHaveTextContent(locale === 'zh' ? '养猪人' : 'Pig Breeder')
+    expect(container).toHaveTextContent(locale === 'zh' ? '喂猪人' : 'Pig Breeder')
     expect(container.querySelectorAll('[data-resource="boar"][data-amount="1"]')).toHaveLength(1)
     expect(container).not.toHaveTextContent(/A165_|through-the-seasons:|\{\w+\}/)
   })

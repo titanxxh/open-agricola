@@ -302,7 +302,7 @@ describe('ActionBoard', () => {
         devMode={false}
       />,
     )
-    expect(html).toContain('>小教堂</h4>')
+    expect(html).toContain('>礼拜堂</h4>')
     expect(html).not.toContain('>教堂</h4>')
   })
 

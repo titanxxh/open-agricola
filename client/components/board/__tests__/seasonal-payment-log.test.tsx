@@ -109,7 +109,7 @@ describe('seasonal payment log', () => {
     expect(row).toHaveTextContent(locale === 'zh' ? '春季减免' : 'Spring: costs')
     expect(row).toHaveTextContent('0')
     expect(row.querySelector('[data-resource="wood"]')).toHaveAttribute('data-amount', '2')
-    expect(row).toHaveTextContent(locale === 'zh' ? '篱笆守护者' : 'Hedge Keeper')
+    expect(row).toHaveTextContent(locale === 'zh' ? '篱笆护理员' : 'Hedge Keeper')
   })
 
   it('retains the seasonal explanation on a card-granted payment', () => {

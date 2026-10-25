@@ -33,3 +33,5 @@ Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流�
 
 `shared/i18n/` 存放 UI 文案 key 与资源；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。`shared/utils/` 存放不含业务规则的通用 helper；`rng.ts` 负责指定种子的生成器与 HMAC-SHA256 宽种子流。
 
+`scripts/import-bga-card-translations.ts` 把传入的 BGA 中文词典导入已有卡面 key。它核对英文来源、重名、图标、数量和占位符，将命名引用对齐到当前 UI，并报告保留的字段。原有引用与新导入引用使用独立的名称映射。它只修改字符串字面量，不导入卡牌规则。测试：`scripts/__tests__/import-bga-card-translations.test.ts` 和 `shared/i18n/__tests__/zh.test.ts`。
+
