@@ -47,6 +47,7 @@ export const en = {
     statusGameOver: 'Game Over',
     statusRoundReady: 'Ready to End Round',
     statusWaiting: 'Waiting',
+    waitingForPlayerAction: 'Waiting for {player} to act',
     actionArea: 'Action Spaces',
     enlargeActionBoard: 'Enlarge action controls',
     fitActionBoard: 'Show full board',
