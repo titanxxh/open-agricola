@@ -83,7 +83,7 @@ for (const locale of ['en', 'zh'] as const) {
           const row = page.locator('.action-log__text').filter({ hasText: locale === 'zh' ? /新生/ : /breeds/ })
           await expect(row).toHaveCount(1)
           await expect(row.locator(`[data-resource="${animal}"][data-amount="1"]`)).toHaveCount(1)
-          await expect(row).toContainText(pigBreeder ? (locale === 'zh' ? '养猪人' : 'Pig Breeder') : (locale === 'zh' ? '春季' : 'Spring'))
+          await expect(row).toContainText(pigBreeder ? (locale === 'zh' ? '喂猪人' : 'Pig Breeder') : (locale === 'zh' ? '春季' : 'Spring'))
         }
         await driver.reload()
         expect(publicRoomState(await roomSnapshot(pages[1]))).toEqual(publicRoomState(current))
