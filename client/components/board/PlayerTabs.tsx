@@ -1,3 +1,5 @@
+import { t as translateMessage } from '../../../shared/i18n'
+import { useCurrentLocale } from '../../contexts/LocaleContext'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { SelectButton } from '../common/SelectButton'
 import { formatScore } from '../../utils/format-score'
@@ -18,6 +20,7 @@ interface Props {
 }
 
 export function PlayerTabs({ players, active, onChange }: Props) {
+  const locale = useCurrentLocale()
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
@@ -36,7 +39,7 @@ export function PlayerTabs({ players, active, onChange }: Props) {
   if (isMobile) {
     return (
       <SelectButton
-        ariaLabel="切换玩家视角"
+        ariaLabel={translateMessage(locale, "ui.copy.client_components_board_PlayerTabs_tsx.switch_player_view_c4f461")}
         className="player-tabs__select"
         value={active}
         onChange={onChange}

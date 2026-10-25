@@ -1,47 +1,50 @@
+import { t as translateMessage } from '../../../shared/i18n'
+import { useCurrentLocale } from '../../contexts/LocaleContext'
 import { useEffect, useState, type ReactNode } from 'react'
 import { startPropose, submissionStatus, type ProposeResponse } from '../../services/workshop-pr'
 
 export type ProposeCard = { id: string; card_id: string; name: string; art_url: string | null }
 
-const hints: Record<string,string> = {
-  submission_pending: '投稿正在处理，可以关闭窗口，稍后回来查看。',
-  github_unavailable: 'GitHub 暂时不可用。原投稿已保留，稍后核实结果。',
-  github_network_error: '服务器连接 GitHub 失败。原投稿已保留。',
-  github_timeout: 'GitHub 请求超时。原投稿已保留。',
-  github_invalid_response: 'GitHub 返回了无法读取的响应。原投稿已保留，需核实处理结果。',
-  submission_internal_error: '工坊处理投稿时发生内部错误。草稿和原投稿已保留，请联系维护者并提供投稿编号。',
-  branch_publish_failed: 'GitHub 未能确认分支更新结果。原投稿已保留，需再次核实。',
-  pr_head_pending: 'GitHub 已收到提交，正在等待 PR 状态同步。原投稿会继续核实。',
-  creation_unknown: '尚不能确认 GitHub 是否已创建 PR。请再次核实；仍无结果时请联系维护者并提供投稿编号。',
-  ambiguous_pr: '找到多个可能的 PR，请联系维护者核实投稿编号。',
-  generated_file_changed: '维护者修改了该卡的源码、图片或生成的索引。更新已暂停，请在原 PR 中协作整合；草稿和人工修改均已保留。',
-  generated_paths_changed: '卡牌或图片路径发生变化，请联系维护者整合原 PR。',
-  branch_conflict: '核查后 PR 又有新提交。更新已暂停，请联系维护者检查原 PR。',
-  pr_scope_changed: '原 PR 包含需要维护者整合的其他修改，更新已暂停。',
-  pr_rebase_conflict: '独立测试与最新主分支冲突，请先由维护者整合原 PR。',
-  pr_paused: '维护者将 PR 设为草稿或修改了目标分支。请处理原 PR 后再次核实。',
-  pr_closed: '原 PR 已关闭。只有明确选择重新投稿才会创建新的 PR，旧 PR 将保留。',
-  pr_open: '原 PR 已重新打开。再次发起 PR 会更新原投稿，不会创建新的 PR。',
-  pr_merged: 'PR 已合并，卡牌将随包含它的版本发布。',
-  legacy_submission: '这是旧投稿。重新投稿会保留旧 PR 历史，并要求新 PR 重新审核。人工修改需先由维护者整合。',
-  legacy_review_required: '旧 PR 缺少可验证的生成基线，请联系维护者核查源码、图片和测试后再迁移。',
-  invalid_art: '卡图地址不受支持，请在工坊重新上传并采用图片后再投稿。',
-  art_unavailable: '卡图文件暂不可用，请稍后重试；旧投稿图片缺失时，请联系维护者恢复原图。草稿和旧 PR 均已保留。',
-  workshop_app_unavailable: '工坊 GitHub App 暂不可用。草稿和原投稿已保留；若持续失败，请联系维护者。',
-  rate_limited: '投稿过于频繁，请稍后再试。',
-  github_rate_limited: 'GitHub 要求暂缓请求，请等待后再次核实。',
-  submission_busy: '投稿状态已变化，请重新核实原投稿后再试。',
-  draft_changed_before_submit: '草稿在核查时发生变化。请校验并确认当前版本后重新投稿。',
-  draft_changed: '已提交当时的版本。你后续编辑的草稿已保留，需要另行提交审核。',
-  handoff_not_ready: '请先完成当前版本的校验和沙盒确认。',
-  localization_not_ready: '请先完成中文卡名和说明。',
-  already_reviewed: '请先下架并编辑卡牌，再提交新的审核版本。',
-  network_error: '连接中断，尚不能确认投稿结果。请再次核实原投稿。',
-}
+const hints = (locale: string): Record<string,string> => ({
+  submission_pending: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.submission_is_processing_you_can_close_this_04f381"),
+  github_unavailable: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.github_is_temporarily_unavailable_your_submission_has_5ba405"),
+  github_network_error: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_server_could_not_reach_github_your_377dae"),
+  github_timeout: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.github_timed_out_your_submission_has_been_3252c3"),
+  github_invalid_response: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.github_returned_an_unreadable_response_your_submission_0680f2"),
+  submission_internal_error: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.workshop_could_not_process_the_submission_your_1ac047"),
+  branch_publish_failed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.github_could_not_confirm_the_branch_update_869b4d"),
+  pr_head_pending: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.github_received_the_commit_waiting_for_the_3c1723"),
+  creation_unknown: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.it_is_not_yet_clear_whether_github_19dfc2"),
+  ambiguous_pr: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.multiple_possible_prs_were_found_contact_a_d8fb47"),
+  generated_file_changed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.a_maintainer_changed_the_card_source_art_58093e"),
+  generated_paths_changed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_card_or_art_paths_changed_contact_6dd1b2"),
+  branch_conflict: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_pr_received_another_commit_during_verification_96adda"),
+  pr_scope_changed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_original_pr_includes_other_changes_that_a5a41f"),
+  pr_rebase_conflict: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_independent_tests_conflict_with_the_latest_60462c"),
+  pr_paused: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.a_maintainer_made_the_pr_a_draft_aa632c"),
+  pr_closed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_original_pr_was_closed_only_an_786109"),
+  pr_open: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_original_pr_was_reopened_resubmitting_will_9a4523"),
+  pr_merged: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_pr_was_merged_the_card_will_8b3c5e"),
+  legacy_submission: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.this_is_an_older_submission_resubmitting_preserves_33ccde"),
+  legacy_review_required: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_older_pr_has_no_verifiable_generation_7e469a"),
+  invalid_art: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_art_url_is_unsupported_upload_and_022770"),
+  art_unavailable: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_art_file_is_temporarily_unavailable_retry_e53b6a"),
+  workshop_app_unavailable: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_workshop_github_app_is_temporarily_unavailable_c2806c"),
+  rate_limited: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.too_many_submissions_retry_later_a11b08"),
+  github_rate_limited: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.github_requested_a_delay_wait_before_verifying_675180"),
+  submission_busy: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_submission_status_changed_verify_the_original_47888f"),
+  draft_changed_before_submit: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_draft_changed_during_verification_validate_and_f87b5c"),
+  draft_changed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_version_from_the_time_of_submission_c1bb70"),
+  handoff_not_ready: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.validate_the_current_version_and_confirm_it_33e69f"),
+  localization_not_ready: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.complete_the_chinese_card_name_and_description_b33e45"),
+  already_reviewed: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.unpublish_and_edit_the_card_before_submitting_1958fa"),
+  network_error: translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_connection_was_interrupted_the_result_is_13579b"),
+})
 
 export function ProposeModal({card,onClose,onSuccess}: {
   card: ProposeCard; onClose: () => void; onSuccess?: (prUrl: string) => void
 }) {
+  const locale = useCurrentLocale()
   const [result,setResult] = useState<ProposeResponse>()
   const [busy,setBusy] = useState(false)
   const [agreed,setAgreed] = useState(false)
@@ -104,24 +107,24 @@ export function ProposeModal({card,onClose,onSuccess}: {
   const recover = result && !result.ok && (result.submissionId || code === 'network_error')
   const restart = code === 'pr_closed' || code === 'legacy_submission' || retryRestart
   const paused = result && !result.ok && result.state === 'pending' && result.needsAttention
-  return <ModalShell title="提交 PR 到主仓库" onClose={onClose}>
+  return <ModalShell title={translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.submit_a_pr_to_the_main_repository_f0df0d")} onClose={onClose}>
     <div style={{padding:16}}>
       <h3>{card.name}</h3>
-      <p>工坊机器人将把你采用的卡牌内容、图片和设计者署名提交到公开仓库。维护者批准当前版本后即可上架，合并后随游戏版本发布。</p>
-      {busy && <p role="status">正在核实并处理投稿… 可以关闭窗口，稍后回来查看。</p>}
+      <p>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_workshop_bot_will_submit_your_adopted_545e37")}</p>
+      {busy && <p role="status">{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.verifying_and_processing_your_submission_you_can_7f7dec")}</p>}
       {code && code !== 'no_submission' && <p role="status">
-        {hints[code] ?? '投稿需要处理，请联系维护者。'}
-        {paused && ' 自动重试已暂停，请点击“再次核实”继续原投稿；若仍失败，请联系维护者并提供投稿编号。'}
-        {remaining > 0 && ` 请等待 ${remaining} 秒后再试。`}
+        {hints(locale)[code] ?? translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.the_submission_needs_attention_contact_a_maintainer_c2dea0")}
+        {paused && translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.automatic_retries_are_paused_select_verify_again_9a46e9")}
+        {remaining > 0 && translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.wait_seconds_before_retrying_f8fee8", { value0: remaining })}
       </p>}
-      {result?.prUrl && <p><a href={result.prUrl} target="_blank" rel="noreferrer">查看审核 PR</a>{result.ok && !code && ' · 已提交，等待维护者审核'}</p>}
-      {result?.submissionId && <p style={{fontSize:'0.85em'}}>投稿编号：{result.submissionId}</p>}
-      {code !== 'pr_merged' && (!recover || restart) && <label style={{display:'flex',gap:8}}><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)}/>我确认公开投稿，并保留设计者署名</label>}
+      {result?.prUrl && <p><a href={result.prUrl} target="_blank" rel="noreferrer">{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.view_review_pr_280482")}</a>{result.ok && !code && translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.submitted_awaiting_maintainer_review_09e5a8")}</p>}
+      {result?.submissionId && <p style={{fontSize:'0.85em'}}>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.submission_id_c83940")}{result.submissionId}</p>}
+      {code !== 'pr_merged' && (!recover || restart) && <label style={{display:'flex',gap:8}}><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)}/>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.i_agree_to_publish_this_submission_with_08b2ce")}</label>}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
-        <button type="button" onClick={onClose}>关闭</button>
-        {recover && <button type="button" disabled={busy || remaining > 0} onClick={() => void run('recover')}>再次核实</button>}
-        {restart && <button type="button" disabled={busy || !agreed || remaining > 0} onClick={() => void run('restart')}>重新投稿</button>}
-        {!restart && !recover && code !== 'pr_merged' && <button type="button" disabled={busy || !agreed || !result || remaining > 0} onClick={() => void run('submit')}>发起 PR</button>}
+        <button type="button" onClick={onClose}>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.close_6cf4a7")}</button>
+        {recover && <button type="button" disabled={busy || remaining > 0} onClick={() => void run('recover')}>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.verify_again_ff7a53")}</button>}
+        {restart && <button type="button" disabled={busy || !agreed || remaining > 0} onClick={() => void run('restart')}>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.submit_again_26d672")}</button>}
+        {!restart && !recover && code !== 'pr_merged' && <button type="button" disabled={busy || !agreed || !result || remaining > 0} onClick={() => void run('submit')}>{translateMessage(locale, "ui.copy.client_app_workshop_ProposeModal_tsx.open_pr_c49a5b")}</button>}
       </div>
     </div>
   </ModalShell>

@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getPlayerDisplayName } from '../../client/utils/player-name'
 import type { Locale } from '../../shared/i18n'
@@ -24,56 +25,7 @@ import {
 } from './model'
 import type { ReplayLayout, ReplayPerspective } from './types'
 
-const labels = {
-  en: {
-    title: 'Game Archive',
-    choose: 'Choose a perspective to open this replay.',
-    open: 'Open information',
-    timeline: 'Timeline first',
-    board: 'Board first',
-    play: 'Play',
-    pause: 'Pause',
-    previous: 'Previous',
-    next: 'Next',
-    loading: 'Opening archive…',
-    missingPrefix: 'The beginning of this game was not archived.',
-    unavailable: 'This replay range is unavailable.',
-    continue: 'Continue at the next intact checkpoint',
-    evidence: 'Frame evidence',
-    actor: 'Actor',
-    command: 'Command',
-    intent: 'Intent',
-    round: 'Round',
-    step: 'Step',
-    frameHash: 'Frame hash',
-    hiddenIntent: 'Hidden for this perspective',
-    scores: 'Final scores',
-  },
-  zh: {
-    title: '对局档案',
-    choose: '选择一个视角后打开回放。',
-    open: '全开信息',
-    timeline: '时间线优先',
-    board: '棋盘优先',
-    play: '播放',
-    pause: '暂停',
-    previous: '上一步',
-    next: '下一步',
-    loading: '正在打开档案…',
-    missingPrefix: '这局游戏的开头未被归档。',
-    unavailable: '这一段回放不可用。',
-    continue: '从下一个完整检查点继续',
-    evidence: '帧证据',
-    actor: '行动者',
-    command: '命令',
-    intent: '意图',
-    round: '轮次',
-    step: '步骤',
-    frameHash: '帧哈希',
-    hiddenIntent: '当前视角不可见',
-    scores: '终局计分',
-  },
-} as const
+const labels = (locale: string) => ({ "title": translateMessage(locale, "ui.copy.ReplayViewer.game_archive_fee7cb"), "choose": translateMessage(locale, "ui.copy.ReplayViewer.choose_a_perspective_to_open_this_replay_44c8b4"), "open": translateMessage(locale, "ui.copy.ReplayViewer.open_information_fc2521"), "timeline": translateMessage(locale, "ui.copy.ReplayViewer.timeline_first_ee2519"), "board": translateMessage(locale, "ui.copy.ReplayViewer.board_first_49810f"), "play": translateMessage(locale, "ui.copy.ReplayViewer.play_2f621d"), "pause": translateMessage(locale, "ui.copy.ReplayViewer.pause_c65f06"), "previous": translateMessage(locale, "ui.copy.ReplayViewer.previous_2c0f2a"), "next": translateMessage(locale, "ui.copy.ReplayViewer.next_b52706"), "loading": translateMessage(locale, "ui.copy.ReplayViewer.opening_archive_cbcdcf"), "missingPrefix": translateMessage(locale, "ui.copy.ReplayViewer.the_beginning_of_this_game_was_not_cdc5fa"), "unavailable": translateMessage(locale, "ui.copy.ReplayViewer.this_replay_range_is_unavailable_5ab826"), "continue": translateMessage(locale, "ui.copy.ReplayViewer.continue_at_the_next_intact_checkpoint_96ee67"), "evidence": translateMessage(locale, "ui.copy.ReplayViewer.frame_evidence_d38efd"), "actor": translateMessage(locale, "ui.copy.ReplayViewer.actor_c3823b"), "command": translateMessage(locale, "ui.copy.ReplayViewer.command_9cfdf5"), "intent": translateMessage(locale, "ui.copy.ReplayViewer.intent_6f9f82"), "round": translateMessage(locale, "ui.copy.ReplayViewer.round_a7a6c3"), "step": translateMessage(locale, "ui.copy.ReplayViewer.step_f2fb72"), "frameHash": translateMessage(locale, "ui.copy.ReplayViewer.frame_hash_4c9bf7"), "hiddenIntent": translateMessage(locale, "ui.copy.ReplayViewer.hidden_for_this_perspective_874967"), "scores": translateMessage(locale, "ui.copy.ReplayViewer.final_scores_81e002") })
 
 type LocationMessage = {
   type: 'open-agricola-replay-location'
@@ -96,8 +48,8 @@ function ReportedEvidenceViewer() {
   const perspective = params.get('perspective') ?? ''
   const stepNo = Number(params.get('step'))
   const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
-  const locale: Locale = params.get('locale') === 'en' ? 'en' : 'zh'
-  const text = labels[locale]
+  const locale: Locale = params.get('locale') ?? 'zh'
+  const text = labels(locale)
   const [evidence, setEvidence] = useState<ReportedEvidence | null>(null)
   let parentOrigin = ''
   try {
@@ -166,8 +118,8 @@ function ArchiveReplayViewer() {
   const params = new URLSearchParams(window.location.search)
   const roomId = params.get('room') ?? ''
   const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
-  const locale: Locale = params.get('locale') === 'en' ? 'en' : 'zh'
-  const text = labels[locale]
+  const locale: Locale = params.get('locale') ?? 'zh'
+  const text = labels(locale)
   const [manifest, setManifest] = useState<ReplayManifest | null>(null)
   const [error, setError] = useState<ReplayUnavailableError | null>(null)
   const [segments, setSegments] = useState<Record<number, ReplaySegment>>({})

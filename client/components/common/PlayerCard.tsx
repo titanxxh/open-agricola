@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import { resolveCardArtUrl } from '../../../shared/utils/card-art-url'
 import { useMemo } from 'react'
 import type { Locale } from '../../../shared/i18n'
@@ -14,30 +15,7 @@ import { getCardDisplayText, type CardType } from './cardText'
 
 export type { CardType } from './cardText'
 
-const CATEGORY_LABELS: Record<string, Record<string, string>> = {
-  en: {
-    ACTIONS_BOOSTER: 'Actions Booster',
-    LIVESTOCK_PROVIDER: 'Livestock Provider',
-    BUILDING_RESOURCE_PROVIDER: 'Building Resource',
-    FARM_PLANNER: 'Farm Planner',
-    CROP_PROVIDER: 'Crop Provider',
-    FOOD_PROVIDER: 'Food Provider',
-    FOOD: 'Food Provider',
-    GOODS_PROVIDER: 'Goods Provider',
-    POINTS_PROVIDER: 'Points Provider',
-  },
-  zh: {
-    ACTIONS_BOOSTER: '行动强化',
-    LIVESTOCK_PROVIDER: '畜牧提供',
-    BUILDING_RESOURCE_PROVIDER: '建筑资源',
-    FARM_PLANNER: '农场规划',
-    CROP_PROVIDER: '作物提供',
-    FOOD_PROVIDER: '食物提供',
-    FOOD: '食物提供',
-    GOODS_PROVIDER: '货物提供',
-    POINTS_PROVIDER: '分数提供',
-  },
-}
+const CATEGORY_LABELS = (locale: string) => ({ "ACTIONS_BOOSTER": translateMessage(locale, "ui.copy.components_common_PlayerCard.actions_booster_7493d2"), "LIVESTOCK_PROVIDER": translateMessage(locale, "ui.copy.components_common_PlayerCard.livestock_provider_6026da"), "BUILDING_RESOURCE_PROVIDER": translateMessage(locale, "ui.copy.components_common_PlayerCard.building_resource_bd538e"), "FARM_PLANNER": translateMessage(locale, "ui.copy.components_common_PlayerCard.farm_planner_c0b8df"), "CROP_PROVIDER": translateMessage(locale, "ui.copy.components_common_PlayerCard.crop_provider_fd9a4c"), "FOOD_PROVIDER": translateMessage(locale, "ui.copy.components_common_PlayerCard.food_provider_528932"), "FOOD": translateMessage(locale, "ui.copy.components_common_PlayerCard.food_provider_528932"), "GOODS_PROVIDER": translateMessage(locale, "ui.copy.components_common_PlayerCard.goods_provider_16420c"), "POINTS_PROVIDER": translateMessage(locale, "ui.copy.components_common_PlayerCard.points_provider_f02254") })
 
 type PlayerCardProps = {
   locale: Locale
@@ -192,7 +170,7 @@ export const PlayerCard = ({
     const meta = cardMeta ?? getCardMeta(cardId)
     if (!meta) return null
     const display = {
-      ...getCardDisplayText(locale, cardType, cardId, meta),
+      ...getCardDisplayText(locale, cardId, cardMeta ? { ...meta, authored: true } : meta),
       altCosts: cardType === 'minor' ? meta.altCosts : undefined,
     }
     if (cardType === 'major') {
@@ -327,7 +305,7 @@ export const PlayerCard = ({
 
   const hasCost = cardData.cost && Object.values(cardData.cost).some((v) => typeof v === 'number' && (v as number) > 0)
   const returnCardsText = 'returnCards' in cardData && cardData.returnCards && cardData.returnCards.length > 0
-    ? `${locale === 'zh' ? '归还' : 'Return'} ${formatReturnCards(cardData.returnCards, locale)}`
+    ? `${translateMessage(locale, "ui.copy.components_common_PlayerCard.return_5859a8")} ${formatReturnCards(cardData.returnCards, locale)}`
     : undefined
   const prerequisiteText = [
     'prerequisite' in cardData && typeof cardData.prerequisite === 'string' ? cardData.prerequisite : undefined,
@@ -405,7 +383,7 @@ export const PlayerCard = ({
         )}
         
         {'category' in cardData && cardData.category && (
-          <div className="card-category" data-category={cardData.category} title={CATEGORY_LABELS[locale]?.[cardData.category] ?? cardData.category} />
+          <div className="card-category" data-category={cardData.category} title={CATEGORY_LABELS(locale)[cardData.category as keyof ReturnType<typeof CATEGORY_LABELS>] ?? cardData.category} />
         )}
 
         {hasCost && !cardData.altCosts && (
@@ -414,7 +392,7 @@ export const PlayerCard = ({
               <div className="card-cost-return">
                 <div className="card-cost-return-text">
                   {returnCardsText}{' '}
-                  {locale === 'zh' ? '或' : 'or'}
+                  {translateMessage(locale, "ui.copy.components_common_PlayerCard.or_a3559d")}
                 </div>
                 {renderCost(cardData.cost, locale)}
               </div>

@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GameLoadScreen } from '../GameLoadScreen'
 
 vi.mock('../../../contexts/LocaleContext', () => ({
-  useLocale: () => ({
+  useCurrentLocale: () => 'en',
+    useLocale: () => ({
     t: (key: string) => key === 'platform.backToLobbyPlain'
       ? 'Back to Lobby'
       : key,

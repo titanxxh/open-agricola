@@ -1,3 +1,5 @@
+import { t as translateMessage } from '../../../shared/i18n'
+import { useCurrentLocale } from '../../contexts/LocaleContext'
 import { useState, type ReactNode } from 'react'
 
 interface DangerButtonProps {
@@ -13,6 +15,7 @@ export function DangerButton({
   children, confirmText, onConfirm,
   size = 'md', disabled, className,
 }: DangerButtonProps) {
+  const locale = useCurrentLocale()
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -52,16 +55,14 @@ export function DangerButton({
               className="btn-secondary"
               onClick={() => setShowConfirm(false)}
             >
-              取消
-            </button>
+              {translateMessage(locale, "ui.copy.client_components_common_DangerButton_tsx.cancel_998b9c")}</button>
             <button
               type="button"
               className="danger-button__trigger"
               onClick={runConfirm}
               disabled={loading}
             >
-              确认
-            </button>
+              {translateMessage(locale, "ui.copy.client_components_common_DangerButton_tsx.confirm_563fd5")}</button>
           </div>
         </div>
       )}

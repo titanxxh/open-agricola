@@ -29,7 +29,8 @@ const localeContext = vi.hoisted(() => {
 })
 
 vi.mock('../../contexts/LocaleContext', () => ({
-  useLocale: () => localeContext,
+  useCurrentLocale: () => localeContext.locale,
+    useLocale: () => localeContext,
 }))
 
 vi.mock('../../components/common/BrandMark', () => ({

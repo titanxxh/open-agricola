@@ -31,6 +31,15 @@ const KEY_PROP_NAMES = new Set([
 export function extractReferencesFromSource(file: string, source: string): ExtractResult {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const out: ExtractResult = { static: [], dynamic: [] }
+  const translators = new Set(['t'])
+  for (const statement of sf.statements) {
+    if (!ts.isImportDeclaration(statement)) continue
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    for (const specifier of bindings.elements) {
+      if ((specifier.propertyName ?? specifier.name).text === 't') translators.add(specifier.name.text)
+    }
+  }
 
   const lineOf = (node: ts.Node): number =>
     sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
@@ -48,7 +57,7 @@ export function extractReferencesFromSource(file: string, source: string): Extra
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      node.expression.text === 't' &&
+      translators.has(node.expression.text) &&
       node.arguments.length >= 1
     ) {
       const first = node.arguments[0]

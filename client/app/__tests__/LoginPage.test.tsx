@@ -77,6 +77,7 @@ vi.mock('../../contexts/LocaleContext', () => {
   }
   const t = (key: string) => labels[key] ?? key
   return {
+    useCurrentLocale: () => 'zh',
     useLocale: () => ({
       locale: 'zh',
       setLocale: vi.fn(),

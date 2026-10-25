@@ -1,3 +1,6 @@
+import { getLanguageManifest } from '../../services/language-pack'
+import { getLoadedLocales } from '../../../shared/i18n'
+import { t as translateMessage } from '../../../shared/i18n'
 import { useEffect, useRef, useState } from 'react'
 import { getLlmConfig, translateCardContent, type LlmConfig } from '../../services/llm'
 import { useLocale } from '../../contexts/LocaleContext'
@@ -11,7 +14,7 @@ type CardLocaleContent = {
 
 type CardLocales = Record<string, CardLocaleContent>
 
-const SUPPORTED_LANGS = ['zh', 'en'] as const
+const supportedLanguages = () => getLanguageManifest()?.languages.map(language => language.id) ?? getLoadedLocales()
 
 export function isLocaleEntryComplete(entry: CardLocaleContent | undefined): boolean {
   if (!entry) return false
@@ -29,7 +32,7 @@ export function getMissingLanguages(
   currentLang: string,
   locales: CardLocales,
 ): string[] {
-  return SUPPORTED_LANGS.filter(
+  return supportedLanguages().filter(
     (lang) => lang !== currentLang && !isLocaleEntryComplete(locales[lang]),
   )
 }
@@ -48,7 +51,7 @@ export function LocalizationModal({
   onClose: () => void
 }) {
   const { locale } = useLocale()
-  const availableLangs = ['zh', 'en'].filter(l => l !== currentLang)
+  const availableLangs = supportedLanguages().filter(l => l !== currentLang)
   const [targetLang, setTargetLang] = useState(availableLangs[0] ?? 'en')
 
   // Initialize target fields from existing locales or empty
@@ -70,7 +73,7 @@ export function LocalizationModal({
     return () => opener?.focus()
   }, [])
 
-  const langLabel = (lang: string) => lang === 'zh' ? '中文' : lang === 'en' ? 'English' : lang
+  const langLabel = (lang: string) => getLanguageManifest()?.languages.find(language => language.id === lang)?.name ?? new Intl.DisplayNames([lang], { type: 'language' }).of(lang) ?? lang
 
   // On mount: if any supported language is missing a translation, fire one
   // request per missing language, merge results into `locales`, and persist
@@ -83,7 +86,7 @@ export function LocalizationModal({
 
     const config = getLlmConfig()
     if (!config) {
-      setError(locale === 'zh' ? '请先配置 LLM API Key' : 'Please configure LLM API Key first')
+      setError(translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.please_configure_llm_api_key_first_82666c"))
       return
     }
 
@@ -123,7 +126,7 @@ export function LocalizationModal({
         if (!cancelled) onSave(updated)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : (locale === 'zh' ? '自动翻译失败' : 'Auto-translation failed'))
+          setError(err instanceof Error ? err.message : (translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.auto_translation_failed_8cbe1c")))
           setAutoTranslating(false)
         }
       }
@@ -149,7 +152,7 @@ export function LocalizationModal({
   const handleTranslate = async () => {
     const config = getLlmConfig()
     if (!config) {
-      setError(locale === 'zh' ? '请先配置 LLM API Key' : 'Please configure LLM API Key first')
+      setError(translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.please_configure_llm_api_key_first_82666c"))
       return
     }
     setTranslating(true)
@@ -168,7 +171,7 @@ export function LocalizationModal({
       setTargetDesc(result.desc.join('\n'))
       setTargetPrerequisite(result.prerequisite ?? '')
     } catch (err) {
-      setError(err instanceof Error ? err.message : (locale === 'zh' ? '翻译失败' : 'Translation failed'))
+      setError(err instanceof Error ? err.message : (translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.translation_failed_a88445")))
     } finally {
       setTranslating(false)
     }
@@ -231,33 +234,33 @@ export function LocalizationModal({
         onKeyDown={handleDialogKeyDown}
       >
         <div className="localization-modal-header">
-          <h3 id="localization-dialog-title">{locale === 'zh' ? '本地化' : 'Localization'}</h3>
+          <h3 id="localization-dialog-title">{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.localization_6ab594")}</h3>
           <button type="button" className="btn-link" onClick={onClose}>
-            {locale === 'zh' ? '关闭' : 'Close'}
+            {translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.close_6cf4a7")}
           </button>
         </div>
         {autoTranslating && (
           <div className="localization-auto-status" role="status" aria-live="polite">
-            {locale === 'zh' ? '正在自动翻译并保存…' : 'Auto-translating and saving…'}
+            {translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.auto_translating_and_saving_f574da")}
           </div>
         )}
         <div className="localization-modal-body">
           {/* Top: current language content (read-only) */}
           <div className="localization-section">
             <div className="localization-section-label">
-              {locale === 'zh' ? '当前语言' : 'Current Language'}: {langLabel(currentLang)}
+              {translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.current_language_19a67a")}: {langLabel(currentLang)}
             </div>
             <div className="localization-field">
-              <label>{locale === 'zh' ? '名称' : 'Name'}</label>
+              <label>{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.name_dd4dc4")}</label>
               <div className="readonly-text">{currentContent.name || '—'}</div>
             </div>
             <div className="localization-field">
-              <label>{locale === 'zh' ? '描述' : 'Description'}</label>
+              <label>{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.description_4ffe9f")}</label>
               <div className="readonly-text">{currentContent.desc.join('\n') || '—'}</div>
             </div>
             {currentContent.prerequisite && (
               <div className="localization-field">
-                <label>{locale === 'zh' ? '前置条件' : 'Prerequisite'}</label>
+                <label>{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.prerequisite_e4c750")}</label>
                 <div className="readonly-text">{currentContent.prerequisite}</div>
               </div>
             )}
@@ -270,7 +273,7 @@ export function LocalizationModal({
               value={targetLang}
               onChange={e => handleLangChange(e.target.value)}
               disabled={translating}
-              aria-label={locale === 'zh' ? '目标语言' : 'Target language'}
+              aria-label={translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.target_language_7bcfed")}
             >
               {availableLangs.map(l => (
                 <option key={l} value={l}>{langLabel(l)}</option>
@@ -283,8 +286,8 @@ export function LocalizationModal({
               disabled={translating}
             >
               {translating
-                ? (locale === 'zh' ? '翻译中…' : 'Translating…')
-                : (locale === 'zh' ? '翻译' : 'Translate')
+                ? (translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.translating_9a8375"))
+                : (translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.translate_783f42"))
               }
             </button>
           </div>
@@ -295,32 +298,32 @@ export function LocalizationModal({
               {langLabel(targetLang)}
             </div>
             <div className="localization-field">
-              <label htmlFor="localization-target-name">{locale === 'zh' ? '名称' : 'Name'}</label>
+              <label htmlFor="localization-target-name">{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.name_dd4dc4")}</label>
               <input
                 id="localization-target-name"
                 type="text"
                 value={targetName}
                 onChange={e => setTargetName(e.target.value)}
-                placeholder={locale === 'zh' ? '翻译后的卡牌名称' : 'Translated card name'}
+                placeholder={translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.translated_card_name_5defcd")}
               />
             </div>
             <div className="localization-field">
-              <label htmlFor="localization-target-description">{locale === 'zh' ? '描述' : 'Description'}</label>
+              <label htmlFor="localization-target-description">{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.description_4ffe9f")}</label>
               <textarea
                 id="localization-target-description"
                 value={targetDesc}
                 onChange={e => setTargetDesc(e.target.value)}
-                placeholder={locale === 'zh' ? '翻译后的描述（每行一条）' : 'Translated description (one per line)'}
+                placeholder={translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.translated_description_one_per_line_267476")}
               />
             </div>
             <div className="localization-field">
-              <label htmlFor="localization-target-prerequisite">{locale === 'zh' ? '前置条件' : 'Prerequisite'}</label>
+              <label htmlFor="localization-target-prerequisite">{translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.prerequisite_e4c750")}</label>
               <input
                 id="localization-target-prerequisite"
                 type="text"
                 value={targetPrerequisite}
                 onChange={e => setTargetPrerequisite(e.target.value)}
-                placeholder={locale === 'zh' ? '翻译后的前置条件' : 'Translated prerequisite'}
+                placeholder={translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.translated_prerequisite_514226")}
               />
             </div>
           </div>
@@ -329,10 +332,10 @@ export function LocalizationModal({
         </div>
         <div className="localization-modal-footer">
           <button type="button" className="btn-link" onClick={onClose}>
-            {locale === 'zh' ? '取消' : 'Cancel'}
+            {translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.cancel_998b9c")}
           </button>
           <button type="button" className="btn-primary" onClick={handleSave}>
-            {locale === 'zh' ? '保存' : 'Save'}
+            {translateMessage(locale, "ui.copy.app_workshop_LocalizationModal.save_ec8e6d")}
           </button>
         </div>
       </div>

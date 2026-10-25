@@ -31,7 +31,9 @@ Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流�
 
 ## `shared/i18n/` 与 `shared/utils/`
 
-`shared/i18n/` 存放 UI 文案 key 与资源；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。`shared/utils/` 存放不含业务规则的通用 helper；`rng.ts` 负责指定种子的生成器与 HMAC-SHA256 宽种子流。
+`shared/i18n/` 负责同步翻译/catalog API 与语言包校验；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。译文与 BGA 导入工具由独立的 [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n) 仓库维护，每种语言只有一个源 JSON 和一个完整运行时 JSON。`i18n.ref` 固定提交与清单哈希；`scripts/prepare-language-packs.ts` 校验语言包/源文件后写入被 Git 忽略的构建缓存。`AGRICOLA_I18N_DIR` 可提供内容与引用一致的本地语言仓库。
 
-`scripts/import-bga-card-translations.ts` 把传入的 BGA 中文词典导入已有卡面 key。它核对英文来源、重名、图标、数量和占位符，将命名引用对齐到当前 UI，并报告保留的字段。原有引用与新导入引用使用独立的名称映射。它只修改字符串字面量，不导入卡牌规则。测试：`scripts/__tests__/import-bga-card-translations.test.ts` 和 `shared/i18n/__tests__/zh.test.ts`。
+`client/services/language-pack.ts` 从清单发现语言，只下载当前语言的完整包，校验身份和哈希后才注册；切换成功后才提交 locale。官方卡面、父母牌、UI、提示和日志共用 catalog。工坊/房间/回放的自定义卡按传入卡牌归一化，不修改全局词典。英文补齐与旧 key 归一化发生在语言仓库构建时。工坊 PR 生成会从待提交的 Card Source 移除译文，在投稿描述中另附初始语言补丁；草稿更新后需重新导出补丁，并在合入前固定匹配的语言包版本。测试：`scripts/__tests__/language-pack-boundary.test.ts`、`client/services/__tests__/language-pack.test.ts`、`e2e-tests/card-localization.spec.ts`。
+
+`shared/utils/` 存放不含业务规则的通用 helper；`rng.ts` 负责指定种子的生成器与 HMAC-SHA256 宽种子流。
 

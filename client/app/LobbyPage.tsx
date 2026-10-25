@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
@@ -37,7 +38,7 @@ type RoomWorkshopCard = {
 
 export function LobbyPage() {
   const { user, logout, apiFetch } = useAuth()
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [myRooms, setMyRooms] = useState<MyRoom[]>([])
   const [joinRoomId, setJoinRoomId] = useState('')
@@ -332,11 +333,9 @@ export function LobbyPage() {
                       onChange={(e) => setEnableCommunityDeck(e.target.checked)}
                     />
                     <span>
-                      启用社区扩展卡（community deck）
-                      <br />
+                      {translateMessage(locale, "ui.copy.client_app_LobbyPage_tsx.enable_community_cards_community_deck_3250b6")}<br />
                       <span className="community-deck-toggle-hint">
-                        这些卡由玩家通过工坊提交、maintainer review 后合入主仓库。质量 / 平衡性可能与官方卡有差异。
-                      </span>
+                        {translateMessage(locale, "ui.copy.client_app_LobbyPage_tsx.these_cards_are_submitted_through_workshop_and_a2b6bf")}</span>
                     </span>
                   </label>
                   {enableCommunityDeck && (

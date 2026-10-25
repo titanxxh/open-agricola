@@ -1,3 +1,4 @@
+import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
 import { SubmissionStore } from './workshop-pr/submission-store'
 import { WorkshopGitHubApp } from './workshop-pr/github-app'

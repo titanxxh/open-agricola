@@ -1,3 +1,4 @@
+import { t as translateMessage } from '../../shared/i18n'
 import { getPlayerDisplayName } from '../../client/utils/player-name'
 import { useEffect, useMemo, useState } from 'react'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
@@ -31,32 +32,7 @@ const idleInteraction: ClientInteractionState = {
 
 const noOp = () => {}
 
-const setupText = {
-  en: {
-    draft: 'Card draft replay',
-    parent: 'Parent Card selection replay',
-    round: 'Round',
-    pool: 'Available cards',
-    kept: 'Already kept',
-    submitted: 'Submitted choice',
-    mothers: 'Mother candidates',
-    fathers: 'Father candidates',
-    waiting: 'Not submitted',
-    hidden: 'Hidden card',
-  },
-  zh: {
-    draft: '卡牌轮抽回放',
-    parent: '父母卡选择回放',
-    round: '轮次',
-    pool: '当前候选',
-    kept: '已经保留',
-    submitted: '已提交选择',
-    mothers: '母亲卡候选',
-    fathers: '父亲卡候选',
-    waiting: '尚未提交',
-    hidden: '隐藏卡牌',
-  },
-} as const
+const setupText = (locale: string) => ({ "draft": translateMessage(locale, "ui.copy.ReplayBoard.card_draft_replay_27937c"), "parent": translateMessage(locale, "ui.copy.ReplayBoard.parent_card_selection_replay_136587"), "round": translateMessage(locale, "ui.copy.ReplayBoard.round_a7a6c3"), "pool": translateMessage(locale, "ui.copy.ReplayBoard.available_cards_f66487"), "kept": translateMessage(locale, "ui.copy.ReplayBoard.already_kept_15426a"), "submitted": translateMessage(locale, "ui.copy.ReplayBoard.submitted_choice_857d0a"), "mothers": translateMessage(locale, "ui.copy.ReplayBoard.mother_candidates_e6a9d9"), "fathers": translateMessage(locale, "ui.copy.ReplayBoard.father_candidates_0fbfd6"), "waiting": translateMessage(locale, "ui.copy.ReplayBoard.not_submitted_a8ee47"), "hidden": translateMessage(locale, "ui.copy.ReplayBoard.hidden_card_04b619") })
 
 function SetupCards({
   ids,
@@ -74,7 +50,7 @@ function SetupCards({
         <li
           key={`${id}:${index}`}
           data-card-id={id}
-          aria-label={id === '?' ? setupText[locale].hidden : id}
+          aria-label={id === '?' ? setupText(locale).hidden : id}
         >
           {id === '?'
             ? <span className="replay-setup__hidden">?</span>
@@ -102,7 +78,7 @@ function ReplayDraftPhase({
   locale: Locale
 }) {
   const draft = state.draft!
-  const text = setupText[locale]
+  const text = setupText(locale)
   return (
     <section className="replay-setup" data-phase="draft" aria-label={text.draft}>
       <header>
@@ -149,7 +125,7 @@ function ReplayParentSelectionPhase({
   locale: Locale
 }) {
   const selection = state.parentSelection!
-  const text = setupText[locale]
+  const text = setupText(locale)
   return (
     <section className="replay-setup" data-phase="parent-selection" aria-label={text.parent}>
       <header><h2>{text.parent}</h2></header>

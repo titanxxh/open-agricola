@@ -1,7 +1,8 @@
+import { t as translateMessage } from '../../shared/i18n'
 import { CardTakedownButton } from './workshop/CardTakedownButton'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useLocale } from '../contexts/LocaleContext'
+import { useLocale, useCurrentLocale } from '../contexts/LocaleContext'
 import { AiCardDesigner } from './workshop/AiCardDesigner'
 import type { PlaytestSource } from '../services/llm/generation/request'
 import { bindSandboxPlaytest, type SandboxPlaytest, type SandboxStartResult } from './workshop/sandbox-playtest'
@@ -157,7 +158,7 @@ type WorkshopPrActionInput = {
   localesComplete?: boolean
 }
 
-export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
+export function getWorkshopPrActionState(input: WorkshopPrActionInput, locale = 'zh'): {
   visible: boolean
   disabled: boolean
   buttonLabel: string
@@ -167,39 +168,39 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
     return { visible: false, disabled: true, buttonLabel: '', secondary: null }
   }
   if (!input.enabled) {
-    return { visible: true, disabled: true, buttonLabel: 'PR 功能未开启', secondary: null }
+    return { visible: true, disabled: true, buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.pr_submission_is_disabled_59ff0f"), secondary: null }
   }
   if (input.reviewStatus === 'merged') {
     const prNum = extractPrNumber(input.githubPrUrl)
     return {
       visible: true,
       disabled: true,
-      buttonLabel: '已合并 ✓',
-      secondary: prNum ? `PR #${prNum} · 社区卡已收录` : '社区卡已收录',
+      buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.merged_36ab93"),
+      secondary: prNum ? translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.pr_community_card_included_b59d7f", { value0: String(prNum) }) : translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.community_card_included_508e16"),
     }
   }
   if (input.reviewStatus === 'approved') {
     return {
       visible: true,
       disabled: true,
-      buttonLabel: '已通过审核',
-      secondary: '可以发布上线；修改草稿后需重新提交审核。',
+      buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.review_approved_a57c77"),
+      secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.ready_to_publish_editing_the_draft_requires_c7e46c"),
     }
   }
   if (input.handoffReady === false) {
     return {
       visible: true,
       disabled: true,
-      buttonLabel: '先完成当前版本沙盒确认',
-      secondary: '静态校验、沙盒通过记录和当前草稿必须完全匹配。',
+      buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.confirm_the_current_version_in_sandbox_first_4963f8"),
+      secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.validation_sandbox_approval_and_the_current_draft_d47d3c"),
     }
   }
   if (input.localesComplete === false) {
     return {
       visible: true,
       disabled: true,
-      buttonLabel: '请先完成中文本地化',
-      secondary: '主仓库代码使用英文，需要 zh 翻译同步提交。点击 AI 设计器顶部的"本地化"按钮补齐。',
+      buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.complete_chinese_localization_first_1af740"),
+      secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.complete_the_chinese_card_name_and_description_13ceef"),
     }
   }
 
@@ -211,26 +212,26 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
       return {
         visible: true,
         disabled: true,
-        buttonLabel: '已合并 ✓',
-        secondary: `PR #${prNum} · 等待收录同步`,
+        buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.merged_36ab93"),
+        secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.pr_waiting_for_inclusion_0cbc20", { value0: String(prNum) }),
       }
     }
     if (input.githubPrStatus === 'closed') {
       return {
         visible: true,
         disabled: false,
-        buttonLabel: '重新提交审核',
-        secondary: `上次 PR #${prNum} 已关闭 · 将创建新的审核 PR`,
+        buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.submit_for_review_again_6ddd67"),
+        secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.previous_pr_was_closed_a_new_review_0eec2a", { value0: String(prNum) }),
       }
     }
     return {
       visible: true,
       disabled: false,
-      buttonLabel: '更新审核 PR',
-      secondary: `#${prNum} 等待 review · 点击重发最新版（会重置已有审核进度）`,
+      buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.update_review_pr_c42259"),
+      secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.awaiting_review_resubmit_the_latest_version_resets_f54511", { value0: String(prNum) }),
     }
   }
-  return { visible: true, disabled: false, buttonLabel: '提交审核（发起 PR）', secondary: '通过 review 后才能发布进入房间。' }
+  return { visible: true, disabled: false, buttonLabel: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.submit_for_review_open_pr_2ff051"), secondary: translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.publishing_to_rooms_requires_review_approval_a8d994") }
 }
 
 /**
@@ -395,6 +396,7 @@ export function CardDetailPrSection({
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   reloadCard: () => void
 }) {
+  const locale = useCurrentLocale()
   const [modalOpen, setModalOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -454,7 +456,7 @@ export function CardDetailPrSection({
     githubPrStatus: card.github_pr_status,
     handoffReady: workspaceState?.cardId === card.id && workspaceState.ready,
     localesComplete: hasZhLocale(card.card_json),
-  })
+  }, locale)
   if (!action.visible) return null
   const currentWorkspace = workspaceState?.cardId === card.id ? workspaceState : null
   const canPublish = isAuthor
@@ -506,7 +508,7 @@ export function CardDetailPrSection({
             live: typeof latest.live === 'boolean' ? latest.live : null,
           }))
         }
-        setPublishError(payload.error ?? payload.code ?? `发布失败 (${response.status})`)
+        setPublishError(payload.error ?? payload.code ?? translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.publishing_failed_16b169", { value0: response.status }))
         reloadCard()
         return
       }
@@ -522,7 +524,7 @@ export function CardDetailPrSection({
         : previous)
       reloadCard()
     } catch {
-      setPublishError('网络错误，发布失败')
+      setPublishError(translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.network_error_publishing_failed_9c4bd5"))
       reloadCard()
     } finally {
       setPublishing(false)
@@ -551,8 +553,7 @@ export function CardDetailPrSection({
         {action.buttonLabel}
       </button>
       <button type="button" className="btn-secondary ws-btn-sm" onClick={() => setModalOpen(true)}>
-        投稿记录与恢复
-      </button>
+        {translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.submissions_and_recovery_6deab1")}</button>
       {canPublish && (
         <button
           type="button"
@@ -560,7 +561,7 @@ export function CardDetailPrSection({
           disabled={publishing}
           onClick={() => { void onPublish() }}
         >
-          {publishing ? '发布中…' : '发布上线'}
+          {publishing ? translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.publishing_bb123e") : translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.publish_live_bf65ed")}
         </button>
       )}
       {action.secondary && (
@@ -573,22 +574,21 @@ export function CardDetailPrSection({
             target="_blank"
             rel="noreferrer"
             style={{ fontSize: '0.9em' }}
-            title="在 GitHub 中打开 PR"
+            title={translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.open_pr_on_github_6f1251")}
           >
-            🔗 打开
-          </a>
+            {translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.open_7120db")}</a>
           <button
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
             style={{ background: 'transparent', border: '1px solid rgba(128,128,128,0.3)', borderRadius: 3, cursor: 'pointer', padding: '2px 8px' }}
-            title="从 GitHub 同步 PR 状态"
+            title={translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.sync_pr_status_from_github_2c8f89")}
           >
-            {refreshing ? '⟳ ...' : '⟳ 刷新'}
+            {refreshing ? '⟳ ...' : translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.refresh_2d0292")}
           </button>
           {refreshError && (
             <span style={{ color: 'crimson', fontSize: '0.85em' }}>
-              刷新失败：{refreshError}
+              {translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.refresh_failed_ec7545")}{refreshError}
             </span>
           )}
         </>
@@ -624,6 +624,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
   currentUserId?: string
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  const locale = useCurrentLocale()
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [liked, setLiked] = useState(card.liked_by_me)
@@ -679,11 +680,11 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
         setVersions(d.versions)
       } else {
         setVersions([])
-        setVersionsError(d.error ?? '加载版本历史失败')
+        setVersionsError(d.error ?? translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.unable_to_load_version_history_08f701"))
       }
     } catch {
       setVersions([])
-      setVersionsError('网络错误，无法加载版本历史')
+      setVersionsError(translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.network_error_unable_to_load_version_history_7a2a13"))
     } finally {
       setVersionsLoading(false)
     }
@@ -761,7 +762,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
         <div className="ws-detail-section ws-version-history-panel">
           <h3>{t('platform.versionHistoryCount', { count: versions.length })}</h3>
           {versionsLoading ? (
-            <p className="ws-empty">正在加载版本历史...</p>
+            <p className="ws-empty">{translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.loading_version_history_97c756")}</p>
           ) : versionsError ? (
             <p className="ws-empty ws-version-error">{versionsError}</p>
           ) : versions.length === 0 ? (
@@ -2019,11 +2020,11 @@ export function WorkshopPage() {
 
       {communityDeckEnabled && (
         <WorkshopSection
-          title="社区卡"
-          subtitle="已合并到主仓库的社区卡（PR 已 merged）。"
+          title={translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.community_cards_954882")}
+          subtitle={translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.community_cards_merged_into_the_main_repository_f7c6d5")}
         >
           {communityCards.length === 0 ? (
-            <p className="rooms-empty">暂无已合并的社区卡。</p>
+            <p className="rooms-empty">{translateMessage(locale, "ui.copy.client_app_WorkshopPage_tsx.no_community_cards_have_been_merged_yet_f25721")}</p>
           ) : (
             <div className="ws-card-grid">
               {communityCards.map(card => (

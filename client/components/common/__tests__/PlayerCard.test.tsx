@@ -8,8 +8,8 @@ import {
 } from '../../../../shared/cards/custom-card-metadata'
 import { loadCardsManifest } from '../../../services/card-meta'
 import { publicAssetUrl } from '../../../utils/public-asset-url'
-import { zh } from '../../../../shared/i18n/zh'
-import { getAnyCardDisplayName, translateCardText } from '../cardText'
+import { getLanguagePack, registerLanguagePack } from '../../../../shared/i18n'
+import { getCardDisplayName, translateCardText } from '../cardText'
 import { resolveCardDisplayName, resolveCardRef } from '../../board/card-reference'
 import { ActionLog } from '../../board/ActionLog'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
@@ -30,10 +30,10 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     })
     const html = renderToStaticMarkup(<PlayerCard locale="zh" cardId="CUSTOM_LocalName" cardType="minor" />)
     expect(html).toContain('统一卡名')
-    expect(getAnyCardDisplayName('zh', 'CUSTOM_LocalName')).toBe('统一卡名')
+    expect(getCardDisplayName('zh', 'CUSTOM_LocalName')).toBe('统一卡名')
     expect(resolveCardDisplayName('zh', 'CUSTOM_LocalName')).toBe('统一卡名')
     expect(translateCardText('zh', '{card:CUSTOM_LocalName}：继续？')).toBe('统一卡名：继续？')
-    expect(getAnyCardDisplayName('en', 'CUSTOM_LocalName')).toBe('English name')
+    expect(getCardDisplayName('en', 'CUSTOM_LocalName')).toBe('English name')
   })
 
   it('uses the translated Moor major description on its face', () => {
@@ -75,7 +75,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     ['A039_Chapel', '礼拜堂'],
   ])('uses the canonical name instead of the old cards namespace alias for %s', (id, name) => {
     expect(translateCardText('zh', `cards.${id}.name`)).toBe(name)
-    expect(getAnyCardDisplayName('zh', id)).toBe(name)
+    expect(getCardDisplayName('zh', id)).toBe(name)
   })
 
   it('uses metadata card type when an old translation is in the wrong section', () => {
@@ -530,15 +530,15 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 
 describe('PlayerCard supplemental rules', () => {
   it('uses the global translation for major-improvement rules', () => {
-    const localeEntry = zh.improvements.Major_Fireplace1 as typeof zh.improvements.Major_Fireplace1 & { rules?: string }
-    localeEntry.rules = '主改良规则翻译'
+    const original = getLanguagePack('zh')!
+    registerLanguagePack({ ...original, messages: { ...original.messages, 'cardFaces.Major_Fireplace1.rules': '主改良规则翻译' } })
     try {
       const html = renderToStaticMarkup(
         <PlayerCard locale="zh" cardId="Major_Fireplace1" cardType="major" />,
       )
       expect(html).toContain('主改良规则翻译')
     } finally {
-      delete localeEntry.rules
+      registerLanguagePack(original)
     }
   })
 })

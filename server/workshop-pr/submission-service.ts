@@ -3,7 +3,7 @@ import { loadReviewBinding, reconcileReviewSnapshot, type ReviewProvider } from 
 import { generatedBlobSha, readSubmissionArtwork } from './generated-files'
 import { enterReview, loadWorkspace } from '../workshop-drafts'
 import { GitHubApiError, GitHubClient } from './github-client'
-import { generatePrFiles, patchCommunityCardsMarkdown, type PrFile } from './code-gen'
+import { generateLanguagePatch, generatePrFiles, patchCommunityCardsMarkdown, type PrFile } from './code-gen'
 import { WorkshopGitHubApp } from './github-app'
 import { SubmissionStore, type SubmissionPayload, type SubmissionRow } from './submission-store'
 import { recordSubmissionFailure, submissionFailureCode } from './submission-failure'
@@ -32,8 +32,16 @@ Submitted by the Workshop App on behalf of the card designer.
 
 - [ ] Card behavior and balance reviewed
 - [ ] Necessary direct behavior or GameSession tests included
-- [ ] Chinese localization complete
+- [ ] Language patch published in open-agricola-i18n and i18n.ref updated
 - [ ] CI passes
+
+### Initial language package patch
+
+For later draft updates, regenerate this patch from the current draft before publishing translations. Merge each initial language entry below into the corresponding file in [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n/tree/main/locales), build the packages against this card branch, then update this PR's i18n.ref. Translations are kept out of the game source files.
+
+\`\`\`json
+${JSON.stringify(generateLanguagePatch(data.wcard), null, 2)}
+\`\`\`
 
 <!-- workshop-proposal:${data.proposalId} -->
 `

@@ -40,6 +40,7 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.authErrors.oauth_onboarding_expired': '注册会话已过期，请重新使用 GitHub 或 Google 注册',
   }
   return {
+    useCurrentLocale: () => 'zh',
     useLocale: () => ({
       locale: 'zh',
       setLocale: vi.fn(),

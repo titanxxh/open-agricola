@@ -5,7 +5,7 @@ import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
 import { FutureEffectMarkers, type OwnedScheduledEffect } from './FutureEffectMarkers'
 import { PlayerCard } from '../common/PlayerCard'
-import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
+import { getCardDisplayName, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import { renderDescriptionPreview } from '../interaction/ActionDescription'
@@ -573,7 +573,7 @@ export const ActionBoard = ({
     if (!reservations?.length) return null
     return reservations.map((owner) => (
       <div key={`${owner.id}:${owner.sourceCardId}`} className="lazybones-stable-marker" data-player-color={owner.color}
-        title={`${playerDisplayName(owner)}: ${getAnyCardDisplayName(locale, owner.sourceCardId)}`}>
+        title={`${playerDisplayName(owner)}: ${getCardDisplayName(locale, owner.sourceCardId)}`}>
         <span className="res-icon res-icon-barn" />
       </div>
     ))

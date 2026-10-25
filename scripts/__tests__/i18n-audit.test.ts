@@ -10,7 +10,7 @@ describe('computeAuditResult', () => {
       { key: 'ui.bar', file: 'b.ts', line: 2 },
       { key: 'ui.qux', file: 'c.ts', line: 3 },
     ]
-    const r = computeAuditResult(refs, flatZh, flatEn)
+    const r = computeAuditResult(refs, new Map([['zh', flatZh], ['en', flatEn]]))
     const byKey = new Map(r.missing.map((m) => [m.key, m]))
     expect(byKey.get('ui.foo')).toBeUndefined()
     expect(byKey.get('ui.bar')?.locales).toEqual(['en'])
@@ -23,7 +23,7 @@ describe('computeAuditResult', () => {
       { key: 'ui.x', file: 'a.ts', line: 1 },
       { key: 'ui.x', file: 'b.ts', line: 2 },
     ]
-    const r = computeAuditResult(refs, new Map(), new Map())
+    const r = computeAuditResult(refs, new Map([['zh', new Map()], ['en', new Map()]]))
     expect(r.missing[0].referencedAt).toEqual(['a.ts:1', 'b.ts:2'])
   })
 })

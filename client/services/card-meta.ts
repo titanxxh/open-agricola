@@ -16,6 +16,7 @@ import {
 import type { CardExchange } from '../../shared/contract/cards'
 
 export type CardMeta = {
+  authored?: true
   id: string
   name: string
   deck: string
@@ -96,6 +97,7 @@ export const loadCardsManifest = (): Promise<Record<string, CardMeta>> => {
 }
 
 const customCardToMeta = ({ cardJson: card, cardType }: CustomCardMetadata): CardMeta => ({
+  authored: true,
   id: card.id,
   name: card.name,
   deck: card.deck,

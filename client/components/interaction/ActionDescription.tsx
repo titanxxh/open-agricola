@@ -1,10 +1,11 @@
+import { t as translateMessage } from '../../../shared/i18n'
 import type { ReactNode } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import type { ChoiceDescriptionPreview, ChoiceEffectPreview, RuleAmount, RuleCondition } from '../../../shared/contract/types'
 import type { RuleOperationPreview } from '../../../shared/contract/rule-operation-previews'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
-import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
+import { getCardDisplayName, translateCardText } from '../common/cardText'
 import { getPlayerDisplayName } from '../../utils/player-name'
 
 export const hasPositiveResources = (resources?: Record<string, number | undefined>) =>
@@ -20,8 +21,8 @@ export const renderPaymentSourceCards = (
   sourceCards: string[] | undefined,
 ): ReactNode => {
   if (!sourceCards || sourceCards.length === 0) return null
-  const names = sourceCards.map((id) => getAnyCardDisplayName(locale, id))
-  const joiner = locale === 'zh' ? '、' : ', '
+  const names = sourceCards.map((id) => getCardDisplayName(locale, id))
+  const joiner = translateMessage(locale, "ui.copy.components_interaction_ActionDescription.separator_9dcfea")
   return (
     <span className="payment-option-sources">
       {t(locale, 'ui.interactionPaymentVia', { cards: names.join(joiner) })}
@@ -93,13 +94,13 @@ export const renderEffectPreview = (
   if (effectPreview.kind === 'roundCardSelection') return <span>{effectPreview.ranges.map((range, index) => <span key={range.from} data-round-start={range.from} data-round-end={range.to}>
     {index ? '; ' : ''}{t(locale, range.to === undefined ? 'ui.ruleFromRound' : 'ui.ruleRoundRange', { start: range.from, end: range.to ?? '' })}{': '}{renderEffectPreview(locale, { kind: 'cardSelection', types: [...range.types] })}
   </span>)}</span>
-  if (effectPreview.kind === 'cardRecordSelection') return <span>{t(locale, 'ui.ruleRecordSelection', { count: effectPreview.count, card: getAnyCardDisplayName(locale, effectPreview.cardId) })}{': '}{effectPreview.choices.map((resources, index) => <span key={index}>{index ? ' / ' : ''}<ResourceLine locale={locale} resources={resources} /></span>)}</span>
-  if (effectPreview.kind === 'cardStack') return <span>{t(locale, effectPreview.amount < 0 ? 'ui.ruleDiscardCardMarker' : 'ui.ruleStoreCardMarker', { card: getAnyCardDisplayName(locale, effectPreview.cardId), amount: Math.abs(effectPreview.amount) })}{' '}{t(locale, `resources.${effectPreview.item}`)}</span>
+  if (effectPreview.kind === 'cardRecordSelection') return <span>{t(locale, 'ui.ruleRecordSelection', { count: effectPreview.count, card: getCardDisplayName(locale, effectPreview.cardId) })}{': '}{effectPreview.choices.map((resources, index) => <span key={index}>{index ? ' / ' : ''}<ResourceLine locale={locale} resources={resources} /></span>)}</span>
+  if (effectPreview.kind === 'cardStack') return <span>{t(locale, effectPreview.amount < 0 ? 'ui.ruleDiscardCardMarker' : 'ui.ruleStoreCardMarker', { card: getCardDisplayName(locale, effectPreview.cardId), amount: Math.abs(effectPreview.amount) })}{' '}{t(locale, `resources.${effectPreview.item}`)}</span>
   if (effectPreview.kind === 'scoringReserve') return <span>{t(locale, 'ui.ruleReserveForScoring')}{' '}<ResourceLine locale={locale} resources={effectPreview.resourcesReserved} />{' → '}<ResourceLine locale={locale} resources={{}} bonusVp={effectPreview.bonusVp} /></span>
   if (effectPreview.kind === 'animalCapacity') return t(locale, 'ui.ruleAddAnimalCapacity', { amount: effectPreview.amount })
   if (effectPreview.kind === 'virtualRoom') return t(locale, 'ui.ruleVirtualRoom', { amount: effectPreview.amount, capacity: effectPreview.animalCapacity })
   if (effectPreview.kind === 'fenceReserve') return t(locale, 'ui.ruleReserveFences', { amount: effectPreview.amount })
-  if (effectPreview.kind === 'cardCounter') return t(locale, effectPreview.amount < 0 ? 'ui.ruleConsumeCardCounter' : 'ui.ruleIncreaseCardCounter', { card: getAnyCardDisplayName(locale, effectPreview.cardId), amount: Math.abs(effectPreview.amount) })
+  if (effectPreview.kind === 'cardCounter') return t(locale, effectPreview.amount < 0 ? 'ui.ruleConsumeCardCounter' : 'ui.ruleIncreaseCardCounter', { card: getCardDisplayName(locale, effectPreview.cardId), amount: Math.abs(effectPreview.amount) })
   if (effectPreview.kind === 'animalPose') return <span>{t(locale, 'ui.ruleLieAnimal', { amount: effectPreview.amount, animal: t(locale, `resources.${effectPreview.animal}`) })}{' → '}<ResourceLine locale={locale} resources={effectPreview.resourcesGained} /></span>
   if (effectPreview.kind === 'resourceSale') return effectPreview.stage === 'buyer-offer' ? <span>{t(locale, 'ui.ruleBuyerIfSelected')}{': '}<ResourceLine locale={locale} resources={effectPreview.buyerPays} mode="payment" />{' → '}<ResourceLine locale={locale} resources={effectPreview.resourcesSold} /></span> : <span>{t(locale, 'ui.ruleSellResources')}{' '}<ResourceLine locale={locale} resources={effectPreview.resourcesSold} />{': '}{t(locale, 'ui.ruleSellToSupply')}{' '}<ResourceLine locale={locale} resources={effectPreview.supplyReward} />{' / '}{t(locale, 'ui.ruleSellToWillingPlayer')}{' '}<ResourceLine locale={locale} resources={effectPreview.buyerPays} /></span>
   if (effectPreview.kind === 'resourceQuantitySchedule') {
@@ -117,19 +118,19 @@ export const renderEffectPreview = (
       {operation.kind === 'replace' ? <><ResourceLine locale={locale} resources={{ [operation.from]: operation.fromAmount }} />{' → '}<ResourceLine locale={locale} resources={{ [operation.to]: operation.toAmount }} /></> : operation.kind === 'remove-top' ? <>{t(locale, 'ui.ruleRemoveTop', { amount: operation.amount, crop: operation.crop ? t(locale, `resources.${operation.crop}`) : t(locale, 'ui.ruleCropToken') })}{hasPositiveResources(operation.gain) ? <>{'; '}{t(locale, 'ui.rulePerSelectedTile')}{' '}<ResourceLine locale={locale} resources={operation.gain} /></> : null}</> : operation.kind === 'discard-all' ? t(locale, 'ui.ruleDiscardAllCrops') : t(locale, 'ui.ruleMoveCrops', { amount: operation.amount })}
     </span>
   }
-  if (effectPreview.kind === 'exchangeCatalog') return <span>{t(locale, 'ui.chooseQuantity')}{': '}{effectPreview.choices.map((choice, index) => <span key={index}>{index ? '; ' : ''}{choice.sourceCard ? `${getAnyCardDisplayName(locale, choice.sourceCard)}: ` : ''}{renderEffectPreview(locale, { kind: 'resourceExchange', resourcesPaid: choice.resourcesPaid, resourcesGained: choice.resourcesGained })}{` (${choice.minTimes}–${Number.isFinite(choice.maxTimes) ? choice.maxTimes : '∞'})`}</span>)}</span>
+  if (effectPreview.kind === 'exchangeCatalog') return <span>{t(locale, 'ui.chooseQuantity')}{': '}{effectPreview.choices.map((choice, index) => <span key={index}>{index ? '; ' : ''}{choice.sourceCard ? `${getCardDisplayName(locale, choice.sourceCard)}: ` : ''}{renderEffectPreview(locale, { kind: 'resourceExchange', resourcesPaid: choice.resourcesPaid, resourcesGained: choice.resourcesGained })}{` (${choice.minTimes}–${Number.isFinite(choice.maxTimes) ? choice.maxTimes : '∞'})`}</span>)}</span>
   if (effectPreview.kind === 'resourceBatchExchange') return <span>{t(locale, 'ui.ruleBatchExchange', { min: effectPreview.minTotal, max: effectPreview.maxTotal })}{': '}<ResourceLine locale={locale} resources={effectPreview.available} />{' → '}{effectPreview.receiveResources.map(resource => t(locale, `resources.${resource}`)).join(' / ')}</span>
-  if (effectPreview.kind === 'workerRecall') return effectPreview.noOp ? t(locale, 'ui.ruleNoWorkerToRecall') : <span>{t(locale, effectPreview.select ? 'ui.ruleChooseWorkerToRecall' : 'ui.ruleRecallWorker')}{effectPreview.workers.map((worker, index) => <span key={index}>{index ? ' / ' : ': '}{t(locale, worker.spaceNameKey)}</span>)}{' → '}{effectPreview.destination.kind === 'card' ? getAnyCardDisplayName(locale, effectPreview.destination.cardId) : t(locale, 'ui.ruleHome')}</span>
+  if (effectPreview.kind === 'workerRecall') return effectPreview.noOp ? t(locale, 'ui.ruleNoWorkerToRecall') : <span>{t(locale, effectPreview.select ? 'ui.ruleChooseWorkerToRecall' : 'ui.ruleRecallWorker')}{effectPreview.workers.map((worker, index) => <span key={index}>{index ? ' / ' : ': '}{t(locale, worker.spaceNameKey)}</span>)}{' → '}{effectPreview.destination.kind === 'card' ? getCardDisplayName(locale, effectPreview.destination.cardId) : t(locale, 'ui.ruleHome')}</span>
   if (effectPreview.kind === 'collection') return t(locale, 'ui.ruleCollectAllOnSpace', { space: t(locale, effectPreview.spaceNameKey), resources: effectPreview.resourceTypes.map(resource => t(locale, `resources.${resource}`)).join(', ') })
   if (effectPreview.kind === 'resourceSetSelection') return <span>{effectPreview.quantitiesByUse ? t(locale, 'ui.ruleResourceSetByUse', { counts: effectPreview.quantitiesByUse.join(' / '), amount: effectPreview.resourcesPerChoice }) : t(locale, 'ui.ruleResourceSetSelection', { min: effectPreview.minDistinct, max: effectPreview.maxDistinct, amount: effectPreview.resourcesPerChoice })}{': '}{effectPreview.choices.map(resource => t(locale, `resources.${resource}`)).join(', ')}{'; '}{t(locale, 'ui.ruleExtraGain')}{' '}<ResourceLine locale={locale} resources={effectPreview.extraGain} /></span>
-  if (effectPreview.kind === 'familyGrowth') return <span>{t(locale, effectPreview.roomRequired ? 'ui.ruleGrowthRoomRequired' : 'ui.ruleGrowthWithoutRoom')}{effectPreview.heldOnCard ? ` (${t(locale, 'ui.ruleNewbornHeldOnCard', { card: getAnyCardDisplayName(locale, effectPreview.heldOnCard) })})` : ''}</span>
+  if (effectPreview.kind === 'familyGrowth') return <span>{t(locale, effectPreview.roomRequired ? 'ui.ruleGrowthRoomRequired' : 'ui.ruleGrowthWithoutRoom')}{effectPreview.heldOnCard ? ` (${t(locale, 'ui.ruleNewbornHeldOnCard', { card: getCardDisplayName(locale, effectPreview.heldOnCard) })})` : ''}</span>
   if (effectPreview.kind === 'harvestFields') return t(locale, effectPreview.privatePhase ? 'ui.rulePrivateHarvestFields' : 'ui.ruleHarvestFields')
   if (effectPreview.kind === 'cardSelection') return <span>{t(locale, 'ui.ruleSelectCards', { types: effectPreview.types.map(type => t(locale, `ui.improvementKinds.${type}`)).join(' / ') })}
-    {effectPreview.allowedCards ? ` (${t(locale, 'ui.ruleAllowedCards', { cards: effectPreview.allowedCards.map(id => getAnyCardDisplayName(locale, id)).join(', ') })})` : ''}
+    {effectPreview.allowedCards ? ` (${t(locale, 'ui.ruleAllowedCards', { cards: effectPreview.allowedCards.map(id => getCardDisplayName(locale, id)).join(', ') })})` : ''}
     {effectPreview.resourcesPaid ? <>{': '}<ResourceLine locale={locale} mode="payment" resources={effectPreview.resourcesPaid} emptyLabel={t(locale, 'ui.free')} /></> : null}
   </span>
   if (effectPreview.kind === 'bakeRecipes') return effectPreview.recipes.length ? <span>{t(locale, 'ui.chooseQuantity')}{': '}{effectPreview.recipes.map((recipe, index) => <span key={recipe.sourceCard}>
-    {index ? '; ' : ''}{getAnyCardDisplayName(locale, recipe.sourceCard)}{': '}{renderEffectPreview(locale, recipe.exchange)}{` (${t(locale, 'ui.ruleQuantityLimit', { amount: recipe.quantityLimit })})`}
+    {index ? '; ' : ''}{getCardDisplayName(locale, recipe.sourceCard)}{': '}{renderEffectPreview(locale, recipe.exchange)}{` (${t(locale, 'ui.ruleQuantityLimit', { amount: recipe.quantityLimit })})`}
   </span>)}</span> : t(locale, 'ui.ruleUseAvailableBakeAbility')
   if (effectPreview.kind === 'fencePlan') return <span>{t(locale, 'ui.ruleChooseFenceLayout')}{': '}{effectPreview.segments.map((segment, index) => <span key={segment.kind}>
     {index ? '; ' : ''}{t(locale, `ui.fenceSegmentType.${segment.kind}`)}{' '}<ResourceLine locale={locale} mode="payment" resources={{ wood: segment.woodCost }} emptyLabel={t(locale, 'ui.free')} />{' '}{t(locale, 'ui.perUnit')}
@@ -147,13 +148,13 @@ export const renderEffectPreview = (
   </span>
   if (effectPreview.kind === 'ruleOperation') return renderRuleOperation(locale, effectPreview.operation)
   if (effectPreview.kind === 'fieldContents') {
-    return <span>{effectPreview.sourceCard ? getAnyCardDisplayName(locale, effectPreview.sourceCard) : t(locale, 'ui.tileField')}{': '}
+    return <span>{effectPreview.sourceCard ? getCardDisplayName(locale, effectPreview.sourceCard) : t(locale, 'ui.tileField')}{': '}
       <ResourceLine locale={locale} resources={effectPreview.resources} hideZero />
     </span>
   }
   if (effectPreview.kind === 'cardScore') {
     return <span data-card-score={effectPreview.delta}>{t(locale, 'ui.choiceCardScore', {
-      card: getAnyCardDisplayName(locale, effectPreview.cardId),
+      card: getCardDisplayName(locale, effectPreview.cardId),
       delta: `${effectPreview.delta >= 0 ? '+' : ''}${effectPreview.delta}`,
     })}</span>
   }
@@ -187,7 +188,7 @@ export const renderEffectPreview = (
   }
   if (effectPreview.kind === 'resourceMovement') {
     const location = effectPreview.from.kind === 'card' ? effectPreview.from : effectPreview.to
-    const name = location.kind === 'card' ? getAnyCardDisplayName(locale, location.cardId)
+    const name = location.kind === 'card' ? getCardDisplayName(locale, location.cardId)
       : location.kind === 'actionSpace' ? t(locale, location.nameKey) : ''
     return <span>
       {t(locale, effectPreview.from.kind === 'card' ? 'ui.choiceTakeFromCard' : 'ui.choiceReturnToSpace', { target: name })}{' '}
@@ -216,7 +217,7 @@ export const renderEffectPreview = (
         {!!effectPreview.cardUsed && (
           <span className="payment-option-card">
             {' '}
-            ({t(locale, 'ui.interactionPaymentReturn')} {getAnyCardDisplayName(locale, effectPreview.cardUsed)})
+            ({t(locale, 'ui.interactionPaymentReturn')} {getCardDisplayName(locale, effectPreview.cardUsed)})
           </span>
         )}
         {renderPaymentSourceCards(locale, effectPreview.sourceCards)}

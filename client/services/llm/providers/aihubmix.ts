@@ -61,17 +61,17 @@ export const aihubmixProvider: ProviderDef = {
   models: [
     {
       id: 'gemini-3.1-flash-image-preview-free',
-      label: 'Gemini 3.1 Flash Image (免费)',
+      label: 'Gemini 3.1 Flash Image', labelKey: "llm.models.aihubmix.gemini-3.1-flash-image-preview-free",
       capabilities: { chat: false, image: true },
     },
     {
       id: 'coding-glm-5.1-free',
-      label: 'Coding GLM 5.1 (免费)',
+      label: 'Coding GLM 5.1', labelKey: "llm.models.aihubmix.coding-glm-5.1-free",
       capabilities: { chat: true, image: false },
     },
     {
       id: 'k2.6-code-preview-free',
-      label: 'K2.6 Code Preview (免费)',
+      label: 'K2.6 Code Preview', labelKey: "llm.models.aihubmix.k2.6-code-preview-free",
       capabilities: { chat: true, image: false },
     },
   ],

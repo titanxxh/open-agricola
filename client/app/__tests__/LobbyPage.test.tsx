@@ -61,6 +61,7 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.resume': 'Resume',
   }
   return {
+    useCurrentLocale: () => 'en',
     useLocale: () => ({
       locale: 'en',
       setLocale: vi.fn(),
@@ -263,7 +264,7 @@ describe('LobbyPage player count selection', () => {
 
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /启用社区扩展卡/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Enable community cards/ }))
     fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
 
@@ -302,7 +303,7 @@ describe('LobbyPage player count selection', () => {
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
 
-    const communityDeck = screen.getByRole('checkbox', { name: /启用社区扩展卡/ })
+    const communityDeck = screen.getByRole('checkbox', { name: /Enable community cards/ })
     expect(screen.queryByText('Reviewed workshop cards')).toBeNull()
     expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards'))
 

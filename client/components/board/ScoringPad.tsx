@@ -10,7 +10,7 @@ import type {
   PlayerStats,
   Resource,
 } from '../../../shared/contract/types'
-import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
+import { getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
 import { resolveCardRef } from './card-reference'
 import { LogCardLink } from './log-rendering'
@@ -83,9 +83,7 @@ const renderCardChildLabel = (
   cardType?: 'major' | 'minor' | 'occupation',
   preferResolvedName = false,
 ) => {
-  const fallbackName = cardType
-    ? getCardDisplayName(locale, cardType, cardId)
-    : getAnyCardDisplayName(locale, cardId)
+  const fallbackName = getCardDisplayName(locale, cardId)
   const typedCardRef = cardType
     ? { id: cardId, type: cardType, name: fallbackName }
     : null
@@ -408,7 +406,7 @@ const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
         ) : (
           <ul>
             {player.stats.draftHistory.map((entry) => {
-              const name = getAnyCardDisplayName(locale, entry.cardId)
+              const name = getCardDisplayName(locale, entry.cardId)
               return (
                 <li key={`${player.id}-pick-${entry.cardId}`}>
                   T{entry.draftTurn} ▸ {name}
@@ -428,7 +426,7 @@ const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
             <ul>
               {player.stats.draftDiscarded.map((cardId) => (
                 <li key={`${player.id}-discard-${cardId}`}>
-                  {getAnyCardDisplayName(locale, cardId)}
+                  {getCardDisplayName(locale, cardId)}
                 </li>
               ))}
             </ul>
