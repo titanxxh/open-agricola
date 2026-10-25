@@ -147,3 +147,26 @@ test('mobile replay defaults to board first and preserves an explicit toggle', a
   await expect(replay.locator('.replay-app--timeline')).toBeVisible()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('timeline')
 })
+
+for (const requestedLocale of [null, 'unknown-language']) {
+  test(`replay uses the package default when locale is ${requestedLocale ?? 'absent'}`, async ({ page, request }) => {
+    const fixture = await createReplay(request)
+    await page.route('**/i18n/manifest.json', async route => {
+      const response = await route.fetch()
+      const manifest = await response.json()
+      await route.fulfill({ response, json: { ...manifest, defaultLocale: 'en' } })
+    })
+    await page.goto(`/?room=${fixture.roomId}`)
+    await page.getByRole('button', { name: /Alice/ }).click()
+    const iframe = page.locator('iframe')
+    await expect(iframe).toHaveAttribute('src', /replay-viewers/)
+    const url = new URL(await iframe.getAttribute('src') ?? '', page.url())
+    if (requestedLocale) url.searchParams.set('locale', requestedLocale)
+    else url.searchParams.delete('locale')
+    await page.goto(url.href)
+    await expect(page.locator('.replay-kicker')).toHaveText('Game Archive')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(page.getByRole('button', { name: 'Switch player view', exact: true })).toBeVisible()
+    await expect(page.locator('.replay-app')).not.toContainText('ui.copy.')
+  })
+}

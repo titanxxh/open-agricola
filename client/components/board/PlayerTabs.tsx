@@ -1,5 +1,4 @@
-import { t as translateMessage } from '../../../shared/i18n'
-import { useCurrentLocale } from '../../contexts/LocaleContext'
+import { t as translateMessage, type Locale } from '../../../shared/i18n'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { SelectButton } from '../common/SelectButton'
 import { formatScore } from '../../utils/format-score'
@@ -14,13 +13,13 @@ export interface PlayerSummary {
 }
 
 interface Props {
+  locale: Locale
   players: PlayerSummary[]
   active: string
   onChange: (id: string) => void
 }
 
-export function PlayerTabs({ players, active, onChange }: Props) {
-  const locale = useCurrentLocale()
+export function PlayerTabs({ locale, players, active, onChange }: Props) {
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return

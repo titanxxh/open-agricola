@@ -65,12 +65,12 @@ const resourceText = (resources: Partial<Resource>, locale: Locale): string =>
   resourceKeyList
     .filter((key) => (resources[key] ?? 0) > 0)
     .map((key) => `${resources[key]} ${t(locale, `resources.${key}`)}`)
-    .join(' · ')
+    .join(t(locale, 'ui.publicEvents.resourceSeparator'))
 
-const accumulationTargetText = (event: Extract<GameEvent, { type: 'resource.accumulated' }>): string => {
+const accumulationTargetText = (event: Extract<GameEvent, { type: 'resource.accumulated' }>, locale: Locale): string => {
   if (event.to.kind === 'actionSpace') return event.to.spaceId
   if (event.to.kind === 'card') return event.to.cardId
-  return `round ${event.to.round}`
+  return t(locale, 'ui.publicEvents.roundTarget', { round: event.to.round })
 }
 
 const actionLabel = (event: GameEvent): string =>
@@ -133,9 +133,7 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'resource',
-      message: locale === 'zh'
-        ? `资源交换：${paid} -> ${gained}`
-        : `Resources exchanged: ${paid} -> ${gained}`,
+      message: t(locale, 'ui.publicEvents.resourcesExchanged', { paid, gained }),
     }
   }
   if (event.type === 'resource.paid') {
@@ -145,7 +143,7 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'payment',
-      message: locale === 'zh' ? `支付资源：${paid}` : `Resources paid: ${paid}`,
+      message: t(locale, 'ui.publicEvents.resourcesPaid', { paid }),
     }
   }
   if (event.type === 'action.accumulated') {
@@ -154,29 +152,25 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'resource',
-      message: locale === 'zh'
-        ? `行动格积累：${event.spaceId} + ${resourceText(resources, locale)}`
-        : `Action accumulated: ${event.spaceId} + ${resourceText(resources, locale)}`,
+      message: t(locale, 'ui.publicEvents.actionAccumulated', { action: event.spaceId, resources: resourceText(resources, locale) }),
     }
   }
   if (event.type === 'resource.accumulated') {
     if (event.silent) return null
     const resources = positiveResources(event.resources)
     if (Object.keys(resources).length === 0) return null
-    const target = accumulationTargetText(event)
+    const target = accumulationTargetText(event, locale)
     return {
       id: event.id,
       kind: 'resource',
-      message: locale === 'zh'
-        ? `资源积累：${target} + ${resourceText(resources, locale)}`
-        : `Resource accumulated: ${target} + ${resourceText(resources, locale)}`,
+      message: t(locale, 'ui.publicEvents.resourceAccumulated', { target, resources: resourceText(resources, locale) }),
     }
   }
   if (event.type === 'action.revealed') {
     return {
       id: event.id,
       kind: 'action',
-      message: locale === 'zh' ? `行动格已揭示：${event.actionId}` : `Action revealed: ${event.actionId}`,
+      message: t(locale, 'ui.publicEvents.actionRevealed', { action: event.actionId }),
     }
   }
   if (event.type === 'action.exclusiveUseSet' || event.type === 'action.exclusiveUseCleared') {
@@ -184,46 +178,42 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'action',
-      message: event.type === 'action.exclusiveUseSet'
-        ? (locale === 'zh' ? `行动格被保留：${action}` : `Action reserved: ${action}`)
-        : (locale === 'zh' ? `行动格保留已清除：${action}` : `Action reservation cleared: ${action}`),
+      message: t(locale, event.type === 'action.exclusiveUseSet' ? 'ui.publicEvents.actionReserved' : 'ui.publicEvents.actionReservationCleared', { action }),
     }
   }
   if (event.type === 'futureMeeple.queued') {
     return {
       id: event.id,
       kind: 'future',
-      message: locale === 'zh' ? `已安排未来工人：${event.cardId}` : `Future worker queued: ${event.cardId}`,
+      message: t(locale, 'ui.publicEvents.futureWorkerQueued', { card: event.cardId }),
     }
   }
   if (event.type === 'futureMeeple.removed') {
     return {
       id: event.id,
       kind: 'future',
-      message: locale === 'zh' ? `移除未来工人：${event.cardId}` : `Future worker removed: ${event.cardId}`,
+      message: t(locale, 'ui.publicEvents.futureWorkerRemoved', { card: event.cardId }),
     }
   }
   if (event.type === 'futureMeeple.resolved') {
     return {
       id: event.id,
       kind: 'future',
-      message: locale === 'zh' ? `未来工人执行：${event.cardId}` : `Future worker resolved: ${event.cardId}`,
+      message: t(locale, 'ui.publicEvents.futureWorkerResolved', { card: event.cardId }),
     }
   }
   if (event.type === 'worker.promoted') {
     return {
       id: event.id,
       kind: 'action',
-      message: locale === 'zh' ? `新生工人成年：${event.workerId}` : `Newborn worker promoted: ${event.workerId}`,
+      message: t(locale, 'ui.publicEvents.newbornPromoted', { worker: event.workerId }),
     }
   }
   if (event.type === 'card.infoboxChanged') {
     return {
       id: event.id,
       kind: 'card',
-      message: locale === 'zh'
-        ? `卡牌标记：${event.cardId}：${event.text}`
-        : `Card note: ${event.cardId}: ${event.text}`,
+      message: t(locale, 'ui.publicEvents.cardNote', { card: event.cardId, text: event.text }),
     }
   }
   if (event.type === 'card.stackChanged') {
@@ -233,32 +223,28 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     return {
       id: event.id,
       kind: 'card',
-      message: locale === 'zh'
-        ? `卡牌资源：${event.cardId} ${sign} ${resourceText(resources, locale)}`
-        : `Card resources: ${event.cardId} ${sign} ${resourceText(resources, locale)}`,
+      message: t(locale, 'ui.publicEvents.cardResources', { card: event.cardId, sign, resources: resourceText(resources, locale) }),
     }
   }
   if (event.type === 'card.swappedWithBoard') {
     return {
       id: event.id,
       kind: 'card',
-      message: locale === 'zh'
-        ? `卡牌交换：${event.fromPlayerCardId} -> ${event.toPlayerCardId}`
-        : `Card swapped: ${event.fromPlayerCardId} -> ${event.toPlayerCardId}`,
+      message: t(locale, 'ui.publicEvents.cardSwapped', { from: event.fromPlayerCardId, to: event.toPlayerCardId }),
     }
   }
   if (event.type === 'card.returnedToBoard') {
     return {
       id: event.id,
       kind: 'card',
-      message: locale === 'zh' ? `卡牌归还：${event.cardId}` : `Card returned: ${event.cardId}`,
+      message: t(locale, 'ui.publicEvents.cardReturned', { card: event.cardId }),
     }
   }
   if (event.type === 'farm.fenceBuilt') {
     return {
       id: event.id,
       kind: 'farm',
-      message: locale === 'zh' ? '农场围栏已更新' : 'Farm fences updated',
+      message: t(locale, 'ui.publicEvents.fencesUpdated'),
     }
   }
   return null

@@ -16,12 +16,15 @@ void loadLanguageManifest().then(async manifest => {
   const requested = new URLSearchParams(location.search).get('locale')
   const locale = manifest.languages.find(language => language.id === requested)?.id ?? manifest.defaultLocale
   await loadLanguagePack(locale)
-}).then(() => loadCardsManifest())
-  .then(() => root.render(
+  return locale
+}).then(async locale => {
+  await loadCardsManifest()
+  root.render(
     <StrictMode>
-      <ReplayViewer />
+      <ReplayViewer locale={locale} />
     </StrictMode>,
-  ))
+  )
+})
   .catch(() => root.render(
     <main className="replay-loading replay-error">Card metadata is unavailable.</main>,
   ))

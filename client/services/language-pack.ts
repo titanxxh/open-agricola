@@ -9,7 +9,7 @@ const pending = new Map<Locale, Promise<void>>()
 const base = `${import.meta.env.BASE_URL}i18n/`
 
 export function loadLanguageManifest(): Promise<LanguageManifest> {
-  manifest ??= fetch(`${base}manifest.json`).then(async response => {
+  manifest ??= fetch(`${base}manifest.json`, { cache: 'no-cache' }).then(async response => {
     if (!response.ok) throw new Error(`Language list unavailable (${response.status})`)
     loadedManifest = parseLanguageManifest(await response.json())
     return loadedManifest
