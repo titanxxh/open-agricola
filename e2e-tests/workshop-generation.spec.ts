@@ -14,6 +14,9 @@ const modelKey = 'browser-only-llm-credential-canary'
 for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and explicit adoption (${locale})`, async ({ page, browser }) => {
   test.setTimeout(90_000)
   if (locale === 'en') await page.setViewportSize({ width: 390, height: 844 })
+  await page.addInitScript(locale => {
+    localStorage.setItem('open-agricola-locale-v2', locale)
+  }, locale)
   const user = await createLocalUserForTests(`editor_${locale}_${Date.now().toString(36)}`, 'editor-test-password')
   const cookie = await createSession(user.id)
   if (!cookie) throw new Error('No local test session')
@@ -23,14 +26,13 @@ for (const locale of ['zh', 'en'] as const) test(`editor candidate recovery and 
   await page.goto(FRONTEND_URL)
   const cardId = `CUSTOM_Editor_${locale}_${Date.now()}`
   const name = 'Editor Tool Test'
-  const id = await page.evaluate(async ({ cardId, name, modelKey, locale }) => {
-    localStorage.setItem('open-agricola-locale-v2', locale)
+  const id = await page.evaluate(async ({ cardId, name, modelKey }) => {
     localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: modelKey, model: 'deepseek-flash' }))
     const response = await fetch('/api/workshop/cards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ card_id: cardId, card_type: 'minor', name, description: '', card_json: { id: cardId, card_type: 'minor', name, cost: { wood: 2 }, desc: [] }, status: 'draft' }) })
     const data = await response.json()
     if (!response.ok || !data.id) throw new Error(JSON.stringify(data))
     return data.id as string
-  }, { cardId, name, modelKey, locale })
+  }, { cardId, name, modelKey })
   const source = (amount: number, bad = false) => `const CARD_ID = '${cardId}'; const CARD_DEF = { cardType: 'minor', meta: { id: CARD_ID, name: '${name}', cost: { wood: 2 }, desc: ['Gain ${amount} food.'] } }; const CARD_IMPL = { effect: { onBuy: () => ${bad ? `({ type: 'seq', items: [gainLeaf(CARD_ID, { food: ${amount} })] })` : `gainLeaf(CARD_ID, { food: ${amount} })`} } };`
   const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = []
   let fail = false
