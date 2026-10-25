@@ -29,7 +29,8 @@ test('season occupants and borrowed card owners localize generated names', async
   }]
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   await page.goto(sandboxUrl, { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('.seasons-board__worker')).toHaveText('玩家 2')
+  await expect(page.locator('.seasons-board__worker')).toHaveAccessibleName('玩家 2')
+  await expect(page.locator('.seasons-board__worker')).toHaveAttribute('title', '玩家 2')
   await expect(page.locator('.borrowed-played-card-owner')).toHaveText('玩家 2')
   await expect(page.locator('.player-tabs__name').first()).toContainText('Player 2')
 })

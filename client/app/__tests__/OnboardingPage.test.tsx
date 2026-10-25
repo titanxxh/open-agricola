@@ -78,7 +78,7 @@ describe('OnboardingPage', () => {
 
     render(<OnboardingPage />)
 
-    expect(screen.getByRole('link', { name: '返回大厅' }))
+    expect(screen.getByRole('link', { name: /返回大厅/ }))
       .toHaveTextContent('Open Agricola')
     expect(screen.getByRole('heading', { name: '完成注册' })).toBeVisible()
   })

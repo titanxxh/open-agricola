@@ -114,7 +114,7 @@ const confirmAlice = async (user: ReturnType<typeof userEvent.setup>) => {
 }
 const selectBob = async (user: ReturnType<typeof userEvent.setup>, mobile = false) => {
   if (mobile) {
-    await user.click(screen.getByRole('button', { name: 'Switch player view' }))
+    await user.click(screen.getByRole('button', { name: /Switch player view/ }))
     await user.click(within(screen.getByRole('listbox')).getByRole('option', { name: /Bob/ }))
   } else {
     await user.click(screen.getByRole('tab', { name: /Bob/ }))
@@ -304,11 +304,11 @@ describe('hotseat public farm browsing', () => {
     const { container } = renderGame()
     await confirmAlice(user)
     await selectBob(user, true)
-    expect(screen.getByRole('button', { name: 'Switch player view' })).toHaveTextContent('Bob')
+    expect(screen.getByRole('button', { name: /Switch player view/ })).toHaveTextContent('Bob')
     expect(container.querySelector('[data-farm-tile-player="p2"].field')).toBeVisible()
     expect(container.querySelector('[data-hand-anchor]')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Return to Alice to continue' }))
-    expect(screen.getByRole('button', { name: 'Switch player view' })).toHaveTextContent('Alice')
+    expect(screen.getByRole('button', { name: /Switch player view/ })).toHaveTextContent('Alice')
     expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
     expect(ruleCommands()).toEqual([])
   })

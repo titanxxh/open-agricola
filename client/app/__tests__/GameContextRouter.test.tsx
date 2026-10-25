@@ -417,7 +417,7 @@ describe('GameContextRouter', () => {
     const perspectiveButtons = await screen.findAllByRole('button', {
       name: 'platform.gameContext.watchAs',
     })
-    expect(screen.getByRole('button', { name: 'Display language' }))
+    expect(screen.getByRole('button', { name: /Display language/ }))
       .toBeVisible()
     expect(screen.getByRole('link', { name: 'platform.backToLobbyPlain' }))
       .toBeVisible()

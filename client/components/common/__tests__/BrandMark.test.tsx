@@ -16,7 +16,7 @@ describe('BrandMark', () => {
       />,
     )
 
-    const link = screen.getByRole('link', { name: 'Back to Lobby' })
+    const link = screen.getByRole('link', { name: 'Open Agricola: Back to Lobby' })
     expect(link).toHaveAttribute('href', import.meta.env.BASE_URL)
     expect(link).toHaveAttribute('title', 'Back to Lobby')
     expect(link).toHaveTextContent('Open Agricola')
@@ -31,7 +31,7 @@ describe('BrandMark', () => {
 
     render(<BrandMark title="Open Agricola" homeLinkLabel="Back to Lobby" />)
 
-    expect(screen.getByRole('link', { name: 'Back to Lobby' }))
+    expect(screen.getByRole('link', { name: 'Open Agricola: Back to Lobby' }))
       .toHaveAttribute('href', '/open-agricola/?bugReport=draft-1')
   })
 })

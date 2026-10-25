@@ -181,7 +181,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />)
 
-    const link = screen.getByRole('link', { name: '返回大厅' })
+    const link = screen.getByRole('link', { name: /返回大厅/ })
     expect(link).toHaveTextContent('Open Agricola')
     expect(link).toHaveAttribute('href', import.meta.env.BASE_URL)
   })

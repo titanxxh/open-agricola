@@ -196,9 +196,9 @@ describe('GameHeader', () => {
       </LocaleProvider>,
     )
 
-    expect(screen.getByRole('link', { name: 'Back to Lobby' }))
+    expect(screen.getByRole('link', { name: 'Open Agricola: Back to Lobby' }))
       .toHaveTextContent('Open Agricola')
-    expect(screen.queryByRole('button', { name: 'Back to Lobby' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Back to Lobby/ })).toBeNull()
 
     rerender(
       <LocaleProvider>
@@ -215,6 +215,6 @@ describe('GameHeader', () => {
       </LocaleProvider>,
     )
 
-    expect(screen.queryByRole('link', { name: 'Back to Lobby' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Back to Lobby/ })).toBeNull()
   })
 })

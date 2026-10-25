@@ -789,18 +789,22 @@ function ArtPanel({
             <span>{candidates.length} / 3</span>
           </div>
           <div className="aicw-art-candidates">
-            {candidates.map(candidate => (
-              <button
-                type="button"
-                key={candidate.id}
-                className={selectedCandidate?.id === candidate.id ? 'is-selected' : ''}
-                onClick={() => onCandidateSelected(candidate.id)}
-                aria-label={`${translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.view_art_candidate_d94c79")} ${candidate.id}`}
-              >
-                <img src={resolveCardArtUrl(candidate.resultUrl, API_BASE)} alt="" />
-                <span>{candidate.model ?? candidate.provider ?? (translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.unknown_model_9ea4ae"))}</span>
-              </button>
-            ))}
+            {candidates.map(candidate => {
+              const candidateLabel = candidate.model ?? candidate.provider
+                ?? translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.unknown_model_9ea4ae")
+              return (
+                <button
+                  type="button"
+                  key={candidate.id}
+                  className={selectedCandidate?.id === candidate.id ? 'is-selected' : ''}
+                  onClick={() => onCandidateSelected(candidate.id)}
+                  aria-label={`${translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.view_art_candidate_d94c79")} ${candidate.id}: ${candidateLabel}`}
+                >
+                  <img src={resolveCardArtUrl(candidate.resultUrl, API_BASE)} alt="" />
+                  <span>{candidateLabel}</span>
+                </button>
+              )
+            })}
           </div>
           {selectedCandidate && (
             <div className="aicw-art-review">

@@ -63,7 +63,7 @@ export function SelectButton<T extends string>({
       <button
         type="button"
         className="select-button__trigger"
-        aria-label={ariaLabel}
+        aria-label={ariaLabel && label ? `${ariaLabel}: ${label}` : ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
