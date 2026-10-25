@@ -60,7 +60,7 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
 })
 
 describe('SeasonsBoard', () => {
-  it.each([true, false])('renders an occupying player by name provenance (%s)', (nameIsDefault) => {
+  it.each([true, false])('renders an occupying worker icon with the localized player name (%s)', (nameIsDefault) => {
     const action = createAction('season-winter-romantic-evening', 'actions.season-winter-romantic-evening.name')
     action.takenBy = [{ playerId: 'p2', workerId: '1' }]
     const { container } = render(<SeasonsBoard locale="zh"
@@ -68,7 +68,25 @@ describe('SeasonsBoard', () => {
       seasonActions={[action]} players={[createPlayer('p1', 'Player 2', 'red'),
         { ...createPlayer('p2', 'Player 2', 'blue'), nameIsDefault }]}
       canTakeAction={() => false} takeAction={vi.fn()} />)
-    expect(container.querySelector('.seasons-board__worker')).toHaveTextContent(nameIsDefault ? '玩家 2' : 'Player 2')
+    const marker = container.querySelector('.seasons-board__worker')
+    expect(marker?.querySelector('.action-farmer-blue')).toBeInTheDocument()
+    expect(marker?.textContent).toBe('')
+    expect(marker).toHaveAccessibleName(nameIsDefault ? '玩家 2' : 'Player 2')
+    expect(marker).toHaveAttribute('title', nameIsDefault ? '玩家 2' : 'Player 2')
+  })
+
+  it.each([true, false])('matches the placed worker newborn status (%s)', (isNewborn) => {
+    const action = createAction('season-autumn-thanksgiving', 'actions.season-autumn-thanksgiving.name')
+    action.takenBy = [{ playerId: 'p1', workerId: '1' }]
+    const player = createPlayer('p1', 'Blue player', 'blue')
+    player.workers[0]!.isNewborn = isNewborn
+    const { container } = render(<SeasonsBoard locale="en"
+      throughTheSeasons={{ startSeason: 'autumn', currentSeason: 'autumn' }}
+      seasonActions={[action]} players={[player]}
+      canTakeAction={() => false} takeAction={vi.fn()} />)
+    const icon = container.querySelector('.seasons-board__worker .action-farmer-blue')
+    expect(icon).toBeInTheDocument()
+    expect(icon?.classList.contains('child')).toBe(isNewborn)
   })
   it.each([['winter', '冬'], ['spring', '春'], ['summer', '夏'], ['autumn', '秋']] as const)(
     'localizes the %s season token', (season, label) => {
