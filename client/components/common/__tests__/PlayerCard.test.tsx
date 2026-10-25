@@ -302,6 +302,24 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('Debug Mallet')
     expect(html).toContain('Gain 1 wood.')
     expect(html).toContain('data-id="CUSTOM_DebugMallet"')
+    expect(html).toContain('data-numbering="O001"')
+    expect(html).not.toContain('data-deck="C"')
+    expect(html).not.toContain('/assets/revised/')
+  })
+
+  it.each(['CUSTOM_', 'CUSTOM_NoImage', '', 'PreviewCard'])('renders unnumbered preview %s without inventing official card art', (cardId) => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId={cardId} cardType="minor" cardMeta={{
+        id: cardId, name: 'Unillustrated preview', deck: 'CUSTOM', number: 0,
+        desc: ['Gain 1 wood.'],
+      }} />,
+    )
+
+    expect(html).toContain('Unillustrated preview')
+    expect(html).toContain('Gain 1 wood.')
+    expect(html).not.toContain('background-image:')
+    expect(html).not.toContain('data-deck="C"')
+    expect(html).not.toContain('O000')
   })
 
   it('renders published community art and card-local Chinese metadata', () => {
@@ -382,7 +400,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     )
 
     expect(html).not.toContain('attacker.example')
-    expect(html).toContain('/assets/revised/')
+    expect(html).not.toContain('background-image:')
   })
 
   it('renders C54 stable printed cost from card metadata', async () => {
@@ -445,6 +463,9 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   })
 
   it('routes all public card art through the pinned source', () => {
+    const revised = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="C112_Thresher" cardType="occupation" />,
+    )
     const moorMajor = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_HorseSlaughterhouse1" cardType="major" />,
     )
@@ -455,6 +476,8 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
       <PlayerCard locale="en" cardId="A169_OffSiter" cardType="occupation" />,
     )
 
+    expect(revised).toContain(publicAssetUrl('/assets/revised/deckC/C112.png'))
+    expect(revised).toContain('data-deck="C"')
     expect(moorMajor).toContain(publicAssetUrl('/assets/moor/major/M001.png'))
     expect(moorMinor).toContain(publicAssetUrl('/assets/moor/minor/M068.png'))
     expect(player56).toContain(publicAssetUrl('/assets/player56/A169.png'))
