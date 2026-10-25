@@ -63,7 +63,7 @@ for (const width of [320, 390, 768, 1920]) {
       const card = await played.boundingBox()
       expect(card!.width).toBeGreaterThanOrEqual(60)
       expect(card!.height).toBeCloseTo(card!.width, 0)
-      expect(await played.ariaSnapshot()).toContain('将当前回合数加2')
+      expect(await played.ariaSnapshot()).toContain('将当前轮次数加2')
       await played.tap()
       await expect(page.locator('.card-hover-preview')).toHaveCount(0)
       await page.keyboard.press('Tab')
