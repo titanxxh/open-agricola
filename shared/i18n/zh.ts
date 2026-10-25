@@ -47,6 +47,7 @@ export const zh = {
     statusGameOver: '游戏结束',
     statusRoundReady: '可结算回合',
     statusWaiting: '等待行动',
+    waitingForPlayerAction: '等待{player}行动',
     actionArea: '行动区',
     enlargeActionBoard: '放大行动区',
     fitActionBoard: '显示完整版图',

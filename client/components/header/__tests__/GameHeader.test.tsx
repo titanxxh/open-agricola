@@ -32,9 +32,9 @@ const snakeOpeningState = (overrides: Partial<GameState> = {}): GameState => ({
   snakeOpening: { reversed: false },
   roundFirstPlayerId: 'p2',
   players: [
-    { id: 'p1', name: 'Alice' },
-    { id: 'p2', name: 'Bob' },
-    { id: 'p3', name: 'Cara' },
+    { id: 'p1', name: 'Alice', color: 'red' },
+    { id: 'p2', name: 'Bob', color: 'blue' },
+    { id: 'p3', name: 'Cara', color: 'yellow' },
   ],
   ...overrides,
 } as unknown as GameState)
@@ -93,7 +93,8 @@ describe('GameHeader snake opening pill', () => {
     game.players[1]!.nameIsDefault = true
     game.players[2]!.name = 'PlayerF'
     const { container } = renderHeader(game, 'zh')
-    expect(container.querySelector('.waiting-turn')).toHaveTextContent('玩家 2')
+    expect(container.querySelector('.waiting-turn')).toHaveTextContent('等待玩家 2行动')
+    expect(container.querySelector('.waiting-turn')).toHaveStyle({ backgroundColor: 'rgb(0, 0, 255)' })
     expect(screen.getByRole('tooltip')).toHaveTextContent('玩家 2 → PlayerF → 玩家 1')
     expect(screen.getByRole('tooltip')).toHaveTextContent('玩家 1 → PlayerF → 玩家 2')
   })
@@ -103,13 +104,14 @@ describe('GameHeader snake opening pill', () => {
     game.players[1]!.name = 'Player 6'
     game.players[1]!.nameIsDefault = false
     const { container } = renderHeader(game, 'zh')
-    expect(container.querySelector('.waiting-turn')).toHaveTextContent('Player 6')
+    expect(container.querySelector('.waiting-turn')).toHaveTextContent('等待Player 6行动')
     expect(screen.getByRole('tooltip')).toHaveTextContent('Player 6 → Cara → Alice')
   })
 
   it('shows the round-1 pill with both placement orders when the variant is enabled', () => {
     renderHeader(snakeOpeningState())
 
+    expect(screen.getByText('Waiting for Bob to act')).toHaveStyle({ backgroundColor: 'rgb(0, 0, 255)' })
     const pill = screen.getByText('Snake opening')
     expect(pill).toHaveClass('header-snake-pill')
     expect(pill).toHaveAttribute('tabindex', '0')

@@ -746,8 +746,10 @@
   animation: pulse-badge 1.5s ease-in-out infinite;
 }
 .status-badge.waiting-turn {
-  background: #e2e8f0;
-  color: #4a5568;
+  color: #fff;
+}
+.status-badge.waiting-turn[data-player-color="yellow"] {
+  color: #211805;
 }
 .status-badge.game-over {
   background: #c53030;

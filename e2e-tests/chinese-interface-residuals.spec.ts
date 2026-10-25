@@ -46,9 +46,11 @@ test('WebSocket default names remain localized through development joins and rel
       await expect(game).toContainText('玩家 2')
       await expect(game).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
     }
-    await expect(guest.locator('.waiting-turn')).toHaveText('玩家 1')
+    await expect(guest.locator('.waiting-turn')).toHaveText('等待玩家 1行动')
+    await expect(guest.locator('.waiting-turn')).toHaveCSS('background-color', 'rgb(255, 0, 0)')
+    await expect(guest.locator('.waiting-turn')).toHaveCSS('color', 'rgb(255, 255, 255)')
     await guest.reload({ waitUntil: 'domcontentloaded' })
-    await expect(guest.locator('.waiting-turn')).toHaveText('玩家 1')
+    await expect(guest.locator('.waiting-turn')).toHaveText('等待玩家 1行动')
     await expect(guest.locator('.game-layout')).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
   } finally {
     await guestContext.close()
