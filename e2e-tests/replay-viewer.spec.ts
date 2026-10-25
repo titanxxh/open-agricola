@@ -166,7 +166,7 @@ for (const requestedLocale of [null, 'unknown-language']) {
     await page.goto(url.href)
     await expect(page.locator('.replay-kicker')).toHaveText('Game Archive')
     await page.setViewportSize({ width: 390, height: 844 })
-    await expect(page.getByRole('button', { name: 'Switch player view', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Switch player view:/ })).toBeVisible()
     await expect(page.locator('.replay-app')).not.toContainText('ui.copy.')
   })
 }

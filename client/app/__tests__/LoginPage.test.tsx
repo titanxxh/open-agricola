@@ -103,7 +103,7 @@ describe('LoginPage auth UI', () => {
 
     render(<LoginPage />)
 
-    expect(screen.getByRole('link', { name: '返回大厅' }))
+    expect(screen.getByRole('link', { name: /返回大厅/ }))
       .toHaveAttribute('href', '/')
   })
 

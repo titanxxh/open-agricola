@@ -20,7 +20,7 @@ describe('GameLoadScreen', () => {
   it('keeps a native home link available while loading', () => {
     render(<GameLoadScreen percent={20} label="Loading" />)
 
-    expect(screen.getByRole('link', { name: 'Back to Lobby' }))
+    expect(screen.getByRole('link', { name: 'Open Agricola: Back to Lobby' }))
       .toHaveAttribute('href', '/')
   })
 
@@ -29,7 +29,7 @@ describe('GameLoadScreen', () => {
 
     render(<GameLoadScreen percent={20} label="Loading" />)
 
-    expect(screen.queryByRole('link', { name: 'Back to Lobby' }))
+    expect(screen.queryByRole('link', { name: /Back to Lobby/ }))
       .not.toBeInTheDocument()
     expect(screen.queryByText('Open Agricola')).not.toBeInTheDocument()
   })
@@ -43,7 +43,7 @@ describe('GameLoadScreen', () => {
       />,
     )
 
-    expect(screen.queryByRole('link', { name: 'Back to Lobby' }))
+    expect(screen.queryByRole('link', { name: /Back to Lobby/ }))
       .not.toBeInTheDocument()
   })
 })

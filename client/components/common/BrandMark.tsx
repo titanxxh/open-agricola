@@ -36,7 +36,7 @@ export function BrandMark({
       <a
         className={`brand-mark brand-mark-home ${className}`.trim()}
         href={buildPlatformPageUrl('lobby')}
-        aria-label={homeLinkLabel}
+        aria-label={`${title}: ${homeLinkLabel}`}
         title={homeLinkLabel}
       >
         {content}

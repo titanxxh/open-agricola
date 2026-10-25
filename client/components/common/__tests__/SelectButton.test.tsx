@@ -13,6 +13,19 @@ describe('SelectButton', () => {
   it('renders the current value in the trigger', () => {
     render(<SelectButton value="zh" options={OPTIONS as any} onChange={() => {}} />)
     expect(screen.getByRole('button')).toHaveTextContent('中文')
+    expect(screen.getByRole('button')).toHaveAccessibleName('中文')
+  })
+
+  it('keeps the selected value in its contextual accessible name when the value changes', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<SelectButton value="zh" options={[...OPTIONS]}
+      onChange={onChange} ariaLabel="界面语言" />)
+    const trigger = screen.getByRole('button')
+    expect(trigger).toHaveAccessibleName('界面语言: 中文')
+    rerender(<SelectButton value="en" options={[...OPTIONS]}
+      onChange={onChange} ariaLabel="界面语言" />)
+    expect(trigger).toHaveTextContent('English')
+    expect(trigger).toHaveAccessibleName('界面语言: English')
   })
 
   it('opens the popover on click', async () => {

@@ -122,7 +122,7 @@ describe('LobbyPage player count selection', () => {
 
     render(<LobbyPage />)
 
-    const link = screen.getByRole('link', { name: 'Back to Lobby' })
+    const link = screen.getByRole('link', { name: 'Open Agricola: Back to Lobby' })
     expect(link).toHaveTextContent('Open Agricola')
     expect(link).toHaveAttribute('href', import.meta.env.BASE_URL)
   })
