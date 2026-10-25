@@ -52,7 +52,7 @@ describe('AnytimeBar', () => {
       />,
     )
 
-    expect(html).toContain('播种者')
+    expect(html).toContain('播种工')
     expect(html).toContain('res-icon-reed')
     expect(html).toContain('选择一项')
     expect(html).toContain('播种')

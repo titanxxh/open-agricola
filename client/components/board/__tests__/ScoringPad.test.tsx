@@ -361,7 +361,7 @@ describe('ScoringPad', () => {
       />,
     )
 
-    expect(screen.getByText('苦役监工')).toBeInTheDocument()
+    expect(screen.getByText('劳务士官')).toBeInTheDocument()
     expect(screen.queryByText('Drudgery Reeve')).toBeNull()
   })
 })
