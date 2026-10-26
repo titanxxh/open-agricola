@@ -193,6 +193,13 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 
   it.each([
     [
+      'M027_GardenPath',
+      'minor' as const,
+      'You immediately get 3',
+      'The previous holder no longer has it.',
+      '原持有者不再保留',
+    ],
+    [
       'C022_BasketChair',
       'minor' as const,
       'When you play this card',

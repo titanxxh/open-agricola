@@ -14,6 +14,7 @@ const isPublicCardMarker = (value: unknown): value is PublicCardMarker => {
   const marker = value as Partial<PublicCardMarker>
   return typeof marker.id === 'string' &&
     typeof marker.label === 'string' &&
+    (marker.labelKey === undefined || typeof marker.labelKey === 'string') &&
     typeof marker.sourceCardId === 'string' &&
     (marker.score === undefined || typeof marker.score === 'number') &&
     (marker.sourcePlayerId === undefined || typeof marker.sourcePlayerId === 'string')
