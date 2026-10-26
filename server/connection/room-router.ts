@@ -794,13 +794,9 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   const previousNames = room.session.state.players.map((player, index) => [index, player.nameIsDefault ? '' : player.name] as [number, string])
   ctx.currentRoom = room
   ctx.currentPlayerIndex = seat.playerIndex
-  const requestedName = typeof (msg as Record<string, unknown>).name === 'string'
-    ? (msg as Record<string, unknown>).name as string
-    : ''
+  const requestedName = typeof msg.name === 'string' ? msg.name.trim() : ''
   const currentPlayer = room.session.state.players[ctx.currentPlayerIndex]
-  const name = wasPlaying && typeof msg.name !== 'string'
-    ? currentPlayer?.nameIsDefault ? '' : currentPlayer?.name ?? requestedName
-    : requestedName
+  const name = requestedName || (currentPlayer?.nameIsDefault ? '' : currentPlayer?.name ?? '')
   const replacedPlayer = seat.replacedExistingPlayer
     ? room.players.find(
       (player) => player.playerIndex === ctx.currentPlayerIndex,

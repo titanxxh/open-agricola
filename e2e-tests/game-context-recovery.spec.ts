@@ -5,6 +5,7 @@ import {
   type APIResponse,
   type BrowserContext,
   type Page,
+  type WebSocketRoute,
 } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 
@@ -188,6 +189,10 @@ test('waiting room shows every seat, authoritative colors, names, and reconnecti
     await expect(host.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', 'purple')
 
     let guest = await guestContext.newPage()
+    const guestSockets: Array<{ client: WebSocketRoute; server: WebSocketRoute }> = []
+    await guest.routeWebSocket('**/ws', socket => {
+      guestSockets.push({ client: socket, server: socket.connectToServer() })
+    })
     await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
     await expect(host.locator('.ws-waiting-count')).toContainText('2 / 6')
     await expect(seats.nth(1)).toContainText(guestName)
@@ -199,6 +204,16 @@ test('waiting room shows every seat, authoritative colors, names, and reconnecti
     await expect(host.locator('.ws-color-option[data-player-color=green]')).toBeDisabled()
     expect(await host.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await host.screenshot({ path: 'output/waiting-room-mobile.png', fullPage: true })
+
+    const guestSocket = guestSockets.at(-1)
+    if (!guestSocket) throw new Error('waiting guest WebSocket was not connected')
+    await guestSocket.client.close({ code: 1012, reason: 'waiting room reconnect test' })
+    await guestSocket.server.close({ code: 1012, reason: 'waiting room reconnect test' })
+    await expect.poll(() => guestSockets.length).toBeGreaterThan(1)
+    await expect(guest.locator('.ws-invite-player').nth(1)).toContainText(guestName)
+    await expect(seats.nth(1)).toContainText(guestName)
+    await expect(seats.nth(1).locator('.ws-seat-offline')).toHaveCount(0)
+    await expect(guest.locator('.ws-invite-player').nth(1)).toHaveAttribute('data-player-color', 'green')
 
     await guest.close()
     await expect(seats.nth(1).locator('.ws-seat-offline')).toBeVisible()

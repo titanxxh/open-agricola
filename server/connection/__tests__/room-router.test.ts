@@ -68,6 +68,43 @@ describe('handleCreateRoom', () => {
     expect(host.currentRoom!.session.state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
   })
 
+  it.each([undefined, '', '   '])('preserves a waiting seat name when resume supplies %s', async (name) => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 3, name: 'Alice' })
+    const room = host.currentRoom!
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    await dispatch(guest, { type: 'joinRoom', roomId: room.id, name: '小大' })
+
+    const resumed = newCtx(deps)
+    resumed.currentUserId = 'u2'
+    await dispatch(resumed, { type: 'joinRoom', roomId: room.id, intent: 'resume', name })
+
+    expect(resumed.currentPlayerIndex).toBe(1)
+    expect(room.status).toBe('waiting')
+    expect(sentMessagesOf(resumed)).toContainEqual(expect.objectContaining({
+      type: 'roomJoined',
+      players: [
+        { playerIndex: 0, name: 'Alice', connected: true },
+        { playerIndex: 1, name: '小大', connected: true },
+      ],
+    }))
+    expect(sentMessagesOf(host).at(-1)).toMatchObject({ type: 'playerJoined', playerIndex: 1, name: '小大' })
+    expect((await host.persistence.load(room.id))?.serialized?.state.players[1]).toMatchObject({ name: '小大', nameIsDefault: false })
+
+    for (const player of room.session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const third = newCtx(deps)
+    third.currentUserId = 'u3'
+    await dispatch(third, { type: 'joinRoom', roomId: room.id, name: 'Carol' })
+    expect(room.status).toBe('playing')
+    expect(room.session.state.players.map(player => player.name)).toEqual(['Alice', '小大', 'Carol'])
+  })
+
   it('creates a room + sets ctx.currentRoom + sends roomCreated', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
