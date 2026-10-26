@@ -5033,7 +5033,7 @@
 }
 .exchange-overlay {
   position: fixed;
-  inset: 0;
+  inset: 0 0 var(--interaction-bar-height, 0px);
   background: rgba(18, 32, 18, 0.45);
   display: flex;
   justify-content: center;
@@ -5046,6 +5046,7 @@
   border-radius: 16px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
   width: min(640px, 94vw);
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -5075,6 +5076,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
 }
 .exchange-options {
   display: flex;
