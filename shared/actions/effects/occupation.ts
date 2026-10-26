@@ -1,5 +1,5 @@
 import type { ActionHookRegistry } from '../hooks'
-import { cardIdentityChoice } from '../helpers/card-choice'
+import { cardIdentityChoice, MAX_DETAILED_CARD_CHOICES } from '../helpers/card-choice'
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ChoiceEffectPreview, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
 import type { CardPayment, EventSink } from '../../contract/events'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
@@ -273,14 +273,14 @@ const mergeResourceReserve = (
   return merged
 }
 
-const buildPlayableOccupationOptions = (
+const playableOccupationCandidates = (
   state: GameState,
   player: PlayerState,
   cost: Partial<PlayerState['resources']>,
   space: ActionSpace,
   actionCardId?: string,
   actionHooks?: ActionHookRegistry,
-): ActionChoiceOption[] =>
+) =>
   player.occupationHand
     .map((id) => getOccupation(id))
     .filter(
@@ -297,13 +297,36 @@ const buildPlayableOccupationOptions = (
         actionHooks,
       ),
     )
-    .flatMap((occupation): ActionChoiceOption[] => {
-      const identity = cardIdentityChoice(occupation.id, 'occupation')
+    .flatMap(occupation => {
       const policy = getOccupationChoicePolicy(state, player, space, occupation.id, cost, actionCardId, actionHooks)
-      if (!policy.doable) return []
-      const effectPreview = describeOccupationActionPayment(state, player, occupation.id, cost, actionCardId, policy.reserveResources, actionHooks)
-      return [{ ...identity, effectPreview, descriptionPreview: { kind: 'action', labelKey: identity.labelKey, effectPreview } }]
+      return policy.doable ? [{ occupation, policy }] : []
     })
+
+const describeOccupationCandidates = (
+  state: GameState,
+  player: PlayerState,
+  cost: Partial<Resource>,
+  actionCardId: string | undefined,
+  actionHooks: ActionHookRegistry | undefined,
+  candidates: ReturnType<typeof playableOccupationCandidates>,
+): ActionChoiceOption[] =>
+  candidates.map(({ occupation, policy }): ActionChoiceOption => {
+    const identity = cardIdentityChoice(occupation.id, 'occupation')
+    const effectPreview = describeOccupationActionPayment(state, player, occupation.id, cost, actionCardId, policy.reserveResources, actionHooks)
+    return { ...identity, effectPreview, descriptionPreview: { kind: 'action', labelKey: identity.labelKey, effectPreview } }
+  })
+
+const buildPlayableOccupationOptions = (
+  state: GameState,
+  player: PlayerState,
+  cost: Partial<Resource>,
+  space: ActionSpace,
+  actionCardId?: string,
+  actionHooks?: ActionHookRegistry,
+): ActionChoiceOption[] => describeOccupationCandidates(
+  state, player, cost, actionCardId, actionHooks,
+  playableOccupationCandidates(state, player, cost, space, actionCardId, actionHooks),
+)
 
 const getOccupationChoicePolicy = (
   state: GameState,
@@ -521,9 +544,11 @@ export const playOccupationAction: ActionDefinition = {
     const cost = getOccupationActionBaseCost(player, space.id, params)
     if (!cost) return undefined
     const allowedCards = (params as { allowedCards?: string[] } | undefined)?.allowedCards
-    const options = buildPlayableOccupationOptions(state, player, cost, space, space.id, actionHooks)
-      .filter(option => !allowedCards || allowedCards.includes(option.value))
-    if (options.length === 0) return undefined
+    const candidates = playableOccupationCandidates(state, player, cost, space, space.id, actionHooks)
+      .filter(candidate => !allowedCards || allowedCards.includes(candidate.occupation.id))
+    if (candidates.length === 0) return undefined
+    if (candidates.length > MAX_DETAILED_CARD_CHOICES) return { kind: 'cardSelection', types: ['occupation'], allowedCards }
+    const options = describeOccupationCandidates(state, player, cost, space.id, actionHooks, candidates)
     if (options.every(option => JSON.stringify(option.effectPreview) === JSON.stringify(options[0]!.effectPreview))) return options[0]!.effectPreview
     return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: options.flatMap(option => option.descriptionPreview ? [option.descriptionPreview] : []) } }
   },

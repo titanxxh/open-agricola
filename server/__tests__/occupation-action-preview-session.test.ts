@@ -6,18 +6,15 @@ import { ensureCardModifiers } from '../../shared/cards/card-modifiers'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { ChoiceEffectPreview } from '../../shared/contract/types'
 
-const actionHooks = new ActionHookRegistry()
-
-import { ActionHookRegistry } from '../../shared/actions/hooks'
-
 const sessions: ReturnType<typeof createWorkSession>[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 const target = 'A123_FrameBuilder'
 const other = 'B121_Geologist'
-const setup = (food = 0, wood = 1, hand = [target]) => {
+const third = 'A124_Knapper'
+const setup = (food = 0, wood = 1, hand = [target], played = ['B109_PaperMaker']) => {
   const session = createWorkSession({ seed: 5109, configure: state => {
     const player = state.players[0]!
-    player.occupationPlayed = ['B109_PaperMaker']
+    player.occupationPlayed = played
     player.occupationHand = hand
     Object.assign(player.resources, { food, wood })
   } })
@@ -30,8 +27,8 @@ const preview = (session: ReturnType<typeof createWorkSession>, params?: Record<
   const space = state.actionSpaces.find(candidate => candidate.id === 'lessons')!
   const registry = new ActionRegistry()
   for (const definition of [...state.actionSpaces, ...createInternalActionDefinitions(id => registry.get(id))]) registry.register(definition)
-  return Engine.fromFlow({ type: 'leaf', actionId: 'occupation', params }, { registry, hooks: new HookDispatcher(actionHooks), log: new LogStore() }, player.id)
-    .describe({ state, player, space, previewMode: base ? 'base' : undefined })
+  return Engine.fromFlow({ type: 'leaf', actionId: 'occupation', params }, { registry, hooks: new HookDispatcher(session.actionHooks), log: new LogStore() }, player.id)
+    .describe({ actionHooks: session.actionHooks, state, player, space, previewMode: base ? 'base' : undefined })
 })
 const paymentPreviews = (effect?: ChoiceEffectPreview): Extract<ChoiceEffectPreview, { kind: 'payment' }>[] => {
   if (effect?.kind === 'payment') return [effect]
@@ -41,6 +38,87 @@ const paymentPreviews = (effect?: ChoiceEffectPreview): Extract<ChoiceEffectPrev
 }
 
 describe('occupation fees come from the actual payment plan', () => {
+  const distinctFees = (count = 3, food = 3) => {
+    const session = setup(food, 0, [target, other, third].slice(0, count), ['A116_WoodCutter'])
+    session.withCtx(() => requireActiveCardRegistry('occupation summary').registerListener({
+      id: 'test-occupation-summary-fees', cardIds: ['A116_WoodCutter'], actions: ['occupation'], phases: ['computeCosts'],
+      handler: context => {
+        const extraFood = [target, other, third].indexOf(context.cardId ?? '')
+        return extraFood > 0 ? { costs: { food: extraFood } } : undefined
+      },
+    }))
+    return session
+  }
+
+  it('summarizes three named fees without losing real card choices or their charges', () => {
+    const session = distinctFees()
+    const before = JSON.stringify(session.state)
+    for (let read = 0; read < 3; read++) expect(preview(session)).toMatchObject({
+      kind: 'action', effectPreview: { kind: 'cardSelection', types: ['occupation'] },
+    })
+    expect(JSON.stringify(session.state)).toBe(before)
+    const response = session.takeAction(0, 'lessons')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Missing occupation choices')
+    expect(response.interaction.request.options.map(option => option.value)).toEqual([target, other, third])
+    expect(response.interaction.request.options.map(option => option.effectPreview)).toMatchObject([
+      { kind: 'payment', resourcesPaid: { food: 1 } }, { kind: 'payment', resourcesPaid: { food: 2 } }, { kind: 'payment', resourcesPaid: { food: 3 } },
+    ])
+    const played = session.resolveChoice(0, third)
+    expect(played.ok, played.error).toBe(true)
+    expect(played.state.players[0]!.occupationPlayed).toEqual(['A116_WoodCutter', third])
+    expect(played.state.players[0]!.occupationHand).toEqual([target, other])
+    expect(played.state.players[0]!.resources.food).toBe(0)
+    expect(played.state.log).toContainEqual(expect.objectContaining({ key: 'log.playOccupation', params: expect.objectContaining({ occupations: third, costResources: { food: 3 } }) }))
+    expect(played.scores?.[0]).toBeDefined()
+  })
+
+  it('keeps two distinct fees detailed and counts only affordable candidates', () => {
+    for (const session of [distinctFees(2), distinctFees(3, 2)]) {
+      expect(preview(session)).toMatchObject({ kind: 'action', effectPreview: { kind: 'rule', description: { kind: 'group', parts: [
+        { labelKey: `occupations.${target}.name`, effectPreview: { resourcesPaid: { food: 1 } } },
+        { labelKey: `occupations.${other}.name`, effectPreview: { resourcesPaid: { food: 2 } } },
+      ] } } })
+    }
+  })
+
+  it('preserves explicit card restrictions in summaries and applies them before counting', () => {
+    const session = distinctFees()
+    expect(preview(session, { allowedCards: [target, other, third] })).toMatchObject({
+      effectPreview: { kind: 'cardSelection', types: ['occupation'], allowedCards: [target, other, third] },
+    })
+    expect(preview(session, { allowedCards: [target, other] })).toMatchObject({ effectPreview: { kind: 'rule', description: { parts: [
+      { labelKey: `occupations.${target}.name` }, { labelKey: `occupations.${other}.name` },
+    ] } } })
+    const empty = preview(session, { allowedCards: [] })
+    expect(empty).toMatchObject({ kind: 'action', labelKey: 'actions.lessons.name' })
+    if (empty?.kind !== 'action') throw new Error('Expected the occupation action')
+    expect(empty.effectPreview).toBeUndefined()
+  })
+
+  it('keeps a shared fee for two cards and summarizes three even when their fees match', () => {
+    const pair = setup(1, 0, [target, other], ['A116_WoodCutter'])
+    expect(preview(pair)).toMatchObject({ effectPreview: { kind: 'payment', resourcesPaid: { food: 1 } } })
+    const trio = setup(1, 0, [target, other, third], ['A116_WoodCutter'])
+    expect(preview(trio)).toMatchObject({ effectPreview: { kind: 'cardSelection', types: ['occupation'] } })
+  })
+
+  it('keeps three payment alternatives for one occupation', () => {
+    const session = setup(2, 2, [target], ['A116_WoodCutter'])
+    session.withCtx(() => {
+      const player = session.state.players[0]!
+      player.minorPlayed = ['A028_ForestSchool']
+      ensureCardModifiers(player, 'A028_ForestSchool')
+    })
+    const description = preview(session, { exactCost: { food: 2 } })
+    if (description?.kind !== 'action') throw new Error('Missing occupation description')
+    const payments = paymentPreviews(description.effectPreview)
+    expect(payments).toHaveLength(3)
+    expect(payments.map(payment => payment.resourcesPaid)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ food: 2, wood: 0 }), expect.objectContaining({ food: 1, wood: 1 }), expect.objectContaining({ food: 0, wood: 2 }),
+    ]))
+  })
+
   it('shows Paper Maker as a before exchange, followed by the actual food payment preview', () => {
     const session = setup(0, 1, [target, other])
     const before = JSON.stringify(session.state)

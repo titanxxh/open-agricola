@@ -867,7 +867,7 @@ export type ChoiceEffectPreview =
   | { kind: 'animalPose'; animal: 'horse'; amount: number; pose: 'lying'; resourcesGained: Partial<Resource> }
   | { kind: 'familyGrowth'; roomRequired: boolean; heldOnCard?: string }
   | { kind: 'harvestFields'; privatePhase: boolean }
-  | { kind: 'cardSelection'; types: ('major' | 'minor')[]; allowedCards?: string[]; resourcesPaid?: Partial<Resource> }
+  | { kind: 'cardSelection'; types: ('major' | 'minor')[] | ['occupation']; allowedCards?: string[]; resourcesPaid?: Partial<Resource> }
   | { kind: 'roundCardSelection'; ranges: readonly { from: number; to?: number; types: readonly ('major' | 'minor')[] }[] }
   | { kind: 'firstMissingResource'; resources: readonly (keyof Resource)[]; amount: number }
   | { kind: 'bakeRecipes'; recipes: { sourceCard: string; exchange: Extract<ChoiceEffectPreview, { kind: 'resourceExchange' }>; quantityLimit: number }[] }

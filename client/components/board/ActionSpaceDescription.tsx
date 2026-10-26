@@ -19,8 +19,8 @@ type HouseType = Extract<RuleCondition, { kind: 'house-type' }>['houseType']
 export const ActionSpaceDescription = ({ locale, preview }: { locale: Locale; preview: ChoiceDescriptionPreview }) => {
   const symbol = (icon: string, label: string) => <span className={`res-icon res-icon-${icon}`} role="img" aria-label={label} title={label} />
   const arrow = <span className="res-icon res-icon-arrow" aria-hidden="true" />
-  const cardTypes = (types: readonly ('major' | 'minor')[]) => types.map((type, index) => <Fragment key={type}>
-    {index > 0 ? ' / ' : null}{symbol(type, t(locale, `ui.improvementKinds.${type}`))}
+  const cardTypes = (types: Readonly<Extract<ChoiceEffectPreview, { kind: 'cardSelection' }>['types']>) => types.map((type, index) => <Fragment key={type}>
+    {index > 0 ? ' / ' : null}{symbol(type, t(locale, type === 'occupation' ? 'actions.occupation.name' : `ui.improvementKinds.${type}`))}
   </Fragment>)
 
   const renderEffect = (effect: ChoiceEffectPreview, labelKey: string, houseType?: HouseType): ReactNode => {
