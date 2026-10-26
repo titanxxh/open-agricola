@@ -251,6 +251,17 @@
   background: #9ca3af;
   cursor: not-allowed;
 }
+.anytime-actions .anytime-exchange-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px;
+}
+.anytime-exchange-button .res-icon-cook {
+  font-size: 16px;
+}
 .anytime-bar--inline {
   flex: 1 1 320px;
   min-width: 0;
@@ -4411,6 +4422,7 @@
 .res-icon-arrow-1x  { width:1.3em; height:0.6em;  background-position:7.09477% 26.3736%; background-size:1750.43%; }
 .res-icon-arrow-2x  { width:1.2em; height:0.6em;  background-position:0.517866% 26.4397%; background-size:1750.43%; }
 .res-icon-bake      { width:1em;   height:1em;    background-position:17.0266% 26.1905%; background-size:3592.98%; }
+.res-icon-cook      { width:2em;   height:1.1em;  background-position:13.3132% 26.2165%; background-size:3150.77%; }
 .res-icon-major   { width:1.1em; height:0.74em; background-position:8.08903% 15.0728%;  background-size:994.175%; }
 .res-icon-minor   { width:1.1em; height:0.74em; background-position:19.7832% 15.0571%; background-size:1008.87%; }
 .res-icon-occupation { width:1.1em; height:0.74em; background-position:31.3279% 15.0571%; background-size:1008.87%; }

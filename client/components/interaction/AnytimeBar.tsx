@@ -28,14 +28,23 @@ export const AnytimeBar = ({
           <button
             key={action.id}
             data-anytime-action-id={action.id}
+            className={action.id === 'exchange' ? 'anytime-exchange-button' : undefined}
+            aria-label={action.id === 'exchange' ? t(locale, 'ui.exchangeCenterTitle') : undefined}
+            title={action.id === 'exchange' ? t(locale, 'ui.exchangeCenterTitle') : undefined}
             onClick={() => takeAnytimeAction(action.id)}
             disabled={!isInteractive}
           >
-            {action.sourceCard && !(action.descriptionPreview?.kind === 'action' && action.descriptionPreview.labelKey === `cards.${action.sourceCard}.name` && !action.descriptionPreview.effectPreview) ? <span className="anytime-source">{getCardDisplayName(locale, action.sourceCard)}{': '}</span> : null}
-            {action.descriptionPreview ? renderDescriptionPreview(locale, action.descriptionPreview) : translateCardText(
-              locale,
-              action.labelKey,
-              action.labelParams as Record<string, string | number> | undefined,
+            {action.id === 'exchange' ? (
+              <span className="res-icon res-icon-cook" aria-hidden="true" />
+            ) : (
+              <>
+                {action.sourceCard && !(action.descriptionPreview?.kind === 'action' && action.descriptionPreview.labelKey === `cards.${action.sourceCard}.name` && !action.descriptionPreview.effectPreview) ? <span className="anytime-source">{getCardDisplayName(locale, action.sourceCard)}{': '}</span> : null}
+                {action.descriptionPreview ? renderDescriptionPreview(locale, action.descriptionPreview) : translateCardText(
+                  locale,
+                  action.labelKey,
+                  action.labelParams as Record<string, string | number> | undefined,
+                )}
+              </>
             )}
           </button>
         ))}
