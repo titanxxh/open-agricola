@@ -111,7 +111,7 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
     await expect(buy.getByRole('img', { name: '2 Food', exact: true })).toBeVisible()
     await expect(pages[0]!.locator('.interaction-bar [data-choice-value="buy"]')).toHaveCount(0)
     if (index === 1) {
-      await current.locator('.anytime-bar').getByRole('button').filter({ hasText: /Exchange|Convert/i }).first().click()
+      await current.locator('[data-anytime-action-id="exchange"]').click()
       const recipe = current.getByTestId('anytime-exchange-option-Major_Fireplace1-ex0')
       await expect(recipe).toBeVisible()
       await recipe.getByRole('button', { name: '+', exact: true }).click()

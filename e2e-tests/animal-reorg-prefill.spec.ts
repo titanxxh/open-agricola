@@ -24,7 +24,7 @@ for (const destination of ['stone', 'boar']) {
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     await page.locator('.action-card').filter({ hasText: 'Sheep Market' }).click()
     await expect(page.locator('.interaction-reorg-panel')).toBeVisible()
-    await page.locator('.anytime-bar').getByRole('button').filter({ hasText: /Exchange|Convert/i }).first().click()
+    await page.locator('[data-anytime-action-id="exchange"]').click()
     const recipe = page.getByTestId(`anytime-exchange-option-B104_SheepWalker-ex${destination === 'boar' ? 0 : 2}`)
     await expect(recipe).toBeVisible()
     const add = recipe.getByRole('button', { name: '+', exact: true })
