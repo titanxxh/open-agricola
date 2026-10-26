@@ -92,6 +92,44 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 1440, height: 900 
     await hand.locator('[data-card-anchor="A076_Cob"]').click()
     await expect(page.locator('.played-cards [data-card-anchor="A076_Cob"]')).toBeVisible()
   })
+
+  for (const count of [2, 3]) {
+    test(`an improvement offer shows ${count === 3 ? 'a summary' : 'details'} for ${count} cards at ${viewport.width}px`, async ({ page, request }) => {
+      await page.setViewportSize(viewport)
+      const cards = ['A053_Claypipe', 'A076_Cob', 'B065_GrainDepot'].slice(0, count)
+      await openGame(page, request, state => {
+        state.players[0]!.minorHand = cards
+        Object.assign(state.players[0]!.resources, { wood: 4, clay: 4, stone: 4, food: 4 })
+      })
+      await page.locator('[data-action-id="meeting-place"] button').first().click()
+      const bar = page.locator('.interaction-bar')
+      const offer = bar.locator('[data-choice-value^="action-improvement-"]')
+      if (count === 3) {
+        await expect(offer).toContainText('Choose a minor improvement')
+        await expect(offer.locator('[data-resource]')).toHaveCount(0)
+        await expect(offer).not.toContainText('Grain Depot')
+      } else {
+        await expect(offer).toContainText('Claypipe')
+        await expect(offer).toContainText('Cob')
+        await expect(offer.locator('[data-resource="clay"][data-amount="1"]')).toBeVisible()
+      }
+      await page.screenshot({ path: `output/playwright/improvement-offer-${count}-cards-${viewport.width}.png`, fullPage: true })
+      await offer.click()
+      for (const id of cards) await expect(bar.locator(`[data-choice-value="${id}"]`)).toBeVisible()
+      if (count === 3) {
+        const depot = bar.locator('[data-choice-value="B065_GrainDepot"]')
+        for (const resource of ['wood', 'clay', 'stone']) {
+          await expect(depot.locator(`[data-resource="${resource}"][data-amount="2"]`)).toBeVisible()
+        }
+        await depot.click()
+        const payments = bar.locator('[data-choice-value^="pay:improvement:minor:B065_GrainDepot:"]')
+        await expect(payments).toHaveCount(3)
+        await page.screenshot({ path: `output/playwright/improvement-payment-after-summary-${viewport.width}.png`, fullPage: true })
+        await payments.filter({ has: page.locator('[data-resource="clay"][data-amount="2"]') }).click()
+        await expect(page.locator('.played-cards [data-card-anchor="B065_GrainDepot"]')).toBeVisible()
+      }
+    })
+  }
 }
 
 test('a two-player supply keeps covered cards unavailable and empty choices out of the purchase flow', async ({ page, request }) => {
