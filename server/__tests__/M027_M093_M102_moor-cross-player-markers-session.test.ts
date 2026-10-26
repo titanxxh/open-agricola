@@ -153,6 +153,7 @@ describe('FoM M027/M093/M102 cross-player markers and transfers', () => {
       {
         id: 'garden-path',
         label: 'Garden Path',
+        labelKey: 'cardFaces.M027_GardenPath.name',
         score: -1,
         sourceCardId: M027,
         sourcePlayerId: owner.id,

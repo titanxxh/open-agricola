@@ -10,6 +10,7 @@ export type CardRuleContributions = {
 export type PublicCardMarker = {
   id: string
   label: string
+  labelKey?: string
   sourceCardId: string
   score?: number
   sourcePlayerId?: string

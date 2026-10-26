@@ -59,13 +59,7 @@ type FarmTerrainMarker = {
   workerId?: string
   sourceCard?: string
 }
-type PublicCardMarkerDisplay = {
-  id: string
-  label: string
-  sourceCardId: string
-  score?: number
-  cardId: string
-}
+type PublicCardMarkerDisplay = NonNullable<CardStatePresentation['publicCardMarkers']>[number] & { cardId: string }
 type ParentCardDisplay = {
   id: ParentCardId
   infobox?: string
@@ -1215,19 +1209,23 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
           {publicCardMarkers.length > 0 ? (<>
             <span className="res-compact-divider" />
             <span className="player-public-card-markers" data-testid="player-public-card-markers">
-              {publicCardMarkers.map((marker) => (
-                <span
-                  key={`${marker.cardId}-${marker.id}`}
-                  className="public-card-marker"
-                  data-testid={`public-card-marker-${marker.sourceCardId}-${marker.id}`}
-                  title={marker.score ? `${marker.label} ${marker.score > 0 ? '+' : ''}${marker.score}` : marker.label}
-                >
-                  <span className="public-card-marker-label">{marker.label}</span>
-                  {marker.score ? (
-                    <span className="public-card-marker-score">{marker.score > 0 ? `+${marker.score}` : marker.score}</span>
-                  ) : null}
-                </span>
-              ))}
+              {publicCardMarkers.map((marker) => {
+                const translated = marker.labelKey ? t(locale, marker.labelKey) : marker.label
+                const label = translated === marker.labelKey ? marker.label : translated
+                return (
+                  <span
+                    key={`${marker.cardId}-${marker.id}`}
+                    className="public-card-marker"
+                    data-testid={`public-card-marker-${marker.sourceCardId}-${marker.id}`}
+                    title={marker.score ? `${label} ${marker.score > 0 ? '+' : ''}${marker.score}` : label}
+                  >
+                    <span className="public-card-marker-label">{label}</span>
+                    {marker.score ? (
+                      <span className="public-card-marker-score">{marker.score > 0 ? `+${marker.score}` : marker.score}</span>
+                    ) : null}
+                  </span>
+                )
+              })}
             </span>
           </>) : null}
         </div>

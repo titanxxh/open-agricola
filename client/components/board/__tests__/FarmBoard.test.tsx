@@ -569,7 +569,12 @@ describe('FarmBoard', () => {
     expect(htmlWithout).not.toContain('farm-terrain-marker-M053_ForestHut')
   })
 
-  it('renders public card markers in the player summary area', () => {
+  it.each([
+    { locale: 'en', labelKey: undefined, expectedLabel: 'Garden Path' },
+    { locale: 'en', labelKey: 'cardFaces.M027_GardenPath.name', expectedLabel: 'Garden Path' },
+    { locale: 'zh', labelKey: 'cardFaces.M027_GardenPath.name', expectedLabel: '花园小径' },
+    { locale: 'zh', labelKey: 'missing.marker.name', expectedLabel: 'Garden Path' },
+  ])('renders a public marker with locale=$locale and key=$labelKey', ({ locale, labelKey, expectedLabel }) => {
     const player = createPlayer('p1', 'Player A', 'red')
     player.cardStates = {
       M027_GardenPath: {
@@ -580,6 +585,7 @@ describe('FarmBoard', () => {
           publicCardMarkers: [{
             id: 'garden-path',
             label: 'Garden Path',
+            labelKey,
             score: -1,
             sourceCardId: 'M027_GardenPath',
             sourcePlayerId: 'p2',
@@ -589,12 +595,13 @@ describe('FarmBoard', () => {
     }
 
     const html = renderToStaticMarkup(
-      <FarmBoard {...createFarmBoardProps(player)} />,
+      <FarmBoard {...createFarmBoardProps(player, { locale })} />,
     )
 
     expect(html).toContain('data-testid="player-public-card-markers"')
     expect(html).toContain('data-testid="public-card-marker-M027_GardenPath-garden-path"')
-    expect(html).toContain('Garden Path')
+    expect(html).toContain(expectedLabel)
+    expect(html).toContain(`title="${expectedLabel} -1"`)
     expect(html).not.toContain('farm-terrain-marker-M027_GardenPath')
   })
 

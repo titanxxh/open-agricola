@@ -65,6 +65,7 @@ export const normalizeCardStatePresentation = (value: unknown): CardStatePresent
     const data = record(marker)
     if (typeof data?.id !== 'string' || typeof data?.label !== 'string' || typeof data?.sourceCardId !== 'string') return []
     const result: PublicCardMarker = { id: data.id, label: data.label, sourceCardId: data.sourceCardId }
+    if (typeof data.labelKey === 'string') result.labelKey = data.labelKey
     if (typeof data.score === 'number' && Number.isFinite(data.score)) result.score = data.score
     if (typeof data.sourcePlayerId === 'string') result.sourcePlayerId = data.sourcePlayerId
     return [result]

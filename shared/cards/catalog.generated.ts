@@ -13847,6 +13847,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "desc": [
       "You immediately get 3 <WOOD>. The player to your left must immediately place the \"Garden Path\" token in front of them."
     ],
+    "rules": [
+      "During scoring, the player holding the __Garden Path__ token loses 1 <SCORE>. There is only one token: each time this card is played, move it to the player to the left. The previous holder no longer has it."
+    ],
     "cost": {
       "clay": 1
     },
