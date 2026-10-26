@@ -129,7 +129,7 @@ test('C094 drains Potter\'s Yard before Toolbox and preserves both room clients 
   } finally { await Promise.all(pages.map(page => page.close())) }
 })
 
-test('feeding batch reactions survive a pending room reload without repeating the exchange or food payment', async ({ browser, request }) => {
+test('feeding batch reactions survive a pending room reload without repeating the exchange or food payment', async ({ browser, request }, testInfo) => {
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   try {
     await joinRoomClients(pages, request)
@@ -171,6 +171,12 @@ test('feeding batch reactions survive a pending room reload without repeating th
     let current = await assertClientsAgree(pages)
     expect(current.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'feed' } })
     await pages[0].getByTestId('harvest-feed-option-B104_SheepWalker-ex0').getByRole('button', { name: '+', exact: true }).click()
+    await pages[0].setViewportSize({ width: 390, height: 844 })
+    await pages[0].locator('.exchange-confirm').click({ trial: true })
+    await pages[0].screenshot({ path: testInfo.outputPath('feeding-exchange-center-mobile.png') })
+    await pages[0].locator('[data-anytime-action-id="exchange"]').click({ trial: true })
+    await pages[0].setViewportSize({ width: 1920, height: 1080 })
+    await pages[0].screenshot({ path: testInfo.outputPath('feeding-exchange-center.png') })
     await driver.ui(0, () => pages[0].locator('.exchange-confirm').click())
     current = await assertClientsAgree(pages)
     expect(current.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: 'E053_BoarSpear' })
