@@ -225,14 +225,14 @@ Choice Preview 由共享的可执行规则计划派生（[ADR 0024](../adr/0024-
 
 - `effectPreview` 的类型包括 `resourceExchange`、`payment`、`text`、`resourceMovement`、`futureSchedule`、`futureOffers`、`actionSpace`、`cardScore` 和 `fieldContents`，完整集合见 `shared/contract/types.ts` 中的 `ChoiceEffectPreview` union。它们由纯查询 `ActionDefinition.previewEffect` 产生。未来请求与执行共用 `normalizeFutureSchedule`（目标过滤、前缀、条件、费用、房间类型）。`seq(pay, gain[, bonus-vp])` 的预览自动聚合，手写的 pay 与 gain leaf 也一样。
 - `descriptionPreview` 递归描述 flow（`ChoiceDescriptionPreview`）：顺序、互斥与可兼选择、并行顺序、可选性和执行者。`Engine.describe()` 读取可执行 flow 而不推进；`Engine.describeFlow()` 描述独立计划；不透明的原生行动提供纯 `ActionDefinition.flowFactory`，执行也调用它。基础描述不含玩家 modifier，并保留所有条件分支；延后的数量在到期前保留其公式。
-- 改良行动预览最多展开两个最终候选卡选项。超过两个时复用现有 `cardSelection` 简述，保留改良类型与购买限制。真正的选卡和支付请求仍保留完整选项及预览；支付方案数不计入此阈值。该策略由 `shared/actions/effects/improvement.ts` 的生产端统一处理，也适用于嵌套预览。
+- 改良和职业行动预览最多展开两个最终候选卡选项。超过两个时使用 `cardSelection` 简述，保留卡牌类型与限制。其 `types` 允许主要/小改良组合，或单独选择职业。真正的选卡和支付请求仍保留完整选项及预览；支付方案数不计入此阈值。`shared/actions/effects/{improvement,occupation}.ts` 的生产端共用 `helpers/card-choice.ts` 中的阈值，也适用于嵌套预览。职业候选不超过两个时，仍合并相同的支付预览。
 - 可见选项文字来自 `descriptionPreview` 与 `effectPreview`；`choiceLabelKey` 只用于语义覆盖。`special-effect` 从 `params.kind` 提供语义描述，纯展示同步不出现在描述中。
 - 预览描述的是声明的效果，不保证未来条件成立。连续且相同的未来条目合并，其他条目按顺序分别显示。
 - 当前交互选项使用 Interaction Player 与权威支付求解器，包括数量上限与替代支付来源。
 - 农场格选择携带 `ActionChoiceOption.target`（执行者、逻辑田、位置、Card Field 槽）与 `targetCard`；客户端渲染这些事实并提交不透明的值。
 - `collectScheduledEffectPreviews()` 把计划领取、offer、定时规则和义务投影为 `ScheduledEffectPreview`（轮次、阶段、来源、描述、重复次数）。分组只影响展示；按玩家过滤会去除隐藏来源与未翻开的行动身份；rehydrate 会剥离这些投影，它们在并入快照 Frame 前先经过 JSON 边界。
 
-测试：`shared/actions/__tests__/future-schedule-preview.test.ts`、`server/__tests__/anytime-description-session.test.ts`、`server/__tests__/improvement-description-session.test.ts`。
+测试：`shared/actions/__tests__/future-schedule-preview.test.ts`、`server/__tests__/anytime-description-session.test.ts`、`server/__tests__/improvement-description-session.test.ts`、`server/__tests__/occupation-action-preview-session.test.ts`。
 
 ## LogEntry
 

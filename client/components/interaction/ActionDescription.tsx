@@ -125,7 +125,9 @@ export const renderEffectPreview = (
   if (effectPreview.kind === 'resourceSetSelection') return <span>{effectPreview.quantitiesByUse ? t(locale, 'ui.ruleResourceSetByUse', { counts: effectPreview.quantitiesByUse.join(' / '), amount: effectPreview.resourcesPerChoice }) : t(locale, 'ui.ruleResourceSetSelection', { min: effectPreview.minDistinct, max: effectPreview.maxDistinct, amount: effectPreview.resourcesPerChoice })}{': '}{effectPreview.choices.map(resource => t(locale, `resources.${resource}`)).join(', ')}{'; '}{t(locale, 'ui.ruleExtraGain')}{' '}<ResourceLine locale={locale} resources={effectPreview.extraGain} /></span>
   if (effectPreview.kind === 'familyGrowth') return <span>{t(locale, effectPreview.roomRequired ? 'ui.ruleGrowthRoomRequired' : 'ui.ruleGrowthWithoutRoom')}{effectPreview.heldOnCard ? ` (${t(locale, 'ui.ruleNewbornHeldOnCard', { card: getCardDisplayName(locale, effectPreview.heldOnCard) })})` : ''}</span>
   if (effectPreview.kind === 'harvestFields') return t(locale, effectPreview.privatePhase ? 'ui.rulePrivateHarvestFields' : 'ui.ruleHarvestFields')
-  if (effectPreview.kind === 'cardSelection') return <span>{t(locale, 'ui.ruleSelectCards', { types: effectPreview.types.map(type => t(locale, `ui.improvementKinds.${type}`)).join(' / ') })}
+  if (effectPreview.kind === 'cardSelection') return <span>{effectPreview.types[0] === 'occupation'
+    ? t(locale, 'actions.occupation.name')
+    : t(locale, 'ui.ruleSelectCards', { types: effectPreview.types.map(type => t(locale, `ui.improvementKinds.${type}`)).join(' / ') })}
     {effectPreview.allowedCards ? ` (${t(locale, 'ui.ruleAllowedCards', { cards: effectPreview.allowedCards.map(id => getCardDisplayName(locale, id)).join(', ') })})` : ''}
     {effectPreview.resourcesPaid ? <>{': '}<ResourceLine locale={locale} mode="payment" resources={effectPreview.resourcesPaid} emptyLabel={t(locale, 'ui.free')} /></> : null}
   </span>

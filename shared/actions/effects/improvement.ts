@@ -1,6 +1,7 @@
 import type { ActionHookRegistry } from '../hooks'
 import type { ActionDefinition, ActionExecutionContext, ActionExecutionResult, ActionChoiceOption, ActionSpace, ChoiceEffectPreview, ExactCost, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState } from '../../contract/types'
 import { payAction } from './pay'
+import { MAX_DETAILED_CARD_CHOICES } from '../helpers/card-choice'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { CardPurchasePayment, PaymentSolver } from '../payment'
 import type { CardPurchasePreview } from '../payment'
@@ -35,7 +36,6 @@ export { isMajorImprovementPlayable, isMinorImprovementPlayable }
 
 export type ImprovementType = 'major' | 'minor'
 const KNOWN_IMPROVEMENT_TYPES: readonly ImprovementType[] = ['major', 'minor']
-const MAX_DETAILED_IMPROVEMENT_OPTIONS = 2
 
 export function readImprovementTypes(ctx?: {
   params?: unknown
@@ -496,7 +496,7 @@ export const improvementAction: ActionDefinition = {
     const summary = { kind: 'cardSelection', types, allowedCards } satisfies ChoiceEffectPreview
     if (context.previewMode === 'base') return summary
     const candidates = improvementCandidates(context)
-    if (candidates.length === 0 || candidates.length > MAX_DETAILED_IMPROVEMENT_OPTIONS) return summary
+    if (candidates.length === 0 || candidates.length > MAX_DETAILED_CARD_CHOICES) return summary
     const options = describeImprovementCandidates(context, candidates)
     return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: options.map(option => ({ kind: 'action', labelKey: option.labelKey, labelParams: option.labelParams, effectPreview: option.effectPreview })) } }
   },

@@ -134,6 +134,24 @@ const renderBarHtml = (
 
 describe('InteractionBar', () => {
   it.each([
+    ['en', 'Play occupation', 'Restricted to', 'Frame Builder', 'Geologist'],
+    ['zh', '打出职业', '限于', '架梁工', '地质学家'],
+  ])('renders an occupation summary and its card restrictions in %s', (locale, label, restricted, first, second) => {
+    const html = renderBarHtml(input => {
+      input.locale = locale
+      input.pending.choice = { ...pendingChoice, options: [{
+        value: 'occupation-summary', labelKey: 'actions.occupation.name',
+        effectPreview: { kind: 'cardSelection', types: ['occupation'], allowedCards: ['A123_FrameBuilder', 'B121_Geologist'] },
+      }] }
+    })
+    expect(html).toContain(label)
+    expect(html).toContain(restricted)
+    expect(html).toContain(first)
+    expect(html).toContain(second)
+    expect(html).not.toContain('ui.improvementKinds.occupation')
+  })
+
+  it.each([
     ['en', 'Hearth Brush', 'Pastoral Letter'], ['zh', '炉灶刷', '牧函'],
   ] as const)('keeps real purchase identities visible alongside payment trees in %s', (locale, hearthName, pastoralName) => {
     const session = createWorkSession({ seed: 7317, options: { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }, configure: state => {
