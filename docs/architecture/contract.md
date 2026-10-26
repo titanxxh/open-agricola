@@ -223,13 +223,14 @@ Choice Preview derives from shared executable rule plans ([ADR 0024](../adr/0024
 
 - `effectPreview` kinds include `resourceExchange`, `payment`, `text`, `resourceMovement`, `futureSchedule`, `futureOffers`, `actionSpace`, `cardScore` and `fieldContents`; the complete set is the `ChoiceEffectPreview` union in `shared/contract/types.ts`. They are produced by the pure `ActionDefinition.previewEffect`. Future requests share `normalizeFutureSchedule` (target filtering, prefixes, conditions, costs, room type) with execution. `seq(pay, gain[, bonus-vp])` previews aggregate automatically, including handwritten pay and gain leaves.
 - `descriptionPreview` recursively describes the flow (`ChoiceDescriptionPreview`): sequence, exclusive and inclusive choices, parallel order, optionality and actor. `Engine.describe()` reads the executable flow without advancing; `Engine.describeFlow()` describes a standalone plan; opaque native actions expose a pure `ActionDefinition.flowFactory` that execution also calls. Base descriptions omit player modifiers and keep every conditional case; deferred quantities keep their formula until due.
+- An improvement preview expands at most two final candidate-card options. More candidates use the existing `cardSelection` summary, preserving improvement types and purchase restrictions. The actual card-selection and payment requests retain their complete options and previews; payment alternatives do not count toward this limit. The producer in `shared/actions/effects/improvement.ts` owns this policy, including nested previews.
 - Visible option text comes from `descriptionPreview` and `effectPreview`; `choiceLabelKey` is only for semantic overrides. `special-effect` supplies semantic descriptions from `params.kind`, and display-only synchronization is omitted.
 - A preview describes declared effects; it does not promise that future conditions will hold. Consecutive identical future entries combine; others stay visible in order.
 - Current interaction choices use the Interaction Player and the authoritative payment solver, including quantity limits and alternative payment sources.
 - Farm-cell choices carry `ActionChoiceOption.target` (actor, logical field, positions, Card Field slots) and `targetCard`; the client renders these and submits the opaque value.
 - `collectScheduledEffectPreviews()` projects scheduled receipts, offers, timed rules and obligations as `ScheduledEffectPreview` (round, phase, source, description, multiplicity). Grouping changes display only; player filtering removes hidden sources and unrevealed action identity; rehydration strips these projections, and they cross the JSON boundary before joining a snapshot Frame.
 
-Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tests__/anytime-description-session.test.ts`.
+Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tests__/anytime-description-session.test.ts`, `server/__tests__/improvement-description-session.test.ts`.
 
 ## LogEntry
 

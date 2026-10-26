@@ -1,5 +1,5 @@
 import type { ActionHookRegistry } from '../hooks'
-import type { ActionDefinition, ActionExecutionContext, ActionExecutionResult, ActionChoiceOption, ActionSpace, ExactCost, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionContext, ActionExecutionResult, ActionChoiceOption, ActionSpace, ChoiceEffectPreview, ExactCost, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState } from '../../contract/types'
 import { payAction } from './pay'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { CardPurchasePayment, PaymentSolver } from '../payment'
@@ -35,6 +35,7 @@ export { isMajorImprovementPlayable, isMinorImprovementPlayable }
 
 export type ImprovementType = 'major' | 'minor'
 const KNOWN_IMPROVEMENT_TYPES: readonly ImprovementType[] = ['major', 'minor']
+const MAX_DETAILED_IMPROVEMENT_OPTIONS = 2
 
 export function readImprovementTypes(ctx?: {
   params?: unknown
@@ -430,7 +431,7 @@ const buildImprovementInternalChildren = (
   }
 }
 
-const improvementChoiceOptions = (context: ActionExecutionContext): ActionChoiceOption[] => {
+const improvementCandidates = (context: ActionExecutionContext): ActionChoiceOption[] => {
   const { state, player, space, sourceCard, params, actionContext } = context
     const exactCost = improvementExactCost(context)
     const types = readImprovementTypes({ params, actionContext })
@@ -464,6 +465,16 @@ const improvementChoiceOptions = (context: ActionExecutionContext): ActionChoice
     const options = [...majorOpts, ...baseMinor, ...extraMinor]
       .filter((option) => isAllowedPurchase(allowedPurchases, option.value)
         && meetsMinimumPayment(state, player, option.value, context))
+  return options
+}
+
+const describeImprovementCandidates = (
+  context: ActionExecutionContext,
+  options: ActionChoiceOption[],
+): ActionChoiceOption[] => {
+  const { state, player, sourceCard, params, actionContext } = context
+  const actionCardId = costActionCardId(context)
+  const exactCost = improvementExactCost(context)
   return options.map(option => {
     const children = buildImprovementInternalChildren(state, player, option.value, actionCardId, readTrueAction(params, actionContext), sourceCard, actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined, exactCost, purchaseActionCardId(context), context?.actionHooks)
     const payment = children?.beforeHostListeners?.[0]
@@ -472,6 +483,9 @@ const improvementChoiceOptions = (context: ActionExecutionContext): ActionChoice
   })
 }
 
+const improvementChoiceOptions = (context: ActionExecutionContext): ActionChoiceOption[] =>
+  describeImprovementCandidates(context, improvementCandidates(context))
+
 export const improvementAction: ActionDefinition = {
   id: 'improvement',
   nameKey: 'actions.improvement.name',
@@ -479,9 +493,12 @@ export const improvementAction: ActionDefinition = {
   previewEffect: context => {
     const types = readImprovementTypes(context)
     const allowedCards = readAllowedPurchases(context.params)
-    if (context.previewMode === 'base') return { kind: 'cardSelection', types, allowedCards }
-    const options = improvementChoiceOptions(context)
-    return options.length ? { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: options.map(option => ({ kind: 'action', labelKey: option.labelKey, labelParams: option.labelParams, effectPreview: option.effectPreview })) } } : { kind: 'cardSelection', types, allowedCards }
+    const summary = { kind: 'cardSelection', types, allowedCards } satisfies ChoiceEffectPreview
+    if (context.previewMode === 'base') return summary
+    const candidates = improvementCandidates(context)
+    if (candidates.length === 0 || candidates.length > MAX_DETAILED_IMPROVEMENT_OPTIONS) return summary
+    const options = describeImprovementCandidates(context, candidates)
+    return { kind: 'rule', description: { kind: 'group', operator: 'xor', separator: ' / ', parts: options.map(option => ({ kind: 'action', labelKey: option.labelKey, labelParams: option.labelParams, effectPreview: option.effectPreview })) } }
   },
   roundAvailable: 1,
   gainPerRound: {},
