@@ -96,7 +96,7 @@ test('Lover shortage settlement survives reload and uses begging when confirmed'
 
 test('Lover allows Fireplace cooking before mandatory settlement and refreshes its preview', async ({ page, request }) => {
   const workerIds = await openSettlement(page, request)
-  await page.locator('.anytime-bar').getByRole('button').filter({ hasText: /Exchange|Convert/i }).first().click()
+  await page.locator('[data-anytime-action-id="exchange"]').click()
   const vegetable = page.getByTestId('anytime-exchange-option-Major_Fireplace1-ex3')
   await expect(vegetable).toBeVisible()
   await vegetable.getByRole('button', { name: '+', exact: true }).click()
