@@ -52,6 +52,10 @@ _Avoid_: 已确认缺陷、直接修复依据
 适用的官方规则、牌面或裁定已确认 Open Agricola 的可达行动、合法选择或权威结果与之不一致。BGA 提交只能作为发现和复现证据；证据冲突由 maintainer 裁定。
 _Avoid_: 规则修改、仅凭 BGA 提交确认
 
+**Project Rule Interpretation（项目规则解释）**:
+现有官方证据未能唯一确定行为时，由维护者为本项目明确采纳的局部规则解释。它不等同于已证实的官方裁定，也不自动推广到其他卡牌或一般规则。
+_Avoid_: Rule Alignment Gap、官方裁定、全局单人特例
+
 **Rule Flow Defect（规则流程缺陷）**:
 规则语义与最终合法结果不变，但候选过滤或强制流程可能暴露必定失败的选项或无法完成。纯交互简化不属于该类。
 _Avoid_: Rule Alignment Gap、纯视觉问题
@@ -60,6 +64,10 @@ _Avoid_: Rule Alignment Gap、纯视觉问题
 创建一局游戏时启用的可选规则模块，会改变该局的设置、公开状态、行动格、阶段流程或计分口径。它不是普通卡牌来源，也不是前端显示偏好。
 _Avoid_: Card Source、UI toggle、player count layout
 
+**Standard Solo Game（标准单人对局）**:
+一名玩家经营一个农场并连续派出自己的人员的单局计分挑战。按单人基础规则和启用的 Game Variant 结算，参考目标不作为强制胜负门槛。
+_Avoid_: 热座、Workshop Sandbox、Solo Campaign、Automa
+
 **Farmers of the Moor**:
 Agricola 的可选扩展名称。讨论该扩展时使用完整名称，不缩写为 Farmers；只有代码标识符可按既有命名使用 `FarmersOfTheMoor`。
 _Avoid_: Farmers
@@ -67,6 +75,10 @@ _Avoid_: Farmers
 **PlayerState**:
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户
+
+**Other Player（其他玩家）**:
+相对于牌的拥有者或规则指定的玩家，本局除此人之外的实际参与者。单人对局没有其他玩家；牌面写明的单人替代条件不改变该身份定义。
+_Avoid_: 本人、虚拟对手、左右邻座的统一替代
 
 **Logical Field（逻辑田）**:
 规则文本中非几何语义的 Field 身份，统一包含 Farmyard Field 与已打出且已注册的 Card Field；田地数量、空置/种植状态、作物、播种、生长、移除和收割默认使用该口径。
@@ -97,8 +109,16 @@ _Avoid_: 全员预扣食物、提前发乞讨、重新开始喂养
 _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择
 
 **Room**:
-单局多人游戏容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。`roomId` 同时是该局 Game Context 的永久标识；`newGame` 迁移人数、在线座位、custom cards 和已持久化变体开关到新 UUID，不复用旧 `roomId`。
+单局游戏容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。`roomId` 同时是该局 Game Context 的永久标识；`newGame` 迁移人数、在线座位、custom cards 和已持久化变体开关到新 UUID，不复用旧 `roomId`。
 _Avoid_: PlayerState
+
+**Game Creation Configuration（对局创建配置）**:
+一局游戏开始时被接受的创建选项组合，描述手牌方式、扩展和卡牌来源等选择。它不包含该局的随机结果、已发手牌或进行进度。
+_Avoid_: GameState、最终手牌、Game Seed、账号级设置偏好
+
+**Same-configuration Rematch（同配置重开）**:
+沿用已完赛对局的 Game Creation Configuration，重新随机创建一局独立对局。原局的结果、回放和永久链接继续属于原局。
+_Avoid_: 继续旧局、Solo Campaign、历史规则重放、复用原对局身份
 
 **Game Context**:
 由 `roomId` 永久标识的一局游戏及其生命周期上下文，只可能处于活动、已完成、已过期或已下架状态。可恢复状态或回放内容消失后，其身份仍保留；从未存在的 `roomId` 不属于 Game Context。
@@ -358,6 +378,14 @@ _Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择、把所有
 **Moor Special Action（沼泽特殊行动）**:
 Farmers of the Moor 规则中命名的一次特殊行动，可以通过正常拿牌、借用牌或卡牌明确授予来执行。一次行动包括其必须完成的付款、改良选择和动物安置。正常工作阶段入口需要尚未放置的健康人员，但不放置或消耗该人员；卡牌授予的入口遵循其牌面条件。仅领取特殊行动牌不构成执行该行动。
 _Avoid_: Action Space Use、Anytime Action、单独领取特殊行动牌、把相同资源或地形结果当作执行特殊行动
+
+**Moor Special Action Card（沼泽特殊行动牌）**:
+列出若干 Moor Special Action 的牌。单人通过当前可用牌、暗堆和弃牌堆流转；弃牌不等于将牌移出游戏，保留可用牌也不等于再次执行行动。
+_Avoid_: Action Space、Moor Special Action、传递小改良
+
+**Solo Card Retention（单人留牌）**:
+泥沼单人每轮一次支付 2 食物、阻止当前特殊行动牌在使用后弃掉，使其视为未用并继续可用。保留后未再使用的牌可以留到下一轮。
+_Avoid_: 多人借牌、自动再执行一次、轮末弃掉保留牌
 
 **Most Recent Action Space（最近使用的行动格）**:
 按实际使用先后确定的最后一个 Action Space。同一个 Turn 使用多个行动格时，C150 Parrot Breeder 的复制目标仍只有最后使用的一格。
@@ -839,7 +867,11 @@ _Avoid_: 当前行动玩家、InteractionState、完整玩家私有状态
 
 **Private Hand（私有手牌）**:
 尚未打出的职业卡与小改良，属于持有玩家的私有信息；浏览另一名玩家的公开桌面不改变查看手牌的权限。
-_Avoid_: 公开已打出牌、共享桌面手牌、当前浏览玩家自动获得的私有信息
+_Avoid_: 公开已打出牌、共享桌面手牌、开局选牌候选、当前浏览玩家自动获得的私有信息
+
+**Starting Hand Selection（开局选牌）**:
+标准单人对局中，玩家从各组固定候选按指定配额挑选起始职业与小改良，并一次确认获得整副手牌。确认前可以调整勾选，未确认的勾选不构成正式手牌或已提交的轮抽选择。
+_Avoid_: 多人轮抽、游戏中抽牌、父母选择、Private Hand
 
 **Compact Played Card（紧凑已打出牌）**:
 用于辨认已打出牌的卡面，展示名称、插画和印刷标记，牌上动态事实保持可见，完整规则通过全卡预览阅读。
