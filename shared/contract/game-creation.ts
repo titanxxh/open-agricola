@@ -14,6 +14,18 @@ export type SoloCreationConfiguration = {
   enableFarmersOfTheMoor: boolean
 }
 
+const object = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+export const isSoloCreationConfiguration = (value: unknown): value is SoloCreationConfiguration => object(value)
+  && value.kind === 'standard-solo' && value.maxPlayers === 1
+  && (value.soloHandMode === 'random' || value.soloHandMode === 'choose-7')
+  && value.officialCardPool === 'default-implemented-A-E'
+  && typeof value.enableCommunityDeck === 'boolean'
+  && typeof value.enableParentCards === 'boolean' && typeof value.draftParents === 'boolean'
+  && typeof value.enableThroughTheSeasons === 'boolean' && typeof value.enableFarmersOfTheMoor === 'boolean'
+  && Array.isArray(value.customCardIds) && value.customCardIds.every(id => typeof id === 'string')
+
 export type ResolvedWorkshopSource = {
   workshopCardId: string
   logicalCardId: string
