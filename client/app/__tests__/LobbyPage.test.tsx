@@ -3,6 +3,12 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../../utils/platform-page-url'
+import { startRoomCreation } from '../../services/room-creation'
+
+vi.mock('../../services/room-creation', async importOriginal => ({
+  ...await importOriginal<typeof import('../../services/room-creation')>(),
+  startRoomCreation: vi.fn(), resumePendingRoomCreation: () => null,
+}))
 
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
@@ -27,6 +33,7 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.startGame': 'Start Game',
     'platform.createMultiplayer': 'Create Multiplayer Game',
     'platform.localHotseat': 'Local Hotseat',
+    'solo.entry': 'Solo game',
     'platform.selectPlayerCount': 'Select number of players',
     'platform.players2': '2 Players',
     'platform.players3': '3 Players',
@@ -126,6 +133,17 @@ describe('LobbyPage my active games', () => {
     expect(setPage).toHaveBeenCalledWith('game', { room: '96725f41-b719-4474-a3df-90e5d239108b' })
   })
 
+  it('creates solo through its fixed one-player settings without navigating before commitment', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+    vi.mocked(startRoomCreation).mockReturnValueOnce(new Promise(() => undefined))
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Solo game' }))
+    expect(screen.getByText('1 player')).toBeVisible()
+    fireEvent.click(screen.getByRole('radio', { name: /Choose 7 from 10/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
+    expect(startRoomCreation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ maxPlayers: 1, soloHandMode: 'choose-7', name: 'Host' }))
+    expect(setPage).not.toHaveBeenCalled()
+  })
   it('shows a your-turn badge on rooms waiting for the player', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
     myRoomsResponse.rooms = [

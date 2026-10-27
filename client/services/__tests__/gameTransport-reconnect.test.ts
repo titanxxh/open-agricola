@@ -3,6 +3,7 @@ import { serializeState } from '../../../shared/session/serialization'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
 import { EngineStack } from '../../../shared/engine'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws'
+import type { SoloCreationConfiguration, SoloCreationIssue } from '../../../shared/contract/game-creation'
 
 const scope = { scopeId: '01800000-0000-4000-8000-000000000001', expiresAt: Date.now() + 86400000 }
 class Socket {
@@ -39,6 +40,53 @@ describe('Room reconnect and durable commands', () => {
     vi.stubGlobal('WebSocket', Socket)
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
+
+  it('recovers an independent creation journal without replacing the old game intent or losing adjustment details', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const old = new WsGameTransport('ws://test', 'old-room', undefined, { route: false })
+    const options = { route: false, journalKey: 'solo-creation-test' } as const
+    const first = new WsGameTransport('ws://test', undefined, undefined, options)
+    let recovered: InstanceType<typeof WsGameTransport> | undefined
+    try {
+      await old.connect()
+      Socket.all[0]!.emit(joined('old-room'))
+      Socket.all[0]!.emit(snapshot(4, 'old-room'))
+      void old.takeAction(0, 'wood').catch(() => undefined)
+      const originalIntent = sessionStorage.getItem('agricola.pending-commands:ws://test')
+      await first.connect()
+      const creation = first.createRoom({ sourceGameContextId: 'finished-room' })
+      void creation.catch(() => undefined)
+      expect(sessionStorage.getItem('agricola.pending-commands:ws://test')).toBe(originalIntent)
+      const command = Socket.all[1]!.sent.find(message => message.type === 'createRoom')!
+      first.destroy()
+      await expect(creation).rejects.toThrow('Transport destroyed')
+
+      recovered = new WsGameTransport('ws://test', undefined, undefined, options)
+      const resumed = recovered.resumeRoomCreation()
+      expect(resumed).not.toBeNull()
+      const connecting = recovered.connect()
+      await vi.waitFor(() => expect(Socket.all).toHaveLength(3))
+      const socket = Socket.all[2]!
+      await vi.waitFor(() => expect(socket.sent.some(message => message.type === 'getCommandReceipt')).toBe(true))
+      const request = socket.sent.find(message => message.type === 'getCommandReceipt')!
+      expect(request.identity).toEqual({ scopeId: command.commandContext.scopeId, commandId: command.commandContext.commandId })
+      const configuration: SoloCreationConfiguration = {
+        kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', officialCardPool: 'default-implemented-A-E',
+        enableCommunityDeck: true, customCardIds: ['missing'], enableParentCards: false, draftParents: true,
+        enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+      }
+      const issues: SoloCreationIssue[] = [{ workshopCardId: 'missing', reason: 'missing' }]
+      const rejected = expect(resumed).rejects.toMatchObject({ code: 'creation_requires_adjustment', creationAdjustment: { configuration, issues } })
+      socket.emit({ type: 'commandReceipt', status: 'completed', requestId: request.requestId,
+        receipt: { scopeId: command.commandContext.scopeId, commandId: command.commandContext.commandId,
+          outcome: { ok: false, code: 'creation_requires_adjustment', creationAdjustment: { configuration, issues } } } })
+      await connecting
+      await rejected
+      expect(socket.sent.filter(message => message.type === 'createRoom')).toHaveLength(0)
+      expect(sessionStorage.getItem('solo-creation-test')).toBeNull()
+      expect(sessionStorage.getItem('agricola.pending-commands:ws://test')).toBe(originalIntent)
+    } finally { old.destroy(); first.destroy(); recovered?.destroy() }
+  })
 
   it.each([undefined, 1])('does not invent a seat before join acknowledgement (hint %s)', async (hint) => {
     const { WsGameTransport } = await import('../gameTransport')

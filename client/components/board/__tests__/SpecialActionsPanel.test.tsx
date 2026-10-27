@@ -24,11 +24,28 @@ const cards: MoorSpecialActionCardState[] = [
 ]
 
 describe('SpecialActionsPanel', () => {
+  it('shows the solo current card, public discard and only next-card icons beside the draw count', () => {
+    const current: MoorSpecialActionCardState = { ...cards[0]!, location: { kind: 'solo-current' } }
+    const discarded: MoorSpecialActionCardState = { ...cards[1]!, location: { kind: 'solo-discard', order: 0 } }
+    const onTake = vi.fn()
+    const { container } = render(<SpecialActionsPanel locale="en" playerCount={1} cards={[current, discarded]}
+      soloSupply={{ drawCount: 5, nextCardActions: ['fell-trees'], retentionPaid: true }} currentPlayerId="p1"
+      availability={{ [current.id]: { cardUsable: true } }} canTakeSpecialAction={() => true} selected={null} onTakeAction={onTake} />)
+    const draw = screen.getByRole('group', { name: 'Draw pile: 5' })
+    expect(draw.querySelector('[data-card-id]')).toBeNull()
+    expect(draw.querySelector('[data-resource]')).toBeNull()
+    expect(screen.getByText('Kept for this round')).toBeVisible()
+    expect(screen.getByText('Current special action card')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Cut Peat' }))
+    expect(onTake).toHaveBeenCalledExactlyOnceWith(current.id, 'cut-peat')
+    expect(container.querySelector('details')).toHaveTextContent('Discard pile')
+    expect(container.querySelector(`[data-card-id="${discarded.id}"]`)).toBeInTheDocument()
+  })
   it.each([
     [1, 1, 0], [2, 1, 1], [3, 2, 0], [4, 1, 0], [5, 1, 1], [6, 1, 1],
   ])('shows base resources for %i players', (playerCount, hiringFood, horseCost) => {
     render(<SpecialActionsPanel locale="en" playerCount={playerCount}
-      cards={[{ ...cards[0]!, actions: ['horse-market', 'hiring-fair', 'black-market', 'illicit-work'] }]}
+      cards={[{ ...cards[0]!, location: playerCount === 1 ? { kind: 'solo-current' } : { kind: 'market' }, actions: ['horse-market', 'hiring-fair', 'black-market', 'illicit-work'] }]}
       currentPlayerId="p1" availability={{}} canTakeSpecialAction={() => false}
       selected={null} onTakeAction={() => {}} />)
 

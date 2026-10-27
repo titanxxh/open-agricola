@@ -35,6 +35,26 @@ const mockPlayers = [
   { id: 'p2', name: 'Bob', stats: createInitialPlayerStats({ isFirstPlayer: false }) },
 ] as unknown as PlayerState[]
 
+it('keeps the injected completion action clickable alongside the final score', () => {
+  let rematched = false
+  const view = render(<ScoringPad locale="en" scores={mockScores} players={mockPlayers} onClose={() => undefined}
+    completionActions={<button onClick={() => { rematched = true }}>Play again with these settings</button>} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Play again with these settings' }))
+  expect(rematched).toBe(true)
+  view.unmount()
+})
+
+it('shows the confirmed starting-hand selection once without multiplayer draft turns', () => {
+  const view = render(<ScoringPad locale="en" scores={mockScores} players={mockPlayers.slice(0, 1)} onClose={() => undefined} showDraftHistory
+    startingHandSelection={{ playerId: 'p1', groups: [{ kind: 'occupation', cardIds: ['A092_AdoptiveParents', 'A136_DrudgeryReeve'], keepCount: 1 }],
+      kept: { groups: [{ kind: 'occupation', cardIds: ['A092_AdoptiveParents'] }] } }} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Starting hand selection' }))
+  expect(screen.getByText('Adoptive Parents')).toBeVisible()
+  expect(screen.queryByText('Drudgery Reeve')).not.toBeInTheDocument()
+  expect(view.container.textContent).not.toContain('T1')
+  view.unmount()
+})
+
 const scoreRowsWithCardBonuses = [
   {
     playerId: 'p1',

@@ -1,0 +1,44 @@
+.app--setup > .solo-hand-overlay { flex: 1; min-height: 0; }
+.solo-hand-overlay { display: flex; flex-direction: column; min-width: 0; background: var(--parchment, #f7f0df); color: #33291d; }
+.solo-hand-heading { padding: 16px 20px 8px; }
+.solo-hand-heading h2 { margin: 0 0 8px; }
+.solo-hand-heading p { margin: 0; max-width: 70ch; }
+.solo-hand-groups { overflow-y: auto; min-height: 0; padding: 8px 20px 20px; overscroll-behavior: contain; }
+.solo-hand-group { border: 0; padding: 12px 0; margin: 0; min-width: 0; }
+.solo-hand-group legend { font-weight: 700; padding: 0; }
+.solo-hand-group legend span { display: inline-block; font-weight: 400; margin-inline-start: 12px; }
+.solo-hand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+.solo-hand-card { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.solo-hand-card .player-card { max-width: 100%; }
+.solo-hand-card-choice { display: flex; gap: 8px; align-items: center; min-height: 44px; width: 100%; overflow-wrap: anywhere; cursor: pointer; }
+.solo-hand-card-choice input { flex: 0 0 auto; width: 20px; height: 20px; }
+.solo-hand-footer { padding: 12px 20px max(12px, env(safe-area-inset-bottom)); background: var(--parchment, #f7f0df); border-top: 1px solid #d1bea2; }
+.solo-hand-footer button { min-height: 44px; width: 100%; touch-action: manipulation; }
+.solo-hand-footer p { margin: 0 0 8px; color: #9b251f; }
+.solo-dialog-backdrop { position: fixed; inset: 0; z-index: 100; background: #172419b3; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.solo-setup-dialog { width: min(620px, 100%); max-height: calc(100dvh - 24px); display: flex; flex-direction: column; color: #33291d; background: #fffaf0; border-radius: 12px; overflow: hidden; box-shadow: 0 12px 36px #0004; }
+.solo-setup-body { min-height: 0; overflow-y: auto; padding: 0 20px 12px; overscroll-behavior: contain; }
+.solo-setup-fields { min-width: 0; padding: 0; border: 0; }
+.solo-setup-fields fieldset { min-width: 0; border: 1px solid #d1bea2; border-radius: 8px; padding: 8px; margin: 8px 0; }
+.solo-setup-fields label { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px; overflow-wrap: anywhere; cursor: pointer; }
+.solo-setup-fields input { width: 20px; height: 20px; flex: 0 0 auto; }
+.solo-setup-fields small { display: block; margin-top: 3px; color: #675b49; }
+.solo-creation-issues { padding: 12px; border: 1px solid #a87b38; border-radius: 8px; background: #fff1cd; overflow-wrap: anywhere; }
+.solo-creation-issues p { margin: 4px 0; }
+.solo-creation-issues ul { margin: 8px 0 0; padding-inline-start: 20px; }
+.solo-setup-footer { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.solo-setup-footer .btn-link { width: auto; flex-shrink: 0; }
+.solo-rematch-actions { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.solo-rematch-actions p { margin: 4px 0; }
+.solo-rematch-actions > button { min-height: 44px; max-width: 100%; white-space: normal; touch-action: manipulation; }
+.solo-completed-summary { padding: 20px; background: #fffaf0; color: #33291d; border-bottom: 1px solid #d1bea2; }
+.solo-completed-summary h1 { margin: 0 0 8px; font-size: 1.3rem; }
+.scoring-completion-actions { padding: 12px 16px; border-bottom: 1px solid #d1bea2; }
+.solo-special-supply { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.solo-special-supply > div { display: flex; align-items: center; gap: 12px; }
+.solo-special-next { display: flex; gap: 6px; }
+.solo-special-discard summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+@media (max-width: 400px) {
+  .solo-hand-heading, .solo-hand-groups, .solo-hand-footer { padding-inline: 8px; }
+  .solo-hand-grid { gap: 8px; }
+}

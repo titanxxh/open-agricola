@@ -30,6 +30,8 @@ import {
   ReplayShell,
 } from './ReplayShell'
 import { verifyReplayViewerBuild } from './replay-viewer-build'
+import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
+import { formatScore } from '../utils/format-score'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
 
@@ -229,8 +231,15 @@ function CompletedContext({
   context: CompletedGameContextDescriptor
 }) {
   const { locale, t } = useLocale()
+  const solo = context.result.playerCount === 1
+  const player = context.result.players[0]
+  const rematch = solo ? <SameConfigurationRematch key={context.roomId} roomId={context.roomId} locale={locale} displayName={player?.nameIsDefault ? undefined : player?.displayName} /> : null
   if (context.replayStatus === 'available') {
-    return <ReplayShell context={context} />
+    return <>{solo ? <section className="solo-completed-summary">
+      <h1>{t('platform.gameContext.completedTitle')}</h1>
+      <p>{t('solo.scoreHint')}: <strong>{formatScore(player?.score ?? 0)}</strong></p>
+      {rematch}
+    </section> : null}<ReplayShell context={context} /></>
   }
   return statusPage(
     t('platform.backToLobbyPlain'),
@@ -246,6 +255,7 @@ function CompletedContext({
           </li>
         ))}
       </ul>
+      {rematch}
     </div>,
   )
 }
