@@ -15,6 +15,7 @@ import { discoverRoom } from './game/room-discovery'
 import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
 import { isUniqueViolation, isWorkshopSubmissionInProgress } from './database/errors'
 import { consumeRateLimit } from './database/rate-limit'
+import { searchInvitablePlayers } from './game/room-access'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -473,11 +474,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (!requestUser && !anonymous) { sendJson(res, 401, { error: 'Login required', code: 'login_required' }); return }
     try {
       const input = JSON.parse(await readBody(req)) as RoomDiscoveryRequest
-      const route = await discoverRoom(directory, requestUser ? `user:${requestUser.id}` : 'development-anonymous', input)
+      const route = await discoverRoom(directory, requestUser ? `user:${requestUser.id}` : 'development-anonymous', input, requestUser?.id)
       sendJson(res, 200, route)
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? error.code : 'room_unavailable'
-      sendJson(res, 409, { code, error: error instanceof Error ? error.message : String(error) })
+      sendJson(res, code === 'login_required' ? 401 : code === 'not_participant' ? 403 : 409, { code, error: error instanceof Error ? error.message : String(error) })
     }
     return
   }
@@ -897,13 +898,27 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   // ── Lobby routes ───────────────────────────────────────
+  if (req.method === 'GET' && req.url?.split('?')[0] === '/api/lobby/players') {
+    res.setHeader('Cache-Control', 'no-store')
+    if (!requestUser) { sendJson(res, 401, { ok: false, code: 'login_required' }); return }
+    const prefix = new URL(req.url, 'http://localhost').searchParams.get('prefix')?.trim() ?? ''
+    if (prefix.length < 2 || prefix.length > 128) { sendJson(res, 400, { ok: false, error: 'Enter at least two player ID characters' }); return }
+    if (process.env.DISABLE_RATE_LIMIT !== '1'
+      && !(await consumeRateLimit(getDb(), 'player-search', requestUser.id, 120, 60_000)).allowed) {
+      sendJson(res, 429, { ok: false, error: 'Too many player searches' })
+      return
+    }
+    sendJson(res, 200, { ok: true, players: await searchInvitablePlayers(getDb(), prefix, requestUser.id) })
+    return
+  }
   if (req.method === 'GET' && req.url && (req.url === '/api/rooms' || req.url.startsWith('/api/rooms?'))) {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
     const rawLimit = Number(url.searchParams.get('limit'))
     const limit = Number.isFinite(rawLimit) && rawLimit > 0
       ? Math.min(Math.floor(rawLimit), 200)
       : 50
-    sendJson(res, 200, { ok: true, rooms: await directory.lobby(limit) })
+    res.setHeader('Cache-Control', 'no-store')
+    sendJson(res, 200, { ok: true, rooms: await directory.lobby(limit, requestUser?.id) })
     return
   }
 

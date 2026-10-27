@@ -1,0 +1,22 @@
+.player-account-id {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.player-account-id code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.player-account-id button {
+  min-height: 44px;
+}
+
+.player-account-id [role="status"] {
+  flex-basis: 100%;
+}

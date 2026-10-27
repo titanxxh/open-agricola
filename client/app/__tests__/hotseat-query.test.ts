@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { isHotseatSetupQuery, parseDraftParamsFromQuery } from '../game-setup-query'
+import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuery } from '../game-setup-query'
+
+describe('invited room query', () => {
+  it('preserves opaque account IDs and keeps an empty invited request for server validation', () => {
+    expect(parseRoomAccessFromQuery('?roomAccess=invited&invitedUserIds=Ab_12-X,Cd_34-Y'))
+      .toEqual({ kind: 'invited', invitedUserIds: ['Ab_12-X', 'Cd_34-Y'] })
+    expect(parseRoomAccessFromQuery('?roomAccess=invited')).toEqual({ kind: 'invited', invitedUserIds: [] })
+    expect(parseRoomAccessFromQuery('?invitedUserIds=Ab_12-X')).toBeUndefined()
+  })
+})
 
 describe('parseDraftParamsFromQuery', () => {
   it('returns undefined when draftMode is missing / none / unknown', () => {

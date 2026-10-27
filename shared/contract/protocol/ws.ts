@@ -5,6 +5,7 @@ import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
+import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -57,6 +58,7 @@ type ClientCommandBody =
   | { type: 'quoteFenceSelection'; playerIndex: number; requestKey: string; payload: FenceSelectionPayload; expectedVersion: number }
   | {
       type: 'createRoom'
+      access?: RoomAccess
       maxPlayers?: number
       name?: string
       customCardIds?: string[]
@@ -108,7 +110,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: RoomColorErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
+      code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }
@@ -146,4 +148,5 @@ export type RoomSummary = {
   maxPlayers: number
   createdBy?: string
   status?: 'waiting' | 'playing'
+  access?: RoomAccess['kind']
 }

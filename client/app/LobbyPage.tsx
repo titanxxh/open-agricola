@@ -11,14 +11,9 @@ import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from './game-container-helpers'
-
-type RoomSummary = {
-  id: string
-  playerCount: number
-  maxPlayers: number
-  createdBy?: string
-  status?: 'waiting' | 'playing'
-}
+import type { RoomSummary } from '../../shared/contract/protocol/ws'
+import { PlayerAccountId } from '../components/common/PlayerAccountId'
+import { RoomInvitePicker } from './RoomInvitePicker'
 
 type MyRoom = {
   id: string
@@ -46,6 +41,8 @@ export function LobbyPage() {
   const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
+  const [roomAccess, setRoomAccess] = useState<'public' | 'invited'>('public')
+  const [invitedPlayerIds, setInvitedPlayerIds] = useState('')
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
   const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
@@ -61,11 +58,11 @@ export function LobbyPage() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/api/rooms`)
+      const resp = await apiFetch('/api/rooms')
       const data = await resp.json()
       if (data.ok) setRooms(data.rooms)
     } catch { /* silently fail */ }
-  }, [])
+  }, [apiFetch])
 
   const fetchMyRooms = useCallback(async () => {
     if (!user) return
@@ -120,6 +117,16 @@ export function LobbyPage() {
       maxPlayers: String(selectedMaxPlayers),
       ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
     }
+    if (selectMode === 'multiplayer' && roomAccess === 'invited') {
+      const ids = [...new Set(invitedPlayerIds.split(/[\s,，;；]+/u).filter(id => id && id !== user?.id))]
+      if (ids.length !== selectedMaxPlayers - 1) {
+        setError(t('platform.invitedPlayerCountError', { count: String(selectedMaxPlayers - 1) }))
+        return
+      }
+      params.roomAccess = 'invited'
+      params.invitedUserIds = ids.join(',')
+    }
+    setError('')
     const query = new URLSearchParams(window.location.search)
     if (selectMode === 'hotseat' && isDevModeAllowedFromQuery(window.location.search) && query.get('player')) {
       params.player = query.get('player')!
@@ -290,6 +297,31 @@ export function LobbyPage() {
                   </button>
                 ))}
               </div>
+              {selectMode === 'multiplayer' && (
+                <fieldset className="room-access-options">
+                  <legend className="player-select-label">{t('platform.roomAccessLabel')}</legend>
+                  <div className="player-select-options">
+                    <label>
+                      <input type="radio" name="room-access" value="public" checked={roomAccess === 'public'} onChange={() => { setRoomAccess('public'); setError('') }} />
+                      {t('platform.roomAccessPublic')}
+                    </label>
+                    <label>
+                      <input type="radio" name="room-access" value="invited" checked={roomAccess === 'invited'} onChange={() => { setRoomAccess('invited'); setError('') }} />
+                      {t('platform.roomAccessInvited')}
+                    </label>
+                  </div>
+                  {roomAccess === 'invited' && (
+                    <div className="room-invitations">
+                      {user && <PlayerAccountId userId={user.id} />}
+                      <label htmlFor="invited-player-ids">{t('platform.invitedPlayerIdsLabel')}</label>
+                      <RoomInvitePicker value={invitedPlayerIds} onChange={value => { setInvitedPlayerIds(value); setError('') }} />
+                      <p id="invited-player-ids-hint" className="community-deck-toggle-hint">
+                        {t('platform.invitedPlayerIdsHint', { count: String(selectedMaxPlayers - 1) })}
+                      </p>
+                    </div>
+                  )}
+                </fieldset>
+              )}
               <div className="player-select-label">{t('platform.draftModeLabel')}</div>
               <div className="player-select-options">
                 <button
@@ -446,7 +478,7 @@ export function LobbyPage() {
             />
             <button type="button" className="btn-primary" onClick={handleJoinRoom}>{t('platform.joinBtn')}</button>
           </div>
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
         </Section>
 
         <Section variant="parchment" icon="🛠️" title={t('platform.workshop')}>
@@ -495,7 +527,10 @@ export function LobbyPage() {
           <ul className="room-list">
             {rooms.map(room => (
               <li key={room.id} className="room-item">
-                <span className="room-id">{t('platform.roomLabel', { id: room.id })}</span>
+                <span className="room-id">
+                  {t('platform.roomLabel', { id: room.id })}
+                  {room.access === 'invited' && <small className="room-access-badge">{t('platform.roomAccessInvited')}</small>}
+                </span>
                 <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
                 <span className="room-status" data-status={room.status}>
                   {room.status === 'playing' ? t('platform.statusPlaying') : t('platform.statusWaiting')}

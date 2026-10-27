@@ -24,6 +24,10 @@ Single-context repo:
 
 This repo currently uses a single root context. There is no `CONTEXT-MAP.md`.
 
+## User-visible text changes
+
+When adding or changing UI text, edit `locales/en.json` and `locales/zh.json` in [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n) first. Build and test that repository, then update this repository's `i18n.ref` to its commit and manifest checksum. Validate the game with `pnpm run lint:i18n`, build and the relevant UI tests. For unpublished local language commits, set `AGRICOLA_I18N_DIR` to the matching checkout during validation. Publish the language commit before publishing a game revision that pins it. Package ownership and runtime boundaries are in [shared-other](../architecture/shared-other.md#sharedi18n-and-sharedutils).
+
 ## Use the glossary's vocabulary
 
 When your output names a domain concept in an issue title, a refactor proposal, a hypothesis, or a test name, use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.

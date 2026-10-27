@@ -27,6 +27,8 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
+import type { RoomAccessErrorCode } from '../../shared/contract/room-access'
+import { canAccessRoom, parseRoomAccess } from '../game/room-access'
 import type { ClientCommand, ServerEvent, RoomColorErrorCode } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import type {
@@ -189,7 +191,7 @@ const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
-  code?: RoomColorErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required',
+  code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required',
   lifecycle?: GameContextLifecycle,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
@@ -561,6 +563,8 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
   const setup = parseGameSetupRequest(msg as Record<string, unknown>, draftOptions.value)
   const maxPlayers = setup.playerCount
+  const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
+  if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
   const enableCommunityDeck = setup.enableCommunityDeck
   const customCardDbIds = resolveCustomCardDbIds(msg as Record<string, unknown>, enableCommunityDeck)
   const executionStamp = ctx.authority ? await new ExecutionAccess(ctx.authority.directory.db).capture(customCardDbIds, ctx.currentUserId ? [ctx.currentUserId] : []) : undefined
@@ -603,6 +607,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     status: 'waiting',
     ...(setup.hotseat ? { hotseat: true } : {}),
     createdBy: ctx.currentUserId,
+    access: access.access,
     customCardDbIds: loadedCustomCards.loadedDbIds,
     customCards,
     enableParentCards: setup.enableParentCards,
@@ -698,6 +703,10 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   const room = ctx.registry.get(roomId)
   if (!room) {
     sendCommandError(ctx, 'room not found', msg.requestId)
+    return
+  }
+  if (!canAccessRoom(room, ctx.currentUserId)) {
+    sendCommandError(ctx, 'Only invited players can enter this room', msg.requestId, ctx.currentUserId ? 'not_participant' : 'login_required', 'active')
     return
   }
   // A hotseat game belongs to one device: nobody else may take a seat in it.

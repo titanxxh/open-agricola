@@ -10,6 +10,7 @@ type Row = { serialized: PersistedSessionSnapshot | null; meta: RoomMeta; update
 
 const copyMeta = (meta: RoomMeta): RoomMeta => ({
   ...meta,
+  ...(meta.access ? { access: structuredClone(meta.access) } : {}),
   customCardDbIds: [...meta.customCardDbIds],
   ...(meta.customCards === undefined ? {} : { customCards: structuredClone(meta.customCards) }),
   players: meta.players.map((player) => ({ ...player })),

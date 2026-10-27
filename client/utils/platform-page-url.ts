@@ -11,6 +11,8 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'transport',
   'hotseat',
   'maxPlayers',
+  'roomAccess',
+  'invitedUserIds',
   'draftMode',
   'draftPoolSize',
   'enableCommunityDeck',

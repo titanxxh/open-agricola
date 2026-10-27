@@ -38,6 +38,46 @@ const markRoomStarted = async (ctx: ReturnType<typeof newCtx>) => {
 }
 
 describe('handleCreateRoom', () => {
+  it('limits active rooms to invited accounts and retains that policy through rematch', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    const guest = newCtx(deps)
+    const outsider = newCtx(deps)
+    host.currentUserId = 'invite-host'
+    guest.currentUserId = 'invite-guest'
+    outsider.currentUserId = 'invite-outsider'
+    await dispatch(guest, { type: 'getCommandScope' })
+    const access = { kind: 'invited', invitedUserIds: ['invite-guest'] } as const
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2, access })
+    const firstRoomId = host.currentRoom!.id
+    for (const player of host.currentRoom!.session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    expect(deps.lobby.getRooms(undefined, 'invite-host').map(room => room.id)).toEqual([firstRoomId])
+    expect(deps.lobby.getRooms(undefined, 'invite-guest').map(room => room.id)).toEqual([firstRoomId])
+    expect(deps.lobby.getRooms(undefined, 'invite-outsider')).toEqual([])
+    expect(deps.lobby.getRooms()).toEqual([])
+    await dispatch(outsider, { type: 'joinRoom', roomId: firstRoomId, requestedPlayerIndex: 0 })
+    expect(outsider.currentRoom).toBeNull()
+    expect(sentMessagesOf(outsider)).toContainEqual(expect.objectContaining({ type: 'error', code: 'not_participant' }))
+    expect(host.currentRoom!.seatOwners).toEqual([{ playerIndex: 0, userId: 'invite-host' }])
+    await dispatch(guest, { type: 'joinRoom', roomId: firstRoomId })
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(guest.currentPlayerIndex).toBe(1)
+    await dispatch(host, { type: 'newGame' })
+    const nextRoom = host.currentRoom!
+    expect(nextRoom.id).not.toBe(firstRoomId)
+    expect(nextRoom.access).toEqual(access)
+    expect((await host.persistence.load(nextRoom.id))?.meta.access).toEqual(access)
+    await dispatch(outsider, { type: 'joinRoom', roomId: nextRoom.id, intent: 'resume' })
+    expect(outsider.currentRoom).toBeNull()
+    const rejoined = newCtx(deps)
+    rejoined.currentUserId = 'invite-guest'
+    await dispatch(rejoined, { type: 'joinRoom', roomId: nextRoom.id, intent: 'resume' })
+    expect(rejoined.currentPlayerIndex).toBe(1)
+  })
+
   it.each([undefined, 'Player 6'])('preserves name provenance through join, rejoin and rematch for %s', async (name) => {
     const deps = newDeps()
     const host = newCtx(deps)
