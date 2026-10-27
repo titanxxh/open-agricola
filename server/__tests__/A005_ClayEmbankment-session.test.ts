@@ -7,6 +7,8 @@ import '../../shared/cards/A/A005_ClayEmbankment'
 import assert from 'node:assert/strict'
 import { assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
 import * as audit09Immediate from './_helpers/audit/ae-negative-09-immediate'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
 
 const CARD_ID = 'A005_ClayEmbankment'
 
@@ -77,6 +79,113 @@ describe('A005 Clay Embankment parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 4, food: 0 })
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[1]!.minorHand).not.toContain(CARD_ID)
+  })
+})
+
+describe('standard solo passing purchase', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+  const make = (playerCount: number, food = 3) => {
+    const session = createWorkSession({ seed: 42, options: { playerCount }, configure(state) {
+      for (const player of state.players) {
+        player.resources = {
+          food: 0, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0,
+          vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        }
+      }
+      state.players[0]!.resources.food = food
+      state.players[0]!.resources.clay = 6
+      state.players[0]!.minorHand = [CARD_ID]
+      state.ordinaryCardDecks.minor = state.ordinaryCardDecks.minor.filter(id => id !== CARD_ID)
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  const buy = (session: GameSession) => {
+    const pending = openMinorPrompt(session)
+    const option = cardOption(pending)
+    return option ? session.resolveChoice(0, option.value) : pending
+  }
+
+  it('pays and grants once, removes the solo card, and restores the whole purchase on undo', () => {
+    const session = make(1)
+    const before = undoRuleSnapshot(session.getState())
+    const score = session.getState().scores![0]!.total
+    const response = buy(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player', nextPlayerIndex: 0 } })
+    const player = response.state.players[0]!
+    expect(player.resources).toEqual({
+      food: 2, wood: 0, clay: 9, reed: 0, stone: 0, grain: 0,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    })
+    expect(player.minorHand).toEqual([])
+    expect(player.minorPlayed).toEqual([])
+    expect(player.improvements).toEqual([])
+    expect(response.state.ordinaryCardDecks.minor).not.toContain(CARD_ID)
+    expect(response.state.events.filter(event => event.type === 'card.destroyed' && event.cardId === CARD_ID))
+      .toEqual([expect.objectContaining({ playerId: 'p1', reason: 'passed', sourceCardId: CARD_ID })])
+    expect(response.state.events.some(event => event.type === 'card.passed' && event.cardId === CARD_ID)).toBe(false)
+    expect(response.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === CARD_ID))
+      .toEqual([expect.objectContaining({ paymentFor: 'minor-improvement', resources: { food: 1 } })])
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID))
+      .toEqual([expect.objectContaining({ resources: { clay: 3 }, reason: 'cardEffect' })])
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardDestroyed', params: expect.objectContaining({ cardId: CARD_ID }),
+    }))
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain', params: expect.objectContaining({ cardId: CARD_ID, gain: { clay: 3 } }),
+    }))
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectPay', params: expect.objectContaining({ cardId: CARD_ID, cost: { food: 1 } }),
+    }))
+    expect(response.scores![0]!.total).toBe(score)
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, CARD_ID))
+    assertUndoRestored(before, session.undoAction())
+    const repeated = buy(session)
+    expect(repeated.state.players[0]!.resources).toMatchObject({ food: 2, clay: 9 })
+    expect(repeated.state.events.filter(event => event.type === 'card.destroyed' && event.cardId === CARD_ID)).toHaveLength(1)
+    confirmNext(session, repeated)
+    assertRejectedUnchanged(session, () => session.undoAction())
+  })
+
+  it('keeps the two-player payment and reward while passing to the real next participant', () => {
+    const session = make(2)
+    const scores = session.getState().scores
+    const response = buy(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, clay: 9 })
+    expect(response.state.players[0]!.minorHand).toEqual([])
+    expect(response.state.players[0]!.minorPlayed).toEqual([])
+    expect(response.state.players[1]!.minorHand).toEqual(['__test_placeholder__', CARD_ID])
+    expect(Object.values(response.state.players[1]!.resources)).toEqual(Array(11).fill(0))
+    expect(response.state.events.filter(event => event.type === 'card.passed' && event.cardId === CARD_ID))
+      .toEqual([expect.objectContaining({ fromPlayerId: 'p1', toPlayerId: 'p2' })])
+    expect(response.state.events.some(event => event.type === 'card.destroyed' && event.cardId === CARD_ID)).toBe(false)
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardPassed', playerRefs: { fromPlayer: 'p1', toPlayer: 'p2' },
+      params: expect.objectContaining({ cardId: CARD_ID }),
+    }))
+    expect(response.scores).toEqual(scores)
+  })
+
+  it('rejects an unaffordable solo card twice without passing, charging, or granting clay', () => {
+    const session = make(1, 0)
+    const response = openMinorPrompt(session)
+    expect(response.ok, response.error).toBe(true)
+    expect(cardOption(response)).toBeUndefined()
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, CARD_ID))
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, CARD_ID))
+    const current = session.getState()
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 0, clay: 6 })
+    expect(current.state.players[0]!.minorHand).toEqual([CARD_ID])
+    expect(current.state.events.some(event => event.sourceCardId === CARD_ID)).toBe(false)
+    expect(current.state.log.some(entry => entry.params?.cardId === CARD_ID)).toBe(false)
   })
 })
 
