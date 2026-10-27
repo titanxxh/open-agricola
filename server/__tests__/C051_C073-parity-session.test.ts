@@ -1,11 +1,13 @@
 import { enterFeeding } from './_helpers/harvest-feeding'
 import { createWorkSession } from './_helpers/session-fixtures'
-import { describe, expect, it } from 'vitest'
+import assert from 'node:assert/strict'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { assertRejectedUnchanged, confirmNext } from './_helpers/session-assertions'
 
 import '../../shared/cards/C/C051_FishingNet'
 import '../../shared/cards/C/C055_Studio'
@@ -188,6 +190,125 @@ describe('C051 Fishing Net parity', () => {
     session.state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = 2
     session.loadState(session.state)
     expect(session.takeAction(0, 'fishing').state.players[0]!.resources.food).toBe(2)
+  })
+})
+
+describe('C051 Fishing Net actual participants', () => {
+  const cardId = 'C051_FishingNet'
+  const sessions: GameSession[] = []
+  afterEach(() => { for (const session of sessions.splice(0)) session.dispose() })
+
+  const makeFishingSession = (playerCount: number, opponentFood = 1) => {
+    const session = createWorkSession({ seed: 42, options: { playerCount }, configure(state) {
+      for (const [index, player] of state.players.entries()) {
+        player.minorHand = [FILLER]
+        player.occupationHand = [FILLER]
+        player.minorPlayed = index === 0 ? [cardId] : []
+        player.cardStates = {}
+        player.resources = {
+          food: index === 0 ? 0 : opponentFood, wood: 0, clay: 0, reed: 0, stone: 0,
+          grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        }
+      }
+      state.actionSpaces.find(space => space.id === 'fishing')!.resources.food = 1
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  const finishOwnerSwitches = (session: GameSession, initial: SessionResponse) => {
+    let response = initial
+    for (let step = 0; step < 6 && response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'confirm-player-switch'; step++) {
+      response = session.resolveChoice(response.interaction.request.fromPlayerIndex, 'confirm')
+      expect(response.ok, response.error).toBe(true)
+    }
+    return response
+  }
+
+  it('solo Fishing is available without food and neither charges its owner nor schedules a deposit', () => {
+    const session = makeFishingSession(1)
+    const resourcesBefore = { ...session.getState().state.players[0]!.resources }
+    const scoresBefore = session.getState().scores
+    expect(session.getActionAvailability(0).fishing).toBe(true)
+    const response = session.takeAction(0, 'fishing')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player', nextPlayerIndex: 0 } })
+    expect(response.state.players).toHaveLength(1)
+    expect(response.state.players[0]!.resources).toEqual({ ...resourcesBefore, food: 1 })
+    expect(response.state.players[0]!.cardStates[cardId]).toBeUndefined()
+    expect(response.state.events.filter(event => event.sourceCardId === cardId)).toEqual([])
+    expect(response.state.log.some(entry => entry.params?.cardId === cardId)).toBe(false)
+    expect(response.state.actionSpaces.find(space => space.id === 'fishing')?.takenBy)
+      .toEqual([{ playerId: 'p1', workerId: '1' }])
+    expect(response.scores).toEqual(scoresBefore)
+    expect(response.scores[0]!.categories).toContainEqual(expect.objectContaining({ key: 'cards', total: 1 }))
+
+    const continued = confirmNext(session, response)
+    const last = session.takeAction(0, 'day-laborer')
+    expect(continued.state.round).toBe(1)
+    expect(last.ok, last.error).toBe(true)
+    const nextRound = confirmNext(session, last)
+    expect(nextRound.state.round).toBe(2)
+    expect(nextRound.state.actionSpaces.find(space => space.id === 'fishing')?.resources.food).toBe(1)
+    expect(nextRound.state.players[0]!.cardStates[cardId]).toBeUndefined()
+  })
+
+  it('a real opponent pays the owner before collecting and deposits two food on returning home', () => {
+    const session = makeFishingSession(2)
+    const resourcesBefore = session.getState().state.players.map(player => ({ ...player.resources }))
+    const scoresBefore = session.getState().scores
+    const ownerAction = session.takeAction(0, 'forest')
+    expect(ownerAction.ok, ownerAction.error).toBe(true)
+    confirmNext(session, ownerAction)
+    expect(session.getState().state.currentPlayerIndex).toBe(1)
+    const response = finishOwnerSwitches(session, session.takeAction(1, 'fishing'))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(response.state.players[0]!.resources).toEqual({ ...resourcesBefore[0], wood: 3, food: 1 })
+    expect(response.state.players[1]!.resources).toEqual(resourcesBefore[1])
+    expect(response.state.players[0]!.cardStates[cardId]?.extraData).toMatchObject({ pendingDeposits: 1, depositEpisode: 1 })
+    expect(response.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === cardId))
+      .toEqual([expect.objectContaining({
+        from: { kind: 'player', playerId: 'p2' }, to: { kind: 'player', playerId: 'p1' }, resources: { food: 1 },
+      })])
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain', playerId: 'p1', params: expect.objectContaining({ cardId, gain: { food: 1 } }),
+    }))
+    expect(response.scores).toEqual(scoresBefore)
+
+    confirmNext(session, response)
+    const ownerLast = session.takeAction(0, 'day-laborer')
+    expect(ownerLast.ok, ownerLast.error).toBe(true)
+    confirmNext(session, ownerLast)
+    const opponentLast = session.takeAction(1, 'clay-pit')
+    expect(opponentLast.ok, opponentLast.error).toBe(true)
+    const nextRound = finishOwnerSwitches(session, confirmNext(session, opponentLast))
+    assert.equal(nextRound.interaction.stateId, 'idle', JSON.stringify(nextRound.interaction))
+    expect(nextRound.state.round).toBe(2)
+    expect(nextRound.state.actionSpaces.find(space => space.id === 'fishing')?.resources.food).toBe(3)
+    expect(nextRound.state.players[0]!.cardStates[cardId]?.extraData).toMatchObject({ pendingDeposits: 0, depositEpisode: 1 })
+    expect(nextRound.scores).toEqual(scoresBefore)
+  })
+
+  it('a real opponent without existing food is rejected atomically before Fishing placement', () => {
+    const session = makeFishingSession(2, 0)
+    confirmNext(session, session.takeAction(0, 'forest'))
+    expect(session.getActionAvailability(1).fishing).toBe(false)
+    const before = session.getState()
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const rejected = assertRejectedUnchanged(session, () => session.takeAction(1, 'fishing'))
+      expect(rejected.historyLength).toBe(before.historyLength)
+      expect(rejected.hasActionStartSnapshot).toBe(before.hasActionStartSnapshot)
+    }
+    expect(session.getState().state.players[0]!.cardStates[cardId]).toBeUndefined()
+    const alternative = session.takeAction(1, 'day-laborer')
+    expect(alternative.ok, alternative.error).toBe(true)
+    expect(alternative.state.players[1]!.resources.food).toBe(2)
+    expect(alternative.state.actionSpaces.find(space => space.id === 'fishing')?.resources.food).toBe(1)
+    expect(alternative.scores).toEqual(before.scores)
   })
 })
 
