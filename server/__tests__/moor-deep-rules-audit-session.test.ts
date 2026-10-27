@@ -167,7 +167,7 @@ describe('Moor clause-level native Session audit', () => {
     expect(response.state.players[0]!.minorHand).toContain(cardId)
   })
 
-  it.each(['farmland', 'cultivation'])('M054 takes a card only after finishing %s, with free and paid acquisition or decline', (spaceId) => {
+  it.each(['farmland', 'cultivation'])('M054 performs the selected card action only after finishing %s, with free and borrowed use or decline', (spaceId) => {
     for (const mode of ['market', 'borrow', 'decline'] as const) {
       const session = setup(['M054_AgriculturalImplement'])
       const player = session.state.players[0]!
@@ -197,18 +197,20 @@ describe('Moor clause-level native Session audit', () => {
       if (mode === 'decline') response = session.resolveChoice(0, '__skip__')
       else {
         response = acceptMoorAuditChoice(session, response)
+        const value = ['card-action', card.id, 'action', 'cut-peat', MOOR.row, MOOR.col].join(':')
+        expect(response.interaction.request.options.map(option => option.value)).toContain(value)
         const before = JSON.stringify(response.state)
-        expect(session.resolveChoice(1, `card:${card.id}`).ok).toBe(false)
+        expect(session.resolveChoice(1, value).ok).toBe(false)
         expect(JSON.stringify(session.getState().state)).toBe(before)
-        response = session.resolveChoice(0, `card:${card.id}`)
+        response = session.resolveChoice(0, value)
       }
       expect(response.ok, response.error).toBe(true)
       expect(response.state.farmersOfTheMoor!.specialActionCards.find((entry) => entry.id === card.id)!.location).toEqual(
         mode === 'decline' ? originalLocation : { kind: mode === 'borrow' ? 'playerFaceDown' : 'playerFaceUp', playerId: player.id },
       )
       expect(response.state.players[0]!.resources.food).toBe(0)
-      expect(response.state.players[0]!.farmTerrain).toEqual(terrain)
-      expect(response.state.players[0]!.resources.fuel).toBe(20)
+      expect(response.state.players[0]!.farmTerrain).toEqual(mode === 'decline' ? terrain : terrain!.filter(tile => tile.row !== MOOR.row || tile.col !== MOOR.col))
+      expect(response.state.players[0]!.resources.fuel).toBe(mode === 'decline' ? 20 : 23)
       expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
       expect(response.interaction.sourceCard).not.toBe('M054_AgriculturalImplement')
     }
@@ -224,14 +226,19 @@ describe('Moor clause-level native Session audit', () => {
     let response = session.takeAction(0, 'farmland')
     response = session.commitSelectionChoice(0, { tile: response.interaction.request.farm.selectableTiles[0]! })
     response = acceptMoorAuditChoice(session, response)
-    expect(response.interaction.request.options.map((option) => option.value)).not.toContain(`card:${blocked!.id}`)
+    const blockedValue = ['card-action', blocked!.id, 'action', 'hiring-fair'].join(':')
+    const availableValue = ['card-action', available!.id, 'action', 'cut-peat', MOOR.row, MOOR.col].join(':')
+    expect(response.interaction.request.options.map((option) => option.value)).not.toContain(blockedValue)
+    expect(response.interaction.request.options.map((option) => option.value)).toContain(availableValue)
     const before = JSON.stringify(response.state)
-    response = session.resolveChoice(0, `card:${blocked!.id}`)
+    response = session.resolveChoice(0, blockedValue)
     expect(response.ok).toBe(false)
     expect(JSON.stringify(response.state)).toBe(before)
-    response = session.resolveChoice(0, `card:${available!.id}`)
+    response = session.resolveChoice(0, availableValue)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(mode === 'poor' ? 1 : 2)
+    expect(response.state.players[0]!.resources.fuel).toBe(23)
+    expect(response.state.players[0]!.farmTerrain).not.toContainEqual(MOOR)
     expect(response.state.farmersOfTheMoor!.specialActionCards.find((entry) => entry.id === available!.id)!.location).toEqual({ kind: 'playerFaceUp', playerId: player.id })
   })
 

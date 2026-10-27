@@ -154,7 +154,7 @@ describe('Moor complex special-action minors', () => {
       .not.toBe('M041_CattleCollar')
   })
 
-  it('M054 Agricultural Implement takes market cards for free and opponent face-up cards for 2 food', () => {
+  it('M054 Agricultural Implement performs market-card actions for free and borrowed-card actions for 2 food', () => {
     const free = setup(['M054_AgriculturalImplement'])
     let resp = free.session.takeAction(0, 'farmland')
     resp = plowFirstTile(free.session, resp)
@@ -165,11 +165,13 @@ describe('Moor complex special-action minors', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected special card choice')
     const marketCard = findSpecialCard(free.session, 'cut-peat')
-    const marketOption = resp.interaction.request.options?.find((option) => option.value === `card:${marketCard.id}`)
+    const marketOption = resp.interaction.request.options?.find((option) => option.value === ['card-action', marketCard.id, 'action', 'cut-peat', MOOR_A.row, MOOR_A.col].join(':'))
     expect(marketOption).toBeDefined()
     resp = free.session.resolveChoice(0, marketOption!.value)
     expect(marketCard.location).toEqual({ kind: 'playerFaceUp', playerId: free.player.id })
     expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.resources.fuel).toBe(3)
+    expect(resp.state.players[0]!.farmTerrain).not.toContainEqual(MOOR_A)
 
     const paid = setup(['M054_AgriculturalImplement'])
     const p2 = paid.state.players[1]!
@@ -182,12 +184,14 @@ describe('Moor complex special-action minors', () => {
     resp = acceptOptional(paid.session, resp)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected special card choice')
-    const borrowedOption = resp.interaction.request.options?.find((option) => option.value === `card:${borrowed.id}`)
+    const borrowedOption = resp.interaction.request.options?.find((option) => option.value === ['card-action', borrowed.id, 'action', 'cut-peat', MOOR_A.row, MOOR_A.col].join(':'))
     expect(borrowedOption).toBeDefined()
     resp = paid.session.resolveChoice(0, borrowedOption!.value)
     const updatedBorrowed = paid.session.state.farmersOfTheMoor!.specialActionCards.find((card) => card.id === borrowed.id)!
     expect(updatedBorrowed.location).toEqual({ kind: 'playerFaceDown', playerId: paid.player.id })
     expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.resources.fuel).toBe(3)
+    expect(resp.state.players[0]!.farmTerrain).not.toContainEqual(MOOR_A)
   })
 
   it('M055 Tool Shed chains the other special action once per round without moving another card or worker', () => {
