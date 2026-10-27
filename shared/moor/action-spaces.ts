@@ -16,7 +16,7 @@ const emptyResources: Resource = {
 
 export const createMoorActionSpaces = (playerCount: number): ActionSpace[] => {
   const spaces: ActionSpace[] = []
-  if (playerCount >= 2 && playerCount <= 6) {
+  if (playerCount >= 1 && playerCount <= 6) {
     spaces.push({
       id: 'moor-infirmary',
       nameKey: 'actions.moor-infirmary.name',

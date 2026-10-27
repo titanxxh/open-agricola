@@ -1070,6 +1070,8 @@ export type ActionFlow = (
       expandFlow?: boolean
       /** Native entry; completePlacement supplies the callback when no place-farmer host owns it. */
       spaceUse?: ActionSpaceUseContext & { completePlacement?: true }
+      /** Native settlement after effects, before the primary completion window. */
+      completionBarrier?: true
     }
   | ({
       /** Keep the decision open and refresh unselected branches after anytime actions. */
@@ -1120,6 +1122,8 @@ export type ActionDefinition = {
   costPreview?: ActionCostPreview
   /** Pure description of this shared primitive, derived from its executable rule parameters. */
   previewEffect?: (context: ActionExecutionContext) => ChoiceEffectPreview | undefined
+  /** Pure native pending refresh after an interrupting action changes legality. */
+  projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest) => InteractionRequest
   /** Pure executable plan, also used for descriptions. Base mode includes all potential branches. */
   flowFactory?: (context: ActionFlowPlanningContext) => ActionFlow | undefined
   execute: (context: ActionMutationContext) => ActionExecutionResult

@@ -747,6 +747,10 @@ export const createInitialState = (
     : extraMinorIdsOrOptions
   const gameSeed = resolveSeed(seed)
   const roundActionOrder = generateRoundActionOrder(gameSeed)
+  if (options.enableFarmersOfTheMoor) {
+    roundActionOrder.splice(roundActionOrder.indexOf('major-improvement'), 1)
+    roundActionOrder.unshift('major-improvement')
+  }
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
   const soloHandMode = players.length === 1 ? options.soloHandMode ?? 'random' : undefined

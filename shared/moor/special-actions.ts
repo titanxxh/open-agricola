@@ -256,7 +256,9 @@ export const applyMoorSpecialAction = (
   const result = executeMoorSpecialActionEffect(state, playerIndex, actionId, payload, eventSink)
   if (!result.ok) return result
 
-  if (card.location.kind === 'market') {
+  if (state.players.length === 1 && card.location.kind === 'solo-current') {
+    card.location = { kind: 'solo-current', inUse: true }
+  } else if (card.location.kind === 'market') {
     card.location = { kind: 'playerFaceUp', playerId: player.id }
   } else {
     player.resources.food -= borrowCost.food ?? 0
@@ -267,6 +269,9 @@ export const applyMoorSpecialAction = (
 }
 
 export const resetMoorSpecialActionCards = (state: GameState): void => {
+  if (state.players.length === 1 && state.farmersOfTheMoor) {
+    return
+  }
   state.farmersOfTheMoor?.specialActionCards.forEach((card) => {
     card.location = { kind: 'market' }
   })

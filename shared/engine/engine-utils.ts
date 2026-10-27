@@ -970,6 +970,7 @@ function buildFlowNodeContent(
       flow.effectPreview,
     )
     actionNode.expandFlow = flow.expandFlow
+    actionNode.completionBarrier = flow.completionBarrier
     actionNode.expandFlowIdStyle = flow.expandFlow ? idStyle : undefined
     if (flow.spaceUse) {
       const scope = wrapSpaceUse(nextSequenceId('space-use'), actionNode, flow.actionId, flow.spaceUse, ownerPlayerId, actionNode.actionContext, flow.spaceUse.completePlacement === true)

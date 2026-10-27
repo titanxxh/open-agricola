@@ -65,6 +65,8 @@ type SessionResponse = {
 
 Tests: `server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`.
 
+Native `ActionDefinition.projectInteractionRequest` and the card projection hook refresh pending requests from current authoritative state without executing effects. This keeps affordability current after an existing legal anytime exchange. Solo Moor preparation uses the native `onMoorSoloPreparation` continuation before round-start hooks; choice annotations and the complete engine cursor survive Session restoration. Tests: `server/__tests__/standard-solo-moor-session.test.ts`.
+
 ## Rotation, extra turns and supply people
 
 A standard solo game has one actual participant. New-game resource initialization gives that player no food; common action definitions admit one player and use the two-player base board, with Forest replenishing two wood. Participant count stays one for dealing, rule queries and settlement. Ordinary actions keep the existing confirmation and undo boundary, including the last placement before returning home or harvesting. Tests: `server/__tests__/standard-solo-core-session.test.ts`.

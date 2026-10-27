@@ -60,6 +60,8 @@ import { reapAction } from './effects/reap'
 import { completeParentFatherAction } from '../parents/father-completion'
 import { createSummerBreadOrSellAction, summerSellGrainAction } from '../seasons/internal-actions'
 import { moorSpecialActionApplyAction, moorSpecialActionChoiceAction } from '../moor/special-action-flow'
+import { moorSoloPreparationAction } from './effects/internal/moor-solo-preparation'
+import { moorSoloRetentionAction } from './effects/internal/moor-solo-retention'
 
 import type { FlowActionResolver } from './flow'
 
@@ -130,4 +132,6 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   createSummerBreadOrSellAction(resolveAction),
   moorSpecialActionApplyAction,
   moorSpecialActionChoiceAction,
+  moorSoloPreparationAction,
+  moorSoloRetentionAction,
 ]

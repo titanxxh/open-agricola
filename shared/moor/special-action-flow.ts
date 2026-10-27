@@ -357,6 +357,7 @@ const takeSpecialActionCard = (
   if (!card || !isMoorSpecialActionCardUsableByPlayer(card, player.id)) {
     return { type: 'fail' as const, errorKey: 'special action unavailable' }
   }
+  if (state.players.length === 1) return { type: 'ok' as const }
   if (card.location.kind === 'market') {
     card.location = { kind: 'playerFaceUp', playerId: player.id }
     return { type: 'ok' as const }
@@ -505,7 +506,11 @@ export const moorSpecialActionApplyAction: ActionDefinition = {
       ? { listenerId: entry.registration.id, ownerPlayerId: entry.ownerPlayerId, cardId: entry.cardId, ownerCardZone: entry.ownerCardZone }
       : { listenerId: entry.registration.id, ownerPlayerId: '' as const, cardId: '' as const })
     return { type: 'flow', flow: {
-      type: 'seq', children: result.followUpFlow ? [result.followUpFlow] : [],
+      type: 'seq', children: [
+        ...(result.followUpFlow ? [result.followUpFlow] : []),
+        ...(parsed.kind === 'card' && state.players.length === 1
+          ? [{ type: 'leaf' as const, actionId: 'moor-solo-retention', params: { cardId: parsed.cardId }, completionBarrier: true as const }] : []),
+      ],
       moorCompletion: { actionId: parsed.actionId, specialActionCardId: parsed.kind === 'card' ? parsed.cardId : undefined, payload: parsed.payload, playerId: player.id,
         result: completionResult, terrainCleared: result.terrainCleared, terrainEvent: result.terrainEvent, sources,
         triggerSnapshot: createTriggerSnapshot(state) },

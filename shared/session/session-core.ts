@@ -878,6 +878,7 @@ export class GameCore {
       },
       onAfterRevealAction: (resume) => { this.continueAfterRevealAction(resume.playerIndex, resume.extra) },
       onPreparation: (resume) => { this.continuePreparation(resume.playerIndex, resume.extra) },
+      onMoorSoloPreparation: (resume) => { this.continueRoundStart(0, resume.extra) },
       onRoundStart: (resume) => { this.continueRoundStart(resume.playerIndex, resume.extra) },
       onEndPreparation: (resume) => { this.continueEndPreparation(resume.playerIndex, resume.extra) },
       onBeforeWork: (resume) => { this.continueAfterFutureMeepleActions(resume.playerIndex, resume.cardIndex, resume.extra) },
@@ -2348,12 +2349,14 @@ export class GameCore {
     const frame = this.engineStack.current()
     const envelope = this.engineStack.peekPendingEnvelope()
     const view = this.engineStack.peekPendingView()
-    if (!frame || !envelope || !view?.sourceCard) return
-    const project = getCardEffect(view.sourceCard)?.projectInteractionRequest
-    if (!project) return
+    if (!frame || !envelope || !view) return
+    const nativeProject = envelope.pendingActionId ? this.registry.get(envelope.pendingActionId)?.projectInteractionRequest : undefined
+    const project = view.sourceCard ? getCardEffect(view.sourceCard)?.projectInteractionRequest : undefined
+    if (!nativeProject && !project) return
     const player = this.state.players[this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, view)]
     if (!player) return
-    const request = project(this.state, player, envelope.request, envelope.pendingActionId)
+    let request = nativeProject?.(this.state, player, envelope.request) ?? envelope.request
+    if (project) request = project(this.state, player, request, envelope.pendingActionId)
     if (request === envelope.request) return
     frame.engine.peekPendingHost()?.setPending({
       ...envelope,
@@ -3389,6 +3392,10 @@ export class GameCore {
     })
     appendImmediateEvents(this.state, accumulatedActionEvents)
     this.state.roundFirstPlayerId = this.state.players.find(player => player.startPlayer)?.id
+    if (this.state.players.length === 1 && this.state.enableFarmersOfTheMoor) {
+      this.stageDispatch.startFlow({ type: 'leaf', actionId: 'moor-solo-preparation' }, 'onMoorSoloPreparation', 0, 0, 0, { roundPreparation: extra?.roundPreparation })
+      return this.respond()
+    }
     return this.continueRoundStart(0, { roundPreparation: extra?.roundPreparation })
   }
 
@@ -4653,6 +4660,9 @@ export class GameCore {
   private continueAfterRoundEnd(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.stageDispatch.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
       return this.respond()
+    }
+    if (this.state.players.length === 1 && this.state.farmersOfTheMoor) {
+      this.state.farmersOfTheMoor.soloRetentionPaid = false
     }
     this.state.players.forEach((p) => {
       for (const w of p.workers) {

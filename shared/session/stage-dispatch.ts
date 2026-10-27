@@ -23,6 +23,7 @@ export type StageResumeState = {
     | 'onBeforeWork'
     | 'onAfterRevealAction'
     | 'onPreparation'
+    | 'onMoorSoloPreparation'
     | 'onEndPreparation'
     | 'onWorkStart'
     | 'onRoundStart'
