@@ -175,7 +175,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     })
     await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     const observe = (page: Page) => {
-      page.on('pageerror', error => errors.push(error.message))
+      page.on('pageerror', error => errors.push(error.stack ?? error.message))
       page.on('websocket', socket => {
         if (!socket.url().startsWith(apiOrigin.replace('https:', 'wss:') + '/nodes/')) return
         socket.on('framereceived', ({ payload }) => {
@@ -264,8 +264,27 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       ]))
       await page.reload({ waitUntil: 'domcontentloaded' })
       await expect(page.getByRole('button', { name: 'Local Hotseat', exact: true })).toBeVisible()
+      const workshopLoads = [
+        page.waitForResponse(response => {
+          const url = new URL(response.url())
+          return url.pathname === '/api/workshop/cards' && !url.searchParams.has('scope') && !url.searchParams.has('featured')
+        }),
+        page.waitForResponse(response => {
+          const url = new URL(response.url())
+          return url.pathname === '/api/workshop/cards' && url.searchParams.get('featured') === '1'
+        }),
+        page.waitForResponse(response => {
+          const url = new URL(response.url())
+          return url.pathname === '/api/workshop/cards' && url.searchParams.get('scope') === 'mine'
+        }),
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/workshop/sandbox'),
+      ]
       await page.goto(`${environment.appUrl}?page=workshop`, { waitUntil: 'domcontentloaded' })
       await expect(page.getByRole('heading', { name: 'Card Workshop', exact: true })).toBeVisible()
+      for (const response of await Promise.all(workshopLoads)) {
+        expect(response.status()).toBe(200)
+        expect(await response.json()).toMatchObject({ ok: true })
+      }
       await page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' })
       await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
       await page.getByRole('checkbox', { name: /Snake opening/ }).uncheck()
