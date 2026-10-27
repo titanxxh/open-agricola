@@ -45,6 +45,7 @@ export type CustomSessionMethod =
   | 'resolveOrdinaryCardDrawChoice'
   | 'commitSelectionChoice'
   | 'submitParentSelection'
+  | 'submitSoloHandSelection'
   | 'performRoundEnd'
   | 'undoStep'
   | 'undoAction'

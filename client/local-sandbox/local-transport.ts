@@ -11,6 +11,7 @@
 import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-selection'
 import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { DraftPickPayload } from '../../shared/draft/types'
+import type { SoloHandSelectionSubmission } from '../../shared/contract/solo-hand-selection'
 import type { ParentSelectionSubmission } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 import type { GameTransport, SnapshotListener, ValidateResult } from '../services/gameTransport.ts'
@@ -129,6 +130,7 @@ export class LocalGameTransport implements GameTransport {
   devPlayCard(playerIndex: number, cardId: string) { return this.call('devPlayCard', [playerIndex, cardId]) }
   devCreatePasture(playerIndex: number) { return this.call('devCreatePasture', [playerIndex]) }
   draftSubmit(playerId: string, pick: DraftPickPayload) { return this.call('draftSubmit', [playerId, pick]) }
+  soloHandSubmit(playerIndex: number, selection: SoloHandSelectionSubmission) { return this.call('soloHandSubmit', [playerIndex, selection]) }
   parentSubmit(playerIndex: number, selection: ParentSelectionSubmission) {
     return this.call('parentSubmit', [playerIndex, selection])
   }

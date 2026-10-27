@@ -1179,6 +1179,17 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
   )
 }
 
+function handleSoloHandSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'soloHandSubmit' }>): void | Promise<void> {
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const seat = namedSeat(ctx, msg.playerIndex)
+  return useSessionResponse(
+    executeRoomSession(room, 'submitSoloHandSelection', [seat, msg.selection],
+      () => room.session.submitSoloHandSelection(seat, msg.selection)),
+    resp => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
+  )
+}
+
 function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'parentSubmit' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
@@ -1463,6 +1474,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   roundEnd: handleRoundEnd,
   commitSelection: handleCommitSelection,
   parentSubmit: handleParentSubmit,
+  soloHandSubmit: handleSoloHandSubmit,
   undoStep: handleUndoStep,
   undoAction: handleUndoAction,
   newGame: handleNewGame,

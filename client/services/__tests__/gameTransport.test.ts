@@ -264,6 +264,20 @@ describe('WsGameTransport request correlation', () => {
     transport.destroy()
   })
 
+  it('sends the complete solo hand selection as one command', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await transport.connect()
+    const socket = FakeWebSocket.instances[0]!
+    const selection = { groups: [{ kind: 'occupation' as const, cardIds: ['o1', 'o2'] }, { kind: 'minor' as const, cardIds: ['m1'] }] }
+    const submitted = transport.soloHandSubmit(0, selection)
+    expect(socket.sent).toHaveLength(1)
+    expect(socket.sent[0]).toMatchObject({ type: 'soloHandSubmit', playerIndex: 0, selection })
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 5))
+    await expect(submitted).resolves.toMatchObject({ historyLength: 5 })
+    transport.destroy()
+  })
+
   it('sends parentSubmit with playerIndex and selection payload', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })

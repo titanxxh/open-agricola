@@ -181,6 +181,7 @@ export class LocalSandboxCore {
       case 'devPlayCard': return core.devPlayCard(a[0], a[1])
       case 'devCreatePasture': return core.startDevFenceSelect(a[0])
       case 'draftSubmit': return core.submitDraftPick(a[0], a[1])
+      case 'soloHandSubmit': return core.submitSoloHandSelection(a[0], a[1])
       case 'parentSubmit': return core.submitParentSelection(a[0], a[1])
       default:
         throw new Error(`Unknown local-sandbox method: ${method}`)

@@ -5,6 +5,6 @@ export type ObservationRoundState = Pick<GameState, 'round' | 'phase' | 'gameOve
 export function observationRound(state?: ObservationRoundState): string {
   if (!state) return 'none'
   if (state.gameOver || (state.phase === 'playing' && state.round === 15)) return 'postgame'
-  if (state.phase === 'draft' || state.phase === 'parent-selection') return 'pregame'
+  if (state.phase === 'draft' || state.phase === 'solo-hand-selection' || state.phase === 'parent-selection') return 'pregame'
   return Number.isInteger(state.round) && state.round >= 1 && state.round <= 14 ? String(state.round) : 'unknown'
 }

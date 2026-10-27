@@ -14,5 +14,5 @@ export type CommandOutcome = {
 }
 export type CommandReceipt = CommandIdentity & { outcome: CommandOutcome }
 export type CommandErrorCode = 'command_identity_required' | 'command_scope_expired' | 'command_content_conflict' | 'command_input_stale' | 'command_pending'
-/** The opaque window changes on each draft round/parent phase and every undo. */
-export type InputWindow = { id: string; kind: 'draft' | 'parent' }
+/** The opaque window identifies opening hands, a draft round or parents, and changes on undo. */
+export type InputWindow = { id: string; kind: 'draft' | 'parent' | 'solo-hand' }

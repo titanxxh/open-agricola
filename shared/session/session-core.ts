@@ -54,6 +54,7 @@ import {
 } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
+import { validateSoloHandSelection } from './solo-hand-selection'
 import {
   ActionRegistry,
   EngineStack,
@@ -4722,6 +4723,35 @@ export class GameCore {
       { playerId, pick },
       () => draftPhase.submitDraftPick(this, playerId, pick),
     )
+  }
+
+  submitSoloHandSelection(playerIndex: number, submission: unknown): SessionResponse {
+    return this.runAuthoritativeCommand('soloHandSelection', playerIndex, submission, () => {
+      const selection = this.state.soloHandSelection
+      const player = this.state.players[playerIndex]
+      if (this.state.phase !== 'solo-hand-selection' || !selection || selection.kept ||
+          this.state.players.length !== 1 || !player || player.id !== selection.playerId) {
+        return this.respond(false, 'not in solo hand selection')
+      }
+      const kept = validateSoloHandSelection(selection, submission)
+      if (!kept) return this.respond(false, 'invalid complete solo hand selection')
+      player.occupationHand = kept.groups.filter(group => group.kind === 'occupation').flatMap(group => group.cardIds)
+      player.minorHand = kept.groups.filter(group => group.kind !== 'occupation').flatMap(group => group.cardIds)
+      selection.kept = kept
+      this.state.phase = this.state.parentSelection ? 'parent-selection' : 'playing'
+      const candidates = this.state.parentSelection?.candidates[player.id]
+      if (candidates?.mother.length === 1 && candidates.father.length === 1) {
+        const mother = candidates.mother[0]!
+        const father = candidates.father[0]!
+        const result = commitParentSelection(this.state, player.id, { mother, father })
+        if (!result.ok) throw new Error(result.error)
+      }
+      const response = this.startFirstRoundAfterSetup()
+      return { ...response, privateEvents: [...(response.privateEvents ?? []), {
+        schemaVersion: 1, type: 'private.handChanged', recipientPlayerId: player.id,
+        cardIds: [...player.occupationHand, ...player.minorHand], cardType: 'mixed', reason: 'solo-hand-selected',
+      }] }
+    })
   }
 
   submitParentSelection(

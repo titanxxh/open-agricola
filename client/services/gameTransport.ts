@@ -7,6 +7,7 @@ import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-se
 import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
+import type { SoloHandSelectionSubmission } from '../../shared/contract/solo-hand-selection'
 import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 
@@ -79,6 +80,7 @@ export interface GameTransport {
   devPlayCard(playerIndex: number, cardId: string): Promise<GameSyncPayload>
   devCreatePasture(playerIndex: number): Promise<GameSyncPayload>
   draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload>
+  soloHandSubmit(playerIndex: number, selection: SoloHandSelectionSubmission): Promise<GameSyncPayload>
   parentSubmit(playerIndex: number, selection: ParentSelectionSubmission): Promise<GameSyncPayload>
   validateFarmChoice(type: string, playerId: string, payload: Record<string, unknown>): Promise<ValidateResult>
   onSnapshot(cb: SnapshotListener): () => void
@@ -223,6 +225,10 @@ export class HttpGameTransport implements GameTransport {
 
   draftSubmit(playerId: string, pick: DraftPickPayload) {
     return this.send(() => post('/api/game/draft-submit', { playerId, pick }))
+  }
+
+  soloHandSubmit(playerIndex: number, selection: SoloHandSelectionSubmission) {
+    return this.send(() => post('/api/game/solo-hand-submit', { playerIndex, selection }))
   }
 
   parentSubmit(playerIndex: number, selection: ParentSelectionSubmission) {
@@ -484,7 +490,7 @@ export class WsGameTransport implements GameTransport {
       const identity = command.commandContext!
       const outcome = this.completed.get(identity.commandId)
       if (outcome) { this.finishCommand(identity.commandId, outcome); continue }
-      const simultaneous = command.type === 'draftSubmit' ? 'draft' : command.type === 'parentSubmit' ? 'parent' : null
+      const simultaneous = command.type === 'draftSubmit' ? 'draft' : command.type === 'parentSubmit' ? 'parent' : command.type === 'soloHandSubmit' ? 'solo-hand' : null
       const valid = command.type === 'createRoom' && !this.roomId || identity.roomId === this.roomId &&
         (simultaneous ? this.inputWindow?.kind === simultaneous && identity.inputWindowId === this.inputWindow.id : identity.expectedVersion === this.committedVersion)
       if (!valid) {
@@ -780,6 +786,10 @@ export class WsGameTransport implements GameTransport {
 
   async draftSubmit(playerId: string, pick: DraftPickPayload): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'draftSubmit', playerId, pick })
+  }
+
+  async soloHandSubmit(playerIndex: number, selection: SoloHandSelectionSubmission): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'soloHandSubmit', playerIndex, selection })
   }
 
   async parentSubmit(playerIndex: number, selection: ParentSelectionSubmission): Promise<GameSyncPayload> {
