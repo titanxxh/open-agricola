@@ -506,6 +506,21 @@ const handleAuthorizedGameRoute = async (
     return true
   }
 
+  if (req.method === 'POST' && req.url === '/api/game/solo-hand-submit') {
+    const body: unknown = JSON.parse(await readBody(req))
+    if (!body || typeof body !== 'object' || !('playerIndex' in body) ||
+        typeof body.playerIndex !== 'number' || !('selection' in body)) {
+      await sendJson(res, 400, { ok: false, error: 'invalid payload' })
+      return true
+    }
+    const { playerIndex, selection } = body
+    if (!(await enforceSeatBinding(req, res, playerIndex))) return true
+    const { resp, result } = await callAndRespond(req, 'submitSoloHandSelection',
+      [playerIndex, selection], s => s.submitSoloHandSelection(playerIndex, selection))
+    await sendJson(res, resp.ok ? 200 : 400, result)
+    return true
+  }
+
   if (req.method === 'POST' && req.url === '/api/game/parent-submit') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number

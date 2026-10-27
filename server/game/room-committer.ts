@@ -154,6 +154,8 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
           father: command.selection.father,
         },
       })
+    case 'soloHandSubmit':
+      return intent(command.type, { selection: command.selection })
     case 'devSetResources':
       return intent(command.type, { resources: command.resources })
     case 'devSetRound':

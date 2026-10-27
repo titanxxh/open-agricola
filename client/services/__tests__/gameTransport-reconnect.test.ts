@@ -247,6 +247,27 @@ describe('Room reconnect and durable commands', () => {
     transport.destroy()
   })
 
+  it('recovers one pending solo confirmation in its original input window', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', 'room-1', 0, { route: false, reconnectDelayMs: 1 })
+    await transport.connect(); const old = Socket.all[0]!; old.emit(joined())
+    old.emit({ ...snapshot(), inputWindow: { id: 'solo-window', kind: 'solo-hand' } })
+    const submitted = transport.soloHandSubmit(0, { groups: [{ kind: 'occupation', cardIds: ['a'] }, { kind: 'minor', cardIds: ['b'] }] })
+    const command = old.sent.at(-1)!
+    old.close(); await tick(); const next = Socket.all[1]!
+    await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('getCommandReceipt'))
+    next.emit({ type: 'commandReceipt', status: 'pending', identity: command.commandContext, requestId: next.sent.at(-1)!.requestId })
+    await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('joinRoom'))
+    next.emit(joined()); next.emit({ ...snapshot(2), inputWindow: { id: 'solo-window', kind: 'solo-hand' } })
+    await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('soloHandSubmit'))
+    expect(next.sent.at(-1)?.commandContext).toEqual(command.commandContext)
+    expect(next.sent.at(-1)?.selection).toEqual(command.selection)
+    next.emit({ ...snapshot(3), requestId: next.sent.at(-1)!.requestId })
+    next.emit({ type: 'commandReceipt', status: 'completed', receipt: { ...command.commandContext, outcome: { ok: true, roomId: 'room-1', roomVersion: 3 } } })
+    await submitted
+    transport.destroy()
+  })
+
   it('never replaces an expired pending scope with a new command identity', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const first = new WsGameTransport('ws://test', undefined, undefined, { route: false })

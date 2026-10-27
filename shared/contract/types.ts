@@ -11,6 +11,8 @@ import type { ThroughTheSeasonsState } from '../seasons/types'
 import type { FarmersOfTheMoorState, FarmTerrainTile } from '../moor/types'
 import type { AnimalKey } from './animals'
 import type { SeasonalAdjustment } from './seasonal-adjustments'
+import type { SoloHandMode } from './game-creation'
+import type { SoloHandSelectionState, SoloHandSelectionGroup } from './solo-hand-selection'
 
 export type Resource = {
   wood: number
@@ -646,14 +648,16 @@ export type GameSeed = number | string
 
 export type GameState = {
   round: number
-  /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
-  phase: 'draft' | 'parent-selection' | 'playing'
+  /** Opening hands, multiplayer draft, parent selection, or ordinary play. */
+  phase: 'draft' | 'solo-hand-selection' | 'parent-selection' | 'playing'
   /** Round sub-phase (preparation/work/returning-home/harvest/field/feeding/breeding). */
   roundPhase: RoundPhase
   /** Draft state when `phase === 'draft'`, otherwise null. */
   draft: import('../draft/types').DraftState | null
   draftMode?: 'simultaneous'
   draftPoolSize?: number
+  soloHandMode?: SoloHandMode
+  soloHandSelection?: SoloHandSelectionState | null
   parentSelection: ParentSelectionState | null
   currentPlayerIndex: number
   roundFirstPlayerId?: string
@@ -1223,6 +1227,7 @@ export type ChoiceMultiSelect = {
 }
 
 export type InteractionRequest = (
+  | { kind: 'solo-hand-selection'; groups: SoloHandSelectionGroup[] }
   | { kind: 'choice'; options: ActionChoiceOption[]; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
@@ -1323,6 +1328,7 @@ export type InteractionRequest = (
 ) & { anytimeWindow?: AnytimeWindow }
 
 export type InteractionCommand =
+  | 'submitSoloHandSelection'
   | 'takeAction'
   | 'resolveChoice'
   | 'commitSelection'

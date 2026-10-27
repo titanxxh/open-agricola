@@ -26,6 +26,7 @@ export const interactionRequestChoices = (request: InteractionRequest): ActionCh
     case 'heating':
     case 'selection':
     case 'card-draft':
+    case 'solo-hand-selection':
     case 'engine-blocked':
     case 'resource-quantity-select':
     case 'resource-batch-exchange-select':

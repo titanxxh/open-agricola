@@ -145,6 +145,7 @@ export const planResolveChoiceSubmission = (
     case 'resource-quantity-select':
     case 'resource-batch-exchange-select':
     case 'card-draft':
+    case 'solo-hand-selection':
     case 'engine-blocked':
       return { ok: false, error: `unhandled interaction kind: ${request.kind}` }
     default: {

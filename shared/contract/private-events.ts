@@ -16,7 +16,7 @@ export type PrivateHandChangedEvent = {
   recipientPlayerId: string
   cardIds: string[]
   cardType: 'minor' | 'occupation' | 'mixed'
-  reason: 'dev-draw-card' | 'draft-finalized' | 'card-effect'
+  reason: 'dev-draw-card' | 'draft-finalized' | 'solo-hand-selected' | 'card-effect'
   sourceCard?: string
   sourceActionId?: string
 }

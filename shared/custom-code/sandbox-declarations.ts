@@ -29,6 +29,7 @@ const INTERACTION_KINDS = {
   'farm-select': true,
   selection: true,
   'card-draft': true,
+  'solo-hand-selection': true,
   'select-trigger': true,
   'engine-blocked': true,
   'resource-quantity-select': true,

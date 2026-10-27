@@ -169,6 +169,7 @@ export const takeAction = (
   const state = core.state
   if (state.gameOver) return core.emitResponse(false, 'game is over')
   if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (state.phase === 'solo-hand-selection') return core.emitResponse(false, 'solo hand selection in progress')
   if (state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
   if (hasPendingOrdinaryCardDrawChoice(state)) {
     return core.emitResponse(false, 'ordinary card draw choice in progress')
@@ -234,6 +235,7 @@ export const takeSpecialAction = (
   const state = core.state
   if (state.gameOver) return core.emitResponse(false, 'game is over')
   if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (state.phase === 'solo-hand-selection') return core.emitResponse(false, 'solo hand selection in progress')
   if (state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
   if (hasPendingOrdinaryCardDrawChoice(state)) {
     return core.emitResponse(false, 'ordinary card draw choice in progress')
@@ -530,6 +532,7 @@ export const takeAnytimeAction = (
 ): SessionResponse => {
   if (core.state.gameOver) return core.emitResponse(false, 'game is over')
   if (core.state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (core.state.phase === 'solo-hand-selection') return core.emitResponse(false, 'solo hand selection in progress')
   if (core.state.phase === 'parent-selection') return core.emitResponse(false, 'parent selection in progress')
   if (hasPendingOrdinaryCardDrawChoice(core.state)) {
     return core.emitResponse(false, 'ordinary card draw choice in progress')

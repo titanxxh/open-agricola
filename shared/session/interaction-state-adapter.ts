@@ -119,6 +119,11 @@ export const deriveInteractionState = ({
   effectiveOwnerIndexForFrame,
   projectPendingRequest,
 }: InteractionStateAdapterInput): InteractionState => {
+  if (state.phase === 'solo-hand-selection' && state.soloHandSelection) return {
+    stateId: 'wait', playerIndex: 0,
+    request: { kind: 'solo-hand-selection', groups: state.soloHandSelection.groups },
+    allowedCommands: ['submitSoloHandSelection'], anytimeActions: [],
+  }
   if (state.gameOver) {
     return {
       stateId: 'gameover',

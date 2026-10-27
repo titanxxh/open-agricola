@@ -7,6 +7,7 @@ import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExc
 import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
+import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -45,6 +46,7 @@ type ClientCommandBody =
     }
   | { type: 'roundEnd' }
   | { type: 'parentSubmit'; playerIndex: number; selection: ParentSelectionSubmission }
+  | { type: 'soloHandSubmit'; playerIndex: number; selection: SoloHandSelectionSubmission }
   | { type: 'undoStep' }
   | { type: 'undoAction' }
   | { type: 'newGame'; seed?: number }

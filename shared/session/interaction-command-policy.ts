@@ -12,6 +12,7 @@ export const interactionSubmitChannel = (
     case 'resource-batch-exchange-select':
       return 'commitSelection'
     case 'card-draft':
+    case 'solo-hand-selection':
     case 'engine-blocked':
       return 'none'
     default:

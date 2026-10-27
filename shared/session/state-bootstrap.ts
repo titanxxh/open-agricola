@@ -35,7 +35,8 @@ import { normalizeFarmyardSpaceStates } from '../domain/farmyard-space-states'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { restoreCardWorkerSpaces } from '../domain/card-worker-space'
 import { createInitialPlayerStats } from './stats'
-import { dealParentCardsIfNeeded, ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
+import { createParentSelectionState, dealParentCardsIfNeeded, ensureParentMotherScheduleLogs, startParentSelectionIfNeeded } from '../parents/selection'
+import { createSoloHandGroups } from './solo-hand-selection'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {
   getCustomMinorImprovement,
@@ -640,7 +641,7 @@ const createInitialPlayers = (
   const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
   const snakeOpening = isSnakeOpeningActive(options)
   let dealtHands = { minorHands: [] as string[][], occupationHands: [] as string[][] }
-  if (draftMode !== 'simultaneous') {
+  if (draftMode !== 'simultaneous' && count !== 1) {
     if (enableFarmersOfTheMoor) {
       const ordinaryMinorDeal = dealHands(
         count,
@@ -748,6 +749,24 @@ export const createInitialState = (
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
+  const soloHandMode = players.length === 1 ? options.soloHandMode ?? 'random' : undefined
+  if (options.soloHandMode !== undefined && players.length !== 1) throw new Error('Solo hand mode requires one player')
+  if (soloHandMode && useDraft) throw new Error('Solo hand selection cannot use simultaneous draft')
+  const soloDeal = soloHandMode
+    ? dealHands(1, gameSeed, options.extraMinorIds, options.extraOccupationIds, options.deckIds, 0, options.enableCommunityDeck) : null
+  const soloMoorMinors = soloHandMode
+    ? dealFarmersOfTheMoorMinorHands(1, gameSeed, getImplementedFarmersOfTheMoorMinorIds(1).length)[0] ?? [] : []
+  const soloGroups = soloHandMode && soloDeal ? createSoloHandGroups(soloHandMode, {
+    occupation: soloDeal.occupationDeck,
+    minor: soloDeal.minorDeck,
+    moorMinor: soloMoorMinors,
+  }, options.enableFarmersOfTheMoor === true) : null
+  const soloHandSelection = soloHandMode === 'choose-7' && soloGroups
+    ? { playerId: players[0]!.id, groups: soloGroups, kept: null } : null
+  if (soloGroups) {
+    players[0]!.occupationHand = soloHandSelection ? [] : soloGroups.filter(group => group.kind === 'occupation').flatMap(group => group.cardIds)
+    players[0]!.minorHand = soloHandSelection ? [] : soloGroups.filter(group => group.kind !== 'occupation').flatMap(group => group.cardIds)
+  }
   const enableSnakeOpening = isSnakeOpeningActive(options)
   const enableFarmersOfTheMoor = options.enableFarmersOfTheMoor === true
   const farmersOfTheMoor = enableFarmersOfTheMoor
@@ -874,6 +893,16 @@ export const createInitialState = (
       options,
     )
   }
+  if (soloHandSelection) {
+    phase = 'solo-hand-selection'
+    const candidates = new Set(soloHandSelection.groups.flatMap(group => group.cardIds))
+    ordinaryCardDecks.occupation = ordinaryCardDecks.occupation.filter(id => !candidates.has(id))
+    ordinaryCardDecks.minor = ordinaryCardDecks.minor.filter(id => !candidates.has(id))
+  }
+  if (soloHandMode) {
+    const moorIds = new Set(soloMoorMinors)
+    ordinaryCardDecks.minor = ordinaryCardDecks.minor.filter(id => !moorIds.has(id))
+  }
 
   const initialEvents: GameEvent[] = [{
     schemaVersion: 1,
@@ -893,6 +922,7 @@ export const createInitialState = (
     draft,
     draftMode: useDraft ? 'simultaneous' : undefined,
     draftPoolSize: draft?.poolSize,
+    ...(soloHandMode ? { soloHandMode, soloHandSelection } : {}),
     parentSelection: null,
     currentPlayerIndex: 0,
     roundFirstPlayerId: players.find((player) => player.startPlayer)?.id,
@@ -943,7 +973,16 @@ export const createInitialState = (
     applyRoundGrowth(initialState)
     applySeasonPreparationAdjustments(initialState)
   }
-  if (options.draftParents === false) {
+  if (soloHandSelection && initialState.enableParentCards) {
+    // Freeze the private parent deal now, but expose/settle it only after hands.
+    initialState.parentSelection = createParentSelectionState(players.map(player => player.id), parentSelectionSeed)
+    if (options.draftParents === false) {
+      for (const candidates of Object.values(initialState.parentSelection.candidates)) {
+        candidates.mother = candidates.mother.slice(0, 1)
+        candidates.father = candidates.father.slice(0, 1)
+      }
+    }
+  } else if (options.draftParents === false) {
     dealParentCardsIfNeeded(initialState, parentSelectionSeed)
   } else {
     startParentSelectionIfNeeded(initialState, parentSelectionSeed)
