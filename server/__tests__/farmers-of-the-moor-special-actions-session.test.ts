@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 const findCardFor = (
   session: GameSession,
@@ -30,18 +31,34 @@ describe('Farmers of the Moor special actions', () => {
     [1, 1, 0], [2, 1, 1], [3, 2, 0], [4, 1, 0], [5, 1, 1], [6, 1, 1],
   ])('applies the printed base resources for %i players', (playerCount, hiringFood, horseCost) => {
     for (const actionId of ['hiring-fair', 'horse-market'] as const) {
-      const session = new GameSession(958, undefined, {
+      const session = createWorkSession({ seed: 958, options: {
         playerCount, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true,
-      })
-      stabilizeRandomHands(session.state.players)
-      const player = session.state.players[0]!
-      player.resources.food = 5
+      }, configure: state => {
+        state.players[0]!.resources.food = 5
+        if (playerCount === 1) {
+          const cards = state.farmersOfTheMoor!.specialActionCards
+          const current = cards.find(card => card.actions.includes(actionId))!
+          let order = 0
+          for (const card of cards) card.location = card.id === current.id
+            ? { kind: 'solo-current' } : { kind: 'solo-draw', order: order++ }
+          state.farmersOfTheMoor!.soloRetentionPaid = false
+        }
+      } })
       const card = findCardFor(session, actionId)
-      const response = session.takeSpecialAction(0, card.id, actionId)
+      if (playerCount === 1) {
+        const cards = session.state.farmersOfTheMoor!.specialActionCards
+        expect(new Set(cards.map(entry => entry.id)).size).toBe(10)
+        expect(cards.filter(entry => entry.location.kind === 'solo-current').map(entry => entry.id)).toEqual([card.id])
+        expect(cards.flatMap(entry => entry.location.kind === 'solo-draw' ? [entry.location.order] : []).sort((a, b) => a - b))
+          .toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8])
+      }
+      try {
+        const response = session.takeSpecialAction(0, card.id, actionId)
 
-      expect(response.ok).toBe(true)
-      expect(response.state.players[0]!.resources.food).toBe(5 + (actionId === 'hiring-fair' ? hiringFood : -horseCost))
-      if (actionId === 'horse-market') expect(response.state.players[0]!.resources.horse).toBe(1)
+        expect(response.ok).toBe(true)
+        expect(response.state.players[0]!.resources.food).toBe(5 + (actionId === 'hiring-fair' ? hiringFood : -horseCost))
+        if (actionId === 'horse-market') expect(response.state.players[0]!.resources.horse).toBe(1)
+      } finally { session.dispose() }
     }
   })
 
