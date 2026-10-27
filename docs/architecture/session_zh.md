@@ -69,6 +69,8 @@ type SessionResponse = {
 
 ## 轮转、额外回合与供应人物
 
+标准单人对局只有一名实际参与者。新局资源初始化给该玩家零食物；共同基础行动定义接纳一人并沿用两人基础行动盘，Forest 每轮补充两木。发牌、规则查询和结算仍读取真实人数一。普通行动沿用现有确认与撤销边界，最后一次放人也在确认后才进入回家或收获。测试：`server/__tests__/standard-solo-core-session.test.ts`。
+
 **额外回合**（[ADR 0001](../adr/0001-a92-adoptive-pull-model-extra-turn-hook.md)、[ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)）：
 
 - `contributeExtraTurn?: (state, player) => ActionFlow | void` 是 `CardEffect` hook，由 `shared/session/phases/round.ts` 的轮转显式消费，`runCardEffectHook` 不会执行它。
@@ -114,6 +116,8 @@ type SessionResponse = {
 测试：`server/__tests__/{person-placement-order-session,move-farmer-before-placement-session}.test.ts`。
 
 ## 逐玩家喂养结算
+
+`shared/actions/helpers/harvest-feeding-requirement.ts` 统一计算喂养需求：实际参与者为一人时成人每人三食，其他人数每人两食；新生儿每人一食。现有卡牌 modifier 在此基数上叠加，然后才提供报价或结算。测试：`shared/actions/helpers/__tests__/harvest-feeding-requirement.test.ts`、`server/__tests__/standard-solo-core-session.test.ts`。
 
 `handleFeedResolved()` 解析已提供目录与实时配方，完整校验批次后，把原等待帧替换为普通 Exchange flow。私有 `harvestSettlementResume` 保存剩余需求、已付食物、转换成本和玩家队列。完整批次反应与必需的动物整理结束后，才支付剩余食物、补乞讨和供暖。快照恢复与撤销同时恢复续行和引擎游标，不重做已完成兑换或重复扣除已付食物。
 
