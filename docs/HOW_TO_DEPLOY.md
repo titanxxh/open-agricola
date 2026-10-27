@@ -8,8 +8,10 @@ This guide is for developers who want to self-host the Open Agricola platform.
 
 ```mermaid
 flowchart LR
-  Browser --> Pages[Static frontend]
+  Browser --> Pages[Pages entry]
+  Pages -. canonical app location .-> Browser
   Browser --> Ingress[HTTPS public origin / Caddy]
+  Ingress --> Frontend[Hosted frontend /open-agricola/]
   Ingress --> Router[HTTP / WS routing]
   Router --> A[Application 1]
   Router --> B[Application 2]
@@ -20,7 +22,7 @@ flowchart LR
 ```
 
 
-The frontend and backend are fully separated. The frontend is a static GitHub Pages site; the backend runs in a Docker container on a VPS.
+The production image contains the application frontend and backend from the same build. A configured same-origin frontend at `/open-agricola/` keeps browser sessions first-party. GitHub Pages remains an entry point and can keep serving a separate frontend when hosted mode is not enabled. Public artwork and fonts continue to use the asset site's CDN.
 
 ---
 
@@ -46,7 +48,7 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-The production image also includes the original `pnpm-lock.yaml` used by the frozen install. Workshop sandbox identity hashes it with the deployed source and runtime versions; omitting it fails contract loading instead of silently ignoring dependency changes.
+The production image also includes the original `pnpm-lock.yaml` used by the frozen install. Workshop sandbox identity hashes it with the deployed source and runtime versions; omitting it fails contract loading instead of silently ignoring dependency changes. The hosted frontend is built before production dependencies are pruned and is copied to `/app/frontend-dist`; the image sets `FRONTEND_ROOT` to that directory.
 
 Set the existing `PUBLIC_API_BASE`, `PUBLIC_APP_ORIGIN`, `CORS_ORIGIN`, and account/OAuth settings in `.env`; preserve registered callbacks. Leave `DATABASE_URL` and the S3 connection group blank to use local services. External S3 requires a complete endpoint, region, private bucket, access key, and secret.
 
@@ -272,14 +274,39 @@ Use this when the VPS already runs Nginx with a Certbot-managed certificate. Doc
 
 ---
 
-## 2. Deploy the Frontend to GitHub Pages
+## 2. Deploy the Frontend
 
-### Prerequisites
+### Same-origin frontend for browser sessions
+
+Enable this mode when the public API is served at an HTTPS origin and the interactive frontend can share that origin. For the existing production host, the activation settings are:
+
+```env
+PUBLIC_API_BASE=https://openagapi.titanxxh.com
+PUBLIC_APP_ORIGIN=https://openagapi.titanxxh.com/open-agricola/
+FRONTEND_ROOT=/app/frontend-dist
+```
+
+`FRONTEND_ROOT` is already set by the production image. Configure `PUBLIC_APP_ORIGIN` explicitly; including the frontend files in an image does not activate a different public entry by itself. Hosted routing and the Pages handoff stay disabled when `FRONTEND_ROOT` is unset, the app uses another origin or path, or the API uses an unsupported path prefix. Ordinary local Vite development leaves hosted mode disabled. A matching hosted configuration with missing files or mismatched build metadata fails startup. API endpoints, `/nodes/<instanceId>/ws`, operations, and immutable Replay Viewer paths retain their existing root routes. OAuth provider callback URLs continue to use `PUBLIC_API_BASE`; they do not move under `/open-agricola/`.
+
+The image uses `pnpm run build:hosted-frontend`, which invokes the ordinary production build with the shared hosted base path and same-origin API/WS configuration. Community cards default to enabled and the Workshop sandbox defaults to `browser`; explicit `VITE_ENABLE_COMMUNITY_DECK` and `VITE_SANDBOX_EXECUTOR` values can override those defaults. `GAME_BUILD_ID` comes from the build environment, or from the local Git HEAD outside Docker. `dist/frontend-build.json` records `{ format: 1, gameBuildId, basePath }`; the build identity must match the running backend.
+
+Use a staged rollout from the owner-controlled machine:
+
+1. Build and validate the exact target image. Keep the current application online during the build. Compare the hosted frontend metadata and the actual HTML, JS/CSS, language packs and cards manifest bytes with that target's local hosted build; the build marker alone is not byte verification.
+2. Set the server's `PUBLIC_APP_ORIGIN` to the hosted URL while preserving `PUBLIC_API_BASE`, provider callbacks, encryption keys and the existing Pages CORS origin. Run the existing `deploy-backend.sh` backup, target restore/storage validation and application deployment procedure.
+3. Verify the hosted URL directly: submit a password in strict-cookie WebKit and Chromium, confirm authenticated lobby requests, refresh, Workshop, routed WebSocket readiness and existing-room recovery, then log out. Check anonymous completed-game Replay and unchanged Viewer hashes. Linux WebKit coverage does not replace physical Safari/iPhone acceptance.
+4. Publish the matching Pages frontend only after the hosted target is healthy. The Pages bootstrap reads public `GET /api/app-location` metadata without credentials before starting authentication and moves old room/context links, query parameters and fragments to the configured hosted entry. It does not reverse-proxy authenticated requests to GitHub or transfer session credentials in the URL.
+
+Changing origin requires a new login. Browser-local drafts, LLM settings, preferences and command journals do not move automatically; existing accounts, Rooms, seats and saved game state remain on the same server. Users with an OAuth registration or account-link flow already in progress at the old origin must restart that flow so its tab-bound verifier is created at the new entry.
+
+Rollback pairs the previous validated application image with its previous public-app configuration and Pages entry. Follow the existing maintenance and storage checks; do not point a canonical entry at a frontend build that is missing or belongs to another backend commit. Other deployment topologies can keep the separate Pages frontend with hosted mode disabled.
+
+### GitHub Pages prerequisites
 
 - In repository **Settings → Pages**, set Source to **GitHub Actions**.
 - In **Settings → Environments → github-pages → Deployment branches and tags**, allow `main` and tags matching `v*`. Release deployments run from the tag ref and are rejected without the tag rule.
 
-### Configuration
+### GitHub Pages configuration
 
 Under **Settings → Secrets and variables → Actions → Variables**, add:
 
@@ -299,7 +326,7 @@ gh release create v0.3.0 --generate-notes
 
 Alternatively, use **Releases → Draft a new release**, create a `vX.Y.Z` tag, generate release notes, and publish. A release does not deploy the backend. A manual `workflow_dispatch` from the Actions page deploys the latest frontend from `main`.
 
-After deployment, the site is available at `https://YOUR_USER.github.io/open-agricola/`.
+After deployment, the entry is available at `https://YOUR_USER.github.io/open-agricola/`. With hosted mode enabled, its public app-location metadata points visitors to the same-origin application; otherwise Pages continues to serve the separate frontend.
 
 ### Manual Build without GitHub Actions
 
@@ -344,7 +371,7 @@ A preflight failure can restart the unchanged source container. After live migra
 
 ### Frontend
 
-Publish a GitHub Release to redeploy the frontend as described in [Trigger a Deployment](#trigger-a-deployment).
+The hosted frontend ships with the backend image and follows its exact build identity. Publish a GitHub Release to update the Pages entry as described in [Trigger a Deployment](#trigger-a-deployment), after the matching hosted backend is ready when hosted mode is enabled.
 
 ---
 
@@ -354,7 +381,7 @@ Production can enable password registration with Resend email verification and G
 
 Required backend settings:
 
-- `PUBLIC_APP_ORIGIN`: the frontend address opened by users. Include the base path for a GitHub Pages subpath deployment, such as `https://your-user.github.io/open-agricola/`.
+- `PUBLIC_APP_ORIGIN`: the frontend address opened by users, including its base path. Use `https://openagapi.titanxxh.com/open-agricola/` for the same-origin hosted entry, or the existing Pages address when hosted mode is disabled.
 - `PUBLIC_API_BASE`: the browser-accessible backend origin, such as `https://api.your-domain.com`. It is used for OAuth provider callbacks and email verification links and is required in production.
 - `CORS_ORIGIN`: when frontend and backend have different origins, set this to the frontend origin.
 - `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` / `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET`: credentials for the account login and registration GitHub OAuth App.
@@ -434,6 +461,7 @@ Never set these in production:
 | `REPLAY_VIEWER_BUILD_ID` | — | Immutable Viewer Build ID locked by new rooms |
 | `REPLAY_TRUST_PROXY` | `false` | Set only when the backend is reachable exclusively through a trusted proxy that overwrites `X-Forwarded-For` |
 | `GAME_BUILD_ID` | — | Current backend Git commit; deployment scripts set it automatically |
+| `FRONTEND_ROOT` | `/app/frontend-dist` in the production image | Bundled frontend directory; hosted mode also requires the matching same-origin `PUBLIC_APP_ORIGIN` |
 | `ADMIN_USERS` | — | Comma-separated administrator usernames |
 | `ACCOUNT_REGISTRATION_POLICY` | required | Use `open` for the first administrator, then `invite_only`; `disabled` blocks new accounts |
 | `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop pull-request target |

@@ -30,7 +30,7 @@
 
 - 支持密码注册（邮箱验证）与 GitHub / Google OAuth
 - 登录创建不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
-- 浏览器通过 HttpOnly session cookie 访问 HTTP 与 WebSocket。跨站密码登录使用分区 cookie，因此 GitHub / Google 账号绑定在原前端顶层上下文中用携带凭据的 POST 发起和完成，不在后端导航上下文中检查原 session。provider callback 将受 PKCE 保护的交接返回设置页，错误保留在该页；登录/注册和独立的 Issue Submission Connection 仍走各自流程。
+- 浏览器通过 HttpOnly session cookie 访问 HTTP 与 WebSocket。同源托管前端使其成为第一方 Cookie；独立 origin 部署仍保留分区 Cookie 路径。GitHub / Google 账号绑定在发起操作的前端上下文中用携带凭据的 POST 发起和完成，不在后端导航上下文中检查原 session。provider callback 将受 PKCE 保护的交接返回设置页，错误保留在该页；登录/注册和独立的 Issue Submission Connection 仍走各自流程。
 - 首次 OAuth 注册通过 URL fragment 交接有效期十五分钟的一次性票据，并用浏览器持有的 secret 校验 OAuth 发起时保存的 SHA-256 challenge。完成注册不依赖第三方注册 Cookie；创建会话仍设置 HttpOnly Cookie。凭证、事务与浏览器覆盖见[服务端认证边界](architecture/server.md#http-endpoints)和 `e2e-tests/oauth-onboarding.spec.ts`。
 - WebSocket 协议仍支持 `{ type: 'auth', token: '...' }` 显式认证
 - 单服务器不需要 JWT 的无状态优势；服务端 session 支持即时吊销
@@ -71,6 +71,8 @@ App.tsx
 
 `server/ingress.ts` 保留同一 backend origin 和 OAuth callback，将 `/nodes/<instanceId>/ws` 转发给 Room 的当前 owner；HTTP 工坊沙盒使用节点亲和 cookie。`scripts/local-backend.ts` 默认启动一个应用进程，可显式配置 `APP_INSTANCES=2` 在同一台机器验证路由。共享目录、lease、owner epoch、写入/发布屏障和命令回执由 PostgreSQL 保存；GameSession 仍是规则状态唯一写入者。
 
+生产镜像也包含为 `/open-agricola/` 构建的普通前端，API 和 WS 均使用同源入口。托管模式要求配置的公开应用 URL 位于 API origin 的该路径。公开 app-location 边界让 Pages 入口在认证或 OAuth verifier 创建前引导访客；其他拓扑保持既有路由。普通静态应用文件由镜像拥有，API、WS、运行看板和不可变 Replay namespace 保持原归属，不把带认证的静态请求反代到 Pages。启用条件、origin 本地数据限制与分阶段上线见[部署文档](HOW_TO_DEPLOY.md#same-origin-frontend-for-browser-sessions)。
+
 ### B2. 开发环境
 
 统一入口 `./restart-local.sh` 准备或复用本机 PostgreSQL、私有 S3、schema 和不可变 Viewer。worktree 的默认依赖数据归属于主仓；应用重启保留数据。`./restart-local.sh --instances 2` 启动本机双实例。`pnpm run verify` 同样使用统一入口，另建测试 schema、S3 prefix、端口和日志。
@@ -79,7 +81,7 @@ App.tsx
 
 ### B3. 单机部署与后续切换
 
-生产镜像包含原生 PostgreSQL 备份工具和一个不可变 Viewer；启动时把 Viewer 发布到 S3。Caddy 继续提供原有 HTTPS origin，私有应用进程和依赖端口不向公网暴露。PostgreSQL 与 S3 使用独立持久卷，默认无云服务前提。
+生产镜像包含原生 PostgreSQL 备份工具、同源托管前端和一个启动时发布到 S3 的不可变 Viewer。前端构建标记与后端使用相同 `GAME_BUILD_ID`；发布验收还须将实际托管文件与目标构建逐一比较。Caddy 继续提供原有 HTTPS origin，私有应用进程和依赖端口不向公网暴露。PostgreSQL 与 S3 使用独立持久卷，默认无云服务前提。
 
 后续可配置外部 `DATABASE_URL` 和完整 `S3_*` 参数。需要在维护窗口搬迁数据、保留加密密钥、合并当前删除 ledger，并通过目标版本恢复检查后启用。只改环境变量不会迁移数据。正常单机/双实例功能检查不构成故障恢复、30 秒恢复或容量认证。
 

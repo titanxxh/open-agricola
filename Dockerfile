@@ -8,7 +8,10 @@ COPY package.json pnpm-lock.yaml .npmrc ./
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate \
     && pnpm install --frozen-lockfile
 COPY . .
-RUN REPLAY_VIEWER_ROOT=/app/viewer-builds pnpm run build:replay-viewer \
+ARG GAME_BUILD_ID=development
+ENV GAME_BUILD_ID=$GAME_BUILD_ID
+RUN pnpm run build:hosted-frontend \
+    && REPLAY_VIEWER_ROOT=/app/viewer-builds pnpm run build:replay-viewer \
     && pnpm prune --prod
 
 # Native PostgreSQL 18 clients match the local database major version.
@@ -20,6 +23,7 @@ RUN groupadd --gid 1000 node && useradd --uid 1000 --gid node --create-home node
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./frontend-dist
 COPY --from=build --chown=node:node /app/viewer-builds ./viewer-builds
 COPY --from=build --chown=node:node /app/public/i18n ./public/i18n
 COPY --chown=node:node package.json pnpm-lock.yaml tsconfig*.json ./
@@ -29,7 +33,7 @@ COPY --chown=node:node scripts/ ./scripts/
 RUN mkdir -p data output && chown node:node data output
 ARG GAME_BUILD_ID=development
 ENV GAME_BUILD_ID=$GAME_BUILD_ID
-ENV NODE_ENV=production BACKEND_PORT=5175 BACKEND_HOST=0.0.0.0 APP_INSTANCES=1 PG_CLIENT_MODE=local
+ENV NODE_ENV=production BACKEND_PORT=5175 BACKEND_HOST=0.0.0.0 APP_INSTANCES=1 PG_CLIENT_MODE=local FRONTEND_ROOT=/app/frontend-dist
 EXPOSE 5175
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 \
     CMD node -e "fetch('http://127.0.0.1:5175/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

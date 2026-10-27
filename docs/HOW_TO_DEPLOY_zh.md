@@ -10,8 +10,10 @@
 
 ```mermaid
 flowchart LR
-  Browser --> Pages[Static frontend]
+  Browser --> Pages[Pages entry]
+  Pages -. canonical app location .-> Browser
   Browser --> Ingress[HTTPS public origin / Caddy]
+  Ingress --> Frontend[Hosted frontend /open-agricola/]
   Ingress --> Router[HTTP / WS routing]
   Router --> A[Application 1]
   Router --> B[Application 2]
@@ -22,7 +24,7 @@ flowchart LR
 ```
 
 
-前端和后端完全分离——前端是纯静态文件（GitHub Pages），后端是一个 Docker 容器（VPS）。
+生产镜像包含同一构建的应用前端和后端。配置在 `/open-agricola/` 的同源前端让浏览器会话使用第一方 Cookie。GitHub Pages 继续作为入口；未启用托管模式时，也可以继续提供独立前端。公共卡图和字体仍由素材站 CDN 提供。
 
 ---
 
@@ -47,7 +49,7 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-生产镜像同时保留冻结安装时使用的原始 `pnpm-lock.yaml`。工坊沙盒标识将它与部署源码和运行时版本一起计算摘要；缺少锁文件会使契约加载失败，不会静默忽略依赖变动。
+生产镜像同时保留冻结安装时使用的原始 `pnpm-lock.yaml`。工坊沙盒标识将它与部署源码和运行时版本一起计算摘要；缺少锁文件会使契约加载失败，不会静默忽略依赖变动。同源前端在裁剪生产依赖前构建，复制到 `/app/frontend-dist`，镜像将 `FRONTEND_ROOT` 设置为这个目录。
 
 设置 `.env` 中原有 `PUBLIC_API_BASE`、`PUBLIC_APP_ORIGIN`、`CORS_ORIGIN` 和账号/OAuth 参数；已有 callback 不改。把 `DATABASE_URL` 与 `S3_*` 连接组留空即使用本机服务。配置外部 S3 时需要完整 endpoint、region、bucket、access key 和 secret，桶必须私有。
 
@@ -290,14 +292,39 @@ Bug Report GitHub App、Workshop PR 和账号 OAuth 都仍是可选集成；配�
 
 ---
 
-## 二、部署前端（GitHub Pages）
+## 二、部署前端
 
-### 前置条件
+### 浏览器会话使用同源前端
+
+当公开 API 位于 HTTPS origin，且交互前端可以共用该 origin 时，启用此模式。现有生产主机的启用配置如下：
+
+```env
+PUBLIC_API_BASE=https://openagapi.titanxxh.com
+PUBLIC_APP_ORIGIN=https://openagapi.titanxxh.com/open-agricola/
+FRONTEND_ROOT=/app/frontend-dist
+```
+
+生产镜像已经设置 `FRONTEND_ROOT`。仍须显式配置 `PUBLIC_APP_ORIGIN`；仅把前端文件打入镜像不会自行切换公开入口。未设置 `FRONTEND_ROOT`、应用使用其他 origin 或路径、API 带有不支持的路径前缀时，同源托管与 Pages 交接保持禁用，普通本地 Vite 开发也不启用该模式。已匹配托管配置却缺失文件或构建元数据不一致时，启动会失败。API、`/nodes/<instanceId>/ws`、运行看板和不可变 Replay Viewer 保留原有根路径。OAuth provider callback 继续使用 `PUBLIC_API_BASE`，不会移到 `/open-agricola/` 下。
+
+镜像通过 `pnpm run build:hosted-frontend` 调用普通生产构建，使用共享的托管 base path 和同源 API/WS 配置。社区卡默认启用，工坊沙盒默认使用 `browser`；显式的 `VITE_ENABLE_COMMUNITY_DECK`、`VITE_SANDBOX_EXECUTOR` 可以覆盖默认值。`GAME_BUILD_ID` 优先取构建环境，Docker 外也可取本地 Git HEAD。`dist/frontend-build.json` 记录 `{ format: 1, gameBuildId, basePath }`，构建标识必须与运行中的后端一致。
+
+从 owner 控制的本机分阶段上线：
+
+1. 构建并验证精确目标镜像，构建期间保留当前应用在线。对比同源前端元数据，以及实际 HTML、JS/CSS、语言包、卡牌 manifest 字节与该提交的本地托管构建；仅检查构建标记不等于字节验证。
+2. 将服务器 `PUBLIC_APP_ORIGIN` 设置为同源入口，保留 `PUBLIC_API_BASE`、provider callback、加密密钥和原有 Pages CORS origin。执行既有 `deploy-backend.sh` 备份、目标恢复/存储校验和应用部署流程。
+3. 直接验证同源 URL：在严格 Cookie 策略的 WebKit 和 Chromium 中实际提交密码，确认大厅认证请求、刷新、工坊、路由 WebSocket 就绪与原房间恢复，再登出。检查匿名完成局回放和原 Viewer 哈希。Linux WebKit 覆盖不能替代实体 Safari/iPhone 验收。
+4. 同源目标健康后再发布对应的 Pages 前端。Pages bootstrap 在开始认证前，不带凭据读取公开 `GET /api/app-location` 元数据，把旧 room/context 链接、query 和 fragment 转到配置的同源入口。它不把认证请求反代到 GitHub，也不通过 URL 转移 session 凭据。
+
+更换 origin 后需要重新登录。浏览器本地草稿、LLM 设置、偏好和命令 journal 不会自动迁移；原有账号、Room、座位和游戏存档继续使用同一服务器。原 origin 上已经开始的 OAuth 注册或账号绑定需要重新发起，使标签页 verifier 在新入口创建。
+
+回退时将上一份已验证应用镜像与其原公开入口配置、Pages 入口配对。继续执行既有维护和存储检查，不把 canonical 入口指向缺失或属于其他后端提交的前端构建。其他部署拓扑可以保持托管模式禁用，继续使用独立 Pages 前端。
+
+### GitHub Pages 前置条件
 
 - GitHub 仓库 Settings → Pages → Source 选 **GitHub Actions**
 - 仓库 Settings → Environments → `github-pages` → Deployment branches and tags：允许 `main` 和 tag 模式 `v*`（release 部署以 tag 为 ref 运行，缺 tag 规则会被拒绝部署）
 
-### 配置
+### GitHub Pages 配置
 
 在 Settings → Secrets and variables → Actions → **Variables** 标签中添加：
 
@@ -317,7 +344,7 @@ gh release create v0.3.0 --generate-notes
 
 也可以在 GitHub UI 操作：Releases → Draft a new release → 新建 tag（`vX.Y.Z`）→ Generate release notes → Publish。后端不会由 release 自动部署。Actions 页面手动触发（workflow_dispatch）时部署 `main` 最新前端。
 
-部署成功后访问：`https://YOUR_USER.github.io/open-agricola/`
+部署成功后访问入口：`https://YOUR_USER.github.io/open-agricola/`。启用同源托管后，公开 app-location 元数据把访客引导到同源应用；否则 Pages 继续提供独立前端。
 
 ### 手动构建（不用 GitHub Actions）
 
@@ -360,7 +387,7 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 ### 前端
 
-发布 GitHub Release 后自动重新部署（见上文「触发部署」）。
+同源前端随后端镜像交付，与后端使用相同构建标识。发布 GitHub Release 更新 Pages 入口（见上文「触发部署」）；启用托管模式时，应先确认对应的托管后端已就绪。
 
 ---
 
@@ -370,7 +397,7 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 OAuth 所需后端环境变量：
 
-- `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端地址；GitHub Pages 子路径部署要包含 base path，例如 `https://your-user.github.io/open-agricola/`。
+- `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端地址，须包含 base path。同源托管入口使用 `https://openagapi.titanxxh.com/open-agricola/`；禁用托管模式时使用原有 Pages 地址。
 - `PUBLIC_API_BASE`：用户浏览器可访问的后端 origin，例如 `https://api.your-domain.com`，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填。
 - `CORS_ORIGIN`：前后端不同源时必须等于前端 origin。
 - `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` / `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET`：账号登录/注册用 GitHub OAuth App 凭据。
@@ -452,6 +479,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `REPLAY_VIEWER_BUILD_ID` | — | 新 Room 锁定的不可变 Viewer Build ID |
 | `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
 | `GAME_BUILD_ID` | — | 当前后端 Git commit；自动部署脚本会填入 |
+| `FRONTEND_ROOT` | 生产镜像内为 `/app/frontend-dist` | 打包的前端目录；托管模式还要求匹配的同源 `PUBLIC_APP_ORIGIN` |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
 | `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop PR 目标仓库 |

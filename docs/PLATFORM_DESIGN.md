@@ -28,7 +28,7 @@ Use server-side sessions instead of JWT:
 
 - Support password registration with email verification plus GitHub and Google OAuth.
 - Login creates an opaque `crypto.randomUUID()` session token stored in `sessions` with a seven-day expiry.
-- Browsers use an HttpOnly session cookie for HTTP and WebSocket access. Cross-site password login uses a partitioned cookie, so GitHub / Google account binding starts and completes with credentialed POSTs in the original frontend top-level context, not with backend navigation session checks. The provider callback returns a PKCE-protected handoff to Settings; errors stay visible there. Login/registration and the independent Issue Submission Connection retain their separate flows.
+- Browsers use an HttpOnly session cookie for HTTP and WebSocket access. The same-origin hosted frontend keeps this cookie first-party; separate-origin deployments retain the partitioned-cookie path. GitHub / Google account binding starts and completes with credentialed POSTs in the initiating frontend context, not with backend navigation session checks. The provider callback returns a PKCE-protected handoff to Settings; errors stay visible there. Login/registration and the independent Issue Submission Connection retain their separate flows.
 - First-time OAuth registration hands off a fifteen-minute, single-use ticket in a URL fragment and verifies a browser-held secret against the SHA-256 challenge saved at OAuth start. Completion does not require third-party onboarding cookies; session creation still sets an HttpOnly cookie. See [server authentication boundaries](architecture/server.md#http-endpoints) and `e2e-tests/oauth-onboarding.spec.ts` for credential, transaction and browser coverage.
 - The WebSocket protocol continues to support explicit `{ type: 'auth', token: '...' }` authentication.
 - A single server does not need stateless JWTs, while server sessions allow immediate revocation.
@@ -67,6 +67,8 @@ Do not add Redux or Zustand:
 
 `server/ingress.ts` preserves the backend origin and OAuth callbacks, routes `/nodes/<instanceId>/ws` to the current Room owner, and provides HTTP Workshop sandbox affinity. `scripts/local-backend.ts` starts one application process by default; `APP_INSTANCES=2` exercises two processes on one host. PostgreSQL owns the directory, leases, owner epochs, write/publication fences, and command receipts. GameSession remains the sole rule-state writer.
 
+The production image also contains an ordinary frontend built for `/open-agricola/` with same-origin API and WS access. Hosted mode requires the configured public app URL to use that path on the API origin. A public app-location boundary lets the Pages entry move visitors before authentication or OAuth verifier creation; other topologies retain their existing routing. Static application files are image-owned, while API, WS, operations and immutable Replay namespaces retain their existing owners. No authenticated static requests are proxied to Pages. Activation, origin-local data limits and staged rollout are documented in [the deployment guide](HOW_TO_DEPLOY.md#same-origin-frontend-for-browser-sessions).
+
 ### B2. Development
 
 `./restart-local.sh` prepares or reuses local PostgreSQL, private S3, schema, and an immutable Viewer. Worktrees share their main checkout's dependency data by default. Restart preserves that data. Use `./restart-local.sh --instances 2` for two local applications. `pnpm run verify` uses the same launcher with a separate test schema, S3 prefix, ports, and logs.
@@ -75,7 +77,7 @@ All hosted Rooms record, including ordinary, Workshop, hotseat, and development 
 
 ### B3. Single-host deployment and later service migration
 
-The production image includes native PostgreSQL backup tools and an immutable Viewer, published to S3 at startup. Caddy retains the existing HTTPS origin. Application processes and dependency ports stay private. PostgreSQL and S3 have independent persistent volumes; cloud accounts are optional.
+The production image includes native PostgreSQL backup tools, the hosted frontend and an immutable Viewer published to S3 at startup. The frontend build marker and backend use the same `GAME_BUILD_ID`; release verification also compares the actual hosted frontend files with the target build. Caddy retains the existing HTTPS origin. Application processes and dependency ports stay private. PostgreSQL and S3 have independent persistent volumes; cloud accounts are optional.
 
 External `DATABASE_URL` and complete `S3_*` settings can be supplied later. Move data during maintenance, preserve encryption keys, merge current erasure facts, and validate recovery with the target build before activation. Configuration changes alone never migrate data. Normal one-host/two-instance checks are not fault-recovery, 30-second recovery, or capacity certification.
 

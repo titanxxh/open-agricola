@@ -86,7 +86,9 @@ import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 import { applyReplayRemovalLedger } from './game/replay-removal.ts'
 import { adminTakedownCard, markBuiltInMergedCards, reconcilePendingMerges } from './workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
+import { createFrontendHosting } from './frontend-hosting'
 
+const handleFrontend = createFrontendHosting()
 
 const serverCorsHeaders = () => corsHeaders({
   methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
@@ -425,6 +427,7 @@ const server = createServer((req, res) => {
 })
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (await handleFrontend(req, res)) return
   if (!req.url) {
     sendJson(res, 404, { error: 'Not found' })
     return
