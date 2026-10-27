@@ -6,6 +6,7 @@ import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
+import type { SoloHandMode } from '../game-creation'
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -60,6 +61,8 @@ type ClientCommandBody =
       type: 'createRoom'
       access?: RoomAccess
       maxPlayers?: number
+      soloHandMode?: SoloHandMode
+      sourceGameContextId?: string
       name?: string
       customCardIds?: string[]
       /** When true, include community-deck cards in the deal pool. Default false. */
