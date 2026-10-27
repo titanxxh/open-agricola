@@ -129,7 +129,6 @@ describe('formal solo creation over the real network', () => {
             }
           }
           value = request.options.find(option => ['PR10', 'PR11', 'PR12'].includes(option.sourceCard ?? '') && !option.disabled)?.value
-            ?? request.options.find(option => option.sourceCard === 'E096_Elder' && !option.disabled)?.value
             ?? request.options.find(option => option.value === '__pass__' && !option.disabled)?.value
         } else if (request.kind === 'choice' && interaction.sourceCard === 'E096_Elder') {
           value = request.options.find(option => option.value === '__skip__' && !option.disabled)?.value
