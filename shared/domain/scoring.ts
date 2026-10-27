@@ -2,7 +2,7 @@ import { getCardUnusedSpaceReduction } from '../cards/card-rule-contributions'
 import { getFencedStableCount } from './pasture'
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
 import { getFarmyardTileCount } from '../domain/farm.ts'
-import { fieldHasCrop } from '../domain/field.ts'
+import { getLogicalFields } from '../cards/helpers/card-field.ts'
 import { getUsedFarmyardTileKeys } from './farmyard-usage.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
@@ -368,9 +368,16 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       ],
     })
 
-    const grainCount =
-      player.resources.grain +
-      player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
+    const cropsInFields = { grain: 0, vegetable: 0 }
+    for (const field of getLogicalFields(player)) {
+      for (const stack of field.stacks) {
+        if (stack.kind === 'grain' || stack.kind === 'vegetable') {
+          cropsInFields[stack.kind] += stack.remaining
+        }
+      }
+    }
+
+    const grainCount = player.resources.grain + cropsInFields.grain
     const grainScore = scoreByRanges(grainCount, ['0', '1-3', '4-5', '6-7', '8+'])
     categories.push({
       key: 'grains',
@@ -379,9 +386,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       entries: [{ type: 'quantity', quantity: grainCount, score: grainScore }],
     })
 
-    const vegetableCount =
-      player.resources.vegetable +
-      player.fields.filter((field) => fieldHasCrop(field, 'vegetable')).length
+    const vegetableCount = player.resources.vegetable + cropsInFields.vegetable
     const vegetableScore = scoreByRanges(
       vegetableCount,
       ['0', '1', '2', '3', '4+'],

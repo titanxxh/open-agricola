@@ -84,7 +84,7 @@ function expectGrowthBeforePeat(response: SessionResponse) {
   expect(peatIndex).toBeGreaterThan(growthIndex)
   expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.actionDetail', params: expect.objectContaining({ detailParts: expect.objectContaining({ gains: { fuel: 3 } }) }) }))
   expect(response.scores?.find(score => score.playerId === player.id)?.categories.find(category => category.key === 'grains'))
-    .toMatchObject({ quantity: 1, total: 1 })
+    .toMatchObject({ quantity: 3, total: 1 })
 }
 
 function expectPeatProvenance(response: SessionResponse, grantingCard: string) {

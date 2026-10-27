@@ -125,7 +125,8 @@ describe('Moor primary body completion', () => {
     ])
     expect(p.resources).toMatchObject({ grain: almanacFirst ? 0 : 1, food: 0, wood: 0, fuel: 0 })
     expect(r.scores[0]!.categories.find(category => category.key === 'fields')).toMatchObject({ quantity: 2, total: 1 })
-    expect(r.scores[0]!.categories.find(category => category.key === 'grains')).toMatchObject({ quantity: 2, total: 1 })
+    expect(r.scores[0]!.categories.find(category => category.key === 'grains'))
+      .toMatchObject({ quantity: almanacFirst ? 6 : 4, total: almanacFirst ? 3 : 2 })
     expect(r.state.events.filter(event => (event.type === 'farm.fieldPlowed' || event.type === 'farm.sown') && [ALMANAC, MACHINE].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId))
       .toEqual(almanacFirst ? [ALMANAC, MACHINE] : [MACHINE, ALMANAC])
     const ordered = r.state.events.filter(event => (event.type === 'farm.fieldPlowed' || event.type === 'farm.sown')
@@ -258,7 +259,7 @@ describe('Moor primary body completion', () => {
     expect(r.state.events.filter(event => event.type === 'card.played' && event.cardId === 'A032_Manger')).toHaveLength(1)
     expect(r.state.events.filter(event => event.type === 'farm.fieldPlowed' && event.sourceCardId === ALMANAC)).toHaveLength(1)
     expect(r.state.events.filter(event => event.type === 'farm.sown' && event.sourceCardId === MACHINE)).toHaveLength(1)
-    expect(r.scores[0]!.categories.find(category => category.key === 'grains')).toMatchObject({ quantity: 2, total: 1 })
+    expect(r.scores[0]!.categories.find(category => category.key === 'grains')).toMatchObject({ quantity: 6, total: 3 })
   })
 
   it.each(['discard', 'keep', 'cook'])('waits for Horse Market animal handling, final choice=%s', mode => {
