@@ -100,3 +100,22 @@ export const chooseCardAction = (session: GameSession, response: SessionResponse
   assert.ok(response.interaction.stateId === 'wait')
   return session.resolveChoice(response.interaction.playerIndex, option.value)
 }
+
+export const finishHarvest = (session: GameSession, initial: SessionResponse, nextRound: number) => {
+  let response = initial
+  for (let step = 0; step < 20 && response.state.round < nextRound; step++) {
+    expect(response.ok, response.error).toBe(true)
+    assert.ok(response.interaction.stateId === 'wait', JSON.stringify(response.interaction))
+    const request = response.interaction.request
+    const actor = response.interaction.playerIndex
+    if (request.kind === 'heating') {
+      response = session.resolveChoice(actor, 'confirm', { fuelUsed: Math.min(request.required, response.state.players[actor]!.resources.fuel ?? 0), woodToFuel: 0 })
+    } else if (request.kind === 'feed') response = session.resolveChoice(actor, 'confirm', { selections: [] })
+    else if (request.kind === 'confirm-player-switch') response = session.resolveChoice(request.fromPlayerIndex, 'confirm')
+    else if (session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') response = session.resolveChoice(actor, '__skip__')
+    else throw new Error(`Unexpected harvest request: ${request.kind}`)
+  }
+  expect(response.ok, response.error).toBe(true)
+  expect(response.state.round).toBe(nextRound)
+  return response
+}

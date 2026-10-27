@@ -568,7 +568,7 @@ describe('card-granted Moor special-action lifecycle', () => {
     },
   )
 
-  it('taking a card alone through M054 leaves the crops, terrain and Moor rewards untouched', () => {
+  it('M054 executes a real action after Farmland with its Moor before reaction', () => {
     const implement = 'M054_AgriculturalImplement'
     const session = setup([implement, FERTILIZER])
     let response = session.takeAction(0, 'farmland')
@@ -577,12 +577,12 @@ describe('card-granted Moor special-action lifecycle', () => {
     response = choose(session, response, implement)
     expect(response.ok, response.error).toBe(true)
     const terrainCard = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes('cut-peat'))!
-    response = session.resolveChoice(0, `card:${terrainCard.id}`)
+    const action = response.interaction.request.options.find(option => option.labelKey === 'moor.specialActions.cut-peat')!
+    response = session.resolveChoice(0, action.value)
+    response = choose(session, response, FERTILIZER)
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.fields).toContainEqual({ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] })
-    expect(response.state.players[0]!.resources.fuel).toBe(0)
-    expect(response.state.players[0]!.farmTerrain).toEqual([MOOR, FOREST])
-    expect(response.state.events.filter(event => event.type === 'farm.cropAdded' || event.type === 'farm.terrainChanged')).toEqual([])
+    expectGrowthBeforePeat(response)
+    expect(response.state.players[0]!.farmTerrain).toEqual([FOREST])
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
     expect(terrainCard.location).toEqual({ kind: 'playerFaceUp', playerId: 'p1' })
   })

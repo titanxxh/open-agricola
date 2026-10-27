@@ -1,12 +1,12 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
-import { hasMoorSpecialActionCardChoice, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow'
+import { hasMoorSpecialActionChoice, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M054_AgriculturalImplement'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
-const choiceContext = { mode: 'take-card' }
+const choiceContext = { mode: 'take-card-action' }
 
 const listener: CardListenerRegistration = {
   id: 'M054-agricultural-implement-after-field-action',
@@ -15,7 +15,7 @@ const listener: CardListenerRegistration = {
   actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!TRIGGER_SPACES.has(context.space?.id ?? '')) return
-    if (!hasMoorSpecialActionCardChoice(context.state, context.player)) return
+    if (!hasMoorSpecialActionChoice(context.state, context.player, choiceContext, context.actionHooks)) return
     return {
       flow: {
         type: 'leaf',

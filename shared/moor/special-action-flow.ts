@@ -150,7 +150,7 @@ type ActionChoice = {
 
 type CardActionChoice = ActionChoice & {
   cardId: string
-  cardLocationKind: 'market' | 'playerFaceUp'
+  cardLocationKind: 'market' | 'playerFaceUp' | 'solo-current'
   cardLocationPlayerId?: string
 }
 
@@ -227,7 +227,8 @@ const cardActionChoices = (
         return [{
           value: cardActionChoiceValue(card.id, actionId, payload),
           cardId: card.id,
-          cardLocationKind: card.location.kind === 'playerFaceUp' ? 'playerFaceUp' : 'market',
+          cardLocationKind: card.location.kind === 'solo-current' ? 'solo-current'
+            : card.location.kind === 'playerFaceUp' ? 'playerFaceUp' : 'market',
           ...(card.location.kind === 'playerFaceUp' ? { cardLocationPlayerId: card.location.playerId } : {}),
           actionId,
           payload,
@@ -263,7 +264,9 @@ const cardActionChoiceMetaPreview = (
   const borrowed = choice.cardLocationKind === 'playerFaceUp'
   return {
     kind: 'action',
-    labelKey: borrowed
+    labelKey: choice.cardLocationKind === 'solo-current'
+      ? hasTile ? 'moor.specialActions.cardChoiceCurrentTile' : 'moor.specialActions.cardChoiceCurrent'
+      : borrowed
       ? hasTile ? 'moor.specialActions.cardChoiceBorrowedTile' : 'moor.specialActions.cardChoiceBorrowed'
       : hasTile ? 'moor.specialActions.cardChoiceMarketTile' : 'moor.specialActions.cardChoiceMarket',
     labelParams: cardActionChoiceLabelParams(state, choice),
