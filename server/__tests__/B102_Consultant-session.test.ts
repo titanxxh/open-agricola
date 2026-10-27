@@ -40,13 +40,78 @@ const play = (playerCount: number) => {
 }
 
 describe('B102 Consultant parity', () => {
-  it('B102 S1: a one-player game has no Lessons space and cannot play Consultant', () => {
-    const response = play(1)
+  it('B102 S1: solo Lessons charges the second occupation fee and grants only two grain', () => {
+    const session = createWorkSession({ seed: 102, options: { playerCount: 1 }, configure(state) {
+      const player = state.players[0]!
+      player.occupationHand = [CARD_ID, 'A123_FrameBuilder']
+      player.occupationPlayed = ['A110_Roughcaster']
+      player.minorHand = ['__test_placeholder__']
+      player.resources = {
+        food: 3, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    } })
+    try {
+      const initial = session.getState()
+      const before = {
+        resources: { ...initial.state.players[0]!.resources },
+        roomTiles: structuredClone(initial.state.players[0]!.roomTiles),
+        score: initial.scores![0]!.total,
+      }
+      const pending = session.takeAction(0, 'lessons')
+      expect(pending.ok, pending.error).toBe(true)
+      assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'choice')
+      expect(pending.interaction.playerIndex).toBe(0)
+      expect(pending.interaction.request.options).toContainEqual(expect.objectContaining({ value: CARD_ID }))
+      expect(pending.state.players[0]!.resources).toEqual(before.resources)
+      expect(pending.state.players[0]!.occupationHand).toEqual([CARD_ID, 'A123_FrameBuilder'])
 
-    expect(response.ok).toBe(false)
-    expect(response.error).toBe('space unavailable')
-    expect(response.state.players[0]!.occupationPlayed).not.toContain(CARD_ID)
-    expect(response.state.players[0]!.resources.grain).toBe(0)
+      const response = session.resolveChoice(0, CARD_ID)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.interaction).toMatchObject({
+        stateId: 'wait', playerIndex: 0,
+        request: { kind: 'confirm-next-player', nextPlayerIndex: 0 },
+      })
+      const player = response.state.players[0]!
+      expect(player.occupationHand).toEqual(['A123_FrameBuilder'])
+      expect(player.occupationPlayed).toEqual(['A110_Roughcaster', CARD_ID])
+      expect(player.resources).toEqual({
+        food: 2, wood: 0, clay: 0, reed: 0, stone: 0, grain: 2,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+      expect(player.cardStates?.[CARD_ID]).toMatchObject({
+        extraData: { resourceStats: { gained: { grain: 2 } } },
+      })
+      expect(player.roomTiles).toEqual(before.roomTiles)
+      expect(player.fields).toEqual([])
+      expect(player.pastures).toEqual([])
+      expect(response.state.actionSpaces.find(space => space.id === 'lessons')?.takenBy)
+        .toEqual([{ playerId: 'p1', workerId: '1' }])
+      expect(response.state.events).toContainEqual(expect.objectContaining({
+        type: 'resource.paid', actorPlayerId: 'p1', paymentFor: 'occupation', resources: { food: 1 },
+      }))
+      expect(response.state.events).toContainEqual(expect.objectContaining({
+        type: 'card.played', actorPlayerId: 'p1', cardId: CARD_ID, cardType: 'occupation',
+        payment: expect.objectContaining({ resources: { food: 1 } }),
+      }))
+      expect(response.state.events).toContainEqual(expect.objectContaining({
+        type: 'resource.moved', sourceCardId: CARD_ID, reason: 'cardEffect', resources: { grain: 2 },
+      }))
+      expect(response.state.log).toContainEqual(expect.objectContaining({
+        key: 'log.playOccupation', playerId: 'p1',
+        params: expect.objectContaining({ occupations: CARD_ID, costResources: { food: 1 } }),
+      }))
+      expect(response.state.log).toContainEqual(expect.objectContaining({
+        key: 'log.cardEffectGain', playerId: 'p1',
+        params: expect.objectContaining({ cardId: CARD_ID, gain: { grain: 2 } }),
+      }))
+      expect(response.scores![0]!.categories).toContainEqual(expect.objectContaining({
+        key: 'grains', quantity: 2, total: 1,
+      }))
+      expect(response.scores![0]!.total - before.score).toBe(2)
+    } finally {
+      session.dispose()
+    }
   })
 
   it.each([
