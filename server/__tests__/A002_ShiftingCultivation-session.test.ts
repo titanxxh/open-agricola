@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -7,6 +7,9 @@ import '../../shared/cards/A/A002_ShiftingCultivation'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged, assertUndoRestored, undoRuleSnapshot } from './_helpers/negative-rule-audit'
 import * as audit02Immediate from './_helpers/audit/ae-negative-02-immediate'
+import { createWorkSession } from './_helpers/session-fixtures'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 const CARD_ID = 'A002_ShiftingCultivation'
 
@@ -105,6 +108,109 @@ describe('A002 Shifting Cultivation parity', () => {
     expect(response.state.players[0]!.fields).toHaveLength(0)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[1]!.minorHand).not.toContain(CARD_ID)
+  })
+})
+
+describe('standard solo passing continuation', () => {
+  const sessions: GameSession[] = []
+  afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
+
+  const make = (playerCount: number) => {
+    const session = createWorkSession({ seed: 42, options: { playerCount }, configure(state) {
+      for (const player of state.players) {
+        player.resources = {
+          food: 0, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0,
+          vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+        }
+      }
+      state.players[0]!.resources.food = 2
+      state.players[0]!.minorHand = [CARD_ID]
+      state.ordinaryCardDecks.minor = state.ordinaryCardDecks.minor.filter(id => id !== CARD_ID)
+    } })
+    sessions.push(session)
+    return session
+  }
+
+  it.each([1, 2])('restores the paid plow pending with an exhausted hand at %i participants', playerCount => {
+    const session = make(playerCount)
+    const before = undoRuleSnapshot(session.getState())
+    const score = session.getState().scores![0]!.total
+    const pending = acceptPlow(session, playMinor(session))
+    expect(pending.ok, pending.error).toBe(true)
+    expect(pending.interaction).toMatchObject({
+      stateId: 'wait', sourceCard: CARD_ID, request: { kind: 'farm-select', farm: { farmType: 'plow' } },
+    })
+    expect(pending.state.players[0]!.resources.food).toBe(0)
+    expect(pending.state.players[0]!.minorHand).toEqual([])
+    const savedState = captureStateWithHistory(pending.state)
+    const savedInteraction = structuredClone(pending.interaction)
+    const saved = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(saved))))
+    sessions.push(restored)
+    expect(captureStateWithHistory(restored.getState().state)).toEqual(savedState)
+    expect(restored.getState().interaction).toEqual(savedInteraction)
+    expect(restored.getState().state.players[0]!.minorHand).toEqual([])
+
+    const undoMetadata = {
+      historyLength: restored.getState().historyLength,
+      hasActionStartSnapshot: restored.getState().hasActionStartSnapshot,
+    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const rejected = assertRejectedUnchanged(restored, () => restored.commitSelectionChoice(0, { tile: { row: 2, col: 0 } }))
+      expect({ historyLength: rejected.historyLength, hasActionStartSnapshot: rejected.hasActionStartSnapshot }).toEqual(undoMetadata)
+    }
+    if (playerCount === 2) {
+      assertRejectedUnchanged(restored, () => restored.commitSelectionChoice(1, { tile: { row: 0, col: 1 } }))
+      assertRejectedUnchanged(restored, () => restored.commitSelectionChoice(1, { tile: { row: 0, col: 1 } }))
+    }
+    const response = restored.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(response.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }])
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.minorHand).toEqual([])
+    expect(response.state.events.filter(event => event.type === 'resource.paid' && event.sourceCardId === CARD_ID))
+      .toEqual([expect.objectContaining({ resources: { food: 2 } })])
+    expect(response.state.events.filter(event => event.type === 'farm.fieldPlowed'))
+      .toEqual([expect.objectContaining({ sourceCardId: CARD_ID })])
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectPay', params: expect.objectContaining({ cardId: CARD_ID, cost: { food: 2 } }),
+    }))
+    expect(response.scores![0]!.categories).toContainEqual(expect.objectContaining({ key: 'fields', quantity: 1, total: -1 }))
+    expect(response.scores![0]!.total - score).toBe(1)
+    if (playerCount === 1) {
+      expect(response.state.events.filter(event => event.type === 'card.destroyed' && event.cardId === CARD_ID)).toHaveLength(1)
+      expect(response.state.events.some(event => event.type === 'card.passed' && event.cardId === CARD_ID)).toBe(false)
+      const step = restored.undoStep()
+      expect(step.ok, step.error).toBe(true)
+      expect(step.interaction).toMatchObject({ stateId: 'wait', sourceCard: CARD_ID, request: { kind: 'farm-select' } })
+      expect(step.state.players[0]!.resources.food).toBe(0)
+      expect(step.state.players[0]!.fields).toEqual([])
+      expect(step.state.players[0]!.minorHand).toEqual([])
+      assertUndoRestored(before, restored.undoAction())
+      acceptPlow(restored, playMinor(restored))
+      const retried = restored.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
+      expect(retried.ok, retried.error).toBe(true)
+      expect(retried.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }])
+      expect(retried.state.events.filter(event => event.type === 'card.destroyed' && event.cardId === CARD_ID)).toHaveLength(1)
+    } else {
+      expect(response.state.players[1]!.minorHand).toEqual(['__test_placeholder__', CARD_ID])
+      expect(response.state.events.filter(event => event.type === 'card.passed' && event.cardId === CARD_ID))
+        .toEqual([expect.objectContaining({ fromPlayerId: 'p1', toPlayerId: 'p2' })])
+    }
+  })
+
+  it('keeps a declined optional plow paid and removes the solo card once', () => {
+    const session = make(1)
+    const pending = playMinor(session)
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', sourceCard: CARD_ID })
+    const response = session.resolveChoice(0, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.fields).toEqual([])
+    expect(response.state.players[0]!.minorHand).toEqual([])
+    expect(response.state.events.filter(event => event.type === 'card.destroyed' && event.cardId === CARD_ID)).toHaveLength(1)
   })
 })
 
