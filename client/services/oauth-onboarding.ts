@@ -4,6 +4,7 @@ const TICKET_KEY = 'open-agricola-onboarding-ticket'
 const hex = (bytes: Uint8Array): string => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 
 export async function prepareOAuthOnboarding(href: string): Promise<string> {
+  if (!globalThis.crypto?.subtle) return href
   const verifier = hex(crypto.getRandomValues(new Uint8Array(32)))
   const challenge = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))))
   const url = new URL(href, window.location.href)

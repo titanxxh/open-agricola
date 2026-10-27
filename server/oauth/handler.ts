@@ -437,7 +437,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     fail('oauth_onboarding_expired', 'Onboarding ticket has expired or was already used')
     return
   }
-  if (explicitTicket && (!profile.onboardingChallenge || typeof body?.verifier !== 'string'
+  if ((profile.onboardingChallenge || explicitTicket) && (!profile.onboardingChallenge || typeof body?.verifier !== 'string'
     || !/^[a-f0-9]{64}$/.test(body.verifier)
     || !timingSafeEqual(Buffer.from(profile.onboardingChallenge, 'hex'), createHash('sha256').update(body.verifier).digest()))) {
     fail('oauth_onboarding_invalid', 'Registration credentials do not belong to this browser tab. Start registration again')

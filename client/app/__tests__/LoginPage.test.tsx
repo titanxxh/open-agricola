@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoginPage } from '../LoginPage'
+import * as oauthOnboarding from '../../services/oauth-onboarding'
 
 type LoginResult = { ok: boolean; code?: string; error?: string }
 
@@ -93,11 +94,26 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   window.history.replaceState(null, '', '/')
 })
 
 describe('LoginPage auth UI', () => {
+  it('allows provider navigation again after a persisted pageshow', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
+    const prepare = vi.spyOn(oauthOnboarding, 'prepareOAuthOnboarding').mockReturnValue(new Promise<string>(() => {}))
+    render(<LoginPage />)
+    const link = screen.getByRole('link', { name: '使用 GitHub 登录' })
+    await user.click(link)
+    await user.click(link)
+    expect(prepare).toHaveBeenCalledTimes(1)
+    act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })) })
+    await user.click(link)
+    expect(prepare).toHaveBeenCalledTimes(2)
+  })
+
   it('uses the brand as a native lobby link', () => {
     window.history.replaceState(null, '', '/?page=login&room=stale')
 
