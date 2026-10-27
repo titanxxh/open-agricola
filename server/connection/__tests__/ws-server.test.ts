@@ -15,6 +15,7 @@ import { recordingResources } from '../../__tests__/_helpers/recording'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
 import { RoomDirectory } from '../../game/room-directory'
 import { CommandStore } from '../../game/command-store'
+import { InvalidationStore } from '../../invalidation'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
 import { afterAll } from 'vitest'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
@@ -363,6 +364,85 @@ it('recovers an authenticated solo rematch after a lost receipt through allocati
     expect(await persistence.loadCreationConfiguration(created.roomId)).toEqual(await persistence.loadCreationConfiguration(source.id))
   } finally {
     for (const peer of peers) peer.close()
+    await backend.shutdown()
+    await new Promise<void>(done => http.close(() => done()))
+  }
+}, 30_000)
+
+it.each(['card-epoch', 'retired-lease'] as const)('keeps the completed solo connection usable after %s changes while reporting and correcting missing-card settings', async stale => {
+  vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
+  const { createLocalUserForTests, createSession } = await import('../../auth.ts')
+  const user = await createLocalUserForTests(`solo_${randomUUID().replaceAll('-', '').slice(0, 12)}`, 'password123', 'Solo owner')
+  const token = await createSession(user.id)
+  const db = getDb()
+  const workshopId = randomUUID()
+  const versionId = randomUUID()
+  const card = { id: 'CUSTOM_CompletedSource', name: 'Completed source', deck: 'CUSTOM', number: 1, desc: ['Probe'], players: '1+' }
+  await db.prepare(`INSERT INTO workshop_cards(id,author_id,card_id,card_type,name,card_json,created_at,updated_at,review_status,live,approved_version_id)
+    VALUES (?, ?, ?, 'minor', ?, ?, 1, 1, 'approved', 1, ?)`)
+    .run(workshopId, user.id, card.id, card.name, JSON.stringify(card), versionId)
+  await db.prepare('INSERT INTO workshop_card_versions(id,card_id,card_json,version_number,created_by,created_at) VALUES(?,?,?,1,?,1)')
+    .run(versionId, workshopId, JSON.stringify(card), user.id)
+  const directory = new RoomDirectory(db)
+  const persistence = new PostgresRoomPersistence(db, directory)
+  const http = createServer()
+  await new Promise<void>(done => { http.listen(0, '127.0.0.1', done) })
+  const port = (http.address() as AddressInfo).port
+  const backend = await createWsServer(http, { persistence, directory, internalUrl: `http://127.0.0.1:${port}`, ...recording })
+  const peer = Object.assign(new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { Cookie: `oa_session=${token}` } }), { received: [] as ServerEvent[] })
+  const closed: number[] = []
+  peer.on('close', code => closed.push(code))
+  attachCollector(peer)
+  const create = async (input: Extract<ClientCommand, { type: 'createRoom' }>, requestId: string) => {
+    peer.send(JSON.stringify({ type: 'getCommandScope', requestId: `${requestId}-scope` }))
+    const scope = await waitForEvent(peer, (event): event is Extract<ServerEvent, { type: 'commandScope' }> => event.type === 'commandScope' && event.requestId === `${requestId}-scope`)
+    const commandContext = { scopeId: scope.scope.scopeId, commandId: randomUUID(), allocationId: randomUUID() }
+    await directory.allocate(`user:${user.id}`, commandContext.allocationId)
+    peer.send(JSON.stringify({ ...input, commandContext, requestId }))
+    await vi.waitFor(() => expect(closed.length > 0 || peer.received.some(event => event.type === 'commandReceipt' && event.requestId === requestId)).toBe(true), { timeout: 5000 })
+    expect(closed).toEqual([])
+    return waitForEvent(peer, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> => event.type === 'commandReceipt' && event.requestId === requestId)
+  }
+  try {
+    await waitForOpen(peer)
+    await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: [workshopId] }, 'original')
+    const opening = await waitForEvent(peer, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    const source = backend.registry.get(opening.roomId)!
+    const terminal = source.session.loadState({ ...source.session.state, round: 14, gameOver: true })
+    await backend.committer.commit(source, terminal, { commandType: 'test-completion', intentJson: '{}' }, 0)
+    const before = await recording.gameContextStore.resolve(source.id)
+    const originalConfiguration = await persistence.loadCreationConfiguration(source.id)
+    expect(await persistence.load(source.id)).toBeNull()
+    const invalidation = await new InvalidationStore(db).begin('card', workshopId, async () => {
+      await db.prepare('DELETE FROM workshop_cards WHERE id=?').run(workshopId)
+    })
+    expect(invalidation.roomIds).toEqual([])
+    await backend.applyInvalidation(invalidation)
+    if (stale === 'retired-lease') await db.transaction(() => directory.retire(source.id, source.owner!, source.version))()
+
+    const adjustment = await create({ type: 'createRoom', sourceGameContextId: source.id }, 'adjustment')
+    expect(adjustment).toMatchObject({ status: 'completed', receipt: { outcome: { ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
+      configuration: { customCardIds: [workshopId] }, issues: [{ workshopCardId: workshopId, reason: 'missing' }],
+    } } } })
+    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 0 })
+
+    const corrected = await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: [] }, 'corrected')
+    expect(corrected).toMatchObject({ status: 'completed', receipt: { outcome: { ok: true, stepNo: 0 } } })
+    if (corrected.status !== 'completed') throw new Error('Expected completed corrected creation')
+    const nextId = corrected.receipt.outcome.roomId!
+    expect(nextId).not.toBe(source.id)
+    expect(backend.registry.get(nextId)?.players[0]?.ws.readyState).toBe(WebSocket.OPEN)
+    expect((await persistence.load(nextId))?.meta.maxPlayers).toBe(1)
+    const frames = peer.received.filter((event): event is StateUpdateEnvelope => event.type === 'stateUpdate' && event.roomId === nextId)
+    expect(frames).toHaveLength(1)
+    expect(peer.received.filter(event => event.type === 'roomCreated' && event.roomId === nextId)).toHaveLength(1)
+    expect(peer.received.filter(event => event.type === 'commandReceipt' && event.requestId === 'corrected')).toHaveLength(1)
+    expect(await db.prepare('SELECT step_no FROM game_replay_steps WHERE room_id=?').all(nextId)).toEqual([{ step_no: 0 }])
+    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 1 })
+    expect(await persistence.loadCreationConfiguration(source.id)).toEqual(originalConfiguration)
+    expect(await recording.gameContextStore.resolve(source.id)).toEqual(before)
+  } finally {
+    peer.close()
     await backend.shutdown()
     await new Promise<void>(done => http.close(() => done()))
   }
