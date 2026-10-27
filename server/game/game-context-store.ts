@@ -1,5 +1,5 @@
 import type { PostgresDatabase as Database } from '../database/postgres'
-import { isDevRoom } from './room.ts'
+import { emptyRoomTtlMs, isDevRoom } from './room.ts'
 import type {
   CompletedGameContextDescriptor,
   GameContextLifecycle,
@@ -81,6 +81,7 @@ export class GameContextStore {
       await this.db.prepare('SELECT room_id FROM room_ownership WHERE room_id=? FOR UPDATE').get(roomId)
       const context = await this.db.prepare('SELECT lifecycle, expires_at FROM game_contexts WHERE room_id = ? FOR UPDATE').get<{ lifecycle: string; expires_at: number | null }>(roomId)
       if (!context || context.lifecycle !== 'active') return
+      if (await this.hasLiveWork(roomId, now)) return
       const exists = await this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId)
       if (exists && (context.expires_at === null || context.expires_at > now)) return
       await this.db.prepare("UPDATE room_ownership SET status='retired', lease_until=0 WHERE room_id=?").run(roomId)
@@ -94,6 +95,41 @@ export class GameContextStore {
         WHERE room_id = ? AND lifecycle = 'active'
       `).run(now, now, roomId))
     })())
+  }
+
+  private async hasLiveWork(roomId: string, now: number): Promise<boolean> {
+    return !!await this.db.prepare(`SELECT 1 FROM room_ownership o JOIN app_instances i USING(instance_id)
+      WHERE o.room_id=? AND o.status!='retired' AND o.lease_until>? AND i.lease_until>? AND i.status IN ('starting','ready')
+        AND (o.admission_until>? OR EXISTS(SELECT 1 FROM room_presence p WHERE p.room_id=o.room_id AND p.epoch=o.epoch AND p.connected_count>0)
+          OR EXISTS(SELECT 1 FROM command_requests r WHERE (r.target_room_id=o.room_id OR r.result_room_id=o.room_id) AND r.outcome_json IS NULL))`)
+      .get(roomId, now, now, now)
+  }
+
+  async expireInactiveRooms(instanceId: string, loadedIds: readonly string[]): Promise<void> {
+    const now = this.now()
+    const candidates = await this.db.prepare(`SELECT c.room_id,r.status FROM game_contexts c JOIN rooms r ON r.id=c.room_id
+      LEFT JOIN room_ownership o ON o.room_id=r.id LEFT JOIN app_instances i USING(instance_id)
+      WHERE c.lifecycle='active' AND r.status IN ('waiting','playing') AND (c.expires_at IS NULL OR c.expires_at<=?)
+        AND NOT coalesce(o.development,false) AND NOT EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id)
+        AND r.id NOT IN (SELECT value FROM json_array_elements_text(?::json) AS item(value))
+        AND (o.room_id IS NULL OR o.instance_id=? OR o.lease_until<=? OR i.lease_until<=? OR i.status NOT IN ('starting','ready'))`)
+      .all<{ room_id: string; status: 'waiting' | 'playing' }>(now, JSON.stringify(loadedIds), instanceId, now, now)
+    for (const candidate of candidates) {
+      await this.db.transaction(async () => {
+        const owner = await this.db.prepare('SELECT admission_until,lease_until FROM room_ownership WHERE room_id=? FOR UPDATE')
+          .get<{ admission_until: number; lease_until: number }>(candidate.room_id)
+        if (owner && owner.lease_until > now && owner.admission_until > now) return
+        if (await this.hasLiveWork(candidate.room_id, now)) return
+        const context = await this.db.prepare('SELECT lifecycle,expires_at FROM game_contexts WHERE room_id=? FOR UPDATE')
+          .get<{ lifecycle: string; expires_at: number | null }>(candidate.room_id)
+        if (!context || context.lifecycle !== 'active') return
+        if (context.expires_at === null) {
+          await this.setActiveExpiry(candidate.room_id, now + emptyRoomTtlMs(candidate))
+        } else if (context.expires_at <= now) {
+          await this.expireActive(candidate.room_id, now)
+        }
+      })()
+    }
   }
 
   private async currentContext(roomId: string): Promise<Awaited<ContextRow | null>> {

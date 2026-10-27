@@ -50,15 +50,26 @@ export function createCollector(db: PostgresDatabase, role: 'app' | 'ingress', r
         }
       } else {
         const rows = await observationDb.query<{ kind: string; value: string }>(`
+          WITH connected_rooms AS (
+            SELECT o.room_id, o.development, p.connected_count FROM room_ownership o
+              JOIN app_instances i ON i.instance_id=o.instance_id AND i.status='ready' AND i.lease_until>$1
+              JOIN room_presence p ON p.room_id=o.room_id AND p.epoch=o.epoch AND p.connected_count>0
+              WHERE o.status='active' AND o.lease_until>$1
+          ), saved_rooms AS (
+            SELECT r.id, r.status, r.hotseat FROM rooms r
+              JOIN game_contexts c ON c.room_id=r.id AND c.lifecycle='active'
+          )
           SELECT 'online_users' AS kind, count(DISTINCT p.user_id)::text AS value FROM observability_presence p JOIN app_instances i USING(instance_id) WHERE p.expires_at>$1 AND i.lease_until>$1 AND i.status='ready'
             HAVING NOT EXISTS (SELECT 1 FROM app_instances a LEFT JOIN observability_instances o USING(instance_id) WHERE a.status='ready' AND a.lease_until>$1 AND (o.observed_at IS NULL OR o.observed_at<=$1-120000))
           UNION ALL SELECT 'instances_ready',count(*)::text FROM app_instances WHERE status='ready' AND lease_until>$1
           UNION ALL SELECT 'versions_ready',count(DISTINCT generation)::text FROM app_instances WHERE status='ready' AND lease_until>$1
           UNION ALL SELECT 'room_capacity',coalesce(sum(room_capacity),0)::text FROM app_instances WHERE status='ready' AND lease_until>$1
-          UNION ALL SELECT 'rooms_'||r.status,count(*)::text FROM rooms r JOIN room_ownership o ON o.room_id=r.id WHERE o.status='active' AND o.lease_until>$1 AND NOT o.development AND r.hotseat=0 GROUP BY r.status
-          UNION ALL SELECT 'rooms_hotseat',count(*)::text FROM rooms WHERE hotseat=1
-          UNION ALL SELECT 'rooms_development',count(*)::text FROM room_ownership WHERE development AND status='active' AND lease_until>$1
-          UNION ALL SELECT 'players_connected',coalesce(sum(p.connected_count),0)::text FROM room_presence p JOIN room_ownership o USING(room_id) WHERE p.epoch=o.epoch AND o.status='active' AND o.lease_until>$1
+          UNION ALL SELECT 'rooms_'||r.status,count(*)::text FROM saved_rooms r JOIN connected_rooms p ON p.room_id=r.id WHERE NOT p.development AND r.hotseat=0 GROUP BY r.status
+          UNION ALL SELECT 'rooms_hotseat',count(*)::text FROM saved_rooms r JOIN connected_rooms p ON p.room_id=r.id WHERE NOT p.development AND r.hotseat=1
+          UNION ALL SELECT 'rooms_development',count(*)::text FROM connected_rooms WHERE development
+          UNION ALL SELECT 'rooms_retained',count(*)::text FROM saved_rooms r LEFT JOIN room_ownership o ON o.room_id=r.id
+            WHERE NOT coalesce(o.development,false) AND NOT EXISTS (SELECT 1 FROM connected_rooms p WHERE p.room_id=r.id)
+          UNION ALL SELECT 'players_connected',coalesce(sum(connected_count),0)::text FROM connected_rooms
           UNION ALL SELECT 'games_completed_7d',count(*)::text FROM game_results WHERE finished_at>$1-604800000
           UNION ALL SELECT 'games_completed_24h',count(*)::text FROM game_results WHERE finished_at>$1-86400000
           UNION ALL SELECT 'reports_backlog',count(*)::text FROM bug_reports WHERE status IN ('queued','retry','reconcile')

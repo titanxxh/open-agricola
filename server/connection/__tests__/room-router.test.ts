@@ -115,31 +115,6 @@ describe('handleCreateRoom', () => {
     expect(sentTypesOf(ctx)).toContain('roomCreated')
   })
 
-  it('caps ordinary waiting and playing rooms at 30 while excluding development rooms', async () => {
-    const ctx = newCtx()
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
-    const devRoom = ctx.currentRoom!
-    ctx.registry.delete(devRoom.id)
-    devRoom.id = 'dev2-00000000-0000-4000-8000-000000000000'
-    ctx.registry.set(devRoom)
-    for (let index = 0; index < 30; index += 1) {
-      await dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
-    }
-
-    await dispatch(ctx, {
-      type: 'createRoom',
-      maxPlayers: 2,
-      requestId: 'over-capacity',
-    })
-
-    expect(ctx.registry.size()).toBe(31)
-    expect(sentMessagesOf(ctx)).toContainEqual({
-      type: 'error',
-      error: 'room capacity reached',
-      requestId: 'over-capacity',
-    })
-  })
-
   it('checkpoints created rooms with state and host metadata', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createOperationsHandler } from '../../../observability/http'
 import { CommandStore } from '../../command-store'
+import { migratePostgres } from '../../../database/migrations'
 import { createTestDatabase } from '../../../__tests__/_helpers/postgres'
 import type { PostgresDatabase } from '../../../database/postgres'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -256,6 +257,24 @@ describe('PostgresRoomPersistence replay commit', () => {
     expect(await persistence.load('room-1')).toBeNull()
     expect((await persistence.loadReplayHead('room-1'))?.latestStepNo).toBe(1)
     expect(await db.prepare('SELECT lifecycle FROM game_contexts').get()).toEqual({ lifecycle: 'completed' })
+  })
+
+  it('preserves existing integer result archives when upgrading score storage', async () => {
+    await persistence.commitReplay(step0())
+    await persistence.commitReplay({ ...nextStep(), result: RESULT })
+    const before = await db.prepare('SELECT * FROM game_result_players ORDER BY player_index').all()
+    await db.exec(`
+      ALTER TABLE game_result_players ALTER COLUMN score TYPE BIGINT USING score::bigint;
+      DELETE FROM postgres_schema_migrations WHERE version = 22;
+    `)
+
+    await migratePostgres(db)
+    await migratePostgres(db)
+
+    expect(await db.prepare('SELECT * FROM game_result_players ORDER BY player_index').all()).toEqual(before)
+    expect(await db.prepare('SELECT lifecycle FROM game_contexts').get()).toEqual({ lifecycle: 'completed' })
+    await db.prepare('UPDATE game_result_players SET score = ? WHERE player_index = 0').run(-13.9)
+    expect(await db.prepare('SELECT score FROM game_result_players WHERE player_index = 0').get()).toEqual({ score: -13.9 })
   })
 
   it('archives current seat identities, name provenance and variant flags once with the final recorded Step', async () => {

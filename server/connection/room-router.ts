@@ -19,6 +19,8 @@ import {
   resolveJoinPlayerIndex,
   resolveJoinRequestPlayerIndex,
   roomOccupiedSeatCount,
+  roomConnectedPlayerCount,
+  emptyRoomTtlMs,
   type Room,
 } from '../game/room.ts'
 import { validateSession } from '../auth.ts'
@@ -53,7 +55,6 @@ import {
 const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
-const MAX_ORDINARY_ROOMS = 30
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
 const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
@@ -538,18 +539,16 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
   if (!previous || previous === next) return
   const player = previous.players.find(candidate => candidate.ws === ctx.ws)
   previous.players = previous.players.filter(candidate => candidate.ws !== ctx.ws)
-  ctx.registry.touchActivity(previous.id, Date.now())
+  const now = Date.now()
+  ctx.registry.touchActivity(previous.id, now)
+  if (roomConnectedPlayerCount(previous) === 0) {
+    if (ctx.authority) await ctx.authority.setExpiry(previous, now + emptyRoomTtlMs(previous))
+    else await ctx.gameContextStore?.setActiveExpiry(previous.id, now + emptyRoomTtlMs(previous))
+  }
   if (player) await ctx.broadcaster.broadcastEvent(previous, { type: 'playerDisconnected', playerIndex: player.playerIndex })
 }
 
 async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): Promise<Awaited<void | Promise<void>>> {
-  const ordinaryRoomCount = [...ctx.registry.iter()]
-    .filter((room) => !isDevRoom(room.id))
-    .length
-  if (ordinaryRoomCount >= MAX_ORDINARY_ROOMS) {
-    sendCommandError(ctx, 'room capacity reached', msg.requestId)
-    return
-  }
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
     commandOutcome('blocked')

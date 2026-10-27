@@ -35,8 +35,8 @@ server/game/
 ```
 
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
-- `roomId` 恰好标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新的 `GameSession` 与 UUID，从不复用旧 ID，并在退役旧局的同一事务中迁移在线座位、人数、自定义卡与变体开关。只有权威 `gameOver` 在一个事务中写入 Game Result Archive 并删除可恢复快照；归档写入失败会回滚并保留最终状态以便重试。过期、解散、删号与未完成的重开把 Game Context 标为 `expired`，不产生结果。
-- 所有托管对局，包括工坊、热座与开发 Room，都使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认创建、等待状态与座位。所有玩家断线后，普通 Room 在等待时保留 30 分钟、进行中保留 7 天；开发对局不会因闲置过期。在线启动不做旧数据清理，缺失录制数据会阻断恢复，而不是编造替代内容。
+- `roomId` 恰好标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新的 `GameSession` 与 UUID，从不复用旧 ID，并在退役旧局的同一事务中迁移在线座位、人数、自定义卡与变体开关。只有权威 `gameOver` 在一个事务中写入 Game Result Archive 并删除可恢复快照；归档写入失败会回滚并保留最终状态以便重试。过期、解散、删号与未完成的重开把 Game Context 标为 `expired`，不产生结果。结果分数保留引擎原始数值，包括小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
+- 所有托管对局，包括工坊、热座与开发 Room，都使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认创建、等待状态与座位。重启后普通存档按需加载，未加载存档由 `GameContextStore` 过期清理，并保护在线连接、准入预留与未完成保存。所有玩家断线后，普通 Room 在等待时保留 30 分钟、进行中保留 7 天；开发对局不会因闲置过期。在线启动不做旧数据清理，缺失录制数据会阻断恢复，而不是编造替代内容。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
 - 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
 - `room-queue.ts` 按 Room 串行化授权、规则、异步提交与发布；移动连接会同时占用两个 Room 队列与连接队列。关闭时停止输入、排空已接受的工作并关闭连接池。
@@ -88,7 +88,7 @@ ClientCommand
 - Replay Intent 由穷尽的协议 switch 白名单化；从不保存 `requestId`、token、站点 `userId` 或未校验 payload。
 - Replay 归档使用有界的权威状态差量（[ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)）。
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。
-- 单实例最多 30 个普通内存 Room（等待加进行中，不含开发 Room），以及由可执行工坊 Room、恢复的 Room 与 HTTP 沙盒共享的 15 个 Worker 槽。达到上限只拒绝需要另一个 Room 或 Worker 的操作，包括 `newGame`。
+- 单实例最多准入 30 个有 OPEN 连接或有效 30 秒预留的普通 Room。`RoomDirectory` 原子检查新建和首次恢复，包括缓存 Room；激活不消耗预留，直到正数在线 presence 消耗它。离线存档和缓存 Room 保留 owner，不占在线配额。独立的 15 个 Worker 槽仍计入保留的可执行工坊 executor、恢复的 Room 与 HTTP 沙盒。满额在线 Room 可重连已有座位，并以 `newGame` 一换一替换。准入、重试中断线及冷恢复不变量由 `room-directory.test.ts` 和 `ws-server.test.ts` 验证。
 - Game Context 链接按生命周期解析（[ADR 0013](../adr/0013-lifecycle-routed-game-context-access.md)）：completed、expired、removed 以及公开 Replay 不需登录；活动描述、恢复、Bug Report、证据与维护者取证执行座位或管理员授权。错误使用 `{ ok:false, code, lifecycle?, message }`。
 - 完成的 Replay 公开保留，直到被删除（[ADR 0010](../adr/0010-public-replay-retention-and-erasure.md)）。
 - Bug Report（[ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)）是可恢复的 PostgreSQL 草稿，带稳定 `submissionId`、尝试记录与原子 claim。生产 GitHub App 客户端与测试 fake 是这一 seam 的两个 adapter。
@@ -186,7 +186,7 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 
 - PostgreSQL 保存平台数据与共享资源目录；私有 S3 保存 `card-art/`、`replay-viewers/<viewerBuildId>/`、`replay-assets/<sha256>` 与 `erasure/ledger.json`。`server/storage/` 负责暂存上传、引用、完整性检查与清理 claim；写入前先持久化上传意图，新上传有 24 小时未引用宽限期，同一对象只有一个 claim 者删除。
 - Durable Room Commit 需要 PostgreSQL、共享资源、`REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`。创建 Room 时锁定两个 Build ID 与自定义卡运行时快照。Viewer Build ID 是其完整 manifest 的 SHA-256；版图美术、卡牌美术与字体来自 `public-assets.ref` 固定的素材站。Build 校验失败时创建 Room 失败，等待中的 Room 在 Step 0 存在之前拒绝对局写入。
-- 只允许回滚到支持所有活动 Room `schemaVersion` 的兼容录制构建。缺少 Viewer、持久化不可写或达到 Room 上限会让 readiness 降级，只拒绝新 Room。
+- 只允许回滚到支持所有活动 Room `schemaVersion` 的兼容录制构建。缺少 Viewer 或持久化不可写会让 readiness 降级。在线 Room 容量只拒绝新准入，离线保留存档不降低 readiness。
 - `server/observability/` 负责有界数值指标、采集、管理员网关与总览健康状态，从不写规则状态。指标不带 Room、账号、命令、卡牌、payload 或异常身份，指标失败不会改变对局结果。命令耗时覆盖从分发到本地发布；投影、编码与发送是独立阶段。
 - 私有 Prometheus 采集器通过 bearer 认证的 ingress 发现实例；ingress 负责全局 Room 聚合与在线用户。Grafana 只在 `/ops/` 后读取聚合数据，每次请求都通过一次性交接 cookie 检查当前站点会话与 `ADMIN_USERS`。
 - 浏览器发送抽样、限流的计时批次（命令 RTT、首个快照、快照到布局），服务端视为不可信的观测输入。

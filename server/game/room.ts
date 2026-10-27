@@ -183,6 +183,9 @@ export const roomOccupiedSeatCount = (
       ...roomSeatOwners(room).map((owner) => owner.playerIndex),
     ]).size
 
+export const roomConnectedPlayerCount = (room: Pick<Room, 'players'>): number =>
+  room.players.filter(player => player.ws.readyState === player.ws.OPEN).length
+
 export const toRoomMeta = (room: Room): RoomMeta => ({
   ...(room.executionStamp ? { executionStamp: room.executionStamp } : {}),
   ...(room.owner ? { owner: room.owner } : {}),

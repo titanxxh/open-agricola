@@ -1,6 +1,7 @@
 import type { RoomDiscoveryRequest, RoomDiscoveryResponse } from '../../shared/contract/protocol/routing'
 import { CommandStore } from './command-store'
 import { RoomDirectory, RoomOwnershipError } from './room-directory'
+import { GameContextStore } from './game-context-store'
 
 /** Discovery supplies a route, never seat permission or a gameplay write. */
 export async function discoverRoom(directory: RoomDirectory, actorId: string, request: RoomDiscoveryRequest): Promise<RoomDiscoveryResponse> {
@@ -26,9 +27,9 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
       const slot = await directory.db.prepare('SELECT room_id FROM development_room_slots WHERE root_id=?').get<{ room_id: string }>(roomId)
       roomId = slot?.room_id ?? roomId
     }
-    const context = await directory.db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id=?').get<{ lifecycle: string }>(roomId)
-    if (!context) throw Object.assign(new Error('Game context was not found'), { code: 'unknown_context' })
-    if (context.lifecycle !== 'active') {
+    const lifecycle = await new GameContextStore(directory.db).lifecycle(roomId)
+    if (!lifecycle) throw Object.assign(new Error('Game context was not found'), { code: 'unknown_context' })
+    if (lifecycle !== 'active') {
       // A pending command must still be able to read its completed receipt even
       // after the final game transition retired the active context.
       if (request.pendingIdentity) {

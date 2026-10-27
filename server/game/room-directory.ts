@@ -5,13 +5,14 @@ import type { CommandIdentity } from '../../shared/contract/protocol/commands'
 import { selectDevelopmentRoom } from './development-room-slots'
 
 export const INSTANCE_LEASE_MS = 30000
+export const ROOM_ADMISSION_MS = 30000
 const ALLOCATION_LEASE_MS = 5 * 60000
 export type OwnerToken = { instanceId: string; epoch: number }
 export type RoomRoute = { roomId: string; owner: OwnerToken; wsPath: string }
 export class RoomOwnershipError extends Error { readonly code = 'room_owner_changed' }
 export class RoomCapacityError extends Error { readonly code = 'room_capacity_reached' }
 type Instance = { instance_id: string; internal_url: string; generation: string; status: string; room_capacity: number; lease_until: number }
-type Ownership = { room_id: string; instance_id: string; epoch: number; lease_until: number; status: string; development: boolean }
+type Ownership = { room_id: string; instance_id: string; epoch: number; lease_until: number; status: string; development: boolean; admission_until: number }
 const route = (owner: Ownership): RoomRoute => ({ roomId: owner.room_id, owner: { instanceId: owner.instance_id, epoch: owner.epoch }, wsPath: `/nodes/${encodeURIComponent(owner.instance_id)}/ws` })
 
 /** Shared placement and fencing. Room state and undo never contain this epoch. */
@@ -69,11 +70,13 @@ export class RoomDirectory {
   private async selectInstance(preferred?: string, development = false, replacing?: string): Promise<Instance> {
     const now = await this.now()
     const rows = await this.db.prepare(`SELECT i.*, count(o.room_id)::bigint AS rooms FROM app_instances i
-      LEFT JOIN room_ownership o ON o.instance_id=i.instance_id AND o.status!='retired' AND NOT o.development AND o.lease_until>? AND o.room_id != ? AND (o.status='reserved' OR EXISTS(SELECT 1 FROM rooms r WHERE r.id=o.room_id))
+      LEFT JOIN room_ownership o ON o.instance_id=i.instance_id AND o.status!='retired' AND NOT o.development AND o.lease_until>? AND o.room_id != ?
+        AND (o.admission_until>? OR (EXISTS(SELECT 1 FROM rooms r WHERE r.id=o.room_id)
+          AND EXISTS(SELECT 1 FROM room_presence p WHERE p.room_id=o.room_id AND p.epoch=o.epoch AND p.connected_count>0)))
       WHERE i.lease_until>? AND (i.status='ready' OR (i.instance_id=? AND i.status='starting'))
         AND (?::text IS NULL OR i.instance_id=?)
       GROUP BY i.instance_id HAVING ?::boolean OR count(o.room_id)<i.room_capacity
-      ORDER BY count(o.room_id), i.instance_id LIMIT 1`).all<Instance>(now, replacing ?? '', now, preferred ?? null, preferred ?? null, preferred ?? null, development)
+      ORDER BY count(o.room_id), i.instance_id LIMIT 1`).all<Instance>(now, replacing ?? '', now, now, preferred ?? null, preferred ?? null, preferred ?? null, development)
     if (!rows[0]) throw new RoomCapacityError('No application instance has room capacity')
     return rows[0]
   }
@@ -86,13 +89,18 @@ export class RoomDirectory {
       const instance = await this.db.prepare("SELECT 1 FROM app_instances WHERE instance_id=? AND lease_until>? AND status IN ('starting','ready')").get(previous.instance_id, now)
       if (instance) {
         if (preferred && previous.instance_id !== preferred) throw new RoomOwnershipError('Room belongs to another instance')
+        const connected = await this.db.prepare('SELECT 1 FROM room_presence WHERE room_id=? AND epoch=? AND connected_count>0').get(roomId, previous.epoch)
+        if (!previous.development && !connected && previous.admission_until <= now) {
+          await this.selectInstance(previous.instance_id, false, replacing)
+          await this.db.prepare('UPDATE room_ownership SET admission_until=? WHERE room_id=?').run(now + ROOM_ADMISSION_MS, roomId)
+        }
         return route(previous)
       }
     }
     const instance = await this.selectInstance(preferred, development, replacing)
-    const owner = await this.db.prepare(`INSERT INTO room_ownership(room_id, instance_id, epoch, lease_until, status, development)
-      VALUES (?, ?, 1, ?, 'reserved', ?) ON CONFLICT(room_id) DO UPDATE SET instance_id=excluded.instance_id,
-        epoch=room_ownership.epoch+1, lease_until=excluded.lease_until RETURNING *`).get<Ownership>(roomId, instance.instance_id, now + INSTANCE_LEASE_MS, development)
+    const owner = await this.db.prepare(`INSERT INTO room_ownership(room_id, instance_id, epoch, lease_until, status, development, admission_until)
+      VALUES (?, ?, 1, ?, 'reserved', ?, ?) ON CONFLICT(room_id) DO UPDATE SET instance_id=excluded.instance_id,
+        epoch=room_ownership.epoch+1, lease_until=excluded.lease_until, admission_until=excluded.admission_until RETURNING *`).get<Ownership>(roomId, instance.instance_id, now + INSTANCE_LEASE_MS, development, development ? 0 : now + ROOM_ADMISSION_MS)
     return route(owner!)
   }
 
@@ -157,9 +165,10 @@ export class RoomDirectory {
     if (row.command_id && (row.command_id !== identity.commandId || row.scope_id !== identity.scopeId)) throw new Error('Creation allocation already belongs to another command')
     const owner = await this.db.prepare('SELECT * FROM room_ownership WHERE room_id=?').get<Ownership>(row.room_id)
     if (!owner || owner.instance_id !== instanceId) throw new RoomOwnershipError('Creation is routed to another instance')
-    await this.assertOwner(row.room_id, { instanceId, epoch: owner.epoch })
+    const admitted = await this.claimLocked(row.room_id, instanceId)
+    await this.assertOwner(row.room_id, admitted.owner)
     await this.db.prepare('UPDATE room_allocations SET scope_id=?, command_id=? WHERE actor_id=? AND allocation_id=?').run(identity.scopeId, identity.commandId, actorId, allocationId)
-    return route(owner)
+    return admitted
   }
 
   /** Must run inside the same transaction as the authoritative write/publication. */
@@ -217,6 +226,12 @@ export class RoomDirectory {
 
   async presence(roomId: string, owner: OwnerToken, connected: number, occupied: number): Promise<void> {
     await this.assertOwner(roomId, owner)
+    if (connected > 0) {
+      const admitted = await this.db.prepare(`SELECT 1 FROM room_ownership o WHERE o.room_id=? AND (o.development OR o.admission_until>?
+        OR EXISTS(SELECT 1 FROM room_presence p WHERE p.room_id=o.room_id AND p.epoch=o.epoch AND p.connected_count>0))`).get(roomId, await this.now())
+      if (!admitted) throw new RoomCapacityError('Room admission expired; reconnect to reserve capacity')
+      await this.db.prepare('UPDATE room_ownership SET admission_until=0 WHERE room_id=?').run(roomId)
+    }
     await this.db.prepare(`INSERT INTO room_presence(room_id, epoch, connected_count, occupied_count) VALUES (?, ?, ?, ?)
       ON CONFLICT(room_id) DO UPDATE SET epoch=excluded.epoch, connected_count=excluded.connected_count, occupied_count=excluded.occupied_count`).run(roomId, owner.epoch, connected, occupied)
   }
