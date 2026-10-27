@@ -125,6 +125,8 @@ describe('effects architecture guard', () => {
       'improvement',
       'individual-food-cost',
       'lie-animal',
+      'moor-solo-preparation',
+      'moor-solo-retention',
       'moor-special-action-apply',
       'moor-special-action-choice',
       'move-farmer-to-space',
