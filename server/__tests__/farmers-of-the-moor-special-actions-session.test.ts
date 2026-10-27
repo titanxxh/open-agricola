@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 const findCardFor = (

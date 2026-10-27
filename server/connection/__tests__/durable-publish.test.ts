@@ -117,13 +117,21 @@ it('retains an action for retry and keeps later input and seat reconnect behind 
   expect(messages(actor)).toEqual([])
   expect(messages(other)).toContainEqual(expect.objectContaining({ type: 'stateUpdate', version: 0, requestId: 'wrong-seat' }))
   vi.mocked(host.ws.send).mockClear(); vi.mocked(guest.ws.send).mockClear()
+  let pausePublished!: () => void
+  const paused = new Promise<void>(resolve => { pausePublished = resolve })
+  const broadcast = actor.broadcaster.broadcastEvent.bind(actor.broadcaster)
+  vi.spyOn(actor.broadcaster, 'broadcastEvent').mockImplementation(async (...args) => {
+    await broadcast(...args)
+    if (args[1].type === 'roomPersistencePaused') pausePublished()
+  })
   vi.spyOn(persistence, 'commitReplay').mockRejectedValueOnce(new Error('temporary persistence error'))
   const action = dispatch(actor, { type: 'action', spaceId: 'forest', requestId: 'action-1' })
   let queued: Promise<void> | undefined
   let joining: Promise<void> | undefined
   const reconnect = context(other.currentUserId!)
   try {
-    await vi.waitFor(() => expect(messages(actor).map(event => event.type)).toEqual(['roomPersistencePaused']))
+    await Promise.race([paused, action.then(() => { throw new Error('Action completed without publishing its durable pause') })])
+    expect(messages(actor).map(event => event.type)).toEqual(['roomPersistencePaused'])
     expect(messages(other).map(event => event.type)).toEqual(['roomPersistencePaused'])
     expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(0)
     expect(tasks.map(task => task.delay)).toEqual([1000])
