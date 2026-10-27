@@ -13,13 +13,16 @@ import { BACKEND_URL } from '../fixtures'
 const exec = promisify(execFile)
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 
-export async function checkpoint(roomId: string) {
+export async function checkpoint(roomId: string, completedSourceId?: string) {
   const schema = process.env.DATABASE_SCHEMA
   const prefix = process.env.S3_PREFIX
   if (!schema || !/^test_[a-f0-9]{32}$/.test(schema) || !prefix?.startsWith('test/e2e-')) throw new Error('Recovery requires an isolated verify environment')
   const db = new PostgresDatabase({ connectionString: process.env.DATABASE_URL, schema })
   const objects = S3ObjectStore.fromEnv()
   try {
+    if (completedSourceId) {
+      expect(await db.prepare('SELECT id FROM rooms WHERE id=?').get(completedSourceId)).toBeUndefined()
+    }
     const room = await db.prepare('SELECT state_json FROM rooms WHERE id=?').get<{ state_json: string }>(roomId)
     const replay = await db.prepare('SELECT latest_step_no,viewer_build_id,game_build_id FROM game_replays WHERE room_id=?')
       .get<{ latest_step_no: number; viewer_build_id: string; game_build_id: string }>(roomId)
@@ -42,7 +45,8 @@ export async function checkpoint(roomId: string) {
       expect(hash(object.body)).toBe(key.content_hash)
       stored.push({ key: key.object_key, sha256: hash(object.body), bytes: object.body.length })
     }
-    return { schema, prefix, stepNo: replay.latest_step_no, viewerBuildId: replay.viewer_build_id, gameBuildId: replay.game_build_id,
+    return { schema, prefix, ...(completedSourceId ? { completedSourceId, completedSourceRoomAbsent: true } : {}),
+      stepNo: replay.latest_step_no, viewerBuildId: replay.viewer_build_id, gameBuildId: replay.game_build_id,
       frameHash: rows.at(-1)!.frame_hash, decodedFrameHashVerified: true,
       snapshotHash: hash(room.state_json), frame, receipts, historyNodes, recoveryNodes, objects: stored }
   } finally { objects.close(); await db.close() }
