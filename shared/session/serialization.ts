@@ -28,6 +28,7 @@ import type { ActionHookRegistry } from '../actions/hooks'
 
 import { canTakeVisibleMoorSpecialAction, isMoorSpecialActionCardUsableByPlayer } from '../moor/special-action-availability'
 import type { MoorSpecialActionId } from '../moor/types'
+import type { FarmersOfTheMoorState, MoorSoloSupplyView } from '../moor/types'
 import { getPlayerPanelSupplySummary, type PlayerPanelSupplySummary } from '../domain/player-panel-summary'
 import { filterSerializedStateForPlayer, filterSerializedCancellationsForPlayer } from '../projections/serialized-state'
 export { filterSerializedStateForPlayer } from '../projections/serialized-state'
@@ -78,6 +79,7 @@ export type SerializedGameState = Omit<
   GameState,
   'actionSpaces' | 'players' | 'parentSelection' | 'gameSeed'
 > & {
+  farmersOfTheMoor?: (FarmersOfTheMoorState & { soloSupply?: MoorSoloSupplyView }) | null
   /** Present in the authoritative frame; withheld from every viewer projection (ADR-0020). */
   gameSeed?: GameSeed
   actionSpaces: SerializedActionSpace[]
