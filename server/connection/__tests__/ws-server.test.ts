@@ -369,7 +369,7 @@ it('recovers an authenticated solo rematch after a lost receipt through allocati
   }
 }, 30_000)
 
-it.each(['card-epoch', 'retired-lease'] as const)('keeps the completed solo connection usable after %s changes while reporting and correcting missing-card settings', async stale => {
+it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] as const)('keeps the completed solo connection usable after %s changes while reporting and correcting missing-card settings', async stale => {
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
   const { createLocalUserForTests, createSession } = await import('../../auth.ts')
   const user = await createLocalUserForTests(`solo_${randomUUID().replaceAll('-', '').slice(0, 12)}`, 'password123', 'Solo owner')
@@ -419,14 +419,33 @@ it.each(['card-epoch', 'retired-lease'] as const)('keeps the completed solo conn
     expect(invalidation.roomIds).toEqual([])
     await backend.applyInvalidation(invalidation)
     if (stale === 'retired-lease') await db.transaction(() => directory.retire(source.id, source.owner!, source.version))()
+    let existingActiveRooms = 0
+    if (stale === 'other-active-lease') {
+      const other = await create({ type: 'createRoom', maxPlayers: 1 }, 'other-active')
+      if (other.status !== 'completed') throw new Error('Expected committed active room')
+      const room = backend.registry.get(other.receipt.outcome.roomId!)!
+      await db.transaction(() => directory.retire(room.id, room.owner!, room.version))()
+      existingActiveRooms = 1
+    }
 
     const adjustment = await create({ type: 'createRoom', sourceGameContextId: source.id }, 'adjustment')
     expect(adjustment).toMatchObject({ status: 'completed', receipt: { outcome: { ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
       configuration: { customCardIds: [workshopId] }, issues: [{ workshopCardId: workshopId, reason: 'missing' }],
     } } } })
-    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 0 })
+    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: existingActiveRooms })
 
+    const lifecycleReads: Array<{ roomId: string; rooms: number; stepNos: number[] }> = []
+    if (stale === 'lifecycle-read') {
+      vi.spyOn(recording.gameContextStore, 'lifecycle').mockImplementationOnce(async roomId => {
+        lifecycleReads.push({ roomId,
+          rooms: (await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get<{ count: number }>())?.count ?? -1,
+          stepNos: (await db.prepare('SELECT s.step_no FROM game_replay_steps s JOIN rooms r ON r.id=s.room_id WHERE r.max_players=1').all<{ step_no: number }>()).map(row => row.step_no),
+        })
+        throw new Error('Previous lifecycle read failed after Step 0 commit')
+      })
+    }
     const corrected = await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: [] }, 'corrected')
+    if (stale === 'lifecycle-read') expect(lifecycleReads).toEqual([{ roomId: source.id, rooms: 1, stepNos: [0] }])
     expect(corrected).toMatchObject({ status: 'completed', receipt: { outcome: { ok: true, stepNo: 0 } } })
     if (corrected.status !== 'completed') throw new Error('Expected completed corrected creation')
     const nextId = corrected.receipt.outcome.roomId!
@@ -438,7 +457,15 @@ it.each(['card-epoch', 'retired-lease'] as const)('keeps the completed solo conn
     expect(peer.received.filter(event => event.type === 'roomCreated' && event.roomId === nextId)).toHaveLength(1)
     expect(peer.received.filter(event => event.type === 'commandReceipt' && event.requestId === 'corrected')).toHaveLength(1)
     expect(await db.prepare('SELECT step_no FROM game_replay_steps WHERE room_id=?').all(nextId)).toEqual([{ step_no: 0 }])
-    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 1 })
+    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: existingActiveRooms + 1 })
+    const identity = corrected.receipt
+    peer.send(JSON.stringify({ type: 'getCommandReceipt', identity: { scopeId: identity.scopeId, commandId: identity.commandId }, requestId: 'recover-corrected' }))
+    const recovered = await waitForEvent(peer, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> => event.type === 'commandReceipt' && event.requestId === 'recover-corrected')
+    expect(recovered).toMatchObject({ status: 'completed', receipt: corrected.receipt })
+    peer.send(JSON.stringify({ type: 'getState', requestId: 'usable-new-session' }))
+    const usable = await waitForEvent(peer, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate' && event.requestId === 'usable-new-session')
+    expect(usable.roomId).toBe(nextId)
+    expect(usable.payload.state.players).toHaveLength(1)
     expect(await persistence.loadCreationConfiguration(source.id)).toEqual(originalConfiguration)
     expect(await recording.gameContextStore.resolve(source.id)).toEqual(before)
   } finally {
