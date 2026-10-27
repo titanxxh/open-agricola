@@ -234,6 +234,30 @@ describe('PostgresRoomPersistence replay commit', () => {
     expect((await db.prepare('SELECT room_id FROM game_results').get())).toEqual({ room_id: 'room-1' })
   })
 
+  it('archives fractional final scores without rounding or blocking the final Step', async () => {
+    await persistence.commitReplay(step0())
+    const final = {
+      ...nextStep(),
+      result: {
+        ...RESULT,
+        players: [
+          { ...RESULT.players[0]!, score: -13.9 },
+          { ...RESULT.players[1]!, score: 9.1 },
+        ],
+      },
+    }
+
+    expect(await persistence.commitReplay(final)).toEqual({ kind: 'committed' })
+    expect(await persistence.commitReplay(final)).toEqual({ kind: 'idempotent' })
+    expect(await db.prepare('SELECT player_index, score FROM game_result_players ORDER BY player_index').all()).toEqual([
+      { player_index: 0, score: -13.9 },
+      { player_index: 1, score: 9.1 },
+    ])
+    expect(await persistence.load('room-1')).toBeNull()
+    expect((await persistence.loadReplayHead('room-1'))?.latestStepNo).toBe(1)
+    expect(await db.prepare('SELECT lifecycle FROM game_contexts').get()).toEqual({ lifecycle: 'completed' })
+  })
+
   it('archives current seat identities, name provenance and variant flags once with the final recorded Step', async () => {
     for (const id of ['old', 'replacement']) await db.prepare("INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,'hash',1)").run(id, id, id)
     const initial = step0()
