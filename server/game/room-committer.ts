@@ -156,7 +156,9 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
         },
       })
     case 'soloHandSubmit':
-      return intent(command.type, { selection: command.selection })
+      return intent(command.type, { selection: {
+        groups: command.selection.groups.map(group => ({ kind: group.kind, cardIds: [...group.cardIds] })),
+      } })
     case 'devSetResources':
       return intent(command.type, { resources: command.resources })
     case 'devSetRound':
