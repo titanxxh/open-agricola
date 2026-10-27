@@ -618,7 +618,7 @@ export const cloneState = (state: GameState): GameState => {
   return cloned
 }
 
-/** Snake Opening is a multiplayer variant: a single seat has nothing to reverse and keeps the standard 2 food. */
+/** Snake Opening is a multiplayer variant; one player uses the standard solo rules. */
 const isSnakeOpeningActive = (options: InitialStateOptions): boolean =>
   options.enableSnakeOpening === true && Math.floor(options.playerCount ?? 2) > 1
 
@@ -690,7 +690,7 @@ const createInitialPlayers = (
     { id: 'p6', name: defaultSandboxPlayerNames[5], color: 'purple', startPlayer: false },
   ]
   return base.slice(0, count).map((info, index) => {
-    const startingFood = snakeOpening || !info.startPlayer ? 3 : 2
+    const startingFood = count === 1 ? 0 : snakeOpening || !info.startPlayer ? 3 : 2
     const player: PlayerState = {
       id: info.id,
       name: playerNames[index]?.trim() ? playerNames[index]! : info.name,
