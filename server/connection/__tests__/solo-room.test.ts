@@ -385,4 +385,17 @@ describe('formal solo creation', () => {
     expect(messages.filter(message => message.type === 'roomCreated')).toHaveLength(1)
     expect(messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome.ok).toBe(true)
   })
+
+  it('keeps the committed authoritative session alive when creation publication fails after adoption', async () => {
+    const { ctx, deps } = createActor()
+    const disposal = vi.fn()
+    vi.spyOn(deps.broadcaster, 'sendRoomEvent').mockImplementationOnce(async (_socket, room) => {
+      vi.spyOn(room.session, 'dispose').mockImplementation(disposal)
+      throw new Error('Publication transport failed')
+    })
+    await expect(dispatch(ctx, { type: 'createRoom', maxPlayers: 1 })).rejects.toThrow('Publication transport failed')
+    expect((await deps.persistence.load(ctx.currentRoom!.id))?.meta.maxPlayers).toBe(1)
+    expect(deps.registry.get(ctx.currentRoom!.id)).toBe(ctx.currentRoom)
+    expect(disposal).not.toHaveBeenCalled()
+  })
 })

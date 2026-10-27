@@ -710,9 +710,11 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
           room.session.dispose()
         }
       } catch (error) {
-        await ctx.committer?.retireRoom(room.id)
-        room.customSessionExecutor?.dispose()
-        room.session.dispose()
+        if (ctx.currentRoom !== room) {
+          await ctx.committer?.retireRoom(room.id)
+          room.customSessionExecutor?.dispose()
+          room.session.dispose()
+        }
         throw error
       }
     },
