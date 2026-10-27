@@ -8,7 +8,7 @@ import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { ThroughTheSeasonsState } from '../seasons/types'
-import type { FarmersOfTheMoorState, FarmTerrainTile } from '../moor/types'
+import type { FarmersOfTheMoorState, FarmTerrainTile, MoorSoloChoice } from '../moor/types'
 import type { AnimalKey } from './animals'
 import type { SeasonalAdjustment } from './seasonal-adjustments'
 import type { SoloHandMode } from './game-creation'
@@ -1228,7 +1228,7 @@ export type ChoiceMultiSelect = {
 
 export type InteractionRequest = (
   | { kind: 'solo-hand-selection'; groups: SoloHandSelectionGroup[] }
-  | { kind: 'choice'; options: ActionChoiceOption[]; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
+  | { kind: 'choice'; options: ActionChoiceOption[]; multiSelect?: ChoiceMultiSelect; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean; moorSolo?: MoorSoloChoice }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[]; prefill?: boolean }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }

@@ -31,6 +31,22 @@ export type MoorSpecialActionCardLocation =
   | { kind: 'market' }
   | { kind: 'playerFaceUp'; playerId: string }
   | { kind: 'playerFaceDown'; playerId: string }
+  | { kind: 'solo-draw'; order: number; playerId?: never }
+  | { kind: 'solo-current'; playerId?: never }
+  | { kind: 'solo-discard'; order: number; playerId?: never }
+
+/** Derived viewer data. Hidden card identities and pile order stay authoritative. */
+export type MoorSoloSupplyView = {
+  drawCount: number
+  nextCardActions: MoorSpecialActionId[]
+  retentionPaid: boolean
+}
+
+/** Native choice annotation; submissions use the ordinary resolveChoice command. */
+export type MoorSoloChoice = {
+  window: 'preparation' | 'retention'
+  currentCardId: string
+}
 
 export type MoorSpecialActionCardState = {
   id: string
@@ -44,4 +60,6 @@ export type FarmersOfTheMoorState = {
   complexity: 'iii'
   startCardByPlayerId: Record<string, MoorStartCardId>
   specialActionCards: MoorSpecialActionCardState[]
+  /** Solo rule progress, derived from actual participant count, never a mode switch. */
+  soloRetentionPaid?: boolean
 }
