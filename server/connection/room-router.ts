@@ -538,6 +538,8 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
   previous.players = previous.players.filter(candidate => candidate.ws !== ctx.ws)
   const now = Date.now()
   ctx.registry.touchActivity(previous.id, now)
+  const lifecycle = await ctx.gameContextStore?.lifecycle(previous.id)
+  if (lifecycle && lifecycle !== 'active') return
   if (roomConnectedPlayerCount(previous) === 0) {
     if (ctx.authority) await ctx.authority.setExpiry(previous, now + emptyRoomTtlMs(previous))
     else await ctx.gameContextStore?.setActiveExpiry(previous.id, now + emptyRoomTtlMs(previous))
@@ -1582,7 +1584,9 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
           assertCommandInput(msg.type, msg.commandContext, ctx.currentRoom.version, ctx.currentRoom.inputWindow)
         }
       }
-      if (ctx.currentRoom && !['auth', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)) await ctx.authority?.assert(ctx.currentRoom)
+      // Creation authorizes its actor, allocation and source independently of
+      // whichever completed rules session this connection previously displayed.
+      if (ctx.currentRoom && !['auth', 'getCommandScope', 'getCommandReceipt', 'createRoom'].includes(msg.type)) await ctx.authority?.assert(ctx.currentRoom)
       if (msg.type === 'joinRoom') { const joined = ctx.registry.get(msg.roomId); if (joined) await ctx.authority?.assert(joined) }
       if (
         ctx.currentRoom !== acceptedRoom
