@@ -405,6 +405,14 @@ it.each(['card-epoch', 'retired-lease', 'lifecycle-read', 'other-active-lease'] 
   }
   try {
     await waitForOpen(peer)
+    const disabledWorkshop = await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: false, customCardIds: [workshopId] }, 'disabled-workshop')
+    expect(disabledWorkshop).toMatchObject({ status: 'completed', receipt: { outcome: {
+      ok: false, code: 'creation_requires_adjustment', creationAdjustment: {
+        configuration: { enableCommunityDeck: false, customCardIds: [workshopId] },
+        issues: [{ workshopCardId: workshopId, reason: 'not-applicable' }],
+      },
+    } } })
+    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 0 })
     await create({ type: 'createRoom', maxPlayers: 1, enableCommunityDeck: true, customCardIds: [workshopId] }, 'original')
     const opening = await waitForEvent(peer, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
     const source = backend.registry.get(opening.roomId)!

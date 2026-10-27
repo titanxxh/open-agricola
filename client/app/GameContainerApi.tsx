@@ -2028,7 +2028,8 @@ export const GameContainerApi = () => {
           }}
         />
       </div>
-      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring}
+        showDraftHistory={state.gameOver && (state.players.length > 1 || !!state.soloHandSelection?.kept)}
         startingHandSelection={state.players.length === 1 ? state.soloHandSelection : undefined}
         completionActions={state.gameOver && state.players.length === 1 && isWs && wsTransport?.roomId
           ? <SameConfigurationRematch key={wsTransport.roomId} roomId={wsTransport.roomId} locale={locale} displayName={state.players[0]?.nameIsDefault ? undefined : state.players[0]?.name} /> : undefined} /> : null}

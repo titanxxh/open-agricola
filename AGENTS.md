@@ -143,6 +143,12 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 </important>
 
+<important if="新增或修改界面译文、语言键或 i18n.ref">
+
+译文源在独立仓库 `titanxxh/open-agricola-i18n`，本机 `/home/xxh/agricola-i18n`。先读该仓库的 AGENTS.md（若有）和 README，核对远端 main 与应用 pin；使用独立 worktree 修改 `locales/en.json`、`locales/zh.json`，按该仓库流程构建并测试 packs。先形成可审阅的语言提交，再更新本仓 `i18n.ref` 并运行 `build:i18n`、`lint:i18n` 和相关界面验收。交付记录两个仓库的 ref、pack 清单哈希及验证结果；发布顺序为语言源及其 CI 完成后再发布消费该 pin 的应用。
+
+</important>
+
 <important if="准备交付变更、复核验证结果或运行浏览器验收">
 
 ## Verification after changes

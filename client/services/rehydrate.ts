@@ -3,13 +3,14 @@ import type { GameState } from '../../shared/contract/types'
 
 /**
  * Client-facing game state. Identical to `GameState` except `players` carry the
- * server-derived snapshot-only display projections (`specialStables`,
+ * server-derived snapshot-only display projections (`soloSupply`, `specialStables`,
  * `playedCardAnimalZones`, `farmCardAnimalZones`, and
  * `borrowedPlayedCardAnimalZones`). The UI reads them directly; they are never
  * written back into the authoritative domain.
  */
-export type ClientGameState = Omit<GameState, 'players'> & {
+export type ClientGameState = Omit<GameState, 'players' | 'farmersOfTheMoor'> & {
   players: SerializedPlayerState[]
+  farmersOfTheMoor?: SerializedGameState['farmersOfTheMoor']
 }
 
 /**
