@@ -33,7 +33,8 @@ export const computeHarvestFeedingRequirement = (
 ): number => {
   const size = familySize(player)
   const newborns = Math.min(newbornCount(player), size)
-  const baseRequired = Math.max(0, size * 2 - newborns)
+  const foodPerAdult = state.players.length === 1 ? 3 : 2
+  const baseRequired = Math.max(0, (size - newborns) * foodPerAdult + newborns)
   let required = baseRequired
 
   for (const [cardId, modifier] of modifiers) {

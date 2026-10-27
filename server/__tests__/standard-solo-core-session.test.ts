@@ -1,5 +1,8 @@
+import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameSession } from '../game/authoritative-session'
+import { createDefaultRoomTiles } from '../../shared/domain/farm'
+import { setActiveWorkerCount } from '../../shared/domain/player'
 import { createOpeningSession, createWorkSession } from './_helpers/session-fixtures'
 
 const sessions: GameSession[] = []
@@ -62,5 +65,46 @@ describe('standard solo core rules', () => {
       expect(response.state.log.length).toBeGreaterThan(logLength)
       expect(response.scores![0]!.total - before.scores![0]!.total).toBe(spaceId === 'grain-seeds' ? 2 : 0)
     }
+  })
+
+  it.each([
+    { playerCount: 1, food: 13, paid: 7 },
+    { playerCount: 2, food: 15, paid: 5 },
+  ])('settles two adults and a newborn at $playerCount players through the harvest', ({ playerCount, food, paid }) => {
+    const session = createWorkSession({ options: { playerCount }, configure(state) {
+      const player = state.players[0]!
+      player.resources.food = 20
+      player.rooms = 3
+      player.roomTiles = createDefaultRoomTiles(3)
+      setActiveWorkerCount(player, 3)
+      player.workers[2]!.isNewborn = true
+      state.round = 4
+      for (const [index, entry] of state.players.entries()) {
+        entry.resources.food = 20
+        const spaces = index === 0 ? ['forest', 'clay-pit'] : ['reed-bank', 'fishing']
+        for (const [workerIndex, id] of spaces.entries()) {
+          const space = state.actionSpaces.find(candidate => candidate.id === id)
+          assert.ok(space)
+          space.takenBy.push({ playerId: entry.id, workerId: entry.workers[workerIndex]!.id })
+        }
+      }
+    } })
+    sessions.push(session)
+    const scores = session.getState().scores
+
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.round).toBe(5)
+    expect(response.state.players[0]!.resources).toMatchObject({ food, begging: 0 })
+    expect(response.state.players[0]!.workers[2]!.isNewborn).toBe(false)
+    if (playerCount === 2) expect(response.state.players[1]!.resources.food).toBe(16)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.paid', actorPlayerId: 'p1', paymentFor: 'feeding', resources: { food: paid },
+    }))
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.harvestFeedDetail', params: expect.objectContaining({ resources: { food: paid } }),
+    }))
+    expect(response.scores).toEqual(scores)
   })
 })

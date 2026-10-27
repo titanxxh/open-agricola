@@ -44,10 +44,12 @@ const createPlayer = (
   cardStates: {},
 } as PlayerState)
 
-const createState = (player: PlayerState): GameState => ({
+const createState = (player: PlayerState, playerCount = 2): GameState => ({
   round: 4,
   currentPlayerIndex: 0,
-  players: [player],
+  players: [player, ...Array.from({ length: playerCount - 1 }, (_, index) => ({
+    ...createPlayer(), id: `p${index + 2}`,
+  }))],
   actionSpaces: [],
   log: [],
   roundActionOrder: [],
@@ -60,6 +62,18 @@ const createState = (player: PlayerState): GameState => ({
 } as GameState)
 
 describe('computeHarvestFeedingRequirement', () => {
+  it.each([
+    { playerCount: 1, active: 2, newborns: 0, required: 6 },
+    { playerCount: 1, active: 3, newborns: 1, required: 7 },
+    { playerCount: 1, active: 3, newborns: 0, required: 9 },
+    { playerCount: 2, active: 2, newborns: 0, required: 4 },
+    { playerCount: 2, active: 3, newborns: 1, required: 5 },
+    { playerCount: 2, active: 3, newborns: 0, required: 6 },
+  ])('requires $required food for $active people with $newborns newborns at $playerCount players', ({ playerCount, active, newborns, required }) => {
+    const player = createPlayer({}, active, newborns)
+    expect(computeHarvestFeedingRequirement(createState(player, playerCount), player)).toBe(required)
+  })
+
   it('uses the base reference feeding formula without modifiers', () => {
     const player = createPlayer({}, 3, 1)
     expect(computeHarvestFeedingRequirement(createState(player), player)).toBe(5)
@@ -72,7 +86,7 @@ describe('computeHarvestFeedingRequirement', () => {
 
   it('subtracts one food per person for E159 Old Miser', () => {
     const player = createPlayer({ occupation: ['E159_OldMiser'] }, 3, 1)
-    expect(computeHarvestFeedingRequirement(createState(player), player)).toBe(2)
+    expect(computeHarvestFeedingRequirement(createState(player, 4), player)).toBe(2)
   })
 
   it('stacks E30 and E159 as formula modifiers', () => {
@@ -80,6 +94,6 @@ describe('computeHarvestFeedingRequirement', () => {
       minor: ['E030_ChildsToy'],
       occupation: ['E159_OldMiser'],
     }, 3, 1)
-    expect(computeHarvestFeedingRequirement(createState(player), player)).toBe(3)
+    expect(computeHarvestFeedingRequirement(createState(player, 4), player)).toBe(3)
   })
 })
