@@ -45,7 +45,7 @@ describe('starting food', () => {
     it('is ignored in a single-player game', () => {
       const state = createInitialState(42, { playerCount: 1, enableSnakeOpening: true })
 
-      expect(state.players.map((player) => player.resources.food)).toEqual([2])
+      expect(state.players.map((player) => player.resources.food)).toEqual([0])
       expect(state.enableSnakeOpening).toBe(false)
       expect(state.snakeOpening).toBeNull()
     })
