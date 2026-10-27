@@ -74,8 +74,10 @@ async function declineElderOpening(driver: SoloBrowserDriver) {
 
 test('solo random starts directly and keeps ordinary action confirmation', async ({ browser, request }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const outsider = await browser.newContext()
   try {
-    await authenticate(context, request, `solo_random_${Date.now().toString(36)}`)
+    const username = `solo_random_${Date.now().toString(36)}`
+    await authenticate(context, request, username)
     const page = await context.newPage()
     const state = observe(page)
     await openSolo(page)
@@ -96,8 +98,44 @@ test('solo random starts directly and keeps ordinary action confirmation', async
     await page.getByRole('button', { name: 'Continue', exact: true }).click()
     await expect.poll(() => state.latest().state.round).toBe(2)
     expect(state.sent.filter(command => command.type === 'createRoom')).toHaveLength(1)
+    const { roomId, version } = state.driver.envelope
+    const player = structuredClone(state.latest().state.players[0]!)
+    const snapshotCount = state.snapshots.length
+    await page.goto(FRONTEND_URL)
+    const game = page.locator('.my-game')
+    await expect(game).toHaveCount(1)
+    await expect(game.locator('.my-game__name')).toHaveText([username])
+    await expect(game.locator('[data-player-color]')).toHaveAttribute('data-player-color', player.color)
+    await expect(game).toContainText('Started')
+    await expect(game.locator('time')).toBeVisible()
+    await expect(game).not.toContainText(roomId)
+    await game.getByRole('button', { name: 'Resume', exact: true }).click()
+    await expect(page.locator('.game-layout')).toBeVisible()
+    await expect.poll(() => state.snapshots.length).toBeGreaterThan(snapshotCount)
+    expect(state.driver.envelope).toMatchObject({ roomId, version })
+    expect(state.latest().state.round).toBe(2)
+    expect(state.latest().state.players[0]!.resources).toEqual(player.resources)
+    expect(state.latest().state.players[0]!.occupationHand).toEqual(player.occupationHand)
+    expect(state.latest().state.players[0]!.minorHand).toEqual(player.minorHand)
+
+    await authenticate(outsider, request, `solo_outsider_${Date.now().toString(36)}`)
+    const otherPage = await outsider.newPage()
+    const [mine, publicRooms] = await Promise.all([
+      otherPage.waitForResponse(response => new URL(response.url()).pathname === '/api/lobby/my-rooms'),
+      otherPage.waitForResponse(response => new URL(response.url()).pathname === '/api/rooms'),
+      otherPage.goto(FRONTEND_URL),
+    ])
+    for (const response of [mine, publicRooms]) {
+      expect(response.ok()).toBe(true)
+      const result: { ok: boolean; rooms: Array<{ id: string }> } = await response.json()
+      expect(result.ok).toBe(true)
+      expect(result.rooms.map(room => room.id)).not.toContain(roomId)
+    }
+    await expect(otherPage.getByRole('button', { name: 'Solo game', exact: true })).toBeVisible()
+    await expect(otherPage.locator('body')).not.toContainText(username)
+    await expect(otherPage.locator('body')).not.toContainText(roomId)
     await page.screenshot({ path: 'output/playwright/solo-random-desktop.png' })
-  } finally { await context.close() }
+  } finally { await Promise.all([context.close(), outsider.close()]) }
 })
 
 test('solo choose-7 preserves candidates and the confirmed result across fresh browser contexts', async ({ browser, request }, testInfo) => {
