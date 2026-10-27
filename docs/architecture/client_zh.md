@@ -25,6 +25,7 @@
 
 - `services/oauth-onboarding.ts` 在当前标签页的 `sessionStorage` 保存浏览器 verifier 与回调票据，从浏览器历史移除票据 fragment，并在刷新、可修正的表单校验错误后保留凭证。`LoginPage` 在跳转授权前准备 challenge；HTTP 局域网等缺少 Web Crypto 的环境保留 Cookie 导航路径，并在持久缓存恢复的 `pageshow` 事件中重置导航状态；`OnboardingPage` 在成功或凭证终止错误时清理凭证，并提供重新注册入口。站点会话仍使用 HttpOnly Cookie。浏览器测试分别验证 ITP 下的账号创建与 CHIPS 会话能力；Linux WPE 不能替代实体 iPhone 的会话验收。
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
+- `services/room-creation.ts` 使用新的已认证连接和独立的待确认命令记录创建房间。恢复时沿用原创建身份，收到持久回执和新房快照后才导航；来源重开失败时保留旧结果和完整的配置调整信息。大厅与两处完成入口共用这条链路。
 - `card-meta.ts` 拉取 `GET /cards-manifest.json`；`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
 - 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。其选色器提供六种颜色，禁用其他玩家已占用的颜色，并等待服务端发布保存后的选择。
@@ -45,6 +46,7 @@
 - 轮抽与父母卡选择阶段在独立滚动的选卡区域上方保留 `GameHeader`。内嵌模式保留语言切换。测试见 `setup-navigation.spec.ts`。
 - `RoomInvitePicker.tsx` 在输入两个字符后搜索用户名或显示名前缀，支持点击与键盘选择，等待输入法组字结束，并丢弃已取消请求的响应。已选玩家显示为带用户名、可移除的名字标签，账号 ID 只用于创建请求。服务端确认 Room 后从 URL 移除创建选项，所有准入决定仍由服务端执行。覆盖：`RoomInvitePicker.test.tsx`、`room-invitations.spec.ts`。
 - `MyActiveGames.tsx` 通过参与者名字和颜色识别对局，显示本地时区的创建或开局时间，以及服务端给出的当前行动玩家。继续游戏使用 Room ID，但不展示该 ID。覆盖：`LobbyPage.test.tsx`、`room-invitations.spec.ts`、`lobby-active-games.spec.ts`。
+- `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - `common/CardWithCopy.tsx` 负责触屏查看详情和绑定当前请求的出牌确认。`CardDetails.tsx` 使用模态对话框，内容独立滚动，关闭与打出按钮持续可见。`useCardPlayChoice` 防止手牌或供应区重复提交，跟随传输结果解除失败请求的提交锁；提交权限取自当前权威选项与本机座位。提交锁与详情权限使用 `useRequestActivation`：重复快照保留当前激活阶段，离开请求后即使恢复同一标识，也建立新的激活阶段；迟到结果仅影响所属阶段。职业多选保留整组确认。覆盖见 `PlayerCard.touch.test.tsx`、`touch-card-play.spec.ts` 与 `card-play-undo.spec.ts`。
 - `improvement-selection.ts` 将当前可用请求选项与应答玩家手牌、主要改良供应区求交。发展请求有小发展候选时聚焦手牌，仅主要改良合法时展开并聚焦供应区，两者皆无候选时聚焦操作控件。`PlayerFarmPanel.improvementSupply` 将唯一供应区视图放在手牌旁；`GameContainerApi` 持有绑定请求标识的展开状态，重复快照及响应式手牌挂载位置变化都保留该状态。覆盖见 `GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx` 与 `improvement-focus.spec.ts`。
@@ -75,6 +77,7 @@ GameContextRouter
 - 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
+- 完成的单人 Game Context 在历史 Viewer 外保留公开分数和私下校验本人资格的再开入口。即时 `ScoringPad` 注入同一再开组件；私有配置读取或 Viewer 失败均不隐藏公开结果。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。

@@ -43,14 +43,17 @@
   z-index: 1;
   background: linear-gradient(180deg, rgba(58, 90, 44, 0.98), rgba(58, 90, 44, 0.92));
 }
-.interaction-bar--farm .interaction-bar__body {
+.interaction-bar--farm .interaction-bar__body,
+.interaction-bar--moor-solo .interaction-bar__body {
   order: -1;
   border-top: 0;
   padding-top: 0;
 }
-.interaction-bar--farm .interaction-bar__top {
+.interaction-bar--farm .interaction-bar__top,
+.interaction-bar--moor-solo .interaction-bar__top {
   position: static;
 }
+.interaction-bar--moor-solo { max-height: min(70dvh, 480px); }
 .interaction-bar__controls {
   display: flex;
   flex-wrap: wrap;

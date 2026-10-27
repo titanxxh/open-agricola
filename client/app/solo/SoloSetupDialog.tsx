@@ -23,19 +23,20 @@ export function SoloSetupDialog({ locale, initialConfiguration, issues = [], cre
   onClose: () => void
   onSubmit: (configuration: SoloCreationConfiguration) => void
 }) {
+  const showCommunity = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true' || initialConfiguration?.enableCommunityDeck === true
+  const showWorkshop = showCommunity || (initialConfiguration?.customCardIds.length ?? 0) > 0
   const [configuration, setConfiguration] = useState(() => initialConfiguration ?? defaultSoloConfiguration)
   const [cards, setCards] = useState<WorkshopCard[]>([])
-  const [catalogStatus, setCatalogStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [catalogStatus, setCatalogStatus] = useState<'idle' | 'loading' | 'error'>(showWorkshop ? 'loading' : 'idle')
   const [retry, setRetry] = useState(0)
-  const showCommunity = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true' || initialConfiguration?.enableCommunityDeck === true
+  const loadWorkshop = configuration.enableCommunityDeck || (initialConfiguration?.customCardIds.length ?? 0) > 0
   useEffect(() => {
-    if (!configuration.enableCommunityDeck) return
+    if (!loadWorkshop) return
     const controller = new AbortController()
-    setCatalogStatus('loading')
     void (async () => {
       const loaded: WorkshopCard[] = []
       for (let page = 1; ; page++) {
-        const response = await fetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`, { signal: controller.signal })
+        const response = await fetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`, { credentials: 'include', signal: controller.signal })
         const body: unknown = await response.json()
         if (!response.ok || !body || typeof body !== 'object' || !('ok' in body) || body.ok !== true
           || !('cards' in body) || !Array.isArray(body.cards) || !body.cards.every(isWorkshopCard)) throw new Error('Card source response unavailable')
@@ -45,12 +46,13 @@ export function SoloSetupDialog({ locale, initialConfiguration, issues = [], cre
       if (!controller.signal.aborted) { setCards(loaded); setCatalogStatus('idle') }
     })().catch(() => { if (!controller.signal.aborted) setCatalogStatus('error') })
     return () => controller.abort()
-  }, [configuration.enableCommunityDeck, retry])
+  }, [loadWorkshop, retry])
   const toggleCard = (id: string) => setConfiguration(current => ({ ...current,
     customCardIds: current.customCardIds.includes(id) ? current.customCardIds.filter(cardId => cardId !== id) : [...current.customCardIds, id],
   }))
   const selectedCards = configuration.customCardIds.filter(id => !cards.some(card => card.id === id)).map(id => ({ id, name: id }))
   const currentIssues = issues.filter(issue => configuration.customCardIds.includes(issue.workshopCardId))
+  const requiresCommunity = !configuration.enableCommunityDeck && configuration.customCardIds.length > 0
   return createPortal(
     <div className="solo-dialog-backdrop">
       <section className="solo-setup-dialog" role="dialog" aria-modal="true" aria-labelledby="solo-setup-title">
@@ -84,20 +86,22 @@ export function SoloSetupDialog({ locale, initialConfiguration, issues = [], cre
             <label><input type="checkbox" checked={configuration.enableThroughTheSeasons} onChange={event => setConfiguration(current => ({ ...current, enableThroughTheSeasons: event.target.checked }))} />{t(locale, 'platform.enableThroughTheSeasons')}</label>
             <label><input type="checkbox" checked={configuration.enableFarmersOfTheMoor} onChange={event => setConfiguration(current => ({ ...current, enableFarmersOfTheMoor: event.target.checked }))} />{t(locale, 'platform.enableFarmersOfTheMoor')}</label>
             {showCommunity ? <label><input type="checkbox" checked={configuration.enableCommunityDeck}
-              onChange={event => setConfiguration(current => ({ ...current, enableCommunityDeck: event.target.checked, customCardIds: event.target.checked ? current.customCardIds : [] }))} />
+              onChange={event => setConfiguration(current => ({ ...current, enableCommunityDeck: event.target.checked }))} />
               {t(locale, 'ui.copy.client_app_LobbyPage_tsx.enable_community_cards_community_deck_3250b6')}</label> : null}
-            {configuration.enableCommunityDeck || configuration.customCardIds.length ? <fieldset><legend>{t(locale, 'platform.reviewedWorkshopCards')}</legend>
+            {showWorkshop && (configuration.enableCommunityDeck || configuration.customCardIds.length > 0) ? <fieldset><legend>{t(locale, 'platform.reviewedWorkshopCards')}</legend>
+              {requiresCommunity ? <p role="status">{t(locale, 'solo.workshopRequiresCommunity')}</p> : null}
               {catalogStatus === 'loading' ? <p>{t(locale, 'solo.loadingSources')}</p> : null}
-              {catalogStatus === 'error' ? <p role="alert">{t(locale, 'solo.sourceLoadFailed')} <button type="button" onClick={() => setRetry(value => value + 1)}>{t(locale, 'solo.retry')}</button></p> : null}
+              {catalogStatus === 'error' ? <p role="alert">{t(locale, 'solo.sourceLoadFailed')} <button type="button" onClick={() => { setCatalogStatus('loading'); setRetry(value => value + 1) }}>{t(locale, 'solo.retry')}</button></p> : null}
+              {catalogStatus === 'idle' && !cards.length && !selectedCards.length ? <p>{t(locale, 'platform.reviewedWorkshopCardsEmpty')}</p> : null}
               {[...selectedCards, ...cards].map(card => <label key={card.id}>
-                <input type="checkbox" checked={configuration.customCardIds.includes(card.id)} onChange={() => toggleCard(card.id)} />
+                <input type="checkbox" checked={configuration.customCardIds.includes(card.id)} disabled={!configuration.enableCommunityDeck && !configuration.customCardIds.includes(card.id)} onChange={() => toggleCard(card.id)} />
                 <span>{card.name}</span>
               </label>)}
             </fieldset> : null}
           </fieldset>
         </div>
         <footer className="solo-hand-footer solo-setup-footer">
-          <button type="button" className="btn-primary" disabled={creating} onClick={() => onSubmit(configuration)}>{t(locale, creating ? 'solo.creating' : 'solo.start')}</button>
+          <button type="button" className="btn-primary" disabled={creating || requiresCommunity} onClick={() => onSubmit(configuration)}>{t(locale, creating ? 'solo.creating' : 'solo.start')}</button>
           <button type="button" className="btn-link" disabled={creating} onClick={onClose}>{t(locale, 'platform.cancel')}</button>
         </footer>
       </section>

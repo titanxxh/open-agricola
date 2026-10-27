@@ -412,7 +412,7 @@ export const InteractionBar = ({
   }, [])
 
   return (
-    <div ref={barRef} className={`interaction-bar${prioritizeTask ? ' interaction-bar--farm' : ''}`} data-interaction-focus="controls">
+    <div ref={barRef} className={`interaction-bar${prioritizeTask ? ' interaction-bar--farm' : ''}${model.moorSolo ? ' interaction-bar--moor-solo' : ''}`} data-interaction-focus="controls">
       <div className="interaction-bar__top">
         <div className="interaction-bar__controls">
           {onReturnToTarget ? <button type="button" onClick={onReturnToTarget}>
