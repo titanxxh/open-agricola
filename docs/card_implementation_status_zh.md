@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-10-22。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-10-27。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 > 本文只覆盖官方卡牌。Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
@@ -20,6 +20,7 @@
 
 | 类别 | 卡牌 |
 |---|---|
+| [#1407](https://github.com/titanxxh/open-agricola/issues/1407) 采纳的项目规则解释，用于现有来源未能确定的单人交互。这些是单卡 OA 决定，不是官方裁定，也不替代全局 other-player 或 neighbour 条件。 | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
 | 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
 | 同一 Turn 内，放人末尾反应再授予 Bake Bread 时不能再次替代，不受参考实现清标记反应顺序影响。维护者裁定见 [#1331](https://github.com/titanxxh/open-agricola/issues/1331)。 | `A097_Freshman` |
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
@@ -75,6 +76,10 @@
 
 | 卡牌 | 备注 |
 |---|---|
+| `E014_WoodSaw` | 单人仍可正常购买本牌，但不授予免放人的建房机会。普通付费建房继续可用。 |
+| `M027_GardenPath` | 单人正常购买支付 1 clay、获得 3 wood，不产生标记接收者，传递牌用后移出。多人唯一惩罚标记仍转移给实际左邻玩家。 |
+| `M054_AgriculturalImplement` | Farmland 或 Cultivation 后，可选从单人当前牌实际执行一个合法特殊行动，最后一个工人也可触发。该行动共用普通用牌次数和保留流程。 |
+| `M056_PeatCuttingRights` | 到期机会在单人准备完成后检查当前牌，需要合法 Cut Peat 行动及沼泽格，不要求健康人员或工作阶段。印刷燃料标记只排定机会，不进入库存。不可用或拒绝的机会在到期当轮失效。实际行动共用普通用牌次数和保留规则。 |
 | `A082_WorkCertificate` | runtime 使用共享 partial-take helper 从 accumulation space 移除资源 |
 | `A113_HeresyTeacher` | OA 按牌面对全部合格 Logical Field 在底部加菜，包含 Card Field。 |
 | `A169_OffSiter` | 统计 owner 已建 major improvement 与 alsoCountsAs major 小改的 printed wood/clay/reed/stone cost（含 fee cost），总数首次达到 9+ 后锁定提供 1 extra room capacity。 |

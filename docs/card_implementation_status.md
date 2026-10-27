@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-10-22. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-10-27. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -20,6 +20,7 @@ Unless the product direction changes, the following are not bugs. Cards without 
 
 | Category | Cards |
 |---|---|
+| Project Rule Interpretations adopted in [#1407](https://github.com/titanxxh/open-agricola/issues/1407) where the available sources do not settle the solo interaction. These are card-local OA decisions, not official rulings or a general replacement for other-player or neighbour conditions. | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
 | Maintainer scheme B: a startable before flow may admit a space whose host cannot finish, requiring undo. Admission does not simulate the reward, and cards add no admission guards. | Space-use before benefits; [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
 | A second Bake Bread granted by a trailing placement reaction cannot replace again within the same Turn, regardless of the reference's flag-reset reaction order. Maintainer ruling in [#1331](https://github.com/titanxxh/open-agricola/issues/1331). | `A097_Freshman` |
 | Maintainer ruling for exhausted ordinary decks: a satisfied tier can be completed; each eligible card type independently draws up to three remaining cards and keeps one; an empty type is skipped, completion still succeeds when both are empty, and there is no downgrade, reshuffle or later compensation. This is an OA ruling, not an official FAQ. | `PS03` |
@@ -75,6 +76,10 @@ Detail for cards in [Accepted differences](#2-accepted-differences) whose differ
 
 | Card | Notes |
 |---|---|
+| `E014_WoodSaw` | In solo, the card remains available for normal purchase but never grants its worker-less room construction. Ordinary paid room construction remains available. |
+| `M027_GardenPath` | In solo, normal purchase pays 1 clay, gains 3 wood, creates no marker recipient, and removes the passing card from play. In multiplayer, the unique penalty marker still moves to the actual left neighbour. |
+| `M054_AgriculturalImplement` | After Farmland or Cultivation, the optional opportunity performs an actual legal Special Action from the current solo card, including after the last worker. It shares the normal card-use and retention lifecycle. |
+| `M056_PeatCuttingRights` | A due opportunity checks the current card after solo preparation. It needs a legal Cut Peat action and moor tile, but no healthy worker or work phase. The printed fuel tokens schedule opportunities and never enter inventory. Each opportunity expires in its due round when unavailable or declined. An executed action shares normal card-use and retention rules. |
 | `A082_WorkCertificate` | The runtime removes resources from the accumulation space with the shared partial-take helper. |
 | `A113_HeresyTeacher` | OA applies the printed bottom-vegetable effect to every eligible Logical Field, including Card Fields. |
 | `A169_OffSiter` | It totals the printed wood / clay / reed / stone cost (including fee cost) of the owner's built majors and of minors that `alsoCountsAs` a major; the first time the total reaches 9+, it locks in 1 extra room capacity. |
