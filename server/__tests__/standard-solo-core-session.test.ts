@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { GameSession } from '../game/authoritative-session'
+import { GameSession } from '../game/authoritative-session'
 import { createDefaultRoomTiles } from '../../shared/domain/farm'
-import { setActiveWorkerCount } from '../../shared/domain/player'
+import { setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { createOpeningSession, createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/session-assertions'
 
 const sessions: GameSession[] = []
 afterEach(() => { for (const session of sessions.splice(0)) session.dispose() })
@@ -106,5 +108,77 @@ describe('standard solo core rules', () => {
       key: 'log.harvestFeedDetail', params: expect.objectContaining({ resources: { food: paid } }),
     }))
     expect(response.scores).toEqual(scores)
+  })
+
+  it('keeps solo confirmation and undo boundaries across recovery', () => {
+    const original = createWorkSession({ options: { playerCount: 1 } })
+    sessions.push(original)
+    const before = undoRuleSnapshot(original.getState())
+    const first = original.takeAction(0, 'forest')
+    expect(first.ok, first.error).toBe(true)
+    expect(first.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player', nextPlayerIndex: 0 } })
+    expect(first.state.players[0]!.resources.wood).toBe(2)
+
+    const saved = serializeSessionSnapshot(original.state, original)
+    const session = new GameSession(rehydrateState(structuredClone(saved)))
+    sessions.push(session)
+    expect(session.getState().interaction).toEqual(first.interaction)
+    expect(session.getState().state.players[0]!.resources.food).toBe(0)
+    assertUndoRestored(before, session.undoAction())
+
+    const repeated = session.takeAction(0, 'forest')
+    const confirmed = confirmNext(session, repeated)
+    expect(confirmed.interaction.stateId).toBe('idle')
+    expect(confirmed.state.round).toBe(1)
+    expect(confirmed.state.currentPlayerIndex).toBe(0)
+    expect(workersAvailable(confirmed.state, confirmed.state.players[0]!)).toBe(1)
+    expect(confirmed.state.players[0]!.resources.wood).toBe(2)
+    assertRejectedUnchanged(session, () => session.undoAction())
+
+    const last = session.takeAction(0, 'clay-pit')
+    expect(last.ok, last.error).toBe(true)
+    expect(last.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(last.state.round).toBe(1)
+    expect(last.state.events.some(event => event.type === 'returnHome.started')).toBe(false)
+    const nextRound = confirmNext(session, last)
+    expect(nextRound.state.round).toBe(2)
+    expect(nextRound.interaction.stateId).toBe('idle')
+    expect(workersAvailable(nextRound.state, nextRound.state.players[0]!)).toBe(2)
+    expect(nextRound.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.actionDetail', params: expect.objectContaining({
+        action: 'actions.forest.name', detailParts: expect.objectContaining({ gains: { wood: 2 } }),
+      }),
+    }))
+  })
+
+  it('waits for the last solo confirmation before entering a harvest', () => {
+    const session = createWorkSession({ options: { playerCount: 1 }, configure(state) {
+      state.round = 4
+      state.players[0]!.resources.food = 20
+    } })
+    sessions.push(session)
+    confirmNext(session, session.takeAction(0, 'forest'))
+    const last = session.takeAction(0, 'clay-pit')
+    expect(last.ok, last.error).toBe(true)
+    expect(last.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
+    expect(last.state.round).toBe(4)
+    expect(last.state.events.some(event => event.type === 'harvest.started')).toBe(false)
+
+    const harvested = confirmNext(session, last)
+    expect(harvested.ok, harvested.error).toBe(true)
+    expect(harvested.state.round).toBe(5)
+    expect(harvested.state.players[0]!.resources).toMatchObject({ food: 14, begging: 0 })
+    expect(harvested.state.events.filter(event => event.type === 'harvest.started')).toHaveLength(1)
+  })
+
+  it('continues switching actual players in a two-player game', () => {
+    const session = createWorkSession()
+    sessions.push(session)
+    const first = confirmNext(session, session.takeAction(0, 'forest'))
+    expect(first.state.currentPlayerIndex).toBe(1)
+    assertRejectedUnchanged(session, () => session.takeAction(0, 'clay-pit'))
+    const second = confirmNext(session, session.takeAction(1, 'day-laborer'))
+    expect(second.state.currentPlayerIndex).toBe(0)
+    expect(second.state.round).toBe(1)
   })
 })
