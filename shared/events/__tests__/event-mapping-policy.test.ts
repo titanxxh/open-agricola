@@ -400,11 +400,9 @@ describe('event mapping policy', () => {
     expect(cardPassedEmitLines("sink.emit({ type: 'card.passed', cardId: 'test' })")).toEqual([1])
   })
 
-  it('card.passed is emitted only by improvement migration branches', () => {
+  it('card.passed is emitted only by the shared minor-card passing helper', () => {
     const allowedFiles = [
-      'shared/actions/helpers/improvement-purchase-lifecycle.ts',
-      'shared/actions/effects/internal/pass-minor-card-to-left.ts',
-      'shared/cards/M/M093_FarmhandsQuarters.ts',
+      'shared/actions/helpers/minor-card-passing.ts',
     ]
     const unexpectedEmitters = findCardPassedEmitters()
       .filter((line) => !allowedFiles.some((path) => line.startsWith(`${path}:`)))
