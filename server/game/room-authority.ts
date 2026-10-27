@@ -5,7 +5,7 @@ import type { PostgresRoomPersistence } from './persistence/postgres-adapter'
 import type { RoomPersistenceCheckpoint } from './room-persistence-checkpoint'
 import type { RoomCommitter } from './room-committer'
 import type { GameContextStore } from './game-context-store'
-import { emptyRoomTtlMs, isDevRoom, roomOccupiedSeatCount, snapshotToRoom, type Room } from './room'
+import { emptyRoomTtlMs, isDevRoom, roomConnectedPlayerCount, roomOccupiedSeatCount, snapshotToRoom, type Room } from './room'
 
 /** Loads only this process's assigned rooms. GameSession remains the state owner. */
 export class RoomAuthority {
@@ -38,8 +38,10 @@ export class RoomAuthority {
   }
 
   async load(roomId: string): Promise<Room | undefined> {
+    const lifecycle = await this.contexts?.lifecycle(roomId)
+    if (lifecycle && lifecycle !== 'active') return undefined
     const existing = this.registry.get(roomId)
-    if (existing) { await this.assert(existing); return existing }
+    if (existing) { await this.assert(existing); await this.claim(roomId); return existing }
     const pending = this.loading.get(roomId)
     if (pending) return pending
     const work = this.loadOwned(roomId)
@@ -48,8 +50,6 @@ export class RoomAuthority {
   }
 
   private async loadOwned(roomId: string): Promise<Room | undefined> {
-    const lifecycle = await this.contexts?.lifecycle(roomId)
-    if (lifecycle && lifecycle !== 'active') return undefined
     const owner = await this.claim(roomId)
     const snap = await this.persistence.load(roomId)
     if (!snap) return undefined
@@ -82,8 +82,13 @@ export class RoomAuthority {
   async setExpiry(room: Room, expiresAt: number): Promise<void> {
     await this.directory.db.transaction(async () => {
       await this.directory.assertOwner(room.id, room.owner!)
-      await this.directory.presence(room.id, room.owner!, room.players.length, roomOccupiedSeatCount(room))
-      await this.contexts?.setActiveExpiry(room.id, expiresAt)
+      const connected = roomConnectedPlayerCount(room)
+      await this.directory.presence(room.id, room.owner!, connected, roomOccupiedSeatCount(room))
+      if (connected === 0) await this.contexts?.setActiveExpiry(room.id, expiresAt)
     })()
+  }
+
+  async cleanupRetainedRooms(): Promise<void> {
+    await this.contexts?.expireInactiveRooms(this.instanceId, [...this.registry.iter()].map(room => room.id))
   }
 }

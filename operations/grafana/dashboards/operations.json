@@ -2,7 +2,7 @@
   "uid": "open-agricola",
   "title": "Open Agricola 平台运行看板",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "editable": false,
   "refresh": "15s",
   "timezone": "browser",
@@ -177,9 +177,9 @@
     },
     {
       "id": 3,
-      "title": "在线用户、房间与对局数量",
+      "title": "在线用户与已连接座位",
       "type": "timeseries",
-      "description": "在线用户跨实例去重；房间按状态区分，另列开发房间和同屏房间。全局采集失败或过期时不展示当前值。",
+      "description": "在线用户按有存活 WS 的认证用户跨实例去重；已连接座位按房间当前有效连接统计。同一用户可持有多个座位。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
@@ -205,7 +205,9 @@
                 "value": null
               }
             ]
-          }
+          },
+          "min": 0,
+          "decimals": 0
         },
         "overrides": []
       },
@@ -221,7 +223,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agricola_platform{role=\"ingress\",kind=~\"online_users|rooms_.*|players_connected|games_completed_.*\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"online_users|players_connected\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
           "legendFormat": "{{kind}}",
           "format": "time_series"
         }
@@ -237,6 +239,69 @@
         {
           "id": "renameByRegex",
           "options": {
+            "regex": "(^|\\s)players_connected(?=\\s|$)",
+            "renamePattern": "$1已连接座位"
+          }
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "title": "房间数量",
+      "type": "timeseries",
+      "description": "等待、进行中、同屏与开发房间只统计当前仍有在线连接的房间；全员离线、仍保留续局存档的普通及同屏房间单独列为离线保留房间。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知 / 暂无样本",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"rooms_.*\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
+          "legendFormat": "{{kind}}",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
             "regex": "(^|\\s)rooms_waiting(?=\\s|$)",
             "renamePattern": "$1等待中的房间"
           }
@@ -246,13 +311,6 @@
           "options": {
             "regex": "(^|\\s)rooms_playing(?=\\s|$)",
             "renamePattern": "$1进行中的房间"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)rooms_finished(?=\\s|$)",
-            "renamePattern": "$1已结束房间"
           }
         },
         {
@@ -272,10 +330,66 @@
         {
           "id": "renameByRegex",
           "options": {
-            "regex": "(^|\\s)players_connected(?=\\s|$)",
-            "renamePattern": "$1已连接座位"
+            "regex": "(^|\\s)rooms_retained(?=\\s|$)",
+            "renamePattern": "$1离线保留房间"
           }
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "title": "完成对局数量",
+      "type": "timeseries",
+      "description": "近一天与近七天内完成的对局数量，来自服务端确认的游戏结果。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知 / 暂无样本",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0
         },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"games_completed_.*\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
+          "legendFormat": "{{kind}}",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [
         {
           "id": "renameByRegex",
           "options": {
@@ -303,7 +417,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 8,
+        "y": 16,
         "w": 12,
         "h": 8
       },
@@ -595,7 +709,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 24,
         "w": 12,
         "h": 8
       },
@@ -785,7 +899,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 16,
+        "y": 24,
         "w": 12,
         "h": 8
       },
@@ -965,7 +1079,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 32,
         "w": 12,
         "h": 8
       },
@@ -1096,7 +1210,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 24,
+        "y": 32,
         "w": 12,
         "h": 8
       },
@@ -1381,7 +1495,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 40,
         "w": 12,
         "h": 8
       },
@@ -1575,7 +1689,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 32,
+        "y": 40,
         "w": 12,
         "h": 8
       },
@@ -1633,7 +1747,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 48,
         "w": 12,
         "h": 8
       },
@@ -1697,7 +1811,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 40,
+        "y": 48,
         "w": 12,
         "h": 8
       },
@@ -1754,7 +1868,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 56,
         "w": 12,
         "h": 8
       },
@@ -1843,7 +1957,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 56,
         "w": 12,
         "h": 8
       },
@@ -1938,7 +2052,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 64,
         "w": 12,
         "h": 8
       },
@@ -1996,7 +2110,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 56,
+        "y": 64,
         "w": 12,
         "h": 8
       },
@@ -2070,7 +2184,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 72,
         "w": 12,
         "h": 8
       },
@@ -2152,7 +2266,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 64,
+        "y": 72,
         "w": 12,
         "h": 8
       },
@@ -2308,6 +2422,146 @@
       ]
     },
     {
+      "id": 20,
+      "title": "阻塞、重试与永久失败的房间",
+      "type": "timeseries",
+      "description": "按实例展示当前受阻、重试与永久失败的房间数量。重试房间同时属于受阻房间，三条曲线不可相加。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知 / 暂无样本",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"app\",kind=~\"blocked_rooms|retrying_rooms|permanent_rooms\"}",
+          "legendFormat": "{{instance}} {{kind}}",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)blocked_rooms(?=\\s|$)",
+            "renamePattern": "$1受阻房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)retrying_rooms(?=\\s|$)",
+            "renamePattern": "$1重试房间"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(^|\\s)permanent_rooms(?=\\s|$)",
+            "renamePattern": "$1永久失败房间"
+          }
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "title": "最早待保存提交的阻塞时间",
+      "type": "timeseries",
+      "description": "按实例展示当前待保存提交中最早一笔距提交发生的秒数；没有待保存提交时为 0。此指标不包含回放头加载重试或永久失败的等待时间。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "未知 / 暂无样本",
+          "custom": {
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_platform{role=\"app\",kind=\"blocked_oldest_age_seconds\"}",
+          "legendFormat": "{{instance}} 最早待保存提交",
+          "format": "time_series"
+        }
+      ],
+      "transformations": []
+    },
+    {
       "id": 19,
       "title": "数据库连接池与规则 Worker",
       "type": "timeseries",
@@ -2318,7 +2572,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 72,
+        "y": 88,
         "w": 12,
         "h": 8
       },
@@ -2425,92 +2679,6 @@
       ]
     },
     {
-      "id": 20,
-      "title": "阻塞、重试与永久失败的房间",
-      "type": "timeseries",
-      "description": "展示各实例受阻房间数、重试房间数、永久失败房间数，以及最早受阻工作的等待时间。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "agricola-prometheus"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 72,
-        "w": 12,
-        "h": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "noValue": "未知 / 暂无样本",
-          "custom": {
-            "spanNulls": false
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "agricola_platform{role=\"app\",kind=~\"blocked_.*|retrying_rooms|permanent_rooms\"}",
-          "legendFormat": "{{instance}} {{kind}}",
-          "format": "time_series"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)blocked_rooms(?=\\s|$)",
-            "renamePattern": "$1受阻房间"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)retrying_rooms(?=\\s|$)",
-            "renamePattern": "$1重试房间"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)permanent_rooms(?=\\s|$)",
-            "renamePattern": "$1永久失败房间"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)blocked_oldest_age_seconds(?=\\s|$)",
-            "renamePattern": "$1最早阻塞距现在（秒）"
-          }
-        }
-      ]
-    },
-    {
       "id": 21,
       "title": "Node.js 进程 CPU 用量",
       "type": "timeseries",
@@ -2520,8 +2688,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 80,
+        "x": 12,
+        "y": 88,
         "w": 12,
         "h": 8
       },
@@ -2588,8 +2756,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 80,
+        "x": 0,
+        "y": 96,
         "w": 12,
         "h": 8
       },
@@ -2646,8 +2814,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 88,
+        "x": 12,
+        "y": 96,
         "w": 12,
         "h": 8
       },
@@ -2704,8 +2872,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 88,
+        "x": 0,
+        "y": 104,
         "w": 12,
         "h": 8
       },
@@ -2786,8 +2954,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 96,
+        "x": 12,
+        "y": 104,
         "w": 12,
         "h": 8
       },
@@ -2882,8 +3050,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 96,
+        "x": 0,
+        "y": 112,
         "w": 12,
         "h": 8
       },
@@ -2999,8 +3167,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 104,
+        "x": 12,
+        "y": 112,
         "w": 12,
         "h": 8
       },
@@ -3057,8 +3225,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 104,
+        "x": 0,
+        "y": 120,
         "w": 12,
         "h": 8
       },
@@ -3362,8 +3530,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 112,
+        "x": 12,
+        "y": 120,
         "w": 12,
         "h": 8
       },
@@ -3549,8 +3717,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 112,
+        "x": 0,
+        "y": 128,
         "w": 12,
         "h": 8
       },
@@ -3715,8 +3883,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 120,
+        "x": 12,
+        "y": 128,
         "w": 12,
         "h": 8
       },
@@ -3777,8 +3945,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 120,
+        "x": 0,
+        "y": 136,
         "w": 12,
         "h": 8
       },
@@ -3847,8 +4015,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 128,
+        "x": 12,
+        "y": 136,
         "w": 12,
         "h": 8
       },
@@ -3905,8 +4073,8 @@
         "uid": "agricola-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 128,
+        "x": 0,
+        "y": 144,
         "w": 12,
         "h": 8
       },
@@ -4020,7 +4188,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 136,
+        "y": 152,
         "w": 24,
         "h": 8
       },

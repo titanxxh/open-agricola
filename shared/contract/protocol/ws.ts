@@ -108,7 +108,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: RoomColorErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required'
+      code?: RoomColorErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

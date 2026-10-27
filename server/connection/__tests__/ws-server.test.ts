@@ -14,6 +14,7 @@ import { getDb } from '../../db'
 import { recordingResources } from '../../__tests__/_helpers/recording'
 import { PostgresRoomPersistence } from '../../game/persistence/postgres-adapter'
 import { RoomDirectory } from '../../game/room-directory'
+import { CommandStore } from '../../game/command-store'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
 import { afterAll } from 'vitest'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
@@ -856,3 +857,145 @@ const sendCommand = async (ws: TestSocket, command: ClientCommand): Promise<void
       inputWindowId: state?.type === 'stateUpdate' ? state.inputWindow?.id : undefined }),
   } }))
 }
+
+async function ownedBackend() {
+  const db = getDb()
+  const directory = new RoomDirectory(db)
+  const persistence = new PostgresRoomPersistence(db, directory)
+  const http = createServer()
+  await new Promise<void>(done => { http.listen(0, '127.0.0.1', done) })
+  const port = (http.address() as AddressInfo).port
+  const backend = await createWsServer(http, { persistence, directory, internalUrl: `http://127.0.0.1:${port}`, ...recording })
+  await db.prepare('UPDATE app_instances SET room_capacity=1 WHERE instance_id=?').run(backend.authority!.instanceId)
+  const peers: TestSocket[] = []
+  const connect = async () => {
+    const ws = Object.assign(new WebSocket(`ws://127.0.0.1:${port}/ws`), { received: [] as ServerEvent[] })
+    peers.push(ws); attachCollector(ws); await waitForOpen(ws)
+    return ws
+  }
+  const create = async (ws: TestSocket, hotseat = false) => {
+    const allocation = await directory.allocate('development-anonymous', randomUUID())
+    const scope = await new CommandStore(db).issueScope('development-anonymous')
+    ws.send(JSON.stringify({ type: 'createRoom', maxPlayers: 2, name: 'Saved name', hotseat,
+      commandContext: { scopeId: scope.scopeId, commandId: randomUUID(), allocationId: allocation.allocationId } }))
+    const event = await waitForEvent(ws, (message): message is Extract<ServerEvent, { type: 'roomCreated' }> => message.type === 'roomCreated')
+    return event.roomId
+  }
+  let closed = false
+  return { backend, directory, persistence, connect, create, close: async () => {
+    if (closed) return
+    closed = true
+    for (const peer of peers) peer.terminate()
+    await backend.shutdown()
+    await new Promise<void>((done, reject) => { http.close(error => error ? reject(error) : done()) })
+  } }
+}
+
+it('checks warm resumes and starts with more than thirty retained saves without loading ordinary Rooms', async () => {
+  const first = await ownedBackend()
+  let restarted: Awaited<ReturnType<typeof ownedBackend>> | undefined
+  try {
+    const host = await first.connect()
+    const roomId = await first.create(host)
+    const snapshot = (await first.persistence.load(roomId))!
+    const closed = new Promise<void>(done => host.once('close', done))
+    host.close(); await closed
+    await vi.waitFor(async () => expect(await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id=?').get(roomId))
+      .toEqual({ connected_count: 0 }))
+    expect((await first.persistence.load(roomId))?.serialized).toEqual(snapshot.serialized)
+    const occupied = await first.directory.allocate('another', randomUUID())
+    await expect(first.backend.authority!.load(roomId)).rejects.toThrow('capacity')
+    await getDb().prepare('UPDATE room_ownership SET admission_until=0 WHERE room_id=?').run(occupied.roomId)
+    expect((await first.backend.authority!.load(roomId))?.id).toBe(roomId)
+    await first.close()
+
+    const stored = new PostgresRoomPersistence(getDb())
+    for (let index = 0; index < 31; index++) await stored.save(randomUUID(), snapshot.serialized, snapshot.meta)
+    restarted = await ownedBackend()
+    expect([...restarted.backend.registry.iter()].filter(room => !room.id.startsWith('dev'))).toEqual([])
+    const newHost = await restarted.connect()
+    const freshId = await restarted.create(newHost)
+    const freshClosed = new Promise<void>(done => newHost.once('close', done))
+    newHost.close(); await freshClosed
+    await vi.waitFor(async () => expect(await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id=?').get(freshId))
+      .toEqual({ connected_count: 0 }))
+    const returning = await restarted.connect()
+    await sendCommand(returning, { type: 'joinRoom', roomId })
+    expect(await waitForEvent(returning, (event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined'))
+      .toMatchObject({ roomId, playerIndex: 0, status: 'waiting', players: [{ playerIndex: 0, name: 'Saved name', connected: true }] })
+    expect((await restarted.persistence.load(roomId))?.serialized?.state.players[0]?.name).toBe('Saved name')
+  } finally {
+    await first.close()
+    await restarted?.close()
+  }
+}, 30_000)
+
+it('records zero OPEN presence while a closed connection is still queued behind its frozen commit', async () => {
+  const resolveSeed = rng.resolveSeed
+  vi.spyOn(rng, 'resolveSeed').mockImplementation(seed => resolveSeed(seed ?? 42))
+  const owned = await ownedBackend()
+  try {
+    const host = await owned.connect()
+    const roomId = await owned.create(host)
+    const guest = await owned.connect()
+    await sendCommand(guest, { type: 'joinRoom', roomId, name: 'Other player' })
+    const initial = await waitForEvent(host, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    const playerIndex = initial.payload.state.currentPlayerIndex
+    const actor = playerIndex === 0 ? host : guest
+    const observer = actor === host ? guest : host
+    const original = owned.persistence.commitReplay.bind(owned.persistence)
+    let retry = true
+    vi.spyOn(owned.persistence, 'commitReplay').mockImplementation(commit => retry ? Promise.reject(new Error('temporary storage unavailable')) : original(commit))
+    const scope = await new CommandStore(getDb()).issueScope('development-anonymous')
+    const commandId = randomUUID()
+    actor.send(JSON.stringify({ type: 'action', spaceId: 'forest', requestId: 'frozen-action',
+      commandContext: { scopeId: scope.scopeId, commandId, roomId, expectedVersion: initial.version, inputWindowId: initial.inputWindow?.id } }))
+    await waitForEvent(actor, (event): event is Extract<ServerEvent, { type: 'roomPersistencePaused' }> => event.type === 'roomPersistencePaused')
+    const actorClosed = new Promise<void>(done => actor.once('close', done))
+    actor.close(); await actorClosed
+    const observerClosed = new Promise<void>(done => observer.once('close', done))
+    observer.close(); await observerClosed
+    await vi.waitFor(async () => expect(await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id=?').get(roomId))
+      .toEqual({ connected_count: 0 }))
+    expect(owned.backend.committer!.isRetrying(roomId)).toBe(true)
+    expect(owned.backend.registry.get(roomId)!.players).toHaveLength(2)
+    const expiresAt = await recording.gameContextStore.activeExpiresAt(roomId)
+    expect((await owned.persistence.loadReplayHead(roomId))?.latestStepNo).toBe(0)
+    retry = false
+    await vi.waitFor(() => expect(owned.backend.committer!.isRetrying(roomId)).toBe(false), { timeout: 5000 })
+    expect((await owned.persistence.loadReplayHead(roomId))?.latestStepNo).toBe(1)
+    await vi.waitFor(() => expect(owned.backend.registry.get(roomId)!.players).toEqual([]))
+    expect(await recording.gameContextStore.activeExpiresAt(roomId)).toBeGreaterThanOrEqual(expiresAt!)
+    expect((await owned.persistence.load(roomId))?.serialized?.state.players[playerIndex]?.resources.wood)
+      .toBe(initial.payload.state.players[playerIndex]!.resources.wood + 3)
+    const receipt = await getDb().prepare('SELECT outcome_json FROM command_requests WHERE scope_id=? AND command_id=?')
+      .get<{ outcome_json: string }>(scope.scopeId, commandId)
+    expect(JSON.parse(receipt!.outcome_json)).toMatchObject({ ok: true, roomVersion: 1, stepNo: 1 })
+  } finally { await owned.close() }
+}, 15_000)
+
+it('closes an expired admission with its capacity code so a connected peer cannot keep using an unadmitted Room', async () => {
+  const owned = await ownedBackend()
+  try {
+    const host = await owned.connect()
+    const roomId = await owned.create(host)
+    const closed = new Promise<void>(done => host.once('close', done))
+    host.close(); await closed
+    await vi.waitFor(async () => expect(await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id=?').get(roomId))
+      .toEqual({ connected_count: 0 }))
+    const claim = owned.directory.claim.bind(owned.directory)
+    vi.spyOn(owned.directory, 'claim').mockImplementationOnce(async (...args) => {
+      const admitted = await claim(...args)
+      await getDb().prepare('UPDATE room_ownership SET admission_until=0 WHERE room_id=?').run(roomId)
+      return admitted
+    })
+    const returning = await owned.connect()
+    const returningClosed = new Promise<number>(done => returning.once('close', code => done(code)))
+    await sendCommand(returning, { type: 'joinRoom', roomId, requestId: 'expired-admission' })
+    expect(await waitForEvent(returning, (event): event is Extract<ServerEvent, { type: 'error' }> => event.type === 'error'))
+      .toMatchObject({ code: 'room_capacity_reached', requestId: 'expired-admission' })
+    expect(await returningClosed).toBe(1013)
+    await vi.waitFor(async () => expect(await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id=?').get(roomId))
+      .toEqual({ connected_count: 0 }))
+  } finally { await owned.close() }
+})

@@ -165,6 +165,7 @@ type GameSyncPayload = {
 ```
 
 - `stateUpdate`、`roomWaiting`、`gameStarted`、`playerJoined`、`playerDisconnected` 与 `roomDissolved` 是广播；`roomCreated`、`roomJoined`、`authOk` 与请求错误是单播。
+- `error.code='room_capacity_reached'` 后使用 WebSocket close 1013，让客户端重新发现容量后再重试已过期或不可用的准入。
 - 每个广播都按连接的 `viewerPlayerId` 构造：目标玩家收到真实私有提示与 `privateEvents`，其他人收到 `private-prompt` 遮蔽。不带 `X-Viewer-Player` 的 HTTP 沙盒保留不过滤的开发流程；带上它时使用相同的视角过滤与座位守卫。
 - `cardWarnings` 只出现在 HTTP 调试与沙盒 payload。HTTP 信封携带 `gameInstanceId`，加载状态后轮换；它既不是授权也不是模型输入。
 - 托管写入携带 `commandContext`（scope、稳定命令 ID、Room ID、期望的已提交版本）；同时进行的选秀与父母选择共用一个 input-window ID。路由先解析持久回执再判断新鲜度，拒绝同一身份下内容不同的命令，并把结果随 Room transaction 持久化。回执只含结果标识与哈希，仅对其发起者可见。`requestId` 只关联一次交换。

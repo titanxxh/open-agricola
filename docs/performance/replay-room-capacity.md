@@ -1,5 +1,7 @@
 # Replay Room Capacity
 
+Current admission counts online Rooms and short reservations; retained offline saves are excluded. See [server architecture](../architecture/server.md). The measurements below retain their original in-memory workload and thresholds.
+
 > Historical SQLite measurements: the results below apply to the recorded commits and harness versions, not the PostgreSQL/S3 deployment. The non-recording capacity and scalar terminal-room probes were retired with mandatory recording; their source remains in Git history at `54c2cb8a`. The current recorded workload harness uses PostgreSQL. This migration does not claim new capacity, RTO, or fault-test acceptance.
 
 

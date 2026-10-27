@@ -11,9 +11,30 @@ beforeAll(async () => {
 })
 afterAll(async () => { await directory.db.close() })
 
+it('expires an unclaimed cold game before discovery can reserve fresh capacity for it', async () => {
+  const roomId = randomUUID()
+  await directory.db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'playing',1,1)").run(roomId)
+  await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,expires_at,created_at,updated_at) VALUES(?,'active',0,1,1)").run(roomId)
+  await expect(discoverRoom(directory, 'alice', { roomId })).rejects.toMatchObject({ code: 'context_changed' })
+  expect(await directory.db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id=?').get(roomId)).toEqual({ lifecycle: 'expired' })
+  expect(await directory.db.prepare('SELECT 1 FROM room_ownership WHERE room_id=?').get(roomId)).toBeUndefined()
+})
+
+it('protects a reservation acquired before expiry until its admission window ends', async () => {
+  const roomId = randomUUID()
+  await directory.db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'playing',1,1)").run(roomId)
+  await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES(?,'active',1,1)").run(roomId)
+  const admitted = await discoverRoom(directory, 'alice', { roomId })
+  await directory.db.prepare('UPDATE game_contexts SET expires_at=0 WHERE room_id=?').run(roomId)
+  expect(await discoverRoom(directory, 'alice', { roomId })).toEqual(admitted)
+  await directory.db.prepare('UPDATE room_ownership SET admission_until=0 WHERE room_id=?').run(roomId)
+  await expect(discoverRoom(directory, 'alice', { roomId })).rejects.toMatchObject({ code: 'context_changed' })
+})
+
 it('resolves explicit development slots after rematches without retargeting permanent links', async () => {
   const nextRoom = `dev2-${randomUUID()}`
   await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES ('dev2','expired',1,1), (?,'active',1,1)").run(nextRoom)
+  await directory.db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'waiting',1,1)").run(nextRoom)
   await directory.db.prepare('INSERT INTO development_room_slots(root_id,room_id) VALUES (?,?)').run('dev2', nextRoom)
   await expect(discoverRoom(directory, 'alice', { roomId: 'dev2' })).rejects.toMatchObject({ code: 'context_changed' })
   vi.stubEnv('NODE_ENV', 'development')
@@ -32,9 +53,10 @@ it('resolves explicit development slots after rematches without retargeting perm
 })
 
 it('discovers an idempotent creation allocation without creating a Room', async () => {
+  const before = await directory.db.prepare('SELECT id FROM rooms ORDER BY id').all()
   const input = { allocationId: randomUUID() }
   expect(await discoverRoom(directory, 'alice', input)).toEqual(await discoverRoom(directory, 'alice', input))
-  expect(await directory.db.prepare('SELECT 1 FROM rooms').get()).toBeUndefined()
+  expect(await directory.db.prepare('SELECT id FROM rooms ORDER BY id').all()).toEqual(before)
 })
 
 it('uses a rematch receipt before looking up the retired original Room and keeps receipt access private', async () => {
@@ -46,6 +68,7 @@ it('uses a rematch receipt before looking up the retired original Room and keeps
   const newRoom = result.request.resultRoomId!
   await directory.db.transaction(async () => {
     await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES ('old-room','expired',1,1), (?,'active',1,1)").run(newRoom)
+    await directory.db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'waiting',1,1)").run(newRoom)
     await commands.complete(result.request, { ok: true, roomId: newRoom, roomVersion: 0 })
   })()
   expect(await discoverRoom(directory, 'alice', { roomId: 'old-room', pendingIdentity: identity })).toEqual({ roomId: newRoom, wsPath: '/nodes/a/ws' })

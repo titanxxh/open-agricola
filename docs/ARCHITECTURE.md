@@ -50,7 +50,7 @@ Violating any invariant below is an architecture bug:
 - **Durable Room Commit:** a successful command that changes the public Frame or Private Session Cursor, or any response marked `durableTransition`, atomically writes Room snapshot and Replay Step before sending viewer-filtered state.
 - **Global Replay Steps:** simultaneous submissions still receive consecutive `stepNo`; automatic settlement belongs to the last triggering input and results do not depend on arrival order.
 - **Failures do not spread:** command errors reach only the caller; durable rejections still publish the committed version to peers as error-free snapshots. Persistence failure freezes the same Frame and blocks the Room instead of overwriting or advancing.
-- **Room limits:** one instance holds at most 30 ordinary waiting and playing Rooms and 15 Worker slots. Reaching a limit rejects only operations that need another Room or Worker, including `newGame`; existing Rooms keep running.
+- **Room limits:** one instance admits at most 30 ordinary Rooms with OPEN player connections or a live 30-second admission reservation. Offline saves and cached Rooms do not consume this online quota. The separate 15-Worker budget still counts retained executors; new admissions and one-for-one `newGame` replacements preserve both limits.
 - **Immutable historical Viewer:** a Room freezes schema and Build. Completed playback uses a credentialless read-only Viewer and never executes historical rules code.
 - **Tests default to two players.** Prove rules at the backend boundary, never infer them from the DOM.
 

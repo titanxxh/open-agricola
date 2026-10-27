@@ -4,6 +4,8 @@ import type { PostgresDatabase } from '../../database/postgres'
 import { afterEach, describe, expect, it } from 'vitest'
 import { handleGameContextRoute } from '../../game-context-routes.ts'
 import { GameContextStore } from '../game-context-store.ts'
+import { RoomDirectory } from '../room-directory'
+import { CommandStore } from '../command-store'
 
 const createDb = async () => {
   const db = await createTestDatabase()
@@ -106,6 +108,45 @@ afterEach(() => {
 })
 
 describe('GameContextStore', () => {
+  it('expires cold saves while retaining online rooms, pending saves, new admissions and loaded caches', async () => {
+    const db = await createDb()
+    try {
+      const directory = new RoomDirectory(db)
+      await directory.register('a', 'http://127.0.0.1:9001', 'test-build')
+      await directory.activate('a')
+      const now = Date.now()
+      const store = new GameContextStore(db, () => now)
+      for (const id of ['expired', 'online', 'pending', 'admitted', 'loaded', 'uninitialized']) {
+        const assigned = await directory.claim(id, 'a')
+        await insertContext(db, id, 'active', { phase: 'playing', expiresAt: id === 'uninitialized' ? null : now - 1 })
+        await db.transaction(async () => {
+          await db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'playing',1,1)").run(id)
+          await directory.markActive(id, assigned.owner)
+          await directory.presence(id, assigned.owner, 1, 2)
+          if (id !== 'online') await directory.presence(id, assigned.owner, 0, 2)
+        })()
+      }
+      const commands = new CommandStore(db)
+      const scope = await commands.issueScope('user:u1')
+      await commands.reserve('user:u1', { scopeId: scope.scopeId, commandId: '00000000-0000-4000-8000-000000000001' }, 'pending', { type: 'action', spaceId: 'forest' })
+      await directory.claim('admitted')
+      await store.expireInactiveRooms('a', ['loaded'])
+      expect(await db.prepare('SELECT room_id,lifecycle FROM game_contexts ORDER BY room_id').all()).toEqual([
+        { room_id: 'admitted', lifecycle: 'active' },
+        { room_id: 'expired', lifecycle: 'expired' },
+        { room_id: 'loaded', lifecycle: 'active' },
+        { room_id: 'online', lifecycle: 'active' },
+        { room_id: 'pending', lifecycle: 'active' },
+        { room_id: 'uninitialized', lifecycle: 'active' },
+      ])
+      expect(await db.prepare("SELECT expires_at FROM game_contexts WHERE room_id='uninitialized'").get())
+        .toEqual({ expires_at: now + 7 * 24 * 60 * 60 * 1000 })
+      expect(await db.prepare("SELECT id FROM rooms WHERE id='expired'").get()).toBeUndefined()
+      expect(await store.lifecycle('pending')).toBe('active')
+      expect(await store.lifecycle('online')).toBe('active')
+      expect(await store.lifecycle('admitted')).toBe('active')
+    } finally { await db.close() }
+  })
   it('retains generated-name provenance in public completed results', async () => {
     const db = (await createDb())
     ;(await insertCompleted(db, 'default-names', 'available'))

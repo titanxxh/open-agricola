@@ -20,6 +20,7 @@ import {
   isDevRoom,
   parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
+  roomConnectedPlayerCount,
   snapshotToRoom,
   type Room,
 } from '../game/room.ts'
@@ -175,15 +176,17 @@ const startRoomCleanup = (
   checkpoint: RoomPersistenceCheckpoint,
   committer: RoomCommitter | undefined,
   intervalMs: number = ROOM_CLEANUP_INTERVAL_MS,
+  authority?: RoomAuthority,
 ): NodeJS.Timeout => {
   return setInterval(() => {
     void (async () => {
       const now = Date.now()
+      await authority?.cleanupRetainedRooms()
       for (const room of registry.iter()) {
-        if (isDevRoom(room.id)) continue
+        if (isDevRoom(room.id) || committer?.isRetrying(room.id)) continue
         await enqueueRoomTask(room, async () => {
           if (!registry.has(room.id) || committer?.isRetrying(room.id)) return
-          if (room.players.length > 0) {
+          if (roomConnectedPlayerCount(room) > 0) {
             registry.touchActivity(room.id, now)
             return
           }
@@ -281,8 +284,10 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
       if (error instanceof RoomOwnershipError) { ws.close(1012, 'room owner changed'); return }
       deps.broadcaster.sendTo(ws, {
         type: 'error', error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof RoomCapacityError ? { code: error.code } : {}),
         requestId: msg.requestId,
       })
+      if (error instanceof RoomCapacityError) ws.close(1013, 'room admission unavailable')
       return
     }
     if (ctx.currentUserId && ctx.currentUserId !== trackedUserId) {
@@ -302,6 +307,13 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
   for (const raw of buffered) void onMessage(raw)
 
   ws.on('close', () => {
+    const disconnectedAt = Date.now()
+    const disconnectedRoom = ctx.currentRoom
+    if (disconnectedRoom && deps.authority && deps.registry.has(disconnectedRoom.id)) {
+      if (roomConnectedPlayerCount(disconnectedRoom) === 0) deps.registry.touchActivity(disconnectedRoom.id, disconnectedAt)
+      void deps.authority.setExpiry(disconnectedRoom, disconnectedAt + emptyRoomTtlMs(disconnectedRoom))
+        .catch(error => console.error('[ws-server] presence update failed', error))
+    }
     void finishConnection(ctx, async () => {
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
@@ -316,7 +328,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
         if (ctx.currentRoom.session.state.gameOver && ctx.currentRoom.customSessionExecutor) {
           ctx.currentRoom.customSessionExecutor.dispose()
         }
-        const now = Date.now()
+        const now = Math.max(disconnectedAt, deps.registry.lastActivityOf(ctx.currentRoom.id) ?? disconnectedAt)
         deps.registry.touchActivity(ctx.currentRoom.id, now)
         if (deps.authority) await deps.authority.setExpiry(ctx.currentRoom, now + emptyRoomTtlMs(ctx.currentRoom))
         else await deps.gameContextStore?.setActiveExpiry(ctx.currentRoom.id, now + emptyRoomTtlMs(ctx.currentRoom))
@@ -414,18 +426,12 @@ export async function createWsServer(
 
   ;(await ensureFixedDevRooms(registry, deps.persistence, checkpoint, deps.gameContextStore, committer, authority))
   if (authority) {
-    const candidates = await authority.directory.db.prepare("SELECT id FROM rooms WHERE status IN ('waiting','playing') ORDER BY created_at, id").all<{ id: string }>()
-    for (const { id } of candidates) {
-      if (registry.has(id) || FIXED_DEV_ROOMS.some(room => room.id === id)) continue
-      try { await authority.load(id) } catch (error) {
-        if (!(error instanceof RoomOwnershipError || error instanceof RoomCapacityError)) throw error
-      }
-    }
+    await authority.cleanupRetainedRooms()
     await authority.directory.activate(instanceId)
   } else {
     await restoreRooms(registry, deps.persistence, checkpoint, committer, deps.gameContextStore, Date.now())
   }
-  const cleanupTimer = startRoomCleanup(registry, checkpoint, committer)
+  const cleanupTimer = startRoomCleanup(registry, checkpoint, committer, ROOM_CLEANUP_INTERVAL_MS, authority)
 
   const allowAnonymous = allowAnonymousWs()
   const wss = new WebSocketServer({ server, path: '/ws' })

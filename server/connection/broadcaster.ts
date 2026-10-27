@@ -2,7 +2,7 @@ import { ExecutionAccess } from '../game/execution-access'
 import { measure, operationsMetrics, roundTag, sendObserved, safe } from '../observability/metrics'
 import { RoomDirectory, RoomOwnershipError } from '../game/room-directory'
 import type { WebSocket } from 'ws'
-import { isDevRoom, roomOccupiedSeatCount, type Room } from '../game/room.ts'
+import { isDevRoom, roomConnectedPlayerCount, roomOccupiedSeatCount, type Room } from '../game/room.ts'
 import type { SessionResponse } from '../game/authoritative-session.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
@@ -46,7 +46,7 @@ export class Broadcaster {
     return this.directory.db.transaction(async () => {
       await this.directory!.assertOwner(room.id, room.owner!, undefined, retired)
       if (!retired && room.executionStamp) await new ExecutionAccess(this.directory!.db).assert(room.executionStamp)
-      if (!retired) await this.directory!.presence(room.id, room.owner!, room.players.length, roomOccupiedSeatCount(room))
+      if (!retired) await this.directory!.presence(room.id, room.owner!, roomConnectedPlayerCount(room), roomOccupiedSeatCount(room))
       for (const seat of room.players) {
         const token = this.tokens.get(seat.ws)
         if (!token) continue

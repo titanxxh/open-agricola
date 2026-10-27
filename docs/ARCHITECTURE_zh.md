@@ -52,7 +52,7 @@
 - **Durable Room Commit**：成功且改变公开 Frame 或 Private Session Cursor 的命令，以及任何带 `durableTransition` 标记的响应，先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
 - **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
 - **失败不扩散**：命令错误只回发起者；durable rejection 仍向其他座位发送已提交版本的无错快照。持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
-- **Room 上限**：单实例最多 30 个普通 `waiting + playing` Room 与 15 个 Worker 槽；达到上限只拒绝需要另一个 Room 或 Worker 的操作（含 `newGame`），已有 Room 继续运行。
+- **Room 上限**：单实例最多准入 30 个有 OPEN 玩家连接或有效 30 秒准入预留的普通 Room。离线存档与缓存 Room 不占在线配额。独立的 15 个 Worker 槽仍计入保留的 executor；新准入和 `newGame` 一换一替换同时遵守这两类限制。
 - **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
 - **测试默认 2 人游戏**：规则正确性站后端边界，不通过 DOM 反推规则。
 
