@@ -252,7 +252,8 @@ const useTransportSetup = (
         playerIndexRef.current = msg.playerIndex
         hotseat = msg.hotseat === true
         if (msg.type === 'roomCreated' || msg.status === 'waiting') {
-          waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.type === 'roomCreated' ? [{ playerIndex: msg.playerIndex, name: displayName ?? '', connected: true }] : msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors }
+          waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.type === 'roomCreated' ? [{ playerIndex: msg.playerIndex, name: displayName ?? '', connected: true }] : msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors,
+            colorConfirmationPlayerIndex: msg.type === 'roomJoined' ? msg.colorConfirmationPlayerIndex : undefined }
           setWsReady(false)
           setWsStatus(waiting)
         } else {
@@ -262,7 +263,7 @@ const useTransportSetup = (
       } else if (msg.type === 'roomWaiting') {
         setRoomColorError(null)
         setRoomInUrl(msg.roomId)
-        waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors }
+        waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors, colorConfirmationPlayerIndex: msg.colorConfirmationPlayerIndex }
         setWsReady(false)
         setWsStatus(waiting)
       } else if (msg.type === 'playerJoined' && waiting) {
@@ -280,7 +281,7 @@ const useTransportSetup = (
         snapshotRoomId = msg.roomId
         setRoomInUrl(msg.roomId)
         if (ws.connected) ready()
-      } else if (msg.type === 'error' && (msg.code === 'color_unavailable' || msg.code === 'color_locked' || msg.code === 'invalid_color' || msg.code === 'color_save_failed')) {
+      } else if (msg.type === 'error' && (msg.code === 'color_unavailable' || msg.code === 'color_locked' || msg.code === 'invalid_color' || msg.code === 'color_save_failed' || msg.code === 'color_confirmation_unavailable' || msg.code === 'color_confirmation_failed')) {
         setRoomColorError(msg.code)
       } else if (msg.type === 'error' && !ws.connected) {
         if (roomId && (msg.code === 'context_changed' || msg.code === 'not_participant')) window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
@@ -1382,10 +1383,15 @@ export const GameContainerApi = () => {
 
     const isNetworkError = wsStatus.phase === 'error' &&
       (wsStatus.message === 'WebSocket connection failed' || wsStatus.message === 'no WebSocket instance')
+    const colorConfirmingPlayer = wsStatus.phase === 'waiting'
+      ? wsStatus.players.find(player => player.playerIndex === wsStatus.colorConfirmationPlayerIndex)
+      : undefined
     const statusText = wsStatus.phase === 'reconnecting'
       ? t(locale, 'platform.roomReconnecting')
       : wsStatus.phase === 'waiting'
-      ? t(locale, 'platform.waitingForPlayers')
+      ? colorConfirmingPlayer
+        ? t(locale, 'platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, colorConfirmingPlayer.name, colorConfirmingPlayer.playerIndex) })
+        : t(locale, 'platform.waitingForPlayers')
       : wsStatus.phase === 'error'
         ? wsStatus.code === 'invalid_room_access'
           ? t(locale, 'platform.invalidRoomAccess')
@@ -1474,7 +1480,8 @@ export const GameContainerApi = () => {
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex} onColorChange={changePlayerColor} colorError={roomColorError} />
+              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex} onColorChange={changePlayerColor} colorError={roomColorError}
+                colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />
               <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
               </button>

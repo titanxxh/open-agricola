@@ -483,6 +483,10 @@ describe('custom session routes', () => {
       roomId: host.currentRoom!.id,
       name: 'Guest',
     })
+    const guestScope = await commands.issueScope('user:guest')
+    await dispatch(guest, { type: 'confirmPlayerColor', commandContext: {
+      scopeId: guestScope.scopeId, commandId: randomUUID(), roomId: host.currentRoom!.id, expectedVersion: 0,
+    } })
     // A listener only reacts while its card is in play.
     expect((await host.currentRoom!.customSessionExecutor!.execute('devPlayCard', [0, 'CUSTOM_RouteRunaway'])).ok).toBe(true)
     hostWs.send.mockClear()

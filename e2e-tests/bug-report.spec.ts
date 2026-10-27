@@ -63,6 +63,7 @@ test('active pinned evidence opens beside the live game', async ({
   expect(roomId).toBeTruthy()
   const guestPage = await guestContext.newPage()
   await guestPage.goto(`${FRONTEND_URL}/?transport=ws&room=${roomId}`)
+  await guestPage.getByRole('button', { name: '确认颜色并开始', exact: true }).click()
   await expect(page.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
 
   const frameHash = 'a'.repeat(64)

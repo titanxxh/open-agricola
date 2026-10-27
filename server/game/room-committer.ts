@@ -113,6 +113,7 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
     case 'createRoom':
     case 'joinRoom':
     case 'setPlayerColor':
+    case 'confirmPlayerColor':
     case 'dissolveRoom':
     case 'getState':
     case 'getHistory':

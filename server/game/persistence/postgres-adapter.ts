@@ -32,6 +32,7 @@ type RoomRow = {
   input_window_json: string | null
   max_players: number
   status: string
+  color_confirmation_player_index: number | null
   version: number
   custom_card_ids: string | null
   custom_cards_runtime_json: string | null
@@ -160,6 +161,7 @@ const roomValues = (
   stateJson: serialized === null ? null : JSON.stringify(serialized),
   maxPlayers: meta.maxPlayers,
   status: meta.status,
+  colorConfirmationPlayerIndex: meta.colorConfirmationPlayerIndex ?? null,
   version,
   customCardIds: JSON.stringify(meta.customCardDbIds),
   customCards: meta.customCards === undefined ? null : JSON.stringify(meta.customCards),
@@ -212,6 +214,7 @@ const toSnapshot = (
     enableSnakeOpening: row.enable_snake_opening === 1,
     hotseat: row.hotseat === 1,
     status: toStatus(row.status),
+    colorConfirmationPlayerIndex: row.color_confirmation_player_index ?? undefined,
     players,
   },
   updatedAt: row.updated_at,
@@ -262,7 +265,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
     this.dbForCleanup = db
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT id, created_by, invited_user_ids, state_json, input_window_json, max_players, status, version, custom_card_ids,
+      `SELECT id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
@@ -274,13 +277,13 @@ export class PostgresRoomPersistence implements RoomPersistence {
     )
     this.upsertRoom = db.prepare(`
       INSERT INTO rooms (
-        id, created_by, invited_user_ids, state_json, input_window_json, max_players, status, version, custom_card_ids,
+        id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, status, version, custom_card_ids,
         custom_cards_runtime_json,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
       ) VALUES (
-        @id, @createdBy, @invitedUserIds::jsonb, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
+        @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
         @customCards,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
@@ -291,6 +294,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         input_window_json = excluded.input_window_json,
         invited_user_ids = excluded.invited_user_ids,
         status = excluded.status,
+        color_confirmation_player_index = excluded.color_confirmation_player_index,
         custom_card_ids = excluded.custom_card_ids,
         custom_cards_runtime_json = COALESCE(rooms.custom_cards_runtime_json, excluded.custom_cards_runtime_json),
         replay_recording = COALESCE(rooms.replay_recording, excluded.replay_recording),
@@ -371,7 +375,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.status,
+      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,

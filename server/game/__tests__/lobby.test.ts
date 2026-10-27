@@ -90,7 +90,7 @@ describe('lobby.getRooms', () => {
     expect(summaries.map((s) => s.id)).toEqual(['a', 'b'])
   })
 
-  it('reports status="playing" only when all seats are filled', () => {
+  it('reports the authoritative status instead of inferring that a full room has started', () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({
       id: 'half',
@@ -112,7 +112,7 @@ describe('lobby.getRooms', () => {
     })
     const summaries = lobby.getRooms()
     expect(summaries.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
-      { id: 'full', playerCount: 2, maxPlayers: 2, createdBy: 'u1', status: 'playing' },
+      { id: 'full', playerCount: 2, maxPlayers: 2, createdBy: 'u1', status: 'waiting' },
       { id: 'half', playerCount: 1, maxPlayers: 4, createdBy: 'u1', status: 'waiting' },
     ])
   })
@@ -143,7 +143,7 @@ describe('lobby.getRooms', () => {
       playerCount: 2,
       maxPlayers: 2,
       createdBy: 'u1',
-      status: 'playing',
+      status: 'waiting',
     }])
   })
 })

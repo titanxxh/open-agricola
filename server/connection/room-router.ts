@@ -233,7 +233,8 @@ const waitingRoomEvent = (room: Room): Extract<ServerEvent, { type: 'roomWaiting
         ?? room.session.state.players[playerIndex]?.name
         ?? `Player ${playerIndex + 1}`,
     }))
-  return { type: 'roomWaiting', roomId: room.id, players, maxPlayers: room.maxPlayers, playerColors: room.session.state.players.map(player => player.color) }
+  return { type: 'roomWaiting', roomId: room.id, players, maxPlayers: room.maxPlayers, playerColors: room.session.state.players.map(player => player.color),
+    ...(room.colorConfirmationPlayerIndex === undefined ? {} : { colorConfirmationPlayerIndex: room.colorConfirmationPlayerIndex }) }
 }
 
 const requireWritableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
@@ -798,6 +799,8 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   const previousPlayers = room.players
   const previousSeatOwners = room.seatOwners
   const previousStatus = room.status
+  const previousColorConfirmationPlayerIndex = room.colorConfirmationPlayerIndex
+  const previousPlayerCount = roomOccupiedSeatCount(room)
   const previousStartedAt = room.startedAt
   const previousNames = room.session.state.players.map((player, index) => [index, player.nameIsDefault ? '' : player.name] as [number, string])
   ctx.currentRoom = room
@@ -818,6 +821,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     else room.startedAt = previousStartedAt
     ctx.currentRoom = previousCtxRoom
     ctx.currentPlayerIndex = previousPlayerIndex
+    room.colorConfirmationPlayerIndex = previousColorConfirmationPlayerIndex
     if (!wasPlaying) {
       if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames(previousNames)
       else for (const [index, name] of previousNames) room.session.updatePlayerName(index, name)
@@ -855,8 +859,12 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   const playerCount = roomOccupiedSeatCount(room)
   // The hotseat owner is the whole table, so rejoining is always a full room.
   const roomFull = room.hotseat === true || playerCount >= room.maxPlayers
-  const starting = !wasPlaying && roomFull
-  if (roomFull) {
+  const starting = !wasPlaying && roomFull && (room.hotseat === true || isDevRoom(room.id))
+  if (!wasPlaying && !starting && roomFull
+    && (previousPlayerCount < room.maxPlayers || room.colorConfirmationPlayerIndex === undefined)) {
+    room.colorConfirmationPlayerIndex = ctx.currentPlayerIndex
+  }
+  if (starting) {
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
@@ -872,6 +880,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
       players,
       maxPlayers: room.maxPlayers,
       playerColors: room.session.state.players.map(player => player.color),
+      ...(room.colorConfirmationPlayerIndex === undefined ? {} : { colorConfirmationPlayerIndex: room.colorConfirmationPlayerIndex }),
       ...(room.hotseat ? { hotseat: true } : {}),
     })
     await ctx.broadcaster.broadcastEvent(room, {
@@ -907,6 +916,9 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
       return
     }
     await publishJoin()
+    if (!wasPlaying && room.colorConfirmationPlayerIndex !== undefined) {
+      await ctx.broadcaster.broadcastEvent(room, waitingRoomEvent(room))
+    }
     if (wasPlaying) {
       return useSessionResponse(
         executeRoomSession(room, 'getState', [], () => room.session.getState()),
@@ -970,6 +982,35 @@ async function handleSetPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientComma
     return
   }
   await ctx.broadcaster.broadcastEvent(room, waitingRoomEvent(room))
+}
+
+async function handleConfirmPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'confirmPlayerColor' }>): Promise<void> {
+  const room = requireRoom(ctx, msg.requestId)
+  if (!room) return
+  if (room.status !== 'waiting') {
+    sendCommandError(ctx, 'Colors are locked after the game starts', msg.requestId, 'color_locked')
+    return
+  }
+  if (room.colorConfirmationPlayerIndex !== ctx.currentPlayerIndex || roomOccupiedSeatCount(room) < room.maxPlayers) {
+    sendCommandError(ctx, 'The final arriving player must confirm their color', msg.requestId, 'color_confirmation_unavailable')
+    return
+  }
+  let response: SessionResponse
+  try {
+    const blocked = ctx.committer?.blockedError(room.id)
+    if (blocked) throw new Error(blocked)
+    response = await executeRoomSession(room, 'getState', [], () => room.session.getState())
+    if (!response.ok) throw new Error(response.error ?? 'Unable to initialize game')
+  } catch (error) {
+    sendCommandError(ctx, error instanceof Error ? error.message : 'Could not start the game; please try again', msg.requestId, 'color_confirmation_failed')
+    return
+  }
+  room.status = 'playing'
+  room.startedAt ??= Date.now()
+  room.colorConfirmationPlayerIndex = undefined
+  await publishInitialState(ctx, room, response, msg.requestId, () => {}, async () => {
+    await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
+  })
 }
 
 async function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'dissolveRoom' }>): Promise<Awaited<void>> {
@@ -1265,6 +1306,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         version: 0,
         seatOwners: room.players.flatMap(player => player.userId ? [{ playerIndex: player.playerIndex, userId: player.userId }] : []),
         status: isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
+        colorConfirmationPlayerIndex: undefined,
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
         enableFarmersOfTheMoor, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
         customCardDbIds: reloaded.loadedDbIds, customCards,
@@ -1409,6 +1451,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   joinRoom: handleJoinRoom,
   dissolveRoom: handleDissolveRoom,
   setPlayerColor: handleSetPlayerColor,
+  confirmPlayerColor: handleConfirmPlayerColor,
   getState: handleGetState,
   getHistory: handleGetHistory,
   quoteFenceSelection: handleFenceQuote,

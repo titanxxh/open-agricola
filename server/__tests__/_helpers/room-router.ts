@@ -54,7 +54,7 @@ export function recordedRouterFixture() {
     instances.push(deps)
     return deps
   }
-  const dispatch = async (ctx: ConnectionCtx, command: ClientCommand) => {
+  const dispatch = async (ctx: ConnectionCtx, command: ClientCommand, options: { confirmFinalColor?: boolean } = {}) => {
     // Capture the client's version before asynchronous scope/user preparation.
     const input = ctx.currentRoom ? { roomId: ctx.currentRoom.id, expectedVersion: ctx.currentRoom.version,
       inputWindowId: ctx.currentRoom.inputWindow?.id } : {}
@@ -68,6 +68,13 @@ export function recordedRouterFixture() {
     await dispatchCommand(ctx, { ...command, commandContext: command.commandContext ?? {
       scopeId: scopes.get(actor)!, commandId: randomUUID(), ...(command.type === 'createRoom' ? {} : input),
     } })
+    // Game fixtures finish the final player's color selection through the public
+    // command. Admission tests opt out to inspect the full waiting room itself.
+    if (command.type === 'joinRoom' && options.confirmFinalColor !== false && ctx.currentRoom?.status === 'waiting'
+      && ctx.currentRoom.id === command.roomId
+      && ctx.currentRoom.colorConfirmationPlayerIndex === ctx.currentPlayerIndex) {
+      await dispatch(ctx, { type: 'confirmPlayerColor' })
+    }
   }
   return { newDeps, dispatch }
 }

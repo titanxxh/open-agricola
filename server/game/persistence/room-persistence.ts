@@ -32,6 +32,7 @@ export type RoomMeta = {
   /** One device plays every seat: hidden from the room list, creator-only resume. */
   hotseat?: boolean
   status: RoomStatus
+  colorConfirmationPlayerIndex?: number
   /** Seated players with persisted user identity. Anonymous seats are skipped. */
   players: Array<{ userId: string; playerIndex: number }>
 }

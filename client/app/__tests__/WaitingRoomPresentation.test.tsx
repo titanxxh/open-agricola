@@ -214,6 +214,28 @@ afterEach(() => {
 })
 
 describe('waiting room presentation', () => {
+  it('keeps a full room on color selection until the final arrival confirms', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?room=room-1')
+    WaitingRoomWebSocket.joinedPlayerIndex = 1
+    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ok: true, wsPath: '/nodes/presentation-test/ws', user: { id: 'u2', username: 'guest', displayName: 'Guest' },
+    }))))
+    render(<LocaleProvider><AuthProvider><AuthenticatedGame /></AuthProvider></LocaleProvider>)
+    await screen.findByRole('button', { name: 'Copy', exact: true })
+    await act(async () => {
+      WaitingRoomWebSocket.emit({ type: 'roomWaiting', roomId: 'room-1', maxPlayers: 2,
+        players: [{ playerIndex: 0, name: 'Host', connected: true }, { playerIndex: 1, name: 'Guest', connected: true }],
+        playerColors: ['red', 'green'], colorConfirmationPlayerIndex: 1 })
+    })
+    expect(document.querySelector('.game-layout')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Green', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm color and start', exact: true }))
+    expect(WaitingRoomWebSocket.sent).toContainEqual(expect.objectContaining({ type: 'confirmPlayerColor' }))
+    expect(document.querySelector('.game-layout')).toBeNull()
+  })
+
   it('creates the room from a customCards URL without any consent round-trip', async () => {
     const confirm = vi.fn(() => false)
     window.localStorage.setItem('open-agricola-locale-v2', 'en')

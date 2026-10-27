@@ -814,6 +814,7 @@ export class WsGameTransport implements GameTransport {
     requestedPlayerIndex?: number
   }): void
   sendRoomCommand(type: 'setPlayerColor', opts: { color: PlayerState['color'] }): void
+  sendRoomCommand(type: 'confirmPlayerColor', opts?: Record<string, never>): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: string, opts?: Record<string, unknown>): void {
     if (!this.connected) throw new Error('WebSocket reconnecting')

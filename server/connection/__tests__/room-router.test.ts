@@ -385,7 +385,7 @@ describe('handleCreateRoom', () => {
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
   })
 
-  it('rolls back the final join when custom worker initialization fails', async () => {
+  it('keeps both seats waiting when initialization fails after final color confirmation', async () => {
     const deps = newDeps()
     const host = newCtx(deps)
     host.currentUserId = 'u1'
@@ -401,8 +401,6 @@ describe('handleCreateRoom', () => {
       updatePlayerNames: vi.fn(async () => room.session.getState()),
       dispose: vi.fn(),
     } as never
-    const playersBefore = [...room.players]
-    const seatOwnersBefore = [...(room.seatOwners ?? [])]
     const guest = newCtx(deps)
     guest.currentUserId = 'u2'
 
@@ -415,14 +413,15 @@ describe('handleCreateRoom', () => {
 
     expect(room.status).toBe('waiting')
     expect(room.startedAt).toBeUndefined()
-    expect(room.players).toEqual(playersBefore)
-    expect(room.seatOwners).toEqual(seatOwnersBefore)
-    expect(guest.currentRoom).toBeNull()
-    expect(sentMessagesOf(guest)).toContainEqual({
+    expect(room.players.map(player => player.playerIndex)).toEqual([0, 1])
+    expect(room.seatOwners).toEqual([{ playerIndex: 0, userId: 'u1' }, { playerIndex: 1, userId: 'u2' }])
+    expect(room.colorConfirmationPlayerIndex).toBe(1)
+    expect(guest.currentRoom).toBe(room)
+    expect(sentMessagesOf(guest)).toContainEqual(expect.objectContaining({
       type: 'error',
       error: 'worker initialization failed',
-      requestId: 'join-1',
-    })
+      code: 'color_confirmation_failed',
+    }))
     expect(sentTypesOf(host)).not.toContain('gameStarted')
   })
 
@@ -1229,6 +1228,80 @@ describe('authenticated Room history reads', () => {
 
 
 describe('waiting room player colors', () => {
+  it('lets the final arrival choose a color before the game starts', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    const guest = newCtx(deps)
+    host.currentUserId = 'u1'
+    guest.currentUserId = 'u2'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2 })
+    await dispatch(host, { type: 'setPlayerColor', color: 'blue' })
+    await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id }, { confirmFinalColor: false })
+    expect(host.currentRoom!.status).toBe('waiting')
+    expect(sentTypesOf(guest)).not.toContain('gameStarted')
+    expect(sentTypesOf(guest)).not.toContain('stateUpdate')
+    await dispatch(guest, { type: 'setPlayerColor', color: 'green' })
+    expect(host.currentRoom!.session.state.players.map(player => player.color)).toEqual(['blue', 'green'])
+    expect(host.currentRoom!.colorConfirmationPlayerIndex).toBe(1)
+    await dispatch(host, { type: 'confirmPlayerColor' })
+    expect(host.currentRoom!.status).toBe('waiting')
+    expect(sentMessagesOf(host)).toContainEqual(expect.objectContaining({ type: 'error', code: 'color_confirmation_unavailable' }))
+    await dispatch(guest, { type: 'confirmPlayerColor' })
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(sentTypesOf(guest)).toContain('gameStarted')
+    expect(host.currentRoom!.colorConfirmationPlayerIndex).toBeUndefined()
+  })
+
+  it('restores the final color confirmation after restart without giving it to an earlier arrival', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps), guest = newCtx(deps)
+    host.currentUserId = 'u1'
+    guest.currentUserId = 'u2'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 2 })
+    const roomId = host.currentRoom!.id
+    await dispatch(guest, { type: 'joinRoom', roomId }, { confirmFinalColor: false })
+    await dispatch(guest, { type: 'setPlayerColor', color: 'green' })
+    const snapshot = (await deps.persistence.load(roomId))!
+    expect(snapshot.meta).toMatchObject({ status: 'waiting', colorConfirmationPlayerIndex: 1 })
+    const restarted = newDeps()
+    restarted.registry.set(snapshotToRoom(snapshot))
+    const returnedHost = newCtx(restarted)
+    returnedHost.currentUserId = 'u1'
+    await dispatch(returnedHost, { type: 'joinRoom', roomId, intent: 'resume' }, { confirmFinalColor: false })
+    expect(returnedHost.currentRoom!.colorConfirmationPlayerIndex).toBe(1)
+    const returnedGuest = newCtx(restarted)
+    returnedGuest.currentUserId = 'u2'
+    await dispatch(returnedGuest, { type: 'joinRoom', roomId, intent: 'resume' }, { confirmFinalColor: false })
+    expect(sentMessagesOf(returnedGuest)).toContainEqual(expect.objectContaining({ type: 'roomJoined', status: 'waiting', colorConfirmationPlayerIndex: 1, playerColors: ['red', 'green'] }))
+    await dispatch(returnedGuest, { type: 'confirmPlayerColor' })
+    expect(returnedGuest.currentRoom!.status).toBe('playing')
+    expect(returnedGuest.currentRoom!.session.state.players.map(player => player.color)).toEqual(['red', 'green'])
+  })
+
+  it('assigns confirmation to the last arrival even when seats were filled out of order', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps), earlyGuest = newCtx(deps), lastGuest = newCtx(deps)
+    host.currentUserId = 'u1'
+    earlyGuest.currentUserId = 'u2'
+    lastGuest.currentUserId = 'u3'
+    await dispatch(host, { type: 'createRoom', maxPlayers: 3 })
+    const roomId = host.currentRoom!.id
+    await dispatch(earlyGuest, { type: 'joinRoom', roomId, requestedPlayerIndex: 2 }, { confirmFinalColor: false })
+    await dispatch(lastGuest, { type: 'joinRoom', roomId, requestedPlayerIndex: 1 }, { confirmFinalColor: false })
+    expect(host.currentRoom!.colorConfirmationPlayerIndex).toBe(1)
+    await dispatch(earlyGuest, { type: 'confirmPlayerColor' })
+    expect(host.currentRoom!.status).toBe('waiting')
+    await dispatch(lastGuest, { type: 'setPlayerColor', color: 'purple' })
+    const scope = await lastGuest.commands!.issueScope('user:u3')
+    const confirm = { type: 'confirmPlayerColor', commandContext: { scopeId: scope.scopeId,
+      commandId: '01800000-0000-4000-8000-000000000010', roomId, expectedVersion: 0 } } as const
+    await dispatch(lastGuest, confirm)
+    await dispatch(lastGuest, confirm)
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(host.currentRoom!.session.state.players[1]!.color).toBe('purple')
+    expect(sentTypesOf(lastGuest).filter(type => type === 'gameStarted')).toHaveLength(1)
+  })
+
   it('saves a first arrival’s color, restores it after restart, and uses it when two players start', async () => {
     const deps = newDeps()
     const host = newCtx(deps)
