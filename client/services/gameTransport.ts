@@ -19,6 +19,17 @@ export type ValidateResult = {
 export type SnapshotListener = (payload: GameSyncPayload, roomId?: string) => void
 export type PersistenceStatusListener = (paused: boolean) => void
 export type GetStateOptions = { unredacted?: boolean }
+export type RoomCreationOptions = Omit<Extract<ClientCommand, { type: 'createRoom' }>, 'type' | 'requestId' | 'commandContext'>
+
+export class CommandRejectedError extends Error {
+  readonly code?: string
+  readonly creationAdjustment?: CommandOutcome['creationAdjustment']
+  constructor(outcome: CommandOutcome) {
+    super(outcome.error ?? 'Command rejected')
+    this.code = outcome.code
+    this.creationAdjustment = outcome.creationAdjustment
+  }
+}
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -546,8 +557,11 @@ export class WsGameTransport implements GameTransport {
     } else if (msg.type === 'stateUpdate') {
       if (this.roomId === msg.roomId && msg.version < this.committedVersion) {
         if (msg.requestId && this.latestPayload) {
-          this.pendingResolvers.get(msg.requestId)?.resolve({ ...this.latestPayload, ok: msg.payload.ok, error: msg.payload.error })
-          this.pendingResolvers.delete(msg.requestId)
+          const pending = this.pendingResolvers.get(msg.requestId)
+          if (!pending?.commandId || this.journal.commands.get(pending.commandId)?.type !== 'createRoom') {
+            pending?.resolve({ ...this.latestPayload, ok: msg.payload.ok, error: msg.payload.error })
+            this.pendingResolvers.delete(msg.requestId)
+          }
         }
         return
       }
@@ -556,7 +570,13 @@ export class WsGameTransport implements GameTransport {
       this.inputWindow = msg.inputWindow
       this.latestPayload = msg.payload
       this.listeners.forEach(listener => listener(msg.payload, msg.roomId))
-      if (msg.requestId) { this.pendingResolvers.get(msg.requestId)?.resolve(msg.payload); this.pendingResolvers.delete(msg.requestId) }
+      if (msg.requestId) {
+        const pending = this.pendingResolvers.get(msg.requestId)
+        if (!pending?.commandId || this.journal.commands.get(pending.commandId)?.type !== 'createRoom') {
+          pending?.resolve(msg.payload)
+          this.pendingResolvers.delete(msg.requestId)
+        }
+      }
       for (const [commandId, outcome] of this.completed) this.finishCommand(commandId, outcome)
     } else if (msg.type === 'roomPersistencePaused' || msg.type === 'roomPersistenceResumed') {
       this.persistencePaused = msg.type === 'roomPersistencePaused'
@@ -566,7 +586,11 @@ export class WsGameTransport implements GameTransport {
       if (msg.requestId) {
         this.pendingFenceQuoteResolvers.get(msg.requestId)?.reject(error); this.pendingFenceQuoteResolvers.delete(msg.requestId)
         this.pendingHistoryResolvers.get(msg.requestId)?.reject(error); this.pendingHistoryResolvers.delete(msg.requestId)
-        this.pendingResolvers.get(msg.requestId)?.reject(error); this.pendingResolvers.delete(msg.requestId)
+        const pending = this.pendingResolvers.get(msg.requestId)
+        if (!pending?.commandId || this.journal.commands.get(pending.commandId)?.type !== 'createRoom') {
+          pending?.reject(error)
+          this.pendingResolvers.delete(msg.requestId)
+        }
       }
       // Only recovery's serial protocol uses these waiters; ordinary request
       // errors never reject another command's independently correlated promise.
@@ -584,7 +608,7 @@ export class WsGameTransport implements GameTransport {
     let waitingForSnapshot = false
     for (const [requestId, pending] of this.pendingResolvers) {
       if (pending.commandId !== commandId) continue
-      if (!outcome.ok) pending.reject(Object.assign(new Error(outcome.error ?? 'Command rejected'), { code: outcome.code }))
+      if (!outcome.ok) pending.reject(new CommandRejectedError(outcome))
       else if (this.latestPayload && (!outcome.roomId || outcome.roomId === this.roomId) && this.committedVersion >= (outcome.roomVersion ?? 0)) pending.resolve({ ...this.latestPayload, ok: outcome.ok, error: outcome.error })
       else { waitingForSnapshot = true; continue }
       this.pendingResolvers.delete(requestId)
@@ -686,6 +710,10 @@ export class WsGameTransport implements GameTransport {
   onEvent(listener: (event: ServerEvent) => void): () => void { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener) } }
   onConnectionStatus(listener: (status: RoomConnectionStatus) => void): () => void { this.connectionListeners.add(listener); listener(this.status); return () => { this.connectionListeners.delete(listener) } }
   onRecoveryNotice(listener: (code: string) => void): () => void { this.recoveryListeners.add(listener); return () => { this.recoveryListeners.delete(listener) } }
+
+  createRoom(options: RoomCreationOptions): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'createRoom', ...options })
+  }
 
   async getState(options?: GetStateOptions): Promise<GameSyncPayload> {
     return this.sendCommand({

@@ -3,6 +3,7 @@ import { serializeState } from '../../../shared/session/serialization'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/contract/protocol/game'
 import { EngineStack } from '../../../shared/engine'
+import type { SoloCreationConfiguration } from '../../../shared/contract/game-creation'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
 
@@ -75,6 +76,62 @@ describe('WsGameTransport request correlation', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.resetModules()
+  })
+
+  it('waits for the identified creation receipt and preserves its complete configuration adjustment', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await transport.connect()
+    const socket = FakeWebSocket.instances[0]!
+    const configuration = {
+      kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', officialCardPool: 'default-implemented-A-E',
+      enableCommunityDeck: true, customCardIds: ['missing-card'], enableParentCards: false, draftParents: true,
+      enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+    } satisfies SoloCreationConfiguration
+    const creation = transport.createRoom({ sourceGameContextId: 'completed-solo' })
+    let settled = false
+    void creation.then(() => { settled = true }, () => { settled = true })
+    const command = socket.sent.at(-1)!
+    expect(command).toMatchObject({ type: 'createRoom', sourceGameContextId: 'completed-solo' })
+    expect(command.commandContext).not.toHaveProperty('roomId')
+    socket.emit({ type: 'error', requestId: command.requestId, code: 'creation_requires_adjustment', error: 'Adjust card sources' })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    const context = command.commandContext
+    if (!context || typeof context !== 'object' || !('commandId' in context)) throw new Error('Expected identified command')
+    const creationAdjustment = { configuration, issues: [{ workshopCardId: 'missing-card', reason: 'missing' }] }
+    socket.emit({ type: 'commandReceipt', requestId: command.requestId, status: 'completed', receipt: {
+      commandId: context.commandId, scopeId: '01800000-0000-4000-8000-000000000001',
+      outcome: { ok: false, code: 'creation_requires_adjustment', error: 'Adjust card sources', creationAdjustment },
+    } })
+    await expect(creation).rejects.toMatchObject({ code: 'creation_requires_adjustment', creationAdjustment })
+    expect(transport.recoveringCommands).toBe(false)
+    transport.destroy()
+  })
+
+  it('settles creation only after its new snapshot and durable receipt instead of an earlier room payload', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await transport.connect()
+    const socket = FakeWebSocket.instances[0]!
+    socket.emit({ ...buildEnvelope('old', 4), roomId: 'completed-old' })
+    const creation = transport.createRoom({ sourceGameContextId: 'completed-old' })
+    let settled = false
+    void creation.then(() => { settled = true }, () => { settled = true })
+    const command = socket.sent.at(-1)!
+    socket.emit({ ...buildEnvelope(String(command.requestId), 0), roomId: 'fresh-solo' })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    const context = command.commandContext
+    if (!context || typeof context !== 'object' || !('commandId' in context)) throw new Error('Expected identified command')
+    socket.emit({ type: 'commandReceipt', status: 'completed', receipt: {
+      commandId: context.commandId, scopeId: '01800000-0000-4000-8000-000000000001',
+      outcome: { ok: true, roomId: 'fresh-solo', roomVersion: 0, stepNo: 0 },
+    } })
+    await expect(creation).resolves.toMatchObject({ ok: true, historyLength: 0 })
+    expect(transport.roomId).toBe('fresh-solo')
+    expect(transport.recoveringCommands).toBe(false)
+    transport.destroy()
   })
 
   it('correlates read-only fence quotes and rejects replies after a newer snapshot', async () => {
