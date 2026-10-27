@@ -1,6 +1,8 @@
 import { expect, test, type APIRequestContext, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
 import type { StateUpdateEnvelope } from '../shared/contract/protocol/game'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { recordSoloEvidence, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
+import { checkpoint } from './helpers/standard-solo-process'
 
 test.use({ actionTimeout: 10_000 })
 
@@ -25,19 +27,12 @@ async function authenticate(context: BrowserContext, request: APIRequestContext,
 }
 
 function observe(page: Page) {
-  const snapshots: StateUpdateEnvelope[] = []
-  const sent: Array<{ type: string; payload?: unknown; commandContext?: { commandId?: string } }> = []
-  page.on('websocket', socket => {
-    socket.on('framereceived', ({ payload }) => {
-      if (typeof payload !== 'string') return
-      const message = JSON.parse(payload) as StateUpdateEnvelope
-      if (message.type === 'stateUpdate') snapshots.push(message)
-    })
-    socket.on('framesent', ({ payload }) => {
-      if (typeof payload === 'string') sent.push(JSON.parse(payload))
-    })
-  })
-  return { snapshots, sent, latest: () => snapshots.at(-1)!.payload }
+  const driver = new SoloBrowserDriver(page)
+  return { driver,
+    get snapshots() { return driver.events.filter((event): event is StateUpdateEnvelope => event.type === 'stateUpdate') },
+    get sent() { return driver.commands },
+    latest: () => driver.payload,
+  }
 }
 
 async function openSolo(page: Page, chooseSeven = false, parents = false, expansions = false) {
@@ -83,9 +78,10 @@ test('solo random starts directly and keeps ordinary action confirmation', async
   } finally { await context.close() }
 })
 
-test('solo choose-7 preserves candidates across refresh and another browser, with local editable picks', async ({ browser, request }) => {
+test('solo choose-7 preserves candidates and the confirmed result across fresh browser contexts', async ({ browser, request }, testInfo) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true })
   const second = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  let confirmedContext: BrowserContext | undefined
   try {
     await authenticate(context, request, `solo_choose_${Date.now().toString(36)}`)
     const page = await context.newPage()
@@ -145,11 +141,50 @@ test('solo choose-7 preserves candidates across refresh and another browser, wit
     await expect(secondPage.locator('.parent-selection-overlay')).toBeVisible()
     expect(restored.latest().state.players[0]!.occupationHand).toEqual(groups[0]!.cardIds.slice(0, 7))
     expect(restored.latest().state.players[0]!.minorHand).toEqual(groups[1]!.cardIds.slice(0, 7))
-    await secondPage.locator('[data-section="mother"] .parent-choice-card').first().click()
-    await secondPage.locator('[data-section="father"] .parent-choice-card').first().click()
-    await secondPage.locator('.parent-selection-confirm').click()
-    await expect(secondPage.locator('.game-layout')).toBeVisible()
-  } finally { await Promise.all([context.close(), second.close()]) }
+    const submitted = restored.sent.find(command => command.type === 'soloHandSubmit')
+    if (!submitted?.commandContext) throw new Error('Missing confirmed hand command identity')
+    await expect.poll(() => restored.driver.events.filter(event => event.type === 'commandReceipt' && event.status === 'completed'
+      && event.receipt.commandId === submitted.commandContext?.commandId).length).toBe(1)
+    const receipt = restored.driver.receipt
+    expect(receipt.commandId).toBe(submitted.commandContext.commandId)
+    expect(receipt.outcome).toMatchObject({ ok: true, stepNo: 1 })
+    const accepted = structuredClone({ kept: restored.latest().state.soloHandSelection?.kept,
+      occupations: restored.latest().state.players[0]!.occupationHand, minors: restored.latest().state.players[0]!.minorHand,
+      parents: restored.latest().state.parentSelection, phase: restored.latest().state.phase,
+    })
+    expect(accepted.phase).toBe('parent-selection')
+    const roomId = new URL(roomUrl).searchParams.get('room')!
+    const before = await checkpoint(roomId)
+    expect(before.stepNo).toBe(receipt.outcome.stepNo)
+    expect(before.receipts.filter(row => row.scope_id === receipt.scopeId && row.command_id === receipt.commandId)).toHaveLength(1)
+    const cookies = await second.cookies()
+    await Promise.all([context.close(), second.close()])
+    confirmedContext = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true })
+    await confirmedContext.addCookies(cookies)
+    await confirmedContext.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    const confirmedPage = await confirmedContext.newPage()
+    const recovered = observe(confirmedPage)
+    await confirmedPage.goto(roomUrl)
+    await expect(confirmedPage.locator('.parent-selection-overlay')).toBeVisible()
+    await expect(confirmedPage.getByRole('dialog', { name: 'Choose your starting hand' })).toHaveCount(0)
+    expect({ kept: recovered.latest().state.soloHandSelection?.kept,
+      occupations: recovered.latest().state.players[0]!.occupationHand, minors: recovered.latest().state.players[0]!.minorHand,
+      parents: recovered.latest().state.parentSelection, phase: recovered.latest().state.phase,
+    }).toEqual(accepted)
+    expect(recovered.driver.envelope.version).toBe(receipt.outcome.roomVersion)
+    expect(recovered.sent.filter(command => command.type === 'soloHandSubmit')).toHaveLength(0)
+    const after = await checkpoint(roomId)
+    expect({ stepNo: after.stepNo, frameHash: after.frameHash, receipts: after.receipts })
+      .toEqual({ stepNo: before.stepNo, frameHash: before.frameHash, receipts: before.receipts })
+    await recordSoloEvidence(testInfo, 'confirmed-hand-new-context', { accepted, receipt,
+      before: { stepNo: before.stepNo, frameHash: before.frameHash, receipts: before.receipts },
+      after: { stepNo: after.stepNo, frameHash: after.frameHash, receipts: after.receipts }, commandsAfterRecovery: recovered.sent,
+    })
+    await confirmedPage.locator('[data-section="mother"] .parent-choice-card').first().click()
+    await confirmedPage.locator('[data-section="father"] .parent-choice-card').first().click()
+    await confirmedPage.locator('.parent-selection-confirm').click()
+    await expect(confirmedPage.locator('.game-layout')).toBeVisible()
+  } finally { await Promise.all([context.close(), second.close(), confirmedContext?.close()]) }
 })
 
 test('a natural fourteen-round solo keeps both owner rematch entries independent from the Viewer', async ({ browser, request }) => {
@@ -245,9 +280,9 @@ test('three expansions use one grouped hand confirmation and native Moor prepara
     }
     await expect(page.getByText('Prepare your special action card', { exact: true })).toBeVisible()
     expect(state.latest().state.round).toBe(2)
-    const freeActions = ['hiring-fair', 'cut-peat', 'fell-trees', 'slash-and-burn', 'horse-market']
     const beforeSupply = state.latest().state.farmersOfTheMoor!
     const oldCurrent = beforeSupply.specialActionCards.find(card => card.location.kind === 'solo-current')!
+    const freeActions: typeof oldCurrent.actions = ['hiring-fair', 'cut-peat', 'fell-trees', 'slash-and-burn', 'horse-market']
     const nextIsUseful = beforeSupply.soloSupply!.nextCardActions.some(actionId => freeActions.includes(actionId))
     await page.locator(`.interaction-bar [data-choice-value="${nextIsUseful ? 'replace' : 'keep'}"]`).click()
     await expect(page.getByText('Prepare your special action card', { exact: true })).toBeHidden()

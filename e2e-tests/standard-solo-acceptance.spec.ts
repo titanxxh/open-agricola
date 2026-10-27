@@ -118,9 +118,9 @@ class ThreeExpansionGame {
 
 test('formal three-expansion choose-7 reaches natural scoring and both owner rematch entries', async ({ browser, request }, testInfo) => {
   test.setTimeout(240_000)
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
-  const page = await context.newPage()
-  const d = new SoloBrowserDriver(page)
+  let context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  let page = await context.newPage()
+  let d = new SoloBrowserDriver(page)
   const paper: unknown[] = []
   const heatingExpected: Array<{ round: number; required: number; sickWorkerIds: string[] }> = []
   try {
@@ -213,13 +213,49 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     await expect(page.getByRole('button', { name: 'Play again with these settings' })).toBeInViewport()
     await page.getByRole('button', { name: 'Play again with these settings' }).click()
     await expect(page.getByRole('dialog', { name: 'Choose your starting hand' })).toBeVisible()
-    expect(new URL(page.url()).searchParams.get('room')).not.toBe(sourceId)
+    const immediateId = new URL(page.url()).searchParams.get('room')!
+    expect(immediateId).not.toBe(sourceId)
+    await expect.poll(() => d.envelope.roomId).toBe(immediateId)
+    const originalConfiguration = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`)).json()
+    expect(originalConfiguration).toMatchObject({ ok: true, configuration: {
+      kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'choose-7', enableParentCards: true, draftParents: true,
+      enableThroughTheSeasons: true, enableFarmersOfTheMoor: true,
+    } })
+    const before = await checkpoint(immediateId, sourceId)
+    const cookies = await context.cookies()
+    await d.attach(testInfo, 'natural-terminal-and-immediate-rematch')
+    await context.close()
+    const processes = await restartIsolatedBackend(before.viewerBuildId, before.gameBuildId)
+    const restored = await checkpoint(immediateId, sourceId)
+    expect(restored).toEqual(before)
+    context = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true })
+    await context.addCookies(cookies)
+    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    page = await context.newPage()
+    d = new SoloBrowserDriver(page)
     await page.route('**/replay-viewers/**', route => route.abort())
     await page.goto(sourceUrl)
     await expect(page.locator('.solo-completed-summary')).toContainText(String(completed.result.players[0].score))
+    expect(await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`)).json()).toEqual(originalConfiguration)
     await page.getByRole('button', { name: 'Play again with these settings' }).click()
     await expect(page.getByRole('dialog', { name: 'Choose your starting hand' })).toBeVisible()
-    expect(new URL(page.url()).searchParams.get('room')).not.toBe(sourceId)
+    const restartedId = new URL(page.url()).searchParams.get('room')!
+    expect(restartedId).not.toBe(sourceId)
+    expect(restartedId).not.toBe(immediateId)
+    await expect.poll(() => d.envelope.roomId).toBe(restartedId)
+    expect(d.commands.filter(command => command.type === 'createRoom')).toHaveLength(1)
+    expect(d.commands.find(command => command.type === 'createRoom')).toMatchObject({ sourceGameContextId: sourceId })
+    expect(d.state).toMatchObject({ phase: 'solo-hand-selection', enableParentCards: true,
+      enableThroughTheSeasons: true, enableFarmersOfTheMoor: true,
+    })
+    expect(d.state.soloHandSelection?.groups.map(group => [group.kind, group.cardIds.length, group.keepCount]))
+      .toEqual([['occupation', 10, 7], ['minor', 4, 3], ['moor-minor', 6, 4]])
+    const originalAfterRestart = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}`)).json()
+    expect(originalAfterRestart).toMatchObject({ lifecycle: 'completed', result: completed.result })
+    await recordSoloEvidence(testInfo, 'completed-source-process-rematch', { processes, before, restored,
+      sourceId, immediateId, restartedId, originalConfiguration, originalAfterRestart,
+      commands: d.commands, viewerUnavailable: true,
+    })
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto(sourceUrl)
     await page.getByRole('button', { name: 'Play again with these settings' }).click()
