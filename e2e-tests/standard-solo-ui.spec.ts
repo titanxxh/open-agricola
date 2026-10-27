@@ -341,9 +341,12 @@ test('three expansions use one grouped hand confirmation and native Moor prepara
     await expect(overlay).toBeVisible()
     expect(state.latest().state.soloHandSelection?.groups.map(group => [group.kind, group.cardIds.length, group.keepCount]))
       .toEqual([['occupation', 10, 7], ['minor', 4, 3], ['moor-minor', 6, 4]])
+    const occupationIndexes = state.latest().state.soloHandSelection!.groups[0]!.cardIds
+      .flatMap((id, index) => id === 'E096_Elder' ? [] : [index]).slice(0, 7)
+    expect(occupationIndexes).toHaveLength(7)
     const quotas = [7, 3, 4]
     for (let group = 0; group < 3; group++) for (let card = 0; card < quotas[group]!; card++) {
-      await overlay.locator('fieldset').nth(group).getByRole('checkbox').nth(card).check()
+      await overlay.locator('fieldset').nth(group).getByRole('checkbox').nth(group === 0 ? occupationIndexes[card]! : card).check()
     }
     await overlay.getByRole('button', { name: 'Confirm starting hand' }).click()
     await expect(page.locator('.parent-selection-overlay')).toBeVisible()
