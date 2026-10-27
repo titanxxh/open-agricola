@@ -7,6 +7,7 @@ import type {
   Resource,
 } from '../../shared/contract/types'
 import type { Locale } from '../../shared/i18n'
+import type { MoorSoloChoice } from '../../shared/moor/types'
 import { t } from '../../shared/i18n'
 import { getPlayerDisplayName } from '../utils/player-name'
 import { getCardDisplayName, translateCardText } from '../components/common/cardText'
@@ -61,6 +62,7 @@ export type InteractionBarPresentationInput = {
   /** Display names already resolved from each seat's authoritative name provenance. */
   playerNames: string[]
   isInteractive: boolean
+  moorSolo?: MoorSoloChoice & { food: number }
   pending: {
     animalReorg: PendingAnimalReorg | null
     choice: PendingChoice | null
@@ -299,7 +301,7 @@ const buildBodyModel = (input: InteractionBarPresentationInput): InteractionBarB
   if (pending.nextPlayerIndex !== null && isInteractive) {
     return {
       kind: 'nextPlayer',
-      title: textKey('ui.interactionConfirmNext'),
+      title: textKey(playerNames.length === 1 ? 'solo.actionCompleted' : 'ui.interactionConfirmNext'),
     }
   }
   if (!isInteractive) {

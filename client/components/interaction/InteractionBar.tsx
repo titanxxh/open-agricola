@@ -527,8 +527,15 @@ export const InteractionBar = ({
           ) : body.kind === 'choice' && choiceModel ? (
             <>
               <div className="interaction-title">
-                {renderInteractionText(locale, choiceModel.title)}
+                {model.moorSolo
+                  ? t(locale, model.moorSolo.window === 'preparation' ? 'solo.moorPreparation' : 'solo.moorRetention')
+                  : renderInteractionText(locale, choiceModel.title)}
               </div>
+              {model.moorSolo?.window === 'retention' ? (
+                <div className="interaction-rule-hint">
+                  {t(locale, 'solo.moorRetentionHint', { food: model.moorSolo.food })}
+                </div>
+              ) : null}
               {choiceModel.triggerSubtitle ? (
                 <div className="interaction-subtitle">
                   {renderInteractionText(locale, choiceModel.triggerSubtitle)}
@@ -650,6 +657,9 @@ export const InteractionBar = ({
                           resolveChoice(option.value)
                         }}
                       >
+                        {model.moorSolo && option.effectPreview?.kind === 'payment'
+                          ? <span>{translateCardText(locale, option.labelKey)} </span>
+                          : null}
                         {renderChoiceOptionContent({
                           locale,
                           option,
@@ -681,7 +691,7 @@ export const InteractionBar = ({
               </div>
               <div className="interaction-actions">
                 <button onClick={confirmNextPlayer} disabled={!isInteractive || model.pending.nextPlayerConfirmDisabled}>
-                  {t(locale, 'ui.interactionConfirmSwitch')}
+                  {t(locale, model.playerNames.length === 1 ? 'solo.continue' : 'ui.interactionConfirmSwitch')}
                 </button>
               </div>
             </>

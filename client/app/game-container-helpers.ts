@@ -317,9 +317,11 @@ export const requestedWsPlayerIdFromQuery = (search: string): string | null => {
 }
 
 export const maxPlayersFromQuery = (search: string): number => {
-  const raw = Number(new URLSearchParams(search).get('maxPlayers'))
+  const value = new URLSearchParams(search).get('maxPlayers')
+  if (!value) return 2
+  const raw = Number(value)
   if (!Number.isFinite(raw)) return 2
-  return Math.min(Math.max(2, Math.floor(raw)), 6)
+  return Math.min(Math.max(1, Math.floor(raw)), 6)
 }
 
 export const enableThroughTheSeasonsFromQuery = (search: string): boolean =>

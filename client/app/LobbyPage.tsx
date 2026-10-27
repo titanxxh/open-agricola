@@ -16,6 +16,9 @@ import { RoomInvitePicker } from './RoomInvitePicker'
 import type { MyActiveRoom } from '../../shared/contract/lobby'
 import { MyActiveGames } from './MyActiveGames'
 import type { InvitablePlayer } from '../../shared/contract/room-access'
+import { SoloSetupDialog } from './solo/SoloSetupDialog'
+import { useRoomCreation } from './solo/useRoomCreation'
+import { soloRoomOptions } from '../services/room-creation'
 
 type RoomWorkshopCard = {
   id: string
@@ -33,6 +36,8 @@ export function LobbyPage() {
   const [error, setError] = useState('')
   const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [soloSetup, setSoloSetup] = useState(false)
+  const soloCreation = useRoomCreation()
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
   const [roomAccess, setRoomAccess] = useState<'public' | 'invited'>('public')
   const [invitedPlayers, setInvitedPlayers] = useState<InvitablePlayer[]>([])
@@ -257,6 +262,13 @@ export function LobbyPage() {
         )}
       </header>
 
+      {soloSetup || soloCreation.adjustment ? <SoloSetupDialog
+        locale={locale} creating={soloCreation.creating}
+        initialConfiguration={soloCreation.adjustment?.configuration} issues={soloCreation.adjustment?.issues}
+        error={soloCreation.state.phase === 'failed' && !soloCreation.adjustment ? t('solo.creationFailed') : undefined}
+        onClose={() => { setSoloSetup(false); soloCreation.clearError() }}
+        onSubmit={configuration => { setSoloSetup(true); soloCreation.create(soloRoomOptions(configuration, user?.displayName || user?.username)) }}
+      /> : null}
       <div className="lobby-grid">
         <Section variant="parchment" icon="🎮" title={t('platform.startGame')} className="lobby-hero">
           {!selectMode ? (
@@ -270,6 +282,9 @@ export function LobbyPage() {
               </button>
               <button type="button" className="btn-secondary" onClick={() => setSelectMode('hotseat')}>
                 {t('platform.localHotseat')}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setSoloSetup(true)}>
+                {t('solo.entry')}
               </button>
             </>
           ) : (

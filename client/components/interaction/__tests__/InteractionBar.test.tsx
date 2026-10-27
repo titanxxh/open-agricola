@@ -20,6 +20,43 @@ import { createWorkSession } from '../../../../server/__tests__/_helpers/session
 
 const noop = () => {}
 
+it('labels the ordinary one-player confirmation Continue while retaining the multiplayer switch label', () => {
+  const solo = baseInput()
+  solo.playerNames = ['P1']
+  solo.pending.nextPlayerIndex = 0
+  const one = renderToStaticMarkup(<InteractionBar model={buildInteractionBarModel(solo)} actions={baseActions()} />)
+  expect(one).toContain('Continue')
+  expect(one).not.toContain('Confirm switch')
+  const multi = baseInput()
+  multi.pending.nextPlayerIndex = 1
+  const two = renderToStaticMarkup(<InteractionBar model={buildInteractionBarModel(multi)} actions={baseActions()} />)
+  expect(two).toContain('Confirm switch')
+})
+
+it('keeps the Moor retention window visible when food is low and follows refreshed authoritative options', () => {
+  const resolveChoice = vi.fn()
+  const configure = (input: InteractionBarPresentationInput, food: number, disabled: boolean) => {
+    input.playerNames = ['P1']
+    input.moorSolo = { window: 'retention', currentCardId: 'current', food }
+    input.pending.choice = { ...pendingChoice, options: [
+      { value: 'retain', labelKey: 'moor.solo.retain', disabled, effectPreview: { kind: 'payment', resourcesPaid: { food: 2 } } },
+      { value: 'discard', labelKey: 'moor.solo.discard' },
+    ] }
+    input.controls.anytimeActions = anytimeActions
+  }
+  const view = renderBar(input => configure(input, 1, true), { resolveChoice })
+  expect(screen.getByText('Keep this special action card?')).toBeVisible()
+  expect(screen.getByText(/currently have 1 food/)).toBeVisible()
+  expect(screen.getByRole('button', { name: /Pay 2 food to keep/ })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Confirm switch' })).toBeEnabled()
+  view.rerender(buildBar(input => configure(input, 2, false), { resolveChoice }))
+  const retain = screen.getByRole('button', { name: /Pay 2 food to keep/ })
+  expect(retain).toBeEnabled()
+  fireEvent.click(retain)
+  expect(resolveChoice).toHaveBeenCalledExactlyOnceWith('retain')
+  view.unmount()
+})
+
 const anytimeActions: AnytimeAction[] = [
   {
     id: 'anytime-test',

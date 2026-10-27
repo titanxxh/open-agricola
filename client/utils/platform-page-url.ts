@@ -13,6 +13,8 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'maxPlayers',
   'roomAccess',
   'invitedUserIds',
+  'soloHandMode',
+  'sourceGameContextId',
   'draftMode',
   'draftPoolSize',
   'enableCommunityDeck',

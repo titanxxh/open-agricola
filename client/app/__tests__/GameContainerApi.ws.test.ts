@@ -137,11 +137,12 @@ describe('GameContainerApi WS player identity', () => {
     vi.unstubAllEnvs()
   })
 
-  it('parses websocket room maxPlayers from query as a 2-6 range', () => {
+  it('parses websocket room maxPlayers from query as a 1-6 range with a two-player default', () => {
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=6')).toBe(6)
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=5')).toBe(5)
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=99')).toBe(6)
-    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=1')).toBe(2)
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=1')).toBe(1)
+    expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=')).toBe(2)
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=bogus')).toBe(2)
     expect(maxPlayersFromQuery('?page=game&transport=ws')).toBe(2)
   })

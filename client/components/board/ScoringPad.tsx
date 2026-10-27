@@ -10,6 +10,7 @@ import type {
   PlayerStats,
   Resource,
 } from '../../../shared/contract/types'
+import type { SoloHandGroupKind, SoloHandSelectionState } from '../../../shared/contract/solo-hand-selection'
 import { getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
 import { resolveCardRef } from './card-reference'
@@ -23,6 +24,8 @@ type Props = {
   players: PlayerState[]
   onClose: () => void
   showDraftHistory?: boolean
+  completionActions?: ReactNode
+  startingHandSelection?: SoloHandSelectionState | null
 }
 
 type Tab = 'score' | 'stats' | 'draft'
@@ -107,7 +110,7 @@ const renderCardChildLabel = (
   )
 }
 
-export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false }: Props) => {
+export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false, completionActions, startingHandSelection }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('score')
   const categoryRows: ScoringRow[] = categoryOrder.map((key) => ({
     id: `cat-${key}`,
@@ -195,16 +198,19 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                 onClick={() => setActiveTab('draft')}
                 className={activeTab === 'draft' ? 'active' : ''}
               >
-                {t(locale, 'ui.scoringTabDraft')}
+                {t(locale, startingHandSelection?.kept ? 'solo.handHistory' : 'ui.scoringTabDraft')}
               </button>
             ) : null}
           </div>
           <button onClick={onClose}>{t(locale, 'ui.close')}</button>
         </div>
+        {completionActions ? <div className="scoring-completion-actions">{completionActions}</div> : null}
         {activeTab === 'stats' ? (
           <StatsTab locale={locale} players={players} />
         ) : activeTab === 'draft' ? (
-          <DraftTab locale={locale} players={players} />
+          startingHandSelection?.kept
+            ? <StartingHandHistory locale={locale} selection={startingHandSelection.kept} />
+            : <DraftTab locale={locale} players={players} />
         ) : (
         <div className="scoring-content">
           <div className="scoring-grid">
@@ -383,6 +389,19 @@ const StatsTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
     </div>
   )
 }
+
+const startingHandGroupLabels: Record<SoloHandGroupKind, string> = {
+  occupation: 'solo.groups.occupation', minor: 'solo.groups.minor', 'moor-minor': 'solo.groups.moor-minor',
+}
+
+const StartingHandHistory = ({ locale, selection }: { locale: Locale; selection: NonNullable<SoloHandSelectionState['kept']> }) => (
+  <div className="scoring-content">
+    {selection.groups.map(group => <section key={group.kind}>
+      <h3>{t(locale, startingHandGroupLabels[group.kind])}</h3>
+      <ul>{group.cardIds.map(cardId => <li key={cardId}>{getCardDisplayName(locale, cardId)}</li>)}</ul>
+    </section>)}
+  </div>
+)
 
 const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] }) => (
   <div

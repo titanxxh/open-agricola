@@ -283,6 +283,7 @@ export type RoomConnectionStatus =
   | { phase: 'stopped'; message: string; code?: string }
 export type RoomConnectionOptions = {
   developmentSlot?: boolean
+  journalKey?: string
   route?: false | ((roomId: string, pending: ClientCommand[]) => Promise<string>)
   reconnectDelayMs?: number
 }
@@ -336,7 +337,7 @@ export class WsGameTransport implements GameTransport {
   constructor(wsUrl: string = WS_BASE, roomId?: string, playerIndex?: number, options: RoomConnectionOptions = {}) {
     this.options = options
     this.wsUrl = wsUrl
-    this.journal = new RoomCommandJournal(`agricola.pending-commands:${wsUrl}`, roomId ?? '')
+    this.journal = new RoomCommandJournal(options.journalKey ?? `agricola.pending-commands:${wsUrl}`, roomId ?? '')
     this.roomId = this.journal.roomId
     this.seatHint = playerIndex ?? this.journal.playerIndex
     this.playerIndex = this.seatHint ?? 0
@@ -715,6 +716,16 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'createRoom', ...options })
   }
 
+  /** Attach before connect so receipt recovery settles the original creation. */
+  resumeRoomCreation(): Promise<GameSyncPayload> | null {
+    const command = [...this.journal.commands.values()].find(item => item.type === 'createRoom')
+    const commandId = command?.commandContext?.commandId
+    if (!commandId) return null
+    return new Promise((resolve, reject) => {
+      this.pendingResolvers.set(commandUuid(), { commandId, resolve, reject })
+    })
+  }
+
   async getState(options?: GetStateOptions): Promise<GameSyncPayload> {
     return this.sendCommand({
       type: 'getState',
@@ -844,7 +855,7 @@ export class WsGameTransport implements GameTransport {
     return () => { this.persistenceStatusListeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: Omit<Extract<ClientCommand, { type: 'createRoom' }>, 'type' | 'requestId' | 'commandContext'>): void
+  sendRoomCommand(type: 'createRoom', opts: RoomCreationOptions): void
   sendRoomCommand(type: 'joinRoom', opts: {
     roomId: string
     intent?: 'join' | 'resume'

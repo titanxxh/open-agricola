@@ -562,6 +562,29 @@ describe('GameContextRouter', () => {
     expect(await screen.findByDisplayValue('The replay is unavailable')).toBeVisible()
   })
 
+  it('keeps a solo fractional result and rematch outside a failed replay Viewer', async () => {
+    window.history.replaceState(null, '', '/?context=solo-completed')
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/game-contexts/solo-completed')) return new Response(JSON.stringify({
+        ok: true, roomId: 'solo-completed', lifecycle: 'completed', replayStatus: 'available',
+        result: { playerCount: 1, players: [{ playerIndex: 0, displayName: 'Alice', score: 5.5 }] },
+        replay: { firstStepNo: 0, lastStepNo: 1, missingPrefix: false, schemaVersion: 1, viewerBuildId: 'a'.repeat(64) },
+      }))
+      if (url.endsWith('/creation-configuration')) return new Response(JSON.stringify({ ok: true, configuration: {
+        kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', enableCommunityDeck: false, customCardIds: [],
+        officialCardPool: 'default-implemented-A-E', enableParentCards: false, draftParents: true,
+        enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+      }, issues: [] }))
+      return new Response(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Unavailable' }), { status: 503 })
+    }))
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+    expect(await screen.findByRole('button', { name: 'Play again with these settings' })).toBeEnabled()
+    expect(screen.getByText('5.5')).toBeVisible()
+    expect(await screen.findByRole('alert')).toBeVisible()
+    expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
   it.each([
     [
       { ok: true, roomId: 'expired-room', lifecycle: 'expired' },

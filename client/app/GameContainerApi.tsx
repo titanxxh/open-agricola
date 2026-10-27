@@ -52,6 +52,8 @@ import { buildFarmTargetChoiceBindings, getFarmTargetChoices } from './farm-targ
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
+import { SoloHandOverlay } from './solo/SoloHandOverlay'
+import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
@@ -251,7 +253,7 @@ const useTransportSetup = (
         setRoomInUrl(msg.roomId)
         playerIndexRef.current = msg.playerIndex
         hotseat = msg.hotseat === true
-        if (msg.type === 'roomCreated' || msg.status === 'waiting') {
+        if (msg.maxPlayers !== 1 && (msg.type === 'roomCreated' || msg.status === 'waiting')) {
           waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.type === 'roomCreated' ? [{ playerIndex: msg.playerIndex, name: displayName ?? '', connected: true }] : msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors,
             colorConfirmationPlayerIndex: msg.type === 'roomJoined' ? msg.colorConfirmationPlayerIndex : undefined }
           setWsReady(false)
@@ -302,6 +304,9 @@ const useTransportSetup = (
           ws.sendRoomCommand('createRoom', {
             maxPlayers: maxPlayersFromQuery(window.location.search),
             access: parseRoomAccessFromQuery(window.location.search),
+            soloHandMode: maxPlayersFromQuery(window.location.search) === 1
+              ? params.get('soloHandMode') === 'choose-7' ? 'choose-7' : 'random'
+              : undefined,
             name: displayName ?? '',
             customCardIds: params.get('customCards')?.split(',').filter(Boolean),
             hotseat: isHotseatSetupQuery(window.location.search) || undefined,
@@ -1556,6 +1561,28 @@ export const GameContainerApi = () => {
     />
   )
 
+  if (state.phase === 'solo-hand-selection') {
+    const waiting = interaction.stateId === 'wait' && interaction.request.kind === 'solo-hand-selection'
+      ? { groups: interaction.request.groups, playerIndex: interaction.playerIndex,
+          canSubmit: interaction.allowedCommands.some(command => command === 'submitSoloHandSelection') }
+      : null
+    return (
+      <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
+        {gameHeader}
+        {notificationStack}
+        {bugReportBar}
+        {waiting?.canSubmit ? (
+          <SoloHandOverlay key={`${wsTransport?.roomId ?? roomId ?? state.gameSeed}:${JSON.stringify(waiting.groups)}`}
+            groups={waiting.groups} locale={locale}
+            onSubmit={async selection => {
+              const response = await transport.soloHandSubmit(waiting.playerIndex, selection)
+              if (!response.ok) throw new Error(response.error ?? 'Starting hand rejected')
+            }} />
+        ) : <GameLoadScreen percent={90} label={t(locale, 'solo.checking')} />}
+      </div>
+    )
+  }
+
   // Card-draft phase — render the draft overlay instead of the game board.
   // The locked URL-pinned player wins in WS mode; otherwise fall back to the
   // sandbox "self" (current player) so HTTP debugging still works.
@@ -1777,6 +1804,10 @@ export const GameContainerApi = () => {
     locale,
     playerNames: state.players.map((p) => playerNames[p.id]),
     isInteractive,
+    moorSolo: state.players.length === 1 && interaction.stateId === 'wait'
+      && interaction.request.kind === 'choice' && interaction.request.moorSolo
+      ? { ...interaction.request.moorSolo, food: currentPlayer.resources.food }
+      : undefined,
     pending: {
       animalReorg: pendingAnimalReorg,
       choice: interactionBarPendingChoice,
@@ -1922,6 +1953,7 @@ export const GameContainerApi = () => {
             locale={locale}
             playerCount={state.players.length}
             cards={state.farmersOfTheMoor.specialActionCards}
+            soloSupply={state.farmersOfTheMoor.soloSupply}
             currentPlayerId={currentPlayer.id}
             availability={currentPlayer.moorSpecialActionAvailability}
             canTakeSpecialAction={canTakeSpecialAction}
@@ -1996,7 +2028,10 @@ export const GameContainerApi = () => {
           }}
         />
       </div>
-      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver} /> : null}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring} showDraftHistory={state.gameOver}
+        startingHandSelection={state.players.length === 1 ? state.soloHandSelection : undefined}
+        completionActions={state.gameOver && state.players.length === 1 && isWs && wsTransport?.roomId
+          ? <SameConfigurationRematch key={wsTransport.roomId} roomId={wsTransport.roomId} locale={locale} displayName={state.players[0]?.nameIsDefault ? undefined : state.players[0]?.name} /> : undefined} /> : null}
       {shouldShowDevPanel({ devMode: devMode && !isPublicFarmView, hasGameView }) ? (
         <DevPanel
           locale={locale} players={state.players}
