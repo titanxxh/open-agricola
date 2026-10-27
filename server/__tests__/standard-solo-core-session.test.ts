@@ -6,6 +6,7 @@ import { setActiveWorkerCount, workersAvailable } from '../../shared/domain/play
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { createOpeningSession, createWorkSession } from './_helpers/session-fixtures'
 import { assertRejectedUnchanged, assertUndoRestored, confirmNext, undoRuleSnapshot } from './_helpers/session-assertions'
+import { computeHarvestFeedingRequirement } from '../../shared/actions/helpers/harvest-feeding-requirement'
 
 const sessions: GameSession[] = []
 afterEach(() => { for (const session of sessions.splice(0)) session.dispose() })
@@ -70,20 +71,29 @@ describe('standard solo core rules', () => {
   })
 
   it.each([
-    { playerCount: 1, food: 13, paid: 7 },
-    { playerCount: 2, food: 15, paid: 5 },
-  ])('settles two adults and a newborn at $playerCount players through the harvest', ({ playerCount, food, paid }) => {
+    { playerCount: 1, toy: 'none', newborn: true, food: 13, paid: 7 },
+    { playerCount: 2, toy: 'none', newborn: true, food: 15, paid: 5 },
+    { playerCount: 1, toy: 'played', newborn: true, food: 12, paid: 8 },
+    { playerCount: 2, toy: 'played', newborn: true, food: 14, paid: 6 },
+    { playerCount: 1, toy: 'hand', newborn: true, food: 13, paid: 7 },
+    { playerCount: 2, toy: 'hand', newborn: true, food: 15, paid: 5 },
+    { playerCount: 1, toy: 'played', newborn: false, food: 11, paid: 9 },
+    { playerCount: 2, toy: 'played', newborn: false, food: 14, paid: 6 },
+  ])('settles three people at $playerCount players with Toy $toy and newborn $newborn', ({ playerCount, toy, newborn, food, paid }) => {
     const session = createWorkSession({ options: { playerCount }, configure(state) {
       const player = state.players[0]!
       player.resources.food = 20
       player.rooms = 3
       player.roomTiles = createDefaultRoomTiles(3)
       setActiveWorkerCount(player, 3)
-      player.workers[2]!.isNewborn = true
+      player.workers[2]!.isNewborn = newborn
+      if (toy === 'played') player.minorPlayed = ['E030_ChildsToy']
+      if (toy === 'hand') player.minorHand = ['E030_ChildsToy']
       state.round = 4
       for (const [index, entry] of state.players.entries()) {
         entry.resources.food = 20
         const spaces = index === 0 ? ['forest', 'clay-pit'] : ['reed-bank', 'fishing']
+        if (index === 0 && !newborn) spaces.push('day-laborer')
         for (const [workerIndex, id] of spaces.entries()) {
           const space = state.actionSpaces.find(candidate => candidate.id === id)
           assert.ok(space)
@@ -93,6 +103,7 @@ describe('standard solo core rules', () => {
     } })
     sessions.push(session)
     const scores = session.getState().scores
+    expect(session.withCtx(() => computeHarvestFeedingRequirement(session.state, session.state.players[0]!))).toBe(paid)
 
     const response = session.performRoundEnd()
     expect(response.ok, response.error).toBe(true)
@@ -108,6 +119,47 @@ describe('standard solo core rules', () => {
       key: 'log.harvestFeedDetail', params: expect.objectContaining({ resources: { food: paid } }),
     }))
     expect(response.scores).toEqual(scores)
+    expect(session.withCtx(() => computeHarvestFeedingRequirement(session.state, session.state.players[0]!)))
+      .toBe(playerCount === 1 ? 9 : 6)
+  })
+
+  it.each([
+    { playerCount: 1, food: 0, begging: 1, paid: 6 },
+    { playerCount: 2, food: 1, begging: 0, paid: 5 },
+  ])('settles six food for two adults and a newborn at $playerCount players without duplicate payment', ({ playerCount, food, begging, paid }) => {
+    const session = createWorkSession({ options: { playerCount }, configure(state) {
+      state.round = 4
+      const player = state.players[0]!
+      player.rooms = 3
+      player.roomTiles = createDefaultRoomTiles(3)
+      setActiveWorkerCount(player, 3)
+      player.workers[2]!.isNewborn = true
+      for (const [index, entry] of state.players.entries()) {
+        entry.resources.food = index === 0 ? 6 : 20
+        for (const [workerIndex, id] of (index === 0 ? ['forest', 'clay-pit'] : ['reed-bank', 'fishing']).entries()) {
+          state.actionSpaces.find(space => space.id === id)!.takenBy.push({ playerId: entry.id, workerId: entry.workers[workerIndex]!.id })
+        }
+      }
+    } })
+    sessions.push(session)
+    let response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId === 'wait') {
+      assert.ok(response.interaction.request.kind === 'feed')
+      expect(response.interaction.request.remaining).toBe(1)
+      response = session.resolveChoice(0, 'confirm', { selections: [] })
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.round).toBe(5)
+    expect(response.state.players[0]!.resources).toMatchObject({ food, begging })
+    expect(response.state.events.filter(event => event.type === 'resource.paid' && event.actorPlayerId === 'p1' && event.paymentFor === 'feeding'))
+      .toEqual([expect.objectContaining({ resources: begging ? { food: paid, begging } : { food: paid } })])
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.harvestFeedDetail', params: expect.objectContaining({ resources: begging ? { food: paid, begging } : { food: paid } }),
+    }))
+    expect(response.scores![0]!.categories).toContainEqual(expect.objectContaining({ key: 'beggings', total: -3 * begging }))
+    assertRejectedUnchanged(session, () => session.resolveChoice(0, 'confirm', { selections: [] }))
   })
 
   it('keeps solo confirmation and undo boundaries across recovery', () => {
