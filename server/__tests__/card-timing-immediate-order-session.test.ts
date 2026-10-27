@@ -164,9 +164,11 @@ describe('Mountain Hiker timing', () => {
 })
 
 describe('Agricultural Implement timing', () => {
-  it('takes a face-up special-action card before ordinary Farmland after reactions', () => {
+  it('performs the face-up special-card action before ordinary Farmland after reactions', () => {
     const card = 'M054_AgriculturalImplement'
-    const session = setup({ cards: [card], moor: true })
+    const session = setup({ cards: [card], moor: true, configure: state => {
+      state.players[0]!.farmTerrain = [{ row: 1, col: 0, kind: 'moor' }]
+    } })
     companion(session, { actionSpaces: ['farmland'] })
     let response = session.takeAction(0, 'farmland')
     expect(response.ok, response.error).toBe(true)
@@ -174,13 +176,15 @@ describe('Agricultural Implement timing', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' && response.interaction.sourceCard, JSON.stringify(response.interaction)).toBe(card)
     response = accept(session, response)
-    const specialCard = options(response).find(option => option.value.startsWith('card:'))
-    expect(specialCard, JSON.stringify(response.interaction)).toBeDefined()
-    response = choose(session, response, specialCard!.value)
+    const specialCard = session.state.farmersOfTheMoor!.specialActionCards.find(entry => entry.actions.includes('cut-peat'))!
+    const value = ['card-action', specialCard.id, 'action', 'cut-peat', 1, 0].join(':')
+    response = choose(session, response, value)
     expect(response.state.farmersOfTheMoor!.specialActionCards).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: specialCard!.value.slice('card:'.length), location: { kind: 'playerFaceUp', playerId: response.state.players[0]!.id } }),
+      expect.objectContaining({ id: specialCard.id, location: { kind: 'playerFaceUp', playerId: response.state.players[0]!.id } }),
     ]))
     expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.state.players[0]!.farmTerrain).toEqual([])
+    expect(response.state.players[0]!.resources.fuel).toBe(3)
     expectAfter(response)
   }, 30_000)
 })
