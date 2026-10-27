@@ -32,7 +32,7 @@ describe('hotseat game setup', () => {
 
   it('clamps the player count to the supported range', () => {
     expect(setupFromPayload({ maxPlayers: 9 }).playerCount).toBe(6)
-    expect(setupFromPayload({ maxPlayers: 1 }).playerCount).toBe(2)
+    expect(setupFromPayload({ maxPlayers: 1 }).playerCount).toBe(1)
     expect(setupFromPayload({}).playerCount).toBe(2)
   })
 

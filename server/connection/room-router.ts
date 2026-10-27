@@ -5,6 +5,7 @@ import { ExecutionAccess, ExecutionRevokedError } from '../game/execution-access
 import { RoomOwnershipError } from '../game/room-directory'
 import type { OwnerToken } from '../game/room-directory'
 import { CommandError, type CommandRequest } from '../game/command-store'
+import { GameCreationStore, GameCreationError } from '../game/game-creation-store'
 import { assertCommandInput } from '../game/command-input'
 import type { CommandErrorCode } from '../../shared/contract/protocol/commands'
 import { withRoomParticipantNames } from './history-presentation'
@@ -37,8 +38,8 @@ import type {
 } from '../../shared/contract/protocol/game-context.ts'
 import {
   loadLiveDraft,
-  type WorkshopDraft,
 } from '../workshop-drafts.ts'
+import { resolveSoloWorkshopCards, workshopDraftToCustomCard } from '../game/workshop-room-cards'
 import { isLoadableLive } from '../workshop-status.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
 import {
@@ -52,24 +53,13 @@ import {
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
+  soloCreationConfiguration,
 } from '../game/game-setup-options.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
-
-const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
-  cardType: draft.cardType,
-  // SAFETY: Workshop's persistence DTO uses generic JSON for card-definition
-  // metadata. This preserves the existing stored-schema assumption at the
-  // custom-card input boundary; the cast is not runtime JSON validation.
-  cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
-  effectCode: draft.effectCode,
-  compiledCode: draft.compiledCode,
-  codeManifest: draft.codeManifest as CustomCodeManifest | null,
-  artUrl: draft.artUrl,
-})
 
 export function parseDraftOptions(
   payload: Record<string, unknown>,
@@ -376,7 +366,7 @@ const publishInitialState = async (
     retireRoomId,
     retiredOwner,
     retiredVersion,
-    ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id, playerIndex: ctx.currentPlayerIndex } } } : {}),
+    ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id, playerIndex: room.players.find(player => player.ws === ctx.ws)?.playerIndex ?? ctx.currentPlayerIndex } } } : {}),
     onReady: publishReady,
   }))
   if (result.kind === 'blocked') {
@@ -386,8 +376,12 @@ const publishInitialState = async (
       sendCommandError(ctx, result.error, requestId)
       return
     }
-    return new Promise((resolve) => {
-      if (!ctx.committer?.waitUntilReady(room.id, error => { finishObservation(error ? 'blocked' : 'committed'); resolve() })) {
+    return new Promise((resolve, reject) => {
+      if (!ctx.committer?.waitUntilReady(room.id, (error, cause) => {
+        finishObservation(error ? 'blocked' : 'committed')
+        if (cause) reject(cause)
+        else resolve()
+      })) {
         finishObservation(ctx.committer?.isBlocked(room.id) || !ctx.committer?.hasReplay(room.id) ? 'blocked' : 'committed')
         resolve()
       }
@@ -560,16 +554,41 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   }
   const roomId = ctx.activeCommand?.request.resultRoomId ?? (await generateRoomId(ctx))
   if (!roomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
-  const draftOptions = parseDraftOptions(msg as Record<string, unknown>)
+  let input = msg
+  if (msg.sourceGameContextId !== undefined) {
+    const source = await new GameCreationStore(getDb()).completedSource(msg.sourceGameContextId, ctx.currentUserId)
+    if (!source.ok) { sendCommandError(ctx, source.message, msg.requestId, source.code); return }
+    input = { type: 'createRoom', ...source.record.configuration, name: msg.name }
+  }
+  const draftOptions = parseDraftOptions(input)
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
-  const setup = parseGameSetupRequest(msg as Record<string, unknown>, draftOptions.value)
+  const setup = parseGameSetupRequest(input, draftOptions.value)
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
+  if (maxPlayers === 1 && !ctx.currentUserId) {
+    sendCommandError(ctx, 'A formal solo game requires login', msg.requestId, 'login_required')
+    return
+  }
+  if (maxPlayers === 1 && (setup.hotseat || setup.draft || setup.enableSnakeOpening
+    || setup.allowIncompleteFarmersOfTheMoorMinorDeal
+    || (input.soloHandMode !== undefined && input.soloHandMode !== 'random' && input.soloHandMode !== 'choose-7'))) {
+    sendCommandError(ctx, 'Unsupported standard solo setup', msg.requestId)
+    return
+  }
   const enableCommunityDeck = setup.enableCommunityDeck
-  const customCardDbIds = resolveCustomCardDbIds(msg as Record<string, unknown>, enableCommunityDeck)
+  const customCardDbIds = resolveCustomCardDbIds(input, maxPlayers === 1 || enableCommunityDeck)
   const executionStamp = ctx.authority ? await new ExecutionAccess(ctx.authority.directory.db).capture(customCardDbIds, ctx.currentUserId ? [ctx.currentUserId] : []) : undefined
-  const loadedCustomCards = (await loadCustomCards(customCardDbIds, ctx.currentUserId, { liveOnly: true }))
+  const configuration = setup.soloHandMode ? soloCreationConfiguration(setup, customCardDbIds) : undefined
+  const soloCards = configuration ? await resolveSoloWorkshopCards(getDb(), configuration) : undefined
+  if (soloCards?.issues.length && configuration) {
+    sendCommandError(ctx, 'The selected card sources require adjustment', msg.requestId, 'creation_requires_adjustment')
+    if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration, issues: soloCards.issues }
+    return
+  }
+  const loadedCustomCards = soloCards
+    ? { cards: soloCards.cards, loadedDbIds: customCardDbIds, hasNotLive: false }
+    : await loadCustomCards(customCardDbIds, ctx.currentUserId, { liveOnly: true })
   if (loadedCustomCards.hasNotLive) {
     sendCommandError(ctx, 'cards must pass review approval and be published live before they can be used in a room; unreviewed cards are only playable in the workshop sandbox', msg.requestId)
     return
@@ -604,6 +623,11 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
       ? [{ playerIndex: 0, userId: ctx.currentUserId }]
       : [],
     maxPlayers,
+    ...(setup.soloHandMode && configuration ? {
+      soloHandMode: setup.soloHandMode,
+      creationConfiguration: { configuration, resolvedWorkshopSources: soloCards?.resolvedWorkshopSources ?? [] },
+    } : {}),
+    ...(msg.sourceGameContextId && ctx.currentUserId ? { creationSource: { roomId: msg.sourceGameContextId, userId: ctx.currentUserId } } : {}),
     version: 0,
     status: 'waiting',
     ...(setup.hotseat ? { hotseat: true } : {}),
@@ -627,8 +651,9 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   room.players.push({ ws: ctx.ws, playerIndex: 0, name, userId: ctx.currentUserId })
   if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames([[0, name]])
   else room.session.updatePlayerName(0, name)
+  const startsImmediately = room.hotseat === true || maxPlayers === 1
   try {
-    await ctx.checkpoint.recordCreated(room, !room.hotseat && ctx.activeCommand ? {
+    if (!startsImmediately) await ctx.checkpoint.recordCreated(room, ctx.activeCommand ? {
       receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId, roomVersion: 0, playerIndex: 0 } },
     } : undefined)
   } catch (error) {
@@ -636,10 +661,10 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     room.session.dispose()
     throw error
   }
-  await detachPreviousRoom(ctx, room)
-  ctx.currentRoom = room
-  ctx.currentPlayerIndex = 0
   const confirmCreated = async (): Promise<void> => {
+    await detachPreviousRoom(ctx, room)
+    ctx.currentRoom = room
+    ctx.currentPlayerIndex = 0
     ctx.registry.set(room)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, {
       type: 'roomCreated',
@@ -655,7 +680,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   // Its confirmation waits for that first deal: once the client sees
   // `roomCreated` it stops listening for creation errors, so confirming a room
   // that then fails to initialize would strand it in the waiting state.
-  if (!room.hotseat) {
+  if (!startsImmediately) {
     await confirmCreated()
     return
   }
@@ -672,14 +697,24 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
         room.session.dispose()
         ctx.registry.delete(room.id)
         ctx.registry.clearActivity(room.id)
-        ;(await ctx.checkpoint.discardRoom(room.id, { owner: room.owner, expectedVersion: room.version }))
-        ctx.currentRoom = null
         sendCommandError(ctx, resp.error ?? 'unable to initialize game', msg.requestId)
         return
       }
-      return (await publishInitialState(ctx, room, resp, msg.requestId, confirmCreated, async () => {
-        await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
-      }))
+      try {
+        await publishInitialState(ctx, room, resp, msg.requestId, confirmCreated, async () => {
+          await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
+        })
+        if (ctx.currentRoom !== room) {
+          await ctx.committer?.retireRoom(room.id)
+          room.customSessionExecutor?.dispose()
+          room.session.dispose()
+        }
+      } catch (error) {
+        await ctx.committer?.retireRoom(room.id)
+        room.customSessionExecutor?.dispose()
+        room.session.dispose()
+        throw error
+      }
     },
   ))
 }
@@ -1225,6 +1260,10 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 
 async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): Promise<Awaited<void | Promise<void>>> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  if (room.maxPlayers === 1 && !isDevRoom(room.id)) {
+    sendCommandError(ctx, 'Complete this solo game before creating a new game from its configuration', msg.requestId, 'source_not_completed')
+    return
+  }
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
     commandOutcome('blocked')
@@ -1562,6 +1601,9 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
       commandOutcome(error instanceof CommandError ? error.code === 'command_input_stale' ? 'stale' : 'rule_rejected' : 'error')
       if (!(error instanceof CommandError)) throw error
       sendCommandError(ctx, error.message, msg.requestId, error.code)
+      if (error instanceof GameCreationError && error.adjustment && ctx.activeCommand?.outcome) {
+        ctx.activeCommand.outcome.creationAdjustment = error.adjustment
+      }
     } finally {
       endPreflight()
       const active = ctx.activeCommand

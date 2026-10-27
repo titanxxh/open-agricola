@@ -686,7 +686,7 @@ const handoffValidation = (
 }
 
 const loadVersion = async (
-  db: Database,
+  db: Pick<Database, 'prepare'>,
   cardId: string,
   versionId: string,
 ): Promise<Awaited<WorkshopVersionRow>> => {
@@ -747,7 +747,7 @@ export async function loadSandboxVersion(
 }
 
 export async function loadLiveDraft(
-  db: Database,
+  db: Pick<Database, 'prepare'>,
   cardId: string,
 ): Promise<Awaited<WorkshopDraft>> {
   const row = (await db.prepare(`

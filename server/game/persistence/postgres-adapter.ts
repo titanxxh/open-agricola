@@ -23,6 +23,10 @@ import type {
   SerializedGameState,
 } from '../../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
+import type { GameCreationRecord, SoloHandMode } from '../../../shared/contract/game-creation'
+import { parseGameCreationRecord } from '../creation-configuration'
+import { GameCreationStore, GameCreationError } from '../game-creation-store'
+import { resolveSoloWorkshopCards } from '../workshop-room-cards'
 
 type RoomRow = {
   id: string
@@ -31,6 +35,7 @@ type RoomRow = {
   state_json: string | null
   input_window_json: string | null
   max_players: number
+  solo_hand_mode: SoloHandMode | null
   status: string
   color_confirmation_player_index: number | null
   version: number
@@ -59,6 +64,8 @@ type RoomDatabase = Database
 
 export type ReplayCommit = {
   roomId: string
+  creationConfiguration?: GameCreationRecord
+  creationSource?: { roomId: string; userId: string }
   retireRoomId?: string
   retiredOwner?: OwnerToken
   retiredVersion?: number
@@ -160,6 +167,7 @@ const roomValues = (
   invitedUserIds: meta.access?.kind === 'invited' ? JSON.stringify(meta.access.invitedUserIds) : null,
   stateJson: serialized === null ? null : JSON.stringify(serialized),
   maxPlayers: meta.maxPlayers,
+  soloHandMode: meta.soloHandMode ?? null,
   status: meta.status,
   colorConfirmationPlayerIndex: meta.colorConfirmationPlayerIndex ?? null,
   version,
@@ -193,6 +201,7 @@ const toSnapshot = (
     access: decodeRoomAccess(row.invited_user_ids),
     startedAt: row.started_at,
     maxPlayers: row.max_players,
+    ...(row.solo_hand_mode ? { soloHandMode: row.solo_hand_mode } : {}),
     customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
     ...(row.custom_cards_runtime_json === null
       ? {}
@@ -222,6 +231,7 @@ const toSnapshot = (
 
 export class PostgresRoomPersistence implements RoomPersistence {
   private readonly loadRoom
+  private readonly loadCreationRow
   private readonly loadPlayers
   private readonly upsertRoom
   private readonly upsertPlayer
@@ -263,9 +273,10 @@ export class PostgresRoomPersistence implements RoomPersistence {
       return true
     }
     this.dbForCleanup = db
+    this.loadCreationRow = db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?')
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, status, version, custom_card_ids,
+      `SELECT id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, solo_hand_mode, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
@@ -278,13 +289,13 @@ export class PostgresRoomPersistence implements RoomPersistence {
     this.upsertRoom = db.prepare(`
       INSERT INTO rooms (
         id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, status, version, custom_card_ids,
-        custom_cards_runtime_json,
+        custom_cards_runtime_json, solo_hand_mode,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
       ) VALUES (
         @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
-        @customCards,
+        @customCards, @soloHandMode,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
         @allowIncompleteFarmersOfTheMoorMinorDeal, @enableSnakeOpening, @hotseat, @startedAt, @now, @now
@@ -296,6 +307,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         status = excluded.status,
         color_confirmation_player_index = excluded.color_confirmation_player_index,
         custom_card_ids = excluded.custom_card_ids,
+        solo_hand_mode = excluded.solo_hand_mode,
         custom_cards_runtime_json = COALESCE(rooms.custom_cards_runtime_json, excluded.custom_cards_runtime_json),
         replay_recording = COALESCE(rooms.replay_recording, excluded.replay_recording),
         replay_viewer_build_id = COALESCE(rooms.replay_viewer_build_id, excluded.replay_viewer_build_id),
@@ -375,7 +387,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.status,
+      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.solo_hand_mode, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,
@@ -538,9 +550,17 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (directory) {
         if (!commit.meta.owner) throw new RoomOwnershipError('Room owner token is required')
         await directory.assertOwner(commit.roomId, commit.meta.owner)
-        if (commit.meta.executionStamp) await new ExecutionAccess(db).assert(commit.meta.executionStamp)
       }
       if (await receiptAlreadyCommitted(commit.receipt)) return { kind: 'idempotent' }
+      if (commit.header && commit.creationConfiguration) {
+        const { configuration, resolvedWorkshopSources } = commit.creationConfiguration
+        const current = await resolveSoloWorkshopCards(db, configuration)
+        if (current.issues.length) throw new GameCreationError('creation_requires_adjustment', 'The selected card sources require adjustment', { configuration, issues: current.issues })
+        if (canonicalJson(current.resolvedWorkshopSources) !== canonicalJson(resolvedWorkshopSources)) {
+          throw new GameCreationError('command_input_stale', 'Published card versions changed during creation; retry with the current versions')
+        }
+      }
+      if (directory && commit.meta.executionStamp) await new ExecutionAccess(db).assert(commit.meta.executionStamp)
       const existingStep = (await this.loadReplayStepHash.get(
         commit.roomId,
         commit.step.stepNo,
@@ -573,6 +593,16 @@ export class PostgresRoomPersistence implements RoomPersistence {
       })
       if (context.changes !== 1) throw new ReplayConflictError('Room context is no longer active')
       if (commit.header) {
+        if (commit.creationSource) {
+          const source = await new GameCreationStore(db).completedSource(commit.creationSource.roomId, commit.creationSource.userId)
+          if (!source.ok) throw new GameCreationError(source.code, source.message)
+        }
+        if (commit.creationConfiguration) {
+          const json = canonicalJson(commit.creationConfiguration)
+          await db.prepare('INSERT INTO game_creation_configurations(room_id, configuration_json) VALUES (?, ?) ON CONFLICT DO NOTHING').run(commit.roomId, json)
+          const saved = await db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(commit.roomId)
+          if (saved?.configuration_json !== json) throw new ReplayConflictError('Game creation configuration changed')
+        }
         const definitions = JSON.parse(commit.header.customCardsJson) as Array<{ artUrl?: string }>
         const keys = [...new Set(definitions.flatMap(definition => definition.artUrl?.startsWith('/replay-assets/') ? [definition.artUrl.slice(1)] : []))].sort()
         for (const key of keys) {
@@ -670,6 +700,11 @@ export class PostgresRoomPersistence implements RoomPersistence {
     }
   }
 
+  async loadCreationConfiguration(roomId: string): Promise<GameCreationRecord | null> {
+    const row = await this.loadCreationRow.get<{ configuration_json: string }>(roomId)
+    return row ? parseGameCreationRecord(row.configuration_json) : null
+  }
+
   async loadReplayFrame(id: string): Promise<Awaited<SerializedGameState | null>> {
     const row = (await this.loadRoom.get(id)) as RoomRow | undefined
     return row?.state_json
@@ -703,6 +738,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       }
       return result
     } catch (error) {
+      if (error instanceof GameCreationError) throw error
       const conflict = error instanceof ReplayConflictError || error instanceof CommandError
       safe(() => operationsMetrics.commitResults.inc({ outcome: conflict ? 'conflict' : 'error' }))
       if (conflict) {

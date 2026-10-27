@@ -166,7 +166,7 @@ describe('handleCreateRoom', () => {
     expect(snap?.meta.players).toEqual([{ userId: 'u1', playerIndex: 0 }])
   })
 
-  it('clamps maxPlayers to [2, 6]', async () => {
+  it('clamps maxPlayers to [1, 6]', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     await dispatch(ctx, { type: 'createRoom', maxPlayers: 99 })
@@ -175,7 +175,7 @@ describe('handleCreateRoom', () => {
     const lowCtx = newCtx()
     lowCtx.currentUserId = 'u1'
     await dispatch(lowCtx, { type: 'createRoom', maxPlayers: 1 })
-    expect(lowCtx.currentRoom!.maxPlayers).toBe(2)
+    expect(lowCtx.currentRoom!.maxPlayers).toBe(1)
   })
 
   it('creates a six-player room session and announces six seats', async () => {

@@ -5,6 +5,7 @@ import type { CommandReceiptWrite } from '../command-store'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import type { RoomAccess } from '../../../shared/contract/room-access'
+import type { SoloHandMode } from '../../../shared/contract/game-creation'
 
 export type RoomWriteOptions = { executionStamp?: ExecutionStamp; owner?: OwnerToken; expectedVersion?: number | null; retiredOwner?: OwnerToken; retiredVersion?: number; resume?: boolean; retireRoomId?: string; receipt?: CommandReceiptWrite }
 
@@ -18,6 +19,7 @@ export type RoomMeta = {
   access?: RoomAccess
   startedAt?: number | null
   maxPlayers: number
+  soloHandMode?: SoloHandMode
   customCardDbIds: string[]
   customCards?: CustomCardData[]
   replayRecording?: boolean
