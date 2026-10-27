@@ -12,6 +12,7 @@ This module centralizes the shapes shared by the frontend, backend and sandbox, 
 | `contract/workshop.ts` | Frontend/backend protocol for Workshop Design Drafts, Workspaces, and generated candidates |
 | `contract/protocol/ws.ts` | `ClientCommand`, `ServerEvent`, `RoomSummary` |
 | `contract/room-access.ts` | Active Room admission policy and player search display identities |
+| `contract/game-creation.ts` | Accepted solo creation configuration and its browser-safe guard, shared by persisted-record and owner-response readers |
 | `contract/protocol/game.ts` | `GameSyncPayload`, `StateUpdateEnvelope`, `StateUpdateCause`, `ActionDetailEffects` |
 | `contract/cards.ts` | `CardDefinition`, the public card shape |
 | `contract/prompt-keys.ts` | `PromptKey` enum used as the i18n anchor |

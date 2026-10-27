@@ -1,13 +1,7 @@
-import type { SoloCreationConfiguration, SoloCreationConfigurationResponse, SoloCreationErrorCode, SoloCreationIssue } from '../../shared/contract/game-creation'
+import { isSoloCreationConfiguration, type SoloCreationConfigurationResponse, type SoloCreationErrorCode, type SoloCreationIssue } from '../../shared/contract/game-creation'
 import { API_BASE } from '../config'
 
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
-const configuration = (value: unknown): value is SoloCreationConfiguration => object(value)
-  && value.kind === 'standard-solo' && value.maxPlayers === 1 && value.officialCardPool === 'default-implemented-A-E'
-  && (value.soloHandMode === 'random' || value.soloHandMode === 'choose-7')
-  && typeof value.enableCommunityDeck === 'boolean' && typeof value.enableParentCards === 'boolean'
-  && typeof value.draftParents === 'boolean' && typeof value.enableThroughTheSeasons === 'boolean' && typeof value.enableFarmersOfTheMoor === 'boolean'
-  && Array.isArray(value.customCardIds) && value.customCardIds.every(id => typeof id === 'string')
 const reasons: SoloCreationIssue['reason'][] = ['missing', 'not-live', 'load-failed', 'not-applicable', 'community-takeover']
 const issue = (value: unknown): value is SoloCreationIssue => object(value)
   && typeof value.workshopCardId === 'string' && reasons.some(reason => reason === value.reason)
@@ -20,7 +14,7 @@ export async function readSoloCreationConfiguration(roomId: string, signal?: Abo
     credentials: 'include', cache: 'no-store', signal,
   })
   const value: unknown = await response.json()
-  if (object(value) && value.ok === true && response.ok && configuration(value.configuration)
+  if (object(value) && value.ok === true && response.ok && isSoloCreationConfiguration(value.configuration)
     && Array.isArray(value.issues) && value.issues.every(issue)) {
     return { ok: true, configuration: value.configuration, issues: value.issues }
   }
