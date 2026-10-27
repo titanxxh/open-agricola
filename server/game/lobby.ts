@@ -14,7 +14,7 @@ export type RoomBroadcaster = {
 }
 
 export type Lobby = {
-  getRooms(limit?: number): RoomSummary[]
+  getRooms(limit?: number, userId?: string): RoomSummary[]
   dissolveRoomById(roomId: string, userId: string | undefined, options?: RoomWriteOptions): Promise<{ ok: boolean; error?: string }>
   endRoomsForUser(userId: string, affectedRoomIds?: readonly string[]): Promise<{ endedRoomIds: string[] }>
   endRoomsUsingCard(cardDbId: string): Promise<{ endedRoomIds: string[] }>
@@ -40,8 +40,8 @@ export function createLobby(deps: {
     }
   }
   return {
-    getRooms(limit?: number) {
-      return summarizeRoomsForLobby(registry.iter(), limit)
+    getRooms(limit?: number, userId?: string) {
+      return summarizeRoomsForLobby(registry.iter(), limit, undefined, userId)
     },
     async dissolveRoomById(roomId, userId, options) {
       const room = registry.get(roomId)

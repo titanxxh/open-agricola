@@ -1,5 +1,6 @@
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { emptyRoomTtlMs, isDevRoom } from './room.ts'
+import { persistedRoomAccessError } from './room-access'
 import type {
   CompletedGameContextDescriptor,
   GameContextLifecycle,
@@ -191,6 +192,8 @@ export class GameContextStore {
       }
     }
     if (context.lifecycle === 'active') {
+      const accessError = await persistedRoomAccessError(this.db, roomId, userId)
+      if (accessError) return accessError
       if (!userId) {
         return {
           ok: false,

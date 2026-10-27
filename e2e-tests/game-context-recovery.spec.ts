@@ -93,14 +93,14 @@ test('two original players recover their own seats without hidden-info leakage',
 
   let firstPage = await firstContext.newPage()
   let secondPage = await secondContext.newPage()
-  await firstPage.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`)
+  await firstPage.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`, { waitUntil: 'domcontentloaded' })
   const roomId = await firstPage.locator('.ws-invite-roomid strong').textContent()
   expect(roomId).toBeTruthy()
   expect(new URL(firstPage.url()).search).toBe(`?room=${roomId}`)
   await expect(firstPage.locator('.ws-invite-url')).toHaveText(`${FRONTEND_URL}/?room=${roomId}`)
   await firstPage.locator('.ws-color-option[data-player-color=blue]').click()
   await expect(firstPage.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', 'blue')
-  await secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`)
+  await secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`, { waitUntil: 'domcontentloaded' })
   await expect(firstPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
 
@@ -112,8 +112,8 @@ test('two original players recover their own seats without hidden-info leakage',
   const firstStates = collectStates(firstPage)
   const secondStates = collectStates(secondPage)
   await Promise.all([
-    firstPage.goto(`${FRONTEND_URL}/?room=${roomId}`),
-    secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`),
+    firstPage.goto(`${FRONTEND_URL}/?room=${roomId}`, { waitUntil: 'domcontentloaded' }),
+    secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`, { waitUntil: 'domcontentloaded' }),
   ])
   await expect(firstPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
@@ -122,7 +122,7 @@ test('two original players recover their own seats without hidden-info leakage',
 
   expect(new URL(firstPage.url()).search).toBe(`?room=${roomId}`)
   expect(new URL(secondPage.url()).search).toBe(`?room=${roomId}`)
-  await secondPage.reload()
+  await secondPage.reload({ waitUntil: 'domcontentloaded' })
   await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   expect(new URL(secondPage.url()).search).toBe(`?room=${roomId}`)
 
@@ -144,7 +144,7 @@ test('two original players recover their own seats without hidden-info leakage',
   await authenticate(outsiderContext, request, outsiderName)
   await outsiderContext.clearCookies()
   const outsiderPage = await outsiderContext.newPage()
-  await outsiderPage.goto(`${FRONTEND_URL}/?context=${roomId}`)
+  await outsiderPage.goto(`${FRONTEND_URL}/?context=${roomId}`, { waitUntil: 'domcontentloaded' })
   await outsiderPage.fill('#username', outsiderName)
   await outsiderPage.fill('#password', 'context-pass-550')
   await outsiderPage.click('button[type="submit"]')

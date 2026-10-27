@@ -4,6 +4,7 @@ import type { RoomInputWindow } from '../command-input'
 import type { CommandReceiptWrite } from '../command-store'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
+import type { RoomAccess } from '../../../shared/contract/room-access'
 
 export type RoomWriteOptions = { executionStamp?: ExecutionStamp; owner?: OwnerToken; expectedVersion?: number | null; retiredOwner?: OwnerToken; retiredVersion?: number; resume?: boolean; retireRoomId?: string; receipt?: CommandReceiptWrite }
 
@@ -14,6 +15,7 @@ export type RoomMeta = {
   owner?: OwnerToken
   inputWindow?: RoomInputWindow | null
   createdBy: string | null
+  access?: RoomAccess
   startedAt?: number | null
   maxPlayers: number
   customCardDbIds: string[]

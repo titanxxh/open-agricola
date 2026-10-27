@@ -1,3 +1,5 @@
+import type { RoomAccess } from '../../shared/contract/room-access'
+
 /**
  * Query-string plumbing for the lobby's game setup panel.
  *
@@ -33,3 +35,9 @@ export function parseDraftParamsFromQuery(
  */
 export const isHotseatSetupQuery = (search: string): boolean =>
   new URLSearchParams(search).get('hotseat') === '1'
+
+export function parseRoomAccessFromQuery(search: string): RoomAccess | undefined {
+  const params = new URLSearchParams(search)
+  if (params.get('roomAccess') !== 'invited') return undefined
+  return { kind: 'invited', invitedUserIds: params.get('invitedUserIds')?.split(',').filter(Boolean) ?? [] }
+}

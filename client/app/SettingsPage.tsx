@@ -10,6 +10,7 @@ import { API_BASE } from '../config'
 import { authErrorMessage } from './auth-errors'
 import { setPage } from '../utils/platform-page-url'
 import { useAccountLinking } from './useAccountLinking'
+import { PlayerAccountId } from '../components/common/PlayerAccountId'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'
@@ -305,6 +306,7 @@ export function SettingsPage() {
       </header>
 
       <Section icon="👤" title={t('platform.basicInfo')} variant="parchment">
+        {user && <PlayerAccountId userId={user.id} />}
         <p className="settings-readonly">
           🔒 <span className="settings-readonly-chip">{user?.username ?? ''}</span>（{t('platform.notEditable')}）
         </p>

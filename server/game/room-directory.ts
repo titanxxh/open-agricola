@@ -237,17 +237,19 @@ export class RoomDirectory {
       ON CONFLICT(room_id) DO UPDATE SET epoch=excluded.epoch, connected_count=excluded.connected_count, occupied_count=excluded.occupied_count`).run(roomId, owner.epoch, connected, occupied)
   }
 
-  async lobby(limit = 50): Promise<RoomSummary[]> {
+  async lobby(limit = 50, userId?: string): Promise<RoomSummary[]> {
     const now = await this.now()
-    const rows = await this.db.prepare(`SELECT r.id, r.created_by, r.max_players, COALESCE(p.occupied_count, 0) AS occupied
+    const rows = await this.db.prepare(`SELECT r.id, r.created_by, r.max_players, r.invited_user_ids IS NOT NULL AS invited, COALESCE(p.occupied_count, 0) AS occupied
       FROM rooms r JOIN game_contexts c ON c.room_id=r.id AND c.lifecycle='active'
       JOIN room_ownership o ON o.room_id=r.id AND o.status='active' AND o.lease_until>?
       JOIN app_instances i ON i.instance_id=o.instance_id AND i.status='ready' AND i.lease_until>?
       LEFT JOIN room_presence p ON p.room_id=r.id AND p.epoch=o.epoch
       WHERE r.hotseat=0 AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
-      ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; occupied: number }>(now, now, limit)
+        AND (r.invited_user_ids IS NULL OR r.created_by=? OR jsonb_exists(r.invited_user_ids, ?))
+      ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; occupied: number; invited: boolean }>(now, now, userId ?? null, userId ?? null, limit)
     return rows.map(row => ({ id: row.id, playerCount: row.occupied, maxPlayers: row.max_players,
-      ...(row.created_by ? { createdBy: row.created_by } : {}), status: row.occupied < row.max_players ? 'waiting' : 'playing' }))
+      ...(row.created_by ? { createdBy: row.created_by } : {}), status: row.occupied < row.max_players ? 'waiting' : 'playing',
+      ...(row.invited ? { access: 'invited' as const } : {}) }))
   }
 
   async owned(instanceId: string): Promise<Array<{ roomId: string; owner: OwnerToken }>> {

@@ -8,6 +8,8 @@ import { rehydrateState } from '../../shared/session/serialization.ts'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
+import type { RoomAccess } from '../../shared/contract/room-access'
+import { canAccessRoom } from './room-access'
 import {
   createIsolatedGameSession,
   type CustomSessionExecutor,
@@ -26,6 +28,7 @@ export type RoomSeatOwner = {
 }
 
 export type Room = {
+  access?: RoomAccess
   executionStamp?: ExecutionStamp
   owner?: OwnerToken
   inputWindow?: RoomInputWindow | null
@@ -191,6 +194,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   ...(room.owner ? { owner: room.owner } : {}),
   ...(room.inputWindow ? { inputWindow: room.inputWindow } : {}),
   createdBy: room.createdBy ?? null,
+  ...(room.access?.kind === 'invited' ? { access: room.access } : {}),
   startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
@@ -289,18 +293,20 @@ export const removePlayerFromRoom = (
 
 type RoomLikeForSummary = Pick<
   Room,
-  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat'
+  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat' | 'access'
 >
 
 export function summarizeRoomsForLobby(
   source: Iterable<RoomLikeForSummary>,
   limit?: number,
   isFixedDev: (id: string) => boolean = isFixedDevRoom,
+  userId?: string,
 ): RoomSummary[] {
   const list: RoomSummary[] = []
   for (const r of source) {
     // Nobody else can take a seat in a hotseat game, so it never shows up here.
     if (r.hotseat) continue
+    if (!canAccessRoom(r, userId)) continue
     if (r.players.length === 0 && !isFixedDev(r.id)) continue
     const playerCount = roomOccupiedSeatCount(r)
     list.push({
@@ -309,6 +315,7 @@ export function summarizeRoomsForLobby(
       maxPlayers: r.maxPlayers,
       createdBy: r.createdBy,
       status: playerCount < r.maxPlayers ? 'waiting' : 'playing',
+      ...(r.access?.kind === 'invited' ? { access: 'invited' } : {}),
     })
     if (typeof limit === 'number' && list.length >= limit) break
   }
@@ -377,6 +384,7 @@ export const snapshotToRoom = (
     status: snapshot.meta.status,
     startedAt: snapshot.meta.startedAt ?? undefined,
     createdBy: snapshot.meta.createdBy ?? undefined,
+    access: snapshot.meta.access,
     customCardDbIds: snapshot.meta.customCardDbIds,
     customCards,
     replayRecording: snapshot.meta.replayRecording,

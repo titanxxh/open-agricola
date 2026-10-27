@@ -7,6 +7,7 @@ import { CommandStore, CommandError, type CommandReceiptWrite } from '../command
 import { canonicalJson } from '../replay-codec'
 import type { RoomWriteOptions } from './room-persistence'
 import { RoomHistoryStore, RoomHistoryCorruptionError, type PackedRoomSnapshot, type RecoveryNode } from './room-history-store'
+import { decodeRoomAccess } from '../room-access'
 import type { HistoryNode } from '../../../shared/session/history-streams'
 import type { PostgresDatabase as Database } from '../../database/postgres'
 import type {
@@ -26,6 +27,7 @@ import type { CustomCardData } from '../../../shared/cards/session-card-context.
 type RoomRow = {
   id: string
   created_by: string | null
+  invited_user_ids: unknown
   state_json: string | null
   input_window_json: string | null
   max_players: number
@@ -154,6 +156,7 @@ const roomValues = (
   id,
   inputWindowJson: meta.inputWindow ? JSON.stringify(meta.inputWindow) : null,
   createdBy: meta.createdBy,
+  invitedUserIds: meta.access?.kind === 'invited' ? JSON.stringify(meta.access.invitedUserIds) : null,
   stateJson: serialized === null ? null : JSON.stringify(serialized),
   maxPlayers: meta.maxPlayers,
   status: meta.status,
@@ -185,6 +188,7 @@ const toSnapshot = (
   meta: {
     ...(row.input_window_json ? { inputWindow: JSON.parse(row.input_window_json) as RoomInputWindow } : {}),
     createdBy: row.created_by,
+    access: decodeRoomAccess(row.invited_user_ids),
     startedAt: row.started_at,
     maxPlayers: row.max_players,
     customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
@@ -258,7 +262,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
     this.dbForCleanup = db
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT id, created_by, state_json, input_window_json, max_players, status, version, custom_card_ids,
+      `SELECT id, created_by, invited_user_ids, state_json, input_window_json, max_players, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
@@ -270,13 +274,13 @@ export class PostgresRoomPersistence implements RoomPersistence {
     )
     this.upsertRoom = db.prepare(`
       INSERT INTO rooms (
-        id, created_by, state_json, input_window_json, max_players, status, version, custom_card_ids,
+        id, created_by, invited_user_ids, state_json, input_window_json, max_players, status, version, custom_card_ids,
         custom_cards_runtime_json,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
       ) VALUES (
-        @id, @createdBy, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
+        @id, @createdBy, @invitedUserIds::jsonb, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
         @customCards,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
@@ -285,6 +289,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       ON CONFLICT(id) DO UPDATE SET
         state_json = COALESCE(excluded.state_json, rooms.state_json),
         input_window_json = excluded.input_window_json,
+        invited_user_ids = excluded.invited_user_ids,
         status = excluded.status,
         custom_card_ids = excluded.custom_card_ids,
         custom_cards_runtime_json = COALESCE(rooms.custom_cards_runtime_json, excluded.custom_cards_runtime_json),
@@ -366,7 +371,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT rooms.id, rooms.created_by, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.status,
+      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,

@@ -5,12 +5,15 @@ import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../../utils/platform-page-url'
 
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
+const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
+  ok: true, rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
+}))))
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 'u1', username: 'host', displayName: 'Host' },
     logout: vi.fn(),
-    apiFetch: vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: myRoomsResponse.rooms }))),
+    apiFetch,
   }),
 }))
 
@@ -59,13 +62,19 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.statusPlaying': 'Playing',
     'platform.yourTurn': 'Your turn',
     'platform.resume': 'Resume',
+    'platform.roomAccessLabel': 'Who can enter',
+    'platform.roomAccessPublic': 'Public',
+    'platform.roomAccessInvited': 'Invited players only',
+    'platform.invitedPlayerIdsLabel': 'Invited player IDs',
+    'platform.invitedPlayerCountError': 'Enter {count} other player IDs',
   }
   return {
     useCurrentLocale: () => 'en',
     useLocale: () => ({
       locale: 'en',
       setLocale: vi.fn(),
-      t: (key: string) => labels[key] ?? key,
+      t: (key: string, params: Record<string, string> = {}) => Object.entries(params)
+        .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), labels[key] ?? key),
     }),
   }
 })
@@ -105,6 +114,33 @@ describe('LobbyPage my active games', () => {
 })
 
 describe('LobbyPage player count selection', () => {
+  it('uses authenticated room listing and creates a private room with normalized account IDs', async () => {
+    render(<LobbyPage />)
+    expect(apiFetch).toHaveBeenCalledWith('/api/rooms')
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    expect(screen.getByRole('radio', { name: 'Public' })).toBeChecked()
+    fireEvent.click(screen.getByRole('radio', { name: 'Invited players only' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Invited player IDs' }), { target: { value: 'u1, Guest_ID-2, Guest_ID-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
+    expect(setPage).toHaveBeenCalledWith('game', expect.objectContaining({
+      maxPlayers: '2', roomAccess: 'invited', invitedUserIds: 'Guest_ID-2',
+    }))
+  })
+
+  it('requires enough distinct invitees for the selected player count', () => {
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(screen.getByRole('button', { name: '3 Players' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Invited players only' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Invited player IDs' }), { target: { value: 'Guest_ID-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter 2 other player IDs')
+    expect(setPage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('radio', { name: 'Public' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
+    expect(setPage).toHaveBeenCalledWith('game', { transport: 'ws', maxPlayers: '3', enableSnakeOpening: 'true' })
+  })
+
   it('preserves the development identity when starting a hotseat game', () => {
     window.history.replaceState(null, '', '/?player=p1&devMode=1')
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))

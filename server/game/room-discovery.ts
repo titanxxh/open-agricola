@@ -2,9 +2,10 @@ import type { RoomDiscoveryRequest, RoomDiscoveryResponse } from '../../shared/c
 import { CommandStore } from './command-store'
 import { RoomDirectory, RoomOwnershipError } from './room-directory'
 import { GameContextStore } from './game-context-store'
+import { persistedRoomAccessError } from './room-access'
 
 /** Discovery supplies a route, never seat permission or a gameplay write. */
-export async function discoverRoom(directory: RoomDirectory, actorId: string, request: RoomDiscoveryRequest): Promise<RoomDiscoveryResponse> {
+export async function discoverRoom(directory: RoomDirectory, actorId: string, request: RoomDiscoveryRequest, userId?: string): Promise<RoomDiscoveryResponse> {
   let roomId = request.roomId
   if (request.pendingIdentity) {
     const pending = await new CommandStore(directory.db).lookup(actorId, request.pendingIdentity)
@@ -38,6 +39,8 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
       }
       throw Object.assign(new Error('Game context changed'), { code: 'context_changed' })
     }
+    const accessError = await persistedRoomAccessError(directory.db, roomId, userId)
+    if (accessError) throw Object.assign(new Error(accessError.message), { code: accessError.code })
     const assigned = await directory.claim(roomId)
     return { roomId, wsPath: assigned.wsPath }
   }

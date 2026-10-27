@@ -300,6 +300,103 @@
   color: var(--color-text-secondary);
   font-weight: 600;
 }
+
+.room-access-options {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.room-access-options .player-select-options {
+  flex-wrap: wrap;
+}
+
+.room-access-options .player-select-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.room-invitations {
+  margin-top: 12px;
+}
+
+.room-invitations input[role="combobox"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.room-invite-picker {
+  position: relative;
+}
+
+.room-invite-suggestions {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: 10;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-parchment, #fff7e6);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgb(60 36 18 / 16%);
+}
+
+.room-invite-suggestions ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.room-invite-suggestions [role="option"] {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.room-invite-suggestions [role="option"][aria-selected="true"] {
+  background: var(--color-bg-warm);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .room-invite-suggestions [role="option"]:hover {
+    background: var(--color-bg-warm);
+  }
+}
+
+.room-invite-suggestions small,
+.room-invite-suggestions code,
+.room-invite-suggestions p {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.room-invite-suggestions p {
+  margin: 8px 12px;
+}
+
+.room-access-badge {
+  display: inline-block;
+  margin-inline-start: 8px;
+  color: var(--color-text-secondary);
+}
 .player-select-options {
   display: flex;
   gap: 8px;

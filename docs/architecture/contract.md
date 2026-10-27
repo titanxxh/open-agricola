@@ -11,6 +11,7 @@ This module centralizes the shapes shared by the frontend, backend and sandbox, 
 | `contract/types.ts` | `GameState`, `PlayerState`, `ActionSpace`, `Resource`, `InteractionState`, `InteractionRequest`, `ActionDefinition` |
 | `contract/workshop.ts` | Frontend/backend protocol for Workshop Design Drafts, Workspaces, and generated candidates |
 | `contract/protocol/ws.ts` | `ClientCommand`, `ServerEvent`, `RoomSummary` |
+| `contract/room-access.ts` | Active Room admission policy and player search display identities |
 | `contract/protocol/game.ts` | `GameSyncPayload`, `StateUpdateEnvelope`, `StateUpdateCause`, `ActionDetailEffects` |
 | `contract/cards.ts` | `CardDefinition`, the public card shape |
 | `contract/prompt-keys.ts` | `PromptKey` enum used as the i18n anchor |
@@ -90,7 +91,7 @@ Tests: `shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`, `sha
 ```ts
 type ClientCommand = (
   | { type: 'auth'; token }
-  | { type: 'createRoom'; maxPlayers?, name?, customCardIds?, enableCommunityDeck?,
+  | { type: 'createRoom'; maxPlayers?, access?: RoomAccess, name?, customCardIds?, enableCommunityDeck?,
       enableParentCards?, draftParents?, enableThroughTheSeasons?,
       enableFarmersOfTheMoor?, allowIncompleteFarmersOfTheMoorMinorDeal?,
       enableSnakeOpening?, draftMode?, draftPoolSize? }
@@ -116,6 +117,7 @@ type ClientCommand = (
 - There are no separate `reorg`, `feed`, `nextPlayer` or `confirmPlayerSwitch` commands: every wait shape submits through `choice`, with `payload` determined by `InteractionRequest.kind`.
 - `commitSelection` is only for structured targeted selections: `interactionSubmitChannel()` (`shared/session/interaction-command-policy.ts`) routes `farm-select`, `selection` (farm-position, occupation-hand), `resource-quantity-select` and `resource-batch-exchange-select` to it. Occupation-hand selections must be unique subsets within the declared limits, validated before any effect or random observation. Farm-position may use server-validated `validPositionGroups`; positions carrying `sourceCard` / `cardFieldSlot` / `groupKey` count by group and are canonicalized by the backend.
 - Game Variant flags (`enableParentCards` / `draftParents`, `enableThroughTheSeasons`, `enableFarmersOfTheMoor`, `enableSnakeOpening`) are Room options persisted across `newGame` and restarts; `draftParents: false` deals each player a parent pair without `parent-selection`.
+- `RoomAccess` is public by default or invited with stable account IDs. Invitation permission allows joining an active Room; it never assigns a seat or changes public completed Replay access. `RoomSummary.access` exposes only the mode, never the invitation list.
 - `customCardIds` take effect only with `enableCommunityDeck: true` and only for live, approved Workshop cards ([Workshop backend](server.md#workshop-backend)).
 
 ## ServerEvent and StateUpdateEnvelope

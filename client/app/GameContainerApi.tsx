@@ -19,7 +19,7 @@ import { buildFenceCommitPayload } from './farm-commit-ui'
 import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
-import { isHotseatSetupQuery, parseDraftParamsFromQuery } from './game-setup-query'
+import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuery } from './game-setup-query'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
@@ -300,6 +300,7 @@ const useTransportSetup = (
           setWsStatus({ phase: 'creating' })
           ws.sendRoomCommand('createRoom', {
             maxPlayers: maxPlayersFromQuery(window.location.search),
+            access: parseRoomAccessFromQuery(window.location.search),
             name: displayName ?? '',
             customCardIds: params.get('customCards')?.split(',').filter(Boolean),
             hotseat: isHotseatSetupQuery(window.location.search) || undefined,
@@ -314,7 +315,9 @@ const useTransportSetup = (
           })
         } else setWsStatus({ phase: 'error', message: 'No room in URL. Use the link shared by Player 1.' })
       } catch (error) {
-        if (!disposed) setWsStatus({ phase: 'error', message: error instanceof Error ? error.message : 'WebSocket connection failed' })
+        const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        const code = errorCode === 'not_participant' || errorCode === 'login_required' ? errorCode : undefined
+        if (!disposed) setWsStatus({ phase: 'error', message: error instanceof Error ? error.message : 'WebSocket connection failed', code })
       }
     }
     void init()
@@ -1384,7 +1387,15 @@ export const GameContainerApi = () => {
       : wsStatus.phase === 'waiting'
       ? t(locale, 'platform.waitingForPlayers')
       : wsStatus.phase === 'error'
-        ? wsStatus.message === 'roomDissolved'
+        ? wsStatus.code === 'invalid_room_access'
+          ? t(locale, 'platform.invalidRoomAccess')
+          : wsStatus.code === 'invited_player_unavailable'
+          ? t(locale, 'platform.invitedPlayerUnavailable')
+          : wsStatus.code === 'not_participant'
+          ? t(locale, 'platform.roomAccessDenied')
+          : wsStatus.code === 'login_required'
+          ? t(locale, 'platform.authErrors.not_authenticated')
+          : wsStatus.message === 'roomDissolved'
           ? t(locale, 'platform.roomDissolved')
           : wsStatus.message === 'roomTerminatedCardTakedown'
             ? t(locale, 'platform.roomTerminatedCardTakedown')
