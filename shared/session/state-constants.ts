@@ -14,6 +14,7 @@
 
 import type { FenceSegment, FenceSegmentSource, GameState, PlayerState, Resource } from '../contract/types'
 import type { DraftMode } from '../draft/types'
+import type { SoloHandMode } from '../contract/game-creation'
 import { createSeededRng, shuffleWithRng, type GameSeed } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
 import { findPlayerById } from '../domain/player'
@@ -80,6 +81,7 @@ export const defaultSandboxPlayerNames = ['Player 1', 'Player 2', 'Player 3', 'P
 
 export type InitialStateOptions = {
   playerCount?: number
+  soloHandMode?: SoloHandMode
   extraMinorIds?: string[]
   extraOccupationIds?: string[]
   deckIds?: string[]
