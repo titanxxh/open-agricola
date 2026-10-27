@@ -160,6 +160,7 @@ export class RoomDirectory {
   async consumeAllocation(actorId: string, allocationId: string, identity: CommandIdentity, instanceId: string): Promise<RoomRoute> {
     this.db.assertInTransaction()
     await this.serial()
+    await this.assertInstance(instanceId)
     const row = await this.db.prepare('SELECT * FROM room_allocations WHERE actor_id=? AND allocation_id=? FOR UPDATE').get<{ room_id: string; scope_id: string | null; command_id: string | null }>(actorId, allocationId)
     if (!row) throw new RoomOwnershipError('Creation allocation is unavailable')
     if (row.command_id && (row.command_id !== identity.commandId || row.scope_id !== identity.scopeId)) throw new Error('Creation allocation already belongs to another command')

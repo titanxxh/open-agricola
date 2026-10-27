@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import type { QueryResultRow } from 'pg'
 import { createTestDatabase } from './_helpers/postgres'
 import { RoomDirectory, type OwnerToken } from '../game/room-directory'
 let directory: RoomDirectory
@@ -120,6 +121,46 @@ it('publishes presence while a simultaneous resume holds the admission lock and 
   } finally {
     publishPresence()
     await Promise.allSettled([publication, resumed])
+    observeLock.mockRestore()
+  }
+})
+
+it('consumes an allocation while a heartbeat holds the instance lock without reversing the owner lock order', async () => {
+  await start('only', 9001, 1)
+  const allocation = await directory.allocate('alice', randomUUID())
+  const identity = { scopeId: randomUUID(), commandId: randomUUID() }
+  let instanceLocked!: () => void
+  let releaseHeartbeat!: () => void
+  const instanceReady = new Promise<void>(done => { instanceLocked = done })
+  const continueHeartbeat = new Promise<void>(done => { releaseHeartbeat = done })
+  const prepare = directory.db.prepare.bind(directory.db)
+  const observeLock = vi.spyOn(directory.db, 'prepare').mockImplementation(sql => {
+    const statement = prepare(sql)
+    return { ...statement, get: async <Row extends QueryResultRow = QueryResultRow>(...args: unknown[]) => {
+      if (sql.includes('FROM app_instances') && sql.endsWith('FOR SHARE')) releaseHeartbeat()
+      const result = await statement.get<Row>(...args)
+      if (sql === 'SELECT * FROM app_instances WHERE instance_id=? FOR UPDATE') {
+        instanceLocked()
+        await continueHeartbeat
+      }
+      return result
+    } }
+  })
+  const heartbeat = directory.heartbeat('only')
+  let creating: Promise<unknown> | undefined
+  try {
+    await instanceReady
+    creating = directory.db.transaction(() => directory.consumeAllocation('alice', allocation.allocationId, identity, 'only'))()
+    const attempts = await Promise.allSettled([creating, heartbeat])
+    expect(attempts).toEqual([
+      { status: 'fulfilled', value: { roomId: allocation.roomId, owner: allocation.owner, wsPath: '/nodes/only/ws' } },
+      { status: 'fulfilled', value: [] },
+    ])
+    expect(await directory.db.prepare('SELECT scope_id,command_id FROM room_allocations WHERE room_id=?').get(allocation.roomId))
+      .toEqual({ scope_id: identity.scopeId, command_id: identity.commandId })
+  } finally {
+    releaseHeartbeat()
+    await Promise.allSettled([creating, heartbeat])
     observeLock.mockRestore()
   }
 })
