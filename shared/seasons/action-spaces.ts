@@ -59,7 +59,7 @@ const seasonHostSpace = (
     descriptionKey: seasonActionDescriptionBySeason[season],
     roundAvailable: 1,
     gainPerRound: {},
-    players: [2, 3, 4, 5, 6],
+    players: [1, 2, 3, 4, 5, 6],
     canBeExecutedByPlayer: canUseSeasonAction(season),
     execute: () => ({ type: 'fail', errorKey: 'log.action' }),
     resources: { ...emptyResources },
@@ -301,7 +301,7 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => {
     descriptionKey: seasonActionDescriptionBySeason[season],
     roundAvailable: 1,
     gainPerRound: {},
-    players: [2, 3, 4, 5, 6],
+    players: [1, 2, 3, 4, 5, 6],
     strictCanExecute: true,
     canBeExecutedByPlayer: season === 'winter' ? canUseRomanticEvening
       : season === 'spring' ? canUseSpringAnimalAndFruit
