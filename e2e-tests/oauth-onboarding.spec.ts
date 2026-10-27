@@ -1,4 +1,4 @@
-import { expect, devices, type BrowserContext } from '@playwright/test'
+import { expect, devices, type BrowserContext, type Request } from '@playwright/test'
 import { createServer } from 'node:https'
 import { createServer as createHttpServer } from 'node:http'
 import { connect, type Socket } from 'node:net'
@@ -166,7 +166,12 @@ for (const provider of ['github', 'google'] as const) {
               await handleOnboardingComplete(req, res)
               return
             }
-            if (url.pathname === '/api/auth/registration-policy') { handleRegistrationPolicy(req, res); return }
+            if (url.pathname === '/api/auth/registration-policy') {
+              // A slow response exposes navigation that cancels the previous page's policy fetch.
+              await new Promise(resolve => setTimeout(resolve, 500))
+              handleRegistrationPolicy(req, res)
+              return
+            }
             if (url.pathname === '/api/auth/me') {
               const user = await validateSession(readCookie(req.headers.cookie, SESSION_COOKIE))
               res.writeHead(user ? 200 : 401, { 'Content-Type': 'application/json' })
@@ -239,7 +244,23 @@ for (const provider of ['github', 'google'] as const) {
         }
         await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
         page.on('pageerror', error => browserErrors.push(error.message))
-        await page.goto(`${apiOrigin}/cookie-seed`, { waitUntil: 'domcontentloaded' })
+        const policyRequests = new Set<Request>()
+        page.on('request', request => {
+          if (request.url() === `${apiOrigin}/api/auth/registration-policy`) policyRequests.add(request)
+        })
+        page.on('requestfinished', request => policyRequests.delete(request))
+        page.on('requestfailed', request => {
+          if (policyRequests.delete(request)) browserErrors.push(request.failure()?.errorText ?? 'Registration policy request failed')
+        })
+        const loadPolicyPage = async (navigate: () => Promise<unknown>) => {
+          const response = page.waitForResponse(`${apiOrigin}/api/auth/registration-policy`)
+          await navigate()
+          const policy = await response
+          expect(policy.status()).toBe(200)
+          expect(await policy.json()).toEqual({ ok: true, policy: 'open' })
+          await expect.poll(() => policyRequests.size).toBe(0)
+        }
+        await loadPolicyPage(() => page.goto(`${apiOrigin}/cookie-seed`, { waitUntil: 'domcontentloaded' }))
         const cookieSupport = await page.evaluate(async origin => {
           await fetch(`${origin}/cookie-partitioned`, { credentials: 'include' })
           return (await fetch(`${origin}/cookie-check`, { credentials: 'include' })).json()
@@ -247,11 +268,11 @@ for (const provider of ['github', 'google'] as const) {
         expect(cookieSupport.unpartitioned).toBe(mode === 'cross-site-allow' || sameSite)
         if (mode === 'cross-site-chromium') expect(cookieSupport.partitioned).toBe(true)
         await page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=register"]`).click()
-        await page.getByRole('link', { name: 'Authorize local registration' }).click()
+        await loadPolicyPage(() => page.getByRole('link', { name: 'Authorize local registration' }).click())
         await expect(page.locator('#onboarding-username')).toBeVisible()
         await expect(page).not.toHaveURL(/onboardingTicket/)
         expect(ticket).toMatch(/^[\w-]{43}$/)
-        await page.reload()
+        await loadPolicyPage(() => page.reload())
         await page.locator('#onboarding-username').fill(username)
         await page.locator('#onboarding-password').fill(password)
         await page.locator('#onboarding-confirm-password').fill(password)
