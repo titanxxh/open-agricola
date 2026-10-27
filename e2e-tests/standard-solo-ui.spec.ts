@@ -51,6 +51,27 @@ async function openSolo(page: Page, chooseSeven = false, parents = false, expans
   await expect(page.locator('.ws-invite-roomid')).toHaveCount(0)
 }
 
+async function declineElderOpening(driver: SoloBrowserDriver) {
+  await expect.poll(() => driver.state.phase).toBe('playing')
+  const opening = driver.interaction
+  if (opening.stateId === 'idle') return
+  expect(driver.state.round).toBe(1)
+  expect(driver.state.roundPhase).toBe('preparation')
+  expect(opening).toMatchObject({ stateId: 'wait', playerIndex: 0, sourceCard: 'E096_Elder',
+    spaceId: '__stage:onRoundStart', promptKey: 'ui.interactionOptionalAction', request: { kind: 'choice' } })
+  if (opening.stateId !== 'wait' || opening.request.kind !== 'choice') throw new Error('Expected the optional Elder opening choice')
+  expect(opening.allowedCommands).toContain('resolveChoice')
+  const skip = opening.request.options.find(option => option.value === '__skip__')
+  expect(skip).toBeDefined()
+  expect(skip?.disabled).not.toBe(true)
+  const resources = structuredClone(driver.state.players[0]!.resources)
+  await driver.choice('__skip__')
+  await expect.poll(() => driver.interaction.stateId).toBe('idle')
+  expect(driver.state.players[0]!.resources).toEqual(resources)
+  expect(driver.state.players[0]!.occupationHand).toContain('E096_Elder')
+  expect(driver.state.players[0]!.occupationPlayed).not.toContain('E096_Elder')
+}
+
 test('solo random starts directly and keeps ordinary action confirmation', async ({ browser, request }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
   try {
@@ -59,6 +80,7 @@ test('solo random starts directly and keeps ordinary action confirmation', async
     const state = observe(page)
     await openSolo(page)
     await expect(page.locator('.game-layout')).toBeVisible()
+    await declineElderOpening(state.driver)
     expect(state.latest().state.players).toHaveLength(1)
     expect(state.latest().state.round).toBe(1)
     const wood = state.latest().state.players[0]!.resources.wood
@@ -201,7 +223,9 @@ test('a natural fourteen-round solo keeps both owner rematch entries independent
     const originalId = new URL(originalUrl).searchParams.get('room')!
     const harvestRounds = [4, 7, 9, 11, 13, 14]
     const foodAfterRound = [3, 6, 9, 6, 9, 12, 9, 12, 9, 12, 9, 12, 9, 6]
+    await declineElderOpening(state.driver)
     for (let round = 1; round <= 14; round++) {
+      expect(state.latest().interaction.stateId).toBe('idle')
       for (const actionId of ['day-laborer', 'fishing']) {
         await page.locator(`[data-action-id="${actionId}"] button`).first().click()
         await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible()
@@ -289,6 +313,7 @@ test('three expansions use one grouped hand confirmation and native Moor prepara
     await page.locator('[data-section="father"] .parent-choice-card').first().click()
     await page.locator('.parent-selection-confirm').click()
     await expect(page.locator('.game-layout')).toBeVisible()
+    await declineElderOpening(state.driver)
     for (const actionId of ['day-laborer', 'forest']) {
       await page.locator(`[data-action-id="${actionId}"] button`).first().click()
       await page.getByRole('button', { name: 'Continue', exact: true }).click()
