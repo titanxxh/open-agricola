@@ -663,11 +663,20 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     room.session.dispose()
     throw error
   }
+  let creationCommitted = false
   const confirmCreated = async (): Promise<void> => {
-    await detachPreviousRoom(ctx, room)
+    // Both callers reach this callback only after their durable creation commit.
+    creationCommitted = true
+    const previous = ctx.currentRoom
     ctx.currentRoom = room
     ctx.currentPlayerIndex = 0
     ctx.registry.set(room)
+    try {
+      await detachPreviousRoom(ctx, room, previous)
+    } catch (error) {
+      console.warn(JSON.stringify({ event: 'previous_room_detach_failed', roomId: room.id, previousRoomId: previous?.id,
+        error: error instanceof Error ? error.message : String(error) }))
+    }
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, {
       type: 'roomCreated',
       roomId,
@@ -706,13 +715,13 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
         await publishInitialState(ctx, room, resp, msg.requestId, confirmCreated, async () => {
           await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
         })
-        if (ctx.currentRoom !== room) {
+        if (!creationCommitted) {
           await ctx.committer?.retireRoom(room.id)
           room.customSessionExecutor?.dispose()
           room.session.dispose()
         }
       } catch (error) {
-        if (ctx.currentRoom !== room) {
+        if (!creationCommitted) {
           await ctx.committer?.retireRoom(room.id)
           room.customSessionExecutor?.dispose()
           room.session.dispose()
