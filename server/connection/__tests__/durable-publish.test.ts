@@ -75,12 +75,15 @@ async function createWaiting() {
   return host.currentRoom!
 }
 
-it('keeps Step 0, the persisted names and successful join publication behind the PostgreSQL commit', async () => {
+it('keeps Step 0 and gameplay publication behind the final color confirmation commit', async () => {
   const room = await createWaiting()
   await dispatch(host, { type: 'action', spaceId: 'forest', requestId: 'waiting' })
   expect(messages(host)).toContainEqual(expect.objectContaining({ type: 'error', requestId: 'waiting' }))
   expect(await persistence.loadReplayHead(room.id)).toBeNull()
+  await dispatch(guest, { type: 'joinRoom', roomId: room.id, name: 'Guest' })
+  expect(room.status).toBe('waiting')
   vi.mocked(host.ws.send).mockClear()
+  vi.mocked(guest.ws.send).mockClear()
   let release!: () => void
   let enter!: () => void
   const entered = new Promise<void>(done => { enter = done })
@@ -91,21 +94,22 @@ it('keeps Step 0, the persisted names and successful join publication behind the
     enter(); await gate
     return result
   })())
-  const joining = dispatch(guest, { type: 'joinRoom', roomId: room.id, name: 'Guest' })
+  const joining = dispatch(guest, { type: 'confirmPlayerColor' })
   try {
-    await Promise.race([entered, joining.then(() => { throw new Error('Join did not reach Step 0 commit') })])
+    await Promise.race([entered, joining.then(() => { throw new Error('Confirmation did not reach Step 0 commit') })])
     expect(messages(host)).toEqual([])
     expect(messages(guest)).toEqual([])
     expect(await persistence.loadReplayHead(room.id)).toBeNull()
   } finally { release(); await joining }
   expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(0)
   expect((await persistence.load(room.id))?.serialized?.state.players.map(player => player.name)).toEqual(['Host', 'Guest'])
-  expect(messages(guest).map(event => event.type)).toEqual(['roomJoined', 'playerJoined', 'stateUpdate', 'gameStarted'])
+  expect(messages(guest).map(event => event.type)).toEqual(['stateUpdate', 'gameStarted'])
 })
 
 it('retains an action for retry and keeps later input and seat reconnect behind its durable publication', async () => {
   const room = await createWaiting()
   await dispatch(guest, { type: 'joinRoom', roomId: room.id, name: 'Guest' })
+  await dispatch(guest, { type: 'confirmPlayerColor' })
   const actor = room.session.state.currentPlayerIndex === 0 ? host : guest
   const other = actor === host ? guest : host
   vi.mocked(host.ws.send).mockClear(); vi.mocked(guest.ws.send).mockClear()

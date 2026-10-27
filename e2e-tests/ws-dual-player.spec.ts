@@ -122,6 +122,7 @@ test.describe('WS dual-player sync', () => {
     // Step 2: P2 joins room
     console.log('\n=== Step 2: P2 joins room ===')
     await p2.goto(`${FRONTEND_URL}/?player=p2&transport=ws&room=${roomId}`)
+    await p2.getByRole('button', { name: /^(确认颜色并开始|Confirm color and start)$/ }).click()
 
     await p2.waitForSelector('.game-layout', { timeout: 15000 })
     await p1.waitForSelector('.game-layout', { timeout: 15000 })

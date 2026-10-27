@@ -841,6 +841,16 @@ describe('room-manager ws sync', () => {
 
 // Exercise the same stable scope/identity/input contract as the browser client.
 const sendCommand = async (ws: TestSocket, command: ClientCommand): Promise<void> => {
+  if (command.type === 'joinRoom') {
+    const start = ws.received.length
+    ws.send(JSON.stringify(command))
+    const event = await waitForEvent(ws, (message): message is Extract<ServerEvent, { type: 'roomJoined' | 'error' }> =>
+      ws.received.indexOf(message) >= start && (message.type === 'error' || message.type === 'roomJoined' && message.roomId === command.roomId))
+    if (event.type === 'roomJoined' && event.status === 'waiting' && event.colorConfirmationPlayerIndex === event.playerIndex) {
+      await sendCommand(ws, { type: 'confirmPlayerColor' })
+    }
+    return
+  }
   const mutating = !['getState','getHistory','joinRoom','auth','getCommandScope','getCommandReceipt'].includes(command.type)
   if (!mutating) { ws.send(JSON.stringify(command)); return }
   const requestId = randomUUID()

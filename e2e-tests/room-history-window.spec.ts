@@ -87,6 +87,7 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   await expect(p1.locator('.ws-invite-roomid strong')).toBeVisible({ timeout: 30000 })
   const room = await p1.locator('.ws-invite-roomid strong').textContent()
   await p2.goto(`/?player=p2&transport=ws&room=${room}`)
+  await p2.getByRole('button', { name: 'Confirm color and start', exact: true }).click()
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
   for (let index = 0; index < 28; index++) {
     const current = await resolveRoomWorkPrompts({

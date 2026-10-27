@@ -93,12 +93,13 @@ type ClientCommandBody =
       requestedPlayerIndex?: number
     }
   | { type: 'setPlayerColor'; color: PlayerState['color'] }
+  | { type: 'confirmPlayerColor' }
   | { type: 'dissolveRoom' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
 
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
 
-export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed'
+export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed' | 'color_confirmation_unavailable' | 'color_confirmation_failed'
 
 export type ServerEvent =
   | { type: 'commandScope'; scope: CommandScope; requestId?: string }
@@ -124,6 +125,7 @@ export type ServerEvent =
       players: Array<{ playerIndex: number; name: string; connected: boolean }>
       maxPlayers: number
       playerColors: PlayerState['color'][]
+      colorConfirmationPlayerIndex?: number
       /** One device plays every seat; the client may act for any of them. */
       hotseat?: boolean
     }
@@ -133,6 +135,7 @@ export type ServerEvent =
       players: Array<{ playerIndex: number; name: string; connected: boolean }>
       maxPlayers: number
       playerColors: PlayerState['color'][]
+      colorConfirmationPlayerIndex?: number
     }
   | { type: 'gameStarted' }
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }

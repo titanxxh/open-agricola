@@ -7,14 +7,17 @@ import type { WsStatus } from './ws-status'
 
 type Waiting = Extract<WsStatus, { phase: 'waiting' }>
 
-type Props = Pick<Waiting, 'players' | 'playerColors'> & {
+type Props = Pick<Waiting, 'players' | 'playerColors' | 'colorConfirmationPlayerIndex'> & {
   playerIndex: number | undefined
   onColorChange: (color: PlayerState['color']) => void
   colorError: RoomColorErrorCode | null
+  onConfirmColor: () => void
+  disabled?: boolean
 }
 
-export function WaitingRoomPlayers({ players, playerColors, playerIndex, onColorChange, colorError }: Props) {
+export function WaitingRoomPlayers({ players, playerColors, playerIndex, onColorChange, colorError, colorConfirmationPlayerIndex, onConfirmColor, disabled }: Props) {
   const { locale, t } = useLocale()
+  const confirmingPlayer = players.find(player => player.playerIndex === colorConfirmationPlayerIndex)
   return (
     <section className="ws-waiting-seats" aria-label={t('platform.roomSeats')}>
       <div className="ws-waiting-count" aria-live="polite">
@@ -43,7 +46,7 @@ export function WaitingRoomPlayers({ players, playerColors, playerIndex, onColor
               const taken = players.some(player => player.playerIndex !== playerIndex && playerColors[player.playerIndex] === color)
               return (
                 <button key={color} type="button" className="ws-color-option" data-player-color={color}
-                  aria-pressed={playerColors[playerIndex] === color} disabled={taken}
+                  aria-pressed={playerColors[playerIndex] === color} disabled={taken || disabled}
                   onClick={() => onColorChange(color)}>
                   <span className="ws-seat-color" aria-hidden="true" />
                   {t(`platform.playerColors.${color}`)}
@@ -54,6 +57,15 @@ export function WaitingRoomPlayers({ players, playerColors, playerIndex, onColor
           {colorError && <p className="ws-color-error" role="alert">{t(`platform.colorErrors.${colorError}`)}</p>}
         </fieldset>
       )}
+      {confirmingPlayer && (playerIndex === colorConfirmationPlayerIndex ? (
+        <button type="button" className="btn-primary ws-confirm-color" onClick={onConfirmColor} disabled={disabled}>
+          {t('platform.confirmColorAndStart')}
+        </button>
+      ) : (
+        <p className="ws-waiting-color-confirmation" role="status">
+          {t('platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, confirmingPlayer.name, confirmingPlayer.playerIndex) })}
+        </p>
+      ))}
     </section>
   )
 }

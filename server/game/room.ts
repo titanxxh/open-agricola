@@ -40,6 +40,7 @@ export type Room = {
   maxPlayers: number
   version: number
   status: RoomStatus
+  colorConfirmationPlayerIndex?: number
   startedAt?: number
   createdBy?: string
   customCardDbIds?: string[]
@@ -197,6 +198,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   ...(room.access?.kind === 'invited' ? { access: room.access } : {}),
   startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
+  colorConfirmationPlayerIndex: room.colorConfirmationPlayerIndex,
   customCardDbIds: room.customCardDbIds ?? [],
   ...(room.customCards === undefined ? {} : { customCards: room.customCards }),
   ...(room.replayRecording === undefined
@@ -293,7 +295,7 @@ export const removePlayerFromRoom = (
 
 type RoomLikeForSummary = Pick<
   Room,
-  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat' | 'access'
+  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat' | 'access' | 'status'
 >
 
 export function summarizeRoomsForLobby(
@@ -314,7 +316,7 @@ export function summarizeRoomsForLobby(
       playerCount,
       maxPlayers: r.maxPlayers,
       createdBy: r.createdBy,
-      status: playerCount < r.maxPlayers ? 'waiting' : 'playing',
+      status: r.status === 'playing' ? 'playing' : 'waiting',
       ...(r.access?.kind === 'invited' ? { access: 'invited' } : {}),
     })
     if (typeof limit === 'number' && list.length >= limit) break
@@ -382,6 +384,7 @@ export const snapshotToRoom = (
     maxPlayers: snapshot.meta.maxPlayers,
     version: snapshot.version ?? 0,
     status: snapshot.meta.status,
+    colorConfirmationPlayerIndex: snapshot.meta.colorConfirmationPlayerIndex,
     startedAt: snapshot.meta.startedAt ?? undefined,
     createdBy: snapshot.meta.createdBy ?? undefined,
     access: snapshot.meta.access,

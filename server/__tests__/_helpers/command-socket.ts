@@ -15,7 +15,28 @@ export async function sendCommand(ws: WebSocket & { received: ServerEvent[] }, c
       if (event.type === 'roomJoined' || event.type === 'roomCreated') input.joined = event
     })
   }
-  if (['getState','getHistory','joinRoom','auth','getCommandScope','getCommandReceipt'].includes(command.type)) {
+  if (command.type === 'joinRoom') {
+    const joined = new Promise<Extract<ServerEvent, { type: 'roomJoined' }> | null>((resolve, reject) => {
+      const timer = setTimeout(() => { ws.off('message', receive); reject(new Error('Join timed out')) }, 8000)
+      const receive = (raw: WebSocket.RawData) => {
+        const event = JSON.parse(raw.toString()) as ServerEvent
+        if (event.type !== 'error' && (event.type !== 'roomJoined' || event.roomId !== command.roomId)) return
+        clearTimeout(timer)
+        ws.off('message', receive)
+        resolve(event.type === 'roomJoined' ? event : null)
+      }
+      ws.on('message', receive)
+    })
+    ws.send(JSON.stringify(command))
+    const event = await joined
+    // This helper prepares a playable game. Raw admission checks send joinRoom
+    // directly so they can assert the final player's confirmation gate.
+    if (event?.status === 'waiting' && event.colorConfirmationPlayerIndex === event.playerIndex) {
+      await sendCommand(ws, { type: 'confirmPlayerColor' })
+    }
+    return
+  }
+  if (['getState','getHistory','auth','getCommandScope','getCommandReceipt'].includes(command.type)) {
     ws.send(JSON.stringify(command)); return
   }
   const requestId = randomUUID()
@@ -32,11 +53,12 @@ export async function sendCommand(ws: WebSocket & { received: ServerEvent[] }, c
   })
   ws.send(JSON.stringify({ type: 'getCommandScope', requestId }))
   const result = await scope
-  const state = inputs.get(ws)!.state ?? ws.received.findLast(event => event.type === 'stateUpdate')
   const joined = inputs.get(ws)!.joined ?? ws.received.findLast(event => event.type === 'roomJoined' || event.type === 'roomCreated')
+  const state = (inputs.get(ws)!.state ?? ws.received.findLast(event => event.type === 'stateUpdate'))
+  const roomState = state?.roomId === joined?.roomId ? state : undefined
   ws.send(JSON.stringify({ ...command, commandContext: command.commandContext ?? {
     scopeId: result.scope.scopeId, commandId: randomUUID(),
     ...(command.type === 'createRoom' ? {} : { roomId: joined?.roomId,
-      expectedVersion: state?.version ?? 0, inputWindowId: state?.inputWindow?.id }),
+      expectedVersion: roomState?.version ?? 0, inputWindowId: roomState?.inputWindow?.id }),
   } }))
 }

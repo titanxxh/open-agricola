@@ -38,6 +38,9 @@ it('restores a recorded custom Room using its pinned definitions even after the 
       commandContext: { scopeId: scope.scopeId, commandId: randomUUID() } })
     const id = host.currentRoom!.id
     await dispatch(guest, { type: 'joinRoom', roomId: id })
+    await dispatch(guest, { type: 'confirmPlayerColor', commandContext: {
+      scopeId: scope.scopeId, commandId: randomUUID(), roomId: id, expectedVersion: 0,
+    } })
     expect((await persistence.loadReplayHead(id))?.latestStepNo).toBe(0)
     const encoded = await db.prepare('SELECT payload_gzip,frame_hash FROM game_replay_steps WHERE room_id=?').all(id)
     await first.shutdown(); servers.pop()

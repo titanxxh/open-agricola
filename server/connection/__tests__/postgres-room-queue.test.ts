@@ -52,6 +52,7 @@ it('holds ordinary room execution and a connection room change behind an in-flig
       player.occupationHand = ['__test_placeholder__']
     }
     await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    await dispatch(guest, { type: 'confirmPlayerColor' })
     const actor = room.session.state.currentPlayerIndex === 0 ? host : guest
     const observer = actor === host ? guest : host
     const seat = actor.currentPlayerIndex

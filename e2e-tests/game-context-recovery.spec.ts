@@ -101,6 +101,9 @@ test('two original players recover their own seats without hidden-info leakage',
   await firstPage.locator('.ws-color-option[data-player-color=blue]').click()
   await expect(firstPage.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', 'blue')
   await secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`, { waitUntil: 'domcontentloaded' })
+  await expect(firstPage.locator('.game-layout')).toHaveCount(0)
+  await expect(secondPage.locator('.game-layout')).toHaveCount(0)
+  await secondPage.getByRole('button', { name: '确认颜色并开始', exact: true }).click()
   await expect(firstPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
   await expect(secondPage.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
 
@@ -247,6 +250,7 @@ for (const [color, expectedShade] of [['green', 'rgb(22, 138, 74)'], ['purple', 
       await host.locator(`.ws-color-option[data-player-color=${color}]`).click()
       await expect(host.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', color)
       await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
+      await guest.getByRole('button', { name: '确认颜色并开始', exact: true }).click()
       await expect(host.locator('.game-layout')).toBeVisible()
       await expect(guest.locator('.game-layout')).toBeVisible()
       const forest = host.locator('[data-action-id="forest"] button').first()
