@@ -991,6 +991,24 @@ describe('auth routes', () => {
     }
   })
 
+  it.each(['github', 'google'] as const)('requires the browser verifier for a bound %s ticket supplied as a cookie', async provider => {
+    const verifier = 'ef'.repeat(32)
+    const challenge = createHash('sha256').update(verifier).digest('hex')
+    const ticket = await createOnboardingTicket({ provider, providerUserId: 'cookie-bound', emailVerified: true }, undefined, undefined, challenge)
+    const credentials = { username: 'cookiebound', password: 'password123', confirmPassword: 'password123' }
+    for (const wrongVerifier of [undefined, 123, 'wrong', 'ab'.repeat(32)]) {
+      const response = await requestJson('POST', '/api/auth/onboarding/complete', { ...credentials, verifier: wrongVerifier }, { Cookie: `oa_onboarding=${ticket}` })
+      expect(response.status).toBe(400)
+      expect(response.json.code).toBe('oauth_onboarding_invalid')
+      expect(await getOnboardingTicket(ticket)).not.toBeNull()
+      expect(await findIdentity(provider, 'cookie-bound')).toBeNull()
+    }
+    const valid = await requestJson('POST', '/api/auth/onboarding/complete', { ...credentials, verifier }, { Cookie: `oa_onboarding=${ticket}` })
+    expect(valid.status).toBe(200)
+    expect(await findIdentity(provider, 'cookie-bound')).not.toBeNull()
+    expect(await getOnboardingTicket(ticket)).toBeNull()
+  })
+
   it('does not accept an unbound cookie ticket as an explicit handoff credential', async () => {
     const ticket = await createOnboardingTicket({ provider: 'github', providerUserId: 'cookie-only', emailVerified: true })
     const response = await requestJson('POST', '/api/auth/onboarding/complete', {

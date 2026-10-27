@@ -48,6 +48,13 @@ function OAuthLink({
   const { t } = useLocale()
   const [starting, setStarting] = useState(false)
   const [startFailed, setStartFailed] = useState(false)
+  useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) setStarting(false)
+    }
+    window.addEventListener('pageshow', restore)
+    return () => window.removeEventListener('pageshow', restore)
+  }, [])
   if (disabled) {
     return (
       <button

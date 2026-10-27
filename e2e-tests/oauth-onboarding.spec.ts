@@ -8,11 +8,67 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from './server-fixtures'
-import { FRONTEND_URL } from './fixtures'
+import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { validateSession } from '../server/auth'
 import { ONBOARDING_COOKIE, SESSION_COOKIE, readCookie } from '../server/auth-cookies'
 import { handleOAuthStart, handleOAuthCallback, handleOnboardingComplete, handleRegistrationPolicy } from '../server/oauth/handler'
 import { findIdentity, getOnboardingTicket } from '../server/oauth/store'
+
+test('OAuth login and registration navigate from an insecure HTTP LAN origin', async ({ playwright }) => {
+  let origin = ''
+  const starts: Array<{ provider: string; intent: string | null; hasChallenge: boolean }> = []
+  const errors: string[] = []
+  const server = createHttpServer((req, res) => {
+    void (async () => {
+      const url = new URL(req.url ?? '/', origin)
+      if (url.pathname === '/client/config.ts') {
+        res.setHeader('Content-Type', 'text/javascript')
+        res.end(`export const API_BASE=${JSON.stringify(origin)};export const WS_BASE='';export const SANDBOX_EXECUTOR='server';`)
+        return
+      }
+      if (url.pathname.endsWith('/start')) {
+        starts.push({ provider: url.pathname.split('/')[4] ?? '', intent: url.searchParams.get('intent'), hasChallenge: url.searchParams.has('onboardingChallenge') })
+        res.setHeader('Content-Type', 'text/html')
+        res.end('<h1>OAuth start reached</h1>')
+        return
+      }
+      const upstream = await fetch(`${url.pathname.startsWith('/api/') ? BACKEND_URL : FRONTEND_URL}${req.url}`, { redirect: 'manual' })
+      res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') ?? 'text/plain' })
+      res.end(Buffer.from(await upstream.arrayBuffer()))
+    })().catch(error => {
+      errors.push(error instanceof Error ? error.message : String(error))
+      if (!res.headersSent) res.writeHead(500)
+      res.end('HTTP navigation failed')
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Missing HTTP test port')
+  origin = `http://lan.agricola.test:${address.port}`
+  const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP lan.agricola.test 127.0.0.1', '--no-proxy-server'] })
+  try {
+    const page = await browser.newPage()
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    for (const provider of ['github', 'google'] as const) {
+      for (const intent of ['login', 'register'] as const) {
+        await page.goto(`${origin}/?page=login&authMode=${intent}`, { waitUntil: 'domcontentloaded' })
+        expect(await page.evaluate(() => ({ secure: isSecureContext, digest: !!crypto.subtle }))).toEqual({ secure: false, digest: false })
+        await page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=${intent}"]`).click()
+        await expect(page.getByRole('heading', { name: 'OAuth start reached' })).toBeVisible()
+      }
+    }
+    expect(starts).toEqual([
+      { provider: 'github', intent: 'login', hasChallenge: false },
+      { provider: 'github', intent: 'register', hasChallenge: false },
+      { provider: 'google', intent: 'login', hasChallenge: false },
+      { provider: 'google', intent: 'register', hasChallenge: false },
+    ])
+    expect(errors).toEqual([])
+  } finally {
+    await browser.close()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+})
 
 // Persistent WebKit contexts enforce ITP; a default temporary context permits the cookie that #1406 loses.
 for (const provider of ['github', 'google'] as const) {
