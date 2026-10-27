@@ -23,6 +23,7 @@ const cases = {
   'resource-quantity-select': { channel: 'commitSelection', commands: ['commitSelection'] },
   'resource-batch-exchange-select': { channel: 'commitSelection', commands: ['commitSelection'] },
   'card-draft': { channel: 'none', commands: [] },
+  'solo-hand-selection': { channel: 'none', commands: [] },
   'engine-blocked': { channel: 'none', commands: [] },
 } satisfies Record<InteractionRequest['kind'], Case>
 
