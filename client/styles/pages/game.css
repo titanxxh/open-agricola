@@ -5520,6 +5520,23 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
  * Draft overlay (PR-5 simultaneous card draft)
  * Keep rules minimal — functional layout only. Visual polish is future work.
  * ============================================================ */
+.app--setup {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+}
+.app--setup > .header-compact {
+  flex-shrink: 0;
+  z-index: 41;
+}
+.app--setup > :is(.draft-overlay, .parent-selection-overlay) {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-height: 0;
+  border-radius: 12px;
+}
 .draft-overlay {
   position: fixed;
   inset: 0;

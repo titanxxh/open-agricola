@@ -7,7 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { createHash } from 'node:crypto'
-import { StrictMode } from 'react'
+import { StrictMode, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
@@ -63,6 +63,27 @@ const stubResponse = (body: unknown, status = 200) => {
 }
 
 describe('GameContextRouter', () => {
+  it('preserves local input when locale changes after a new room updates its URL', async () => {
+    window.history.replaceState(null, '', '/?transport=ws&hotseat=1')
+    stubResponse({ ok: true, roomId: 'new-room', lifecycle: 'active', phase: 'playing', playerIndex: 0, stepNo: 0 })
+    function Selection() {
+      const [selected, setSelected] = useState(false)
+      return <button onClick={() => setSelected(true)}>{selected ? 'selected card' : 'choose card'}</button>
+    }
+    const { rerender } = render(<GameContextRouter><Selection /></GameContextRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'choose card' }))
+    window.history.replaceState(null, '', '/?room=new-room')
+    localeContext.locale = 'zh'
+    rerender(<GameContextRouter><Selection /></GameContextRouter>)
+
+    expect(screen.getByRole('button', { name: 'selected card' })).toBeVisible()
+    expect(fetch).not.toHaveBeenCalled()
+
+    fireEvent(window, new PopStateEvent('popstate'))
+    expect(await screen.findByRole('button', { name: 'choose card' })).toBeVisible()
+    expect(fetch).toHaveBeenCalledWith('/api/v1/game-contexts/new-room', expect.objectContaining({ credentials: 'include' }))
+  })
+
   it('does not resolve or mount public dependencies without a context link', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)

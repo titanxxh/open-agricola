@@ -38,6 +38,7 @@
 
 - `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
+- 轮抽与父母卡选择阶段在独立滚动的选卡区域上方保留 `GameHeader`。内嵌模式保留语言切换。测试见 `setup-navigation.spec.ts`。
 - 对局布局共用玩家总览与只读公开农场。窄屏把总览放在最前、默认展开的 Action Log 放在最后，详细计分按需打开。`ActionBoard.actionSpaceOutlets` 把原有行动格视图放入扩展面板，复用可用性与工人标记。布局覆盖见 `mobile-table-layout.spec.ts`、`mobile-game-layout.spec.ts` 与 `desktop-table-layout.spec.ts`。
 - `common/CardWithCopy.tsx` 负责触屏查看详情和绑定当前请求的出牌确认。`CardDetails.tsx` 使用模态对话框，内容独立滚动，关闭与打出按钮持续可见。`useCardPlayChoice` 防止手牌或供应区重复提交，跟随传输结果解除失败请求的提交锁；提交权限取自当前权威选项与本机座位。提交锁与详情权限使用 `useRequestActivation`：重复快照保留当前激活阶段，离开请求后即使恢复同一标识，也建立新的激活阶段；迟到结果仅影响所属阶段。职业多选保留整组确认。覆盖见 `PlayerCard.touch.test.tsx`、`touch-card-play.spec.ts` 与 `card-play-undo.spec.ts`。
 - `improvement-selection.ts` 将当前可用请求选项与应答玩家手牌、主要改良供应区求交。发展请求有小发展候选时聚焦手牌，仅主要改良合法时展开并聚焦供应区，两者皆无候选时聚焦操作控件。`PlayerFarmPanel.improvementSupply` 将唯一供应区视图放在手牌旁；`GameContainerApi` 持有绑定请求标识的展开状态，重复快照及响应式手牌挂载位置变化都保留该状态。覆盖见 `GameContainerApi.presentation.test.tsx`、`MajorImprovements.test.tsx` 与 `improvement-focus.spec.ts`。
@@ -65,6 +66,7 @@ GameContextRouter
 
 - `game-room-url.ts` 生成的普通对局链接只需 `room`；连接方式和座位来自 Room 与登录账号。开发链接保留显式座位控制。
 - `?room=<roomId>` 在卡牌 manifest 与登录门之前解析；未登录的活动上下文保留完整的 `returnTo`，非活动上下文不加载认证依赖。
+- 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。

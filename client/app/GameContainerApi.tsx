@@ -1523,6 +1523,21 @@ export const GameContainerApi = () => {
     </div>
   ) : null
 
+  const gameHeader = (
+    <GameHeader
+      locale={locale}
+      state={state}
+      currentPlayer={currentPlayer}
+      devMode={devMode}
+      setDevMode={setDevMode}
+      myPlayerName={isHotseat && hotseatAudienceId
+        ? playerNames[hotseatAudienceId]
+        : selfPlayer ? playerNames[selfPlayer.id] : null}
+      isMyTurn={isMyTurn}
+      embedded={isEmbedded}
+    />
+  )
+
   // Card-draft phase — render the draft overlay instead of the game board.
   // The locked URL-pinned player wins in WS mode; otherwise fall back to the
   // sandbox "self" (current player) so HTTP debugging still works.
@@ -1545,7 +1560,8 @@ export const GameContainerApi = () => {
       )
     }
     return (
-      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+      <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
+        {gameHeader}
         {notificationStack}
         {bugReportBar}
         <DraftOverlay
@@ -1583,7 +1599,8 @@ export const GameContainerApi = () => {
       )
     }
     return (
-      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+      <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
+        {gameHeader}
         {notificationStack}
         {bugReportBar}
         <ParentSelectionOverlay
@@ -1979,16 +1996,7 @@ export const GameContainerApi = () => {
       ) : null}
 
       <div ref={headerRef}>
-        <GameHeader
-          locale={locale}
-          state={state}
-          currentPlayer={currentPlayer}
-          devMode={devMode}
-          setDevMode={setDevMode}
-          myPlayerName={selfPlayer ? playerNames[selfPlayer.id] : null}
-          isMyTurn={isMyTurn}
-          embedded={isEmbedded}
-        />
+        {gameHeader}
       </div>
 
       {isDesktopTable && !nearbyMajorSupply ? majorImprovementsPresentation : null}

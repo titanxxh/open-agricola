@@ -323,13 +323,13 @@ function PublicContext({
 
 export function GameContextRouter({ children }: { children: ReactNode }) {
   const { t } = useLocale()
-  const [locationVersion, setLocationVersion] = useState(0)
+  const [location, setLocation] = useState(() => ({ search: window.location.search, version: 0 }))
   const [closedEvidenceKey, setClosedEvidenceKey] = useState<string | null>(null)
-  const params = new URLSearchParams(window.location.search)
-  const roomId = roomIdFromQuery(window.location.search) ?? ''
+  const params = new URLSearchParams(location.search)
+  const roomId = roomIdFromQuery(location.search) ?? ''
   const hasContext = (params.has('context') || params.has('room'))
     && !isDevRoomId(roomId) && (!params.has('page') || params.get('page') === 'game')
-  const resolutionKey = `${locationVersion}:${roomId}`
+  const resolutionKey = `${location.version}:${roomId}`
   const [resolution, setResolution] = useState<{
     key: string
     response: GameContextResponse
@@ -362,8 +362,9 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const refresh = () => {
+      const search = window.location.search
       setClosedEvidenceKey(null)
-      setLocationVersion((version) => version + 1)
+      setLocation((previous) => ({ search, version: previous.version + 1 }))
     }
     window.addEventListener('popstate', refresh)
     window.addEventListener(GAME_CONTEXT_CHANGED_EVENT, refresh)
