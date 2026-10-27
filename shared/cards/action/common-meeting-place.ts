@@ -8,7 +8,7 @@ export const meetingPlace: ActionDefinition = {
   rulesKey: 'actions.meeting-place.rules',
   roundAvailable: 1,
   gainPerRound: {},
-  players: [2, 3, 4, 5, 6],
+  players: [1, 2, 3, 4, 5, 6],
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
