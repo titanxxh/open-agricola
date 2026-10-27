@@ -12,14 +12,14 @@ import {
   readPrivateHandChangeSourceCard,
 } from '../../session/private-hand-events'
 import { getPositiveResourceLog, type ResolvedMinorImprovement } from './improvement-helpers'
-import { findPlayerIndexById } from '../../domain/player'
+import { completeMinorCardPass } from './minor-card-passing'
 
 export type ImprovementPurchaseKind = 'major' | 'minor'
 
 type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
 
 type ApplyMinorResult =
-  | { passing: true; nextPlayer: PlayerState }
+  | { passing: true }
   | { passing: false }
 
 type CommitImprovementPurchaseLifecycleArgs = {
@@ -85,13 +85,7 @@ const applyMinorImprovementPurchase = (
 
   player.minorHand = player.minorHand.filter((id) => id !== improvement.id)
   if (improvement.passing === true) {
-    const idx = findPlayerIndexById(state, player.id)
-    const nextPlayer = state.players[(idx + 1) % state.players.length]
-    nextPlayer.minorHand = nextPlayer.minorHand ?? []
-    if (!nextPlayer.minorHand.includes(improvement.id)) {
-      nextPlayer.minorHand.push(improvement.id)
-    }
-    return { passing: true, nextPlayer }
+    return { passing: true }
   }
 
   if (!player.minorPlayed.includes(improvement.id)) {
@@ -150,13 +144,9 @@ export const commitImprovementPurchaseLifecycle = ({
     ))
   }
   if (passResult && passResult.passing) {
-    eventSink?.emit<'card.passed'>({
-      type: 'card.passed',
-      cardId: improvementId,
-      fromPlayerId: player.id,
-      toPlayerId: passResult.nextPlayer.id,
-      sourceActionId: 'improvement',
-      sourceCardId: improvementId,
+    completeMinorCardPass({
+      state, player, cardId: improvementId, sourceActionId: 'improvement',
+      sourceCardId: improvementId, eventSink,
     })
   } else {
     eventSink?.emit<'card.played'>({
