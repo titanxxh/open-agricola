@@ -98,6 +98,27 @@ export const normalizeMoorSpecialActionCards = (
   playerCount: number,
 ): MoorSpecialActionCardState[] => {
   const fallback = createMoorSpecialActionCards(playerCount)
+  if (playerCount === 1) {
+    if (!Array.isArray(raw) || raw.length !== fallback.length) throw new Error('Invalid solo Moor supply')
+    const orders = new Set<string>()
+    let currentCount = 0
+    return fallback.map(card => {
+      const saved: unknown = raw.find(entry => entry && typeof entry === 'object' && 'id' in entry && entry.id === card.id)
+      if (!saved || typeof saved !== 'object' || !('location' in saved) || !saved.location || typeof saved.location !== 'object' || !('kind' in saved.location)) throw new Error('Invalid solo Moor supply')
+      const location = saved.location
+      if (location.kind === 'solo-current') {
+        if (++currentCount > 1 || 'inUse' in location && location.inUse !== true) throw new Error('Invalid solo Moor current card')
+        return { ...card, location: { kind: 'solo-current', ...('inUse' in location ? { inUse: true } : {}) } }
+      }
+      if ((location.kind === 'solo-draw' || location.kind === 'solo-discard') && 'order' in location && typeof location.order === 'number' && Number.isSafeInteger(location.order) && location.order >= 0) {
+        const key = `${location.kind}:${location.order}`
+        if (orders.has(key)) throw new Error('Duplicate solo Moor pile order')
+        orders.add(key)
+        return { ...card, location: { kind: location.kind, order: location.order } }
+      }
+      throw new Error('Invalid solo Moor location')
+    })
+  }
   if (!Array.isArray(raw)) return fallback
   return fallback.map((card) => {
     const saved = raw.find((entry) =>

@@ -32,7 +32,7 @@ export type MoorSpecialActionCardLocation =
   | { kind: 'playerFaceUp'; playerId: string }
   | { kind: 'playerFaceDown'; playerId: string }
   | { kind: 'solo-draw'; order: number; playerId?: never }
-  | { kind: 'solo-current'; playerId?: never }
+  | { kind: 'solo-current'; inUse?: true; playerId?: never }
   | { kind: 'solo-discard'; order: number; playerId?: never }
 
 /** Derived viewer data. Hidden card identities and pile order stay authoritative. */

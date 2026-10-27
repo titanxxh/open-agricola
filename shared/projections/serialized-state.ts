@@ -520,6 +520,17 @@ export const filterSerializedStateForPlayer = (
   viewerPlayerId: string | null,
   options: ViewerProjectionOptions = {},
 ): SerializedGameState => {
+  if (base.players.length === 1 && base.farmersOfTheMoor) {
+    const { soloRetentionPaid, ...moor } = base.farmersOfTheMoor
+    const draw = moor.specialActionCards.filter(card => card.location.kind === 'solo-draw')
+      .sort((a, b) => (a.location.kind === 'solo-draw' ? a.location.order : 0) - (b.location.kind === 'solo-draw' ? b.location.order : 0))
+    const visible = moor.specialActionCards.filter(card => card.location.kind !== 'solo-draw')
+    const ids = new Set(visible.map(card => card.id))
+    base = { ...base, farmersOfTheMoor: { ...moor, specialActionCards: visible,
+      soloSupply: { drawCount: draw.length, nextCardActions: draw[0]?.actions ?? [], retentionPaid: soloRetentionPaid === true } },
+      players: base.players.map(player => ({ ...player, moorSpecialActionAvailability:
+        Object.fromEntries(Object.entries(player.moorSpecialActionAvailability).filter(([id]) => ids.has(id))) })) }
+  }
   const { hiddenCardIds, hiddenRefs, seqView } = createHiddenHandVisibility(
     base,
     viewerPlayerId,

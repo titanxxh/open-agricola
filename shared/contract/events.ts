@@ -54,6 +54,7 @@ export type PaymentPurpose =
   | 'cardEffect'
   | 'harvest'
   | 'begging'
+  | 'moor-retention'
 
 export type ResourceMovedEvent = GameEventBase<'resource.moved'> & {
   seasonalGrant?: SeasonalGrant

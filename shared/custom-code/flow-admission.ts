@@ -40,6 +40,7 @@ const LEAF_FIELDS = {
   targetPlayerId: false,
   expandFlow: false,
   spaceUse: false,
+  completionBarrier: false,
 } as const satisfies Record<KeysOfUnion<LeafFlow>, boolean>
 
 const GROUP_FIELDS = {

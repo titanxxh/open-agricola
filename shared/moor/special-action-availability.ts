@@ -7,6 +7,7 @@ export const isMoorSpecialActionCardUsableByPlayer = (
   playerId: string,
 ): boolean =>
   card.location.kind === 'market'
+  || (card.location.kind === 'solo-current' && card.location.inUse !== true)
   || (card.location.kind === 'playerFaceUp' && card.location.playerId !== playerId)
 
 export const canTakeVisibleMoorSpecialAction = (

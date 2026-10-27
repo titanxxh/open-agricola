@@ -67,6 +67,8 @@ type SessionResponse = {
 
 测试：`server/__tests__/{authoritative-command-settlement,rejected-pending-input}.test.ts`。
 
+原生 `ActionDefinition.projectInteractionRequest` 与卡牌投影 hook 从当前权威状态刷新 pending 请求，不执行效果，使已有合法 anytime 兑换后的支付资格保持准确。单人 Moor 准备使用原生 `onMoorSoloPreparation` 续行，先于回合开始 hook；选择注解与完整引擎游标随 Session 恢复。测试：`server/__tests__/standard-solo-moor-session.test.ts`。
+
 ## 轮转、额外回合与供应人物
 
 标准单人对局只有一名实际参与者。新局资源初始化给该玩家零食物；共同基础行动定义接纳一人并沿用两人基础行动盘，Forest 每轮补充两木。发牌、规则查询和结算仍读取真实人数一。普通行动沿用现有确认与撤销边界，最后一次放人也在确认后才进入回家或收获。测试：`server/__tests__/standard-solo-core-session.test.ts`。
