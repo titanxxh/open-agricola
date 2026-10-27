@@ -133,7 +133,7 @@ describe('verification modes and evidence', () => {
     expect(sourceFingerprint(cwd, options)).not.toBe(original)
   })
 
-  it('preserves the existing isolated Playwright command and its arguments', () => {
+  it('builds the hosted frontend before the isolated Playwright command and preserves its arguments', () => {
     const cwd = repo(), calls: string[][] = []
     for (const args of [[], ['--', 'e2e-tests/example.spec.ts', '--browser=webkit']]) {
       runVerification(cwd, verificationPlan(cwd, args), (command, params) => {
@@ -141,7 +141,9 @@ describe('verification modes and evidence', () => {
       })
     }
     expect(calls).toEqual([
+      ['pnpm', 'run', 'build:hosted-frontend'],
       ['bash', 'scripts/verify.sh'],
+      ['pnpm', 'run', 'build:hosted-frontend'],
       ['bash', 'scripts/verify.sh', 'e2e-tests/example.spec.ts', '--browser=webkit'],
     ])
   })

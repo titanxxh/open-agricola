@@ -4,6 +4,8 @@
 
 The server owns connections, Rooms, durable commit, persistence and the product HTTP APIs. `GameSession` (`server/game/authoritative-session.ts`) is its rule command and query seam, and rule mutations run in the `GameCore` and action leaves it drives; connection, persistence and HTTP infrastructure never adjudicate rules outside it.
 
+`frontend-hosting.ts` owns the optional fixed `/open-agricola/` static mount and public, credential-free `/api/app-location`. Hosted mode requires matching app/API origins, a root API base and the fixed app path; other valid deployment topologies stay disabled. Ingress handles these requests before directory lookup. The image's frontend build identity/base must match runtime configuration; static routing never falls back over API, operations, metrics or Replay namespaces. Coverage: `frontend-hosting.test.ts` and `hosted-password-login.spec.ts`.
+
 ## `server/connection/`: WebSocket entry
 
 ```text

@@ -80,7 +80,10 @@ export function verificationPlan(cwd: string, input: string[]): Plan {
     ] }
   }
   // Preserve the existing pnpm verify [Playwright args] contract, including no arguments.
-  return { mode: 'e2e', steps: [{ name: 'browser-tests', command: 'bash', args: ['scripts/verify.sh', ...args] }] }
+  return { mode: 'e2e', steps: [
+    { name: 'hosted-frontend', command: 'pnpm', args: ['run', 'build:hosted-frontend'] },
+    { name: 'browser-tests', command: 'bash', args: ['scripts/verify.sh', ...args] },
+  ] }
 }
 
 const runCommand: RunCommand = (command, args, cwd) => {

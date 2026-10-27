@@ -11,6 +11,7 @@ import { installShutdownHandlers } from './shutdown'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { clientIp } from './client-ip'
+import { createFrontendHosting } from './frontend-hosting'
 
 const AFFINITY_COOKIE = 'agricola_instance'
 const jsonError = (res: ServerResponse, status: number, message: string) => {
@@ -21,6 +22,7 @@ const nodePath = /^\/nodes\/([A-Za-z0-9-]+)\/ws(?:\?(.*))?$/
 
 /** One public origin. Routing cookies convey affinity only, never authentication. */
 export function createPublicIngress(directory: RoomDirectory, secureCookies: boolean, trustProxy = process.env.REPLAY_TRUST_PROXY === 'true' || process.env.REPLAY_TRUST_PROXY === '1', observationDb?: PostgresDatabase) {
+  const handleFrontend = createFrontendHosting()
   const collect = createCollector(directory.db, 'ingress', undefined, undefined, undefined, observationDb)
   let next = 0
   const sockets = new Set<Duplex>()
@@ -34,6 +36,7 @@ export function createPublicIngress(directory: RoomDirectory, secureCookies: boo
   const server = createServer((req, res) => {
     operationsMetrics.http(req, res)
     void (async () => {
+      if (await handleFrontend(req, res)) return
       const path = new URL(req.url ?? '/', 'http://localhost').pathname
       if (path.startsWith('/internal/metrics')) {
         if (!metricsAuthorized(req)) { res.writeHead(401); res.end(); return }
