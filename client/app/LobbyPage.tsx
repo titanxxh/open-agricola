@@ -12,17 +12,10 @@ import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from './game-container-helpers'
 import type { RoomSummary } from '../../shared/contract/protocol/ws'
-import { PlayerAccountId } from '../components/common/PlayerAccountId'
 import { RoomInvitePicker } from './RoomInvitePicker'
-
-type MyRoom = {
-  id: string
-  status: string
-  max_players: number
-  updated_at: number
-  player_index: number
-  my_turn: number
-}
+import type { MyActiveRoom } from '../../shared/contract/lobby'
+import { MyActiveGames } from './MyActiveGames'
+import type { InvitablePlayer } from '../../shared/contract/room-access'
 
 type RoomWorkshopCard = {
   id: string
@@ -35,14 +28,14 @@ export function LobbyPage() {
   const { user, logout, apiFetch } = useAuth()
   const { locale, t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
-  const [myRooms, setMyRooms] = useState<MyRoom[]>([])
+  const [myRooms, setMyRooms] = useState<MyActiveRoom[]>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
   const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
   const [roomAccess, setRoomAccess] = useState<'public' | 'invited'>('public')
-  const [invitedPlayerIds, setInvitedPlayerIds] = useState('')
+  const [invitedPlayers, setInvitedPlayers] = useState<InvitablePlayer[]>([])
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
   const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
@@ -118,7 +111,7 @@ export function LobbyPage() {
       ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
     }
     if (selectMode === 'multiplayer' && roomAccess === 'invited') {
-      const ids = [...new Set(invitedPlayerIds.split(/[\s,，;；]+/u).filter(id => id && id !== user?.id))]
+      const ids = invitedPlayers.map(player => player.id)
       if (ids.length !== selectedMaxPlayers - 1) {
         setError(t('platform.invitedPlayerCountError', { count: String(selectedMaxPlayers - 1) }))
         return
@@ -312,10 +305,9 @@ export function LobbyPage() {
                   </div>
                   {roomAccess === 'invited' && (
                     <div className="room-invitations">
-                      {user && <PlayerAccountId userId={user.id} />}
-                      <label htmlFor="invited-player-ids">{t('platform.invitedPlayerIdsLabel')}</label>
-                      <RoomInvitePicker value={invitedPlayerIds} onChange={value => { setInvitedPlayerIds(value); setError('') }} />
-                      <p id="invited-player-ids-hint" className="community-deck-toggle-hint">
+                      <label htmlFor="invited-players">{t('platform.invitedPlayerIdsLabel')}</label>
+                      <RoomInvitePicker value={invitedPlayers} onChange={value => { setInvitedPlayers(value); setError('') }} />
+                      <p id="invited-players-hint" className="community-deck-toggle-hint">
                         {t('platform.invitedPlayerIdsHint', { count: String(selectedMaxPlayers - 1) })}
                       </p>
                     </div>
@@ -489,26 +481,7 @@ export function LobbyPage() {
       </div>
 
       {myRooms.length > 0 && (
-        <Section icon="🎯" title={t('platform.myActiveGames')} variant="default" className="lobby-rooms">
-          <ul className="room-list">
-            {myRooms.map(r => (
-              <li key={`${r.id}:${r.player_index}`} className={r.my_turn === 1 ? 'room-item room-item--my-turn' : 'room-item'}>
-                <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
-                <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
-                <span className="room-status" data-status={r.my_turn === 1 ? 'my-turn' : r.status}>
-                  {r.my_turn === 1 ? t('platform.yourTurn') : r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
-                </span>
-                <button
-                  type="button"
-                  className="btn-small"
-                  onClick={() => handleResumeRoom(r.id)}
-                >
-                  {t('platform.resume')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <MyActiveGames rooms={myRooms} onResume={handleResumeRoom} />
       )}
 
       <Section icon="🏠" title={t('platform.activeRooms')} variant="default" className="lobby-rooms">

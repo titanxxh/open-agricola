@@ -14,22 +14,23 @@ const isInvitablePlayer = (value: unknown): value is InvitablePlayer =>
   && 'username' in value && typeof value.username === 'string'
   && 'displayName' in value && typeof value.displayName === 'string'
 
-export function RoomInvitePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function RoomInvitePicker({ value, onChange }: { value: InvitablePlayer[]; onChange: (value: InvitablePlayer[]) => void }) {
   const { apiFetch } = useAuth()
   const { t } = useLocale()
   const listId = useId()
   const [result, setResult] = useState<SearchResult>({ phase: 'idle' })
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
-  const prefix = /[^\s,，;；]+$/u.exec(value)?.[0] ?? ''
-  const selectedIds = value.slice(0, value.length - prefix.length).split(/[\s,，;；]+/u)
+  const [query, setQuery] = useState('')
+  const [composing, setComposing] = useState(false)
+  const prefix = query.trim()
   const players = result.phase === 'loaded' && result.prefix === prefix
-    ? result.players.filter(player => !selectedIds.includes(player.id))
+    ? result.players.filter(player => !value.some(selected => selected.id === player.id))
     : []
-  const showList = open && prefix.length >= 2 && prefix.length <= 128
+  const showList = open && !composing && prefix.length >= 2 && prefix.length <= 128
 
   useEffect(() => {
-    if (prefix.length < 2 || prefix.length > 128) return
+    if (composing || prefix.length < 2 || prefix.length > 128) return
     const controller = new AbortController()
     const timer = setTimeout(() => {
       const search = async () => {
@@ -46,35 +47,40 @@ export function RoomInvitePicker({ value, onChange }: { value: string; onChange:
       void search()
     }, 200)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [apiFetch, prefix])
+  }, [apiFetch, prefix, composing])
 
   const selectPlayer = (player: InvitablePlayer) => {
-    onChange(`${value.slice(0, value.length - prefix.length)}${player.id}, `)
+    onChange([...value, player])
+    setQuery('')
     setActiveIndex(-1)
     setOpen(false)
   }
 
   return (
     <div className="room-invite-picker">
+      {value.length > 0 && (
+        <div className="room-invite-selected">
+          {value.map(player => (
+            <span key={player.id} className="room-invite-chip">
+              <span>{player.displayName} <small>@{player.username}</small></span>
+              <button type="button" aria-label={`${t('platform.remove')} ${player.displayName}`}
+                onClick={() => onChange(value.filter(selected => selected.id !== player.id))}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
       <input
-        id="invited-player-ids"
+        id="invited-players"
         type="text"
         role="combobox"
-        value={value}
-        onChange={event => { onChange(event.target.value); setActiveIndex(-1); setOpen(true) }}
+        value={query}
+        onChange={event => { setQuery(event.target.value); setActiveIndex(-1); setOpen(true) }}
+        onCompositionStart={() => setComposing(true)}
+        onCompositionEnd={() => setComposing(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onPaste={event => {
-          const text = event.clipboardData.getData('text')
-          if (!/[\r\n]/u.test(text)) return
-          event.preventDefault()
-          const input = event.currentTarget
-          onChange(value.slice(0, input.selectionStart ?? value.length) + text.replace(/[\r\n]+/gu, ', ')
-            + value.slice(input.selectionEnd ?? value.length))
-          setActiveIndex(-1)
-          setOpen(true)
-        }}
         onKeyDown={event => {
+          if (event.nativeEvent.isComposing || composing) return
           if (event.key === 'Escape') { setOpen(false); return }
           if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && players.length) {
             event.preventDefault()
@@ -87,15 +93,15 @@ export function RoomInvitePicker({ value, onChange }: { value: string; onChange:
             if (player) selectPlayer(player)
           }
         }}
-        maxLength={1024}
+        maxLength={128}
         autoCapitalize="none"
         autoCorrect="off"
         autoComplete="off"
         spellCheck={false}
-        aria-describedby="invited-player-ids-hint"
+        aria-describedby="invited-players-hint"
         aria-autocomplete="list"
         aria-expanded={showList}
-        aria-controls={listId}
+        aria-controls={showList ? listId : undefined}
         aria-activedescendant={showList && players[activeIndex] ? `${listId}-${activeIndex}` : undefined}
       />
       {showList && (
@@ -111,7 +117,6 @@ export function RoomInvitePicker({ value, onChange }: { value: string; onChange:
                 onClick={() => selectPlayer(player)}
               >
                 <span>{player.displayName} <small>@{player.username}</small></span>
-                <code>{player.id}</code>
               </li>
             ))}
           </ul>

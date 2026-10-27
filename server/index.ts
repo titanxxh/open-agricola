@@ -19,6 +19,7 @@ import { searchInvitablePlayers } from './game/room-access'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
+import { listMyActiveRooms } from './lobby-my-rooms'
 import { handleGameRoute, disposeSandboxSessionsUsingCard, configureSandboxAuthority, disposeSandboxSessionsForUser, shutdownSandboxSessions } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
@@ -905,7 +906,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     res.setHeader('Cache-Control', 'no-store')
     if (!requestUser) { sendJson(res, 401, { ok: false, code: 'login_required' }); return }
     const prefix = new URL(req.url, 'http://localhost').searchParams.get('prefix')?.trim() ?? ''
-    if (prefix.length < 2 || prefix.length > 128) { sendJson(res, 400, { ok: false, error: 'Enter at least two player ID characters' }); return }
+    if (prefix.length < 2 || prefix.length > 128) { sendJson(res, 400, { ok: false, error: 'Enter at least two characters of a player name' }); return }
     if (process.env.DISABLE_RATE_LIMIT !== '1'
       && !(await consumeRateLimit(getDb(), 'player-search', requestUser.id, 120, 60_000)).allowed) {
       sendJson(res, 429, { ok: false, error: 'Too many player searches' })
@@ -939,28 +940,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   // Rooms the current user has participated in (shared PostgreSQL)
   if (req.method === 'GET' && req.url === '/api/lobby/my-rooms') {
+    res.setHeader('Cache-Control', 'no-store')
     const token = (await getAuthToken(req))
     const user = (await validateSession(token))
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     try {
-      const rows = (await getDb().prepare(`
-        SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index,
-               CASE WHEN r.status = 'playing' AND r.state_json IS JSON THEN
-                 CASE WHEN r.state_json::jsonb #>> '{state,phase}' = 'playing'
-                        AND (r.state_json::jsonb #>> '{state,gameOver}') IS DISTINCT FROM 'true'
-                        AND COALESCE(
-                              (r.state_json::jsonb #>> '{sessionCursor,engineStackCursor,frames,-1,ownerPlayerIndex}')::integer,
-                              (r.state_json::jsonb #>> '{state,currentPlayerIndex}')::integer
-                            ) = rp.player_index
-                      THEN 1 ELSE 0 END
-               ELSE 0 END AS my_turn
-        FROM room_players rp
-        JOIN rooms r ON rp.room_id = r.id
-        WHERE rp.user_id = ? AND r.status != 'finished'
-        ORDER BY my_turn DESC, r.updated_at DESC
-        LIMIT 20
-      `).all(user.id)) as Array<{ id: string; status: string; max_players: number; updated_at: number; player_index: number; my_turn: number }>
-      sendJson(res, 200, { ok: true, rooms: rows })
+      sendJson(res, 200, { ok: true, rooms: await listMyActiveRooms(getDb(), user.id) })
     } catch {
       sendJson(res, 200, { ok: true, rooms: [] })
     }

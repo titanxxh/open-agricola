@@ -247,6 +247,22 @@
   box-shadow: 0 0 0 1px var(--color-success), 0 1px 3px rgba(90, 58, 32, 0.05);
 }
 
+.lobby-rooms .my-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+.my-game__details { min-width: 0; }
+.my-game__players { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.my-game__player { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; }
+.my-game__name { overflow-wrap: anywhere; min-width: 0; }
+.my-game__player small { flex-shrink: 0; color: var(--color-text-secondary); font-weight: 500; }
+.my-game__color { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.25); }
+.my-game__player[data-current="true"] .my-game__color { outline: 2px solid var(--color-text-secondary); outline-offset: 2px; }
+.my-game__meta { margin-top: 8px; font-size: 12px; color: var(--color-text-secondary); }
+.my-game__turn { display: block; margin-top: 5px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.my-game__turn[data-my-turn="true"] { color: var(--color-success); }
+
 /* ── Tablet breakpoint ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .lobby-grid {
@@ -288,6 +304,8 @@
   .lobby-rooms .room-item .room-status { grid-area: status; justify-self: end; }
   .lobby-rooms .room-item .room-players { grid-area: players; }
   .lobby-rooms .room-item > button { grid-area: button; justify-self: end; }
+  .lobby-rooms .my-game { grid-template-areas: "details" "button"; grid-template-columns: minmax(0, 1fr); }
+  .my-game__details { grid-area: details; }
 }
 
 .player-select-panel {
@@ -339,6 +357,11 @@
 .room-invite-picker {
   position: relative;
 }
+.room-invite-selected { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.room-invite-chip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding-inline-start: 10px; background: var(--color-bg-warm); border: 1px solid var(--color-border); border-radius: 6px; overflow-wrap: anywhere; }
+.room-invite-chip > span { min-width: 0; }
+.room-invite-chip small { color: var(--color-text-secondary); }
+.room-invite-chip button { flex-shrink: 0; min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--color-text-secondary); font-size: 20px; cursor: pointer; }
 
 .room-invite-suggestions {
   position: absolute;
@@ -382,7 +405,6 @@
 }
 
 .room-invite-suggestions small,
-.room-invite-suggestions code,
 .room-invite-suggestions p {
   color: var(--color-text-secondary);
   font-size: 13px;
