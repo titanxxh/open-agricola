@@ -41,9 +41,10 @@ export const GameHeader = ({
   const [menuOpen, setMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
   const snakePopoverId = useId()
+  const isSetup = state.phase === 'draft' || state.phase === 'parent-selection'
   const isHarvestRound = harvestRounds.includes(state.round)
   const phases = isHarvestRound ? PHASES_HARVEST : PHASES_NORMAL
-  const snakeOrders = shouldShowSnakeOpeningPill(state) ? snakeOpeningPlacementOrders(state, locale) : null
+  const snakeOrders = !isSetup && shouldShowSnakeOpeningPill(state) ? snakeOpeningPlacementOrders(state, locale) : null
   const currentPlayerIndex = state.players?.findIndex((player) => player.id === currentPlayer.id) ?? -1
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export const GameHeader = ({
   }, [menuOpen])
 
   return (
-    <header className={`header-compact ${isMyTurn ? 'my-turn' : 'not-my-turn'}`}>
+    <header className={`header-compact${isSetup ? '' : isMyTurn ? ' my-turn' : ' not-my-turn'}`}>
       <div className="header-left">
         {!embedded && (
           <BrandMark
@@ -78,14 +79,14 @@ export const GameHeader = ({
             homeLinkLabel={t(locale, 'platform.backToLobbyPlain')}
           />
         )}
-        <span className="header-round">R{state.round}/14</span>
-        <span className="header-phase-pills">
+        {!isSetup && <span className="header-round">R{state.round}/14</span>}
+        {!isSetup && <span className="header-phase-pills">
           {phases.map((phase) => (
             <span key={phase} className={`header-phase-pill${phase === state.roundPhase ? ' active' : ''}`}>
               {t(locale, `ui.phases.${phase}`)}
             </span>
           ))}
-        </span>
+        </span>}
         {snakeOrders && (
           <span className="header-snake-opening">
             <span className="header-snake-pill" tabIndex={0} aria-describedby={snakePopoverId}>
@@ -106,7 +107,7 @@ export const GameHeader = ({
         )}
       </div>
       <div className="header-right">
-        {state.gameOver ? (
+        {!isSetup && (state.gameOver ? (
           <span className="status-badge game-over">{t(locale, 'ui.statusGameOver')}</span>
         ) : isMyTurn ? (
           <span className="status-badge your-turn">{translateMessage(locale, "ui.copy.components_header_GameHeader.your_turn_a14e9a")}</span>
@@ -116,7 +117,7 @@ export const GameHeader = ({
               player: getPlayerDisplayName(locale, currentPlayer.name, currentPlayerIndex >= 0 ? currentPlayerIndex : undefined, currentPlayer.nameIsDefault),
             })}
           </span>
-        )}
+        ))}
         <div className="header-actions" ref={menuContainerRef}>
           {!embedded && <GitHubRepoLink />}
           <LocaleSwitcher className="header-locale-select" />
