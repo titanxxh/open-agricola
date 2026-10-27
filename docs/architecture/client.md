@@ -18,6 +18,7 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ## Services and synchronized state
 
+- `services/oauth-onboarding.ts` keeps the browser verifier and callback ticket in tab-scoped `sessionStorage`, removes the ticket fragment from browser history, and retains credentials across reloads and correctable validation errors. `LoginPage` prepares the challenge before provider navigation; `OnboardingPage` clears credentials on success or a terminal credential error and offers a fresh registration. Site sessions remain HttpOnly cookies. Browser tests distinguish ITP account creation from CHIPS session support; Linux WPE coverage does not replace a physical iPhone session check.
 - `gameTransport.ts` (`WsGameTransport`) owns the WebSocket in the service layer. It journals unconfirmed commands per tab, isolates old socket callbacks, suspends input while reconnecting, queries receipts, waits for a complete filtered snapshot, and retries only still-valid inputs with their original identity.
 - `card-meta.ts` fetches `GET /cards-manifest.json`; `rehydrate.ts` rehydrates snapshots without importing `shared/actions` or the card catalog.
 - `client/hooks/useGameSync.ts` replaces `state`, `pending`, `interaction` and `scores` as a unit on every `stateUpdate`. There are no optimistic commits: a click sends a command, and game UI changes only after the snapshot arrives. Local ephemeral state (hover, drafts, inputs) is separate and invalid selections clear on a new snapshot.

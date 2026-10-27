@@ -29,6 +29,7 @@ Use server-side sessions instead of JWT:
 - Support password registration with email verification plus GitHub and Google OAuth.
 - Login creates an opaque `crypto.randomUUID()` session token stored in `sessions` with a seven-day expiry.
 - Browsers use an HttpOnly session cookie for HTTP and WebSocket access. Cross-site password login uses a partitioned cookie, so GitHub / Google account binding starts and completes with credentialed POSTs in the original frontend top-level context, not with backend navigation session checks. The provider callback returns a PKCE-protected handoff to Settings; errors stay visible there. Login/registration and the independent Issue Submission Connection retain their separate flows.
+- First-time OAuth registration hands off a fifteen-minute, single-use ticket in a URL fragment and verifies a browser-held secret against the SHA-256 challenge saved at OAuth start. Completion does not require third-party onboarding cookies; session creation still sets an HttpOnly cookie. See [server authentication boundaries](architecture/server.md#http-endpoints) and `e2e-tests/oauth-onboarding.spec.ts` for credential, transaction and browser coverage.
 - The WebSocket protocol continues to support explicit `{ type: 'auth', token: '...' }` authentication.
 - A single server does not need stateless JWTs, while server sessions allow immediate revocation.
 

@@ -7,6 +7,7 @@ import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
 import { setPage } from '../utils/platform-page-url'
+import { clearOnboardingCredentials, readOnboardingCredentials } from '../services/oauth-onboarding'
 
 function safeReturnTo(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return null
@@ -48,7 +49,8 @@ export function OnboardingPage() {
   const [policyLoadFailed, setPolicyLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [expired, setExpired] = useState(false)
+  const [credentials] = useState(readOnboardingCredentials)
+  const [terminalError, setTerminalError] = useState<'expired' | 'missing' | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -103,6 +105,7 @@ export function OnboardingPage() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...credentials,
           username: username.trim(),
           displayName: displayName.trim() || undefined,
           password,
@@ -111,13 +114,20 @@ export function OnboardingPage() {
       })
       const data = await resp.json()
       if (data.ok) {
+        clearOnboardingCredentials()
         await refreshSession()
         window.history.pushState(null, '', onboardingDestination(data.returnTo))
         window.dispatchEvent(new PopStateEvent('popstate'))
         return
       }
       if (data.code === 'oauth_onboarding_expired') {
-        setExpired(true)
+        clearOnboardingCredentials()
+        setTerminalError('expired')
+        return
+      }
+      if (data.code === 'oauth_onboarding_missing' || data.code === 'oauth_onboarding_invalid') {
+        clearOnboardingCredentials()
+        setTerminalError('missing')
         return
       }
       setError(authErrorMessage(data.code, data.error, t))
@@ -146,10 +156,10 @@ export function OnboardingPage() {
         <h1 className="login-context-title">{t('platform.onboardingTitle')}</h1>
         <p className="login-subtitle">{t('platform.onboardingSubtitle')}</p>
 
-        {expired ? (
+        {terminalError ? (
           <div className="login-form">
-            <h2 className="auth-method-title">{t('platform.onboardingExpiredTitle')}</h2>
-            <p role="alert">{authErrorMessage('oauth_onboarding_expired', undefined, t)}</p>
+            <h2 className="auth-method-title">{t(terminalError === 'expired' ? 'platform.onboardingExpiredTitle' : 'platform.registerBtn')}</h2>
+            <p role="alert">{authErrorMessage(terminalError === 'expired' ? 'oauth_onboarding_expired' : 'oauth_registration_required', undefined, t)}</p>
             <button
               type="button"
               className="btn-primary"

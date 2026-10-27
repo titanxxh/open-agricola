@@ -1,5 +1,5 @@
 import { isUniqueViolation } from '../database/errors'
-import { createHash, randomBytes, scrypt } from 'node:crypto'
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { nanoid } from 'nanoid'
 import {
@@ -207,7 +207,7 @@ async function createLocalUserForOnboarding(input: {
     })())
   } catch (err) {
     if (err instanceof Error && err.message === 'onboarding expired') {
-      return { ok: false as const, code: 'oauth_onboarding_expired', error: 'Onboarding ticket is missing or expired' }
+      return { ok: false as const, code: 'oauth_onboarding_expired', error: 'Onboarding ticket has expired or was already used' }
     }
     if (isUniqueViolation(err, 'users_username_key')) {
       return { ok: false as const, code: 'username_taken', error: 'Username already taken' }
@@ -258,6 +258,11 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
   }
 
   const returnTo = safeReturnTo(url.searchParams.get('returnTo'))
+  const onboardingChallenge = url.searchParams.get('onboardingChallenge')
+  if (onboardingChallenge !== null && !/^[a-f0-9]{64}$/.test(onboardingChallenge)) {
+    redirect(res, appLocation('/?page=login&authError=oauth_state_invalid'))
+    return
+  }
   const policy = getRegistrationPolicy()
   const inviteCode = url.searchParams.get('inviteCode')?.trim() ?? ''
   let inviteCodeHash: string | undefined
@@ -280,6 +285,7 @@ export async function handleOAuthStart(req: IncomingMessage, res: ServerResponse
     ...(user ? { userId: user.id } : {}),
     ...(returnTo ? { returnTo } : {}),
     ...(inviteCodeHash ? { inviteCodeHash } : {}),
+    ...(onboardingChallenge ? { onboardingChallenge } : {}),
   }))
   redirect(res, buildOAuthAuthorizationUrl(provider, state, req), {
     'Set-Cookie': serializeOAuthStateCookie(state, { backendOrigin: getRequestOrigin(req) }),
@@ -363,7 +369,14 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
     return
   }
 
-  const ticket = (await createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo), state.inviteCodeHash))
+  const ticket = await createOnboardingTicket(profile, appRelativeReturnTo(state.returnTo), state.inviteCodeHash, state.onboardingChallenge)
+  if (state.onboardingChallenge) {
+    redirect(res, `${appLocation('/?page=onboarding')}#${new URLSearchParams({ onboardingTicket: ticket })}`, oauthStateClearHeaders(req, {
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+    }))
+    return
+  }
   redirect(res, appLocation('/?page=onboarding'), oauthStateClearHeaders(req, {
     'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }),
   }))
@@ -405,15 +418,34 @@ export async function handleOAuthLinkComplete(req: IncomingMessage, res: ServerR
 }
 
 export async function handleOnboardingComplete(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const ticket = readCookie(req.headers.cookie, ONBOARDING_COOKIE)
-  const profile = ticket ? (await getOnboardingTicket(ticket)) : null
+  const fail = (code: string, error: string) => sendJson(res, 400, { ok: false, code, error }, { 'Cache-Control': 'no-store' })
+  const body = await parseBody<{
+    ticket?: unknown; verifier?: unknown; username?: unknown; displayName?: unknown; password?: unknown; confirmPassword?: unknown
+  }>(req)
+  const explicitTicket = body?.ticket !== undefined
+  const ticket = explicitTicket ? body.ticket : readCookie(req.headers.cookie, ONBOARDING_COOKIE)
+  if (!ticket) {
+    fail('oauth_onboarding_missing', 'Registration credentials are missing. Start registration again with GitHub or Google')
+    return
+  }
+  if (typeof ticket !== 'string' || !/^[\w-]{43}$/.test(ticket)) {
+    fail('oauth_onboarding_invalid', 'Registration credentials are invalid. Start registration again with GitHub or Google')
+    return
+  }
+  const profile = await getOnboardingTicket(ticket)
   if (!profile) {
-    sendJson(res, 400, { ok: false, code: 'oauth_onboarding_expired', error: 'Onboarding ticket is missing or expired' })
+    fail('oauth_onboarding_expired', 'Onboarding ticket has expired or was already used')
+    return
+  }
+  if (explicitTicket && (!profile.onboardingChallenge || typeof body?.verifier !== 'string'
+    || !/^[a-f0-9]{64}$/.test(body.verifier)
+    || !timingSafeEqual(Buffer.from(profile.onboardingChallenge, 'hex'), createHash('sha256').update(body.verifier).digest()))) {
+    fail('oauth_onboarding_invalid', 'Registration credentials do not belong to this browser tab. Start registration again')
     return
   }
 
-  const body = await parseBody<{ username?: string; displayName?: string; password?: string; confirmPassword?: string }>(req)
-  if (!body?.username || !body.password) {
+  if (typeof body?.username !== 'string' || !body.username || typeof body.password !== 'string' || !body.password
+    || (body.displayName !== undefined && typeof body.displayName !== 'string')) {
     sendJson(res, 400, { ok: false, code: 'invalid_username', error: 'Missing username or password' })
     return
   }
@@ -447,6 +479,7 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
     user: result.user,
     ...(profile.returnTo ? { returnTo: appRelativeReturnTo(profile.returnTo) } : {}),
   }, {
+    'Cache-Control': 'no-store',
     'Set-Cookie': [
       serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
       clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),

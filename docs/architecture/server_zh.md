@@ -122,6 +122,9 @@ HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `Sess
 - `POST /api/game/new` 接受 `seed?` 与 WebSocket `createRoom` 的设置，经 `server/game/game-setup-options.ts` 映射。`POST /api/game/load`、`POST /api/game/dev/*` 与 `POST /api/game/new-sandbox` 是调试与工坊沙盒路径。
 - `GET /cards-manifest.json` 向主 bundle 提供卡牌 metadata。
 - OAuth 账号绑定：`POST /api/auth/oauth/:provider/start?intent=link`、`GET …/callback` 与 `POST …/complete`，使用 PKCE S256 与 fragment 交接，从不创建新的站点会话。
+- OAuth 注册：`GET /api/auth/oauth/:provider/start` 将浏览器的 SHA-256 challenge 绑定到 OAuth state 和有效期十五分钟的一次性注册票据。回调用 fragment 交接票据，并设置 `no-store`、`no-referrer`；`POST /api/auth/onboarding/complete` 只在浏览器 verifier 匹配时接受显式票据。Cookie 提交仍可使用，显式凭证失败时不会退回其他 Cookie 身份。账号创建、身份绑定、邀请码与票据消费共用同一事务。凭证缺失、无效与票据过期、已消费使用不同错误码。
+
+认证测试：`server/__tests__/auth-routes.test.ts`、`server/oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 
 Game Context、Replay 与 Bug Report 是版本化的产品 API：
 

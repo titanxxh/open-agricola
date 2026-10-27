@@ -218,13 +218,35 @@ test.describe('Platform: auth', () => {
     await expect(providerGroup.getByText('使用 Google 注册', { exact: true })).toBeVisible()
   })
 
-  test('expired onboarding replaces the form and returns to registration', async ({ page }) => {
+  test('missing onboarding credentials replace the form and restart registration without claiming expiry', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await page.fill('#onboarding-username', `expired_${RUN_ID}`)
     await page.fill('#onboarding-password', PASSWORD)
     await page.fill('#onboarding-confirm-password', PASSWORD)
     await page.getByRole('button', { name: '完成注册' }).click()
 
+    await expect(page.getByRole('alert')).toContainText('新用户需要使用 GitHub 或 Google 注册')
+    await expect(page.locator('#onboarding-username')).toHaveCount(0)
+    await page.getByRole('button', { name: '重新注册' }).click()
+    await expect(page.getByRole('tab', { name: '注册' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('a consumed onboarding ticket shows expiry and offers fresh registration', async ({ page, request }) => {
+    const username = `consumed_${RUN_ID}`
+    const { cookies } = await callOAuthHelper(request, 'github', { providerUserId: `consumed-${RUN_ID}` })
+    const onboarding = cookies.find(cookie => cookie.startsWith('oa_onboarding='))
+    if (!onboarding) throw new Error('Missing onboarding cookie')
+    const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
+      data: { username, password: PASSWORD, confirmPassword: PASSWORD },
+      headers: { Cookie: cookieHeaderFromSetCookie(cookies, 'oa_onboarding') },
+    })
+    expect(complete.ok()).toBe(true)
+    await page.context().addCookies([cookieFromSetCookie(onboarding)])
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
+    await page.fill('#onboarding-username', username)
+    await page.fill('#onboarding-password', PASSWORD)
+    await page.fill('#onboarding-confirm-password', PASSWORD)
+    await page.getByRole('button', { name: '完成注册' }).click()
     await expect(page.getByRole('alert')).toContainText('注册会话已过期')
     await expect(page.locator('#onboarding-username')).toHaveCount(0)
     await page.getByRole('button', { name: '重新注册' }).click()

@@ -3,6 +3,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OnboardingPage } from '../OnboardingPage'
+import { prepareOAuthOnboarding, readOnboardingCredentials } from '../../services/oauth-onboarding'
+import { webcrypto } from 'node:crypto'
 
 const refreshSessionMock = vi.fn(async () => {})
 
@@ -38,6 +40,8 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.authErrors.invalid_invite': '邀请码无效、已过期或已使用',
     'platform.authErrors.registration_disabled': '当前暂不开放注册',
     'platform.authErrors.oauth_onboarding_expired': '注册会话已过期，请重新使用 GitHub 或 Google 注册',
+    'platform.authErrors.oauth_registration_required': '新用户需要使用 GitHub 或 Google 注册',
+    'platform.restartRegistration': '重新注册',
   }
   return {
     useCurrentLocale: () => 'zh',
@@ -70,9 +74,54 @@ afterEach(() => {
   vi.clearAllMocks()
   vi.unstubAllGlobals()
   window.history.replaceState(null, '', '/?page=onboarding')
+  window.sessionStorage.clear()
 })
 
 describe('OnboardingPage', () => {
+  it('submits a fragment handoff after removing it from the URL and keeps it retryable until success', async () => {
+    vi.stubGlobal('crypto', webcrypto)
+    await prepareOAuthOnboarding('/api/auth/oauth/github/start?intent=register')
+    const ticket = 'a'.repeat(43)
+    window.history.replaceState(null, '', `/?page=onboarding#onboardingTicket=${ticket}`)
+    const user = userEvent.setup()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(policyResponse('open'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, code: 'username_taken' }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<OnboardingPage />)
+    expect(window.location.hash).toBe('')
+    const credentials = readOnboardingCredentials()
+    expect(credentials).toEqual({ ticket, verifier: expect.stringMatching(/^[a-f0-9]{64}$/) })
+    if (!credentials) throw new Error('Missing onboarding credentials')
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('用户名已被占用')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject(credentials)
+    expect(readOnboardingCredentials()).toEqual(credentials)
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+    await waitFor(() => expect(refreshSessionMock).toHaveBeenCalledTimes(1))
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it.each(['oauth_onboarding_missing', 'oauth_onboarding_invalid'])('restarts registration for %s without reporting ticket expiry', async code => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(policyResponse('open'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, code }), { status: 400 })))
+    render(<OnboardingPage />)
+    await user.type(screen.getByLabelText('用户名'), 'newuser')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.type(screen.getByLabelText('确认密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '完成注册' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('新用户需要使用 GitHub 或 Google 注册')
+    expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重新注册' }))
+    expect(window.location.search).toBe('?page=login&authMode=register')
+  })
+
   it('keeps onboarding context separate from the native home brand', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
 

@@ -20,6 +20,7 @@
 
 ## 服务与同步状态
 
+- `services/oauth-onboarding.ts` 在当前标签页的 `sessionStorage` 保存浏览器 verifier 与回调票据，从浏览器历史移除票据 fragment，并在刷新、可修正的表单校验错误后保留凭证。`LoginPage` 在跳转授权前准备 challenge；`OnboardingPage` 在成功或凭证终止错误时清理凭证，并提供重新注册入口。站点会话仍使用 HttpOnly Cookie。浏览器测试分别验证 ITP 下的账号创建与 CHIPS 会话能力；Linux WPE 不能替代实体 iPhone 的会话验收。
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
 - `card-meta.ts` 拉取 `GET /cards-manifest.json`；`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。

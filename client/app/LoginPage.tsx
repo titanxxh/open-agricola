@@ -7,6 +7,7 @@ import { BrandMark } from '../components/common/BrandMark'
 import { DonateWidgets } from '../components/common/DonateWidgets'
 import { authErrorMessage } from './auth-errors'
 import { API_BASE } from '../config'
+import { prepareOAuthOnboarding } from '../services/oauth-onboarding'
 
 type Mode = 'login' | 'register'
 type OAuthProvider = 'github' | 'google'
@@ -44,6 +45,9 @@ function OAuthLink({
   onDisabledClick?: () => void
   children: ReactNode
 }) {
+  const { t } = useLocale()
+  const [starting, setStarting] = useState(false)
+  const [startFailed, setStartFailed] = useState(false)
   if (disabled) {
     return (
       <button
@@ -59,10 +63,22 @@ function OAuthLink({
   }
 
   return (
-    <a className="btn-secondary oauth-provider-link" href={href}>
+    <>
+    <a className="btn-secondary oauth-provider-link" href={href} aria-disabled={starting || undefined} onClick={event => {
+      event.preventDefault()
+      if (!href || starting) return
+      setStarting(true)
+      setStartFailed(false)
+      void prepareOAuthOnboarding(href).then(url => window.location.assign(url)).catch(() => {
+        setStarting(false)
+        setStartFailed(true)
+      })
+    }}>
       <OAuthProviderIcon provider={provider} />
       <span>{children}</span>
     </a>
+    {startFailed && <p role="alert">{t('platform.networkError')}</p>}
+    </>
   )
 }
 

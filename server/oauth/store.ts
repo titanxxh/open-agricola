@@ -12,6 +12,7 @@ type OAuthStateRow = {
   return_to: string | null
   invite_code_hash: string | null
   account_pkce_verifier: string | null
+  onboarding_challenge: string | null
 }
 
 type OnboardingTicketRow = {
@@ -24,11 +25,13 @@ type OnboardingTicketRow = {
   avatar_url: string | null
   return_to: string | null
   invite_code_hash: string | null
+  onboarding_challenge: string | null
 }
 
 export type OAuthOnboardingProfile = OAuthProfile & {
   returnTo?: string
   inviteCodeHash?: string
+  onboardingChallenge?: string
 }
 
 function createRawSecret(): string {
@@ -52,13 +55,14 @@ export async function createOAuthState(input: {
   returnTo?: string
   inviteCodeHash?: string
   accountPkceVerifier?: string
+  onboardingChallenge?: string
 }): Promise<Awaited<string>> {
   const raw = createRawSecret()
   const now = Date.now()
   ;(await pruneExpiredOAuthRows(now))
   ;(await getDb().prepare(`
-    INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, invite_code_hash, expires_at, created_at, account_pkce_verifier)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO oauth_states (state_hash, provider, intent, user_id, return_to, invite_code_hash, expires_at, created_at, account_pkce_verifier, onboarding_challenge)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     hashSecret(raw),
     input.provider,
@@ -69,6 +73,7 @@ export async function createOAuthState(input: {
     now + STATE_TTL_MS,
     now,
     input.accountPkceVerifier ?? null,
+    input.onboardingChallenge ?? null,
   ))
   return raw
 }
@@ -82,12 +87,13 @@ function stateFromRow(row: OAuthStateRow | undefined) {
     ...(row.return_to ? { returnTo: row.return_to } : {}),
     ...(row.invite_code_hash ? { inviteCodeHash: row.invite_code_hash } : {}),
     ...(row.account_pkce_verifier ? { accountPkceVerifier: row.account_pkce_verifier } : {}),
+    ...(row.onboarding_challenge ? { onboardingChallenge: row.onboarding_challenge } : {}),
   }
 }
 
 export async function getOAuthState(rawState: string) {
   const row = await getDb().prepare(`
-    SELECT provider, intent, user_id, return_to, invite_code_hash, account_pkce_verifier
+    SELECT provider, intent, user_id, return_to, invite_code_hash, account_pkce_verifier, onboarding_challenge
     FROM oauth_states WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
   `).get(hashSecret(rawState), Date.now()) as OAuthStateRow | undefined
   return stateFromRow(row)
@@ -100,7 +106,7 @@ export async function consumeOAuthState(rawState: string, owner?: { provider: OA
     UPDATE oauth_states SET used_at = ?
     WHERE state_hash = ? AND used_at IS NULL AND expires_at > ?
     AND (?::text IS NULL OR (provider = ? AND intent = 'link' AND user_id = ? AND account_pkce_verifier IS NOT NULL))
-    RETURNING provider, intent, user_id, return_to, invite_code_hash, account_pkce_verifier
+    RETURNING provider, intent, user_id, return_to, invite_code_hash, account_pkce_verifier, onboarding_challenge
   `).get(now, hashSecret(rawState), now, owner?.userId ?? null, owner?.provider ?? null, owner?.userId ?? null) as OAuthStateRow | undefined
   if (row?.account_pkce_verifier) {
     await db.prepare('UPDATE oauth_states SET account_pkce_verifier = NULL WHERE state_hash = ?').run(hashSecret(rawState))
@@ -153,16 +159,16 @@ export async function linkIdentity(userId: string, profile: OAuthProfile): Promi
   ))
 }
 
-export async function createOnboardingTicket(profile: OAuthProfile, returnTo?: string, inviteCodeHash?: string): Promise<Awaited<string>> {
+export async function createOnboardingTicket(profile: OAuthProfile, returnTo?: string, inviteCodeHash?: string, onboardingChallenge?: string): Promise<Awaited<string>> {
   const raw = createRawSecret()
   const now = Date.now()
   ;(await pruneExpiredOAuthRows(now))
   ;(await getDb().prepare(`
     INSERT INTO oauth_onboarding_tickets (
       ticket_hash, provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash, expires_at, created_at
+      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash, expires_at, created_at, onboarding_challenge
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     hashSecret(raw),
     profile.provider,
@@ -176,6 +182,7 @@ export async function createOnboardingTicket(profile: OAuthProfile, returnTo?: s
     inviteCodeHash ?? null,
     now + ONBOARDING_TICKET_TTL_MS,
     now,
+    onboardingChallenge ?? null,
   ))
   return raw
 }
@@ -191,6 +198,7 @@ function profileFromTicketRow(row: OnboardingTicketRow): OAuthOnboardingProfile 
     ...(row.avatar_url ? { avatarUrl: row.avatar_url } : {}),
     ...(row.return_to ? { returnTo: row.return_to } : {}),
     ...(row.invite_code_hash ? { inviteCodeHash: row.invite_code_hash } : {}),
+    ...(row.onboarding_challenge ? { onboardingChallenge: row.onboarding_challenge } : {}),
   }
 }
 
@@ -198,7 +206,7 @@ export async function getOnboardingTicket(rawTicket: string): Promise<Awaited<OA
   const ticketHash = hashSecret(rawTicket)
   const row = (await getDb().prepare(`
     SELECT provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
+      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash, onboarding_challenge
     FROM oauth_onboarding_tickets
     WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
   `).get(ticketHash, Date.now())) as OnboardingTicketRow | undefined
@@ -214,7 +222,7 @@ export async function consumeOnboardingTicket(rawTicket: string): Promise<Awaite
     UPDATE oauth_onboarding_tickets SET used_at = ?
     WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
     RETURNING provider, provider_user_id, provider_login, provider_email,
-      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash
+      provider_email_verified, display_name, avatar_url, return_to, invite_code_hash, onboarding_challenge
   `).get(now, ticketHash, now)) as OnboardingTicketRow | undefined
 
   if (!row) return null
