@@ -1,5 +1,8 @@
 import { expect, test, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import type { MyActiveRoom } from '../shared/contract/lobby'
+import type { GameSyncPayload } from '../shared/contract/protocol/game'
+import type { ServerEvent } from '../shared/contract/protocol/ws'
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find(entry => entry.name.toLowerCase() === 'set-cookie' && entry.value.startsWith(`${name}=`))
@@ -7,14 +10,14 @@ const cookieValue = (response: APIResponse, name: string): string => {
   return header.value.split(';')[0]!.slice(name.length + 1)
 }
 
-async function authenticate(context: BrowserContext, username: string) {
+async function authenticate(context: BrowserContext, username: string, displayName = username) {
   const oauth = await context.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
-    data: { providerUserId: `invite-${username}`, providerLogin: username, email: `${username}@example.com`, displayName: username },
+    data: { providerUserId: `invite-${username}`, providerLogin: username, email: `${username}@example.com`, displayName },
   })
   expect(oauth.ok()).toBe(true)
   const complete = await context.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
     headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
-    data: { username, displayName: username, password: 'invite-pass-550', confirmPassword: 'invite-pass-550' },
+    data: { username, displayName, password: 'invite-pass-550', confirmPassword: 'invite-pass-550' },
   })
   expect(complete.ok(), await complete.text()).toBe(true)
   await context.addCookies([{ name: 'oa_session', value: cookieValue(complete, 'oa_session'), url: FRONTEND_URL }])
@@ -50,7 +53,7 @@ async function directJoin(page: Page, wsPath: string, roomId: string) {
 }
 
 for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: 'mobile', width: 390, height: 844 }]) {
-  test(`invited rooms use player ID autocomplete and enforce admission (${viewport.name})`, async ({ browser }, testInfo) => {
+  test(`invited rooms search player names, enforce admission and show resumable game details (${viewport.name})`, async ({ browser }, testInfo) => {
     const contexts: BrowserContext[] = []
     try {
       const device = { viewport: { width: viewport.width, height: viewport.height },
@@ -62,7 +65,9 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
       contexts.push(creator, guest, outsider, anonymous)
       const suffix = `${Date.now().toString(36)}_${viewport.name.slice(0, 1)}`
       const creatorId = await authenticate(creator, `iv_host_${suffix}`)
-      const guestId = await authenticate(guest, `iv_guest_${suffix}`)
+      const guestName = `iv_guest_${suffix}`
+      const guestDisplayName = `农友${suffix}`
+      const guestId = await authenticate(guest, guestName, guestDisplayName)
       await authenticate(outsider, `iv_other_${suffix}`)
       const page = await creator.newPage()
       await page.goto(`${FRONTEND_URL}/?page=settings`, { waitUntil: 'domcontentloaded' })
@@ -75,18 +80,23 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
       await page.getByRole('radio', { name: '仅邀请玩家', exact: true }).check()
       const searchRequests: string[] = []
       page.on('request', request => { if (request.url().includes('/api/lobby/players?')) searchRequests.push(request.url()) })
-      const input = page.getByRole('combobox', { name: '受邀玩家 ID' })
-      await input.fill(guestId.slice(0, 1))
+      const input = page.getByRole('combobox', { name: '受邀玩家', exact: true })
+      await input.fill(guestName.slice(0, 1))
       await page.waitForTimeout(300)
       expect(searchRequests).toEqual([])
-      await input.fill(guestId.slice(0, 2))
-      const option = page.getByRole('option').filter({ hasText: guestId })
+      await input.fill(guestName.slice(0, 2).toUpperCase())
+      const option = page.getByRole('option').filter({ hasText: guestName })
       await expect(option).toBeVisible()
-      await expect(option).toContainText(`iv_guest_${suffix}`)
+      await expect(option).toContainText(guestDisplayName)
+      await expect(option).not.toContainText(guestId)
       expect(searchRequests.length).toBeGreaterThan(0)
-      await page.screenshot({ path: testInfo.outputPath('player-id-dropdown.png'), fullPage: true })
+      await input.fill('农友')
+      await expect(option).toBeVisible()
+      await page.screenshot({ path: testInfo.outputPath('player-name-dropdown.png'), fullPage: true })
       await option.click()
-      await expect(input).toHaveValue(`${guestId}, `)
+      await expect(input).toHaveValue('')
+      await expect(page.locator('.room-invite-chip')).toContainText(guestDisplayName)
+      await expect(page.locator('.room-invitations')).not.toContainText(guestId)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       await page.getByRole('button', { name: '创建游戏', exact: true }).click()
       const roomId = await page.locator('.ws-invite-roomid strong').textContent()
@@ -98,8 +108,18 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
       expect(await roomIds(outsider)).not.toContain(roomId)
       expect(await roomIds(anonymous)).not.toContain(roomId)
       const guestPage = await guest.newPage()
+      const synced: { latest?: GameSyncPayload } = {}
+      guestPage.on('websocket', socket => socket.on('framereceived', event => {
+        const message: ServerEvent = JSON.parse(event.payload.toString())
+        if (message.type === 'stateUpdate') synced.latest = message.payload
+      }))
       await guestPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
       await expect(guestPage.locator('.room-item').filter({ hasText: roomId })).toBeVisible()
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
+      await expect(page.locator('.my-game')).toContainText('创建于')
+      await expect(page.locator('.my-game')).not.toContainText(roomId)
+      await page.locator('.my-game').getByRole('button', { name: /继续/ }).click()
+      await expect(page.locator('.ws-invite-roomid strong')).toHaveText(roomId)
       const outsiderPage = await outsider.newPage()
       await outsiderPage.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
       await expect(outsiderPage.locator('.room-item').filter({ hasText: roomId })).toHaveCount(0)
@@ -134,13 +154,39 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
       await expect(guestPage.locator('.game-layout')).toBeVisible({ timeout: 20_000 })
       expect(new URL(guestPage.url()).search).toBe(`?room=${roomId}`)
       expect(await roomIds(outsider)).not.toContain(roomId)
+      if (!synced.latest) throw new Error('Expected an authoritative state update')
+      const { state, interaction } = synced.latest
+      const actor = interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+        ? interaction.playerIndex : state.currentPlayerIndex
+      const myRooms = await creator.request.get(`${BACKEND_URL}/api/lobby/my-rooms`)
+      expect(myRooms.headers()['cache-control']).toBe('no-store')
+      const summary: { rooms: MyActiveRoom[] } = await myRooms.json()
+      const active = summary.rooms.find(room => room.id === roomId)
+      expect(active?.current_player_index).toBe(actor)
+      expect(active?.players.map(player => player.color)).toEqual(['red', 'green'])
+      expect(active?.started_at).not.toBeNull()
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
+      const game = page.locator('.my-game')
+      await expect(game.locator('.my-game__name')).toHaveText([`iv_host_${suffix}`, guestDisplayName])
+      await expect(game.locator('[data-player-color=green]')).toBeVisible()
+      await expect(game).toContainText('开始于')
+      await expect(game).not.toContainText(roomId)
+      if (!active?.started_at) throw new Error('Expected the persisted start time')
+      await expect(game.locator('time')).toHaveAttribute('datetime', new Date(active.started_at).toISOString())
+      if (actor === 0) await expect(game.locator('.my-game__turn')).toHaveAttribute('data-my-turn', 'true')
+      else await expect(game.locator('.my-game__turn')).toContainText(guestDisplayName)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      await game.screenshot({ path: testInfo.outputPath('my-active-game.png') })
+      await game.getByRole('button', { name: /继续/ }).click()
+      await expect(page.locator('.game-layout')).toBeVisible({ timeout: 20_000 })
+      expect(new URL(page.url()).search).toBe(`?room=${roomId}`)
     } finally {
       await Promise.all(contexts.map(context => context.close()))
     }
   })
 }
 
-test('player search requires authentication and two literal ID characters; unknown guests reject creation', async ({ browser, request }) => {
+test('player search requires authentication and two literal name characters; unknown guests reject creation', async ({ browser, request }) => {
   const anonymous = await request.get(`${BACKEND_URL}/api/lobby/players?prefix=ab`)
   expect(anonymous.status()).toBe(401)
   const context = await browser.newContext()
@@ -153,7 +199,7 @@ test('player search requires authentication and two literal ID characters; unkno
     const before = await roomIds(context)
     const page = await context.newPage()
     await page.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2&roomAccess=invited&invitedUserIds=nonexistent-player-id`, { waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('alert')).toContainText('受邀玩家 ID 不存在或账号不可用')
+    await expect(page.getByRole('alert')).toContainText('受邀玩家不存在或账号不可用')
     expect(await roomIds(context)).toEqual(before)
   } finally { await context.close() }
 })

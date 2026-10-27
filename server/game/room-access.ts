@@ -13,8 +13,9 @@ const eligibleAccount = `(email IS NULL OR email_verified_at IS NOT NULL)
 
 export async function searchInvitablePlayers(db: AccessDatabase, prefix: string, currentUserId: string): Promise<InvitablePlayer[]> {
   return db.prepare(`SELECT id, username, display_name AS "displayName" FROM users
-    WHERE starts_with(id, ?) AND id <> ? AND ${eligibleAccount}
-    ORDER BY id LIMIT 10`).all<InvitablePlayer>(prefix, currentUserId)
+    WHERE (starts_with(lower(username), lower(?)) OR starts_with(lower(display_name), lower(?)))
+      AND id <> ? AND ${eligibleAccount}
+    ORDER BY lower(display_name), lower(username), id LIMIT 10`).all<InvitablePlayer>(prefix, prefix, currentUserId)
 }
 
 export async function parseRoomAccess(

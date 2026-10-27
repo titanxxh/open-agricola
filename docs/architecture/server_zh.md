@@ -37,7 +37,8 @@ server/game/
 ```
 
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
-- `room-access.ts` 负责邀请准入。创建默认公开，也可为其余每个座位指定一个可用账号 ID。`RoomMeta` 将权限存入 `rooms.invited_user_ids`，恢复与 `newGame` 保留该权限。大厅 SQL 在限制条数前按已认证用户过滤；定位、活动 Context 和直接 WS 加入分别校验准入，恢复原座位仍由已有座位归属控制。邀请名单不进入 GameState、Replay 或公开摘要，完赛 Replay 仍公开。`GET /api/lobby/players?prefix=` 要求登录，按至少两个字符的大小写敏感 ID 字面前缀匹配，最多返回十个展示身份。测试：`server/__tests__/room-invitations.test.ts`、`e2e-tests/room-invitations.spec.ts`。
+- `room-access.ts` 负责邀请准入。创建默认公开，也可为其余每个座位指定一个可用账号 ID。`RoomMeta` 将权限存入 `rooms.invited_user_ids`，恢复与 `newGame` 保留该权限。大厅 SQL 在限制条数前按已认证用户过滤；定位、活动 Context 和直接 WS 加入分别校验准入，恢复原座位仍由已有座位归属控制。邀请名单不进入 GameState、Replay 或公开摘要，完赛 Replay 仍公开。`GET /api/lobby/players?prefix=` 要求登录，按用户名或显示名开头至少两个字符匹配，忽略大小写，排除本人及不可用账号，最多返回十个展示身份。测试：`server/__tests__/room-invitations.test.ts`、`e2e-tests/room-invitations.spec.ts`。
+- `lobby-my-rooms.ts` 为 `/api/lobby/my-rooms` 读取已提交快照，不恢复 Session。共享 `MyActiveRoom` 契约只公开已占用座位的显示名、颜色、创建与开局时间，以及 pending frame 的所有者或当前玩家，不返回私有状态或账号 ID。快照无法解析时只省略该房间的玩家详情。测试：`server/__tests__/lobby-my-rooms.test.ts`。
 - `roomId` 恰好标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新的 `GameSession` 与 UUID，从不复用旧 ID，并在退役旧局的同一事务中迁移在线座位、人数、自定义卡与变体开关。只有权威 `gameOver` 在一个事务中写入 Game Result Archive 并删除可恢复快照；归档写入失败会回滚并保留最终状态以便重试。过期、解散、删号与未完成的重开把 Game Context 标为 `expired`，不产生结果。结果分数保留引擎原始数值，包括小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
 - 所有托管对局，包括工坊、热座与开发 Room，都使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认创建、等待状态与座位。重启后普通存档按需加载，未加载存档由 `GameContextStore` 过期清理，并保护在线连接、准入预留与未完成保存。所有玩家断线后，普通 Room 在等待时保留 30 分钟、进行中保留 7 天；开发对局不会因闲置过期。在线启动不做旧数据清理，缺失录制数据会阻断恢复，而不是编造替代内容。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。

@@ -7,6 +7,7 @@ import { setPage } from '../../utils/platform-page-url'
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
   ok: true, rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
+  players: [{ id: 'Guest_ID-2', username: 'guest', displayName: 'Guest' }],
 }))))
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -62,11 +63,18 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.statusPlaying': 'Playing',
     'platform.yourTurn': 'Your turn',
     'platform.resume': 'Resume',
+    'platform.me': 'Me',
+    'platform.statusWaiting': 'Waiting',
+    'platform.gameStartedAt': 'Started',
+    'platform.roomCreatedAt': 'Created',
+    'platform.playerColors.red': 'Red',
+    'platform.playerColors.blue': 'Blue',
+    'ui.waitingForPlayerAction': 'Waiting for {player} to act',
     'platform.roomAccessLabel': 'Who can enter',
     'platform.roomAccessPublic': 'Public',
     'platform.roomAccessInvited': 'Invited players only',
-    'platform.invitedPlayerIdsLabel': 'Invited player IDs',
-    'platform.invitedPlayerCountError': 'Enter {count} other player IDs',
+    'platform.invitedPlayerIdsLabel': 'Invited players',
+    'platform.invitedPlayerCountError': 'Select {count} other players',
   }
   return {
     useCurrentLocale: () => 'en',
@@ -93,11 +101,38 @@ afterEach(() => {
 })
 
 describe('LobbyPage my active games', () => {
+  it('identifies games by their players, colors, start time and current player instead of UUID', async () => {
+    const startedAt = Date.UTC(2026, 9, 27, 8, 30)
+    myRoomsResponse.rooms = [{
+      id: '96725f41-b719-4474-a3df-90e5d239108b', status: 'playing', max_players: 2,
+      updated_at: startedAt + 60_000, created_at: startedAt - 60_000, started_at: startedAt,
+      player_index: 0, my_turn: 0, current_player_index: 1,
+      players: [
+        { playerIndex: 0, name: 'Alice', color: 'red' },
+        { playerIndex: 1, name: 'Bob', color: 'blue' },
+      ],
+    }]
+
+    render(<LobbyPage />)
+
+    expect(await screen.findByText('Alice')).toBeInTheDocument()
+    expect(screen.getByText('Bob')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Red' })).toHaveAttribute('data-player-color', 'red')
+    expect(screen.getByRole('img', { name: 'Blue' })).toHaveAttribute('data-player-color', 'blue')
+    expect(screen.getByText('Waiting for Bob to act')).toBeInTheDocument()
+    expect(document.querySelector('time')).toHaveAttribute('datetime', '2026-10-27T08:30:00.000Z')
+    expect(screen.queryByText(/96725f41/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(setPage).toHaveBeenCalledWith('game', { room: '96725f41-b719-4474-a3df-90e5d239108b' })
+  })
+
   it('shows a your-turn badge on rooms waiting for the player', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
     myRoomsResponse.rooms = [
-      { id: 'room-a', status: 'playing', max_players: 2, updated_at: 2, player_index: 1, my_turn: 1 },
-      { id: 'room-b', status: 'playing', max_players: 2, updated_at: 1, player_index: 0, my_turn: 0 },
+      { id: 'room-a', status: 'playing', max_players: 2, updated_at: 2, player_index: 1, my_turn: 1,
+        created_at: 1, started_at: 1, current_player_index: 1, players: [] },
+      { id: 'room-b', status: 'playing', max_players: 2, updated_at: 1, player_index: 0, my_turn: 0,
+        created_at: 1, started_at: 1, current_player_index: null, players: [] },
     ]
 
     render(<LobbyPage />)
@@ -111,16 +146,31 @@ describe('LobbyPage my active games', () => {
     fireEvent.click(within(items[0]!).getByRole('button', { name: 'Resume' }))
     expect(setPage).toHaveBeenCalledWith('game', { room: 'room-a' })
   })
+
+  it('shows creation time while a room is waiting to start', async () => {
+    myRoomsResponse.rooms = [{
+      id: 'waiting-room', status: 'waiting', max_players: 2, updated_at: 1,
+      player_index: 0, my_turn: 0, created_at: Date.UTC(2026, 9, 27), started_at: null,
+      current_player_index: null, players: [{ playerIndex: 0, name: 'Alice', color: 'red' }],
+    }]
+    render(<LobbyPage />)
+    expect(await screen.findByText('Alice')).toBeInTheDocument()
+    expect(screen.getByText('Created', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Waiting', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByText('Started', { exact: false })).toBeNull()
+    expect(screen.queryByText('Your turn')).toBeNull()
+  })
 })
 
 describe('LobbyPage player count selection', () => {
-  it('uses authenticated room listing and creates a private room with normalized account IDs', async () => {
+  it('uses authenticated room listing and creates a private room from a selected player name', async () => {
     render(<LobbyPage />)
     expect(apiFetch).toHaveBeenCalledWith('/api/rooms')
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
     expect(screen.getByRole('radio', { name: 'Public' })).toBeChecked()
     fireEvent.click(screen.getByRole('radio', { name: 'Invited players only' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Invited player IDs' }), { target: { value: 'u1, Guest_ID-2, Guest_ID-2' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Invited players' }), { target: { value: 'Gu' } })
+    fireEvent.click(await screen.findByRole('option', { name: /Guest/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
     expect(setPage).toHaveBeenCalledWith('game', expect.objectContaining({
       maxPlayers: '2', roomAccess: 'invited', invitedUserIds: 'Guest_ID-2',
@@ -132,9 +182,9 @@ describe('LobbyPage player count selection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
     fireEvent.click(screen.getByRole('button', { name: '3 Players' }))
     fireEvent.click(screen.getByRole('radio', { name: 'Invited players only' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Invited player IDs' }), { target: { value: 'Guest_ID-2' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Invited players' }), { target: { value: 'Guest' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter 2 other player IDs')
+    expect(screen.getByRole('alert')).toHaveTextContent('Select 2 other players')
     expect(setPage).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('radio', { name: 'Public' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))

@@ -62,15 +62,17 @@ describe('invitation creation and player lookup', () => {
     }
   })
 
-  it('matches literal ID prefixes, excludes self and unavailable accounts, and returns display identities only', async () => {
-    expect(await searchInvitablePlayers(db, 'ab', 'host')).toEqual([
-      { id: 'ab_One', username: 'user_ab_One', displayName: 'Name ab_One' },
-      { id: 'ab_Two', username: 'user_ab_Two', displayName: 'Name ab_Two' },
+  it('matches English usernames case-insensitively and Chinese display names, excluding self and unavailable accounts', async () => {
+    for (const [id, username, displayName] of [
+      ['ab_One', 'alice', '阿明甲'], ['ab_Two', 'albert', '阿明乙'],
+      ['ab_pending', 'al_pending', '阿明待验证'], ['ab_deleting', 'al_deleting', '阿明待删除'],
+    ]) await db.prepare('UPDATE users SET username = ?, display_name = ? WHERE id = ?').run(username, displayName, id)
+    expect((await searchInvitablePlayers(db, 'aL', 'host')).map(player => player.id).sort()).toEqual(['ab_One', 'ab_Two'])
+    expect(await searchInvitablePlayers(db, '阿明', 'ab_One')).toEqual([
+      { id: 'ab_Two', username: 'albert', displayName: '阿明乙' },
     ])
-    expect(await searchInvitablePlayers(db, 'ab_', 'ab_One')).toEqual([
-      { id: 'ab_Two', username: 'user_ab_Two', displayName: 'Name ab_Two' },
-    ])
-    expect(await searchInvitablePlayers(db, 'ab%', 'host')).toEqual([])
+    expect(await searchInvitablePlayers(db, 'ab', 'host')).toEqual([])
+    expect(await searchInvitablePlayers(db, 'al%', 'host')).toEqual([])
   })
 })
 
