@@ -1,5 +1,6 @@
-import type { ActionDefinition, PlayerState } from '../../../contract/types'
+import type { ActionDefinition } from '../../../contract/types'
 import { cardEffectHandChangedEvent } from '../../../session/private-hand-events'
+import { completeMinorCardPass } from '../../helpers/minor-card-passing'
 
 const ACTION_ID = 'pass-minor-card-to-left'
 
@@ -13,12 +14,6 @@ const removeCard = (cards: string[], cardId: string) => {
   return true
 }
 
-const leftPlayerOf = (players: PlayerState[], player: PlayerState) => {
-  const index = players.findIndex((candidate) => candidate.id === player.id)
-  if (index < 0 || players.length === 0) return undefined
-  return players[(index + 1) % players.length]
-}
-
 export const passMinorCardToLeftAction: ActionDefinition = {
   id: ACTION_ID,
   nameKey: 'actions.pass-minor-card-to-left.name',
@@ -29,25 +24,16 @@ export const passMinorCardToLeftAction: ActionDefinition = {
   execute: ({ state, player, params, sourceCard, emitPrivateEvent, eventSink }) => {
     const cardId = readCardId(params)
     if (!cardId) return { type: 'fail', errorKey: 'log.cardEffectFail' }
-    const target = leftPlayerOf(state.players, player)
     const removed = removeCard(player.minorPlayed, cardId) || removeCard(player.improvements, cardId)
     if (!removed) return { type: 'fail', errorKey: 'log.cardEffectFail' }
     if (player.cardStates) {
       delete player.cardStates[cardId]
     }
-    if (!target || target.id === player.id) return { type: 'ok' }
-    if (!target.minorHand.includes(cardId)) {
-      target.minorHand.push(cardId)
-    }
-    eventSink?.emit<'card.passed'>({
-      type: 'card.passed',
-      cardId,
-      fromPlayerId: player.id,
-      toPlayerId: target.id,
-      sourceActionId: ACTION_ID,
-      sourceCardId: sourceCard ?? cardId,
+    const target = completeMinorCardPass({
+      state, player, cardId, sourceActionId: ACTION_ID,
+      sourceCardId: sourceCard ?? cardId, eventSink,
     })
-    emitPrivateEvent?.(cardEffectHandChangedEvent(
+    if (target) emitPrivateEvent?.(cardEffectHandChangedEvent(
       target.id,
       [cardId],
       'minor',

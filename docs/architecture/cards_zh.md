@@ -108,5 +108,5 @@ cardField?: {
 
 `CardDefinition.passing?: boolean` 标记购买后传给下家的小改良。改良宿主通过内部 `pay` child 完成支付，再在 `completeInternalChildren` 中提交购买：卡进入下一玩家的 `minorHand`（不进 `minorPlayed`），不计入 `totalMinorBuilt`，不安装 modifier，发出 `card.passed` 而不是 `card.played`，`onBuy` 仍经 `afterHostCommitListeners` 中的 `activate-card-effect` 执行。“卡牌进场”反应自然跳过它。客户端为 `card.passed` 播放动画，mapper 派生 `log.cardPassed`。
 
-`actions/helpers/minor-card-passing.ts` 负责传递终点和公开事件。只有一名真实参与者时，卡移出游戏并发出 reason 为 `passed` 的 `card.destroyed`，不回到本人手牌或普通抽牌供给。支付和完整的 `onBuy` continuation 仍各执行一次；已有对局恢复时保留耗尽的空手牌。多人传递使用真实下家并保留普通交牌事件。Session 回归位于 Clay Embankment 与 Shifting Cultivation 的测试文件。
+`actions/helpers/minor-card-passing.ts` 负责购买及显式 `pass-minor-card-to-left` 行动的传递终点和公开事件。只有一名真实参与者时，卡移出游戏并发出 reason 为 `passed` 的 `card.destroyed`，不回到本人手牌或普通抽牌供给。支付和完整的 `onBuy` continuation 仍各执行一次；已有对局恢复时保留耗尽的空手牌。多人传递使用真实下家并保留普通交牌事件。Session 回归位于 Clay Embankment、Shifting Cultivation 与 Savings Deposit 的测试文件。
 
