@@ -7,7 +7,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 // Shared recovery defect: real purchases must be followed by exact public undo,
-// including naturally empty hands. These scenarios use fresh two-player games.
+// including naturally empty hands. These scenarios use fresh games with one or two actual players.
 const evidence = createScenarioEvidence(import.meta.url)
 
 function succeeded(response: SessionResponse): SessionResponse {
@@ -26,6 +26,56 @@ function playOccupation(session: GameSession, card: string): SessionResponse {
 }
 
 describe('Session Recovery Snapshot data', () => {
+  it.each([1, 2])('preserves both naturally exhausted hands after two real purchases at %i players', playerCount => {
+    const session = evidence.track(createWorkSession({ seed: 42, options: { playerCount }, configure(state) {
+      for (const player of state.players) player.resources.food = 3
+      const owner = state.players[0]!
+      owner.resources.clay = 6
+      owner.occupationHand = ['A110_Roughcaster']
+      owner.minorHand = ['A005_ClayEmbankment']
+      state.ordinaryCardDecks.occupation = state.ordinaryCardDecks.occupation.filter(id => id !== 'A110_Roughcaster')
+      state.ordinaryCardDecks.minor = state.ordinaryCardDecks.minor.filter(id => id !== 'A005_ClayEmbankment')
+    } }))
+    confirmNext(session, playOccupation(session, 'A110_Roughcaster'))
+    if (playerCount === 2) confirmNext(session, succeeded(session.takeAction(1, 'forest')))
+    let purchase = succeeded(session.takeAction(0, 'meeting-place'))
+    const improvement = purchase.interaction.stateId === 'wait'
+      ? purchase.interaction.request.options?.find(option => option.value.startsWith('action-improvement-')) : undefined
+    if (improvement) purchase = succeeded(session.resolveChoice(0, improvement.value))
+    if (purchase.state.players[0]!.minorHand.includes('A005_ClayEmbankment')) {
+      purchase = succeeded(session.resolveChoice(0, 'A005_ClayEmbankment'))
+    }
+    confirmNext(session, purchase)
+    if (playerCount === 2) confirmNext(session, succeeded(session.takeAction(1, 'clay-pit')))
+    const original = session.getState()
+    expect(original.state.round).toBe(2)
+    expect(original.interaction.stateId).toBe('idle')
+    expect(original.state.players[0]!.minorHand).toEqual([])
+    expect(original.state.players[0]!.occupationHand).toEqual([])
+    expect(original.state.players[0]!.resources).toMatchObject({ food: 2, clay: 9 })
+    const before = { ...original, state: captureStateWithHistory(original.state),
+      interaction: structuredClone(original.interaction), scores: structuredClone(original.scores) }
+    const pending = succeeded(session.takeAction(0, 'farmland'))
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    const saved = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+    const restored = evidence.track(new GameSession(rehydrateState(JSON.parse(JSON.stringify(saved)))))
+    expect(restored.getState().interaction).toEqual(pending.interaction)
+    expect(restored.state.players[0]!.minorHand).toEqual([])
+    expect(restored.state.players[0]!.occupationHand).toEqual([])
+    const undone = succeeded(restored.undoAction())
+    assertUndoRestored(undoRuleSnapshot(before), undone)
+    expect(undone.interaction).toEqual(before.interaction)
+    expect(undone.state.players[0]!.minorHand).toEqual([])
+    expect(undone.state.players[0]!.occupationHand).toEqual([])
+    if (playerCount === 2) expect(undone.state.players[1]!.minorHand).toContain('A005_ClayEmbankment')
+    succeeded(restored.takeAction(0, 'farmland'))
+    const retried = succeeded(restored.commitSelectionChoice(0, { tile: { row: 0, col: 1 } }))
+    expect(retried.state.players[0]!.fields).toEqual([{ row: 0, col: 1, stacks: [] }])
+    expect(retried.state.players[0]!.resources).toMatchObject({ food: 2, clay: 9 })
+    expect(retried.state.events.filter(event => event.type === 'resource.moved' && event.sourceCardId === 'A005_ClayEmbankment'))
+      .toEqual([expect.objectContaining({ resources: { clay: 3 } })])
+  })
+
   it.each([false, true])('preserves a purchased occupation hand through undo (remaining card: %s)', remaining => {
     const session = evidence.track(createWorkSession({ seed: 4242, configure(state) {
       state.round = 3
