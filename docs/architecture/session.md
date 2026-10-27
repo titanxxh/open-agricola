@@ -67,6 +67,8 @@ Tests: `server/__tests__/{authoritative-command-settlement,rejected-pending-inpu
 
 ## Rotation, extra turns and supply people
 
+A standard solo game has one actual participant. New-game resource initialization gives that player no food; common action definitions admit one player and use the two-player base board, with Forest replenishing two wood. Participant count stays one for dealing, rule queries and settlement. Ordinary actions keep the existing confirmation and undo boundary, including the last placement before returning home or harvesting. Tests: `server/__tests__/standard-solo-core-session.test.ts`.
+
 **Extra turns** ([ADR 0001](../adr/0001-a92-adoptive-pull-model-extra-turn-hook.md), [ADR 0008](../adr/0008-node-parallel-reaction-dispatch.md)):
 
 - `contributeExtraTurn?: (state, player) => ActionFlow | void` is a `CardEffect` hook consumed explicitly by rotation in `shared/session/phases/round.ts`, never by `runCardEffectHook`.
@@ -112,6 +114,8 @@ Rotation opportunity, Turn Scope and action-execution scope are separate lifetim
 Tests: `server/__tests__/{person-placement-order-session,move-farmer-before-placement-session}.test.ts`.
 
 ## Player Feeding Settlement
+
+`shared/actions/helpers/harvest-feeding-requirement.ts` owns the feeding requirement: adults require three food with one actual participant and two otherwise; newborns require one. Existing card modifiers apply to that base before the result is offered or settled. Tests: `shared/actions/helpers/__tests__/harvest-feeding-requirement.test.ts` and `server/__tests__/standard-solo-core-session.test.ts`.
 
 `handleFeedResolved()` resolves the offered and live recipe catalogs and validates the complete batch before replacing its pending frame with an ordinary Exchange flow. Its private `harvestSettlementResume` stores remaining demand, prepaid food, conversion costs and the player queue. Every batch reaction and required animal reorganization completes before remaining food payment, begging and heating. Snapshot recovery and undo restore that continuation with the engine cursor, so completed exchange and prepaid food never replay.
 
