@@ -191,7 +191,7 @@ describe('A113 Heresy Teacher session', () => {
     expect(p1.fields[0]!.stacks).toEqual([])
   })
 
-  it('scoring counts mixed field as both grain-field and vegetable-field', () => {
+  it('scoring counts every crop in mixed fields', () => {
     const session = setup({
       fields: [
         makeField(0, 0, [
@@ -221,8 +221,7 @@ describe('A113 Heresy Teacher session', () => {
     const mine = scores.find((s) => s.playerId === p1.id)!
     const grains = mine.categories.find((c) => c.key === 'grains')!
     const vegetables = mine.categories.find((c) => c.key === 'vegetables')!
-    // 4 mixed fields → grain count = 4 (≥4 → 2 pts), vegetable count = 4 (≥4 → 4 pts)
-    expect(grains.quantity).toBe(4)
-    expect(vegetables.quantity).toBe(4)
+    expect(grains).toMatchObject({ quantity: 12, total: 4 })
+    expect(vegetables).toMatchObject({ quantity: 4, total: 4 })
   })
 })

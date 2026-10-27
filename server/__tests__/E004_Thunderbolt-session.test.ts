@@ -18,6 +18,15 @@ const FIXED_HANDS = [
   { occupation: '__test_occupation_p4__', minor: '__test_minor_p4__' },
 ]
 
+const scoresWithoutGrain = (scores: SessionResponse['scores']): SessionResponse['scores'] =>
+  scores.map((score, index) => index === 0 ? {
+    ...score,
+    total: score.total - 2,
+    categories: score.categories.map((category) => category.key === 'grains'
+      ? { key: 'grains', quantity: 0, total: -1, entries: [{ type: 'quantity', quantity: 0, score: -1 }] }
+      : category),
+  } : score)
+
 const setup = () => {
   const session = new GameSession(404, undefined, { playerCount: 4 })
   stabilizeRandomHands(session.state.players)
@@ -201,7 +210,7 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.state.players[0]!.resources.wood).toBe(woodBefore + 4)
     expect(response.state.players[0]!.resources.vegetable).toBe(1)
     expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([null])
-    expect(response.scores).toEqual(scoresBefore)
+    expect(response.scores).toEqual(scoresWithoutGrain(scoresBefore))
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     expect(response.interaction.promptKey).toBe('ui.interactionOptionalAction')
@@ -252,9 +261,12 @@ describe('E004 Thunderbolt native session', () => {
     if (response.interaction.stateId === 'wait') {
       expect(response.interaction.request.kind).toBe('confirm-next-player')
     }
-    expect(response.scores.map((score) => score.playerId)).toEqual(scoresBefore.map((score) => score.playerId))
-    expect(response.scores[0]!.categories.find((category) => category.key === 'vegetables')?.quantity).toBe(0)
-    expect(response.scores[0]!.total).toBe(scoresBefore[0]!.total - 2)
+    const scoresAfterSow = scoresWithoutGrain(scoresBefore)
+    scoresAfterSow[0]!.total = scoresBefore[0]!.total - 1
+    scoresAfterSow[0]!.categories = scoresAfterSow[0]!.categories.map((category) => category.key === 'vegetables'
+      ? { key: 'vegetables', quantity: 2, total: 2, entries: [{ type: 'quantity', quantity: 2, score: 2 }] }
+      : category)
+    expect(response.scores).toEqual(scoresAfterSow)
   })
 
   it('completes E070 removal without a sow interaction when vegetable is unavailable', () => {
@@ -299,7 +311,7 @@ describe('E004 Thunderbolt native session', () => {
       expect(response.interaction.sourceCard).not.toBe(CROP_ROTATION_FIELD)
     }
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
-    expect(response.scores).toEqual(scoresBefore)
+    expect(response.scores).toEqual(scoresWithoutGrain(scoresBefore))
   })
 })
 

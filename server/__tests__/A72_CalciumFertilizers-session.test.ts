@@ -108,6 +108,8 @@ describe('A072_CalciumFertilizers session', () => {
     session.loadState(state)
     const beforeLogLength = session.state.log.length
     const beforeScores = session.getState().scores
+    expect(beforeScores[0]!.categories.find((category) => category.key === 'grains'))
+      .toMatchObject({ quantity: 4, total: 2 })
 
     const resp = session.takeAction(0, 'eastern-quarry')
 
@@ -143,7 +145,11 @@ describe('A072_CalciumFertilizers session', () => {
         params: expect.objectContaining({ crops: { grain: 1 } }),
       }),
     ]))
-    expect(resp.scores).toEqual(beforeScores)
+    const expectedScores = structuredClone(beforeScores)
+    expectedScores[0]!.categories = expectedScores[0]!.categories.map((category) => category.key === 'grains'
+      ? { key: 'grains', quantity: 5, total: 2, entries: [{ type: 'quantity', quantity: 5, score: 2 }] }
+      : category)
+    expect(resp.scores).toEqual(expectedScores)
   })
 
   it('does not add a crop to a field growing multiple crop types', () => {

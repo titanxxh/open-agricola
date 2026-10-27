@@ -87,7 +87,8 @@ for (const almanacFirst of [true, false]) test(`Moor and improvement after share
     expect(current.state.players[0]!.fields.map(field => field.stacks)).toEqual([
       [{ kind: 'grain', remaining: 3 }], almanacFirst ? [{ kind: 'grain', remaining: 3 }] : [],
     ])
-    expect(current.scores[0]!.categories.find(category => category.key === 'grains')).toMatchObject({ quantity: 2, total: 1 })
+    expect(current.scores[0]!.categories.find(category => category.key === 'grains'))
+      .toMatchObject({ quantity: almanacFirst ? 6 : 4, total: almanacFirst ? 3 : 2 })
     await page.screenshot({ path: `output/playwright/moor-completion-${almanacFirst ? 'plow-first' : 'sow-first'}.png` })
   } finally { await Promise.all(pages.map(page => page.close())) }
 })

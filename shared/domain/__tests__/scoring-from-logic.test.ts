@@ -7,6 +7,11 @@ import { majorCardDefinitions } from '../../cards/major'
 
 import { C133_Soldier_impl } from '../../cards/C/C133_Soldier'
 import { M084_BogPony_impl } from '../../cards/M/M084_BogPony'
+import '../../cards/B/B068_Beanfield'
+import '../../cards/B/B113_PatchCaregiver'
+import '../../cards/D/D075_WoodField'
+import '../../cards/E/E070_CropRotationField'
+import '../../cards/E/E080_RockGarden'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -228,23 +233,102 @@ describe('computeScores', () => {
     expect(byKey.get('fields')?.total).toBe(-1)
   })
 
-  it('counts mixed-stack field as both grain and vegetable field', () => {
+  it('counts every crop in a mixed-stack farmyard field', () => {
     const player = createPlayer()
     player.fields = [
       {
         row: 1,
         col: 1,
         stacks: [
-          { kind: 'vegetable', remaining: 1 },
+          { kind: 'vegetable', remaining: 2 },
           { kind: 'grain', remaining: 3 },
         ],
       },
     ]
     const [result] = computeScores(createState(player))
     const byKey = new Map(result.categories.map((item) => [item.key, item]))
-    // 1 grain field + 0 grain in reserve = 1 grain count
-    expect(byKey.get('grains')?.quantity).toBe(1)
-    // 1 vegetable field + 0 in reserve = 1 vegetable count
-    expect(byKey.get('vegetables')?.quantity).toBe(1)
+    expect(byKey.get('grains')).toMatchObject({ quantity: 3, total: 1 })
+    expect(byKey.get('vegetables')).toMatchObject({ quantity: 2, total: 2 })
+  })
+
+  it.each([
+    { supply: 1, stacks: [2, 3, 1, 1] },
+    { supply: 2, stacks: [3, 1, 2] },
+  ])('scores eight grain with $supply in supply and the rest on fields as four points', ({ supply, stacks }) => {
+    const player = createPlayer()
+    player.resources.grain = supply
+    player.fields = stacks.map((remaining, col) => ({
+      row: 1, col, stacks: [{ kind: 'grain', remaining }],
+    }))
+
+    const [result] = computeScores(createState(player))
+
+    expect(result.categories.find((category) => category.key === 'grains')).toEqual({
+      key: 'grains', quantity: 8, total: 4,
+      entries: [{ type: 'quantity', quantity: 8, score: 4 }],
+    })
+  })
+
+  it('counts all crop layers on played minor and occupation card fields together with supply and farmyard crops', () => {
+    const player = createPlayer()
+    player.resources.grain = 2
+    player.resources.vegetable = 1
+    player.fields = [{ row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
+    player.minorPlayed = ['B068_Beanfield']
+    player.occupationPlayed = ['B113_PatchCaregiver']
+    player.cardStates = {
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } },
+      B113_PatchCaregiver: {
+        extraData: {
+          cardFieldStacks: [{
+            crop: 'grain', remaining: 2,
+            below: [{ crop: 'grain', remaining: 3 }, { crop: 'vegetable', remaining: 2 }],
+          }],
+        },
+      },
+    }
+    const state = createState(player)
+    const before = JSON.stringify(state)
+
+    const [result] = computeScores(state)
+    const byKey = new Map(result.categories.map((category) => [category.key, category]))
+
+    expect(byKey.get('grains')).toMatchObject({ quantity: 8, total: 4 })
+    expect(byKey.get('vegetables')).toMatchObject({ quantity: 5, total: 4 })
+    expect(byKey.get('fields')).toMatchObject({ quantity: 1, total: -1 })
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('ignores empty card fields and crop state belonging to unplayed cards', () => {
+    const player = createPlayer()
+    player.minorPlayed = ['E070_CropRotationField']
+    player.minorHand = ['B068_Beanfield']
+    player.cardStates = {
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 3 }] } },
+      B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] } },
+    }
+
+    const [result] = computeScores(createState(player))
+    const byKey = new Map(result.categories.map((category) => [category.key, category]))
+
+    expect(byKey.get('grains')).toMatchObject({ quantity: 0, total: -1 })
+    expect(byKey.get('vegetables')).toMatchObject({ quantity: 0, total: -1 })
+  })
+
+  it('does not count wood or stone on multi-slot card fields as crops', () => {
+    const player = createPlayer()
+    player.minorPlayed = ['D075_WoodField', 'E080_RockGarden']
+    player.cardStates = {
+      D075_WoodField: {
+        extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 2 }] },
+      },
+      E080_RockGarden: { extraData: { cardFieldStacks: [{ crop: 'stone', remaining: 2 }] } },
+    }
+
+    const [result] = computeScores(createState(player))
+    const byKey = new Map(result.categories.map((category) => [category.key, category]))
+
+    expect(byKey.get('grains')).toMatchObject({ quantity: 0, total: -1 })
+    expect(byKey.get('vegetables')).toMatchObject({ quantity: 0, total: -1 })
   })
 })
