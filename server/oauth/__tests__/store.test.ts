@@ -7,6 +7,7 @@ import {
   createOAuthState,
   createOnboardingTicket,
   findIdentity,
+  getOnboardingTicket,
   linkIdentity,
 } from '../store.ts'
 
@@ -124,5 +125,16 @@ describe('oauth store', () => {
       returnTo: '/?page=workshop',
     })
     expect((await consumeOnboardingTicket(ticket))).toBeNull()
+  })
+
+  it('expires browser-bound onboarding at fifteen minutes without extending the ticket on reads', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    const ticket = await createOnboardingTicket({ provider: 'google', providerUserId: 'bound-ttl', emailVerified: true }, undefined, undefined, 'ab'.repeat(32))
+    vi.setSystemTime(new Date('2026-01-01T00:14:59.999Z'))
+    expect(await getOnboardingTicket(ticket)).toMatchObject({ providerUserId: 'bound-ttl', onboardingChallenge: 'ab'.repeat(32) })
+    vi.setSystemTime(new Date('2026-01-01T00:15:00Z'))
+    expect(await getOnboardingTicket(ticket)).toBeNull()
+    expect(await consumeOnboardingTicket(ticket)).toBeNull()
   })
 })

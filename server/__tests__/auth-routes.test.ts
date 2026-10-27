@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream'
+import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -932,6 +933,99 @@ describe('auth routes', () => {
     expect((res.json.user as { username: string }).username).toBe('newuser')
     expect(res.headers['Set-Cookie']).toContain('oa_session=')
     expect((await findIdentity('github', 'gh-new'))?.userId).toBe((res.json.user as { id: string }).id)
+  })
+
+  it.each(['github', 'google'] as const)('completes %s onboarding without third-party cookies using a browser-bound ticket', async provider => {
+    const verifier = 'ab'.repeat(32)
+    const challenge = createHash('sha256').update(verifier).digest('hex')
+    const ticket = await createOnboardingTicket({ provider, providerUserId: 'cookie-free', emailVerified: true }, undefined, undefined, challenge)
+    const res = await requestJson('POST', '/api/auth/onboarding/complete', {
+      ticket, verifier, username: 'cookiefree', password: 'password123', confirmPassword: 'password123',
+    })
+    expect(res.status).toBe(200)
+    expect(res.json).toMatchObject({ ok: true, user: { username: 'cookiefree' } })
+    expect(await findIdentity(provider, 'cookie-free')).toEqual({ userId: (res.json.user as { id: string }).id })
+    expect(await getOnboardingTicket(ticket)).toBeNull()
+  })
+
+  it.each(['github', 'google'] as const)('hands off %s registration in a fragment with the initiating browser challenge', async provider => {
+    vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://frontend.example/open-agricola/')
+    const verifier = 'cd'.repeat(32)
+    const challenge = createHash('sha256').update(verifier).digest('hex')
+    const admin = await createLocalUserForTests('inviteadmin', 'password123', 'Admin')
+    const invite = await createInvite(admin.id, { expiresAt: Date.now() + 60_000, maxUses: 1 })
+    vi.stubEnv('ACCOUNT_REGISTRATION_POLICY', 'invite_only')
+    vi.mocked(exchangeOAuthCode).mockResolvedValueOnce({ provider, providerUserId: 'handoff', emailVerified: true })
+    const start = await requestJson('GET', `/api/auth/oauth/${provider}/start?intent=register&onboardingChallenge=${challenge}&inviteCode=${invite.code}&returnTo=%2F%3Fpage%3Dworkshop`)
+    const state = new URL(String(start.headers.Location)).searchParams.get('state')
+    const callback = await requestJson('GET', `/api/auth/oauth/${provider}/callback?state=${state}&code=test-code`, undefined, { Cookie: startOAuthCookie(start) })
+    const location = new URL(String(callback.headers.Location))
+    const ticket = new URLSearchParams(location.hash.slice(1)).get('onboardingTicket')
+    expect(ticket).toMatch(/^[\w-]{43}$/)
+    expect(location.origin + location.pathname + location.search).toBe('https://frontend.example/open-agricola/?page=onboarding')
+    expect(callback.headers['Cache-Control']).toBe('no-store')
+    expect(callback.headers['Referrer-Policy']).toBe('no-referrer')
+    expect(JSON.stringify(callback.headers['Set-Cookie'])).not.toContain('oa_onboarding=')
+    if (!ticket) throw new Error('Missing onboarding handoff')
+    expect(await getOnboardingTicket(ticket)).toMatchObject({ onboardingChallenge: challenge, inviteCodeHash: hashInviteCode(invite.code), returnTo: '/?page=workshop' })
+    const complete = await requestJson('POST', '/api/auth/onboarding/complete', {
+      ticket, verifier, username: 'handoffuser', password: 'password123', confirmPassword: 'password123',
+    })
+    expect(complete.status).toBe(200)
+    expect(complete.json.returnTo).toBe('/?page=workshop')
+    expect(await getDb().prepare('SELECT use_count FROM account_invites WHERE id = ?').get(invite.id)).toEqual({ use_count: 1 })
+  })
+
+  it('rejects a ticket from another browser without consuming it or falling back to a cookie', async () => {
+    const verifier = 'ef'.repeat(32)
+    const challenge = createHash('sha256').update(verifier).digest('hex')
+    const ticket = await createOnboardingTicket({ provider: 'github', providerUserId: 'bound', emailVerified: true }, undefined, undefined, challenge)
+    for (const wrongVerifier of [undefined, 123, 'wrong', 'ab'.repeat(32)]) {
+      const response = await requestJson('POST', '/api/auth/onboarding/complete', {
+        ticket, verifier: wrongVerifier, username: 'wrongbrowser', password: 'password123', confirmPassword: 'password123',
+      }, { Cookie: `oa_onboarding=${ticket}` })
+      expect(response.status).toBe(400)
+      expect(response.json.code).toBe('oauth_onboarding_invalid')
+      expect(await getOnboardingTicket(ticket)).not.toBeNull()
+      expect(await findIdentity('github', 'bound')).toBeNull()
+    }
+  })
+
+  it('does not accept an unbound cookie ticket as an explicit handoff credential', async () => {
+    const ticket = await createOnboardingTicket({ provider: 'github', providerUserId: 'cookie-only', emailVerified: true })
+    const response = await requestJson('POST', '/api/auth/onboarding/complete', {
+      ticket, verifier: 'ab'.repeat(32), username: 'unbound', password: 'password123', confirmPassword: 'password123',
+    })
+    expect(response.status).toBe(400)
+    expect(response.json.code).toBe('oauth_onboarding_invalid')
+    expect(await getOnboardingTicket(ticket)).not.toBeNull()
+  })
+
+  it('distinguishes missing registration credentials from the fifteen-minute ticket expiry', async () => {
+    const body = { username: 'expired', password: 'password123', confirmPassword: 'password123' }
+    const missing = await requestJson('POST', '/api/auth/onboarding/complete', body)
+    expect(missing.status).toBe(400)
+    expect(missing.json.code).toBe('oauth_onboarding_missing')
+    const ticket = await createOnboardingTicket({ provider: 'google', providerUserId: 'expired', emailVerified: true })
+    await getDb().prepare('UPDATE oauth_onboarding_tickets SET created_at = ?, expires_at = ?').run(Date.now() - 15 * 60_000, Date.now())
+    const expired = await requestJson('POST', '/api/auth/onboarding/complete', body, { Cookie: `oa_onboarding=${ticket}` })
+    expect(expired.status).toBe(400)
+    expect(expired.json.code).toBe('oauth_onboarding_expired')
+    expect(await findIdentity('google', 'expired')).toBeNull()
+  })
+
+  it('preserves the browser-bound ticket after validation errors and consumes it once under concurrent submissions', async () => {
+    const verifier = '12'.repeat(32)
+    const challenge = createHash('sha256').update(verifier).digest('hex')
+    const ticket = await createOnboardingTicket({ provider: 'google', providerUserId: 'bound-race', emailVerified: true }, undefined, undefined, challenge)
+    const body = { ticket, verifier, username: 'bounduser', password: 'password123', confirmPassword: 'different123' }
+    const mismatch = await requestJson('POST', '/api/auth/onboarding/complete', body)
+    expect(mismatch.json.code).toBe('password_mismatch')
+    expect(await getOnboardingTicket(ticket)).not.toBeNull()
+    const responses = await Promise.all(['firstbound', 'secondbound'].map(username => requestJson('POST', '/api/auth/onboarding/complete', { ...body, username, confirmPassword: body.password })))
+    expect(responses.map(response => response.status).sort()).toEqual([200, 400])
+    expect(responses.find(response => response.status === 400)?.json.code).toBe('oauth_onboarding_expired')
+    expect(await getDb().prepare('SELECT COUNT(*) AS n FROM auth_identities').get()).toEqual({ n: 1 })
   })
 
   it('consumes one onboarding ticket and creates one identity under concurrent submissions', async () => {

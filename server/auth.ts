@@ -42,6 +42,8 @@ export type AuthErrorCode =
   | 'oauth_identity_taken'
   | 'oauth_onboarding_required'
   | 'oauth_onboarding_expired'
+  | 'oauth_onboarding_missing'
+  | 'oauth_onboarding_invalid'
   | 'not_authenticated'
   | 'rate_limited'
   | 'missing_fields'
