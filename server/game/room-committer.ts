@@ -4,6 +4,7 @@ import type { OwnerToken } from './room-directory'
 import { RoomOwnershipError } from './room-directory'
 import { nextInputWindow } from './command-input'
 import type { CommandReceiptWrite } from './command-store'
+import { CommandError } from './command-store'
 import { RoomHistoryCorruptionError } from './persistence/room-history-store'
 import { ReplayResources, ReplayAssetValidationError } from '../storage/replay-resources'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
@@ -77,7 +78,7 @@ type PendingCommit = {
   error: string
   timer: unknown | null
   onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void | Promise<void>
-  waiters: Array<(error?: string) => void>
+  waiters: Array<(error?: string, cause?: CommandError) => void>
 }
 
 type PendingReplayLoad = {
@@ -86,7 +87,7 @@ type PendingReplayLoad = {
   retryIndex: number
   error: string
   timer: unknown | null
-  waiters: Array<(error?: string) => void>
+  waiters: Array<(error?: string, cause?: CommandError) => void>
 }
 
 const defaultScheduler: RoomCommitScheduler = {
@@ -281,7 +282,7 @@ export class RoomCommitter {
       this.pendingReplayLoads.get(roomId)?.error
   }
 
-  waitUntilReady(roomId: string, callback: (error?: string) => void): boolean {
+  waitUntilReady(roomId: string, callback: (error?: string, cause?: CommandError) => void): boolean {
     const pending = this.pending.get(roomId) ?? this.pendingReplayLoads.get(roomId)
     if (!pending) return false
     pending.waiters.push(callback)
@@ -323,6 +324,7 @@ export class RoomCommitter {
     try {
       return (await this.prepareLoadedRoom(room, options, persisted))
     } catch (error) {
+      if (error instanceof CommandError) throw error
       if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) return this.blockPermanently(room.id, errorMessage(error))
       if (error instanceof RoomHistoryCorruptionError) return this.blockPermanently(room.id, errorMessage(error))
       if (error instanceof ReplayAssetValidationError) {
@@ -373,6 +375,8 @@ export class RoomCommitter {
     const commit: ReplayCommit = {
       roomId: room.id,
       retireRoomId: options.retireRoomId,
+      creationConfiguration: room.creationConfiguration,
+      creationSource: room.creationSource,
       retiredOwner: options.retiredOwner,
       retiredVersion: options.retiredVersion,
       serialized,
@@ -555,6 +559,7 @@ export class RoomCommitter {
       return this.acceptCommit(room, commit, frame, encoded, privateCursor)
     } catch (error) {
       const message = errorMessage(error)
+      if (error instanceof CommandError) throw error
       if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) return this.blockPermanently(room.id, message)
       if (this.stopped) return { kind: 'blocked', error: message }
       const pending: PendingCommit = {
@@ -644,7 +649,10 @@ export class RoomCommitter {
       this.updateStorageFailed()
       pending.waiters.splice(0).forEach((waiter) => waiter(error))
     } catch (error) {
-      if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError)) { this.blockPermanently(pending.room.id, error.message); return }
+      if ((error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError || error instanceof CommandError)) {
+        this.blockPermanently(pending.room.id, error.message, error instanceof CommandError ? error : undefined)
+        return
+      }
       pending.error = errorMessage(error)
       console.warn(JSON.stringify({
         event: 'durable_room_commit_retry_failed',
@@ -697,8 +705,8 @@ export class RoomCommitter {
       const persisted = (await this.persistence.loadReplayHead(pending.room.id))
       result = (await this.prepareLoadedRoom(pending.room, pending.options, persisted))
     } catch (error) {
-      if (error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError || error instanceof RoomHistoryCorruptionError) {
-        this.blockPermanently(pending.room.id, errorMessage(error))
+      if (error instanceof RoomOwnershipError || error instanceof ExecutionRevokedError || error instanceof RoomHistoryCorruptionError || error instanceof CommandError) {
+        this.blockPermanently(pending.room.id, errorMessage(error), error instanceof CommandError ? error : undefined)
         return
       }
       if (error instanceof ReplayAssetValidationError) {
@@ -765,7 +773,7 @@ export class RoomCommitter {
     }
   }
 
-  private blockPermanently(roomId: string, error: string): Extract<RoomCommitResult, { kind: 'blocked' }> {
+  private blockPermanently(roomId: string, error: string, cause?: CommandError): Extract<RoomCommitResult, { kind: 'blocked' }> {
     const pending = this.pending.get(roomId)
     const pendingLoad = this.pendingReplayLoads.get(roomId)
     if (pending?.timer !== null && pending?.timer !== undefined) {
@@ -779,8 +787,8 @@ export class RoomCommitter {
     this.permanentErrors.set(roomId, error)
     this.updateStorageFailed()
     console.error(JSON.stringify({ event: 'durable_room_commit_blocked', roomId, error }))
-    pending?.waiters.forEach((waiter) => waiter(error))
-    pendingLoad?.waiters.forEach((waiter) => waiter(error))
+    pending?.waiters.forEach((waiter) => cause ? waiter(error, cause) : waiter(error))
+    pendingLoad?.waiters.forEach((waiter) => cause ? waiter(error, cause) : waiter(error))
     return { kind: 'blocked', error }
   }
 }

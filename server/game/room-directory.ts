@@ -244,7 +244,7 @@ export class RoomDirectory {
       JOIN room_ownership o ON o.room_id=r.id AND o.status='active' AND o.lease_until>?
       JOIN app_instances i ON i.instance_id=o.instance_id AND i.status='ready' AND i.lease_until>?
       LEFT JOIN room_presence p ON p.room_id=r.id AND p.epoch=o.epoch
-      WHERE r.hotseat=0 AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
+      WHERE r.hotseat=0 AND r.max_players>1 AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
         AND (r.invited_user_ids IS NULL OR r.created_by=? OR jsonb_exists(r.invited_user_ids, ?))
       ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; status: string; occupied: number; invited: boolean }>(now, now, userId ?? null, userId ?? null, limit)
     return rows.map(row => ({ id: row.id, playerCount: row.occupied, maxPlayers: row.max_players,

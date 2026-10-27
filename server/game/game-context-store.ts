@@ -1,6 +1,9 @@
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { emptyRoomTtlMs, isDevRoom } from './room.ts'
 import { persistedRoomAccessError } from './room-access'
+import { GameCreationStore } from './game-creation-store'
+import type { SoloCreationConfigurationResponse } from '../../shared/contract/game-creation'
+import { resolveSoloWorkshopCards } from './workshop-room-cards'
 import type {
   CompletedGameContextDescriptor,
   GameContextLifecycle,
@@ -59,6 +62,13 @@ const removedReason = (
 
 export class GameContextStore {
   private readonly db: StoreDatabase
+
+  async readCreationConfiguration(roomId: string, userId?: string): Promise<SoloCreationConfigurationResponse> {
+    const source = await new GameCreationStore(this.db).completedSource(roomId, userId)
+    if (!source.ok) return source
+    const resolved = await resolveSoloWorkshopCards(this.db, source.record.configuration)
+    return { ok: true, configuration: source.record.configuration, issues: resolved.issues }
+  }
   private readonly now: () => number
 
   constructor(

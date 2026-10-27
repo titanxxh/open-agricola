@@ -6,6 +6,7 @@ import type { GameContextError, GameContextResponse } from '../shared/contract/p
 import { GameContextStore } from './game/game-context-store.ts'
 
 const CONTEXT_ROUTE = /^\/api\/v1\/game-contexts\/([^/]+)$/
+const CREATION_ROUTE = /^\/api\/v1\/game-contexts\/([^/]+)\/creation-configuration$/
 const CONTEXT_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
 
 const errorStatus = (error: GameContextError): number => {
@@ -83,7 +84,8 @@ export async function handleGameContextRoute(
 ): Promise<Awaited<boolean>> {
   if (req.method !== 'GET' || !req.url) return false
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
-  const match = CONTEXT_ROUTE.exec(url.pathname)
+  const creation = CREATION_ROUTE.exec(url.pathname)
+  const match = creation ?? CONTEXT_ROUTE.exec(url.pathname)
   if (!match) return false
   let roomId = ''
   try {
@@ -102,6 +104,15 @@ export async function handleGameContextRoute(
       code: 'invalid_context_link',
       message: 'Invalid game context link',
     })
+    return true
+  }
+  if (creation) {
+    const response = await store.readCreationConfiguration(roomId, user?.id)
+    const status = response.ok ? 200 : response.code === 'login_required' ? 401
+      : response.code === 'not_participant' ? 403 : response.code === 'source_removed' ? 410 : 409
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
+      ...corsHeaders({ methods: 'GET,OPTIONS', headers: 'Content-Type, Authorization' }) })
+    res.end(JSON.stringify(response))
     return true
   }
   const response = (await store.resolve(roomId, user?.id))

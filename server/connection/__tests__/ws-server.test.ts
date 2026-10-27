@@ -291,6 +291,83 @@ it('completes an owned two-seat game and durably deduplicates its WebSocket rema
   }
 })
 
+it('recovers an authenticated solo rematch after a lost receipt through allocation, reconnect and the persisted command', async () => {
+  vi.stubEnv('ALLOW_ANONYMOUS_WS', 'false')
+  const { createLocalUserForTests, createSession } = await import('../../auth.ts')
+  const user = await createLocalUserForTests(`solo_${randomUUID().replaceAll('-', '').slice(0, 12)}`, 'password123', 'Solo owner')
+  const token = await createSession(user.id)
+  const db = getDb()
+  const directory = new RoomDirectory(db)
+  const persistence = new PostgresRoomPersistence(db, directory)
+  const http = createServer()
+  await new Promise<void>(done => { http.listen(0, '127.0.0.1', done) })
+  const port = (http.address() as AddressInfo).port
+  const backend = await createWsServer(http, { persistence, directory, internalUrl: `http://127.0.0.1:${port}`, ...recording })
+  const peers: TestSocket[] = []
+  const connect = async () => {
+    const socket = Object.assign(new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { Cookie: `oa_session=${token}` } }), { received: [] as ServerEvent[] })
+    peers.push(socket); attachCollector(socket); await waitForOpen(socket)
+    return socket
+  }
+  const identity = async (socket: TestSocket) => {
+    const requestId = randomUUID()
+    socket.send(JSON.stringify({ type: 'getCommandScope', requestId }))
+    const event = await waitForEvent(socket, (event): event is Extract<ServerEvent, { type: 'commandScope' }> => event.type === 'commandScope' && event.requestId === requestId)
+    return { scopeId: event.scope.scopeId, commandId: randomUUID(), allocationId: randomUUID() }
+  }
+  try {
+    const first = await connect()
+    const firstIdentity = await identity(first)
+    await directory.allocate(`user:${user.id}`, firstIdentity.allocationId)
+    first.send(JSON.stringify({ type: 'createRoom', maxPlayers: 1, soloHandMode: 'random', commandContext: firstIdentity, requestId: 'first-solo' }))
+    const opening = await waitForEvent(first, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    expect(opening.payload.state.players).toHaveLength(1)
+    const source = backend.registry.get(opening.roomId)!
+    const terminal = source.session.loadState({ ...source.session.state, round: 14, gameOver: true })
+    await backend.committer.commit(source, terminal, { commandType: 'test-completion', intentJson: '{}' }, 0)
+    first.close()
+    await new Promise<void>(done => first.once('close', done))
+    backend.registry.delete(source.id)
+    source.session.dispose()
+    await db.prepare('DELETE FROM game_replay_steps WHERE room_id=?').run(source.id)
+    const before = await recording.gameContextStore.resolve(source.id)
+
+    const second = await connect()
+    const commandContext = await identity(second)
+    await directory.allocate(`user:${user.id}`, commandContext.allocationId)
+    const sendTo = backend.broadcaster.sendTo.bind(backend.broadcaster)
+    vi.spyOn(backend.broadcaster, 'sendTo').mockImplementation((socket, event) => {
+      if (event.type === 'commandReceipt' && event.requestId === 'lost-rematch') return
+      sendTo(socket, event)
+    })
+    const rematch = { type: 'createRoom', sourceGameContextId: source.id, commandContext }
+    second.send(JSON.stringify({ ...rematch, requestId: 'lost-rematch' }))
+    const created = await waitForEvent(second, (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated')
+    expect(second.received.some(event => event.type === 'commandReceipt' && event.requestId === 'lost-rematch')).toBe(false)
+    second.close()
+    await new Promise<void>(done => second.once('close', done))
+
+    const recovered = await connect()
+    recovered.send(JSON.stringify({ type: 'getCommandReceipt', identity: commandContext, requestId: 'recover-receipt' }))
+    const receipt = await waitForEvent(recovered, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> => event.type === 'commandReceipt' && event.requestId === 'recover-receipt')
+    expect(receipt).toMatchObject({ status: 'completed', receipt: { outcome: { ok: true, roomId: created.roomId, stepNo: 0 } } })
+    recovered.send(JSON.stringify({ ...rematch, requestId: 'retry-original' }))
+    const duplicate = await waitForEvent(recovered, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> => event.type === 'commandReceipt' && event.requestId === 'retry-original')
+    expect(duplicate).toMatchObject(receipt.status === 'completed' ? { status: 'completed', receipt: receipt.receipt } : {})
+    await sendCommand(recovered, { type: 'joinRoom', roomId: created.roomId, intent: 'resume' })
+    const resumed = await waitForEvent(recovered, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+    expect(resumed.roomId).toBe(created.roomId)
+    expect(resumed.payload.state.players).toHaveLength(1)
+    expect(await db.prepare('SELECT count(*) AS count FROM rooms WHERE max_players=1').get()).toEqual({ count: 1 })
+    expect(await recording.gameContextStore.resolve(source.id)).toEqual(before)
+    expect(await persistence.loadCreationConfiguration(created.roomId)).toEqual(await persistence.loadCreationConfiguration(source.id))
+  } finally {
+    for (const peer of peers) peer.close()
+    await backend.shutdown()
+    await new Promise<void>(done => http.close(() => done()))
+  }
+}, 30_000)
+
 describe('room-manager ws sync', () => {
   let server: ReturnType<typeof createServer>
   let wsServerResult: Awaited<ReturnType<typeof createWsServer>>

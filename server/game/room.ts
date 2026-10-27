@@ -10,6 +10,7 @@ import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
 import type { RoomAccess } from '../../shared/contract/room-access'
 import { canAccessRoom } from './room-access'
+import type { GameCreationRecord, SoloHandMode } from '../../shared/contract/game-creation'
 import {
   createIsolatedGameSession,
   type CustomSessionExecutor,
@@ -38,6 +39,9 @@ export type Room = {
   players: RoomPlayer[]
   seatOwners?: RoomSeatOwner[]
   maxPlayers: number
+  soloHandMode?: SoloHandMode
+  creationConfiguration?: GameCreationRecord
+  creationSource?: { roomId: string; userId: string }
   version: number
   status: RoomStatus
   colorConfirmationPlayerIndex?: number
@@ -199,6 +203,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
   colorConfirmationPlayerIndex: room.colorConfirmationPlayerIndex,
+  ...(room.soloHandMode ? { soloHandMode: room.soloHandMode } : {}),
   customCardDbIds: room.customCardDbIds ?? [],
   ...(room.customCards === undefined ? {} : { customCards: room.customCards }),
   ...(room.replayRecording === undefined
@@ -307,7 +312,7 @@ export function summarizeRoomsForLobby(
   const list: RoomSummary[] = []
   for (const r of source) {
     // Nobody else can take a seat in a hotseat game, so it never shows up here.
-    if (r.hotseat) continue
+    if (r.hotseat || r.maxPlayers === 1) continue
     if (!canAccessRoom(r, userId)) continue
     if (r.players.length === 0 && !isFixedDev(r.id)) continue
     const playerCount = roomOccupiedSeatCount(r)
@@ -382,6 +387,7 @@ export const snapshotToRoom = (
     players: [],
     seatOwners: snapshot.meta.players.map((owner) => ({ ...owner })),
     maxPlayers: snapshot.meta.maxPlayers,
+    soloHandMode: snapshot.meta.soloHandMode,
     version: snapshot.version ?? 0,
     status: snapshot.meta.status,
     colorConfirmationPlayerIndex: snapshot.meta.colorConfirmationPlayerIndex,

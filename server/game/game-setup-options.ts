@@ -1,4 +1,5 @@
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
+import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
 
 export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -10,6 +11,7 @@ export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: numb
  */
 export type GameSetupRequest = {
   playerCount: number
+  soloHandMode?: SoloHandMode
   enableCommunityDeck: boolean
   enableParentCards: boolean
   draftParents: boolean | undefined
@@ -22,11 +24,11 @@ export type GameSetupRequest = {
   hotseat: boolean
 }
 
-export const PLAYER_COUNT_MIN = 2
+export const PLAYER_COUNT_MIN = 1
 export const PLAYER_COUNT_MAX = 6
 
 export const clampPlayerCount = (value: unknown): number => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return PLAYER_COUNT_MIN
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 2
   return Math.min(Math.max(PLAYER_COUNT_MIN, Math.floor(value)), PLAYER_COUNT_MAX)
 }
 
@@ -49,6 +51,8 @@ export const parseGameSetupRequest = (
   draft: DraftSetupOptions | null,
 ): GameSetupRequest => ({
   playerCount: clampPlayerCount(raw.maxPlayers ?? raw.playerCount),
+  ...(clampPlayerCount(raw.maxPlayers ?? raw.playerCount) === 1
+    ? { soloHandMode: raw.soloHandMode === 'choose-7' ? 'choose-7' : 'random' } : {}),
   enableCommunityDeck: raw.enableCommunityDeck === true,
   enableParentCards: raw.enableParentCards === true,
   draftParents: raw.draftParents === false ? false : undefined,
@@ -62,6 +66,7 @@ export const parseGameSetupRequest = (
 
 export const buildInitialStateOptions = (request: GameSetupRequest): InitialStateOptions => ({
   playerCount: request.playerCount,
+  ...(request.soloHandMode ? { soloHandMode: request.soloHandMode } : {}),
   enableCommunityDeck: request.enableCommunityDeck,
   enableParentCards: request.enableParentCards,
   ...(request.draftParents === false ? { draftParents: false } : {}),
@@ -72,6 +77,17 @@ export const buildInitialStateOptions = (request: GameSetupRequest): InitialStat
   ...(request.draft
     ? { draftMode: request.draft.draftMode, draftPoolSize: request.draft.draftPoolSize }
     : {}),
+})
+
+export const soloCreationConfiguration = (setup: GameSetupRequest, customCardIds: string[]): SoloCreationConfiguration => ({
+  kind: 'standard-solo', maxPlayers: 1, soloHandMode: setup.soloHandMode ?? 'random',
+  enableCommunityDeck: setup.enableCommunityDeck,
+  customCardIds: [...new Set(customCardIds)].sort(),
+  officialCardPool: 'default-implemented-A-E',
+  enableParentCards: setup.enableParentCards,
+  draftParents: setup.draftParents !== false,
+  enableThroughTheSeasons: setup.enableThroughTheSeasons,
+  enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
 })
 
 /** Community-deck cards are only honoured when the community deck is on. */

@@ -1,3 +1,5 @@
+import type { SoloCreationErrorCode, SoloCreationConfiguration, SoloCreationIssue } from '../game-creation'
+
 /** Stable across transports; requestId is only a single-connection correlation. */
 export type CommandIdentity = { scopeId: string; commandId: string }
 export type CommandScope = { scopeId: string; expiresAt: number }
@@ -11,8 +13,9 @@ export type CommandOutcome = {
   playerIndex?: number
   error?: string
   code?: string
+  creationAdjustment?: { configuration: SoloCreationConfiguration; issues: SoloCreationIssue[] }
 }
 export type CommandReceipt = CommandIdentity & { outcome: CommandOutcome }
-export type CommandErrorCode = 'command_identity_required' | 'command_scope_expired' | 'command_content_conflict' | 'command_input_stale' | 'command_pending'
+export type CommandErrorCode = 'command_identity_required' | 'command_scope_expired' | 'command_content_conflict' | 'command_input_stale' | 'command_pending' | SoloCreationErrorCode
 /** The opaque window identifies opening hands, a draft round or parents, and changes on undo. */
 export type InputWindow = { id: string; kind: 'draft' | 'parent' | 'solo-hand' }
