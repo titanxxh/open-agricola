@@ -50,7 +50,7 @@ export class SoloNetworkPeer {
     })
   }
 
-  async mutate(command: ClientCommand, state?: StateUpdateEnvelope, allocationId?: string) {
+  async prepare(command: ClientCommand, state?: StateUpdateEnvelope, allocationId?: string) {
     const scopeRequest = randomUUID()
     this.socket.send(JSON.stringify({ type: 'getCommandScope', requestId: scopeRequest }))
     const scope = await this.wait((event): event is Extract<ServerEvent, { type: 'commandScope' }> =>
@@ -60,13 +60,18 @@ export class SoloNetworkPeer {
       ...(state ? { roomId: state.roomId, expectedVersion: state.version, inputWindowId: state.inputWindow?.id } : {}),
     }
     const requestId = randomUUID()
-    this.socket.send(JSON.stringify({ ...command, requestId, commandContext: identity }))
+    return { identity, requestId, command: { ...command, requestId, commandContext: identity } }
+  }
+
+  async mutate(command: ClientCommand, state?: StateUpdateEnvelope, allocationId?: string) {
+    const prepared = await this.prepare(command, state, allocationId)
+    this.socket.send(JSON.stringify(prepared.command))
     const receipt = await this.wait((event): event is Extract<ServerEvent, { type: 'commandReceipt' }> =>
-      event.type === 'commandReceipt' && event.requestId === requestId)
+      event.type === 'commandReceipt' && event.requestId === prepared.requestId)
     if (receipt.status !== 'completed' || !receipt.receipt.outcome.ok) throw new Error(`Command rejected: ${JSON.stringify(receipt)}`)
     const next = await this.wait((event): event is StateUpdateEnvelope => event.type === 'stateUpdate'
       && event.roomId === receipt.receipt.outcome.roomId && event.version === receipt.receipt.outcome.roomVersion)
-    return { identity, receipt: receipt.receipt, state: next }
+    return { identity: prepared.identity, receipt: receipt.receipt, state: next }
   }
 
   async close(): Promise<void> {
@@ -77,10 +82,8 @@ export class SoloNetworkPeer {
   }
 }
 
-/** A real backend process with one private PG schema and one private S3 prefix. */
-export async function startFormalSoloBackend(db: PostgresDatabase) {
-  const schema = await db.prepare('SELECT current_schema() AS name').get<{ name: string }>()
-  if (!schema?.name.startsWith('test_')) throw new Error('Formal acceptance requires a private test schema')
+/** Keep this owner alive across service rebuilds; close only after recovery assertions. */
+export async function createFormalSoloRecording(db: PostgresDatabase) {
   const storage = testStorageEnvironment()
   const prefix = `test/solo-matrix-${randomUUID()}/`
   const objects = S3ObjectStore.fromEnv(storage, prefix)
@@ -89,11 +92,27 @@ export async function startFormalSoloBackend(db: PostgresDatabase) {
   const html = Buffer.from('<main>Standard solo network acceptance</main>')
   const manifest = Buffer.from(JSON.stringify({ entrypoint: 'index.html', files: { 'index.html': objectHash(html) } }))
   const buildId = objectHash(manifest)
-  let backend: ReturnType<typeof spawn> | undefined
-  let output = ''
   try {
     await resources.stage(`replay-viewers/${buildId}/index.html`, html, 'text/html')
     await replay.publishViewer(buildId, manifest)
+    return { environment: storage, prefix, buildId, resources: replay,
+      close: async () => { try { await objects.clearPrefix() } finally { objects.close() } },
+    }
+  } catch (error) {
+    try { await objects.clearPrefix() } finally { objects.close() }
+    throw error
+  }
+}
+
+/** A real backend process with one private PG schema and one private S3 prefix. */
+export async function startFormalSoloBackend(db: PostgresDatabase) {
+  const schema = await db.prepare('SELECT current_schema() AS name').get<{ name: string }>()
+  if (!schema?.name.startsWith('test_')) throw new Error('Formal acceptance requires a private test schema')
+  const recording = await createFormalSoloRecording(db)
+  const { buildId, prefix } = recording
+  let backend: ReturnType<typeof spawn> | undefined
+  let output = ''
+  try {
     const reservation = createServer()
     reservation.listen(0, '127.0.0.1')
     await once(reservation, 'listening')
@@ -103,7 +122,7 @@ export async function startFormalSoloBackend(db: PostgresDatabase) {
     const baseUrl = `http://127.0.0.1:${address.port}`
     backend = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
       cwd: fileURLToPath(new URL('../../../', import.meta.url)),
-      env: { ...process.env, ...storage,
+      env: { ...process.env, ...recording.environment,
         NODE_ENV: 'production', DATABASE_URL: getTestDatabaseUrl(), DATABASE_SCHEMA: schema.name,
         S3_PREFIX: prefix, BACKEND_PORT: String(address.port), BACKEND_HOST: '127.0.0.1',
         INSTANCE_INTERNAL_URL: baseUrl, PUBLIC_APP_ORIGIN: baseUrl,
@@ -132,15 +151,11 @@ export async function startFormalSoloBackend(db: PostgresDatabase) {
       baseUrl, buildId, schema: schema.name, prefix, processId: child.pid,
       output: () => output,
       close: async () => {
-        try { await stop(child) } finally {
-          try { await objects.clearPrefix() } finally { objects.close() }
-        }
+        try { await stop(child) } finally { await recording.close() }
       },
     }
   } catch (error) {
-    try { if (backend) await stop(backend) } finally {
-      try { await objects.clearPrefix() } finally { objects.close() }
-    }
+    try { if (backend) await stop(backend) } finally { await recording.close() }
     throw error
   }
 }
