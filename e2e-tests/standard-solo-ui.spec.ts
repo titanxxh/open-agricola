@@ -187,13 +187,14 @@ test('solo choose-7 preserves candidates and the confirmed result across fresh b
   } finally { await Promise.all([context.close(), second.close(), confirmedContext?.close()]) }
 })
 
-test('a natural fourteen-round solo keeps both owner rematch entries independent from the Viewer', async ({ browser, request }) => {
+test('a natural fourteen-round solo keeps both owner rematch entries independent from the Viewer', async ({ browser, request }, testInfo) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
   const visitor = await browser.newContext()
   try {
     await authenticate(context, request, `solo_finish_${Date.now().toString(36)}`)
     const page = await context.newPage()
     const state = observe(page)
+    try {
     await openSolo(page)
     await expect(page.locator('.game-layout')).toBeVisible()
     const originalUrl = page.url()
@@ -250,6 +251,20 @@ test('a natural fourteen-round solo keeps both owner rematch entries independent
     expect(state.latest().state.round).toBe(1)
     const retained = await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${originalId}`)
     expect((await retained.json()).result.players[0].score).toBe(-14)
+    } catch (error) {
+      try {
+        const snapshot = structuredClone({ latest: state.snapshots.at(-1), events: state.driver.events,
+          commands: state.sent.map(command => command.type === 'auth' ? { type: 'auth', token: '<REDACTED>' } : command),
+          lastReceipt: state.driver.events.findLast(event => event.type === 'commandReceipt'),
+        })
+        const dom = await page.content().catch(() => null)
+        const persisted = snapshot.latest ? await checkpoint(snapshot.latest.roomId).catch(() => ({ unavailable: true })) : null
+        await recordSoloEvidence(testInfo, 'natural-solo-failure', { ...snapshot, dom, persisted })
+      } catch {
+        console.warn('Unable to record natural solo failure diagnostics')
+      }
+      throw error
+    }
   } finally { await Promise.all([context.close(), visitor.close()]) }
 })
 
