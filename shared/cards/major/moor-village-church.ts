@@ -1,8 +1,8 @@
 import { defineMajorCard } from '../card-source'
 import type { CardSourceMetaInput } from '../card-source'
 import type { CardImpl } from '../registry'
-import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import type { GameState, PlayerState } from '../../contract/types'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import { createSingleHarvestExchange } from '../helpers/stage-effects'
 
 const CARD_ID = 'Major_Moor_VillageChurch'
 
@@ -10,17 +10,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { food: 2 }),
-    onHarvest: (_state: GameState, player: PlayerState) => {
-      if ((player.resources.fuel ?? 0) < 1) return
-      return {
-        type: 'seq' as const,
-        optional: true,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { fuel: 1 } }),
-          { type: 'leaf' as const, actionId: 'bonus-vp' as const, sourceCard: CARD_ID },
-        ],
-      }
-    },
+    onHarvest: createSingleHarvestExchange(CARD_ID),
   },
 } satisfies CardImpl
 
@@ -34,6 +24,10 @@ export const Major_Moor_VillageChurch = defineMajorCard({
     cost: { wood: 2, stone: 4 },
     vp: 4,
     extraVp: true,
+    exchanges: [{
+      from: { fuel: 1 }, to: {}, max: 1, sourceId: CARD_ID, triggers: ['harvest'],
+      sideEffect: { type: 'bonusVp', amount: 1 },
+    }],
     requiresFarmersOfTheMoor: true,
     desc: [
       '[Harvest]',
