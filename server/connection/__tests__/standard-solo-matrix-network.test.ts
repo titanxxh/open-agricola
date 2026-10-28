@@ -91,7 +91,7 @@ describe('formal solo creation over the real network', () => {
         checkpointStepNo: step0!.checkpoint_step_no, frameHash: step0!.frame_hash })
       expect(frame).toMatchObject({ players: [{ id: 'p1' }], phase: configuration.mode === 'choose-7' ? 'solo-hand-selection' : 'playing' })
       expect(await persistence.loadCreationConfiguration(roomId)).toEqual({ configuration: {
-        kind: 'standard-solo', officialCardPool: 'default-implemented-A-E', ...options,
+        kind: 'standard-solo', officialCardPool: 'default-implemented-A-E', ...options, enableMoorBalanceRules: false,
       }, resolvedWorkshopSources: [] })
       let candidates: SoloHandSelectionGroup[] = []
       if (configuration.mode === 'choose-7') {
