@@ -37,7 +37,7 @@ writeFileSync(join(config, 'metrics-token'), dependencies.OBSERVABILITY_METRICS_
 writeFileSync(join(config, 'prometheus.yml'), prometheusConfig({ app: 'app:5175', host: 'node-exporter:9100', accounts: 'accounts-exporter:9201' }), { mode: 0o600 })
 for (const folder of ['prometheus', 'grafana']) mkdirSync(join(values.OBSERVABILITY_DATA_DIR, folder), { recursive: true })
 const docker = (args, options = {}) => execFileSync('docker', args, { encoding: 'utf8', ...options })
-const compose = (directory, args, options = {}) => docker(['compose', '--env-file', join(directory, 'config/runtime.env'), '-f', join(directory, 'operations/compose.prod.yml'), ...args], { stdio: 'inherit', ...options })
+const compose = (directory, args, options = {}) => docker(['compose', '--project-name', 'open-agricola-operations', '--env-file', join(directory, 'config/runtime.env'), '-f', join(directory, 'operations/compose.prod.yml'), ...args], { stdio: 'inherit', ...options })
 const ids = service => docker(['ps', '-aq', '--filter', 'label=com.docker.compose.project=open-agricola', '--filter', `label=com.docker.compose.service=${service}`]).trim().split('\n').filter(Boolean)
 const appIds = ids('app')
 if (!appIds.length) throw new Error('No existing game application container found')
