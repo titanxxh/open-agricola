@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { animalKeysForState } from '../../contract/animals'
 
 const CARD_ID = 'D035_FodderChamber'
 
@@ -7,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (state, player) => {
-    const totalAnimals = player.resources.sheep + player.resources.boar + player.resources.cattle
+    const totalAnimals = animalKeysForState(state).reduce((sum, animal) => sum + (player.resources[animal] ?? 0), 0)
     const divisors = [7, 5, 4, 3, 3, 3]
     const divisor = divisors[state.players.length - 1] ?? 3
     return Math.floor(totalAnimals / divisor)

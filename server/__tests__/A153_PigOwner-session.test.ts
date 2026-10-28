@@ -1,9 +1,8 @@
-import { type SessionResponse } from '../game/authoritative-session'
+import type { GameSession, SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import { describe, expect, it, afterEach } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { createWorkSession } from './_helpers/session-fixtures'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/A/A153_PigOwner'
@@ -13,36 +12,24 @@ import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit16Animals from './_helpers/audit/ae-negative-16-animals'
 
 const CARD_ID = 'A153_PigOwner'
+const directSessions: GameSession[] = []
+afterEach(() => { for (const session of directSessions.splice(0)) session.dispose() })
+const track = (session: GameSession) => { directSessions.push(session); return session }
 
 describe('A153_PigOwner session', () => {
   const setup = (boar = 0) => {
-    const session = new GameSession(42)
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
-
-    const player = state.players[0]!
-    player.occupationHand.push(CARD_ID)
-    player.resources.boar = boar
-    // Place the pigs in a pasture so they count as "on the farm" (A153 counts
-    // on-farm pigs, not supply). Pasture covers 2 spaces in row 2 to avoid
-    // colliding with default rooms at row 0.
-    if (boar > 0) {
-      player.pastures = [
-        {
-          id: 'p1',
-          tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }],
-          animalType: 'boar',
-          animalCount: boar,
-          stables: 0,
-        } as any,
-      ]
-    }
-    session.loadState(state)
-    session.devPlayCard(0, CARD_ID)
-    return session
+    return track(createWorkSession({ seed: 42, configure(state) {
+      const player = state.players[0]!
+      player.occupationPlayed = [CARD_ID]
+      player.resources.boar = boar
+      if (boar > 0) {
+        player.pastures = [{ id: 'pigs',
+          tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }],
+          animalType: 'boar', animalCount: boar }]
+        player.fenceSegments = ['H-0-2', 'H-0-3', 'H-0-4', 'H-1-2', 'H-1-3', 'H-1-4', 'V-0-2', 'V-0-5']
+          .map(edge => ({ edge, type: 'fence' }))
+      }
+    } }))
   }
 
   const enterActiveInteraction = (session: GameSession) => {
@@ -91,9 +78,7 @@ describe('A153 Pig Owner parity', () => {
   const FILLER = '__test_placeholder__'
 
   const setup = ({ played = true, pigs = 0 } = {}) => {
-    const session = new GameSession(6153, undefined, { playerCount: 4 })
-    const state = session.getState().state
-    stabilizeRandomHands(state.players)
+    return track(createWorkSession({ seed: 6153, options: { playerCount: 4 }, configure(state) {
     state.currentPlayerIndex = 0
     state.round = 14
     state.roundPhase = 'work'
@@ -113,17 +98,18 @@ describe('A153 Pig Owner parity', () => {
     player.occupationPlayed = played ? [CARD_ID] : []
     player.pastures = pigs > 0 ? [{
       id: 'pig-owner-pasture',
-      size: 1,
-      tiles: [{ row: 1, col: 0 }],
-      stables: pigs >= 4 ? 1 : 0,
+      tiles: [{ row: 0, col: 3 }],
       animalType: 'boar',
       animalCount: Math.min(pigs, 4),
     }] : []
-    player.houseAnimals = Object.fromEntries(player.roomTiles.slice(0, pigs >= 5 ? 1 : 0).map(tile => [`${tile.row}-${tile.col}`, pigs >= 5 ? 'boar' : null]));
+    player.stableTiles = pigs >= 4 ? [{ row: 0, col: 3 }] : []
+    player.fenceSegments = pigs > 0
+      ? ['H-0-3', 'H-1-3', 'V-0-3', 'V-0-4'].map(edge => ({ edge, type: 'fence' })) : []
+    const petRoom = [...player.roomTiles].sort((a, b) => a.col - b.col || b.row - a.row)[0]!
+    player.houseAnimals = pigs >= 5 ? { [`${petRoom.row}-${petRoom.col}`]: 'boar' } : {}
     player.stableAnimals = {}
     player.resources.boar = pigs
-    session.loadState(state)
-    return session
+    } }))
   }
 
   const enterInteraction = (session: GameSession): SessionResponse => {
