@@ -190,6 +190,7 @@ const createFarmBoardProps = (
     players: [player],
     currentPlayer: player,
     displayPlayer: player,
+    viewerPlayerId: player.id,
     playerPanelSummary: getPlayerPanelSupplySummary({ players: [player] } as GameState, player),
     devMode: false,
     currentStartPlayerId: '',

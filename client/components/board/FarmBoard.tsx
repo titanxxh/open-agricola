@@ -411,6 +411,7 @@ export type FarmBoardView = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
+  viewerPlayerId: string | null
   activePlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
   devMode: boolean
@@ -854,6 +855,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     players,
     currentPlayer,
     displayPlayer,
+    viewerPlayerId,
     activePlayerId,
     playerPanelSummary,
     currentStartPlayerId,
@@ -1034,7 +1036,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const handPanel = (
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === activeFarmPlayerId || devMode ? (
+      {displayPlayer.id === viewerPlayerId || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
           <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>

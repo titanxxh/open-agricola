@@ -91,6 +91,7 @@ const props = (
     players,
     currentPlayer,
     displayPlayer,
+    viewerPlayerId: currentPlayer.id,
     playerPanelSummary,
     devMode: false,
     currentStartPlayerId: '',

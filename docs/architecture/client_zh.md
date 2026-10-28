@@ -43,6 +43,7 @@
 
 - `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
+- `FarmBoardView.viewerPlayerId` 决定可见的私有手牌，独立于 Interaction Player。联机座位在其他玩家回合仍能查看自己的手牌，提交仍需本机座位的交互权限。热座沿用已确认的接机身份，浏览公开农场时隐藏手牌。覆盖见 `GameContainerApi.hotseat.test.tsx`、`ws-dual-player.spec.ts` 与 `hotseat-public-farms.spec.ts`。
 - 轮抽与父母卡选择阶段在独立滚动的选卡区域上方保留 `GameHeader`。内嵌模式保留语言切换。测试见 `setup-navigation.spec.ts`。
 - `RoomInvitePicker.tsx` 在输入两个字符后搜索用户名或显示名前缀，支持点击与键盘选择，等待输入法组字结束，并丢弃已取消请求的响应。已选玩家显示为带用户名、可移除的名字标签，账号 ID 只用于创建请求。服务端确认 Room 后从 URL 移除创建选项，所有准入决定仍由服务端执行。覆盖：`RoomInvitePicker.test.tsx`、`room-invitations.spec.ts`。
 - `MyActiveGames.tsx` 通过参与者名字和颜色识别对局，显示本地时区的创建或开局时间，以及服务端给出的当前行动玩家。继续游戏使用 Room ID，但不展示该 ID。覆盖：`LobbyPage.test.tsx`、`room-invitations.spec.ts`、`lobby-active-games.spec.ts`。
