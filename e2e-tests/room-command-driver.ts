@@ -124,7 +124,16 @@ export function roomDriver(pages: [Page, Page]) {
       await expect.poll(() => page.evaluate(() => !!window.lifecycleUpdate)).toBe(true)
     }
   }
-  return { command, ui, reload }
+  const newGame = async (seed = 428029) => {
+    const previousRoomId = await pages[0].evaluate(() => window.lifecycleUpdate?.roomId)
+    if (!previousRoomId) throw new Error('Room has not synchronized')
+    await command(0, { type: 'newGame', seed })
+    for (const page of pages) {
+      await expect.poll(() => page.evaluate(() => window.lifecycleUpdate?.roomId)).not.toBe(previousRoomId)
+      await expect.poll(() => page.evaluate(() => window.lifecycleUpdate?.payload.state.gameOver)).toBe(false)
+    }
+  }
+  return { command, ui, reload, newGame }
 }
 
 export const publicRoomState = ({ state, scores }: GameSyncPayload) => ({
