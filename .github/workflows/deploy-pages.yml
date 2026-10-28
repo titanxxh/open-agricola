@@ -35,14 +35,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
-          VITE_BASE_PATH: /open-agricola/
           VITE_ENABLE_COMMUNITY_DECK: ${{ vars.VITE_ENABLE_COMMUNITY_DECK }}
           VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
-        run: pnpm run build
+        run: pnpm run build:pages-frontend
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: dist
+          path: dist-pages
 
   deploy:
     needs: build

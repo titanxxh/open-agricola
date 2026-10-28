@@ -24,11 +24,19 @@ it.each(['https://example.com', 'https://203.0.113.7:8443'])('allows same-origin
   expect(target.apiUrl).toBe(origin)
 })
 
+it('accepts the Pages root frontend and same-site API as separate origins', () => {
+  expect(parseSmokeTarget('https://open-agricola.titanxxh.com/', 'https://openagapi.titanxxh.com', 'selected-build')).toEqual({
+    appUrl: 'https://open-agricola.titanxxh.com/', apiUrl: 'https://openagapi.titanxxh.com', buildId: 'selected-build',
+  })
+})
+
 it.each([
   ['https://user:secret@example.com/open-agricola/', 'https://example.com'],
   ['https://example.com/open-agricola/?token=secret', 'https://example.com'],
   ['https://example.com/open-agricola/', 'https://example.com?token=secret'],
-  ['https://example.com/open-agricola/', 'https://other.example.com'],
+  ['https://example.com/open-agricola/', 'https://other.example.net'],
+  ['https://alice.github.io/', 'https://bob.github.io'],
+  ['https://example.com/unknown/', 'https://example.com'],
 ])('rejects an unsafe hosted target %s with API %s', (app, api) => {
   expect(() => parseSmokeTarget(app, api, 'selected-build')).toThrow()
 })

@@ -7,5 +7,5 @@ export type AppLocationResponse =
 export type FrontendBuild = {
   format: 1
   gameBuildId: string
-  basePath: typeof HOSTED_APP_PATH
+  basePath: '/' | typeof HOSTED_APP_PATH
 }

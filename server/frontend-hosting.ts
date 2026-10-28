@@ -3,6 +3,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename, extname, join, resolve, sep } from 'node:path'
 import { HOSTED_APP_PATH, type AppLocationResponse, type FrontendBuild } from '../shared/contract/protocol/app-location'
+import { isSameSite } from './http-origin'
 
 const contentTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -76,6 +77,7 @@ function immutable(relativePath: string): boolean {
 export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   const app = configuredUrl(env.PUBLIC_APP_ORIGIN, 'PUBLIC_APP_ORIGIN')
   const api = configuredUrl(env.PUBLIC_API_BASE, 'PUBLIC_API_BASE')
+  const pagesApp = app && api && app.protocol === 'https:' && app.origin !== api.origin && isSameSite(app, api) ? app : undefined
   let directory: string | undefined
   let location: AppLocationResponse = { mode: 'disabled' }
   if (env.FRONTEND_ROOT && app && api && app.origin === api.origin && api.pathname === '/' && app.pathname === HOSTED_APP_PATH) {
@@ -89,6 +91,24 @@ export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (re
 
   return async (req, res) => {
     const rawPath = (req.url ?? '').split('?', 1)[0] ?? ''
+    if (pagesApp && ['/open-agricola', '/open-agricola/', '/open-agricola/index.html'].includes(rawPath)) {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        finish(req, res, 405, 'Method not allowed', { Allow: 'GET, HEAD' })
+        return true
+      }
+      const destination = new URL(pagesApp)
+      const query = new URL(req.url ?? '/', api).searchParams
+      if (query.get('page') === 'onboarding') {
+        destination.search = new URLSearchParams({ page: 'login', authMode: 'register', authError: 'oauth_onboarding_expired' }).toString()
+      } else {
+        for (const [key, value] of query) {
+          if (['room', 'context', 'step', 'frame', 'perspective', 'page', 'bg', 'lang', 'transport', 'hotseat'].includes(key)) destination.searchParams.append(key, value)
+        }
+      }
+      // An explicit empty fragment prevents browsers from inheriting an old credential fragment.
+      finish(req, res, 308, '', { Location: `${destination.href}#` })
+      return true
+    }
     if (rawPath === '/api/app-location') {
       const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json; charset=utf-8' }
       if (req.method !== 'GET' && req.method !== 'HEAD') {

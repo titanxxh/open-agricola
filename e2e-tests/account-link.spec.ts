@@ -16,12 +16,13 @@ import { findIdentity } from '../server/oauth/store'
 // Exercise the real UI, handlers, DB and cookie serializer on two HTTPS sites.
 // Only provider authorization/token/profile responses are simulated; no personal accounts or secrets are used.
 for (const provider of ['github', 'google'] as const) {
+  for (const sameSite of [false, true]) {
   for (const cancelled of [false, true]) {
-    test(`${provider} binding under a partitioned session: ${cancelled ? 'cancel' : 'complete'}`, async ({ playwright }, testInfo) => {
+    test(`${provider} binding under a ${sameSite ? 'same-site' : 'partitioned'} session: ${cancelled ? 'cancel' : 'complete'}`, async ({ playwright }, testInfo) => {
       const directory = mkdtempSync(join(tmpdir(), 'agricola-account-link-'))
       execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes',
         '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem'),
-        '-days', '1', '-subj', '/CN=app.test', '-addext', 'subjectAltName=DNS:app.test,DNS:api.test'], { stdio: 'ignore' })
+        '-days', '1', '-subj', '/CN=app.test', '-addext', 'subjectAltName=DNS:app.test,DNS:api.test,DNS:app.agricola.test,DNS:api.agricola.test'], { stdio: 'ignore' })
       const user = await createLocalUserForTests(`link_${randomUUID().slice(0, 8)}`, 'testpass123', 'Binding Test')
       const token = await createSession(user.id)
       const subject = `link-${randomUUID()}`
@@ -49,7 +50,7 @@ for (const provider of ['github', 'google'] as const) {
       const server = createServer({ key: readFileSync(join(directory, 'key.pem')), cert: readFileSync(join(directory, 'cert.pem')) }, (req, res) => {
         void (async () => {
           const url = new URL(req.url ?? '/', apiOrigin)
-          if (req.headers.host?.startsWith('api.test')) {
+          if (req.headers.host === new URL(apiOrigin).host) {
             requests.push({ path: url.pathname, cookie: !!readCookie(req.headers.cookie, SESSION_COOKIE), method: req.method ?? '' })
             const current = await validateSession(readCookie(req.headers.cookie, SESSION_COOKIE))
             res.setHeader('Access-Control-Allow-Origin', appOrigin)
@@ -88,13 +89,13 @@ for (const provider of ['github', 'google'] as const) {
       await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
       const address = server.address()
       if (!address || typeof address === 'string') throw new Error('missing HTTPS port')
-      appOrigin = `https://app.test:${address.port}`
-      apiOrigin = `https://api.test:${address.port}`
+      appOrigin = `https://${sameSite ? 'app.agricola.test' : 'app.test'}:${address.port}`
+      apiOrigin = `https://${sameSite ? 'api.agricola.test' : 'api.test'}:${address.port}`
       process.env.NODE_ENV = 'production'
       process.env.PUBLIC_APP_ORIGIN = `${appOrigin}/`
       process.env.PUBLIC_API_BASE = apiOrigin
       process.env.CORS_ORIGIN = appOrigin
-      const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP app.test 127.0.0.1, MAP api.test 127.0.0.1', '--no-proxy-server'] })
+      const browser = await playwright.chromium.launch({ args: [`--host-resolver-rules=MAP ${new URL(appOrigin).hostname} 127.0.0.1, MAP ${new URL(apiOrigin).hostname} 127.0.0.1`, '--no-proxy-server'] })
       try {
         const context = await browser.newContext({ ignoreHTTPSErrors: true })
         const page = await context.newPage()
@@ -109,7 +110,7 @@ for (const provider of ['github', 'google'] as const) {
         })
         await page.goto(`${appOrigin}/cookie-seed`)
         await page.evaluate(async api => { await fetch(`${api}/api/auth/login`, { method: 'POST', credentials: 'include' }) }, apiOrigin)
-        expect((await context.cookies()).find(cookie => cookie.name === SESSION_COOKIE)?.partitionKey).toBe('https://app.test')
+        expect((await context.cookies()).find(cookie => cookie.name === SESSION_COOKIE)?.partitionKey).toBe(sameSite ? undefined : 'https://app.test')
         await page.goto(`${appOrigin}/?page=settings`)
         await page.getByRole('button', { name: provider === 'github' ? '绑定 GitHub' : '绑定 Google' }).click()
         if (cancelled) {
@@ -127,7 +128,7 @@ for (const provider of ['github', 'google'] as const) {
         const forPath = (suffix: string) => requests.find(request => request.method !== 'OPTIONS' && request.path.endsWith(suffix))
         expect(forPath('/me')?.cookie).toBe(true)
         expect(forPath('/start')?.cookie).toBe(true)
-        expect(forPath('/callback')?.cookie).toBe(false)
+        expect(forPath('/callback')?.cookie).toBe(sameSite)
         expect(forPath('/complete')?.cookie).toBe(true)
         await testInfo.attach('cookie-boundaries', { body: JSON.stringify(requests, null, 2), contentType: 'application/json' })
       } finally {
@@ -144,5 +145,6 @@ for (const provider of ['github', 'google'] as const) {
         rmSync(directory, { recursive: true, force: true })
       }
     })
+  }
   }
 }

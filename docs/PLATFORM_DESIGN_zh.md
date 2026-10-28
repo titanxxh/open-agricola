@@ -30,7 +30,7 @@
 
 - 支持密码注册（邮箱验证）与 GitHub / Google OAuth
 - 登录创建不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
-- 浏览器通过 HttpOnly session cookie 访问 HTTP 与 WebSocket。同源托管前端使其成为第一方 Cookie；独立 origin 部署仍保留分区 Cookie 路径。GitHub / Google 账号绑定在发起操作的前端上下文中用携带凭据的 POST 发起和完成，不在后端导航上下文中检查原 session。provider callback 将受 PKCE 保护的交接返回设置页，错误保留在该页；登录/注册和独立的 Issue Submission Connection 仍走各自流程。
+- 浏览器通过仅属于 API host 的 HttpOnly 会话 Cookie 访问 HTTP 与 WebSocket。GitHub Pages 前端 `open-agricola.titanxxh.com` 与 API `openagapi.titanxxh.com` 同站但跨源，站点比较包含 Public Suffix List 私有后缀。同站部署使用 `SameSite=Lax; Secure`，不加 `Partitioned` 或父域 Cookie。跨站自托管保留既有分区 Cookie 路径及其浏览器支持边界。见 ADR 0035。GitHub / Google 账号绑定在发起操作的前端上下文中用携带凭据的 POST 发起和完成，不在后端导航上下文中检查原 session。provider callback 将受 PKCE 保护的交接返回设置页，错误保留在该页；登录/注册和独立的 Issue Submission Connection 仍走各自流程。
 - 首次 OAuth 注册通过 URL fragment 交接有效期十五分钟的一次性票据，并用浏览器持有的 secret 校验 OAuth 发起时保存的 SHA-256 challenge。完成注册不依赖第三方注册 Cookie；创建会话仍设置 HttpOnly Cookie。凭证、事务与浏览器覆盖见[服务端认证边界](architecture/server.md#http-endpoints)和 `e2e-tests/oauth-onboarding.spec.ts`。
 - WebSocket 协议仍支持 `{ type: 'auth', token: '...' }` 显式认证
 - 单服务器不需要 JWT 的无状态优势；服务端 session 支持即时吊销
@@ -71,7 +71,7 @@ App.tsx
 
 `server/ingress.ts` 保留同一 backend origin 和 OAuth callback，将 `/nodes/<instanceId>/ws` 转发给 Room 的当前 owner；HTTP 工坊沙盒使用节点亲和 cookie。`scripts/local-backend.ts` 默认启动一个应用进程，可显式配置 `APP_INSTANCES=2` 在同一台机器验证路由。共享目录、lease、owner epoch、写入/发布屏障和命令回执由 PostgreSQL 保存；GameSession 仍是规则状态唯一写入者。
 
-生产镜像也包含为 `/open-agricola/` 构建的普通前端，API 和 WS 均使用同源入口。托管模式要求配置的公开应用 URL 位于 API origin 的该路径。公开 app-location 边界让 Pages 入口在认证或 OAuth verifier 创建前引导访客；其他拓扑保持既有路由。普通静态应用文件由镜像拥有，API、WS、运行看板和不可变 Replay namespace 保持原归属，不把带认证的静态请求反代到 Pages。启用条件、origin 本地数据限制与分阶段上线见[部署文档](HOW_TO_DEPLOY.md#same-origin-frontend-for-browser-sessions)。
+GitHub Pages 在 `https://open-agricola.titanxxh.com/` 提供生产前端，显式配置 API 与 WS origin。后端镜像保留用于同源自托管的可选 `/open-agricola/` 前端；生产只把旧应用入口跳转到 Pages。启动过程不再把 Pages 应用移到 API origin。API、WS、运行看板和不可变 Replay 命名空间保留原归属。见[部署文档](HOW_TO_DEPLOY.md#github-pages-with-a-same-site-frontend-domain)与 ADR 0035。
 
 ### B2. 开发环境
 

@@ -74,6 +74,7 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
 for (const provider of ['github', 'google'] as const) {
   for (const mode of ['cross-site-itp', 'cross-site-allow', 'same-site-itp', 'cross-site-chromium'] as const) {
     test(`${provider} registration: ${mode}`, async ({ playwright }, testInfo) => {
+      const appPath = mode === 'same-site-itp' ? '/' : '/open-agricola/'
       const directory = mkdtempSync(join(tmpdir(), 'agricola-onboarding-'))
       execFileSync('openssl', [
         'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
@@ -133,7 +134,7 @@ for (const provider of ['github', 'google'] as const) {
             if (url.pathname === '/cookie-seed') {
               res.writeHead(302, {
                 'Set-Cookie': 'unpartitioned_probe=1; HttpOnly; Secure; SameSite=None; Path=/',
-                Location: `${appOrigin}/open-agricola/?page=login&authMode=register&bg=none`,
+                Location: `${appOrigin}${appPath}?page=login&authMode=register&bg=none`,
               })
               res.end()
               return
@@ -223,7 +224,7 @@ for (const provider of ['github', 'google'] as const) {
       const proxyAddress = proxy.address()
       if (!proxyAddress || typeof proxyAddress === 'string') throw new Error('Missing proxy test port')
       process.env.NODE_ENV = 'production'
-      process.env.PUBLIC_APP_ORIGIN = `${appOrigin}/open-agricola/`
+      process.env.PUBLIC_APP_ORIGIN = `${appOrigin}${appPath}`
       process.env.PUBLIC_API_BASE = apiOrigin
       process.env.CORS_ORIGIN = appOrigin
       process.env.ACCOUNT_REGISTRATION_POLICY = 'open'
@@ -307,6 +308,25 @@ for (const provider of ['github', 'google'] as const) {
         }, { origin: apiOrigin, body: completionBody })
         expect(replay).toEqual({ status: 400, code: 'oauth_onboarding_expired' })
         expect(await page.evaluate(() => Object.keys(sessionStorage).filter(key => key.startsWith('open-agricola-onboarding-')))).toEqual([])
+        if (sameSite) {
+          expect(new URL(page.url()).origin).toBe(appOrigin)
+          expect(new URL(page.url()).pathname).toBe('/')
+          expect((await context.cookies(apiOrigin)).find(cookie => cookie.name === SESSION_COOKIE)).toMatchObject({
+            domain: new URL(apiOrigin).hostname, sameSite: 'Lax', secure: true, httpOnly: true,
+          })
+          await context.clearCookies()
+          await page.goto(`${appOrigin}/?page=login`, { waitUntil: 'domcontentloaded' })
+          await expect(page.locator('#username')).toBeVisible()
+          await page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=login"]`).click()
+          await page.getByRole('link', { name: 'Authorize local registration' }).click()
+          await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
+          await page.reload({ waitUntil: 'domcontentloaded' })
+          await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
+          expect(new URL(page.url()).origin).toBe(appOrigin)
+          expect(new URL(page.url()).pathname).toBe('/')
+          expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).json(), apiOrigin))
+            .toMatchObject({ ok: true, user: { id: identity?.userId, username } })
+        }
         expect(serverErrors).toEqual([])
         expect(browserErrors).toEqual([])
         await testInfo.attach('registration-evidence', {

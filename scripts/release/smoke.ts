@@ -6,6 +6,7 @@ import { expect, type Page } from '@playwright/test'
 import { SoloBrowserDriver } from '../../e2e-tests/helpers/standard-solo-acceptance'
 import { observeReleasePage, type ReleaseDiagnosticSnapshot } from '../../e2e-tests/helpers/release-diagnostics'
 import { verifyVisibleReleaseAssets } from './render'
+import { isSameSite } from '../../server/http-origin'
 
 export type SmokeMode = 'random' | 'choose-7'
 export type SmokeTarget = { appUrl: string; apiUrl: string; buildId: string }
@@ -26,8 +27,8 @@ export function parseSmokeTarget(appUrl: string, apiUrl: string, buildId: string
     assert.ok(['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash, 'Use HTTP(S) URLs without credentials, queries or fragments')
     assert.ok(url.protocol === 'https:' || ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'Remote targets require HTTPS; HTTP is limited to loopback addresses')
   }
-  assert.equal(app.origin, api.origin, 'Release smoke uses the hosted first-party topology')
-  assert.equal(app.pathname, '/open-agricola/'); assert.equal(api.pathname, '/')
+  assert.ok(isSameSite(app, api), 'Release smoke requires same-site frontend and API origins')
+  assert.ok(['/', '/open-agricola/'].includes(app.pathname)); assert.equal(api.pathname, '/')
   assert.ok(buildId.trim(), 'Select the expected hosted build')
   return { appUrl: app.href, apiUrl: api.origin, buildId }
 }
@@ -127,7 +128,7 @@ export async function runReleaseSmoke({ page, target, credentials, outputDirecto
     const metadata = await page.context().request.get(`${target.appUrl}frontend-build.json`)
     assert.equal(metadata.status(), 200)
     const build: unknown = await metadata.json()
-    assert.ok(object(build) && build.format === 1 && build.gameBuildId === target.buildId && build.basePath === '/open-agricola/', 'Hosted frontend must match the selected build')
+    assert.ok(object(build) && build.format === 1 && build.gameBuildId === target.buildId && build.basePath === new URL(target.appUrl).pathname, 'Frontend must match the selected build and base path')
     stage = 'login'
     await page.goto(`${target.appUrl}?page=login`, { waitUntil: 'domcontentloaded' })
     await page.locator('#username').fill(credentials.username); await page.locator('#password').fill(credentials.password)

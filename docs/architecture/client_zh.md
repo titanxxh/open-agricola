@@ -20,8 +20,8 @@
 
 ## 服务与同步状态
 
-- 生产启动在加载应用或创建 OAuth verifier 前，无凭据读取公开 `/api/app-location`。`app/canonical-app-location.ts` 将普通 query/fragment 链接保留到配置的同源 `/open-agricola/` 入口；旧源的在途 onboarding 重新开始注册，不跨源传递绑定票据或 verifier。本地偏好和草稿不会自动跨源迁移。
-- 托管前端使用同源 HTTP，并按页面真实 scheme/host 推导 WS/WSS；discovery 和节点路径不放进网页子路径。`hosted-password-login.spec.ts` 用生产文件、真实密码登录、Cookie 保持、刷新和 routed WS 验证严格 WebKit 策略与 Chromium；引擎测试不能替代实体 Safari 验收。
+- 生产启动保留前端 origin。GitHub Pages 提供 `https://open-agricola.titanxxh.com/`，HTTP 与 WS 使用单独配置的 API origin。两个 HTTPS 子域同站，账号会话继续使用仅属于 API host 的 HttpOnly Cookie。本地偏好和草稿不会自动跨源迁移。见 ADR 0035。
+- `build:pages-frontend` 生成根路径生产构建，显式配置 API/WS origin 并写入构建元数据；可选的 `build:hosted-frontend` 保留同源自托管。`hosted-password-login.spec.ts` 在两个 HTTPS 同站子域提供实际 Pages 构建，验证严格 WebKit 与 Chromium 下的登录、浏览器重开和 routed Room 恢复。引擎测试不能替代实体 Safari 验收。
 
 - `services/oauth-onboarding.ts` 在当前标签页的 `sessionStorage` 保存浏览器 verifier 与回调票据，从浏览器历史移除票据 fragment，并在刷新、可修正的表单校验错误后保留凭证。`LoginPage` 在跳转授权前准备 challenge；HTTP 局域网等缺少 Web Crypto 的环境保留 Cookie 导航路径，并在持久缓存恢复的 `pageshow` 事件中重置导航状态；`OnboardingPage` 在成功或凭证终止错误时清理凭证，并提供重新注册入口。站点会话仍使用 HttpOnly Cookie。浏览器测试分别验证 ITP 下的账号创建与 CHIPS 会话能力；Linux WPE 不能替代实体 iPhone 的会话验收。
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。

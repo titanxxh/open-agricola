@@ -6,7 +6,7 @@
 
 服务端负责连接、Room、持久提交、持久化与产品 HTTP API。`GameSession`（`server/game/authoritative-session.ts`）是服务端的规则命令与查询 seam，规则修改在它驱动的 `GameCore` 与 action leaf 中执行；连接、持久化与 HTTP 基础设施从不在它之外裁定规则。
 
-`frontend-hosting.ts` 负责可选的固定 `/open-agricola/` 静态入口，以及公开、无凭据的 `/api/app-location`。仅 app/API 同源、API 基址为根路径且 app 路径匹配时启用；其它有效部署拓扑保持 disabled。Ingress 在 directory 查询前处理这些请求。镜像内前端的构建身份与 base 必须匹配运行配置；静态路由不覆盖 API、operations、metrics 或 Replay 命名空间。测试入口为 `frontend-hosting.test.ts` 与 `hosted-password-login.spec.ts`。
+`frontend-hosting.ts` 负责可选的同源 `/open-agricola/` 静态托管及其公开构建元数据。配置同站的独立前端时，仅旧应用入口跳转到前端，保留公开 Room/Replay 参数并清除认证 fragment。API、operations、metrics 和 Replay 命名空间保留原归属。`auth-cookies.ts` 经 `http-origin.ts` 使用 Public Suffix List 判断站点；同站子域使用 host-only HttpOnly Cookie，不依赖 CHIPS。测试见 `auth-cookies.test.ts`、`frontend-hosting.test.ts` 和 `hosted-password-login.spec.ts`，决策见 ADR 0035。
 
 ## server/connection/ — WebSocket 入口
 
