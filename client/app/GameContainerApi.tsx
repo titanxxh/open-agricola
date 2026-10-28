@@ -1693,6 +1693,7 @@ export const GameContainerApi = () => {
       pendingPalisadeSet: new Set<string>(),
     } : {}),
     locale,
+    viewerPlayerId: selfPlayer?.id ?? null,
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',

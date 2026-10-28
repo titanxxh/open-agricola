@@ -156,6 +156,33 @@ afterEach(() => {
 })
 
 describe('hotseat public farm browsing', () => {
+  it.each([false, true])('keeps the online seat hand visible across other players turns, mobile=%s', async mobile => {
+    GameSocket.hotseat = false
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098')
+    setupViewport(mobile)
+    const user = userEvent.setup()
+    const { container } = renderGame()
+    await screen.findByRole('region', { name: 'Action Spaces' })
+    expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
+
+    const otherTurn = workPayload()
+    otherTurn.state.currentPlayerIndex = 1
+    act(() => GameSocket.snapshot(otherTurn))
+
+    expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
+    expect(container.querySelector('[data-action-id="forest"] button')).toBeDisabled()
+    await selectBob(user, mobile)
+    expect(container.querySelector('[data-hand-anchor]')).not.toBeInTheDocument()
+    expect(container.querySelector('.hand-hidden')).toHaveTextContent('Hand cards are hidden')
+    await user.click(mobile
+      ? screen.getByRole('button', { name: /Switch player view/ })
+      : screen.getByRole('tab', { name: /Alice/ }))
+    if (mobile) await user.click(within(screen.getByRole('listbox')).getByRole('option', { name: /Alice/ }))
+    expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
+    expect(screen.queryByRole('dialog', { name: 'Hotseat handoff' })).not.toBeInTheDocument()
+    expect(ruleCommands()).toEqual([])
+  })
+
   it('waits for the confirmed seat before focusing its occupation hand and preserves manual browsing on repeated snapshots', async () => {
     const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
     const user = userEvent.setup()

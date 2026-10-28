@@ -96,6 +96,83 @@ test.describe('WS dual-player sync', () => {
   const takenHolderByText = (page: Page, text: string) =>
     page.locator('.action-card-holder.taken', { hasText: text })
 
+  for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
+    test(`own hands remain readable during another player's turn at ${viewport.width}px`, async ({ browser, request }, testInfo) => {
+      const mobile = viewport.width < 900
+      const ctx1 = await browser.newContext({ viewport, hasTouch: mobile })
+      const ctx2 = await browser.newContext({ viewport, hasTouch: mobile })
+      try {
+        for (const context of [ctx1, ctx2]) {
+          await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+        }
+        const suffix = Date.now().toString(36)
+        const name1 = `hand_a_${suffix}`
+        const name2 = `hand_b_${suffix}`
+        await authenticate(ctx1, request, name1)
+        await authenticate(ctx2, request, name2)
+        const p1 = await ctx1.newPage()
+        const p2 = await ctx2.newPage()
+        await p1.goto(`${FRONTEND_URL}/?transport=ws`)
+        const roomLabel = p1.locator('.ws-invite-roomid strong')
+        await expect(roomLabel).toBeVisible()
+        const roomId = await roomLabel.textContent()
+        await p2.goto(`${FRONTEND_URL}/?transport=ws&room=${roomId}`)
+        await p2.getByRole('button', { name: 'Confirm color and start', exact: true }).click()
+        await expect(p1.locator('.game-layout')).toBeVisible()
+        await expect(p2.locator('.game-layout')).toBeVisible()
+        const forest = p1.locator('[data-action-id="forest"] button:enabled').first()
+        const skips = [p1, p2].map(page => page.locator('.interaction-bar')
+          .getByRole('button', { name: /^(Skip|Do not use Elder)$/ }))
+        for (let step = 0; step < 8; step++) {
+          await expect.poll(async () => await forest.isVisible() ||
+            (await Promise.all(skips.map(skip => skip.isVisible()))).some(Boolean)).toBe(true)
+          if (await forest.isVisible()) break
+          for (const skip of skips) if (await skip.isVisible()) await skip.click()
+        }
+        const expectOwnHand = async (page: Page, playerId: string) => {
+          const hand = page.locator(`[data-hand-anchor="${playerId}"]`)
+          await expect(hand).toBeVisible()
+          await expect(hand.locator('.occupation .player-card')).toHaveCount(7)
+          await expect(hand.locator('.minor .player-card')).toHaveCount(7)
+          await expect(page.locator('[data-hand-anchor]')).toHaveCount(1)
+        }
+        await expectOwnHand(p1, 'p1')
+        await expectOwnHand(p2, 'p2')
+        await forest.click()
+        await p1.getByRole('button', { name: 'Confirm switch', exact: true }).click()
+        await expect(p1.locator('.header-compact.not-my-turn')).toBeVisible()
+        await expect(p2.locator('.header-compact.my-turn')).toBeVisible()
+        await expectOwnHand(p1, 'p1')
+        await expectOwnHand(p2, 'p2')
+        const hand = p1.locator('[data-hand-anchor="p1"]')
+        await expect(hand.locator('.player-card[aria-disabled="true"]')).toHaveCount(14)
+        await expect(p1.locator('.action-card-holder button:enabled')).toHaveCount(0)
+        if (mobile) {
+          await hand.locator('.occupation .player-card').first().tap()
+          const details = p1.getByRole('dialog', { name: 'Card details' })
+          await expect(details).toBeVisible()
+          await expect(details.getByRole('button', { name: 'Play this card' })).toHaveCount(0)
+          await details.getByRole('button', { name: 'Close', exact: true }).tap()
+        }
+        const browse = async (name: string) => {
+          if (mobile) {
+            await p1.getByRole('button', { name: 'Switch player view' }).click()
+            await p1.getByRole('listbox').getByRole('option', { name: new RegExp(name) }).click()
+          } else await p1.getByRole('tab', { name: new RegExp(name) }).click()
+        }
+        await browse(name2)
+        await expect(p1.locator('[data-hand-anchor]')).toHaveCount(0)
+        await expect(p1.locator('.hand-hidden')).toBeVisible()
+        await browse(name1)
+        await expectOwnHand(p1, 'p1')
+        await p1.reload()
+        await expect(p1.locator('.header-compact.not-my-turn')).toBeVisible()
+        await expectOwnHand(p1, 'p1')
+        await p1.screenshot({ path: testInfo.outputPath('own-hand-offturn.png'), fullPage: true })
+      } finally { await Promise.all([ctx1.close(), ctx2.close()]) }
+    })
+  }
+
   test('full game flow: create room, sync actions, confirm next player, undo', async ({ browser, request }) => {
     test.setTimeout(120_000)
 
