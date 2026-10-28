@@ -5,14 +5,16 @@ import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './ro
 
 const CARD = 'M027_GardenPath'
 
-for (const width of [1920, 375]) test(`independent scoring markers follow their holder and locale at ${width}px`, async ({ browser, request }) => {
+for (const width of [1920, 375]) test(`independent scoring markers follow their holder and locale at ${width}px`, async ({ browser, request }, testInfo) => {
   const pages: [Page, Page] = [
     await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width === 375 }),
     await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width === 375 }),
   ]
+  const driver = roomDriver(pages)
+  let joined = false
   try {
     await joinRoomClients(pages, request)
-    const driver = roomDriver(pages)
+    joined = true
     const scoringState = async (page: Page) => {
       const { round, roundPhase, players, scores } = publicRoomState(await roomSnapshot(page))
       return { round, roundPhase, players, scores }
@@ -41,7 +43,8 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
         const current = await roomSnapshot(pages[actor]!)
         if (current.interaction.stateId !== 'wait') throw new Error('Expected a purchase interaction')
         if (current.interaction.request.kind === 'confirm-next-player') return
-        const options = current.interaction.request.options ?? []
+        if (current.interaction.request.kind !== 'choice') throw new Error(`Unexpected purchase interaction: ${JSON.stringify(current.interaction)}`)
+        const options = current.interaction.request.options
         const option = current.interaction.promptKey === 'prompt.selectPayment' ? options[0]
           : options.find(option => option.value.startsWith('action-improvement-')) ?? options.find(option => option.value === CARD)
         if (!option) throw new Error(JSON.stringify(current.interaction))
@@ -52,6 +55,7 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
     const checkPad = async (page: Page, locale: 'en' | 'zh', values: string[], step: string) => {
       await page.locator('.game-layout__right').getByRole('button', { name: locale === 'en' ? 'Scoring Pad' : '计分板', exact: true }).click()
       const pad = page.locator('.scoring-pad')
+      await expect(page.locator('.scoring-overlay')).toHaveCSS('opacity', '1')
       const marker = pad.locator('[data-score-row="marker-M027_GardenPath-garden-path"]')
       await expect(marker).toHaveCount(1)
       await expect(marker.locator('.scoring-label')).toHaveText(locale === 'en' ? '· Garden Path' : '· 花园小径')
@@ -59,7 +63,7 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
       await marker.scrollIntoViewIfNeeded()
       await expect(marker).toBeInViewport()
       expect(await pad.locator('.scoring-content').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
-      await pad.screenshot({ path: `output/playwright/source-aware-scoring-${width}-${step}.png` })
+      await pad.screenshot({ path: testInfo.outputPath(`${step}.png`) })
       await pad.getByRole('button', { name: locale === 'en' ? 'Close' : '关闭', exact: true }).click()
     }
 
@@ -78,5 +82,8 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
     await checkPad(pages[0], 'en', ['-1', '0'], 'restored')
     await driver.command(1, { type: 'undoAction' })
     await checkPad(pages[0], 'en', ['0', '-1'], 'undone')
-  } finally { await Promise.all(pages.map(page => page.close())) }
+  } finally {
+    try { if (joined) await driver.newGame() }
+    finally { await Promise.all(pages.map(page => page.close())) }
+  }
 })
