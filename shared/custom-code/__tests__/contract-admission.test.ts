@@ -85,6 +85,14 @@ describe('normalizeCustomManifest', () => {
       .toEqual(['actions', 'cardIds', 'phases', 'registrationId', 'scope'])
   })
 
+  it('admits an exclusively pre-scoring anytime listener declaration', () => {
+    const normalized = normalizeCustomManifest(listener({
+      actions: ['anytime'], phases: ['anytime'], preScoring: 'only',
+    }), CARD_ID)
+    expect(normalized.listeners[0]?.preScoring).toBe('only')
+    expect(registeredListenerData(normalized.listeners[0]!)).toEqual({ preScoring: 'only' })
+  })
+
   it.each([
     [manifest({ effectMetadata: { beforeEndGameScope: 'everyone' } }), "effect beforeEndGameScope must be 'owner' or 'allPlayers'"],
     // The engine reads these by truthiness, so the string would switch the behavior on.
@@ -98,7 +106,8 @@ describe('normalizeCustomManifest', () => {
     [manifest({ effectMetadata: { preHarvestGoodsWantedBeforeReap: ['grain', 'fence'] } }), 'effect preHarvestGoodsWantedBeforeReap must be an array of resource names'],
     [listener({ zones: ['discard'] }), "listener zones must be an array of 'played' or 'hand'"],
     [listener({ mandatory: 'false' }), 'listener mandatory must be a boolean'],
-    [listener({ preScoring: 1 }), 'listener preScoring must be a boolean'],
+    [listener({ preScoring: 1 }), "listener preScoring must be a boolean or 'only'"],
+    [listener({ preScoring: 'true' }), "listener preScoring must be a boolean or 'only'"],
     [listener({ replacesTurn: 'true' }), 'listener replacesTurn must be a boolean'],
     [listener({ blockedAnytimeInteractionKinds: 'choice' }), 'listener blockedAnytimeInteractionKinds must be an array of interaction kinds'],
     // A misspelled kind would never match, leaving the entry offered during that interaction.

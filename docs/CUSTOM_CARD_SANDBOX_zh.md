@@ -289,7 +289,7 @@ listener 条目可以声明 `handler`、`actions`、`phases`、`scope`、`cardId
 | --- | --- | --- |
 | `zones` | 由 `'played'`、`'hand'` 组成的数组 | 卡牌在哪里时 listener 才触发。默认 `['played']`；`['hand']` 只在卡牌还在手牌时触发 |
 | `mandatory` | `boolean` | 同一时机有多个反应等待时，玩家选择执行顺序，其余可以放弃；标为强制的不能放弃。`before` 反应默认可放弃，除非这里写 `true` |
-| `preScoring` | `boolean` | 用于 `anytime` listener：在终局计分前的窗口里也提供它；未标记的 anytime listener 在这个窗口里不提供 |
+| `preScoring` | `boolean` 或 `'only'` | 用于 `anytime` listener：`true` 允许在终局计分前窗口额外使用；`'only'` 限制为仅在该窗口使用。未标记的 listener 在此不可用。菜单查询与命令准入共用此限制。 |
 | `replacesTurn` | `boolean` | 用于 `anytime` listener：只在持有者轮到自己且空闲时提供，使用它就顶替这一回合的放工人 |
 | `blockedAnytimeInteractionKinds` | 交互类型数组 | 用于 `anytime` listener：玩家正在处理这些类型的交互（如 `'farm-select'`、`'animal-reorg'`）时隐藏这个入口。可用的类型是 `'choice'`、`'animal-reorg'`、`'confirm-next-player'`、`'confirm-player-switch'`、`'feed'`、`'heating'`、`'farm-select'`、`'selection'`、`'card-draft'`、`'select-trigger'`、`'engine-blocked'`、`'resource-quantity-select'`、`'resource-batch-exchange-select'`；写了其他字符串时保存失败 |
 

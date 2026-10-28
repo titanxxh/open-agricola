@@ -2202,6 +2202,7 @@ export class GameCore {
     const context = this.getActiveInteractionContext()
     if (!context) return []
     const { player, space } = context
+    const preScoringWindow = options.preScoringOnly === true || this.stageResume?.hook === 'preScoringWindow'
     const blockedIds = new Set(policy.blockedIds)
     const activeIds = new Set(this.engineStack.getActiveAnytimeActionIds(player.id))
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow; replacesTurn?: boolean }[] = []
@@ -2213,7 +2214,7 @@ export class GameCore {
     const actionContext = interactionKind ? {
       anytimeInteractionKind: interactionKind, ...(preparationWindow ? { includeBasicConversions: true } : {}),
     } : undefined
-    for (const action of options.preScoringOnly ? [] : this.registry.values()) {
+    for (const action of preScoringWindow ? [] : this.registry.values()) {
       if (preparationWindow && action.id !== 'exchange') continue
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
@@ -2248,7 +2249,7 @@ export class GameCore {
     for (const entry of matchedAnytime) {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue
-      if (options.preScoringOnly && entry.registration.preScoring !== true) continue
+      if (preScoringWindow ? !entry.registration.preScoring : entry.registration.preScoring === 'only') continue
       if (blockedIds.has(entry.registration.id)) continue
       if (activeIds.has(entry.registration.id) && entry.registration.allowAnytimeReentry !== true) continue
       if (entry.registration.replacesTurn && (this.engineStack.depth() > 0 || options.nestedWindow)) continue

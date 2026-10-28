@@ -411,7 +411,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     expect(trade).toMatchObject({ from: { horse: 1 }, to: { food: 2 } })
   })
 
-  it('M108 feeds once per harvest and scores one bonus VP per final fuel-grain pair', () => {
+  it('M108 feeds once per harvest without automatically scoring unchosen final inventory pairs', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.minorPlayed = ['M108_GrainDistillery']
@@ -420,27 +420,22 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const harvestTrades = session.withCtx(() => getExchangesInWindow(player, 'harvest', session.state)).filter((trade) => trade.sourceId === 'M108_GrainDistillery')
     expect(harvestTrades).toHaveLength(1)
     expect(harvestTrades[0]).toMatchObject({ from: { fuel: 1, grain: 1 }, to: { food: 5 }, max: 1 })
-    expect(bonusVp(session, session.state)).toBe(2)
-    expect(bonusVpEntries(session, session.state)).toEqual([
-      expect.objectContaining({
-        cardId: 'M108_GrainDistillery',
-        score: 2,
-      }),
-    ])
+    expect(bonusVp(session, session.state)).toBe(0)
+    expect(bonusVpEntries(session, session.state)).toEqual([])
 
     player.resources.grain = 0
     expect(bonusVp(session, session.state)).toBe(0)
 
     player.resources = fullResources({ fuel: 3, grain: 2 })
     player.improvements = ['Major_Moor_PeatCharcoalKiln']
-    expect(bonusVp(session, session.state)).toBe(2)
+    expect(bonusVp(session, session.state)).toBe(1)
     expect(bonusVpEntries(session, session.state)).toEqual([
       expect.objectContaining({
-        cardId: 'M108_GrainDistillery',
-        score: 2,
+        cardId: 'Major_Moor_PeatCharcoalKiln',
+        score: 1,
       }),
     ])
-    expect(bonusVpEntries(session, session.state).some((entry) => entry.cardId === 'Major_Moor_PeatCharcoalKiln')).toBe(false)
+    expect(bonusVpEntries(session, session.state).some((entry) => entry.cardId === 'M108_GrainDistillery')).toBe(false)
   })
 
   it('M115 gives 2 wood on play and extra wood for converted boar, cattle, and horses only', () => {

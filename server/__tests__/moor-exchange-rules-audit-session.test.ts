@@ -172,7 +172,7 @@ describe('Moor exchange printed-rule native audit', () => {
     expect(rejected.interaction.request.options).toEqual(offered.interaction.request.options)
   })
 
-  it.each([[3, 2, 2], [3, 0, 1], [5, 2, 3]])('M108 publicly scores %i fuel and %i grain without reusing fuel for the Peat-charcoal Kiln', (fuel, grain, expected) => {
+  it.each([[3, 2, 1], [3, 0, 1], [5, 2, 2]])('M108 leaves unchosen %i fuel and %i grain available for the Peat-charcoal Kiln', (fuel, grain, expected) => {
     const session = setupMoorAudit()
     const player = session.state.players[0]!
     player.minorPlayed = ['M108_GrainDistillery']
