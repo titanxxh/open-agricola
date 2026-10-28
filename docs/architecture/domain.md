@@ -50,6 +50,8 @@ shared/domain/
 
 **Scoring.**
 
+Source-aware score rules follow [ADR 0035](../adr/0035-score-rules-preserve-source-identity.md); the accepted change is pending implementation.
+
 - Base field points count Farmyard Fields only. Grain and vegetable points count every matching crop in the supply and every layer and slot returned by `getLogicalFields()`, including played Card Fields. Scoring queries do not remove crops.
 - `cardBonusVp` is the single category for non-printed card points, attributed by `cardId` / `cardType`; printed card VP stays in `cards`; public card markers may score negative. Each bonus source enters the category once: generic scoring already reads `cardStates[cardId].counters.bonusVp`, so a card storing points there never also returns them from `computeBonusScore`. The `bonus-vp` leaf (`params.amount`, default 1) and an exchange `sideEffect: { type: 'bonusVp' }` both write that counter. Old `cardsBonus` / `cardStateBonusVp` / `cardBonus` shapes are gone.
 - Scoring Reserve is a final-scoring reservation, not payment, recorded through `special-effect` `record-scoring-reserve-bonus`. `computeScores()` deducts every selected reserve from a scoring clone before the costed-bonus solver, resource-based major scoring reads that clone, and an unpayable combination invalidates the bundle.

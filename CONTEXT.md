@@ -72,6 +72,10 @@ _Avoid_: 热座、Workshop Sandbox、Solo Campaign、Automa
 Agricola 的可选扩展名称。讨论该扩展时使用完整名称，不缩写为 Farmers；只有代码标识符可按既有命名使用 `FarmersOfTheMoor`。
 _Avoid_: Farmers
 
+**Moor Balance Rules（沼泽扩展平衡规则）**:
+与 Farmers of the Moor 同时启用、开局确定的一组可选削弱规则，改变指定卡牌的达成条件或设施计数范围。它不改变农场格的 used 身份、扩展格的空地扣分或卡牌本身的身份。
+_Avoid_: 森林沼泽一律算 unused、全局移除 Moor 主要改良身份
+
 **PlayerState**:
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户
@@ -638,8 +642,17 @@ _Avoid_: Scoring Reserve、只在计分副本中预留资源、自动最大化�
 
 **Card Bonus VP**:
 由已打出卡牌产生的非印刷分数，包括主要改良资源计分、计分卡牌效果、卡牌局部状态累计分和 Scoring Reserve bonus；它和 Cards / 卡牌分（卡牌本身印刷 VP）分开统计。
+公共计分标记的得失分属于标记本身，不因其来源是一张卡牌而成为 Card Bonus VP。
 统一 score category 是 `cardBonusVp`，不保留旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` shape。
 _Avoid_: Improvement bonus、card state bonus、printed VP
+
+**Public Score Marker（公共计分标记）**:
+以独立标记身份计入持有者总分的得失分，来源卡牌与标记持有者可以分离。花园小径标记的 -1 分属于此类，通常的负分资格与补偿判断忽略该标记，但其持有者仍承受这 1 分扣分。
+_Avoid_: 卡牌印刷分、Card Bonus VP、标记扣分被免除
+
+**Base Score Adjustment（基础分修正）**:
+改变某个基础计分类别的有效得分，不独立构成一项卡牌奖励或惩罚。通常负分判断读取修正后的类别结果，而不是用于解释差额的数值。
+_Avoid_: 独立负卡分、把算术差额当作 Card Bonus VP
 
 **Major Improvement（主要改良）**:
 主要改良包括供应区主要改良，以及卡面语义上同时视为主要改良的已打出小改良。
