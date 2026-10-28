@@ -85,6 +85,7 @@
   top: 0;
   left: 0;
   border-radius: 19.5px;
+  transform: scale(var(--card-content-scale, 0.8));
   transform: scale(calc(100cqi / 235px));
   transform-origin: top left;
 }

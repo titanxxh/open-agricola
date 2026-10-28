@@ -3,6 +3,7 @@ import type { CardStatePresentation } from '../../../shared/contract/card-state'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
+import { useElementWidth } from '../../hooks/useElementWidth'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type {
@@ -923,9 +924,13 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
   const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
+  const farmContainerRef = useRef<HTMLDivElement>(null)
+  const measuredFarmWidth = useElementWidth(farmContainerRef,
+    !globalThis.CSS?.supports?.('width', '1cqw'))
   const gridColumns = Math.max(1, farmGridColumns)
   const farmGridRows = Math.max(1, Math.ceil(farmCells.length / gridColumns))
-  const farmGridStyle: CSSProperties & { '--farm-grid-ratio': string; '--farm-grid-row-ratio': string } = {
+  const farmGridStyle: CSSProperties & { '--farm-grid-ratio': string; '--farm-grid-row-ratio': string; '--farm-container-width'?: string } = {
+    '--farm-container-width': measuredFarmWidth === undefined ? undefined : `${measuredFarmWidth}px`,
     '--farm-grid-ratio': `${Math.floor(gridColumns / 2) + Math.ceil(gridColumns / 2) * 18 / 110}`,
     '--farm-grid-row-ratio': `${Math.floor(farmGridRows / 2) + Math.ceil(farmGridRows / 2) * 18 / 110}`,
     gridTemplateColumns: Array.from({ length: gridColumns }, (_, index) =>
@@ -1286,7 +1291,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     </div>
     <div className={`farm-operation-area${hasCardTargets ? ' farm-operation-area--with-card-targets' : ''}`}
       data-interaction-focus="farm" data-focus-player={displayPlayer.id}>
-    <div className="farm-operation-grid">
+    <div className="farm-operation-grid" ref={farmContainerRef}>
     <div className="farm-grid" style={farmGridStyle}>
       {farmCells.map((cell, cellIndex) => {
         if (cell.type === 'void') {

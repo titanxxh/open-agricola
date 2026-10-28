@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { CardHoverPreview } from './CardHoverPreview'
 import { CardDetails } from './CardDetails'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
 import { useRequestActivation, type RequestActivation } from '../../hooks/useRequestActivation'
+import { useElementWidth } from '../../hooks/useElementWidth'
 
 export type CardTouchInteraction = { kind: 'inspect' } | { kind: 'play'; requestKey: string }
 
@@ -21,6 +22,7 @@ type Props = {
   previewWidth?: number
   previewHeight?: number
   previewClassName?: string
+  canvasWidth?: number
   'data-card-anchor'?: string
   'data-card-id'?: string
 }
@@ -44,10 +46,17 @@ export const CardWithCopy = ({
   previewWidth,
   previewHeight,
   previewClassName,
+  canvasWidth,
   'data-card-anchor': dataCardAnchor,
   'data-card-id': dataCardId,
 }: Props) => {
   const rootRef = useRef<HTMLDivElement>(null)
+  const measuredWidth = useElementWidth(rootRef, canvasWidth !== undefined &&
+    !globalThis.CSS?.supports?.('transform', 'scale(calc(100cqi / 235px))'))
+  const sizingStyle: CSSProperties & { '--card-content-scale'?: number } = {
+    '--card-content-scale': canvasWidth !== undefined && measuredWidth !== undefined
+      ? measuredWidth / canvasWidth : undefined,
+  }
   const showTimerRef = useRef<number | null>(null)
   const hideTimerRef = useRef<number | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
@@ -239,6 +248,7 @@ export const CardWithCopy = ({
     <>
       <div
         ref={rootRef}
+        style={sizingStyle}
         className={className}
         onClick={handleClick}
         onPointerEnter={handleCardEnter}

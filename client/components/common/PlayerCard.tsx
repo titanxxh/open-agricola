@@ -336,6 +336,7 @@ export const PlayerCard = ({
       touchInteraction={touchInteraction}
       disabled={disabled}
       className={classes}
+      canvasWidth={235}
       enablePreview={enablePreview}
       previewCard={previewCard}
       data-card-anchor={cardId}

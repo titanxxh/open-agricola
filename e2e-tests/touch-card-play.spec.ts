@@ -173,3 +173,85 @@ test('a failed transport submission can retry the same live card request', async
   expect(result.ok, JSON.stringify(result)).toBe(true)
   expect(result.state.players[0].occupationPlayed).toContain('A116_WoodCutter')
 })
+
+test.describe('iPad without container units or CSS length division', () => {
+  test.beforeEach(async ({ page }) => {
+    // Reproduce Safari 15's rejected declarations, rather than changing its user agent.
+    await page.route(/\/client\/.*\.css(?:\?|$)/, async route => {
+      const response = await route.fetch()
+      const source = await response.text()
+      await route.fulfill({ response, body: source
+        .replace(/(\d+(?:\.\d+)?)cq([iw])\b/g, '$1unsupportedcq$2')
+        .replace(/container-type:\s*inline-size/g, 'container-type: normal') })
+    })
+    await page.addInitScript(() => {
+      const supports = CSS.supports.bind(CSS)
+      CSS.supports = (property: string, value?: string) => {
+        if (/container-type|cq[wi]\b/.test(`${property} ${value ?? ''}`)) return false
+        return value === undefined ? supports(property) : supports(property, value)
+      }
+    })
+  })
+
+  for (const portrait of [{ width: 744, height: 1133 }, { width: 768, height: 1024 }]) {
+    test(`cards fit their slots through rotation at ${portrait.width}px`, async ({ page, request }) => {
+      await page.setViewportSize(portrait)
+      await openGame(page, request, state => {
+        state.players[0]!.occupationHand = ['A116_WoodCutter', 'A124_Knapper', 'A126_MasterWorkman']
+        state.players[0]!.minorHand = ['A076_Cob', 'A007_GardenersKnife']
+        state.players[0]!.occupationPlayed = ['A119_FirewoodCollector', 'C105_BasketCarrier']
+      })
+      for (const viewport of [portrait, { width: portrait.height, height: portrait.width }, portrait]) {
+        await page.setViewportSize(viewport)
+        const cards = page.locator('.hand-cards .player-card, .played-cards .player-card')
+        await expect(cards).toHaveCount(7)
+        await expect.poll(() => cards.evaluateAll(elements => elements.every(element => {
+          const inner = element.querySelector('.player-card-inner')
+          if (!inner) return false
+          const slot = element.getBoundingClientRect()
+          const face = inner.getBoundingClientRect()
+          return Math.abs(face.width - element.clientWidth) <= 1 &&
+            face.right <= slot.right + 1 && face.bottom <= slot.bottom + 1
+        }))).toBe(true)
+        const hand = page.locator('.hand-cards [data-card-anchor="A116_WoodCutter"]')
+        await hand.scrollIntoViewIfNeeded()
+        await page.screenshot({ path: `output/playwright/legacy-ipad-cards-${viewport.width}.png` })
+        await hand.tap()
+        const details = page.getByRole('dialog', { name: 'Card details' })
+        await expect(details).toBeVisible()
+        await expect(details.getByRole('button', { name: 'Close', exact: true })).toBeInViewport({ ratio: 1 })
+        await details.getByRole('button', { name: 'Close', exact: true }).tap()
+        const action = page.locator('[data-action-id="farmland"] button').first()
+        await action.scrollIntoViewIfNeeded()
+        await expect(action).toBeInViewport({ ratio: 0.99 })
+        await expect(action).toBeEnabled()
+      }
+      await page.locator('[data-action-id="lessons"] button').first().tap()
+      await page.locator('.hand-cards [data-card-anchor="A116_WoodCutter"]').tap()
+      const dialog = await expectDialogFits(page)
+      const committed = page.waitForResponse(response => response.url().endsWith('/api/game/choice'))
+      await dialog.getByRole('button', { name: 'Play this card' }).tap()
+      const result = await (await committed).json()
+      expect(result.ok, JSON.stringify(result)).toBe(true)
+      expect(result.state.players[0].occupationPlayed).toContain('A116_WoodCutter')
+    })
+  }
+
+  test('the action board opens a usable farm selection without container units', async ({ page, request }) => {
+    await page.setViewportSize({ width: 768, height: 1024 })
+    await openGame(page, request, () => {})
+    const action = page.locator('[data-action-id="farmland"] button').first()
+    await action.scrollIntoViewIfNeeded()
+    await action.tap()
+    await expect(page.locator('.interaction-bar__body')).toContainText('Select a tile to plow')
+    const farm = page.locator('.game-layout__center .farm-grid')
+    await expect.poll(() => farm.locator('.farm-tile').first().evaluate(element => element.getBoundingClientRect().width))
+      .toBeGreaterThanOrEqual(36)
+    await farm.locator('.farm-tile.selectable').first().tap()
+    await page.getByRole('button', { name: 'Confirm plow', exact: true }).last().tap()
+    await expect(farm.locator('.farm-tile.field')).toHaveCount(1)
+    const result = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
+    expect(result.state.players[0].fields).toHaveLength(1)
+    await page.screenshot({ path: 'output/playwright/legacy-ipad-plow-768.png' })
+  })
+})
