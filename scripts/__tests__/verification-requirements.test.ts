@@ -59,7 +59,7 @@ export default class SelectionOnlyReporter extends Reporter { onEnd() {} }
       steps: [{ name: 'browser-tests', command: process.execPath, args: [cli, 'test', '--config', join(cwd, 'playwright.config.ts'), '--browser=chromium', '--grep', grep, ...extra] }],
     }
     return runVerification(cwd, plan, (command, args, directory, environment) => {
-      const child = spawnSync(command, args, { cwd: directory, env: { ...environment, ...env }, encoding: 'utf8' })
+      const child = spawnSync(command, args, { cwd: directory, env: { ...environment, ...env }, encoding: 'utf8', timeout: 15_000 })
       output = String(child.stdout) + String(child.stderr)
       if (child.error) throw child.error
       return child.status ?? 1
@@ -70,7 +70,7 @@ export default class SelectionOnlyReporter extends Reporter { onEnd() {} }
 
 afterEach(() => { directories.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true })) })
 
-describe('explicit browser requirements and real reporter evidence', () => {
+describe('explicit browser requirements and real reporter evidence', { timeout: 30_000 }, () => {
   it('rejects missing identities and file-only declarations', () => {
     expect(() => parseRequirements({ schemaVersion: 1, cases: [{ file: 'control.spec.ts' }] })).toThrow('titlePath')
     expect(() => parseRequirements({ schemaVersion: 1, cases: [{ ...required('first'), file: '../control.spec.ts' }] })).toThrow('repository-relative')
