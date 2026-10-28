@@ -80,7 +80,7 @@ test('independent metrics render registration stats and room totals with two axe
     }
     await expect.poll(() => query('agricola_accounts{kind="total"}'), { timeout: 30_000 }).toEqual(['2'])
     expect(await query('agricola_accounts{kind="today"}')).toEqual(['1'])
-    expect(await query('sum(agricola_platform{kind=~"rooms_waiting|rooms_playing|rooms_hotseat|rooms_retained"})')).toEqual(['126'])
+    await expect.poll(() => query('sum(agricola_platform{kind=~"rooms_waiting|rooms_playing|rooms_hotseat|rooms_retained"})'), { timeout: 30_000 }).toEqual(['126'])
     const dashboard = (await (await page.request.get(base + '/ops/api/dashboards/uid/open-agricola')).json()).dashboard
     const room = dashboard.panels.find((panel: { id: number }) => panel.id === 36)
     expect(room.fieldConfig.defaults.custom.axisPlacement).toBe('left')
