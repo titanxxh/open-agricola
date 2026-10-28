@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { guardedListener } from './listener-purity-guard'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
-import type { DraftGameEvent } from '../../contract/events'
+import type { DraftGameEvent, FarmSpacesUsedEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import { runCardListeners } from '../card-listeners'
 import { A130_MummysBoy_impl } from '../A/A130_MummysBoy'
 import { B124_Trimmer_impl } from '../B/B124_Trimmer'
 import { B132_EstateMaster_impl } from '../B/B132_EstateMaster'
@@ -184,6 +185,11 @@ const fenceBuilt = (): DraftGameEvent<'farm.fenceBuilt'> => ({
   fences: [{ edge: 'H-0-0', type: 'fence' }],
   newFenceEdges: ['H-0-0'],
   newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
+})
+
+const farmSpaceUsed = (playerId: string): FarmSpacesUsedEvent => ({
+  schemaVersion: 1, id: 'farm-used', seq: 1, round: 1, phase: 'work', visibility: 'public',
+  type: 'farm.spacesUsed', newlyUsedTiles: [{ playerId, row: 2, col: 4 }],
 })
 
 describe('listener purity wave 2a', () => {
@@ -559,32 +565,34 @@ describe('listener purity wave 2a', () => {
     expect(result).toBeUndefined()
   })
 
-  it('B132 EstateMaster saturation listener returns saturated leaf without mutating cardStates', () => {
+  it('B132 EstateMaster farm-usage listener returns a saturated leaf without mutating state or cardStates', () => {
     const p = player(B132, {
+      minorPlayed: [], occupationPlayed: [B132],
       cardStates: { [B132]: { extraData: { saturated: false } } },
       roomTiles: Array.from({ length: 15 }, (_, index) => ({
         row: Math.floor(index / 5),
         col: index % 5,
       })),
     })
-    const ctx = context(p, { actionId: 'construct', phase: 'after' })
+    const ctx = context(p, { actionId: 'selection', phase: 'after', actionEvents: [farmSpaceUsed(p.id)] })
     const before = snapshot(p)
+    const beforeState = JSON.stringify(ctx.state)
 
-    const result = listenerById(
-      B132_EstateMaster_impl.listeners,
-      'B132-saturate-after-construct',
-    ).handler(ctx)
+    const results = runCardListeners({ ...ctx, actionHooks: undefined }, B132_EstateMaster_impl.listeners?.map(guardedListener))
 
     expectCardStatesUnchanged(p, before, 'B132 owner')
-    expectLeaf(result?.flow, {
+    expect(JSON.stringify(ctx.state)).toBe(beforeState)
+    expect(results).toHaveLength(1)
+    expectLeaf(results[0]?.flow, {
       actionId: 'special-effect',
       sourceCard: B132,
       params: { kind: 'set-extra-data', key: 'saturated', value: true },
     })
   })
 
-  it('B132 EstateMaster saturation respects farmyard extensions', () => {
+  it('B132 EstateMaster farm-usage listener ignores a full base board with unused extensions', () => {
     const p = player(B132, {
+      minorPlayed: [], occupationPlayed: [B132],
       cardStates: { [B132]: { extraData: { saturated: false } } },
       roomTiles: Array.from({ length: 15 }, (_, index) => ({
         row: Math.floor(index / 5),
@@ -598,16 +606,15 @@ describe('listener purity wave 2a', () => {
         ],
       }],
     })
-    const ctx = context(p, { actionId: 'construct', phase: 'after' })
+    const ctx = context(p, { actionId: 'selection', phase: 'after', actionEvents: [farmSpaceUsed(p.id)] })
     const before = snapshot(p)
+    const beforeState = JSON.stringify(ctx.state)
 
-    const result = listenerById(
-      B132_EstateMaster_impl.listeners,
-      'B132-saturate-after-construct',
-    ).handler(ctx)
+    const results = runCardListeners({ ...ctx, actionHooks: undefined }, B132_EstateMaster_impl.listeners?.map(guardedListener))
 
     expectCardStatesUnchanged(p, before, 'B132 owner')
-    expect(result).toBeUndefined()
+    expect(JSON.stringify(ctx.state)).toBe(beforeState)
+    expect(results).toEqual([])
   })
 
   it('B132 EstateMaster reap listener returns bonusVp increment leaf without mutating cardStates', () => {
