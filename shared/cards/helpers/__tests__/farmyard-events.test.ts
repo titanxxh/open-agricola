@@ -2,7 +2,7 @@ import { commitFarmOperation } from '../../../domain/farm-operations'
 import { describe, expect, it } from 'vitest'
 import { createInitialState } from '../../../session/state-bootstrap'
 import type { GameEvent } from '../../../contract/events'
-import { getActionNewlyUsedTiles } from '../farmyard-events'
+import { getActionFarmOperations, getActionNewlyUsedTiles } from '../farmyard-events'
 
 const player = createInitialState(42, { playerCount: 2 }).players[0]!
 const used: GameEvent = {
@@ -36,6 +36,17 @@ describe('committed host farmyard usage', () => {
       .toEqual([{ playerId: owner.id, row: 0, col: 1 }])
     expect(getActionNewlyUsedTiles({ player: owner, result: { type: 'flow', flow: { type: 'leaf', actionId: 'gain' }, farmOperations: [] }, actionEvents: [used] }))
       .toEqual([])
+    expect(getActionFarmOperations({ result: { type: 'ok', farmOperations: [outer] } })?.map(operation => operation.after.stableTiles))
+      .toEqual([[{ row: 0, col: 1 }]])
+    expect(owner.stableTiles).toEqual([{ row: 0, col: 1 }, { row: 1, col: 3 }])
   })
 
+  it('distinguishes missing receipts from an empty completed host receipt', () => {
+    expect(getActionFarmOperations({})).toBeUndefined()
+    expect(getActionFarmOperations({ result: { type: 'ok' } })).toBeUndefined()
+    expect(getActionFarmOperations({ result: { type: 'ok', farmOperations: [] } })).toEqual([])
+    expect(getActionFarmOperations({ result: { type: 'flow', flow: { type: 'leaf', actionId: 'gain' }, farmOperations: [] } }))
+      .toEqual([])
+    expect(getActionFarmOperations({ result: { type: 'fail', errorKey: 'rejected' } })).toBeUndefined()
+  })
 })

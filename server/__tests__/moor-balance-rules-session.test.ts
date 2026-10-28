@@ -14,9 +14,9 @@ import { createWorkSession } from './_helpers/session-fixtures'
 const sessions: GameSession[] = []
 afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
 
-const setup = (cardId: string, balance: boolean, configure: (player: PlayerState, state: GameState) => void = () => {}) => {
+const setup = (cardId: string, balance: boolean, configure: (player: PlayerState, state: GameState) => void = () => {}, playerCount: 2 | 3 = 2) => {
   const session = createWorkSession({ seed: cardId === 'B132_EstateMaster' ? 429132 : 429101,
-    options: { playerCount: 2, enableFarmersOfTheMoor: true, enableMoorBalanceRules: balance },
+    options: { playerCount, enableFarmersOfTheMoor: true, enableMoorBalanceRules: balance },
     configure: state => {
       state.round = 4
       for (const player of state.players) {
@@ -101,8 +101,8 @@ const confirmTurn = (session: GameSession, response = session.getState()) => {
   return response
 }
 
-const openMinor = (session: GameSession, cardId: string) => {
-  let response = session.takeAction(0, 'meeting-place')
+const openMinor = (session: GameSession, cardId: string, spaceId = 'meeting-place') => {
+  let response = session.takeAction(0, spaceId)
   expect(response.ok, response.error).toBe(true)
   if (response.interaction.stateId === 'wait') {
     const branch = response.interaction.request.options?.find(option => option.value.startsWith('action-improvement-'))
@@ -229,6 +229,67 @@ describe('Moor optional balance rules', () => {
       expect(response.state.players[0]!.cardStates[cardId]?.extraData?.saturated).toBe(true)
       restore(session)
     }
+  })
+  it.each([false, true])('Estate Master remembers blocking the last unused space before a real extension and Harvest with balance=%s', balance => {
+    const cardId = 'B132_EstateMaster'
+    let session = setup(cardId, balance, player => {
+      player.houseType = 'stone'
+      player.roomTiles = [{ row: 2, col: 0 }, { row: 1, col: 0 }]
+      const occupied = new Set([...player.roomTiles.map(positionKey), '0-4'])
+      player.fields = getFarmyardTilePositions(player).filter(tile => !occupied.has(positionKey(tile)))
+        .map(tile => ({ ...tile, stacks: tile.row === 2 && tile.col === 1 ? [{ kind: 'vegetable', remaining: 2 }] : [] }))
+      player.minorHand = ['M064_FamilyBurialPlot', 'M050_FarmExtension']
+      player.resources.stone = 1
+      player.resources.clay = 1
+    }, 3)
+    const before = session.getState()
+    expect(before.scores[0]!.categories.find(category => category.key === 'empty')?.total).toBe(-1)
+    expect(before.state.players[0]!.cardStates[cardId]?.extraData?.saturated).toBeUndefined()
+    expect(session.getState()).toEqual(before)
+
+    let response = openMinor(session, 'M064_FamilyBurialPlot')
+    assert.equal(response.interaction.stateId, 'wait')
+    const accept = response.interaction.request.options?.find(option => option.value !== '__skip__')
+    assert.ok(accept)
+    response = session.resolveChoice(0, accept.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.selection?.kind).toBe('farm-position')
+    response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 4 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.stone).toBe(0)
+    expect(response.state.players[0]!.farmyardSpaceStates).toContainEqual({
+      spaceKey: '0-4', sourceCardId: 'M064_FamilyBurialPlot', kind: 'blocked-farmyard-space', bonusVp: 1, blocksPlacement: true,
+    })
+    expect(response.scores[0]!.categories.find(category => category.key === 'empty')?.total).toBe(0)
+    expect(response.state.events.filter(event => event.type === 'farm.spacesUsed')).toMatchObject([
+      { sourceCardId: 'M064_FamilyBurialPlot', newlyUsedTiles: [{ playerId: 'p1', row: 0, col: 4 }] },
+    ])
+    expect.soft(response.state.players[0]!.cardStates[cardId]?.extraData?.saturated).toBe(true)
+    session = restore(session)
+    confirmTurn(session)
+    confirmTurn(session, session.takeAction(1, 'forest'))
+    confirmTurn(session, session.takeAction(2, 'clay-pit'))
+
+    response = openMinor(session, 'M050_FarmExtension', 'major-improvement')
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.selection?.kind).toBe('farm-position')
+    response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 5 }, { row: 1, col: 5 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(response.state.players[0]!.farmyardExtensions).toHaveLength(1)
+    expect(response.scores[0]!.categories.find(category => category.key === 'empty')).toMatchObject({ quantity: 2, total: -2 })
+    expect.soft(response.state.players[0]!.cardStates[cardId]?.extraData?.saturated).toBe(true)
+    session = restore(session)
+    confirmTurn(session)
+    confirmTurn(session, session.takeAction(1, 'reed-bank'))
+    response = confirmTurn(session, session.takeAction(2, 'grain-seeds'))
+    response = finishHarvest(session, response)
+    expect(bonus(response, cardId)).toBe(1)
+    expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 1, food: 0, fuel: 2, begging: 0 })
+    expect(response.state.log.filter(entry => entry.key === 'log.playMinorImprovement').map(entry => entry.params?.improvements))
+      .toEqual(['M050_FarmExtension', 'M064_FamilyBurialPlot'])
+    expect(response.state.players[0]!.cardStates[cardId]?.extraData?.saturated).toBe(true)
+    expect(session.getState()).toEqual(response)
+    restore(session)
   })
   it('Estate Master remembers the last forest conversion before a real extension and Harvest', () => {
     const cardId = 'B132_EstateMaster'

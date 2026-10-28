@@ -3,10 +3,15 @@ import type { CardListenerContext } from '../card-listeners'
 import { positionKey } from '../../domain/farmyard-geometry'
 import { createEventQuery } from '../../events/query'
 
+/** Undefined means no receipt was provided; an empty receipt still owns its host. */
+export const getActionFarmOperations = (context: Pick<CardListenerContext, 'result'>) => {
+  const result = context.result
+  return result?.type === 'ok' || result?.type === 'flow' ? result.farmOperations : undefined
+}
+
 /** A returned-flow host keeps its own operation facts, excluding nested children. */
 export const getActionTerrainOperations = (context: Pick<CardListenerContext, 'result' | 'actionEvents'>) => {
-  const operations = context.result?.type === 'ok' || context.result?.type === 'flow'
-    ? context.result.farmOperations : undefined
+  const operations = getActionFarmOperations(context)
   if (operations !== undefined) return operations.flatMap(operation => operation.kind === 'terrain'
     ? [{ type: 'farm.terrainChanged' as const, playerId: operation.playerId, operation: operation.terrainMode,
       changes: operation.terrainChanges, newlyUsedTiles: operation.newlyUsedTiles }] : [])
@@ -16,7 +21,7 @@ export const getActionTerrainOperations = (context: Pick<CardListenerContext, 'r
 /** Only this host's committed geometry; nested hosts retain separate scopes. */
 export const getActionNewlyUsedTiles = (context: Pick<CardListenerContext, 'actionEvents' | 'player' | 'result'>) => {
   const tiles = new Map<string, FarmyardTileUsage>()
-  const operations = context.result?.type === 'ok' || context.result?.type === 'flow' ? context.result.farmOperations : undefined
+  const operations = getActionFarmOperations(context)
   if (operations !== undefined) {
     for (const operation of operations) for (const tile of operation.newlyUsedTiles) {
       if (tile.playerId === context.player.id) tiles.set(positionKey(tile), { ...tile })
