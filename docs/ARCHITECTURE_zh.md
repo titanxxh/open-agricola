@@ -20,6 +20,7 @@
 | `shared/domain/` | [domain](architecture/domain_zh.md) | `PlayerBoard`、农场、动物、计分、大改良供应 |
 | `shared/draft/`、`shared/custom-code/`、游戏变体、`i18n`、`utils` | [shared-other](architecture/shared-other_zh.md) | 同时选牌、游戏变体、工坊准入、本地化、工具函数 |
 | `server/` | [server](architecture/server_zh.md) | 连接、Room、Durable Room Commit、Replay、Bug Report、工坊后端、持久化、运维 |
+| `operations/` | [服务端部署边界](architecture/server_zh.md#部署回滚与可观测性) | 独立监控部署和受限账户聚合 |
 | `client/` | [client](architecture/client_zh.md) | Bundle、传输与同步状态、视图、Replay Viewer、Bug Report |
 | 测试与门禁 | [testing](architecture/testing_zh.md) | 测试分层与架构门禁 |
 

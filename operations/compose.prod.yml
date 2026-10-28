@@ -1,0 +1,49 @@
+name: open-agricola-operations
+services:
+  accounts-exporter:
+    build:
+      context: .
+      args:
+        OPERATIONS_BUILD_ID: ${OPERATIONS_BUILD_ID:?}
+    image: open-agricola-operations:${OPERATIONS_BUILD_ID:?}
+    environment:
+      DATABASE_URL: ${ACCOUNTS_DATABASE_URL:?}
+      OBSERVABILITY_METRICS_TOKEN: ${OBSERVABILITY_METRICS_TOKEN:?}
+    networks: [dependencies]
+    read_only: true
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    user: "${OBSERVABILITY_UID:-1000}:${OBSERVABILITY_GID:-1000}"
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ${OBSERVABILITY_DATA_DIR:?}/prometheus:/prometheus
+      - ${OPERATIONS_CONFIG_DIR:?}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${OPERATIONS_CONFIG_DIR:?}/metrics-token:/etc/prometheus/metrics-token:ro
+    networks: [dependencies]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.2.3
+    user: "${OBSERVABILITY_UID:-1000}:${OBSERVABILITY_GID:-1000}"
+    environment:
+      GF_SERVER_ROOT_URL: ${PUBLIC_API_BASE:?}/ops/
+      PROMETHEUS_URL: http://prometheus:9090
+    volumes:
+      - ${OBSERVABILITY_DATA_DIR:?}/grafana:/var/lib/grafana
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    networks: [dependencies]
+    restart: unless-stopped
+  node-exporter:
+    image: prom/node-exporter:v1.10.2
+    pid: host
+    command: ["--path.rootfs=/host", "--collector.disable-defaults", "--collector.cpu", "--collector.meminfo", "--collector.filesystem", "--collector.diskstats", "--collector.netdev", "--collector.loadavg"]
+    volumes: ["/:/host:ro,rslave"]
+    read_only: true
+    networks: [dependencies]
+    restart: unless-stopped
+networks:
+  dependencies:
+    external: true
+    name: open-agricola-local_default

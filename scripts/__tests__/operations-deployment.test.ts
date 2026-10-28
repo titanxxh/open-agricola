@@ -1,0 +1,59 @@
+import { spawnSync } from 'node:child_process'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { afterEach, expect, it } from 'vitest'
+
+const repository = resolve(import.meta.dirname, '../..')
+const roots: string[] = []
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+const deploy = (fail: boolean) => {
+  const root = mkdtempSync(join(tmpdir(), 'oa-operations-'))
+  roots.push(root)
+  const build = 'a'.repeat(40)
+  const release = join(root, 'releases', build)
+  const game = join(root, 'game')
+  const bin = join(root, 'bin')
+  mkdirSync(bin)
+  mkdirSync(join(game, 'data'), { recursive: true })
+  cpSync(join(repository, 'operations'), join(release, 'operations'), { recursive: true, filter: source => !source.includes('node_modules') })
+  writeFileSync(join(game, '.env'), 'PUBLIC_API_BASE=https://api.example.invalid\n')
+  writeFileSync(join(game, 'data/dependencies.compose.env'), 'DATABASE_URL=postgresql://owner:private@postgres/agricola\nOBSERVABILITY_METRICS_TOKEN=private-scrape-token\n')
+  const calls = join(root, 'calls')
+  writeFileSync(join(bin, 'docker'), `#!${process.execPath}
+const fs=require('node:fs');
+const args=process.argv.slice(2);
+fs.appendFileSync(process.env.OPS_TEST_CALLS, JSON.stringify(args)+'\\n');
+if(args[0]==='ps') {
+ const service=args.find(x=>x.startsWith('label=com.docker.compose.service=')).split('=').at(-1);
+ process.stdout.write(service==='app'?'game-container':'legacy-'+service);
+} else if(args[0]==='inspect') process.stdout.write('game-container game-image original-start-time');
+else if(args.includes('up') && process.env.OPS_TEST_FAIL==='1') process.exit(1);
+`)
+  chmodSync(join(bin, 'docker'), 0o755)
+  const result = spawnSync(process.execPath, [join(release, 'operations/deploy.mjs'), root, game, build], {
+    encoding: 'utf8', env: { ...process.env, PATH: bin + ':' + process.env.PATH, OPS_TEST_CALLS: calls, OPS_TEST_FAIL: fail ? '1' : '0' },
+  })
+  const recorded: string[][] = readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  return { root, build, result, recorded }
+}
+
+it('publishes only monitoring services, preserves game identity and keeps credentials out of output', () => {
+  const { root, build, result, recorded } = deploy(false)
+  expect(result.status, result.stderr).toBe(0)
+  expect(JSON.parse(result.stdout.trim())).toEqual({ operationsBuildId: build, gameContainersUnchanged: true })
+  expect(readFileSync(join(root, 'deployed-build-id'), 'utf8')).toBe(build + '\n')
+  expect(recorded.filter(args => args[0] === 'stop')).toEqual([['stop', 'legacy-prometheus', 'legacy-grafana', 'legacy-node-exporter']])
+  expect(recorded.filter(args => args[0] === 'inspect')).toHaveLength(2)
+  expect(recorded.some(args => args.includes('container-entry.ts') || args.includes('storage-archive-cli.ts') || args.includes('game-container') && args[0] !== 'inspect')).toBe(false)
+  expect(result.stdout + result.stderr).not.toContain('private-scrape-token')
+  expect(result.stdout + result.stderr).not.toContain('owner:private')
+})
+
+it('restores legacy monitoring when the first independent deployment fails and leaves the version marker absent', () => {
+  const { root, result, recorded } = deploy(true)
+  expect(result.status).not.toBe(0)
+  expect(existsSync(join(root, 'deployed-build-id'))).toBe(false)
+  expect(recorded.some(args => args.includes('down'))).toBe(true)
+  expect(recorded.at(-1)).toEqual(['start', 'legacy-prometheus', 'legacy-grafana', 'legacy-node-exporter'])
+})

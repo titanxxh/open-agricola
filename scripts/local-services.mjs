@@ -124,4 +124,6 @@ if (spawnSync('docker', ['--version'], { stdio: 'ignore' }).error?.code === 'ENO
   catch { execFileSync('docker', ['network', 'create', 'open-agricola-local_default'], { stdio: 'ignore' }) }
 }
 
-execFileSync(process.execPath, ['scripts/observability.mjs', '--prepare-only'], { stdio: 'inherit', env: { ...process.env, SHARED_DATA_DIR: dataDir } })
+if (!process.argv.includes('--skip-observability')) {
+  execFileSync(process.execPath, ['scripts/observability.mjs', '--prepare-only'], { stdio: 'inherit', env: { ...process.env, SHARED_DATA_DIR: dataDir } })
+}
