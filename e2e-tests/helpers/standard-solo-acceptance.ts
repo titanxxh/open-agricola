@@ -33,10 +33,12 @@ export async function authenticateSolo(context: BrowserContext, request: APIRequ
 }
 
 export class SoloBrowserDriver {
+  readonly page: Page
   readonly events: ServerEvent[] = []
   readonly commands: ClientCommand[] = []
   readonly trace: unknown[] = []
-  constructor(readonly page: Page) {
+  constructor(page: Page) {
+    this.page = page
     page.on('websocket', socket => {
       socket.on('framereceived', ({ payload }) => {
         if (typeof payload === 'string') this.events.push(JSON.parse(payload) as ServerEvent)

@@ -18,6 +18,7 @@ const architectureChecks = [
   'pnpm run check:card-impl-boundaries',
   'pnpm run check:card-state-boundaries',
   'pnpm run check:architecture-types',
+  'pnpm run check:verification-types',
   'pnpm run check:architecture-tests',
   'pnpm run check:prompt-sync -- --strict',
   'pnpm run check:dependencies',
@@ -31,6 +32,9 @@ describe('canonical architecture verification wiring', () => {
     }
 
     expect(pkg.scripts['check:architecture']?.split(' && ')).toEqual(architectureChecks)
+    expect(pkg.scripts['check:verification-types']).toBe('tsc -p tsconfig.verification-tools.json --noEmit')
+    const solution: unknown = JSON.parse(fs.readFileSync(path.join(repoRoot, 'tsconfig.json'), 'utf8'))
+    expect(solution).not.toMatchObject({ references: expect.arrayContaining([{ path: './tsconfig.verification-tools.json' }]) })
     const architectureTests = [
       'shared/actions/effects/__tests__/architecture-guard.test.ts',
       'shared/cards/__tests__/provenance-result-audit.test.ts',

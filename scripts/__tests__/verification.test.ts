@@ -46,15 +46,15 @@ describe('verification modes and evidence', () => {
     const run = (command: string, args: string[]) => { calls.push([command, ...args].join(' ')); return 0 }
     runVerification(cwd, plan, run)
     expect(calls).toEqual([
-      `${process.execPath} scripts/local-services.mjs --test`, 'pnpm run check:card-impl-boundaries', 'pnpm test:fast', 'pnpm run lint',
+      `${process.execPath} scripts/local-services.mjs --test`, 'pnpm run check:card-impl-boundaries', 'pnpm run check:verification-types', 'pnpm test:fast', 'pnpm run lint',
     ])
     expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')).toMatchObject({
       current: true, record: { status: 'passed', steps: [
-        { name: 'test-services', status: 'passed' }, { name: 'card-impl-boundaries', status: 'passed' }, { name: 'fast', status: 'passed' }, { name: 'lint', status: 'passed' },
+        { name: 'test-services', status: 'passed' }, { name: 'card-impl-boundaries', status: 'passed' }, { name: 'verification-types', status: 'passed' }, { name: 'fast', status: 'passed' }, { name: 'lint', status: 'passed' },
       ] },
     })
     runVerification(cwd, plan, run)
-    expect(calls).toHaveLength(8)
+    expect(calls).toHaveLength(10)
     expect(() => verificationPlan(cwd, ['prepush', '--project', 'fast-server'])).toThrow('accepts no filters')
   })
 
@@ -70,7 +70,7 @@ describe('verification modes and evidence', () => {
     const result = verificationStatus(cwd).find(entry => entry.mode === 'prepush')!
     expect(result.current).toBe(true)
     expect(result.record).toMatchObject({ status: 'failed', steps: [
-      { name: 'test-services', exitCode: 0 }, { name: 'card-impl-boundaries', exitCode: 0 }, { name: 'fast', exitCode: 7 },
+      { name: 'test-services', exitCode: 0 }, { name: 'card-impl-boundaries', exitCode: 0 }, { name: 'verification-types', exitCode: 0 }, { name: 'fast', exitCode: 7 },
     ] })
   })
 
@@ -86,6 +86,20 @@ describe('verification modes and evidence', () => {
     expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')).toMatchObject({
       current: true, record: { status: 'failed', steps: [
         { name: 'test-services', exitCode: 0 }, { name: 'card-impl-boundaries', exitCode: 1 },
+      ] },
+    })
+  })
+
+  it('stops before fast and lint when verification tool type checking fails', () => {
+    const cwd = repo(), calls: string[] = []
+    expect(() => runVerification(cwd, verificationPlan(cwd, ['prepush']), (_command, args) => {
+      calls.push(args.join(' '))
+      return args.includes('check:verification-types') ? 2 : 0
+    })).toThrow('verification-types failed (exit 2)')
+    expect(calls).toEqual(['scripts/local-services.mjs --test', 'run check:card-impl-boundaries', 'run check:verification-types'])
+    expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')).toMatchObject({
+      current: true, record: { status: 'failed', steps: [
+        { name: 'test-services', exitCode: 0 }, { name: 'card-impl-boundaries', exitCode: 0 }, { name: 'verification-types', exitCode: 2 },
       ] },
     })
   })
@@ -136,9 +150,7 @@ describe('verification modes and evidence', () => {
   it('builds the hosted frontend before the isolated Playwright command and preserves its arguments', () => {
     const cwd = repo(), calls: string[][] = []
     for (const args of [[], ['--', 'e2e-tests/example.spec.ts', '--browser=webkit']]) {
-      runVerification(cwd, verificationPlan(cwd, args), (command, params) => {
-        calls.push([command, ...params]); return 0
-      })
+      for (const step of verificationPlan(cwd, args).steps) calls.push([step.command, ...step.args])
     }
     expect(calls).toEqual([
       ['pnpm', 'run', 'build:hosted-frontend'],
@@ -146,9 +158,11 @@ describe('verification modes and evidence', () => {
       ['pnpm', 'run', 'build:hosted-frontend'],
       ['bash', 'scripts/verify.sh', 'e2e-tests/example.spec.ts', '--browser=webkit'],
     ])
+    expect(verificationPlan(cwd, ['e2e-tests/example.spec.ts', '--requirements', 'output/required.json']).steps[1]?.args)
+      .toEqual(['scripts/verify.sh', 'e2e-tests/example.spec.ts'])
   })
 
-  it.each(['PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR'])('invalidates evidence when %s changes', key => {
+  it.each(['PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR', 'RELEASE_SMOKE_PROXY'])('invalidates evidence when %s changes', key => {
     const cwd = repo()
     vi.stubEnv(key, undefined)
     runVerification(cwd, verificationPlan(cwd, ['prepush']), () => 0)

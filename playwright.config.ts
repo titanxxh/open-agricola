@@ -10,6 +10,9 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1920, height: 1080 },
     baseURL: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    ...(process.env.RELEASE_SMOKE_PROXY ? {
+      proxy: { server: process.env.RELEASE_SMOKE_PROXY, bypass: 'localhost,127.0.0.1,[::1],*.agricola.test' },
+    } : {}),
   },
   outputDir: './output/playwright',
 })
