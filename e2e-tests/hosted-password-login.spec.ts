@@ -1,4 +1,4 @@
-import { expect, devices, type BrowserContext, type Page, type PlaywrightWorkerArgs } from '@playwright/test'
+import { expect, devices, type BrowserContext, type Page, type PlaywrightWorkerArgs, type Request } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -47,6 +47,18 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const sockets = new Set<Duplex>()
   const errors: string[] = []
   const socketMessages: string[] = []
+  type LifecycleDetail = { requestId?: number; status?: number; failure?: string; name?: string }
+  const lifecycle: Array<LifecycleDetail & { at: number; pageId: number; event: string; origin: string; path: string }> = []
+  const pageIds = new WeakMap<Page, number>()
+  let pageSequence = 0
+  const note = (page: Page, event: string, detail: LifecycleDetail & { url?: string } = {}) => {
+    const { url = page.url(), ...data } = detail
+    const location = new URL(url)
+    const pageId = pageIds.get(page) ?? ++pageSequence
+    pageIds.set(page, pageId)
+    lifecycle.push({ at: Date.now(), pageId, event, origin: location.origin, path: location.pathname, ...data })
+    if (lifecycle.length > 128) lifecycle.shift()
+  }
   let appOrigin = ''
   let apiOrigin = ''
   const backend = new URL(BACKEND_URL)
@@ -175,8 +187,21 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     })
     await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     const observe = (page: Page) => {
-      const onPageError = (error: Error) => { errors.push(error.stack ?? error.message) }
+      const requests = new WeakMap<Request, number>()
+      let requestSequence = 0
+      note(page, 'observed')
+      page.on('framenavigated', frame => { if (frame === page.mainFrame()) note(page, 'navigation', { url: frame.url() }) })
+      page.on('close', () => note(page, 'close'))
+      const onPageError = (error: Error) => { errors.push(error.stack ?? error.message); note(page, 'pageerror', { name: error.name }) }
       page.on('pageerror', onPageError)
+      page.on('request', request => {
+        if (new URL(request.url()).pathname !== '/api/observability/telemetry') return
+        requests.set(request, ++requestSequence)
+        note(page, 'telemetry-start', { requestId: requestSequence, url: request.url() })
+      })
+      page.on('response', response => { const requestId = requests.get(response.request()); if (requestId) note(page, 'telemetry-status', { requestId, status: response.status(), url: response.url() }) })
+      page.on('requestfinished', request => { const requestId = requests.get(request); if (requestId) note(page, 'telemetry-finish', { requestId, url: request.url() }) })
+      page.on('requestfailed', request => { const requestId = requests.get(request); if (requestId) note(page, 'telemetry-failure', { requestId, url: request.url(), failure: request.failure()?.errorText.replace(/https?:\/\/[^\s]+/g, '[url]') }) })
       page.on('websocket', socket => {
         if (!socket.url().startsWith(apiOrigin.replace('https:', 'wss:') + '/nodes/')) return
         socket.on('framereceived', ({ payload }) => {
@@ -185,12 +210,13 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
           if (message && typeof message === 'object' && 'type' in message && typeof message.type === 'string') socketMessages.push(message.type)
         })
       })
-      return () => page.off('pageerror', onPageError)
+      return () => { note(page, 'observer-retired'); page.off('pageerror', onPageError) }
     }
     return {
       appUrl: `${appOrigin}${HOSTED_APP_PATH}`, apiOrigin, build, username, userId: user.id,
-      context, observe, errors, socketMessages,
+      context, observe, errors, socketMessages, lifecycle, note,
       close: async () => {
+        for (const page of context?.pages() ?? []) note(page, 'intent-context-close')
         await context?.close()
         for (const socket of sockets) socket.destroy()
         await new Promise<void>(done => proxy.close(() => done()))
@@ -240,6 +266,7 @@ test('strict WebKit reproduces legacy cross-site password login returning to the
     expect((await rejectedLobby).status()).toBe(401)
     await expect(page.locator('#username')).toBeVisible()
     expect((await environment.context.cookies(environment.apiOrigin)).some(cookie => cookie.name === SESSION_COOKIE)).toBe(false)
+    if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine: 'webkit', topology: 'legacy-cross-site', events: environment.lifecycle }))
     expect(environment.errors).toEqual([])
     testInfo.annotations.push({ type: 'limitation', description: 'Linux WPE reproduction is not physical Safari/iPhone acceptance' })
   } finally { await environment.close() }
@@ -264,6 +291,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(await environment.context.cookies(environment.apiOrigin)).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: SESSION_COOKIE, secure: true, httpOnly: true, sameSite: 'Lax' }),
       ]))
+      environment.note(page, 'intent-reload')
       await page.reload({ waitUntil: 'domcontentloaded' })
       await expect(page.getByRole('button', { name: 'Local Hotseat', exact: true })).toBeVisible()
       const workshopLoads = [
@@ -302,9 +330,11 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(saved).toMatchObject({ created_by: environment.userId, max_players: 2, hotseat: 1 })
       const savedHash = createHash('sha256').update(saved.state_json).digest('hex')
       const scopes = environment.socketMessages.filter(type => type === 'commandScope').length
+      if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine, topology: 'hosted', events: environment.lifecycle }))
       expect(environment.errors).toEqual([])
       // Closing the document can cancel sampled telemetry in WebKit.
       stopObservingPage()
+      environment.note(page, 'intent-page-close')
       await page.close()
       await expect.poll(async () => (await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id = ?')
         .get<{ connected_count: number }>(roomId))?.connected_count).toBe(0)
@@ -337,6 +367,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(logout.status()).toBe(200)
       await expect(page.locator('#username')).toBeVisible()
       expect(await page.evaluate(async () => (await fetch('/api/auth/me', { credentials: 'include' })).status)).toBe(401)
+      if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine, topology: 'hosted', events: environment.lifecycle }))
       expect(environment.errors).toEqual([])
       await testInfo.attach('hosted-session-evidence', {
         body: JSON.stringify({ engine, gameBuildId: environment.build.gameBuildId, productionDocumentBytesMatched: true,
