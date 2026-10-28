@@ -180,14 +180,13 @@ test('skipping a spatial Scythe choice retains normal field harvesting', async (
   expect(result.state.players[0].resources.grain).toBe(1)
 })
 
-test('one farm cell with multiple authoritative options requires an explicit action-card choice', async ({ page, request }) => {
+test('a scheduled Cut Peat offer commits its single physical card from the farm', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  // Solo Moor rules provide several distinct physical cards offering Cut Peat.
-  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1056, playerCount: 1, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
+  const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1056, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
   expect(fresh.ok()).toBe(true)
-  const solo = createWorkSession({ seed: 1056, options: { playerCount: 1, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
-  const state = solo.withCtx(() => serializeState(solo.state, {}))
-  solo.dispose()
+  const session = createWorkSession({ seed: 1056, options: { playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
+  const state = session.withCtx(() => serializeState(session.state, {}))
+  session.dispose()
   state.round = 5
   const owner = state.players[0]!
   owner.minorHand = ['__test_placeholder__']
@@ -196,7 +195,11 @@ test('one farm cell with multiple authoritative options requires an explicit act
   owner.resources.food = 20
   owner.resources.fuel = 20
   owner.farmTerrain = [{ row: 2, col: 1, kind: 'moor' }]
-  for (const worker of owner.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: owner.id, workerId: worker.id })
+  for (const player of state.players) {
+    player.resources.food = 20
+    player.resources.fuel = 20
+    for (const worker of player.workers.filter((candidate) => candidate.isActive)) state.actionSpaces[0]!.takenBy.push({ playerId: player.id, workerId: worker.id })
+  }
   owner.cardStates.M056_PeatCuttingRights = { extraData: { scheduledOffers: [{ id: 'browser-cut-peat', kind: 'moor-special-action', dueRound: 6, actionId: 'cut-peat', consumed: false }] } }
   expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
   const roundEndResponse = await request.post(`${BACKEND_URL}/api/game/round-end`)
@@ -225,19 +228,22 @@ test('one farm cell with multiple authoritative options requires an explicit act
   expect(activated.state.players[0].farmTerrain).toEqual([{ row: 2, col: 1, kind: 'moor' }])
   expect(activated.state.players[0].cardStates.M056_PeatCuttingRights.extraData.scheduledOffers)
     .toEqual([expect.objectContaining({ id: 'browser-cut-peat', consumed: false })])
+  const targets = activated.interaction.request.options.filter((option: ActionChoiceOption) => option.targetCard && !option.disabled)
+  expect(targets).toMatchObject([{
+    targetCard: { cardId: 'moor-special-1-2-terrain' },
+    target: { kind: 'farm-cell', playerId: owner.id, positions: [{ row: 2, col: 1 }] },
+  }])
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
   const tile = page.locator('[data-farm-tile-player="p1"][data-farm-tile-key="2-1"]')
   await expect(tile).toHaveClass(/position-selectable/)
-  await tile.click()
-  const sources = page.locator('.interaction-bar [data-target-card]')
-  await expect(sources).toHaveCount(3)
-  const before = await (await request.get(`${BACKEND_URL}/api/game/state`)).json()
-  expect(before.state.players[0].farmTerrain).toHaveLength(1)
   const committed = page.waitForResponse((response) => response.url().endsWith('/api/game/choice'))
-  await sources.first().locator('..').locator('..').click()
+  await tile.click()
   const result = await (await committed).json()
   expect(result.ok, JSON.stringify(result)).toBe(true)
-  expect(result.state.players[0].farmTerrain).toHaveLength(0)
+  expect(result.state.players[0].farmTerrain).toEqual([])
+  expect(result.state.players[0].resources.fuel).toBe(23)
+  expect(result.state.players[0].cardStates.M056_PeatCuttingRights.extraData.scheduledOffers)
+    .toEqual([expect.objectContaining({ id: 'browser-cut-peat', consumed: true, consumedRound: 6 })])
 })
 
 for (const first of ['C048_Farmstead', 'B027_Toolbox']) {
