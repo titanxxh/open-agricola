@@ -1,4 +1,5 @@
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { CardExchange } from '../../contract/cards'
 import { initCardState } from './card-state'
 import { getCardExchanges, getRemainingHarvestExchangeUses } from '../../actions/helpers/exchange-recipes'
 import { exchangeToTrade } from '../../actions/helpers/trades'
@@ -22,9 +23,13 @@ export const hasCardCounter = (
   key: string,
 ) => (player.cardStates?.[cardId]?.counters?.[key] ?? 0) > 0
 
-export const createSingleHarvestExchange = (sourceId: string) =>
+export const createSingleHarvestExchange = (
+  sourceId: string,
+  recipeOf: (state: GameState, player: PlayerState) => CardExchange | undefined =
+    state => getCardExchanges(sourceId, state).find(entry => entry.triggers?.includes('harvest')),
+) =>
   (state: GameState, player: PlayerState): ActionFlow | undefined => {
-  const recipe = getCardExchanges(sourceId, state).find((entry) => entry.triggers?.includes('harvest'))
+  const recipe = recipeOf(state, player)
   if (!recipe) return
   const trade = exchangeToTrade(recipe, sourceId)
   if (getRemainingHarvestExchangeUses(player, trade.sourceId ?? sourceId, trade.max, state.round) <= 0 ||

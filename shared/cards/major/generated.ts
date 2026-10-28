@@ -1120,6 +1120,23 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 4,
     "extraVp": true,
+    "exchanges": [
+      {
+        "from": {
+          "fuel": 1
+        },
+        "to": {},
+        "max": 1,
+        "sourceId": "Major_Moor_VillageChurch",
+        "triggers": [
+          "harvest"
+        ],
+        "sideEffect": {
+          "type": "bonusVp",
+          "amount": 1
+        }
+      }
+    ],
     "requiresFarmersOfTheMoor": true,
     "desc": [
       "[Harvest]",

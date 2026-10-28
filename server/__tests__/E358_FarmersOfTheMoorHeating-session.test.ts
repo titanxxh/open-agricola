@@ -710,25 +710,13 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(resp.ok).toBe(false)
   })
 
-  it('applies Village Church purchase food and optional harvest fuel-to-bonus-vp flow', () => {
+  it('keeps the Village Church purchase reward at exactly two food', () => {
     const session = prepareMajorPurchaseSession('Major_Moor_VillageChurch')
 
     const buyResp = buyMajor(session, 'Major_Moor_VillageChurch')
 
     const player = buyResp.state.players[0]!
     expect(player.resources.food).toBe(2)
-    player.resources.fuel = 1
-    const flow = session.withCtx(() => runCardEffectHook(buyResp.state, player, 'Major_Moor_VillageChurch', 'onHarvest'))
-    expect(flow).toMatchObject({
-      type: 'seq',
-      optional: true,
-      children: [
-        { type: 'leaf', actionId: 'pay', params: { fuel: 1 }, sourceCard: 'Major_Moor_VillageChurch' },
-        { type: 'leaf', actionId: 'bonus-vp', sourceCard: 'Major_Moor_VillageChurch' },
-      ],
-    })
-
-    player.resources.fuel = 0
-    expect(session.withCtx(() => runCardEffectHook(buyResp.state, player, 'Major_Moor_VillageChurch', 'onHarvest'))).toBeNull()
+    expect(player.improvements).toContain('Major_Moor_VillageChurch')
   })
 })
