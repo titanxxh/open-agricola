@@ -5,6 +5,7 @@ import type { AnimalKey } from './animals'
 export type CardRuleContributions = {
   reservedSupply?: Partial<Record<SupplyTokenKey, number>>
   unusedSpaceReduction?: number
+  farmerScoreAdjustment?: number
 }
 
 export type PublicCardMarker = {

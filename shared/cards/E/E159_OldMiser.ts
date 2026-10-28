@@ -9,9 +9,7 @@ registerHarvestFeedingRequirementModifier(CARD_ID, ({ familySize }) => -familySi
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) => {
-      return -familySize(player)
-    },
+    getRuleContributions: (player) => ({ farmerScoreAdjustment: -familySize(player) }),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

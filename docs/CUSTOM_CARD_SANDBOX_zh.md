@@ -258,7 +258,7 @@ reaction-compatible hook（action listener 的 `before` / `immediatelyAfter` / `
 | `computeLockedFarmTiles`                     | `(player) => FarmTilePosition[]`                                  | 田地锁定                                                |
 | `getInvalidAnimals`                          | `(player, zone, meeples) => Meeple[]`                             | 卡牌专属动物分区禁入校验；沙盒不传 `state`                           |
 | `getBuiltSpecialStables`                     | `(player) => FarmTilePosition[]`                                | 当前矗立的特殊 stable（驱动 snapshot `specialStables` 展示派生）    |
-| `getRuleContributions` | `(player) => CardRuleContributions` | 来源卡只读贡献组件预留或空格数量调整；有限、取整、非负并按类别上限约束 |
+| `getRuleContributions` | `(player) => CardRuleContributions` | 来源卡只读贡献；组件预留与空格减免保持有限、向下取整、非负并按类别上限约束。可选 `farmerScoreAdjustment` 为有符号有限数，向零取整，改变有效人物分而不增加卡牌惩罚 |
 | `getStatePresentation` | `(player) => CardStatePresentation` | 明确的公开计数、资源组、作物层和标记；普通客户端不读取内部状态 |
 | `computeResourceCommitments` | `(state, owner) => Array<{ playerId, resources }>` | 声明玩家必须留存的物品。一条命令如果会让被点名的玩家低于这个数量，就被拒绝并回滚。每条命令之后都会调用 |
 | `countExtraTurns` | `(state, player) => number` | 本卡本轮还能提供的额外行动次数，见上文 |

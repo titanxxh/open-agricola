@@ -3,7 +3,6 @@ import { createOfficialCardRegistry } from '../../shared/cards/__tests__/card-en
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/domain/scoring'
 import type { ActionChoiceOption,  GameState, PlayerState, Resource } from '../../shared/contract/types'
 
@@ -197,8 +196,8 @@ describe('E159_OldMiser session', () => {
     })
   })
 
-  describe('scoring penalty', () => {
-    it('reduces farmer score by 1 per person (2 people = -2 VP)', () => {
+  describe('effective farmer score', () => {
+    it('scores two people at two points each without a separate card penalty', () => {
     const ruleRegistry = createOfficialCardRegistry()
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
@@ -206,19 +205,14 @@ describe('E159_OldMiser session', () => {
       const state = createState(player)
       const [result] = withActiveRegistry(ruleRegistry, () => computeScores(state))
 
-      // Normal farmer score: 2 * 3 = 6
-      // Post-score adjustment: -2 (1 per person)
-      // So net farmer effect: 4 VP
       const farmerCat = result.categories.find((c) => c.key === 'farmers')
-      expect(farmerCat!.total).toBe(6) // Base farmer score still 6
+      expect(farmerCat!.total).toBe(4)
 
-      // Post-score penalty
       const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')
-      expect(postScoreCat).toBeDefined()
-      expect(postScoreCat!.total).toBe(-2) // -1 per person * 2 people
+      expect(postScoreCat).toBeUndefined()
     })
 
-    it('with 5 people, reduces by 5 VP', () => {
+    it('scores five people at ten effective farmer points', () => {
     const ruleRegistry = createOfficialCardRegistry()
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
@@ -227,8 +221,8 @@ describe('E159_OldMiser session', () => {
       const [result] = withActiveRegistry(ruleRegistry, () => computeScores(state))
 
       const postScoreCat = result.categories.find((c) => c.key === 'cardBonusVp')
-      expect(postScoreCat).toBeDefined()
-      expect(postScoreCat!.total).toBe(-5)
+      expect(postScoreCat).toBeUndefined()
+      expect(result.categories.find((c) => c.key === 'farmers')!.total).toBe(10)
     })
 
     it('no penalty when card not played', () => {
@@ -250,5 +244,5 @@ describe('ae-negative-56-family', () => {
   afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
   it('E159 N1 real harvest charges one food per adult for two three and five people while a held card grants no reduction',()=>{for(const[n,held]of[[2,false],[3,false],[5,false],[2,true]]as const){const s=make('E159_OldMiser',st=>people(st.players[0]!,n),!held,4),r=finish(s,end(s));assert.equal(r.state.players[0]!.resources.food,100-n*(held?2:1));assert.equal(r.state.players[0]!.resources.begging,0);save(`E159-N1-${n}-${held}`,r)}})
   it('E159 N2 genuine round-seven newborn requires zero food and nonharvest round never feeds family',()=>{const s=make('E159_OldMiser',st=>{people(st.players[0]!,3);setActiveWorkerCount(st.players[0]!,2)},true,7),grown=finish(s,ok(s.takeAction(0,'wish-children')),true),r=finish(s,end(s));assert.equal(familySize(grown.state.players[0]!),3);assert.equal(r.state.players[0]!.resources.food,98);const n=make('E159_OldMiser',undefined,true,5),nr=finish(n,end(n));assert.equal(nr.state.players[0]!.resources.food,100);save('E159-N2',{grown,r,nr})})
-  it('E159 N3 actual final scoring retains ordinary three-point farmer category and subtracts one per person for net two',()=>{for(const n of[2,3,5]){const s=make('E159_OldMiser',st=>people(st.players[0]!,n),true,14),r=finish(s,end(s));assert.equal(r.state.gameOver,true);assert.equal(r.scores?.[0]?.categories.find(c=>c.key==='farmers')?.total,3*n);assert.equal(bonus(r,'E159_OldMiser'),-n);save(`E159-N3-${n}`,r)}})
+  it('E159 N3 actual final scoring uses two-point effective farmers without a separate penalty',()=>{for(const n of[2,3,5]){const s=make('E159_OldMiser',st=>people(st.players[0]!,n),true,14),r=finish(s,end(s));assert.equal(r.state.gameOver,true);assert.equal(r.scores?.[0]?.categories.find(c=>c.key==='farmers')?.total,2*n);assert.equal(bonus(r,'E159_OldMiser'),0);save(`E159-N3-${n}`,r)}})
 })

@@ -30,3 +30,9 @@ export const getCardUnusedSpaceReduction = (player: PlayerState, unusedSpaces: n
   Math.min(nonNegativeInteger(unusedSpaces), collectCardRuleContributions(player).reduce(
     (sum, contribution) => sum + nonNegativeInteger(contribution.unusedSpaceReduction), 0,
   ))
+
+export const getCardFarmerScoreAdjustment = (player: PlayerState): number =>
+  collectCardRuleContributions(player).reduce((sum, contribution) => {
+    const adjustment = contribution.farmerScoreAdjustment
+    return sum + (typeof adjustment === 'number' && Number.isFinite(adjustment) ? Math.trunc(adjustment) : 0)
+  }, 0)

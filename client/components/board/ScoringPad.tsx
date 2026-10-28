@@ -4,6 +4,7 @@ import { t } from '../../../shared/i18n'
 import type {
   PlayerScoreSummary,
   ScoreCategoryResult,
+  ScoreEntry,
 } from '../../../shared/domain'
 import type {
   PlayerState,
@@ -78,6 +79,7 @@ type ScoringRow =
   | { id: string; type: 'card'; cardId: string; cardType: 'major' | 'minor' | 'occupation' }
   | { id: string; type: 'parentCard'; cardId: string }
   | { id: string; type: 'cardBonus'; cardId: string; cardType?: 'major' | 'minor' | 'occupation' }
+  | { id: string; type: 'marker'; marker: Extract<ScoreEntry, { type: 'marker' }> }
   | { id: string; type: 'total' }
 
 const renderCardChildLabel = (
@@ -110,6 +112,14 @@ const renderCardChildLabel = (
   )
 }
 
+const renderMarkerLabel = (locale: Locale, marker: Extract<ScoreEntry, { type: 'marker' }>) => {
+  const label = marker.labelKey ? t(locale, marker.labelKey) : marker.label
+  const cardRef = resolveCardRef(locale, marker.cardId)
+  return <span className="scoring-card-label">{'· '}{cardRef
+    ? <LogCardLink locale={locale} cardRef={cardRef}>{label}</LogCardLink>
+    : label}</span>
+}
+
 export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory = false, completionActions, startingHandSelection }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('score')
   const categoryRows: ScoringRow[] = categoryOrder.map((key) => ({
@@ -121,6 +131,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
   const cardRows: ScoringRow[] = []
   const parentCardRows: ScoringRow[] = []
   const cardBonusRows: ScoringRow[] = []
+  const markerRows = new Map<string, ScoringRow>()
   const cardMap = new Map<string, 'major' | 'minor' | 'occupation'>()
   const parentCardIds = new Set<string>()
   const cardBonusMap = new Map<string, 'major' | 'minor' | 'occupation' | undefined>()
@@ -142,6 +153,10 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     bonusCategory?.entries.forEach((entry) => {
       if (entry.type === 'bonus' && entry.score !== 0) {
         cardBonusMap.set(entry.cardId, entry.cardType)
+      }
+      if (entry.type === 'marker' && entry.score !== 0) {
+        const id = `marker-${entry.cardId}-${entry.markerId}`
+        markerRows.set(id, { id, type: 'marker', marker: entry })
       }
     })
   })
@@ -167,6 +182,7 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
     }
     if (row.type === 'category' && row.key === 'cardBonusVp') {
       rows.push(...cardBonusRows)
+      rows.push(...markerRows.values())
     }
   })
 
@@ -238,9 +254,11 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                       ? <span className="scoring-card-label">{'· '}{row.cardId}</span>
                       : row.type === 'cardBonus'
                         ? renderCardChildLabel(locale, row.cardId, row.cardType, true)
-                        : t(locale, 'ui.scoringTotal')
+                        : row.type === 'marker'
+                          ? renderMarkerLabel(locale, row.marker)
+                          : t(locale, 'ui.scoringTotal')
               return (
-                <div key={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
+                <div key={row.id} data-score-row={row.id} className="scoring-row" style={{ gridTemplateColumns }}>
                   <div className="scoring-cell scoring-label">{rowLabel}</div>
                   {scores.map((player) => {
                     if (row.type === 'total') {
@@ -308,7 +326,8 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
                     )
                     const score = category?.entries.reduce(
                       (sum, item) =>
-                        item.type === 'bonus' && item.cardId === row.cardId && item.score !== 0
+                        ((row.type === 'marker' && item.type === 'marker' && item.cardId === row.marker.cardId && item.markerId === row.marker.markerId)
+                          || (row.type === 'cardBonus' && item.type === 'bonus' && item.cardId === row.cardId))
                           ? sum + item.score
                           : sum,
                       0,

@@ -1,4 +1,4 @@
-import { getCardUnusedSpaceReduction } from '../cards/card-rule-contributions'
+import { getCardFarmerScoreAdjustment, getCardUnusedSpaceReduction } from '../cards/card-rule-contributions'
 import { getFencedStableCount } from './pasture'
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
 import { getFarmyardTileCount } from '../domain/farm.ts'
@@ -65,6 +65,16 @@ export type ScoreEntry =
       reserved?: Partial<Resource>
     }
   | { type: 'parentCard'; cardId: string; score: number }
+  | {
+      type: 'marker'
+      markerId: string
+      cardId: string
+      holderPlayerId: string
+      sourcePlayerId?: string
+      label: string
+      labelKey?: string
+      score: number
+    }
 
 export type ScoreCategoryResult = {
   key: ScoreCategoryKey
@@ -487,7 +497,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     const sickWorkerCount = state.enableFarmersOfTheMoor === true
       ? Math.min(playerFamilySize, new Set(player.sickWorkerIds ?? []).size)
       : 0
-    const farmerScore = (playerFamilySize - sickWorkerCount) * 3 + sickWorkerCount
+    const farmerScore = (playerFamilySize - sickWorkerCount) * 3 + sickWorkerCount + getCardFarmerScoreAdjustment(player)
     categories.push({
       key: 'farmers',
       total: farmerScore,
@@ -608,7 +618,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     }
 
     let cardBonusVp = 0
-    const cardBonusEntries: Extract<ScoreEntry, { type: 'bonus' }>[] = []
+    const cardBonusEntries: Extract<ScoreEntry, { type: 'bonus' | 'marker' }>[] = []
     for (const { cardId, bonus } of selectedReserveIsAffordable ? selectedReserveEntries : []) {
       const entry: Extract<ScoreEntry, { type: 'bonus' }> = {
         type: 'bonus',
@@ -644,13 +654,16 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     for (const marker of readAllPublicCardMarkers(player)) {
       const score = marker.score ?? 0
       if (score === 0) continue
-      const cardType = playedCardType(player, marker.sourceCardId)
       cardBonusVp += score
       cardBonusEntries.push({
-        type: 'bonus',
+        type: 'marker',
+        markerId: marker.id,
         score,
         cardId: marker.sourceCardId,
-        ...(cardType ? { cardType } : {}),
+        holderPlayerId: player.id,
+        ...(marker.sourcePlayerId ? { sourcePlayerId: marker.sourcePlayerId } : {}),
+        label: marker.label,
+        ...(marker.labelKey ? { labelKey: marker.labelKey } : {}),
       })
     }
 

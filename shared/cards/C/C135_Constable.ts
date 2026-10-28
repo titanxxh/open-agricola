@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { getOrdinaryNegativeScoreTotal } from '../../domain/score-rules'
 
 const CARD_ID = 'C135_Constable'
 const WOOD_BY_REMAINING: Record<number, number> = {
@@ -21,9 +22,7 @@ const cardImpl = {
   },
   computeSharedPostScore: (_state, _owner, summaries) => {
     return summaries.flatMap((summary) =>
-      summary.categories.some((category) =>
-        category.total < 0 || category.entries.some((entry) => entry.score < 0),
-      )
+      getOrdinaryNegativeScoreTotal(summary) < 0
         ? []
         : [{ playerId: summary.playerId, score: 3 }],
     )
