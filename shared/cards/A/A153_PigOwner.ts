@@ -1,4 +1,4 @@
-import { countRoomAnimals } from '../../domain/animals'
+import { getPlacedAnimalsByType } from '../../domain/animal-zones'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -6,17 +6,6 @@ import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A153_PigOwner'
-const countPigsOnFarm = (player: CardListenerContext['player']): number => {
-  let count = 0
-  for (const pasture of player.pastures) {
-    if (pasture.animalType === 'boar') count += pasture.animalCount ?? 0
-  }
-  count += countRoomAnimals(player, 'boar')
-  for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal.animalType === 'boar') count += animal.animalCount
-  }
-  return count
-}
 
 const anytimeListener: CardListenerRegistration = {
   id: 'A153-pig-owner-anytime',
@@ -25,7 +14,7 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (countPigsOnFarm(context.player) < 5) return
+    if (getPlacedAnimalsByType(context.player, context.state).boar < 5) return
     return {
       flow: {
         type: 'seq',

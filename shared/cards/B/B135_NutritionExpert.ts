@@ -1,15 +1,16 @@
 import { defineOccupationCard } from '../card-source'
 import { payGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { animalKeysForState } from '../../contract/animals'
 
 const CARD_ID = 'B135_NutritionExpert'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  onRoundStart: (state, player) => {
 
-    const animalTypes = ['sheep', 'boar', 'cattle'] as const
+    const animalTypes = animalKeysForState(state)
     const availableAnimals = animalTypes.filter((a) => (player.resources[a] ?? 0) >= 1)
     const hasGrain = (player.resources.grain ?? 0) >= 1
     const hasVeg = (player.resources.vegetable ?? 0) >= 1
