@@ -4,44 +4,21 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { playerBoard } from '../../domain'
 import { areRequiredEmptyZoneGroupsSatisfied } from '../../domain/animal-zones'
-import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
+import { sumActionSpaceMovedToPlayer } from '../helpers/event-provenance'
+import { bonusVpLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E033_BeaverColony'
 const REQUIRED_EMPTY_GROUP_ID = `${CARD_ID}:stabled-pastures`
-const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
-
-const reedMovedFromActionSpace = (context: CardListenerContext): number => {
-  const events = context.actionEvents ?? context.transactionEvents
-  return sumResourceMovedToPlayer(events, 'reed', context.player.id, (event) =>
-    event.from.kind === 'actionSpace',
-  )
-}
-
-const afterCollectListener: CardListenerRegistration = {
-  id: 'E33-beaver-colony-after-collect',
+const afterSpaceUseListener: CardListenerRegistration = {
+  id: 'E33-beaver-colony-after-space-use',
   cardIds: [CARD_ID],
   phases: ['after'],
-  actions: ['collect'],
+  actionSpaces: 'all',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (reedMovedFromActionSpace(context) <= 0) return
+    if (sumActionSpaceMovedToPlayer(context.actionEvents ?? context.transactionEvents, 'reed', context.player.id) <= 0) return
     return {
-      flow: { type: 'leaf', actionId: 'bonus-vp', params: { score: 1 }, sourceCard: CARD_ID },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
-const afterGainListener: CardListenerRegistration = {
-  id: 'E33-beaver-colony-after-gain',
-  cardIds: [CARD_ID],
-  phases: ['after'],
-  actions: ['gain'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || !REED_ACTION_SPACES.has(context.space.id)) return
-    if (reedMovedFromActionSpace(context) <= 0) return
-    return {
-      flow: { type: 'leaf', actionId: 'bonus-vp', params: { score: 1 }, sourceCard: CARD_ID },
+      flow: bonusVpLeaf(CARD_ID),
       sourceCard: CARD_ID,
     }
   },
@@ -49,7 +26,7 @@ const afterGainListener: CardListenerRegistration = {
 
 const cardImpl = {
   prerequisiteCheck: (player) => getFencedStableCount(player) > 0,
-  listeners: [afterCollectListener, afterGainListener],
+  listeners: [afterSpaceUseListener],
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
