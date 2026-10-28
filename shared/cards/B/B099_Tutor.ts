@@ -1,5 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { countOccupations } from '../helpers/prerequisites'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B099_Tutor'
@@ -8,11 +9,11 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'playedAtCount', player.occupationPlayed.length)
+    writeCardExtraData(player, CARD_ID, 'playedAtCount', countOccupations(player))
   },
   computeBonusScore: (_state, player) => {
     const playedAt = readCardExtraData<number>(player, CARD_ID, 'playedAtCount') ?? 0
-    return Math.max(0, player.occupationPlayed.length - playedAt)
+    return Math.max(0, countOccupations(player) - playedAt)
   },
 },
   reaches: [] as readonly string[],
