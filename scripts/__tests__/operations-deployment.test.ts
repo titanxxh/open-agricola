@@ -57,3 +57,29 @@ it('restores legacy monitoring when the first independent deployment fails and l
   expect(recorded.some(args => args.includes('down'))).toBe(true)
   expect(recorded.at(-1)).toEqual(['start', 'legacy-prometheus', 'legacy-grafana', 'legacy-node-exporter'])
 })
+
+it('rebuilds the local accounts image when the normal restart prepares monitoring', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oa-operations-local-'))
+  roots.push(root)
+  const bin = join(root, 'bin')
+  const data = join(root, 'data')
+  mkdirSync(bin)
+  mkdirSync(data)
+  writeFileSync(join(data, 'dependencies.local'), 'DATABASE_URL=postgresql://test@localhost/test\nOBSERVABILITY_METRICS_TOKEN=test-token\n')
+  const calls = join(root, 'calls')
+  writeFileSync(join(bin, 'docker'), `#!${process.execPath}
+const fs=require('node:fs');
+const args=process.argv.slice(2);
+fs.appendFileSync(process.env.OPS_TEST_CALLS,JSON.stringify(args)+'\\n');
+if(args.includes('config')) process.stdout.write(JSON.stringify({services:{grafana:{image:'fixture-grafana'}}}));
+else if(args[0]==='run') fetch(args.at(-1)).then(r=>r.text()).then(body=>process.stdout.write(body));
+`)
+  chmodSync(join(bin, 'docker'), 0o755)
+  const result = spawnSync(process.execPath, ['scripts/observability.mjs'], {
+    cwd: repository, encoding: 'utf8', timeout: 10_000,
+    env: { ...process.env, PATH: bin + ':' + process.env.PATH, SHARED_DATA_DIR: data, OPS_TEST_CALLS: calls },
+  })
+  expect(result.status, result.stderr).toBe(0)
+  const recorded: string[][] = readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  expect(recorded.at(-1)).toEqual(['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--build', '--force-recreate'])
+})
