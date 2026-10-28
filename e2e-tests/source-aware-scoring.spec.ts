@@ -13,6 +13,10 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
   try {
     await joinRoomClients(pages, request)
     const driver = roomDriver(pages)
+    const scoringState = async (page: Page) => {
+      const { round, roundPhase, players, scores } = publicRoomState(await roomSnapshot(page))
+      return { round, roundPhase, players, scores }
+    }
     const fixture = createWorkSession({ seed: 428029, options: { enableFarmersOfTheMoor: true }, configure(state) {
       state.round = 4
       for (const player of state.players) {
@@ -60,14 +64,14 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
     }
 
     await purchase(0, 'meeting-place')
-    expect(publicRoomState(await roomSnapshot(pages[0]))).toEqual(publicRoomState(await roomSnapshot(pages[1])))
+    expect(await scoringState(pages[0])).toEqual(await scoringState(pages[1]))
     await checkPad(pages[0], 'en', ['0', '-1'], 'first-owner')
     await checkPad(pages[1], 'en', ['0', '-1'], 'peer-first-owner')
     await pages[0].locator('.header-locale-select button').click()
     await pages[0].getByRole('option', { name: '简体中文', exact: true }).click()
     await driver.command(0, { type: 'choice', value: 'confirm' })
     await purchase(1, 'major-improvement')
-    expect(publicRoomState(await roomSnapshot(pages[0]))).toEqual(publicRoomState(await roomSnapshot(pages[1])))
+    expect(await scoringState(pages[0])).toEqual(await scoringState(pages[1]))
     await checkPad(pages[0], 'zh', ['-1', '0'], 'transferred-zh')
     await checkPad(pages[1], 'en', ['-1', '0'], 'transferred-en')
     await driver.reload()

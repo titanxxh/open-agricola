@@ -48,7 +48,10 @@ for (const scenario of [
       for (let step = 0; step < 30; step++) {
         const current = await roomSnapshot(pages[0])
         if (current.interaction.stateId !== 'wait') throw new Error('Expected a final Harvest or scoring choice')
-        const { playerIndex, request: pending } = current.interaction
+        const { playerIndex } = current.interaction
+        const owner = await roomSnapshot(pages[playerIndex]!)
+        if (owner.interaction.stateId !== 'wait') throw new Error('Expected the responding player to have a Harvest choice')
+        const pending = owner.interaction.request
         if (pending.kind === 'choice' && pending.options.some(option => option.sourceCard === CARD_ID)) break
         if (pending.kind === 'feed') await driver.command(playerIndex, { type: 'choice', value: 'confirm', payload: { selections: [] } })
         else if (pending.kind === 'heating') await driver.command(playerIndex, { type: 'choice', value: 'confirm', payload: { fuelUsed: pending.required, woodToFuel: 0 } })
