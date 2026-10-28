@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
-import { getFarmyardFields } from '../helpers/card-field'
+import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 
 const CARD_ID = 'A031_DebtSecurity'
 
@@ -9,12 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    const usedTiles = new Set<string>()
-    player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    getFarmyardFields(player).forEach((field) => usedTiles.add(`${field.row},${field.col}`))
-    player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.pastures.flatMap((p) => p.tiles ?? []).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    const unusedSpaces = 15 - usedTiles.size
+    const unusedSpaces = countUnusedFarmyardSpaces(player)
     return Math.min(collectCardsAs(player, 'major').length, unusedSpaces)
   },
 },

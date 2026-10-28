@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { getFarmyardFields } from '../helpers/card-field'
+import { hasNoUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 
 const CARD_ID = 'E034_LandRegister'
 
@@ -8,12 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    const usedTiles = new Set<string>()
-    player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    getFarmyardFields(player).forEach((field) => usedTiles.add(`${field.row},${field.col}`))
-    player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.pastures.flatMap((p) => p.tiles).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    return usedTiles.size >= 15 ? 2 : 0
+    return hasNoUnusedFarmyardSpaces(player) ? 2 : 0
   },
 },
   reaches: [] as readonly string[],

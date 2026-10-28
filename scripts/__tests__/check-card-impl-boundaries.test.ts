@@ -32,6 +32,43 @@ const writeFixture = (root: string, rel: string, content: string): string => {
 }
 
 describe('check-card-impl-boundaries', () => {
+  it.each([
+    ['A031_DebtSecurity', 'debt-security'],
+    ['B031_PotteryYard', 'pottery-yard'],
+    ['D033_SummerHouse', 'summer-house'],
+    ['E034_LandRegister', 'land-register'],
+  ])('rejects the former %s farmyard union instead of banning coordinates or fifteen', (cardId, fixture) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'manual-farmyard-'))
+    try {
+      const oldSource = readFileSync(new URL(`./fixtures/${fixture}-manual-farmyard.ts.txt`, import.meta.url), 'utf8')
+      const file = writeFixture(root, `shared/cards/${cardId[0]}/${cardId}.ts`, oldSource)
+      const result = checkCardImplBoundaries([file])
+      expect(result.scopeErrors).toEqual([])
+      expect(result.violations).toEqual([expect.objectContaining({
+        cardId, kind: 'manual-farmyard-usage',
+        message: expect.stringContaining('getUsedFarmyardTileKeys'),
+      })])
+      expect(cardImplBoundaryExitCode(result)).toBe(1)
+
+      writeFileSync(file, `
+        const otherValues = new Set([15])
+        export const ${cardId} = defineMinorCard({ meta: { id: '${cardId}' }, impl: {
+          effect: { computeBonusScore: (_state, player) => {
+            const used = getUsedFarmyardTileKeys(player)
+            const unused = getFarmyardTilePositions(player).filter(tile => !used.has(positionKey(tile)))
+            const adjacent = unused.filter(tile => player.roomTiles.some(room =>
+              Math.abs(tile.row - room.row) + Math.abs(tile.col - room.col) === 1))
+            const fields = getFarmyardFields(player)
+            return Math.min(15, adjacent.length + fields.length)
+          } },
+        } })
+      `)
+      expect(checkCardImplBoundaries([file]).violations).toEqual([])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it.each(['loadImpl', 'addListener', 'registerListener', 'session'] as const)('%s rejects every authoritative board ID in actions', entry => {
     const ids = collectBoardActionSpaceIds()
     expect(ids).toEqual(expect.arrayContaining(['fishing', 'lessons-56-variable', 'moor-infirmary', 'season-spring-animal-and-fruit']))

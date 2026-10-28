@@ -23,7 +23,7 @@ export type CardImplBoundaryViolation = {
   line?: number
   cardId: string
   referencedCardId?: string
-  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation' | 'farm-layout-write' | 'listener-subscription-contract'
+  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'manual-farmyard-usage' | 'listener-state-mutation' | 'farm-layout-write' | 'listener-subscription-contract'
   message?: string
   listenerId?: string
   phases?: unknown
@@ -68,6 +68,55 @@ export function checkFieldStorageBoundaries(files: string[]): CardImplBoundaryVi
     visit(sourceFile)
   }
   return violations
+}
+
+function manualFarmyardUsageFindings(source: ts.SourceFile, cardId: string): CardImplBoundaryViolation[] {
+  const findings: CardImplBoundaryViolation[] = []
+  const walk = (node: ts.Node, inspect: (node: ts.Node) => void): void => {
+    inspect(node)
+    ts.forEachChild(node, child => walk(child, inspect))
+  }
+  walk(source, node => {
+    if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)
+      || !node.initializer || !ts.isNewExpression(node.initializer)
+      || !ts.isIdentifier(node.initializer.expression) || node.initializer.expression.text !== 'Set') return
+    const setName = node.name.text
+    let scope: ts.Node = node.parent
+    while (!ts.isFunctionLike(scope) && !ts.isSourceFile(scope)) scope = scope.parent
+    if (ts.isSourceFile(scope)) return
+    if (!ts.isPropertyAssignment(scope.parent) || propertyNameText(scope.parent.name) !== 'computeBonusScore') return
+    const sources = new Set<string>()
+    walk(scope, candidate => {
+      if (!ts.isCallExpression(candidate) || !ts.isPropertyAccessExpression(candidate.expression)
+        || candidate.expression.name.text !== 'forEach') return
+      let writesSet = false
+      for (const callback of candidate.arguments) {
+        walk(callback, call => {
+          if (ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression)
+            && ts.isIdentifier(call.expression.expression)
+            && call.expression.expression.text === setName && call.expression.name.text === 'add') {
+            writesSet = true
+          }
+        })
+      }
+      if (!writesSet) return
+      walk(candidate.expression.expression, receiver => {
+        if (ts.isPropertyAccessExpression(receiver)
+          && ['roomTiles', 'stableTiles', 'pastures'].includes(receiver.name.text)) {
+          sources.add(receiver.name.text)
+        }
+      })
+    })
+    if (sources.size !== 3) return
+    findings.push({
+      file: source.fileName,
+      line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      cardId,
+      kind: 'manual-farmyard-usage',
+      message: 'manual farmyard occupancy union bypasses terrain, blocked spaces and extensions; use getUsedFarmyardTileKeys / countUnusedFarmyardSpaces / hasNoUnusedFarmyardSpaces',
+    })
+  })
+  return findings
 }
 
 export type CardImplBoundaryResult = {
@@ -369,6 +418,7 @@ export function checkCardImplBoundaries(
   for (const file of files) {
     const sourceFile = parseSource(file)
     const cardId = cardIdFromFile(file)
+    violations.push(...manualFarmyardUsageFindings(sourceFile, cardId))
     const aliases = collectConstCardAliases(sourceFile, cardId)
     const reaches = collectReachCardIds(sourceFile, aliases)
 
