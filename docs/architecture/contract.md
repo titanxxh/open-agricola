@@ -13,6 +13,7 @@ This module centralizes the shapes shared by the frontend, backend and sandbox, 
 | `contract/protocol/ws.ts` | `ClientCommand`, `ServerEvent`, `RoomSummary` |
 | `contract/room-access.ts` | Active Room admission policy and player search display identities |
 | `contract/game-creation.ts` | Accepted solo creation configuration and its browser-safe guard, shared by persisted-record and owner-response readers |
+| `contract/game-variants.ts` | Canonical creation-option normalization for dependent Game Variant choices |
 | `contract/protocol/game.ts` | `GameSyncPayload`, `StateUpdateEnvelope`, `StateUpdateCause`, `ActionDetailEffects` |
 | `contract/cards.ts` | `CardDefinition`, the public card shape |
 | `contract/prompt-keys.ts` | `PromptKey` enum used as the i18n anchor |
@@ -94,7 +95,7 @@ type ClientCommand = (
   | { type: 'auth'; token }
   | { type: 'createRoom'; maxPlayers?, access?: RoomAccess, name?, customCardIds?, enableCommunityDeck?,
       enableParentCards?, draftParents?, enableThroughTheSeasons?,
-      enableFarmersOfTheMoor?, allowIncompleteFarmersOfTheMoorMinorDeal?,
+      enableFarmersOfTheMoor?, enableMoorBalanceRules?, allowIncompleteFarmersOfTheMoorMinorDeal?,
       enableSnakeOpening?, draftMode?, draftPoolSize? }
   | { type: 'joinRoom'; roomId; intent?: 'join' | 'resume'; requestedPlayerIndex?; name? }
   | { type: 'dissolveRoom' }
@@ -117,7 +118,7 @@ type ClientCommand = (
 - `newGame.seed` is honored only in a dev room; elsewhere it is ignored and a wide seed is drawn. `loadGame` and `dev*` commands are rejected outside a dev room.
 - There are no separate `reorg`, `feed`, `nextPlayer` or `confirmPlayerSwitch` commands: every wait shape submits through `choice`, with `payload` determined by `InteractionRequest.kind`.
 - `commitSelection` is only for structured targeted selections: `interactionSubmitChannel()` (`shared/session/interaction-command-policy.ts`) routes `farm-select`, `selection` (farm-position, occupation-hand), `resource-quantity-select` and `resource-batch-exchange-select` to it. Occupation-hand selections must be unique subsets within the declared limits, validated before any effect or random observation. Farm-position may use server-validated `validPositionGroups`; positions carrying `sourceCard` / `cardFieldSlot` / `groupKey` count by group and are canonicalized by the backend.
-- Game Variant flags (`enableParentCards` / `draftParents`, `enableThroughTheSeasons`, `enableFarmersOfTheMoor`, `enableSnakeOpening`) are Room options persisted across `newGame` and restarts; `draftParents: false` deals each player a parent pair without `parent-selection`.
+- Game Variant flags (`enableParentCards` / `draftParents`, `enableThroughTheSeasons`, `enableFarmersOfTheMoor` / `enableMoorBalanceRules`, `enableSnakeOpening`) are Room options persisted across `newGame` and restarts; `draftParents: false` deals each player a parent pair without `parent-selection`. Moor balance requires both Moor and balance to be boolean `true`; other or absent values normalize to `false`.
 - `RoomAccess` is public by default or invited with stable account IDs. Invitation permission allows joining an active Room; it never assigns a seat or changes public completed Replay access. `RoomSummary.access` exposes only the mode, never the invitation list.
 - `customCardIds` take effect only with `enableCommunityDeck: true` and only for live, approved Workshop cards ([Workshop backend](server.md#workshop-backend)).
 

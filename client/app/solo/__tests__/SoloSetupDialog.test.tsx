@@ -6,6 +6,23 @@ import type { SoloCreationConfiguration } from '../../../../shared/contract/game
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
+it('submits the optional Moor balance choice and clears it when Moor is unchecked', () => {
+  const submit = vi.fn()
+  render(<SoloSetupDialog locale="en" creating={false} onClose={vi.fn()} onSubmit={submit} />)
+  expect(screen.queryByRole('checkbox', { name: 'Moor balance rules' })).toBeNull()
+  const moor = screen.getByRole('checkbox', { name: /Farmers of the Moor expansion/ })
+  fireEvent.click(moor)
+  expect(screen.getByRole('checkbox', { name: 'Moor balance rules' })).not.toBeChecked()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Moor balance rules' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
+  expect(submit).toHaveBeenLastCalledWith(expect.objectContaining({ enableFarmersOfTheMoor: true, enableMoorBalanceRules: true }))
+  fireEvent.click(moor)
+  fireEvent.click(moor)
+  expect(screen.getByRole('checkbox', { name: 'Moor balance rules' })).not.toBeChecked()
+  fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
+  expect(submit).toHaveBeenLastCalledWith(expect.objectContaining({ enableFarmersOfTheMoor: true, enableMoorBalanceRules: false }))
+})
+
 it('offers a fixed one-player setup and submits both hand modes with independent expansion choices', () => {
   const submit = vi.fn()
   render(<SoloSetupDialog locale="en" creating={false} onClose={vi.fn()} onSubmit={submit} />)
@@ -20,14 +37,14 @@ it('offers a fixed one-player setup and submits both hand modes with independent
   fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
   expect(submit).toHaveBeenCalledExactlyOnceWith({ kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'choose-7',
     officialCardPool: 'default-implemented-A-E', enableCommunityDeck: false, customCardIds: [],
-    enableParentCards: true, draftParents: false, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true })
+    enableParentCards: true, draftParents: false, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: false })
 })
 
 it('preserves unavailable explicit choices until the player removes them and then submits adjusted settings', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, cards: [], hasMore: false }))))
   const configuration: SoloCreationConfiguration = { kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random',
     officialCardPool: 'default-implemented-A-E', enableCommunityDeck: true, customCardIds: ['missing-card'],
-    enableParentCards: false, draftParents: true, enableThroughTheSeasons: false, enableFarmersOfTheMoor: false }
+    enableParentCards: false, draftParents: true, enableThroughTheSeasons: false, enableFarmersOfTheMoor: false, enableMoorBalanceRules: false }
   const submit = vi.fn()
   render(<SoloSetupDialog locale="en" creating={false} initialConfiguration={configuration}
     issues={[{ workshopCardId: 'missing-card', reason: 'missing' }]} onClose={vi.fn()} onSubmit={submit} />)

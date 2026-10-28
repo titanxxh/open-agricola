@@ -12,6 +12,7 @@ export type SoloCreationConfiguration = {
   draftParents: boolean
   enableThroughTheSeasons: boolean
   enableFarmersOfTheMoor: boolean
+  enableMoorBalanceRules: boolean
 }
 
 const object = (value: unknown): value is Record<string, unknown> =>
@@ -24,6 +25,8 @@ export const isSoloCreationConfiguration = (value: unknown): value is SoloCreati
   && typeof value.enableCommunityDeck === 'boolean'
   && typeof value.enableParentCards === 'boolean' && typeof value.draftParents === 'boolean'
   && typeof value.enableThroughTheSeasons === 'boolean' && typeof value.enableFarmersOfTheMoor === 'boolean'
+  && typeof value.enableMoorBalanceRules === 'boolean'
+  && (!value.enableMoorBalanceRules || value.enableFarmersOfTheMoor)
   && Array.isArray(value.customCardIds) && value.customCardIds.every(id => typeof id === 'string')
 
 export type ResolvedWorkshopSource = {

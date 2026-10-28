@@ -5,6 +5,7 @@ export const soloCreationConfiguration = {
   officialCardPool: 'default-implemented-A-E', enableCommunityDeck: false,
   enableParentCards: false, draftParents: false,
   enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+  enableMoorBalanceRules: false,
   customCardIds: ['workshop-card'],
 } satisfies SoloCreationConfiguration
 
@@ -16,8 +17,9 @@ export const invalidSoloCreationConfigurations: Array<{ name: string; value: unk
   { name: 'hand mode', value: { ...soloCreationConfiguration, soloHandMode: 'draft' } },
   { name: 'missing hand mode', value: { ...soloCreationConfiguration, soloHandMode: undefined } },
   { name: 'official pool', value: { ...soloCreationConfiguration, officialCardPool: 'unknown' } },
-  ...['enableCommunityDeck', 'enableParentCards', 'draftParents', 'enableThroughTheSeasons', 'enableFarmersOfTheMoor']
+  ...['enableCommunityDeck', 'enableParentCards', 'draftParents', 'enableThroughTheSeasons', 'enableFarmersOfTheMoor', 'enableMoorBalanceRules']
     .map(name => ({ name, value: { ...soloCreationConfiguration, [name]: 'true' } })),
+  { name: 'balance requires Moor', value: { ...soloCreationConfiguration, enableMoorBalanceRules: true } },
   { name: 'custom card list', value: { ...soloCreationConfiguration, customCardIds: 'workshop-card' } },
   { name: 'custom card identity', value: { ...soloCreationConfiguration, customCardIds: [42] } },
 ]

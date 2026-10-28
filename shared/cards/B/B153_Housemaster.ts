@@ -1,14 +1,16 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { collectCardDefinitionsAs } from '../helpers/card-type'
+import { countsForMoorBalanceRules } from '../helpers/moor-balance'
 
 const CARD_ID = 'B153_Housemaster'
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) => {
+    computeBonusScore: (state, player) => {
       const majorVps = collectCardDefinitionsAs(player, 'major')
+        .filter(def => countsForMoorBalanceRules(state, def.id))
         .map((def) => def.vp ?? 0)
         .filter((vp) => vp > 0)
       if (majorVps.length === 0) return 0

@@ -58,6 +58,7 @@ describe('formal solo creation', () => {
         enableCommunityDeck: false, customCardIds: [], officialCardPool: 'default-implemented-A-E',
         enableParentCards: true, draftParents: false,
         enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+        enableMoorBalanceRules: false,
       },
       resolvedWorkshopSources: [],
     })

@@ -80,6 +80,11 @@ export const GameHeader = ({
           />
         )}
         {!isSetup && <span className="header-round">R{state.round}/14</span>}
+        {state.enableMoorBalanceRules === true && (
+          <span className="header-moor-balance" data-testid="moor-balance-rules" title={t(locale, 'platform.moorBalanceRulesHint')}>
+            {t(locale, 'platform.moorBalanceRules')}
+          </span>
+        )}
         {!isSetup && <span className="header-phase-pills">
           {phases.map((phase) => (
             <span key={phase} className={`header-phase-pill${phase === state.roundPhase ? ' active' : ''}`}>

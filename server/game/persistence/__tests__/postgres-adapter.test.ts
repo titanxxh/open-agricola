@@ -41,6 +41,24 @@ const setupDb = async () => {
 }
 
 describe('PostgresRoomPersistence', () => {
+  it('persists the locked Moor balance choice in metadata as well as the session snapshot', async () => {
+    const db = await setupDb()
+    const persistence = new PostgresRoomPersistence(db)
+    const session = new GameSession(429001, undefined, { playerCount: 2, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true })
+    try {
+      const snapshot = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+      await persistence.save('balance-room', snapshot, { ...META, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true })
+      const saved = await persistence.load('balance-room')
+      expect(saved?.meta.enableMoorBalanceRules).toBe(true)
+      expect(saved?.serialized?.state.enableMoorBalanceRules).toBe(true)
+      if (!saved) throw new Error('Missing saved room')
+      const restored = snapshotToRoom(saved)
+      try {
+        expect(restored.enableMoorBalanceRules).toBe(true)
+        expect(buildGameResult(restored, NOW).moorBalanceRules).toBe(true)
+      } finally { restored.session.dispose() }
+    } finally { session.dispose() }
+  })
   let db: PostgresDatabase
   let p: PostgresRoomPersistence
 

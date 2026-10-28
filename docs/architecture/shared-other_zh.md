@@ -20,6 +20,8 @@
 
 Game Variant 改变一局游戏的设置、公开状态、行动格、阶段流程或计分；它不是卡牌来源，也不增加前端规则。
 
+Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.ts` 规范化，开局后固定。指定卡牌通过 `cards/helpers/moor-balance.ts` 仅在可选计数中排除 Moor 大设施，不改变一般 major、cookery 或供应身份。农场历史资格由来源卡根据真实出牌或农场操作事实记录，后续扩展不清除资格，查询不写入。测试：`server/__tests__/moor-balance-rules-session.test.ts` 与 `e2e-tests/moor-balance-rules.spec.ts`。
+
 - **Parent Cards**（[ADR 0005](../adr/0005-parent-cards-dedicated-expansion-runtime.md)）是 `shared/parents/*` 中的结构化数据，素材由 `public-assets.ref` 固定，与 Card Source 投影分离；选择、奖励与支线任务由后端权威裁定，并使用非公开种子。
 - **Through the Seasons** 把四个季节格保留在版图上，只启用当前季节；其 modifier 注册在每个 Core 的 `ActionHookRegistry`，从不写玩家 `cardStates`。新回合编号一提交季节就推进，早于准备阶段；准备阶段先做普通回合增长，再做该季节的累积调整（先 `applyRoundGrowth()`，后 `applySeasonPreparationAdjustments()`），调整结果不低于零。季节收益与建筑 hook 通过 `actionContext` 把来源带到原有结果事实（[ADR 0034](../adr/0034-seasonal-adjustments-belong-to-settlement-events.md)）；`server/__tests__/seasonal-grants-session.test.ts` 覆盖 pending、恢复和撤销边界。准备阶段在结算时记录常规增长与季节实际差值；受影响但净增长为零的结果仍保留公开事实，不额外制造资源移动。
 - **Farmers of the Moor**（[ADR 0007](../adr/0007-farmers-of-the-moor-variant-runtime.md)）通过 [domain](domain_zh.md) 的通用 seam 增加地形、扩展、马、供暖与自己的大改良供应。多人局不使用同时选秀时，`createInitialPlayers()`（`shared/session/state-bootstrap.ts`）给每位玩家发 4 张 FoM 小改良加 3 张已出版小改良；额外、自定义与 Community Deck 小改良只进入已出版部分；只有设置 `allowIncompleteFarmersOfTheMoorMinorDeal` 时，FoM 小改良池不足才会让每位玩家的 FoM 部分等量减少。单人开局采用上面的足额配比。

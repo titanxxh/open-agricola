@@ -50,6 +50,7 @@ export function LobbyPage() {
   const [enableParentCards, setEnableParentCards] = useState(false)
   const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(false)
   const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(false)
+  const [enableMoorBalanceRules, setEnableMoorBalanceRules] = useState(false)
   const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(false)
   const [enableSnakeOpening, setEnableSnakeOpening] = useState(true)
   const showCommunityDeckToggle = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
@@ -148,6 +149,7 @@ export function LobbyPage() {
     }
     if (enableFarmersOfTheMoor) {
       params.enableFarmersOfTheMoor = 'true'
+      if (enableMoorBalanceRules) params.enableMoorBalanceRules = 'true'
       if (allowIncompleteFarmersOfTheMoorMinorDeal) {
         params.allowIncompleteFarmersOfTheMoorMinorDeal = 'true'
       }
@@ -447,11 +449,25 @@ export function LobbyPage() {
                   checked={enableFarmersOfTheMoor}
                   onChange={(e) => {
                     setEnableFarmersOfTheMoor(e.target.checked)
-                    if (!e.target.checked) setAllowIncompleteFarmersOfTheMoorMinorDeal(false)
+                    if (!e.target.checked) {
+                      setAllowIncompleteFarmersOfTheMoorMinorDeal(false)
+                      setEnableMoorBalanceRules(false)
+                    }
                   }}
                 />
                 <span>{t('platform.enableFarmersOfTheMoor')}</span>
               </label>
+              {enableFarmersOfTheMoor && (
+                <label className="community-deck-toggle">
+                  <input type="checkbox" checked={enableMoorBalanceRules}
+                    aria-label={t('platform.moorBalanceRules')}
+                    onChange={event => setEnableMoorBalanceRules(event.target.checked)} />
+                  <span className="community-deck-toggle-label">
+                    <span>{t('platform.moorBalanceRules')}</span>
+                    <span className="community-deck-toggle-hint">{t('platform.moorBalanceRulesHint')}</span>
+                  </span>
+                </label>
+              )}
               {enableFarmersOfTheMoor && (
                 <label className="community-deck-toggle">
                   <input

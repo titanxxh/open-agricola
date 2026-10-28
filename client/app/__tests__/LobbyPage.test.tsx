@@ -55,6 +55,8 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.enableParentCards': 'Enable Parent Cards expansion',
     'platform.enableThroughTheSeasons': 'Enable Through the Seasons expansion',
     'platform.enableFarmersOfTheMoor': 'Enable Farmers of the Moor expansion',
+    'platform.moorBalanceRules': 'Moor balance rules',
+    'platform.moorBalanceRulesHint': 'Apply BGA optional card balance rules',
     'platform.allowIncompleteFarmersOfTheMoorMinorDeal': 'Allow an incomplete Farmers of the Moor minor improvement pool',
     'platform.snakeOpeningHint': 'Every player starts with 3 food. In round 1, each player’s second person is placed in reverse turn order.',
     'platform.cancel': 'Cancel',
@@ -181,6 +183,24 @@ describe('LobbyPage my active games', () => {
 })
 
 describe('LobbyPage player count selection', () => {
+  it('clears the optional balance choice when Moor is unchecked and forwards the final selection', () => {
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    expect(screen.queryByRole('checkbox', { name: 'Moor balance rules' })).toBeNull()
+    const moor = screen.getByRole('checkbox', { name: 'Enable Farmers of the Moor expansion' })
+    fireEvent.click(moor)
+    expect(screen.getByRole('checkbox', { name: 'Moor balance rules' })).not.toBeChecked()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Moor balance rules' }))
+    fireEvent.click(moor)
+    expect(screen.queryByRole('checkbox', { name: 'Moor balance rules' })).toBeNull()
+    fireEvent.click(moor)
+    expect(screen.getByRole('checkbox', { name: 'Moor balance rules' })).not.toBeChecked()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Moor balance rules' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+    expect(setPage).toHaveBeenCalledWith('game', expect.objectContaining({
+      enableFarmersOfTheMoor: 'true', enableMoorBalanceRules: 'true',
+    }))
+  })
   it('uses authenticated room listing and creates a private room from a selected player name', async () => {
     render(<LobbyPage />)
     expect(apiFetch).toHaveBeenCalledWith('/api/rooms')

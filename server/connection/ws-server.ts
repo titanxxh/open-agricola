@@ -108,6 +108,7 @@ const ensureFixedDevRooms = async (
         draftPoolSize: startupOptions.draftPoolSize,
         enableThroughTheSeasons: session.state.enableThroughTheSeasons,
         enableFarmersOfTheMoor: session.state.enableFarmersOfTheMoor === true,
+        enableMoorBalanceRules: session.state.enableMoorBalanceRules === true,
         allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
         enableSnakeOpening: session.state.enableSnakeOpening === true,
       }

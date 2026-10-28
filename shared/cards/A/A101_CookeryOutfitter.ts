@@ -1,13 +1,15 @@
 import { defineOccupationCard } from '../card-source'
 import { getPlayerCookeryCards } from '../helpers/cookery'
 import type { CardImpl } from '../registry'
+import { countsForMoorBalanceRules } from '../helpers/moor-balance'
 
 const CARD_ID = 'A101_CookeryOutfitter'
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) => getPlayerCookeryCards(player).length,
+    computeBonusScore: (state, player) => getPlayerCookeryCards(player)
+      .filter(card => countsForMoorBalanceRules(state, card.id)).length,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

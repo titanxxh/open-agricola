@@ -694,6 +694,19 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.farmersOfTheMoor).not.toBeNull()
   })
 
+  it('preserves Moor balance rules in Room metadata and a same-configuration new game', async () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2,
+      enableFarmersOfTheMoor: true, enableMoorBalanceRules: true })
+    expect(ctx.currentRoom!.session.state.enableMoorBalanceRules).toBe(true)
+    expect(ctx.currentRoom!.enableMoorBalanceRules).toBe(true)
+    await markRoomStarted(ctx)
+    await dispatch(ctx, { type: 'newGame' })
+    expect(ctx.currentRoom!.session.state.enableMoorBalanceRules).toBe(true)
+    expect(ctx.currentRoom!.enableMoorBalanceRules).toBe(true)
+  })
+
   it('allows enableFarmersOfTheMoor by default once its minor pool is sufficient', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

@@ -87,6 +87,7 @@ describe('WsGameTransport request correlation', () => {
       kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', officialCardPool: 'default-implemented-A-E',
       enableCommunityDeck: true, customCardIds: ['missing-card'], enableParentCards: false, draftParents: true,
       enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+      enableMoorBalanceRules: false,
     } satisfies SoloCreationConfiguration
     const creation = transport.createRoom({ sourceGameContextId: 'completed-solo' })
     let settled = false

@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 import { bonusVpLeaf } from '../helpers/pay-gain-node'
+import { isMoorBalanceRulesEnabled } from '../../contract/game-variants'
 
 const CARD_ID = 'A033_BigCountry'
 
@@ -25,7 +26,8 @@ const cardImpl = {
     }
   },
 },
-  prerequisiteCheck: hasNoUnusedFarmyardSpaces,
+  prerequisiteCheck: (player, state) => hasNoUnusedFarmyardSpaces(player)
+    && (!isMoorBalanceRulesEnabled(state) || (player.farmTerrain?.length ?? 0) === 0),
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

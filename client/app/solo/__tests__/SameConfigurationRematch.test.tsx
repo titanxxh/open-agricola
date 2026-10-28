@@ -15,7 +15,7 @@ vi.mock('../../../utils/platform-page-url', () => ({ setPage: vi.fn() }))
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 const configuration: SoloCreationConfiguration = { kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'choose-7',
   officialCardPool: 'default-implemented-A-E', enableCommunityDeck: true, customCardIds: ['missing-card'],
-  enableParentCards: true, draftParents: false, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true }
+  enableParentCards: true, draftParents: false, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true }
 
 it('keeps public results visible when private qualification is forbidden or fails', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: false, code: 'not_participant', message: 'Private' }), { status: 403 })))
@@ -54,7 +54,7 @@ it('opens unchanged unavailable settings and submits an adjusted ordinary creati
   expect(startRoomCreation).not.toHaveBeenCalled()
   fireEvent.click(await screen.findByRole('checkbox', { name: /missing-card/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Start solo game' }))
-  expect(startRoomCreation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ maxPlayers: 1, soloHandMode: 'choose-7', customCardIds: [], enableFarmersOfTheMoor: true }))
+  expect(startRoomCreation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ maxPlayers: 1, soloHandMode: 'choose-7', customCardIds: [], enableFarmersOfTheMoor: true, enableMoorBalanceRules: true }))
   expect(vi.mocked(startRoomCreation).mock.calls[0]?.[0]).not.toHaveProperty('sourceGameContextId')
   expect(setPage).not.toHaveBeenCalled()
 })

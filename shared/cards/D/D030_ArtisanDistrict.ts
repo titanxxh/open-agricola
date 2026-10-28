@@ -1,14 +1,16 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { isBottomRowMajorImprovement } from '../major/supply'
+import { countsForMoorBalanceRules } from '../helpers/moor-balance'
 
 const CARD_ID = 'D030_ArtisanDistrict'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const count = player.improvements.filter(isBottomRowMajorImprovement).length
+  computeBonusScore: (state, player) => {
+    const count = player.improvements.filter(isBottomRowMajorImprovement)
+      .filter(cardId => countsForMoorBalanceRules(state, cardId)).length
     if (count >= 5) return 8
     if (count >= 4) return 5
     if (count >= 3) return 2

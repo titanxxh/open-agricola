@@ -48,6 +48,7 @@ type RoomRow = {
   draft_parents: number | null
   enable_through_the_seasons: number
   enable_farmers_of_the_moor: number
+  enable_moor_balance_rules: number
   allow_incomplete_farmers_of_the_moor_minor_deal: number
   enable_snake_opening: number
   hotseat: number
@@ -180,6 +181,7 @@ const roomValues = (
   draftParents: typeof meta.draftParents === 'boolean' ? (meta.draftParents ? 1 : 0) : null,
   enableThroughTheSeasons: meta.enableThroughTheSeasons === true ? 1 : 0,
   enableFarmersOfTheMoor: meta.enableFarmersOfTheMoor === true ? 1 : 0,
+  enableMoorBalanceRules: meta.enableFarmersOfTheMoor === true && meta.enableMoorBalanceRules === true ? 1 : 0,
   allowIncompleteFarmersOfTheMoorMinorDeal:
     meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0,
   enableSnakeOpening: meta.enableSnakeOpening === true ? 1 : 0,
@@ -219,6 +221,7 @@ const toSnapshot = (
     draftParents: row.draft_parents === null ? undefined : row.draft_parents === 1,
     enableThroughTheSeasons: row.enable_through_the_seasons === 1,
     enableFarmersOfTheMoor: row.enable_farmers_of_the_moor === 1,
+    enableMoorBalanceRules: row.enable_moor_balance_rules === 1,
     allowIncompleteFarmersOfTheMoorMinorDeal: row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
     enableSnakeOpening: row.enable_snake_opening === 1,
     hotseat: row.hotseat === 1,
@@ -279,7 +282,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       `SELECT id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, solo_hand_mode, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
-              enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
+              enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
               allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, updated_at
        FROM rooms WHERE id = ?`,
     )
@@ -291,13 +294,13 @@ export class PostgresRoomPersistence implements RoomPersistence {
         id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, status, version, custom_card_ids,
         custom_cards_runtime_json, solo_hand_mode,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
-        enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
+        enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
         allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
       ) VALUES (
         @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
         @customCards, @soloHandMode,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
-        @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
+        @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor, @enableMoorBalanceRules,
         @allowIncompleteFarmersOfTheMoorMinorDeal, @enableSnakeOpening, @hotseat, @startedAt, @now, @now
       )
       ON CONFLICT(id) DO UPDATE SET
@@ -316,6 +319,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         draft_parents = excluded.draft_parents,
         enable_through_the_seasons = excluded.enable_through_the_seasons,
         enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
+        enable_moor_balance_rules = excluded.enable_moor_balance_rules,
         allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
         enable_snake_opening = excluded.enable_snake_opening,
         hotseat = excluded.hotseat,
@@ -358,11 +362,11 @@ export class PostgresRoomPersistence implements RoomPersistence {
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
-        enable_snake_opening
+        enable_snake_opening, enable_moor_balance_rules
       ) VALUES (
         @roomId, @startedAt, @finishedAt, @roundsPlayed, @playerCount,
         @communityDeck, @parentCards, @throughTheSeasons, @farmersOfTheMoor,
-        @snakeOpening
+        @snakeOpening, @moorBalanceRules
       )
     `)
     this.insertResultPlayer = db.prepare(`
@@ -500,6 +504,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         parentCards: result.parentCards ? 1 : 0,
         throughTheSeasons: result.throughTheSeasons ? 1 : 0,
         farmersOfTheMoor: result.farmersOfTheMoor ? 1 : 0,
+        moorBalanceRules: result.farmersOfTheMoor && result.moorBalanceRules === true ? 1 : 0,
         snakeOpening: result.snakeOpening ? 1 : 0,
       }))
       for (const player of result.players) {

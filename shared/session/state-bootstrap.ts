@@ -1,4 +1,5 @@
 import { restoreSessionState } from './state-recovery'
+import { isMoorBalanceRulesEnabled } from '../contract/game-variants'
 // Catalog-dependent state helpers (server-facing).
 //
 // For the client-safe slice (pure data, no catalog), see `./state-constants`.
@@ -594,6 +595,7 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
       : null,
     enableFarmersOfTheMoor,
     farmersOfTheMoor,
+    enableMoorBalanceRules: isMoorBalanceRulesEnabled(raw),
     enableSnakeOpening,
     snakeOpening: enableSnakeOpening ? { reversed: raw.snakeOpening?.reversed === true } : null,
     ordinaryCardDecks,
@@ -965,6 +967,7 @@ export const createInitialState = (
       : null,
     enableFarmersOfTheMoor,
     farmersOfTheMoor,
+    enableMoorBalanceRules: isMoorBalanceRulesEnabled(options),
     enableSnakeOpening,
     snakeOpening: enableSnakeOpening ? { reversed: false } : null,
     ordinaryCardDecks,
