@@ -60,7 +60,9 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const socketMessages: string[] = []
   let latestRoomState: Record<string, unknown> | undefined
   let gameChunkDelayed = false
-  type LifecycleDetail = { requestId?: number; status?: number; failure?: string; name?: string }
+  let sandboxResponseCount = 0
+  let sandboxBodyHeld = false
+  type LifecycleDetail = { requestId?: number; status?: number; failure?: string; name?: string; method?: string; resourceType?: string; route?: string }
   const lifecycle: Array<LifecycleDetail & { at: number; pageId: number; event: string; origin: string; path: string }> = []
   const pageIds = new WeakMap<Page, number>()
   let pageSequence = 0
@@ -69,8 +71,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     const location = new URL(url)
     const pageId = pageIds.get(page) ?? ++pageSequence
     pageIds.set(page, pageId)
-    lifecycle.push({ at: Date.now(), pageId, event, origin: location.origin, path: location.pathname, ...data })
-    if (lifecycle.length > 128) lifecycle.shift()
+    lifecycle.push({ at: Date.now(), pageId, event, origin: location.origin, path: location.pathname, route: location.searchParams.get('page') ?? undefined, ...data })
+    if (lifecycle.length > 4096) lifecycle.shift()
   }
   let appOrigin = ''
   let apiOrigin = ''
@@ -120,6 +122,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       // database session, API authorization and WS. This TLS adapter only maps the
       // known fixture origin and serializes its real session cookie for production HTTPS.
       let cancelled = false
+      const holdSandboxBody = topology === 'same-site-pages' && req.method === 'GET'
+        && url.pathname === '/api/workshop/sandbox' && ++sandboxResponseCount === 2
       const upstream = httpRequest(new URL(req.url ?? '/', backend), {
         method: req.method, headers: forwardedHeaders(req),
       }, response => {
@@ -139,6 +143,20 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
         if (topology === 'same-site-pages' && ['/api/rooms', '/api/lobby/my-rooms'].includes(url.pathname)) {
           res.flushHeaders()
           setTimeout(() => response.pipe(res), 500)
+        } else if (holdSandboxBody) {
+          res.flushHeaders()
+          response.once('data', (chunk: Buffer) => {
+            response.pause()
+            sandboxBodyHeld = true
+            res.write(chunk.subarray(0, 1))
+            setTimeout(() => {
+              sandboxBodyHeld = false
+              if (res.destroyed) return
+              res.write(chunk.subarray(1))
+              response.pipe(res)
+              response.resume()
+            }, 2000)
+          })
         } else response.pipe(res)
       })
       upstream.on('error', error => {
@@ -236,9 +254,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       page.on('pageerror', onPageError)
       page.on('request', request => {
         if (isLobby(request)) pending.add(request)
-        if (!['/api/rooms', '/api/lobby/my-rooms', '/api/observability/telemetry'].includes(new URL(request.url()).pathname)) return
         requests.set(request, ++requestSequence)
-        note(page, 'request-start', { requestId: requestSequence, url: request.url() })
+        note(page, 'request-start', { requestId: requestSequence, url: request.url(), method: request.method(), resourceType: request.resourceType() })
       })
       page.on('response', response => { const requestId = requests.get(response.request()); if (requestId) note(page, 'request-status', { requestId, status: response.status(), url: response.url() }) })
       page.on('requestfinished', request => { const requestId = requests.get(request); if (requestId) note(page, 'request-finish', { requestId, url: request.url() }); requests.delete(request); pending.delete(request) })
@@ -292,6 +309,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
       get context() { if (!context) throw new Error('Browser context is not open'); return context },
       get latestRoomState() { return latestRoomState },
+      get sandboxBodyHeld() { return sandboxBodyHeld },
       restartBrowser: async () => { await context?.close(); context = await openContext() },
       observe, loadLobby, waitForStartedRoom, errors, socketMessages, lifecycle, note,
       close: async () => {
@@ -389,6 +407,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
         }),
         page.waitForResponse(response => new URL(response.url()).pathname === '/api/workshop/sandbox'),
       ]
+      environment.note(page, 'intent-workshop')
       await page.goto(`${environment.appUrl}?page=workshop`, { waitUntil: 'domcontentloaded' })
       await expect(page.getByRole('heading', { name: 'Card Workshop', exact: true })).toBeVisible()
       for (const response of await Promise.all(workshopLoads)) {
@@ -397,7 +416,19 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       }
       await expect(page.locator('.ws-section-sandbox').getByText('3 Players', { exact: true })).toBeVisible()
       await expect(page.locator('.ws-loading')).toHaveCount(0)
+      environment.note(page, 'intent-workshop-leave')
       await environment.loadLobby(page, () => page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' }))
+      const pendingSandbox = page.waitForResponse(response => new URL(response.url()).pathname === '/api/workshop/sandbox')
+      await page.goto(`${environment.appUrl}?page=workshop`, { waitUntil: 'domcontentloaded' })
+      expect((await pendingSandbox).status()).toBe(200)
+      await expect.poll(() => environment.sandboxBodyHeld).toBe(true)
+      environment.note(page, 'intent-workshop-early-leave')
+      await environment.loadLobby(page, () => page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' }))
+      if (engine === 'webkit') {
+        await expect.poll(() => environment.lifecycle.some(event =>
+          event.event === 'request-failure' && event.path === '/api/workshop/sandbox',
+        )).toBe(true)
+      }
       await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
       await page.getByRole('checkbox', { name: /Snake opening/ }).uncheck()
       await page.getByRole('button', { name: 'Start Hotseat Game', exact: true }).click()
