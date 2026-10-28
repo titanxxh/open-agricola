@@ -1,4 +1,4 @@
-import { countRoomAnimals } from '../../domain/animals'
+import { countAnimalOccupiedFarmyardSpaces } from '../../domain/animal-occupied-spaces'
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 
@@ -7,15 +7,7 @@ const CARD_ID = 'C134_CowPrince'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) => {
-      let count = 0
-      count += player.pastures
-        .filter((pasture) => pasture.animalType === 'cattle')
-        .reduce((sum, pasture) => sum + Math.min(pasture.tiles.length, pasture.animalCount), 0)
-      count += countRoomAnimals(player, 'cattle')
-      count += Object.values(player.stableAnimals ?? {}).filter((animal) => animal.animalType === 'cattle' && animal.animalCount > 0).length
-      return count
-    },
+    computeBonusScore: (state, player) => countAnimalOccupiedFarmyardSpaces(player, state, 'cattle'),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

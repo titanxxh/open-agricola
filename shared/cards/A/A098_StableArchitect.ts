@@ -1,17 +1,13 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getUnfencedStableCountForCards } from '../../domain/stables'
 
 const CARD_ID = 'A098_StableArchitect'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const pastureStableTiles = new Set(
-      player.pastures.flatMap((p) => p.tiles.map((t) => `${t.row},${t.col}`))
-    )
-    return player.stableTiles.filter((t) => !pastureStableTiles.has(`${t.row},${t.col}`)).length
-  },
+  computeBonusScore: (_state, player) => getUnfencedStableCountForCards(player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
