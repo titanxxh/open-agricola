@@ -174,7 +174,39 @@ describe('C131 Private Teacher parity', () => {
 
 describe('C134 Cow Prince parity', () => {
   it('C134 S1: Cow Prince is played as the first occupation', () => expect(playOccupation(setup({ cardId: 'C134_CowPrince', played: false, playerCount: 3 }), 'C134_CowPrince').state.players[0]!.occupationPlayed).toContain('C134_CowPrince'))
-  it('C134 S2: two cattle held in two house rooms score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { houseAnimals: Object.fromEntries(s.state.players[0]!.roomTiles.map(tile => [`${tile.row}-${tile.col}`, 'cattle'])) }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
+  it('C134 S2: two cattle held in two house rooms score two points', () => {
+    const session = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 })
+    session.state.players[0]!.occupationPlayed.push('A086_AnimalTamer')
+    session.state.actionSpaces.find(space => space.id === 'cattle-market')!.resources.cattle = 2
+    session.loadState(session.state)
+
+    const collected = session.takeAction(0, 'cattle-market')
+    expect(collected.ok, collected.error).toBe(true)
+    expect(collected.state.players[0]!.resources.cattle).toBe(2)
+    expect(collected.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.moved', resources: { cattle: 2 },
+      from: { kind: 'actionSpace', spaceId: 'cattle-market' }, to: { kind: 'player', playerId: 'p1' },
+    }))
+    if (collected.interaction.stateId !== 'wait' || collected.interaction.request.kind !== 'animal-reorg') {
+      throw new Error('Expected cattle placement')
+    }
+    const rooms = collected.interaction.request.zones.filter(zone => zone.zoneType === 'house')
+    expect(rooms).toHaveLength(2)
+    expect(rooms).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'house:1-0', capacity: 1, occupiedZoneLimit: 2 }),
+      expect.objectContaining({ id: 'house:2-0', capacity: 1, occupiedZoneLimit: 2 }),
+    ]))
+    const placed = session.resolveChoice(0, 'confirm', { zones: rooms.map(zone => ({ ...zone, animalType: 'cattle', animalCount: 1 })) })
+    expect(placed.ok, placed.error).toBe(true)
+    expect(placed.state.players[0]!.resources.cattle).toBe(2)
+    expect(placed.state.players[0]!.houseAnimals).toEqual({ '1-0': 'cattle', '2-0': 'cattle' })
+    expect(bonus(placed, 'C134_CowPrince')).toBe(2)
+    expect(placed.interaction.stateId === 'wait' && placed.interaction.request.kind).toBe('confirm-next-player')
+    const next = session.resolveChoice(0, 'confirm')
+    expect(next.ok, next.error).toBe(true)
+    expect(next.interaction.stateId).toBe('idle')
+    expect(bonus(next, 'C134_CowPrince')).toBe(2)
+  })
   it('C134 S3: two cattle spread across a two-space pasture score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { resources: { ...s.state.players[0]!.resources, cattle: 2 }, pastures: [{ id: 'p', size: 2, tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }], stables: 0, animalType: 'cattle', animalCount: 2 }] }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
 })
 
