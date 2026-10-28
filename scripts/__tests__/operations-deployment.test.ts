@@ -32,7 +32,7 @@ else if(args.includes('up') && process.env.OPS_TEST_FAIL==='1') process.exit(1);
 `)
   chmodSync(join(bin, 'docker'), 0o755)
   const result = spawnSync(process.execPath, [join(release, 'operations/deploy.mjs'), root, game, build], {
-    encoding: 'utf8', env: { ...process.env, PATH: bin + ':' + process.env.PATH, OPS_TEST_CALLS: calls, OPS_TEST_FAIL: fail ? '1' : '0' },
+    encoding: 'utf8', env: { ...process.env, PATH: bin + ':' + process.env.PATH, OPS_TEST_CALLS: calls, OPS_TEST_FAIL: fail ? '1' : '0', COMPOSE_PROJECT_NAME: 'open-agricola' },
   })
   const recorded: string[][] = readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line))
   return { root, build, result, recorded }
@@ -45,6 +45,9 @@ it('publishes only monitoring services, preserves game identity and keeps creden
   expect(readFileSync(join(root, 'deployed-build-id'), 'utf8')).toBe(build + '\n')
   expect(recorded.filter(args => args[0] === 'stop')).toEqual([['stop', 'legacy-prometheus', 'legacy-grafana', 'legacy-node-exporter']])
   expect(recorded.filter(args => args[0] === 'inspect')).toHaveLength(2)
+  for (const args of recorded.filter(args => args[0] === 'compose')) {
+    expect(args.slice(0, 3)).toEqual(['compose', '--project-name', 'open-agricola-operations'])
+  }
   expect(recorded.some(args => args.includes('container-entry.ts') || args.includes('storage-archive-cli.ts') || args.includes('game-container') && args[0] !== 'inspect')).toBe(false)
   expect(result.stdout + result.stderr).not.toContain('private-scrape-token')
   expect(result.stdout + result.stderr).not.toContain('owner:private')
