@@ -53,6 +53,7 @@ export const M060_SowingMachine = defineMinorCard({
     cost: {
         "wood": 3
     },
+    vp: 1,
     prerequisite: "1 Horse",
     implemented: true,
     requiresFarmersOfTheMoor: true,

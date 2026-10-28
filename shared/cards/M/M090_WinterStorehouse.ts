@@ -56,7 +56,7 @@ export const M090_WinterStorehouse = defineMinorCard({
         "wood": 1,
         "clay": 2
     },
-    vp: 1,
+    vp: 0,
     implemented: true,
     requiresFarmersOfTheMoor: true,
   },
