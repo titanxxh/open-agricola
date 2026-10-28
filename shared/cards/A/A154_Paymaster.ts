@@ -3,19 +3,9 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
+import { isFoodAccumulationSpace } from '../helpers/action-space-categories'
 
 const CARD_ID = 'A154_Paymaster'
-/**
- * A154 Paymaster:
- * Each time an opponent uses a food accumulation space (Fishing, Traveling Players),
- * the card owner can optionally give the opponent 1 grain to get 1 bonus VP.
- *
- * Rule: isListeningTo → PlaceFarmer on Fishing/TravelingPlayers.
- *      onOpponentAfterPlaceFarmer → optional: pay 1 grain → give to opponent → bonus VP.
- *
- * Uses gain with recipientPlayerId to give grain to the opponent, then bonus-vp for owner.
- */
 const listener: CardListenerRegistration = {
   id: 'A154-paymaster-opponent-food-accumulation',
   cardIds: [CARD_ID],
@@ -23,8 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const spaceId = context.space?.id
-    if (spaceId !== 'fishing' && !isTravelingPlayersSpaceId(spaceId)) return
+    if (!isFoodAccumulationSpace(context.space)) return
 
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
 

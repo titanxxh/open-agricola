@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RESOURCE_MARKET_SPACE_IDS, isResourceMarketSpaceId } from '../action-space-categories'
+import { RESOURCE_MARKET_SPACE_IDS, isResourceMarketSpaceId, isFoodAccumulationSpace } from '../action-space-categories'
 
 describe('action-space category helpers', () => {
   it('recognizes all Resource Market variants', () => {
@@ -10,5 +10,15 @@ describe('action-space category helpers', () => {
     expect(isResourceMarketSpaceId('day-laborer')).toBe(false)
     expect(isResourceMarketSpaceId(null)).toBe(false)
     expect(isResourceMarketSpaceId(undefined)).toBe(false)
+  })
+
+  it('classifies food accumulation by its replenishment rather than a space id or fixed gain', () => {
+    const renamed = { id: 'different-food-space', gainPerRound: { food: 1 } }
+    const empty = { id: 'fishing', gainPerRound: { food: 0 } }
+    const fixedFood = { id: 'day-laborer', gain: { food: 2 }, gainPerRound: {} }
+    expect(isFoodAccumulationSpace(renamed)).toBe(true)
+    expect(isFoodAccumulationSpace(empty)).toBe(false)
+    expect(isFoodAccumulationSpace(fixedFood)).toBe(false)
+    expect(isFoodAccumulationSpace(undefined)).toBe(false)
   })
 })
