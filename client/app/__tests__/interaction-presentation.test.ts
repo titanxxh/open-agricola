@@ -23,12 +23,11 @@ const option = (value: string, labelKey = value): ActionChoiceOption => ({
 const waitChoice = (
   options: ActionChoiceOption[],
   promptKey = 'ui.interactionChooseOne',
-): InteractionState => ({
+): Extract<InteractionState, { stateId: 'wait' }> => ({
   stateId: 'wait',
   playerIndex: 0,
   promptKey: promptKey as never,
   request: { kind: 'choice', options },
-  options,
   allowedCommands: ['resolveChoice', 'undoStep'],
   anytimeActions: [],
 })
@@ -244,6 +243,21 @@ describe('Interaction Presentation', () => {
     expect(plan.pendingChoice.options).toHaveLength(1)
     expect(plan.choices.isActive).toBe(true)
     expect(plan.suppressChoiceOptions).toBe(true)
+  })
+
+  it('prefers authoritative spatial targets over native Moor choice routing', () => {
+    const options: ActionChoiceOption[] = [
+      { ...option('card-action:moor-special-1-3-work-market:action:fell-trees:2:1'),
+        target: { kind: 'farm-cell', playerId: 'p1', positions: [{ row: 2, col: 1 }] } },
+      { ...option('card-action:moor-special-1-3-horse-terrain:action:slash-and-burn:2:1'),
+        target: { kind: 'farm-cell', playerId: 'p1', positions: [{ row: 2, col: 1 }] } },
+    ]
+    const plan = buildInteractionPresentationPlan(waitChoice(options))
+
+    expect(plan.kind).toBe('choice-bar')
+    if (plan.kind !== 'choice-bar') return
+    expect(plan.pendingChoice.options).toEqual(options)
+    expect(plan.suppressChoiceOptions).toBe(false)
   })
 
   it('does not expose redacted private prompts as public interaction surfaces', () => {

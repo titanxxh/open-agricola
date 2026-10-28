@@ -294,11 +294,15 @@ const takeCardActionOptions = (
   actionContext?: Record<string, unknown>,
   actionHooks?: ActionHookRegistry,
 ): ActionChoiceOption[] =>
-  cardActionChoices(state, player, actionContext, actionHooks).map((choice) => ({
+  cardActionChoices(state, player, actionContext, actionHooks).map((choice): ActionChoiceOption => ({
     value: choice.value,
     labelKey: optionLabel(choice.actionId),
     labelParams: cardActionChoiceLabelParams(state, choice),
     descriptionPreview: cardActionChoiceDescriptionPreview(state, player, choice, actionHooks),
+    ...(choice.payload.tile ? {
+      target: { kind: 'farm-cell', playerId: player.id, positions: [{ ...choice.payload.tile }] },
+      targetCard: { cardId: choice.cardId, actionNameKeys: [optionLabel(choice.actionId)] },
+    } : {}),
   }))
 
 const choiceMode = (actionContext?: Record<string, unknown>) => {

@@ -369,7 +369,7 @@ export const buildInteractionPresentationPlan = (
   if (!isChoiceSurfaceInteraction(interaction)) return { kind: 'none' }
 
   const moorChoices = buildPendingMoorSpecialActionChoiceMaps(pendingChoice.options)
-  if (moorChoices.isActive) {
+  if (moorChoices.isActive && !pendingChoice.options.some(option => option.target)) {
     return {
       kind: 'moor-special-action',
       pendingChoice,
