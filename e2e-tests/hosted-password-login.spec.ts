@@ -49,6 +49,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   ], { stdio: 'ignore' })
   const username = `hosted_${randomUUID().slice(0, 8)}`
   const user = await createLocalUserForTests(username, PASSWORD)
+  await getDb().prepare(`
+    INSERT INTO sandbox_settings (user_id, player_count, updated_at) VALUES (?, 3, ?)
+    ON CONFLICT (user_id) DO UPDATE SET player_count = 3, updated_at = EXCLUDED.updated_at
+  `).run(user.id, Date.now())
   const keys = ['NODE_ENV', 'PUBLIC_APP_ORIGIN', 'PUBLIC_API_BASE', 'CORS_ORIGIN']
   const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]))
   const sockets = new Set<Duplex>()
@@ -339,6 +343,8 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
         expect(response.status()).toBe(200)
         expect(await response.json()).toMatchObject({ ok: true })
       }
+      await expect(page.locator('.ws-section-sandbox').getByText('3 Players', { exact: true })).toBeVisible()
+      await expect(page.locator('.ws-loading')).toHaveCount(0)
       await page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' })
       await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
       await page.getByRole('checkbox', { name: /Snake opening/ }).uncheck()
