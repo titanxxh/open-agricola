@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getLooseStableKeys } from '../../domain/animal-zones'
 
 const CARD_ID = 'D029_MuckRake'
 
@@ -7,7 +8,10 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    const types = new Set(Object.values(player.stableAnimals ?? {}).filter(assignment => assignment.animalCount > 0).map(assignment => assignment.animalType))
+    const types = new Set(getLooseStableKeys(player).flatMap(key => {
+      const assignment = player.stableAnimals?.[key]
+      return assignment?.animalCount === 1 ? [assignment.animalType] : []
+    }))
     let bonus = 0
     if (types.has('sheep')) bonus++
     if (types.has('boar')) bonus++
