@@ -1,4 +1,10 @@
 import type { IncomingMessage } from 'node:http'
+import { getDomain } from 'tldts'
+
+export function isSameSite(first: URL, second: URL): boolean {
+  const siteHost = (url: URL) => getDomain(url.hostname, { allowPrivateDomains: true }) ?? url.hostname
+  return first.protocol === second.protocol && siteHost(first) === siteHost(second)
+}
 
 export function corsHeaders(options: {
   methods?: string

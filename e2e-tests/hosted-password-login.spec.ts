@@ -6,7 +6,7 @@ import { createServer as createHttpServer, request as httpRequest, type Incoming
 import { createServer } from 'node:https'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { extname, join, resolve, sep } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { createLocalUserForTests } from '../server/auth'
 import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from '../server/auth-cookies'
@@ -16,29 +16,36 @@ import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening } from './fixtures'
 import { test } from './server-fixtures'
 
-type Topology = 'legacy-cross-site' | 'hosted'
+type Topology = 'legacy-cross-site' | 'same-site-pages'
 type Engine = 'webkit' | 'chromium'
 const PASSWORD = 'hosted-password-session-826'
 
-function hostedBuild() {
-  const directory = resolve('dist')
+let pagesBuilt = false
+function frontendBuild(topology: Topology) {
+  if (topology === 'same-site-pages' && !pagesBuilt) {
+    execFileSync('pnpm', ['run', 'build:pages-frontend'], { stdio: 'pipe', env: {
+      ...process.env, VITE_API_BASE: 'https://api.agricola.test', VITE_WS_BASE: 'wss://api.agricola.test/ws',
+    } })
+    pagesBuilt = true
+  }
+  const directory = resolve(topology === 'same-site-pages' ? 'dist-pages' : 'dist')
   const metadata: unknown = JSON.parse(readFileSync(join(directory, 'frontend-build.json'), 'utf8'))
   if (!metadata || typeof metadata !== 'object' || !('gameBuildId' in metadata) || typeof metadata.gameBuildId !== 'string') {
     throw new Error('Build the production frontend with pnpm run build:hosted-frontend before this spec')
   }
-  expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: HOSTED_APP_PATH })
+  expect(metadata).toEqual({ format: 1, gameBuildId: metadata.gameBuildId, basePath: topology === 'same-site-pages' ? '/' : HOSTED_APP_PATH })
   return { directory, gameBuildId: metadata.gameBuildId }
 }
 
 async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: Engine, topology: Topology) {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
-  const build = hostedBuild()
+  const build = frontendBuild(topology)
   const directory = mkdtempSync(join(tmpdir(), 'agricola-hosted-login-'))
   execFileSync('openssl', [
     'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
     '-keyout', join(directory, 'key.pem'), '-out', join(directory, 'cert.pem'),
     '-days', '1', '-subj', '/CN=app.agricola.test',
-    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:app.test,DNS:api.test',
+    '-addext', 'subjectAltName=DNS:app.agricola.test,DNS:api.agricola.test,DNS:app.test,DNS:api.test',
   ], { stdio: 'ignore' })
   const username = `hosted_${randomUUID().slice(0, 8)}`
   const user = await createLocalUserForTests(username, PASSWORD)
@@ -78,6 +85,14 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }, (req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', appOrigin)
+      if (topology === 'same-site-pages' && req.headers.host === new URL(appOrigin).host) {
+        const file = resolve(build.directory, `.${url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname)}`)
+        if (!file.startsWith(`${build.directory}${sep}`)) { res.writeHead(404); res.end(); return }
+        const contentTypes: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' }
+        res.setHeader('Content-Type', contentTypes[extname(file)] ?? 'application/octet-stream')
+        res.end(readFileSync(file))
+        return
+      }
       if (topology === 'legacy-cross-site' && req.headers.host === new URL(appOrigin).host) {
         if (url.pathname === '/client/config.ts') {
           res.setHeader('Content-Type', 'text/javascript')
@@ -155,17 +170,18 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   await new Promise<void>(resolveListen => server.listen(0, '127.0.0.1', resolveListen))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Missing HTTPS fixture port')
-  appOrigin = `https://${topology === 'hosted' ? 'app.agricola.test' : 'app.test'}:${address.port}`
-  apiOrigin = topology === 'hosted' ? appOrigin : `https://api.test:${address.port}`
+  appOrigin = topology === 'same-site-pages' ? 'https://app.agricola.test' : `https://app.test:${address.port}`
+  apiOrigin = topology === 'same-site-pages' ? 'https://api.agricola.test' : `https://api.test:${address.port}`
+  const appPath = topology === 'same-site-pages' ? '/' : HOSTED_APP_PATH
   process.env.NODE_ENV = 'production'
-  process.env.PUBLIC_APP_ORIGIN = `${appOrigin}${HOSTED_APP_PATH}`
+  process.env.PUBLIC_APP_ORIGIN = `${appOrigin}${appPath}`
   process.env.PUBLIC_API_BASE = apiOrigin
   process.env.CORS_ORIGIN = appOrigin
   const handleFrontend = createFrontendHosting({ ...process.env, FRONTEND_ROOT: build.directory, GAME_BUILD_ID: build.gameBuildId })
   const proxy = createHttpServer((_req, res) => { res.writeHead(502); res.end() })
   proxy.on('connect', (req, socket, head) => {
     const target = new URL(`http://${req.url}`)
-    const local = ['app.test', 'api.test', 'app.agricola.test'].includes(target.hostname)
+    const local = ['app.test', 'api.test', 'app.agricola.test', 'api.agricola.test'].includes(target.hostname)
     const upstream = connect(local ? address.port : Number(target.port) || 443, local ? '127.0.0.1' : target.hostname, () => {
       socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
       if (head.length) upstream.write(head)
@@ -178,14 +194,18 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const proxyAddress = proxy.address()
   if (!proxyAddress || typeof proxyAddress === 'string') throw new Error('Missing proxy fixture port')
   let context: BrowserContext | undefined
-  try {
-    context = await playwright[engine].launchPersistentContext(join(directory, 'browser-profile'), {
+  const openContext = async () => {
+    const browserContext = await playwright[engine].launchPersistentContext(join(directory, 'browser-profile'), {
       ...(engine === 'webkit' ? devices['iPhone 13'] : { viewport: { width: 1280, height: 900 } }),
       ignoreHTTPSErrors: true,
       args: engine === 'webkit' ? ['--enable-itp', '--cookies-policy=no-third-party'] : ['--test-third-party-cookie-phaseout'],
       proxy: { server: `http://127.0.0.1:${proxyAddress.port}` },
     })
-    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await browserContext.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    return browserContext
+  }
+  try {
+    context = await openContext()
     const observe = (page: Page) => {
       const requests = new WeakMap<Request, number>()
       let requestSequence = 0
@@ -213,8 +233,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       return () => { note(page, 'observer-retired'); page.off('pageerror', onPageError) }
     }
     return {
-      appUrl: `${appOrigin}${HOSTED_APP_PATH}`, apiOrigin, build, username, userId: user.id,
-      context, observe, errors, socketMessages, lifecycle, note,
+      appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
+      get context() { if (!context) throw new Error('Browser context is not open'); return context },
+      restartBrowser: async () => { await context?.close(); context = await openContext() },
+      observe, errors, socketMessages, lifecycle, note,
       close: async () => {
         for (const page of context?.pages() ?? []) note(page, 'intent-context-close')
         await context?.close()
@@ -275,7 +297,7 @@ test('strict WebKit reproduces legacy cross-site password login returning to the
 for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
   test(`${engine} production frontend retains password session through refresh and routed room recovery`, async ({ playwright }, testInfo) => {
     if (engine === 'webkit') testInfo.annotations.push({ type: 'limitation', description: 'Strict WebKit engine coverage does not replace physical Safari/iPhone acceptance' })
-    const environment = await fixture(playwright, engine, 'hosted')
+    const environment = await fixture(playwright, engine, 'same-site-pages')
     try {
       let page = await environment.context.newPage()
       const stopObservingPage = environment.observe(page)
@@ -283,13 +305,15 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       if (!document) throw new Error('Production app document was not loaded')
       expect(document.status()).toBe(200)
       expect(await document.body()).toEqual(readFileSync(join(environment.build.directory, 'index.html')))
+      expect(new URL(page.url()).origin).toBe(new URL(environment.appUrl).origin)
+      expect(new URL(environment.appUrl).origin).not.toBe(environment.apiOrigin)
       await expect(page.locator('#username')).toBeVisible()
       const authenticatedLobby = page.waitForResponse(response => new URL(response.url()).pathname === '/api/lobby/my-rooms')
       await submitPassword(page, environment.username)
       expect((await authenticatedLobby).status()).toBe(200)
       await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
       expect(await environment.context.cookies(environment.apiOrigin)).toEqual(expect.arrayContaining([
-        expect.objectContaining({ name: SESSION_COOKIE, secure: true, httpOnly: true, sameSite: 'Lax' }),
+        expect.objectContaining({ name: SESSION_COOKIE, domain: 'api.agricola.test', secure: true, httpOnly: true, sameSite: 'Lax' }),
       ]))
       environment.note(page, 'intent-reload')
       await page.reload({ waitUntil: 'domcontentloaded' })
@@ -330,7 +354,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(saved).toMatchObject({ created_by: environment.userId, max_players: 2, hotseat: 1 })
       const savedHash = createHash('sha256').update(saved.state_json).digest('hex')
       const scopes = environment.socketMessages.filter(type => type === 'commandScope').length
-      if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine, topology: 'hosted', events: environment.lifecycle }))
+      if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine, topology: 'same-site-pages', events: environment.lifecycle }))
       expect(environment.errors).toEqual([])
       // Closing the document can cancel sampled telemetry in WebKit.
       stopObservingPage()
@@ -338,6 +362,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       await page.close()
       await expect.poll(async () => (await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id = ?')
         .get<{ connected_count: number }>(roomId))?.connected_count).toBe(0)
+      await environment.restartBrowser()
       page = await environment.context.newPage()
       environment.observe(page)
       await page.goto(`${environment.appUrl}?room=${roomId}`, { waitUntil: 'domcontentloaded' })
@@ -350,7 +375,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(restored.created_by).toBe(environment.userId)
       expect(createHash('sha256').update(restored.state_json).digest('hex')).toBe(savedHash)
       await page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' })
-      expect(await page.evaluate(async id => (await fetch(`/api/rooms/${id}/dissolve`, { method: 'POST', credentials: 'include' })).status, roomId)).toBe(200)
+      expect(await page.evaluate(async ({ origin, id }) => (await fetch(`${origin}/api/rooms/${id}/dissolve`, { method: 'POST', credentials: 'include' })).status, { origin: environment.apiOrigin, id: roomId })).toBe(200)
       await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
       const desktopLogout = page.getByRole('button', { name: 'Sign Out', exact: true })
       if (!await desktopLogout.isVisible()) {
@@ -366,12 +391,16 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       ])
       expect(logout.status()).toBe(200)
       await expect(page.locator('#username')).toBeVisible()
-      expect(await page.evaluate(async () => (await fetch('/api/auth/me', { credentials: 'include' })).status)).toBe(401)
-      if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine, topology: 'hosted', events: environment.lifecycle }))
+      expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).status, environment.apiOrigin)).toBe(401)
+      await page.goto(`${environment.apiOrigin}/open-agricola/?page=login&bg=none&token=private#onboardingTicket=private`, { waitUntil: 'domcontentloaded' })
+      await expect(page.locator('#username')).toBeVisible()
+      expect(page.url()).toBe(`${environment.appUrl}?page=login&bg=none#`)
+      if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine, topology: 'same-site-pages', events: environment.lifecycle }))
       expect(environment.errors).toEqual([])
       await testInfo.attach('hosted-session-evidence', {
         body: JSON.stringify({ engine, gameBuildId: environment.build.gameBuildId, productionDocumentBytesMatched: true,
-          passwordAccepted: true, sessionSurvivedReload: true, routedCommandScope: true, retainedRoomStateSha256: savedHash,
+          appOrigin: new URL(environment.appUrl).origin, apiOrigin: environment.apiOrigin,
+          passwordAccepted: true, sessionSurvivedReload: true, sessionSurvivedBrowserRestart: true, routedCommandScope: true, retainedRoomStateSha256: savedHash,
           roomRecovered: true, logoutRejectedSession: true, cookieAdaptation: 'real backend token, production cookie serializer at TLS boundary' }),
         contentType: 'application/json',
       })

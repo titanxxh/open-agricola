@@ -1,4 +1,4 @@
-[![Open Agricola — play together, make it your own](docs/assets/social-preview.png)](https://titanxxh.github.io/open-agricola/)
+[![Open Agricola — play together, make it your own](docs/assets/social-preview.png)](https://open-agricola.titanxxh.com/)
 
 # Open Agricola
 
@@ -17,7 +17,7 @@ The project also aims to provide solid infrastructure for players to create new 
 [![CI](https://github.com/titanxxh/open-agricola/actions/workflows/ci.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions)
 [![Pages Deploy](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml)
 [![License: Apache 2.0](https://img.shields.io/github/license/titanxxh/open-agricola)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://titanxxh.github.io/open-agricola/)
+[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://open-agricola.titanxxh.com/)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Me-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/titanxxh)
 [![Afdian](https://img.shields.io/badge/Afdian-Support%20titanxxh-946ce6)](https://afdian.com/a/titanxxh)
 
@@ -31,7 +31,7 @@ The project also aims to provide solid infrastructure for players to create new 
 
 ## Live Demo
 
-https://titanxxh.github.io/open-agricola/
+https://open-agricola.titanxxh.com/
 
 ![Open Agricola gameplay screenshot](docs/assets/gameplay-screenshot.webp)
 

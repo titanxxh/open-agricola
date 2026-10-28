@@ -1,3 +1,5 @@
+import { isSameSite } from './http-origin'
+
 export const SESSION_COOKIE = 'oa_session'
 export const ONBOARDING_COOKIE = 'oa_onboarding'
 export const OAUTH_STATE_COOKIE = 'oa_oauth_state'
@@ -22,7 +24,7 @@ function sameSiteAttribute(options: CookieOptions = {}): string {
   if (process.env.NODE_ENV !== 'production') return 'SameSite=Lax'
   const appOrigin = originUrl(process.env.PUBLIC_APP_ORIGIN)
   const apiOrigin = originUrl(process.env.PUBLIC_API_BASE) ?? originUrl(options.backendOrigin)
-  if (appOrigin?.protocol === 'https:' && apiOrigin?.protocol === 'https:' && appOrigin.origin !== apiOrigin.origin) {
+  if (appOrigin?.protocol === 'https:' && apiOrigin?.protocol === 'https:' && !isSameSite(appOrigin, apiOrigin)) {
     return 'SameSite=None'
   }
   return 'SameSite=Lax'
@@ -42,7 +44,7 @@ function partitionedSuffix(options: CookieOptions = {}): string {
   return requestOrigin?.origin === appOrigin?.origin &&
     appOrigin?.protocol === 'https:' &&
     apiOrigin?.protocol === 'https:' &&
-    appOrigin.origin !== apiOrigin.origin
+    !isSameSite(appOrigin, apiOrigin)
     ? '; Partitioned'
     : ''
 }

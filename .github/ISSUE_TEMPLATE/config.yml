@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: 在线试玩
-    url: https://titanxxh.github.io/open-agricola/
+    url: https://open-agricola.titanxxh.com/
     about: 先在线上环境确认问题是否仍存在
   - name: 玩家 Bug Reports
     url: https://github.com/titanxxh/open-agricola/issues

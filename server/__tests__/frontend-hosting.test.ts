@@ -67,6 +67,29 @@ async function start(options = env) {
 }
 
 describe('frontend hosting', () => {
+  it('moves only old API application entries to the configured same-site Pages host', async () => {
+    const get = await start({ ...env, PUBLIC_APP_ORIGIN: 'https://open-agricola.titanxxh.com/', PUBLIC_API_BASE: 'https://openagapi.titanxxh.com' })
+    for (const path of ['/open-agricola', '/open-agricola/', '/open-agricola/index.html']) {
+      const response = await get(`${path}?room=retained&step=7&frame=abc&perspective=p1&token=private&next=https://elsewhere.example`)
+      expect(response.status).toBe(308)
+      expect(response.headers.location).toBe('https://open-agricola.titanxxh.com/?room=retained&step=7&frame=abc&perspective=p1#')
+      expect(response.headers['cache-control']).toBe('no-store')
+    }
+    expect(await get('/open-agricola/', 'HEAD')).toMatchObject({ status: 308, body: '' })
+    expect(await get('/open-agricola/', 'POST')).toMatchObject({ status: 405 })
+    for (const path of ['/open-agricola/assets/index-Ab1234Cd.js', '/api/auth/me', '/ops/', '/replay-viewers/build/index.html']) {
+      expect(await get(path)).toMatchObject({ status: 418 })
+    }
+    expect(JSON.parse((await get('/api/app-location')).body)).toEqual({ mode: 'disabled' })
+  })
+
+  it('restarts an old-origin onboarding flow instead of forwarding its credentials', async () => {
+    const get = await start({ ...env, PUBLIC_APP_ORIGIN: 'https://open-agricola.titanxxh.com/', PUBLIC_API_BASE: 'https://openagapi.titanxxh.com' })
+    const response = await get('/open-agricola/?page=onboarding&onboardingTicket=private')
+    expect(response.status).toBe(308)
+    expect(response.headers.location).toBe('https://open-agricola.titanxxh.com/?page=login&authMode=register&authError=oauth_onboarding_expired#')
+  })
+
   it('publishes canonical location without credentials and gives HEAD the same metadata headers', async () => {
     const get = await start()
     const response = await get('/api/app-location?cache=ignored', 'GET', { origin: 'https://old-pages.example', cookie: 'oa_session=not-public', authorization: 'Bearer not-public', host: 'untrusted.example' })
