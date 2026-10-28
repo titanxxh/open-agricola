@@ -3,14 +3,13 @@ import { installOfficialCardRegistry } from './card-environment'
 installOfficialCardRegistry()
 
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
+import { runCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { computeAnimalZones, type AnimalZone } from '../../domain/animal-zones'
 import type { ActionSpace, FarmTilePosition, GameState, Pasture, PlayerState } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
 import '../E/E033_BeaverColony'
-import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'E033_BeaverColony'
 
@@ -77,8 +76,21 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const afterSpaceUse = (
+  player: PlayerState,
+  spaceId: string,
+  actionEvents: DraftGameEvent[] = [],
+  transactionEvents = actionEvents,
+) => runCardListeners({
+  state: createState(player), player, space: createSpace(spaceId),
+  actionId: spaceId, actionSpaceUse: { newPlacement: true }, phase: 'after',
+  actionEvents, transactionEvents, actionHooks: undefined,
+})
+
+const expectedBonus = [{
+  flow: { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
+  sourceCard: CARD_ID,
+}]
 
 describe('E033_BeaverColony pasture constraint', () => {
   it('tags every stabled pasture without changing capacities', () => {
@@ -153,69 +165,74 @@ describe('E033_BeaverColony pasture constraint', () => {
 
 // ─── Reed bonus VP ──────────────────────────────────────────────────
 
-describe('E033_BeaverColony reed bonus VP', () => {
-  it('gives bonus VP after collecting reed from reed-bank', () => {
-    const listener = findListener('E33-beaver-colony-after-collect')!
-    expect(listener).toBeDefined()
+describe('E033_BeaverColony reed from an Action Space Use', () => {
+  it.each([
+    { spaceId: 'reed-bank', reed: 3 },
+    { spaceId: 'resource-market-4', reed: 1 },
+    { spaceId: 'resource-market-56', reed: 1 },
+    { spaceId: 'riverbank-forest-56', reed: 1 },
+  ])('offers one bonus point for $reed reed from $spaceId', ({ spaceId, reed }) => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
-    const result = executeCardListener(listener, {
-      state: createState(player), player,
-      space: createSpace('reed-bank'),
-      actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 2 } },
-      transactionEvents: [reedMoved(2, player.id)],
-      actionEvents: [reedMoved(2, player.id)],
-    } as unknown as CardListenerContext)
-    expect(result?.flow?.type).toBe('leaf')
-    if (result?.flow?.type === 'leaf') {
-      expect(result.flow.actionId).toBe('bonus-vp')
+    const before = structuredClone(player)
+    expect(afterSpaceUse(player, spaceId, [reedMoved(reed, player.id, spaceId)])).toEqual(expectedBonus)
+    expect(player).toEqual(before)
+  })
+
+  it.each(['reed-bank', 'day-laborer'])('does not reward a use of %s without reed', spaceId => {
+    const player = createPlayer()
+    player.minorPlayed = [CARD_ID]
+    const food: DraftGameEvent<'resource.moved'> = {
+      type: 'resource.moved', resources: { food: 1 }, from: { kind: 'actionSpace', spaceId },
+      to: { kind: 'player', playerId: player.id }, reason: 'gain',
     }
+    expect(afterSpaceUse(player, spaceId, [food])).toEqual([])
   })
 
-  it('does not trigger when no reed gained', () => {
-    const listener = findListener('E33-beaver-colony-after-collect')!
+  it('offers only one bonus for collect and gain facts in the same space use', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
-    const result = executeCardListener(listener, {
-      state: createState(player), player,
-      space: createSpace('reed-bank'),
-      actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { wood: 3 } },
-    } as unknown as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(afterSpaceUse(player, 'riverbank-forest-56', [
+      reedMoved(1, player.id, 'riverbank-forest-56'),
+      { ...reedMoved(1, player.id, 'riverbank-forest-56'), reason: 'gain' },
+    ])).toEqual(expectedBonus)
   })
 
-
-  it('gives bonus VP after gain on resource-market-4', () => {
-    const listener = findListener('E33-beaver-colony-after-gain')!
-    expect(listener).toBeDefined()
+  it.each(['card', 'supply'] as const)('does not reward card-gift reed from %s during a space use', kind => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
-    const result = executeCardListener(listener, {
-      state: createState(player), player,
-      space: createSpace('resource-market-4'),
-      actionId: 'gain', phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 1, stone: 1, food: 1 } },
-      transactionEvents: [reedMoved(1, player.id, 'resource-market-4')],
-      actionEvents: [reedMoved(1, player.id, 'resource-market-4')],
-    } as unknown as CardListenerContext)
-    expect(result?.flow?.type).toBe('leaf')
-    if (result?.flow?.type === 'leaf') {
-      expect(result.flow.actionId).toBe('bonus-vp')
+    const gift: DraftGameEvent<'resource.moved'> = { ...reedMoved(1),
+      from: kind === 'card' ? { kind, cardId: 'B009_BeatingRod' } : { kind },
+      sourceCardId: 'B009_BeatingRod', reason: 'cardEffect',
     }
+    expect(afterSpaceUse(player, 'meeting-place', [gift])).toEqual([])
   })
 
-  it('does not trigger gain on non-reed action space', () => {
-    const listener = findListener('E33-beaver-colony-after-gain')!
+  it('does not reward reed received by another player', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
-    const result = executeCardListener(listener, {
-      state: createState(player), player,
-      space: createSpace('day-laborer'),
+    expect(afterSpaceUse(player, 'reed-bank', [reedMoved(3, 'p2')])).toEqual([])
+  })
+
+  it('does not reward a card that is only in hand', () => {
+    const player = createPlayer()
+    player.minorHand = [CARD_ID]
+    expect(afterSpaceUse(player, 'reed-bank', [reedMoved(3)])).toEqual([])
+  })
+
+  it('does not borrow reed facts from outside the current space use', () => {
+    const player = createPlayer()
+    player.minorPlayed = [CARD_ID]
+    expect(afterSpaceUse(player, 'day-laborer', [], [reedMoved(3)])).toEqual([])
+  })
+
+  it('does not subscribe to a nested rule action within the space use', () => {
+    const player = createPlayer()
+    player.minorPlayed = [CARD_ID]
+    expect(runCardListeners({
+      state: createState(player), player, space: createSpace('resource-market-4'),
       actionId: 'gain', phase: 'after',
-      result: { type: 'ok', resourcesGained: { food: 1 } },
-    } as unknown as CardListenerContext)
-    expect(result).toBeUndefined()
+      actionEvents: [reedMoved(1, player.id, 'resource-market-4')], actionHooks: undefined,
+    })).toEqual([])
   })
 })
