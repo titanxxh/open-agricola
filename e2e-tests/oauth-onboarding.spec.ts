@@ -180,6 +180,14 @@ for (const provider of ['github', 'google'] as const) {
               return
             }
             res.setHeader('Content-Type', 'application/json')
+            if (mode === 'same-site-itp' && ['/api/rooms', '/api/lobby/my-rooms'].includes(url.pathname)) {
+              // Expose navigation that interrupts a lobby response after its headers arrive.
+              res.setHeader('Cache-Control', 'no-store')
+              res.write('{"ok":true,')
+              await new Promise(resolve => setTimeout(resolve, 500))
+              res.end('"rooms":[],"games":[],"enabled":false}')
+              return
+            }
             res.end(JSON.stringify({ ok: true, rooms: [], games: [], enabled: false }))
             return
           }
@@ -244,14 +252,21 @@ for (const provider of ['github', 'google'] as const) {
           await cdp.send('Network.setCookieControls', { enableThirdPartyCookieRestriction: true })
         }
         await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+        const isLobby = (raw: string) => {
+          const url = new URL(raw)
+          return url.origin === apiOrigin && ['/api/rooms', '/api/lobby/my-rooms'].includes(url.pathname)
+        }
         page.on('pageerror', error => browserErrors.push(error.message))
         const policyRequests = new Set<Request>()
+        const lobbyRequests = new Set<Request>()
         page.on('request', request => {
           if (request.url() === `${apiOrigin}/api/auth/registration-policy`) policyRequests.add(request)
+          if (isLobby(request.url())) lobbyRequests.add(request)
         })
-        page.on('requestfinished', request => policyRequests.delete(request))
+        page.on('requestfinished', request => { policyRequests.delete(request); lobbyRequests.delete(request) })
         page.on('requestfailed', request => {
           if (policyRequests.delete(request)) browserErrors.push(request.failure()?.errorText ?? 'Registration policy request failed')
+          if (lobbyRequests.delete(request)) browserErrors.push(request.failure()?.errorText ?? 'Lobby request failed')
         })
         const loadPolicyPage = async (navigate: () => Promise<unknown>) => {
           const response = page.waitForResponse(`${apiOrigin}/api/auth/registration-policy`)
@@ -261,6 +276,17 @@ for (const provider of ['github', 'google'] as const) {
           expect(await policy.json()).toEqual({ ok: true, policy: 'open' })
           await expect.poll(() => policyRequests.size).toBe(0)
         }
+        const loadLobbyPage = async (navigate: () => Promise<unknown>) => {
+          const responses = Promise.all(['/api/rooms', '/api/lobby/my-rooms']
+            .map(path => page.waitForResponse(`${apiOrigin}${path}`)))
+          const [, loaded] = await Promise.all([navigate(), responses])
+          for (const response of loaded) {
+            expect(response.status()).toBe(200)
+            expect(await response.json()).toMatchObject({ ok: true })
+          }
+          await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
+          await expect.poll(() => lobbyRequests.size).toBe(0)
+        }
         await loadPolicyPage(() => page.goto(`${apiOrigin}/cookie-seed`, { waitUntil: 'domcontentloaded' }))
         const cookieSupport = await page.evaluate(async origin => {
           await fetch(`${origin}/cookie-partitioned`, { credentials: 'include' })
@@ -268,17 +294,20 @@ for (const provider of ['github', 'google'] as const) {
         }, apiOrigin)
         expect(cookieSupport.unpartitioned).toBe(mode === 'cross-site-allow' || sameSite)
         if (mode === 'cross-site-chromium') expect(cookieSupport.partitioned).toBe(true)
+        const supportsSession = cookieSupport.partitioned || sameSite || mode === 'cross-site-allow'
         await page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=register"]`).click()
         await loadPolicyPage(() => page.getByRole('link', { name: 'Authorize local registration' }).click())
         await expect(page.locator('#onboarding-username')).toBeVisible()
         await expect(page).not.toHaveURL(/onboardingTicket/)
         expect(ticket).toMatch(/^[\w-]{43}$/)
-        await loadPolicyPage(() => page.reload())
+        await loadPolicyPage(() => page.reload({ waitUntil: 'domcontentloaded' }))
         await page.locator('#onboarding-username').fill(username)
         await page.locator('#onboarding-password').fill(password)
         await page.locator('#onboarding-confirm-password').fill(password)
         const completion = page.waitForResponse(response => response.url() === `${apiOrigin}/api/auth/onboarding/complete` && response.request().method() === 'POST')
-        await page.getByRole('button', { name: '完成注册', exact: true }).click()
+        const submitRegistration = () => page.getByRole('button', { name: '完成注册', exact: true }).click()
+        if (supportsSession) await loadLobbyPage(submitRegistration)
+        else await submitRegistration()
         const response = await completion
         completionBody = response.request().postDataJSON()
         expect(response.status()).toBe(200)
@@ -287,16 +316,14 @@ for (const provider of ['github', 'google'] as const) {
         const identity = await findIdentity(provider, subject)
         expect(identity).not.toBeNull()
         expect(await getOnboardingTicket(ticket)).toBeNull()
-        const supportsSession = cookieSupport.partitioned || sameSite || mode === 'cross-site-allow'
-        if (supportsSession) await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
-        else {
+        if (!supportsSession) {
           // WPE's libsoup port cannot exercise Safari's CHIPS session support. Registration remains a real ITP regression.
           expect(process.platform).toBe('linux')
           testInfo.annotations.push({ type: 'limitation', description: 'Linux WPE lacks CHIPS: account creation is verified; iPhone session acceptance remains a device check.' })
           await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible()
         }
-        await page.reload()
-        if (supportsSession) await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
+        if (supportsSession) await loadLobbyPage(() => page.reload({ waitUntil: 'domcontentloaded' }))
+        else await page.reload({ waitUntil: 'domcontentloaded' })
         const me = await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).json(), apiOrigin)
         if (supportsSession) expect(me).toMatchObject({ ok: true, user: { id: identity?.userId, username } })
         else expect(me).toMatchObject({ ok: false, code: 'not_authenticated' })
@@ -314,14 +341,13 @@ for (const provider of ['github', 'google'] as const) {
           expect((await context.cookies(apiOrigin)).find(cookie => cookie.name === SESSION_COOKIE)).toMatchObject({
             domain: new URL(apiOrigin).hostname, sameSite: 'Lax', secure: true, httpOnly: true,
           })
+          await expect.poll(() => lobbyRequests.size).toBe(0)
           await context.clearCookies()
           await page.goto(`${appOrigin}/?page=login`, { waitUntil: 'domcontentloaded' })
           await expect(page.locator('#username')).toBeVisible()
           await page.locator(`a[href*="/api/auth/oauth/${provider}/start"][href*="intent=login"]`).click()
-          await page.getByRole('link', { name: 'Authorize local registration' }).click()
-          await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
-          await page.reload({ waitUntil: 'domcontentloaded' })
-          await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
+          await loadLobbyPage(() => page.getByRole('link', { name: 'Authorize local registration' }).click())
+          await loadLobbyPage(() => page.reload({ waitUntil: 'domcontentloaded' }))
           expect(new URL(page.url()).origin).toBe(appOrigin)
           expect(new URL(page.url()).pathname).toBe('/')
           expect(await page.evaluate(async origin => (await fetch(`${origin}/api/auth/me`, { credentials: 'include' })).json(), apiOrigin))
