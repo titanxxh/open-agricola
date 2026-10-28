@@ -28,7 +28,7 @@ async function hostNetworkingAvailable(env) {
 if (!process.argv.includes('--prepare-only')) {
   const env = { ...process.env, PUBLIC_API_BASE: publicApiBase, OBSERVABILITY_DATA_DIR: data, ACCOUNTS_DATABASE_URL: dependencies.DATABASE_URL, OBSERVABILITY_METRICS_TOKEN: dependencies.OBSERVABILITY_METRICS_TOKEN, OBSERVABILITY_UID: String(process.getuid()), OBSERVABILITY_GID: String(process.getgid()) }
   if (await hostNetworkingAvailable(env)) {
-    execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--force-recreate'], { stdio: 'inherit', env })
+    execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--build', '--force-recreate'], { stdio: 'inherit', env })
   } else {
     console.warn('Local monitoring skipped: Docker could not complete the host-network loopback probe. On Docker Desktop, enable host networking (4.34+); retry once images are available. The application will still start.')
   }
