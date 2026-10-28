@@ -85,7 +85,7 @@ export class SoloBrowserDriver {
     expect(this.interaction, JSON.stringify(this.interaction)).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player', nextPlayerIndex: 0 } })
     return this.ui('continue', () => this.page.getByRole('button', { name: 'Continue', exact: true }).click())
   }
-  async open() {
+  async open({ moorBalanceRules = false } = {}) {
     await this.page.goto(FRONTEND_URL)
     await this.page.getByRole('button', { name: 'Solo game', exact: true }).click()
     const setup = this.page.getByRole('dialog', { name: 'Start a solo game' })
@@ -93,10 +93,12 @@ export class SoloBrowserDriver {
     for (const name of ['Enable Parent Cards expansion', 'Enable Through the Seasons expansion', 'Enable Farmers of the Moor expansion']) {
       await setup.getByRole('checkbox', { name }).check()
     }
+    if (moorBalanceRules) await setup.getByRole('checkbox', { name: 'Moor balance rules', exact: true }).check()
     await setup.getByRole('button', { name: 'Start solo game', exact: true }).click()
     await expect(this.page).toHaveURL(/\?room=[^&]+$/)
     const overlay = this.page.getByRole('dialog', { name: 'Choose your starting hand' })
     await expect(overlay).toBeVisible()
+    expect(this.state.enableMoorBalanceRules).toBe(moorBalanceRules)
     expect(this.state.soloHandSelection!.groups.map(group => [group.kind, group.cardIds.length, group.keepCount]))
       .toEqual([['occupation', 10, 7], ['minor', 4, 3], ['moor-minor', 6, 4]])
     for (const [index, group] of this.state.soloHandSelection!.groups.entries()) {

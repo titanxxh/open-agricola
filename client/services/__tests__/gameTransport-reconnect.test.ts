@@ -74,6 +74,7 @@ describe('Room reconnect and durable commands', () => {
         kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', officialCardPool: 'default-implemented-A-E',
         enableCommunityDeck: true, customCardIds: ['missing'], enableParentCards: false, draftParents: true,
         enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+        enableMoorBalanceRules: false,
       }
       const issues: SoloCreationIssue[] = [{ workshopCardId: 'missing', reason: 'missing' }]
       const rejected = expect(resumed).rejects.toMatchObject({ code: 'creation_requires_adjustment', creationAdjustment: { configuration, issues } })

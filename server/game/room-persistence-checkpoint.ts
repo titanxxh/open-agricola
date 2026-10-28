@@ -20,6 +20,7 @@ export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
     parentCards: state.enableParentCards,
     throughTheSeasons: state.enableThroughTheSeasons,
     farmersOfTheMoor: state.enableFarmersOfTheMoor === true,
+    moorBalanceRules: state.enableFarmersOfTheMoor === true && state.enableMoorBalanceRules === true,
     snakeOpening: state.enableSnakeOpening === true,
     players: scores.map((score, playerIndex) => ({
       playerIndex,

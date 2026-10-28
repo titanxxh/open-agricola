@@ -22,6 +22,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'draftParents',
   'enableThroughTheSeasons',
   'enableFarmersOfTheMoor',
+  'enableMoorBalanceRules',
   'allowIncompleteFarmersOfTheMoorMinorDeal',
   'enableSnakeOpening',
   'customCards',

@@ -43,12 +43,16 @@ const insertCompleted = async (
   db: PostgresDatabase,
   roomId: string,
   replayStatus: 'available' | 'legacy_no_replay',
-  options: { snakeOpening?: boolean } = {},
+  options: { snakeOpening?: boolean; moorBalanceRules?: boolean } = {},
 ) => {
   ;(await insertContext(db, roomId, 'completed', { replayStatus }))
   ;(await db.prepare(`
-    INSERT INTO game_results VALUES (?, 10, 20, 14, 2, 1, 0, 1, 0, ?)
-  `).run(roomId, options.snakeOpening ? 1 : 0))
+    INSERT INTO game_results (
+      room_id, started_at, finished_at, rounds_played, player_count,
+      enable_community_deck, enable_parent_cards, enable_through_the_seasons,
+      enable_farmers_of_the_moor, enable_snake_opening, enable_moor_balance_rules
+    ) VALUES (?, 10, 20, 14, 2, 1, 0, 1, ?, ?, ?)
+  `).run(roomId, options.moorBalanceRules ? 1 : 0, options.snakeOpening ? 1 : 0, options.moorBalanceRules ? 1 : 0))
   ;(await db.prepare(`
     INSERT INTO game_result_players (room_id, player_index, game_player_id, user_id, display_name, score) VALUES (?, 0, 'p1', 'u1', 'Alice', 42)
   `).run(roomId))
@@ -108,6 +112,15 @@ afterEach(() => {
 })
 
 describe('GameContextStore', () => {
+  it('includes the selected Moor balance rule in the public completed result', async () => {
+    const db = await createDb()
+    try {
+      await insertCompleted(db, 'balance-result', 'legacy_no_replay', { moorBalanceRules: true })
+      expect(await new GameContextStore(db).resolve('balance-result')).toMatchObject({
+        lifecycle: 'completed', result: { enableFarmersOfTheMoor: true, enableMoorBalanceRules: true },
+      })
+    } finally { await db.close() }
+  })
   it('expires cold saves while retaining online rooms, pending saves, new admissions and loaded caches', async () => {
     const db = await createDb()
     try {
@@ -210,6 +223,7 @@ describe('GameContextStore', () => {
         enableParentCards: false,
         enableThroughTheSeasons: true,
         enableFarmersOfTheMoor: false,
+        enableMoorBalanceRules: false,
         enableSnakeOpening: false,
         players: [
           { playerIndex: 0, displayName: 'Alice', score: 42 },

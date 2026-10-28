@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { SoloCreationConfiguration, SoloCreationIssue } from '../../../shared/contract/game-creation'
+import { isMoorBalanceRulesEnabled } from '../../../shared/contract/game-variants'
 import { t, type Locale } from '../../../shared/i18n'
 import { API_BASE } from '../../config'
 import './solo.css'
@@ -8,7 +9,7 @@ import './solo.css'
 const defaultSoloConfiguration: SoloCreationConfiguration = {
   kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', officialCardPool: 'default-implemented-A-E',
   enableCommunityDeck: false, customCardIds: [], enableParentCards: false, draftParents: true,
-  enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+  enableThroughTheSeasons: false, enableFarmersOfTheMoor: false, enableMoorBalanceRules: false,
 }
 type WorkshopCard = { id: string; name: string }
 const isWorkshopCard = (value: unknown): value is WorkshopCard => value !== null && typeof value === 'object'
@@ -25,7 +26,9 @@ export function SoloSetupDialog({ locale, initialConfiguration, issues = [], cre
 }) {
   const showCommunity = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true' || initialConfiguration?.enableCommunityDeck === true
   const showWorkshop = showCommunity || (initialConfiguration?.customCardIds.length ?? 0) > 0
-  const [configuration, setConfiguration] = useState(() => initialConfiguration ?? defaultSoloConfiguration)
+  const [configuration, setConfiguration] = useState(() => initialConfiguration
+    ? { ...initialConfiguration, enableMoorBalanceRules: isMoorBalanceRulesEnabled(initialConfiguration) }
+    : defaultSoloConfiguration)
   const [cards, setCards] = useState<WorkshopCard[]>([])
   const [catalogStatus, setCatalogStatus] = useState<'idle' | 'loading' | 'error'>(showWorkshop ? 'loading' : 'idle')
   const [retry, setRetry] = useState(0)
@@ -84,7 +87,13 @@ export function SoloSetupDialog({ locale, initialConfiguration, issues = [], cre
               <label><input type="radio" name="solo-parent-mode" checked={!configuration.draftParents} onChange={() => setConfiguration(current => ({ ...current, draftParents: false }))} />{t(locale, 'solo.parentsRandom')}</label>
             </fieldset> : null}
             <label><input type="checkbox" checked={configuration.enableThroughTheSeasons} onChange={event => setConfiguration(current => ({ ...current, enableThroughTheSeasons: event.target.checked }))} />{t(locale, 'platform.enableThroughTheSeasons')}</label>
-            <label><input type="checkbox" checked={configuration.enableFarmersOfTheMoor} onChange={event => setConfiguration(current => ({ ...current, enableFarmersOfTheMoor: event.target.checked }))} />{t(locale, 'platform.enableFarmersOfTheMoor')}</label>
+            <label><input type="checkbox" checked={configuration.enableFarmersOfTheMoor} onChange={event => setConfiguration(current => ({ ...current, enableFarmersOfTheMoor: event.target.checked, enableMoorBalanceRules: false }))} />{t(locale, 'platform.enableFarmersOfTheMoor')}</label>
+            {configuration.enableFarmersOfTheMoor ? <label>
+              <input type="checkbox" aria-label={t(locale, 'platform.moorBalanceRules')}
+                checked={configuration.enableMoorBalanceRules}
+                onChange={event => setConfiguration(current => ({ ...current, enableMoorBalanceRules: event.target.checked }))} />
+              <span>{t(locale, 'platform.moorBalanceRules')}<small>{t(locale, 'platform.moorBalanceRulesHint')}</small></span>
+            </label> : null}
             {showCommunity ? <label><input type="checkbox" checked={configuration.enableCommunityDeck}
               onChange={event => setConfiguration(current => ({ ...current, enableCommunityDeck: event.target.checked }))} />
               {t(locale, 'ui.copy.client_app_LobbyPage_tsx.enable_community_cards_community_deck_3250b6')}</label> : null}

@@ -77,6 +77,8 @@ type ClientCommandBody =
       enableThroughTheSeasons?: boolean
       /** When true, enable the Farmers of the Moor game variant. Default false. */
       enableFarmersOfTheMoor?: boolean
+      /** Optional BGA card balance rules; only effective with Farmers of the Moor. */
+      enableMoorBalanceRules?: boolean
       allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
       /** When true, enable the Snake Opening game variant. Default false. */
       enableSnakeOpening?: boolean

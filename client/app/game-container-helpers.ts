@@ -330,6 +330,9 @@ export const enableThroughTheSeasonsFromQuery = (search: string): boolean =>
 export const enableFarmersOfTheMoorFromQuery = (search: string): boolean =>
   new URLSearchParams(search).get('enableFarmersOfTheMoor') === 'true'
 
+export const enableMoorBalanceRulesFromQuery = (search: string): boolean =>
+  enableFarmersOfTheMoorFromQuery(search) && new URLSearchParams(search).get('enableMoorBalanceRules') === 'true'
+
 export const allowIncompleteFarmersOfTheMoorMinorDealFromQuery = (search: string): boolean =>
   new URLSearchParams(search).get('allowIncompleteFarmersOfTheMoorMinorDeal') === 'true'
 

@@ -5,6 +5,7 @@ import {
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
+  soloCreationConfiguration,
 } from '../game/game-setup-options'
 import { parseDraftOptions } from '../connection/room-router'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from '../../client/app/hotseat-seat'
@@ -25,6 +26,24 @@ const setupFromPayload = (payload: Record<string, unknown>) => {
 }
 
 describe('hotseat game setup', () => {
+  it('records the normalized Moor balance choice for a same-configuration solo game', () => {
+    const setup = parseGameSetupRequest({ maxPlayers: 1, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true }, null)
+    const configuration = soloCreationConfiguration(setup, [])
+    expect(configuration.enableMoorBalanceRules).toBe(true)
+    expect(configuration.enableFarmersOfTheMoor).toBe(true)
+  })
+  it.each([
+    [true, true, true], [true, false, false], [true, undefined, false],
+    [true, 'true', false], [true, 1, false], [false, true, false], [undefined, true, false],
+  ])('normalizes Moor %j and balance %j to %j before creating a game', (moor, balance, expected) => {
+    const options = setupFromPayload({ maxPlayers: 2, enableFarmersOfTheMoor: moor, enableMoorBalanceRules: balance })
+    expect(options.enableMoorBalanceRules).toBe(expected)
+    const session = new GameSession(429001, undefined, options)
+    try {
+      expect(session.getState().state.enableMoorBalanceRules).toBe(expected)
+    } finally { session.dispose() }
+  })
+
   it('deals the requested player count', () => {
     const session = new GameSession(4242, undefined, setupFromPayload({ maxPlayers: 4 }))
     expect(session.getState().state.players).toHaveLength(4)

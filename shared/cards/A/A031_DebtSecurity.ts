@@ -2,15 +2,17 @@ import { defineMinorCard } from '../card-source'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
+import { countsForMoorBalanceRules } from '../helpers/moor-balance'
 
 const CARD_ID = 'A031_DebtSecurity'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  computeBonusScore: (_state, player) => {
+  computeBonusScore: (state, player) => {
     const unusedSpaces = countUnusedFarmyardSpaces(player)
-    return Math.min(collectCardsAs(player, 'major').length, unusedSpaces)
+    const majors = collectCardsAs(player, 'major').filter(cardId => countsForMoorBalanceRules(state, cardId))
+    return Math.min(majors.length, unusedSpaces)
   },
 },
   reaches: [] as readonly string[],

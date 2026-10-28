@@ -1,18 +1,20 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { bonusVpLeaf } from '../helpers/pay-gain-node'
+import { countsForMoorBalanceRules } from '../helpers/moor-balance'
 
 const CARD_ID = 'E098_Prodigy'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBuy: (_state, player) => {
+  onBuy: (state, player) => {
     // Only triggers when this is the 1st occupation played (including this card)
     if (player.occupationPlayed.length !== 1) return
 
     // Count all improvements: major + minor improvements
-    const improvementCount = player.improvements.length + player.minorPlayed.length
+    const improvementCount = [...player.improvements, ...player.minorPlayed]
+      .filter(cardId => countsForMoorBalanceRules(state, cardId)).length
     if (improvementCount <= 0) return
 
     return bonusVpLeaf(CARD_ID, improvementCount)

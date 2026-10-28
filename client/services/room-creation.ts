@@ -1,4 +1,5 @@
 import type { SoloCreationConfiguration } from '../../shared/contract/game-creation'
+import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
 import { WS_BASE } from '../config'
 import { WsGameTransport, type RoomCreationOptions } from './gameTransport'
 
@@ -49,4 +50,5 @@ export const soloRoomOptions = (configuration: SoloCreationConfiguration, name?:
   enableCommunityDeck: configuration.enableCommunityDeck, customCardIds: [...configuration.customCardIds],
   enableParentCards: configuration.enableParentCards, draftParents: configuration.draftParents,
   enableThroughTheSeasons: configuration.enableThroughTheSeasons, enableFarmersOfTheMoor: configuration.enableFarmersOfTheMoor,
+  enableMoorBalanceRules: isMoorBalanceRulesEnabled(configuration),
 })

@@ -686,6 +686,7 @@ export type GameState = {
   enableThroughTheSeasons: boolean
   throughTheSeasons: ThroughTheSeasonsState | null
   enableFarmersOfTheMoor?: boolean
+  enableMoorBalanceRules?: boolean
   farmersOfTheMoor?: FarmersOfTheMoorState | null
   /** Snake Opening variant: every player starts with 3 food and the round-1 second placement runs in reverse Round Work Order. */
   enableSnakeOpening: boolean

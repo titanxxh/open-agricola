@@ -29,6 +29,7 @@ export type RoomMeta = {
   draftParents?: boolean
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
+  enableMoorBalanceRules?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   enableSnakeOpening?: boolean
   /** One device plays every seat: hidden from the room list, creator-only resume. */
@@ -76,6 +77,7 @@ export type GameResult = {
   parentCards: boolean
   throughTheSeasons: boolean
   farmersOfTheMoor: boolean
+  moorBalanceRules?: boolean
   snakeOpening: boolean
   players: GameResultPlayer[]
 }

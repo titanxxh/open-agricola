@@ -643,6 +643,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     draftPoolSize: draftOptions.value?.draftPoolSize,
     enableThroughTheSeasons: setup.enableThroughTheSeasons,
     enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
+    enableMoorBalanceRules: setup.enableMoorBalanceRules,
     allowIncompleteFarmersOfTheMoorMinorDeal: setup.allowIncompleteFarmersOfTheMoorMinorDeal,
     enableSnakeOpening: setup.enableSnakeOpening,
   }
@@ -1303,6 +1304,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const draftPoolSize = room.draftPoolSize ?? room.session.state.draftPoolSize
   const enableThroughTheSeasons = room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons
   const enableFarmersOfTheMoor = room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true)
+  const enableMoorBalanceRules = enableFarmersOfTheMoor && room.session.state.enableMoorBalanceRules === true
   const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
   const enableSnakeOpening = room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true)
   let created: ReturnType<typeof createIsolatedGameSession>
@@ -1321,6 +1323,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
           : {}),
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
+        enableMoorBalanceRules,
         allowIncompleteFarmersOfTheMoorMinorDeal,
         enableSnakeOpening,
       },
@@ -1371,7 +1374,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         status: isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
         colorConfirmationPlayerIndex: undefined,
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
-        enableFarmersOfTheMoor, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
+        enableFarmersOfTheMoor, enableMoorBalanceRules, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
         customCardDbIds: reloaded.loadedDbIds, customCards,
       }
       nextRoom.startedAt = nextRoom.status === 'playing' ? Date.now() : undefined

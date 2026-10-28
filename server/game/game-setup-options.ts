@@ -1,5 +1,6 @@
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
 import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
+import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
 
 export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -17,6 +18,7 @@ export type GameSetupRequest = {
   draftParents: boolean | undefined
   enableThroughTheSeasons: boolean
   enableFarmersOfTheMoor: boolean
+  enableMoorBalanceRules: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal: boolean
   enableSnakeOpening: boolean
   draft: DraftSetupOptions | null
@@ -58,6 +60,7 @@ export const parseGameSetupRequest = (
   draftParents: raw.draftParents === false ? false : undefined,
   enableThroughTheSeasons: raw.enableThroughTheSeasons === true,
   enableFarmersOfTheMoor: raw.enableFarmersOfTheMoor === true,
+  enableMoorBalanceRules: isMoorBalanceRulesEnabled(raw),
   allowIncompleteFarmersOfTheMoorMinorDeal: raw.allowIncompleteFarmersOfTheMoorMinorDeal === true,
   enableSnakeOpening: raw.enableSnakeOpening === true,
   draft,
@@ -72,6 +75,7 @@ export const buildInitialStateOptions = (request: GameSetupRequest): InitialStat
   ...(request.draftParents === false ? { draftParents: false } : {}),
   enableThroughTheSeasons: request.enableThroughTheSeasons,
   enableFarmersOfTheMoor: request.enableFarmersOfTheMoor,
+  enableMoorBalanceRules: isMoorBalanceRulesEnabled(request),
   allowIncompleteFarmersOfTheMoorMinorDeal: request.allowIncompleteFarmersOfTheMoorMinorDeal,
   enableSnakeOpening: request.enableSnakeOpening,
   ...(request.draft
@@ -88,6 +92,7 @@ export const soloCreationConfiguration = (setup: GameSetupRequest, customCardIds
   draftParents: setup.draftParents !== false,
   enableThroughTheSeasons: setup.enableThroughTheSeasons,
   enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
+  enableMoorBalanceRules: isMoorBalanceRulesEnabled(setup),
 })
 
 /** Community-deck cards are only honoured when the community deck is on. */

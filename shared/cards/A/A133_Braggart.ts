@@ -1,13 +1,15 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { countsForMoorBalanceRules } from '../helpers/moor-balance'
 
 const CARD_ID = 'A133_Braggart'
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const count = player.improvements.length + player.minorPlayed.length
+  computeBonusScore: (state, player) => {
+    const count = [...player.improvements, ...player.minorPlayed]
+      .filter(cardId => countsForMoorBalanceRules(state, cardId)).length
     if (count >= 10) return 9
     if (count >= 9) return 7
     if (count >= 8) return 5

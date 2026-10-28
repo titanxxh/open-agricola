@@ -125,7 +125,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
   const heatingExpected: Array<{ round: number; required: number; sickWorkerIds: string[] }> = []
   try {
     await authenticateSolo(context, request, `solo_full_${Date.now().toString(36)}`)
-    const parents = await d.open()
+    const parents = await d.open({ moorBalanceRules: true })
     const game = new ThreeExpansionGame(d, parents.mother)
     await game.settle()
     const sourceUrl = page.url()
@@ -219,7 +219,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     const originalConfiguration = await (await context.request.get(`${BACKEND_URL}/api/v1/game-contexts/${sourceId}/creation-configuration`)).json()
     expect(originalConfiguration).toMatchObject({ ok: true, configuration: {
       kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'choose-7', enableParentCards: true, draftParents: true,
-      enableThroughTheSeasons: true, enableFarmersOfTheMoor: true,
+      enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true,
     } })
     const before = await checkpoint(immediateId, sourceId)
     const cookies = await context.cookies()
@@ -246,7 +246,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     expect(d.commands.filter(command => command.type === 'createRoom')).toHaveLength(1)
     expect(d.commands.find(command => command.type === 'createRoom')).toMatchObject({ sourceGameContextId: sourceId })
     expect(d.state).toMatchObject({ phase: 'solo-hand-selection', enableParentCards: true,
-      enableThroughTheSeasons: true, enableFarmersOfTheMoor: true,
+      enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true,
     })
     expect(d.state.soloHandSelection?.groups.map(group => [group.kind, group.cardIds.length, group.keepCount]))
       .toEqual([['occupation', 10, 7], ['minor', 4, 3], ['moor-minor', 6, 4]])
@@ -266,7 +266,7 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
       await page.route(`**/api/v1/game-contexts/${sourceId}/creation-configuration`, route => route.fulfill({ json: {
         ok: true, configuration: { kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'choose-7',
           officialCardPool: 'default-implemented-A-E', enableCommunityDeck: false, customCardIds: ['fixture-unavailable-card'],
-          enableParentCards: true, draftParents: true, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true },
+          enableParentCards: true, draftParents: true, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true },
         issues: [{ workshopCardId: 'fixture-unavailable-card', reason: 'missing' }],
       } }))
       await page.goto(sourceUrl)

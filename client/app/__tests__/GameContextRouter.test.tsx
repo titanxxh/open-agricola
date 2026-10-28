@@ -575,6 +575,7 @@ describe('GameContextRouter', () => {
         kind: 'standard-solo', maxPlayers: 1, soloHandMode: 'random', enableCommunityDeck: false, customCardIds: [],
         officialCardPool: 'default-implemented-A-E', enableParentCards: false, draftParents: true,
         enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
+        enableMoorBalanceRules: false,
       }, issues: [] }))
       return new Response(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Unavailable' }), { status: 503 })
     }))

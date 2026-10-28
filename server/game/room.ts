@@ -58,6 +58,7 @@ export type Room = {
   draftPoolSize?: number
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
+  enableMoorBalanceRules?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   enableSnakeOpening?: boolean
   /**
@@ -98,6 +99,7 @@ export type FixedDevRoomStartupOptions = {
   enableParentCards?: boolean
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
+  enableMoorBalanceRules?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
   enableSnakeOpening?: boolean
   draftParents?: boolean
@@ -117,6 +119,10 @@ export const parseFixedDevRoomStartupOptions = (
   }
   if (env.DEV_ENABLE_FARMERS_OF_THE_MOOR === 'true' || env.DEV_ENABLE_FARMERS_OF_THE_MOOR === '1') {
     options.enableFarmersOfTheMoor = true
+  }
+  if (options.enableFarmersOfTheMoor
+    && (env.DEV_ENABLE_MOOR_BALANCE_RULES === 'true' || env.DEV_ENABLE_MOOR_BALANCE_RULES === '1')) {
+    options.enableMoorBalanceRules = true
   }
   if (
     env.DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL === 'true' ||
@@ -148,6 +154,7 @@ export const buildFixedDevRoomInitialStateOptions = (
   ...(startupOptions.enableParentCards ? { enableParentCards: true } : {}),
   ...(startupOptions.enableThroughTheSeasons ? { enableThroughTheSeasons: true } : {}),
   ...(startupOptions.enableFarmersOfTheMoor ? { enableFarmersOfTheMoor: true } : {}),
+  ...(startupOptions.enableFarmersOfTheMoor && startupOptions.enableMoorBalanceRules === true ? { enableMoorBalanceRules: true } : {}),
   ...(startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal ? { allowIncompleteFarmersOfTheMoorMinorDeal: true } : {}),
   ...(startupOptions.enableSnakeOpening ? { enableSnakeOpening: true } : {}),
   ...(startupOptions.draftParents === false ? { draftParents: false } : {}),
@@ -219,6 +226,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   draftParents: room.draftParents,
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
+  enableMoorBalanceRules: room.session.state.enableMoorBalanceRules === true,
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
   enableSnakeOpening: room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true),
   hotseat: room.hotseat === true,
@@ -341,6 +349,7 @@ const createSessionFromSnapshot = (
       ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
+      enableMoorBalanceRules: snapshot.meta.enableMoorBalanceRules === true,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
       enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? false,
     })
@@ -359,6 +368,7 @@ const createSessionFromSnapshot = (
       ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
+      enableMoorBalanceRules: snapshot.meta.enableMoorBalanceRules === true,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
       enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? false,
     })
@@ -406,6 +416,7 @@ export const snapshotToRoom = (
     draftPoolSize: session.state.draftPoolSize,
     enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.state?.enableThroughTheSeasons ?? false,
     enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.state?.enableFarmersOfTheMoor === true),
+    enableMoorBalanceRules: session.state.enableMoorBalanceRules === true,
     allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
     enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? (snapshot.serialized?.state?.enableSnakeOpening === true),
     ...(snapshotRehydrationFailed ? { snapshotRehydrationFailed: true } : {}),

@@ -85,6 +85,11 @@ describe('snakeOpeningPlacementOrders', () => {
 })
 
 describe('GameHeader snake opening pill', () => {
+  it('shows the locked Moor balance choice from the authoritative state', () => {
+    renderHeader(snakeOpeningState({ round: 4, enableFarmersOfTheMoor: true, enableMoorBalanceRules: true }))
+    expect(screen.getByTestId('moor-balance-rules')).toHaveTextContent('Moor balance rules')
+    expect(screen.getByTestId('moor-balance-rules')).toHaveAttribute('title', "Apply BGA's optional balance rules to the affected cards.")
+  })
   it('localizes the waiting turn and snake orders in Chinese', () => {
     const game = snakeOpeningState()
     game.players[0]!.name = 'Player 1'

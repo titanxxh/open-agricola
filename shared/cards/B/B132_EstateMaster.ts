@@ -3,15 +3,18 @@ import { defineOccupationCard } from '../card-source'
 import {
   readCardExtraData,
 } from '../helpers/card-state'
-import type { ActionFlow, PlayerState } from '../../contract/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import { isMoorBalanceRulesEnabled } from '../../contract/game-variants'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import type { CardImpl } from '../registry'
-import type { CardListenerRegistration } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import { getActionNewlyUsedTiles, getActionTerrainOperations } from '../helpers/farmyard-events'
 
 const CARD_ID = 'B132_EstateMaster'
 
-const isFarmSaturated = (player: PlayerState): boolean =>
+const isFarmSaturated = (player: PlayerState, state?: GameState): boolean =>
   hasNoUnusedFarmyardSpaces(player)
+  && (!isMoorBalanceRulesEnabled(state) || (player.farmTerrain?.length ?? 0) === 0)
 
 const isSaturatedFlagged = (player: PlayerState): boolean =>
   readCardExtraData<boolean>(player, CARD_ID, 'saturated') === true
@@ -23,12 +26,19 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
   params,
 })
 
-/**
- * The reference pattern: lazily set a saturation flag once the farmyard fills via any
- * Construct/Stables/Fencing/Plow event. Reap then awards bonus VP only when
- * the flag is set (or, defensively, when the live check passes if some
- * exotic SE filled the farm via another path).
- */
+const isSaturatedAfterAction = (context: CardListenerContext): boolean => {
+  const operations = context.result?.type === 'ok' || context.result?.type === 'flow'
+    ? context.result.farmOperations : undefined
+  if (operations === undefined) return isFarmSaturated(context.player, context.state)
+  return operations.some(operation => operation.playerId === context.player.id && isFarmSaturated({
+    ...context.player,
+    ...operation.after,
+    farmTerrain: operation.after.farmTerrain ?? [],
+    farmyardExtensions: operation.after.farmyardExtensions ?? [],
+    farmyardSpaceStates: operation.after.farmyardSpaceStates ?? [],
+  }, context.state))
+}
+
 const saturationCheckListener = (
   actionId: NonNullable<CardListenerRegistration['actions']>[number],
 ): CardListenerRegistration => ({
@@ -39,7 +49,7 @@ const saturationCheckListener = (
   scope: 'player',
   handler: (ctx) => {
     if (isSaturatedFlagged(ctx.player)) return
-    if (isFarmSaturated(ctx.player)) {
+    if (isSaturatedAfterAction(ctx)) {
       return {
         flow: specialEffect({ kind: 'set-extra-data', key: 'saturated', value: true }),
         sourceCard: CARD_ID,
@@ -47,6 +57,25 @@ const saturationCheckListener = (
     }
   },
 })
+
+const saturationEventListener: CardListenerRegistration = {
+  id: 'B132-saturate-after-farm-change',
+  cardIds: [CARD_ID],
+  events: ['farm.spacesUsed', 'farm.terrainChanged'],
+  phases: ['after'],
+  scope: 'player',
+  handler: context => {
+    if (!isMoorBalanceRulesEnabled(context.state) || isSaturatedFlagged(context.player)
+      || !isSaturatedAfterAction(context)) return
+    const changed = getActionNewlyUsedTiles(context).length > 0 || getActionTerrainOperations(context)
+      .some(event => event.playerId === context.player.id && event.changes.length > 0)
+    if (!changed) return
+    return {
+      sourceCard: CARD_ID,
+      flow: specialEffect({ kind: 'set-extra-data', key: 'saturated', value: true }),
+    }
+  },
+}
 
 const reapListener: CardListenerRegistration = {
   id: 'B132-estate-master-reap',
@@ -59,7 +88,7 @@ const reapListener: CardListenerRegistration = {
     if (amount <= 0) return
     // Rule: bonus VP gated on saturation flag; defensive fallback to live check
     // for paths that bypass the four flag-setting hooks.
-    if (!isSaturatedFlagged(player) && !isFarmSaturated(player)) return
+    if (!isSaturatedFlagged(player) && !isFarmSaturated(player, ctx.state)) return
     return {
       flow: specialEffect({ kind: 'increment-counter', key: 'bonusVp', amount }),
       sourceCard: CARD_ID,
@@ -73,10 +102,13 @@ const cardImpl = {
     saturationCheckListener('stables'),
     saturationCheckListener('fence'),
     saturationCheckListener('plow'),
+    saturationEventListener,
     reapListener,
   ],
   effect: {
     id: CARD_ID,
+    onBuy: (state, player) => isFarmSaturated(player, state)
+      ? specialEffect({ kind: 'set-extra-data', key: 'saturated', value: true }) : undefined,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
