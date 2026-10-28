@@ -2,7 +2,7 @@
   "uid": "open-agricola",
   "title": "Open Agricola 平台运行看板",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "editable": false,
   "refresh": "15s",
   "timezone": "browser",
@@ -176,6 +176,218 @@
       ]
     },
     {
+      "id": 39,
+      "title": "现存注册账户",
+      "type": "stat",
+      "description": "按现存账户统计，包括尚未验证邮箱的账户；账户注销后不再计入。今日按 Asia/Singapore（UTC+8）自然日统计，其余为滚动时间窗口。独立数据库采集每60秒刷新，过期或采集失败显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 6,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "未知 / 暂无样本",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_accounts{kind=\"total\"} and on(job,instance) (agricola_accounts_collection_success==1 and on(job,instance) (time()-agricola_accounts_last_success_unixtime<120))",
+          "legendFormat": "现存注册账户",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "title": "今日新增注册（UTC+8）",
+      "type": "stat",
+      "description": "按现存账户统计，包括尚未验证邮箱的账户；账户注销后不再计入。今日按 Asia/Singapore（UTC+8）自然日统计，其余为滚动时间窗口。独立数据库采集每60秒刷新，过期或采集失败显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 8,
+        "w": 6,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "未知 / 暂无样本",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_accounts{kind=\"today\"} and on(job,instance) (agricola_accounts_collection_success==1 and on(job,instance) (time()-agricola_accounts_last_success_unixtime<120))",
+          "legendFormat": "今日新增注册（UTC+8）",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "title": "近24小时新增注册",
+      "type": "stat",
+      "description": "按现存账户统计，包括尚未验证邮箱的账户；账户注销后不再计入。今日按 Asia/Singapore（UTC+8）自然日统计，其余为滚动时间窗口。独立数据库采集每60秒刷新，过期或采集失败显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 6,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "未知 / 暂无样本",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_accounts{kind=\"last_24h\"} and on(job,instance) (agricola_accounts_collection_success==1 and on(job,instance) (time()-agricola_accounts_last_success_unixtime<120))",
+          "legendFormat": "近24小时新增注册",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "title": "近7天新增注册",
+      "type": "stat",
+      "description": "按现存账户统计，包括尚未验证邮箱的账户；账户注销后不再计入。今日按 Asia/Singapore（UTC+8）自然日统计，其余为滚动时间窗口。独立数据库采集每60秒刷新，过期或采集失败显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 8,
+        "w": 6,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "未知 / 暂无样本",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agricola_accounts{kind=\"last_7d\"} and on(job,instance) (agricola_accounts_collection_success==1 and on(job,instance) (time()-agricola_accounts_last_success_unixtime<120))",
+          "legendFormat": "近7天新增注册",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
       "id": 3,
       "title": "在线用户与已连接座位",
       "type": "timeseries",
@@ -186,7 +398,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 13,
         "w": 12,
         "h": 8
       },
@@ -249,14 +461,14 @@
       "id": 36,
       "title": "房间数量",
       "type": "timeseries",
-      "description": "等待、进行中、同屏与开发房间只统计当前仍有在线连接的房间；全员离线、仍保留续局存档的普通及同屏房间单独列为离线保留房间。",
+      "description": "等待、进行中、同屏与开发房间只统计当前仍有在线连接的房间；全员离线、仍保留续局存档的普通及同屏房间单独列为离线保留房间。 总房间为等待、进行中、同屏和离线保留之和，不含开发、已完成或已过期房间。右轴显示离线保留和总房间，左轴显示在线各类房间。",
       "datasource": {
         "type": "prometheus",
         "uid": "agricola-prometheus"
       },
       "gridPos": {
         "x": 12,
-        "y": 8,
+        "y": 13,
         "w": 12,
         "h": 8
       },
@@ -265,7 +477,9 @@
           "unit": "short",
           "noValue": "未知 / 暂无样本",
           "custom": {
-            "spanNulls": false
+            "spanNulls": false,
+            "axisPlacement": "left",
+            "axisLabel": "在线房间（个）"
           },
           "thresholds": {
             "mode": "absolute",
@@ -279,7 +493,40 @@
           "min": 0,
           "decimals": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "离线保留房间"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "保留及总房间（个）"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "总房间"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "保留及总房间（个）"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -293,8 +540,20 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agricola_platform{role=\"ingress\",kind=~\"rooms_.*\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
+          "expr": "agricola_platform{role=\"ingress\",kind=~\"rooms_waiting|rooms_playing|rooms_hotseat|rooms_development\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
           "legendFormat": "{{kind}}",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "agricola_platform{role=\"ingress\",kind=\"rooms_retained\"} and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
+          "legendFormat": "离线保留房间",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by(job,instance) (agricola_platform{role=\"ingress\",kind=~\"rooms_waiting|rooms_playing|rooms_hotseat|rooms_retained\"}) and on(job,instance) ((time()-agricola_collector_last_success_unixtime{source=\"global\"}<120) and on(job,instance,source) (agricola_collector_status{source=\"global\"}==1))",
+          "legendFormat": "总房间",
           "format": "time_series"
         }
       ],
@@ -326,13 +585,6 @@
             "regex": "(^|\\s)rooms_development(?=\\s|$)",
             "renamePattern": "$1开发房间"
           }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "(^|\\s)rooms_retained(?=\\s|$)",
-            "renamePattern": "$1离线保留房间"
-          }
         }
       ]
     },
@@ -347,7 +599,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 21,
         "w": 12,
         "h": 8
       },
@@ -417,7 +669,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 16,
+        "y": 21,
         "w": 12,
         "h": 8
       },
@@ -709,7 +961,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 29,
         "w": 12,
         "h": 8
       },
@@ -899,7 +1151,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 24,
+        "y": 29,
         "w": 12,
         "h": 8
       },
@@ -1079,7 +1331,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 37,
         "w": 12,
         "h": 8
       },
@@ -1210,7 +1462,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 32,
+        "y": 37,
         "w": 12,
         "h": 8
       },
@@ -1495,7 +1747,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 45,
         "w": 12,
         "h": 8
       },
@@ -1689,7 +1941,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 40,
+        "y": 45,
         "w": 12,
         "h": 8
       },
@@ -1747,7 +1999,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 53,
         "w": 12,
         "h": 8
       },
@@ -1811,7 +2063,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 53,
         "w": 12,
         "h": 8
       },
@@ -1868,7 +2120,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 61,
         "w": 12,
         "h": 8
       },
@@ -1957,7 +2209,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 56,
+        "y": 61,
         "w": 12,
         "h": 8
       },
@@ -2052,7 +2304,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 69,
         "w": 12,
         "h": 8
       },
@@ -2110,7 +2362,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 64,
+        "y": 69,
         "w": 12,
         "h": 8
       },
@@ -2184,7 +2436,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 72,
+        "y": 77,
         "w": 12,
         "h": 8
       },
@@ -2266,7 +2518,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 72,
+        "y": 77,
         "w": 12,
         "h": 8
       },
@@ -2432,7 +2684,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 80,
+        "y": 85,
         "w": 12,
         "h": 8
       },
@@ -2513,7 +2765,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 80,
+        "y": 85,
         "w": 12,
         "h": 8
       },
@@ -2572,7 +2824,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 88,
+        "y": 93,
         "w": 12,
         "h": 8
       },
@@ -2689,7 +2941,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 88,
+        "y": 93,
         "w": 12,
         "h": 8
       },
@@ -2757,7 +3009,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 96,
+        "y": 101,
         "w": 12,
         "h": 8
       },
@@ -2815,7 +3067,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 96,
+        "y": 101,
         "w": 12,
         "h": 8
       },
@@ -2873,7 +3125,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 104,
+        "y": 109,
         "w": 12,
         "h": 8
       },
@@ -2955,7 +3207,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 104,
+        "y": 109,
         "w": 12,
         "h": 8
       },
@@ -3051,7 +3303,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 112,
+        "y": 117,
         "w": 12,
         "h": 8
       },
@@ -3168,7 +3420,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 112,
+        "y": 117,
         "w": 12,
         "h": 8
       },
@@ -3226,7 +3478,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 120,
+        "y": 125,
         "w": 12,
         "h": 8
       },
@@ -3531,7 +3783,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 120,
+        "y": 125,
         "w": 12,
         "h": 8
       },
@@ -3718,7 +3970,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 128,
+        "y": 133,
         "w": 12,
         "h": 8
       },
@@ -3884,7 +4136,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 128,
+        "y": 133,
         "w": 12,
         "h": 8
       },
@@ -3946,7 +4198,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 136,
+        "y": 141,
         "w": 12,
         "h": 8
       },
@@ -4016,7 +4268,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 136,
+        "y": 141,
         "w": 12,
         "h": 8
       },
@@ -4074,7 +4326,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 144,
+        "y": 149,
         "w": 12,
         "h": 8
       },
@@ -4188,7 +4440,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 152,
+        "y": 157,
         "w": 24,
         "h": 8
       },

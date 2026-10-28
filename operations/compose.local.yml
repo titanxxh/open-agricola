@@ -1,5 +1,16 @@
 name: open-agricola-observability
 services:
+  accounts-exporter:
+    image: open-agricola-accounts:local
+    build: { context: . }
+    network_mode: host
+    environment:
+      DATABASE_URL: ${ACCOUNTS_DATABASE_URL:?}
+      OBSERVABILITY_METRICS_TOKEN: ${OBSERVABILITY_METRICS_TOKEN:?}
+      ACCOUNTS_HOST: 127.0.0.1
+      ACCOUNTS_PORT: 19201
+    read_only: true
+    restart: unless-stopped
   prometheus:
     image: prom/prometheus:v3.15.0
     user: "${OBSERVABILITY_UID:-1000}:${OBSERVABILITY_GID:-1000}"

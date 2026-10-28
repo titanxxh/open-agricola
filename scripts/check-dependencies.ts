@@ -8,9 +8,9 @@ import { walkSourceFiles, parseSource } from './source-files.ts'
 import { importViolation, isSourceFile, isTestFile, normalizePath, resolveImport, browserDataFiles, workerFiles, privilegedRoots } from './architecture-policy.mjs'
 
 export type DependencyEdge = { from: string; to: string; typeOnly: boolean; dynamic: boolean }
-export const runtimeRoots = ['shared', 'server', 'client', 'replay-viewer/src']
+export const runtimeRoots = ['shared', 'server', 'client', 'replay-viewer/src', 'operations']
 
-const knownRoots = new Set(['shared', 'server', 'client', 'replay-viewer', 'scripts', 'tests', 'e2e-tests'])
+const knownRoots = new Set(['shared', 'server', 'client', 'replay-viewer', 'scripts', 'tests', 'e2e-tests', 'operations'])
 const artifacts = new Set(['node_modules', '.git', '.worktree', 'dist', 'data', 'output', 'public', 'docs', 'coverage', 'playwright-report', 'test-results', '.codex', '.agents'])
 
 /**

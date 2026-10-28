@@ -70,13 +70,6 @@ services:
       - ./backups:/app/backups:ro
     restart: unless-stopped
 
-  prometheus:
-    extends: { file: docker-compose.yml, service: prometheus }
-  grafana:
-    extends: { file: docker-compose.yml, service: grafana }
-  node-exporter:
-    extends: { file: docker-compose.yml, service: node-exporter }
-
   caddy:
     image: caddy:alpine
     user: "${APP_UID:-1000}:${APP_GID:-1000}"

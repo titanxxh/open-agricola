@@ -18,6 +18,7 @@
 | `shared/domain/` | [domain](architecture/domain.md) | `PlayerBoard`, farmyard, animals, scoring, major supply |
 | `shared/draft/`, `shared/custom-code/`, Game Variants, `i18n`, `utils` | [shared-other](architecture/shared-other.md) | Simultaneous draft, Game Variants, Workshop admission, locale, utilities |
 | `server/` | [server](architecture/server.md) | Connections, Rooms, Durable Room Commit, Replay, Bug Report, Workshop backend, persistence, operations |
+| `operations/` | [server deployment boundary](architecture/server.md#deployment-rollback-and-observability) | Independent monitoring deployment and restricted account aggregates |
 | `client/` | [client](architecture/client.md) | Bundles, transport and synchronized state, views, Replay Viewer, Bug Report |
 | Tests and gates | [testing](architecture/testing.md) | Test layers and architecture fitness checks |
 

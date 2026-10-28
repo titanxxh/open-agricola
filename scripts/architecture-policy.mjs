@@ -63,6 +63,8 @@ export const isRuleRuntime = file => !browserDataFiles.has(file) && (
 export function importViolation(from, to, specifier, typeOnly = false) {
   if (isTestFile(from)) return null
   const layer = from.split('/')[0]
+  if (layer === 'operations' && /^(?:shared|server|client|replay-viewer|scripts)\//.test(to)) return 'operations cannot depend on game or release code'
+  if (['shared', 'server', 'client', 'replay-viewer'].includes(layer) && to.startsWith('operations/')) return 'game runtime cannot depend on operations code'
   if (layer === 'shared' && /^(?:server|client|replay-viewer)\//.test(to)) return 'shared cannot depend on server or browser code'
   if (layer === 'server' && /^(?:client|replay-viewer)\//.test(to)) return 'server cannot depend on browser code'
   if ((layer === 'client' || layer === 'replay-viewer') && to.startsWith('server/')) return 'browser cannot depend on server code'

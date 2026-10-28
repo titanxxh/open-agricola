@@ -29,6 +29,10 @@ describe('resolved architecture dependencies', () => {
     ['shared/contract/Probe.ts', '../parents/index.ts'],
     ['client/Probe.ts', '../shared/cards/M/M084_BogPony.ts'],
     ['server/Probe.ts', '../client/main.tsx'],
+    ['operations/Probe.ts', '../server/index.ts'],
+    ['operations/Probe.ts', '../shared/session/session-core.ts'],
+    ['server/Probe.ts', '../operations/accounts-exporter.ts'],
+    ['client/Probe.ts', '../operations/accounts-exporter.ts'],
   ])('rejects imports without config overrides: %s -> %s', async (file, target) => {
     const eslint = new ESLint({ cwd: path.resolve(import.meta.dirname, '../..') })
     const relativeTarget = file === 'shared/cards/A/Probe.ts' ? '../../../server/index.ts' : target
@@ -140,6 +144,7 @@ describe('resolved architecture dependencies', () => {
         'server/index.ts': 'export const s = 1',
         'client/main.ts': 'export const c = 1',
         'replay-viewer/src/main.ts': 'export const r = 1',
+        'operations/main.ts': 'export const o = 1',
         '.scratch/probe.ts': 'export const p = 1',
         'extra/probe.ts': 'export const e = 1',
       })
