@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-29
-- Implementation: Pending
+- Implementation: Implemented in [PR #1450](https://github.com/titanxxh/open-agricola/pull/1450)
 
 The maintainer chose option A: retain the current scoring result and add the semantic distinctions required by rule consumers. A separate internal scoring model and display projection was considered, but the observed defects do not yet justify migrating every scoring input contract.
 
