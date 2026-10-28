@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-10-27。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-10-29。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 > 本文只覆盖官方卡牌。Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
@@ -36,6 +36,16 @@
 | B104 沿用系统 exchange 默认窗口，有意移除原独立入口的计分前机会；收获配方继续可用。 | `B104_SheepWalker` |
 | OA 保留明确选择卡上围栏数量。跳过后普通库存不足时拒绝提交，不自动补用卡上库存。选中的实体独立于 B015 折扣：选四建四扣四，选五建四也只扣四。 | `E074_AshTrees` |
 | 没有相反作物种子时，不可执行的可选播种分支自动跳过，不显示拒绝提示。 | `E070_CropRotationField` |
+| 可选 Moor Balance Rules 对以下八张卡采用已选定的参考行为，默认关闭。两种模式共用统一农场 used 与卡牌身份；范围和成对预期见 [#1449](https://github.com/titanxxh/open-agricola/issues/1449)。 | `A033_BigCountry`, `B132_EstateMaster`, `A133_Braggart`, `B153_Housemaster`, `A031_DebtSecurity`, `A101_CookeryOutfitter`, `D030_ArtisanDistrict`, `E098_Prodigy` |
+| 维护者保留按当前编写的积累格牌文匹配，不采用参考实现的历史目标名单。 | `B100_Clutterer` |
+| 维护者允许酒馆老板赠麦，使原本没有作物的玩家能够执行本次待定播种。 | `A132_Publican` |
+| 维护者保留仅在手持或已打出该卡时记录羊历史；中途抽到该卡不回溯重建更早的羊历史。 | `D036_BreedRegistry` |
+| 维护者保留所有声明 oven 身份的卡均参与该卡额外计分。 | `M072_OvenDamper` |
+| 花园小径只有一个共享标记，转移后仅由当前持有者扣 1 分，不按出牌次数累积扣分。通常负分规则忽略这个独立标记。 | `M027_GardenPath` |
+| 教牧信函也为当前拥有的升级 Church 加 1 分，已移除的 Village Church 不再计入。 | `M063_PastoralLetter` |
+| 维护者选择参考实现的卡牌计分值 0，即使官方规则示例牌图为 1；见 [#1448](https://github.com/titanxxh/open-agricola/issues/1448)。 | `M090_WinterStorehouse` |
+| 行政管理使用逻辑大设施身份，包括女巫舞池这类双重身份设施。 | `M074_Administration` |
+| 实时预估在最终结算前已考虑可用的最优工坊兑换。 | `E124_MayorCandidate` |
 
 ## 3. 基础设施待办
 

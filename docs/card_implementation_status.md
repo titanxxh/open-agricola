@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-10-27. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-10-29. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -36,6 +36,16 @@ Unless the product direction changes, the following are not bugs. Cards without 
 | B104 uses the default system exchange windows; its former standalone pre-scoring opportunity is intentionally removed. Harvest recipes remain available. | `B104_SheepWalker` |
 | OA keeps an explicit choice of how many card-held fences to use. After skipping, a submission is rejected when ordinary stock is short; card stock is not used automatically. Selected entities are independent of B015's discount: selecting four and building four consumes four; selecting five and building four still consumes four. | `E074_AshTrees` |
 | When no opposite crop seed is available, the impossible optional sow branch auto-skips instead of showing a decline prompt. | `E070_CropRotationField` |
+| Optional Moor Balance Rules use the selected reference behavior for these eight cards. The setting defaults off; both modes share canonical farmyard usage and card identities. Maintainer scope and paired expectations are in [#1449](https://github.com/titanxxh/open-agricola/issues/1449). | `A033_BigCountry`, `B132_EstateMaster`, `A133_Braggart`, `B153_Housemaster`, `A031_DebtSecurity`, `A101_CookeryOutfitter`, `D030_ArtisanDistrict`, `E098_Prodigy` |
+| The maintainer keeps current authored accumulation wording as Clutterer's matching source, rather than the reference's historical target list. | `B100_Clutterer` |
+| The maintainer allows a Publican grain gift to make the pending Sow executable when the sower initially has no crops. | `A132_Publican` |
+| The maintainer retains sheep-history tracking while the card is held or played; a later draw does not reconstruct earlier sheep history. | `D036_BreedRegistry` |
+| The maintainer keeps all cards declaring oven identity eligible for Oven Damper scoring. | `M072_OvenDamper` |
+| One shared Garden Path marker moves between holders and applies one -1 to its current holder, rather than accumulating per-purchase penalties. Ordinary negative-score rules exclude the independent marker. | `M027_GardenPath` |
+| Pastoral Letter also gives an owned upgraded Church +1. Removed Village Church cards no longer contribute. | `M063_PastoralLetter` |
+| The maintainer selected the reference's printed scoring value of 0 despite the official rulebook sample showing 1; see [#1448](https://github.com/titanxxh/open-agricola/issues/1448). | `M090_WinterStorehouse` |
+| Administration uses logical major-improvement identity, including dual-type improvements such as Witches' Dance Floor. | `M074_Administration` |
+| Live estimates account for available optimal craft conversions before final settlement. | `E124_MayorCandidate` |
 
 ## 3. Infrastructure backlog
 
