@@ -11,7 +11,7 @@ import { createTestDatabase, getTestDatabaseUrl } from '../server/__tests__/_hel
 import { allocateTestPort } from '../scripts/test-ports'
 import { BACKEND_URL } from './fixtures'
 
-test('independent metrics render registration stats and room totals with two axes in real Grafana', async ({ page, request }) => {
+test('independent metrics render registration stats and room totals with two axes in real Grafana', async ({ page, request }, testInfo) => {
   test.setTimeout(180_000)
   expect((await request.get(BACKEND_URL + '/api/health')).ok()).toBe(true)
   const directory = mkdtempSync(join(tmpdir(), 'oa-ops-browser-'))
@@ -21,6 +21,16 @@ test('independent metrics render registration stats and room totals with two axe
   const pool = createAccountsPool(getTestDatabaseUrl(), schema)
   const names: string[] = []
   const servers: Server[] = []
+  const panelQueries: Array<{ status: number; request: unknown; response: unknown }> = []
+  const panelCaptures: Promise<void>[] = []
+  page.on('response', response => {
+    if (new URL(response.url()).pathname !== '/ops/api/ds/query' || response.request().method() !== 'POST' || panelQueries.length >= 40) return
+    panelCaptures.push((async () => {
+      try {
+        panelQueries.push({ status: response.status(), request: response.request().postDataJSON(), response: await response.json() })
+      } catch { panelQueries.push({ status: response.status(), request: null, response: 'unreadable' }) }
+    })())
+  })
   const previous = { ADMIN_USERS: process.env.ADMIN_USERS, GRAFANA_URL: process.env.GRAFANA_URL }
   const listen = async (server: Server) => {
     servers.push(server)
@@ -82,6 +92,10 @@ test('independent metrics render registration stats and room totals with two axe
     expect(await query('agricola_accounts{kind="today"}')).toEqual(['1'])
     await expect.poll(() => query('sum(agricola_platform{kind=~"rooms_waiting|rooms_playing|rooms_hotseat|rooms_retained"})'), { timeout: 30_000 }).toEqual(['126'])
     const dashboard = (await (await page.request.get(base + '/ops/api/dashboards/uid/open-agricola')).json()).dashboard
+    for (const [id, expected] of [[39, '2'], [40, '1']] as const) {
+      const expression = dashboard.panels.find((panel: { id: number }) => panel.id === id).targets[0].expr
+      await expect.poll(() => query(expression), { timeout: 30_000 }).toEqual([expected])
+    }
     const room = dashboard.panels.find((panel: { id: number }) => panel.id === 36)
     expect(room.fieldConfig.defaults.custom.axisPlacement).toBe('left')
     expect(room.fieldConfig.overrides.map((override: { matcher: { options: string } }) => override.matcher.options)).toEqual(['离线保留房间', '总房间'])
@@ -92,9 +106,13 @@ test('independent metrics render registration stats and room totals with two axe
     await expect(page.getByText('总房间', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
     await page.screenshot({ path: 'output/operations-dashboard.png', fullPage: true })
   } finally {
+    await Promise.allSettled(panelCaptures)
+    writeFileSync(testInfo.outputPath('operations-panel-queries.json'), JSON.stringify(panelQueries, null, 2))
     for (const name of names.reverse()) {
       const logs = spawnSync('docker', ['logs', name], { encoding: 'utf8' })
-      writeFileSync(join('output', name.startsWith('oa-ops-grafana-') ? 'operations-grafana.log' : 'operations-prometheus.log'), logs.stdout + logs.stderr)
+      const file = name.startsWith('oa-ops-grafana-') ? 'operations-grafana.log' : 'operations-prometheus.log'
+      writeFileSync(join('output', file), logs.stdout + logs.stderr)
+      writeFileSync(testInfo.outputPath(file), logs.stdout + logs.stderr)
       try { docker(['rm', '-f', name]) } catch { /* Already stopped. */ }
     }
     await Promise.all(servers.map(server => new Promise<void>(done => server.close(() => done()))))
