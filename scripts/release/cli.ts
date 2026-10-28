@@ -15,7 +15,7 @@ export async function releaseSmokeCli(args: string[], env: NodeJS.ProcessEnv = p
     help: { type: 'boolean', short: 'h' },
   } })
   if (values.help) {
-    console.log('pnpm release:smoke --app-url URL/open-agricola/ --api-url ORIGIN --expected-build SHA [--output DIR] [--browser chromium|webkit] [--proxy URL]\nPrivate environment: RELEASE_SMOKE_USERNAME, RELEASE_SMOKE_PASSWORD, DATABASE_URL, optional DATABASE_SCHEMA. Creates two owned solo games; retries reuse saved rooms.')
+    console.log('pnpm release:smoke --app-url URL/open-agricola/ --api-url ORIGIN --expected-build SHA [--output DIR] [--browser chromium|webkit] [--proxy URL]\nRemote targets require HTTPS; loopback may use HTTP.\nPrivate environment: RELEASE_SMOKE_USERNAME, RELEASE_SMOKE_PASSWORD, DATABASE_URL, optional DATABASE_SCHEMA. Creates two owned solo games; retries reuse saved rooms.')
     return
   }
   assert.ok(values['app-url'] && values['api-url'], 'Usage: pnpm release:smoke --app-url URL/open-agricola/ --api-url ORIGIN --expected-build SHA [--output DIR] [--browser chromium|webkit] [--proxy URL]')

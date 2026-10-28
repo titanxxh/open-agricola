@@ -54,7 +54,7 @@ reviewer 在 requirements 文件中声明必需 case 的仓库相对 `file`、�
 
 本机需要代理时设置 `RELEASE_SMOKE_PROXY`，Playwright 与 standalone smoke 使用同一设置；该环境变量计入验证指纹。依赖与语言、素材来源继续使用现有隔离环境及 pin 校验。可选代理不关闭 TLS 校验，也不证明目标生产域名可用。
 
-真实目标可调用同一个浏览器流程。命令会以指定已有账号创建两局正式单人测试局，并保留它们；在操作者已授权的目标运行。凭据只从私有环境读取，数据库通过现有适配器和 codec 在只读事务内核验：
+真实目标可调用同一个浏览器流程。远端目标必须使用 HTTPS；HTTP 仅允许 `localhost`、`127.0.0.1` 或 `[::1]`，防止向远端明文发送凭据。命令会以指定已有账号创建两局正式单人测试局，并保留它们；在操作者已授权的目标运行。凭据只从私有环境读取，数据库通过现有适配器和 codec 在只读事务内核验：
 
 ```bash
 # 私有环境配置 RELEASE_SMOKE_USERNAME、RELEASE_SMOKE_PASSWORD、DATABASE_URL；schema 由 DATABASE_SCHEMA 指定

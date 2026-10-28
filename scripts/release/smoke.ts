@@ -22,7 +22,10 @@ export const evidenceHash = (value: unknown) => createHash('sha256').update(JSON
 
 export function parseSmokeTarget(appUrl: string, apiUrl: string, buildId: string): SmokeTarget {
   const app = new URL(appUrl), api = new URL(apiUrl)
-  for (const url of [app, api]) assert.ok(['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash, 'Use HTTP(S) URLs without credentials, queries or fragments')
+  for (const url of [app, api]) {
+    assert.ok(['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash, 'Use HTTP(S) URLs without credentials, queries or fragments')
+    assert.ok(url.protocol === 'https:' || ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'Remote targets require HTTPS; HTTP is limited to loopback addresses')
+  }
   assert.equal(app.origin, api.origin, 'Release smoke uses the hosted first-party topology')
   assert.equal(app.pathname, '/open-agricola/'); assert.equal(api.pathname, '/')
   assert.ok(buildId.trim(), 'Select the expected hosted build')
