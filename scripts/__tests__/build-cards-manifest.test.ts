@@ -3,11 +3,20 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { buildCardsManifest, writeCardsManifest } from '../build-cards-manifest'
+import { getMinorImprovementCard } from '../../shared/cards/catalog'
 
 const fixturesRoot = path.resolve(__dirname, 'fixtures/cards')
 const extendedFixturesRoot = path.resolve(__dirname, 'fixtures/manifest-fixtures')
 
 describe('buildCardsManifest', () => {
+  it('projects the maintainer-selected Moor printed values into the public manifest and generated catalog', () => {
+    const manifest = buildCardsManifest(path.resolve(__dirname, '../../shared/cards'))
+    expect(manifest['M090_WinterStorehouse']?.meta.vp).toBe(0)
+    expect(getMinorImprovementCard('M090_WinterStorehouse')?.vp).toBe(0)
+    expect(manifest['M060_SowingMachine']?.meta.vp).toBe(1)
+    expect(getMinorImprovementCard('M060_SowingMachine')?.vp).toBe(1)
+  })
+
   it('extracts meta from a single Occupation card', () => {
     const manifest = buildCardsManifest(fixturesRoot)
     expect(manifest['A999_TestCard']).toBeDefined()
