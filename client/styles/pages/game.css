@@ -3195,7 +3195,7 @@
 .farm-grid {
   display: grid;
   --farm-grid-ratio: 5.981818;
-  --tile: clamp(36px, calc(100cqw / var(--farm-grid-ratio)), 110px);
+  --tile: clamp(36px, calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), 110px);
   --fence: calc(var(--tile) * 18 / 110);
   grid-template-columns: var(--fence) var(--tile) var(--fence) var(--tile)
     var(--fence) var(--tile) var(--fence) var(--tile) var(--fence)
@@ -3214,7 +3214,7 @@
   overflow: visible;
 }
 .farm-operation-area[data-interaction-focused="true"] .farm-grid {
-  --tile: clamp(36px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
+  --tile: clamp(36px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
 }
 .farm-fence-hit {
   position: absolute;
@@ -3587,7 +3587,7 @@
   margin-bottom: 0;
 }
 .farm-operation-area--with-card-targets[data-interaction-focused="true"] .farm-grid {
-  --tile: clamp(36px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 210px) / var(--farm-grid-row-ratio))), 110px);
+  --tile: clamp(36px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 210px) / var(--farm-grid-row-ratio))), 110px);
 }
 .farm-card-target-tray {
   padding: 8px;
@@ -3653,7 +3653,7 @@
     align-items: start;
   }
   .farm-operation-area--with-card-targets[data-interaction-focused="true"] .farm-grid {
-    --tile: clamp(30px, min(calc(100cqw / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
+    --tile: clamp(30px, min(calc(var(--farm-container-width, 100cqw) / var(--farm-grid-ratio)), calc((100dvh - var(--interaction-bar-height, 0px) - 36px) / var(--farm-grid-row-ratio))), 110px);
   }
   .farm-card-target-tray {
     max-height: calc(100dvh - var(--interaction-bar-height, 0px) - 36px);
