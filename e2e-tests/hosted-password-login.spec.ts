@@ -175,7 +175,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     })
     await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     const observe = (page: Page) => {
-      page.on('pageerror', error => errors.push(error.stack ?? error.message))
+      const onPageError = (error: Error) => { errors.push(error.stack ?? error.message) }
+      page.on('pageerror', onPageError)
       page.on('websocket', socket => {
         if (!socket.url().startsWith(apiOrigin.replace('https:', 'wss:') + '/nodes/')) return
         socket.on('framereceived', ({ payload }) => {
@@ -184,6 +185,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
           if (message && typeof message === 'object' && 'type' in message && typeof message.type === 'string') socketMessages.push(message.type)
         })
       })
+      return () => page.off('pageerror', onPageError)
     }
     return {
       appUrl: `${appOrigin}${HOSTED_APP_PATH}`, apiOrigin, build, username, userId: user.id,
@@ -249,7 +251,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
     const environment = await fixture(playwright, engine, 'hosted')
     try {
       let page = await environment.context.newPage()
-      environment.observe(page)
+      const stopObservingPage = environment.observe(page)
       const document = await page.goto(`${environment.appUrl}?page=login&bg=none`, { waitUntil: 'domcontentloaded' })
       if (!document) throw new Error('Production app document was not loaded')
       expect(document.status()).toBe(200)
@@ -300,6 +302,9 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(saved).toMatchObject({ created_by: environment.userId, max_players: 2, hotseat: 1 })
       const savedHash = createHash('sha256').update(saved.state_json).digest('hex')
       const scopes = environment.socketMessages.filter(type => type === 'commandScope').length
+      expect(environment.errors).toEqual([])
+      // Closing the document can cancel sampled telemetry in WebKit.
+      stopObservingPage()
       await page.close()
       await expect.poll(async () => (await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id = ?')
         .get<{ connected_count: number }>(roomId))?.connected_count).toBe(0)
