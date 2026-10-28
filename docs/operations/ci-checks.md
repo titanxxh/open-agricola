@@ -32,7 +32,7 @@ pnpm verify status
 
 E2E 入口先构建可选同源托管的 production frontend，再创建隔离环境并重启应用，避免浏览器验收依赖残留 `dist/`。独立 Pages 会话验收另外通过 `build:pages-frontend` 构建根路径产物，以 HTTPS 同站跨源拓扑验证真实生产文件；同源产物不能替代该验收。隔离环境由 `scripts/test-environment.ts` 生成：应用端口取自 20000–32767，低于 Linux / macOS 自动分配端口的范围；并设置 `OWNED_PROCESSES_FILE`，让 `restart-local.sh` 的启动和 `--kill-only` 只停止该环境自己启动的进程。端口被其他进程占用时直接失败，不终止对方。
 
-Hosted 和 Pages 构建入口固定 `NODE_ENV=production`。隔离后端继续使用 `NODE_ENV=test`，浏览器验收加载与正式发布相同的 React 运行模式。
+Hosted 和 Pages 构建入口固定 `NODE_ENV=production`。隔离后端继续使用 `NODE_ENV=test`，浏览器验收加载与正式发布相同的 React 运行模式。 Grafana 验收先滚动到待检查的面板以触发可见区域查询；失败诊断保留面板位置、导航时间范围和实际查询。
 
 每次 push 前先 rebase main，再对最终源码运行 `pnpm verify prepush`。定向通过不算完整门禁通过。完整检查通过后，只有后续修改、失败或未解决的问题才需要扩大或重跑；rebase 改变文件内容也需要重跑。
 
