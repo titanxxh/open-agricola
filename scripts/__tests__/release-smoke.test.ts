@@ -2,7 +2,36 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { createFailureRecorder } from '../release/smoke'
+import { createFailureRecorder, parseSmokeTarget } from '../release/smoke'
+
+it.each(['http://localhost:5175', 'http://127.0.0.1:5175', 'http://[::1]:5175'])('allows loopback HTTP rehearsal at %s', origin => {
+  const target = parseSmokeTarget(`${origin}/open-agricola/`, origin, 'selected-build')
+  expect(target.appUrl).toBe(`${origin}/open-agricola/`)
+  expect(target.apiUrl).toBe(origin)
+  expect(target.buildId).toBe('selected-build')
+})
+
+it.each([
+  'http://example.com', 'http://203.0.113.7:8080', 'http://[2001:db8::1]',
+  'http://192.168.1.2', 'http://localhost.example.com', 'http://127.0.0.1.example.com',
+])('rejects non-loopback HTTP credentials target %s', origin => {
+  expect(() => parseSmokeTarget(`${origin}/open-agricola/`, origin, 'selected-build')).toThrow()
+})
+
+it.each(['https://example.com', 'https://203.0.113.7:8443'])('allows same-origin HTTPS release target %s', origin => {
+  const target = parseSmokeTarget(`${origin}/open-agricola/`, origin, 'selected-build')
+  expect(target.appUrl).toBe(`${origin}/open-agricola/`)
+  expect(target.apiUrl).toBe(origin)
+})
+
+it.each([
+  ['https://user:secret@example.com/open-agricola/', 'https://example.com'],
+  ['https://example.com/open-agricola/?token=secret', 'https://example.com'],
+  ['https://example.com/open-agricola/', 'https://example.com?token=secret'],
+  ['https://example.com/open-agricola/', 'https://other.example.com'],
+])('rejects an unsafe hosted target %s with API %s', (app, api) => {
+  expect(() => parseSmokeTarget(app, api, 'selected-build')).toThrow()
+})
 
 it('retains the first failure when cleanup also fails and never writes arbitrary error text', () => {
   const directory = mkdtempSync(join(tmpdir(), 'release-failure-'))
