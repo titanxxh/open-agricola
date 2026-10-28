@@ -240,7 +240,7 @@ Advanced-hook details:
 | `computeLockedFarmTiles` | `(player) => FarmTilePosition[]` | Locked farm tiles |
 | `getInvalidAnimals` | `(player, zone, meeples) => Meeple[]` | Card-zone animal restriction; sandbox supplies no `state` |
 | `getBuiltSpecialStables` | `(player) => FarmTilePosition[]` | Currently standing special stables for derived snapshot display |
-| `getRuleContributions` | `(player) => CardRuleContributions` | Read-only source-owned component reservations and unused-space quantity adjustments; finite, floored, nonnegative and capped by the consuming category |
+| `getRuleContributions` | `(player) => CardRuleContributions` | Read-only source-owned component reservations and unused-space reductions are finite, floored, nonnegative and capped by the consumer. Optional `farmerScoreAdjustment` is signed, finite and truncated toward zero; it changes the effective farmer category without adding a card penalty |
 | `getStatePresentation` | `(player) => CardStatePresentation` | Explicit public counters, resource groups, crop layers and markers; ordinary clients do not read internal storage |
 | `computeResourceCommitments` | `(state, owner) => Array<{ playerId, resources }>` | Goods a player must keep. A command that would leave a named player with less is rejected and rolled back. The hook runs after every command |
 | `countExtraTurns` | `(state, player) => number` | Extra turns the card still offers this round; see above |

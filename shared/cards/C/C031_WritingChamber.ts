@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getOrdinaryNegativeScoreTotal } from '../../domain/score-rules'
 
 const CARD_ID = 'C031_WritingChamber'
 
@@ -7,9 +8,8 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeSharedPostScore: (_state, player, summaries) => {
-    const entries = summaries.find((summary) => summary.playerId === player.id)?.categories
-      .flatMap((category) => category.entries) ?? []
-    const negativeTotal = entries.reduce((sum, entry) => sum + Math.min(0, entry.score), 0)
+    const summary = summaries.find((summary) => summary.playerId === player.id)
+    const negativeTotal = summary ? getOrdinaryNegativeScoreTotal(summary) : 0
     return [{ playerId: player.id, score: Math.min(7, -negativeTotal) }]
   },
 },

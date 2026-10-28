@@ -35,6 +35,28 @@ const mockPlayers = [
   { id: 'p2', name: 'Bob', stats: createInitialPlayerStats({ isFirstPlayer: false }) },
 ] as unknown as PlayerState[]
 
+it('renders an independent marker once under its holder and follows locale and holder changes', () => {
+  const scores = (holder: number): PlayerScoreSummary[] => mockPlayers.map((player, index) => ({
+    playerId: player.id, playerName: player.name, total: index === holder ? -1 : 0,
+    categories: [{ key: 'cardBonusVp', total: index === holder ? -1 : 0, entries: index === holder ? [{
+      type: 'marker', markerId: 'garden-path', cardId: 'M027_GardenPath', holderPlayerId: player.id,
+      sourcePlayerId: mockPlayers[1 - holder]!.id, label: 'Garden Path',
+      labelKey: 'cardFaces.M027_GardenPath.name', score: -1,
+    }] : [] }],
+  }))
+  const view = render(<ScoringPad locale="en" scores={scores(0)} players={mockPlayers} onClose={() => undefined} />)
+  const row = () => view.container.querySelector('[data-score-row="marker-M027_GardenPath-garden-path"]')
+  expect(row()).not.toBeNull()
+  expect(row()!.textContent).toContain('Garden Path')
+  expect(Array.from(row()!.querySelectorAll('.scoring-cell-value')).map(cell => cell.textContent)).toEqual(['-1', '0'])
+  expect(view.container.querySelectorAll('[data-score-row^="marker-"]')).toHaveLength(1)
+  view.rerender(<ScoringPad locale="zh" scores={scores(1)} players={mockPlayers} onClose={() => undefined} />)
+  expect(row()!.textContent).toContain('花园小径')
+  expect(Array.from(row()!.querySelectorAll('.scoring-cell-value')).map(cell => cell.textContent)).toEqual(['0', '-1'])
+  expect(view.container.querySelectorAll('[data-score-row^="marker-"]')).toHaveLength(1)
+  view.unmount()
+})
+
 it('keeps the injected completion action clickable alongside the final score', () => {
   let rematched = false
   const view = render(<ScoringPad locale="en" scores={mockScores} players={mockPlayers} onClose={() => undefined}

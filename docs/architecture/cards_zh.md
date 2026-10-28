@@ -55,7 +55,7 @@ export const CardName = defineOccupationCard({   // the constant shares the file
 - 共享例外是多张卡和农场几何都依赖的事实：`player.farmyardSpaceStates`（封锁格、农场格与田地货物标记、非田作物格；放置锁与已用 / 未用状态分开）与 `player.farmyardExtensions`。
 - 后续玩家选择是显式续行：卡牌返回的 flow 中由 leaf 发出请求，并在 `pending` envelope 中等待，从不使用隐藏的共享槽。
 - 卡上工人使用 `shared/cards/helpers/card-held-workers.ts`；归家时释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把新生儿直接放到卡上。
-- 只读的 UI 标记（`extraData.farmTerrainMarkers`）与跨玩家公开标记（`extraData.publicCardMarkers`，计入 `cardBonusVp`）由通用逻辑渲染。
+- 只读的 UI 标记（`extraData.farmTerrainMarkers`）与跨玩家公开标记（`extraData.publicCardMarkers`，在 `cardBonusVp` 中以独立 `marker` 计分条目展示）由通用逻辑渲染。持有者未打出来源卡时，标记计分身份仍与卡牌奖励分离。
 - 公开卡牌标记可提供翻译键 `labelKey`，并保留 `label` 作为字面回退文本。投影保留翻译键，客户端按当前语言解析，不改变已保存的标记归属或计分。
 - **可见性**（[ADR 0023](../adr/0023-explicit-card-state-visibility-and-presentation.md)）：卡牌状态默认是内部的。原生 `presentation` 声明与 `getStatePresentation(player)` 把事实开放给公开 adapter；序列化记录规范化的 `cardStatePresentation`，rehydrate 时剥离。玩家私有的 `privateData` 属于存储它的玩家，而不是当前持有者。视角快照、事件、历史与座位视角 Replay 只暴露公开事实和观看者自己的私有数据，对卡牌所有者也是如此；权威状态、恢复、撤销、debug 完整状态与全开 Replay 保留原始状态。`card.stateChanged` 事件只带 key 不带值，投影也会去掉历史事件中的值，但不改写 Frame。
 - `getRuleContributions(player)` 暴露只读的组件预留与空格减免；消费者合并不重复的来源、取整有限值、拒绝负数与非数字并封顶扣减。通用马厩发现与归还按 `sourceCardId` 分发，只有来源卡改变自身的建造状态。查询的输入与结果都与存储分离，原生卡与工坊卡相同。

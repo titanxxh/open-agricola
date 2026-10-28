@@ -77,8 +77,8 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   },
   computeExtraRoomCapacity: { table: 'advanced', signature: '(player) => number', usage: '额外容纳空间' },
   getRuleContributions: {
-    table: 'advanced', signature: '(player) => { reservedSupply?, unusedSpaceReduction? }',
-    usage: '只读规则贡献；组件预留数量与空格扣分数量减免，不能写状态',
+    table: 'advanced', signature: '(player) => { reservedSupply?, unusedSpaceReduction?, farmerScoreAdjustment? }',
+    usage: '只读规则贡献；组件预留、空格数量减免和有符号人物分修正，不能写状态',
   },
   getStatePresentation: {
     table: 'advanced', signature: '(player) => CardStatePresentation',

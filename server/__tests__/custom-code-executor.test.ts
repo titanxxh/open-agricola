@@ -21,6 +21,7 @@ import { rehydrateState } from '../../shared/session/serialization'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { Scoring } from '../../shared/domain'
 import type { ActionFlow } from '../../shared/contract/types'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -40,6 +41,29 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
+  it.each([{ adjustment: -2, expected: 4 }, { adjustment: 3, expected: 9 }, { adjustment: undefined, expected: 6 }])(
+    'applies signed farmer score contributions from sandbox queries ($adjustment)', ({ adjustment, expected }) => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = { effect: { id: CARD_ID, getRuleContributions: () => (${JSON.stringify({ farmerScoreAdjustment: adjustment })}) } }
+    `, 'CUSTOM_ExecutorCard')
+    if (!compiled.valid) throw new Error(compiled.errors.join('\n'))
+    const cards = [makeCardData(compiled.compiledCode, compiled.manifest)]
+    const session = createWorkSession({ seed: 428029, customCards: cards, configure(state) {
+      state.players[0]!.minorPlayed = ['CUSTOM_ExecutorCard']
+    } })
+    try {
+      const before = JSON.stringify(session.state)
+      const response = session.getState()
+      expect(response.scores[0]!.categories.find(category => category.key === 'farmers')?.total).toBe(expected)
+      expect(response.scores[0]!.categories.find(category => category.key === 'cardBonusVp')).toBeUndefined()
+      expect(JSON.stringify(session.state)).toBe(before)
+      const saved = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+      const restored = new GameSession(rehydrateState(saved), cards)
+      try { expect(restored.getState().scores).toEqual(response.scores) } finally { restored.dispose() }
+    } finally { session.dispose() }
+  })
   it.each([{ mode: 'native', kind: 'selection' }, { mode: 'sandbox', kind: 'selection' }, { mode: 'native', kind: 'pay' }, { mode: 'sandbox', kind: 'pay' }])(
     'uses a source-owned quantity and current-step window through $mode / $kind, including restoration', ({ mode, kind }) => {
     const flow: ActionFlow = { type: 'leaf', actionId: kind, sourceCard: 'CUSTOM_ExecutorCard', optional: true,
