@@ -1314,6 +1314,7 @@ export function WorkshopPage() {
   const [browseLoading, setBrowseLoading] = useState(false)
   const [featuredLoading, setFeaturedLoading] = useState(false)
   const [myLoading, setMyLoading] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [resetSandboxOpen, setResetSandboxOpen] = useState(false)
   const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
   const [sandboxPlaytest, setSandboxPlaytest] = useState<SandboxPlaytest | null>(null)
@@ -1355,6 +1356,8 @@ export function WorkshopPage() {
         setBrowseCards(prev => pageToLoad === 1 ? data.cards : [...prev, ...data.cards])
         setBrowseHasMore(data.hasMore)
       }
+    } catch {
+      setLoadFailed(true)
     } finally {
       setBrowseLoading(false)
     }
@@ -1370,6 +1373,8 @@ export function WorkshopPage() {
       })
       const data = await fetchCardList(params)
       if (data.ok) setFeaturedCards(data.cards)
+    } catch {
+      setLoadFailed(true)
     } finally {
       setFeaturedLoading(false)
     }
@@ -1389,6 +1394,8 @@ export function WorkshopPage() {
       })
       const data = await fetchCardList(params)
       if (data.ok) setMyCards(data.cards)
+    } catch {
+      setLoadFailed(true)
     } finally {
       setMyLoading(false)
     }
@@ -1400,11 +1407,15 @@ export function WorkshopPage() {
       setSandboxSettings(DEFAULT_SANDBOX_SETTINGS)
       return
     }
-    const response = await apiFetch('/api/workshop/sandbox')
-    const data = await response.json()
-    if (data.ok) {
-      setSandboxCards(data.cards)
-      setSandboxSettings(normalizeSandboxSettings(data.settings))
+    try {
+      const response = await apiFetch('/api/workshop/sandbox')
+      const data = await response.json()
+      if (data.ok) {
+        setSandboxCards(data.cards)
+        setSandboxSettings(normalizeSandboxSettings(data.settings))
+      }
+    } catch {
+      setLoadFailed(true)
     }
   }, [apiFetch, user])
 
@@ -1439,6 +1450,7 @@ export function WorkshopPage() {
   }, [loadSandboxData])
 
   const refreshAllSections = useCallback(() => {
+    setLoadFailed(false)
     if (browsePage === 1) {
       void loadBrowseCards(1, search, sort)
     } else {
@@ -1879,6 +1891,17 @@ export function WorkshopPage() {
         onOpenHome={() => navigateView('home')}
         t={t}
       />
+
+      {loadFailed && (
+        <div className="form-error" role="alert">
+          {t('platform.networkError')}
+          <div className="ws-error-actions">
+            <button type="button" className="btn-secondary ws-btn-sm" onClick={refreshAllSections}>
+              {t('platform.retry')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {user && (
         <Section

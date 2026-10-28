@@ -18,6 +18,7 @@ const build = spawnSync('pnpm', ['run', 'build', '--outDir', outputDirectory], {
   cwd: repoRoot,
   env: {
     ...process.env,
+    NODE_ENV: 'production',
     GAME_BUILD_ID: gameBuildId,
     VITE_BASE_PATH: basePath,
     VITE_API_BASE: mode === 'hosted' ? '' : process.env.VITE_API_BASE,

@@ -6,7 +6,7 @@
 
 PR 的浏览器 E2E 在本机运行。涉及应用运行行为、UI 或 WS 的改动，用 `pnpm verify <file.spec.ts>` 在隔离环境跑通相关 spec，并把命令和结果写进 PR 描述；本机通过即满足 PR 的 E2E 要求。合入 main 后 `e2e.yml` 仍会跑全量。
 
-main E2E 无论成功或失败都会保留 7 天的验证记录、认证请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>`；请求生命周期只包含路径、状态和完成 / 失败事件，不记录 Cookie 或认证头。
+main E2E 无论成功或失败都会保留 7 天的验证记录、认证和工坊请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>`；生命周期包含各请求实例的方法、资源类型、来源、路径、状态和完成 / 失败事件，不记录 Cookie、认证头或完整查询参数。
 
 ## 调试与最终验证
 
@@ -31,6 +31,8 @@ pnpm verify status
 定向测试若依赖 PostgreSQL / S3，先运行一次 `node scripts/local-services.mjs --test`。纯测试、工具和文档调试不要求每次重启应用。涉及运行行为、UI 或 WS 时，最终验收必须通过 `./restart-local.sh` 重启再检查真实行为，或使用上述隔离 Playwright 入口。按风险补相关 slow Session / E2E；`prepush` 不能替代它们或下节的全量 CI。
 
 E2E 入口先构建可选同源托管的 production frontend，再创建隔离环境并重启应用，避免浏览器验收依赖残留 `dist/`。独立 Pages 会话验收另外通过 `build:pages-frontend` 构建根路径产物，以 HTTPS 同站跨源拓扑验证真实生产文件；同源产物不能替代该验收。隔离环境由 `scripts/test-environment.ts` 生成：应用端口取自 20000–32767，低于 Linux / macOS 自动分配端口的范围；并设置 `OWNED_PROCESSES_FILE`，让 `restart-local.sh` 的启动和 `--kill-only` 只停止该环境自己启动的进程。端口被其他进程占用时直接失败，不终止对方。
+
+Hosted 和 Pages 构建入口固定 `NODE_ENV=production`。隔离后端继续使用 `NODE_ENV=test`，浏览器验收加载与正式发布相同的 React 运行模式。
 
 每次 push 前先 rebase main，再对最终源码运行 `pnpm verify prepush`。定向通过不算完整门禁通过。完整检查通过后，只有后续修改、失败或未解决的问题才需要扩大或重跑；rebase 改变文件内容也需要重跑。
 
