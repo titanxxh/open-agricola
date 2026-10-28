@@ -15,7 +15,7 @@ PR 的浏览器 E2E 在本机运行。涉及应用运行行为、UI 或 WS 的�
 pnpm verify focus server/__tests__/session-fixtures.test.ts
 pnpm verify focus server/__tests__/first-round-start-session.test.ts --testNamePattern 'direct deal'
 
-# 最终版本：准备测试依赖，全卡实现边界扫描，完整 fast，再 lint；任一步失败立即停止
+# 最终版本：准备测试依赖，全卡实现边界扫描，工具严格类型检查，完整 fast，再 lint；任一步失败立即停止
 pnpm verify prepush
 
 # 真实应用行为：隔离 PostgreSQL / S3、端口，调用 restart-local.sh 后跑 Playwright
@@ -37,6 +37,31 @@ E2E 入口先构建同源托管的 production frontend，再创建隔离环境�
 这些记录用于核对本地检查范围，**不会缓存或跳过检查**；不代表被忽略的环境文件、外部服务状态或远端 CI 已验证。每个模式保留最近一次记录，失败不会沿用上次成功。提交或 rebase 后文件内容及运行环境完全相同可保持 current，但仍遵守每次 push 前的检查要求。push 后必须等待相关 Actions 结束，并区分实际成功、失败与 skipped。
 
 若本机已有 `public-assets.ref` 对应的完整素材仓，可用 `PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush` 或同环境下的 `pnpm verify <spec>` 避免构建时联网取素材元数据。入口核对素材仓 HEAD、干净的 `assets/` 和全部必需文件，构建继续生成 Pages URL。该环境设置计入验证指纹；本地素材验证不证明线上 Pages 状态。默认 CI 仍执行远端元数据检查，细节见 `docs/HOW_TO_DEPLOY.md`。
+
+## 发布工具演练与必需浏览器用例
+
+`pnpm release:rehearse` 是发布验收工具的本地入口：先运行现有 prepush，再构建 Hosted 前端、通过 `restart-local.sh` 启动隔离 PostgreSQL/S3 应用，运行正式账号登录、两种单人配置、选牌、刷新与新上下文恢复、素材解码和数据库持久化核验，最后检查必需用例证据。它只创建和清理隔离测试命名空间，不部署服务或发布版本。`scripts/release/` 中的工具接受 ESLint、测试和 `check:verification-types` 严格类型检查；类型门禁同时接入 prepush 与 `check:architecture`，工具类型项目独立于生产 Docker 构建。
+
+```bash
+pnpm release:rehearse
+pnpm verify status --requirements scripts/release/requirements.json
+
+# 调试时可只跑指定用例；最终范围仍由 requirements 决定
+pnpm verify e2e-tests/release-rehearsal.spec.ts --browser=chromium --requirements scripts/release/requirements.json
+```
+
+reviewer 在 requirements 文件中声明必需 case 的仓库相对 `file`、完整 `titlePath`（describe 层级和 test 标题）、`project` 和 `browser`；不支持把文件名当成全部用例已执行。实际执行证据在 `output/verification/e2e-runs/<runId>/` 中不可覆盖地保存。相同源码指纹、相同 requirements 内容 hash 的运行可累计；缺失、过滤掉、跳过、预期失败、flaky、后续失败或缺少 reporter 结果都不能满足必需用例。`status --requirements` 还要求当前 prepush 成功。未传 requirements 时，原有 `verify` 和 `status` 契约保持不变。
+
+本机需要代理时设置 `RELEASE_SMOKE_PROXY`，Playwright 与 standalone smoke 使用同一设置；该环境变量计入验证指纹。依赖与语言、素材来源继续使用现有隔离环境及 pin 校验。可选代理不关闭 TLS 校验，也不证明目标生产域名可用。
+
+真实目标可调用同一个浏览器流程。命令会以指定已有账号创建两局正式单人测试局，并保留它们；在操作者已授权的目标运行。凭据只从私有环境读取，数据库通过现有适配器和 codec 在只读事务内核验：
+
+```bash
+# 私有环境配置 RELEASE_SMOKE_USERNAME、RELEASE_SMOKE_PASSWORD、DATABASE_URL；schema 由 DATABASE_SCHEMA 指定
+pnpm release:smoke --app-url https://example.com/open-agricola/ --api-url https://example.com --expected-build <sha> --output output/release-<version>-smoke
+```
+
+同一输出目录的 `progress.json` 绑定目标、build 和账号摘要，已创建的局在重试时复用。创建结果不确定时保留命令身份并阻止再次创建，先核实原回执；完成后从 `result.json` 的 passed 状态及退出码确认成功。成功只在退出账号、关闭浏览器和数据库后写入。浏览器失败首轮即写 `failure.json`，清理失败另写 `cleanup-failure.json`，保留首个故障；`diagnostics.json` 记录有界的文档、连接、协议类型和请求状态，不保存认证头、Cookie、查询参数、完整消息或手牌。该本地演练不替代生产 TLS/cookie、部署身份、备份恢复和旧对局保留检查。
 
 ## 全卡订阅审计
 
@@ -69,7 +94,7 @@ pnpm run check:bundle-size
 pnpm run check:community-deck
 ```
 
-`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、测试规则环境、测试观测副本不归一化、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、跨层 Card State 边界、架构契约类型检查、架构契约测试、strict prompt-sync、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。两份 workflow 各调用它一次，meta-test 防止接线漂移。
+`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、测试规则环境、测试观测副本不归一化、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、跨层 Card State 边界、架构契约类型检查、验证工具类型检查、架构契约测试、strict prompt-sync、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。两份 workflow 各调用它一次，meta-test 防止接线漂移。
 
 `check:architecture-tests` 复用现有 Vitest project 配置，执行 effect 架构、资源事实来源审计、事件映射策略、交互命令策略、Card Source、PromptKey、LLM prompt 契约、CI 接线，以及 listener 纯度 guard 的正负例与两人 Session 契约测试。跨层 Card State 检查覆盖 domain / actions（含 internal effects）/ engine / session / projections / server / client / Replay Viewer，检查固定单卡状态、提示键判断、私有状态 helper 导入和前端原始状态读取；静态 metadata 和卡牌文案声明可用，扫描根缺失、为空、解析错误及失效例外均失败。卡牌实现边界检查同时对每个已解析 listener handler / cost-candidate transform 做显式状态写入的静态扫描；运行时 guard 则由各 Vitest project 的 setup 安装，`pnpm test` 中任何 listener 直接修改权威状态都会失败。它们仍属于 `pnpm test` / `pnpm test:fast`，保证单独运行完整测试时不漏检；只跑架构入口也会执行这些断言。沙盒文档的名字集合同步由入口内的 strict prompt-sync 检查，完整 CI 无需再单独执行该命令。
 

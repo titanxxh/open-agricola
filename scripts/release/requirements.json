@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {"file":"e2e-tests/release-rehearsal.spec.ts","titlePath":["release rehearsal creates and restores both formal solo configurations"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-rehearsal.spec.ts","titlePath":["release rehearsal preserves the first login failure with sanitized diagnostics"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-diagnostics.spec.ts","titlePath":["release diagnostics binds reload snapshots to new documents and observes room entry intent"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-diagnostics.spec.ts","titlePath":["release diagnostics binds reload snapshots to new documents and observes context entry intent"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-diagnostics.spec.ts","titlePath":["release diagnostics distinguishes a joined seat without a full snapshot on the first failure record"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-diagnostics.spec.ts","titlePath":["release diagnostics bounds and sanitizes evidence and detaches observers before old-page errors"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-rendering.spec.ts","titlePath":["release rendering decodes visible PNG backgrounds, masks and images without exposing query strings"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/release-rendering.spec.ts","titlePath":["release rendering rejects a visible image returning 404"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/choice-previews.spec.ts","titlePath":["a scheduled Cut Peat offer commits its single physical card from the farm"],"project":"chromium","browser":"chromium"},
+    {"file":"e2e-tests/choice-previews.spec.ts","titlePath":["one farm cell with multiple authoritative options requires an explicit action-card choice"],"project":"chromium","browser":"chromium"}
+  ]
+}

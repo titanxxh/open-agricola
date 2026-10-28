@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.verification-tools.tsbuildinfo",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": [
+    "scripts/verify.ts",
+    "scripts/verification-*.ts",
+    "scripts/release/**/*.ts",
+    "e2e-tests/helpers/release-diagnostics.ts",
+    "e2e-tests/helpers/hosted-release-app.ts",
+    "e2e-tests/release-rehearsal.spec.ts",
+    "e2e-tests/release-diagnostics.spec.ts",
+    "e2e-tests/release-rendering.spec.ts",
+    "scripts/__tests__/verification.test.ts",
+    "scripts/__tests__/verification-requirements.test.ts",
+    "scripts/__tests__/release-smoke.test.ts"
+  ],
+  "exclude": []
+}
