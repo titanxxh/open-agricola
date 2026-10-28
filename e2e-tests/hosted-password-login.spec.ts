@@ -6,7 +6,7 @@ import { createServer as createHttpServer, request as httpRequest, type Incoming
 import { createServer } from 'node:https'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
-import { extname, join, resolve, sep } from 'node:path'
+import { basename, extname, join, resolve, sep } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { createLocalUserForTests } from '../server/auth'
 import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE } from '../server/auth-cookies'
@@ -58,6 +58,8 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   const sockets = new Set<Duplex>()
   const errors: string[] = []
   const socketMessages: string[] = []
+  let latestRoomState: Record<string, unknown> | undefined
+  let gameChunkDelayed = false
   type LifecycleDetail = { requestId?: number; status?: number; failure?: string; name?: string }
   const lifecycle: Array<LifecycleDetail & { at: number; pageId: number; event: string; origin: string; path: string }> = []
   const pageIds = new WeakMap<Page, number>()
@@ -94,6 +96,11 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
         if (!file.startsWith(`${build.directory}${sep}`)) { res.writeHead(404); res.end(); return }
         const contentTypes: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' }
         res.setHeader('Content-Type', contentTypes[extname(file)] ?? 'application/octet-stream')
+        if (engine === 'webkit' && !gameChunkDelayed && basename(file).startsWith('GameContainerApi-')) {
+          // A lazy route can still be loading after the opening helper's control-poll deadline.
+          gameChunkDelayed = true
+          await new Promise(resolve => setTimeout(resolve, 6000))
+        }
         res.end(readFileSync(file))
         return
       }
@@ -217,6 +224,7 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
     const isLobby = (request: Request) => new URL(request.url()).origin === apiOrigin
       && ['/api/rooms', '/api/lobby/my-rooms'].includes(new URL(request.url()).pathname)
     const observe = (page: Page) => {
+      latestRoomState = undefined
       const requests = new Map<Request, number>()
       const pending = new Set<Request>()
       lobbyRequests.set(page, pending)
@@ -249,6 +257,20 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
           if (typeof payload !== 'string') return
           const message: unknown = JSON.parse(payload)
           if (message && typeof message === 'object' && 'type' in message && typeof message.type === 'string') socketMessages.push(message.type)
+          if (message && typeof message === 'object' && 'type' in message && message.type === 'stateUpdate'
+            && 'payload' in message && message.payload && typeof message.payload === 'object'
+            && 'state' in message.payload && message.payload.state && typeof message.payload.state === 'object') {
+            const state = message.payload.state
+            latestRoomState = { phase: 'phase' in state ? state.phase : undefined,
+              roundPhase: 'roundPhase' in state ? state.roundPhase : undefined,
+              currentPlayerIndex: 'currentPlayerIndex' in state ? state.currentPlayerIndex : undefined,
+              playerIds: 'players' in state && Array.isArray(state.players)
+                ? state.players.map((player: unknown) => player && typeof player === 'object' && 'id' in player ? player.id : null) : undefined,
+              forest: 'actionSpaces' in state && Array.isArray(state.actionSpaces)
+                ? state.actionSpaces.find((space: unknown) => space && typeof space === 'object' && 'id' in space && space.id === 'forest') : undefined,
+              payloadKeys: Object.keys(message.payload),
+              interaction: 'interaction' in message.payload ? message.payload.interaction : undefined }
+          }
         })
       })
       return () => { note(page, 'observer-retired'); page.off('pageerror', onPageError); page.off('requestfailed', onRequestFailed) }
@@ -263,11 +285,15 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
       await expect.poll(() => lobbyRequests.get(page)?.size).toBe(0)
     }
+    const waitForStartedRoom = async () => {
+      await expect.poll(() => latestRoomState?.phase, { timeout: 30_000 }).toBe('playing')
+    }
     return {
       appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
       get context() { if (!context) throw new Error('Browser context is not open'); return context },
+      get latestRoomState() { return latestRoomState },
       restartBrowser: async () => { await context?.close(); context = await openContext() },
-      observe, loadLobby, errors, socketMessages, lifecycle, note,
+      observe, loadLobby, waitForStartedRoom, errors, socketMessages, lifecycle, note,
       close: async () => {
         for (const page of context?.pages() ?? []) note(page, 'intent-context-close')
         await context?.close()
@@ -375,6 +401,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
       await page.getByRole('checkbox', { name: /Snake opening/ }).uncheck()
       await page.getByRole('button', { name: 'Start Hotseat Game', exact: true }).click()
+      await environment.waitForStartedRoom()
       await finishHotseatOpening(page)
       await expect(page.locator('.game-layout')).toBeVisible()
       await expect.poll(() => environment.socketMessages.includes('commandScope')).toBe(true)
@@ -398,6 +425,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       page = await environment.context.newPage()
       environment.observe(page)
       await page.goto(`${environment.appUrl}?room=${roomId}`, { waitUntil: 'domcontentloaded' })
+      await environment.waitForStartedRoom()
       await finishHotseatOpening(page)
       await expect(page.locator('.game-layout')).toBeVisible()
       await expect.poll(() => environment.socketMessages.filter(type => type === 'commandScope').length).toBeGreaterThan(scopes)
@@ -436,6 +464,18 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
           roomRecovered: true, logoutRejectedSession: true, cookieAdaptation: 'real backend token, production cookie serializer at TLS boundary' }),
         contentType: 'application/json',
       })
+    } catch (error) {
+      const failedPage = environment.context.pages().findLast(page => new URL(page.url()).origin === new URL(environment.appUrl).origin)
+      if (failedPage) {
+        writeFileSync(testInfo.outputPath('session-failure.json'), JSON.stringify({
+          game: environment.latestRoomState,
+          visibleText: await failedPage.locator('body').innerText().catch(() => '<unavailable>'),
+          forestElements: await failedPage.locator('[data-action-id="forest"]').count(),
+          enabledForestButtons: await failedPage.locator('[data-action-id="forest"] button:enabled').count(),
+        }, null, 2))
+        await failedPage.screenshot({ path: testInfo.outputPath('session-failure.png'), fullPage: true }).catch(() => undefined)
+      }
+      throw error
     } finally {
       writeFileSync(testInfo.outputPath('session-lifecycle.json'), JSON.stringify(environment.lifecycle, null, 2))
       await environment.close()
