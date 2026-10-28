@@ -38,12 +38,6 @@ jobs:
       - name: E2E (Chromium)
         run: pnpm run verify
 
-      - name: Browser-local sandbox
-        run: pnpm run verify:e2e:browser-sandbox
-
-      - name: iOS Safari smoke (WebKit)
-        run: pnpm run verify:e2e:webkit
-
       - name: Retain browser readiness diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -56,3 +50,9 @@ jobs:
             output/playwright/**/session-lifecycle.json
             output/playwright/**/operations-panel-queries.json
             output/playwright/**/operations-*.log
+
+      - name: Browser-local sandbox
+        run: pnpm run verify:e2e:browser-sandbox
+
+      - name: iOS Safari smoke (WebKit)
+        run: pnpm run verify:e2e:webkit
