@@ -54,6 +54,7 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ### Interaction display invariants
 
+- `interaction-presentation.ts` gives backend-declared spatial targets priority over native Moor card routing; choices without targets keep the native card panel.
 - New local input requests trigger focus once. Repeated snapshots and other players' actions preserve manual browsing. A fully visible target receives a highlight without scrolling. Payment and other continuations retain focus until the whole action completes. An online responder can return a followed action to Action Spaces using the public completion classification of a redacted prompt; revealing input targets still requires the local seat and confirmed hotseat audience.
 - Narrow screens retain a continuous page. The operation bar prioritizes the current task and required confirmation, with a shortcut to its target. Targets and confirmation controls remain above fixed controls, including in short landscape viewports.
 - Played occupations and improvements share the snapshot's `playedCardChronology` order, from left to right and then top to bottom. Entry and re-entry append cards, while state updates preserve position. Parent Cards remain separate. The snapshot projection uses complete effective history before History Window trimming; see [the protocol contract](contract.md). Coverage is in `played-card-chronology-session.test.ts` and `played-card-chronology.spec.ts`.
