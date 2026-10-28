@@ -70,7 +70,7 @@
     "build:i18n": "tsx scripts/prepare-language-packs.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1155.0",
+    "@aws-sdk/client-s3": "^3.1156.0",
     "@noble/hashes": "^2.4.0",
     "better-sqlite3": "^13.0.3",
     "canvas": "^3.2.1",
