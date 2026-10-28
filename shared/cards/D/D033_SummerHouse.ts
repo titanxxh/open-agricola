@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { getFarmyardFields } from '../helpers/card-field'
+import { getFarmyardTilePositions, positionKey } from '../../domain/farmyard-geometry'
+import { getUsedFarmyardTileKeys } from '../../domain/farmyard-usage'
 
 const CARD_ID = 'D033_SummerHouse'
 
@@ -9,29 +10,12 @@ const cardImpl = {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
     if (player.houseType !== 'stone') return 0
-    const usedTiles = new Set<string>()
-    player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    getFarmyardFields(player).forEach((field) => usedTiles.add(`${field.row},${field.col}`))
-    player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.pastures.flatMap((p) => p.tiles ?? []).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    let count = 0
-    for (const room of player.roomTiles) {
-      const neighbors = [
-        { row: room.row - 1, col: room.col },
-        { row: room.row + 1, col: room.col },
-        { row: room.row, col: room.col - 1 },
-        { row: room.row, col: room.col + 1 },
-      ]
-      for (const n of neighbors) {
-        if (n.row < 0 || n.row > 2 || n.col < 0 || n.col > 4) continue
-        const key = `${n.row},${n.col}`
-        if (!usedTiles.has(key)) {
-          usedTiles.add(key) // avoid double counting
-          count++
-        }
-      }
-    }
-    return count * 2
+    const usedTiles = getUsedFarmyardTileKeys(player)
+    return getFarmyardTilePositions(player).filter(tile =>
+      !usedTiles.has(positionKey(tile)) && player.roomTiles.some(room =>
+        Math.abs(tile.row - room.row) + Math.abs(tile.col - room.col) === 1,
+      ),
+    ).length * 2
   },
 },
   reaches: [] as readonly string[],
