@@ -83,7 +83,7 @@ export type CardListenerRegistration = ({
   mandatory?: boolean
   /** Space listeners that require placing a new worker. */
   requiresNewPlacement?: true
-  preScoring?: boolean
+  preScoring?: boolean | 'only'
   allowAnytimeReentry?: boolean
   /**
    * This anytime entry is a complete replacement for the owner's current

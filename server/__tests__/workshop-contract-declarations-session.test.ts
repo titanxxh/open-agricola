@@ -368,16 +368,23 @@ describe('Workshop Capability Contract listener data fields', () => {
     expect(session.cardWarnings).toEqual([])
   })
 
-  it('preScoring: only the marked anytime entry is offered in the window before scoring', () => {
+  it.each([true, 'only'] as const)('preScoring %s: only the marked anytime entry is offered before scoring', preScoring => {
     // The marked entry is offered once: using it sets the card's flag.
     const session = start(`{ listeners: [
-      { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], preScoring: true,
+      { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], preScoring: ${JSON.stringify(preScoring)},
         handler: (ctx) => ctx.player.cardStates[CARD_ID] && ctx.player.cardStates[CARD_ID].flagged ? undefined
           : { sourceCard: CARD_ID, flow: { type: 'seq', children: [
               { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
               ${GAIN_FOOD}] } } },
       { cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], handler: () => ({ sourceCard: CARD_ID, flow: gainLeaf(CARD_ID, { grain: 1 }) }) },
     ] }`, roundEnding(14))
+
+    const before = session.getState()
+    expect(before.interaction.anytimeActions.some(action => action.id === `${CARD_ID}:listener:0`)).toBe(preScoring === true)
+    if (preScoring === 'only') {
+      expect(session.takeAnytimeAction(0, `${CARD_ID}:listener:0`).ok).toBe(false)
+      expect(session.getState()).toEqual(before)
+    }
 
     // Earlier Harvest windows list no option of the card and are skipped.
     const prompts = endRound(session, interaction => cardOption(interaction) ?? '__skip__')

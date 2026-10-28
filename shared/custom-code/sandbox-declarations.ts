@@ -1,5 +1,5 @@
 import type { BeforeEndGameScope } from '../cards/card-effects'
-import type { CardListenerZone } from '../cards/card-listeners'
+import type { CardListenerRegistration, CardListenerZone } from '../cards/card-listeners'
 import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import type { InteractionRequest, ResourceKey } from '../contract/types'
 
@@ -63,7 +63,7 @@ const LISTENER_DATA_FIELDS = {
     matches: (value: unknown) => isStringArray(value) && value.every(zone => zone === 'played' || zone === 'hand'),
   },
   mandatory: { expected: 'a boolean', matches: isBoolean },
-  preScoring: { expected: 'a boolean', matches: isBoolean },
+  preScoring: { expected: "a boolean or 'only'", matches: (value: unknown) => isBoolean(value) || value === 'only' },
   replacesTurn: { expected: 'a boolean', matches: isBoolean },
   blockedAnytimeInteractionKinds: { expected: 'an array of interaction kinds', matches: isInteractionKindArray },
 } as const satisfies Record<string, Rule>
@@ -86,7 +86,7 @@ export type SandboxEffectMetadata = {
 export type SandboxListenerData = {
   zones?: CardListenerZone[]
   mandatory?: boolean
-  preScoring?: boolean
+  preScoring?: CardListenerRegistration['preScoring']
   replacesTurn?: boolean
   blockedAnytimeInteractionKinds?: InteractionRequest['kind'][]
 }

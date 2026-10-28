@@ -268,7 +268,7 @@ A listener entry declares `handler`, `actions`, `phases`, `scope`, and `cardIds`
 |---|---|---|
 | `zones` | array of `'played'` and `'hand'` | Where the card must be for the listener to react. The default is `['played']`; `['hand']` reacts only while the card is still in hand |
 | `mandatory` | `boolean` | When several reactions wait at the same moment, the player chooses their order and may pass the rest. A mandatory one cannot be passed. A `before` reaction is optional unless this is `true` |
-| `preScoring` | `boolean` | On an `anytime` listener: also offer it in the window before final scoring, where unmarked anytime listeners are not offered |
+| `preScoring` | `boolean` or `'only'` | On an `anytime` listener: `true` also permits the window before final scoring; `'only'` restricts it to that window. Unmarked listeners are unavailable there. Menu queries and command admission share this restriction. |
 | `replacesTurn` | `boolean` | On an `anytime` listener: the entry is offered only while the owner is idle on their turn, and using it takes the place of that turn's worker placement |
 | `blockedAnytimeInteractionKinds` | array of interaction kinds | On an `anytime` listener: hide the entry while the player answers an interaction of one of these kinds, such as `'farm-select'` or `'animal-reorg'`. The kinds are `'choice'`, `'animal-reorg'`, `'confirm-next-player'`, `'confirm-player-switch'`, `'feed'`, `'heating'`, `'farm-select'`, `'selection'`, `'card-draft'`, `'select-trigger'`, `'engine-blocked'`, `'resource-quantity-select'`, and `'resource-batch-exchange-select'`; another string fails on save |
 

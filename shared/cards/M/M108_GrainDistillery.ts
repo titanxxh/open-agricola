@@ -1,23 +1,35 @@
 import { defineMinorCard } from '../card-source'
-import type { BonusScoreLevel } from '../card-effects'
 import type { CardImpl } from '../registry'
+import type { PlayerState } from '../../contract/types'
+import { scoringOfferChoice, type ScoringOffer } from '../../actions/plans/scoring-offer'
 
 const CARD_ID = 'M108_GrainDistillery'
+const maxPairs = (player: PlayerState) => Math.max(0, Math.min(player.resources.fuel ?? 0, player.resources.grain))
+const scoringChoice = scoringOfferChoice(CARD_ID, player => Array.from(
+  { length: maxPairs(player) + 1 },
+  (_, pairs): ScoringOffer => ({
+    value: `${CARD_ID}:pairs:${pairs}`,
+    kind: 'pay',
+    resources: pairs === 0 ? {} : { grain: pairs, fuel: pairs },
+    score: pairs,
+  }),
+))
 
 const cardImpl = {
+  listeners: [{
+    id: `${CARD_ID}:scoring`,
+    cardIds: [CARD_ID],
+    actions: ['anytime'],
+    phases: ['anytime'],
+    preScoring: 'only',
+    handler: ({ player }) => maxPairs(player) > 0 ? {
+      sourceCard: CARD_ID,
+      flow: scoringChoice.promptLeaf(player, 'ui.interactionResourceExchange'),
+    } : undefined,
+  }],
   effect: {
     id: CARD_ID,
-    computeCostedBonus: (_state, player) => {
-      const maxPairs = Math.min(player.resources.fuel ?? 0, player.resources.grain ?? 0)
-      const levels: BonusScoreLevel[] = []
-      for (let pairs = 0; pairs <= maxPairs; pairs += 1) {
-        levels.push({
-          cost: pairs === 0 ? {} : { fuel: pairs, grain: pairs },
-          score: pairs,
-        })
-      }
-      return levels
-    },
+    resolveChoice: scoringChoice.resolveChoice,
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
