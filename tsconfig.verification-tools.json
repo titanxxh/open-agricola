@@ -15,6 +15,7 @@
     "e2e-tests/release-rendering.spec.ts",
     "scripts/__tests__/verification.test.ts",
     "scripts/__tests__/verification-requirements.test.ts",
+    "scripts/__tests__/hosted-release-app.test.ts",
     "scripts/__tests__/release-smoke.test.ts"
   ],
   "exclude": []
