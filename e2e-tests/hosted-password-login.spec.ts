@@ -1,7 +1,7 @@
 import { expect, devices, type BrowserContext, type Page, type PlaywrightWorkerArgs, type Request } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer as createHttpServer, request as httpRequest, type IncomingMessage } from 'node:http'
 import { createServer } from 'node:https'
 import { connect } from 'node:net'
@@ -129,7 +129,10 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
           })
         }
         res.writeHead(response.statusCode ?? 502, headers)
-        response.pipe(res)
+        if (topology === 'same-site-pages' && ['/api/rooms', '/api/lobby/my-rooms'].includes(url.pathname)) {
+          res.flushHeaders()
+          setTimeout(() => response.pipe(res), 500)
+        } else response.pipe(res)
       })
       upstream.on('error', error => {
         if (cancelled) return
@@ -210,8 +213,13 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
   }
   try {
     context = await openContext()
+    const lobbyRequests = new WeakMap<Page, Set<Request>>()
+    const isLobby = (request: Request) => new URL(request.url()).origin === apiOrigin
+      && ['/api/rooms', '/api/lobby/my-rooms'].includes(new URL(request.url()).pathname)
     const observe = (page: Page) => {
-      const requests = new WeakMap<Request, number>()
+      const requests = new Map<Request, number>()
+      const pending = new Set<Request>()
+      lobbyRequests.set(page, pending)
       let requestSequence = 0
       note(page, 'observed')
       page.on('framenavigated', frame => { if (frame === page.mainFrame()) note(page, 'navigation', { url: frame.url() }) })
@@ -219,13 +227,22 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
       const onPageError = (error: Error) => { errors.push(error.stack ?? error.message); note(page, 'pageerror', { name: error.name }) }
       page.on('pageerror', onPageError)
       page.on('request', request => {
-        if (new URL(request.url()).pathname !== '/api/observability/telemetry') return
+        if (isLobby(request)) pending.add(request)
+        if (!['/api/rooms', '/api/lobby/my-rooms', '/api/observability/telemetry'].includes(new URL(request.url()).pathname)) return
         requests.set(request, ++requestSequence)
-        note(page, 'telemetry-start', { requestId: requestSequence, url: request.url() })
+        note(page, 'request-start', { requestId: requestSequence, url: request.url() })
       })
-      page.on('response', response => { const requestId = requests.get(response.request()); if (requestId) note(page, 'telemetry-status', { requestId, status: response.status(), url: response.url() }) })
-      page.on('requestfinished', request => { const requestId = requests.get(request); if (requestId) note(page, 'telemetry-finish', { requestId, url: request.url() }) })
-      page.on('requestfailed', request => { const requestId = requests.get(request); if (requestId) note(page, 'telemetry-failure', { requestId, url: request.url(), failure: request.failure()?.errorText.replace(/https?:\/\/[^\s]+/g, '[url]') }) })
+      page.on('response', response => { const requestId = requests.get(response.request()); if (requestId) note(page, 'request-status', { requestId, status: response.status(), url: response.url() }) })
+      page.on('requestfinished', request => { const requestId = requests.get(request); if (requestId) note(page, 'request-finish', { requestId, url: request.url() }); requests.delete(request); pending.delete(request) })
+      const onRequestFailed = (request: Request) => {
+        pending.delete(request)
+        const requestId = requests.get(request)
+        if (!requestId) return
+        note(page, 'request-failure', { requestId, url: request.url(), failure: request.failure()?.errorText.replace(/https?:\/\/[^\s]+/g, '[url]') })
+        if (topology === 'same-site-pages' && isLobby(request)) errors.push('Lobby request interrupted')
+        requests.delete(request)
+      }
+      page.on('requestfailed', onRequestFailed)
       page.on('websocket', socket => {
         if (!socket.url().startsWith(apiOrigin.replace('https:', 'wss:') + '/nodes/')) return
         socket.on('framereceived', ({ payload }) => {
@@ -234,13 +251,23 @@ async function fixture(playwright: PlaywrightWorkerArgs['playwright'], engine: E
           if (message && typeof message === 'object' && 'type' in message && typeof message.type === 'string') socketMessages.push(message.type)
         })
       })
-      return () => { note(page, 'observer-retired'); page.off('pageerror', onPageError) }
+      return () => { note(page, 'observer-retired'); page.off('pageerror', onPageError); page.off('requestfailed', onRequestFailed) }
+    }
+    const loadLobby = async (page: Page, navigate: () => Promise<unknown>) => {
+      const responses = Promise.all(['/api/rooms', '/api/lobby/my-rooms'].map(path => page.waitForResponse(`${apiOrigin}${path}`)))
+      const [, loaded] = await Promise.all([navigate(), responses])
+      for (const response of loaded) {
+        expect(response.status()).toBe(200)
+        expect(await response.json()).toMatchObject({ ok: true })
+      }
+      await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
+      await expect.poll(() => lobbyRequests.get(page)?.size).toBe(0)
     }
     return {
       appUrl: `${appOrigin}${appPath}`, apiOrigin, build, username, userId: user.id,
       get context() { if (!context) throw new Error('Browser context is not open'); return context },
       restartBrowser: async () => { await context?.close(); context = await openContext() },
-      observe, errors, socketMessages, lifecycle, note,
+      observe, loadLobby, errors, socketMessages, lifecycle, note,
       close: async () => {
         for (const page of context?.pages() ?? []) note(page, 'intent-context-close')
         await context?.close()
@@ -295,7 +322,10 @@ test('strict WebKit reproduces legacy cross-site password login returning to the
     if (environment.errors.length) console.error('[hosted-login-lifecycle]', JSON.stringify({ engine: 'webkit', topology: 'legacy-cross-site', events: environment.lifecycle }))
     expect(environment.errors).toEqual([])
     testInfo.annotations.push({ type: 'limitation', description: 'Linux WPE reproduction is not physical Safari/iPhone acceptance' })
-  } finally { await environment.close() }
+  } finally {
+    writeFileSync(testInfo.outputPath('session-lifecycle.json'), JSON.stringify(environment.lifecycle, null, 2))
+    await environment.close()
+  }
 })
 
 for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
@@ -312,16 +342,12 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(new URL(page.url()).origin).toBe(new URL(environment.appUrl).origin)
       expect(new URL(environment.appUrl).origin).not.toBe(environment.apiOrigin)
       await expect(page.locator('#username')).toBeVisible()
-      const authenticatedLobby = page.waitForResponse(response => new URL(response.url()).pathname === '/api/lobby/my-rooms')
-      await submitPassword(page, environment.username)
-      expect((await authenticatedLobby).status()).toBe(200)
-      await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
+      await environment.loadLobby(page, () => submitPassword(page, environment.username))
       expect(await environment.context.cookies(environment.apiOrigin)).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: SESSION_COOKIE, domain: 'api.agricola.test', secure: true, httpOnly: true, sameSite: 'Lax' }),
       ]))
       environment.note(page, 'intent-reload')
-      await page.reload({ waitUntil: 'domcontentloaded' })
-      await expect(page.getByRole('button', { name: 'Local Hotseat', exact: true })).toBeVisible()
+      await environment.loadLobby(page, () => page.reload({ waitUntil: 'domcontentloaded' }))
       const workshopLoads = [
         page.waitForResponse(response => {
           const url = new URL(response.url())
@@ -345,7 +371,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       }
       await expect(page.locator('.ws-section-sandbox').getByText('3 Players', { exact: true })).toBeVisible()
       await expect(page.locator('.ws-loading')).toHaveCount(0)
-      await page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' })
+      await environment.loadLobby(page, () => page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' }))
       await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
       await page.getByRole('checkbox', { name: /Snake opening/ }).uncheck()
       await page.getByRole('button', { name: 'Start Hotseat Game', exact: true }).click()
@@ -380,7 +406,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       if (!restored) throw new Error('Original room disappeared during recovery')
       expect(restored.created_by).toBe(environment.userId)
       expect(createHash('sha256').update(restored.state_json).digest('hex')).toBe(savedHash)
-      await page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' })
+      await environment.loadLobby(page, () => page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' }))
       expect(await page.evaluate(async ({ origin, id }) => (await fetch(`${origin}/api/rooms/${id}/dissolve`, { method: 'POST', credentials: 'include' })).status, { origin: environment.apiOrigin, id: roomId })).toBe(200)
       await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
       const desktopLogout = page.getByRole('button', { name: 'Sign Out', exact: true })
@@ -410,6 +436,9 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
           roomRecovered: true, logoutRejectedSession: true, cookieAdaptation: 'real backend token, production cookie serializer at TLS boundary' }),
         contentType: 'application/json',
       })
-    } finally { await environment.close() }
+    } finally {
+      writeFileSync(testInfo.outputPath('session-lifecycle.json'), JSON.stringify(environment.lifecycle, null, 2))
+      await environment.close()
+    }
   })
 }

@@ -6,6 +6,8 @@
 
 PR 的浏览器 E2E 在本机运行。涉及应用运行行为、UI 或 WS 的改动，用 `pnpm verify <file.spec.ts>` 在隔离环境跑通相关 spec，并把命令和结果写进 PR 描述；本机通过即满足 PR 的 E2E 要求。合入 main 后 `e2e.yml` 仍会跑全量。
 
+main E2E 无论成功或失败都会保留 7 天的验证记录、认证请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>`；请求生命周期只包含路径、状态和完成 / 失败事件，不记录 Cookie 或认证头。
+
 ## 调试与最终验证
 
 使用 Node.js 24.15+（不含 Node 25），按改动范围选择入口：
