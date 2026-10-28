@@ -6,8 +6,8 @@ import { GameSession } from '../game/authoritative-session'
 import {
   getRegisteredCardListeners,
   executeCardListener,
-  type CardListenerContext,
 } from '../../shared/cards/card-listeners'
+import type { GameEvent } from '../../shared/contract/events'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { PlayerState, ActionSpace } from '../../shared/contract/types'
@@ -58,33 +58,40 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as unknown as ActionSpace
 
-const findListenersByAction = (ruleOwner: SessionRuleOwner | TestCardRegistry, actionId: string) =>
+const committedUsage = (player: PlayerState, actionId: string): GameEvent => ({
+  schemaVersion: 1, id: 'used', seq: 1, round: 1, phase: 'work', visibility: 'public',
+  type: 'farm.spacesUsed', sourceActionId: actionId,
+  newlyUsedTiles: [{ playerId: player.id, row: 2, col: 4 }],
+})
+
+const findUsageListeners = (ruleOwner: SessionRuleOwner | TestCardRegistry) =>
   {
   const lookupRule1 = () => getRegisteredCardListeners().filter(
     (l) =>
       (l.cardIds ?? []).includes(CARD_ID) &&
-      (l.actions ?? []).includes(actionId) &&
+      (l.events ?? []).includes('farm.spacesUsed') &&
       (l.phases ?? []).includes('after'),
   )
   return ruleOwner instanceof TestCardRegistry ? withActiveRegistry(ruleOwner, lookupRule1) : ruleOwner.withCtx(lookupRule1)
 }
 
-describe('B132_EstateMaster — saturation flag listeners', () => {
+describe('B132_EstateMaster — committed farm usage qualification', () => {
   for (const action of ['construct', 'stables', 'fence', 'plow']) {
-    it(`sets saturated flag after action=${action} when farm is full`, () => {
+    it(`sets saturated flag after action=${action} makes the farm full`, () => {
       const { session, state } = setupSession()
       const player = state.players[0]!
       player.occupationPlayed.push(CARD_ID)
       fillFarm(player)
       session.loadState(state)
 
-      const matched = findListenersByAction(session, action)
+      const matched = findUsageListeners(session)
       expect(matched.length).toBeGreaterThan(0)
       const space = createSpace(action)
       const result = session.withCtx(() => executeCardListener(matched[0]!, {
         state, player, space,
         actionId: action, phase: 'after',
-      } as unknown as CardListenerContext))
+        actionEvents: [committedUsage(player, action)], actionHooks: undefined,
+      }))
 
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
       expect(result?.flow).toMatchObject({
@@ -113,15 +120,33 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
       fillFarmMinus1(player)
       session.loadState(state)
 
-      const matched = findListenersByAction(session, action)
+      const matched = findUsageListeners(session)
       expect(matched.length).toBeGreaterThan(0)
       const result = session.withCtx(() => executeCardListener(matched[0]!, {
         state, player, space: createSpace(action),
         actionId: action, phase: 'after',
-      } as unknown as CardListenerContext))
+        actionEvents: [committedUsage(player, action)], actionHooks: undefined,
+      }))
 
       expect(result?.flow).toBeUndefined()
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
     })
   }
+
+  it.each(['no fact', 'opponent fact'])('does not qualify a prepared full farm with %s', fact => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    fillFarm(player)
+    session.loadState(state)
+    const matched = findUsageListeners(session)
+    expect(matched).toHaveLength(1)
+    const result = session.withCtx(() => executeCardListener(matched[0]!, {
+      state, player, space: createSpace('selection'), actionId: 'selection', phase: 'after',
+      actionEvents: fact === 'no fact' ? [] : [committedUsage(state.players[1]!, 'selection')],
+      actionHooks: undefined,
+    }))
+    expect(result).toBeUndefined()
+    expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
+  })
 })

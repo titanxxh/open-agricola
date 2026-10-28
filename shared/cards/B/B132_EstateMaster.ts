@@ -8,7 +8,7 @@ import { isMoorBalanceRulesEnabled } from '../../contract/game-variants'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import type { CardImpl } from '../registry'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import { getActionNewlyUsedTiles, getActionTerrainOperations } from '../helpers/farmyard-events'
+import { getActionFarmOperations, getActionNewlyUsedTiles, getActionTerrainOperations } from '../helpers/farmyard-events'
 
 const CARD_ID = 'B132_EstateMaster'
 
@@ -27,8 +27,7 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
 })
 
 const isSaturatedAfterAction = (context: CardListenerContext): boolean => {
-  const operations = context.result?.type === 'ok' || context.result?.type === 'flow'
-    ? context.result.farmOperations : undefined
+  const operations = getActionFarmOperations(context)
   if (operations === undefined) return isFarmSaturated(context.player, context.state)
   return operations.some(operation => operation.playerId === context.player.id && isFarmSaturated({
     ...context.player,
@@ -39,25 +38,6 @@ const isSaturatedAfterAction = (context: CardListenerContext): boolean => {
   }, context.state))
 }
 
-const saturationCheckListener = (
-  actionId: NonNullable<CardListenerRegistration['actions']>[number],
-): CardListenerRegistration => ({
-  id: `B132-saturate-after-${actionId}`,
-  cardIds: [CARD_ID],
-  actions: [actionId],
-  phases: ['after'],
-  scope: 'player',
-  handler: (ctx) => {
-    if (isSaturatedFlagged(ctx.player)) return
-    if (isSaturatedAfterAction(ctx)) {
-      return {
-        flow: specialEffect({ kind: 'set-extra-data', key: 'saturated', value: true }),
-        sourceCard: CARD_ID,
-      }
-    }
-  },
-})
-
 const saturationEventListener: CardListenerRegistration = {
   id: 'B132-saturate-after-farm-change',
   cardIds: [CARD_ID],
@@ -65,8 +45,7 @@ const saturationEventListener: CardListenerRegistration = {
   phases: ['after'],
   scope: 'player',
   handler: context => {
-    if (!isMoorBalanceRulesEnabled(context.state) || isSaturatedFlagged(context.player)
-      || !isSaturatedAfterAction(context)) return
+    if (isSaturatedFlagged(context.player) || !isSaturatedAfterAction(context)) return
     const changed = getActionNewlyUsedTiles(context).length > 0 || getActionTerrainOperations(context)
       .some(event => event.playerId === context.player.id && event.changes.length > 0)
     if (!changed) return
@@ -86,8 +65,6 @@ const reapListener: CardListenerRegistration = {
     const player = ctx.player
     const amount = getReapedCropAmount(ctx, 'vegetable')
     if (amount <= 0) return
-    // Rule: bonus VP gated on saturation flag; defensive fallback to live check
-    // for paths that bypass the four flag-setting hooks.
     if (!isSaturatedFlagged(player) && !isFarmSaturated(player, ctx.state)) return
     return {
       flow: specialEffect({ kind: 'increment-counter', key: 'bonusVp', amount }),
@@ -98,10 +75,6 @@ const reapListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [
-    saturationCheckListener('construct'),
-    saturationCheckListener('stables'),
-    saturationCheckListener('fence'),
-    saturationCheckListener('plow'),
     saturationEventListener,
     reapListener,
   ],
