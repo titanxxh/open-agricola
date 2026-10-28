@@ -62,7 +62,11 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
       let cancelled = false
       const upstream = trackRequest(httpRequest(backendTarget(request), {
         method: request.method, headers: forwardedHeaders(request),
-      }, result => { response.writeHead(result.statusCode ?? 502, result.headers); result.pipe(response) }))
+      }, result => {
+        result.on('aborted', () => response.destroy())
+        result.on('error', () => response.destroy())
+        response.writeHead(result.statusCode ?? 502, result.headers); result.pipe(response)
+      }))
       upstream.on('error', () => {
         if (cancelled || response.destroyed || response.writableEnded) return
         if (!response.headersSent) response.writeHead(502)
@@ -91,7 +95,11 @@ export async function startHostedReleaseApp({ backendUrl, frontendOrigin, direct
       socket.on('close', () => transport.destroy()); transport.on('close', () => socket.destroy())
       socket.pipe(transport).pipe(socket)
     })
-    upstream.on('response', result => { writeHead(result); result.pipe(socket) })
+    upstream.on('response', result => {
+      result.on('aborted', () => socket.destroy())
+      result.on('error', () => socket.destroy())
+      writeHead(result); result.pipe(socket)
+    })
     upstream.on('error', () => socket.destroy())
     socket.on('close', () => upstream.destroy())
     upstream.end()
