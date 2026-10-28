@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Response } from '@playwright/test'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -23,14 +23,19 @@ test('independent metrics render registration stats and room totals with two axe
   const servers: Server[] = []
   const panelQueries: Array<{ status: number; request: unknown; response: unknown }> = []
   const panelCaptures: Promise<void>[] = []
-  page.on('response', response => {
+  const capturePanel = (response: Response) => {
     if (new URL(response.url()).pathname !== '/ops/api/ds/query' || response.request().method() !== 'POST' || panelQueries.length >= 40) return
+    const payload: unknown = response.request().postDataJSON()
+    if (!payload || typeof payload !== 'object' || !('queries' in payload) || !Array.isArray(payload.queries)) return
+    if (!payload.queries.some(query => query && typeof query === 'object' && typeof query.expr === 'string' && query.expr.startsWith('agricola_accounts{'))) return
+    const entry = { status: response.status(), request: payload, response: 'pending' as unknown }
+    panelQueries.push(entry)
     panelCaptures.push((async () => {
-      try {
-        panelQueries.push({ status: response.status(), request: response.request().postDataJSON(), response: await response.json() })
-      } catch { panelQueries.push({ status: response.status(), request: null, response: 'unreadable' }) }
+      try { entry.response = await response.json() }
+      catch { entry.response = 'unreadable' }
     })())
-  })
+  }
+  page.on('response', capturePanel)
   const previous = { ADMIN_USERS: process.env.ADMIN_USERS, GRAFANA_URL: process.env.GRAFANA_URL }
   const listen = async (server: Server) => {
     servers.push(server)
@@ -106,6 +111,8 @@ test('independent metrics render registration stats and room totals with two axe
     await expect(page.getByText('总房间', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
     await page.screenshot({ path: 'output/operations-dashboard.png', fullPage: true })
   } finally {
+    page.off('response', capturePanel)
+    await page.close()
     await Promise.allSettled(panelCaptures)
     writeFileSync(testInfo.outputPath('operations-panel-queries.json'), JSON.stringify(panelQueries, null, 2))
     for (const name of names.reverse()) {
