@@ -13,6 +13,7 @@ import { BACKEND_URL } from './fixtures'
 
 test('independent metrics render registration stats and room totals with two axes in real Grafana', async ({ page, request }, testInfo) => {
   test.setTimeout(180_000)
+  await page.setViewportSize({ width: 1280, height: 320 })
   expect((await request.get(BACKEND_URL + '/api/health')).ok()).toBe(true)
   const directory = mkdtempSync(join(tmpdir(), 'oa-ops-browser-'))
   chmodSync(directory, 0o755)
@@ -23,11 +24,21 @@ test('independent metrics render registration stats and room totals with two axe
   const servers: Server[] = []
   const panelQueries: Array<{ status: number; request: unknown; response: unknown }> = []
   const panelCaptures: Promise<void>[] = []
+  const navigations: string[] = []
+  const panelViews: unknown[] = []
+  page.on('framenavigated', frame => {
+    if (frame !== page.mainFrame()) return
+    const url = new URL(frame.url())
+    const params = new URLSearchParams()
+    for (const key of ['from', 'to', 'refresh']) { const value = url.searchParams.get(key); if (value) params.set(key, value) }
+    navigations.push(url.origin + url.pathname + (params.size ? '?' + params.toString() : ''))
+    if (navigations.length > 64) navigations.shift()
+  })
   const capturePanel = (response: Response) => {
     if (new URL(response.url()).pathname !== '/ops/api/ds/query' || response.request().method() !== 'POST' || panelQueries.length >= 40) return
     const payload: unknown = response.request().postDataJSON()
     if (!payload || typeof payload !== 'object' || !('queries' in payload) || !Array.isArray(payload.queries)) return
-    if (!payload.queries.some(query => query && typeof query === 'object' && typeof query.expr === 'string' && query.expr.startsWith('agricola_accounts{'))) return
+    if (!payload.queries.some(query => query && typeof query === 'object' && typeof query.expr === 'string' && (query.expr.startsWith('agricola_accounts{') || query.expr.includes('agricola_platform{')))) return
     const entry = { status: response.status(), request: payload, response: 'pending' as unknown }
     panelQueries.push(entry)
     panelCaptures.push((async () => {
@@ -105,16 +116,24 @@ test('independent metrics render registration stats and room totals with two axe
     expect(room.fieldConfig.defaults.custom.axisPlacement).toBe('left')
     expect(room.fieldConfig.overrides.map((override: { matcher: { options: string } }) => override.matcher.options)).toEqual(['离线保留房间', '总房间'])
     for (const override of room.fieldConfig.overrides) expect(override.properties).toContainEqual({ id: 'custom.axisPlacement', value: 'right' })
-    await page.goto(base + '/ops/d/open-agricola/operations?from=now-5m&to=now&refresh=5s')
-    await expect(page.getByRole('region', { name: '现存注册账户', exact: true })).toContainText('2', { timeout: 30_000 })
+    await page.goto(base + '/ops/d/open-agricola/operations?from=now-5m&to=now&refresh=15s')
+    panelViews.push({ viewport: page.viewportSize(), accountBounds: await page.getByRole('region', { name: '现存注册账户', exact: true }).boundingBox(), roomBounds: await page.getByRole('region', { name: '房间数量', exact: true }).boundingBox() })
+    const accountPanel = page.getByRole('region', { name: '现存注册账户', exact: true })
+    await accountPanel.scrollIntoViewIfNeeded()
+    panelViews.push({ accountBoundsAfterScroll: await accountPanel.boundingBox() })
+    await expect(accountPanel).toContainText('2', { timeout: 30_000 })
     await expect(page.getByRole('region', { name: '今日新增注册（UTC+8）', exact: true })).toContainText('1')
-    await expect(page.getByText('总房间', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+    const roomPanel = page.getByRole('region', { name: '房间数量', exact: true })
+    await roomPanel.scrollIntoViewIfNeeded()
+    panelViews.push({ roomBoundsAfterScroll: await roomPanel.boundingBox() })
+    await expect(roomPanel.getByText('总房间', { exact: true })).toBeVisible({ timeout: 30_000 })
     await page.screenshot({ path: 'output/operations-dashboard.png', fullPage: true })
   } finally {
     page.off('response', capturePanel)
     await page.close()
     await Promise.allSettled(panelCaptures)
     writeFileSync(testInfo.outputPath('operations-panel-queries.json'), JSON.stringify(panelQueries, null, 2))
+    writeFileSync(testInfo.outputPath('operations-panel-visibility.json'), JSON.stringify({ navigations, panelViews }, null, 2))
     for (const name of names.reverse()) {
       const logs = spawnSync('docker', ['logs', name], { encoding: 'utf8' })
       const file = name.startsWith('oa-ops-grafana-') ? 'operations-grafana.log' : 'operations-prometheus.log'
