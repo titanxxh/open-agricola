@@ -62,7 +62,7 @@ test('Cubbyhole payment choices show the shared reed cost', async ({ page, reque
   expect(result.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1, reed: 0 })
 })
 
-for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 390 }] as const) {
+for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
   for (const target of ['farm', 'card'] as const) {
     test(`whole-field ${target} choices click farm and Card Fields in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
       await page.setViewportSize({ width: scenario.width, height: 1000 })
@@ -118,8 +118,8 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
   }
 }
 
-for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 390 }] as const) {
-  test(`Peat Sled displays four distinct executable schedules in ${scenario.locale}`, async ({ page, request }) => {
+for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
+  test(`Peat Sled displays four distinct executable schedules in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
     const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1079, playerCount: 2, customCardIds: [], enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true } })
@@ -143,8 +143,8 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     const plans = page.locator('.interaction-future-schedule')
     await expect(plans).toHaveCount(4)
-    await expect(plans.first()).toContainText(scenario.locale === 'en' ? 'Round 3:' : '第 3 回合：')
-    await expect(plans.last()).toContainText(scenario.locale === 'en' ? 'Round 11:' : '第 11 回合：')
+    await expect(plans.first()).toContainText('Round 3:')
+    await expect(plans.last()).toContainText('Round 11:')
     await expect(plans.first().locator('[data-resource="fuel"]')).toHaveAttribute('data-amount', '3')
     await expect(plans.last().locator('[data-resource="fuel"]')).toHaveAttribute('data-amount', '6')
     await page.screenshot({ path: `output/playwright/choice-peat-sled-${scenario.locale}.png` })

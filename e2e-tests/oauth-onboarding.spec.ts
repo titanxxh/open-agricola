@@ -48,7 +48,7 @@ test('OAuth login and registration navigate from an insecure HTTP LAN origin', a
   const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP lan.agricola.test 127.0.0.1', '--no-proxy-server'] })
   try {
     const page = await browser.newPage()
-    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     for (const provider of ['github', 'google'] as const) {
       for (const intent of ['login', 'register'] as const) {
         await page.goto(`${origin}/?page=login&authMode=${intent}`, { waitUntil: 'domcontentloaded' })
@@ -251,7 +251,7 @@ for (const provider of ['github', 'google'] as const) {
           await cdp.send('Network.enable')
           await cdp.send('Network.setCookieControls', { enableThirdPartyCookieRestriction: true })
         }
-        await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+        await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
         const isLobby = (raw: string) => {
           const url = new URL(raw)
           return url.origin === apiOrigin && ['/api/rooms', '/api/lobby/my-rooms'].includes(url.pathname)
@@ -284,7 +284,7 @@ for (const provider of ['github', 'google'] as const) {
             expect(response.status()).toBe(200)
             expect(await response.json()).toMatchObject({ ok: true })
           }
-          await expect(page.getByRole('button', { name: '创建多人游戏', exact: true })).toBeVisible()
+          await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
           await expect.poll(() => lobbyRequests.size).toBe(0)
         }
         await loadPolicyPage(() => page.goto(`${apiOrigin}/cookie-seed`, { waitUntil: 'domcontentloaded' }))
@@ -305,7 +305,7 @@ for (const provider of ['github', 'google'] as const) {
         await page.locator('#onboarding-password').fill(password)
         await page.locator('#onboarding-confirm-password').fill(password)
         const completion = page.waitForResponse(response => response.url() === `${apiOrigin}/api/auth/onboarding/complete` && response.request().method() === 'POST')
-        const submitRegistration = () => page.getByRole('button', { name: '完成注册', exact: true }).click()
+        const submitRegistration = () => page.getByRole('button', { name: 'Complete registration', exact: true }).click()
         if (supportsSession) await loadLobbyPage(submitRegistration)
         else await submitRegistration()
         const response = await completion
@@ -320,7 +320,7 @@ for (const provider of ['github', 'google'] as const) {
           // WPE's libsoup port cannot exercise Safari's CHIPS session support. Registration remains a real ITP regression.
           expect(process.platform).toBe('linux')
           testInfo.annotations.push({ type: 'limitation', description: 'Linux WPE lacks CHIPS: account creation is verified; iPhone session acceptance remains a device check.' })
-          await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible()
+          await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible()
         }
         if (supportsSession) await loadLobbyPage(() => page.reload({ waitUntil: 'domcontentloaded' }))
         else await page.reload({ waitUntil: 'domcontentloaded' })

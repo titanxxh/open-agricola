@@ -4,7 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 TEST_RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/open-agricola-e2e.XXXXXX")"
 umask 077
-node scripts/local-services.mjs --test
+if [[ "${E2E_DEPENDENCIES_READY:-0}" != 1 ]]; then
+  node scripts/local-services.mjs --test
+fi
 pnpm exec tsx scripts/test-environment.ts create "$TEST_RUN_DIR"
 set -a
 # shellcheck disable=SC1090

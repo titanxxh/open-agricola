@@ -6,7 +6,7 @@ import { BACKEND_URL } from './fixtures'
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test(`seasonal placement uses the board worker icon at ${viewport.width}px`, async ({ page, request }) => {
     await page.setViewportSize(viewport)
-    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     expect((await request.post(`${BACKEND_URL}/api/game/new-sandbox`, {
       data: { seed: 1373, playerCount: 2, customCardIds: [], enableThroughTheSeasons: true },
     })).ok()).toBe(true)

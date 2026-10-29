@@ -33,6 +33,7 @@
     "test:bench": "RUN_BENCHMARKS=1 vitest run --project fast-tests tests/payment-solver-benchmark.test.ts --testTimeout=20000 --disableConsoleIntercept",
     "test:e2e": "playwright test",
     "verify": "tsx scripts/verify.ts",
+    "verify:parallel": "node scripts/verify-parallel.mjs",
     "release:rehearse": "pnpm verify prepush && pnpm verify e2e-tests/release-rehearsal.spec.ts e2e-tests/release-diagnostics.spec.ts e2e-tests/release-rendering.spec.ts e2e-tests/choice-previews.spec.ts --browser=chromium --requirements scripts/release/requirements.json && pnpm verify status --requirements scripts/release/requirements.json",
     "release:smoke": "tsx scripts/release/cli.ts",
     "verify:e2e:browser-sandbox": "VITE_SANDBOX_EXECUTOR=browser tsx scripts/verify.ts e2e-tests/local-sandbox.spec.ts",

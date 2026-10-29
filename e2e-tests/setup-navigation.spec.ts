@@ -41,7 +41,7 @@ for (const phase of phases) {
       let joined = false
       try {
         await page.setViewportSize({ width, height: 844 })
-        await joinRoomClients(pages, request, 'zh')
+        await joinRoomClients(pages, request)
         joined = true
         await driver.command(0, { type: 'loadGame', state: setupState(phase) })
         for (const client of pages) await expect(client.locator(overlaySelector)).toBeVisible()
@@ -67,14 +67,14 @@ for (const phase of phases) {
         await expect(language).toHaveAccessibleName(/language.*English/i)
         await expect(selected).toHaveCount(2)
         expect(await roomSnapshot(page)).toEqual(before)
-        await expect(peer.locator('.header-compact').getByRole('button', { name: /语言/ })).toBeVisible()
+        await expect(peer.locator('.header-compact').getByRole('button', { name: /language/i })).toBeVisible()
 
         const confirm = page.locator(phase === 'draft' ? '.draft-confirm-btn' : '.parent-selection-confirm')
         await driver.ui(0, () => confirm.click())
         await expect(page.locator(statusSelector)).toHaveAttribute('data-already-submitted', '1')
         const submitted = await roomSnapshot(page)
         await language.click()
-        await page.getByRole('option', { name: '简体中文', exact: true }).click()
+        await page.getByRole('option', { name: 'English', exact: true }).click()
         await expect(page.locator(statusSelector)).toHaveAttribute('data-already-submitted', '1')
         expect(await roomSnapshot(page)).toEqual(submitted)
         await expect(peer.locator(statusSelector)).toHaveAttribute('data-already-submitted', '0')
@@ -123,7 +123,7 @@ for (const phase of phases) {
     ]
     const [page] = pages
     try {
-      await joinRoomClients(pages, request, 'zh')
+      await joinRoomClients(pages, request)
       const setup = phase === 'draft' ? 'draftMode=simultaneous&draftPoolSize=7' : 'enableParentCards=true'
       await page.goto(`${FRONTEND_URL}/?transport=ws&hotseat=1&maxPlayers=2&${setup}`, { waitUntil: 'domcontentloaded' })
       const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
@@ -132,7 +132,7 @@ for (const phase of phases) {
       await handoff.getByRole('button').tap()
       await expect(page.locator(overlaySelector)).toBeVisible()
       await test.step('select both cards by touch', () => selectCards(page, phase, true))
-      await page.locator('.header-compact').getByRole('button', { name: /语言/ }).tap()
+      await page.locator('.header-compact').getByRole('button', { name: /language/i }).tap()
       await page.getByRole('option', { name: 'English', exact: true }).tap()
       await expect(page.locator('.header-compact').getByRole('button', { name: /language.*English/i })).toBeVisible()
       const selected = page.locator(phase === 'draft' ? '.draft-card.selected' : '.parent-choice-card.is-selected')

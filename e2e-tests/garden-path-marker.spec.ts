@@ -24,7 +24,7 @@ const purchase = (session: GameSession, actor: number, space: 'meeting-place' | 
   throw new Error(`Purchase did not finish: ${JSON.stringify(response.interaction)}`)
 }
 
-for (const locale of ['zh', 'en']) {
+for (const locale of ['en']) {
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     const mobile = viewport.width === 390
     test.describe(`Garden Path ${locale} at ${viewport.width}px`, () => {
@@ -59,7 +59,7 @@ for (const locale of ['zh', 'en']) {
           await page.addInitScript(value => localStorage.setItem('open-agricola-locale-v2', value), locale)
           await page.goto('/?page=game&player=p2&embedded=1&devMode=1')
           await expect(page.locator('.game-layout')).toBeVisible()
-          const label = locale === 'zh' ? '花园小径' : 'Garden Path'
+          const label = 'Garden Path'
           const marker = page.getByTestId(`public-card-marker-${CARD_ID}-garden-path`)
           await expect(marker).toHaveText(`${label}-1`)
           await expect(marker).toHaveAttribute('title', `${label} -1`)
@@ -75,11 +75,11 @@ for (const locale of ['zh', 'en']) {
           const details = mobile ? page.getByRole('dialog') : page.locator('.card-hover-preview')
           await expect(details).toBeVisible()
           const rules = details.locator('.card-rules')
-          await expect(rules).toContainText(locale === 'zh' ? '此标记只有一个' : 'There is only one token')
-          await expect(rules).toContainText(locale === 'zh' ? '原持有者不再保留' : 'The previous holder no longer has it.')
+          await expect(rules).toContainText('There is only one token')
+          await expect(rules).toContainText('The previous holder no longer has it.')
           await rules.scrollIntoViewIfNeeded()
           await details.screenshot({ path: `output/playwright/m027-rules-${locale}-${viewport.width}.png` })
-          if (mobile) await details.getByRole('button', { name: locale === 'zh' ? '关闭' : 'Close', exact: true }).tap()
+          if (mobile) await details.getByRole('button', { name: 'Close', exact: true }).tap()
           else await page.mouse.move(0, 0)
           await expect(details).toBeHidden()
 

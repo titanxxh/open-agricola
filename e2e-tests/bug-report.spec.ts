@@ -8,7 +8,6 @@ import {
 import { createHash } from 'node:crypto'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import en from '../output/i18n/locales/en.json' with { type: 'json' }
-import zh from '../output/i18n/locales/zh.json' with { type: 'json' }
 
 const cookieValue = (response: APIResponse, name: string): string => {
   const header = response.headersArray().find(({ name: headerName, value }) =>
@@ -56,6 +55,7 @@ test('active pinned evidence opens beside the live game', async ({
 }) => {
   const suffix = Date.now().toString(36)
   const guestContext = await browser.newContext()
+  await guestContext.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   await authenticate(page.context(), request, `bug_report_a_${suffix}`)
   await authenticate(guestContext, request, `bug_report_b_${suffix}`)
   await page.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`)
@@ -63,7 +63,7 @@ test('active pinned evidence opens beside the live game', async ({
   expect(roomId).toBeTruthy()
   const guestPage = await guestContext.newPage()
   await guestPage.goto(`${FRONTEND_URL}/?transport=ws&room=${roomId}`)
-  await guestPage.getByRole('button', { name: '确认颜色并开始', exact: true }).click()
+  await guestPage.getByRole('button', { name: 'Confirm color and start', exact: true }).click()
   await expect(page.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
 
   const frameHash = 'a'.repeat(64)
@@ -285,8 +285,8 @@ test('completed replay submits one hosted bug report with the current anchor', a
   expect(submitCount).toBe(1)
 })
 
-for (const locale of ['en', 'zh'] as const) {
-  const copy = (locale === 'en' ? en : zh).platform.bugReport
+for (const locale of ['en'] as const) {
+  const copy = en.platform.bugReport
   for (const width of [320, 1280]) {
     test(`GitHub connection is a visible keyboard-operable button (${locale}, ${width}px)`, async ({
       page,

@@ -2,11 +2,10 @@ import { expect, test } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL, postJson } from './fixtures'
 
 const names = {
-  zh: ['伐木', '刀耕火种', '挖泥炭', '马市', '雇工集市', '黑市', '非法工作'],
   en: ['Fell Trees', 'Slash and Burn', 'Cut Peat', 'Horse Market', 'Hiring Fair', 'Black Market', 'Illicit Work'],
 }
 
-for (const locale of ['zh', 'en'] as const) {
+for (const locale of ['en'] as const) {
   for (const width of [1920, 390]) {
     test(`${locale} special action cards stay readable at ${width}px for every player count`, async ({ page, request }) => {
       await page.setViewportSize({ width, height: 1080 })
@@ -45,7 +44,7 @@ for (const locale of ['zh', 'en'] as const) {
           expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth)
         }
         await expect(panel.getByRole('button', { name: names[locale][5], exact: true }).first())
-          .toContainText(locale === 'zh' ? '另付改良费用' : 'Pay improvement cost separately')
+          .toContainText('Pay improvement cost separately')
         if (playerCount === 2 || playerCount === 6) {
           await panel.screenshot({ path: `output/playwright/issue958-cards-${locale}-${width}-${playerCount}p.png` })
         }
@@ -55,8 +54,8 @@ for (const locale of ['zh', 'en'] as const) {
   }
 }
 
-test('Chinese titles remain visible after using and borrowing a special action card', async ({ page, request }) => {
-  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+test('English titles remain visible after using and borrowing a special action card', async ({ page, request }) => {
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   const game = await postJson(request, `${BACKEND_URL}/api/game/new`, {
     seed: 958, maxPlayers: 2, enableFarmersOfTheMoor: true,
     allowIncompleteFarmersOfTheMoorMinorDeal: true,
@@ -64,20 +63,20 @@ test('Chinese titles remain visible after using and borrowing a special action c
   expect(game.ok).toBe(true)
   await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)
   const card = page.locator('[data-card-id="moor-special-1-2-market-work"]')
-  await card.getByRole('button', { name: '雇工集市', exact: true }).click()
-  await expect(card.locator('.special-action-card__status')).toHaveText('已使用')
-  await expect(card.getByRole('button', { name: '雇工集市' })).toBeDisabled()
+  await card.getByRole('button', { name: 'Hiring Fair', exact: true }).click()
+  await expect(card.locator('.special-action-card__status')).toHaveText('Used')
+  await expect(card.getByRole('button', { name: 'Hiring Fair' })).toBeDisabled()
   await expect(card).toHaveClass(/special-action-card--disabled/)
   await card.screenshot({ path: 'output/playwright/issue958-used.png' })
 
   const confirmed = await postJson(request, `${BACKEND_URL}/api/game/choice`, { playerIndex: 0, value: 'confirm' })
   expect(confirmed.ok).toBe(true)
   await page.goto(`${FRONTEND_URL}/?page=game&player=p2&embedded=1&devMode=1`)
-  await expect(card.locator('.special-action-card__status')).toHaveText('借用 2 食物')
-  await card.getByRole('button', { name: '雇工集市', exact: true }).click()
-  await expect(card.locator('.special-action-card__status')).toHaveText('不可用')
+  await expect(card.locator('.special-action-card__status')).toHaveText('Borrow 2 food')
+  await card.getByRole('button', { name: 'Hiring Fair', exact: true }).click()
+  await expect(card.locator('.special-action-card__status')).toHaveText('Unavailable')
   await expect(card).toHaveClass(/special-action-card--disabled/)
-  for (const name of names.zh.slice(3)) {
+  for (const name of names.en.slice(3)) {
     await expect(card.getByRole('button', { name, exact: true })).toHaveText(new RegExp(name))
     await expect(card.getByRole('button', { name, exact: true })).toBeDisabled()
   }

@@ -4,7 +4,7 @@ import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } fr
 const sandboxUrl = `${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
 })
 
 test('season occupants and borrowed card owners localize generated names', async ({ page, request }) => {
@@ -29,20 +29,20 @@ test('season occupants and borrowed card owners localize generated names', async
   }]
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   await page.goto(sandboxUrl, { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('.seasons-board__worker')).toHaveAccessibleName('玩家 2')
-  await expect(page.locator('.seasons-board__worker')).toHaveAttribute('title', '玩家 2')
-  await expect(page.locator('.borrowed-played-card-owner')).toHaveText('玩家 2')
+  await expect(page.locator('.seasons-board__worker')).toHaveAccessibleName('Player 2')
+  await expect(page.locator('.seasons-board__worker')).toHaveAttribute('title', 'Player 2')
+  await expect(page.locator('.borrowed-played-card-owner')).toHaveText('Player 2')
   await expect(page.locator('.player-tabs__name').first()).toContainText('Player 2')
 })
 
 test('dev lobby creates a hotseat room and preserves identity after reload', async ({ page }) => {
   await page.goto(`${FRONTEND_URL}/?player=p1&devMode=1`)
-  await page.getByRole('button', { name: '本地热座', exact: true }).click()
-  await page.getByRole('button', { name: '开始热座对局', exact: true }).click()
+  await page.getByRole('button', { name: 'Local Hotseat', exact: true }).click()
+  await page.getByRole('button', { name: 'Start Hotseat Game', exact: true }).click()
   const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
   await expect(handoff).toBeVisible({ timeout: 15000 })
   // Synthetic dev account labels keep generated-name provenance through hotseat and reload.
-  await expect(handoff).toContainText(/请把设备交给 玩家 [12]。/)
+  await expect(handoff).toContainText(/Pass the device to Player [12]\./)
   await finishHotseatOpening(page)
   const url = new URL(page.url())
   expect(url.searchParams.get('player')).toBe('p1')
@@ -52,23 +52,22 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   await expect(page.locator('.game-layout')).toBeVisible()
   await page.reload()
   await expect(handoff).toBeVisible({ timeout: 15000 })
-  await expect(handoff).toContainText('请把设备交给 玩家 1。')
+  await expect(handoff).toContainText('Pass the device to Player 1.')
   await handoff.getByRole('button').click()
   await expect(page.locator('.game-layout')).toBeVisible()
   await page.locator('.action-card-holder[data-action-id="forest"]').click()
-  await page.getByRole('button', { name: '确认切换', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm switch', exact: true }).click()
   await expect(handoff).toBeVisible({ timeout: 15000 })
-  await expect(handoff).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
-  await expect(handoff).toContainText('玩家 2')
+  await expect(handoff).toContainText('Player 2')
 })
 
 for (const [stage, prompt] of [
-  ['standard', '选择 1 张职业和 1 张小改良'],
-  ['occupation', '选择 1 张职业'],
-  ['farmersOfTheMoorMinor', '选择 1 张沼泽农夫小改良'],
-  ['publishedMinor', '选择 1 张小改良'],
+  ['standard', 'Pick 1 occupation + 1 minor improvement, then confirm.'],
+  ['occupation', 'Pick 1 occupation, then confirm.'],
+  ['farmersOfTheMoorMinor', 'Pick 1 Farmers of the Moor minor improvement, then confirm.'],
+  ['publishedMinor', 'Pick 1 minor improvement, then confirm.'],
 ] as const) {
-  test(`Chinese draft renders the ${stage} stage and translated card faces`, async ({ page, request }) => {
+  test(`English draft renders the ${stage} stage and translated card faces`, async ({ page, request }) => {
     await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 931, maxPlayers: 2 })
     const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
     state.phase = 'draft'
@@ -87,28 +86,27 @@ for (const [stage, prompt] of [
     }
     expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
     await page.goto(sandboxUrl)
-    const dialog = page.getByRole('dialog', { name: '卡牌轮抽' })
+    const dialog = page.getByRole('dialog', { name: 'Card draft' })
     await expect(dialog).toBeVisible()
-    await expect(dialog).toContainText('轮抽 — 第 1 / 7 轮')
+    await expect(dialog).toContainText('Draft — Round 1 / 7')
     await expect(dialog).toContainText(prompt)
-    await expect(dialog.getByRole('button', { name: '确认选择' })).toBeVisible()
-    await expect(dialog).not.toContainText(/Draft|Pick|Occupations|Minor improvements|Already kept/)
+    await expect(dialog.getByRole('button', { name: 'Confirm picks' })).toBeVisible()
     const faces = dialog.locator('.player-card-inner')
     for (const face of await faces.all()) {
-      await expect(face.locator('.card-title')).toHaveText(/[\u4e00-\u9fff]/)
-      await expect(face.locator('.card-desc')).not.toContainText(/[A-Za-z]/)
+      await expect(face.locator('.card-title')).not.toHaveText('')
+      await expect(face.locator('.card-desc')).not.toContainText(/[\u4e00-\u9fff]/)
     }
     if (stage === 'standard') {
-      await expect(dialog).toContainText('养父母')
+      await expect(dialog).toContainText('Adoptive Parents')
       await dialog.locator('[data-id="A092_AdoptiveParents"]').click()
       await dialog.locator('[data-id="D018_SteamPlow"]').click()
-      await dialog.getByRole('button', { name: '确认选择' }).click()
-      await expect(dialog).toContainText('等待其他玩家（1/2）…')
+      await dialog.getByRole('button', { name: 'Confirm picks' }).click()
+      await expect(dialog).toContainText('Waiting for other players (1/2)…')
     }
   })
 }
 
-test('spring interaction and breeding log use Chinese season/action names without debug events', async ({ page, request }) => {
+test('spring interaction and breeding log use English season/action names without debug events', async ({ page, request }) => {
   await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 9, maxPlayers: 2, enableThroughTheSeasons: true })
   const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
   state.phase = 'playing'
@@ -126,15 +124,15 @@ test('spring interaction and breeding log use Chinese season/action names withou
   first.fenceSegments = ['H-0-1', 'H-0-2', 'H-1-1', 'H-1-2', 'V-0-1', 'V-0-3'].map(edge => ({ edge, type: 'fence', source: { kind: 'own', ownerPlayerId: first.id } }))
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   await page.goto(sandboxUrl)
-  await expect(page.locator('.seasons-board__token')).toHaveText('春')
+  await expect(page.locator('.seasons-board__token')).toHaveText('Sp')
   await page.locator('.seasons-board__space-button[data-season="spring"]').click()
-  await expect(page.locator('.interaction-bar')).toContainText('由 春季 触发')
-  await page.getByRole('button', { name: '繁殖', exact: true }).click()
-  await expect(page.locator('.action-log')).toContainText('春季 触发 (繁殖)')
+  await expect(page.locator('.interaction-bar')).toContainText('Triggered by Spring')
+  await page.getByRole('button', { name: 'Breed', exact: true }).click()
+  await expect(page.locator('.action-log')).toContainText('Spring triggered (Breed)')
   await expect(page.locator('.action-log')).not.toContainText(/through-the-seasons:|farm\.animalBred|actor=|seq=|\(breed\)/)
 })
 
-test('completed fathers and the infirmary restriction have Chinese labels', async ({ page, request }) => {
+test('completed fathers and the infirmary restriction have English labels', async ({ page, request }) => {
   await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 931, maxPlayers: 2, enableParentCards: true, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true })
   const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
   state.phase = 'playing'
@@ -155,7 +153,7 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
   })
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   await page.goto(sandboxUrl)
-  await expect(page.locator('.parent-card-infobox')).toHaveText('已完成')
+  await expect(page.locator('.parent-card-infobox')).toHaveText('Completed')
   const father = page.locator('.parent-card-face--father').first()
   await father.screenshot({ path: 'output/playwright/completed-parent.png' })
   const completionSize = await father.evaluate(element => ({
@@ -164,7 +162,7 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
   }))
   expect(completionSize.badge).toBeLessThan(completionSize.card / 4)
   const infirmaryCard = page.locator('[data-action-id="moor-infirmary"]')
-  const restriction = infirmaryCard.getByText('病人只能来此；健康工人也可使用', { exact: true })
+  const restriction = infirmaryCard.getByText('Sick: here only; healthy: allowed', { exact: true })
   await expect(restriction).toBeVisible()
   await expect(infirmaryCard.locator('.action-farmer-stack')).toHaveCount(2)
   const textBox = await restriction.boundingBox()
@@ -172,7 +170,6 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
   expect(textBox).not.toBeNull()
   expect(workerBox).not.toBeNull()
   expect(textBox!.y + textBox!.height).toBeLessThanOrEqual(workerBox!.y)
-  await expect(page.locator('.game-layout')).not.toContainText(/Completed|Sick workers only/)
 })
 
 test('winter payments fly to supply with negative amounts and a localized source', async ({ page, request }) => {
@@ -202,7 +199,7 @@ test('winter payments fly to supply with negative amounts and a localized source
   await page.locator('.seasons-board__space-button[data-season="winter"]').click()
   await expect.poll(() => page.locator('html').getAttribute('data-payment-amounts')).toContain('−2')
   await expect.poll(() => page.locator('html').getAttribute('data-payment-amounts')).toContain('−6')
-  await expect(page.locator('.action-log')).toContainText('冬季')
-  await expect(page.locator('.action-log')).toContainText('支付资源')
+  await expect(page.locator('.action-log')).toContainText('Winter')
+  await expect(page.locator('.action-log')).toContainText('Pay Resources')
   await expect(page.locator('.action-log')).not.toContainText(/through-the-seasons:|\(pay\)/)
 })

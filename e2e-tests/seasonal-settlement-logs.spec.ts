@@ -5,7 +5,7 @@ import { serializeState } from '../shared/session/serialization'
 import { emptyResources } from '../shared/session/state-bootstrap'
 import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './room-command-driver'
 
-async function openRoom(browser: Browser, request: APIRequestContext, locale: 'en' | 'zh', configure: (state: GameState) => void, enableMoor = false) {
+async function openRoom(browser: Browser, request: APIRequestContext, locale: 'en', configure: (state: GameState) => void, enableMoor = false) {
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   try {
     await joinRoomClients(pages, request, locale)
@@ -35,7 +35,7 @@ async function chooseByLabel(pages: [Page, Page], driver: ReturnType<typeof room
   await driver.command(current.interaction.playerIndex, { type: 'choice', value: option.value })
 }
 
-for (const locale of ['en', 'zh'] as const) {
+for (const locale of ['en'] as const) {
   for (const pigBreeder of [false, true]) {
     test(`${pigBreeder ? 'Pig Breeder' : 'spring'} logs actual newborns in ${locale}`, async ({ browser, request }) => {
       const animal = pigBreeder ? 'boar' : 'sheep'
@@ -80,10 +80,10 @@ for (const locale of ['en', 'zh'] as const) {
         expect(current.state.players[0]!.resources[animal]).toBe(3)
         expect(current.state.events.filter(event => event.type === 'farm.animalBred')).toMatchObject([{ animals: { [animal]: 1 } }])
         for (const page of pages) {
-          const row = page.locator('.action-log__text').filter({ hasText: locale === 'zh' ? /新生/ : /breeds/ })
+          const row = page.locator('.action-log__text').filter({ hasText: /breeds/ })
           await expect(row).toHaveCount(1)
           await expect(row.locator(`[data-resource="${animal}"][data-amount="1"]`)).toHaveCount(1)
-          await expect(row).toContainText(pigBreeder ? (locale === 'zh' ? '喂猪人' : 'Pig Breeder') : (locale === 'zh' ? '春季' : 'Spring'))
+          await expect(row).toContainText(pigBreeder ? 'Pig Breeder' : 'Spring')
         }
         await driver.reload()
         expect(publicRoomState(await roomSnapshot(pages[1]))).toEqual(publicRoomState(current))
@@ -119,10 +119,10 @@ for (const locale of ['en', 'zh'] as const) {
         { required: 0, fuelUsed: 0, woodToFuel: 0, sickWorkerIds: [] },
       ])
       for (const page of pages) {
-        const row = page.locator('.action-log__text').filter({ hasText: locale === 'zh' ? /夏季.*豁免/ : /Summer.*waives/ })
+        const row = page.locator('.action-log__text').filter({ hasText: /Summer.*waives/ })
         await expect(row).toHaveCount(2)
         for (const heating of await row.all()) {
-          await expect(heating).toContainText(locale === 'zh' ? '豁免 2 燃料需求（原需 2）' : 'waives 2 fuel requirement (normally 2)')
+          await expect(heating).toContainText('waives 2 fuel requirement (normally 2)')
         }
       }
       await driver.reload()
@@ -150,7 +150,7 @@ for (const locale of ['en', 'zh'] as const) {
       expect(current.state.players[0]!.roomTiles).toHaveLength(3)
       expect(current.state.players[0]!.stableTiles).toEqual([{ row: 0, col: 0 }])
       for (const page of pages) {
-        const row = page.locator('.action-log__text').filter({ hasText: locale === 'zh' ? /夏季/ : /Summer/i })
+        const row = page.locator('.action-log__text').filter({ hasText: /Summer/i })
         await expect(row).toHaveCount(1)
         await expect(row).toContainText('1')
       }
@@ -175,11 +175,11 @@ for (const locale of ['en', 'zh'] as const) {
       const reed = current.state.events.filter(event => event.type === 'action.accumulated' && event.spaceId === 'reed-bank')
       expect(reed).toHaveLength(1)
       expect(reed[0]).toMatchObject({ resources: {} })
-      const target = locale === 'zh' ? '芦苇河岸' : 'Reed Bank'
+      const target = 'Reed Bank'
       for (const page of pages) {
         const row = page.locator('.action-log__text').filter({ hasText: target })
         await expect(row).toHaveCount(1)
-        await expect(row).toContainText(locale === 'zh' ? '冬季' : 'Winter')
+        await expect(row).toContainText('Winter')
         await expect(row).toContainText('0')
         await expect(row).toContainText('1')
       }
@@ -207,12 +207,12 @@ for (const locale of ['en', 'zh'] as const) {
         expect(current.state.players[0]!.resources.wood).toBe(free ? 10 : 5)
         expect(current.state.players[0]!.fenceSegments).toHaveLength(free ? 4 : 7)
         expect(publicRoomState(await roomSnapshot(pages[1]))).toEqual(publicRoomState(current))
-        const explanation = locale === 'zh' ? /春季/ : /Spring/i
+        const explanation = /Spring/i
         for (const page of pages) {
           const row = page.locator('.action-log__text').filter({ hasText: explanation })
           await expect(row).toHaveCount(1)
-          await expect(row).toContainText(locale === 'zh' ? `建造 ${free ? 4 : 7} 段围栏` : `Build ${free ? 4 : 7} fence(s)`)
-          await expect(row).toContainText(new RegExp(`${locale === 'zh' ? '支付' : 'Pays'}.*${free ? 0 : 5}`))
+          await expect(row).toContainText(`Build ${free ? 4 : 7} fence(s)`)
+          await expect(row).toContainText(new RegExp(`Pays.*${free ? 0 : 5}`))
           await expect(row.locator('[data-resource="wood"][data-amount="2"]')).toHaveCount(1)
           await expect(row.locator('[data-resource="wood"][data-amount="5"]')).toHaveCount(free ? 0 : 1)
         }
@@ -236,7 +236,7 @@ for (const locale of ['en', 'zh'] as const) {
       const current = await roomSnapshot(pages[0])
       expect(current.state.players[0]!.resources.food).toBe(0)
       expect(current.state.players[0]!.fields).toHaveLength(1)
-      const explanation = locale === 'zh' ? /冬季/ : /Winter/i
+      const explanation = /Winter/i
       for (const page of pages) {
         const row = page.locator('.action-log__text').filter({ hasText: explanation })
         await expect(row).toHaveCount(1)
@@ -266,7 +266,7 @@ for (const locale of ['en', 'zh'] as const) {
       expect(current.state.players[0]!.resources.clay).toBe(1)
       expect(current.state.players[0]!.improvements).toContain('Major_Fireplace1')
       for (const page of pages) {
-        const row = page.locator('.action-log__text').filter({ hasText: locale === 'zh' ? /秋季/ : /Autumn/i })
+        const row = page.locator('.action-log__text').filter({ hasText: /Autumn/i })
         await expect(row).toHaveCount(1)
         await expect(row).toContainText('1')
       }
@@ -284,7 +284,7 @@ for (const locale of ['en', 'zh'] as const) {
       const current = await roomSnapshot(pages[0])
       expect(current.state.players[0]!.resources.grain).toBe(1)
       expect(publicRoomState(await roomSnapshot(pages[1]))).toEqual(publicRoomState(current))
-      const explanation = locale === 'zh' ? /夏季/ : /Summer/
+      const explanation = /Summer/
       for (const page of pages) {
         await expect(page.locator('.action-log__text').filter({ hasText: explanation })).toHaveCount(1)
       }

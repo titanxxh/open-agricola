@@ -12,19 +12,36 @@ const [operation, root] = process.argv.slice(2)
 if (!root || !['create', 'cleanup'].includes(operation)) throw new Error('Usage: test-environment.ts create|cleanup <private-test-directory>')
 const envPath = join(root, 'test.env')
 if (operation === 'create') {
+  const requestedPort = (name: string, span = 1) => {
+    const value = process.env[name]
+    if (value === undefined || value === '') return undefined
+    const port = Number(value)
+    if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1024 || port + span - 1 > 65535) {
+      throw new Error(`${name} must be an unprivileged TCP port${span === 2 ? ' with a second consecutive port' : ''}`)
+    }
+    return port
+  }
+  const requestedBackend = requestedPort('BACKEND_PORT')
+  const requestedFrontend = requestedPort('FRONTEND_PORT')
+  const requestedAppBase = requestedPort('APP_BASE_PORT', 2)
+  const taken = [requestedBackend, requestedFrontend, requestedAppBase,
+    requestedAppBase === undefined ? undefined : requestedAppBase + 1].filter(port => port !== undefined)
+  if (new Set(taken).size !== taken.length) throw new Error('Test frontend, backend and app instance ports must not overlap')
+  const backend = requestedBackend ?? await allocateTestPort({ taken })
+  taken.push(backend)
+  const frontend = requestedFrontend ?? await allocateTestPort({ taken })
+  taken.push(frontend)
+  // Parent runners reserve disjoint lane ports; ordinary verify allocates its own.
+  const appBase = requestedAppBase ?? await allocateTestPort({ span: 2, taken })
   const schema = `test_${randomUUID().replaceAll('-', '')}`
   const url = getTestDatabaseUrl()
   const db = new PostgresDatabase({ connectionString: url })
   try { await db.exec(`CREATE SCHEMA "${schema}"`) } finally { await db.close() }
-  const backend = process.env.BACKEND_PORT || String(await allocateTestPort())
-  const frontend = process.env.FRONTEND_PORT || String(await allocateTestPort({ taken: [Number(backend)] }))
-  // Two local app instances listen on APP_BASE_PORT and the port after it.
-  const appBase = await allocateTestPort({ span: 2, taken: [Number(backend), Number(frontend)] })
   const base = `http://127.0.0.1:${backend}`, client = `http://127.0.0.1:${frontend}`
   const values: Record<string, string | undefined> = { ...testStorageEnvironment(),
     DATABASE_URL: url, DATABASE_SCHEMA: schema, S3_PREFIX: `test/e2e-${randomUUID()}/`,
     LOCAL_ENV_FILE: envPath, SHARED_DATA_DIR: root, REPLAY_VIEWER_ROOT: join(root, 'replay-viewers'),
-    BACKEND_PORT: backend, FRONTEND_PORT: frontend, APP_BASE_PORT: String(appBase),
+    BACKEND_PORT: String(backend), FRONTEND_PORT: String(frontend), APP_BASE_PORT: String(appBase),
     // The launcher then stops only the processes it started for this environment.
     OWNED_PROCESSES_FILE: join(root, 'owned-processes'),
     BACKEND_LOG: join(root, 'backend.log'), FRONTEND_LOG: join(root, 'frontend.log'),

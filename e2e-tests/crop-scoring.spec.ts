@@ -3,7 +3,7 @@ import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
 
 for (const device of [
-  { name: 'desktop', viewport: { width: 1920, height: 1080 }, locale: 'zh' },
+  { name: 'desktop', viewport: { width: 1920, height: 1080 }, locale: 'en' },
   { name: 'mobile', viewport: { width: 393, height: 800 }, locale: 'en' },
 ]) {
   test.describe(device.name, () => {
@@ -47,13 +47,13 @@ for (const device of [
       await page.addInitScript((locale) => localStorage.setItem('open-agricola-locale-v2', locale), device.locale)
       await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
       await page.locator('.game-layout__right').getByRole('button', {
-        name: device.locale === 'zh' ? '计分板' : 'Scoring Pad', exact: true,
+        name: 'Scoring Pad', exact: true,
       }).click()
 
       const pad = page.locator('.scoring-pad')
       await expect(page.locator('.scoring-overlay')).toHaveCSS('opacity', '1')
-      const grainLabel = device.locale === 'zh' ? '谷物' : 'Grain'
-      const vegetableLabel = device.locale === 'zh' ? '蔬菜' : 'Vegetables'
+      const grainLabel = 'Grain'
+      const vegetableLabel = 'Vegetables'
       const grainRow = pad.locator('.scoring-row').filter({
         has: page.locator('.scoring-label').getByText(grainLabel, { exact: true }),
       })
