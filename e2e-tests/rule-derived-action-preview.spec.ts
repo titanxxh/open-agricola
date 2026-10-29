@@ -56,7 +56,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(scenario.width)
     await expect(page.locator('.public-event-notification')).toHaveCount(0, { timeout: 15000 })
-    await page.screenshot({ path: `output/playwright/rule-derived-schedules-${scenario.locale}.png` })
+    await page.screenshot({ path: `output/playwright/rule-derived-schedules-${scenario.locale}-${scenario.width}.png` })
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
     await expect(plans.getByRole('button')).toBeFocused()

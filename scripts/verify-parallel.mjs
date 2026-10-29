@@ -151,6 +151,8 @@ async function main() {
   for (const key of ['BACKEND_PORT', 'FRONTEND_PORT', 'APP_BASE_PORT', 'FRONTEND_URL', 'BACKEND_URL', 'SHARED_DATA_DIR',
     'LOCAL_ENV_FILE', 'OWNED_PROCESSES_FILE', 'REPLAY_VIEWER_ROOT', 'OPEN_AGRICOLA_VERIFICATION_RUN']) delete env[key]
   try {
+    const bootstrap = await command('pnpm', ['run', 'build:cards-manifest'], root, env, join(output, 'bootstrap.log'), 'bootstrap')
+    if (bootstrap.exitCode !== 0) throw new Error('Browser source bootstrap failed; see bootstrap.log')
     const listArgs = requirementsArgument(args).args
     if (listArgs[0] === 'e2e') listArgs.shift()
     const listing = await command('pnpm', ['exec', 'playwright', 'test', ...listArgs, '--list', '--reporter=json'], root, env, join(output, 'list.log'), 'selection', true)

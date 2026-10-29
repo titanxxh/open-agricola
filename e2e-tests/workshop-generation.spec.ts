@@ -11,10 +11,10 @@ const referenceBody = 'Sandbox example: use gainLeaf(CARD_ID, { food: 1 }).\n'
 const blob = createHash('sha1').update(`blob ${Buffer.byteLength(referenceBody)}\0`).update(referenceBody).digest('hex')
 const modelKey = 'browser-only-llm-credential-canary'
 
-for (const width of [1440, 390]) test(`editor candidate recovery and explicit adoption (en, ${width}px)`, async ({ page, browser }) => {
+for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) test(`editor candidate recovery and explicit adoption (en, ${width}px)`, async ({ page, browser }) => {
   const locale = 'en'
   test.setTimeout(90_000)
-  await page.setViewportSize({ width, height: 844 })
+  await page.setViewportSize({ width, height })
   await page.addInitScript(locale => {
     localStorage.setItem('open-agricola-locale-v2', locale)
   }, locale)
