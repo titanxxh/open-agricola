@@ -1,3 +1,4 @@
+import '../../__tests__/_helpers/opening-seat-random'
 import * as rng from '../../../shared/utils/rng'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'

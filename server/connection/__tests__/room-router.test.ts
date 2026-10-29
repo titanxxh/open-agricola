@@ -1,7 +1,7 @@
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { describe, expect, it, vi } from 'vitest'
 import { createConnectionCtx } from '../connection-ctx.ts'
-import { snapshotToRoom } from '../../game/room.ts'
+import { removePlayerFromRoom, snapshotToRoom } from '../../game/room.ts'
 import { GameSession, type SessionResponse } from '../../game/authoritative-session.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
@@ -10,7 +10,7 @@ const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
 const WIDE_SEED = /^[0-9a-f]{32}$/
 
-const { newDeps, dispatch } = recordedRouterFixture()
+const { newDeps, dispatch, openingSeatRandom } = recordedRouterFixture()
 
 const newCtx = (deps = newDeps()) => {
   const ws = fakeWs() as never
@@ -38,6 +38,105 @@ const markRoomStarted = async (ctx: ReturnType<typeof newCtx>) => {
 }
 
 describe('handleCreateRoom', () => {
+  it('randomizes all four opening ranks, preserves private draft ownership and rerolls a rematch', async () => {
+    const deps = newDeps()
+    const clients = ['Alice', 'Bob', 'Carol', 'Dan'].map(name => {
+      const ctx = newCtx(deps)
+      ctx.currentUserId = name
+      return ctx
+    })
+    const host = clients[0]!
+    openingSeatRandom.mockReturnValueOnce(2).mockReturnValueOnce(0).mockReturnValueOnce(1)
+    await dispatch(host, { type: 'createRoom', maxPlayers: 4, name: 'Alice', draftMode: 'simultaneous', draftPoolSize: 7 })
+    expect(host.currentPlayerIndex).toBe(2)
+    const room = host.currentRoom!
+    await dispatch(host, { type: 'setPlayerColor', color: 'yellow' })
+    for (const client of clients.slice(1)) {
+      await dispatch(client, { type: 'joinRoom', roomId: room.id, name: client.currentUserId })
+    }
+    expect(room.session.state.players.map(player => player.name)).toEqual(['Bob', 'Dan', 'Alice', 'Carol'])
+    expect(room.session.state.players[0]!.startPlayer).toBe(true)
+    expect(room.session.state.phase).toBe('draft')
+    expect((await host.persistence.load(room.id))!.meta.players).toEqual([
+      { userId: 'Bob', playerIndex: 0 }, { userId: 'Dan', playerIndex: 1 },
+      { userId: 'Alice', playerIndex: 2 }, { userId: 'Carol', playerIndex: 3 },
+    ])
+    const colors = new Map(clients.map(client => [client.currentUserId, room.session.state.players[client.currentPlayerIndex]!.color]))
+    for (const client of clients.slice(0, 3)) {
+      const id = room.session.state.players[client.currentPlayerIndex]!.id
+      const pool = room.session.state.draft!.pools[id]!
+      await dispatch(client, { type: 'draftSubmit', playerId: id, pick: { occCardId: pool.occ[0]!, minorCardId: pool.minor[0]! } })
+      expect(room.session.state.draft!.pendingPicks[id]).toEqual({ occ: pool.occ[0], minor: pool.minor[0] })
+    }
+    const resumed = newCtx(deps)
+    resumed.currentUserId = 'Alice'
+    const draws = openingSeatRandom.mock.calls.length
+    await dispatch(resumed, { type: 'joinRoom', roomId: room.id, intent: 'resume' })
+    expect(resumed.currentPlayerIndex).toBe(2)
+    expect(openingSeatRandom).toHaveBeenCalledTimes(draws)
+    expect(sentMessagesOf(resumed)).toContainEqual(expect.objectContaining({ type: 'stateUpdate', payload: expect.objectContaining({
+      state: expect.objectContaining({ draft: expect.objectContaining({ pendingPicks: expect.objectContaining({
+        p1: { occ: '?', minor: '?' }, p2: { occ: null, minor: null },
+      }) }) }),
+    }) }))
+    const previousId = room.id
+    openingSeatRandom.mockReturnValueOnce(3).mockReturnValueOnce(0).mockReturnValueOnce(0)
+    await dispatch(resumed, { type: 'newGame' })
+    expect(room.id).not.toBe(previousId)
+    expect(room.session.state.players.map(player => player.name)).toEqual(['Dan', 'Alice', 'Carol', 'Bob'])
+    for (const client of [resumed, ...clients.slice(1)]) {
+      await dispatch(client, { type: 'getState' })
+      expect(room.session.state.players[client.currentPlayerIndex]!.name).toBe(client.currentUserId)
+      expect(room.session.state.players[client.currentPlayerIndex]!.color).toBe(colors.get(client.currentUserId))
+      expect(sentMessagesOf(client)).toContainEqual(expect.objectContaining({ type: 'roomJoined', roomId: room.id, playerIndex: client.currentPlayerIndex }))
+    }
+  })
+
+  it('does not let a new participant choose an unowned opening rank', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'host'
+    const guest = newCtx(deps)
+    guest.currentUserId = 'guest'
+    openingSeatRandom.mockReturnValueOnce(3).mockReturnValueOnce(1)
+    await dispatch(host, { type: 'createRoom', maxPlayers: 4 })
+    await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, requestedPlayerIndex: 0 })
+    expect(host.currentPlayerIndex).toBe(3)
+    expect(guest.currentPlayerIndex).toBe(1)
+    expect(host.currentRoom!.seatOwners).toEqual([{ playerIndex: 1, userId: 'guest' }, { playerIndex: 3, userId: 'host' }])
+  })
+
+  it('retains fresh carried seats while a partial rematch waits for more players', async () => {
+    const deps = newDeps()
+    const clients = Array.from({ length: 3 }, (_, index) => {
+      const ctx = newCtx(deps)
+      ctx.currentUserId = `partial-${index}`
+      return ctx
+    })
+    const host = clients[0]!
+    await dispatch(host, { type: 'createRoom', maxPlayers: 3, name: 'Host', draftMode: 'simultaneous' })
+    const room = host.currentRoom!
+    await dispatch(clients[1]!, { type: 'joinRoom', roomId: room.id, name: 'Peer' })
+    await dispatch(clients[2]!, { type: 'joinRoom', roomId: room.id, name: 'Departed' })
+    removePlayerFromRoom(room, clients[2]!.ws)
+    openingSeatRandom.mockReturnValueOnce(2).mockReturnValueOnce(0)
+    await dispatch(host, { type: 'newGame' })
+    expect(room.status).toBe('waiting')
+    const draws = openingSeatRandom.mock.calls.length
+    await dispatch(host, { type: 'getState' })
+    expect(host.currentPlayerIndex).toBe(2)
+    expect((await host.persistence.load(room.id))!.meta.players).toEqual([
+      { userId: 'partial-1', playerIndex: 0 }, { userId: 'partial-0', playerIndex: 2 },
+    ])
+    const last = newCtx(deps)
+    last.currentUserId = 'partial-new'
+    await dispatch(last, { type: 'joinRoom', roomId: room.id, name: 'New' })
+    expect(last.currentPlayerIndex).toBe(1)
+    expect(room.status).toBe('playing')
+    expect(room.session.state.players.map(player => player.name)).toEqual(['Peer', 'New', 'Host'])
+    expect(openingSeatRandom).toHaveBeenCalledTimes(draws)
+  })
+
   it('limits active rooms to invited accounts and retains that policy through rematch', async () => {
     const deps = newDeps()
     const host = newCtx(deps)
@@ -1297,10 +1396,11 @@ describe('waiting room player colors', () => {
     host.currentUserId = 'u1'
     earlyGuest.currentUserId = 'u2'
     lastGuest.currentUserId = 'u3'
+    openingSeatRandom.mockReturnValueOnce(0).mockReturnValueOnce(1)
     await dispatch(host, { type: 'createRoom', maxPlayers: 3 })
     const roomId = host.currentRoom!.id
-    await dispatch(earlyGuest, { type: 'joinRoom', roomId, requestedPlayerIndex: 2 }, { confirmFinalColor: false })
-    await dispatch(lastGuest, { type: 'joinRoom', roomId, requestedPlayerIndex: 1 }, { confirmFinalColor: false })
+    await dispatch(earlyGuest, { type: 'joinRoom', roomId }, { confirmFinalColor: false })
+    await dispatch(lastGuest, { type: 'joinRoom', roomId }, { confirmFinalColor: false })
     expect(host.currentRoom!.colorConfirmationPlayerIndex).toBe(1)
     await dispatch(earlyGuest, { type: 'confirmPlayerColor' })
     expect(host.currentRoom!.status).toBe('waiting')

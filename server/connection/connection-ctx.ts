@@ -45,3 +45,8 @@ export const createConnectionCtx = (
   currentPlayerIndex: -1,
   ...deps,
 })
+
+export const refreshConnectionSeat = (ctx: ConnectionCtx): void => {
+  const seat = ctx.currentRoom?.players.find(player => player.ws === ctx.ws)
+  if (seat) ctx.currentPlayerIndex = seat.playerIndex
+}

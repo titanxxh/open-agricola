@@ -49,9 +49,14 @@ const command = async (page: Page, body: Record<string, unknown>, observer?: Pag
 test('real Room history loads earlier groups, preserves cancellation markers and refreshes names after reconnect', async ({ browser, request }) => {
   const suffix = Date.now().toString(36)
   const pages: Page[] = []
+  const seats = new Map<Page, number>()
   const tokens: string[] = []
   for (let index = 0; index < 2; index++) {
     const page = await browser.newPage()
+    page.on('websocket', socket => socket.on('framereceived', ({ payload }) => {
+      const message: ServerEvent = JSON.parse(payload.toString())
+      if (message.type === 'roomCreated' || message.type === 'roomJoined') seats.set(page, message.playerIndex)
+    }))
     const username = `history_${suffix}_${index}`
     const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
       providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: `History${index}`,
@@ -89,6 +94,8 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   await p2.goto(`/?player=p2&transport=ws&room=${room}`)
   await p2.getByRole('button', { name: 'Confirm color and start', exact: true }).click()
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
+  expect([...seats.values()].sort()).toEqual([0, 1])
+  pages.sort((left, right) => seats.get(left)! - seats.get(right)!)
   for (let index = 0; index < 28; index++) {
     const current = await resolveRoomWorkPrompts({
       snapshot: actor => snapshot(pages[actor]!),
@@ -139,7 +146,7 @@ test('real Room history loads earlier groups, preserves cancellation markers and
     if (!viewport) throw new Error('Log viewport is missing')
     return Math.abs(element.getBoundingClientRect().top - viewport.getBoundingClientRect().top - offsetY)
   }, reading.offsetY)).toBeLessThanOrEqual(2)
-  await command(p2, { type: 'undoAction' })
+  await command(pages[1]!, { type: 'undoAction' })
   await expect(p1.getByRole('button', { name: 'Load earlier entries', exact: true })).toBeVisible()
   await expect(p1.getByRole('status').filter({ hasText: 'History updated' })).toBeVisible()
   await expect(p1.locator('.action-log__text--canceled')).not.toHaveCount(0)

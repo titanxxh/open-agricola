@@ -1,3 +1,4 @@
+import { openingSeatRandom } from './opening-seat-random'
 import { randomUUID } from 'node:crypto'
 import { beforeEach, afterEach, vi } from 'vitest'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
@@ -76,5 +77,5 @@ export function recordedRouterFixture() {
       await dispatch(ctx, { type: 'confirmPlayerColor' })
     }
   }
-  return { newDeps, dispatch }
+  return { newDeps, dispatch, openingSeatRandom }
 }

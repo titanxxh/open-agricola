@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { ExecutionStamp } from './execution-access'
 import { RoomCapacityError, type OwnerToken } from './room-directory'
 import { nextInputWindow, type RoomInputWindow } from './command-input'
@@ -239,7 +240,7 @@ export type JoinSeatResolution =
   | { ok: false; error: string }
 
 export const resolveJoinPlayerIndex = (
-  room: Pick<Room, 'id' | 'maxPlayers' | 'players' | 'seatOwners'>,
+  room: Pick<Room, 'id' | 'maxPlayers' | 'players' | 'seatOwners' | 'hotseat'>,
   requestedPlayerIndex?: number,
   userId?: string,
 ): JoinSeatResolution => {
@@ -264,16 +265,18 @@ export const resolveJoinPlayerIndex = (
     if (!isDevRoom(room.id) && owner && owner.userId !== userId) {
       return { ok: false, error: 'player slot occupied' }
     }
-    return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: false }
+    if (isDevRoom(room.id) || room.hotseat || room.maxPlayers === 1 || (userId && owner?.userId === userId)) {
+      return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: false }
+    }
   }
   const taken = new Set(room.players.map((p) => p.playerIndex))
   if (!isDevRoom(room.id)) {
     for (const owner of roomSeatOwners(room)) taken.add(owner.playerIndex)
   }
-  for (let i = 0; i < room.maxPlayers; i += 1) {
-    if (!taken.has(i)) return { ok: true, playerIndex: i, replacedExistingPlayer: false }
-  }
-  return { ok: false, error: 'room full' }
+  const free = Array.from({ length: room.maxPlayers }, (_, index) => index).filter(index => !taken.has(index))
+  if (free.length === 0) return { ok: false, error: 'room full' }
+  const offset = isDevRoom(room.id) || room.hotseat || free.length === 1 ? 0 : randomInt(free.length)
+  return { ok: true, playerIndex: free[offset]!, replacedExistingPlayer: false }
 }
 
 export const resolveJoinRequestPlayerIndex = (

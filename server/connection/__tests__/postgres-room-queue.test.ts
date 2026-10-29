@@ -1,3 +1,4 @@
+import '../../__tests__/_helpers/opening-seat-random'
 import { randomUUID } from 'node:crypto'
 import type { ClientCommand } from '../../../shared/contract/protocol/ws'
 import type { ConnectionCtx } from '../connection-ctx'
