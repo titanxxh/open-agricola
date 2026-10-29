@@ -37,7 +37,7 @@ Hosted 和 Pages 构建入口固定 `NODE_ENV=production`。隔离后端继续�
 
 E2E 使用英文界面，业务流程不再按英文 / 中文重复展开；桌面、移动端、玩家人数和浏览器差异继续覆盖。产品仍提供中英文，语言包缺键检查继续由 `lint:i18n` 执行。
 
-`verify:parallel` 先准备一次共享测试依赖，再在 `.worktree/` 下从当前 HEAD 创建独立工作树。每片自行安装锁定的依赖、构建前端并通过原有 `pnpm verify --shard=i/N --workers=1` 运行。工作树、Vite 缓存、固定开发房间、应用端口、数据库 schema、S3 前缀和 Replay 目录互相隔离，因此一片中的房间重置或后端重启不会打断其他片。不要在同一个应用环境直接增大 worker 数。
+`verify:parallel` 先生成收集测试所需的卡牌和语言产物，准备一次共享测试依赖，再在 `.worktree/` 下从当前 HEAD 创建独立工作树。每片自行安装锁定的依赖、构建前端并通过原有 `pnpm verify --shard=i/N --workers=1` 运行。工作树、Vite 缓存、固定开发房间、应用端口、数据库 schema、S3 前缀和 Replay 目录互相隔离，因此一片中的房间重置或后端重启不会打断其他片。不要在同一个应用环境直接增大 worker 数。
 
 并行运行的日志、各片原始验证记录和汇总保存于 `output/verification/parallel-runs/`。汇总检查退出码和各片实际选择的 case，缺少 reporter、重复 case 或失败不能通过；它不覆盖根目录最近一次 E2E 记录。成功后仅清理本次创建且干净的工作树，失败时保留工作树和证据用于定位。完整发布验收还需执行 browser-local sandbox 和 WebKit 入口。
 

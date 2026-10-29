@@ -147,7 +147,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 39
     await expect(plans.last()).toContainText('Round 11:')
     await expect(plans.first().locator('[data-resource="fuel"]')).toHaveAttribute('data-amount', '3')
     await expect(plans.last().locator('[data-resource="fuel"]')).toHaveAttribute('data-amount', '6')
-    await page.screenshot({ path: `output/playwright/choice-peat-sled-${scenario.locale}.png` })
+    await page.screenshot({ path: `output/playwright/choice-peat-sled-${scenario.locale}-${scenario.width}.png` })
     const committed = page.waitForResponse((result) => result.url().endsWith('/api/game/choice'))
     await plans.last().click()
     const result = await (await committed).json()
