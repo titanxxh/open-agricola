@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "${1:-}" == '--wechat-qr' ]]; then
+if [[ "${1:-}" == '--wechat-qr' || "${1:-}" == '--feishu-qr' ]]; then
+  QR_PLATFORM="${1#--}"
+  QR_PLATFORM="${QR_PLATFORM%-qr}"
   shift
-  exec node "$(dirname "$0")/operations/update-wechat-qr.mjs" "$@"
+  exec node "$(dirname "$0")/operations/update-community-qr.mjs" "$QR_PLATFORM" "$@"
 fi
 HOST="${1:-ubuntu@ten-kr}"
 [[ "$HOST" == *@* ]] || HOST="ubuntu@$HOST"

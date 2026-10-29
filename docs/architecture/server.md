@@ -7,7 +7,7 @@ The server owns connections, Rooms, durable commit, persistence and the product 
 `frontend-hosting.ts` owns optional same-origin `/open-agricola/` static hosting and its public build metadata. With a configured same-site external frontend, only old application entry URLs redirect to that frontend; public Room/Replay parameters survive and credential fragments are cleared. API, operations, metrics and Replay namespaces retain their owners. `auth-cookies.ts` uses Public Suffix List site comparison through `http-origin.ts`; same-site subdomains retain host-only HttpOnly cookies without CHIPS. Coverage: `auth-cookies.test.ts`, `frontend-hosting.test.ts` and `hosted-password-login.spec.ts`; see ADR 0035.
 
 
-`community-qr.ts` owns the public read-only WeChat image endpoint. It rereads the atomically replaced host file for every request with no-store caching. `operations/update-wechat-qr.mjs`, invoked by `deploy-operations.sh --wechat-qr`, validates original images and publishes them through owner SSH access; the application mounts only the persistent community directory read only. Coverage: `wechat-community.test.ts` and `wechat-community.spec.ts`.
+`community-qr.ts` owns the public read-only WeChat and Feishu image endpoints. It rereads the atomically replaced host file for every request with no-store caching. `operations/update-community-qr.mjs`, invoked by `deploy-operations.sh --wechat-qr` or `--feishu-qr`, validates original images and publishes them through owner SSH access; the application mounts only the persistent community directory read only. Coverage: `wechat-community.test.ts` and `wechat-community.spec.ts`.
 
 
 ## `server/connection/`: WebSocket entry
