@@ -65,16 +65,11 @@ pnpm verify e2e-tests/release-rehearsal.spec.ts --browser=chromium --requirement
 
 reviewer 在 requirements 文件中声明必需 case 的仓库相对 `file`、完整 `titlePath`（describe 层级和 test 标题）、`project` 和 `browser`；不支持把文件名当成全部用例已执行。实际执行证据在 `output/verification/e2e-runs/<runId>/` 中不可覆盖地保存。相同源码指纹、相同 requirements 内容 hash 的运行可累计；缺失、过滤掉、跳过、预期失败、flaky、后续失败或缺少 reporter 结果都不能满足必需用例。`status --requirements` 还要求当前 prepush 成功。未传 requirements 时，原有 `verify` 和 `status` 契约保持不变。
 
-本机需要代理时设置 `RELEASE_SMOKE_PROXY`，Playwright 与 standalone smoke 使用同一设置；该环境变量计入验证指纹。依赖与语言、素材来源继续使用现有隔离环境及 pin 校验。可选代理不关闭 TLS 校验，也不证明目标生产域名可用。
+本机需要代理时设置 `RELEASE_SMOKE_PROXY`；该环境变量计入验证指纹。依赖与语言、素材来源继续使用现有隔离环境及 pin 校验。可选代理不关闭 TLS 校验，也不证明目标生产域名可用。
 
-真实目标可调用同一个浏览器流程。远端目标必须使用 HTTPS；HTTP 仅允许 `localhost`、`127.0.0.1` 或 `[::1]`，防止向远端明文发送凭据。命令会以指定已有账号创建两局正式单人测试局，并保留它们；在操作者已授权的目标运行。凭据只从私有环境读取，数据库通过现有适配器和 codec 在只读事务内核验：
+正式单人开局、选牌和持久化测试只在上述本机隔离演练中运行。浏览器流程拒绝前端或 API 指向非回环地址；原远端 `release:smoke` 命令已移除。上线验收不创建正式对局，也不向已有对局发送游戏操作。上线后核对生产 TLS/cookie、登录退出、前后端与 Pages 构建身份、静态资源、工坊和回放读取、备份恢复以及旧对局保留。
 
-```bash
-# 私有环境配置 RELEASE_SMOKE_USERNAME、RELEASE_SMOKE_PASSWORD、DATABASE_URL；schema 由 DATABASE_SCHEMA 指定
-pnpm release:smoke --app-url https://example.com/open-agricola/ --api-url https://example.com --expected-build <sha> --output output/release-<version>-smoke
-```
-
-同一输出目录的 `progress.json` 绑定目标、build 和账号摘要，已创建的局在重试时复用。创建结果不确定时保留命令身份并阻止再次创建，先核实原回执；完成后从 `result.json` 的 passed 状态及退出码确认成功。成功只在退出账号、关闭浏览器和数据库后写入。浏览器失败首轮即写 `failure.json`，清理失败另写 `cleanup-failure.json`，保留首个故障；`diagnostics.json` 记录有界的文档、连接、协议类型和请求状态，不保存认证头、Cookie、查询参数、完整消息或手牌。该本地演练不替代生产 TLS/cookie、部署身份、备份恢复和旧对局保留检查。
+本机演练在同一输出目录的 `progress.json` 中绑定目标、build 和账号摘要，已创建的局在重试时复用。创建结果不确定时保留命令身份并阻止再次创建，先核实原回执。浏览器失败首轮即写 `failure.json`，清理失败另写 `cleanup-failure.json`，保留首个故障；`diagnostics.json` 记录有界的文档、连接、协议类型和请求状态，不保存认证头、Cookie、查询参数、完整消息或手牌。演练通过现有数据库适配器和 codec 在只读事务内核验持久化。本机演练结果不替代上线后的检查。
 
 ## 全卡订阅审计
 
