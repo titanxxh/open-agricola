@@ -2,6 +2,13 @@
 # pnpm run verify -- [Playwright args]; real isolated PostgreSQL + S3 namespaces.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if [[ "$(uname -s)" == Linux ]]; then
+  export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE-1}"
+  export WEBKIT_SKIA_ENABLE_CPU_RENDERING="${WEBKIT_SKIA_ENABLE_CPU_RENDERING-1}"
+  if [[ -z "${__EGL_VENDOR_LIBRARY_FILENAMES+x}" && -f /usr/share/glvnd/egl_vendor.d/50_mesa.json ]]; then
+    export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json
+  fi
+fi
 TEST_RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/open-agricola-e2e.XXXXXX")"
 umask 077
 if [[ "${E2E_DEPENDENCIES_READY:-0}" != 1 ]]; then

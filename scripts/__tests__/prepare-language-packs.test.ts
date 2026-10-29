@@ -55,50 +55,61 @@ describe('pinned language package preparation', () => {
     expect(readFileSync(join(root, 'public/i18n', file), 'utf8')).toBe(pack)
   })
 
-  it('keeps complete JSON visible to concurrent readers during repeated cache preparation and repair', async () => {
-    const { root, file, pack, source, manifest } = fixture('Ferme '.repeat(180_000))
+  it('preserves complete bytes for existing and new readers across cache repair and preparation', async () => {
+    const { root, file, pack, source, manifest } = fixture()
     const files = new Map([
       ['packs/manifest.json', { target: join(root, 'public/i18n/manifest.json'), text: manifest }],
       [`packs/${file}`, { target: join(root, 'public/i18n', file), text: pack }],
       ['locales/fr.json', { target: join(root, 'output/i18n/locales/fr.json'), text: source }],
     ])
-    vi.stubGlobal('fetch', vi.fn((url: string) => {
+    const fetch = vi.fn((url: string) => {
       const entry = [...files].find(([path]) => url.endsWith(`/${path}`))?.[1]
       if (!entry) throw new Error(`Unexpected language request: ${url}`)
       return Promise.resolve(new Response(entry.text))
-    }))
-    const statistics = new Int32Array(new SharedArrayBuffer(4 * Int32Array.BYTES_PER_ELEMENT))
-    const reader = new Worker(`
-      const { readFileSync } = require('node:fs')
-      const { parentPort, workerData } = require('node:worker_threads')
-      const statistics = new Int32Array(workerData.statistics)
-      parentPort.postMessage('ready')
-      while (Atomics.load(statistics, 0) === 0) {
-        for (const path of workerData.paths) {
-          try { JSON.parse(readFileSync(path, 'utf8')) }
-          catch (error) { Atomics.add(statistics, error instanceof SyntaxError ? 2 : 3, 1) }
-          Atomics.add(statistics, 1, 1)
-        }
+    })
+    vi.stubGlobal('fetch', fetch)
+    const replaceWithNonCanonicalBytes = (suffix: string) => {
+      for (const { target, text } of files.values()) {
+        writeFileSync(`${target}.replacement`, text + suffix)
+        renameSync(`${target}.replacement`, target)
       }
-    `, { eval: true, workerData: { paths: [...files.values()].map(entry => entry.target), statistics: statistics.buffer } })
-    const exited = once(reader, 'exit')
-    await once(reader, 'message')
-    try {
-      for (let iteration = 0; iteration < 64; iteration++) {
-        if (iteration % 2 === 0) {
-          for (const { target, text } of files.values()) {
-            writeFileSync(`${target}.replacement`, `${text}\n`)
-            renameSync(`${target}.replacement`, target)
-          }
-        }
-        await prepareLanguagePacks(root)
-      }
-    } finally {
-      Atomics.store(statistics, 0, 1)
-      await exited
     }
-    expect(Atomics.load(statistics, 1)).toBeGreaterThan(0)
-    expect(Atomics.load(statistics, 3)).toBe(0)
-    expect(Atomics.load(statistics, 2)).toBe(0)
+    replaceWithNonCanonicalBytes('\n')
+    const reader = new Worker(`
+      const { fstatSync, openSync, readFileSync, readSync } = require('node:fs')
+      const { parentPort, workerData } = require('node:worker_threads')
+      const files = workerData.paths.map(path => ({ path, fd: openSync(path, 'r') }))
+      const read = fd => {
+        const bytes = Buffer.alloc(fstatSync(fd).size)
+        readSync(fd, bytes, 0, bytes.length, 0)
+        const text = bytes.toString('utf8')
+        JSON.parse(text)
+        return text
+      }
+      parentPort.postMessage(files.map(({ fd }) => read(fd)))
+      parentPort.on('message', () => parentPort.postMessage(files.map(({ path, fd }) => {
+        const newlyOpened = readFileSync(path, 'utf8')
+        JSON.parse(newlyOpened)
+        return { existing: read(fd), newlyOpened }
+      })))
+    `, { eval: true, workerData: { paths: [...files.values()].map(entry => entry.target) } })
+    try {
+      const [opened] = await once(reader, 'message')
+      expect(opened).toEqual([...files.values()].map(({ text }) => `${text}\n`))
+      for (let repair = 0; repair < 2; repair++) {
+        if (repair) replaceWithNonCanonicalBytes('\n\n')
+        await prepareLanguagePacks(root)
+        const reading = once(reader, 'message')
+        reader.postMessage('read')
+        const [observed] = await reading
+        expect(observed).toEqual([...files.values()].map(({ text }) => ({
+          existing: `${text}\n`, newlyOpened: text,
+        })))
+      }
+      await prepareLanguagePacks(root)
+      expect(fetch).toHaveBeenCalledTimes(6)
+    } finally {
+      await reader.terminate()
+    }
   })
 })
