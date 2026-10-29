@@ -30,7 +30,7 @@ const play = async (page: Page, request: APIRequestContext) => {
   return state
 }
 
-for (const [locale, actionName] of [['en', 'Gain Bonus VP'], ['zh', '获得加分']] as const) {
+for (const [locale, actionName] of [['en', 'Gain Bonus VP']] as const) {
   test(`new ${locale} bonus-vp logs stay singular across reload and distinct after undo`, async ({ page, request }) => {
     expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
       seed: 1097, playerCount: 2, customCardIds: [],

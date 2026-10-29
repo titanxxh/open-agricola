@@ -28,9 +28,9 @@ for (const viewport of [
     })
     expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
     await page.setViewportSize(viewport)
-    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-    await page.locator('.game-layout__right').getByRole('button', { name: '计分板', exact: true }).click()
+    await page.locator('.game-layout__right').getByRole('button', { name: 'Scoring Pad', exact: true }).click()
     const pad = page.locator('.scoring-pad')
     await expect(page.locator('.scoring-overlay')).toHaveCSS('opacity', '1')
     const content = pad.locator('.scoring-content')
@@ -51,7 +51,7 @@ for (const viewport of [
       expect(await content.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
       for (const name of await names.all()) await expect(name).toBeInViewport({ ratio: 1 })
     }
-    await pad.getByRole('button', { name: '统计', exact: true }).click()
+    await pad.getByRole('button', { name: 'Stats', exact: true }).click()
     await expect(names).toHaveText(playerNames)
     for (const name of await names.all()) await expect(name).toBeInViewport({ ratio: 1 })
     expect(await content.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
@@ -62,7 +62,7 @@ for (const viewport of [
       expect(await cell.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
     }
     await pad.screenshot({ path: `output/playwright/scoring-stats-four-players-${viewport.width}.png` })
-    await pad.getByRole('button', { name: '关闭', exact: true }).click()
+    await pad.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(pad).toHaveCount(0)
   })
 }

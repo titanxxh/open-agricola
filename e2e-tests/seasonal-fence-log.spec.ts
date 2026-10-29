@@ -5,7 +5,7 @@ import { serializeState } from '../shared/session/serialization'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import { emptyResources } from '../shared/session/state-bootstrap'
 
-for (const locale of ['zh', 'en'] as const) {
+for (const locale of ['en'] as const) {
   for (const free of [false, true]) {
     test(`spring fence cost explanation in ${locale}, payment ${free ? 0 : 5}`, async ({ page, request }) => {
       await page.addInitScript(value => localStorage.setItem('open-agricola-locale-v2', value), locale)
@@ -42,13 +42,13 @@ for (const locale of ['zh', 'en'] as const) {
           seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }] }),
       ])
       await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-      const payment = page.locator('.action-log li').filter({ hasText: locale === 'zh' ? '春季减免' : 'Spring: costs' })
+      const payment = page.locator('.action-log li').filter({ hasText: 'Spring: costs' })
       await expect(payment).toHaveCount(1)
-      await expect(payment).toContainText(locale === 'zh' ? /支付.*[05]/ : /Pays.*[05]/)
+      await expect(payment).toContainText(/Pays.*[05]/)
       await expect(payment.locator('[data-resource="wood"][data-amount="2"]')).toHaveCount(1)
       if (free) await expect(payment).toContainText('0')
       else await expect(payment.locator('[data-resource="wood"][data-amount="5"]')).toHaveCount(1)
-      await expect(payment).toContainText(locale === 'zh' ? `建造 ${free ? 4 : 7} 段围栏` : `Build ${free ? 4 : 7} fence(s)`)
+      await expect(payment).toContainText(`Build ${free ? 4 : 7} fence(s)`)
       await page.locator('.action-log').screenshot({ path: `output/playwright/seasonal-fence-${locale}-${free ? 'free' : 'paid'}.png` })
     })
   }

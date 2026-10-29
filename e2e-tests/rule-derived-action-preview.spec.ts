@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { BACKEND_URL } from './fixtures'
 
-for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 390 }] as const) {
-  test(`actual anytime plans and player-separated schedules in ${scenario.locale}`, async ({ page, request }) => {
+for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 390 }] as const) {
+  test(`actual anytime plans and player-separated schedules in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
     await page.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
     const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 6117, playerCount: 2, customCardIds: [] } })
@@ -28,11 +28,11 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
     ]
     expect((await request.post(`${BACKEND_URL}/api/game/load`, { data: { state } })).ok()).toBe(true)
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
-    const anytime = page.locator('.anytime-bar button').filter({ hasText: scenario.locale === 'en' ? 'Whisky Distiller' : '威士忌蒸馏师' })
+    const anytime = page.locator('.anytime-bar button').filter({ hasText: 'Whisky Distiller' })
     await expect(anytime).toHaveCount(1)
     await expect(anytime.locator('[data-resource="food"]')).toHaveAttribute('data-amount', '4')
     await expect(anytime.locator('[data-resource="grain"]')).toHaveAttribute('data-amount', '1')
-    await expect(anytime).toContainText(scenario.locale === 'en' ? 'Round 7' : '第 7 回合')
+    await expect(anytime).toContainText('Round 7')
     for (let index = 0; index < 2; index++) {
       const response = page.waitForResponse(result => result.url().endsWith('/api/game/anytime'))
       await anytime.click()
@@ -45,7 +45,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
     await expect(plans.locator('[data-source-card="D106_WhiskyDistiller"] [data-resource="food"]')).toHaveAttribute('data-amount', '8')
     await expect(plans.locator('[data-source-card="A074_StableTree"]')).toHaveCount(1)
     await plans.getByRole('button').click({ timeout: 10000 })
-    const dialog = page.getByRole('dialog', { name: scenario.locale === 'en' ? 'Scheduled effects' : '已安排效果' })
+    const dialog = page.getByRole('dialog', { name: 'Scheduled effects' })
     await expect(dialog).toBeVisible()
     await expect(dialog.locator('[data-player-color="red"] li')).toHaveCount(2)
     await expect(dialog.locator('[data-player-color="blue"] li')).toHaveCount(1)
@@ -69,7 +69,7 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 39
 
 test('dense schedules keep six player colors separated on a narrow board', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 900 })
-  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   // Six players are intentional here: this verifies every supported player color.
   const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 6117, playerCount: 6, customCardIds: [] } })
   expect(fresh.ok()).toBe(true)
@@ -100,7 +100,7 @@ test('dense schedules keep six player colors separated on a narrow board', async
     await expect(owner.locator('[data-resource="wood"]')).toHaveAttribute('data-amount', '1234')
   }
   await plans.getByRole('button').click({ timeout: 10000 })
-  const dialog = page.getByRole('dialog', { name: '已安排效果' })
+  const dialog = page.getByRole('dialog', { name: 'Scheduled effects' })
   await expect(dialog.locator('section')).toHaveCount(6)
   await expect(dialog.locator('li')).toHaveCount(12)
   await expect(dialog).toContainText('×12')
@@ -110,7 +110,7 @@ test('dense schedules keep six player colors separated on a narrow board', async
   expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await page.screenshot({ path: 'output/playwright/rule-derived-schedules-six-colors.png' })
   await page.keyboard.press('Tab')
-  await expect(dialog.getByRole('button', { name: '关闭' })).toBeFocused()
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
   await expect(plans.getByRole('button')).toBeFocused()
@@ -150,7 +150,7 @@ test('baking uses authoritative prices and quantities for the interaction player
 
 test('declared timed resource formulas show exact fixed quantities on their future round', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 1000 })
-  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
   const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 2424, playerCount: 2, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true, customCardIds: [] } })
   expect(fresh.ok()).toBe(true)
   const { state } = await fresh.json() as { state: SerializedGameState }
@@ -164,8 +164,8 @@ test('declared timed resource formulas show exact fixed quantities on their futu
   await expect(plans).toHaveCount(2)
   for (const [resource, amount] of [['wood', '3'], ['clay', '2'], ['reed', '1']] as const) await expect(plans.first().locator(`[data-resource="${resource}"]`)).toHaveAttribute('data-amount', amount)
   await plans.first().getByRole('button').click({ timeout: 10000 })
-  const dialog = page.getByRole('dialog', { name: '已安排效果' })
+  const dialog = page.getByRole('dialog', { name: 'Scheduled effects' })
   await expect(dialog.locator('[data-player-color="red"] li')).toHaveCount(1)
-  await expect(dialog).toContainText('田地阶段')
+  await expect(dialog).toContainText('Field phase')
   await page.screenshot({ path: 'output/playwright/rule-derived-fixed-timed-resources.png' })
 })

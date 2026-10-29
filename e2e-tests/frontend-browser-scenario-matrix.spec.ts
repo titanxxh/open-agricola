@@ -11,7 +11,7 @@ import {
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 type LocaleScenario = {
-  locale: 'en' | 'zh'
+  locale: 'en'
   actionArea: string
   score: string
   log: string
@@ -35,17 +35,6 @@ const ENGLISH: LocaleScenario = {
   scoreBreakdown: ['Fields', 'Pastures', 'Grain', 'Vegetables', 'Family members', 'Cards', 'Card bonus'],
   plowPrompt: 'Select a tile to plow',
   plowConfirm: 'Confirm plow',
-}
-
-const CHINESE: LocaleScenario = {
-  locale: 'zh',
-  actionArea: '行动区',
-  score: '计分板',
-  log: '行动记录',
-  close: '关闭',
-  scoreBreakdown: ['田地', '圈地', '谷物', '蔬菜', '家庭成员', '卡牌分', '卡牌加分'],
-  plowPrompt: '选择要开垦的田地',
-  plowConfirm: '确认开垦',
 }
 
 const setLocale = async (page: Page, locale: LocaleScenario['locale']) => {
@@ -362,7 +351,7 @@ for (const variants of WORKSHOP_VARIANTS) {
   })
 }
 
-for (const locale of [CHINESE, ENGLISH]) {
+for (const locale of [ENGLISH]) {
   test(`${locale.locale} completes one mobile farm interaction with matching visible and accessible copy @locale`, async ({
     page,
   }) => {

@@ -3,6 +3,10 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
 
 const backend = process.env.BACKEND_URL ?? 'http://localhost:5175'
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+})
+
 const createReplay = async (request: APIRequestContext) => {
   const response = await request.post(`${backend}/api/test/replays/completed`)
   expect(response.status()).toBe(201)
@@ -14,25 +18,23 @@ const createReplay = async (request: APIRequestContext) => {
 
 for (const recordReplay of [true, false]) {
   test(`completed results localize generated names and preserve account names (replay=${recordReplay})`, async ({ page, request }) => {
-    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
     const response = await request.post(`${backend}/api/test/replays/completed?defaultNames=1&recordReplay=${recordReplay ? 1 : 0}`)
     expect(response.status()).toBe(201)
     const { roomId } = await response.json() as { roomId: string }
     await page.goto(`/?room=${roomId}`, { waitUntil: 'domcontentloaded' })
     const results = page.locator(recordReplay ? '.replay-results li' : '.ws-status-card li')
     await expect(results.nth(0)).toContainText('Player 2')
-    await expect(results.nth(1)).toContainText('玩家 2')
-    await expect(results.nth(1)).not.toContainText('Player 2')
+    await expect(results.nth(1)).toContainText('Player 2')
     if (!recordReplay) {
       await expect(page.locator('iframe')).toHaveCount(0)
       return
     }
-    await page.getByRole('button', { name: /玩家 2/ }).click()
+    await page.getByRole('button', { name: /Player 2/ }).nth(1).click()
     const replay = page.frameLocator('iframe')
     await expect(replay.locator('.replay-header select option[value="p1"]')).toHaveText('Player 2')
-    await expect(replay.locator('.replay-header select option[value="p2"]')).toHaveText('玩家 2')
+    await expect(replay.locator('.replay-header select option[value="p2"]')).toHaveText('Player 2')
     await replay.locator('button[data-player="p2"]').click()
-    await expect(replay.locator('button[data-player="p2"]')).toContainText('玩家 2')
+    await expect(replay.locator('button[data-player="p2"]')).toContainText('Player 2')
   })
 }
 
@@ -46,7 +48,7 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   await expect(page.locator('iframe')).toHaveCount(0)
   const alicePerspective = page.getByRole('button', { name: /Alice/ })
   await expect(alicePerspective).toBeVisible()
-  await expect(page.getByRole('link', { name: '返回大厅' }))
+  await expect(page.getByRole('link', { name: 'Back to Lobby' }))
     .toContainText('Open Agricola')
   const accessibility = await new AxeBuilder({ page })
     .include('.replay-shell--chooser')
@@ -79,8 +81,8 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
 
   await replay.locator('.replay-play').click()
   await expect(replay.locator('.replay-transport output')).toContainText('2 / 2', { timeout: 5000 })
-  await expect(replay.getByText('计分板')).toBeVisible()
-  await replay.getByRole('button', { name: '关闭' }).click()
+  await expect(replay.getByText('Scoring Pad')).toBeVisible()
+  await replay.getByRole('button', { name: 'Close' }).click()
   await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('2')
   await replay.locator('.replay-timeline button').first().click()
   await expect(replay.locator('.replay-transport output')).toContainText('0 / 2')
@@ -90,12 +92,12 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('1')
   await expect.poll(() => new URL(page.url()).searchParams.get('frame')).toMatch(/^[a-f0-9]{64}$/)
   await replay.locator('.replay-header select').selectOption('p2')
-  await expect(replay.getByText('当前视角不可见')).toBeVisible()
+  await expect(replay.getByText('Hidden for this perspective')).toBeVisible()
 
   await replay.locator('.replay-layout-toggle').click()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('board')
   expect(new URL(
-    await page.getByRole('link', { name: '返回大厅' }).getAttribute('href') ?? '',
+    await page.getByRole('link', { name: 'Back to Lobby' }).getAttribute('href') ?? '',
     page.url(),
   ).search).toBe('')
 
@@ -117,7 +119,7 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   )
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.locator('iframe')).toHaveCount(0)
-  await page.getByRole('link', { name: '返回大厅' }).click()
+  await page.getByRole('link', { name: 'Back to Lobby' }).click()
   await expect(page.locator('#username')).toBeVisible()
   expect(new URL(page.url()).searchParams.has('context')).toBe(false)
 })
@@ -129,7 +131,7 @@ test('mobile replay defaults to board first and preserves an explicit toggle', a
   const fixture = await createReplay(request)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/?room=${fixture.roomId}`)
-  await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Back to Lobby' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => (
     document.documentElement.scrollWidth <= document.documentElement.clientWidth
   ))).toBe(true)

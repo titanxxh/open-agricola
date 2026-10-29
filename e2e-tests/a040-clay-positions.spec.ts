@@ -42,6 +42,7 @@ async function observe(page: Page) {
 }
 
 async function snapshot(page: Page) {
+  await page.waitForFunction(() => window.a040Payload !== undefined)
   const payload = await page.evaluate(() => window.a040Payload)
   if (!payload) throw new Error('Missing authoritative room state')
   return payload

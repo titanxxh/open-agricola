@@ -6,7 +6,7 @@ const CARD_ID = 'E148_Lazybones'
 
 for (const scenario of [
   { locale: 'en', width: 1440, confirm: 'Confirm (2/2)', grain: 'Grain Seeds', farmland: 'Farmland' },
-  { locale: 'zh', width: 390, confirm: '确认 (2/2)', grain: '谷物种子', farmland: '农田' },
+  { locale: 'en', width: 390, confirm: 'Confirm (2/2)', grain: 'Grain Seeds', farmland: 'Farmland' },
 ] as const) {
   test(`Lazybones shows four selectable tiles at ${scenario.width}px in ${scenario.locale}`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })

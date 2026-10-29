@@ -4,7 +4,7 @@ import type { MyActiveRoom } from '../shared/contract/lobby'
 test.use({ timezoneId: 'Asia/Singapore' })
 
 for (const width of [320, 1280]) {
-  for (const locale of ['zh', 'en']) {
+  for (const locale of ['en']) {
     test(`active games show six colored players and update turns at ${width}px in ${locale}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await page.clock.install()
@@ -30,7 +30,7 @@ for (const width of [320, 1280]) {
       await expect(game.locator('time')).toHaveAttribute('datetime', '2026-10-27T08:30:00.000Z')
       await expect(game.locator('.my-game__turn')).toContainText(names[1]!)
       for (const color of colors) await expect(game.locator(`.my-game__color[data-player-color=${color}]`)).toBeVisible()
-      const resume = game.getByRole('button', { name: locale === 'zh' ? /继续/ : 'Resume' })
+      const resume = game.getByRole('button', { name: 'Resume' })
       await expect(resume).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       await game.screenshot({ path: testInfo.outputPath('six-player-game.png') })
@@ -39,7 +39,7 @@ for (const width of [320, 1280]) {
       room.my_turn = 1
       await page.clock.fastForward(5_100)
       await expect(game.locator('.my-game__turn')).toHaveAttribute('data-my-turn', 'true')
-      await expect(game.locator('.my-game__turn')).toHaveText(locale === 'zh' ? '轮到你了' : 'Your turn')
+      await expect(game.locator('.my-game__turn')).toHaveText('Your turn')
       await page.reload()
       await expect(game.locator('.my-game__name')).toHaveText(names)
       await expect(game.locator('.my-game__turn')).toHaveAttribute('data-my-turn', 'true')

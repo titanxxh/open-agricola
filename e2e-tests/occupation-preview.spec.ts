@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { BACKEND_URL } from './fixtures'
 
-for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 375 }]) {
+for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'en', width: 375 }]) {
   for (const count of [2, 3]) {
-    test(`occupation offer uses ${count === 3 ? 'a summary' : 'the shared payment'} for ${count} cards in ${scenario.locale}`, async ({ page, request }) => {
+    test(`occupation offer uses ${count === 3 ? 'a summary' : 'the shared payment'} for ${count} cards in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
       await page.setViewportSize({ width: scenario.width, height: 900 })
       await page.addInitScript(locale => localStorage.setItem('open-agricola-locale-v2', locale), scenario.locale)
       const fresh = await request.post(`${BACKEND_URL}/api/game/new-sandbox`, { data: { seed: 1373, playerCount: 2, customCardIds: [] } })
@@ -26,9 +26,9 @@ for (const scenario of [{ locale: 'en', width: 1440 }, { locale: 'zh', width: 37
       const bar = page.locator('.interaction-bar')
       const offer = bar.locator('[data-choice-value]:not([data-choice-value="__skip__"])')
       await expect(offer).toHaveCount(1)
-      const free = scenario.locale === 'en' ? 'Free' : '免费'
+      const free = 'Free'
       if (count === 3) {
-        await expect(offer).toContainText(scenario.locale === 'en' ? 'Play occupation' : '打出职业')
+        await expect(offer).toContainText('Play occupation')
         await expect(offer).not.toContainText(free)
       } else {
         await expect(offer).toContainText(free)

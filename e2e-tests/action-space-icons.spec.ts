@@ -4,11 +4,11 @@ import { BACKEND_URL, getJson, postJson } from './fixtures'
 
 for (const scenario of [
   { locale: 'en', width: 1440, playerCount: 2 },
-  { locale: 'zh', width: 1440, playerCount: 3 },
+  { locale: 'en', width: 1440, playerCount: 3 },
   { locale: 'en', width: 1440, playerCount: 4 },
-  { locale: 'zh', width: 1440, playerCount: 5 },
+  { locale: 'en', width: 1440, playerCount: 5 },
   // Six players also exercises the extra action frames at phone width.
-  { locale: 'zh', width: 390, playerCount: 6 },
+  { locale: 'en', width: 390, playerCount: 6 },
 ] as const) {
   test(`${scenario.playerCount}p action symbols and rule-derived costs in ${scenario.locale} at ${scenario.width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width: scenario.width, height: 1000 })
@@ -71,7 +71,7 @@ for (const scenario of [
     if (scenario.width > 1000) {
       await board.locator('[data-action-id="fencing"]').hover()
       await expect(page.locator('.tooltip-action-card .res-icon-fence-icon')).toBeVisible()
-      await expect(page.locator('.round-action-tooltip .tooltip-text')).toContainText(scenario.locale === 'en' ? 'Choose fence layout' : '选择围栏布局')
+      await expect(page.locator('.round-action-tooltip .tooltip-text')).toContainText('Choose fence layout')
     }
   })
 }

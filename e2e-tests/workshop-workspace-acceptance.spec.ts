@@ -11,7 +11,7 @@ import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { test } from './server-fixtures'
 import { createLocalUserForTests, createSession } from '../server/auth'
 
-type Locale = 'zh' | 'en'
+type Locale = 'en'
 type Viewport = 'desktop' | 'mobile'
 type Variant = {
   locale: Locale
@@ -52,13 +52,11 @@ type ScenarioContext = {
 }
 
 const variants: Variant[] = [
-  { locale: 'zh', viewport: 'desktop', size: { width: 1440, height: 1000 } },
-  { locale: 'zh', viewport: 'mobile', size: { width: 390, height: 844 } },
   { locale: 'en', viewport: 'desktop', size: { width: 1440, height: 1000 } },
   { locale: 'en', viewport: 'mobile', size: { width: 390, height: 844 } },
 ]
 
-const text = (locale: Locale, zh: string, en: string) => locale === 'zh' ? zh : en
+const text = (_locale: Locale, _zh: string, en: string) => en
 const imagePng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
 const imageData = `data:image/png;base64,${imagePng}`
 let sequence = 0
@@ -78,7 +76,7 @@ const CARD_DEF = {
     vp: 0,
   },
 }
-const CARD_IMPL = ${invalid ? "{ onPlay() { eval('invalid') } }" : '{}'}
+const CARD_IMPL = ${invalid ? '{ onPlay() { eval(\'invalid\') } }' : '{}'}
 `.trim()
 
 const createAccount = async (
@@ -1651,7 +1649,7 @@ test('pending submission protects card and account deletion without invalidating
     expect(await responseJson(await api(request,account,route,{method:'DELETE'}),409)).toMatchObject({code:'submission_in_progress'})
   }
   expect((await loadWorkspace(request,account,workspace.id)).id).toBe(workspace.id)
-  await withDatabase(db => db.prepare("UPDATE workshop_submissions SET state='complete' WHERE card_id=?").run(workspace.id))
+  await withDatabase(db => db.prepare('UPDATE workshop_submissions SET state=\'complete\' WHERE card_id=?').run(workspace.id))
   await responseJson(await api(request,account,`/api/workshop/cards/${workspace.id}`,{method:'DELETE'}))
   await responseJson(await api(request,account,'/api/auth/account',{method:'DELETE'}))
 })

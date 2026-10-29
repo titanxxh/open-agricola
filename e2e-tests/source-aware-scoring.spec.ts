@@ -5,7 +5,7 @@ import { joinRoomClients, publicRoomState, roomDriver, roomSnapshot } from './ro
 
 const CARD = 'M027_GardenPath'
 
-for (const width of [1920, 375]) test(`independent scoring markers follow their holder and locale at ${width}px`, async ({ browser, request }, testInfo) => {
+for (const width of [1920, 375]) test(`independent scoring markers follow their holder at ${width}px`, async ({ browser, request }, testInfo) => {
   const pages: [Page, Page] = [
     await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width === 375 }),
     await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width === 375 }),
@@ -52,19 +52,19 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
       }
       throw new Error('Purchase did not complete')
     }
-    const checkPad = async (page: Page, locale: 'en' | 'zh', values: string[], step: string) => {
-      await page.locator('.game-layout__right').getByRole('button', { name: locale === 'en' ? 'Scoring Pad' : '计分板', exact: true }).click()
+    const checkPad = async (page: Page, locale: 'en', values: string[], step: string) => {
+      await page.locator('.game-layout__right').getByRole('button', { name: 'Scoring Pad', exact: true }).click()
       const pad = page.locator('.scoring-pad')
       await expect(page.locator('.scoring-overlay')).toHaveCSS('opacity', '1')
       const marker = pad.locator('[data-score-row="marker-M027_GardenPath-garden-path"]')
       await expect(marker).toHaveCount(1)
-      await expect(marker.locator('.scoring-label')).toHaveText(locale === 'en' ? '· Garden Path' : '· 花园小径')
+      await expect(marker.locator('.scoring-label')).toHaveText('· Garden Path')
       await expect(marker.locator('.scoring-cell-value')).toHaveText(values)
       await marker.scrollIntoViewIfNeeded()
       await expect(marker).toBeInViewport()
       expect(await pad.locator('.scoring-content').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
       await pad.screenshot({ path: testInfo.outputPath(`${step}.png`) })
-      await pad.getByRole('button', { name: locale === 'en' ? 'Close' : '关闭', exact: true }).click()
+      await pad.getByRole('button', { name: 'Close', exact: true }).click()
     }
 
     await purchase(0, 'meeting-place')
@@ -72,11 +72,11 @@ for (const width of [1920, 375]) test(`independent scoring markers follow their 
     await checkPad(pages[0], 'en', ['0', '-1'], 'first-owner')
     await checkPad(pages[1], 'en', ['0', '-1'], 'peer-first-owner')
     await pages[0].locator('.header-locale-select button').click()
-    await pages[0].getByRole('option', { name: '简体中文', exact: true }).click()
+    await pages[0].getByRole('option', { name: 'English', exact: true }).click()
     await driver.command(0, { type: 'choice', value: 'confirm' })
     await purchase(1, 'major-improvement')
     expect(await scoringState(pages[0])).toEqual(await scoringState(pages[1]))
-    await checkPad(pages[0], 'zh', ['-1', '0'], 'transferred-zh')
+    await checkPad(pages[0], 'en', ['-1', '0'], 'transferred-owner')
     await checkPad(pages[1], 'en', ['-1', '0'], 'transferred-en')
     await driver.reload()
     await checkPad(pages[0], 'en', ['-1', '0'], 'restored')

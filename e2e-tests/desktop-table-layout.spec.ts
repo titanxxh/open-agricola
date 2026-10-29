@@ -38,22 +38,22 @@ for (const width of [2239, 1920, 1440]) {
   test(`desktop table keeps readable cards and a full-width private hand at ${width}px`, async ({ page, request }) => {
     await prepareTable(request)
     await page.setViewportSize({ width, height: 1271 })
-    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     await expect(page.locator('.game-layout__hand .hand-cards')).toBeVisible()
     const sidebar = page.locator('.game-layout__right')
     await expect(sidebar.locator('.score-panel')).toHaveCount(0)
     await expect(sidebar.locator('.desktop-player-overview__score')).toHaveCount(2)
-    await sidebar.getByRole('button', { name: '计分板', exact: true }).click()
+    await sidebar.getByRole('button', { name: 'Scoring Pad', exact: true }).click()
     const scoringBoard = page.locator('.scoring-pad')
     await expect(scoringBoard).toBeVisible()
     await expect(scoringBoard.locator('.scoring-header-row .scoring-player-name')).toHaveCount(2)
-    for (const label of ['总分', '田地', '圈地', '谷物', '蔬菜', '家庭成员', '卡牌分', '卡牌加分']) {
+    for (const label of ['Total', 'Fields', 'Pastures', 'Grain', 'Vegetables', 'Family members', 'Cards', 'Card bonus']) {
       await expect(scoringBoard.getByText(label, { exact: true })).toBeVisible()
     }
     await expect(scoringBoard.locator('.scoring-card-label').first()).toBeVisible()
     if (width === 1920) await scoringBoard.screenshot({ path: 'output/desktop-scoring-board.png' })
-    await scoringBoard.getByRole('button', { name: '关闭', exact: true }).click()
+    await scoringBoard.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(scoringBoard).toHaveCount(0)
     await expect(page.locator('.game-layout__center .hand-cards')).toHaveCount(0)
     await expect(page.locator('.desktop-public-farm[data-player-id="p2"] .farm-grid')).toBeVisible()

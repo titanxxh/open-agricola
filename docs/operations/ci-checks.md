@@ -6,7 +6,7 @@
 
 PR 的浏览器 E2E 在本机运行。涉及应用运行行为、UI 或 WS 的改动，用 `pnpm verify <file.spec.ts>` 在隔离环境跑通相关 spec，并把命令和结果写进 PR 描述；本机通过即满足 PR 的 E2E 要求。合入 main 后 `e2e.yml` 仍会跑全量。
 
-main E2E 无论成功或失败都会保留 7 天的验证记录、认证和工坊请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>`；生命周期包含各请求实例的方法、资源类型、来源、路径、状态和完成 / 失败事件，不记录 Cookie、认证头或完整查询参数。
+main E2E 分成四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立 runner，并行执行。每个 runner 使用自己的应用、数据库 schema、S3 前缀和构建目录。任一 lane 失败都会使 workflow 失败，其余 lane 继续保留诊断。无论成功或失败都会保留 7 天的验证记录、认证和工坊请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>-<lane>`；生命周期包含各请求实例的方法、资源类型、来源、路径、状态和完成 / 失败事件，不记录 Cookie、认证头或完整查询参数。
 
 ## 调试与最终验证
 
@@ -21,9 +21,10 @@ pnpm verify focus server/__tests__/first-round-start-session.test.ts --testNameP
 pnpm verify prepush
 
 # 真实应用行为：隔离 PostgreSQL / S3、端口，调用 restart-local.sh 后跑 Playwright
-pnpm verify e2e-tests/chinese-interface.spec.ts
-pnpm verify e2e e2e-tests/chinese-interface.spec.ts  # 显式模式，含义相同
-pnpm verify                                      # 保留原有完整 Playwright 入口
+pnpm verify e2e-tests/hosted-password-login.spec.ts
+pnpm verify e2e e2e-tests/hosted-password-login.spec.ts  # 显式模式，含义相同
+pnpm verify                                          # 单个隔离环境，完整 Playwright
+pnpm verify:parallel --shards=4                       # 已提交且干净的源码，四个隔离环境并行
 
 pnpm verify status
 ```
@@ -33,6 +34,12 @@ pnpm verify status
 E2E 入口先构建可选同源托管的 production frontend，再创建隔离环境并重启应用，避免浏览器验收依赖残留 `dist/`。独立 Pages 会话验收另外通过 `build:pages-frontend` 构建根路径产物，以 HTTPS 同站跨源拓扑验证真实生产文件；同源产物不能替代该验收。隔离环境由 `scripts/test-environment.ts` 生成：应用端口取自 20000–32767，低于 Linux / macOS 自动分配端口的范围；并设置 `OWNED_PROCESSES_FILE`，让 `restart-local.sh` 的启动和 `--kill-only` 只停止该环境自己启动的进程。端口被其他进程占用时直接失败，不终止对方。
 
 Hosted 和 Pages 构建入口固定 `NODE_ENV=production`。隔离后端继续使用 `NODE_ENV=test`，浏览器验收加载与正式发布相同的 React 运行模式。 Grafana 验收先滚动到待检查的面板以触发可见区域查询；失败诊断保留面板位置、导航时间范围和实际查询。
+
+E2E 使用英文界面，业务流程不再按英文 / 中文重复展开；桌面、移动端、玩家人数和浏览器差异继续覆盖。产品仍提供中英文，语言包缺键检查继续由 `lint:i18n` 执行。
+
+`verify:parallel` 先准备一次共享测试依赖，再在 `.worktree/` 下从当前 HEAD 创建独立工作树。每片自行安装锁定的依赖、构建前端并通过原有 `pnpm verify --shard=i/N --workers=1` 运行。工作树、Vite 缓存、固定开发房间、应用端口、数据库 schema、S3 前缀和 Replay 目录互相隔离，因此一片中的房间重置或后端重启不会打断其他片。不要在同一个应用环境直接增大 worker 数。
+
+并行运行的日志、各片原始验证记录和汇总保存于 `output/verification/parallel-runs/`。汇总检查退出码和各片实际选择的 case，缺少 reporter、重复 case 或失败不能通过；它不覆盖根目录最近一次 E2E 记录。成功后仅清理本次创建且干净的工作树，失败时保留工作树和证据用于定位。完整发布验收还需执行 browser-local sandbox 和 WebKit 入口。
 
 每次 push 前先 rebase main，再对最终源码运行 `pnpm verify prepush`。定向通过不算完整门禁通过。完整检查通过后，只有后续修改、失败或未解决的问题才需要扩大或重跑；rebase 改变文件内容也需要重跑。
 
