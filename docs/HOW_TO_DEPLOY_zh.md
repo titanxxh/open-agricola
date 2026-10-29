@@ -714,3 +714,23 @@ Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租
 回滚显示可用对应 Compose 停止 `prometheus grafana node-exporter accounts-exporter`，保留数据供恢复；不要删除卷。趋势存储不可用时应用显示未知，游戏仍由原权威持久化与路由链路处理。本次不发布生产、不注入故障、不认证容量。
 
 配置遵循官方 [Grafana auth proxy 文档](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/auth-proxy/)和 [Prometheus 发现/配置文档](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)。
+
+## 微信玩家群二维码
+
+顶部微信按钮在每次打开弹窗时从 API 域名读取 `/api/community/wechat-qr`。首次安装需要应用代码和 `docker-compose.prod.yml` 中只读挂载的 `data/community`。后续换图无需 Release、Pages 构建、游戏镜像构建、应用重启或运维重新部署。
+
+在已安装依赖的工作树中使用现有维护入口：
+
+```bash
+./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.png
+# 自定义游戏目录：
+./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.jpg /home/ubuntu/open-agricola
+# 本地应用，使用其 COMMUNITY_DATA_DIR 或 SHARED_DATA_DIR/community：
+./deploy-operations.sh --wechat-qr --local /absolute/path/wechat-group.png /absolute/path/data/community
+```
+
+子命令先校验 PNG 或 JPEG，保留原始字节，通过 SSH 更新 `<game-dir>/data/community/wechat-qr`。图片最大 5 MiB，宽高分别为 200–4096 像素。本地工作树需要 `pnpm install --frozen-lockfile` 安装现有图片解码器；远端使用 Bash、`flock`、`sha256sum` 和普通文件权限。部署账户须拥有该目录，与其他游戏数据保持一致。远端先校验传输哈希，再通过原子重命名替换；校验失败或传输中断时保留旧图。成功输出包含 `wechatQrSha256`、宽和高。再次传入旧图片即可恢复旧图。
+
+公开接口只允许 GET/HEAD，成功和错误响应均带 `Cache-Control: no-store`。未配置图片时返回 404，图片不可读时返回 503，弹窗提供重试。每次打开弹窗也使用新的请求 URL。没有公开上传接口。更新应用时保留 `data/community`，另存最新原图供恢复；数据库/S3 归档备份不包含该宿主机目录。本地 `restart-local.sh` 默认将 `COMMUNITY_DATA_DIR` 设为 `$SHARED_DATA_DIR/community`。
+
+按微信标注的有效期及时换图。该命令不会延长群邀请本身的有效期。弹窗保留导出原图及其中的有效期文字。换图后重新打开弹窗，并核对接口字节或 SHA-256 与原图一致。

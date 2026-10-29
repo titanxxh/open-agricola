@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
-import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
+import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { BrandMark } from '../components/common/BrandMark'
 import { DonateWidgets } from '../components/common/DonateWidgets'
 import { authErrorMessage } from './auth-errors'
@@ -227,7 +227,7 @@ export function LoginPage() {
         {new URLSearchParams(window.location.search).get('accountDeletion') === 'pending' && <p role="status">{t('platform.accountDeletionPending')}</p>}
         {new URLSearchParams(window.location.search).get('accountDeletion') === 'complete' && <p role="status">{t('platform.accountDeleted')}</p>}
         <div className="login-top-bar">
-          <GitHubRepoLink />
+          <SiteCommunityLinks />
           <LocaleSwitcher />
         </div>
         <BrandMark

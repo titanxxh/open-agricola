@@ -6,6 +6,10 @@
 
 客户端渲染权威快照、收集输入并管理本地 UI 临时态。它从不裁定规则。
 
+
+`SiteCommunityLinks` 在各页面顶部统一展示 GitHub 链接和微信入口。原生模态弹窗管理焦点，每次打开重新加载运行时图片；嵌入对局不展示站点入口。测试见 `wechat-community.spec.ts`。
+
+
 ## 客户端 bundle
 
 | Bundle | 入口 | 路径 | 约束 |
