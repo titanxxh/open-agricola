@@ -21,6 +21,7 @@ REF="$2"
 export APP_UID="$(id -u)" APP_GID="$(id -g)"
 umask 077
 mkdir -p backups
+mkdir -p -m 0755 data/community
 exec 9>backups/.maintenance.lock
 flock -w 1800 9
 # Keep local operator configuration and refuse to overwrite tracked edits.

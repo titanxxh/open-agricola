@@ -637,6 +637,26 @@ pnpm install
 
 When `VITE_API_BASE` is unset, it defaults to the empty string for same-origin use. In development, the frontend automatically connects to `localhost:5175`.
 
+## WeChat player group QR code
+
+The header's WeChat button reads `/api/community/wechat-qr` from the API origin each time its dialog opens. The first installation needs the application code and the read-only `data/community` mount in `docker-compose.prod.yml`. Later image changes need no Release, Pages rebuild, game image build, application restart or operations redeployment.
+
+Use the existing owner-controlled maintenance entry from a checkout with dependencies installed:
+
+```bash
+./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.png
+# Custom game directory:
+./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.jpg /home/ubuntu/open-agricola
+# Local application (use its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community):
+./deploy-operations.sh --wechat-qr --local /absolute/path/wechat-group.png /absolute/path/data/community
+```
+
+This subcommand validates a PNG or JPEG, preserves its original bytes, and updates `<game-dir>/data/community/wechat-qr` over SSH. Images must be at most 5 MiB and 200–4096 pixels on each side. The local checkout requires `pnpm install --frozen-lockfile` for the existing image decoder; the remote host uses Bash, `flock`, `sha256sum` and normal filesystem permissions. The deployment account must own the community directory, as it does the other game data. The remote command verifies the transfer checksum before atomically renaming the file; validation or interrupted-transfer failures preserve the previous image. Successful output includes `wechatQrSha256`, width and height. Repeating the command with an earlier image restores the previous QR image.
+
+The public endpoint permits only GET/HEAD and returns `Cache-Control: no-store`, including on errors. Missing images return 404, unreadable images return 503, and the dialog offers a retry. Each dialog opening also uses a fresh request URL. There is no public upload endpoint. Keep `data/community` when updating the application, and retain a copy of the latest original image for recovery; database/S3 archive backups do not include this host directory. For a local application, `restart-local.sh` defaults `COMMUNITY_DATA_DIR` to `$SHARED_DATA_DIR/community`.
+
+Replace the image before the expiry shown in WeChat. This command does not renew the underlying group invitation. The dialog preserves the full exported image, including any expiry caption. After updating, reopen the dialog and compare the endpoint's bytes or SHA-256 with the source image.
+
 ## Operations monitoring
 
 The provisioned Grafana dashboard uses Chinese titles, metric explanations, legends and round-selector display labels. Grafana's default UI language is Simplified Chinese (`zh-Hans`); metric names, label values and PromQL remain unchanged.

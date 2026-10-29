@@ -4,6 +4,10 @@
 
 The client renders authoritative snapshots, collects input and keeps temporary local UI state. It never adjudicates rules.
 
+
+`SiteCommunityLinks` pairs the GitHub link with the WeChat entry across site headers. Its native modal dialog owns focus and reloads the runtime image on every opening; embedded game views omit the site links. Coverage: `wechat-community.spec.ts`.
+
+
 ## Client bundles
 
 | Bundle | Entry | Paths | Constraint |

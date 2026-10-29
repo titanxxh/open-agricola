@@ -9,7 +9,7 @@ import { bindSandboxPlaytest, type SandboxPlaytest, type SandboxStartResult } fr
 import { ProposeModal } from './workshop/ProposeModal'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
-import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
+import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { ResourceText } from '../components/common/ResourceText'
 import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
@@ -2171,7 +2171,7 @@ function WorkshopNav({
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-actions">
-        <GitHubRepoLink />
+        <SiteCommunityLinks />
         <LocaleSwitcher />
       </div>
     </div>

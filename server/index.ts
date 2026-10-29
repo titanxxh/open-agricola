@@ -88,8 +88,10 @@ import { applyReplayRemovalLedger } from './game/replay-removal.ts'
 import { adminTakedownCard, markBuiltInMergedCards, reconcilePendingMerges } from './workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
 import { createFrontendHosting } from './frontend-hosting'
+import { createCommunityQrHandler } from './community-qr'
 
 const handleFrontend = createFrontendHosting()
+const handleCommunityQr = createCommunityQrHandler()
 
 const serverCorsHeaders = () => corsHeaders({
   methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
@@ -443,6 +445,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (rejectUntrustedOrigin(req, res)) return
 
+  if (await handleCommunityQr(req, res)) return
   if (await handleOperations(req, res)) return
 
   // ── Health ─────────────────────────────────────────────

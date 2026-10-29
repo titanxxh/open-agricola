@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
-import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
+import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
 import { API_BASE } from '../config'
@@ -300,7 +300,7 @@ export function SettingsPage() {
           <h1>{t('platform.settingsTitle')}</h1>
         </div>
         <div className="site-header-links">
-          <GitHubRepoLink />
+          <SiteCommunityLinks />
           <LocaleSwitcher />
         </div>
       </header>

@@ -44,7 +44,7 @@ import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
-import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
+import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
 import { buildActionBoardProjection, buildFarmBoardProjection } from './farm-board-projection'
@@ -1443,7 +1443,7 @@ export const GameContainerApi = () => {
     return (
       <div className="ws-status-screen">
         <div className="ws-status-card">
-          {!isEmbedded && <div className="site-header-links"><GitHubRepoLink /></div>}
+          {!isEmbedded && <div className="site-header-links"><SiteCommunityLinks /></div>}
           {!isEmbedded ? (
             <BrandMark
               title="Open Agricola"

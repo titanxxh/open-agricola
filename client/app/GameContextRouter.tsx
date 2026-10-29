@@ -22,7 +22,7 @@ import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { getPlayerDisplayName } from '../utils/player-name'
 import { BrandMark } from '../components/common/BrandMark'
-import { GitHubRepoLink } from '../components/common/GitHubRepoLink'
+import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { BugReportBar } from './BugReportBar'
 import {
@@ -65,7 +65,7 @@ const statusPage = (
 ) => (
   <main className="ws-status-screen">
     <section className="ws-status-card" aria-labelledby="game-context-title">
-      <div className="site-header-links"><GitHubRepoLink /></div>
+      <div className="site-header-links"><SiteCommunityLinks /></div>
       <BrandMark
         title="Open Agricola"
         titleAs="h2"
@@ -186,7 +186,7 @@ function ReportedEvidenceContext({
             titleClassName="site-home-brand__title"
             homeLinkLabel={t('platform.backToLobbyPlain')}
           />
-          <GitHubRepoLink />
+          <SiteCommunityLinks />
         </div>
       ) : null}
       <header className="reported-evidence__header">

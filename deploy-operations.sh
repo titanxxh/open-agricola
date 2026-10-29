@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${1:-}" == '--wechat-qr' ]]; then
+  shift
+  exec node "$(dirname "$0")/operations/update-wechat-qr.mjs" "$@"
+fi
 HOST="${1:-ubuntu@ten-kr}"
 [[ "$HOST" == *@* ]] || HOST="ubuntu@$HOST"
 REF="${2:-main}"
