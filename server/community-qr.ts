@@ -4,9 +4,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { corsHeaders } from './http-origin'
 
 export function createCommunityQrHandler(directory = process.env.COMMUNITY_DATA_DIR ?? 'data/community') {
-  const imagePath = resolve(directory, 'wechat-qr')
+  const images = new Map([
+    ['/api/community/wechat-qr', 'wechat-qr'],
+    ['/api/community/feishu-qr', 'feishu-qr'],
+  ])
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
-    if (new URL(req.url ?? '/', 'http://localhost').pathname !== '/api/community/wechat-qr') return false
+    const filename = images.get(new URL(req.url ?? '/', 'http://localhost').pathname)
+    if (!filename) return false
+    const imagePath = resolve(directory, filename)
     const headers = { ...corsHeaders({ methods: 'GET,HEAD,OPTIONS', headers: 'Content-Type' }),
       'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
     if (req.method !== 'GET' && req.method !== 'HEAD') {

@@ -639,25 +639,26 @@ pnpm install
 
 When `VITE_API_BASE` is unset, it defaults to the empty string for same-origin use. In development, the frontend automatically connects to `localhost:5175`.
 
-## WeChat player group QR code
+## Player group QR codes
 
-The header's WeChat button reads `/api/community/wechat-qr` from the API origin each time its dialog opens. The first installation needs the application code and the read-only `data/community` mount in `docker-compose.prod.yml`. Later image changes need no Release, Pages rebuild, game image build, application restart or operations redeployment.
+The header has separate WeChat and Feishu buttons. Each dialog opening reads its own image from `/api/community/wechat-qr` or `/api/community/feishu-qr` on the API origin. Initial installation requires the application code and the read-only `data/community` mount in `docker-compose.prod.yml`. Later image changes need no Release, Pages rebuild, game image build, application restart or operations redeployment.
 
-Use the existing owner-controlled maintenance entry from a checkout with dependencies installed:
+Use the owner-controlled maintenance entry from a checkout with dependencies installed:
 
 ```bash
 ./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.png
+./deploy-operations.sh --feishu-qr ubuntu@ten-kr /absolute/path/feishu-group.png
 # Custom game directory:
-./deploy-operations.sh --wechat-qr ubuntu@ten-kr /absolute/path/wechat-group.jpg /home/ubuntu/open-agricola
-# Local application (use its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community):
-./deploy-operations.sh --wechat-qr --local /absolute/path/wechat-group.png /absolute/path/data/community
+./deploy-operations.sh --feishu-qr ubuntu@ten-kr /absolute/path/feishu-group.jpg /home/ubuntu/open-agricola
+# Local application, using its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community:
+./deploy-operations.sh --feishu-qr --local /absolute/path/feishu-group.png /absolute/path/data/community
 ```
 
-This subcommand validates a PNG or JPEG, preserves its original bytes, and updates `<game-dir>/data/community/wechat-qr` over SSH. Images must be at most 5 MiB and 200–4096 pixels on each side. The local checkout requires `pnpm install --frozen-lockfile` for the existing image decoder; the remote host uses Bash, `flock`, `sha256sum` and normal filesystem permissions. The deployment account must own the community directory, as it does the other game data. The remote command verifies the transfer checksum before atomically renaming the file; validation or interrupted-transfer failures preserve the previous image. Successful output includes `wechatQrSha256`, width and height. Repeating the command with an earlier image restores the previous QR image.
+Both flags use `operations/update-community-qr.mjs` to validate a PNG or JPEG, preserve the original bytes and update `<game-dir>/data/community/wechat-qr` or `feishu-qr` over SSH. The files and replacement locks are separate, so updating one group does not replace the other. Images must be at most 5 MiB and 200–4096 pixels on each side. The local checkout requires `pnpm install --frozen-lockfile` for the existing image decoder; the remote host uses Bash, `flock`, `sha256sum` and normal filesystem permissions. The deployment account must own the community directory, as it does the other game data. The remote command verifies the transfer checksum before atomically renaming the file; validation or interrupted-transfer failures preserve the previous image. Successful output includes `wechatQrSha256` or `feishuQrSha256`, width and height. Repeating the matching command with an earlier image restores that group's previous image.
 
-The public endpoint permits only GET/HEAD and returns `Cache-Control: no-store`, including on errors. Missing images return 404, unreadable images return 503, and the dialog offers a retry. Each dialog opening also uses a fresh request URL. There is no public upload endpoint. Keep `data/community` when updating the application, and retain a copy of the latest original image for recovery; database/S3 archive backups do not include this host directory. For a local application, `restart-local.sh` defaults `COMMUNITY_DATA_DIR` to `$SHARED_DATA_DIR/community`.
+The public endpoints permit only GET/HEAD and return `Cache-Control: no-store`, including on errors. Missing images return 404, unreadable images return 503, and the dialog offers a retry. Each dialog opening also uses a fresh request URL. There is no public upload endpoint. Keep `data/community` when updating the application, and retain a copy of each latest original image for recovery; database/S3 archive backups do not include this host directory. For a local application, `restart-local.sh` defaults `COMMUNITY_DATA_DIR` to `$SHARED_DATA_DIR/community`.
 
-Replace the image before the expiry shown in WeChat. This command does not renew the underlying group invitation. The dialog preserves the full exported image, including any expiry caption. After updating, reopen the dialog and compare the endpoint's bytes or SHA-256 with the source image.
+Replace an image before the expiry shown by its platform. These commands do not renew the underlying invitation. The dialogs preserve the full exported image, including any expiry caption. After updating, reopen the corresponding dialog and compare the endpoint's bytes or SHA-256 with the source image.
 
 ## Operations monitoring
 
