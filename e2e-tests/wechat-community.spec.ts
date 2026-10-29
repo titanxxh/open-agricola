@@ -122,13 +122,15 @@ test.describe('shared headers on touch devices', () => {
   })
 })
 
-test('Chinese labels identify each group correctly', async ({ page }) => {
+test('Chinese labels remain correct when quickly switching groups', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
   await page.goto('/?page=login&bg=none')
-  for (const name of ['微信', '飞书']) {
+  await expect(page.locator('.login-page')).toBeVisible()
+  for (const name of ['微信', '飞书', '微信', '飞书']) {
     await page.getByRole('button', { name: `${name}玩家群`, exact: true }).click()
     const dialog = page.getByRole('dialog', { name: `加入${name}玩家群` })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+    await expect(dialog).not.toBeVisible()
   }
 })
