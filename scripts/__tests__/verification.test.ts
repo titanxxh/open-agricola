@@ -162,11 +162,18 @@ describe('verification modes and evidence', () => {
       .toEqual(['scripts/verify.sh', 'e2e-tests/example.spec.ts'])
   })
 
-  it.each(['PUBLIC_ASSET_LOCAL_DIR', 'PUBLIC_ASSET_VALIDATION_DIR', 'RELEASE_SMOKE_PROXY'])('invalidates evidence when %s changes', key => {
+  it.each([
+    ['PUBLIC_ASSET_LOCAL_DIR', '/local/assets'],
+    ['PUBLIC_ASSET_VALIDATION_DIR', '/local/assets'],
+    ['RELEASE_SMOKE_PROXY', 'http://127.0.0.1:8080'],
+    ['LIBGL_ALWAYS_SOFTWARE', '0'],
+    ['WEBKIT_SKIA_ENABLE_CPU_RENDERING', '0'],
+    ['__EGL_VENDOR_LIBRARY_FILENAMES', '/custom/egl-vendor.json'],
+  ])('invalidates evidence when %s changes', (key, value) => {
     const cwd = repo()
     vi.stubEnv(key, undefined)
     runVerification(cwd, verificationPlan(cwd, ['prepush']), () => 0)
-    vi.stubEnv(key, '/local/assets')
+    vi.stubEnv(key, value)
     expect(verificationStatus(cwd).find(entry => entry.mode === 'prepush')!.current).toBe(false)
   })
 })

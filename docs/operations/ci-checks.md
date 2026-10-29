@@ -39,6 +39,8 @@ E2E 使用英文界面，业务流程不再按英文 / 中文重复展开；桌�
 
 `verify:parallel` 先生成收集测试所需的卡牌和语言产物，准备一次共享测试依赖，再在 `.worktree/` 下从当前 HEAD 创建独立工作树。每片自行安装锁定的依赖、构建前端并通过原有 `pnpm verify --shard=i/N --workers=1` 运行。工作树、Vite 缓存、固定开发房间、应用端口、数据库 schema、S3 前缀和 Replay 目录互相隔离，因此一片中的房间重置或后端重启不会打断其他片。不要在同一个应用环境直接增大 worker 数。
 
+Linux 浏览器验收默认使用 `LIBGL_ALWAYS_SOFTWARE=1` 和 `WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`，与 [WebKit 自身的 WPE 测试入口](https://github.com/WebKit/WebKit/blob/main/Tools/Scripts/webkitpy/port/wpe.py)一致；本机有 Mesa EGL vendor JSON 时仅选择 Mesa，让 headless 测试独立于桌面和计算任务的 NVIDIA 图形资源。显式环境配置会保留并计入验证指纹。普通开发启动及生产浏览器不受该测试入口影响。
+
 并行运行的日志、各片原始验证记录和汇总保存于 `output/verification/parallel-runs/`。汇总检查退出码和各片实际选择的 case，缺少 reporter、重复 case 或失败不能通过；它不覆盖根目录最近一次 E2E 记录。成功后仅清理本次创建且干净的工作树，失败时保留工作树和证据用于定位。完整发布验收还需执行 browser-local sandbox 和 WebKit 入口。
 
 每次 push 前先 rebase main，再对最终源码运行 `pnpm verify prepush`。定向通过不算完整门禁通过。完整检查通过后，只有后续修改、失败或未解决的问题才需要扩大或重跑；rebase 改变文件内容也需要重跑。
