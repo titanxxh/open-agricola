@@ -1,3 +1,4 @@
+import '../../__tests__/_helpers/opening-seat-random'
 import { randomUUID } from 'node:crypto'
 import * as rng from '../../../shared/utils/rng'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'

@@ -1,3 +1,4 @@
+import './_helpers/opening-seat-random'
 import { createWorkSession } from './_helpers/session-fixtures'
 import type { PostgresDatabase } from '../database/postgres'
 import { createTestDatabase } from './_helpers/postgres'

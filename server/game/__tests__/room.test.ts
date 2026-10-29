@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { openingSeatRandom as drawSeat } from '../../__tests__/_helpers/opening-seat-random'
 import { serializeSessionSnapshot } from '../../../shared/session/serialization.ts'
 import { GameSession } from '../authoritative-session.ts'
 import {
@@ -34,6 +35,14 @@ const createRoom = (
 })
 
 describe('room-manager seat assignment', () => {
+  it.each([0, 1, 2, 3])('can assign opening rank %s to the creator', rank => {
+    drawSeat.mockReturnValue(rank)
+    expect(resolveJoinPlayerIndex(createRoom('ordinary-room', [], 4))).toEqual({
+      ok: true, playerIndex: rank, replacedExistingPlayer: false,
+    })
+    expect(drawSeat).toHaveBeenCalledWith(4)
+  })
+
   it('binds fixed dev room reconnects to requested seat', () => {
     const room = createRoom(PRIMARY_DEV_ROOM_ID, [0, 1])
     const result = resolveJoinPlayerIndex(room, 0)

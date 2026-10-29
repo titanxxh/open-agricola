@@ -14,6 +14,7 @@ type RecoveryState = {
   payload: {
     state: {
       players: Array<{
+        name: string
         color: string
         minorHand: string[]
         occupationHand: string[]
@@ -99,7 +100,7 @@ test('two original players recover their own seats without hidden-info leakage',
   expect(new URL(firstPage.url()).search).toBe(`?room=${roomId}`)
   await expect(firstPage.locator('.ws-invite-url')).toHaveText(`${FRONTEND_URL}/?room=${roomId}`)
   await firstPage.locator('.ws-color-option[data-player-color=blue]').click()
-  await expect(firstPage.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', 'blue')
+  await expect(firstPage.locator('.ws-invite-player').filter({ hasText: `context_a_${suffix}` })).toHaveAttribute('data-player-color', 'blue')
   await secondPage.goto(`${FRONTEND_URL}/?room=${roomId}`, { waitUntil: 'domcontentloaded' })
   await expect(firstPage.locator('.game-layout')).toHaveCount(0)
   await expect(secondPage.locator('.game-layout')).toHaveCount(0)
@@ -131,16 +132,20 @@ test('two original players recover their own seats without hidden-info leakage',
 
   const first = latestState(firstStates)
   const second = latestState(secondStates)
-  expect(first.players.map(player => player.color)).toEqual(['blue', 'red'])
-  expect(second.players.map(player => player.color)).toEqual(['blue', 'red'])
-  expect(first.players[0]!.minorHand).not.toContain('?')
-  expect(first.players[0]!.occupationHand).not.toContain('?')
-  expect(first.players[1]!.minorHand).toEqual(first.players[1]!.minorHand.map(() => '?'))
-  expect(first.players[1]!.occupationHand).toEqual(first.players[1]!.occupationHand.map(() => '?'))
-  expect(second.players[0]!.minorHand).toEqual(second.players[0]!.minorHand.map(() => '?'))
-  expect(second.players[0]!.occupationHand).toEqual(second.players[0]!.occupationHand.map(() => '?'))
-  expect(second.players[1]!.minorHand).not.toContain('?')
-  expect(second.players[1]!.occupationHand).not.toContain('?')
+  const firstIndex = first.players.findIndex(player => player.name === `context_a_${suffix}`)
+  const secondIndex = first.players.findIndex(player => player.name === `context_b_${suffix}`)
+  expect([firstIndex, secondIndex].sort()).toEqual([0, 1])
+  expect(first.players[firstIndex]!.color).toBe('blue')
+  expect(first.players[secondIndex]!.color).toBe('red')
+  expect(second.players.map(player => player.color)).toEqual(first.players.map(player => player.color))
+  expect(first.players[firstIndex]!.minorHand).not.toContain('?')
+  expect(first.players[firstIndex]!.occupationHand).not.toContain('?')
+  expect(first.players[secondIndex]!.minorHand).toEqual(first.players[secondIndex]!.minorHand.map(() => '?'))
+  expect(first.players[secondIndex]!.occupationHand).toEqual(first.players[secondIndex]!.occupationHand.map(() => '?'))
+  expect(second.players[firstIndex]!.minorHand).toEqual(second.players[firstIndex]!.minorHand.map(() => '?'))
+  expect(second.players[firstIndex]!.occupationHand).toEqual(second.players[firstIndex]!.occupationHand.map(() => '?'))
+  expect(second.players[secondIndex]!.minorHand).not.toContain('?')
+  expect(second.players[secondIndex]!.occupationHand).not.toContain('?')
 
   const outsiderContext = await browser.newContext()
   const outsiderName = `context_outsider_${suffix}`
@@ -181,15 +186,17 @@ test('waiting room shows every seat, authoritative colors, names, and reconnecti
     await expect(seats).toHaveCount(6)
     expect(await seats.evaluateAll(elements => elements.map(element => element.getAttribute('data-player-color'))))
       .toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])
-    await expect(seats.nth(0)).toContainText(hostName)
+    const hostSeat = seats.filter({ hasText: hostName })
+    const guestSeat = seats.filter({ hasText: guestName })
+    await expect(hostSeat).toContainText(hostName)
     await expect(host.locator('.ws-waiting-count')).toContainText('1 / 6')
     await expect(host.locator('.ws-invite-player.is-empty')).toHaveCount(5)
     await expect(seats.locator('[role="img"]')).toHaveCount(6)
 
     await host.locator('.ws-color-option[data-player-color=purple]').click()
-    await expect(seats.nth(0)).toHaveAttribute('data-player-color', 'purple')
+    await expect(hostSeat).toHaveAttribute('data-player-color', 'purple')
     await host.reload()
-    await expect(host.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', 'purple')
+    await expect(hostSeat).toHaveAttribute('data-player-color', 'purple')
 
     let guest = await guestContext.newPage()
     const guestSockets: Array<{ client: WebSocketRoute; server: WebSocketRoute }> = []
@@ -198,12 +205,12 @@ test('waiting room shows every seat, authoritative colors, names, and reconnecti
     })
     await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
     await expect(host.locator('.ws-waiting-count')).toContainText('2 / 6')
-    await expect(seats.nth(1)).toContainText(guestName)
-    await expect(guest.locator('.ws-invite-player').nth(0)).toContainText(hostName)
+    await expect(guestSeat).toContainText(guestName)
+    await expect(guest.locator('.ws-invite-player').filter({ hasText: hostName })).toContainText(hostName)
     await expect(host.locator('.ws-invite-player.is-empty')).toHaveCount(4)
     await expect(guest.locator('.ws-color-option[data-player-color=purple]')).toBeDisabled()
     await guest.locator('.ws-color-option[data-player-color=green]').click()
-    await expect(seats.nth(1)).toHaveAttribute('data-player-color', 'green')
+    await expect(guestSeat).toHaveAttribute('data-player-color', 'green')
     await expect(host.locator('.ws-color-option[data-player-color=green]')).toBeDisabled()
     expect(await host.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await host.screenshot({ path: 'output/waiting-room-mobile.png', fullPage: true })
@@ -213,19 +220,19 @@ test('waiting room shows every seat, authoritative colors, names, and reconnecti
     await guestSocket.client.close({ code: 1012, reason: 'waiting room reconnect test' })
     await guestSocket.server.close({ code: 1012, reason: 'waiting room reconnect test' })
     await expect.poll(() => guestSockets.length).toBeGreaterThan(1)
-    await expect(guest.locator('.ws-invite-player').nth(1)).toContainText(guestName)
-    await expect(seats.nth(1)).toContainText(guestName)
-    await expect(seats.nth(1).locator('.ws-seat-offline')).toHaveCount(0)
-    await expect(guest.locator('.ws-invite-player').nth(1)).toHaveAttribute('data-player-color', 'green')
+    await expect(guest.locator('.ws-invite-player').filter({ hasText: guestName })).toContainText(guestName)
+    await expect(guestSeat).toContainText(guestName)
+    await expect(guestSeat.locator('.ws-seat-offline')).toHaveCount(0)
+    await expect(guest.locator('.ws-invite-player').filter({ hasText: guestName })).toHaveAttribute('data-player-color', 'green')
 
     await guest.close()
-    await expect(seats.nth(1).locator('.ws-seat-offline')).toBeVisible()
-    await expect(seats.nth(1)).toContainText(guestName)
+    await expect(guestSeat.locator('.ws-seat-offline')).toBeVisible()
+    await expect(guestSeat).toContainText(guestName)
     guest = await guestContext.newPage()
     await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
-    await expect(guest.locator('.ws-invite-player').nth(1)).toContainText(guestName)
-    await expect(guest.locator('.ws-invite-player').nth(1)).toHaveAttribute('data-player-color', 'green')
-    await expect(seats.nth(1).locator('.ws-seat-offline')).toHaveCount(0)
+    await expect(guest.locator('.ws-invite-player').filter({ hasText: guestName })).toContainText(guestName)
+    await expect(guest.locator('.ws-invite-player').filter({ hasText: guestName })).toHaveAttribute('data-player-color', 'green')
+    await expect(guestSeat.locator('.ws-seat-offline')).toHaveCount(0)
     await expect(host.locator('.ws-waiting-count')).toContainText('2 / 6')
     expect(new URL(guest.url()).search).toBe(`?room=${roomId}`)
     await guest.screenshot({ path: 'output/waiting-room-desktop.png', fullPage: true })
@@ -242,21 +249,35 @@ for (const [color, expectedShade] of [['green', 'rgb(22, 138, 74)'], ['purple', 
     const hostContext = await browser.newContext()
     const guestContext = await browser.newContext()
     try {
-      await authenticate(hostContext, request, `piece_host_${color}_${suffix}`)
+      const hostName = `piece_host_${color}_${suffix}`
+      await authenticate(hostContext, request, hostName)
       await authenticate(guestContext, request, `piece_guest_${color}_${suffix}`)
       const host = await hostContext.newPage(), guest = await guestContext.newPage()
       await host.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=2`)
       const roomId = await host.locator('.ws-invite-roomid strong').textContent()
       await host.locator(`.ws-color-option[data-player-color=${color}]`).click()
-      await expect(host.locator('.ws-invite-player').nth(0)).toHaveAttribute('data-player-color', color)
+      const hostSeat = host.locator('.ws-invite-player').filter({ hasText: hostName })
+      await expect(hostSeat).toHaveAttribute('data-player-color', color)
+      const hostIndex = await hostSeat.evaluate(element => [...element.parentElement!.children].indexOf(element))
+      expect([0, 1]).toContain(hostIndex)
       await guest.goto(`${FRONTEND_URL}/?room=${roomId}`)
       await guest.getByRole('button', { name: '确认颜色并开始', exact: true }).click()
       await expect(host.locator('.game-layout')).toBeVisible()
       await expect(guest.locator('.game-layout')).toBeVisible()
       const forest = host.locator('[data-action-id="forest"] button').first()
+      const peerAction = guest.locator('[data-action-id="reed-bank"] button').first()
       const skips = [host, guest].map(page => page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use Elder|不使用长者)$/ }))
-      await expect.poll(async () => await forest.isEnabled() || (await Promise.all(skips.map(skip => skip.isVisible()))).some(Boolean)).toBe(true)
-      for (const skip of skips) if (await skip.isVisible()) await skip.click()
+      const firstAction = hostIndex === 0 ? forest : peerAction
+      for (let step = 0; step < 4; step++) {
+        await expect.poll(async () => await firstAction.isEnabled() || (await Promise.all(skips.map(skip => skip.isVisible()))).some(Boolean)).toBe(true)
+        if (await firstAction.isEnabled()) break
+        for (const skip of skips) if (await skip.isVisible()) await skip.click()
+      }
+      if (hostIndex !== 0) {
+        await expect(peerAction).toBeEnabled()
+        await peerAction.click()
+        await guest.getByRole('button', { name: /^(Confirm switch|确认切换)$/ }).click()
+      }
       await expect(forest).toBeEnabled()
       await forest.click()
       for (const page of [host, guest]) {

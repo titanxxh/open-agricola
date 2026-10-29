@@ -319,11 +319,12 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom && deps.registry.has(ctx.currentRoom.id)) {
+      const disconnectedSeat = ctx.currentRoom.players.find(player => player.ws === ws)?.playerIndex
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
         await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
           type: 'playerDisconnected',
-          playerIndex: ctx.currentPlayerIndex,
+          playerIndex: disconnectedSeat ?? ctx.currentPlayerIndex,
         })
       } else if (removal === 'empty') {
         if (ctx.currentRoom.session.state.gameOver && ctx.currentRoom.customSessionExecutor) {

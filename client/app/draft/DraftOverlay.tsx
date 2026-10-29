@@ -4,6 +4,7 @@ import type { DraftPickPayload, DraftStageKind, DraftState } from '../../../shar
 import { t, type Locale } from '../../../shared/i18n'
 import { DraftPoolRow } from './DraftPoolRow'
 import { DraftHistoryPanel } from './DraftHistoryPanel'
+import { getPlayerDisplayName } from '../../utils/player-name'
 
 interface Props {
   state: GameState
@@ -25,6 +26,8 @@ export interface DraftViewModel {
   totalRounds: number
   seatCount: number
   submittedCount: number
+  submittedPlayerIds: string[]
+  waitingPlayerIds: string[]
   myPool: { occ: string[]; minor: string[] }
   myKept: { occ: string[]; minor: string[] }
   myPending: { occ: string | null; minor: string | null }
@@ -44,7 +47,7 @@ export function computeDraftViewModel(draft: DraftState, meId: string): DraftVie
         ? myPending.occ !== null
         : myPending.minor !== null
 
-  let submittedCount = 0
+  const submittedPlayerIds: string[] = []
   for (const pid of draft.seatOrder) {
     const p = draft.pendingPicks[pid]
     if (
@@ -54,7 +57,7 @@ export function computeDraftViewModel(draft: DraftState, meId: string): DraftVie
         : stage === 'occupation'
           ? p.occ !== null
           : p.minor !== null)
-    ) submittedCount += 1
+    ) submittedPlayerIds.push(pid)
   }
 
   return {
@@ -62,7 +65,9 @@ export function computeDraftViewModel(draft: DraftState, meId: string): DraftVie
     round: draft.round,
     totalRounds: draft.totalRounds,
     seatCount: draft.seatOrder.length,
-    submittedCount,
+    submittedCount: submittedPlayerIds.length,
+    submittedPlayerIds,
+    waitingPlayerIds: draft.seatOrder.filter(pid => !submittedPlayerIds.includes(pid)),
     myPool,
     myKept,
     myPending,
@@ -142,6 +147,36 @@ export function DraftOverlay({ state, meId, locale, onSubmit }: Props) {
               : promptText}
           </div>
         </header>
+
+        <section className="draft-opening-order" aria-label={t(locale, 'ui.openingOrder')}>
+          <h3 className="draft-section-title">{t(locale, 'ui.openingOrder')}</h3>
+          <ol className="draft-opening-players">
+            {state.players.map((player, index) => (
+              <li key={player.id} className="draft-opening-player" data-player-id={player.id}
+                data-is-you={player.id === meId ? 'true' : 'false'}>
+                <span className="draft-opening-rank">{index + 1}</span>
+                <span className="draft-opening-color" role="img" aria-label={t(locale, `platform.playerColors.${player.color}`)}
+                  style={{ backgroundColor: player.color }} />
+                <span className="draft-opening-name">{getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)}</span>
+                <span className="draft-opening-details">
+                  {player.id === meId && <span className="draft-opening-badge">{t(locale, 'ui.you')}</span>}
+                  {player.startPlayer && <span className="draft-opening-badge">{t(locale, 'ui.startPlayer')}</span>}
+                  <span className="draft-opening-selection" data-submitted={vm.submittedPlayerIds.includes(player.id) ? 'true' : 'false'}>
+                    {t(locale, vm.submittedPlayerIds.includes(player.id) ? 'ui.draft.submitted' : 'ui.draft.selecting')}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          {vm.alreadySubmitted && <p className="draft-opening-hint" role="status">
+            {t(locale, 'ui.draft.waitingForPlayers', { players: vm.waitingPlayerIds.map(id => {
+              const index = state.players.findIndex(player => player.id === id)
+              const player = state.players[index]
+              return getPlayerDisplayName(locale, player?.name, index, player?.nameIsDefault)
+            }).join(' · ') })}
+          </p>}
+          {state.enableSnakeOpening && <p className="draft-opening-hint">{t(locale, 'ui.snakeOpening')} · {t(locale, 'ui.snakeOpeningDescription')}</p>}
+        </section>
 
         {!vm.alreadySubmitted && (
           <>

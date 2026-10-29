@@ -1,3 +1,4 @@
+import '../../__tests__/_helpers/opening-seat-random'
 import * as rng from '../../../shared/utils/rng'
 import * as database from '../../db'
 import { sendCommand } from '../../__tests__/_helpers/command-socket'
