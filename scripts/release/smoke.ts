@@ -12,7 +12,6 @@ export type SmokeMode = 'random' | 'choose-7'
 export type SmokeTarget = { appUrl: string; apiUrl: string; buildId: string }
 export type SmokeCredentials = { username: string; password: string }
 export type ReleaseFailureStage = 'build-metadata' | 'login' | 'logout' | 'browser-errors'
-  | 'launch-browser' | 'browser-smoke' | 'durability' | 'source-validation' | 'close-database' | 'close-browser'
   | `${SmokeMode}:${'create-or-resume' | 'opening' | 'reload' | 'render'}`
 type SavedRoom = { roomId: string; step0Hash: string }
 type Progress = { version: 1; targetKey: string; rooms: Partial<Record<SmokeMode, SavedRoom>>;
@@ -25,7 +24,7 @@ export function parseSmokeTarget(appUrl: string, apiUrl: string, buildId: string
   const app = new URL(appUrl), api = new URL(apiUrl)
   for (const url of [app, api]) {
     assert.ok(['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash, 'Use HTTP(S) URLs without credentials, queries or fragments')
-    assert.ok(url.protocol === 'https:' || ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'Remote targets require HTTPS; HTTP is limited to loopback addresses')
+    assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'Formal game rehearsal is limited to loopback targets; production acceptance must not create games')
   }
   assert.ok(isSameSite(app, api), 'Release smoke requires same-site frontend and API origins')
   assert.ok(['/', '/open-agricola/'].includes(app.pathname)); assert.equal(api.pathname, '/')

@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { expect } from '@playwright/test'
 import { createLocalUserForTests } from '../server/auth'
 import { getDb } from '../server/db'
@@ -10,8 +8,6 @@ import { runReleaseSmoke, writeEvidence } from '../scripts/release/smoke'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { startHostedReleaseApp } from './helpers/hosted-release-app'
 import { test } from './server-fixtures'
-
-const exec = promisify(execFile)
 
 test('release rehearsal creates and restores both formal solo configurations', async ({ browser }, testInfo) => {
   expect(process.env.DATABASE_SCHEMA).toMatch(/^test_[a-f0-9]{32}$/)
@@ -36,17 +32,17 @@ test('release rehearsal creates and restores both formal solo configurations', a
     }
     expect(durable).toHaveLength(2)
     await context.close()
-    await exec('pnpm', ['exec', 'tsx', 'scripts/release/cli.ts', '--app-url', hosted.appUrl, '--api-url', hosted.apiUrl,
-      '--expected-build', hosted.gameBuildId, '--output', directory], {
-      env: { ...process.env, RELEASE_SMOKE_USERNAME: username, RELEASE_SMOKE_PASSWORD: password }, timeout: 90_000,
-    })
-    const restored: unknown = JSON.parse(readFileSync(`${directory}/result.json`, 'utf8'))
-    expect(restored).toMatchObject({ status: 'passed', browserClosed: true, logout: true,
-      rooms: evidence.rooms.map(room => ({ roomId: room.roomId })),
-    })
-    for (const type of ['createRoom', 'soloHandSubmit', 'parentSubmit', 'takeAction']) {
-      expect(restored).toHaveProperty('commandTypes', expect.not.arrayContaining([type]))
-    }
+    const retryContext = await browser.newContext()
+    try {
+      const restored = await runReleaseSmoke({ page: await retryContext.newPage(),
+        target: { appUrl: hosted.appUrl, apiUrl: hosted.apiUrl, buildId: hosted.gameBuildId },
+        credentials: { username, password }, outputDirectory: directory })
+      expect(restored.rooms.map(room => room.roomId)).toEqual(evidence.rooms.map(room => room.roomId))
+      expect(restored.logout).toBe(true)
+      for (const type of ['createRoom', 'soloHandSubmit', 'parentSubmit', 'takeAction']) {
+        expect(restored.commandTypes).not.toContain(type)
+      }
+    } finally { await retryContext.close() }
     writeEvidence(directory, 'durability.json', { rooms: durable, logout: evidence.logout, build: hosted.gameBuildId })
     await testInfo.attach('release-durability', { path: `${directory}/durability.json`, contentType: 'application/json' })
   } finally {
