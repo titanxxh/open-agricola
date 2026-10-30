@@ -71,7 +71,11 @@ export function ensureCommitRef(repository: string, ref: string, sha: string): v
 }
 
 export function candidateSha(cwd: string, repository: string, ref: string): string {
-  const commit = github(repository, `commits/${encodeURIComponent(ref)}`)
+  const main = ref === 'main' ? github(repository, 'git/ref/heads/main') : null
+  if (main !== null && (typeof main !== 'object' || !('ref' in main) || main.ref !== 'refs/heads/main')) {
+    throw new Error('GitHub did not resolve the exact main branch')
+  }
+  const commit = main === null ? github(repository, `commits/${encodeURIComponent(ref)}`) : { sha: referenceCommit(repository, main) }
   if (typeof commit !== 'object' || !commit || !('sha' in commit) || typeof commit.sha !== 'string') {
     throw new Error('GitHub did not resolve the candidate commit')
   }

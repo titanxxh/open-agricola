@@ -3,6 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repository = resolve(import.meta.dirname, '../..')
 const roots: string[] = []
@@ -15,6 +16,8 @@ type GitHubState = {
   evidence: Evidence
   afterDispatch: Evidence
   mainSha: string
+  nextMainSha: string
+  provenance: Record<string, unknown>
   moveMain: boolean
   refs: Record<string, { sha: string; type: string }>
   annotatedTags: Record<string, { sha: string; type: string }>
@@ -60,9 +63,11 @@ function fixture() {
   if (manifest.status !== 0) throw new Error(manifest.stderr)
   const value: unknown = JSON.parse(manifest.stdout)
   if (typeof value !== 'object' || !value || !('configuration' in value) || typeof value.configuration !== 'string') throw new Error('Invalid fixture manifest')
+  git('commit', '--allow-empty', '-m', 'later main integration')
+  const nextMainSha = git('rev-parse', 'HEAD')
   const state: GitHubState = {
     sha, configuration: value.configuration, evidence: 'passed', afterDispatch: 'passed',
-    mainSha: sha, moveMain: false, refs: {}, annotatedTags: {}, release: null,
+    mainSha: sha, nextMainSha, provenance: finalSnapshotMetadata(sha), moveMain: false, refs: {}, annotatedTags: {}, release: null,
   }
   const save = () => writeFileSync(join(root, 'state.json'), JSON.stringify(state))
   save()
@@ -96,18 +101,23 @@ if (args.includes('POST')) {
     state.refs[ref] = { type: 'commit', sha: body.sha };
   } else if (endpoint === 'actions/workflows/100/dispatches') {
     state.evidence = state.afterDispatch;
-    if (state.moveMain) state.mainSha = 'b'.repeat(40);
+    if (state.moveMain) state.mainSha = state.nextMainSha;
   } else throw Error('Unexpected mutation: ' + endpoint);
   save(); output({}); process.exit(0);
 }
-if (endpoint.startsWith('commits/')) {
+if (Object.hasOwn(state.provenance, args[1])) {
+  let metadata = state.provenance[args[1]];
+  if (endpoint === 'git/ref/heads/main') metadata = { ...metadata, object: { type: 'commit', sha: state.mainSha } };
+  if (Array.isArray(metadata) && args.includes('--paginate')) metadata.forEach(output); else output(metadata);
+} else if (endpoint.startsWith('commits/')) {
   const ref = decodeURIComponent(endpoint.slice(8));
   const sha = ref === 'main' ? state.mainSha : state.refs['heads/' + ref]?.sha ?? (ref === state.sha ? state.sha : null);
   if (!sha) absent(); output({ sha });
 } else if (endpoint === 'actions/workflows/candidate-verification.yml') output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
 else if (endpoint.startsWith('actions/workflows/100/runs?')) {
   if (state.evidence !== 'missing') output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.sha,
-    repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' });
+    repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 },
+    status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' });
 } else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
   output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/run/1',
     started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
@@ -176,7 +186,7 @@ event({ kind: 'remote-pnpm', args });
   writeFileSync(join(value.bin, 'ssh'), prefix + `
 event({ kind: 'ssh', args });
 const stateFile = path.join(root, 'state.json'); const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-if (state.moveMain) { state.mainSha = 'b'.repeat(40); fs.writeFileSync(stateFile, JSON.stringify(state)); }
+if (state.moveMain) { state.mainSha = state.nextMainSha; fs.writeFileSync(stateFile, JSON.stringify(state)); }
 const result = spawnSync('bash', ['-c', args[1]], { input: fs.readFileSync(0), encoding: 'utf8' });
 process.stdout.write(result.stdout); process.stderr.write(result.stderr); process.exit(result.status ?? 1);
 `)
@@ -185,6 +195,16 @@ process.stdout.write(result.stdout); process.stderr.write(result.stderr); proces
 }
 
 describe('owner-machine release entry', () => {
+  it.each(['release', 'backend'])('rejects an unmerged producer before protected %s side effects', entry => {
+    const value = fixture()
+    value.state.provenance[`repos/titanxxh/open-agricola/commits/${value.sha}/pulls?per_page=100`] = []
+    value.save()
+    const result = entry === 'release' ? value.publish() : value.deploy()
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Candidate is ineligible for formal verification')
+    expect(value.events().filter(event => ['release', 'mutation', 'ssh'].includes(event.kind))).toEqual([])
+  })
+
   it('creates the Release for the fixed candidate after complete GitHub evidence passes', () => {
     const value = fixture()
     const result = value.publish()
@@ -213,7 +233,7 @@ describe('owner-machine release entry', () => {
       },
     }])
     expect(value.events().filter(event => event.kind === 'release')[0]?.args).toContain(value.sha)
-    expect(readFileSync(join(value.root, 'state.json'), 'utf8')).toContain('"mainSha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"')
+    expect(readFileSync(join(value.root, 'state.json'), 'utf8')).toContain(`"mainSha":"${value.state.nextMainSha}"`)
   })
 
   it('reuses an existing Release and tag on retry without creating or rewriting either', () => {

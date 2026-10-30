@@ -33,6 +33,8 @@ pnpm install --frozen-lockfile
 pnpm release vX.Y.Z --ref main
 ```
 
+Formal candidates must be a merged PR's final integration snapshot on the selected repository's protected `main`. The guard resolves `refs/heads/main` explicitly, including when a tag is named `main`, and checks native repository/PR identities plus raw Git reachability. Unmerged or intermediate snapshots fail before dispatch, publication, candidate install, or SSH. Eligible older final snapshots remain valid after main advances. The approved final tree defines the producer; its configuration hash does not grant approval. Native governance includes authorized override authority and proves no historical policy. This eligibility policy is recorded in ADR 0037.
+
 The command resolves the candidate once and prints its full SHA. It reuses successful complete GitHub verification for that SHA and configuration. If required tasks are missing or failed, it requests those tasks on `verification/candidates/<SHA>` and waits for all required tasks to pass. This branch stays pinned for retries. An existing branch with a different target is rejected, and the command never force-updates it.
 
 Only after the complete evidence passes does the command create the version tag and Release. The Release target is the fixed SHA even if `main` moves during verification. An existing tag or Release for another SHA is rejected. A matching published Release is reused without rewriting its tag or creating another Release.
@@ -43,7 +45,7 @@ If an attempt stops, retry the printed candidate explicitly:
 pnpm release vX.Y.Z --ref <full-sha>
 ```
 
-Use `--repository owner/name` for a fork with its own candidate-verification workflow. The default repository is `titanxxh/open-agricola`. `--poll-seconds` defaults to 15 and `--timeout-seconds` to 7200. A timeout or failed task leaves publication blocked. After fixing the source, select a new candidate and version as needed.
+Use `--repository owner/name` for a fork with its own candidate-verification workflow and the same protected-main final-PR eligibility policy. The default repository is `titanxxh/open-agricola`. `--poll-seconds` defaults to 15 and `--timeout-seconds` to 7200. A timeout or failed task leaves publication blocked. After fixing the source, select a new candidate and version as needed.
 
 The standard command checks GitHub run and job evidence before publication. A Release created through the website or bare `gh release create` can exist without this evidence. Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
 
@@ -340,7 +342,7 @@ After the new request and broker workflows reach `main` and their local entry te
 4. Delete tag policies and any branch policy other than `main`, preserving the existing main policy and unrelated environment settings. At the canonical repository's cutover, the `v*` tag policy is `56008318` and the retained main policy is `56205883`. Look up current IDs before a change.
 5. Read back the old workflow state and environment policies. Require `disabled_manually` for the legacy workflow and exactly `name=main,type=branch` in the custom allowlist. These native settings are part of the deployment gate.
 
-For an application rollback, leave both protections in place and use the main broker with a previously verified full SHA. Historical commits without the required verification configuration remain blocked. To roll back the gate itself, first stop Pages publication, then restore the saved workflow state and policies deliberately. Restore policies by name and type because GitHub assigns new IDs. Re-enabling the old workflow or allowing tags removes the historical-workflow protection.
+For an application rollback, leave both protections in place and use the main broker with a previously verified eligible final-integration SHA. Historical commits without the required verification configuration remain blocked. To roll back the gate itself, first stop Pages publication, then restore the saved workflow state and policies deliberately. Restore policies by name and type because GitHub assigns new IDs. Re-enabling the old workflow or allowing tags removes the historical-workflow protection.
 
 ### GitHub Pages configuration
 
@@ -372,7 +374,7 @@ The broker pins its main policy SHA separately from the candidate. Release reque
 
 The shared `pages` concurrency lock belongs only to the deploy job after the gated build. It does not cancel running deployments; rejected requests never acquire that lock. This serialization does not define release-version ordering.
 
-`node scripts/ci/pages-deployment.ts` uses Node.js 24's native TypeScript support, with no policy dependency install. It calculates the candidate configuration from Git objects and checks trusted full GitHub evidence before checking out or installing candidate code. Missing, failed, cancelled, skipped, or incompatible required tasks stop the job before artifact upload or deployment. Ordinary PR checks do not satisfy this gate. Only after success does the trusted helper create a separate temporary worktree, install dependencies, and build the fixed candidate. It checks clean source and the `frontend-build.json` SHA before copying the artifact for publication. The candidate's version of the gate is never executed.
+`node scripts/ci/pages-deployment.ts` uses Node.js 24's native TypeScript support, with no policy dependency install. It admits the final protected-main PR snapshot, then calculates configuration from Git objects and checks trusted full GitHub evidence before checking out or installing candidate code. Missing, failed, cancelled, skipped, or incompatible required tasks stop the job before artifact upload or deployment. Ordinary PR checks do not satisfy this gate. Only after success does the trusted helper create a separate temporary worktree, install dependencies, and build the fixed candidate. It checks clean source and the `frontend-build.json` SHA before copying the artifact for publication. The candidate's version of the gate is never executed.
 
 You can still create a Release through **Releases → Draft a new release** or bare `gh release create`. These entries can create an unverified Release; they cannot bypass the deployment gate. Older releases may have no fresh request workflow, so use the manual broker after completing candidate verification. Inspect the failed broker step for blocking tasks, complete verification, and retry the same full SHA. A Release does not deploy the backend.
 

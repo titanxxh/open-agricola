@@ -4,7 +4,7 @@ import { evaluateCandidateVerification, parseGitHubJsonLines } from '../ci/candi
 const sha = 'a'.repeat(40)
 const configuration = 'b'.repeat(64)
 const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']
-const identity = { repository: 'titanxxh/open-agricola', sha, configuration, workflowId: 100 }
+const identity = { repository: 'titanxxh/open-agricola', repositoryId: 1164782262, sha, configuration, workflowId: 100 }
 const step = (name: string, conclusion = 'success') => ({ name, status: 'completed', conclusion })
 const timing = (started_at: string | null, completed_at: string | null) => ({ started_at, completed_at })
 const job = (name: string, id: number) => ({ id, run_id: 1, name, status: 'completed', conclusion: 'success', run_attempt: 1,
@@ -16,7 +16,7 @@ const job = (name: string, id: number) => ({ id, run_id: 1, name, status: 'compl
 function evidence() {
   return {
     run: { id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch',
-      head_sha: sha, repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed',
+      head_sha: sha, repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 }, status: 'completed',
       created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z',
       run_attempt: 1, html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' },
     jobs: [
@@ -98,6 +98,8 @@ describe('GitHub full candidate verification evidence', () => {
   it.each([
     ['SHA', (value: ReturnType<typeof evidence>) => { value.run.head_sha = 'c'.repeat(40) }],
     ['repository', (value: ReturnType<typeof evidence>) => { value.run.repository.full_name = 'someone/fork' }],
+    ['repository ID', (value: ReturnType<typeof evidence>) => { value.run.repository.id = 999 }],
+    ['head repository ID', (value: ReturnType<typeof evidence>) => { value.run.head_repository.id = 999 }],
     ['workflow', (value: ReturnType<typeof evidence>) => { value.run.path = '.github/workflows/ci.yml' }],
     ['workflow ID', (value: ReturnType<typeof evidence>) => { value.run.workflow_id = 999 }],
     ['event', (value: ReturnType<typeof evidence>) => { value.run.event = 'pull_request' }],
@@ -106,6 +108,19 @@ describe('GitHub full candidate verification evidence', () => {
     const value = evidence()
     change(value)
     expect(evaluateCandidateVerification(identity, [value]).status).toBe('blocked')
+  })
+
+  it('requires numeric producer provenance instead of only matching repository names', () => {
+    const value = evidence()
+    expect(() => evaluateCandidateVerification(identity, [{ ...value, run: { ...value.run, head_repository: null } }])).toThrow('Invalid GitHub evidence')
+    expect(() => evaluateCandidateVerification(identity, [{ ...value, run: { ...value.run, repository: { full_name: value.run.repository.full_name } } }]))
+      .toThrow('Invalid GitHub evidence')
+  })
+
+  it.each(['failure', 'cancelled'])('does not mask a newer %s producer with missing numeric identity behind older success', conclusion => {
+    const newer = laterEvidence()
+    const untrusted = { ...newer, run: { ...newer.run, conclusion, head_repository: null } }
+    expect(() => evaluateCandidateVerification(identity, [evidence(), untrusted])).toThrow('Invalid GitHub evidence')
   })
 
   it('waits for an in-progress run even if old successful attempt jobs are present', () => {

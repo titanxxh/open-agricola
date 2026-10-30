@@ -132,6 +132,10 @@ pnpm run check:bundle-size
 
 `candidate-verification.yml` 只按需手动运行或被 CI 复用，不声明 push、PR 或定时触发。正式发布证据只接受专用 `workflow_dispatch`，绑定实际干净检出、候选 SHA 与验证配置。PR 的完整计划也不能替代这一回执。
 
+正式 request/check 新增最终快照准入：候选必须等于所选仓库 `main` 上一个已合入 PR 的最终 `merge_commit_sha`，并可从明确解析的 `refs/heads/main` 原始提交到达。门禁核对仓库、PR base、producer run/head 的原生数字 ID，以及有效的 PR、线性历史、禁止 force update 和删除规则。关联 PR 或祖先关系本身不够；未合入、中间 rebase 提交和开放的 test merge 均拒绝。该策略也适用于显式选择的 fork。可信最终代码树批准 producer，配置哈希只区分兼容执行。普通 PR catalog 不要求该准入。
+
+原生保护按当前治理生效，信任 owner、管理员和已配置 override 权限，不证明历史保护或审核质量，也不要求只读 token 看不到的特权 bypass 信息。API 或对象证明不明确时，在 dispatch、Release、候选安装和 SSH 前直接失败。main 前进不改变已固定且仍可达的合格旧最终 SHA。首次验收应在策略合入后，对真实最终合入 SHA 请求完整十任务验证；预合入绿色检查仍只是日常结果。
+
 在 owner 本机固定候选与指向该 SHA 的 ref 后，可请求完整验证并检查结果：
 
 ```bash
