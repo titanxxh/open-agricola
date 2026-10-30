@@ -194,8 +194,8 @@ import {
   validateResourceBatchExchangeCommit,
   validateResourceQuantityCommit,
   type FeedSelections,
-  type SelectionCommitPayload,
 } from './pending-command-resolution'
+import type { CommitSelectionPayload } from '../contract/protocol/commit-selection'
 import {
   isMoorSpecialActionId,
   resetMoorSpecialActionCards,
@@ -2054,9 +2054,10 @@ export class GameCore {
 
   private buildFenceInteractionFromNode(
     player: PlayerState,
+    actionContext?: Record<string, unknown>,
   ): InteractionFarmSelection {
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmInteraction.selectableTiles('fence')
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('fence', { actionContext })
   }
 
   private buildSelectionInteractionFromNode(
@@ -2120,7 +2121,7 @@ export class GameCore {
     const costOverride = this.peekHostContextSnapshot()?.costs
     switch (farmType) {
       case 'fence':
-        return this.buildFenceInteractionFromNode(player)
+        return this.buildFenceInteractionFromNode(player, ctx)
       case 'room':
         return this.buildRoomInteraction(player, costOverride, ctx)
       case 'stable':
@@ -4890,7 +4891,7 @@ export class GameCore {
 
   private resolveFarmSelectionChoice(
     playerIndex: number,
-    payload: SelectionCommitPayload,
+    payload: CommitSelectionPayload,
     pushHistoryEntry: boolean,
   ): SessionResponse {
     const view = this.engineStack.peekPendingView()
@@ -4982,7 +4983,7 @@ export class GameCore {
 
   commitSelectionChoice(
     playerIndex: number,
-    payload: SelectionCommitPayload,
+    payload: CommitSelectionPayload,
   ): SessionResponse {
     return this.runAuthoritativeCommand(
       'commitSelection',
@@ -4994,7 +4995,7 @@ export class GameCore {
 
   private commitSelectionChoiceInContext(
     playerIndex: number,
-    payload: SelectionCommitPayload,
+    payload: CommitSelectionPayload,
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const view = this.engineStack.peekPendingView()

@@ -15,15 +15,17 @@ export const parseFenceSelectionQuote = (value: unknown): FenceSelectionQuote =>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
-const isEdges = (value: unknown): value is string[] => Array.isArray(value)
+export const isFenceEdges = (value: unknown): value is string[] => Array.isArray(value)
   && value.length <= 200 && value.every(edge => typeof edge === 'string' && edge.length <= 32)
-const isSources = (value: unknown): value is Record<string, string> => isRecord(value)
+export const isFenceSources = (value: unknown): value is Record<string, string> => isRecord(value)
   && Object.keys(value).length <= 200 && Object.values(value).every(source => typeof source === 'string')
+const fenceSelectionKeys = new Set(['edges', 'palisadeEdges', 'fenceSources'])
 
 export const parseFenceSelectionPayload = (value: unknown): FenceSelectionPayload => {
-  if (!isRecord(value) || !isEdges(value.edges)
-    || (value.palisadeEdges !== undefined && !isEdges(value.palisadeEdges))
-    || (value.fenceSources !== undefined && !isSources(value.fenceSources))) {
+  if (!isRecord(value) || !isFenceEdges(value.edges)
+    || Object.entries(value).some(([key, field]) => field !== undefined && !fenceSelectionKeys.has(key))
+    || (value.palisadeEdges !== undefined && !isFenceEdges(value.palisadeEdges))
+    || (value.fenceSources !== undefined && !isFenceSources(value.fenceSources))) {
     throw new Error('Invalid fence selection')
   }
   return { edges: value.edges, palisadeEdges: value.palisadeEdges,

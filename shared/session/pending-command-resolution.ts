@@ -6,6 +6,7 @@ import type {
   Resource,
   ResourceBatchExchangePayload,
 } from '../contract/types'
+import type { CommitSelectionPayload } from '../contract/protocol/commit-selection'
 import type { PendingEnvelope, PendingView } from '../engine/types'
 import {
   isPendingChoiceValueAllowed,
@@ -28,28 +29,6 @@ export type FeedSelection = {
 }
 
 export type FeedSelections = FeedSelection[]
-
-type SowSelectionPayload = {
-  row: number
-  col: number
-  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
-}
-
-export type SelectionCommitPayload = {
-  cancel?: boolean
-  positions?: FarmTilePosition[]
-  cardIds?: string[]
-  resourceCounts?: Partial<Record<keyof Resource, number>>
-  resourceBatchExchange?: ResourceBatchExchangePayload
-  edges?: string[]
-  palisadeEdges?: string[]
-  fenceSources?: Record<string, string>
-  rooms?: FarmTilePosition[]
-  stables?: FarmTilePosition[]
-  farmHand?: FarmTilePosition
-  tile?: FarmTilePosition
-  crops?: SowSelectionPayload[]
-}
 
 type Failure = { ok: false; error: string }
 
@@ -187,7 +166,7 @@ export const planCommitSelectionSubmission = (input: {
   isSelectionPrompt: boolean
   pendingPlayerIndex: number
   playerIndex: number
-  payload: SelectionCommitPayload
+  payload: CommitSelectionPayload
 }): CommitSelectionSubmissionPlan => {
   const effectiveKind = effectiveCommitSelectionKind(input.requestKind, {
     isFarmPrompt: input.isFarmPrompt,

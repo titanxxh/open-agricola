@@ -88,6 +88,7 @@ describe('authoritative fence selection quote', () => {
     expect(() => session.quoteFenceSelection(1, requestKey, { edges })).toThrow('Fence selection is no longer current')
     expect(() => session.quoteFenceSelection(0, 'old-step', { edges })).toThrow('Fence selection is no longer current')
     expect(() => session.quoteFenceSelection(0, requestKey, { edges, palisadeEdges: ['x'.repeat(33)] })).toThrow('Invalid fence selection')
+    expect(() => session.quoteFenceSelection(0, requestKey, { edges, extraWood: 0 } as never)).toThrow('Invalid fence selection')
     expect(JSON.stringify(serializeSessionSnapshot(session.state, session))).toBe(before)
   })
 

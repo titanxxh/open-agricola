@@ -1,3 +1,4 @@
+import { parseCommitSelectionPayload } from '../../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../../shared/contract/protocol/farm-selection'
 /**
  * Testable core of the local-sandbox engine worker: owns the `GameCore`
@@ -152,7 +153,7 @@ export class LocalSandboxCore {
       case 'resolveChoice': return core.resolveChoice(a[0], a[1], a[2])
       case 'takeAnytimeAction': return core.takeAnytimeAction(a[0], a[1])
       case 'ordinaryDrawKeep': return core.resolveOrdinaryCardDrawChoice(a[0], a[1], a[2])
-      case 'commitSelection': return core.commitSelectionChoice(a[0], a[1])
+      case 'commitSelection': return core.commitSelectionChoice(a[0], parseCommitSelectionPayload(a[1]))
       case 'confirmFeed':
         return core.resolveChoice(a[0], 'confirm' as never, { selections: a[1] } as never)
       case 'confirmNextPlayer': {

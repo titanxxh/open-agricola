@@ -1,31 +1,16 @@
 import type { CommandIdentity, CommandInput, CommandScope, CommandReceipt, CommandErrorCode } from './commands'
 import type { RoomHistoryPage } from './history'
+import type { CommitSelectionPayload } from './commit-selection'
 import type { FenceSelectionPayload, FenceSelectionQuote, StateUpdateEnvelope } from './game'
 import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
-import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../types'
+import type { ParentSelectionSubmission, PlayerState } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
 import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
 
 import type { GameEndProposal } from './game-termination'
-
-type CommitSelectionPayload = {
-  cancel?: boolean
-  positions?: { row: number; col: number }[]
-  cardIds?: string[]
-  resourceCounts?: Partial<Record<keyof Resource, number>>
-  resourceBatchExchange?: ResourceBatchExchangePayload
-  edges?: string[]
-  palisadeEdges?: string[]
-  fenceSources?: Record<string, string>
-  rooms?: { row: number; col: number }[]
-  stables?: { row: number; col: number }[]
-  farmHand?: { row: number; col: number }
-  tile?: { row: number; col: number }
-  crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
-}
 
 type MoorSpecialActionPayload = {
   tile?: { row: number; col: number }

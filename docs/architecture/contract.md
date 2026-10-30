@@ -109,7 +109,7 @@ type ClientCommand = (
   | { type: 'anytime'; actionId }
   | { type: 'commitSelection'; playerIndex; payload: {
       cancel?, positions?, cardIds?, resourceCounts?, resourceBatchExchange?,
-      edges?, palisadeEdges?, rooms?, stables?, tile?, crops?
+      edges?, palisadeEdges?, fenceSources?, rooms?, stables?, farmHand?, tile?, crops?
     } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }
@@ -122,6 +122,7 @@ type ClientCommand = (
 - `newGame.seed` is honored only in a dev room; elsewhere it is ignored and a wide seed is drawn. `loadGame` and `dev*` commands are rejected outside a dev room.
 - There are no separate `reorg`, `feed`, `nextPlayer` or `confirmPlayerSwitch` commands: every wait shape submits through `choice`, with `payload` determined by `InteractionRequest.kind`.
 - `commitSelection` is only for structured targeted selections: `interactionSubmitChannel()` (`shared/session/interaction-command-policy.ts`) routes `farm-select`, `selection` (farm-position, occupation-hand), `resource-quantity-select` and `resource-batch-exchange-select` to it. Occupation-hand selections must be unique subsets within the declared limits, validated before any effect or random observation. Farm-position may use server-validated `validPositionGroups`; positions carrying `sourceCard` / `cardFieldSlot` / `groupKey` count by group and are canonicalized by the backend.
+- HTTP, Room WebSocket and the browser-local sandbox parse the payload with `parseCommitSelectionPayload()` (`shared/contract/protocol/commit-selection.ts`) before the session; an unknown or malformed field rejects the command as `invalid payload`. Fence quotes use `parseFenceSelectionPayload()` with the same fence field checks and also reject unknown fields. Tests: `shared/contract/__tests__/commit-selection.test.ts`, `server/connection/__tests__/fence-selection-quote.test.ts`.
 - Game Variant flags (`enableParentCards` / `draftParents`, `enableThroughTheSeasons`, `enableFarmersOfTheMoor` / `enableMoorBalanceRules`, `enableSnakeOpening`) are Room options persisted across `newGame` and restarts; `draftParents: false` deals each player a parent pair without `parent-selection`. Moor balance requires both Moor and balance to be boolean `true`; other or absent values normalize to `false`.
 - `RoomAccess` is public by default or invited with stable account IDs. Invitation permission allows joining an active Room; it never assigns a seat or changes public completed Replay access. `RoomSummary.access` exposes only the mode, never the invitation list.
 - `customCardIds` take effect only with `enableCommunityDeck: true` and only for live, approved Workshop cards ([Workshop backend](server.md#workshop-backend)).
