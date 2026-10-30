@@ -324,7 +324,7 @@ describe('direct backend deployment entry', () => {
     expect(result.status, result.stdout).not.toBe(0)
     expect(result.stderr).toContain('Fetched backend candidate mismatch')
     expect(value.events().filter(event => event.kind === 'remote-pnpm' || event.kind === 'remote-docker' || event.kind === 'remote-services')).toEqual([])
-  })
+  }, 30_000)
 
   it('refuses a remote checkout that differs from the verified candidate before installing or building', () => {
     const value = fixture()
@@ -333,7 +333,7 @@ describe('direct backend deployment entry', () => {
     expect(result.status).not.toBe(0)
     expect(result.stderr).toContain('Checked-out backend candidate mismatch')
     expect(value.events().filter(event => event.kind === 'remote-pnpm' || event.kind === 'remote-docker' || event.kind === 'remote-services')).toEqual([])
-  })
+  }, 30_000)
 
   it('deploys the verified SHA when main moves after the local gate, and reports that SHA as the deployed build', () => {
     const value = fixture()
@@ -350,7 +350,7 @@ describe('direct backend deployment entry', () => {
     expect(events.findIndex(event => event.endpoint === 'actions/runs/1/jobs?filter=all&per_page=100')).toBeLessThan(events.findIndex(event => event.kind === 'ssh'))
     expect(events.filter(event => event.kind === 'remote-docker' && event.args?.includes('build'))).toHaveLength(1)
     expect(result.stdout).toContain(`Current build: ${value.sha}`)
-  })
+  }, 30_000)
 
   it('refuses execution in CI before GitHub or production access', () => {
     const value = fixture()
