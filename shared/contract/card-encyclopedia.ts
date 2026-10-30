@@ -1,4 +1,4 @@
-import type { PaymentResourceKey } from './types'
+import type { PaymentResource } from './types'
 import type { SeasonId } from '../seasons/types'
 
 export type EncyclopediaSourceKind = 'card' | 'major' | 'parent' | 'moorSpecialAction' | 'moorStart' | 'season'
@@ -50,7 +50,7 @@ export type EncyclopediaFace =
   | { readonly kind: 'moorStart'; readonly tiles: readonly EncyclopediaTerrainTile[] }
   | { readonly kind: 'season'; readonly season: SeasonId; readonly actionId: string }
 
-export type EncyclopediaCostPath = Readonly<Partial<Record<PaymentResourceKey, number>>>
+export type EncyclopediaCostPath = Readonly<Partial<Record<keyof PaymentResource, number>>>
 
 /**
  * Static printed payment data only. `unlisted` means the card prints no resource
