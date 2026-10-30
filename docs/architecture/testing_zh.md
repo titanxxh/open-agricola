@@ -26,7 +26,7 @@
 
 按需执行的 `candidate-verification.yml` 使用 `scripts/ci/verification-tasks.ts` 中的完整任务清单。fast、slow、构建、质量检查和浏览器分道各自执行，失败任务可独立重试。契约和社区卡测试由正常 Vitest project 覆盖，不额外重复执行。浏览器任务复用 `scripts/verify.ts` 及其结构化结果。
 
-`scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据；较新的失败会使该任务的旧成功失效。本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
+`scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据。跨 run 和重跑按任务自身的执行时间排序；重跑其他任务不会推进未重跑 job 的时间。新 manifest 要求但未执行的任务持续阻断旧成功，直到 run 完成。执行时间缺失时，已完成 run 的可信 `updated_at` 可约束未通过证据的最晚时间，允许后续正常执行替代它。时间无界或执行区间重叠时不能复用。本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
 
 该工作流也支持复用以在合入前执行。只有所有选中的 matrix 任务成功后，完成 job 才输出任务 ID 和实际检出提交。正式发布证据要求在准确候选提交上执行其专用手动工作流。
 
@@ -40,13 +40,13 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览�
 
 `scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。消费者缺失或前端模块未知时扩大到全量。
 
-`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、共享规则、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。公共机制保留完整 slow project 和浏览器分道；公开契约还覆盖客户端消费者。工坊覆盖当前行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。未知目录、声明的消费者缺失或 project 缺失时扩大到全量。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
+`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、共享规则、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。公共机制保留完整 slow project、client project 和浏览器分道，包含公开 i18n 与农场 helper 的消费者。工坊覆盖当前行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。未知目录、声明的消费者缺失或 project 缺失时扩大到全量。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
 
 `scripts/ci/card-verification.ts` 将权威 Card Source 身份与独立发现的 Vitest、浏览器测试中的字面量、import 和本地测试 helper 关联。索引统一卡号前导零，选择完整文件，包括跨卡和 slow Session 消费者。生产 import 与注册 bootstrap 是归属遍历的终点。通用注册表、文件读取、动态来源、手牌与开局消费者始终保留在保守安全组中，即使同一文件还列有卡牌。有限的卡牌 UI 组、浏览器沙盒、WebKit、质量和构建也保留。新增或删除卡牌路径、缺少行为关联、身份歧义、helper 证据失效，以及手牌或全局可用卡牌都会扩大到全量。公共机制沿用更广的验证范围。索引属于声明式关联契约，不推断语义依赖。公共边界测试位于 `scripts/__tests__/card-verification.test.ts` 和 `scoped-verification-cli.test.ts`。
 
 `scripts/ci/scoped-verification.ts` 计算并执行 canonical plan。执行前重新计算计划，核对 digest 与源码身份，将文件名和 selector 作为进程参数传入。浏览器检查调用 `pnpm verify`，保留隔离依赖、`restart-local.sh` 和结构化 case 结果。执行记录与计划摘要属于日常证据，不能充当完整发布回执。
 
-`ci.yml` 在规划、inline 文件与浏览器检查、可复用 catalog 任务之后始终评估必需的 `verify` job。`scripts/ci/routine-verification-gate.ts` 要求所有选中分支在同一计划与检出上完成。选中任务缺失、失败、取消、跳过或不完整都会失败；未选中分支必须跳过。公共边界测试位于 `scripts/__tests__/` 下的 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
+`ci.yml` 在规划、inline 文件与浏览器检查、可复用 catalog 任务之后始终评估必需的 `verify` job。`scripts/ci/routine-verification-gate.ts` 要求所有选中分支在同一计划与检出上完成。选中任务缺失、失败、取消、跳过或不完整都会失败；未选中分支必须跳过。仅含 inline 的范围计划输出 `catalog_tasks=none`，因为 GitHub 会省略空 job output；选择缺失或为空仍失败。浏览器 catalog 分道和 inline 浏览器计划均安装 Chromium 与 WebKit，因为 spec 可以直接启动任一引擎。公共边界测试位于 `scripts/__tests__/` 下的 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
 
 ## 架构门禁
 

@@ -96,6 +96,7 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow).toContain('--partition inline --expected-digest "$EXPECTED_PLAN_DIGEST"')
     expect(workflow).toContain('uses: ./.github/workflows/candidate-verification.yml')
     expect(workflow).toContain('tasks: ${{ needs.plan.outputs.catalog_tasks }}')
+    expect(workflow).toContain("if: needs.plan.outputs.catalog_tasks != '' && needs.plan.outputs.catalog_tasks != 'none'")
     expect(workflow).toContain('candidate_sha: ${{ github.sha }}')
     expect(workflow).toContain('base_sha:\n        description: Optional full comparison base SHA for a manual scope probe')
     expect(workflow.match(/BASE_REF: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.base_sha \|\| github.event.pull_request.base.sha \|\| github.event.before \|\| github.sha \}\}/g)).toHaveLength(2)
@@ -119,6 +120,16 @@ describe('canonical architecture verification wiring', () => {
     expect(completion).toContain('"$MANIFEST_RESULT" != success || "$TASK_RESULT" != success')
     expect(completion).toContain('"$VERIFIED_SHA" != "$EXPECTED_SHA"')
     expect(workflow).not.toContain('continue-on-error:')
+  })
+
+  it('installs both engines in browser catalog lanes and declared inline browser checks', () => {
+    const candidate = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-verification.yml'), 'utf8')
+    const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+
+    expect(candidate).toContain("if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'")
+    expect(candidate).toContain('run: pnpm exec playwright install --with-deps chromium webkit')
+    expect(routine).toContain("if: contains(needs.plan.outputs.browsers, 'chromium')\n        run: pnpm exec playwright install --with-deps chromium")
+    expect(routine).toContain("if: contains(needs.plan.outputs.browsers, 'webkit')\n        run: pnpm exec playwright install --with-deps webkit")
   })
 
   it('verifies public PRs and main with read-only permissions and preserves manual verification', () => {

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { assertPlanCurrent, createRepositoryPlan, formatPlanSummary, type PlannedCheck, type VerificationPlan } from './verification-plan'
 import { FULL_TASK_IDS, selectedTasks, taskCommands, verificationTask, type VerificationCommand } from './verification-tasks'
-import { assertRoutineGate } from './routine-verification-gate'
+import { assertRoutineGate, NO_CATALOG_TASKS } from './routine-verification-gate'
 
 export type ExecutionPartition = 'inline' | 'all'
 type CommandRunner = (command: string, args: string[], cwd: string) => number
@@ -44,8 +44,8 @@ export function routinePlanManifest(plan: VerificationPlan) {
     plan_digest: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
     tested_sha: plan.identity.testedSha,
     inline_checks: plan.checks.filter(check => check.kind !== 'catalog').length,
-    catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : '',
-    browsers: [...new Set(plan.checks.flatMap(check => check.kind === 'browser' ? [check.browser] : []))].sort().join(' '),
+    catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : NO_CATALOG_TASKS,
+    browsers: plan.checks.some(check => check.kind === 'browser') ? 'chromium webkit' : '',
   }
 }
 

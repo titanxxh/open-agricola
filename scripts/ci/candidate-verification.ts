@@ -38,15 +38,17 @@ const integer = (value: unknown): number => {
   return value
 }
 const conclusion = (value: unknown): string | null => value === null || value === undefined ? null : string(value)
+const timestamp = (value: unknown): number | null => {
+  const parsed = typeof value === 'string' ? Date.parse(value) : NaN
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 function parseRun(value: unknown) {
   const run = object(value)
-  const createdAt = Date.parse(string(run.created_at))
-  if (!Number.isFinite(createdAt)) throw new Error('Invalid GitHub run creation time')
   return {
     id: integer(run.id), workflowId: integer(run.workflow_id), path: string(run.path), event: string(run.event),
     sha: string(run.head_sha), repository: string(object(run.repository).full_name),
-    status: string(run.status), attempt: integer(run.run_attempt), createdAt, url: string(run.html_url),
+    status: string(run.status), attempt: integer(run.run_attempt), updatedAt: timestamp(run.updated_at), url: string(run.html_url),
   }
 }
 
@@ -56,6 +58,7 @@ function parseJob(value: unknown) {
   return {
     id: integer(job.id), runId: integer(job.run_id), name: string(job.name), status: string(job.status), conclusion: conclusion(job.conclusion),
     attempt: integer(job.run_attempt), url: string(job.html_url),
+    createdAt: timestamp(job.created_at), startedAt: timestamp(job.started_at), completedAt: timestamp(job.completed_at),
     steps: (job.steps ?? []).map((entry: unknown) => {
       const step = object(entry)
       return { name: string(step.name), status: string(step.status), conclusion: conclusion(step.conclusion) }
@@ -64,12 +67,36 @@ function parseJob(value: unknown) {
 }
 
 type Job = ReturnType<typeof parseJob>
+type ExecutionTime = { start: number; end: number | null }
+type TaskExecution = { result: CandidateTaskResult; time: ExecutionTime | null }
+
+function executionTime(job: Job): ExecutionTime | null {
+  if (job.status === 'completed') {
+    return job.startedAt !== null && job.completedAt !== null && job.completedAt >= job.startedAt
+      ? { start: job.startedAt, end: job.completedAt } : null
+  }
+  const start = job.startedAt ?? job.createdAt
+  return start !== null && job.completedAt === null ? { start, end: null } : null
+}
+
+function latestExecution(executions: TaskExecution[]): CandidateTaskResult {
+  const unknown = executions.find(execution => execution.time === null)
+  if (unknown) return { ...unknown.result, status: 'blocked', reason: 'Candidate task execution chronology is missing or invalid' }
+  const ordered = executions.flatMap(execution => execution.time ? [{ result: execution.result, time: execution.time }] : [])
+    .sort((a, b) => b.time.start - a.time.start)
+  const latest = ordered[0]
+  if (ordered.slice(1).some(execution => execution.time.end === null || execution.time.end >= latest.time.start)) {
+    return { ...latest.result, status: 'blocked', reason: 'Candidate task execution chronology is ambiguous' }
+  }
+  return latest.result
+}
+
 const successfulStep = (job: Job, name: string): boolean =>
   job.steps.filter(step => step.name === name).length === 1
   && job.steps.some(step => step.name === name && step.status === 'completed' && step.conclusion === 'success')
 const newestJob = (jobs: Job[]): Job | undefined => [...jobs].sort((a, b) => b.attempt - a.attempt || b.id - a.id)[0]
 
-function manifestSelection(jobs: Job[], identity: CandidateIdentity): FullTaskId[] | null {
+function manifestSelection(jobs: Job[], identity: CandidateIdentity): { tasks: FullTaskId[]; job: Job } | null {
   const manifest = newestJob(jobs.filter(job => job.name === 'candidate-manifest'))
   if (!manifest || manifest.status !== 'completed' || manifest.conclusion !== 'success'
     || !successfulStep(manifest, 'Generate candidate manifest')) return null
@@ -78,7 +105,7 @@ function manifestSelection(jobs: Job[], identity: CandidateIdentity): FullTaskId
   if (bindings.length !== 1 || !successfulStep(manifest, bindings[0].name)) return null
   try {
     const selection = selectedTasks(bindings[0].name.slice(prefix.length))
-    return selection.join(',') === bindings[0].name.slice(prefix.length) ? selection : null
+    return selection.join(',') === bindings[0].name.slice(prefix.length) ? { tasks: selection, job: manifest } : null
   } catch { return null }
 }
 
@@ -88,18 +115,22 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
   const results = new Map<FullTaskId, CandidateTaskResult>(FULL_TASK_IDS.map(id => [id, {
     id, status: 'blocked', reason: 'No verified task evidence', runId: null, jobId: null, url: null,
   }]))
+  const executions = new Map<FullTaskId, TaskExecution[]>()
   const runs = evidence.map(entry => ({ run: parseRun(entry.run), jobs: entry.jobs.map(parseJob) }))
     .filter(({ run }) => run.repository.toLowerCase() === identity.repository.toLowerCase()
       && run.sha === identity.sha && run.workflowId === identity.workflowId
       && run.path === CANDIDATE_WORKFLOW && run.event === 'workflow_dispatch')
-    .sort((a, b) => a.run.createdAt - b.run.createdAt || a.run.id - b.run.id)
   for (const { run, jobs } of runs) {
     const compatibleJobs = jobs.every(job => job.runId === run.id && job.attempt <= run.attempt)
+    const endedAt = run.status === 'completed' ? run.updatedAt : null
+    const completionBound = endedAt !== null && jobs.every(job => [job.createdAt, job.startedAt, job.completedAt]
+      .every(time => time === null || time <= endedAt)) ? { start: endedAt, end: endedAt } : null
     const selection = compatibleJobs ? manifestSelection(jobs, identity) : null
-    for (const id of selection ?? FULL_TASK_IDS) {
+    const manifest = newestJob(jobs.filter(job => job.name === 'candidate-manifest'))
+    for (const id of selection?.tasks ?? FULL_TASK_IDS) {
       const name = `candidate / ${id} / ${identity.configuration}`
       const candidates = jobs.filter(job => job.name === name)
-      const job = newestJob(candidates)
+      const job = newestJob(candidates.filter(candidate => !selection || candidate.attempt >= selection.job.attempt))
       const requiredSteps = ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task']
       if (verificationTask(id).browser) requiredSteps.push('Install browsers')
       let reason: string | null = null
@@ -109,9 +140,29 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
       else if (candidates.filter(candidate => candidate.attempt === job.attempt).length !== 1) reason = 'Duplicate required candidate task'
       else if (job.status !== 'completed' || job.conclusion !== 'success') reason = `Required candidate task is ${job.conclusion ?? job.status}`
       else if (!requiredSteps.every(step => successfulStep(job, step))) reason = 'Required verification step did not succeed'
-      results.set(id, { id, status: reason ? 'blocked' : 'passed', reason, runId: run.id, jobId: job?.id ?? null, url: job?.url ?? run.url })
+      let time = job ? executionTime(job) : null
+      if (!selection) {
+        const declared = compatibleJobs && manifest ? executionTime(manifest) : null
+        time = declared ? { start: declared.end ?? declared.start, end: completionBound?.end ?? null } : null
+      } else if (!job) {
+        const requested = executionTime(selection.job)
+        time = requested && requested.end !== null ? { start: requested.end, end: completionBound?.end ?? null } : null
+      }
+      if (job && candidates.filter(candidate => candidate.attempt === job.attempt).length !== 1
+        || run.status !== 'completed' && !jobs.some(candidate => candidate.attempt === run.attempt)) time = null
+      if (!time) {
+        reason ??= 'Candidate task execution chronology is missing or invalid'
+        time = compatibleJobs ? completionBound : null
+      }
+      const attempts = executions.get(id) ?? []
+      attempts.push({
+        result: { id, status: reason ? 'blocked' : 'passed', reason, runId: run.id, jobId: job?.id ?? null, url: job?.url ?? run.url },
+        time,
+      })
+      executions.set(id, attempts)
     }
   }
+  for (const [id, attempts] of executions) results.set(id, latestExecution(attempts))
   const tasks = [...results.values()]
   return {
     status: tasks.every(task => task.status === 'passed') ? 'passed' : 'blocked',

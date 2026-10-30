@@ -120,7 +120,7 @@ jobs:
 
   catalog:
     needs: plan
-    if: needs.plan.outputs.catalog_tasks != ''
+    if: needs.plan.outputs.catalog_tasks != '' && needs.plan.outputs.catalog_tasks != 'none'
     uses: ./.github/workflows/candidate-verification.yml
     with:
       candidate_sha: ${{ github.sha }}

@@ -12,6 +12,12 @@ const write = (cwd: string, file: string, content: string) => {
   mkdirSync(dirname(join(cwd, file)), { recursive: true })
   writeFileSync(join(cwd, file), content)
 }
+const githubJobOutputs = (file: string): Record<string, string> => Object.fromEntries(
+  readFileSync(file, 'utf8').trim().split('\n').map(line => {
+    const separator = line.indexOf('=')
+    return [line.slice(0, separator), line.slice(separator + 1)]
+  }).filter(([, value]) => value !== ''),
+)
 
 function fixture(change: 'documentation' | 'frontend' | 'card' = 'documentation') {
   const cwd = mkdtempSync(join(tmpdir(), 'scoped-verification-cli-'))
@@ -102,12 +108,17 @@ describe('scoped verification public CLI', () => {
     }))
     expect(summary.status).toBe(1)
     expect(summary.stderr).toContain('Selected inline checks did not all succeed')
-  })
+  }, 60_000)
 
-  it('executes the planned documentation constraint through a real process', () => {
+  it('executes documentation constraints and passes the gate with GitHub job output omission', () => {
     const value = fixture()
+    const planOutput = join(value.cwd, 'output/documentation-plan.txt')
+    value.env.GITHUB_OUTPUT = planOutput
     const planned = value.run('plan', '--base', 'main')
     expect(planned.status, planned.stderr).toBe(0)
+    expect(JSON.parse(planned.stdout)).toMatchObject({ mode: 'scoped', inline_checks: 1, catalog_tasks: 'none' })
+    const executionOutput = join(value.cwd, 'output/documentation-execution.txt')
+    value.env.GITHUB_OUTPUT = executionOutput
     const result = value.run('run', '--base', 'main', '--plan', 'output/verification/scoped-plan.json', '--partition', 'inline')
     expect(result.status, result.stderr).toBe(0)
     expect(value.commands()).toEqual([
@@ -116,7 +127,24 @@ describe('scoped verification public CLI', () => {
     ])
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
     expect(record).toMatchObject({ kind: 'routine', status: 'passed', partition: 'inline', checks: [{ status: 'passed' }] })
-  })
+    const plan = githubJobOutputs(planOutput)
+    expect(plan).not.toHaveProperty('browsers')
+    const needs = {
+      plan: { result: 'success', outputs: plan },
+      inline: { result: 'success', outputs: githubJobOutputs(executionOutput) },
+      catalog: { result: 'skipped', outputs: {} },
+    }
+    value.env.NEEDS_JSON = JSON.stringify(needs)
+    const accepted = value.run('gate', '--sha', value.sha)
+    expect(accepted.status, accepted.stderr).toBe(0)
+    expect(JSON.parse(accepted.stdout)).toMatchObject({ status: 'passed', mode: 'scoped', sha: value.sha })
+
+    delete plan.catalog_tasks
+    value.env.NEEDS_JSON = JSON.stringify(needs)
+    const missing = value.run('gate', '--sha', value.sha)
+    expect(missing.status).toBe(1)
+    expect(missing.stderr).toContain('Missing verification job output')
+  }, 60_000)
 
   it('cannot erase required checks from a saved plan while preserving its source fingerprint', () => {
     const value = fixture()
@@ -152,7 +180,7 @@ describe('scoped verification public CLI', () => {
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
     ])
-  })
+  }, 60_000)
 
   it('passes unusual selected file names as one argument without interpreting shell syntax', () => {
     const value = fixture('frontend')
@@ -231,7 +259,7 @@ describe('scoped verification public CLI', () => {
     expect(summary.stderr).toContain('Selected inline checks did not all succeed')
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
     expect(record).toMatchObject({ kind: 'routine', status: 'failed', checks: [{ status: 'failed' }] })
-  })
+  }, 60_000)
 
   it('rejects source mutation during selected commands and a workflow checkout mismatch', () => {
     const value = fixture()

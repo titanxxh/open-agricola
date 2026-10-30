@@ -107,11 +107,13 @@ if (endpoint.startsWith('commits/')) {
 } else if (endpoint === 'actions/workflows/candidate-verification.yml') output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
 else if (endpoint.startsWith('actions/workflows/100/runs?')) {
   if (state.evidence !== 'missing') output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: state.sha,
-    repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' });
+    repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' });
 } else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
   output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/run/1',
+    started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
     steps: [step('Generate candidate manifest'), step('Candidate manifest / ' + state.sha + ' / ' + state.configuration + ' / ' + tasks.join(','))] });
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + state.configuration,
+    started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: task === 'webkit' && state.evidence === 'failed' ? 'failure' : 'success', html_url: 'https://example.test/job/' + task,
     steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }));
 } else if (endpoint.startsWith('git/ref/')) {

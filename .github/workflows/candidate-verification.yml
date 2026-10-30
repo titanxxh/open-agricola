@@ -83,14 +83,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install browsers
         if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
-        env:
-          VERIFICATION_TASK: ${{ matrix.task }}
-        run: |
-          if [ "$VERIFICATION_TASK" = webkit ]; then
-            pnpm exec playwright install --with-deps webkit
-          else
-            pnpm exec playwright install --with-deps chromium
-          fi
+        run: pnpm exec playwright install --with-deps chromium webkit
       - name: Verify candidate checkout
         env:
           CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}

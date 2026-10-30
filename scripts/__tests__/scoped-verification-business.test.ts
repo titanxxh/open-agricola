@@ -1,5 +1,6 @@
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { planVerification, type PlannedCheck, type TestInventory } from '../ci/verification-plan'
+import { planVerification, readTestInventory, type PlannedCheck, type TestInventory } from '../ci/verification-plan'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
 const identity = {
@@ -101,6 +102,24 @@ const workshopInventory: TestInventory = {
 }
 
 describe('business verification groups', () => {
+  it.each([
+    ['shared/i18n/index.ts', 'client/services/__tests__/language-pack.test.ts'],
+    ['shared/domain/farm.ts', 'client/hooks/__tests__/useFarmSelection.test.ts'],
+  ])('selects the real complete client project for shared contract %s', (path, consumer) => {
+    const actual = readTestInventory(resolve(import.meta.dirname, '../..'))
+    const selected = plan([path], actual)
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.expansionReasons).toEqual([])
+    expect(selected.selections.map(selection => selection.scope)).toEqual(['rules'])
+    const client = selected.checks.find(check => check.kind === 'vitest' && check.project === 'fast-client')
+    expect(client).toMatchObject({ kind: 'vitest', project: 'fast-client', files: expect.arrayContaining([consumer]) })
+    expect(client).toEqual({
+      kind: 'vitest', project: 'fast-client',
+      files: actual.vitest.filter(test => test.project === 'fast-client').map(test => test.file).sort(),
+    })
+  })
+
   it('runs the complete backend and client groups plus login, room and multiplayer browsers for a room change', () => {
     const selected = plan(['server/game/room.ts'])
 
@@ -187,6 +206,9 @@ describe('business verification groups', () => {
       ] },
       { kind: 'vitest', project: 'fast-card-runtime', files: [
         'shared/actions/effects/__tests__/pay-supply-token.test.ts', 'shared/session/__tests__/serialization-cursor.test.ts',
+      ] },
+      { kind: 'vitest', project: 'fast-client', files: [
+        'client/app/__tests__/ReplayViewer.recovery.test.tsx', 'client/services/__tests__/gameTransport-reconnect.test.ts',
       ] },
       { kind: 'vitest', project: 'fast-server', files: [
         'server/__tests__/auth.test.ts', 'server/__tests__/listener-purity-gate-session.test.ts',

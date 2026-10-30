@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { planVerification } from '../ci/verification-plan'
+import { routinePlanManifest } from '../ci/scoped-verification'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
 const identity = {
@@ -19,6 +20,22 @@ const inventory = {
 }
 
 describe('routine verification scope', () => {
+  it.each([
+    'hosted-password-login', 'oauth-onboarding', 'workshop-browser-card-tests',
+  ])('installs both engines for the embedded browser launches in %s', file => {
+    const plan = planVerification({
+      identity, changes: [{ status: 'M', path: 'README.md' }],
+      inventory: { vitest: [{ file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' }], browser: [] },
+      fullTaskIds: FULL_TASK_IDS,
+    })
+
+    const manifest = routinePlanManifest({ ...plan, checks: [
+      { kind: 'browser', browser: 'chromium', files: [`e2e-tests/${file}.spec.ts`], grep: null },
+    ] })
+
+    expect(manifest.browsers).toBe('chromium webkit')
+  })
+
   it('runs the complete frontend group and the board browser consumers without backend rule suites', () => {
     const plan = planVerification({
       identity, changes: [{ status: 'M', path: 'client/components/board/FarmBoard.tsx' }],

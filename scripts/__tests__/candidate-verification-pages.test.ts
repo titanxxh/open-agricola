@@ -66,11 +66,13 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const candidateWorkflow = { id: 100, path: '.github/workflows/candidate-verification.yml' }
   const candidateRun = { id: 1, workflow_id: 100, path: candidateWorkflow.path, event: 'workflow_dispatch', head_sha: sha,
     repository: { full_name: repository }, status: 'completed', run_attempt: 1,
-    created_at: '2026-10-30T00:00:00Z', html_url: `https://github.com/${repository}/actions/runs/1` }
+    created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: `https://github.com/${repository}/actions/runs/1` }
   const jobs = tasks.map((task, index) => ({ id: index + 2, run_id: 1, run_attempt: 1,
+    started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     name: `candidate / ${task} / ${configuration}`, status: 'completed', conclusion: 'success', html_url: candidateRun.html_url,
     steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }))
   jobs.unshift({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: candidateRun.html_url,
+    started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
     steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${sha} / ${configuration} / ${tasks.join(',')}`)] })
   const requestWorkflow = { id: 200, path: requestPath }
   const requestRun = { id: 99, workflow_id: 200, path: requestPath, event: 'release', head_sha: sha, run_attempt: 1,
