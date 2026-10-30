@@ -1,3 +1,4 @@
+import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 import { measure } from '../observability/metrics'
 import { ExecutionRevokedError } from './execution-access'
 import type { OwnerToken } from './room-directory'
@@ -64,6 +65,7 @@ type PrepareRoomOptions = {
   retireRoomId?: string
   retiredOwner?: OwnerToken
   retiredVersion?: number
+  retiredTermination?: GameTermination
   missingPrefix: boolean
   onReady?: (result: PrepareRoomReadyResult) => void | Promise<void>
 }
@@ -116,6 +118,10 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
     case 'setPlayerColor':
     case 'confirmPlayerColor':
     case 'dissolveRoom':
+    case 'proposeGameEnd':
+    case 'respondGameEnd':
+    case 'withdrawGameEnd':
+    case 'getGameEndProposal':
     case 'getState':
     case 'getHistory':
     case 'quoteFenceSelection':
@@ -381,6 +387,7 @@ export class RoomCommitter {
       creationSource: room.creationSource,
       retiredOwner: options.retiredOwner,
       retiredVersion: options.retiredVersion,
+      retiredTermination: options.retiredTermination,
       serialized,
       meta: { ...toRoomMeta(room), inputWindow: nextInputWindow(room.inputWindow, serialized.state, 'initial') },
       ...(options.receipt ? { receipt: { request: { ...options.receipt.request }, outcome: { ...options.receipt.outcome, roomId: room.id, roomVersion: 0, stepNo: 0, frameHash: encoded.frameHash } } } : {}),

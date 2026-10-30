@@ -942,6 +942,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   // Rooms the current user has participated in (shared PostgreSQL)
+  if (req.method === 'GET' && req.url === '/api/lobby/ended-games') {
+    const user = await validateSession(await getAuthToken(req))
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
+    const games = await getDb().prepare(`
+      SELECT g.room_id AS id, 'completed' AS outcome, g.finished_at AS ended_at
+      FROM game_results g JOIN game_result_players p USING(room_id) WHERE p.user_id=?
+      UNION
+      SELECT t.room_id AS id, 'terminated' AS outcome, t.ended_at
+      FROM game_terminations t JOIN game_termination_players p USING(room_id) WHERE p.user_id=?
+      ORDER BY ended_at DESC LIMIT 20
+    `).all(user.id, user.id)
+    sendJson(res, 200, { ok: true, games })
+    return
+  }
+
   if (req.method === 'GET' && req.url === '/api/lobby/my-rooms') {
     res.setHeader('Cache-Control', 'no-store')
     const token = (await getAuthToken(req))

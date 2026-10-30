@@ -1,3 +1,4 @@
+import { GameContextStore } from '../server/game/game-context-store'
 import type { PostgresDatabase } from '../server/database/postgres'
 import type { ResourceStore } from '../server/storage/resource-store'
 import { ReplayResources } from '../server/storage/replay-resources'
@@ -38,7 +39,8 @@ export async function validateStorage(db: PostgresDatabase, resources: ResourceS
     parseCustomCards(header.custom_cards_json)
     if (!await replayResources.viewer(header.viewer_build_id)) throw new Error(`replay viewer unavailable: ${header.room_id}: ${header.viewer_build_id}`)
     if (header.lifecycle === 'active' && (header.replay_status !== null || header.status !== 'recording')) throw new Error(`replay metadata invalid: ${header.room_id}`)
-    if (header.lifecycle === 'completed' && !(await store.manifest(header.room_id)).ok) throw new Error(`replay metadata invalid: ${header.room_id}`)
+    if (['completed', 'terminated'].includes(header.lifecycle) && !(await store.manifest(header.room_id)).ok) throw new Error(`replay metadata invalid: ${header.room_id}`)
+    if (header.lifecycle === 'terminated' && !(await new GameContextStore(db).resolve(header.room_id)).ok) throw new Error(`termination metadata invalid: ${header.room_id}`)
     const steps = await db.prepare('SELECT * FROM game_replay_steps WHERE room_id = ? ORDER BY step_no').all<ReplayStepRow>(header.room_id)
     const counts = validateReplay(header, steps)
     replayStepCount += counts.stepCount; replaySegmentCount += counts.segmentCount

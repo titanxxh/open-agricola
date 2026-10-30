@@ -17,6 +17,7 @@ export function nextInputWindow(previous: RoomInputWindow | null | undefined, st
 
 /** Call only AFTER looking up a previously completed command receipt. */
 export function assertCommandInput(type: string, input: Partial<CommandInput>, version: number, window: RoomInputWindow | null | undefined): void {
+  if (['proposeGameEnd', 'respondGameEnd', 'withdrawGameEnd'].includes(type)) return
   const simultaneous = type === 'draftSubmit' ? 'draft' : type === 'parentSubmit' ? 'parent' : type === 'soloHandSubmit' ? 'solo-hand' : null
   if (simultaneous && window?.kind === simultaneous && input.inputWindowId === window.id) return
   if (!simultaneous && Number.isSafeInteger(input.expectedVersion) && input.expectedVersion === version) return

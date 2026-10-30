@@ -4,6 +4,7 @@ import { persistedRoomAccessError } from './room-access'
 import { GameCreationStore } from './game-creation-store'
 import type { SoloCreationConfigurationResponse } from '../../shared/contract/game-creation'
 import { resolveSoloWorkshopCards } from './workshop-room-cards'
+import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 import type {
   CompletedGameContextDescriptor,
   GameContextLifecycle,
@@ -200,6 +201,29 @@ export class GameContextStore {
         roomId,
         lifecycle: 'removed',
         reason: removedReason(context.removal_reason),
+      }
+    }
+    if (context.lifecycle === 'terminated') {
+      const ending = await this.db.prepare(`SELECT reason, intent, proposer_index, started_at, ended_at, round
+        FROM game_terminations WHERE room_id=?`).get<{
+          reason: GameTermination['reason']; intent: GameTermination['intent']; proposer_index: number;
+          started_at: number; ended_at: number; round: number
+        }>(roomId)
+      const players = await this.db.prepare(`SELECT player_index, display_name, name_is_default, agreed_at
+        FROM game_termination_players WHERE room_id=? ORDER BY player_index`)
+        .all<{ player_index: number; display_name: string; name_is_default: number; agreed_at: number }>(roomId)
+      const replay = await this.db.prepare(`SELECT r.schema_version, r.viewer_build_id, r.latest_step_no, r.missing_prefix,
+        MIN(s.step_no) AS first_step_no FROM game_replays r JOIN game_replay_steps s USING(room_id)
+        WHERE r.room_id=? GROUP BY r.room_id`).get<ReplayRow>(roomId)
+      if (!ending || !replay) return { ok: false, code: 'replay_segment_unavailable', lifecycle: 'terminated', message: 'Terminated game archive is unavailable' }
+      return {
+        ok: true, roomId, lifecycle: 'terminated', replayStatus: 'available',
+        termination: { reason: ending.reason, intent: ending.intent, proposerIndex: ending.proposer_index,
+          startedAt: ending.started_at, endedAt: ending.ended_at, round: ending.round,
+          players: players.map(player => ({ playerIndex: player.player_index, displayName: player.display_name,
+            ...(player.name_is_default ? { nameIsDefault: true } : {}), agreedAt: player.agreed_at })) },
+        replay: { firstStepNo: replay.first_step_no, lastStepNo: replay.latest_step_no,
+          missingPrefix: replay.missing_prefix === 1, schemaVersion: replay.schema_version, viewerBuildId: replay.viewer_build_id },
       }
     }
     if (context.lifecycle === 'active') {

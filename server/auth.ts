@@ -590,6 +590,8 @@ export async function deleteAccount(userId: string): Promise<Awaited<{ ok: true 
       WHERE user_id = ?
     `).run(userId))
 
+    await db.prepare(`UPDATE game_termination_players SET user_id=NULL,
+      display_name='Deleted player (seat ' || (player_index + 1) || ')', name_is_default=0 WHERE user_id=?`).run(userId)
     ;(await db.prepare('DELETE FROM github_propose_audit WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM github_propose_rate_limit WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM workshop_card_versions WHERE created_by = ?').run(userId))

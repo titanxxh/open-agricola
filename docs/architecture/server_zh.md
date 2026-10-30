@@ -47,7 +47,7 @@ server/game/
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
 - 创建在持久提交回调中先采用新 Room，再分离原连接。旧房通知失败只记录故障，不回滚或释放已提交的新会话；初始化清理由提交边界决定。
 - 正式单人通过 `createRoom(maxPlayers: 1)` 创建一个登录账号座位，Step 0 提交后才确认创建。进行中的单人 Room 不进入公开发现，原参与者仍沿用普通恢复授权。`createRoom(sourceGameContextId)` 经 `game-creation-store.ts` 读取不可变的已接受创建元数据，校验已完成来源的唯一参与者，不加载旧 Room 或 Replay 就能创建新局。首次事务同时提交 Room、Step 0、创建配置和命令回执，并再次校验来源及 Workshop 准入；显式卡源不可用时返回完整原选择和类型化差异。契约及测试见 `shared/contract/game-creation.ts`、`server/connection/__tests__/solo-room.test.ts`。
-- `roomId` 恰好标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新的 `GameSession` 与 UUID，从不复用旧 ID，并在退役旧局的同一事务中迁移在线座位、人数、自定义卡与变体开关。只有权威 `gameOver` 在一个事务中写入 Game Result Archive 并删除可恢复快照；归档写入失败会回滚并保留最终状态以便重试。过期、解散、删号与未完成的重开把 Game Context 标为 `expired`，不产生结果。结果分数保留引擎原始数值，包括小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
+- `roomId` 恰好标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新的 `GameSession` 与 UUID，从不复用旧 ID，并在退役旧局的同一事务中迁移在线座位、人数、自定义卡与变体开关。只有权威 `gameOver` 在一个事务中写入 Game Result Archive 并删除可恢复快照；归档写入失败会回滚并保留最终状态以便重试。闲置过期、取消等待房间与销毁清理把 Game Context 标为 `expired`，不产生结果；协商提前结束则保留独立的 `terminated` 归档。结果分数保留引擎原始数值，包括小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
 - 所有托管对局，包括工坊、热座与开发 Room，都使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认创建、等待状态与座位。重启后普通存档按需加载，未加载存档由 `GameContextStore` 过期清理，并保护在线连接、准入预留与未完成保存。所有玩家断线后，普通 Room 在等待时保留 30 分钟、进行中保留 7 天；开发对局不会因闲置过期。在线启动不做旧数据清理，缺失录制数据会阻断恢复，而不是编造替代内容。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
 - 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
@@ -59,6 +59,8 @@ server/game/
 - **历史窗口**：视角快照携带最近 20 个完整操作组，带稳定记录 ID、按视角绑定的分支 ID、`projectionHash` 锚点与更早一页的游标。`getHistory` / `historyPage` 使用活动座位授权与完整视角过滤；分支或投影变化时返回 `history_branch_changed` / `history_projection_changed`。读取从不写 Room。HTTP、本地与 debug payload 保持完整。
 
 测试：`server/game/__tests__/`、`server/__tests__/session-recovery-data.test.ts`。
+
+协商终止（[ADR 0036](../adr/0036-consensual-game-termination.md)）是独立的 Room 生命周期转换。`game-end.ts` 定义同意规则；Room 元数据检查点持久化待处理提议，不受游戏撤销影响。`PostgresRoomPersistence.terminate()` 在同一事务中写入终止记录、保留录制回放、完成命令回执并退出活动恢复。它不写正常 Game Result，也不改变规则层的 `gameOver`。未完赛重开复用同一归档事务，并为所有原参与者保留新局座位，包括离线玩家。
 
 ## Durable Room Commit、Game Context、Replay 与 Bug Report
 

@@ -1,4 +1,15 @@
-export type GameContextLifecycle = 'active' | 'completed' | 'expired' | 'removed'
+import type { GameTermination } from './game-termination'
+
+export type GameContextLifecycle = 'active' | 'completed' | 'terminated' | 'expired' | 'removed'
+
+export type TerminatedGameContextDescriptor = {
+  ok: true
+  roomId: string
+  lifecycle: 'terminated'
+  replayStatus: 'available'
+  termination: GameTermination
+  replay: NonNullable<CompletedGameContextDescriptor['replay']>
+}
 
 export type ActiveGameContextDescriptor = {
   ok: true
@@ -59,6 +70,7 @@ export type RemovedGameContextDescriptor = {
 export type GameContextDescriptor =
   | ActiveGameContextDescriptor
   | CompletedGameContextDescriptor
+  | TerminatedGameContextDescriptor
   | ExpiredGameContextDescriptor
   | RemovedGameContextDescriptor
 

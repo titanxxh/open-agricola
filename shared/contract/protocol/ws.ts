@@ -9,6 +9,8 @@ import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
 import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
 
+import type { GameEndProposal } from './game-termination'
+
 type CommitSelectionPayload = {
   cancel?: boolean
   positions?: { row: number; col: number }[]
@@ -102,6 +104,10 @@ type ClientCommandBody =
   | { type: 'setPlayerColor'; color: PlayerState['color'] }
   | { type: 'confirmPlayerColor' }
   | { type: 'dissolveRoom' }
+  | { type: 'proposeGameEnd'; intent: 'end' | 'rematch' }
+  | { type: 'respondGameEnd'; proposalId: string; agree: boolean }
+  | { type: 'withdrawGameEnd'; proposalId: string }
+  | { type: 'getGameEndProposal' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
 
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
@@ -109,6 +115,8 @@ export type ClientCommand = ClientCommandBody & { requestId?: string; commandCon
 export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed' | 'color_confirmation_unavailable' | 'color_confirmation_failed'
 
 export type ServerEvent =
+  | { type: 'gameEndProposal'; roomId: string; proposal: GameEndProposal | null }
+  | { type: 'gameTerminated'; roomId: string }
   | { type: 'commandScope'; scope: CommandScope; requestId?: string }
   | { type: 'commandReceipt'; status: 'completed'; receipt: CommandReceipt; requestId?: string }
   | { type: 'commandReceipt'; status: 'pending' | 'unknown'; identity: CommandIdentity; requestId?: string }

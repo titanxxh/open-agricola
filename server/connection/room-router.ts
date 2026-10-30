@@ -13,6 +13,8 @@ import { buildRoomHistoryPage, HistoryBranchChangedError, HistoryProjectionChang
 import { enqueueRoomCommand, enqueueRoomTask, waitForConnection } from '../game/room-queue.ts'
 import { serializeState } from '../../shared/session/serialization'
 import { randomUUID } from 'node:crypto'
+import { agreeToGameEnd, buildGameTermination, createGameEndProposal, hasUnanimousAgreement } from '../game/game-end'
+import type { GameEndProposal, GameTermination } from '../../shared/contract/protocol/game-termination'
 import type { SessionResponse } from '../game/authoritative-session.ts'
 import {
   fixedDevRoomRootId,
@@ -22,6 +24,7 @@ import {
   roomOccupiedSeatCount,
   roomConnectedPlayerCount,
   emptyRoomTtlMs,
+  toRoomMeta,
   type Room,
 } from '../game/room.ts'
 import { validateSession } from '../auth.ts'
@@ -349,6 +352,7 @@ const publishInitialState = async (
   retireRoomId?: string,
   retiredOwner?: OwnerToken,
   retiredVersion?: number,
+  retiredTermination?: GameTermination,
 ): Promise<Awaited<void | Promise<void>>> => {
   const finishObservation = captureCommandOutcome()
   const publishReady = async (): Promise<Awaited<void>> => {
@@ -367,6 +371,7 @@ const publishInitialState = async (
     retireRoomId,
     retiredOwner,
     retiredVersion,
+    retiredTermination,
     ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id, playerIndex: room.players.find(player => player.ws === ctx.ws)?.playerIndex ?? ctx.currentPlayerIndex } } } : {}),
     onReady: publishReady,
   }))
@@ -910,7 +915,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   ctx.registry.touchActivity(room.id, Date.now())
   const playerCount = roomOccupiedSeatCount(room)
   // The hotseat owner is the whole table, so rejoining is always a full room.
-  const roomFull = room.hotseat === true || playerCount >= room.maxPlayers
+  const roomFull = room.hotseat === true || (room.awaitingRematchPlayers ? roomConnectedPlayerCount(room) : playerCount) >= room.maxPlayers
   const starting = !wasPlaying && roomFull && (room.hotseat === true || isDevRoom(room.id))
   if (!wasPlaying && !starting && roomFull
     && (previousPlayerCount < room.maxPlayers || room.colorConfirmationPlayerIndex === undefined)) {
@@ -1043,7 +1048,7 @@ async function handleConfirmPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientC
     sendCommandError(ctx, 'Colors are locked after the game starts', msg.requestId, 'color_locked')
     return
   }
-  if (room.colorConfirmationPlayerIndex !== ctx.currentPlayerIndex || roomOccupiedSeatCount(room) < room.maxPlayers) {
+  if (room.colorConfirmationPlayerIndex !== ctx.currentPlayerIndex || (room.awaitingRematchPlayers ? roomConnectedPlayerCount(room) : roomOccupiedSeatCount(room)) < room.maxPlayers) {
     sendCommandError(ctx, 'The final arriving player must confirm their color', msg.requestId, 'color_confirmation_unavailable')
     return
   }
@@ -1060,9 +1065,85 @@ async function handleConfirmPlayerColor(ctx: ConnectionCtx, msg: Extract<ClientC
   room.status = 'playing'
   room.startedAt ??= Date.now()
   room.colorConfirmationPlayerIndex = undefined
+  room.awaitingRematchPlayers = false
   await publishInitialState(ctx, room, response, msg.requestId, () => {}, async () => {
     await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
   })
+}
+
+async function handleGetGameEndProposal(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getGameEndProposal' }>): Promise<void> {
+  const room = requireRoom(ctx, msg.requestId)
+  if (room) await ctx.broadcaster.sendRoomEvent(ctx.ws, room, { type: 'gameEndProposal', roomId: room.id, proposal: room.endProposal ?? null })
+}
+
+async function updateGameEndProposal(ctx: ConnectionCtx, room: Room, proposal: GameEndProposal | null, requestId?: string): Promise<void> {
+  const previous = room.endProposal
+  const previousRoomId = room.id
+  let terminated = false
+  room.endProposal = proposal
+  const receipt = ctx.activeCommand ? { request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id } } : undefined
+  try {
+    if (proposal && hasUnanimousAgreement(proposal)) {
+      const termination = buildGameTermination(room, proposal)
+      if (proposal.intent === 'rematch') {
+        const id = room.id
+        await handleNewGame(ctx, { type: 'newGame', requestId }, termination)
+        if (room.id === id) room.endProposal = previous
+      } else {
+        await ctx.checkpoint.terminateRoom(room, termination, { receipt })
+        terminated = true
+        await ctx.committer?.retireRoom(room.id)
+        try {
+          if (receipt) ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', requestId,
+            receipt: { scopeId: receipt.request.scopeId, commandId: receipt.request.commandId, outcome: receipt.outcome } })
+          await ctx.broadcaster.broadcastEvent(room, { type: 'gameTerminated', roomId: room.id })
+        } finally {
+          ctx.registry.delete(room.id)
+          ctx.registry.clearActivity(room.id)
+          for (const player of room.players) player.ws.close()
+          room.players = []
+          room.session.dispose()
+          ctx.currentRoom = null
+        }
+      }
+      return
+    }
+    await ctx.checkpoint.recordMeta(room, { receipt })
+  } catch (error) {
+    if (terminated || room.id !== previousRoomId) throw error
+    room.endProposal = previous
+    if (error instanceof RoomOwnershipError) throw error
+    sendCommandError(ctx, error instanceof Error ? error.message : 'Could not save the end proposal', requestId)
+    return
+  }
+  await ctx.broadcaster.broadcastEvent(room, { type: 'gameEndProposal', roomId: room.id, proposal })
+}
+
+async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'proposeGameEnd' }>): Promise<void> {
+  const room = requireWritableRoom(ctx, msg.requestId)
+  if (!room) return
+  if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
+  let proposal: GameEndProposal
+  try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent) }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
+  await updateGameEndProposal(ctx, room, proposal, msg.requestId)
+}
+
+async function handleRespondGameEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'respondGameEnd' }>): Promise<void> {
+  const room = requireWritableRoom(ctx, msg.requestId)
+  if (!room) return
+  const proposal = room.endProposal
+  if (!proposal || proposal.id !== msg.proposalId || typeof msg.agree !== 'boolean') { sendCommandError(ctx, 'End proposal is no longer pending', msg.requestId); return }
+  await updateGameEndProposal(ctx, room, msg.agree ? agreeToGameEnd(proposal, ctx.currentPlayerIndex) : null, msg.requestId)
+}
+
+async function handleWithdrawGameEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'withdrawGameEnd' }>): Promise<void> {
+  const room = requireWritableRoom(ctx, msg.requestId)
+  if (!room) return
+  if (!room.endProposal || room.endProposal.id !== msg.proposalId || room.endProposal.proposerIndex !== ctx.currentPlayerIndex) {
+    sendCommandError(ctx, 'Only the proposer can withdraw this proposal', msg.requestId); return
+  }
+  await updateGameEndProposal(ctx, room, null, msg.requestId)
 }
 
 async function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'dissolveRoom' }>): Promise<Awaited<void>> {
@@ -1275,10 +1356,10 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   )
 }
 
-async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): Promise<Awaited<void | Promise<void>>> {
+async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>, termination?: GameTermination): Promise<Awaited<void | Promise<void>>> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
-  if (room.maxPlayers === 1 && !isDevRoom(room.id)) {
-    sendCommandError(ctx, 'Complete this solo game before creating a new game from its configuration', msg.requestId, 'source_not_completed')
+  if (!termination && room.status === 'playing' && !room.session.state.gameOver && !isDevRoom(room.id)) {
+    await handleProposeGameEnd(ctx, { type: 'proposeGameEnd', intent: 'rematch', requestId: msg.requestId })
     return
   }
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
@@ -1296,7 +1377,16 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   // is refreshed alongside so a stale id cannot mark this room for a later
   // takedown it does not deserve.
   const enableCommunityDeck = room.session.state.enableCommunityDeck
-  const reloaded = (await loadCustomCards(
+  const soloConfiguration = room.creationConfiguration?.configuration
+  const soloCards = soloConfiguration ? await resolveSoloWorkshopCards(getDb(), soloConfiguration) : undefined
+  if (soloCards?.issues.length && soloConfiguration) {
+    sendCommandError(ctx, 'The selected card sources require adjustment', msg.requestId, 'creation_requires_adjustment')
+    if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration: soloConfiguration, issues: soloCards.issues }
+    return
+  }
+  const reloaded = soloCards && soloConfiguration
+    ? { cards: soloCards.cards, loadedDbIds: soloConfiguration.customCardIds, hasNotLive: false }
+    : (await loadCustomCards(
     enableCommunityDeck ? room.customCardDbIds ?? [] : [],
     room.createdBy,
     { liveOnly: true },
@@ -1318,6 +1408,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount: room.maxPlayers,
+        ...(room.soloHandMode ? { soloHandMode: room.soloHandMode } : {}),
         enableCommunityDeck,
         enableParentCards,
         ...(room.draftParents === false ? { draftParents: false } : {}),
@@ -1342,7 +1433,9 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
     return
   }
-  const nextRoomId = ctx.activeCommand?.request.resultRoomId ?? (await generateRoomId(ctx, fixedDevRoomRootId(previousRoomId)))
+  const nextRoomId = termination && room.endProposal?.intent === 'rematch'
+    ? room.endProposal.nextRoomId
+    : ctx.activeCommand?.request.resultRoomId ?? (await generateRoomId(ctx, fixedDevRoomRootId(previousRoomId)))
   if (!nextRoomId) {
     created.executor?.dispose()
     created.session.dispose()
@@ -1350,21 +1443,32 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     return
   }
   const nextPlayers: Room['players'] = []
+  const nextOwners: NonNullable<Room['seatOwners']> = []
+  const names: Array<[number, string]> = []
   const colorsBySeat = new Map<number, typeof room.session.state.players[number]['color']>()
-  for (const player of room.players) {
-    const seat = resolveJoinPlayerIndex({ ...room, id: nextRoomId, players: nextPlayers, seatOwners: [] },
-      isDevRoom(nextRoomId) || room.hotseat ? player.playerIndex : undefined, player.userId)
+  const originalOwners = toRoomMeta(room).players
+  const sourceIndices = termination
+    ? room.session.state.players.map((_, index) => index)
+    : room.players.map(player => player.playerIndex)
+  for (const originalIndex of sourceIndices) {
+    const original = room.session.state.players[originalIndex]!
+    const connected = room.players.find(player => player.playerIndex === originalIndex)
+    const userId = originalOwners.find(owner => owner.playerIndex === originalIndex)?.userId
+    const seat = resolveJoinPlayerIndex({ ...room, id: nextRoomId, players: nextPlayers, seatOwners: nextOwners },
+      isDevRoom(nextRoomId) || room.hotseat ? originalIndex : undefined, userId)
     if (!seat.ok) throw new Error(seat.error)
-    nextPlayers.push({ ...player, playerIndex: seat.playerIndex })
-    colorsBySeat.set(seat.playerIndex, room.session.state.players[player.playerIndex]!.color)
+    if (connected) nextPlayers.push({ ...connected, playerIndex: seat.playerIndex })
+    if (userId) nextOwners.push({ userId, playerIndex: seat.playerIndex })
+    names.push([seat.playerIndex, connected?.name ?? (original.nameIsDefault ? '' : original.name)])
+    colorsBySeat.set(seat.playerIndex, original.color)
   }
   nextPlayers.sort((left, right) => left.playerIndex - right.playerIndex)
+  nextOwners.sort((left, right) => left.playerIndex - right.playerIndex)
   const unusedColors = playerColorOptions.filter(color => ![...colorsBySeat.values()].includes(color))
   const colors: Parameters<Room['session']['updatePlayerColors']>[0] = created.session.state.players.map((_, index) =>
     [index, colorsBySeat.get(index) ?? unusedColors.shift()!])
   if (created.executor) await created.executor.updatePlayerColors(colors)
   else created.session.updatePlayerColors(colors)
-  const names: Array<[number, string]> = nextPlayers.map(player => [player.playerIndex, player.name])
   let response: SessionResponse | Promise<SessionResponse>
   if (created.executor) {
     response = created.executor.execute('updatePlayerNames', [names])
@@ -1389,7 +1493,13 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         customSessionExecutor: created.executor,
         players: nextPlayers,
         version: 0,
-        seatOwners: nextPlayers.flatMap(player => player.userId ? [{ playerIndex: player.playerIndex, userId: player.userId }] : []),
+        endProposal: null,
+        awaitingRematchPlayers: !!termination && nextPlayers.length < room.maxPlayers,
+        creationSource: undefined,
+        ...(soloCards && soloConfiguration ? { creationConfiguration: {
+          configuration: soloConfiguration, resolvedWorkshopSources: soloCards.resolvedWorkshopSources,
+        } } : {}),
+        seatOwners: nextOwners,
         status: isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
         colorConfirmationPlayerIndex: undefined,
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
@@ -1421,12 +1531,13 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         }
       }
       if (nextRoom.status === 'playing') {
-        return publishInitialState(ctx, nextRoom, resp, msg.requestId, adopt, () => {}, previousRoomId, previousOwner, previousVersion)
+        return publishInitialState(ctx, nextRoom, resp, msg.requestId, adopt, () => {}, previousRoomId, previousOwner, previousVersion, termination)
       }
       await ctx.checkpoint.recordCreated(nextRoom, {
         retireRoomId: previousRoomId,
         retiredOwner: previousOwner,
         retiredVersion: previousVersion,
+        retiredTermination: termination,
         ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: nextRoomId, roomVersion: 0, playerIndex: nextPlayers.find(player => player.ws === ctx.ws)!.playerIndex } } } : {}),
       })
       await adopt()
@@ -1544,6 +1655,10 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   createRoom: handleCreateRoom,
   joinRoom: handleJoinRoom,
   dissolveRoom: handleDissolveRoom,
+  proposeGameEnd: handleProposeGameEnd,
+  respondGameEnd: handleRespondGameEnd,
+  withdrawGameEnd: handleWithdrawGameEnd,
+  getGameEndProposal: handleGetGameEndProposal,
   setPlayerColor: handleSetPlayerColor,
   confirmPlayerColor: handleConfirmPlayerColor,
   getState: handleGetState,
@@ -1593,7 +1708,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
     const commands = ctx.commands
     try {
       if (ctx.sessionToken && !(await validateSession(ctx.sessionToken))) { commandOutcome('canceled'); ctx.ws.close(1008, 'session revoked'); return }
-      const writes = !['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)
+      const writes = !['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt', 'getGameEndProposal'].includes(msg.type)
       if (writes) {
         if (!commands || !msg.commandContext) throw new CommandError('command_identity_required', 'A stable command identity is required')
         const targetRoomId = msg.type === 'createRoom' ? null : msg.commandContext.roomId ?? null
@@ -1628,7 +1743,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
       }
       // Creation authorizes its actor, allocation and source independently of
       // whichever completed rules session this connection previously displayed.
-      if (ctx.currentRoom && !['auth', 'getCommandScope', 'getCommandReceipt', 'createRoom'].includes(msg.type)) await ctx.authority?.assert(ctx.currentRoom)
+      if (ctx.currentRoom && !['auth', 'getCommandScope', 'getCommandReceipt', 'createRoom', 'getGameEndProposal'].includes(msg.type)) await ctx.authority?.assert(ctx.currentRoom)
       if (msg.type === 'joinRoom') { const joined = ctx.registry.get(msg.roomId); if (joined) await ctx.authority?.assert(joined) }
       if (
         ctx.currentRoom !== acceptedRoom

@@ -1,0 +1,11 @@
+.game-end-controls {
+  margin: 8px auto;
+  padding: 8px 12px;
+  max-width: 960px;
+  border: 1px solid var(--color-border, #c9b894);
+  border-radius: 8px;
+  background: var(--color-surface, #f8f2e6);
+}
+.game-end-controls p { margin: 4px 0 8px; }
+.game-end-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.game-end-hint { font-size: 0.875rem; }

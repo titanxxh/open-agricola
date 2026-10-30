@@ -12,7 +12,7 @@ vi.mock('../../services/room-creation', async importOriginal => ({
 
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
-  ok: true, rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
+  ok: true, games: [], rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
   players: [{ id: 'Guest_ID-2', username: 'guest', displayName: 'Guest' }],
 }))))
 

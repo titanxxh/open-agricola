@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CompletedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
+import type { CompletedGameContextDescriptor, TerminatedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
 import type {
   ReplayAnchorResponse,
   ReplayManifest,
@@ -126,7 +126,7 @@ export function ReplayFrame({
 export function ReplayShell({
   context,
 }: {
-  context: CompletedGameContextDescriptor
+  context: CompletedGameContextDescriptor | TerminatedGameContextDescriptor
 }) {
   const { locale, t } = useLocale()
   const [manifest, setManifest] = useState<ReplayManifest | null>(null)
@@ -272,13 +272,13 @@ export function ReplayShell({
     return (
       <main className="replay-shell replay-shell--status">
         {navigation}
-        <h1>{t('platform.gameContext.completedTitle')}</h1>
+        <h1>{t(context.lifecycle === 'terminated' ? 'platform.gameEnd.terminated' : 'platform.gameContext.completedTitle')}</h1>
         <p role="alert">{t('platform.gameContext.viewerUnavailable')}</p>
         <ol className="replay-results">
-          {context.result.players.map((player) => (
+          {(context.lifecycle === 'terminated' ? context.termination.players : context.result.players).map((player) => (
             <li key={player.playerIndex}>
               <span>{getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}</span>
-              <strong>{t('platform.gameContext.score', { score: player.score })}</strong>
+              {'score' in player ? <strong>{t('platform.gameContext.score', { score: player.score })}</strong> : null}
             </li>
           ))}
         </ol>
@@ -302,14 +302,14 @@ export function ReplayShell({
         {navigation}
         <header>
           <p>{t('platform.gameContext.room', { id: context.roomId })}</p>
-          <h1>{t('platform.gameContext.completedTitle')}</h1>
+          <h1>{t(context.lifecycle === 'terminated' ? 'platform.gameEnd.terminated' : 'platform.gameContext.completedTitle')}</h1>
           <p>{t('platform.gameContext.choosePerspective')}</p>
         </header>
         <ol className="replay-results">
-          {context.result.players.map((player) => (
+          {(context.lifecycle === 'terminated' ? context.termination.players : context.result.players).map((player) => (
             <li key={player.playerIndex}>
               <span>{getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}</span>
-              <strong>{t('platform.gameContext.score', { score: player.score })}</strong>
+              {'score' in player ? <strong>{t('platform.gameContext.score', { score: player.score })}</strong> : null}
               <button
                 type="button"
                 onClick={() => choosePerspective(`p${player.playerIndex + 1}`)}

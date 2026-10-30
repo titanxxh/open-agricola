@@ -250,7 +250,7 @@ const loadEvidenceFrame = async (
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
   `).get(report.room_id)) as { lifecycle: string } | undefined
   if (
-    context?.lifecycle !== 'completed'
+    context?.lifecycle !== 'completed' && context?.lifecycle !== 'terminated'
     && (
       report.evidence_expires_at === null
       || report.evidence_expires_at <= now

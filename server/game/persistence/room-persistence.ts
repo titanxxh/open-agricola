@@ -7,11 +7,15 @@ import type { CustomCardData } from '../../../shared/cards/session-card-context.
 import type { RoomAccess } from '../../../shared/contract/room-access'
 import type { SoloHandMode } from '../../../shared/contract/game-creation'
 
-export type RoomWriteOptions = { executionStamp?: ExecutionStamp; owner?: OwnerToken; expectedVersion?: number | null; retiredOwner?: OwnerToken; retiredVersion?: number; resume?: boolean; retireRoomId?: string; receipt?: CommandReceiptWrite }
+import type { GameEndProposal, GameTermination } from '../../../shared/contract/protocol/game-termination'
+
+export type RoomWriteOptions = { executionStamp?: ExecutionStamp; owner?: OwnerToken; expectedVersion?: number | null; retiredOwner?: OwnerToken; retiredVersion?: number; resume?: boolean; retireRoomId?: string; retiredTermination?: GameTermination; receipt?: CommandReceiptWrite }
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
 
 export type RoomMeta = {
+  endProposal?: GameEndProposal | null
+  awaitingRematchPlayers?: boolean
   executionStamp?: ExecutionStamp
   owner?: OwnerToken
   inputWindow?: RoomInputWindow | null
@@ -84,6 +88,7 @@ export type GameResult = {
 
 /** PostgreSQL is the runtime store. The memory implementation is a test double. */
 export interface RoomPersistence {
+  terminate(id: string, termination: GameTermination, options?: RoomWriteOptions): Promise<void> | void
   load(id: string): Promise<RoomSnapshot | null> | RoomSnapshot | null
   /** A null snapshot updates metadata while preserving the committed state. */
   save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta, options?: RoomWriteOptions): Promise<void> | void

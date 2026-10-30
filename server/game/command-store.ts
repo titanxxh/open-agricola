@@ -95,7 +95,7 @@ export class CommandStore {
       if (row.outcome_json !== canonicalJson(outcome)) throw new CommandError('command_content_conflict', 'A committed command cannot change its result')
       return { scopeId: request.scopeId, commandId: request.commandId, outcome: JSON.parse(row.outcome_json) as CommandOutcome }
     }
-    await this.db.prepare('UPDATE command_requests SET outcome_json = ?, completed_at = ? WHERE scope_id = ? AND command_id = ?').run(canonicalJson(outcome), await this.now(), request.scopeId, request.commandId)
+    await this.db.prepare('UPDATE command_requests SET outcome_json = ?, completed_at = ?, result_room_id = COALESCE(?, result_room_id) WHERE scope_id = ? AND command_id = ?').run(canonicalJson(outcome), await this.now(), outcome.ok ? outcome.roomId ?? null : null, request.scopeId, request.commandId)
     return { scopeId: request.scopeId, commandId: request.commandId, outcome }
   }
 
