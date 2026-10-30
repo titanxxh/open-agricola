@@ -32,6 +32,7 @@ function fixture(change: 'documentation' | 'frontend' | 'card' = 'documentation'
   }
   write(cwd, 'README.md', 'Guide\n')
   if (change === 'card') {
+    write(cwd, 'e2e-tests/card-localization.spec.ts', '// generic card metadata consumer\n')
     write(cwd, 'shared/cards/A/A029_AleBenches.ts', "export const A029_AleBenches = defineMinorCard({ meta: { id: 'A029_AleBenches', cost: { wood: 1 } } })\n")
     write(cwd, 'shared/cards/__tests__/A29_AleBenches.test.ts', "import '../A/A029_AleBenches'\n")
     write(cwd, 'server/__tests__/A029_AleBenches-session.test.ts', "const ALE = 'A029_AleBenches'\n")

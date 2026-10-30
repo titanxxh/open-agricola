@@ -15,6 +15,7 @@ const identity = {
   baseRef: 'main', headRef: 'HEAD', baseSha: '1'.repeat(40), mergeBaseSha: '1'.repeat(40),
   headSha: '2'.repeat(40), testedSha: '2'.repeat(40), sourceFingerprint: '3'.repeat(64),
 }
+const browserSafety = ['card-localization', 'choice-previews', 'farm-card-targets', 'frontend-browser-scenario-matrix'].map(name => `e2e-tests/${name}.spec.ts`)
 function fixture() {
   const cwd = mkdtempSync(join(tmpdir(), 'card-verification-'))
   temporary.push(cwd)
@@ -28,7 +29,8 @@ function fixture() {
     { file: 'server/__tests__/A029_AleBenches-session.test.ts', project: 'slow' },
     { file: 'server/__tests__/cross-card-session.test.ts', project: 'fast-server' },
     { file: 'shared/cards/__tests__/registry-audit.test.ts', project: 'fast-cards' },
-  ], browser: [] }
+  ], browser: [...browserSafety] }
+  for (const file of browserSafety) write(cwd, file, 'const cards = catalogCardDefinitions\n')
   write(cwd, inventory.vitest[0]!.file, "import { A029_AleBenches as ale } from '../A/A029_AleBenches'\nale.impl.effect()\n")
   write(cwd, inventory.vitest[1]!.file, "const card = 'A127_Lodger'\nexpect(card).toBeDefined()\n")
   write(cwd, inventory.vitest[2]!.file, "const played = ['A29_AleBenches']\nexpect(played).toContain('A29_AleBenches')\n")
@@ -52,23 +54,28 @@ describe('card test associations', () => {
       ] },
       { kind: 'vitest', project: 'fast-server', files: ['server/__tests__/cross-card-session.test.ts'] },
       { kind: 'vitest', project: 'slow', files: ['server/__tests__/A029_AleBenches-session.test.ts'] },
+      { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
+      { kind: 'browser', browser: 'chromium', files: browserSafety, grep: null },
     ] })
   })
 
   it('selects card-owned browser helpers and retains generic card UI and specialized engine checks', () => {
     const { cwd, source, inventory } = fixture()
-    inventory.browser = ['e2e-tests/ale.spec.ts', 'e2e-tests/lodger.spec.ts', 'e2e-tests/card-ui.spec.ts']
-    write(cwd, inventory.browser[0]!, "import { ALE } from './helpers/cards'\nexpect(ALE).toBeDefined()\n")
+    inventory.browser.push('e2e-tests/ale.spec.ts', 'e2e-tests/lodger.spec.ts', 'e2e-tests/card-ui.spec.ts')
+    write(cwd, 'e2e-tests/ale.spec.ts', "import { ALE } from './helpers/cards'\nexpect(ALE).toBeDefined()\n")
     write(cwd, 'e2e-tests/helpers/cards.ts', "export const ALE = 'A029_AleBenches'\n")
-    write(cwd, inventory.browser[1]!, "const card = 'A127_Lodger'\n")
-    write(cwd, inventory.browser[2]!, "const named = 'A127_Lodger'\nconst cards = catalogCardDefinitions.map(card => card.id)\n")
+    write(cwd, 'e2e-tests/lodger.spec.ts', "const card = 'A127_Lodger'\n")
+    write(cwd, 'e2e-tests/card-ui.spec.ts', "const named = 'A127_Lodger'\nconst cards = catalogCardDefinitions.map(card => card.id)\n")
 
     const mapping = cardVerification([source], inventory, readCardAssociationIndex(cwd, inventory), [{ status: 'M', path: source }])
 
     expect(mapping.expansionReasons).toEqual([])
     expect(mapping.checks.filter(check => check.kind === 'browser' || (check.kind === 'catalog' && !['quality', 'build'].includes(check.taskId)))).toEqual([
       { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
-      { kind: 'browser', browser: 'chromium', files: ['e2e-tests/ale.spec.ts', 'e2e-tests/card-ui.spec.ts'], grep: null },
+      { kind: 'browser', browser: 'chromium', files: [
+        'e2e-tests/ale.spec.ts', 'e2e-tests/card-localization.spec.ts', 'e2e-tests/card-ui.spec.ts',
+        'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts',
+      ], grep: null },
     ])
   })
 
@@ -85,7 +92,6 @@ describe('card test associations', () => {
     expect(mapping.expansionReasons).toEqual([])
     expect(mapping.checks.flatMap(check => check.kind === 'catalog' ? [] : check.files)).not.toContain('server/__tests__/auth.test.ts')
     expect(mapping.checks.flatMap(check => check.kind === 'catalog' ? [] : check.files)).not.toContain('e2e-tests/auth.spec.ts')
-    expect(mapping.checks.filter(check => check.kind === 'browser')).toEqual([])
   })
 
   it.each([
@@ -106,7 +112,7 @@ describe('card test associations', () => {
 
   it('uses associations in the public plan and expands the whole plan when a card has hand/global footprint', () => {
     const { cwd, source, inventory } = fixture()
-    const input = { identity, changes: [{ status: 'M', path: source }] as const, inventory, fullTaskIds: ['quality', 'fast', 'slow', 'build'] }
+    const input = { identity, changes: [{ status: 'M', path: source }] as const, inventory, fullTaskIds: ['quality', 'fast', 'slow', 'build', 'browser-sandbox', 'webkit'] }
     const scoped = planVerification({ ...input, changes: [...input.changes], cardAssociations: readCardAssociationIndex(cwd, inventory) })
     expect(scoped.mode).toBe('scoped')
     expect(scoped.checks).toContainEqual({ kind: 'vitest', project: 'slow', files: ['server/__tests__/A029_AleBenches-session.test.ts'] })
@@ -116,6 +122,7 @@ describe('card test associations', () => {
     expect(full.mode).toBe('full')
     expect(full.checks).toEqual([
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'fast' }, { kind: 'catalog', taskId: 'slow' }, { kind: 'catalog', taskId: 'build' },
+      { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
     ])
     expect(full.expansionReasons.join(' ')).toContain('hand or global')
   })
@@ -139,6 +146,14 @@ describe('card test associations', () => {
     expect(cardVerification([source], inventory, associations, []).expansionReasons.join(' ')).toContain('does not match')
     expect(cardVerification([other], inventory, readCardAssociationIndex(cwd, inventory), []).expansionReasons.join(' ')).toContain('No declared behavior-test association')
     expect(cardVerification([source], inventory, undefined, []).expansionReasons.join(' ')).toContain('evidence is missing')
+  })
+
+  it('expands when a declared generic card UI consumer disappears from the inventory', () => {
+    const { cwd, source, inventory } = fixture()
+    inventory.browser = inventory.browser.filter(file => file !== 'e2e-tests/choice-previews.spec.ts')
+    const mapping = cardVerification([source], inventory, readCardAssociationIndex(cwd, inventory), [])
+    expect(mapping.checks).toEqual([])
+    expect(mapping.expansionReasons.join(' ')).toContain('Declared card UI consumers are missing')
   })
 
   it.each(['direct', 'Session'])('accepts declared %s-only behavior coverage without imposing another test layer', layer => {
