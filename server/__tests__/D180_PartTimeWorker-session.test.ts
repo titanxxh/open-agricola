@@ -225,6 +225,79 @@ describe('D180 Part-Time Worker session', () => {
       .toEqual([['collect', { wood: 6 }], ['return', { wood: 3 }], ['cardEffect', { cattle: 1 }]])
   })
 
+  it.each([
+    { pastureTiles: 2, housed: 5, discarded: 1, final: 3, score: 2 },
+    { pastureTiles: 3, housed: 6, discarded: 0, final: 4, score: 3 },
+  ])('settles animal housing before return when $housed of six cattle fit', ({ pastureTiles, housed, discarded, final, score }) => {
+    const session = setup({}, state => {
+      state.round = 14
+      state.players[0]!.pastures = [{
+        id: 'cattle', tiles: Array.from({ length: pastureTiles }, (_, row) => ({ row, col: 2 })),
+        animalType: null, animalCount: 0,
+      }]
+      state.actionSpaces.find(space => space.id === 'cattle-market')!.resources.cattle = 6
+    })
+    const offered = session.takeAction(0, 'cattle-market')
+    expect(offered.ok, offered.error).toBe(true)
+    expect(offered.state.players[0]!.resources.cattle).toBe(6)
+    expect(offered.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    expect(options(offered).some(option => option.sourceCard === CARD_ID)).toBe(false)
+    const settled = settleAnimals(session, offered)
+    expect(settled.state.players[0]!.resources.cattle).toBe(housed)
+    const discards = settled.state.events.filter(event => event.type === 'farm.animalDiscarded')
+    expect(discards).toHaveLength(discarded > 0 ? 1 : 0)
+    if (discarded > 0) expect(discards).toEqual([
+      expect.objectContaining({ animals: { cattle: discarded }, reason: 'noRoom' }),
+    ])
+    expect(options(settled).some(option => option.sourceCard === CARD_ID)).toBe(true)
+    const response = chooseCard(session, settled)
+
+    expect(response.state.players[0]!.resources.cattle).toBe(final)
+    expect(spaceResources(response, 'cattle-market').cattle).toBe(3)
+    expect(collectEvents(response, 'cattle-market')).toEqual([expect.objectContaining({ resources: { cattle: 6 } })])
+    expect(returnEvents(response)).toEqual([expect.objectContaining({ resources: { cattle: 3 } })])
+    expect(response.state.players[0]!.stats.resourcesFromBoard.cattle).toBe(6)
+    expect(response.scores!.find(score => score.playerId === 'p1')!.categories.find(category => category.key === 'cattles'))
+      .toMatchObject({ quantity: final, total: score })
+  })
+
+  it.each(['A017_ReclamationPlow', 'B034_SpecialFood'])(
+    'finishes animal housing before sharing after reactions with %s', minor => {
+      const session = setup({}, state => {
+        state.round = 14
+        state.players[0]!.minorPlayed = [minor]
+        state.players[0]!.pastures = [{
+          id: 'cattle', tiles: [{ row: 0, col: 2 }, { row: 1, col: 2 }, { row: 2, col: 2 }],
+          animalType: null, animalCount: 0,
+        }]
+        state.actionSpaces.find(space => space.id === 'cattle-market')!.resources.cattle = 6
+      })
+      const offered = session.takeAction(0, 'cattle-market')
+      expect(offered.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+      expect(offered.state.players[0]!.pastures[0]!.animalCount).toBe(0)
+      const settled = settleAnimals(session, offered)
+      expect(settled.state.players[0]!.resources.cattle).toBe(6)
+      expect(settled.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+      expect(options(settled).map(option => option.sourceCard)).toEqual(expect.arrayContaining([CARD_ID, minor]))
+
+      let response = acceptCard(session, settled, minor)
+      if (minor === 'A017_ReclamationPlow') {
+        assert.ok(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select')
+        assert.equal(response.interaction.request.farm.farmType, 'plow')
+        response = session.commitSelectionChoice(0, { tile: response.interaction.request.farm.selectableTiles[0]! })
+        expect(response.ok, response.error).toBe(true)
+        expect(response.state.players[0]!.fields).toHaveLength(1)
+      } else {
+        expect(response.state.players[0]!.cardStates[minor]?.counters?.bonusVp).toBe(6)
+      }
+      expect(response.state.players[0]!.cardStates[minor]?.flagged).toBe(true)
+      response = chooseCard(session, response)
+      expect(response.state.players[0]!.resources.cattle).toBe(4)
+      expect(returnEvents(response)).toEqual([expect.objectContaining({ resources: { cattle: 3 } })])
+      expect(response.state.players[0]!.stats.resourcesFromBoard.cattle).toBe(6)
+    },
+  )
+
   it('counts only the original pile when a before reward adds another wood', () => {
     const session = setup({ wood: 6 }, state => {
       state.players[0]!.occupationPlayed = [CARD_ID, 'A116_WoodCutter']
@@ -310,6 +383,17 @@ describe('D180 Part-Time Worker session', () => {
       response = acceptCard(session, response, first!)
       response = acceptCard(session, response, second!)
 
+      expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, cattle: 1, food: 1 })
+      expect(collectEvents(response)).toEqual([expect.objectContaining({ resources: { wood: 6 } })])
+      expect(returnEvents(response)).toEqual([expect.objectContaining({ resources: { wood: 3 } })])
+
+      const undone = session.undoAction(0)
+      expect(undone.ok, undone.error).toBe(true)
+      response = session.takeAction(0, 'forest')
+      expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+      expect(options(response).map(option => option.sourceCard)).toEqual(expect.arrayContaining([CARD_ID, 'D140_Loudmouth']))
+      response = acceptCard(session, response, second!)
+      response = acceptCard(session, response, first!)
       expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, cattle: 1, food: 1 })
       expect(collectEvents(response)).toEqual([expect.objectContaining({ resources: { wood: 6 } })])
       expect(returnEvents(response)).toEqual([expect.objectContaining({ resources: { wood: 3 } })])
