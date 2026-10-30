@@ -1,4 +1,5 @@
 import { Fragment, type Key, type ReactNode } from 'react'
+import type { CardTextIconToken } from '../../../shared/projections/card-text-icons'
 
 /**
  * Renders card description text with inline resource icons and
@@ -16,7 +17,7 @@ import { Fragment, type Key, type ReactNode } from 'react'
  * `\n` splits the input into lines separated by `<br/>`.
  */
 
-const RESOURCE_TAGS: Record<string, string> = {
+const RESOURCE_TAGS: Readonly<Record<string, string>> = {
   // ── Resources ──
   WOOD: 'wood',
   CLAY: 'clay',
@@ -47,7 +48,7 @@ const RESOURCE_TAGS: Record<string, string> = {
   MOOR: 'moor',
   FENCE: 'fence-icon',
   GRAIN_VEG_STACK: 'grain-veg-stack',
-}
+} satisfies Record<CardTextIconToken, string>
 
 // One regex covers all three token kinds — alternation captures into
 // distinct groups so the dispatch loop knows which kind it matched.
