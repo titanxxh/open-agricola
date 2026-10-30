@@ -31,7 +31,7 @@ type ReplayRemovalLedger = {
 
 type ReplayRow = {
   room_id: string
-  lifecycle: 'active' | 'completed' | 'expired' | 'removed'
+  lifecycle: 'active' | 'completed' | 'terminated' | 'expired' | 'removed'
   replay_status: 'available' | 'legacy_no_replay' | null
   custom_cards_json: string | null
 }
@@ -253,6 +253,7 @@ const applyEntries = async (
     }
     if (entry.eraseResult) {
       ;(await db.prepare('DELETE FROM game_results WHERE room_id = ?').run(entry.roomId))
+      await db.prepare('DELETE FROM game_terminations WHERE room_id=?').run(entry.roomId)
     } else {
       ;(await db.prepare(`
         UPDATE game_result_players
@@ -262,6 +263,8 @@ const applyEntries = async (
         WHERE room_id = ?
       `).run(entry.roomId))
     }
+    await db.prepare(`UPDATE game_termination_players SET user_id=NULL,
+      display_name='Deleted player (seat ' || (player_index + 1) || ')', name_is_default=0 WHERE room_id=?`).run(entry.roomId)
     ;(await db.prepare(`
       DELETE FROM game_context_participants
       WHERE room_id = ?
@@ -295,7 +298,7 @@ const planRows = async (
 ): Promise<Awaited<ReplayRow[]>> => {
   if (!assetHash) {
     if (
-      target.lifecycle !== 'completed'
+      !['completed', 'terminated'].includes(target.lifecycle)
       || target.replay_status !== 'available'
       || target.custom_cards_json === null
     ) {

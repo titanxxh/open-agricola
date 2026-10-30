@@ -50,6 +50,7 @@ export function createLobby(deps: {
         if (!registry.has(roomId)) return { ok: false, error: 'room not found' }
         if (isDevRoom(room.id)) return { ok: false, error: 'cannot dissolve dev room' }
         if (room.createdBy !== userId) return { ok: false, error: 'only the room creator can dissolve' }
+        if (room.status !== 'waiting' || room.startedAt !== undefined) return { ok: false, error: 'started games require an end proposal' }
         await retire(room, undefined, options)
         return { ok: true }
       })

@@ -101,6 +101,10 @@ type ClientCommand = (
       enableSnakeOpening?, draftMode?, draftPoolSize? }
   | { type: 'joinRoom'; roomId; intent?: 'join' | 'resume'; requestedPlayerIndex?; name? }
   | { type: 'dissolveRoom' }
+  | { type: 'proposeGameEnd'; intent: 'end' | 'rematch' }
+  | { type: 'respondGameEnd'; proposalId: string; agree: boolean }
+  | { type: 'withdrawGameEnd'; proposalId: string }
+  | { type: 'getGameEndProposal' }
   | { type: 'getState' }
   | { type: 'action'; spaceId }
   | { type: 'choice'; value; payload? }

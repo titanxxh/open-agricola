@@ -1,3 +1,4 @@
+import { GameEndControls } from './GameEndControls'
 import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
 import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
@@ -1400,7 +1401,9 @@ export const GameContainerApi = () => {
         ? t(locale, 'platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, colorConfirmingPlayer.name, colorConfirmingPlayer.playerIndex) })
         : t(locale, 'platform.waitingForPlayers')
       : wsStatus.phase === 'error'
-        ? wsStatus.code === 'invalid_room_access'
+        ? wsStatus.message === 'gameTerminated'
+          ? t(locale, 'platform.gameEnd.terminated')
+          : wsStatus.code === 'invalid_room_access'
           ? t(locale, 'platform.invalidRoomAccess')
           : wsStatus.code === 'invited_player_unavailable'
           ? t(locale, 'platform.invitedPlayerUnavailable')
@@ -1548,6 +1551,10 @@ export const GameContainerApi = () => {
     </div>
   ) : null
 
+  const gameEndControls = wsTransport && !state.gameOver ? (
+    <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} />
+  ) : null
+
   const gameHeader = (
     <GameHeader
       locale={locale}
@@ -1573,6 +1580,7 @@ export const GameContainerApi = () => {
         {gameHeader}
         {notificationStack}
         {bugReportBar}
+        {gameEndControls}
         {waiting?.canSubmit ? (
           <SoloHandOverlay key={`${wsTransport?.roomId ?? roomId ?? state.gameSeed}:${JSON.stringify(waiting.groups)}`}
             groups={waiting.groups} locale={locale}
@@ -1599,6 +1607,7 @@ export const GameContainerApi = () => {
       return (
         <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
           <HotseatHandoff
+            actions={gameEndControls}
             playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
             locale={locale}
             onConfirm={() => confirmHotseatSeat(hotseatSeatId)}
@@ -1611,6 +1620,7 @@ export const GameContainerApi = () => {
         {gameHeader}
         {notificationStack}
         {bugReportBar}
+        {gameEndControls}
         <DraftOverlay
           state={state}
           meId={meId}
@@ -1638,6 +1648,7 @@ export const GameContainerApi = () => {
       return (
         <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
           <HotseatHandoff
+            actions={gameEndControls}
             playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
             locale={locale}
             onConfirm={() => confirmHotseatSeat(hotseatSeatId)}
@@ -1650,6 +1661,7 @@ export const GameContainerApi = () => {
         {gameHeader}
         {notificationStack}
         {bugReportBar}
+        {gameEndControls}
         <ParentSelectionOverlay
           state={state}
           meId={meId}
@@ -1673,6 +1685,7 @@ export const GameContainerApi = () => {
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         <HotseatHandoff
+          actions={gameEndControls}
           playerName={playerNames[activePlayer.id] ?? activePlayer.id}
           locale={locale}
           onConfirm={() => confirmHotseatSeat(activePlayer.id)}
@@ -2052,6 +2065,7 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
+      {gameEndControls}
       <div ref={headerRef}>
         {gameHeader}
       </div>

@@ -5,18 +5,22 @@ import type {
   RestoreOptions,
 } from './room-persistence.ts'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
+import type { GameTermination } from '../../../shared/contract/protocol/game-termination'
 
 type Row = { serialized: PersistedSessionSnapshot | null; meta: RoomMeta; updatedAt: number }
 
 const copyMeta = (meta: RoomMeta): RoomMeta => ({
   ...meta,
   ...(meta.access ? { access: structuredClone(meta.access) } : {}),
+
+  ...(meta.endProposal ? { endProposal: structuredClone(meta.endProposal) } : {}),
   customCardDbIds: [...meta.customCardDbIds],
   ...(meta.customCards === undefined ? {} : { customCards: structuredClone(meta.customCards) }),
   players: meta.players.map((player) => ({ ...player })),
 })
 
 export class InMemoryRoomPersistence implements RoomPersistence {
+  readonly terminations = new Map<string, GameTermination>()
   private rooms = new Map<string, Row>()
 
   load(id: string): RoomSnapshot | null {
@@ -43,6 +47,11 @@ export class InMemoryRoomPersistence implements RoomPersistence {
   }
 
   discard(id: string): void {
+    this.rooms.delete(id)
+  }
+
+  terminate(id: string, termination: GameTermination): void {
+    this.terminations.set(id, structuredClone(termination))
     this.rooms.delete(id)
   }
 

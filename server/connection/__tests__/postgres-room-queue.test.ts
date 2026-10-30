@@ -81,10 +81,11 @@ it('holds ordinary room execution and a connection room change behind an in-flig
     expect(room.players.some(player => player.ws === actor.ws)).toBe(false)
     const previousRoomId = room.id
     await dispatch(observer, { type: 'newGame' })
-    expect(observer.currentRoom?.id).not.toBe(previousRoomId)
-    expect(await persistence.load(previousRoomId)).toBeNull()
-    expect((await persistence.load(observer.currentRoom!.id))?.meta.status).toBe('waiting')
-    expect((await db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?').get(previousRoomId))?.lifecycle).toBe('expired')
+    expect(observer.currentRoom?.id).toBe(previousRoomId)
+    expect(await persistence.load(previousRoomId)).not.toBeNull()
+    expect((await persistence.load(observer.currentRoom!.id))?.meta.status).toBe('playing')
+    expect((await db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?').get(previousRoomId))?.lifecycle).toBe('active')
+    expect(room.endProposal?.intent).toBe('rematch')
 
   } finally {
     release?.()

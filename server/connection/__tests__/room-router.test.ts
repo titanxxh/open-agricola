@@ -30,6 +30,17 @@ const sentMessagesOf = (ctx: ReturnType<typeof newCtx>): Array<Record<string, un
   return send.mock.calls.map(([raw]) => JSON.parse(raw as string) as Record<string, unknown>)
 }
 
+const approveRematch = async (ctx: ReturnType<typeof newCtx>) => {
+  const room = ctx.currentRoom!
+  const proposal = room.endProposal
+  if (!proposal) return
+  for (const player of [...room.players]) {
+    if (proposal.agreements.some(vote => vote.playerIndex === player.playerIndex)) continue
+    const peer = { ...ctx, ws: player.ws, currentPlayerIndex: player.playerIndex, currentUserId: player.userId, activeCommand: undefined }
+    await dispatch(peer, { type: 'respondGameEnd', proposalId: proposal.id, agree: true })
+  }
+}
+
 const markRoomStarted = async (ctx: ReturnType<typeof newCtx>) => {
   ctx.currentRoom!.status = 'playing'
   ctx.currentRoom!.startedAt ??= 1
@@ -82,6 +93,7 @@ describe('handleCreateRoom', () => {
     const previousId = room.id
     openingSeatRandom.mockReturnValueOnce(3).mockReturnValueOnce(0).mockReturnValueOnce(0)
     await dispatch(resumed, { type: 'newGame' })
+    await approveRematch(resumed)
     expect(room.id).not.toBe(previousId)
     expect(room.session.state.players.map(player => player.name)).toEqual(['Dan', 'Alice', 'Carol', 'Bob'])
     for (const client of [resumed, ...clients.slice(1)]) {
@@ -106,7 +118,7 @@ describe('handleCreateRoom', () => {
     expect(host.currentRoom!.seatOwners).toEqual([{ playerIndex: 1, userId: 'guest' }, { playerIndex: 3, userId: 'host' }])
   })
 
-  it('retains fresh carried seats while a partial rematch waits for more players', async () => {
+  it('keeps an unfinished game while an offline player has not agreed to rematch', async () => {
     const deps = newDeps()
     const clients = Array.from({ length: 3 }, (_, index) => {
       const ctx = newCtx(deps)
@@ -119,22 +131,14 @@ describe('handleCreateRoom', () => {
     await dispatch(clients[1]!, { type: 'joinRoom', roomId: room.id, name: 'Peer' })
     await dispatch(clients[2]!, { type: 'joinRoom', roomId: room.id, name: 'Departed' })
     removePlayerFromRoom(room, clients[2]!.ws)
-    openingSeatRandom.mockReturnValueOnce(2).mockReturnValueOnce(0)
+    const oldId = room.id
     await dispatch(host, { type: 'newGame' })
-    expect(room.status).toBe('waiting')
-    const draws = openingSeatRandom.mock.calls.length
-    await dispatch(host, { type: 'getState' })
-    expect(host.currentPlayerIndex).toBe(2)
-    expect((await host.persistence.load(room.id))!.meta.players).toEqual([
-      { userId: 'partial-1', playerIndex: 0 }, { userId: 'partial-0', playerIndex: 2 },
-    ])
-    const last = newCtx(deps)
-    last.currentUserId = 'partial-new'
-    await dispatch(last, { type: 'joinRoom', roomId: room.id, name: 'New' })
-    expect(last.currentPlayerIndex).toBe(1)
+    expect(room.id).toBe(oldId)
     expect(room.status).toBe('playing')
-    expect(room.session.state.players.map(player => player.name)).toEqual(['Peer', 'New', 'Host'])
-    expect(openingSeatRandom).toHaveBeenCalledTimes(draws)
+    expect(room.endProposal?.intent).toBe('rematch')
+    expect(room.endProposal?.agreements).toHaveLength(1)
+    expect((await host.persistence.load(room.id))!.meta.players).toHaveLength(3)
+
   })
 
   it('limits active rooms to invited accounts and retains that policy through rematch', async () => {
@@ -165,6 +169,7 @@ describe('handleCreateRoom', () => {
     expect(host.currentRoom!.status).toBe('playing')
     expect(guest.currentPlayerIndex).toBe(1)
     await dispatch(host, { type: 'newGame' })
+    await approveRematch(host)
     const nextRoom = host.currentRoom!
     expect(nextRoom.id).not.toBe(firstRoomId)
     expect(nextRoom.access).toEqual(access)
@@ -203,6 +208,7 @@ describe('handleCreateRoom', () => {
     expect(rejoined.currentRoom!.session.state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
 
     await dispatch(host, { type: 'newGame', seed: 936 })
+    await approveRematch(host)
     expect(host.currentRoom!.session.state.players[0]).toMatchObject(expectedHost)
     expect(host.currentRoom!.session.state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
   })
@@ -303,7 +309,7 @@ describe('handleCreateRoom', () => {
   it('ignores a client seed outside dev rooms', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2 })
     ;(await markRoomStarted(ctx))
     const previousSeed = ctx.currentRoom!.session.state.gameSeed
 
@@ -332,7 +338,7 @@ describe('handleCreateRoom', () => {
   it('preserves enableParentCards when starting a new game', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2, enableParentCards: true })
     ;(await markRoomStarted(ctx))
 
     await dispatch(ctx, { type: 'newGame', seed: 309 })
@@ -348,7 +354,7 @@ describe('handleCreateRoom', () => {
     // game must not resurrect in the fresh room.
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2 })
     ctx.currentRoom!.customCardDbIds = ['deleted-card']
     ctx.currentRoom!.customCards = [{
       cardType: 'minor',
@@ -371,7 +377,7 @@ describe('handleCreateRoom', () => {
     const deps = newDeps()
     const ctx = newCtx(deps)
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2 })
     const room = ctx.currentRoom!
     const previousRoomId = room.id
     const previousSession = room.session
@@ -551,7 +557,7 @@ describe('handleCreateRoom', () => {
   it('checkpoints newGame state through the broadcast path', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2, enableParentCards: true })
     ;(await markRoomStarted(ctx))
 
     await dispatch(ctx, { type: 'newGame', seed: 309 })
@@ -559,10 +565,10 @@ describe('handleCreateRoom', () => {
     expect((await ctx.persistence.load(ctx.currentRoom!.id))?.serialized?.state.gameSeed).toMatch(WIDE_SEED)
   })
 
-  it('moves newGame to a fresh room id and discards the unfinished game', async () => {
+  it('moves an agreed newGame to a fresh room id and archives the terminated game', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
     ;(await markRoomStarted(ctx))
 
@@ -573,7 +579,7 @@ describe('handleCreateRoom', () => {
     expect(ctx.registry.has(previousRoomId)).toBe(false)
     expect(ctx.registry.has(nextRoomId)).toBe(true)
     expect((await ctx.persistence.load(previousRoomId))).toBeNull()
-    expect(await ctx.gameContextStore!.lifecycle(previousRoomId)).toBe('expired')
+    expect(await ctx.gameContextStore!.lifecycle(previousRoomId)).toBe('terminated')
     expect((await ctx.persistence.load(nextRoomId))?.serialized?.state.gameSeed).toMatch(WIDE_SEED)
     expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
       type: 'stateUpdate',
@@ -601,7 +607,7 @@ describe('handleCreateRoom', () => {
     expect(sentTypesOf(ctx).slice(before)).toContain('stateUpdate')
   })
 
-  it('does not carry disconnected seat owners into the new room id', async () => {
+  it('requires the disconnected seat owner to agree before a new game', async () => {
     const deps = newDeps()
     const host = newCtx(deps)
     host.currentUserId = 'u1'
@@ -613,23 +619,13 @@ describe('handleCreateRoom', () => {
       player.userId === 'u1'
     )
 
+    const oldId = host.currentRoom!.id
     await dispatch(host, { type: 'newGame', seed: 309 })
+    expect(host.currentRoom!.id).toBe(oldId)
+    expect(host.currentRoom!.seatOwners).toHaveLength(2)
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(host.currentRoom!.endProposal?.intent).toBe('rematch')
 
-    expect(host.currentRoom!.seatOwners).toEqual([
-      { playerIndex: 0, userId: 'u1' },
-    ])
-    expect(host.currentRoom!.status).toBe('waiting')
-    expect(sentMessagesOf(host)).toContainEqual({
-      type: 'roomWaiting',
-      roomId: host.currentRoom!.id,
-      players: [{ playerIndex: 0, name: '', connected: true }],
-      maxPlayers: 2,
-      playerColors: ['red', 'blue'],
-    })
-    const replacement = newCtx(deps)
-    replacement.currentUserId = 'u3'
-    await dispatch(replacement, { type: 'joinRoom', roomId: host.currentRoom!.id })
-    expect(replacement.currentPlayerIndex).toBe(1)
   })
 
   it('switches every connected seat to the new game id before broadcasting', async () => {
@@ -643,6 +639,7 @@ describe('handleCreateRoom', () => {
     const previousRoomId = host.currentRoom!.id
 
     await dispatch(host, { type: 'newGame', seed: 309 })
+    await approveRematch(host)
 
     expect(guest.currentRoom).toBe(host.currentRoom)
     expect(guest.currentRoom!.id).not.toBe(previousRoomId)
@@ -769,7 +766,7 @@ describe('handleCreateRoom', () => {
   it('preserves enableThroughTheSeasons when starting a new game', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableThroughTheSeasons: true } as never)
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2, enableThroughTheSeasons: true } as never)
     ;(await markRoomStarted(ctx))
 
     await dispatch(ctx, { type: 'newGame', seed: 309 })
@@ -796,7 +793,7 @@ describe('handleCreateRoom', () => {
   it('preserves Moor balance rules in Room metadata and a same-configuration new game', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2,
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2,
       enableFarmersOfTheMoor: true, enableMoorBalanceRules: true })
     expect(ctx.currentRoom!.session.state.enableMoorBalanceRules).toBe(true)
     expect(ctx.currentRoom!.enableMoorBalanceRules).toBe(true)
@@ -859,7 +856,7 @@ describe('handleCreateRoom', () => {
   it('preserves enableSnakeOpening when starting a new game', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
-    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableSnakeOpening: true } as never)
+    await dispatch(ctx, { type: 'createRoom', hotseat: true, maxPlayers: 2, enableSnakeOpening: true } as never)
     ;(await markRoomStarted(ctx))
 
     await dispatch(ctx, { type: 'newGame', seed: 309 })
@@ -1117,6 +1114,8 @@ describe('custom room command queue', () => {
     guest.currentUserId = 'u2'
     await dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
     const room = host.currentRoom!
+    await dispatch(guest, { type: 'proposeGameEnd', intent: 'rematch' })
+    const proposalId = room.endProposal!.id
     const previousSession = room.session
     const originalGetState = GameSession.prototype.getState
     let releaseInitialization = () => {}
@@ -1133,7 +1132,7 @@ describe('custom room command queue', () => {
       })
 
     try {
-      const rematch = Promise.resolve(dispatch(host, { type: 'newGame', seed: 309 }))
+      const rematch = Promise.resolve(dispatch(host, { type: 'respondGameEnd', proposalId, agree: true }))
       const action = Promise.resolve(dispatch(host, {
         type: 'action',
         spaceId: 'forest',

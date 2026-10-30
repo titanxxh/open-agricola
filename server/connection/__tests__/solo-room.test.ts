@@ -202,16 +202,14 @@ describe('formal solo creation', () => {
     expect(await getDb().prepare('SELECT count(*) AS count FROM rooms').get()).toEqual({ count: 0 })
   })
 
-  it('keeps an active formal solo intact when the legacy newGame command is sent', async () => {
-    const { ctx, deps, socket } = createActor()
+  it('archives the old solo when the legacy newGame command requests a confirmed rematch', async () => {
+    const { ctx, deps } = createActor()
     await dispatch(ctx, { type: 'createRoom', maxPlayers: 1 })
-    const sourceId = ctx.currentRoom!.id
-    socket.send.mockClear()
+    const oldId = ctx.currentRoom!.id
     await dispatch(ctx, { type: 'newGame' })
-    expect(ctx.currentRoom!.id).toBe(sourceId)
-    expect(deps.registry.size()).toBe(1)
-    const messages = socket.send.mock.calls.map(([raw]: [string]) => JSON.parse(raw))
-    expect(messages.find(message => message.type === 'commandReceipt' && message.status === 'completed')?.receipt.outcome.ok).toBe(false)
+    expect(ctx.currentRoom!.id).not.toBe(oldId)
+    expect(await deps.gameContextStore.lifecycle(oldId)).toBe('terminated')
+    expect(await deps.commands.db.prepare('SELECT 1 FROM game_results WHERE room_id=?').get(oldId)).toBeUndefined()
   })
 
   it('resolves the current approved Workshop version for rematch and ignores unpublished drafts', async () => {

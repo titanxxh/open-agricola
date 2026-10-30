@@ -290,7 +290,7 @@ export type RoomConnectionOptions = {
 type ReceiptEvent = Extract<ServerEvent, { type: 'commandReceipt' }>
 type PendingEvent = { match: (event: ServerEvent) => boolean; resolve: (event: ServerEvent) => void; reject: (error: Error) => void }
 const readOnlyCommand = (command: ClientCommand): boolean =>
-  ['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt'].includes(command.type)
+  ['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt', 'getGameEndProposal'].includes(command.type)
 const terminalCode = (code?: string): boolean => !!code && [
   'seat_replaced', 'login_required', 'not_participant', 'unknown_context', 'context_changed',
   'context_expired', 'context_removed', 'command_scope_expired',
@@ -483,7 +483,7 @@ export class WsGameTransport implements GameTransport {
       const result = await waiting as ReceiptEvent
       if (result.status === 'completed') {
         this.completed.set(identity.commandId, result.receipt.outcome)
-        if (result.receipt.outcome.ok && result.receipt.outcome.roomId && ['createRoom', 'newGame'].includes(command.type)) this.setRoom(result.receipt.outcome.roomId)
+        if (result.receipt.outcome.ok && result.receipt.outcome.roomId && ['createRoom', 'newGame', 'proposeGameEnd', 'respondGameEnd'].includes(command.type)) this.setRoom(result.receipt.outcome.roomId)
       }
     }
     if (this.roomId !== originalRoom && this.options.route !== false) {
@@ -529,6 +529,7 @@ export class WsGameTransport implements GameTransport {
     if (msg.type === 'commandReceipt' && msg.status === 'completed') responseReceived(msg.requestId, undefined, msg.receipt.outcome.ok ? 'ok' : 'rejected')
     if (msg.type === 'seat_replaced') this.stop('seat was replaced', 'seat_replaced')
     if (msg.type === 'roomDissolved') this.stop(msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved')
+    if (msg.type === 'gameTerminated') this.stop('gameTerminated')
     if (msg.type === 'error' && terminalCode(msg.code)) this.stop(msg.error, msg.code)
     if (msg.type === 'commandReceipt' && msg.status === 'completed') {
       this.completed.set(msg.receipt.commandId, msg.receipt.outcome)
@@ -865,6 +866,8 @@ export class WsGameTransport implements GameTransport {
   sendRoomCommand(type: 'setPlayerColor', opts: { color: PlayerState['color'] }): void
   sendRoomCommand(type: 'confirmPlayerColor', opts?: Record<string, never>): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
+  sendRoomCommand(type: 'getGameEndProposal', opts?: Record<string, unknown>): void
+  sendRoomCommand(type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', opts: Record<string, unknown>): void
   sendRoomCommand(type: string, opts?: Record<string, unknown>): void {
     if (!this.connected) throw new Error('WebSocket reconnecting')
     this.sendRaw(this.identify({ type, ...(opts ?? {}) } as ClientCommand))

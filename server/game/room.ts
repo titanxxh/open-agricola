@@ -12,6 +12,8 @@ import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
 import type { RoomAccess } from '../../shared/contract/room-access'
 import { canAccessRoom } from './room-access'
 import type { GameCreationRecord, SoloHandMode } from '../../shared/contract/game-creation'
+
+import type { GameEndProposal } from '../../shared/contract/protocol/game-termination'
 import {
   createIsolatedGameSession,
   type CustomSessionExecutor,
@@ -31,6 +33,9 @@ export type RoomSeatOwner = {
 
 export type Room = {
   access?: RoomAccess
+
+  endProposal?: GameEndProposal | null
+  awaitingRematchPlayers?: boolean
   executionStamp?: ExecutionStamp
   owner?: OwnerToken
   inputWindow?: RoomInputWindow | null
@@ -203,6 +208,8 @@ export const roomConnectedPlayerCount = (room: Pick<Room, 'players'>): number =>
   room.players.filter(player => player.ws.readyState === player.ws.OPEN).length
 
 export const toRoomMeta = (room: Room): RoomMeta => ({
+  endProposal: room.endProposal ?? null,
+  awaitingRematchPlayers: room.awaitingRematchPlayers === true,
   ...(room.executionStamp ? { executionStamp: room.executionStamp } : {}),
   ...(room.owner ? { owner: room.owner } : {}),
   ...(room.inputWindow ? { inputWindow: room.inputWindow } : {}),
@@ -394,6 +401,8 @@ export const snapshotToRoom = (
   const session = created.session
   return {
     id: snapshot.id,
+    endProposal: snapshot.meta.endProposal ?? null,
+    awaitingRematchPlayers: snapshot.meta.awaitingRematchPlayers === true,
     inputWindow: snapshot.meta.inputWindow ?? nextInputWindow(null, session.state, 'initial'),
     session,
     ...(created.executor ? { customSessionExecutor: created.executor } : {}),

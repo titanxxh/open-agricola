@@ -80,6 +80,8 @@ class GameSocket {
           hotseat: GameSocket.hotseat, status: 'playing', maxPlayers: 2, playerColors: ['red', 'blue'],
           players: [{ playerIndex: 0, name: 'Alice', connected: true }, { playerIndex: 1, name: 'Bob', connected: true }] })
         GameSocket.snapshot()
+      } else if (message.type === 'getGameEndProposal') {
+        GameSocket.emit({ type: 'gameEndProposal', roomId: 'room-1098', proposal: null })
       } else if (message.type === 'getState') {
         GameSocket.emit({ type: 'stateUpdate', roomId: 'room-1098', version: GameSocket.version,
           sync: 'snapshot', cause: 'reconnect', requestId: message.requestId,
@@ -129,7 +131,7 @@ const choicePayload = (playerIndex: number): GameSyncPayload => ({
   },
 })
 const ruleCommands = () => GameSocket.sent.filter(message =>
-  !['getCommandScope', 'joinRoom', 'getState', 'getHistory'].includes(String(message.type)),
+  !['getCommandScope', 'joinRoom', 'getState', 'getHistory', 'getGameEndProposal'].includes(String(message.type)),
 )
 
 beforeEach(() => {

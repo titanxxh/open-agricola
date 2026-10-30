@@ -2,6 +2,7 @@ import { serializeSessionSnapshot } from '../../shared/session/serialization.ts'
 import { Scoring } from '../../shared/domain/scoring.ts'
 import { toRoomMeta, type Room } from './room.ts'
 import type { GameResult, RoomPersistence, RoomWriteOptions } from './persistence/room-persistence.ts'
+import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 
 export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
   const state = room.session.state
@@ -62,6 +63,12 @@ export class RoomPersistenceCheckpoint {
   async discardRoom(roomId: string, options?: RoomWriteOptions): Promise<void> {
     await this.persistence.discard(roomId, options)
     this.markInactive(roomId)
+  }
+
+  async terminateRoom(room: Room, termination: GameTermination, options?: RoomWriteOptions): Promise<void> {
+    this.assertWritable(room.id)
+    await this.persistence.terminate(room.id, termination, { executionStamp: room.executionStamp, owner: room.owner, expectedVersion: room.version, ...options })
+    this.markInactive(room.id)
   }
 
   async hasRoomId(roomId: string): Promise<boolean> {

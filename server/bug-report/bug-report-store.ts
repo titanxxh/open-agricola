@@ -80,7 +80,7 @@ type ReportRow = {
   reporter_user_id: string | null
   room_id: string
   player_index: number
-  lifecycle: 'active' | 'completed'
+  lifecycle: 'active' | 'completed' | 'terminated'
   room_version: number
   step_no: number
   frame_hash: string
@@ -124,7 +124,7 @@ export type BugReportView = {
   roomId: string
   reporterUserId: string | null
   playerIndex: number
-  lifecycle: 'active' | 'completed'
+  lifecycle: 'active' | 'completed' | 'terminated'
   roomVersion: number
   stepNo: number
   frameHash: string
@@ -637,16 +637,17 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
       SELECT lifecycle FROM game_contexts WHERE room_id = ?
     `).get(input.roomId)) as ContextRow | undefined
     if (!context) throw new BugReportError('unknown_context', 404)
-    if (context.lifecycle !== 'active' && context.lifecycle !== 'completed') {
+    if (context.lifecycle !== 'active' && context.lifecycle !== 'completed' && context.lifecycle !== 'terminated') {
       throw new BugReportError(`context_${context.lifecycle}`, 410)
     }
+    const archivedPlayers = context.lifecycle === 'terminated' ? 'game_termination_players' : 'game_result_players'
     const participant = context.lifecycle === 'active'
       ? (await this.db.prepare(`
           SELECT 1 FROM room_players
           WHERE room_id = ? AND user_id = ?
         `).get(input.roomId, input.userId))
       : (await this.db.prepare(`
-          SELECT 1 FROM game_result_players
+          SELECT 1 FROM ${archivedPlayers}
           WHERE room_id = ? AND user_id = ?
         `).get(input.roomId, input.userId))
     if (!participant) throw new BugReportError('not_participant', 403)
@@ -677,7 +678,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
         WHERE rooms.id = ?
         ORDER BY room_players.player_index LIMIT 1
       `).get(input.userId, input.roomId)) as AnchorRow | undefined
-    } else if (context.lifecycle === 'completed') {
+    } else if (context.lifecycle === 'completed' || context.lifecycle === 'terminated') {
       if (
         !Number.isSafeInteger(input.stepNo)
         || typeof input.frameHash !== 'string'
@@ -690,7 +691,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
                step.room_version,
                step.step_no,
                step.frame_hash
-        FROM game_result_players AS result_player
+        FROM ${archivedPlayers} AS result_player
         JOIN game_replay_steps AS step
           ON step.room_id = result_player.room_id
          AND step.step_no = ?
@@ -759,9 +760,16 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
               WHERE room_id = context.room_id AND user_id = ?
             )
           )
+          OR (
+            context.lifecycle = 'terminated'
+            AND EXISTS (
+              SELECT 1 FROM game_termination_players
+              WHERE room_id = context.room_id AND user_id = ?
+            )
+          )
         )
       LIMIT 1
-    `).get(roomId, userId, userId)))
+    `).get(roomId, userId, userId, userId)))
   }
 
   async getOwned(submissionId: string, userId: string): Promise<Awaited<BugReportView>> {
@@ -961,7 +969,7 @@ try {
              AND checkpoint.step_no = anchor.checkpoint_step_no
              AND checkpoint.payload_kind = 'checkpoint'
             WHERE current_context.room_id = bug_reports.room_id
-              AND current_context.lifecycle IN ('active', 'completed')
+              AND current_context.lifecycle IN ('active', 'completed', 'terminated')
               AND anchor.step_no = bug_reports.step_no
               AND anchor.frame_hash = bug_reports.frame_hash
               AND (

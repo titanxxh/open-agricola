@@ -135,6 +135,20 @@ describe('WsGameTransport request correlation', () => {
     transport.destroy()
   })
 
+  it('keeps proposal queries out of the write journal so repeated refreshes do not block voting', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await transport.connect()
+    const socket = FakeWebSocket.instances[0]!
+    socket.emit(buildEnvelope('initial', 4))
+    for (let index = 0; index < 40; index++) transport.sendRoomCommand('getGameEndProposal')
+    transport.sendRoomCommand('proposeGameEnd', { intent: 'end' })
+    expect(socket.sent.filter(command => command.type === 'getGameEndProposal')).toHaveLength(40)
+    expect(socket.sent.filter(command => command.type === 'getGameEndProposal').every(command => command.commandContext === undefined)).toBe(true)
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'proposeGameEnd', commandContext: expect.any(Object) })
+    transport.destroy()
+  })
+
   it('correlates read-only fence quotes and rejects replies after a newer snapshot', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })

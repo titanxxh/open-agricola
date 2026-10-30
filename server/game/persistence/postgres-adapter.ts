@@ -5,6 +5,7 @@ import { RoomDirectory, RoomOwnershipError, type OwnerToken } from '../room-dire
 import type { RoomInputWindow } from '../command-input'
 import { CommandStore, CommandError, type CommandReceiptWrite } from '../command-store'
 import { canonicalJson } from '../replay-codec'
+import type { GameEndProposal, GameTermination } from '../../../shared/contract/protocol/game-termination'
 import type { RoomWriteOptions } from './room-persistence'
 import { RoomHistoryStore, RoomHistoryCorruptionError, type PackedRoomSnapshot, type RecoveryNode } from './room-history-store'
 import { decodeRoomAccess } from '../room-access'
@@ -34,6 +35,8 @@ type RoomRow = {
   invited_user_ids: unknown
   state_json: string | null
   input_window_json: string | null
+  end_proposal_json: string | null
+  awaiting_rematch_players: number
   max_players: number
   solo_hand_mode: SoloHandMode | null
   status: string
@@ -70,6 +73,7 @@ export type ReplayCommit = {
   retireRoomId?: string
   retiredOwner?: OwnerToken
   retiredVersion?: number
+  retiredTermination?: GameTermination
   receipt?: CommandReceiptWrite
   serialized: PersistedSessionSnapshot
   meta: RoomMeta
@@ -163,6 +167,8 @@ const roomValues = (
   version: number | null,
 ): Record<string, string | number | null> => ({
   id,
+  awaitingRematchPlayers: meta.awaitingRematchPlayers ? 1 : 0,
+  endProposalJson: meta.endProposal ? JSON.stringify(meta.endProposal) : null,
   inputWindowJson: meta.inputWindow ? JSON.stringify(meta.inputWindow) : null,
   createdBy: meta.createdBy,
   invitedUserIds: meta.access?.kind === 'invited' ? JSON.stringify(meta.access.invitedUserIds) : null,
@@ -198,6 +204,8 @@ const toSnapshot = (
   version: row.version,
   serialized: row.state_json ? (JSON.parse(row.state_json) as PersistedSessionSnapshot) : null,
   meta: {
+    awaitingRematchPlayers: row.awaiting_rematch_players === 1,
+    endProposal: row.end_proposal_json ? JSON.parse(row.end_proposal_json) as GameEndProposal : null,
     ...(row.input_window_json ? { inputWindow: JSON.parse(row.input_window_json) as RoomInputWindow } : {}),
     createdBy: row.created_by,
     access: decodeRoomAccess(row.invited_user_ids),
@@ -279,7 +287,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
     this.loadCreationRow = db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?')
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, solo_hand_mode, status, version, custom_card_ids,
+      `SELECT id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
@@ -291,13 +299,13 @@ export class PostgresRoomPersistence implements RoomPersistence {
     )
     this.upsertRoom = db.prepare(`
       INSERT INTO rooms (
-        id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, max_players, status, version, custom_card_ids,
+        id, created_by, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, status, version, custom_card_ids,
         custom_cards_runtime_json, solo_hand_mode,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
         allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, created_at, updated_at
       ) VALUES (
-        @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
+        @id, @createdBy, @invitedUserIds::jsonb, @colorConfirmationPlayerIndex, @stateJson, @inputWindowJson, @endProposalJson, @awaitingRematchPlayers, @maxPlayers, @status, COALESCE(@version, 0), @customCardIds,
         @customCards, @soloHandMode,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor, @enableMoorBalanceRules,
@@ -307,6 +315,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
         state_json = COALESCE(excluded.state_json, rooms.state_json),
         input_window_json = excluded.input_window_json,
         invited_user_ids = excluded.invited_user_ids,
+        end_proposal_json = excluded.end_proposal_json,
+        awaiting_rematch_players = excluded.awaiting_rematch_players,
         status = excluded.status,
         color_confirmation_player_index = excluded.color_confirmation_player_index,
         custom_card_ids = excluded.custom_card_ids,
@@ -391,7 +401,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json, rooms.max_players, rooms.solo_hand_mode, rooms.status,
+      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json, end_proposal_json, rooms.max_players, rooms.solo_hand_mode, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,
@@ -546,6 +556,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
           if (!options.retiredOwner) throw new RoomOwnershipError('Previous room owner token is required')
           await directory.retire(options.retireRoomId, options.retiredOwner, options.retiredVersion)
         }
+        if (options.retiredTermination) await this.archiveTermination(options.retireRoomId, options.retiredTermination)
         await replaceDevelopmentRoom(db, options.retireRoomId, String(values.id))
         await this.deleteRoom.run(options.retireRoomId)
       }
@@ -682,6 +693,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
           if (!commit.retiredOwner) throw new RoomOwnershipError('Previous room owner token is required')
           await directory.retire(commit.retireRoomId, commit.retiredOwner, commit.retiredVersion)
         }
+        if (commit.retiredTermination) await this.archiveTermination(commit.retireRoomId, commit.retiredTermination)
         await replaceDevelopmentRoom(db, commit.retireRoomId, commit.roomId)
         await this.deleteRoom.run(commit.retireRoomId)
       }
@@ -784,6 +796,43 @@ export class PostgresRoomPersistence implements RoomPersistence {
       }
     }
     return hashes
+  }
+
+  private async archiveTermination(id: string, termination: GameTermination): Promise<void> {
+    const db = this.dbForCleanup
+    const updated = await db.prepare(`UPDATE game_contexts SET lifecycle='terminated', phase=NULL,
+      replay_status='available', expires_at=NULL, updated_at=? WHERE room_id=? AND lifecycle='active'`)
+      .run(termination.endedAt, id)
+    if (updated.changes !== 1) throw new ReplayConflictError('Game is no longer active')
+    const replay = await this.completeReplay.run({ roomId: id, completedAt: termination.endedAt })
+    if (replay.changes !== 1) throw new ReplayConflictError('Game replay is not recording')
+    await db.prepare(`INSERT INTO game_terminations
+      (room_id, reason, intent, proposer_index, started_at, ended_at, round) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, termination.reason, termination.intent, termination.proposerIndex, termination.startedAt, termination.endedAt, termination.round)
+    const owners = await this.loadPlayers.all<{ userId: string; playerIndex: number }>(id)
+    for (const player of termination.players) {
+      const userId = owners.find(owner => owner.playerIndex === player.playerIndex)?.userId ?? null
+      await db.prepare(`INSERT INTO game_termination_players
+        (room_id, player_index, user_id, display_name, name_is_default, agreed_at) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(id, player.playerIndex, userId, player.displayName, player.nameIsDefault ? 1 : 0, player.agreedAt)
+      await db.prepare(`INSERT INTO game_context_participants (room_id, player_index, user_id)
+        VALUES (?, ?, ?) ON CONFLICT DO NOTHING`).run(id, player.playerIndex, userId)
+    }
+  }
+
+  async terminate(id: string, termination: GameTermination, options?: RoomWriteOptions): Promise<void> {
+    await this.dbForCleanup.transaction(async () => {
+      if (this.directory) {
+        if (!options?.owner) throw new RoomOwnershipError('Room owner token is required')
+        await this.directory.assertOwner(id, options.owner, options.expectedVersion)
+        if (options.executionStamp) await new ExecutionAccess(this.dbForCleanup).assert(options.executionStamp)
+        await this.directory.retire(id, options.owner, options.expectedVersion)
+      }
+      await this.archiveTermination(id, termination)
+      if (options?.receipt) await new CommandStore(this.dbForCleanup).complete(options.receipt.request, options.receipt.outcome)
+      await this.deleteRoom.run(id)
+    })()
+    this.history.forget(id)
   }
 
   async discard(id: string, options?: RoomWriteOptions): Promise<void> {

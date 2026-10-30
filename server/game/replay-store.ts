@@ -268,8 +268,12 @@ export class ReplayStore {
       SELECT player_index, display_name, name_is_default
       FROM game_result_players
       WHERE room_id = ?
+      UNION ALL
+      SELECT player_index, display_name, name_is_default
+      FROM game_termination_players
+      WHERE room_id = ?
       ORDER BY player_index
-    `).all(roomId)) as ReplayParticipantRow[]
+    `).all(roomId, roomId)) as ReplayParticipantRow[]
   }
 
   async manifest(roomId: string): Promise<Awaited<ReplayManifestResponse>> {

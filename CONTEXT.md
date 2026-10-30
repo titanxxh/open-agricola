@@ -121,11 +121,19 @@ _Avoid_: PlayerState
 _Avoid_: GameState、最终手牌、Game Seed、账号级设置偏好
 
 **Same-configuration Rematch（同配置重开）**:
-沿用已完赛对局的 Game Creation Configuration，重新随机创建一局独立对局。原局的结果、回放和永久链接继续属于原局。
+沿用已完赛或已获全员同意终止的对局的 Game Creation Configuration，重新随机创建一局独立对局。原局的结果、回放和永久链接继续属于原局。
 _Avoid_: 继续旧局、Solo Campaign、历史规则重放、复用原对局身份
 
+**Game End Proposal（结束提议）**:
+已开局对局中，任一已入座玩家提出的提前结束请求。发起者确认且其他所有玩家明确同意后成立；单人和热座对局经一次确认即可成立。
+_Avoid_: 退出页面、断线、房主单方面解散
+
+**Agreed Game Termination（协商终止）**:
+由成立的 Game End Proposal 导致的非正常对局结束，可与按游戏规则正常完赛区分。
+_Avoid_: 正常完赛、自动过期、内容下架
+
 **Game Context**:
-由 `roomId` 永久标识的一局游戏及其生命周期上下文，只可能处于活动、已完成、已过期或已下架状态。可恢复状态或回放内容消失后，其身份仍保留；从未存在的 `roomId` 不属于 Game Context。
+由 `roomId` 永久标识的一局游戏及其生命周期上下文，只可能处于活动、正常完赛、协商终止、已过期或已下架状态。可恢复状态或回放内容消失后，其身份仍保留；从未存在的 `roomId` 不属于 Game Context。
 _Avoid_: 可复用房间号、GameState、Room Invite
 
 **Game Context Link**:
@@ -137,8 +145,8 @@ _Avoid_: Room Invite Link、登录回调、恢复令牌
 _Avoid_: 加入空座位、活动局观战、回到历史步骤继续操作
 
 **Expired Game Context**:
-未正常完赛且已不能恢复的 Game Context；它永久保留 `roomId` 身份，但不提供活动 Room 或完整 Game Replay Archive。
-_Avoid_: 未知 roomId、Replay Tombstone、正常完赛
+因过期或内容丢弃而不能恢复、且未正常完赛或协商终止的 Game Context；它永久保留 `roomId` 身份，但不提供活动 Room 或完整 Game Replay Archive。
+_Avoid_: 未知 roomId、Replay Tombstone、正常完赛、Agreed Game Termination
 
 **Durable Room Commit**:
 一次玩家可感知的权威状态推进在对局参与者看见前成为可恢复事实的提交点；它同时固定 Room 快照和对应 Replay Step，失败时该 Room 不能继续推进。
@@ -157,7 +165,8 @@ _Avoid_: Game Sync Snapshot、新局初始化、从当前规则重新计算历�
 _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
 
 **Game Replay Archive**:
-正式录制上线后正常完赛并以 `roomId` 永久公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态。它与 Game Result Archive 分离，不保存原始 Private Event payload、临时通知、生成溯源或可执行源码；上线前完成局只有 Game Result Archive。
+正式录制上线后正常完赛或协商终止、并以 `roomId` 永久公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态。协商终止的回放保留结束原因，不构成正常完赛或正式成绩。
+它与 Game Result Archive 分离，不保存原始 Private Event payload、临时通知、生成溯源或可执行源码；上线前完成局只有 Game Result Archive。
 _Avoid_: 活动 Room 快照、Public Event timeline、Game Result Archive
 
 **Replay Step**:

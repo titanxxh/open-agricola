@@ -125,7 +125,7 @@ export class Broadcaster {
     for (const seat of room.players) {
       sendObserved(seat.ws, event, round, data)
     }
-    }, event.type === 'roomDissolved')
+    }, event.type === 'roomDissolved' || event.type === 'gameTerminated')
   }
 
   sendTo(ws: WebSocket, event: ServerEvent): void {

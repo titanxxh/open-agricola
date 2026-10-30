@@ -32,6 +32,7 @@ export function LobbyPage() {
   const { locale, t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [myRooms, setMyRooms] = useState<MyActiveRoom[]>([])
+  const [endedGames, setEndedGames] = useState<Array<{ id: string; outcome: 'completed' | 'terminated'; ended_at: number }>>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
   const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
@@ -69,6 +70,8 @@ export function LobbyPage() {
       const resp = await apiFetch('/api/lobby/my-rooms')
       const data = await resp.json()
       if (data.ok) setMyRooms(data.rooms)
+      const ended = await (await apiFetch('/api/lobby/ended-games')).json()
+      if (ended.ok) setEndedGames(ended.games)
     } catch { /* silently fail */ }
   }, [apiFetch, user])
 
@@ -555,6 +558,19 @@ export function LobbyPage() {
         )}
       </Section>
 
+      {endedGames.length ? (
+        <Section title={t('platform.gameEnd.history')} variant="default" className="lobby-rooms">
+          <ul className="room-list">
+            {endedGames.map(game => (
+              <li className="room-item" key={game.id}>
+                <span className="room-id">{t('platform.roomLabel', { id: game.id })}</span>
+                <span>{t(game.outcome === 'terminated' ? 'platform.gameEnd.terminated' : 'platform.gameContext.completedTitle')}</span>
+                <a className="btn-small" href={`?room=${encodeURIComponent(game.id)}`}>{t('platform.gameEnd.viewReplay')}</a>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
       <DonateWidgets />
     </div>
   )

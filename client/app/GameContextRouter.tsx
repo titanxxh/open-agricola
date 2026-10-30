@@ -277,6 +277,7 @@ function PublicContext({
   if (response.ok && response.lifecycle === 'completed') {
     return <CompletedContext context={response} />
   }
+  if (response.ok && response.lifecycle === 'terminated') return <ReplayShell context={response} />
   if (response.ok && response.lifecycle === 'expired') {
     const expired = statusPage(
       t('platform.backToLobbyPlain'),
