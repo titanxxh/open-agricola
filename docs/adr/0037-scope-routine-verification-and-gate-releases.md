@@ -1,4 +1,4 @@
-# 35. Scope routine verification and gate releases
+# 37. Scope routine verification and gate releases
 
 - Status: Accepted direction, implementation pending
 - Date: 2026-10-30
@@ -15,7 +15,7 @@ A Release created directly through GitHub's website or a bare CLI command can ex
 
 GitHub Actions results are the authoritative evidence for integration and release. Local runs provide focused development feedback and browser reproduction. Running the same verification locally is not a prerequisite for its CI execution.
 
-Full verification covers the union of the existing CI, CI Full, and E2E checks: fast and slow tests, fixed LLM regression tests, architecture checks, lint, i18n, type checks, application and Replay Viewer builds, bundle budgets, community-deck checks, the Chromium suite, the browser-local sandbox, and the WebKit smoke tests. Paid model acceptance and performance benchmarks remain separate checks selected for the change.
+Full verification covers the union of the current CI, CI Full, and E2E checks: fast and slow tests, Workshop behavior regressions, architecture checks, lint, i18n, type checks, application and Replay Viewer builds, bundle budgets, community-deck checks, the Chromium suite, the browser-local sandbox, and the WebKit smoke tests. The legacy fixed LLM harness was retired on main before implementation of this policy. Its replacement Workshop behavior tests remain part of the current test projects. Paid model acceptance and performance benchmarks remain separate checks selected for the change.
 
 Successful results may be combined across compatible runs for the same candidate commit and verification configuration. Retry failed tasks without repeating other successful tasks. Every required task must actually succeed. Missing, failed, cancelled, or skipped required tasks do not establish a successful release result.
 
