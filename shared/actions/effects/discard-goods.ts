@@ -119,7 +119,7 @@ export const discardGoodsAction: ActionDefinition = {
         availableByResource,
         promptKey: 'ui.interactionDiscardGoods',
         requireAtLeastOne: true,
-        anytimeWindow: { allowed: true, blockedIds: ['discard-goods'] },
+        anytimeWindow: { allowed: false },
       },
       promptKey: 'ui.interactionDiscardGoods',
     }
