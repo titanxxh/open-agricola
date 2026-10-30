@@ -210,7 +210,7 @@ describe('production deployment config', () => {
     for (const workflowPath of [
       '.github/workflows/ci.yml',
       '.github/workflows/candidate-verification.yml',
-      '.github/workflows/deploy-pages.yml',
+      '.github/workflows/deploy-pages-broker.yml',
     ]) {
       const workflow = readFileSync(workflowPath, 'utf8')
       expect(workflow).not.toContain('BGA_CDN_BASE_URL')

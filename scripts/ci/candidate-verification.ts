@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks'
+import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
 export type CandidateIdentity = { repository: string; sha: string; configuration: string; workflowId: number }

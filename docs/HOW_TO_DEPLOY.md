@@ -327,7 +327,20 @@ The production image retains `FRONTEND_ROOT=/app/frontend-dist` and `pnpm run bu
 ### GitHub Pages prerequisites
 
 - In repository **Settings → Pages**, set Source to **GitHub Actions**.
-- In **Settings → Environments → github-pages → Deployment branches and tags**, allow `main` and tags matching `v*`. Release deployments run from the tag ref and are rejected without the tag rule.
+- Keep the default branch as `main`. In **Settings → Environments → github-pages → Deployment branches and tags**, select custom policies with exactly one allowed **branch** named `main`. Remove every tag policy, including `v*`. The broker checks this setting before building.
+- Keep the retired `.github/workflows/deploy-pages.yml` workflow disabled. Removing its YAML from main does not disable its historical versions. A main-only environment blocks old tag deployments, but old manual runs recorded on `main` can still be rerun unless the old workflow is disabled. [GitHub disables both triggers and reruns for a disabled workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows).
+
+### Migrate an existing Pages deployment
+
+After the new request and broker workflows reach `main` and their local entry tests pass, complete this native configuration change:
+
+1. Save the `github-pages` environment, its deployment branch policies, and the old workflow metadata from the GitHub API. Use `GET repos/<owner>/<repo>/environments/github-pages`, its `/deployment-branch-policies` endpoint, and `GET repos/<owner>/<repo>/actions/workflows/deploy-pages.yml`.
+2. Wait for or cancel active legacy Pages runs before changing the rules. Disabling a workflow does not cancel runs already in progress.
+3. Disable the old workflow by its recorded ID. In `titanxxh/open-agricola`, that ID is `253270751`. Keep the fresh `pages-release-request.yml` and `deploy-pages-broker.yml` workflows enabled.
+4. Delete tag policies and any branch policy other than `main`, preserving the existing main policy and unrelated environment settings. At the canonical repository's cutover, the `v*` tag policy is `56008318` and the retained main policy is `56205883`. Look up current IDs before a change.
+5. Read back the old workflow state and environment policies. Require `disabled_manually` for the legacy workflow and exactly `name=main,type=branch` in the custom allowlist. These native settings are part of the deployment gate.
+
+For an application rollback, leave both protections in place and use the main broker with a previously verified full SHA. Historical commits without the required verification configuration remain blocked. To roll back the gate itself, first stop Pages publication, then restore the saved workflow state and policies deliberately. Restore policies by name and type because GitHub assigns new IDs. Re-enabling the old workflow or allowing tags removes the historical-workflow protection.
 
 ### GitHub Pages configuration
 
@@ -347,11 +360,19 @@ Use the [standard owner-machine release command](#standard-owner-machine-release
 pnpm release vX.Y.Z --ref main
 ```
 
-Publishing the Release triggers `.github/workflows/deploy-pages.yml` through `release: published`. For a manual deployment, select the workflow and its branch or tag in Actions, then run `workflow_dispatch`.
+Publishing a Release for a commit containing `.github/workflows/pages-release-request.yml` starts **Pages Release Request**. This workflow only records the request. Its successful completion starts `.github/workflows/deploy-pages-broker.yml` through `workflow_run`; [that event executes the broker from the default branch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
-Both entries fix the event's full `github.sha`, check out that commit, and call `scripts/ci/pages-deployment.ts`. The command checks trusted full GitHub candidate evidence for the same SHA and verification configuration before building. Missing, failed, cancelled, skipped, or incompatible required tasks stop the job before artifact upload or deployment. Ordinary PR checks do not satisfy this gate. The build also checks the actual checkout and `frontend-build.json` identity. A branch or tag moving after the trigger cannot change the deployed candidate.
+For a manual deployment or historical rollback, run the broker from `main` with the fixed candidate SHA:
 
-You can still create a Release through **Releases → Draft a new release** or bare `gh release create`. Those entries can create an unverified Release, but the Pages gate refuses to deploy its candidate until the required evidence passes. Inspect the failed build step for the blocking task and complete candidate verification before rerunning the workflow. A Release does not deploy the backend.
+```bash
+gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha='<full-sha>'
+```
+
+The broker pins its main policy SHA separately from the candidate. Release requests use the original request run's `head_sha`, checked against GitHub's workflow ID, path, repository, event, and successful completed run metadata. Manual requests require a full lowercase commit SHA. The broker never resolves the release tag again. Running it from another branch or tag is rejected.
+
+`node scripts/ci/pages-deployment.ts` uses Node.js 24's native TypeScript support, with no policy dependency install. It calculates the candidate configuration from Git objects and checks trusted full GitHub evidence before checking out or installing candidate code. Missing, failed, cancelled, skipped, or incompatible required tasks stop the job before artifact upload or deployment. Ordinary PR checks do not satisfy this gate. Only after success does the trusted helper create a separate temporary worktree, install dependencies, and build the fixed candidate. It checks clean source and the `frontend-build.json` SHA before copying the artifact for publication. The candidate's version of the gate is never executed.
+
+You can still create a Release through **Releases → Draft a new release** or bare `gh release create`. These entries can create an unverified Release; they cannot bypass the deployment gate. Older releases may have no fresh request workflow, so use the manual broker after completing candidate verification. Inspect the failed broker step for blocking tasks, complete verification, and retry the same full SHA. A Release does not deploy the backend.
 
 After deployment, the production entry is `https://open-agricola.titanxxh.com/`, served by GitHub Pages. A self-hosted installation can configure its own Pages custom domain with the same topology.
 
