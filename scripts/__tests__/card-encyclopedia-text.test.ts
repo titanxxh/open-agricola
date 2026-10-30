@@ -43,15 +43,21 @@ describe('card encyclopedia text references', () => {
 
   it('spells out special action effects per player count when the printed values differ', () => {
     const card = entry('moorSpecialAction:moor-special-1-3-work-market')
-    expect(render('zh', card.text.name)).toBe('伐木 / 雇工集市 / 黑市 / 非法工作')
+    expect(render('zh', card.text.name)).toBe('伐木、雇工集市、黑市、非法工作')
     expect(render('zh', card.text.body)).toBe([
-      '1/3 人',
       '伐木 · 移除 1 块森林，获得 2 木材',
       '雇工集市 · 1 人 · 获得 1 食物',
       '雇工集市 · 3 人 · 获得 2 食物',
       '黑市 · 支付 1 燃料，购买 1 张小改良 · 另付改良费用',
       '非法工作 · 支付 1 食物和 1 燃料，购买 1 张主要改良 · 另付改良费用',
     ].join('\n'))
+  })
+
+  it('names a starting terrain card by its number and leaves the layout to the face', () => {
+    const terrain = entry('moorStart:moor-start-3')
+    expect(terrain.text).toEqual({ name: [{ key: 'ui.encyclopedia.moorStart.name', params: { number: 3 } }] })
+    expect(render('en', terrain.text.name)).toBe('Starting Terrain 3')
+    expect(render('zh', terrain.text.name)).toBe('开局地形 3')
   })
 
   it('describes a season by its action card and board changes', () => {
@@ -77,9 +83,10 @@ describe('card encyclopedia text references', () => {
 
   it('references only keys that exist with text in both the English and Chinese packs', () => {
     const missing: string[] = []
-    for (const item of entries.filter((candidate) => candidate.sourceKind !== 'moorStart')) {
-      for (const [field, parts] of Object.entries(item.text)) {
-        if (field === 'name' || field === 'body') expect(parts.length, `${item.key} ${field}`).toBeGreaterThan(0)
+    for (const item of entries) {
+      expect(item.text.name.length, item.key).toBeGreaterThan(0)
+      if (item.sourceKind !== 'moorStart') expect(item.text.body?.length, item.key).toBeGreaterThan(0)
+      for (const parts of Object.values(item.text)) {
         for (const part of parts) {
           if (!('key' in part)) continue
           for (const locale of ['en', 'zh']) {

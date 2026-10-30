@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ENCYCLOPEDIA_GROUPS } from '../../shared/contract/card-encyclopedia'
-import { buildEncyclopediaEntries } from '../card-encyclopedia/catalog'
+import { buildEncyclopediaEntries, projectPlayers } from '../card-encyclopedia/catalog'
 import { loadEncyclopediaSources } from '../card-encyclopedia/sources'
 
 const entries = buildEncyclopediaEntries(loadEncyclopediaSources())
@@ -30,9 +30,9 @@ describe('card encyclopedia printed costs', () => {
       const { group, displayNumber, cost } = entry(`major:${id}`)
       return { group, displayNumber, cost }
     })).toEqual([
-      { group: 'major', displayNumber: null, cost: { kind: 'printed', paths: [{ clay: 2 }] } },
-      { group: 'major', displayNumber: null, cost: { kind: 'printed', paths: [{ clay: 3 }] } },
-      { group: 'majorFiveSix', displayNumber: null, cost: { kind: 'printed', paths: [{ clay: 4 }] } },
+      { group: 'majorStandard', displayNumber: null, cost: { kind: 'printed', paths: [{ clay: 2 }] } },
+      { group: 'majorStandard', displayNumber: null, cost: { kind: 'printed', paths: [{ clay: 3 }] } },
+      { group: 'major56', displayNumber: null, cost: { kind: 'printed', paths: [{ clay: 4 }] } },
     ])
   })
 
@@ -63,8 +63,21 @@ describe('card encyclopedia scores', () => {
 
 describe('card encyclopedia identity facts', () => {
   it('shows Farmers of the Moor majors by their M deck number', () => {
-    expect(entry('major:Major_Moor_HorseSlaughterhouse1')).toMatchObject({ group: 'M', displayNumber: 'M001', publicType: 'major' })
-    expect(entry('major:Major_Moor_VillageChurch')).toMatchObject({ group: 'M', displayNumber: 'M005' })
+    expect(entry('major:Major_Moor_HorseSlaughterhouse1')).toMatchObject({ group: 'majorMoor', displayNumber: 'M001', publicType: 'major' })
+    expect(entry('major:Major_Moor_VillageChurch')).toMatchObject({ group: 'majorMoor', displayNumber: 'M005' })
+  })
+
+  it('keeps the printed player-count condition', () => {
+    expect(entry('card:D143_TreeCutter').players).toEqual({ minimum: 3 })
+    expect(entry('card:A162_ForestTallyman').players).toEqual({ minimum: 4 })
+    expect(entry('moorSpecialAction:moor-special-1-5-6-market-work').players).toEqual({ counts: [1, 5, 6] })
+    for (const key of ['card:A004_Baseboards', 'major:Major_Joinery', 'parent:PR01', 'moorStart:moor-start-1', 'season:winter']) {
+      expect(entry(key).players, key).toBeNull()
+    }
+  })
+
+  it('refuses a player-count condition it cannot print', () => {
+    expect(() => projectPlayers({ id: 'X001_Odd', players: '2-3' })).toThrow('X001_Odd')
   })
 
   it('files internal player-action cards under their public card type', () => {
@@ -80,16 +93,20 @@ describe('card encyclopedia identity facts', () => {
       kind: 'moorSpecialAction',
       image: expect.stringMatching(/\.(png|jpg|webp)$/),
       actions: ['black-market', 'illicit-work'],
-      players: [1, 5, 6],
     })
   })
 
   it('orders the catalog by declared group, then display number, then source id', () => {
-    const groupOrder = entries.map((item) => ENCYCLOPEDIA_GROUPS.indexOf(item.group))
-    expect(groupOrder).toEqual([...groupOrder].sort((a, b) => a - b))
+    expect([...new Set(entries.map((item) => item.group))]).toEqual([
+      'A', 'B', 'C', 'D', 'E', 'M', 'majorStandard', 'major56', 'majorMoor', 'parents', 'moor', 'seasons',
+    ])
+    expect(ENCYCLOPEDIA_GROUPS).toEqual([...new Set(entries.map((item) => item.group))])
     expect(entries.slice(0, 2).map((item) => item.key)).toEqual(['card:A001_Shelter', 'card:A002_ShiftingCultivation'])
-    expect(entries.filter((item) => item.group === 'M').slice(13, 16).map((item) => item.displayNumber)).toEqual(['M014', 'M015', 'M016'])
-    expect(entries.filter((item) => item.group === 'major').map((item) => item.sourceId).slice(0, 3))
+    expect(entries.filter((item) => item.group === 'M').slice(0, 2).map((item) => item.displayNumber)).toEqual(['M015', 'M016'])
+    expect(entries.filter((item) => item.group === 'majorMoor').map((item) => item.displayNumber)).toEqual([
+      'M001', 'M002', 'M003', 'M004', 'M005', 'M006', 'M007', 'M008', 'M009', 'M010', 'M011', 'M012', 'M013', 'M014',
+    ])
+    expect(entries.filter((item) => item.group === 'majorStandard').map((item) => item.sourceId).slice(0, 3))
       .toEqual(['Major_Basket', 'Major_ClayOven', 'Major_CookingHearth1'])
     expect(entries.filter((item) => item.group === 'seasons').map((item) => item.sourceId)).toEqual(['autumn', 'spring', 'summer', 'winter'])
   })

@@ -13,6 +13,7 @@ const entry = (sourceId: string): EncyclopediaEntry => ({
   group: 'seasons',
   publicType: 'season',
   displayNumber: null,
+  players: null,
   face: { kind: 'season', season: 'winter', actionId: 'season-winter-romantic-evening' },
   text: { name: [{ key: 'ui.seasons.winter' }], body: [{ literal: 'Body' }] },
   cost: { kind: 'notApplicable' },
@@ -22,7 +23,7 @@ const document = (sourceId: string): EncyclopediaSearchDocument => ({
   key: `season:${sourceId}`,
   identifiers: [sourceId],
   locales: { en: { name: { text: 'Winter', status: 'localized' } } },
-  iconTerms: [],
+  extraTerms: [],
 })
 
 const directories: string[] = []

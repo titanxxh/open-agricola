@@ -17,19 +17,25 @@ const CARD_TEXT_ICON_NAMES = {
   FUEL: [{ nameKey: 'resources.fuel' }],
   STABLE: [{ nameKey: 'resources.stable' }],
   BEGGING: [{ nameKey: 'resources.begging' }],
-  SCORE: [{ nameKey: 'resources.bonusVp' }],
+  SCORE: [{ nameKey: 'ui.encyclopedia.icons.score' }],
   ARROW: [],
   'ARROW-1X': [],
   'ARROW-2X': [],
   BAKE: [{ nameKey: 'actions.bake-bread.name' }],
   FIELD: [{ nameKey: 'ui.ruleTerrain.field' }],
-  FOREST: [{ nameKey: 'ui.ruleTerrain.forest' }],
-  MOOR: [{ nameKey: 'ui.ruleTerrain.moor' }],
+  FOREST: [{ nameKey: 'ui.tileForest' }],
+  MOOR: [{ nameKey: 'ui.tileMoor' }],
   FENCE: [{ nameKey: 'resources.fence' }],
   GRAIN_VEG_STACK: [{ nameKey: 'resources.grain' }, { nameKey: 'resources.vegetable' }],
 } as const satisfies Record<string, readonly IconName[]>
 
 export type CardTextIconToken = keyof typeof CARD_TEXT_ICON_NAMES
+
+/** Extra search words for a canonical name (木头 finds 木材); never shown on a card. */
+export const CARD_TEXT_SEARCH_ALIASES = [
+  { nameKey: 'resources.wood', aliases: [{ nameKey: 'ui.encyclopedia.searchAliases.wood' }] },
+  { nameKey: 'resources.stable', aliases: [{ nameKey: 'ui.encyclopedia.searchAliases.stable' }] },
+] as const satisfies readonly { nameKey: string; aliases: readonly IconName[] }[]
 
 const ICON_TOKEN = /<([A-Z0-9_-]+)>/g
 
