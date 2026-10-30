@@ -9,6 +9,7 @@ const entry: EncyclopediaEntry = {
   group: 'A',
   publicType: 'minor',
   displayNumber: 'A004',
+  players: null,
   face: { kind: 'card', cardId: 'A004_Baseboards', cardType: 'minor' },
   text: { name: [{ key: 'cardFaces.A004_Baseboards.name' }], body: [{ key: 'cardFaces.A004_Baseboards.description' }] },
   cost: { kind: 'printed', paths: [{ food: 2 }, { grain: 1 }] },
@@ -18,7 +19,7 @@ const document: EncyclopediaSearchDocument = {
   key: 'card:A004_Baseboards',
   identifiers: ['A004_Baseboards', 'A004'],
   locales: { en: { name: { text: 'Baseboards', status: 'localized' } }, zh: { name: { text: '踢脚板', status: 'localized' } } },
-  iconTerms: ['Wood', '木材'],
+  extraTerms: ['Wood', '木材', '木头'],
 }
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
 const catalogText = JSON.stringify({ version: 1, entries: [entry] })

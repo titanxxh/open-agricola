@@ -15,7 +15,7 @@ export type EncyclopediaPublicType =
 
 /** Declared deck / expansion order; the catalog's default order starts from this. */
 export const ENCYCLOPEDIA_GROUPS = [
-  'A', 'B', 'C', 'D', 'E', 'M', 'major', 'majorFiveSix', 'moor', 'parents', 'seasons',
+  'A', 'B', 'C', 'D', 'E', 'M', 'majorStandard', 'major56', 'majorMoor', 'parents', 'moor', 'seasons',
 ] as const
 
 export type EncyclopediaGroup = typeof ENCYCLOPEDIA_GROUPS[number]
@@ -31,7 +31,8 @@ export type EncyclopediaTextField = 'name' | 'body' | 'rules' | 'prerequisite'
 
 export type EncyclopediaTexts = {
   readonly name: EncyclopediaText
-  readonly body: EncyclopediaText
+  /** Absent only for starting terrain, whose face is the layout itself. */
+  readonly body?: EncyclopediaText
   readonly rules?: EncyclopediaText
   readonly prerequisite?: EncyclopediaText
 }
@@ -41,12 +42,7 @@ export type EncyclopediaTerrainTile = { readonly row: number; readonly col: numb
 export type EncyclopediaFace =
   | { readonly kind: 'card'; readonly cardId: string; readonly cardType: 'occupation' | 'minor' | 'major' }
   | { readonly kind: 'parent'; readonly parentId: string }
-  | {
-    readonly kind: 'moorSpecialAction'
-    readonly image: string
-    readonly actions: readonly string[]
-    readonly players: readonly number[]
-  }
+  | { readonly kind: 'moorSpecialAction'; readonly image: string; readonly actions: readonly string[] }
   | { readonly kind: 'moorStart'; readonly tiles: readonly EncyclopediaTerrainTile[] }
   | { readonly kind: 'season'; readonly season: SeasonId; readonly actionId: string }
 
@@ -65,6 +61,9 @@ export type EncyclopediaCost =
 /** `fixed: null` means no fixed score is printed; it is never folded into 0. */
 export type EncyclopediaScore = { readonly fixed: number | null; readonly extraVp: boolean }
 
+/** Printed player-count condition: `minimum` reads `3+`, `counts` lists exact counts. */
+export type EncyclopediaPlayers = { readonly minimum: number } | { readonly counts: readonly number[] }
+
 export type EncyclopediaEntry = {
   readonly key: string
   readonly sourceKind: EncyclopediaSourceKind
@@ -72,6 +71,7 @@ export type EncyclopediaEntry = {
   readonly group: EncyclopediaGroup
   readonly publicType: EncyclopediaPublicType
   readonly displayNumber: string | null
+  readonly players: EncyclopediaPlayers | null
   readonly face: EncyclopediaFace
   readonly text: EncyclopediaTexts
   readonly cost: EncyclopediaCost
@@ -89,8 +89,11 @@ export type EncyclopediaSearchDocument = {
   readonly identifiers: readonly string[]
   /** Plain text per language: markup removed and icons replaced by their names. */
   readonly locales: Readonly<Record<string, Readonly<Partial<Record<EncyclopediaTextField, EncyclopediaSearchText>>>>>
-  /** Canonical names and fixed aliases of the icons printed on the entry, in every language. */
-  readonly iconTerms: readonly string[]
+  /**
+   * Words the entry should match without printing them: names of its icons and terrain in every
+   * language, plus fixed aliases (木头 for 木材) wherever the canonical name appears.
+   */
+  readonly extraTerms: readonly string[]
 }
 
 export type CardEncyclopediaCatalogFile = {

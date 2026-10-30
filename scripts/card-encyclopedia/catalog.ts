@@ -4,6 +4,7 @@ import {
   type EncyclopediaCostPath,
   type EncyclopediaEntry,
   type EncyclopediaGroup,
+  type EncyclopediaPlayers,
   type EncyclopediaScore,
 } from '../../shared/contract/card-encyclopedia'
 import type { CardDefinition } from '../../shared/contract/cards'
@@ -17,18 +18,18 @@ import {
   officialCardDisplayNumber,
 } from '../../shared/projections/card-display-number'
 import type { EncyclopediaSources, MajorCardSource, OrdinaryCardSource } from './sources'
-import { cardTexts, moorSpecialActionTexts, parentTexts, seasonTexts } from './text'
+import { cardTexts, moorSpecialActionTexts, moorStartTexts, parentTexts, seasonTexts } from './text'
 
 const OFFICIAL_DECKS = new Set<string>(['A', 'B', 'C', 'D', 'E', 'M'])
 const PRINTED_RESOURCES = new Set<string>(PAYMENT_RESOURCE_KEYS)
 const PRINTED_COMPLEX_COST_FIELDS = new Set(['fee', 'fees', 'cards'])
 
-type EntryDraft = Omit<EncyclopediaEntry, 'key' | 'cost' | 'score' | 'text'> & Partial<EncyclopediaEntry>
+type EntryDraft = Omit<EncyclopediaEntry, 'key' | 'cost' | 'score' | 'players'> & Partial<EncyclopediaEntry>
 
 const entry = (draft: EntryDraft): EncyclopediaEntry => ({
   cost: { kind: 'notApplicable' },
   score: { fixed: null, extraVp: false },
-  text: { name: [], body: [] },
+  players: null,
   ...draft,
   key: `${draft.sourceKind}:${draft.sourceId}`,
 })
@@ -83,6 +84,13 @@ const cardScore = (card: Pick<CardDefinition, 'vp' | 'extraVp'>): EncyclopediaSc
   extraVp: card.extraVp === true,
 })
 
+export const projectPlayers = (card: Pick<CardDefinition, 'id' | 'players'>): EncyclopediaPlayers | null => {
+  if (card.players === undefined) return null
+  const minimum = /^([1-6])\+$/.exec(card.players)?.[1]
+  if (!minimum) throw new Error(`${card.id} prints an unsupported player count ${card.players}`)
+  return { minimum: Number(minimum) }
+}
+
 const parentScore = (card: ParentCardDefinition): EncyclopediaScore => card.kind === 'mother'
   ? { fixed: card.score, extraVp: false }
   : { fixed: null, extraVp: card.rewards.some((reward) => reward.effects.some((effect) => effect.type === 'bonus-points')) }
@@ -104,6 +112,7 @@ const ordinaryEntry = (card: OrdinaryCardSource): EncyclopediaEntry => {
     group: card.deck as EncyclopediaGroup,
     publicType,
     displayNumber: officialCardDisplayNumber(card.id) ?? null,
+    players: projectPlayers(card),
     face: { kind: 'card', cardId: card.id, cardType: publicType },
     text: cardTexts(card),
     cost: projectPrintedCost(card),
@@ -112,9 +121,9 @@ const ordinaryEntry = (card: OrdinaryCardSource): EncyclopediaEntry => {
 }
 
 const majorGroup = (card: MajorCardSource, sources: EncyclopediaSources): EncyclopediaGroup => {
-  if (moorMajorDisplayNumber(card.id)) return 'M'
-  if (sources.baseMajorIds.includes(card.id)) return 'major'
-  if (sources.fiveSixMajorIds.includes(card.id)) return 'majorFiveSix'
+  if (moorMajorDisplayNumber(card.id)) return 'majorMoor'
+  if (sources.baseMajorIds.includes(card.id)) return 'majorStandard'
+  if (sources.fiveSixMajorIds.includes(card.id)) return 'major56'
   throw new Error(`${card.id} is not part of any published major improvement supply`)
 }
 
@@ -124,6 +133,7 @@ const majorEntry = (card: MajorCardSource, sources: EncyclopediaSources): Encycl
   group: majorGroup(card, sources),
   publicType: 'major',
   displayNumber: officialCardDisplayNumber(card.id) ?? null,
+  players: projectPlayers(card),
   face: { kind: 'card', cardId: card.id, cardType: 'major' },
   text: cardTexts(card),
   cost: projectPrintedCost(card),
@@ -160,7 +170,8 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       group: 'moor',
       publicType: 'moorSpecialAction',
       displayNumber: null,
-      face: { kind: 'moorSpecialAction', image: card.image, actions: [...card.actions], players: [...card.players] },
+      players: { counts: [...card.players] },
+      face: { kind: 'moorSpecialAction', image: card.image, actions: [...card.actions] },
       text: moorSpecialActionTexts(card),
     })),
     ...sources.moorStartCards.map((card) => entry({
@@ -170,6 +181,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       publicType: 'moorStart',
       displayNumber: null,
       face: { kind: 'moorStart', tiles: card.terrain.map(({ row, col, kind }) => ({ row, col, kind })) },
+      text: moorStartTexts(card),
     })),
     ...sources.seasons.map((season) => entry({
       sourceKind: 'season',

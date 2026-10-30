@@ -62,7 +62,7 @@ describe('encyclopedia search documents from injected languages', () => {
           body: { text: 'Anytime Buy 1 蔬菜 3 食物 .', status: 'fallback' },
         },
       },
-      iconTerms: ['Vegetable', '蔬菜', 'Food', '食物'],
+      extraTerms: ['Vegetable', '蔬菜', 'Food', '食物'],
     })
   })
 
@@ -104,7 +104,32 @@ describe('encyclopedia search documents from the pinned language packs', () => {
       'Anytime Vegetable 2 Food Boar 2 Food Sheep 2 Food Cattle 3 Food Bake Bread action: Grain 2 Food',
     )
     expect(fireplace?.locales.zh.body?.text).toBe('随时 蔬菜 2 食物 野猪 2 食物 羊 2 食物 牛 3 食物 烤面包行动： 谷物 2 食物')
-    expect(fireplace?.iconTerms).toEqual(['Vegetable', '蔬菜', 'Food', '食物', 'Boar', '野猪', 'Sheep', '羊', 'Cattle', '牛', 'Grain', '谷物'])
+    expect(fireplace?.extraTerms).toEqual(['Vegetable', '蔬菜', 'Food', '食物', 'Boar', '野猪', 'Sheep', '羊', 'Cattle', '牛', 'Grain', '谷物'])
+  })
+
+  it('adds the fixed aliases wherever the canonical name is printed, as an icon or as a word', () => {
+    expect(byKey.get('card:A004_Baseboards')?.extraTerms).toEqual(['Wood', '木材', '木头'])
+    expect(byKey.get('card:A001_Shelter')?.extraTerms).toEqual(expect.arrayContaining(['Stable', '畜栏', '马厩']))
+    expect(byKey.get('card:B015_CarpentersBench')?.locales.zh.body?.text).toContain('木材累积格')
+    expect(byKey.get('card:B015_CarpentersBench')?.extraTerms).toEqual(['木头'])
+    expect(byKey.get('card:B015_CarpentersBench')?.locales.zh.body?.text).not.toContain('木头')
+  })
+
+  it('names the score icon as points rather than bonus points', () => {
+    expect(byKey.get('card:A031_DebtSecurity')?.locales.en.body?.text).toContain('you get 1 bonus Points for each major improvement')
+    expect(byKey.get('card:A031_DebtSecurity')?.extraTerms).toEqual(expect.arrayContaining(['Points', '分']))
+  })
+
+  it('finds a starting terrain card by its number and by the terrain it shows', () => {
+    expect(byKey.get('moorStart:moor-start-1')).toEqual({
+      key: 'moorStart:moor-start-1',
+      identifiers: ['moor-start-1'],
+      locales: {
+        en: { name: { text: 'Starting Terrain 1', status: 'localized' } },
+        zh: { name: { text: '开局地形 1', status: 'localized' } },
+      },
+      extraTerms: ['Forest', '森林', 'Moor', '沼泽'],
+    })
   })
 
   it('never leaks markup, raw keys or arrow words into searchable text', () => {

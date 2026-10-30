@@ -4,13 +4,20 @@ import type {
   EncyclopediaEntry,
   EncyclopediaSearchDocument,
   EncyclopediaSearchText,
+  EncyclopediaTerrainTile,
   EncyclopediaText,
   EncyclopediaTextField,
   EncyclopediaTextStatus,
 } from '../../shared/contract/card-encyclopedia'
 import { formatMessage, parseLanguageManifest, parseLanguagePack } from '../../shared/i18n'
 import { resolveEncyclopediaText } from '../../shared/projections/card-encyclopedia-text'
-import { cardTextIconNameKeys, cardTextIconTokens, searchableCardText } from '../../shared/projections/card-text-icons'
+import {
+  CARD_TEXT_SEARCH_ALIASES,
+  cardTextIconNameKeys,
+  cardTextIconTokens,
+  searchableCardText,
+  type CardTextIconToken,
+} from '../../shared/projections/card-text-icons'
 import { flattenDictionary } from '../i18n/flatten-dictionary'
 
 export type EncyclopediaLanguage = {
@@ -64,9 +71,23 @@ const fieldStatus = (
 const iconWords = (language: EncyclopediaLanguage, token: string) =>
   (cardTextIconNameKeys(token) ?? []).map((key) => translate(language, key)).filter(Boolean)
 
+const TERRAIN_ICONS = { forest: 'FOREST', moor: 'MOOR' } as const satisfies Record<EncyclopediaTerrainTile['kind'], CardTextIconToken>
+
+const aliasTerms = (
+  iconNameKeys: ReadonlySet<string>,
+  languages: readonly EncyclopediaLanguage[],
+  plainText: ReadonlyMap<string, string>,
+): string[] => CARD_TEXT_SEARCH_ALIASES.flatMap(({ nameKey, aliases }) => languages.flatMap((language) => {
+  const canonical = translate(language, nameKey).toLowerCase()
+  const printed = iconNameKeys.has(nameKey) || (!!canonical && !!plainText.get(language.id)?.toLowerCase().includes(canonical))
+  if (!printed) return []
+  return aliases.map((alias) => translate(language, alias.nameKey)).filter((alias) => alias && alias.toLowerCase() !== canonical)
+}))
+
 const searchDocument = (entry: EncyclopediaEntry, languages: readonly EncyclopediaLanguage[]): EncyclopediaSearchDocument => {
   const english = languages.find((language) => language.id === BASE_LANGUAGE)
   const rawTexts: string[] = []
+  const plainText = new Map<string, string>()
   const locales = Object.fromEntries(languages.map((language) => {
     const fields: Partial<Record<EncyclopediaTextField, EncyclopediaSearchText>> = {}
     for (const field of TEXT_FIELDS) {
@@ -79,12 +100,18 @@ const searchDocument = (entry: EncyclopediaEntry, languages: readonly Encycloped
         status: fieldStatus(entry, parts, language, english, raw),
       }
     }
+    plainText.set(language.id, Object.values(fields).map((field) => field.text).join('\n'))
     return [language.id, fields]
   }))
-  const tokens = [...new Set(rawTexts.flatMap(cardTextIconTokens))]
-  const iconTerms = [...new Set(tokens.flatMap((token) => languages.flatMap((language) => iconWords(language, token))))]
+  const terrainTokens = entry.face.kind === 'moorStart' ? entry.face.tiles.map((tile) => TERRAIN_ICONS[tile.kind]) : []
+  const tokens = [...new Set([...rawTexts.flatMap(cardTextIconTokens), ...terrainTokens])]
+  const iconNameKeys = new Set(tokens.flatMap((token) => cardTextIconNameKeys(token) ?? []))
+  const extraTerms = [...new Set([
+    ...tokens.flatMap((token) => languages.flatMap((language) => iconWords(language, token))),
+    ...aliasTerms(iconNameKeys, languages, plainText),
+  ])]
   const identifiers = [...new Set([entry.sourceId, ...(entry.displayNumber ? [entry.displayNumber] : [])])]
-  return { key: entry.key, identifiers, locales, iconTerms }
+  return { key: entry.key, identifiers, locales, extraTerms }
 }
 
 export const buildSearchDocuments = (

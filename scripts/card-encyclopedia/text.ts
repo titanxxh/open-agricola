@@ -1,5 +1,6 @@
-import type { EncyclopediaText, EncyclopediaTexts } from '../../shared/contract/card-encyclopedia'
+import type { EncyclopediaText, EncyclopediaTextPart, EncyclopediaTexts } from '../../shared/contract/card-encyclopedia'
 import type { CardDefinition } from '../../shared/contract/cards'
+import type { MoorStartCardDefinition } from '../../shared/moor/start-cards'
 import type { ParentCardDefinition } from '../../shared/parents'
 import {
   moorSpecialActionBuysImprovement,
@@ -11,12 +12,12 @@ import type { MoorSpecialActionCardSource } from './sources'
 
 const SEPARATOR = { literal: ' · ' }
 const NEWLINE = { literal: '\n' }
+const LIST_SEPARATOR = { key: 'ui.listSeparator' }
 
-const joinLines = (lines: readonly EncyclopediaText[]): EncyclopediaText =>
-  lines.flatMap((line, index) => (index === 0 ? line : [NEWLINE, ...line]))
+const joinWith = (parts: readonly EncyclopediaText[], separator: EncyclopediaTextPart): EncyclopediaText =>
+  parts.flatMap((part, index) => (index === 0 ? part : [separator, ...part]))
 
-const joinWith = (parts: readonly EncyclopediaText[], separator: string): EncyclopediaText =>
-  parts.flatMap((part, index) => (index === 0 ? part : [{ literal: separator }, ...part]))
+const joinLines = (lines: readonly EncyclopediaText[]): EncyclopediaText => joinWith(lines, NEWLINE)
 
 /** Same language-pack face fields the card face renders through `cardText`. */
 export const cardTexts = (card: Pick<CardDefinition, 'id' | 'rules' | 'prerequisite'>): EncyclopediaTexts => ({
@@ -33,7 +34,7 @@ export const parentTexts = (card: ParentCardDefinition): EncyclopediaTexts => ({
     : joinLines(([['requirement', 'requirement'], ['reward', 'reward']] as const).map(([label, field]) => [
       { key: `ui.parentCard.${label}` },
       SEPARATOR,
-      ...joinWith(card.rewards.map((reward) => [{ key: `parentFaces.${card.id}.rewards.${reward.tier}.${field}` }]), ' / '),
+      ...joinWith(card.rewards.map((reward) => [{ key: `parentFaces.${card.id}.rewards.${reward.tier}.${field}` }]), { literal: ' / ' }),
     ])),
 })
 
@@ -41,9 +42,8 @@ const playerCountText = (counts: readonly number[]): EncyclopediaText =>
   [{ key: 'moor.specialActions.players', params: { count: counts.join('/') } }]
 
 export const moorSpecialActionTexts = (card: MoorSpecialActionCardSource): EncyclopediaTexts => ({
-  name: joinWith(card.actions.map((actionId) => [{ key: `moor.specialActions.${actionId}` }]), ' / '),
+  name: joinWith(card.actions.map((actionId) => [{ key: `moor.specialActions.${actionId}` }]), LIST_SEPARATOR),
   body: joinLines([
-    playerCountText(card.players),
     ...card.actions.flatMap((actionId) => {
       const byEffect = new Map<string, { params: ReturnType<typeof moorSpecialActionEffectParams>; counts: number[] }>()
       for (const count of card.players) {
@@ -66,6 +66,12 @@ export const moorSpecialActionTexts = (card: MoorSpecialActionCardSource): Encyc
     }),
   ]),
 })
+
+export const moorStartTexts = (card: Pick<MoorStartCardDefinition, 'id'>): EncyclopediaTexts => {
+  const number = /^moor-start-(\d+)$/.exec(card.id)?.[1]
+  if (!number) throw new Error(`${card.id} has no starting terrain number`)
+  return { name: [{ key: 'ui.encyclopedia.moorStart.name', params: { number: Number(number) } }] }
+}
 
 export const seasonTexts = (season: SeasonId): EncyclopediaTexts => ({
   name: [{ key: seasonDisplay[season].nameKey }],
