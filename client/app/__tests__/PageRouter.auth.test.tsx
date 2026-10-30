@@ -39,6 +39,10 @@ vi.mock('../../components/common/GameLoadScreen', () => ({
   ),
 }))
 
+vi.mock('../encyclopedia/EncyclopediaPage', () => ({
+  EncyclopediaPage: () => <main>Encyclopedia Page</main>,
+}))
+
 vi.mock('../../sandbox', () => ({
   SandboxAppLazy: () => {
     throw new Promise(() => {})
@@ -144,6 +148,36 @@ describe('PageRouter auth routes', () => {
     renderWithAuth()
 
     await waitFor(() => expect(screen.queryByText('Lobby Page')).toBeNull())
+  })
+
+  describe('encyclopedia without an account', () => {
+    it.each([
+      ['a signed-out visitor', () => stubMe({ ok: false })],
+      ['an unreachable auth API', () => vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))],
+      ['an auth request that never settles', () => vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))],
+    ])('opens the catalog and a shared card link for %s', async (_case, stubAuth) => {
+      for (const url of ['/?page=encyclopedia', '/?page=encyclopedia&entry=card%3AA004_Baseboards']) {
+        stubAuth()
+        window.history.replaceState(null, '', url)
+
+        const view = renderWithAuth()
+
+        expect(await screen.findByText('Encyclopedia Page')).toBeInTheDocument()
+        expect(screen.queryByLabelText('用户名')).toBeNull()
+        expect(window.location.search).toBe(url.slice(1))
+        view.unmount()
+      }
+    })
+
+    it('keeps the encyclopedia for signed-in players', async () => {
+      stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
+      window.history.replaceState(null, '', '/?page=encyclopedia')
+
+      renderWithAuth()
+
+      expect(await screen.findByText('Encyclopedia Page')).toBeInTheDocument()
+      await waitFor(() => expect(screen.queryByText('Lobby Page')).toBeNull())
+    })
   })
 
   it('does not bypass login for arbitrary ws rooms with player and devMode params', async () => {
