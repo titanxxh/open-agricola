@@ -40,17 +40,19 @@ pnpm install
 - **E2E**（`e2e-tests/*.spec.ts`）——Playwright 浏览器测试，需要前后端在运行。
 
 ```bash
-pnpm test:fast              # fast project（CI 默认）
+pnpm test:fast              # 本机完整 fast project
 pnpm test                   # vitest 全量（fast + slow）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不重启应用
-pnpm verify prepush         # 最终源码的完整 fast + lint
+pnpm verify prepush         # 可选本机完整 fast 门禁，含类型、边界与 lint
 pnpm verify <file.spec.ts>   # 重启隔离应用并跑 Playwright
 pnpm verify status          # 检查验证记录是否对应当前源码
 pnpm run test:e2e           # Playwright E2E
 pnpm run lint               # ESLint，error 必须清零
 ```
 
-调试期间针对受影响行为跑定向测试，纯测试、工具和文档改动不要求每次重启应用。涉及应用行为、UI 或 WebSocket 时，最终验证先通过 `./restart-local.sh` 重启并检查真实行为；`pnpm verify <file.spec.ts>` 会在隔离环境完成这些步骤。最终源码上运行 `pnpm verify prepush`，按风险补相关 slow Session / E2E。定向检查不能代替完整门禁。
+调试期间针对受影响行为跑定向测试，纯测试、工具和文档改动不要求每次重启应用。本机复现应用、UI 或 WebSocket 时，通过 `./restart-local.sh` 重启；`pnpm verify <file.spec.ts>` 会在隔离环境完成这些步骤。写明本机实际检查范围，`pnpm verify prepush` 保留为可选的完整 fast 门禁。
+
+PR 与 main CI 使用同一范围规则，并始终评估必需的 `verify` 检查。公共机制选择完整受影响组，未知范围执行完整任务清单，选中的浏览器检查在 GitHub 上运行。GitHub Actions 是集成与发布的正式证据，本机检查不是前置条件。发布要求同一提交与验证配置的完整候选成功证据，见[部署操作](docs/HOW_TO_DEPLOY.md)。
 
 Session 夹具区分真实开局和预设工作阶段场景，见[卡牌测试模板](docs/CARD_TEST_TEMPLATE_zh.md#52-状态准备方式)。验证记录、测试依赖准备与本机全量 CI 见 [CI 操作文档](docs/operations/ci-checks.md)。记录用于识别过期结果，不会自动跳过检查。
 
@@ -68,7 +70,7 @@ Session 夹具区分真实开局和预设工作阶段场景，见[卡牌测试�
 
 - Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文，简洁明了。
 - 永远 rebase main，**禁止 merge commit**。
-- 每次 push 前 rebase main，在最终源码上运行 `pnpm verify prepush`。push 后等待所有相关 GitHub Actions run 结束；失败要修复，skipped 不算成功验证。
+- 每次 push 前 rebase main 并解决冲突，按需运行本机检查，再等待最终 head 的全部选中 GitHub Actions 检查。修复失败，必需任务跳过不算通过；无需在本机重复完整 CI。
 - 官方卡牌相关改动必须同步 [docs/card_implementation_status_zh.md](docs/card_implementation_status_zh.md)；改动通用扩展点（hook phase、ActionFlow node、协议层）必须同步 [docs/architecture/](docs/architecture/) 中对应的 module 文档。
 
 ## Issue

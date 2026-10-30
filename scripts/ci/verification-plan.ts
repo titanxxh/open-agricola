@@ -33,6 +33,39 @@ export type PlannedCheck =
   | { kind: 'vitest'; project: string; files: string[] }
   | { kind: 'browser'; browser: 'chromium' | 'webkit'; files: string[]; grep: string | null }
 
+function normalizeChecks(checks: PlannedCheck[], fullTaskIds: readonly string[]): PlannedCheck[] {
+  const projects = new Map<string, Set<string>>()
+  const browsers = new Map<string, Extract<PlannedCheck, { kind: 'browser' }>>()
+  const tasks = new Set<string>()
+  for (const check of checks) {
+    if (check.kind === 'catalog') tasks.add(check.taskId)
+    else if (check.kind === 'vitest') {
+      const files = projects.get(check.project) ?? new Set<string>()
+      for (const file of check.files) files.add(file)
+      projects.set(check.project, files)
+    } else {
+      const key = JSON.stringify([check.browser, check.grep])
+      const selected = browsers.get(key) ?? { ...check, files: [] }
+      selected.files = [...new Set([...selected.files, ...check.files])].sort()
+      browsers.set(key, selected)
+    }
+  }
+  const projectOrder = [...FAST_PROJECT_GLOBS.map(project => project.name), 'slow']
+  const orderedProjects = [...projects].sort(([left], [right]) =>
+    projectOrder.indexOf(left) - projectOrder.indexOf(right) || left.localeCompare(right))
+  const browserChecks = [...browsers.values()].flatMap(check => {
+    const fullFiles = browsers.get(JSON.stringify([check.browser, null]))?.files ?? []
+    const files = check.grep === null ? check.files : check.files.filter(file => !fullFiles.includes(file))
+    return files.length ? [{ ...check, files }] : []
+  })
+  return [
+    ...orderedProjects.map(([project, files]): PlannedCheck => ({ kind: 'vitest', project, files: [...files].sort() })),
+    ...fullTaskIds.filter(taskId => tasks.has(taskId)).map((taskId): PlannedCheck => ({ kind: 'catalog', taskId })),
+    ...browserChecks.sort((left, right) =>
+      left.browser.localeCompare(right.browser) || (left.grep ?? '').localeCompare(right.grep ?? '')),
+  ]
+}
+
 const scopeReasons = {
   documentation: 'Ordinary documentation requires documentation constraints.',
   frontend: 'Frontend changes require the complete client group, quality and builds, and the declared module browser consumers.',
@@ -155,7 +188,7 @@ export function planVerification(input: {
     selections,
     expansionReasons,
     checks: full ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId }))
-      : [...new Map(scopedChecks.map(check => [JSON.stringify(check), check])).values()],
+      : normalizeChecks(scopedChecks, input.fullTaskIds),
   }
 }
 const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trimEnd()

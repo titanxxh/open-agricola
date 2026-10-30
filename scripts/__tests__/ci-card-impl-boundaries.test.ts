@@ -3,9 +3,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { verificationPlan } from '../verify'
 import { taskCommands } from '../ci/verification-tasks'
+import { plannedCheckCommands } from '../ci/scoped-verification'
 
 const repoRoot = path.resolve(__dirname, '../..')
-const legacyWorkflows = ['ci-full.yml']
 const architectureChecks = [
   'pnpm run lint',
   'pnpm run check:test-project-coverage',
@@ -69,25 +69,23 @@ describe('canonical architecture verification wiring', () => {
       .toEqual(['pnpm run check:card-impl-boundaries'])
   })
 
-  it.each(legacyWorkflows)('%s calls the canonical check once', (name) => {
-    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
-
-    expect(workflow).toMatch(/on:\s*\n\s+workflow_dispatch:/)
-    expect(workflow).toMatch(/permissions:\s*\n\s+contents: read/)
-    expect(workflow.match(/pnpm run check:architecture/g)).toHaveLength(1)
-    expect(workflow).not.toContain('pnpm run check:reaches')
-    expect(workflow).not.toContain('pnpm run check:card-impl-boundaries')
+  it('uses one automatic PR/main verifier without scheduled full or duplicate preview workflows', () => {
+    const workflows = fs.readdirSync(path.join(repoRoot, '.github/workflows')).filter(file => file.endsWith('.yml'))
+      .map(file => ({ file, source: fs.readFileSync(path.join(repoRoot, '.github/workflows', file), 'utf8') }))
+    expect(workflows.filter(workflow => /^ {2}(?:pull_request|push):/m.test(workflow.source)).map(workflow => workflow.file).sort())
+      .toEqual(['ci.yml'])
+    expect(workflows.some(workflow => /^ {2}schedule:/m.test(workflow.source))).toBe(false)
+    expect(workflows.some(workflow => /runs-on:.*self-hosted/.test(workflow.source))).toBe(false)
+    for (const retired of ['ci-full.yml', 'e2e.yml', 'verification-plan.yml']) {
+      expect(workflows.map(workflow => workflow.file)).not.toContain(retired)
+    }
   })
 
-  it.each(legacyWorkflows)('%s starts isolated dependencies before architecture and storage tests', (name) => {
-    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
-    const dependencies = workflow.indexOf('run: node scripts/local-services.mjs --test')
-    const architecture = workflow.indexOf('run: pnpm run check:architecture')
-    const tests = workflow.indexOf('run: pnpm test')
-
-    expect(dependencies).toBeGreaterThanOrEqual(0)
-    expect(dependencies).toBeLessThan(architecture)
-    expect(dependencies).toBeLessThan(tests)
+  it.each(['fast', 'slow'])('starts isolated dependencies before the canonical %s storage tests', taskId => {
+    expect(plannedCheckCommands(repoRoot, { kind: 'catalog', taskId })).toEqual([
+      { command: process.execPath, args: ['scripts/local-services.mjs', '--test'] },
+      { command: 'pnpm', args: [taskId === 'fast' ? 'test:fast' : 'test:slow'] },
+    ])
   })
 
   it('routes selected CI tasks to the canonical runner and always evaluates the stable required gate', () => {
@@ -123,12 +121,10 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow).not.toContain('continue-on-error:')
   })
 
-  it.each(['ci.yml', ...legacyWorkflows, 'e2e.yml'])('%s is ready for public PRs without running automatic private jobs', (name) => {
-    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
+  it('verifies public PRs and main with read-only permissions and preserves manual verification', () => {
+    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
 
-    // Browser E2E for a pull request runs locally; the workflow covers main and manual runs.
-    if (name === 'e2e.yml') expect(workflow).not.toMatch(/^ {2}pull_request:/m)
-    else expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]$/m)
+    expect(workflow).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]$/m)
     expect(workflow).toMatch(/^ {2}push:\n {4}branches: \[main\]$/m)
     expect(workflow).toMatch(/^ {2}workflow_dispatch:$/m)
     expect(workflow).toMatch(/permissions:\s*\n\s+contents: read/)

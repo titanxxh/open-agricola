@@ -22,11 +22,11 @@ pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0
 ./restart-local.sh       # 本地应用启动 / 重启统一入口，默认绑 127.0.0.1
 ./restart-local.sh --intranet   # 改绑局域网 IP（eth0/en0），供同网段其他机器访问
 pnpm test                   # vitest 全量（fast + slow）
-pnpm test:fast              # 只跑 fast project（CI 默认）
+pnpm test:fast              # 本机完整 fast project；范围 CI 按计划选择
 pnpm test:slow              # 只跑 slow project（单卡 session 测试）
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
-pnpm verify prepush         # 全卡实现边界扫描 + 工具类型检查 + 完整 fast + lint，记录源码指纹与结果
+pnpm verify prepush         # 可选本机完整 fast 门禁，含边界扫描、工具类型与 lint，记录实际范围
 pnpm verify <file.spec.ts>   # 隔离环境重启应用并跑 Playwright；不传文件则跑全部
 pnpm verify status          # 查看验证记录是否仍对应当前源码
 pnpm release:rehearse       # 发布工具本地演练与必需用例门禁，见 docs/operations/ci-checks.md
@@ -151,12 +151,13 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 ## Verification after changes
 
-调试与最终验证分开，详见 `docs/operations/ci-checks.md`：
+本机调试与 GitHub 正式验证分开，详见 `docs/operations/ci-checks.md`：
 
 1. 调试用 `pnpm verify focus <file.test.ts>` 验证最小范围。定向 Vitest 及纯测试、工具、文档调试不要求启动应用。
-2. 涉及应用运行行为、UI 或 WS，最终验收必须先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行验证真实行为。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。PR 的浏览器 E2E 在本机执行，通过后把结果写入 PR 描述；GitHub Actions 不在 PR 上跑浏览器 E2E。
-3. 最终源码运行 `pnpm verify prepush`，覆盖全卡实现边界扫描、工具严格类型检查、完整 fast 和 lint。按风险补 slow Session 或 E2E，定向测试不能替代完整门禁。
-4. 修改源码或 rebase 改变文件内容后重新验证。`pnpm verify status` 检查记录是否仍对应当前源码；记录不自动跳过检查。
+2. 本机复现应用行为、UI 或 WS 时，先通过 `./restart-local.sh` 重启，再用浏览器、Playwright 或命令行检查。`pnpm verify <file.spec.ts>` 在隔离环境调用该入口。本机结果写明实际范围；`pnpm verify prepush` 是可选的完整 fast 门禁，不是 push 的前置条件。
+3. PR 与 main 使用同一 canonical plan 执行受影响文件、业务组与浏览器检查，由始终运行的 `verify` 汇总。公共机制扩大到完整受影响组，未知范围执行全部任务。GitHub Actions 是集成与发布的正式证据；本机通过不能替代或补齐远端结果。
+4. 源码或 rebase 改变文件内容后，重新运行受影响检查并等待对应新 head 的 CI。`pnpm verify status` 仅核对本机记录及其实际范围，不自动跳过检查。
+5. 发布候选必须取得同一 SHA 与验证配置的完整 GitHub 回执，重试只补兼容的失败任务；缺失、失败、取消或跳过的必需任务均阻断。标准发布与独立部署门禁见 `docs/HOW_TO_DEPLOY.md`，不增加定时全量。
 
 </important>
 
@@ -164,7 +165,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 ## Commit and CI workflow
 
-- 永远使用 rebase，禁止 merge。每次 push 前先 rebase main，解决冲突，再在最终源码上运行 `pnpm verify prepush`；失败立即定位修复。prepush 覆盖全卡实现边界扫描、fast 和 lint，本机全量 CI 按 `docs/operations/ci-checks.md` 执行。
+- 永远使用 rebase，禁止 merge。每次 push 前先 rebase main 并解决冲突，按需运行受影响的本机检查。无需重复运行远端相同的完整门禁；检查入口与范围规则见 `docs/operations/ci-checks.md`。
 - push 后必须等待相关 GitHub Actions run 结束。运行中或失败时任务不算完成；失败立即定位修复。
 - Commit 标题使用 `feat:` / `fix:` / `refactor:` / `docs:`，英文、简洁。
 - `.env` 已有 `GH_TOKEN`，source 后可调 GitHub API；查 run、失败日志、手动触发 workflow 和 repo variables 的命令见 `docs/operations/ci-checks.md`。
@@ -176,7 +177,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 ## Deployment
 
-前端发布 GitHub Release 后，由 `.github/workflows/deploy-pages.yml` 自动部署，命令为 `gh release create vX.Y.Z --generate-notes`。后端只在 owner 控制的本机用 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` 部署。GitHub Actions 固定使用 `ubuntu-latest`，额度不足直接失败，不使用 self-hosted runner。步骤、环境变量、TLS、CORS 和常见问题见 `docs/HOW_TO_DEPLOY.md`。
+标准发布入口、固定候选完整验证以及 Pages 与后端独立部署门禁见 `docs/HOW_TO_DEPLOY.md`。后端只在 owner 控制的本机用 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` 部署。GitHub Actions 固定使用 `ubuntu-latest`，额度不足直接失败，不使用 self-hosted runner。
 
 </important>
 

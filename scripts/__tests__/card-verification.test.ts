@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cardVerification, readCardAssociationIndex } from '../ci/card-verification'
 import { planVerification, readTestInventory, type ChangedPath, type TestInventory } from '../ci/verification-plan'
+import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
 const temporary: string[] = []
 afterEach(() => temporary.splice(0).forEach(cwd => rmSync(cwd, { recursive: true, force: true })))
@@ -126,6 +127,35 @@ describe('card test associations', () => {
       { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
     ])
     expect(full.expansionReasons.join(' ')).toContain('hand or global')
+  })
+
+  it('covers narrower same-engine selectors with complete files and retains the other browser and sandbox checks', () => {
+    const { cwd, source, inventory } = fixture()
+    inventory.vitest.push({ file: 'client/services/__tests__/gameTransport.test.ts', project: 'fast-client' })
+    write(cwd, 'client/services/__tests__/gameTransport.test.ts', 'export {}\n')
+    for (const name of ['hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player']) {
+      const file = `e2e-tests/${name}.spec.ts`
+      inventory.browser.push(file)
+      write(cwd, file, 'export {}\n')
+    }
+    const selected = planVerification({
+      identity, changes: [{ status: 'M', path: source }, { status: 'M', path: 'client/services/gameTransport.ts' }],
+      inventory, fullTaskIds: FULL_TASK_IDS, cardAssociations: readCardAssociationIndex(cwd, inventory),
+    })
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.checks.filter(check => check.kind === 'browser')).toEqual([
+      { kind: 'browser', browser: 'chromium', files: [
+        'e2e-tests/card-localization.spec.ts', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts',
+        'e2e-tests/frontend-browser-scenario-matrix.spec.ts', 'e2e-tests/hosted-password-login.spec.ts',
+        'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
+      ], grep: null },
+      { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
+    ])
+    expect(selected.checks.filter(check => check.kind === 'catalog')).toEqual([
+      { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
+      { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
+    ])
   })
 
   it.each<ChangedPath>([
