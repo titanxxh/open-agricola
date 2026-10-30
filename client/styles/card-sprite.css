@@ -651,52 +651,7 @@
   gap: 4px;
 }
 .card-res-icon {
-  display: inline-block;
-  background-image: url('/assets/revised/meeples.png');
-  background-repeat: no-repeat;
   font-size: 26px; /* 1em = 26px for meeples */
-}
-.card-res-icon.wood {
-  width: 0.6em;
-  height: 0.78em;
-  background-position: 58.4507% 21.7766%;
-  background-size: 3413.33%;
-}
-.card-res-icon.clay {
-  width: 0.64em;
-  height: 0.74em;
-  background-position: 97.127% 8.61196%;
-  background-size: 3200%;
-}
-.card-res-icon.reed {
-  width: 0.72em;
-  height: 0.82em;
-  background-position: 14.1194% 21.821%;
-  background-size: 2844.44%;
-}
-.card-res-icon.stone {
-  width: 0.64em;
-  height: 0.8em;
-  background-position: 36.9456% 21.7988%;
-  background-size: 3200%;
-}
-.card-res-icon.grain {
-  width: 0.75em;
-  height: 0.79em;
-  background-position: 54.5869% 21.7877%;
-  background-size: 2730.67%;
-}
-.card-res-icon.vegetable {
-  width: 0.82em;
-  height: 0.8em;
-  background-position: 77.0791% 21.7325%;
-  background-size: 2694.74%;
-}
-.card-res-icon.food {
-  width: 0.8em;
-  height: 0.8em;
-  background-position: 41.0061% 21.7988%;
-  background-size: 2560%;
 }
 
 
