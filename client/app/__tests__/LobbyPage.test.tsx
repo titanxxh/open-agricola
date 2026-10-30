@@ -116,6 +116,7 @@ describe('LobbyPage my active games', () => {
       id: '96725f41-b719-4474-a3df-90e5d239108b', status: 'playing', max_players: 2,
       updated_at: startedAt + 60_000, created_at: startedAt - 60_000, started_at: startedAt,
       player_index: 0, my_turn: 0, current_player_index: 1,
+      waiting_player_indexes: [1], progress: { phase: 'playing', round: 1 }, expansions: [],
       players: [
         { playerIndex: 0, name: 'Alice', color: 'red' },
         { playerIndex: 1, name: 'Bob', color: 'blue' },
@@ -150,9 +151,9 @@ describe('LobbyPage my active games', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
     myRoomsResponse.rooms = [
       { id: 'room-a', status: 'playing', max_players: 2, updated_at: 2, player_index: 1, my_turn: 1,
-        created_at: 1, started_at: 1, current_player_index: 1, players: [] },
+        created_at: 1, started_at: 1, current_player_index: 1, players: [], waiting_player_indexes: [1], progress: null, expansions: [] },
       { id: 'room-b', status: 'playing', max_players: 2, updated_at: 1, player_index: 0, my_turn: 0,
-        created_at: 1, started_at: 1, current_player_index: null, players: [] },
+        created_at: 1, started_at: 1, current_player_index: null, players: [], waiting_player_indexes: [], progress: null, expansions: [] },
     ]
 
     render(<LobbyPage />)
@@ -172,6 +173,7 @@ describe('LobbyPage my active games', () => {
       id: 'waiting-room', status: 'waiting', max_players: 2, updated_at: 1,
       player_index: 0, my_turn: 0, created_at: Date.UTC(2026, 9, 27), started_at: null,
       current_player_index: null, players: [{ playerIndex: 0, name: 'Alice', color: 'red' }],
+      waiting_player_indexes: [], progress: null, expansions: [],
     }]
     render(<LobbyPage />)
     expect(await screen.findByText('Alice')).toBeInTheDocument()

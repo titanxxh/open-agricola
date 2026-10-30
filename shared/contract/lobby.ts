@@ -1,4 +1,10 @@
-import type { PlayerState } from './types'
+import type { GameState, PlayerState } from './types'
+
+export type LobbyExpansion = keyof Pick<GameState,
+  'enableParentCards' | 'enableThroughTheSeasons' | 'enableFarmersOfTheMoor' | 'enableCommunityDeck'>
+
+export type LobbyGameProgress = { phase: 'playing'; round: number }
+  | { phase: Exclude<GameState['phase'], 'playing'> }
 
 export type MyActiveRoom = {
   id: string
@@ -10,5 +16,8 @@ export type MyActiveRoom = {
   player_index: number
   my_turn: number
   current_player_index: number | null
+  waiting_player_indexes: number[]
+  progress: LobbyGameProgress | null
+  expansions: LobbyExpansion[]
   players: Array<Pick<PlayerState, 'name' | 'nameIsDefault' | 'color'> & { playerIndex: number }>
 }

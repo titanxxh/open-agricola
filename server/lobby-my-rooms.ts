@@ -1,24 +1,48 @@
-import type { MyActiveRoom } from '../shared/contract/lobby'
+import type { LobbyExpansion, LobbyGameProgress, MyActiveRoom } from '../shared/contract/lobby'
 import { playerColorOptions } from '../shared/contract/state-constants'
 import type { PostgresDatabase } from './database/postgres'
 import { parseRoomBody } from './game/persistence/room-body-codec'
 
-type RoomRow = Omit<MyActiveRoom, 'players'> & { state_json: string | null; occupied_seats: number[] }
+type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes'>
+type RoomRow = Omit<MyActiveRoom, keyof RoomDetails> & { state_json: string | null; occupied_seats: number[] }
 
-function lobbyPlayers(json: string | null, seats: number[]): MyActiveRoom['players'] {
-  if (!json) return []
+const expansionFlags: LobbyExpansion[] = ['enableParentCards', 'enableThroughTheSeasons', 'enableFarmersOfTheMoor', 'enableCommunityDeck']
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+function lobbyDetails(json: string | null, seats: number[], status: RoomRow['status'], actor: number | null): RoomDetails {
+  const empty: RoomDetails = { players: [], progress: null, expansions: [], waiting_player_indexes: [] }
+  if (!json) return empty
   let snapshot: unknown
-  try { snapshot = parseRoomBody(json) } catch { return [] }
-  if (!snapshot || typeof snapshot !== 'object' || !('state' in snapshot)) return []
+  try { snapshot = parseRoomBody(json) } catch { return empty }
+  if (!isRecord(snapshot) || !isRecord(snapshot.state)) return empty
   const state = snapshot.state
-  if (!state || typeof state !== 'object' || !('players' in state) || !Array.isArray(state.players)) return []
-  return state.players.flatMap((player: unknown, playerIndex) => {
-    if (!seats.includes(playerIndex) || !player || typeof player !== 'object'
-      || !('name' in player) || typeof player.name !== 'string' || !('color' in player)) return []
+  const players = Array.isArray(state.players) ? state.players : []
+  const draft = isRecord(state.draft) ? state.draft : null
+  const pendingPicks = draft && isRecord(draft.pendingPicks) ? draft.pendingPicks : {}
+  const waiting: number[] = []
+  const participants: MyActiveRoom['players'] = players.flatMap((player: unknown, playerIndex) => {
+    if (!seats.includes(playerIndex) || !isRecord(player) || typeof player.name !== 'string') return []
     const color = playerColorOptions.find(option => option === player.color)
     if (!color) return []
+    if (status === 'playing' && state.phase === 'draft' && draft && typeof player.id === 'string') {
+      const pick = pendingPicks[player.id]
+      const submitted = isRecord(pick) && (draft.stage === 'occupation' ? typeof pick.occ === 'string'
+        : draft.stage === 'farmersOfTheMoorMinor' || draft.stage === 'publishedMinor' ? typeof pick.minor === 'string'
+          : typeof pick.occ === 'string' && typeof pick.minor === 'string')
+      if (!submitted) waiting.push(playerIndex)
+    } else if (playerIndex === actor) waiting.push(playerIndex)
     return [{ playerIndex, name: player.name, color, nameIsDefault: 'nameIsDefault' in player && player.nameIsDefault === true }]
   })
+  let progress: LobbyGameProgress | null = null
+  if (status === 'playing') {
+    const phase = state.phase
+    if (phase === 'draft' || phase === 'parent-selection' || phase === 'solo-hand-selection') progress = { phase }
+    else if (phase === 'playing' && typeof state.round === 'number' && Number.isInteger(state.round) && state.round > 0) {
+      progress = { phase, round: state.round }
+    }
+  }
+  return { players: participants, progress, expansions: expansionFlags.filter(flag => state[flag] === true), waiting_player_indexes: waiting }
 }
 
 /** Read committed room summaries without restoring sessions or exposing private state. */
@@ -46,6 +70,6 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
     LIMIT 20
   `).all<RoomRow>(userId)
   return rows.map(({ state_json, occupied_seats, ...room }) => ({
-    ...room, players: lobbyPlayers(state_json, occupied_seats),
+    ...room, ...lobbyDetails(state_json, occupied_seats, room.status, room.current_player_index),
   }))
 }
