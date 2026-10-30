@@ -38,6 +38,8 @@
 
 `scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、共享规则、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。公共机制保留完整 slow project 和浏览器分道；公开契约还覆盖客户端消费者。工坊覆盖当前行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。未知目录、声明的消费者缺失或 project 缺失时扩大到全量。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
 
+`scripts/ci/card-verification.ts` 将权威 Card Source 身份与独立发现的 Vitest、浏览器测试中的字面量、import 和本地测试 helper 关联。索引统一卡号前导零，选择完整文件，包括跨卡和 slow Session 消费者。生产 import 与注册 bootstrap 是归属遍历的终点。通用注册表、文件读取、动态来源、手牌与开局消费者始终保留在保守安全组中，即使同一文件还列有卡牌。有限的卡牌 UI 组、浏览器沙盒、WebKit、质量和构建也保留。新增或删除卡牌路径、缺少行为关联、身份歧义、helper 证据失效，以及手牌或全局可用卡牌都会扩大到全量。公共机制沿用更广的验证范围。索引属于声明式关联契约，不推断语义依赖。公共边界测试位于 `scripts/__tests__/card-verification.test.ts` 和 `scoped-verification-cli.test.ts`。
+
 `scripts/ci/scoped-verification.ts` 计算并执行 canonical plan。执行前重新计算计划，核对 digest 与源码身份，将文件名和 selector 作为进程参数传入。浏览器检查调用 `pnpm verify`，保留隔离依赖、`restart-local.sh` 和结构化 case 结果。执行记录与计划摘要属于日常证据，不能充当完整发布回执。
 
 `ci.yml` 在规划、inline 文件与浏览器检查、可复用 catalog 任务之后始终评估必需的 `verify` job。`scripts/ci/routine-verification-gate.ts` 要求所有选中分支在同一计划与检出上完成。选中任务缺失、失败、取消、跳过或不完整都会失败；未选中分支必须跳过。公共边界测试位于 `scripts/__tests__/` 下的 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
