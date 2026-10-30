@@ -20,6 +20,14 @@ Rule correctness is proven at the backend seam with the smallest sufficient laye
 - Serialized display projections (`lockedFarmTileKeys`, `playerPanelSummary`, `moorSpecialActionAvailability`, card-state presentation, animal zones, special stables) are derived in the owning Session context and stripped on rehydration; pure perspective filtering lives in `shared/projections/serialized-state.ts`. New fields are additive, and existing Replay Viewer builds and payloads stay immutable.
 - Prefer calling `GameSession` methods directly; `/api/game/*` or WebSocket messages serve black-box contracts. Assert resources, played cards, `cardStates`, action spaces, `pending` / `interaction`, `log` and `scores`.
 
+## Full candidate verification
+
+The on-demand `candidate-verification.yml` workflow runs the canonical complete task catalog in `scripts/ci/verification-tasks.ts`. It separates fast and slow tests, builds, quality checks and browser lanes so a failed task can be retried independently. Contract and community-card tests belong to their normal Vitest projects rather than additional duplicate runs. Browser tasks reuse `scripts/verify.ts` and its structured browser results.
+
+`scripts/ci/candidate-verification.ts` binds the actual clean checkout, dispatch commit and verification configuration. Its check command reads GitHub run, job and step metadata. Every required task must have successful compatible evidence. Later failures invalidate earlier success for that task. Local success JSON and ordinary scoped CI runs cannot establish full candidate verification.
+
+The workflow also supports reuse for pre-merge execution. Formal release evidence requires its dedicated manual run for the exact candidate commit. Introducing this workflow does not remove routine CI gates.
+
 ## Architecture fitness
 
 `pnpm run check:architecture` is the single architecture gate, called once by each CI workflow. It runs the architecture scripts, the contract type checks, the contract tests through `check:architecture-tests` and the sandbox prompt / documentation sync. Checks stay simple: they catch common mistakes by agents and developers, not deliberate bypasses, and each diagnostic must be actionable.

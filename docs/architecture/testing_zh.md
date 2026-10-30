@@ -22,6 +22,14 @@
 - 序列化的展示投影（`lockedFarmTileKeys`、`playerPanelSummary`、`moorSpecialActionAvailability`、卡牌状态展示、动物区、特殊马厩）在所属 Session 上下文中派生，rehydrate 时剥离；纯视角过滤位于 `shared/projections/serialized-state.ts`。新增字段只做加法，已有的 Replay Viewer build 与 payload 保持不变。
 - 优先直接调用 `GameSession` 方法；`/api/game/*` 或 WebSocket 消息用于黑盒契约。断言资源、已打出的卡、`cardStates`、行动格、`pending` / `interaction`、`log` 与 `scores`。
 
+## 候选版本完整验证
+
+按需执行的 `candidate-verification.yml` 使用 `scripts/ci/verification-tasks.ts` 中的完整任务清单。fast、slow、构建、质量检查和浏览器分道各自执行，失败任务可独立重试。契约和社区卡测试由正常 Vitest project 覆盖，不额外重复执行。浏览器任务复用 `scripts/verify.ts` 及其结构化结果。
+
+`scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据；较新的失败会使该任务的旧成功失效。本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
+
+该工作流也支持复用以在合入前执行。正式发布证据要求在准确候选提交上执行其专用手动工作流。新增此入口不会移除日常 CI 门禁。
+
 ## 架构门禁
 
 `pnpm run check:architecture` 是唯一的架构门禁，每个 CI workflow 调用一次。它运行架构脚本、契约类型检查、经 `check:architecture-tests` 的契约测试，以及沙盒 prompt / 文档同步。检查保持简单：它们捕捉 agent 与开发者的常见错误，不防御刻意绕过，每条诊断都必须可操作。
