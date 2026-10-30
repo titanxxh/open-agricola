@@ -19,7 +19,7 @@ async function mockPlatformApis(page: Page) {
     const pathname = new URL(route.request().url()).pathname
     const json = pathname === '/api/auth/me'
       ? { ok: true, user: { id: 'u1', username: 'testuser', displayName: 'Test User' } }
-      : { ok: true, cards: [], rooms: [], identities: [], hasMore: false, settings: sandboxSettings }
+      : { ok: true, cards: [], rooms: [], games: [], identities: [], hasMore: false, settings: sandboxSettings }
     await route.fulfill({ json })
   })
 }

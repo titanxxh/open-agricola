@@ -35,14 +35,14 @@ const snapshot = (page: Page) => page.evaluate(() => {
   return payload
 })
 const ruleCommands = (page: Page) => page.evaluate(() => window.hotseatProbe.sent
-  .filter(message => !['getCommandScope', 'joinRoom', 'getState', 'getHistory'].includes(message.type)))
+  .filter(message => !['getCommandScope', 'joinRoom', 'getState', 'getHistory', 'getGameEndProposal'].includes(message.type)))
 
 const confirmHandoff = async (page: Page, name: string) => {
   const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
   await expect(handoff).toBeVisible()
   await expect(handoff).toContainText(`Pass the device to ${name}.`)
   await expect(page.locator('.farm-grid')).toHaveCount(0)
-  await handoff.getByRole('button').click()
+  await handoff.getByRole('button', { name: /continue$|，开始$/ }).click()
   await expect(page.locator('.game-layout')).toBeVisible()
 }
 const browse = async (page: Page, name: string, mobile: boolean) => {

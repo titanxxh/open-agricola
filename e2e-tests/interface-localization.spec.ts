@@ -53,7 +53,7 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   await page.reload()
   await expect(handoff).toBeVisible({ timeout: 15000 })
   await expect(handoff).toContainText('Pass the device to Player 1.')
-  await handoff.getByRole('button').click()
+  await handoff.getByRole('button', { name: /continue$|，开始$/ }).click()
   await expect(page.locator('.game-layout')).toBeVisible()
   await page.locator('.action-card-holder[data-action-id="forest"]').click()
   await page.getByRole('button', { name: 'Confirm switch', exact: true }).click()

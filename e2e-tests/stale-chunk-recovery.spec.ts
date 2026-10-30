@@ -6,7 +6,7 @@ test('shows recovery controls when the game chunk still fails after one reload',
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, rooms: [] }),
+      body: JSON.stringify({ ok: true, rooms: [], games: [] }),
     }),
   )
   await page.route(/GameContainerApi.*\.(?:tsx|js)/, route => {

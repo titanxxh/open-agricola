@@ -80,7 +80,7 @@ export async function finishHotseatOpening(page: Page) {
     const next = await nextStep()
     if (next === 'work') return
     if (next === 'waiting') continue
-    const control = next === 'handoff' ? handoff.getByRole('button')
+    const control = next === 'handoff' ? handoff.getByRole('button', { name: /continue$|，开始$/ })
       : next === 'skip' ? skip : next === 'confirm' ? confirm : choice
     const value = await control.getAttribute('data-choice-value')
     await control.click()

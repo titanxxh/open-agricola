@@ -6,7 +6,7 @@ import { checkpoint, restartIsolatedBackend } from './helpers/standard-solo-proc
 const clearHotseatCover = async (page: Page) => {
   await page.locator('.game-layout, .hotseat-handoff').first().waitFor()
   const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
-  if (await handoff.isVisible()) await handoff.getByRole('button').click()
+  if (await handoff.isVisible()) await handoff.getByRole('button', { name: /continue$|，开始$/ }).click()
 }
 
 for (const width of [1280, 375]) for (const mode of ['multiplayer', 'hotseat', 'solo'] as const) {

@@ -23,7 +23,7 @@ for (const width of [320, 390, 1280]) {
         const path = new URL(route.request().url()).pathname
         return route.fulfill({ json: path === '/api/auth/me'
           ? { ok: true, user: { id: 'alice', username: 'alice', displayName: 'Alice' } }
-          : { ok: true, rooms: path === '/api/lobby/my-rooms' ? [room] : [] } })
+          : { ok: true, rooms: path === '/api/lobby/my-rooms' ? [room] : [], games: [] } })
       })
       await page.goto('/?page=lobby')
       const game = page.locator('.my-game')
