@@ -15,6 +15,9 @@ import { setPage, type PlatformPage } from '../utils/platform-page-url'
 import '../App.css'
 
 const OperationsPageLazy = lazy(() => import('./OperationsPage').then(m => ({ default: m.OperationsPage })))
+const OpeningEventsPrototype = import.meta.env.DEV
+  ? lazy(() => import('./OpeningEvents.prototype'))
+  : null
 
 const GameContainerApiLazy = lazy(() =>
   import('./GameContainerApi').then((m) => ({ default: m.GameContainerApi })),
@@ -68,6 +71,11 @@ export function PageRouter() {
       setPage('lobby')
     }
   }, [loading, page, user])
+
+  // Throwaway rendering on the existing lobby/game routes; no game commands are sent.
+  if (OpeningEventsPrototype && new URLSearchParams(window.location.search).get('prototype') === 'le') {
+    return <Suspense fallback={<AppShellLoadScreen />}><OpeningEventsPrototype /></Suspense>
+  }
 
   if (loading) {
     const { percent, labelKey } = getGameLoadProgress('auth')
