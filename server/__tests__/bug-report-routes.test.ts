@@ -264,6 +264,48 @@ describe('bug report routes', () => {
     })
   })
 
+  it('persists client diagnostics through a draft resume and delivers them with the authenticated player ID', async () => {
+    const diagnostics = {
+      deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' },
+      disconnects: [{ occurredAt: 1_700_000_000_000, code: 1006, reason: '', wasClean: false }],
+    }
+    const created = await invoke('POST', '/api/v1/game-contexts/active-room/bug-reports', {
+      phenomenon: 'The board keeps disappearing', clientDiagnostics: diagnostics,
+    })
+    expect(created.statusCode).toBe(201)
+    expect(json(created).report).toMatchObject({ reporterUserId: 'u1', playerIndex: 0, clientDiagnostics: diagnostics })
+    const saved = json(created).report
+    if (!saved || typeof saved !== 'object' || !('submissionId' in saved) || typeof saved.submissionId !== 'string') throw new Error('Missing report ID')
+    const submissionId = saved.submissionId
+    expect(json(await invoke('GET', `/api/v1/bug-reports/${submissionId}`)).report)
+      .toMatchObject({ clientDiagnostics: diagnostics })
+    const updated = { ...diagnostics, disconnects: [...diagnostics.disconnects, {
+      occurredAt: 1_700_000_000_100, code: 1012, reason: 'service restart', wasClean: true,
+    }] }
+    expect((await invoke('PATCH', `/api/v1/bug-reports/${submissionId}`, {
+      clientDiagnostics: updated, authorIdentity: 'hosted', confirmHosted: true,
+    })).statusCode).toBe(200)
+    expect((await invoke('POST', `/api/v1/bug-reports/${submissionId}/submit`, {})).statusCode).toBe(200)
+    expect(createIssue).toHaveBeenCalledWith('hosted', expect.objectContaining({ body: expect.stringContaining('Reporter site ID: `u1`') }), undefined)
+    const body = createIssue.mock.calls[0]![1].body
+    expect(body).toContain('Device type: `mobile`')
+    expect(body).toContain('Browser: `Safari 17.4`')
+    expect(body).toContain('2023-11-14T22:13:20.000Z')
+    expect(body).toContain('code `1006`, clean `false`, reason `(none)`')
+    expect(body).toContain('code `1012`, clean `true`, reason `service restart`')
+    expect(await store.getOwned(submissionId, 'u1')).toMatchObject({ status: 'submitted', clientDiagnostics: null })
+  })
+
+  it.each([
+    { reporterUserId: 'forged-player' },
+    { clientDiagnostics: { deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' }, disconnects: [], reporterUserId: 'forged-player' } },
+    { clientDiagnostics: { deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' }, disconnects: [{ code: 1006, reason: 'x'.repeat(124), wasClean: false, occurredAt: 1_700_000_000_000 }] } },
+  ])('rejects forged identity and unbounded diagnostics %#', async extra => {
+    const response = await invoke('POST', '/api/v1/game-contexts/active-room/bug-reports', { phenomenon: 'Problem', ...extra })
+    expect(response.statusCode).toBe(400)
+    expect(await db.prepare('SELECT COUNT(*) AS count FROM bug_reports').get()).toEqual({ count: 0 })
+  })
+
   it('rejects client authority fields and fixes the active anchor on the server', async () => {
     const forged = await invoke(
       'POST',

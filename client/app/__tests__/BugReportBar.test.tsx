@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../../contexts/LocaleContext'
 import { BugReportBar } from '../BugReportBar'
+import { collectBugReportDiagnostics } from '../../services/bug-report-diagnostics'
 
 const FRAME_HASH = 'a'.repeat(64)
 
@@ -112,7 +113,7 @@ describe('BugReportBar', () => {
       )
     const create = calls.find(({ url }) =>
       url.endsWith('/api/v1/game-contexts/room-1/bug-reports'))
-    expect(create?.body).toEqual({ phenomenon: 'The game froze' })
+    expect(create?.body).toEqual({ phenomenon: 'The game froze', clientDiagnostics: collectBugReportDiagnostics('room-1') })
     expect(calls.filter(({ url }) =>
       url.endsWith('/api/v1/bug-reports/submission-1/submit'))).toHaveLength(1)
   })
@@ -163,6 +164,7 @@ describe('BugReportBar', () => {
     await user.click(screen.getByRole('button', { name: 'Connect GitHub' }))
     expect(createBody).toEqual({
       phenomenon: 'Wrong score',
+      clientDiagnostics: collectBugReportDiagnostics('room-1'),
       stepNo: 21,
       frameHash: FRAME_HASH,
     })

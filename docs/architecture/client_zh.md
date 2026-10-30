@@ -88,5 +88,6 @@ GameContextRouter
 - 完成的单人 Game Context 在历史 Viewer 外保留公开分数和私下校验本人资格的再开入口。即时 `ScoringPad` 注入同一再开组件；私有配置读取或 Viewer 失败均不隐藏公开结果。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
+- Bug Report 诊断由 `services/bug-report-diagnostics.ts` 识别浏览器和设备，并在标签页存储中保留当前 Room 最近一小时最多五次 WebSocket 关闭记录。`WsGameTransport` 只记录当前连接的关闭，排除主动销毁。创建、编辑草稿及最终确认作者时附带最新的有界诊断快照；刷新后仍可读取，不包含原始 User-Agent。测试见 `bug-report-diagnostics.test.ts` 和 `bug-report.spec.ts`。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
 

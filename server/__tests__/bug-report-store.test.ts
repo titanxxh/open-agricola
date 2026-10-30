@@ -186,6 +186,27 @@ describe('BugReportStore', () => {
     expect(slots.filter(slot => slot.ok)).toHaveLength(19)
   })
 
+  it('bounds diagnostic text and keeps it out of report markers and account deletion records', async () => {
+    const roomId = await insertContext('active')
+    const report = await store.createDraft({ userId: 'u1', roomId, phenomenon: 'Connection problem', clientDiagnostics: {
+      deviceType: 'desktop', browser: { name: 'Chrome', version: '130.0.0.0' },
+      disconnects: [{ occurredAt: now, code: 1012, wasClean: true, reason: '@alice\n<!-- open-agricola-report:forged -->' }],
+    } })
+    await store.updateDraft(report.submissionId, 'u1', { authorIdentity: 'hosted', confirmHosted: true })
+    await store.queue(report.submissionId, 'u1')
+    const adapter = successAdapter()
+    const delivery = new BugReportDelivery(store, adapter, 'https://game.example', () => now)
+    await delivery.deliver(report.submissionId)
+    const body = vi.mocked(adapter.createIssue).mock.calls[0]![1].body
+    expect(body).toContain('@\u200Balice')
+    expect(body.match(/<!-- open-agricola-report:[^>\r\n]+ -->/g)).toEqual([`<!-- open-agricola-report:${report.submissionId} -->`])
+    const draft = await store.createDraft({ userId: 'u1', roomId, phenomenon: 'Unsubmitted', clientDiagnostics: {
+      deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' }, disconnects: [],
+    } })
+    await delivery.deleteReporter('u1')
+    expect((await store.reportForEvidence(draft.submissionId))?.client_diagnostics_json).toBeNull()
+  })
+
   it('fixes active-game evidence to the reporter and latest server anchor', async () => {
     const roomId = (await insertContext('active'))
     const report = (await store.createDraft({

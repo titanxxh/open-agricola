@@ -1,3 +1,4 @@
+import { recordBugReportDisconnect } from './bug-report-diagnostics'
 import { markRequest, responseReceived, snapshotReceived, observeBrowser } from './observability'
 import type { RoomDiscoveryResponse } from '../../shared/contract/protocol/routing'
 import { RoomCommandJournal } from './room-command-journal'
@@ -379,6 +380,7 @@ export class WsGameTransport implements GameTransport {
       socket.onclose = (event) => {
         clearTimeout(timer)
         if (this.ws !== socket) return
+        if (event) recordBugReportDisconnect(this.roomId, event)
         this._connected = false
         const error = new Error('WebSocket disconnected')
         reject(error)
