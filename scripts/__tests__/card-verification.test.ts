@@ -98,6 +98,7 @@ describe('card test associations', () => {
     ['filesystem fixture', "import { readFileSync as read } from 'node:fs'\nconst fixture = JSON.parse(read(inputPath, 'utf8'))\nconsume(fixture)\n"],
     ['computed module', 'const imported = await import(inputPath)\nconsume(imported)\n'],
     ['unresolved local helper', "import { consume } from './_helpers/missing'\nconsume()\n"],
+    ['parameterized card lookup', "const named = 'A127_Lodger'\nfunction find(cardId: string) { return getCardEffect(cardId) }\n"],
   ])('retains an unbounded %s consumer even without a literal owner', (_, contents) => {
     const { cwd, source, inventory } = fixture()
     const file = 'server/__tests__/indirect.test.ts'
