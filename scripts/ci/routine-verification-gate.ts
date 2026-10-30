@@ -1,4 +1,5 @@
 import { FULL_TASK_IDS, fullSha, selectedTasks } from './verification-tasks'
+import { ROUTINE_PARTITION_IDS } from './routine-partitions'
 
 export const NO_CATALOG_TASKS = 'none'
 
@@ -22,6 +23,22 @@ const job = (value: unknown) => {
   return { result: text(input.result), outputs: object(input.outputs) }
 }
 
+function partitions(value: unknown) {
+  const manifest = object(JSON.parse(text(value)))
+  const keys = Object.keys(manifest).sort()
+  if (keys.join(',') !== [...ROUTINE_PARTITION_IDS].sort().join(',')) throw new Error('Invalid routine partition manifest')
+  return ROUTINE_PARTITION_IDS.map(id => {
+    if (manifest[id] === null) return { id, expected: null }
+    const input = object(manifest[id])
+    const digest = text(input.digest)
+    if (input.id !== id || !/^[a-f0-9]{64}$/.test(digest)
+      || typeof input.checks !== 'number' || !Number.isSafeInteger(input.checks) || input.checks < 1) {
+      throw new Error('Invalid routine partition manifest')
+    }
+    return { id, expected: { digest, checks: input.checks } }
+  })
+}
+
 export function assertRoutineGate(input: { sha: string; needs: unknown }) {
   const sha = fullSha(input.sha)
   const needs = object(input.needs)
@@ -32,21 +49,25 @@ export function assertRoutineGate(input: { sha: string; needs: unknown }) {
   if (mode !== 'scoped' && mode !== 'full' || !/^[a-f0-9]{64}$/.test(digest) || plan.outputs.tested_sha !== sha) {
     throw new Error('Verification plan identity or mode is invalid')
   }
-  const selected = count(plan.outputs.inline_checks)
+  const selected = partitions(plan.outputs.partitions)
   const catalog = text(plan.outputs.catalog_tasks)
   const tasks = catalog === NO_CATALOG_TASKS ? '' : selectedTasks(catalog).join(',')
-  if (catalog !== NO_CATALOG_TASKS && tasks !== catalog || selected === 0 && !tasks) {
+  const hasPartitions = selected.some(partition => partition.expected !== null)
+  if (catalog !== NO_CATALOG_TASKS && tasks !== catalog || !hasPartitions && !tasks) {
     throw new Error('Verification task selection is empty or noncanonical')
   }
-  if (mode === 'full' && (selected !== 0 || tasks !== FULL_TASK_IDS.join(','))) throw new Error('Full fallback must execute every canonical task')
-  const inline = job(needs.inline)
-  if (selected > 0) {
-    if (inline.result !== 'success' || inline.outputs.status !== 'passed'
-      || inline.outputs.plan_digest !== digest || inline.outputs.tested_sha !== sha
-      || count(inline.outputs.completed_checks) !== selected) {
-      throw new Error('Selected inline checks did not all succeed for this plan and checkout')
-    }
-  } else if (inline.result !== 'skipped') throw new Error('The unselected inline branch must be skipped')
+  if (mode === 'full' && (hasPartitions || tasks !== FULL_TASK_IDS.join(','))) throw new Error('Full fallback must execute every canonical task')
+  for (const { id, expected } of selected) {
+    const execution = job(needs[id])
+    if (expected) {
+      if (execution.result !== 'success' || execution.outputs.status !== 'passed'
+        || execution.outputs.partition_id !== id || execution.outputs.partition_digest !== expected.digest
+        || execution.outputs.plan_digest !== digest || execution.outputs.tested_sha !== sha
+        || count(execution.outputs.completed_checks) !== expected.checks) {
+        throw new Error(`Selected ${id} partition did not all succeed for this plan and checkout`)
+      }
+    } else if (execution.result !== 'skipped') throw new Error(`The unselected ${id} partition must be skipped`)
+  }
   const execution = job(needs.catalog)
   if (tasks) {
     if (execution.result !== 'success' || execution.outputs.verified_tasks !== tasks || execution.outputs.verified_sha !== sha) {

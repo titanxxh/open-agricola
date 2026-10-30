@@ -44,9 +44,9 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览�
 
 `scripts/ci/card-verification.ts` 将权威 Card Source 身份与独立发现的 Vitest、浏览器测试中的字面量、import 和本地测试 helper 关联。索引统一卡号前导零，选择完整文件，包括跨卡和 slow Session 消费者。生产 import 与注册 bootstrap 是归属遍历的终点。通用注册表、文件读取、动态来源、手牌与开局消费者始终保留在保守安全组中，即使同一文件还列有卡牌。有限的卡牌 UI 组、浏览器沙盒、WebKit、质量和构建也保留。新增或删除卡牌路径、缺少行为关联、身份歧义、helper 证据失效，以及手牌或全局可用卡牌都会扩大到全量。公共机制沿用更广的验证范围。索引属于声明式关联契约，不推断语义依赖。公共边界测试位于 `scripts/__tests__/card-verification.test.ts` 和 `scoped-verification-cli.test.ts`。
 
-`scripts/ci/scoped-verification.ts` 计算并执行 canonical plan。执行前重新计算计划，核对 digest 与源码身份，将文件名和 selector 作为进程参数传入。浏览器检查调用 `pnpm verify`，保留隔离依赖、`restart-local.sh` 和结构化 case 结果。执行记录与计划摘要属于日常证据，不能充当完整发布回执。
+`scripts/ci/scoped-verification.ts` 在执行前重新计算 canonical plan，核对 digest 与源码身份。`routine-partitions.ts` 将完整 Vitest 检查保留在 `units`，将浏览器 `(engine, grep, file)` 元组排序后轮流分配到四个分区，再按原引擎和 selector 归组，并断言恰好覆盖一次。worker 保留 `pnpm verify`、隔离依赖、`restart-local.sh` 和结构化 case 结果。本机 `all` 模式仍执行完整计划。日常结果不能充当完整发布回执。
 
-`ci.yml` 在规划、inline 文件与浏览器检查、可复用 catalog 任务之后始终评估必需的 `verify` job。`scripts/ci/routine-verification-gate.ts` 要求所有选中分支在同一计划与检出上完成。选中任务缺失、失败、取消、跳过或不完整都会失败；未选中分支必须跳过。仅含 inline 的范围计划输出 `catalog_tasks=none`，因为 GitHub 会省略空 job output；选择缺失或为空仍失败。浏览器 catalog 分道和 inline 浏览器计划均安装 Chromium 与 WebKit，因为 spec 可以直接启动任一引擎。公共边界测试位于 `scripts/__tests__/` 下的 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
+`ci.yml` 在规划后独立调度 units、四个明确的浏览器 caller 和 catalog 任务。范围 caller 共用 `scoped-verification.yml`；空分区以 null descriptor 明示并跳过。始终执行的 `verify` 分别核对每个选中 caller 的状态、分区 ID 与 digest、完整计划 digest、SHA 和完成数。其他成功不能补齐失败或缺失的 caller。仅含 units 的计划保留 `catalog_tasks=none`；浏览器 worker 安装两种引擎以支持嵌入式启动。公开测试位于 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
 
 ## 架构门禁
 

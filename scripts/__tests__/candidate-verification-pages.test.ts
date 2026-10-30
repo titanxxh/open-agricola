@@ -215,6 +215,17 @@ function runWorkflow(value: ReturnType<typeof fixture>) {
 }
 
 describe('Pages trusted broker public CLI', () => {
+  it('claims the noncanceling Pages lock only after the verified build succeeds', () => {
+    const workflow = readFileSync(join(repoRoot, brokerPath), 'utf8')
+    const [policy, jobs] = workflow.split('\njobs:')
+    const [build, deploy] = jobs.split('\n  deploy:')
+
+    expect(policy).not.toMatch(/^concurrency:/m)
+    expect(build).not.toMatch(/^ {4}concurrency:/m)
+    expect(deploy).toContain('    needs: build\n')
+    expect(deploy).toContain('    concurrency:\n      group: pages\n      cancel-in-progress: false\n')
+  })
+
   it('builds a verified historical candidate using current main policy without installing policy dependencies', () => {
     const value = fixture()
     value.env.GAME_BUILD_ID = 'c'.repeat(40)
