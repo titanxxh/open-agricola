@@ -39,7 +39,7 @@ export function parseBugReportDiagnostics(value: unknown): BugReportDiagnostics 
     if (typeof occurredAt !== 'number' || !Number.isSafeInteger(occurredAt) || occurredAt <= 0 || occurredAt >= 8_640_000_000_000_000) return null
     if (typeof code !== 'number' || !Number.isInteger(code) || code < 1000 || code > 4999) return null
     if (typeof reason !== 'string' || reason.length > 123 || typeof wasClean !== 'boolean') return null
-    parsed.push({ occurredAt, code, reason: reason.replace(/[\p{Cc}\p{Cf}]/gu, '').replaceAll('<', '&lt;'), wasClean })
+    parsed.push({ occurredAt, code, reason: reason.replace(/[\p{Cc}\p{Cf}]/gu, ''), wasClean })
   }
   return { deviceType, browser: { name, version }, disconnects: parsed }
 }

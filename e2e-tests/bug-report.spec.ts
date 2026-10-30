@@ -389,14 +389,15 @@ test('a mobile report retains actual WebSocket close diagnostics after reconnect
     await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     await authenticate(context, request, `bug_diagnostics_${Date.now().toString(36)}`)
     const page = await context.newPage()
+    const closeReason = '<' + 'x'.repeat(122)
     let closeSocket: (() => void) | undefined
     let connections = 0
     await page.routeWebSocket('**/nodes/*/ws', route => {
       const server = route.connectToServer()
       connections++
       closeSocket = () => {
-        server.close({ code: 1012, reason: 'diagnostic test restart' })
-        route.close({ code: 1012, reason: 'diagnostic test restart' })
+        server.close({ code: 1012, reason: closeReason })
+        route.close({ code: 1012, reason: closeReason })
       }
     })
     await page.route('**/api/v1/issue-submission-connection?**', route =>
@@ -429,7 +430,7 @@ test('a mobile report retains actual WebSocket close diagnostics after reconnect
       clientDiagnostics: {
         deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' },
         disconnects: expect.arrayContaining([{
-          occurredAt: expect.any(Number), code: 1012, reason: 'diagnostic test restart', wasClean: true,
+          occurredAt: expect.any(Number), code: 1012, reason: closeReason, wasClean: true,
         }]),
       },
     })

@@ -296,6 +296,24 @@ describe('bug report routes', () => {
     expect(await store.getOwned(submissionId, 'u1')).toMatchObject({ status: 'submitted', clientDiagnostics: null })
   })
 
+  it('preserves a maximum-length close reason through draft persistence and revalidation', async () => {
+    const reason = '<' + 'x'.repeat(122)
+    const diagnostics = {
+      deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' },
+      disconnects: [{ occurredAt: 1_700_000_000_000, code: 1012, reason, wasClean: true }],
+    }
+    const created = await invoke('POST', '/api/v1/game-contexts/active-room/bug-reports', {
+      phenomenon: 'Connection problem', clientDiagnostics: diagnostics,
+    })
+    expect(created.statusCode).toBe(201)
+    expect(json(created).report).toMatchObject({ clientDiagnostics: diagnostics })
+    const saved = json(created).report
+    if (!saved || typeof saved !== 'object' || !('submissionId' in saved) || typeof saved.submissionId !== 'string') throw new Error('Missing report ID')
+    const patched = await invoke('PATCH', `/api/v1/bug-reports/${saved.submissionId}`, { clientDiagnostics: diagnostics })
+    expect(patched.statusCode).toBe(200)
+    expect(json(patched).report).toMatchObject({ clientDiagnostics: diagnostics })
+  })
+
   it.each([
     { reporterUserId: 'forged-player' },
     { clientDiagnostics: { deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' }, disconnects: [], reporterUserId: 'forged-player' } },
