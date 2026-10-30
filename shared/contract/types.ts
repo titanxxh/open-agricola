@@ -1129,6 +1129,8 @@ export type ActionDefinition = {
     player: PlayerState,
     request: InteractionRequest,
     actionContext?: Record<string, unknown>,
+    actionHooks?: ActionHookRegistry,
+    sourceCard?: string,
   ) => InteractionRequest
   /** Pure executable plan, also used for descriptions. Base mode includes all potential branches. */
   flowFactory?: (context: ActionFlowPlanningContext) => ActionFlow | undefined

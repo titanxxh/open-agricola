@@ -298,7 +298,7 @@ describe('D119 Wood Barterer session', () => {
     if (useAnytime) {
       response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
       expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
-      expect(response.interaction.anytimeActions).toEqual([])
+      expect(response.interaction.anytimeActions.map((action) => action.id)).toEqual(['discard-goods'])
     }
     response = session.resolveChoice(0, 'continue')
     expect(response.interaction.request.kind).toBe('engine-blocked')

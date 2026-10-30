@@ -2360,7 +2360,9 @@ export class GameCore {
       && snapshot.actionContext && typeof snapshot.actionContext === 'object'
       ? snapshot.actionContext as Record<string, unknown>
       : undefined
-    let request = nativeProject?.(this.state, player, envelope.request, actionContext) ?? envelope.request
+    let request = nativeProject?.(
+      this.state, player, envelope.request, actionContext, this.actionHooks, view.sourceCard,
+    ) ?? envelope.request
     if (project) request = project(this.state, player, request, envelope.pendingActionId)
     if (request === envelope.request) return
     frame.engine.peekPendingHost()?.setPending({
