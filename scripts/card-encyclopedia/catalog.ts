@@ -1,8 +1,15 @@
 import {
   ENCYCLOPEDIA_GROUPS,
+  type EncyclopediaCost,
+  type EncyclopediaCostPath,
   type EncyclopediaEntry,
   type EncyclopediaGroup,
+  type EncyclopediaScore,
 } from '../../shared/contract/card-encyclopedia'
+import type { CardDefinition } from '../../shared/contract/cards'
+import { PAYMENT_RESOURCE_KEYS } from '../../shared/contract/resource-keys'
+import type { ComplexCost, PaymentResourceMap } from '../../shared/contract/types'
+import type { ParentCardDefinition } from '../../shared/parents'
 import { seasonActionIdBySeason } from '../../shared/projections/season-actions'
 import {
   moorMajorDisplayNumber,
@@ -12,6 +19,8 @@ import {
 import type { EncyclopediaSources, MajorCardSource, OrdinaryCardSource } from './sources'
 
 const OFFICIAL_DECKS = new Set<string>(['A', 'B', 'C', 'D', 'E', 'M'])
+const PRINTED_RESOURCES = new Set<string>(PAYMENT_RESOURCE_KEYS)
+const PRINTED_COMPLEX_COST_FIELDS = new Set(['fee', 'fees', 'cards'])
 
 type EntryDraft = Omit<EncyclopediaEntry, 'key' | 'cost' | 'score' | 'text'> & Partial<EncyclopediaEntry>
 
@@ -22,6 +31,60 @@ const entry = (draft: EntryDraft): EncyclopediaEntry => ({
   ...draft,
   key: `${draft.sourceKind}:${draft.sourceId}`,
 })
+
+const printedPath = (cardId: string, map: PaymentResourceMap): EncyclopediaCostPath => {
+  for (const [resource, amount] of Object.entries(map)) {
+    if (!PRINTED_RESOURCES.has(resource)) throw new Error(`${cardId} prints unsupported cost resource ${resource}`)
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0) {
+      throw new Error(`${cardId} prints invalid ${resource} cost ${String(amount)}`)
+    }
+  }
+  const path: Partial<Record<(typeof PAYMENT_RESOURCE_KEYS)[number], number>> = {}
+  for (const resource of PAYMENT_RESOURCE_KEYS) {
+    const amount = map[resource] ?? 0
+    if (amount > 0) path[resource] = amount
+  }
+  return path
+}
+
+const asComplexCost = (cardId: string, cost: PaymentResourceMap | ComplexCost): ComplexCost | undefined => {
+  const fields = Object.keys(cost).filter((field) => !PRINTED_RESOURCES.has(field))
+  if (fields.length === 0) return undefined
+  const unsupported = fields.filter((field) => !PRINTED_COMPLEX_COST_FIELDS.has(field))
+  const complex = cost as ComplexCost
+  if (complex.cards?.cost || complex.cards?.required) unsupported.push('cards.cost/required')
+  if (unsupported.length > 0) throw new Error(`${cardId} has cost fields the encyclopedia cannot print: ${unsupported.join(', ')}`)
+  return complex
+}
+
+/** Printed candidates follow the payment semantics: `fees`, else `fee`, else the plain map; then `altCosts`. */
+export const projectPrintedCost = (card: Pick<CardDefinition, 'id' | 'cost' | 'altCosts' | 'returnCards'>): EncyclopediaCost => {
+  const complex = card.cost ? asComplexCost(card.id, card.cost) : undefined
+  const base: PaymentResourceMap[] = complex
+    ? complex.fees ?? (complex.fee ? [complex.fee] : [])
+    : card.cost ? [card.cost as PaymentResourceMap] : []
+  const seen = new Set<string>()
+  const paths = [...base, ...(card.altCosts ?? [])]
+    .map((map) => printedPath(card.id, map))
+    .filter((path) => {
+      const signature = JSON.stringify(path)
+      if (Object.keys(path).length === 0 || seen.has(signature)) return false
+      seen.add(signature)
+      return true
+    })
+  const returnCards = card.returnCards ?? complex?.cards?.list
+  const upgrade = returnCards?.length ? { returnCards: [...returnCards] } : {}
+  return paths.length > 0 ? { kind: 'printed', paths, ...upgrade } : { kind: 'unlisted', ...upgrade }
+}
+
+const cardScore = (card: Pick<CardDefinition, 'vp' | 'extraVp'>): EncyclopediaScore => ({
+  fixed: typeof card.vp === 'number' ? card.vp : null,
+  extraVp: card.extraVp === true,
+})
+
+const parentScore = (card: ParentCardDefinition): EncyclopediaScore => card.kind === 'mother'
+  ? { fixed: card.score, extraVp: false }
+  : { fixed: null, extraVp: card.rewards.some((reward) => reward.effects.some((effect) => effect.type === 'bonus-points')) }
 
 const isOfficialOrdinaryCard = (card: OrdinaryCardSource) =>
   OFFICIAL_DECKS.has(card.deck) && officialCardDeck(card.id) === card.deck
@@ -41,6 +104,8 @@ const ordinaryEntry = (card: OrdinaryCardSource): EncyclopediaEntry => {
     publicType,
     displayNumber: officialCardDisplayNumber(card.id) ?? null,
     face: { kind: 'card', cardId: card.id, cardType: publicType },
+    cost: projectPrintedCost(card),
+    score: cardScore(card),
   })
 }
 
@@ -58,6 +123,8 @@ const majorEntry = (card: MajorCardSource, sources: EncyclopediaSources): Encycl
   publicType: 'major',
   displayNumber: officialCardDisplayNumber(card.id) ?? null,
   face: { kind: 'card', cardId: card.id, cardType: 'major' },
+  cost: projectPrintedCost(card),
+  score: cardScore(card),
 })
 
 const groupIndex = (group: EncyclopediaGroup) => ENCYCLOPEDIA_GROUPS.indexOf(group)
@@ -81,6 +148,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       publicType: card.kind,
       displayNumber: card.id,
       face: { kind: 'parent', parentId: card.id },
+      score: parentScore(card),
     })),
     ...sources.moorSpecialActionCards.map((card) => entry({
       sourceKind: 'moorSpecialAction',
