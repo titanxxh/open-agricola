@@ -5,6 +5,8 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { serializeSessionSnapshot } from '../../shared/session/serialization'
 import type { RoomMeta } from '../game/persistence/room-persistence'
+import { initDraftState } from '../../shared/draft/draft-manager'
+import type { DraftStageKind } from '../../shared/draft/types'
 
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
@@ -49,6 +51,7 @@ describe('my active room summaries', () => {
     expect(rooms[0]).toEqual({
       id: 'room', status: 'playing', max_players: 2, created_at: expect.any(Number), started_at: 1_793_089_800_000,
       updated_at: expect.any(Number), player_index: 1, my_turn: 0, current_player_index: 0,
+      waiting_player_indexes: [0], progress: { phase: 'playing', round: 1 }, expansions: [],
       players: [
         { playerIndex: 0, name: 'Alice in game', nameIsDefault: false, color: 'red' },
         { playerIndex: 1, name: 'Bob in game', nameIsDefault: false, color: 'purple' },
@@ -78,7 +81,7 @@ describe('my active room summaries', () => {
     const { db, persistence, snapshot, meta } = await setup()
     await persistence.save('waiting', snapshot, { ...meta, status: 'waiting', startedAt: null, players: meta.players.slice(0, 1) })
     const rooms = await listMyActiveRooms(db, 'alice')
-    expect(rooms[0]).toMatchObject({ started_at: null, current_player_index: null, my_turn: 0 })
+    expect(rooms[0]).toMatchObject({ started_at: null, current_player_index: null, my_turn: 0, progress: null, waiting_player_indexes: [] })
     expect(rooms[0]?.players).toEqual([{ playerIndex: 0, name: 'Alice in game', nameIsDefault: false, color: 'red' }])
   })
 
@@ -92,6 +95,53 @@ describe('my active room summaries', () => {
       expect(rooms).toHaveLength(2)
       expect(rooms.find(room => room.id === 'healthy')?.players.map(player => player.name)).toEqual(['Alice in game', 'Bob in game'])
       expect(rooms.find(room => room.id === 'damaged')?.players).toEqual([])
+      expect(rooms.find(room => room.id === 'damaged')).toMatchObject({ progress: null, expansions: [], waiting_player_indexes: [] })
+    },
+  )
+
+  it('projects the actual game round and enabled expansions without private state', async () => {
+    const { db, persistence, snapshot, meta } = await setup()
+    await persistence.save('expanded', { ...snapshot, state: {
+      ...snapshot.state, round: 8, enableParentCards: true, enableThroughTheSeasons: true,
+      enableFarmersOfTheMoor: true, enableCommunityDeck: true,
+    } }, meta)
+    const [room] = await listMyActiveRooms(db, 'alice')
+    expect(room).toMatchObject({
+      progress: { phase: 'playing', round: 8 },
+      expansions: ['enableParentCards', 'enableThroughTheSeasons', 'enableFarmersOfTheMoor', 'enableCommunityDeck'],
+    })
+    expect(room).not.toHaveProperty('state')
+  })
+
+  it.each(['standard', 'occupation', 'farmersOfTheMoorMinor', 'publishedMinor'] satisfies DraftStageKind[])(
+    'only circles unsubmitted players during the %s draft stage', async stage => {
+      const { db, persistence, snapshot, meta } = await setup()
+      const [alice, bob] = snapshot.state.players
+      if (!alice || !bob) throw new Error('Expected two players')
+      const draft = initDraftState([alice.id, bob.id], {
+        [alice.id]: { occ: ['private-occ-a'], minor: ['private-minor-a'] },
+        [bob.id]: { occ: ['private-occ-b'], minor: ['private-minor-b'] },
+      }, 1)
+      draft.stage = stage
+      const drafting: typeof snapshot = { ...snapshot, state: { ...snapshot.state, phase: 'draft', draft } }
+      await persistence.save('draft', drafting, meta)
+      expect((await listMyActiveRooms(db, 'alice'))[0]).toMatchObject({
+        progress: { phase: 'draft' }, waiting_player_indexes: [0, 1], current_player_index: null,
+      })
+      if (stage === 'standard') {
+        draft.pendingPicks[alice.id] = { occ: 'private-occ-a', minor: null }
+        await persistence.save('draft', drafting, meta)
+        expect((await listMyActiveRooms(db, 'alice'))[0]?.waiting_player_indexes).toEqual([0, 1])
+      }
+      draft.pendingPicks[alice.id] = {
+        occ: stage === 'standard' || stage === 'occupation' ? 'private-occ-a' : null,
+        minor: stage === 'occupation' ? null : 'private-minor-a',
+      }
+      await persistence.save('draft', drafting, meta)
+      const [room] = await listMyActiveRooms(db, 'alice')
+      expect(room?.waiting_player_indexes).toEqual([1])
+      expect(JSON.stringify(room)).not.toContain('private-')
+      expect(room?.progress).not.toHaveProperty('round')
     },
   )
 

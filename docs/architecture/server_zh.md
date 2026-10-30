@@ -43,7 +43,7 @@ server/game/
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
 - 普通多人局通过 `resolveJoinPlayerIndex` 为新玩家均匀随机分配空座；原有玩家恢复已提交座位。重开先准备新的身份绑定并保留名字、颜色，提交后在首份快照前向各连接发布座位。命令入口从采用后的 Room 刷新座位；开发房间、单人和热座沿用原有分配方式。覆盖：`server/connection/__tests__/room-router.test.ts`、`e2e-tests/draft-opening-order.spec.ts`。
 - `room-access.ts` 负责邀请准入。创建默认公开，也可为其余每个座位指定一个可用账号 ID。`RoomMeta` 将权限存入 `rooms.invited_user_ids`，恢复与 `newGame` 保留该权限。大厅 SQL 在限制条数前按已认证用户过滤；定位、活动 Context 和直接 WS 加入分别校验准入，恢复原座位仍由已有座位归属控制。邀请名单不进入 GameState、Replay 或公开摘要，完赛 Replay 仍公开。`GET /api/lobby/players?prefix=` 要求登录，按用户名或显示名开头至少两个字符匹配，忽略大小写，排除本人及不可用账号，最多返回十个展示身份。测试：`server/__tests__/room-invitations.test.ts`、`e2e-tests/room-invitations.spec.ts`。
-- `lobby-my-rooms.ts` 为 `/api/lobby/my-rooms` 读取已提交快照，不恢复 Session。共享 `MyActiveRoom` 契约只公开已占用座位的显示名、颜色、创建与开局时间，以及 pending frame 的所有者或当前玩家，不返回私有状态或账号 ID。快照无法解析时只省略该房间的玩家详情。测试：`server/__tests__/lobby-my-rooms.test.ts`。
+- `lobby-my-rooms.ts` 为 `/api/lobby/my-rooms` 读取已提交快照，不恢复 Session。共享 `MyActiveRoom` 契约公开已占用座位的显示名、颜色、创建与开局时间、启用的扩展、游戏回合或开局阶段，以及 pending frame 的所有者或当前玩家。同时轮抽的等待座位列表包含当前阶段尚未提交所需选牌的所有玩家，不返回私有状态、卡牌身份或账号 ID。快照无法解析时省略该房间从状态派生的详情。测试：`server/__tests__/lobby-my-rooms.test.ts`。
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
 - 创建在持久提交回调中先采用新 Room，再分离原连接。旧房通知失败只记录故障，不回滚或释放已提交的新会话；初始化清理由提交边界决定。
 - 正式单人通过 `createRoom(maxPlayers: 1)` 创建一个登录账号座位，Step 0 提交后才确认创建。进行中的单人 Room 不进入公开发现，原参与者仍沿用普通恢复授权。`createRoom(sourceGameContextId)` 经 `game-creation-store.ts` 读取不可变的已接受创建元数据，校验已完成来源的唯一参与者，不加载旧 Room 或 Replay 就能创建新局。首次事务同时提交 Room、Step 0、创建配置和命令回执，并再次校验来源及 Workshop 准入；显式卡源不可用时返回完整原选择和类型化差异。契约及测试见 `shared/contract/game-creation.ts`、`server/connection/__tests__/solo-room.test.ts`。

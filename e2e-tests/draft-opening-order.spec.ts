@@ -14,7 +14,7 @@ test('four-player draft shows opening ranks and who is still choosing through re
       drivers.push(new SoloBrowserDriver(await context.newPage()))
     }
     const host = drivers[0]!
-    await host.page.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=4&draftMode=simultaneous&draftPoolSize=7&enableSnakeOpening=true`)
+    await host.page.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=4&draftMode=simultaneous&draftPoolSize=7&enableSnakeOpening=true&enableThroughTheSeasons=true`)
     const id = host.page.locator('.ws-invite-roomid strong')
     await expect(id).toBeVisible()
     const roomId = await id.innerText()
@@ -52,6 +52,16 @@ test('four-player draft shows opening ranks and who is still choosing through re
     await expect(waiting).not.toContainText(`draft_${suffix}_1`)
     await expect(waiting).toContainText(`draft_${suffix}_2`)
     await expect(waiting).toContainText(`draft_${suffix}_3`)
+    const lobby = await contexts[0]!.newPage()
+    await lobby.goto(`${FRONTEND_URL}/?page=lobby`)
+    const activeGame = lobby.locator('.my-game')
+    await expect(activeGame.locator('.my-game__progress')).toHaveText('Card draft')
+    await expect(activeGame.locator('[data-expansion=enableThroughTheSeasons]')).toBeVisible()
+    const waitingNames = [`draft_${suffix}_2`, `draft_${suffix}_3`]
+    await expect(activeGame.locator('.my-game__player[data-current=true] .my-game__name')).toHaveText(
+      host.state.players.filter(player => waitingNames.includes(player.name)).map(player => player.name),
+    )
+    for (const name of waitingNames) await expect(activeGame.locator('.my-game__turn')).toContainText(name)
     await host.page.reload()
     await expect(host.page.locator('.draft-overlay-status')).toHaveAttribute('data-already-submitted', '1')
     expect(host.state.players.map(player => [player.id, player.name, player.color])).toEqual(opening)
@@ -60,14 +70,19 @@ test('four-player draft shows opening ranks and who is still choosing through re
       await expect(host.page.getByRole('region', { name: 'Opening turn order' })).toBeVisible()
       expect(await host.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       await host.page.screenshot({ path: testInfo.outputPath(`draft-waiting-${width}.png`), fullPage: true })
+      await lobby.setViewportSize({ width, height: 900 })
+      expect(await lobby.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      await activeGame.screenshot({ path: testInfo.outputPath(`lobby-draft-waiting-${width}.png`) })
     }
     await pick(drivers[2]!)
+    await expect(activeGame.locator('.my-game__player[data-current=true] .my-game__name')).toHaveText([`draft_${suffix}_3`], { timeout: 10_000 })
     await pick(drivers[3]!)
     for (const driver of drivers) {
       await expect(driver.page.locator('.draft-overlay-title')).toHaveText('Draft — Round 2 / 7')
       await expect(driver.page.locator('.draft-opening-selection[data-submitted="false"]')).toHaveCount(4)
       expect(driver.state.players.map(player => [player.id, player.name, player.color])).toEqual(opening)
     }
+    await expect(activeGame.locator('.my-game__player[data-current=true]')).toHaveCount(4, { timeout: 10_000 })
   } finally {
     await Promise.all(contexts.map(context => context.close()))
   }
