@@ -66,7 +66,7 @@ describe('encyclopedia page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
 
-    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+    expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument()
     expect(galleryNames()).toEqual(['25', '26', '27', '28', '29', '30'].map(number => `View Entry ${number}`))
     expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
   })
@@ -75,6 +75,7 @@ describe('encyclopedia page', () => {
     load.mockResolvedValue(numbered(30))
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+    await screen.findByText('Page 2 of 2')
     const opener = screen.getByRole('button', { name: 'View Entry 27' })
 
     fireEvent.click(opener)
@@ -143,6 +144,7 @@ describe('encyclopedia page', () => {
     load.mockResolvedValue(numbered(30))
     const first = renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+    await screen.findByText('Page 2 of 2')
     first.unmount()
     encyclopediaBrowseStore.setScrollTop(640)
 
