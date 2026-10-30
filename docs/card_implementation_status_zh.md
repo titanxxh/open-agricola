@@ -12,9 +12,7 @@
 
 参考实现 PHP 路径相对参考实现源码树；OA 路径相对本仓库。
 
-| 优先级 | Issue | 缺口 |
-|---|---|---|
-| 未分配 | [#1481](https://github.com/titanxxh/open-agricola/issues/1481) | `D180_PartTimeWorker` 当前用部分拿取替代完整 collect。维护者于 2026-10-30 确认完整取得后单独返还，保留原始取得事实和阈值判断。本卡的项目决定取代 #1336 的旧口径，不作为新查证的官方裁定。实现及测试说明确认仍待完成。其他卡保留按数量和类型取物的能力。 |
+当前没有登记中的未修复项。
 
 ## 2. 已接受差异
 
@@ -24,6 +22,7 @@
 |---|---|
 | [#1407](https://github.com/titanxxh/open-agricola/issues/1407) 采纳的项目规则解释，用于现有来源未能确定的单人交互。这些是单卡 OA 决定，不是官方裁定，也不替代全局 other-player 或 neighbour 条件。 | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
 | 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
+| 维护者于 2026-10-30 确认的项目解释：完整取得格上货物，再可选返还一半换动物，保留原始取得事实和阈值判断。按 [#1481](https://github.com/titanxxh/open-agricola/issues/1481) 取代本卡 #1336 的旧口径，不作为新查证的官方裁定，不改变其他卡按数量或类型取物的能力。 | `D180_PartTimeWorker` |
 | 同一 Turn 内，放人末尾反应再授予 Bake Bread 时不能再次替代，不受参考实现清标记反应顺序影响。维护者裁定见 [#1331](https://github.com/titanxxh/open-agricola/issues/1331)。 | `A097_Freshman` |
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
 | Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |

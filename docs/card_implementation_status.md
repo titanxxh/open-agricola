@@ -12,9 +12,7 @@
 
 Reference PHP paths are relative to the reference implementation's source tree; OA paths are relative to this repository.
 
-| Priority | Issue | Gap |
-|---|---|---|
-| Unassigned | [#1481](https://github.com/titanxxh/open-agricola/issues/1481) | `D180_PartTimeWorker` currently replaces the full collect with partial takes. On 2026-10-30 the maintainer confirmed full collection followed by a separate return, preserving the original collection facts and thresholds. This project decision supersedes #1336 for this card; it is not a newly verified official ruling. Implementation and test-plan approval remain pending. Other cards retain their quantity- and type-limited takes. |
+None currently tracked.
 
 ## 2. Accepted differences
 
@@ -24,6 +22,7 @@ Unless the product direction changes, the following are not bugs. Cards without 
 |---|---|
 | Project Rule Interpretations adopted in [#1407](https://github.com/titanxxh/open-agricola/issues/1407) where the available sources do not settle the solo interaction. These are card-local OA decisions, not official rulings or a general replacement for other-player or neighbour conditions. | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
 | Maintainer scheme B: a startable before flow may admit a space whose host cannot finish, requiring undo. Admission does not simulate the reward, and cards add no admission guards. | Space-use before benefits; [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
+| Maintainer interpretation confirmed 2026-10-30: collect the full pile, then optionally return half for an animal, preserving the original acquisition facts and thresholds. This supersedes #1336 for this card under [#1481](https://github.com/titanxxh/open-agricola/issues/1481); it is not a newly verified official ruling and does not change other cards' quantity- or type-limited takes. | `D180_PartTimeWorker` |
 | A second Bake Bread granted by a trailing placement reaction cannot replace again within the same Turn, regardless of the reference's flag-reset reaction order. Maintainer ruling in [#1331](https://github.com/titanxxh/open-agricola/issues/1331). | `A097_Freshman` |
 | Maintainer ruling for exhausted ordinary decks: a satisfied tier can be completed; each eligible card type independently draws up to three remaining cards and keeps one; an empty type is skipped, completion still succeeds when both are empty, and there is no downgrade, reshuffle or later compensation. This is an OA ruling, not an official FAQ. | `PS03` |
 | Reseller excludes an entire printed-cost candidate that contains a stable or fence component, and keeps its once-per-game opportunity when no supported candidate remains. This does not rule out future component refunds, tracked in [#849](https://github.com/titanxxh/open-agricola/issues/849). | `E146_Reseller` |

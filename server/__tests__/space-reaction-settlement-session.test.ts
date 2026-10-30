@@ -253,9 +253,9 @@ describe('space reaction settlement', () => {
   })
 
   it.each([
-    { card: 'D180_PartTimeWorker', pigs: 4, food: 2, retained: 3, left: 2 },
+    { card: 'D180_PartTimeWorker', pigs: 4, food: 4, retained: 3, left: 2 },
     { card: 'D138_PetLover', pigs: 1, food: 3, retained: 1, left: 1 },
-  ])('separates original collection from $card replacement rewards', ({ card, pigs, food, retained, left }) => {
+  ])('separates original collection from $card card rewards', ({ card, pigs, food, retained, left }) => {
     const session = opening(state => {
       const player = state.players[0]!
       player.minorPlayed = [HAT]
@@ -264,14 +264,15 @@ describe('space reaction settlement', () => {
       player.pastures = [{ id: 'pig-pasture', tiles: [{ row: 0, col: 2 }, { row: 1, col: 2 }], animalType: 'boar', animalCount: 0 }]
       state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = pigs
     }, 5)
-    let response = session.takeAction(0, 'pig-market')
+    let response = animals(session, session.takeAction(0, 'pig-market'))
     const replacement = options(response).find(option => option.sourceCard === card)
     expect(replacement, JSON.stringify(response.interaction)).toBeDefined()
     response = animals(session, choose(session, response, replacement!.value))
     expect(response.state.players[0]!.resources).toMatchObject({ boar: retained, food })
     expect(response.state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar).toBe(left)
     expect(readCardResourceStats(response.state.players[0]!, HAT)?.used ?? 0).toBe(card === 'D180_PartTimeWorker' ? 1 : 0)
-    const gains = response.state.events.filter(event => event.type === 'resource.moved' && (event.resources.boar ?? 0) > 0)
+    const gains = response.state.events.filter(event => event.type === 'resource.moved' && (event.resources.boar ?? 0) > 0
+      && event.to.kind === 'player')
     expect(gains.map(event => event.from.kind)).toEqual(card === 'D180_PartTimeWorker' ? ['actionSpace', 'card'] : ['card'])
   })
 
