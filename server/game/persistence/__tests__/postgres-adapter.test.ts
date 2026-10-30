@@ -82,6 +82,29 @@ describe('PostgresRoomPersistence', () => {
     expect((await p.load('nope'))).toBeNull()
   })
 
+  it('restores an agreed rematch that still waits for offline players at startup', async () => {
+    const session = new GameSession(1479, undefined, { playerCount: 2 })
+    try {
+      await p.save('waiting-rematch', serializeSessionSnapshot(session.state, session), {
+        ...META, status: 'waiting', awaitingRematchPlayers: true,
+        players: [{ userId: 'u1', playerIndex: 0 }, { userId: 'u2', playerIndex: 1 }],
+      })
+      const snapshots = await new PostgresRoomPersistence(db).listRestorable({
+        now: Date.now(), waitingTtlMs: WAITING_TTL, playingTtlMs: PLAYING_TTL,
+      })
+      const snapshot = snapshots.find(room => room.id === 'waiting-rematch')
+      expect(snapshot?.meta.awaitingRematchPlayers).toBe(true)
+      if (!snapshot) throw new Error('Missing waiting rematch')
+      const restored = snapshotToRoom(snapshot)
+      try {
+        expect(restored.awaitingRematchPlayers).toBe(true)
+        expect(restored.status).toBe('waiting')
+        expect(restored.players).toEqual([])
+        expect(restored.seatOwners).toEqual([{ userId: 'u1', playerIndex: 0 }, { userId: 'u2', playerIndex: 1 }])
+      } finally { restored.session.dispose() }
+    } finally { session.dispose() }
+  })
+
   it('upgrades existing ownership rows without changing snapshots, timestamps or dev slots', async () => {
     await p.save('r1', STATE, META)
     await db.prepare("UPDATE room_players SET joined_at = ? WHERE room_id = 'r1'").run(NOW)

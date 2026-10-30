@@ -401,7 +401,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json, end_proposal_json, rooms.max_players, rooms.solo_hand_mode, rooms.status,
+      SELECT rooms.id, rooms.created_by, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
+             rooms.end_proposal_json, rooms.awaiting_rematch_players, rooms.max_players, rooms.solo_hand_mode, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,
