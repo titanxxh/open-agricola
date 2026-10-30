@@ -45,7 +45,7 @@
     "check:card-state-boundaries": "tsx scripts/check-card-state-boundaries.ts",
     "check:effects-file-list": "tsx scripts/check-effects-file-list.ts",
     "check:provenance-result-audit": "vitest run shared/cards/__tests__/provenance-result-audit.test.ts",
-    "build:cards-manifest": "tsx scripts/build-cards-manifest.ts && tsx scripts/prepare-language-packs.ts",
+    "build:cards-manifest": "tsx scripts/build-cards-manifest.ts && tsx scripts/prepare-language-packs.ts && tsx scripts/build-card-encyclopedia.ts",
     "prebuild": "pnpm run build:cards-manifest",
     "pretest": "pnpm run build:cards-manifest",
     "pretest:fast": "pnpm run build:cards-manifest",
