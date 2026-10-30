@@ -9,6 +9,7 @@ import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
 import { moorMajorDisplayNumber, officialCardDeck, officialCardDisplayNumber } from '../../../shared/projections/card-display-number'
 import { getCardMeta, type CardMeta } from '../../services/card-meta'
+import { moorMajorArtPath, officialCardArtPath } from './playerCardArt'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy, type CardTouchInteraction } from './CardWithCopy'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
@@ -44,7 +45,8 @@ type MoorMajorDisplay = {
 
 const getMoorMajorDisplay = (cardId: string): MoorMajorDisplay | undefined => {
   const numbering = moorMajorDisplayNumber(cardId)
-  return numbering ? { numbering, imageUrl: `/assets/moor/major/${numbering}.png` } : undefined
+  const imageUrl = moorMajorArtPath(cardId)
+  return numbering && imageUrl ? { numbering, imageUrl } : undefined
 }
 
 const getCardNumbering = (cardId: string): string => {
@@ -56,14 +58,6 @@ const getCardNumbering = (cardId: string): string => {
 }
 
 const getDeckFromId = officialCardDeck
-
-const getPlayer56PortraitUrl = (numbering: string): string => publicAssetUrl(`/assets/player56/${numbering}.png`)
-
-const PLAYER56_PORTRAITS = new Set(
-  ['A', 'B', 'C', 'D'].flatMap((deck) =>
-    Array.from({ length: 12 }, (_, index) => `${deck}${169 + index}`),
-  ),
-)
 
 const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
   const positions: Record<string, { x: string; y: string }> = {
@@ -194,7 +188,6 @@ export const PlayerCard = ({
   const staticArt = cardData?.artUrl?.startsWith('/card-art/community/')
     ? cardData.artUrl
     : undefined
-  const hasPlayer56Portrait = cardType !== 'major' && !runtimeArt && !staticArt && PLAYER56_PORTRAITS.has(numbering)
 
   const iconStyle = useMemo(() => {
     if (cardType === 'major') {
@@ -238,29 +231,9 @@ export const PlayerCard = ({
         backgroundPosition: 'center',
       }
     }
-    const deckMap: Record<string, string> = {
-      A: 'deckA',
-      B: 'deckB',
-      C: 'deckC',
-      D: 'deckD',
-      E: 'deckE',
-    }
-    if (hasPlayer56Portrait) {
-      return {
-        backgroundImage: `url(${getPlayer56PortraitUrl(numbering)})`,
-      }
-    }
-    if (cardType === 'minor' && deck === 'M') {
-      return {
-        backgroundImage: `url(${publicAssetUrl(`/assets/moor/minor/${numbering}.png`)})`,
-      }
-    }
-    const deckName = deck ? deckMap[deck] : undefined
-    if (!deckName) return {}
-    return {
-      backgroundImage: `url(${publicAssetUrl(`/assets/revised/${deckName}/${numbering}.png`)})`,
-    }
-  }, [cardType, cardId, runtimeArt, staticArt, deck, hasPlayer56Portrait, numbering])
+    const officialArt = officialCardArtPath(cardId, cardType)
+    return officialArt ? { backgroundImage: `url(${publicAssetUrl(officialArt)})` } : {}
+  }, [cardType, cardId, runtimeArt, staticArt])
 
   if (!cardData) return null
 
