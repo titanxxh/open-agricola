@@ -113,8 +113,8 @@ Tests: `server/game/__tests__/{room-committer,room-committer-private-cursor,repl
 
 ```text
 server/custom-code/
-├── runtime.ts           sandbox runtime
-├── engine.ts            source validation, compilation, and manifest extraction
+├── runtime.ts           isolated executor binding for the shared registrar
+├── engine.ts            isolated-vm boundary for shared validation and manifest extraction
 ├── isolate-runner.ts    isolated-vm entry
 ├── executor-worker.ts   Worker Thread entry
 └── client.ts            synchronous main-process to Worker Thread client

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { generateImplFile } from '../code-gen'
+import { generateCardSourceFile } from '../code-gen'
 
-describe('generateImplFile', () => {
+describe('generateCardSourceFile', () => {
   it('emits Card Source with CardImpl type + only used helpers', () => {
     const wcard = {
       id: 'wc1',
@@ -13,7 +13,7 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Foo', deck: 'communi
 const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 2 }) } }
 `.trim(),
     }
-    const out = generateImplFile(wcard, {
+    const out = generateCardSourceFile(wcard, {
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
@@ -38,7 +38,7 @@ const CARD_ID = 'CUSTOM_Hut'
 const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Hut', deck: 'community', number: 0, desc: [], cost: { wood: 1 }, vp: 1 })
 `.trim(),
     }
-    const out = generateImplFile(wcard, {
+    const out = generateCardSourceFile(wcard, {
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
@@ -67,7 +67,7 @@ const CARD_IMPL = {
 }
 `.trim(),
     }
-    const out = generateImplFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
+    const out = generateCardSourceFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
     expect(out).toMatch(/handler:\s*\(_context: any\)\s*=>/)
   })
 
@@ -106,7 +106,7 @@ const CARD_IMPL = {
 }
 `.trim(),
     }
-    const out = generateImplFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
+    const out = generateCardSourceFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
     expect(out).toContain(`const SPACES = ['forest', 'clay-pit']`)
     expect(out).toContain('function isTracked(context: any): any {')
     expect(out).toContain('function buildFlow(gained: any): any {')
@@ -132,7 +132,7 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Plain', deck: 'commu
 const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { food: 1 }) } }
 `.trim(),
     }
-    const out = generateImplFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
+    const out = generateCardSourceFile(wcard, { githubLogin: 'gh', iso: '2026-05-09T00:00:00Z' })
     expect(out).not.toContain('eslint-disable')
   })
 })

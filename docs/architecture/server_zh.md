@@ -114,8 +114,8 @@ ClientCommand
 
 ```text
 server/custom-code/
-├── runtime.ts           沙盒运行时
-├── engine.ts            源码校验、编译与 manifest 提取
+├── runtime.ts           为共享 registrar 绑定隔离执行器
+├── engine.ts            共享校验及 manifest 提取的 isolated-vm 执行边界
 ├── isolate-runner.ts    isolated-vm 隔离入口
 ├── executor-worker.ts   Worker Thread 入口
 └── client.ts            主进程 → Worker Thread 同步调用客户端

@@ -145,7 +145,7 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 生产编辑器使用 `client/services/llm/generation/` 中的浏览器循环；原有纯文本能力生成路径已移除。上方模型表列出的是现有 UI 注册项，不代表已经通过工具调用验收的组合。
 
-**Generation Attempt（生成尝试）**包含资料查询、模型回答和有界修复。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。已登录浏览器通过 `GET /api/workshop/references/main` 和 `GET /api/workshop/references/tree/:sha` 读取 main 与固定版本的目录。后端使用项目自己的 GitHub 只读凭据，固定仓库与操作、限制响应大小，并只返回 commit/目录字段；不接收模型凭据、不执行模型循环。源码正文仍由浏览器匿名请求 `raw.githubusercontent.com`，并按目录中的 blob 哈希验证，不随站点发布。main 不缓存，也不以旧版本兜底；项目凭据缺失、GitHub 元数据不可达或目录不完整时暂停生成。
+**Generation Attempt（生成尝试）**包含资料查询、模型回答和模型自行决定的修复，应用不设请求次数或总时长额度。暂停后继续沿用其模型配置、资料 commit 和累计统计；取消时不能把半截输出当作完成候选。每次新尝试解析 GitHub 最新 `main`，并将该次资料读取固定到这个 commit。参考资料独立于站点发布，生成的可执行代码仍须遵守实际 Custom Code Sandbox 的能力限制。LLM 凭据仍只由浏览器发送给模型服务。已登录浏览器通过 `GET /api/workshop/references/main` 和 `GET /api/workshop/references/tree/:sha` 读取 main 与固定版本的目录。后端使用项目自己的 GitHub 只读凭据，固定仓库与操作、限制响应大小，并只返回 commit/目录字段；不接收模型凭据、不执行模型循环。源码正文仍由浏览器匿名请求 `raw.githubusercontent.com`，并按目录中的 blob 哈希验证，不随站点发布。main 不缓存，也不以旧版本兜底；项目凭据缺失、GitHub 元数据不可达或目录不完整时暂停生成。
 
 未命中缓存的元数据读取在取得项目凭据前消耗 PostgreSQL 共享额度：每个已认证用户每分钟 20 次、每小时 120 次，全站每分钟 100 次、每小时 1,000 次。用户额度拒绝不消耗全站额度。GitHub 冷却期限也由多个后端实例共享，返回 `429` 与 `Retry-After`；每个进程另限制最多 3 个上游读取并发。目录接口仅接受过去一小时内成功读取 main 时确认过的 commit，在返回缓存前也检查。main 成功后重试目录仍沿用原 SHA。已经初始化的资料会话持有自己的目录，一小时授权窗口过后仍可继续读取同 SHA 的源码正文，不重新解析 main。
 
