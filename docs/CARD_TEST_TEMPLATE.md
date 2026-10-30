@@ -34,7 +34,7 @@ Do not use it for:
 - Style-only changes
 - Text-only translation changes
 - General UI component tests unrelated to cards
-- Tests of whether Workshop or AI Designer generated code runs; that framework is documented in `docs/test/llm-card-gen.md`
+- Tests of whether Workshop or AI Designer generated code runs; local acceptance is documented in `docs/test/llm-card-gen.md`
 
 ## 3. Test Layers
 

@@ -11,10 +11,7 @@ import {
   FAST_SERVER_INCLUDE,
   FAST_SHARED_EXCLUDE,
   FAST_SHARED_INCLUDE,
-  FAST_TESTS_EXCLUDE,
   FAST_TESTS_INCLUDE,
-  LLM_INCLUDE,
-  SHARED_EXCLUDE,
   SLOW_INCLUDE,
 } from './scripts/test-project-globs.ts'
 
@@ -35,10 +32,6 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      // Top-level exclude is inherited by every project's exclude (vitest
-      // concatenates parent + project). Keep it minimal so the `llm` project
-      // can opt back in by setting its own exclude that doesn't drop LLM
-      // tests. Per-project excludes below add LLM_GLOB where needed.
       exclude: BASE_EXCLUDE,
       projects: [
         {
@@ -112,7 +105,7 @@ export default mergeConfig(
           test: {
             name: 'fast-tests',
             include: FAST_TESTS_INCLUDE,
-            exclude: FAST_TESTS_EXCLUDE,
+            exclude: FAST_EXCLUDE,
             setupFiles: ['./tests/setup-language-packs.ts',
               './shared/cards/__tests__/setup-register-all.ts',
               './shared/cards/__tests__/setup-listener-purity.ts',
@@ -124,21 +117,12 @@ export default mergeConfig(
           test: {
             name: 'slow',
             include: SLOW_INCLUDE,
-            exclude: SHARED_EXCLUDE,
+            exclude: BASE_EXCLUDE,
             setupFiles: ['./tests/setup-language-packs.ts',
               './shared/cards/__tests__/setup-register-all.ts',
               './shared/cards/__tests__/setup-listener-purity.ts',
             ],
             isolate: false,
-          },
-        },
-        {
-          extends: true,
-          test: {
-            name: 'llm',
-            include: LLM_INCLUDE,
-            exclude: BASE_EXCLUDE,
-            setupFiles: ['./tests/setup-language-packs.ts', ],
           },
         },
       ],

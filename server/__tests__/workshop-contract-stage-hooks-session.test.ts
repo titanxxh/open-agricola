@@ -6,7 +6,7 @@ import { flowCardEffectHooks } from '../../shared/cards/card-effects'
 import type { GameState } from '../../shared/contract/types'
 import type { GameSession } from '../game/authoritative-session'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { createWorkSession } from './_helpers/session-fixtures'
 

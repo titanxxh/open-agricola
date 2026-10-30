@@ -3,7 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/D/D113_FoodMerchant'
 import assert from 'node:assert/strict'

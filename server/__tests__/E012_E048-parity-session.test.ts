@@ -5,7 +5,7 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { getCardStack, pushToCardStack, readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { chooseSupplyWorkerTurn } from './_helpers/supply-worker-turn'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/E/E012_AnimalBedding'
 import '../../shared/cards/E/E017_SkimmerPlow'

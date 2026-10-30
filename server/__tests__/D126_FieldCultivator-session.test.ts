@@ -9,7 +9,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D126_FieldCultivator'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import '../../shared/cards/B/B068_Beanfield'
 import assert from 'node:assert/strict'
 import * as audit51Family from './_helpers/audit/ae-negative-51-family'

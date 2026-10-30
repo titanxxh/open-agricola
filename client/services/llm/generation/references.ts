@@ -4,7 +4,7 @@ import type { GenerationReference } from '../../../../shared/contract/workshop-g
 import type { ToolCall, ToolDefinition } from './protocol'
 
 export const REFERENCE_REPOSITORY = 'titanxxh/open-agricola'
-export const REFERENCE_TOOL_VERSION = 'github-text-v7'
+export const REFERENCE_TOOL_VERSION = 'github-text-v8'
 export const REFERENCE_LIMITS = Object.freeze({ fileBytes: 256 * 1024, readLines: 160, resultBytes: 16 * 1024, searchHits: 40, httpRetries: 2 })
 export const REFERENCE_TOOLS: readonly ToolDefinition[] = [
   { type: 'function', function: {
@@ -41,7 +41,6 @@ export function allowedReferencePath(path: string): boolean {
     || /^client\/local-sandbox\/(?:card-test-runtime|card-tests|card-tests\.worker|browser-executor|browser-runtime)\.ts$/.test(path)
     || /^client\/local-sandbox\/__tests__\/card-(?:test-runtime|tests)\.test\.ts$/.test(path)
     || /^server\/(custom-code\/.*|__tests__\/.*|game\/authoritative-session)\.ts$/.test(path)
-    || /^tests\/llm-card-gen\/fixtures\/.+\.ts$/.test(path)
 }
 
 function kind(path: string): string {

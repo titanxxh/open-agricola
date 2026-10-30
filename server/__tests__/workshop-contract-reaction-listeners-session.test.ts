@@ -3,7 +3,7 @@ import type { CustomCardData } from '../../shared/cards/session-card-context'
 import { clearCustomCards } from '../../shared/cards/custom-registry'
 import type { GameSession } from '../game/authoritative-session'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { createWorkSession } from './_helpers/session-fixtures'
 

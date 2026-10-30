@@ -4,7 +4,7 @@ import type { GameState, PlayerState } from '../../shared/contract/types'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { markAllWorkersUsed, workersAvailable } from '../../shared/domain/player'
 import type { GameSession } from '../game/authoritative-session'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { compileContractCard, createRoundTenSession } from './_helpers/workshop-contract-card'
 

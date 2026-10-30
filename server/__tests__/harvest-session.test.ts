@@ -6,7 +6,7 @@ import '../../shared/cards/D/D060_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 import '../../shared/cards/E/E058_LunchtimeBeer'
 import '../../shared/cards/M/M081_PeatBoat'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('harvest session flow', () => {
   it('uses start-player harvest order and logs reap/feed/breed details with begging', () => {

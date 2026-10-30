@@ -5,7 +5,7 @@ import type { CardListenerRegistration } from '../../shared/cards/card-listeners
 import { isActionVetoedInFlowContext } from '../../shared/actions/flow'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 const CARD = '__runtime_listener__'
 const sessions: ReturnType<typeof createWorkSession>[] = []

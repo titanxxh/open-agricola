@@ -5,7 +5,7 @@ import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player
 import { setStoredResource, getStoredResource } from '../../shared/cards/helpers/card-storage'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/A/A078_Canoe'
 import '../../shared/cards/A/A079_GardenHoe'

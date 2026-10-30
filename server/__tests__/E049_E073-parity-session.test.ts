@@ -4,7 +4,7 @@ import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome, workersAvai
 import { getStoredResource, setStoredResource } from '../../shared/cards/helpers/card-storage'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/E/E049_Twibil'
 import '../../shared/cards/E/E050_WildGreens'

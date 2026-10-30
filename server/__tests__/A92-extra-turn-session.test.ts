@@ -9,7 +9,7 @@ import {
 } from '../../shared/domain/player'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import '../../shared/cards/A/A092_AdoptiveParents'
 
 const A92 = 'A092_AdoptiveParents'

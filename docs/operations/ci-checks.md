@@ -95,7 +95,6 @@ node scripts/local-services.mjs --test
 pnpm run check:architecture
 pnpm run lint:i18n
 pnpm test
-pnpm test:llm
 pnpm run build
 REPLAY_VIEWER_ROOT="$(mktemp -d)" pnpm run build:replay-viewer
 pnpm run check:bundle-size
@@ -106,7 +105,7 @@ pnpm run check:community-deck
 
 `check:architecture-tests` 复用现有 Vitest project 配置，执行 effect 架构、资源事实来源审计、事件映射策略、交互命令策略、Card Source、PromptKey、LLM prompt 契约、CI 接线，以及 listener 纯度 guard 的正负例与两人 Session 契约测试。跨层 Card State 检查覆盖 domain / actions（含 internal effects）/ engine / session / projections / server / client / Replay Viewer，检查固定单卡状态、提示键判断、私有状态 helper 导入和前端原始状态读取；静态 metadata 和卡牌文案声明可用，扫描根缺失、为空、解析错误及失效例外均失败。卡牌实现边界检查同时对每个已解析 listener handler / cost-candidate transform 做显式状态写入的静态扫描；运行时 guard 则由各 Vitest project 的 setup 安装，`pnpm test` 中任何 listener 直接修改权威状态都会失败。它们仍属于 `pnpm test` / `pnpm test:fast`，保证单独运行完整测试时不漏检；只跑架构入口也会执行这些断言。工坊能力名称由部署契约直接读取源码常量，文档链接源码，不维护另一份名字表。
 
-工坊的时序与支付行为由 `server/__tests__/workshop-timing-payment-session.test.ts` 直接构造源码，在两人 Session 中验证触发、支付与不触发条件；测试由 `check:architecture-tests` 执行，不从 Markdown 提取源码。当前简短 prompt 使用后端提供的 format-2 能力名称契约；模型按需读取 GitHub 源码和真实行为测试。维护者质量评估按 `docs/test/llm-card-gen.md` 保存浏览器工具写入的源码，再通过既有11题固定 case 测试。历史 golden 只验证已有输出，有限固定测试不能证明任意生成结果正确，也不作为产品模型白名单；CI 不持有 LLM key，不发起付费调用。
+工坊的时序与支付行为由 `server/__tests__/workshop-timing-payment-session.test.ts` 直接构造源码，在两人 Session 中验证触发、支付与不触发条件；测试由 `check:architecture-tests` 执行，不从 Markdown 提取源码。当前简短 prompt 使用后端提供的 format-2 能力名称契约；模型按需读取 GitHub 源码和真实行为测试。本地模型工具往返验收见 `docs/test/llm-card-gen.md`；CI 不发起模型调用。
 
 架构类型门禁执行 `tsc -p tsconfig.architecture.json --noEmit`，包含架构契约测试及日志、effect 扫描器测试。依赖检查按 TypeScript 模块解析构图，运行时循环一律失败；仅显式 type-only 声明从运行时图移除。浏览器检查对主页面和 Replay Viewer 分别执行不写产物的 Vite 构建，验证真实传递依赖；普通页面不保留规则运行时基线。确切的沙盒入口、Worker 文件及纯元数据权限见 `scripts/architecture-policy.mjs`，未知入口和失效权限均失败。
 
@@ -119,8 +118,8 @@ pnpm run check:community-deck
 准备代码合入后，保持现有 main 审核、禁止删除、禁止 force push 和线性历史规则。公开切换后按顺序启用：
 
 1. 读回 repository visibility，确认三个 workflow 的自动 job 已实际运行；私有期 skipped 的 run 不计入本步。
-2. 让一次真实 PR run 和一次 main run 的 `verify`、`llm-cards-record` job 成功完成。PR head 变化后必须等待对应新 head 的检查。
-3. 从这些提交的 check-runs 核实实际 check 名与 GitHub Actions provider，再把两项检查加入现有 main ruleset。不要只凭界面显示的 `CI / verify` 推测 API context，也不要覆盖已有审核与分支保护规则。
+2. 让一次真实 PR run 和一次 main run 的 `verify` job 成功完成。PR head 变化后必须等待对应新 head 的检查。
+3. 从这些提交的 check-runs 核实实际 check 名与 GitHub Actions provider，再把已验证的检查加入现有 main ruleset。不要只凭界面显示的 `CI / verify` 推测 API context，也不要覆盖已有审核与分支保护规则。
 4. Full 在 PR 和 main 上自动运行，E2E 只在 main 上自动运行，不作为 PR 的 required check。将 Full 纳入 required checks 前，同样先取得 PR/main 的成功证据。所有相关 run 都必须结束，失败立即定位，不能忽略未被设为 required 的失败。
 5. 设置外部贡献者 fork PR 的 Actions 审批为 `all_external_contributors`。当前 GitHub API 不允许为私有仓库配置这项 public fork 设置，因此留到切换后执行并读回验证。
 
@@ -197,8 +196,6 @@ GitHub Actions 固定使用 `ubuntu-latest`；额度不足时 workflow 直接失
 长期凭据只保存在已忽略的本地 `.env` 或本机 SSH 配置中：
 
 ```bash
-pnpm test:llm:live
-
 set -a
 source .env
 set +a

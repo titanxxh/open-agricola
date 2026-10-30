@@ -8,7 +8,7 @@ import {
   setWorkersAtHome,
 } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E030_ChildsToy'

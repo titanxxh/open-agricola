@@ -11,13 +11,13 @@
 > - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署工坊能力契约；format-2 契约只包含已部署能力的名字、运行时标识和限制；模型按需从 GitHub 读取源码、测试和本文
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
 > - **设计文档作者** — `docs/architecture/shared-other.md` 与 `docs/architecture/server.md` 中提到沙盒的章节
-> - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证工坊能力契约的 fixture 套件
+> - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了本地模型验收
 >
 > **修改本文件的同时**必须：
 >
 > 1. 保持源码链接有效。已部署工坊能力契约从源码常量派生能力名称。
 > 2. 架构文档引用本文，不另行维护能力表。
-> 3. 执行行为变化由 executor、parity 和两人 Session 测试覆盖；模型质量评估遵循 `docs/test/llm-card-gen.md` 及 owner 已批准的预算。
+> 3. 执行行为变化由 executor、parity 和两人 Session 测试覆盖；本地模型验收遵循 `docs/test/llm-card-gen.md`。
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/domain/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
 
@@ -691,7 +691,7 @@ const CARD_IMPL = {
 
 ### 9.2 执行行为变化
 
-修改支付行为、hook 参数、JSON 边界或 injected helper 时，更新对应的 executor、parity 和两人 Session 测试。[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) 直接验证触发时序和支付。能力名称仍须满足 ADR 0025 的固定行为测试要求。模型质量评估及现有 owner 批准预算保留在 [`llm-card-gen.md`](test/llm-card-gen.md)。
+修改支付行为、hook 参数、JSON 边界或 injected helper 时，更新对应的 executor、parity 和两人 Session 测试。[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) 直接验证触发时序和支付。能力名称仍须满足 ADR 0025 的固定行为测试要求。本地模型验收见 [`llm-card-gen.md`](test/llm-card-gen.md)。
 
 ### 9.3 工坊能力契约规则
 

@@ -5,7 +5,7 @@ import { playImprovement, playMinorImprovement } from '../../shared/actions/effe
 import { isActionVetoedInFlowContext } from '../../shared/actions/flow'
 import { getActiveCardRegistry, requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 const sessions: ReturnType<typeof createWorkSession>[] = []
 const game = (options: Parameters<typeof createWorkSession>[0] = {}) => {
