@@ -93,6 +93,8 @@ export function ReplayFrame({
       perspective: initialLocation.perspective,
       locale,
       api: API_BASE || window.location.origin,
+      // Bypass entry HTML cached with the old sandbox CSP.
+      policy: '2',
     })
     if (initialLocation.layout) params.set('layout', initialLocation.layout)
     if (initialLocation.step !== null) params.set('step', String(initialLocation.step))

@@ -167,6 +167,8 @@ POST   /api/v1/github-app/webhook
 
 Public Replay APIs return versioned JSON, never PostgreSQL encoding. A Segment expands at most one checkpoint chain with every Frame Hash verified; an Anchor must match `stepNo + frameHash` exactly. Public reads have per-IP quotas and size caps; authenticated evidence and report endpoints are rate-limited per account.
 
+Viewer entry HTML revalidates its response policy; content-addressed assets remain immutable. Its CSP explicitly allows the `PUBLIC_API_BASE` origin (the request origin in local development) for public reads from the opaque sandbox, while scripts remain restricted to `'self'`. Coverage: `replay-routes.test.ts` and `replay-viewer-csp.spec.ts`.
+
 ## Workshop backend
 
 `server/workshop.ts` and `server/workshop-pr/` provide custom-card upload, compilation, the sandbox and pull-request delivery. See [Platform design](../PLATFORM_DESIGN.md) for the full product flow.

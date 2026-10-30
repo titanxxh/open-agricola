@@ -4,7 +4,9 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
 const backend = process.env.BACKEND_URL ?? 'http://localhost:5175'
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+  await page.addInitScript(() => {
+    if (window.top === window) localStorage.setItem('open-agricola-locale-v2', 'en')
+  })
 })
 
 const createReplay = async (request: APIRequestContext) => {

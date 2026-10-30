@@ -198,7 +198,9 @@ describe('public replay routes', () => {
   it('serves only hash-verified immutable viewer files', async () => {
     const first = await handleStream(request(`/replay-viewers/${buildId}/index.html`))
     expect(first.status).toBe(200)
-    expect(first.headers['Cache-Control']).toContain('immutable')
+    expect(first.headers['Cache-Control']).toBe('no-cache')
+    const script = await handleStream(request(`/replay-viewers/${buildId}/app.js`))
+    expect(script.headers['Cache-Control']).toBe('public, max-age=31536000, immutable')
     expect(first.headers['Content-Security-Policy']).toContain("form-action 'none'")
     expect(first.headers['Content-Security-Policy']).toContain(
       "img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/",
@@ -224,6 +226,29 @@ describe('public replay routes', () => {
 
     await resources.storage.objects.delete(`replay-viewers/${buildId}/index.html`)
     expect((await handleStream(request(`/replay-viewers/${buildId}/index.html`))).status).toBe(503)
+  })
+
+  it('allows the configured API origin for sandboxed viewer reads without trusting URL or proxy overrides', async () => {
+    vi.stubEnv('PUBLIC_API_BASE', 'https://api.example:8443/backend/')
+    const result = await handleStream(request(`/replay-viewers/${buildId}/index.html?api=https://untrusted.example`, {
+      host: 'internal.example:5175',
+      'x-forwarded-host': 'untrusted.example',
+      'x-forwarded-proto': 'http',
+      origin: 'https://untrusted.example',
+    }))
+    expect(result.headers['Content-Security-Policy'].split('; ').find(value => value.startsWith('connect-src ')))
+      .toBe("connect-src 'self' https://api.example:8443")
+    expect(result.headers).not.toHaveProperty('Access-Control-Allow-Credentials')
+  })
+
+  it('uses the request origin including scheme and port for local viewer reads without PUBLIC_API_BASE', async () => {
+    vi.stubEnv('PUBLIC_API_BASE', '')
+    const result = await handleStream(request(`/replay-viewers/${buildId}/index.html`, {
+      host: 'localhost:5175',
+      'x-forwarded-proto': 'https',
+    }))
+    expect(result.headers['Content-Security-Policy'].split('; ').find(value => value.startsWith('connect-src ')))
+      .toBe("connect-src 'self' https://localhost:5175")
   })
 
   it('revalidates content-addressed replay images and rejects corruption', async () => {
