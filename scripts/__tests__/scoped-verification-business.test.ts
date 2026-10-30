@@ -154,15 +154,15 @@ describe('business verification groups', () => {
         'server/game/__tests__/replay-codec.test.ts', 'server/game/__tests__/room.test.ts',
         'server/game/persistence/__tests__/room-history-recovery.test.ts',
       ] },
-      { kind: 'vitest', project: 'fast-tests', files: ['tests/game-sync-pipeline.test.ts', 'tests/replay-viewer-model.test.ts'] },
       { kind: 'vitest', project: 'fast-scripts', files: [
         'scripts/__tests__/publish-replay-viewer.test.ts', 'scripts/__tests__/replay-removal.test.ts',
         'scripts/__tests__/room-commit-acceptance.test.ts',
       ] },
+      { kind: 'vitest', project: 'fast-tests', files: ['tests/game-sync-pipeline.test.ts', 'tests/replay-viewer-model.test.ts'] },
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
       { kind: 'browser', browser: 'chromium', files: [
-        'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/room-history-window.spec.ts', 'e2e-tests/room-history-projection.spec.ts',
-        'e2e-tests/replay-viewer.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
+        'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts', 'e2e-tests/replay-viewer.spec.ts',
+        'e2e-tests/room-history-projection.spec.ts', 'e2e-tests/room-history-window.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
       ], grep: null },
       { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@ws' },
       { kind: 'browser', browser: 'webkit', files: [
@@ -217,7 +217,7 @@ describe('business verification groups', () => {
     expect(selected.mode).toBe('scoped')
     expect(selected.selections.map(selection => selection.scope)).toEqual(['contract'])
     expect(selected.checks.filter(check => check.kind === 'vitest').map(check => check.project)).toEqual([
-      'fast-shared', 'fast-cards', 'fast-card-runtime', 'fast-server', 'fast-tests', 'slow', 'fast-client',
+      'fast-shared', 'fast-cards', 'fast-card-runtime', 'fast-client', 'fast-server', 'fast-tests', 'slow',
     ])
     expect(selected.checks.find(check => check.kind === 'vitest' && check.project === 'fast-client')).toEqual({
       kind: 'vitest', project: 'fast-client', files: [
@@ -250,28 +250,28 @@ describe('business verification groups', () => {
         'shared/cards/__tests__/A29_AleBenches.test.ts', 'shared/cards/__tests__/listener-purity-guard.test.ts',
       ] },
       { kind: 'vitest', project: 'fast-card-runtime', files: ['shared/actions/effects/__tests__/pay-supply-token.test.ts'] },
+      { kind: 'vitest', project: 'fast-client', files: [
+        'client/local-sandbox/__tests__/card-test-runtime.test.ts', 'client/services/__tests__/generation-prompt.test.ts',
+        'client/services/llm/generation/__tests__/references.test.ts',
+      ] },
       { kind: 'vitest', project: 'fast-server', files: [
         'server/__tests__/listener-purity-gate-session.test.ts', 'server/__tests__/workshop-capability-contract-session.test.ts',
         'server/__tests__/workshop-composed-behaviors-session.test.ts', 'server/__tests__/workshop-sandbox-contract.test.ts',
         'server/__tests__/workshop-timing-payment-session.test.ts',
       ] },
+      { kind: 'vitest', project: 'fast-scripts', files: [
+        'scripts/__tests__/docs-budget.test.ts', 'scripts/__tests__/listener-contract-admission.test.ts',
+      ] },
       { kind: 'vitest', project: 'fast-tests', files: ['tests/cost-pay-parity.test.ts'] },
       { kind: 'vitest', project: 'slow', files: [
         'server/__tests__/A029_AleBenches-session.test.ts', 'server/__tests__/A27_OvenSite-session.test.ts',
       ] },
-      { kind: 'vitest', project: 'fast-client', files: [
-        'client/local-sandbox/__tests__/card-test-runtime.test.ts', 'client/services/__tests__/generation-prompt.test.ts',
-        'client/services/llm/generation/__tests__/references.test.ts',
-      ] },
-      { kind: 'vitest', project: 'fast-scripts', files: [
-        'scripts/__tests__/docs-budget.test.ts', 'scripts/__tests__/listener-contract-admission.test.ts',
-      ] },
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
       { kind: 'catalog', taskId: 'browser-sandbox' },
       { kind: 'browser', browser: 'chromium', files: [
+        'e2e-tests/local-sandbox.spec.ts', 'e2e-tests/workshop-browser-card-tests.spec.ts',
         'e2e-tests/workshop-generation.spec.ts', 'e2e-tests/workshop-smoke.spec.ts',
-        'e2e-tests/workshop-workspace-acceptance.spec.ts', 'e2e-tests/workshop-browser-card-tests.spec.ts',
-        'e2e-tests/local-sandbox.spec.ts',
+        'e2e-tests/workshop-workspace-acceptance.spec.ts',
       ], grep: null },
       { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@workshop' },
       { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
@@ -284,26 +284,66 @@ describe('business verification groups', () => {
     expect(selected.mode).toBe('scoped')
     expect(selected.selections.map(selection => selection.scope)).toEqual(['server', 'recovery'])
     expect(selected.checks.filter(check => check.kind === 'vitest').map(check => check.project)).toEqual([
-      'fast-shared', 'fast-client', 'fast-server', 'fast-tests', 'fast-card-runtime', 'fast-scripts',
+      'fast-shared', 'fast-card-runtime', 'fast-client', 'fast-server', 'fast-scripts', 'fast-tests',
     ])
     expect(selected.checks.filter(check => check.kind === 'catalog')).toEqual([
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
     ])
     expect(selected.checks.filter(check => check.kind === 'browser')).toEqual([
       { kind: 'browser', browser: 'chromium', files: [
-        'e2e-tests/hosted-password-login.spec.ts', 'e2e-tests/oauth-onboarding.spec.ts',
+        'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/hosted-password-login.spec.ts',
+        'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts', 'e2e-tests/replay-viewer.spec.ts',
+        'e2e-tests/room-history-projection.spec.ts', 'e2e-tests/room-history-window.spec.ts',
         'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
       ], grep: null },
       { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@ws' },
-      { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
-      { kind: 'browser', browser: 'chromium', files: [
-        'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/room-history-window.spec.ts', 'e2e-tests/room-history-projection.spec.ts',
-        'e2e-tests/replay-viewer.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
-      ], grep: null },
       { kind: 'browser', browser: 'webkit', files: [
         'e2e-tests/frontend-browser-scenario-matrix.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts',
       ], grep: '@webkit' },
     ])
+  })
+
+  it('executes each mixed-scope project and identical browser selector once in stable file order', () => {
+    const paths = ['README.md', 'server/game/persistence/postgres-adapter.ts', 'server/game/room.ts']
+    const selected = plan(paths, recoveryInventory)
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.checks.filter(check => check.kind === 'vitest')).toEqual([
+      { kind: 'vitest', project: 'fast-shared', files: [
+        'shared/actions/payment/internal/__tests__/pay.test.ts', 'shared/contract/__tests__/authoritative-command.test.ts',
+      ] },
+      { kind: 'vitest', project: 'fast-card-runtime', files: [
+        'shared/actions/effects/__tests__/pay-supply-token.test.ts', 'shared/session/__tests__/serialization-cursor.test.ts',
+      ] },
+      { kind: 'vitest', project: 'fast-client', files: [
+        'client/app/__tests__/ReplayViewer.recovery.test.tsx', 'client/services/__tests__/gameTransport-reconnect.test.ts',
+      ] },
+      { kind: 'vitest', project: 'fast-server', files: [
+        'server/__tests__/auth.test.ts', 'server/connection/__tests__/ws-server.test.ts',
+        'server/game/__tests__/replay-codec.test.ts', 'server/game/__tests__/room.test.ts',
+        'server/game/persistence/__tests__/room-history-recovery.test.ts',
+      ] },
+      { kind: 'vitest', project: 'fast-scripts', files: [
+        'scripts/__tests__/docs-budget.test.ts', 'scripts/__tests__/publish-replay-viewer.test.ts',
+        'scripts/__tests__/replay-removal.test.ts', 'scripts/__tests__/room-commit-acceptance.test.ts',
+      ] },
+      { kind: 'vitest', project: 'fast-tests', files: ['tests/game-sync-pipeline.test.ts', 'tests/replay-viewer-model.test.ts'] },
+    ])
+    expect(selected.checks.filter(check => check.kind === 'browser')).toEqual([
+      { kind: 'browser', browser: 'chromium', files: [
+        'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/hosted-password-login.spec.ts',
+        'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts', 'e2e-tests/replay-viewer.spec.ts',
+        'e2e-tests/room-history-projection.spec.ts', 'e2e-tests/room-history-window.spec.ts',
+        'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
+      ], grep: null },
+      { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@ws' },
+      { kind: 'browser', browser: 'webkit', files: [
+        'e2e-tests/frontend-browser-scenario-matrix.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts',
+      ], grep: '@webkit' },
+    ])
+    expect(plan([...paths].reverse(), {
+      vitest: [...recoveryInventory.vitest].reverse(), browser: [...recoveryInventory.browser].reverse(),
+    }).checks).toEqual(selected.checks)
   })
 
   it.each([

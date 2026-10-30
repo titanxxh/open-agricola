@@ -38,17 +38,19 @@ The project has three test layers:
 - **E2E** (`e2e-tests/*.spec.ts`) — Playwright browser tests that require the frontend and backend to be running.
 
 ```bash
-pnpm test:fast              # Fast projects; the CI default
+pnpm test:fast              # Complete local fast projects
 pnpm test                   # Full Vitest suite: fast + slow
 pnpm verify focus <file.test.ts> # Focused Vitest checks during debugging; no app restart
-pnpm verify prepush         # Complete fast suite + lint for the final sources
+pnpm verify prepush         # Optional complete local fast gate, types, boundaries, and lint
 pnpm verify <file.spec.ts>   # Restart an isolated app and run Playwright
 pnpm verify status          # Check whether verification records match current sources
 pnpm run test:e2e           # Playwright E2E
 pnpm run lint               # ESLint; errors must be zero
 ```
 
-During debugging, run focused tests for the affected behavior. Test, tooling, and documentation edits do not require an app restart on every iteration. For app behavior, UI, or WebSocket changes, restart with `./restart-local.sh` and exercise the real behavior before final verification; `pnpm verify <file.spec.ts>` handles this in an isolated environment. Run `pnpm verify prepush` on the final sources and add relevant slow Session or E2E tests according to risk. Focused checks do not replace the complete gate.
+During debugging, run focused tests for the affected behavior. Test, tooling, and documentation edits do not require an app restart on every iteration. For local app, UI, or WebSocket reproduction, restart with `./restart-local.sh`; `pnpm verify <file.spec.ts>` handles this in an isolated environment. Record the actual local scope. `pnpm verify prepush` remains an optional complete fast gate.
+
+PR and main CI use the same scope rules and always evaluate the required `verify` check. Shared mechanisms select complete affected groups; unknown scope selects the complete catalog. Selected browser checks run on GitHub. GitHub Actions results are authoritative for integration and release; local runs are not a prerequisite. A release requires successful full candidate evidence for the same commit and verification configuration. See [deployment operations](docs/HOW_TO_DEPLOY.md).
 
 Session fixtures distinguish real startup from prepared work scenarios; see [the card testing template](docs/CARD_TEST_TEMPLATE.md#52-preparing-state). Verification records, test-service setup, and full local CI are described in [CI operations](docs/operations/ci-checks.md). Records help identify stale results and never skip checks automatically.
 
@@ -66,7 +68,7 @@ See [AGENTS.md](AGENTS.md) for the complete card workflow, implementation rules,
 
 - Use concise English commit subjects with one of these prefixes: `feat:`, `fix:`, `refactor:`, or `docs:`.
 - Always rebase onto `main`; do not create merge commits.
-- Before every push, rebase onto `main` and run `pnpm verify prepush` on the final sources. Wait for all related GitHub Actions runs to finish after pushing; failures need to be fixed and skipped jobs are not successful verification.
+- Before every push, rebase onto `main` and resolve conflicts. Run local checks as needed, then wait for all selected GitHub Actions checks on the resulting head. Fix failures; skipped required work does not establish a pass. You do not need to duplicate the complete CI checks locally.
 - Official card changes must update [docs/card_implementation_status.md](docs/card_implementation_status.md). Changes to shared extension points such as hook phases, ActionFlow nodes, or protocols must update the matching module document under [docs/architecture/](docs/architecture/).
 
 ## Issues

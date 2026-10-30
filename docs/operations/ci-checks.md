@@ -1,12 +1,12 @@
 # CI Checks Operations
 
-`ci.yml` 和 `ci-full.yml` 声明 `pull_request`（目标 `main`）、`push: main` 和 `workflow_dispatch`；`e2e.yml` 只声明 `push: main` 和 `workflow_dispatch`，不在 PR 上运行。三者都使用只读 `contents` 权限，并按 workflow + PR/ref 隔离 concurrency。自动执行任务只在仓库为 public 时运行；私有期可手动执行。`verify` 汇总始终运行，所需任务被跳过时会失败。私有期自动 run 的 skipped job 不是通过验证的证据。
+`ci.yml` 是 PR（目标 `main`）与 `push: main` 的唯一自动验证入口，也支持 `workflow_dispatch`。PR 与 main 使用同一 canonical plan，执行受影响文件、业务组、浏览器检查和 catalog 任务，再由始终运行的 `verify` 汇总。旧 `ci-full.yml`、`e2e.yml` 与重复的 `verification-plan.yml` 已退场，不增加定时全量。
 
-私有期提交和 rebase merge 前仍必须在 owner 控制的本机跑完下列 CI 并把结果写入 PR。push 后等待相关 Actions run 结束，同时明确区分 skipped 和实际执行成功。公开后恢复自动执行，并按下文取得真实成功证据再启用 main 的 required status checks；准备 YAML 不等于 GitHub 门禁已启用。
+GitHub Actions 是集成与发布的正式证据。本机按需定向调试或主动运行完整检查，不要求每次 push 前把远端相同检查完整跑一遍。push 后等待当前 head 的所有选中任务结束并修复失败。所需任务被跳过不算成功；私有仓库的自动 job 仍受 visibility 条件限制，可在 GitHub 手动运行。工作流配置不证明远端 required check 已启用，必须实际读回核对。
 
-`ci.yml` 根据 canonical plan 执行相关文件、浏览器检查与完整 catalog 任务，再由始终运行的 `verify` 汇总。选中的浏览器检查在 GitHub runner 上通过 `pnpm verify` 运行。本机 `pnpm verify <file.spec.ts>` 用于调试和复现，不能替代这些正式 CI 结果。迁移期间 `ci-full.yml` 仍保留旧全量触发，`e2e.yml` 仍在 main 运行。
+选中的浏览器检查在 GitHub runner 上通过 `pnpm verify` 运行。本机同一入口用于调试与复现，不能补齐正式 CI 结果。工作流使用只读 `contents` 权限、`ubuntu-latest`，按 workflow + PR/ref 隔离 concurrency，并取消同一 PR 的过期 run。
 
-main E2E 分成四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立 runner，并行执行。每个 runner 使用自己的应用、数据库 schema、S3 前缀和构建目录。任一 lane 失败都会使 workflow 失败，其余 lane 继续保留诊断。无论成功或失败都会保留 7 天的验证记录、认证和工坊请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>-<lane>`；生命周期包含各请求实例的方法、资源类型、来源、路径、状态和完成 / 失败事件，不记录 Cookie、认证头或完整查询参数。
+完整 catalog 保留四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立浏览器 runner，以及 quality、fast、slow、build，合计十个任务。每个浏览器 runner 使用独立应用、数据库 schema、S3 前缀和构建目录。任务失败不取消其余任务，诊断保留 7 天，catalog 产物名为 `candidate-<run-id>-<attempt>-<task>`。日常范围执行按计划选择这些任务或明确的文件与标签。
 
 ## 调试与最终验证
 
@@ -14,13 +14,15 @@ main E2E 分成四个 Chromium shard、browser-local sandbox 和 Linux WebKit �
 
 Run `pnpm exec tsx scripts/verification-plan.ts --base origin/main` to preview the whole branch's verification scope. Use `--head <ref>` when comparing another committed head. Differences between that head and the actual checked-out commit are also included, along with staged, unstaged, and untracked changes. It writes `output/verification/plan.json`; `--json` also prints the plan, and `--summary <file>` writes its human-readable summary.
 
-The `CI` workflow computes this plan for the actual checkout, including the complete branch diff and the PR merge commit. It retains the base, merge base, head, actual checked-out commit, source fingerprint, test ownership, and selection reasons. Missing roots, malformed changed sources, or unclassified tests fail planning. Unknown ownership, shared configuration, and scopes without complete narrow associations expand to the canonical complete task catalog.
+The `CI` workflow computes this plan for the actual checkout, including the complete branch diff and the PR merge commit. Main uses the push event's before/after range, including every commit in that integration. The plan retains the base, merge base, head, actual checked-out commit, source fingerprint, test ownership, and selection reasons. Missing roots, malformed changed sources, or unclassified tests fail planning. Unknown ownership, shared configuration, and scopes without complete narrow associations expand to the canonical complete task catalog.
 
-Ordinary documentation runs its constraints. Known frontend module groups run the complete client test group, canonical quality and build tasks, and their declared browser files or matrix tags. These associations live in `scripts/ci/frontend-verification.ts`; unknown modules and missing consumers expand to full verification. Runtime contract and prompt documentation retain broader business verification. Card, backend, and Workshop changes retain full fallback until bounded mappings are installed.
+Ordinary documentation runs its constraints. `frontend-verification.ts` selects complete client tests, quality/build tasks, and declared module browser consumers. `card-verification.ts` selects complete literal/import/helper-associated card tests, conservative generic consumers, and browser checks. `business-verification.ts` declares backend, recovery, shared-rule, protocol, and Workshop groups. Shared mechanisms select complete affected projects, including slow Session and broader browser lanes. Runtime contract and prompt documentation retain their business scope. Missing associations or consumers expand to full verification.
+
+Mixed scopes union complete Vitest files per project and browser files per engine and identical grep selector, in stable order. An unfiltered browser file covers its narrower selectors for the same engine. Browser-sandbox and WebKit catalog tasks do not by themselves cover inline file selectors, so their presence cannot erase those checks.
 
 The public execution CLI is `pnpm exec tsx scripts/ci/scoped-verification.ts`. `plan --base <ref>` writes `output/verification/scoped-plan.json`. `run --base <ref> --plan output/verification/scoped-plan.json` recomputes the canonical plan before execution and rejects edited checks, changed refs, or changed source content. It writes actual command results to `output/verification/scoped-result.json`. CI passes the plan digest directly and separates inline file/browser checks from reusable catalog jobs. Browser checks retain the isolated environment, restart entry point, and case reporter.
 
-The required check remains named `verify`. It always evaluates the selected jobs, their completed check count, plan digest, catalog task IDs, and actual checkout. Missing, failed, cancelled, or skipped selected work fails the gate. Unselected branches are intentionally skipped. A plan alone proves no tests passed. Neither scoped PR results nor reused catalog jobs qualify as dedicated full release receipts. The separate `Verification Scope` preview workflow remains during migration.
+The required check remains named `verify`. It always evaluates the selected jobs, their completed check count, plan digest, catalog task IDs, and actual checkout. Missing, failed, cancelled, or skipped selected work fails the gate. Unselected branches are intentionally skipped. The same CI run retains the plan and execution results; a plan alone proves no tests passed. Neither scoped PR results nor reused catalog jobs qualify as dedicated full release receipts.
 
 For a manual scope probe, dispatch `ci.yml` on the desired ref with an optional full comparison `base_sha`: `gh workflow run ci.yml --ref <branch> -f base_sha=<full-sha>`. The head and tested commit remain `github.sha`. PR and push events ignore this input and use their complete event diff. This manual CI run does not qualify as a dedicated full candidate receipt.
 
@@ -31,7 +33,7 @@ For a manual scope probe, dispatch `ci.yml` on the desired ref with an optional 
 pnpm verify focus server/__tests__/session-fixtures.test.ts
 pnpm verify focus server/__tests__/first-round-start-session.test.ts --testNamePattern 'direct deal'
 
-# 最终版本：准备测试依赖，全卡实现边界扫描，工具严格类型检查，完整 fast，再 lint；任一步失败立即停止
+# 可选本机完整 fast 门禁：准备依赖、边界扫描、工具类型、完整 fast 与 lint
 pnpm verify prepush
 
 # 真实应用行为：隔离 PostgreSQL / S3、端口，调用 restart-local.sh 后跑 Playwright
@@ -43,7 +45,7 @@ pnpm verify:parallel --shards=4                       # 已提交且干净的源
 pnpm verify status
 ```
 
-定向测试若依赖 PostgreSQL / S3，先运行一次 `node scripts/local-services.mjs --test`。纯测试、工具和文档调试不要求每次重启应用。涉及运行行为、UI 或 WS 时，最终验收必须通过 `./restart-local.sh` 重启再检查真实行为，或使用上述隔离 Playwright 入口。按风险补相关 slow Session / E2E；`prepush` 不能替代它们或下节的全量 CI。
+定向测试若依赖 PostgreSQL / S3，先运行一次 `node scripts/local-services.mjs --test`。纯测试、工具和文档调试不要求每次重启应用。本机复现运行行为、UI 或 WS 时，通过 `./restart-local.sh` 重启再检查，或使用上述隔离 Playwright 入口。按问题选择相关 slow Session 或 E2E；本机 `prepush` 仅覆盖其声明的 fast 门禁，不代表完整候选通过。
 
 E2E 入口先构建可选同源托管的 production frontend，再创建隔离环境并重启应用，避免浏览器验收依赖残留 `dist/`。独立 Pages 会话验收另外通过 `build:pages-frontend` 构建根路径产物，以 HTTPS 同站跨源拓扑验证真实生产文件；同源产物不能替代该验收。隔离环境由 `scripts/test-environment.ts` 生成：应用端口取自 20000–32767，低于 Linux / macOS 自动分配端口的范围；并设置 `OWNED_PROCESSES_FILE`，让 `restart-local.sh` 的启动和 `--kill-only` 只停止该环境自己启动的进程。端口被其他进程占用时直接失败，不终止对方。
 
@@ -57,11 +59,11 @@ Linux 浏览器验收默认使用 `LIBGL_ALWAYS_SOFTWARE=1` 和 `WEBKIT_SKIA_ENA
 
 并行运行的日志、各片原始验证记录和汇总保存于 `output/verification/parallel-runs/`。汇总检查退出码和各片实际选择的 case，缺少 reporter、重复 case 或失败不能通过；它不覆盖根目录最近一次 E2E 记录。成功后仅清理本次创建且干净的工作树，失败时保留工作树和证据用于定位。完整发布验收还需执行 browser-local sandbox 和 WebKit 入口。
 
-每次 push 前先 rebase main，再对最终源码运行 `pnpm verify prepush`。定向通过不算完整门禁通过。完整检查通过后，只有后续修改、失败或未解决的问题才需要扩大或重跑；rebase 改变文件内容也需要重跑。
+每次 push 前先 rebase main 并解决冲突，按需进行本机检查。修改源码或 rebase 改变内容后，重新检查受影响范围并等待新 head 的 GitHub 结果。只有后续修改、失败或未解决的问题才需要扩大或重跑本机检查。
 
 `scripts/verify.ts` 在已忽略的 `output/verification/` 分别记录最近一次 focus、prepush 和 E2E：HEAD、源码指纹、Node 版本、起止时间、实际命令及各步退出码。指纹包含 Git 跟踪文件和未忽略的新文件的内容（包括未提交修改、删除及执行权限），以及 Node / 平台和选定运行环境；不包含验证记录本身。运行中源码变化会使记录失效，之后改动则在 `status` 中显示 stale。只有当前源码对应的 prepush 成功记录才能使 `status` 返回 0。
 
-这些记录用于核对本地检查范围，**不会缓存或跳过检查**；不代表被忽略的环境文件、外部服务状态或远端 CI 已验证。每个模式保留最近一次记录，失败不会沿用上次成功。提交或 rebase 后文件内容及运行环境完全相同可保持 current，但仍遵守每次 push 前的检查要求。push 后必须等待相关 Actions 结束，并区分实际成功、失败与 skipped。
+这些记录用于核对本机检查范围，不会缓存或跳过检查；不代表被忽略的环境文件、外部服务状态或远端 CI 已验证。每个模式保留最近一次记录，失败不会沿用上次成功。提交或 rebase 后文件内容及运行环境完全相同可保持 current。`status` 缺少 prepush 而返回非零，不表示当前范围的 GitHub 门禁失败，也不要求补跑本机完整检查。
 
 若本机已有 `public-assets.ref` 对应的完整素材仓，可用 `PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prepush` 或同环境下的 `pnpm verify <spec>` 避免构建时联网取素材元数据。入口核对素材仓 HEAD、干净的 `assets/` 和全部必需文件，构建继续生成 Pages URL。该环境设置计入验证指纹；本地素材验证不证明线上 Pages 状态。默认 CI 仍执行远端元数据检查，细节见 `docs/HOW_TO_DEPLOY.md`。
 
@@ -99,9 +101,9 @@ pnpm run check:card-impl-boundaries --report output/card-listener-audit
 
 `prepush` 在 fast 前运行相同生产扫描，并将该步骤和退出码写入验证记录。`check:architecture` 保留同一正式入口，执行扫描器、注册入口和验证步骤的反例测试。正式门禁不使用 `--warn-only`。
 
-## 本机全量 CI
+## 按需本机完整检查
 
-本机执行普通 CI 与 CI Full 的并集；`pnpm test` 已覆盖 fast + slow，无需再重复 `pnpm test:fast`：
+本机可以主动运行完整非浏览器检查，以便调试；它不生成正式 GitHub 回执。`pnpm test` 已覆盖 fast、slow 与社区卡测试：
 
 ```bash
 pnpm install --frozen-lockfile
@@ -112,10 +114,9 @@ pnpm test
 pnpm run build
 REPLAY_VIEWER_ROOT="$(mktemp -d)" pnpm run build:replay-viewer
 pnpm run check:bundle-size
-pnpm run check:community-deck
 ```
 
-`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、测试规则环境、测试观测副本不归一化、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、跨层 Card State 边界、架构契约类型检查、验证工具类型检查、架构契约测试、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。quality 任务从该声明派生生产检查，测试由所属 Vitest 组执行。旧 CI Full 仍调用聚合入口，meta-test 同时约束范围 CI 的任务接线与始终运行的汇总门禁。
+`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、测试规则环境、测试观测副本不归一化、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、跨层 Card State 边界、架构契约类型检查、验证工具类型检查、架构契约测试、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。正式 quality 任务从该声明派生生产检查，不重复执行 `check:architecture-tests` 和 `check:test-project-coverage`；这些测试及 project 检查由 fast 执行。`check:community-deck` 是 fast-cards 与 fast-server 的子集，保留为定向调试入口，不在完整 catalog 额外执行。meta-test 约束范围 CI 的接线与始终运行的汇总门禁。
 
 `check:architecture-tests` 复用现有 Vitest project 配置，执行 effect 架构、资源事实来源审计、事件映射策略、交互命令策略、Card Source、PromptKey、LLM prompt 契约、CI 接线，以及 listener 纯度 guard 的正负例与两人 Session 契约测试。跨层 Card State 检查覆盖 domain / actions（含 internal effects）/ engine / session / projections / server / client / Replay Viewer，检查固定单卡状态、提示键判断、私有状态 helper 导入和前端原始状态读取；静态 metadata 和卡牌文案声明可用，扫描根缺失、为空、解析错误及失效例外均失败。卡牌实现边界检查同时对每个已解析 listener handler / cost-candidate transform 做显式状态写入的静态扫描；运行时 guard 则由各 Vitest project 的 setup 安装，`pnpm test` 中任何 listener 直接修改权威状态都会失败。它们仍属于 `pnpm test` / `pnpm test:fast`，保证单独运行完整测试时不漏检；只跑架构入口也会执行这些断言。工坊能力名称由部署契约直接读取源码常量，文档链接源码，不维护另一份名字表。
 
@@ -127,15 +128,28 @@ pnpm run check:community-deck
 
 测试发现独立于 project glob；Card Source 声明独立于已注册实现枚举。缺少扫描根目录、语法错误、无法解析的依赖，以及 bundle 检查缺少 `dist/assets` 或 JS 产物，都不能产生成功证据。`check:bundle-size` 仍负责体积预算，隔离证明由 `check:browser-boundaries` 承担。
 
-## 启用公开仓库 GitHub 门禁
+## 固定候选完整回执
 
-准备代码合入后，保持现有 main 审核、禁止删除、禁止 force push 和线性历史规则。公开切换后按顺序启用：
+`candidate-verification.yml` 只按需手动运行或被 CI 复用，不声明 push、PR 或定时触发。正式发布证据只接受专用 `workflow_dispatch`，绑定实际干净检出、候选 SHA 与验证配置。PR 的完整计划也不能替代这一回执。
 
-1. 读回 repository visibility，确认三个 workflow 的自动 job 已实际运行；私有期 skipped 的 run 不计入本步。
+在 owner 本机固定候选与指向该 SHA 的 ref 后，可请求完整验证并检查结果：
+
+```bash
+pnpm exec tsx scripts/ci/candidate-verification.ts request --repository titanxxh/open-agricola --sha <full-sha> --ref <fixed-ref> --tasks all
+pnpm exec tsx scripts/ci/candidate-verification.ts check --repository titanxxh/open-agricola --sha <full-sha>
+```
+
+check 读取 GitHub run、job 和 step 元数据。同一 SHA 与配置的兼容成功任务可以复用，重试通过 `--tasks <failed-task-ids>` 只补失败或缺失任务。较新的失败使旧成功失效；缺失、失败、取消、跳过或配置不符均阻断。不能拼接另一个 PR、SHA 或本机结果。标准发布与 Pages、后端独立门禁见 [部署文档](../HOW_TO_DEPLOY.md)。
+
+## 核对 GitHub 必需检查
+
+切换工作流时，保持现有 main 审核、禁止删除、禁止 force push 和线性历史规则。按顺序核对：
+
+1. 读回 repository visibility，确认 `CI` 的选中 job 已实际运行；skipped 的必需任务不计入成功。
 2. 让一次真实 PR run 和一次 main run 的 `verify` job 成功完成。PR head 变化后必须等待对应新 head 的检查。
 3. 从这些提交的 check-runs 核实实际 check 名与 GitHub Actions provider，再把已验证的检查加入现有 main ruleset。不要只凭界面显示的 `CI / verify` 推测 API context，也不要覆盖已有审核与分支保护规则。
-4. Full 在 PR 和 main 上自动运行，E2E 只在 main 上自动运行，不作为 PR 的 required check。将 Full 纳入 required checks 前，同样先取得 PR/main 的成功证据。所有相关 run 都必须结束，失败立即定位，不能忽略未被设为 required 的失败。
-5. 设置外部贡献者 fork PR 的 Actions 审批为 `all_external_contributors`。当前 GitHub API 不允许为私有仓库配置这项 public fork 设置，因此留到切换后执行并读回验证。
+4. 只有替代 `verify` 实际通过后，才移除旧工作流或已退役任务的 required context。只修改该列表，保留其他保护；读回新列表并核对检查 provider。缺少所需任务必须仍使 `verify` 失败。
+5. 分别核对普通范围、公共机制、main 集成与专用固定候选的计划和实际结果，不把未执行场景写成通过。所有相关 run 都必须结束，失败立即定位。公开仓库外部贡献者的 Actions 审批策略也需实际读回核对。
 
 在真实检查尚不可满足时不提前配置 required，以免锁死 main。标准 GitHub-hosted runner 的公开仓库运行时间免费，较大 runner 及超额存储仍可能收费；保持当前 `ubuntu-latest`、timeout 和取消同一 PR 旧 run 的设置。
 
@@ -181,11 +195,10 @@ gh run view <RUN_ID> --log-failed
 
 ## 手动触发前端部署
 
+从默认 main 的 broker 指定固定候选，步骤与来源校验见 [部署文档](../HOW_TO_DEPLOY.md)：
+
 ```bash
-curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/dispatches \
-  -d '{"ref":"main"}'
+gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha=<full-sha>
 ```
 
 ## 查 GitHub repo variables
@@ -213,7 +226,7 @@ GitHub Actions 固定使用 `ubuntu-latest`；额度不足时 workflow 直接失
 set -a
 source .env
 set +a
-gh workflow run deploy-pages.yml --ref main  # 仅在 public-assets.ref 更新后执行
+gh workflow run deploy-pages-broker.yml --ref main -f candidate_sha=<full-sha>
 ./deploy-backend.sh root@your-game.duckdns.org main /root/open-agricola
 ```
 

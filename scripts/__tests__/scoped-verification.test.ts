@@ -44,8 +44,8 @@ describe('routine verification scope', () => {
       ] },
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
       { kind: 'browser', browser: 'chromium', files: [
-        'e2e-tests/farm-select.spec.ts', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts',
-        'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts',
+        'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-card-targets.spec.ts',
+        'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts',
       ], grep: null },
       { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@viewport|@ws' },
       { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
@@ -66,13 +66,13 @@ describe('routine verification scope', () => {
 
   it.each([
     { path: 'client/services/gameTransport.ts', files: ['hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player'], tag: '@ws' },
-    { path: 'client/contexts/__tests__/LocaleContext.test.tsx', files: ['interface-localization', 'interface-localization-fields', 'card-localization'], tag: '@locale' },
-    { path: 'client/components/interaction/InteractionBar.tsx', files: ['choice-previews', 'online-interaction-completion', 'interaction-focus', 'mobile-interaction-continuity'], tag: '@viewport|@ws' },
-    { path: 'replay-viewer/src/ReplayBoard.tsx', files: ['replay-viewer', 'replay-viewer-csp', 'game-context-recovery'], tag: '@webkit' },
+    { path: 'client/contexts/__tests__/LocaleContext.test.tsx', files: ['card-localization', 'interface-localization', 'interface-localization-fields'], tag: '@locale' },
+    { path: 'client/components/interaction/InteractionBar.tsx', files: ['choice-previews', 'interaction-focus', 'mobile-interaction-continuity', 'online-interaction-completion'], tag: '@viewport|@ws' },
+    { path: 'replay-viewer/src/ReplayBoard.tsx', files: ['game-context-recovery', 'replay-viewer', 'replay-viewer-csp'], tag: '@webkit' },
   ])('selects declared module consumers for $path', ({ path, files, tag }) => {
     const plan = planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS })
     expect(plan.mode).toBe('scoped')
-    expect(plan.checks).toContainEqual({ kind: 'browser', browser: 'chromium', files: files.map(file => `e2e-tests/${file}.spec.ts`), grep: null })
+    expect(plan.checks).toContainEqual({ kind: 'browser', browser: 'chromium', files: files.map(file => `e2e-tests/${file}.spec.ts`).sort(), grep: null })
     expect(plan.checks.some(check => check.kind === 'browser' && check.grep === tag)).toBe(true)
     expect(plan.checks).not.toContainEqual({ kind: 'catalog', taskId: 'fast' })
     expect(plan.checks).not.toContainEqual({ kind: 'catalog', taskId: 'slow' })

@@ -209,7 +209,7 @@ describe('production deployment config', () => {
   it('builds both frontends from the pinned public asset repository only', () => {
     for (const workflowPath of [
       '.github/workflows/ci.yml',
-      '.github/workflows/ci-full.yml',
+      '.github/workflows/candidate-verification.yml',
       '.github/workflows/deploy-pages.yml',
     ]) {
       const workflow = readFileSync(workflowPath, 'utf8')

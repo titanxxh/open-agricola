@@ -148,7 +148,7 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
       ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
       ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
-      ['verify', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
     ])

@@ -113,6 +113,10 @@ jobs:
             output/verification/**
             output/playwright/**/session-lifecycle.json
             output/playwright/**/session-failure.json
+            output/playwright/**/session-failure.png
+            output/playwright/**/operations-panel-queries.json
+            output/playwright/**/operations-panel-visibility.json
+            output/playwright/**/operations-*.log
 
   complete:
     name: candidate-complete

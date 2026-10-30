@@ -30,7 +30,11 @@ The workflow also supports reuse for pre-merge execution. Its completion job exp
 
 ## Routine scope verification
 
+GitHub Actions is authoritative for integration and release. Local focused checks and browser reproduction provide development feedback; the complete local `prepush` remains optional. `ci.yml` is the only automatic PR/main verifier. Legacy full-test and browser workflows do not repeat the selected work, and no scheduled full run is configured.
+
 `scripts/ci/verification-plan.ts` discovers test ownership independently of selection and includes the whole branch diff, both rename paths, and actual checkout changes. Unknown ownership and shared configuration expand to the complete catalog. Ordinary documentation selects its constraint tests. Runtime-readable documentation retains the owning business scope.
+
+The planner unions mixed scopes into one complete file set per Vitest project and one browser file set per engine and identical grep selector. Checks and files have stable ordering. An unfiltered file covers narrower selectors for the same engine; specialized catalog browser tasks do not erase inline checks. PR plans include the merge checkout, and main plans include the complete push integration range. Both use the same groups and retain their declared integration browser consumers.
 
 `scripts/ci/frontend-verification.ts` declares complete frontend business groups and their browser consumers. Known farm board, interaction, authentication, transport, locale, and Replay modules select the complete client test group, quality and builds, and explicit browser files or matrix tags. Missing consumers and unknown frontend modules expand to full verification.
 
