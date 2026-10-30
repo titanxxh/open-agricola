@@ -340,7 +340,7 @@ describe('generation result ownership and recovery', () => {
     ...testedArtifacts(`const CARD_ID = '${id}'`),
     validation: { ...testedArtifacts(`const CARD_ID = '${id}'`).validation, valid, errors: valid ? [] : ['invalid'] }, createdAt: 1, baseRevision: 1, stale: false,
   })
-  it('checkpoints artifacts at a budget pause without replacing the active input or invalidating the attempt', () => {
+  it('checkpoints artifacts at an error pause without replacing the active input or invalidating the attempt', () => {
     const original = candidate('A', true)
     let state = workshopDraftReducer(createWorkshopDraftState(workspace()), { type: 'candidateCompleted', candidate: original })
     state = workshopDraftReducer(state, { type: 'generationStarted', attemptId: 'paused-generation' })

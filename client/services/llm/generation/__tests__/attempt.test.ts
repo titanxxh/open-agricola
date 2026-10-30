@@ -174,9 +174,9 @@ describe('four-tool generation loop', () => {
     expect(await attempt.resume({ retry: true })).toMatchObject({ status: 'completed', modelRequests: 2, usage: { inputTokens: null, outputTokens: null } })
   })
 
-  it('does not count a POST stopped before its cost reservation', async () => {
+  it('does not count a model request stopped before POST', async () => {
     const io = ports()
-    io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async () => { throw new ModelTurnError('preflight', 'Budget exhausted') })
+    io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async () => { throw new ModelTurnError('preflight', 'Request cancelled before POST') })
     const attempt = new GenerationAttempt(request(), io)
     expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 0, retry: 'model' })
     expect(attempt.requestAccounting()).toEqual([])

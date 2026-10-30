@@ -1,12 +1,12 @@
 // client/services/llm/index.ts
 // Public API for provider configuration, browser translation and image generation.
-// Workshop ability generation uses the bounded generation/ module.
-import type { LlmConfig, ReferenceImage, ProviderId } from './types'
-import { getProvider, PROVIDERS, listModelsFor } from './registry'
+// Workshop ability generation uses the generation/ module.
+import type { LlmConfig, ReferenceImage } from './types'
+import { getProvider, listModelsFor } from './registry'
 import { openaiCompatGenerateImage } from './openai-compat'
 
 export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef, Capabilities, ModelDef } from './types'
-export { PROVIDERS, getProvider, listModelsFor, defaultModelFor } from './registry'
+export { PROVIDERS, getProvider, listProviders, listModelsFor, defaultModelFor } from './registry'
 
 export { streamChat } from './stream-chat'
 
@@ -62,20 +62,6 @@ export function saveLlmConfig(config: LlmConfig, storageKey?: string): void {
 export function clearLlmConfig(storageKey?: string): void {
   localStorage.removeItem(storageKey ?? KEY_LLM_CONFIG)
 }
-
-// ── Backwards-compat exports (computed from PROVIDERS) ──────────────────────
-// AiCardDesigner.tsx still reads these as Record<LlmProvider, …>. We compute
-// them once from PROVIDERS so the registry stays the source of truth.
-
-export type LlmProvider = ProviderId
-
-export const PROVIDER_LABELS = Object.fromEntries(
-  Object.entries(PROVIDERS).map(([id, def]) => [id, def!.label]),
-) as Record<ProviderId, string>
-
-export const PROVIDER_KEY_HINTS = Object.fromEntries(
-  Object.entries(PROVIDERS).map(([id, def]) => [id, def!.apiKeyHint]),
-) as Record<ProviderId, string>
 
 // ── Re-export card-utils ────────────────────────────────────────────────────
 export {

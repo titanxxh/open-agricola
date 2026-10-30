@@ -113,12 +113,12 @@ describe('browser model protocol', () => {
     expect(await readModelTurn(stream([frame({}, 'stop')]), signal())).toMatchObject({ calls: [], text: '', finishReason: 'stop' })
   })
 
-  it('does not send a request that fails its cost reservation', async () => {
+  it('does not send an already cancelled request', async () => {
     const fetchModel = vi.fn<typeof fetch>()
     const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' }, {
-      fetch: fetchModel, beforePost: async () => { throw new Error('Budget exhausted') },
+      fetch: fetchModel,
     })
-    await expect(transport.complete([], [], signal())).rejects.toMatchObject({ kind: 'preflight', message: 'Budget exhausted' })
+    await expect(transport.complete([], [], AbortSignal.abort(new Error('Cancelled before POST')))).rejects.toMatchObject({ kind: 'preflight', message: 'Cancelled before POST' })
     expect(fetchModel).not.toHaveBeenCalled()
   })
 })

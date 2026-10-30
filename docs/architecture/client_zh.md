@@ -36,6 +36,7 @@
 - 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
 - 客户端按 `occurrenceId` 消费公开事件，用于临时通知、高亮与动画；首个快照初始化游标，不重放历史。Action Log 把 `publicEventArchive` 当作只读时间线读取。
 - 玩家名通过 `client/utils/player-name.ts` 按生成名来源与座位号本地化；玩家提供的名字原样显示。
+- `llm/registry.ts` 是设置界面直接读取的 provider 列表、名称与密钥提示来源。翻译使用通用文本流，provider 只为图片生成提供覆盖实现。
 - `llm/generation/`：浏览器持有生成尝试、provider 工具协议与固定到一个 main SHA 的有界 GitHub 读取。LLM 凭据只发给配置的 provider。`server/workshop-references.ts` 用项目凭据提供已认证的仓库树 metadata，不接受调用方 URL 或模型凭据；浏览器匿名拉取固定版本的原文并校验 blob hash。`GET /api/workshop/sandbox-contract` 提供 prompt 所依据的已部署契约；参考资料不能扩大它。`POST /api/workshop/cards/validate-code` 把校验绑定到源码与沙盒身份，现有 provider/model 选择不再受硬编码准入限制。四个工具负责查资料、读资料、写产物和浏览器测试，由模型决定修复；采用需要匹配的静态校验与浏览器测试报告。`local-sandbox/card-tests.ts` 管理 opaque iframe、新 Worker 及实际独立 Worker 产物的字节 hash，引擎导入仍只允许在精确 Worker 入口内。见 [Platform design](../PLATFORM_DESIGN.md) 与 [`docs/test/llm-card-gen.md`](../test/llm-card-gen.md)。
 
 ## 视图与本地沙盒
