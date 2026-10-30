@@ -4,7 +4,7 @@
 
 > This English file is canonical. [`card_implementation_status_zh.md`](card_implementation_status_zh.md) is its Chinese mirror.
 
-> Updated 2026-10-29. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
+> Updated 2026-10-30. Rule authority comes from publisher card text and printed icons, official rulings, and recorded maintainer decisions. The reference implementation is implementation evidence only.
 
 > This document covers official cards only. Hook ownership is derived from `ALL_CARD_IMPLS`; query the registry instead of mirroring it here.
 
@@ -12,7 +12,9 @@
 
 Reference PHP paths are relative to the reference implementation's source tree; OA paths are relative to this repository.
 
-None currently tracked.
+| Priority | Issue | Gap |
+|---|---|---|
+| Unassigned | [#1481](https://github.com/titanxxh/open-agricola/issues/1481) | `D180_PartTimeWorker` currently replaces the full collect with partial takes. On 2026-10-30 the maintainer confirmed full collection followed by a separate return, preserving the original collection facts and thresholds. This project decision supersedes #1336 for this card; it is not a newly verified official ruling. Implementation and test-plan approval remain pending. Other cards retain their quantity- and type-limited takes. |
 
 ## 2. Accepted differences
 
@@ -126,4 +128,3 @@ Detail for cards in [Accepted differences](#2-accepted-differences) whose differ
 | `D176_Woodshacker` | In the work phase, the owner's first / second wood-accumulation use this round gives an extra 1 / 2 clay, counted by actual uses this round (repeated uses of the same space count) and reset when returning home. |
 | `D178_SubstituteTeacher` | Registers an owner-only Action Space, available once all three visible Lessons spaces are actually occupied; the reward is 1 building resource or grain + vegetable. |
 | `D179_Bullcatcher` | Registers an owner-only Action Space, available when the Action Spaces of round slots 3 and 6 are both occupied and the owner still has an available worker; using it gives 1 cattle + 2 food. |
-| `D180_PartTimeWorker` | At the collect step of an accumulation space with exactly 2 / 4 / 6 goods, a `computeReplace` alternative offers to take all but 1 / 2 / 3 goods (every legal combination for mixed goods) and gain a sheep / boar / cattle. Left goods never reach the player, so "take at least N" cards count only the goods taken. A card's partial take is not a use of the space and never offers it. With mixed goods each taken type is a separate partial take. |
