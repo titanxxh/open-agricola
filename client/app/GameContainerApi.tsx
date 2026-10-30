@@ -1580,9 +1580,9 @@ export const GameContainerApi = () => {
         {gameHeader}
         {notificationStack}
         {bugReportBar}
-        {gameEndControls}
         {waiting?.canSubmit ? (
           <SoloHandOverlay key={`${wsTransport?.roomId ?? roomId ?? state.gameSeed}:${JSON.stringify(waiting.groups)}`}
+            actions={gameEndControls}
             groups={waiting.groups} locale={locale}
             onSubmit={async selection => {
               const response = await transport.soloHandSubmit(waiting.playerIndex, selection)
