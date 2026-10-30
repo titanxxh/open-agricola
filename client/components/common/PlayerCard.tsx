@@ -5,6 +5,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/types'
 import { emptyResources } from '../../../shared/contract/state-constants'
+import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
 import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { publicAssetUrl } from '../../utils/public-asset-url'
@@ -137,16 +138,11 @@ const formatReturnCards = (cardIds: string[], locale: Locale): string => {
 }
 
 const renderCost = (cost: PaymentResourceMap, locale: Locale) => {
-  const parts = []
-  if (cost.wood) parts.push(<div key="wood" className="card-cost-item">{cost.wood} <span className="card-res-icon wood" title={t(locale, 'resources.wood')}/></div>)
-  if (cost.clay) parts.push(<div key="clay" className="card-cost-item">{cost.clay} <span className="card-res-icon clay" title={t(locale, 'resources.clay')}/></div>)
-  if (cost.reed) parts.push(<div key="reed" className="card-cost-item">{cost.reed} <span className="card-res-icon reed" title={t(locale, 'resources.reed')}/></div>)
-  if (cost.stone) parts.push(<div key="stone" className="card-cost-item">{cost.stone} <span className="card-res-icon stone" title={t(locale, 'resources.stone')}/></div>)
-  if (cost.grain) parts.push(<div key="grain" className="card-cost-item">{cost.grain} <span className="card-res-icon grain" title={t(locale, 'resources.grain')}/></div>)
-  if (cost.vegetable) parts.push(<div key="vegetable" className="card-cost-item">{cost.vegetable} <span className="card-res-icon vegetable" title={t(locale, 'resources.vegetable')}/></div>)
-  if (cost.food) parts.push(<div key="food" className="card-cost-item">{cost.food} <span className="card-res-icon food" title={t(locale, 'resources.food')}/></div>)
-  if (cost.fence) parts.push(<div key="fence" className="card-cost-item">{cost.fence} <span className="card-res-icon fence res-icon-fence-icon" title="fence"/></div>)
-  if (cost.stable) parts.push(<div key="stable" className="card-cost-item">{cost.stable} <span className="card-res-icon stable res-icon-barn" title="stable"/></div>)
+  const parts = PAYMENT_RESOURCE_KEYS.filter(key => (cost[key] ?? 0) > 0).map(key => {
+    const icon = key === 'fence' ? 'fence-icon' : key === 'stable' ? 'barn' : key
+    return <div key={key} className="card-cost-item">{cost[key]} <span
+      className={`card-res-icon ${key} res-icon res-icon-${icon}`} title={t(locale, `resources.${key}`)} /></div>
+  })
   return parts.length > 0 ? <div className="card-cost-text">{parts}</div> : null
 }
 
