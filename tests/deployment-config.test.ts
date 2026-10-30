@@ -82,11 +82,14 @@ if (endpoint.startsWith('commits/')) {
   output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
 } else if (endpoint === 'actions/workflows/100/runs?head_sha=' + sha + '&event=workflow_dispatch&per_page=100') {
   output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: sha,
-    repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1, created_at: '2026-10-30T00:00:00Z', html_url: 'https://example.test/run/1' });
+    repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1,
+    created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://example.test/run/1' });
 } else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
   output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/1',
+    started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
     steps: [step('Generate candidate manifest'), step('Candidate manifest / ' + sha + ' / ' + configuration + ' / ' + tasks.join(','))] });
   tasks.forEach((task, index) => output({ id: index + 2, run_id: 1, run_attempt: 1, name: 'candidate / ' + task + ' / ' + configuration,
+    started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/' + task,
     steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step) }));
 } else throw Error('Unexpected fixture GitHub endpoint: ' + endpoint);

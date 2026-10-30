@@ -28,17 +28,17 @@ function evidence() {
   }
 }
 
-function laterEvidence() {
+function laterEvidence(hour = '01') {
   const value = evidence()
   value.run.id = 2
-  value.run.created_at = '2026-10-30T01:00:00Z'
-  value.run.updated_at = '2026-10-30T01:15:00Z'
+  value.run.created_at = value.run.created_at.replace('T00:', `T${hour}:`)
+  value.run.updated_at = value.run.updated_at.replace('T00:', `T${hour}:`)
   for (const job of value.jobs) {
     job.run_id = 2
     job.id += 100
-    job.created_at = job.created_at.replace('T00:', 'T01:')
-    job.started_at = job.started_at?.replace('T00:', 'T01:') ?? null
-    job.completed_at = job.completed_at?.replace('T00:', 'T01:') ?? null
+    job.created_at = job.created_at.replace('T00:', `T${hour}:`)
+    job.started_at = job.started_at?.replace('T00:', `T${hour}:`) ?? null
+    job.completed_at = job.completed_at?.replace('T00:', `T${hour}:`) ?? null
   }
   return value
 }
@@ -112,6 +112,32 @@ describe('GitHub full candidate verification evidence', () => {
     const value = evidence()
     value.run.status = 'in_progress'
     expect(evaluateCandidateVerification(identity, [value]).status).toBe('blocked')
+  })
+
+  it.each([false, true])('blocks a completed canceled attempt with only successful earlier-attempt jobs; independent success: %s', independent => {
+    const original = evidence()
+    original.run.run_attempt = 2
+    original.run.updated_at = '2026-10-30T03:10:00Z'
+    const canceled = { ...original, run: { ...original.run, conclusion: 'cancelled' } }
+
+    const result = evaluateCandidateVerification(identity, independent ? [laterEvidence(), canceled] : [canceled])
+
+    expect(result.status).toBe('blocked')
+    expect(result.tasks.filter(task => task.status === 'blocked').map(task => task.id)).toEqual([
+      'quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit',
+    ])
+  })
+
+  it('recovers after a canceled attempt retained all its earlier successful job history', () => {
+    const original = evidence()
+    original.run.run_attempt = 2
+    original.run.updated_at = '2026-10-30T03:10:00Z'
+    const canceled = { ...original, run: { ...original.run, conclusion: 'cancelled' } }
+
+    const result = evaluateCandidateVerification(identity, [laterEvidence('04'), canceled])
+
+    expect(result.status).toBe('passed')
+    expect(result.tasks.every(task => task.runId === 2)).toBe(true)
   })
 
   it('uses the failed task retry while preserving successful tasks from the original attempt', () => {

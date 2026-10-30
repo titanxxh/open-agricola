@@ -122,6 +122,7 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
       && run.path === CANDIDATE_WORKFLOW && run.event === 'workflow_dispatch')
   for (const { run, jobs } of runs) {
     const compatibleJobs = jobs.every(job => job.runId === run.id && job.attempt <= run.attempt)
+    const hasCurrentAttempt = jobs.some(job => job.attempt === run.attempt)
     const endedAt = run.status === 'completed' ? run.updatedAt : null
     const completionBound = endedAt !== null && jobs.every(job => [job.createdAt, job.startedAt, job.completedAt]
       .every(time => time === null || time <= endedAt)) ? { start: endedAt, end: endedAt } : null
@@ -134,7 +135,8 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
       const requiredSteps = ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task']
       if (verificationTask(id).browser) requiredSteps.push('Install browsers')
       let reason: string | null = null
-      if (!selection) reason = 'Candidate manifest is missing, unsuccessful or incompatible'
+      if (!hasCurrentAttempt) reason = 'Current candidate attempt has no job evidence'
+      else if (!selection) reason = 'Candidate manifest is missing, unsuccessful or incompatible'
       else if (run.status !== 'completed') reason = 'Candidate run has not completed'
       else if (!job) reason = 'Required candidate task was not run'
       else if (candidates.filter(candidate => candidate.attempt === job.attempt).length !== 1) reason = 'Duplicate required candidate task'
@@ -149,7 +151,7 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
         time = requested && requested.end !== null ? { start: requested.end, end: completionBound?.end ?? null } : null
       }
       if (job && candidates.filter(candidate => candidate.attempt === job.attempt).length !== 1
-        || run.status !== 'completed' && !jobs.some(candidate => candidate.attempt === run.attempt)) time = null
+        || !hasCurrentAttempt) time = null
       if (!time) {
         reason ??= 'Candidate task execution chronology is missing or invalid'
         time = compatibleJobs ? completionBound : null
