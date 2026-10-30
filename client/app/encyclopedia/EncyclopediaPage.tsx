@@ -3,6 +3,7 @@ import { BrandMark } from '../../components/common/BrandMark'
 import { LocaleSwitcher } from '../../components/common/LocaleSwitcher'
 import { useLocale } from '../../contexts/LocaleContext'
 import { EncyclopediaBrowser } from './EncyclopediaBrowser'
+import { EncyclopediaLoadError } from './EncyclopediaLoadError'
 import { encyclopediaBrowseStore } from './encyclopedia-browse-store'
 import { useEncyclopediaUrlNavigation } from './encyclopedia-navigation'
 import { useCardEncyclopedia } from './useCardEncyclopedia'
@@ -36,13 +37,7 @@ export function EncyclopediaPage() {
         {load.status === 'ready'
           ? <EncyclopediaBrowser encyclopedia={load.encyclopedia} navigation={navigation} locale={locale} />
           : load.status === 'error'
-            ? (
-              <div className="encyclopedia-load-error" role="alert">
-                <h2>{t('ui.encyclopedia.loadError.title')}</h2>
-                <p>{t('ui.encyclopedia.loadError.body')}</p>
-                <button type="button" className="btn-primary" onClick={load.retry}>{t('platform.retry')}</button>
-              </div>
-            )
+            ? <EncyclopediaLoadError locale={locale} onRetry={load.retry} />
             : <p className="encyclopedia-page__loading" role="status">{t('platform.loading')}</p>}
       </main>
     </div>
