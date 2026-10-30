@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 更新日期：2026-10-29。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
+> 更新日期：2026-10-30。规则权威为出版社卡牌文字和印刷图标、官方裁定及已记录的维护者决定。参考实现仅作实现对照。
 
 > 本文只覆盖官方卡牌。Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本；需要时直接查注册表。
 
@@ -12,7 +12,9 @@
 
 参考实现 PHP 路径相对参考实现源码树；OA 路径相对本仓库。
 
-当前没有登记中的未修复项。
+| 优先级 | Issue | 缺口 |
+|---|---|---|
+| 未分配 | [#1481](https://github.com/titanxxh/open-agricola/issues/1481) | `D180_PartTimeWorker` 当前用部分拿取替代完整 collect。维护者于 2026-10-30 确认完整取得后单独返还，保留原始取得事实和阈值判断。本卡的项目决定取代 #1336 的旧口径，不作为新查证的官方裁定。实现及测试说明确认仍待完成。其他卡保留按数量和类型取物的能力。 |
 
 ## 2. 已接受差异
 
@@ -126,4 +128,3 @@
 | `D176_Woodshacker` | work phase 中 owner 本回合第 1/2 次使用 wood accumulation 额外给 1/2 clay，按本轮实际使用次数计数（同一空间重复使用也计次），随回家重置。 |
 | `D178_SubstituteTeacher` | 注册 owner-only action space，三个可见 Lessons 格都实际 occupied 后可用，奖励为 1 building resource 或 grain+vegetable。 |
 | `D179_Bullcatcher` | 注册 owner-only action space，round slot 3 与 round slot 6 对应行动格都 occupied 且 owner 仍有可用工人时可用，使用后获得 1 cattle + 2 food。 |
-| `D180_PartTimeWorker` | 收取格上正好有 2/4/6 个货物的累积格时，`computeReplace` 替代方案提供只拿走其余货物、留下 1/2/3 个（混合货物时列出所有合法组合）并获得 sheep/boar/cattle。留下的货物从不进入玩家供给，"拿走至少 N 个"类卡只按实际拿走数判断。卡牌的部分拿取不算使用该格，不提供此选项。混合货物时每种拿走的货物是一次单独的部分拿取。 |
