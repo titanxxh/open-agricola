@@ -1,0 +1,17 @@
+name: Pages Release Request
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record release deployment request
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: printf 'Requested Pages deployment for `%s`. The main broker verifies this candidate before building.\n' "$CANDIDATE_SHA" >> "$GITHUB_STEP_SUMMARY"

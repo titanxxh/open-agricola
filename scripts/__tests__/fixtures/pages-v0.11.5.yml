@@ -1,0 +1,54 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
+          VITE_ENABLE_COMMUNITY_DECK: ${{ vars.VITE_ENABLE_COMMUNITY_DECK }}
+          VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
+        run: pnpm run build:pages-frontend
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
