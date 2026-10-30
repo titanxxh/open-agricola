@@ -53,11 +53,12 @@ export type ScopeSelection = {
 function scopeFor(file: string): VerificationScope {
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(?:tsconfig|vite|vitest|playwright|eslint)[^/]*|AGENTS\.md|CLAUDE\.md|CONTEXT\.md|\.env[^/]*)$/.test(file)
     || file.startsWith('.github/') || file.startsWith('scripts/') || file.startsWith('tests/')
-    || /(?:^|\/)(?:_helpers|fixtures|__fixtures__)\//.test(file)) return 'global'
+    || /(?:^|\/)(?:_helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
+    || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)) return 'global'
   if (/^docs\/(?:CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status|community-card-examples)(?:_zh)?\.md$/.test(file)
     || /^docs\/(?:architecture|test)\//.test(file)
-    || /^client\/(?:local-sandbox|sandbox|app\/workshop|services\/(?:llm|workshop))\//.test(file)
-    || /^server\/(?:custom-code|workshop|workshop-pr)(?:\/|\.)/.test(file)
+    || /^client\/(?:local-sandbox|sandbox|app\/workshop|services\/(?:llm|workshop))(?:\/|[-.])/.test(file)
+    || /^server\/(?:custom-code|workshop)(?:\/|[-.])/.test(file)
     || /^shared\/(?:custom-code|projections\/workshop)/.test(file)) return 'workshop'
   if (/^shared\/(?:contract|projections)\//.test(file)) return 'contract'
   if (/^shared\/cards\/(?:[A-Z]+|major|community)\//.test(file)
@@ -73,6 +74,7 @@ function scopeFor(file: string): VerificationScope {
 
 export type VerificationPlan = {
   schemaVersion: 1
+  status: 'planned'
   mode: 'scoped' | 'full'
   identity: VerificationIdentity
   changes: ChangedPath[]
@@ -103,7 +105,7 @@ export function planVerification(input: {
   const selections = [...grouped].map(([scope, paths]) => ({ scope, paths: [...paths].sort(), reason: scopeReasons[scope] }))
   const documentationTests = input.inventory.vitest.filter(test => test.file === 'scripts/__tests__/docs-budget.test.ts')
   const expansionReasons = selections.filter(selection => selection.scope !== 'documentation')
-    .map(selection => `${selection.reason} Full verification is selected for ${selection.paths.join(', ')}.`)
+    .map(selection => `${selection.reason} Full verification is selected for ${selection.paths.length} affected paths.`)
   if (!input.changes.length) expansionReasons.push('No changes were established; full verification is required.')
   if (selections.some(selection => selection.scope === 'documentation') && !documentationTests.length) {
     expansionReasons.push('Documentation constraint tests are missing; full verification is required.')
@@ -111,16 +113,17 @@ export function planVerification(input: {
   const full = expansionReasons.length > 0
   return {
     schemaVersion: 1,
+    status: 'planned',
     mode: full ? 'full' : 'scoped',
     identity: input.identity,
     changes: input.changes,
     inventory: input.inventory,
     selections,
     expansionReasons,
-    checks: full ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId })) : [{
-      kind: 'vitest', project: 'fast-scripts',
-      files: documentationTests.map(test => test.file),
-    }],
+    checks: full ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId }))
+      : [...new Set(documentationTests.map(test => test.project))].map(project => ({
+        kind: 'vitest', project, files: documentationTests.filter(test => test.project === project).map(test => test.file),
+      })),
   }
 }
 const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trimEnd()
@@ -210,6 +213,7 @@ export function createRepositoryPlan(input: {
   const inventory = readTestInventory(input.cwd)
   const changes = [
     ...readChanges(input.cwd, [identity.mergeBaseSha, identity.headSha]),
+    ...readChanges(input.cwd, [identity.headSha, identity.testedSha]),
     ...readChanges(input.cwd, ['HEAD']),
     ...git(input.cwd, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean)
       .map(path => ({ status: 'A', path } satisfies ChangedPath)),
@@ -233,4 +237,27 @@ export function assertPlanCurrent(cwd: string, plan: VerificationPlan): void {
   if (commitSha(cwd, plan.identity.baseRef) !== plan.identity.baseSha) throw new Error('Base reference changed; regenerate the verification plan')
   if (commitSha(cwd, plan.identity.headRef) !== plan.identity.headSha) throw new Error('Head reference changed; regenerate the verification plan')
   if (sourceContentFingerprint(cwd) !== plan.identity.sourceFingerprint) throw new Error('Source contents changed; regenerate the verification plan')
+}
+
+export function formatPlanSummary(plan: VerificationPlan): string {
+  const code = (value: string) => `\`${JSON.stringify(value).slice(1, -1).replaceAll('`', '\\`')}\``
+  const paths = (files: string[]) => files.slice(0, 20).map(code).join(', ')
+    + (files.length > 20 ? `, and ${files.length - 20} more in the plan artifact` : '')
+  return [
+    '# Verification scope plan', '',
+    'This plan is not verification evidence.', '',
+    `Mode: **${plan.mode}**`, '',
+    `Base: ${code(plan.identity.baseSha)}`,
+    `Merge base: ${code(plan.identity.mergeBaseSha)}`,
+    `Head: ${code(plan.identity.headSha)}`,
+    `Checked-out commit: ${code(plan.identity.testedSha)}`, '',
+    `Test ownership: ${plan.inventory.vitest.length} Vitest files and ${plan.inventory.browser.length} browser files.`, '',
+    '## Selected scopes', '',
+    ...plan.selections.map(selection => `- **${selection.scope}**: ${selection.reason} ${paths(selection.paths)}`), '',
+    ...(plan.expansionReasons.length ? ['## Why verification expands', '', ...plan.expansionReasons.map(reason => `- ${reason}`), ''] : []),
+    '## Planned checks', '',
+    ...plan.checks.map(check => check.kind === 'catalog'
+      ? `- Complete task ${code(check.taskId)}`
+      : `- ${code(check.project)}: ${paths(check.files)}`), '',
+  ].join('\n')
 }
