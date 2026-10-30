@@ -37,6 +37,16 @@ describe('bug report diagnostics', () => {
     expect(reloaded.collectBugReportDiagnostics('history-room').disconnects).toEqual([])
   })
 
+  it('retains a maximum-length close reason containing an angle bracket after reload', async () => {
+    const reason = '<' + 'x'.repeat(122)
+    recordBugReportDisconnect('angle-bracket-room', { code: 1012, reason, wasClean: true })
+    vi.resetModules()
+    const reloaded = await import('../bug-report-diagnostics')
+    expect(reloaded.collectBugReportDiagnostics('angle-bracket-room').disconnects).toEqual([
+      { occurredAt: expect.any(Number), code: 1012, reason, wasClean: true },
+    ])
+  })
+
   it('still collects a close when browser storage is blocked', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })

@@ -1450,7 +1450,7 @@ const neutralizeMentions = (value: string): string =>
   )
 
 const code = (value: string | number): string =>
-  `\`${String(value).replaceAll('`', "'")}\``
+  `\`${String(value).replaceAll('`', "'").replaceAll('<', '&lt;')}\``
 
 const contextUrl = (report: ReportRow, appOrigin: string): string => {
   try {
