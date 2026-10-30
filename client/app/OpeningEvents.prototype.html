@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LE 交互草图</title></head><body><div id="root"></div>
+<!-- Throwaway UI artifact, development only. Fixed replies; no rule engine or game mutations. -->
+<script type="module">
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import '../index.css';
+// Three LE layouts on the existing lobby/game routes. Fixed UI replies, no rule engine or mutations.
+import { useEffect, useState } from 'react';
+import { BrandMark } from '../components/common/BrandMark';
+import './OpeningEvents.prototype.css';
+const variants = ['A', 'B', 'C'];
+const variantNames = { A: '顶部入口', B: '常驻规则卡', C: '随结算展开' };
+const events = {
+    LE01: { name: '宠物爱好者', english: 'Pet Lovers', short: '木／砖／石屋，整屋可养 1／2／3 只不同种宠物。', body: '额度按整栋房屋计算，不按房间叠加。所有事件宠物放在最左列最下方的普通宠物房。与 Animal Tamer 选择一套完整安置规则，不能混用。', example: '两间石屋：事件可养羊、野猪、牛各 1 只；Animal Tamer 可按每房 1 只，养 2 只同种动物。' },
+    LE02: { name: '丰收', english: 'Good Harvest', short: '每次供养，全家所需食物总额减 1，最低为 0。', body: '先结算其他家庭成员修正，再将供养总额减 1。每位玩家每次供养只减一次。供养为 0 时仍保留供养阶段；取暖费用另算。', example: '其他修正后的家庭供养为 3 食物，事件减 1，实际需付 2 食物。' },
+    LE03: { name: '流浪木匠', english: 'Wandering Carpenters', short: '打出发展卡时，木材费用减 1，最低为 0。', body: '包括由卡牌提供的打出发展卡机会，并与其他折扣或替代费用共同结算。免费打出时不会额外返还木头；独立支付仍保留。', example: '印刷费用 3 木，Lumber Mill 减 1，事件再减 1，实际支付 1 木。' },
+    LE04: { name: '求知欲', english: 'Inquisitive Minds', short: '打出职业时免除学费，其他独立费用仍需支付。', body: '适用于行动格和卡牌提供的职业学费。给其他玩家的独立支付、职业牌自身的额外费用或返还资源，不因免学费而取消。', example: 'Lover 在第 10 回合打出：学费为 0，牌面额外费用 4 食物仍需支付。' },
+};
+const scenes = [
+    { id: 'create', name: '建局' }, { id: 'waiting', name: '等待房' },
+    { id: 'draft', name: '轮抽首帧' }, { id: 'solo', name: '单人选牌首帧' }, { id: 'parents', name: '父母牌首帧' },
+    { id: 'work', name: '对局中' }, { id: 'animals', name: '宠物安置' }, { id: 'feeding', name: '供养' },
+    { id: 'improvement', name: '发展费用' }, { id: 'occupation', name: '职业学费' }, { id: 'replay', name: '回放' },
+];
+const eventIds = ['LE01', 'LE02', 'LE03', 'LE04'];
+const params = new URLSearchParams(window.location.search);
+const initialScene = scenes.find(s => s.id === params.get('scene'))?.id ?? 'create';
+const initialVariant = variants.find(v => v === params.get('variant')) ?? 'A';
+function sceneEvent(scene) {
+    if (scene === 'feeding' || scene === 'replay')
+        return 'LE02';
+    if (scene === 'improvement')
+        return 'LE03';
+    if (scene === 'occupation')
+        return 'LE04';
+    return 'LE01';
+}
+function OpeningEventsPrototypePage() {
+    const [variant, setVariant] = useState(initialVariant);
+    const [scene, setScene] = useState(initialScene);
+    const [mode, setMode] = useState(initialScene === 'create' ? 'off' : 'random');
+    const [chosen, setChosen] = useState(sceneEvent(initialScene));
+    const [event, setEvent] = useState(initialScene === 'create' || initialScene === 'waiting' ? null : sceneEvent(initialScene));
+    const [detail, setDetail] = useState(false);
+    const [tab, setTab] = useState('action');
+    const [zero, setZero] = useState(false);
+    const [feedingCase, setFeedingCase] = useState('family');
+    const [scheme, setScheme] = useState('event');
+    const [receipt, setReceipt] = useState(null);
+    const [extra, setExtra] = useState(false);
+    function updateUrl(nextVariant, nextScene) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('variant', nextVariant);
+        url.searchParams.set('scene', nextScene);
+        url.searchParams.set('page', nextScene === 'create' || nextScene === 'waiting' ? 'lobby' : 'game');
+        window.history.replaceState(null, '', url);
+        if (window.parent !== window) {
+            const parentUrl = new URL(window.parent.location.href);
+            parentUrl.search = url.search;
+            window.parent.history.replaceState(null, '', parentUrl);
+        }
+    }
+    function switchVariant(next) { setVariant(next); updateUrl(next, scene); }
+    function switchScene(next) {
+        setScene(next);
+        setReceipt(null);
+        setDetail(false);
+        setTab('action');
+        setZero(false);
+        setFeedingCase('family');
+        setScheme('event');
+        setExtra(false);
+        setMode(next === 'create' ? 'off' : 'random');
+        setEvent(next === 'create' || next === 'waiting' ? null : sceneEvent(next));
+        setChosen(sceneEvent(next));
+        updateUrl(variant, next);
+    }
+    function cycle(direction) {
+        const next = variants[(variants.indexOf(variant) + direction + variants.length) % variants.length];
+        if (next)
+            switchVariant(next);
+    }
+    useEffect(() => {
+        function keydown(e) {
+            if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]'))
+                return;
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                cycle(e.key === 'ArrowRight' ? 1 : -1);
+            }
+            if (e.key === 'Escape')
+                setDetail(false);
+        }
+        window.addEventListener('keydown', keydown);
+        return () => window.removeEventListener('keydown', keydown);
+    });
+    const lobby = scene === 'create' || scene === 'waiting';
+    const opening = scene === 'draft' || scene === 'solo' || scene === 'parents';
+    const current = event ? events[event] : null;
+    const publicChoice = mode === 'off' ? '关闭' : mode === 'random' ? '随机，开局公开' : `${events[chosen].name} · ${chosen}`;
+    const eventEntry = createElement("button", { className: "lep-event-chip", onClick: () => setDetail(true) },
+        "\u672C\u5C40\u4E8B\u4EF6 \u00B7 ",
+        current ? current.name : '未启用',
+        " ",
+        createElement("span", null, "\u67E5\u770B\u89C4\u5219"));
+    const eventCard = createElement("section", { className: "lep-event-card" },
+        createElement("div", { className: "lep-eyebrow" }, "\u6574\u5C40\u9002\u7528 \u00B7 \u5168\u4F53\u73A9\u5BB6"),
+        createElement("h2", null, current ? current.name : '未启用开局事件'),
+        current && event && createElement(React.Fragment, null,
+            createElement("div", { className: "lep-muted" },
+                current.english,
+                " \u00B7 ",
+                event),
+            createElement("p", null, current.short),
+            createElement("p", { className: "lep-small" }, current.body),
+            createElement("div", { className: "lep-example" }, current.example),
+            createElement("button", { onClick: () => setExtra(!extra), "aria-expanded": extra }, "\u5DF2\u6709\u5361\u724C\u4E0E\u6269\u5C55\u5982\u4F55\u7EC4\u5408"),
+            extra && createElement("p", { className: "lep-small" }, event === 'LE01' ? 'Domestician Expert 的额外养羊区独立使用；Milking Place 禁止房屋动物时仍不能养。启用 Farmers of the Moor 后，马也可作为一种宠物，额度仍为 1／2／3。' : event === 'LE02' ? 'Child’s Toy、Old Miser 等先修正家庭供养，事件最后对总额减 1。标准单人同样对供养总额减 1。' : event === 'LE03' ? '与 Lumber Mill、Wood Expert 等按同一费用报价结算。免费打出不会返木，独立支付不减。' : 'Private Teacher 的职业学费可免；Puppeteer 向对手支付食物、Lover 的额外费用及 Forestry Studies 返还木头仍保留。')));
+    function lines(rows) {
+        return createElement("dl", { className: "lep-lines" }, rows.map(([label, value]) => createElement("div", { key: label },
+            createElement("dt", null, label),
+            createElement("dd", null, value))));
+    }
+    const contribution = scene === 'feeding' ? feedingCase === 'alreadyZero' ? '本局事件 · 丰收：本次没有进一步减少食物' : '本局事件 · 丰收：供养所需食物减少 1' : scene === 'improvement' ? zero ? '本局事件 · 流浪木匠：本次节省 0 木' : '本局事件 · 流浪木匠：木材费用减少 1' : scene === 'occupation' ? '本局事件 · 求知欲：免除职业学费' : scheme === 'tamer' ? '采用 Animal Tamer 的完整安置方案，未叠加事件额度。' : '本局事件 · 宠物爱好者：采用整屋宠物规则';
+    const hint = scene === 'replay' ? '本条显示已记录的结算与事件贡献。' : scene === 'feeding' ? '供养减免已计入下方应付总额。' : scene === 'improvement' ? '所选支付方案已包含事件与卡牌折扣。' : scene === 'occupation' ? '学费为 0；牌面独立费用仍保留。' : scene === 'animals' ? '整屋选择一套合法方案，不能将两套额度相加。' : '随时查看本局事件；当前行动没有额外结算。';
+    let action;
+    if (scene === 'animals') {
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, "\u5B89\u7F6E\u52A8\u7269"),
+            createElement("p", { className: "lep-muted" }, "\u4E24\u95F4\u77F3\u5C4B \u00B7 \u5DF2\u6253\u51FA Animal Tamer \u00B7 \u7B49\u5F85\u786E\u8BA4"),
+            createElement("div", { className: "lep-options", role: "group", "aria-label": "\u5B8C\u6574\u5B89\u7F6E\u65B9\u6848" }, [
+                { id: 'event', title: '事件方案', text: '羊、野猪、牛各 1 只，放在 B1。' },
+                { id: 'tamer', title: 'Animal Tamer 方案', text: '羊 2 只，A1、B1 各 1 只。' },
+                { id: 'mixed', title: '混合额度示例', text: '羊 2 只、野猪 1 只，不构成合法方案。' },
+            ].map(item => createElement("button", { key: item.id, "aria-pressed": scheme === item.id, onClick: () => { if (item.id === 'event' || item.id === 'tamer' || item.id === 'mixed')
+                    setScheme(item.id); setReceipt(null); } },
+                createElement("strong", null, item.title),
+                createElement("span", null, item.text)))),
+            createElement(Farm, { scheme: scheme, animals: true }),
+            createElement("p", { className: scheme === 'mixed' ? 'lep-error' : 'lep-notice', role: "status" }, scheme === 'event' ? '3 只不同种宠物，实际都在 B1。计为 1 个有动物的农场格。' : scheme === 'tamer' ? '2 只羊按真实房间分放。计为 2 个有动物的农场格。' : '不能把事件与 Animal Tamer 的额度混合。请选择一套完整方案。'),
+            createElement("button", { className: "lep-primary", disabled: scheme === 'mixed' || receipt !== null, onClick: () => setReceipt(scheme === 'event' ? '已安置：B1 羊、野猪、牛各 1。使用事件方案，1 个有动物的农场格。' : '已安置：A1 羊 1、B1 羊 1。使用 Animal Tamer，2 个有动物的农场格。') }, "\u786E\u8BA4\u5B89\u7F6E"));
+    }
+    else if (scene === 'feeding') {
+        const empty = feedingCase !== 'family';
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, "\u4F9B\u517B\u5BB6\u4EBA"),
+            createElement("p", { className: "lep-muted" }, "\u6536\u83B7 \u00B7 \u73A9\u5BB6\u5C0F\u9EA6 \u00B7 \u6301\u6709 5 \u98DF\u7269"),
+            createElement("label", { className: "lep-mode-select" },
+                "\u4F9B\u517B\u793A\u4F8B ",
+                createElement("select", { "aria-label": "\u4F9B\u517B\u793A\u4F8B", value: feedingCase, onChange: e => { if (e.target.value === 'family' || e.target.value === 'reduced' || e.target.value === 'alreadyZero')
+                        setFeedingCase(e.target.value); setReceipt(null); } },
+                    createElement("option", { value: "family" }, "\u5176\u4ED6\u4FEE\u6B63\u540E 3 \u98DF\u7269\uFF0C\u4E8B\u4EF6\u51CF\u5230 2"),
+                    createElement("option", { value: "reduced" }, "1 \u98DF\u7269\u51CF\u5230 0"),
+                    createElement("option", { value: "alreadyZero" }, "\u539F\u672C\u5DF2\u662F 0 \u98DF\u7269"))),
+            lines(feedingCase === 'alreadyZero' ? [['其他家庭修正后的所需食物', '0 食物'], ['本局事件 · 丰收', '无进一步减少'], ['本次应付', '0 食物']] : feedingCase === 'reduced' ? [['其他家庭修正后的所需食物', '1 食物'], ['本局事件 · 丰收', '−1 食物'], ['本次应付', '0 食物']] : [['2 名成人 + 1 名新生儿', '5 食物'], ['Child’s Toy', '+1 食物'], ['Old Miser', '−3 食物'], ['本局事件 · 丰收', '−1 食物'], ['本次应付', '2 食物']]),
+            createElement("p", { className: "lep-notice" },
+                feedingCase === 'alreadyZero' ? '所需食物原本已为 0，事件本次没有产生节省。仍需完成供养步骤。' : empty ? '本次无需食物支付，供养步骤仍需完成。事件实际减少了 1 食物。' : '事件对全家总额减一次。预览与确认支付显示同一份报价。',
+                "\u53D6\u6696\u53E6\u884C\u7ED3\u7B97\u3002"),
+            createElement("button", { className: "lep-primary", disabled: receipt !== null, onClick: () => setReceipt(feedingCase === 'alreadyZero' ? '已完成供养 · 实付 0 食物 · 事件减少 0 食物 · 供养流程继续' : empty ? '已完成供养 · 实付 0 食物 · 事件减少 1 食物 · 供养流程继续' : '已完成供养 · 实付 2 食物 · 食物 5 → 3 · 事件减少 1 食物') }, empty ? '完成供养（0 食物）' : '支付 2 食物并完成供养'));
+    }
+    else if (scene === 'improvement') {
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, "\u652F\u4ED8\u53D1\u5C55\u8D39\u7528"),
+            createElement("p", { className: "lep-muted" }, "\u9009\u5B9A\u53D1\u5C55\u5361 \u00B7 \u6301\u6709 4 \u6728"),
+            createElement("label", { className: "lep-check" },
+                createElement("input", { type: "checkbox", checked: zero, onChange: e => { setZero(e.target.checked); setReceipt(null); } }),
+                "\u67E5\u770B\u514D\u8D39\u6253\u51FA\u4E0E\u72EC\u7ACB\u652F\u4ED8"),
+            lines(zero ? [['打出发展卡', '免费'], ['取得本次机会的独立支付', '1 食物'], ['本局事件 · 流浪木匠', '无可减少的木材费用'], ['本次应付', '1 食物']] : [['牌面发展费用', '3 木'], ['卡牌 · Lumber Mill', '−1 木'], ['本局事件 · 流浪木匠', '−1 木'], ['本次应付', '1 木']]),
+            createElement("p", { className: "lep-notice" }, zero ? '免费打出不会返还木头，独立支付仍需付清。事件本次没有产生资源节省。' : '此处展示当前选定的支付方案；其他替代方案同样应先取得完整报价。'),
+            createElement("button", { className: "lep-primary", disabled: receipt !== null, onClick: () => setReceipt(zero ? '已打出发展卡 · 独立支付 1 食物 · 没有返还木头 · 事件节省 0 木' : '已打出发展卡 · 实付 1 木 · 木 4 → 3 · Lumber Mill 减少 1 木 · 事件减少 1 木') }, zero ? '支付 1 食物并打出' : '支付 1 木并打出'));
+    }
+    else if (scene === 'occupation') {
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, "\u6253\u51FA\u804C\u4E1A \u00B7 Lover"),
+            createElement("p", { className: "lep-muted" }, "\u7B2C 10 \u56DE\u5408 \u00B7 \u6301\u6709 6 \u98DF\u7269"),
+            lines([['本次职业学费', '免除（原需 1 食物）'], ['来源 · 本局事件', '求知欲'], ['Lover 牌面额外费用', '4 食物'], ['本次应付', '4 食物']]),
+            createElement("p", { className: "lep-notice" }, "\u514D\u5B66\u8D39\u4ECD\u9700\u5B8C\u6210\u6253\u51FA\u804C\u4E1A\u7684\u6D41\u7A0B\u3002Lover \u7684\u989D\u5916 4 \u98DF\u7269\u5C5E\u4E8E\u72EC\u7ACB\u8D39\u7528\uFF0C\u4E0D\u5728\u5B66\u8D39\u51CF\u514D\u8303\u56F4\u3002"),
+            createElement("button", { className: "lep-primary", disabled: receipt !== null, onClick: () => setReceipt('已打出 Lover · 实付 4 食物 · 食物 6 → 2 · 本局事件免除学费，独立费用已支付') }, "\u652F\u4ED8 4 \u98DF\u7269\u5E76\u6253\u51FA\u804C\u4E1A"));
+    }
+    else if (opening) {
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, scene === 'draft' ? '轮抽 · 第 1 轮' : scene === 'solo' ? '单人开局 · 选择手牌' : '开局 · 选择父母牌'),
+            createElement("p", null, current ? '本局事件已公开，选择前可阅读完整规则。' : '本局未启用事件，按既有流程选择。'),
+            createElement("div", { className: "lep-hand" }, (scene === 'parents' ? ['父母牌方案一', '父母牌方案二'] : ['职业牌', '次要发展', '职业牌', '次要发展']).map((card, index) => createElement("button", { key: index, onClick: () => setReceipt(`已选中${card} ${index + 1}。演示到此，未发送真实选择。`) },
+                createElement("span", null, card),
+                createElement("strong", null, index + 1),
+                createElement("small", null, "\u70B9\u9009\u6B64\u724C")))),
+            createElement("p", { className: "lep-muted" }, scene === 'solo' ? '单人局不经过多人等待房，第一帧选牌前即可查看事件。' : scene === 'parents' ? '事件与父母牌选择同时可见，不等到工作阶段。' : '最后一位玩家确认颜色后进入本帧，轮抽前即可查看事件。'));
+    }
+    else if (scene === 'replay') {
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, "\u56DE\u653E \u00B7 \u7B2C 4 \u56DE\u5408\u6536\u83B7"),
+            createElement("p", { className: "lep-muted" }, "\u5C0F\u9EA6 \u00B7 \u8BB0\u5F55 26 / 41"),
+            lines([['家庭供养，其他修正后', '3 食物'], ['本局事件 · 丰收', '−1 食物'], ['已支付', '2 食物']]),
+            createElement("p", { className: "lep-notice" }, "\u672C\u6761\u7ED3\u7B97\u4E2D\u7684\u4E8B\u4EF6\u8D21\u732E\uFF1A\u6240\u9700\u98DF\u7269\u51CF\u5C11 1\u3002"),
+            createElement("details", { open: true },
+                createElement("summary", null, "\u7ED3\u7B97\u6765\u6E90"),
+                createElement("p", null, "\u672C\u5C40\u4E8B\u4EF6\u5217\u5728\u4E8B\u4EF6\u8D21\u732E\u4E2D\u3002Child\u2019s Toy\u3001Old Miser \u7B49\u5355\u5361\u6548\u679C\u4ECD\u5F52\u5404\u81EA\u5361\u724C\uFF1B\u4E8B\u4EF6\u4E0D\u4F1A\u6DF7\u5165\u5355\u5361\u6536\u76CA\u3002")),
+            createElement("div", { className: "lep-controls" },
+                createElement("button", { onClick: () => setReceipt('已切换到前一条：小麦取得 2 谷物，没有事件结算。') }, "\u4E0A\u4E00\u6761\u8BB0\u5F55"),
+                createElement("button", { onClick: () => setReceipt('已切换到后一条：收获继续，事件仍为丰收。') }, "\u4E0B\u4E00\u6761\u8BB0\u5F55")));
+    }
+    else {
+        action = createElement(React.Fragment, null,
+            createElement("h2", null, "\u7B2C 4 \u56DE\u5408 \u00B7 \u5DE5\u4F5C\u9636\u6BB5"),
+            createElement("p", { className: "lep-muted" }, "\u8F6E\u5230\u5C0F\u9EA6 \u00B7 \u8FD8\u6709 1 \u540D\u5BB6\u5EAD\u6210\u5458\u53EF\u6D3E\u51FA"),
+            createElement("div", { className: "lep-actions" }, [['森林', '3 木'], ['谷物利用', '播种 / 烤面包'], ['发展', '打出发展卡'], ['课程', '打出职业'], ['扩建', '房间 / 马厩'], ['集市', '起始玩家 / 次发']].map(([name, value]) => createElement("button", { key: name, onClick: () => name === '发展' ? switchScene('improvement') : name === '课程' ? switchScene('occupation') : setReceipt(`演示选择：${name}。当前事件没有新增支付。`) },
+                createElement("strong", null, name),
+                createElement("span", null, value)))),
+            createElement("h3", null, "\u5C0F\u9EA6\u7684\u519C\u573A"),
+            createElement(Farm, { scheme: "event", animals: false }));
+    }
+    const log = createElement("section", { className: "lep-panel" },
+        createElement("h2", null, "\u5BF9\u5C40\u8BB0\u5F55"),
+        createElement("ol", { className: "lep-log" },
+            createElement("li", null, current ? `开局事件已公开：${current.name}` : '本局未启用开局事件'),
+            receipt && createElement("li", null, receipt)),
+        receipt && ['animals', 'feeding', 'improvement', 'occupation'].includes(scene) && createElement("details", null,
+            createElement("summary", null, "\u672C\u6761\u6765\u6E90"),
+            createElement("p", null, contribution),
+            createElement("p", { className: "lep-muted" }, "\u5355\u5361\u6548\u679C\u5206\u522B\u663E\u793A\uFF0C\u4E0D\u5C06\u4E8B\u4EF6\u8BA1\u5165\u5355\u5361\u6536\u76CA\u3002")));
+    return createElement("div", { className: `lep-root lep-variant-${variant}` },
+        createElement("aside", { className: "lep-lab", "aria-label": "\u539F\u578B\u63A7\u5236" },
+            createElement("strong", null, "LE \u4EA4\u4E92\u8349\u56FE \u00B7 \u6A21\u62DF\u6570\u636E"),
+            createElement("label", null,
+                "\u573A\u666F ",
+                createElement("select", { value: scene, onChange: e => { const next = scenes.find(s => s.id === e.target.value); if (next)
+                        switchScene(next.id); } }, scenes.map(s => createElement("option", { value: s.id, key: s.id }, s.name)))),
+            !lobby && createElement("label", null,
+                "\u6F14\u793A\u4E8B\u4EF6 ",
+                createElement("select", { value: event ?? 'off', onChange: e => { const next = eventIds.find(id => id === e.target.value); setEvent(next ?? null); setDetail(false); setReceipt(null); } },
+                    !['animals', 'feeding', 'improvement', 'occupation', 'replay'].includes(scene) && createElement("option", { value: "off" }, "\u672A\u542F\u7528"),
+                    eventIds.filter(id => !['animals', 'feeding', 'improvement', 'occupation', 'replay'].includes(scene) || id === sceneEvent(scene)).map(id => createElement("option", { value: id, key: id }, events[id].name)))),
+            createElement("small", null, "\u4EC5\u6BD4\u8F83\u754C\u9762\uFF1B\u6309\u94AE\u4F7F\u7528\u56FA\u5B9A\u6F14\u793A\u56DE\u590D\u3002")),
+        createElement("div", { className: "lep-shell" },
+            createElement("header", { className: "lep-header" },
+                createElement(BrandMark, { title: "Open Agricola", titleAs: "h1" }),
+                createElement("span", { className: "lep-user" },
+                    "\u5C0F\u9EA6 \u00B7 ",
+                    lobby ? '游戏大厅' : scene === 'replay' ? '回放' : scene === 'solo' ? '单人对局' : '2 人对局'),
+                !lobby && variant === 'A' && eventEntry),
+            lobby ? createElement("div", { className: "lep-lobby" },
+                createElement("section", { className: "lep-panel" },
+                    createElement("h2", null, scene === 'create' ? '创建对局' : '等待玩家确认颜色'),
+                    scene === 'create' ? createElement(React.Fragment, null,
+                        createElement("div", { className: "lep-config" },
+                            createElement("label", null,
+                                "\u4EBA\u6570 ",
+                                createElement("select", { defaultValue: "2" },
+                                    createElement("option", null, "2"),
+                                    createElement("option", null, "3"),
+                                    createElement("option", null, "4"))),
+                            createElement("label", null,
+                                createElement("input", { type: "checkbox", defaultChecked: true }),
+                                "\u540C\u65F6\u8F6E\u62BD"),
+                            createElement("label", null,
+                                createElement("input", { type: "checkbox" }),
+                                "Parent Cards"),
+                            createElement("label", null,
+                                createElement("input", { type: "checkbox" }),
+                                "Farmers of the Moor")),
+                        createElement("h3", null, "\u5F00\u5C40\u5168\u5C40\u4E8B\u4EF6"),
+                        createElement("p", { className: "lep-muted" }, "\u5168\u4F53\u73A9\u5BB6\u5171\u7528\u4E00\u5F20\u4E8B\u4EF6\uFF0C\u6574\u5C40\u751F\u6548\u3002"),
+                        variant === 'A' ? createElement("label", { className: "lep-mode-select" },
+                            "\u4E8B\u4EF6\u9009\u62E9 ",
+                            createElement("select", { "aria-label": "\u4E8B\u4EF6\u6A21\u5F0F", value: mode, onChange: e => { if (e.target.value === 'off' || e.target.value === 'random' || e.target.value === 'specific')
+                                    setMode(e.target.value); } },
+                                createElement("option", { value: "off" }, "\u5173\u95ED\uFF08\u9ED8\u8BA4\uFF09"),
+                                createElement("option", { value: "random" }, "\u968F\u673A\u4E00\u5F20"),
+                                createElement("option", { value: "specific" }, "\u6307\u5B9A\u4E00\u5F20"))) : createElement("div", { className: `lep-modes ${variant === 'C' ? 'lep-mode-list' : ''}` }, ['off', 'random', 'specific'].map(m => createElement("button", { key: m, "aria-pressed": mode === m, onClick: () => setMode(m) },
+                            createElement("strong", null, m === 'off' ? '关闭' : m === 'random' ? '随机一张' : '指定一张'),
+                            createElement("span", null, m === 'off' ? '按原规则开局' : m === 'random' ? '四张等概率，开局公开' : '选择一张，本局固定')))),
+                        mode === 'specific' && createElement("label", { className: "lep-mode-select" },
+                            "\u6307\u5B9A\u4E8B\u4EF6 ",
+                            createElement("select", { value: chosen, onChange: e => { const id = eventIds.find(id => id === e.target.value); if (id)
+                                    setChosen(id); } }, eventIds.map(id => createElement("option", { value: id, key: id },
+                                events[id].name,
+                                " \u00B7 ",
+                                id)))),
+                        createElement("p", { className: "lep-notice" }, mode === 'off' ? '本局不启用开局事件。' : mode === 'random' ? '创建房间时固定随机结果，等待房不公开。开局前的刷新、重连不会重新抽取。' : events[chosen].short),
+                        createElement("button", { className: "lep-primary", onClick: () => { setScene('waiting'); setEvent(null); updateUrl(variant, 'waiting'); } }, "\u521B\u5EFA\u5BF9\u5C40\uFF08\u6F14\u793A\uFF09")) : createElement(React.Fragment, null,
+                        createElement("div", { className: "lep-players" },
+                            createElement("div", null,
+                                createElement("b", null, "\u5C0F\u9EA6"),
+                                createElement("span", null, "\u7EA2\u8272 \u00B7 \u5DF2\u786E\u8BA4")),
+                            createElement("div", null,
+                                createElement("b", null, "\u7267\u573A"),
+                                createElement("span", null, "\u84DD\u8272 \u00B7 \u5F85\u786E\u8BA4"))),
+                        lines([['开局事件配置', publicChoice], ['轮抽', '启用'], ['人数', '2 人']]),
+                        mode === 'random' && createElement("p", { className: "lep-notice" }, "\u4E8B\u4EF6\u5C06\u5728\u5F00\u5C40\u540E\u516C\u5F00\u3002\u5F53\u524D\u4E0D\u663E\u793A\u4E8B\u4EF6\u540D\u79F0\u3001\u6548\u679C\u6216\u7ED3\u7B97\u9884\u89C8\u3002"),
+                        createElement("button", { className: "lep-primary", onClick: () => { setEvent(mode === 'off' ? null : mode === 'specific' ? chosen : 'LE02'); setScene('draft'); updateUrl(variant, 'draft'); } }, "\u786E\u8BA4\u6700\u540E\u4E00\u4E2A\u989C\u8272\u5E76\u5F00\u5C40\uFF08\u6F14\u793A\uFF09"),
+                        createElement("button", { className: "lep-back", onClick: () => switchScene('create') }, "\u8FD4\u56DE\u5EFA\u5C40"))),
+                createElement("aside", { className: "lep-panel" },
+                    createElement("h3", null, variant === 'C' ? '配置确认单' : '开局事件是什么？'),
+                    variant === 'C' && lines([['事件配置', publicChoice], ['事件公开', '开局第一帧'], ['同配置随机新局', '独立抽取，可能重复']]),
+                    createElement("p", { className: "lep-small" }, "\u53EA\u542F\u7528\u56DB\u5F20\u5DF2\u51FA\u7248 LE \u4E8B\u4EF6\u4E4B\u4E00\u3002\u6307\u5B9A\u6A21\u5F0F\u5728\u7B49\u5F85\u623F\u663E\u793A\u914D\u7F6E\uFF1B\u968F\u673A\u6A21\u5F0F\u5728\u5F00\u5C40\u524D\u4E0D\u663E\u793A\u7ED3\u679C\u3002"))) : createElement(React.Fragment, null,
+                opening && createElement("section", { className: "lep-opening" },
+                    createElement("div", { className: "lep-eyebrow" }, "\u5F00\u5C40 \u00B7 \u5168\u4F53\u73A9\u5BB6\u53EF\u89C1"),
+                    createElement("h2", null, current ? `本局事件：${current.name}` : '本局未启用开局事件'),
+                    createElement("p", null, current ? current.short : '按既有规则进行。'),
+                    current && createElement("button", { onClick: () => setDetail(true) }, "\u9009\u62E9\u524D\u9605\u8BFB\u5B8C\u6574\u89C4\u5219")),
+                variant === 'C' && createElement("nav", { className: "lep-tabs", "aria-label": "\u5BF9\u5C40\u4FE1\u606F" },
+                    createElement("button", { "aria-pressed": tab === 'action', onClick: () => setTab('action') }, "\u5F53\u524D\u884C\u52A8"),
+                    createElement("button", { "aria-pressed": tab === 'rules', onClick: () => setTab('rules') },
+                        "\u672C\u5C40\u89C4\u5219 \u00B7 ",
+                        current?.name ?? '未启用事件'),
+                    createElement("button", { "aria-pressed": tab === 'log', onClick: () => setTab('log') }, "\u7ED3\u7B97\u8BB0\u5F55")),
+                createElement("div", { className: "lep-game-layout" },
+                    createElement("main", { className: "lep-game-main" }, variant === 'C' && tab === 'rules' ? eventCard : variant === 'C' && tab === 'log' ? log : createElement(React.Fragment, null,
+                        createElement("section", { className: "lep-panel" },
+                            variant === 'C' && createElement("div", { className: "lep-context" },
+                                createElement("strong", null, current ? current.name : '未启用事件'),
+                                createElement("p", null, current ? hint : '本局按原规则结算。'),
+                                createElement("button", { onClick: () => setTab('rules') }, "\u67E5\u770B\u672C\u5C40\u89C4\u5219")),
+                            action,
+                            receipt && createElement("p", { className: "lep-receipt", role: "status" }, receipt)),
+                        variant !== 'C' && log)),
+                    createElement("aside", { className: "lep-game-side" },
+                        variant === 'B' && createElement("details", { className: "lep-sticky-card", open: true },
+                            createElement("summary", null,
+                                "\u672C\u5C40\u4E8B\u4EF6 \u00B7 ",
+                                current?.name ?? '未启用'),
+                            eventCard),
+                        createElement("section", { className: "lep-panel" },
+                            createElement("h3", null, "\u73A9\u5BB6"),
+                            lines(scene === 'solo' ? [['小麦', '单人对局']] : [['小麦 · 当前玩家', '2 人 / 5 食物'], ['牧场', '2 人 / 3 食物']]),
+                            createElement("p", { className: "lep-muted lep-small" }, opening ? '开局选择阶段' : scene === 'occupation' ? '第 10 回合 · 工作阶段' : scene === 'feeding' || scene === 'replay' ? '第 4 回合 · 收获' : '第 4 回合 · 工作阶段'),
+                            variant === 'C' && createElement("button", { onClick: () => setTab('log') }, "\u67E5\u770B\u4E8B\u4EF6\u4E0E\u5361\u724C\u7684\u7ED3\u7B97\u6765\u6E90"))))),
+            createElement("details", { className: "lep-state" },
+                createElement("summary", null, "\u5F53\u524D\u6F14\u793A\u72B6\u6001"),
+                createElement("p", null,
+                    "\u65B9\u6848 ",
+                    variant,
+                    " \u00B7 ",
+                    scenes.find(s => s.id === scene)?.name,
+                    " \u00B7 ",
+                    lobby ? `公开配置：${publicChoice}；玩法快照未发布` : `公开事件：${current?.name ?? '未启用'}；${receipt ? '已有模拟确认记录' : '尚未确认'}`),
+                createElement("p", null, "\u754C\u9762\u6570\u503C\u6765\u81EA\u56FA\u5B9A\u573A\u666F\uFF0C\u4E0D\u8FDE\u63A5\u771F\u5B9E\u5BF9\u5C40\uFF0C\u4E0D\u6267\u884C\u89C4\u5219\u8BA1\u7B97\u3002"))),
+        detail && createElement("div", { className: "lep-overlay", onClick: () => setDetail(false) },
+            createElement("section", { className: "lep-dialog", role: "dialog", "aria-modal": "true", "aria-label": "\u672C\u5C40\u4E8B\u4EF6\u89C4\u5219", onClick: e => e.stopPropagation() },
+                createElement("button", { className: "lep-close", autoFocus: true, onClick: () => setDetail(false) }, "\u5173\u95ED"),
+                eventCard,
+                createElement("p", { className: "lep-muted lep-small" }, "\u672C\u5C40\u56FA\u5B9A\uFF0C\u5237\u65B0\u3001\u91CD\u8FDE\u4E0E\u64A4\u56DE\u4E0D\u4F1A\u6362\u4E8B\u4EF6\u3002"))),
+        import.meta.env.DEV && createElement("nav", { className: "lep-switcher", "aria-label": "\u5207\u6362\u8BBE\u8BA1\u65B9\u6848" },
+            createElement("button", { "aria-label": "\u4E0A\u4E00\u4E2A\u65B9\u6848", onClick: () => cycle(-1) }, "\u2190"),
+            createElement("span", null,
+                variant,
+                " \u00B7 ",
+                variantNames[variant]),
+            createElement("button", { "aria-label": "\u4E0B\u4E00\u4E2A\u65B9\u6848", onClick: () => cycle(1) }, "\u2192")));
+}
+function Farm({ scheme, animals }) {
+    return createElement("div", { className: "lep-farm", "aria-label": "\u519C\u573A\u7248\u56FE" }, Array.from({ length: 15 }, (_, index) => {
+        const room = index === 0 || index === 5;
+        const pet = !animals ? '' : scheme === 'tamer' && room ? '羊 1' : index === 5 ? scheme === 'mixed' ? '羊 2 · 猪 1' : '羊 1 · 猪 1 · 牛 1' : '';
+        return createElement("div", { key: index, className: `lep-tile ${room ? 'lep-room' : index === 3 ? 'lep-field' : ''}` },
+            createElement("small", null,
+                'ABC'[Math.floor(index / 5)],
+                index % 5 + 1),
+            createElement("span", null, room ? '石屋' : index === 3 ? '谷田' : ''),
+            pet && createElement("b", null, pet));
+    }));
+}
+createRoot(document.getElementById('root')).render(createElement(OpeningEventsPrototypePage));
+
+</script></body></html>
