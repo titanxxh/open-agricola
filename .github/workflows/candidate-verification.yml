@@ -19,6 +19,11 @@ on:
       tasks:
         default: all
         type: string
+    outputs:
+      verified_tasks:
+        value: ${{ jobs.complete.outputs.verified_tasks }}
+      verified_sha:
+        value: ${{ jobs.complete.outputs.verified_sha }}
 
 permissions:
   contents: read
@@ -36,6 +41,7 @@ jobs:
       sha: ${{ steps.manifest.outputs.sha }}
       configuration: ${{ steps.manifest.outputs.configuration }}
       matrix: ${{ steps.manifest.outputs.matrix }}
+      tasks: ${{ steps.manifest.outputs.tasks }}
     steps:
       - name: Checkout candidate
         uses: actions/checkout@v7
@@ -107,3 +113,27 @@ jobs:
             output/verification/**
             output/playwright/**/session-lifecycle.json
             output/playwright/**/session-failure.json
+
+  complete:
+    name: candidate-complete
+    if: always()
+    needs: [manifest, task]
+    runs-on: ubuntu-latest
+    outputs:
+      verified_tasks: ${{ steps.complete.outputs.verified_tasks }}
+      verified_sha: ${{ steps.complete.outputs.verified_sha }}
+    steps:
+      - name: Confirm every selected candidate task
+        id: complete
+        env:
+          MANIFEST_RESULT: ${{ needs.manifest.result }}
+          TASK_RESULT: ${{ needs.task.result }}
+          VERIFIED_TASKS: ${{ needs.manifest.outputs.tasks }}
+          VERIFIED_SHA: ${{ needs.manifest.outputs.sha }}
+          EXPECTED_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          if [[ "$MANIFEST_RESULT" != success || "$TASK_RESULT" != success || -z "$VERIFIED_TASKS" || "$VERIFIED_SHA" != "$EXPECTED_SHA" ]]; then
+            echo 'Selected candidate tasks did not all execute successfully' >&2
+            exit 1
+          fi
+          printf 'verified_tasks=%s\nverified_sha=%s\n' "$VERIFIED_TASKS" "$VERIFIED_SHA" >> "$GITHUB_OUTPUT"

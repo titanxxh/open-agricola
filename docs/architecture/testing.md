@@ -26,11 +26,21 @@ The on-demand `candidate-verification.yml` workflow runs the canonical complete 
 
 `scripts/ci/candidate-verification.ts` binds the actual clean checkout, dispatch commit and verification configuration. Its check command reads GitHub run, job and step metadata. Every required task must have successful compatible evidence. Later failures invalidate earlier success for that task. Local success JSON and ordinary scoped CI runs cannot establish full candidate verification.
 
-The workflow also supports reuse for pre-merge execution. Formal release evidence requires its dedicated manual run for the exact candidate commit. Introducing this workflow does not remove routine CI gates.
+The workflow also supports reuse for pre-merge execution. Its completion job exports the selected task IDs and checked-out commit only after every selected matrix task succeeds. Formal release evidence requires its dedicated manual run for the exact candidate commit.
+
+## Routine scope verification
+
+`scripts/ci/verification-plan.ts` discovers test ownership independently of selection and includes the whole branch diff, both rename paths, and actual checkout changes. Unknown ownership and shared configuration expand to the complete catalog. Ordinary documentation selects its constraint tests. Runtime-readable documentation retains the owning business scope.
+
+`scripts/ci/frontend-verification.ts` declares complete frontend business groups and their browser consumers. Known farm board, interaction, authentication, transport, locale, and Replay modules select the complete client test group, quality and builds, and explicit browser files or matrix tags. Missing consumers and unknown frontend modules expand to full verification. Workshop, card, and backend changes retain the full fallback until their bounded mappings exist.
+
+`scripts/ci/scoped-verification.ts` computes and executes canonical plans. Execution recomputes the plan, checks its digest and source identity, and passes file names and selectors as process arguments. Browser checks call `pnpm verify`, preserving isolated dependencies, `restart-local.sh`, and structured case results. Results and plan summaries remain routine evidence rather than full release receipts.
+
+`ci.yml` always evaluates the required `verify` job after planning, inline file and browser checks, and reusable catalog tasks. `scripts/ci/routine-verification-gate.ts` requires every selected branch to complete with the same plan and checkout. Missing, failed, cancelled, skipped, or incomplete selected work fails. Unselected branches must be skipped. Public boundary coverage is in `scoped-verification*.test.ts`, `routine-verification-gate.test.ts`, and `ci-card-impl-boundaries.test.ts` under `scripts/__tests__/`.
 
 ## Architecture fitness
 
-`pnpm run check:architecture` is the single architecture gate, called once by each CI workflow. It runs the architecture scripts, the contract type checks, the contract tests through `check:architecture-tests` and the sandbox prompt / documentation sync. Checks stay simple: they catch common mistakes by agents and developers, not deliberate bypasses, and each diagnostic must be actionable.
+`pnpm run check:architecture` owns the architecture check declaration. The quality task consumes its production scanners, type checks, and lint commands. Tests belong to their Vitest groups. The aggregate command also runs contract tests through `check:architecture-tests` and sandbox prompt and documentation checks. Each scanner catches common mistakes by agents and developers and provides actionable diagnostics.
 
 | Invariant | Executable coverage | Limits |
 |---|---|---|
@@ -46,7 +56,7 @@ The workflow also supports reuse for pre-merge execution. Formal release evidenc
 | Documentation budgets | `scripts/__tests__/docs-budget.test.ts` | Every Workshop-readable doc under `REFERENCE_LIMITS.fileBytes`; architecture index ≤ 16 KiB, each module document ≤ 32 KiB, no card IDs |
 | Generated catalog matches Card Sources | `pnpm run check:generated-cards-sync` | Structural equality |
 | `GameSession` owns the command seam | `CONTEXT.md`, ADR 0014, review and layering errors | Ownership, not a whole-program mutation proof |
-| Canonical architecture wiring | `pnpm run check:architecture`, `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Both CI workflows call the aggregator once; prepush runs the same production card scan; contract counterexamples run through `check:architecture-tests`; required checks follow `docs/operations/ci-checks.md` |
+| Canonical architecture wiring | `pnpm run check:architecture`, `scripts/ci/verification-tasks.ts`, `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Scoped CI selects canonical tasks and always evaluates `verify`; quality retains the production scanners; contract counterexamples belong to their Vitest groups; required checks follow `docs/operations/ci-checks.md` |
 
 Prefer source discovery, file lists, import boundaries and small syntax checks. Scanners reuse `scripts/source-files.ts`; a missing or empty required root, a parse error or an unsupported entry fails, and a named exemption that no longer matches a recognized write is stale. Do not grow checkers into symbol or dataflow engines without a concrete repository case.
 

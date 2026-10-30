@@ -79,6 +79,16 @@ describe('candidate verification public CLI', () => {
     expect(manifest.binding).toContain(sha)
   })
 
+  it('exports the canonical selected task IDs for reusable workflow completion', () => {
+    const value = fixture()
+    const output = join(value.bin, 'github-output')
+    value.env.GITHUB_OUTPUT = output
+    const result = value.run('manifest', '--sha', value.sha, '--tasks', 'build,quality')
+    expect(result.status, result.stderr).toBe(0)
+    expect(readFileSync(output, 'utf8')).toContain('\ntasks=quality,build\n')
+    expect(JSON.parse(result.stdout).matrix.task).toEqual(['quality', 'build'])
+  })
+
   it('does not allow a requested SHA to stand in for a different actual checkout', () => {
     const { run } = fixture()
     const result = run('manifest', '--sha', 'c'.repeat(40))

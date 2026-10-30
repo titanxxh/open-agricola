@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { verificationPlan } from '../verify'
+import { taskCommands } from '../ci/verification-tasks'
 
 const repoRoot = path.resolve(__dirname, '../..')
-const workflows = ['ci.yml', 'ci-full.yml']
+const legacyWorkflows = ['ci-full.yml']
 const architectureChecks = [
   'pnpm run lint',
   'pnpm run check:test-project-coverage',
@@ -68,7 +69,7 @@ describe('canonical architecture verification wiring', () => {
       .toEqual(['pnpm run check:card-impl-boundaries'])
   })
 
-  it.each(workflows)('%s calls the canonical check once', (name) => {
+  it.each(legacyWorkflows)('%s calls the canonical check once', (name) => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
 
     expect(workflow).toMatch(/on:\s*\n\s+workflow_dispatch:/)
@@ -78,18 +79,51 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow).not.toContain('pnpm run check:card-impl-boundaries')
   })
 
-  it.each(workflows)('%s starts isolated dependencies before architecture and storage tests', (name) => {
+  it.each(legacyWorkflows)('%s starts isolated dependencies before architecture and storage tests', (name) => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
     const dependencies = workflow.indexOf('run: node scripts/local-services.mjs --test')
     const architecture = workflow.indexOf('run: pnpm run check:architecture')
-    const tests = workflow.indexOf(name === 'ci.yml' ? 'run: pnpm run test:fast' : 'run: pnpm test')
+    const tests = workflow.indexOf('run: pnpm test')
 
     expect(dependencies).toBeGreaterThanOrEqual(0)
     expect(dependencies).toBeLessThan(architecture)
     expect(dependencies).toBeLessThan(tests)
   })
 
-  it.each([...workflows, 'e2e.yml'])('%s is ready for public PRs without running automatic private jobs', (name) => {
+  it('routes selected CI tasks to the canonical runner and always evaluates the stable required gate', () => {
+    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+    const gate = workflow.slice(workflow.indexOf('\n  verify:'))
+    expect(workflow).not.toMatch(/^\s+paths(?:-ignore)?:/m)
+    expect(workflow).toContain('scripts/ci/scoped-verification.ts plan --base "$BASE_REF" --head "$HEAD_REF"')
+    expect(workflow).toContain('--partition inline --expected-digest "$EXPECTED_PLAN_DIGEST"')
+    expect(workflow).toContain('uses: ./.github/workflows/candidate-verification.yml')
+    expect(workflow).toContain('tasks: ${{ needs.plan.outputs.catalog_tasks }}')
+    expect(workflow).toContain('candidate_sha: ${{ github.sha }}')
+    expect(workflow).toContain('base_sha:\n        description: Optional full comparison base SHA for a manual scope probe')
+    expect(workflow.match(/BASE_REF: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.base_sha \|\| github.event.pull_request.base.sha \|\| github.event.before \|\| github.sha \}\}/g)).toHaveLength(2)
+    expect(workflow.match(/HEAD_REF: \$\{\{ github.event.pull_request.head.sha \|\| github.sha \}\}/g)).toHaveLength(2)
+    expect(gate).toContain('name: verify\n    if: always()\n    needs: [plan, inline, catalog]')
+    expect(gate).toContain('NEEDS_JSON: ${{ toJSON(needs) }}')
+    expect(gate).toContain('scripts/ci/scoped-verification.ts gate --sha "$GITHUB_SHA"')
+    expect(workflow).not.toContain('continue-on-error:')
+    expect(taskCommands(repoRoot, 'quality')).toContainEqual({ command: 'pnpm', args: ['run', 'check:card-impl-boundaries'] })
+    expect(taskCommands(repoRoot, 'quality')).toContainEqual({ command: 'pnpm', args: ['run', 'lint'] })
+  })
+
+  it('exports reusable catalog completion only after the manifest and every matrix task succeed', () => {
+    const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-verification.yml'), 'utf8')
+    const completion = workflow.slice(workflow.indexOf('\n  complete:'))
+    expect(workflow).toContain('matrix: ${{ fromJSON(needs.manifest.outputs.matrix) }}')
+    expect(workflow).toContain('run-task "$VERIFICATION_TASK" --sha "$CANDIDATE_SHA"')
+    expect(completion).toContain('if: always()\n    needs: [manifest, task]')
+    expect(completion).toContain('MANIFEST_RESULT: ${{ needs.manifest.result }}')
+    expect(completion).toContain('TASK_RESULT: ${{ needs.task.result }}')
+    expect(completion).toContain('"$MANIFEST_RESULT" != success || "$TASK_RESULT" != success')
+    expect(completion).toContain('"$VERIFIED_SHA" != "$EXPECTED_SHA"')
+    expect(workflow).not.toContain('continue-on-error:')
+  })
+
+  it.each(['ci.yml', ...legacyWorkflows, 'e2e.yml'])('%s is ready for public PRs without running automatic private jobs', (name) => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows', name), 'utf8')
 
     // Browser E2E for a pull request runs locally; the workflow covers main and manual runs.

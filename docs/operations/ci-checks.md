@@ -1,22 +1,28 @@
 # CI Checks Operations
 
-`ci.yml` 和 `ci-full.yml` 声明 `pull_request`（目标 `main`）、`push: main` 和 `workflow_dispatch`；`e2e.yml` 只声明 `push: main` 和 `workflow_dispatch`，不在 PR 上运行。三者都使用只读 `contents` 权限，并按 workflow + PR/ref 隔离 concurrency。自动 job 只在仓库为 public 时执行；私有期仅允许手动执行，避免公开准备阶段消耗私有仓库额度。私有期自动 run 的 skipped job 不是通过验证的证据。
+`ci.yml` 和 `ci-full.yml` 声明 `pull_request`（目标 `main`）、`push: main` 和 `workflow_dispatch`；`e2e.yml` 只声明 `push: main` 和 `workflow_dispatch`，不在 PR 上运行。三者都使用只读 `contents` 权限，并按 workflow + PR/ref 隔离 concurrency。自动执行任务只在仓库为 public 时运行；私有期可手动执行。`verify` 汇总始终运行，所需任务被跳过时会失败。私有期自动 run 的 skipped job 不是通过验证的证据。
 
 私有期提交和 rebase merge 前仍必须在 owner 控制的本机跑完下列 CI 并把结果写入 PR。push 后等待相关 Actions run 结束，同时明确区分 skipped 和实际执行成功。公开后恢复自动执行，并按下文取得真实成功证据再启用 main 的 required status checks；准备 YAML 不等于 GitHub 门禁已启用。
 
-PR 的浏览器 E2E 在本机运行。涉及应用运行行为、UI 或 WS 的改动，用 `pnpm verify <file.spec.ts>` 在隔离环境跑通相关 spec，并把命令和结果写进 PR 描述；本机通过即满足 PR 的 E2E 要求。合入 main 后 `e2e.yml` 仍会跑全量。
+`ci.yml` 根据 canonical plan 执行相关文件、浏览器检查与完整 catalog 任务，再由始终运行的 `verify` 汇总。选中的浏览器检查在 GitHub runner 上通过 `pnpm verify` 运行。本机 `pnpm verify <file.spec.ts>` 用于调试和复现，不能替代这些正式 CI 结果。迁移期间 `ci-full.yml` 仍保留旧全量触发，`e2e.yml` 仍在 main 运行。
 
 main E2E 分成四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立 runner，并行执行。每个 runner 使用自己的应用、数据库 schema、S3 前缀和构建目录。任一 lane 失败都会使 workflow 失败，其余 lane 继续保留诊断。无论成功或失败都会保留 7 天的验证记录、认证和工坊请求生命周期，以及 Grafana 面板查询和临时容器日志。产物名为 `browser-readiness-<run-id>-<attempt>-<lane>`；生命周期包含各请求实例的方法、资源类型、来源、路径、状态和完成 / 失败事件，不记录 Cookie、认证头或完整查询参数。
 
 ## 调试与最终验证
 
-### Preview verification scope
+### Routine verification scope
 
 Run `pnpm exec tsx scripts/verification-plan.ts --base origin/main` to preview the whole branch's verification scope. Use `--head <ref>` when comparing another committed head. Differences between that head and the actual checked-out commit are also included, along with staged, unstaged, and untracked changes. It writes `output/verification/plan.json`; `--json` also prints the plan, and `--summary <file>` writes its human-readable summary.
 
-The `Verification Scope` workflow publishes the same plan in PR Checks, with the base, merge base, head, actual checked-out commit, source fingerprint, test ownership, and selection reasons. Missing roots, malformed changed sources, or unclassified tests fail planning. Unknown ownership, shared configuration, and scopes without complete narrow associations expand to the canonical complete task catalog.
+The `CI` workflow computes this plan for the actual checkout, including the complete branch diff and the PR merge commit. It retains the base, merge base, head, actual checked-out commit, source fingerprint, test ownership, and selection reasons. Missing roots, malformed changed sources, or unclassified tests fail planning. Unknown ownership, shared configuration, and scopes without complete narrow associations expand to the canonical complete task catalog.
 
-This is a plan preview. The existing CI and CI Full gates still execute, and the plan is not evidence that any test passed. A changed ref, checked-out commit, or source content invalidates the saved plan.
+Ordinary documentation runs its constraints. Known frontend module groups run the complete client test group, canonical quality and build tasks, and their declared browser files or matrix tags. These associations live in `scripts/ci/frontend-verification.ts`; unknown modules and missing consumers expand to full verification. Runtime contract and prompt documentation retain broader business verification. Card, backend, and Workshop changes retain full fallback until bounded mappings are installed.
+
+The public execution CLI is `pnpm exec tsx scripts/ci/scoped-verification.ts`. `plan --base <ref>` writes `output/verification/scoped-plan.json`. `run --base <ref> --plan output/verification/scoped-plan.json` recomputes the canonical plan before execution and rejects edited checks, changed refs, or changed source content. It writes actual command results to `output/verification/scoped-result.json`. CI passes the plan digest directly and separates inline file/browser checks from reusable catalog jobs. Browser checks retain the isolated environment, restart entry point, and case reporter.
+
+The required check remains named `verify`. It always evaluates the selected jobs, their completed check count, plan digest, catalog task IDs, and actual checkout. Missing, failed, cancelled, or skipped selected work fails the gate. Unselected branches are intentionally skipped. A plan alone proves no tests passed. Neither scoped PR results nor reused catalog jobs qualify as dedicated full release receipts. The separate `Verification Scope` preview workflow remains during migration.
+
+For a manual scope probe, dispatch `ci.yml` on the desired ref with an optional full comparison `base_sha`: `gh workflow run ci.yml --ref <branch> -f base_sha=<full-sha>`. The head and tested commit remain `github.sha`. PR and push events ignore this input and use their complete event diff. This manual CI run does not qualify as a dedicated full candidate receipt.
 
 使用 Node.js 24.15+（不含 Node 25），按改动范围选择入口：
 
@@ -109,7 +115,7 @@ pnpm run check:bundle-size
 pnpm run check:community-deck
 ```
 
-`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、测试规则环境、测试观测副本不归一化、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、跨层 Card State 边界、架构契约类型检查、验证工具类型检查、架构契约测试、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。两份 workflow 各调用它一次，meta-test 防止接线漂移。
+`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、测试规则环境、测试观测副本不归一化、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、跨层 Card State 边界、架构契约类型检查、验证工具类型检查、架构契约测试、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。quality 任务从该声明派生生产检查，测试由所属 Vitest 组执行。旧 CI Full 仍调用聚合入口，meta-test 同时约束范围 CI 的任务接线与始终运行的汇总门禁。
 
 `check:architecture-tests` 复用现有 Vitest project 配置，执行 effect 架构、资源事实来源审计、事件映射策略、交互命令策略、Card Source、PromptKey、LLM prompt 契约、CI 接线，以及 listener 纯度 guard 的正负例与两人 Session 契约测试。跨层 Card State 检查覆盖 domain / actions（含 internal effects）/ engine / session / projections / server / client / Replay Viewer，检查固定单卡状态、提示键判断、私有状态 helper 导入和前端原始状态读取；静态 metadata 和卡牌文案声明可用，扫描根缺失、为空、解析错误及失效例外均失败。卡牌实现边界检查同时对每个已解析 listener handler / cost-candidate transform 做显式状态写入的静态扫描；运行时 guard 则由各 Vitest project 的 setup 安装，`pnpm test` 中任何 listener 直接修改权威状态都会失败。它们仍属于 `pnpm test` / `pnpm test:fast`，保证单独运行完整测试时不漏检；只跑架构入口也会执行这些断言。工坊能力名称由部署契约直接读取源码常量，文档链接源码，不维护另一份名字表。
 

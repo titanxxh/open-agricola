@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { globSync } from 'glob'
 import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-globs'
 import { parseSource, sourceExtensions } from '../source-files'
+import { frontendVerification } from './frontend-verification'
 
 export type VerificationIdentity = {
   baseRef: string
@@ -28,10 +29,11 @@ export type TestInventory = {
 export type PlannedCheck =
   | { kind: 'catalog'; taskId: string }
   | { kind: 'vitest'; project: string; files: string[] }
+  | { kind: 'browser'; browser: 'chromium' | 'webkit'; files: string[]; grep: string | null }
 
 const scopeReasons = {
   documentation: 'Ordinary documentation requires documentation constraints.',
-  frontend: 'Frontend changes require the owning module and its browser consumers.',
+  frontend: 'Frontend changes require the complete client group, quality and builds, and the declared module browser consumers.',
   card: 'Card behavior requires explicit direct, Session, and cross-card test associations.',
   server: 'Server changes require their complete backend and multiplayer groups.',
   rules: 'Shared rule mechanisms require complete affected rule groups.',
@@ -52,10 +54,13 @@ export type ScopeSelection = {
 
 function scopeFor(file: string): VerificationScope {
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(?:tsconfig|vite|vitest|playwright|eslint)[^/]*|AGENTS\.md|CLAUDE\.md|CONTEXT\.md|\.env[^/]*)$/.test(file)
+    || /(?:^|\/)(?:tsconfig[^/]*\.json|(?:vite|vitest|playwright|eslint)\.config\.[^/]+)$/.test(file)
+    || /^docs\/(?:operations\/|agents\/|adr\/|(?:PLATFORM_DESIGN|DEPLOY_PLAN|HOW_TO_DEPLOY)(?:_zh)?\.md$)/.test(file)
     || file.startsWith('.github/') || file.startsWith('scripts/') || file.startsWith('tests/')
     || /(?:^|\/)(?:_helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
     || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)) return 'global'
   if (/^docs\/(?:CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status|community-card-examples)(?:_zh)?\.md$/.test(file)
+    || /^docs\/(?:prompts|examples)\//.test(file)
     || /^docs\/(?:architecture|test)\//.test(file)
     || /^client\/(?:local-sandbox|sandbox|app\/workshop|services\/(?:llm|workshop))(?:\/|[-.])/.test(file)
     || /^server\/(?:custom-code|workshop)(?:\/|[-.])/.test(file)
@@ -104,8 +109,22 @@ export function planVerification(input: {
   }
   const selections = [...grouped].map(([scope, paths]) => ({ scope, paths: [...paths].sort(), reason: scopeReasons[scope] }))
   const documentationTests = input.inventory.vitest.filter(test => test.file === 'scripts/__tests__/docs-budget.test.ts')
-  const expansionReasons = selections.filter(selection => selection.scope !== 'documentation')
-    .map(selection => `${selection.reason} Full verification is selected for ${selection.paths.length} affected paths.`)
+  const scopedChecks: PlannedCheck[] = []
+  const expansionReasons: string[] = []
+  for (const selection of selections) {
+    if (selection.scope === 'documentation') {
+      scopedChecks.push(...[...new Set(documentationTests.map(test => test.project))].map(project => ({
+        kind: 'vitest' as const, project, files: documentationTests.filter(test => test.project === project).map(test => test.file),
+      })))
+    } else if (selection.scope === 'frontend') {
+      const mapping = frontendVerification(selection.paths, input.inventory)
+      scopedChecks.push(...mapping.checks)
+      expansionReasons.push(...mapping.expansionReasons)
+    } else expansionReasons.push(`${selection.reason} Full verification is selected for ${selection.paths.length} affected paths.`)
+  }
+  if (scopedChecks.some(check => check.kind === 'catalog' && !input.fullTaskIds.includes(check.taskId))) {
+    expansionReasons.push('The canonical catalog cannot execute the selected scope; full verification is required.')
+  }
   if (!input.changes.length) expansionReasons.push('No changes were established; full verification is required.')
   if (selections.some(selection => selection.scope === 'documentation') && !documentationTests.length) {
     expansionReasons.push('Documentation constraint tests are missing; full verification is required.')
@@ -121,9 +140,7 @@ export function planVerification(input: {
     selections,
     expansionReasons,
     checks: full ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId }))
-      : [...new Set(documentationTests.map(test => test.project))].map(project => ({
-        kind: 'vitest', project, files: documentationTests.filter(test => test.project === project).map(test => test.file),
-      })),
+      : [...new Map(scopedChecks.map(check => [JSON.stringify(check), check])).values()],
   }
 }
 const git = (cwd: string, args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trimEnd()
@@ -256,8 +273,12 @@ export function formatPlanSummary(plan: VerificationPlan): string {
     ...plan.selections.map(selection => `- **${selection.scope}**: ${selection.reason} ${paths(selection.paths)}`), '',
     ...(plan.expansionReasons.length ? ['## Why verification expands', '', ...plan.expansionReasons.map(reason => `- ${reason}`), ''] : []),
     '## Planned checks', '',
-    ...plan.checks.map(check => check.kind === 'catalog'
-      ? `- Complete task ${code(check.taskId)}`
-      : `- ${code(check.project)}: ${paths(check.files)}`), '',
+    ...plan.checks.map(check => {
+      switch (check.kind) {
+        case 'catalog': return `- Complete task ${code(check.taskId)}`
+        case 'vitest': return `- ${code(check.project)}: ${paths(check.files)}`
+        case 'browser': return `- Browser ${code(check.browser)}: ${paths(check.files)}${check.grep ? `; titles ${code(check.grep)}` : ''}`
+      }
+    }), '',
   ].join('\n')
 }

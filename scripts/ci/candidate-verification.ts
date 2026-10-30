@@ -240,7 +240,7 @@ export function candidateVerificationCli(cwd: string, input: string[]): number {
   if (mode === 'manifest') {
     const manifest = candidateManifest(cwd, sha, option('--tasks', 'all'))
     if (process.env.GITHUB_OUTPUT) {
-      appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nconfiguration=${manifest.configuration}\nmatrix=${JSON.stringify(manifest.matrix)}\nbinding=${manifest.binding}\n`)
+      appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nconfiguration=${manifest.configuration}\nmatrix=${JSON.stringify(manifest.matrix)}\ntasks=${manifest.matrix.task.join(',')}\nbinding=${manifest.binding}\n`)
     }
     console.log(JSON.stringify(manifest))
     return 0
