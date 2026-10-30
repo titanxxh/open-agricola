@@ -105,7 +105,7 @@ describe('verification scope planning', () => {
     })).toThrow('canonical full task catalog')
   })
 
-  it.each(['shared/cards/__tests__/setup-register-all.ts', 'client/components/__tests__/fixtures.ts'])('treats shared test setup as global: %s', path => {
+  it.each(['shared/cards/__tests__/setup-register-all.ts', 'shared/cards/__tests__/card-environment.ts', 'client/components/__tests__/fixtures.ts'])('treats shared test setup as global: %s', path => {
     const plan = planVerification({
       identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
     })

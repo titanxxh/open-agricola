@@ -7,6 +7,7 @@ import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-
 import { parseSource, sourceExtensions } from '../source-files'
 import { frontendVerification } from './frontend-verification'
 import { businessScopeFor, businessVerification } from './business-verification'
+import { cardVerification, readCardAssociationIndex, type CardAssociationIndex } from './card-verification'
 
 export type VerificationIdentity = {
   baseRef: string
@@ -35,7 +36,7 @@ export type PlannedCheck =
 const scopeReasons = {
   documentation: 'Ordinary documentation requires documentation constraints.',
   frontend: 'Frontend changes require the complete client group, quality and builds, and the declared module browser consumers.',
-  card: 'Card behavior requires explicit direct, Session, and cross-card test associations.',
+  card: 'Card behavior selects complete literal/import/helper-associated tests and generic card-safety consumers, with quality, builds and browser checks.',
   server: 'Server changes require their complete backend and multiplayer groups.',
   recovery: 'Persistence and recovery changes require complete storage, serialization, transport and Replay consumers.',
   rules: 'Shared rule mechanisms require complete affected rule groups.',
@@ -59,6 +60,7 @@ function scopeFor(file: string): VerificationScope {
     || /(?:^|\/)(?:tsconfig[^/]*\.json|(?:vite|vitest|playwright|eslint)\.config\.[^/]+)$/.test(file)
     || /^docs\/(?:operations\/|agents\/|adr\/|(?:PLATFORM_DESIGN|DEPLOY_PLAN|HOW_TO_DEPLOY)(?:_zh)?\.md$)/.test(file)
     || file.startsWith('.github/') || file.startsWith('scripts/') || file.startsWith('tests/')
+    || file === 'shared/cards/__tests__/card-environment.ts'
     || /(?:^|\/)(?:_helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
     || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)) return 'global'
   const businessScope = businessScopeFor(file)
@@ -98,6 +100,7 @@ export function planVerification(input: {
   changes: ChangedPath[]
   inventory: TestInventory
   fullTaskIds: readonly string[]
+  cardAssociations?: CardAssociationIndex
 }): VerificationPlan {
   if (!input.fullTaskIds.length || new Set(input.fullTaskIds).size !== input.fullTaskIds.length) {
     throw new Error('A nonempty, unique canonical full task catalog is required')
@@ -122,6 +125,10 @@ export function planVerification(input: {
       })))
     } else if (selection.scope === 'frontend') {
       const mapping = frontendVerification(selection.paths, input.inventory)
+      scopedChecks.push(...mapping.checks)
+      expansionReasons.push(...mapping.expansionReasons)
+    } else if (selection.scope === 'card') {
+      const mapping = cardVerification(selection.paths, input.inventory, input.cardAssociations, input.changes)
       scopedChecks.push(...mapping.checks)
       expansionReasons.push(...mapping.expansionReasons)
     } else if (['server', 'recovery', 'rules', 'contract', 'workshop'].includes(selection.scope)) {
@@ -252,7 +259,9 @@ export function createRepositoryPlan(input: {
       parseSource(file)
     }
   }
-  const plan = planVerification({ identity, changes: uniqueChanges, inventory, fullTaskIds: input.fullTaskIds })
+  const cardAssociations = uniqueChanges.some(change => scopeFor(change.path) === 'card' || (change.status === 'R' && scopeFor(change.previousPath) === 'card'))
+    ? readCardAssociationIndex(input.cwd, inventory) : undefined
+  const plan = planVerification({ identity, changes: uniqueChanges, inventory, fullTaskIds: input.fullTaskIds, cardAssociations })
   assertPlanCurrent(input.cwd, plan)
   return plan
 }
