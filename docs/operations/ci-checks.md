@@ -10,6 +10,14 @@ main E2E 分成四个 Chromium shard、browser-local sandbox 和 Linux WebKit �
 
 ## 调试与最终验证
 
+### Preview verification scope
+
+Run `pnpm exec tsx scripts/verification-plan.ts --base origin/main` to preview the whole branch's verification scope. Use `--head <ref>` when comparing another committed head. Differences between that head and the actual checked-out commit are also included, along with staged, unstaged, and untracked changes. It writes `output/verification/plan.json`; `--json` also prints the plan, and `--summary <file>` writes its human-readable summary.
+
+The `Verification Scope` workflow publishes the same plan in PR Checks, with the base, merge base, head, actual checked-out commit, source fingerprint, test ownership, and selection reasons. Missing roots, malformed changed sources, or unclassified tests fail planning. Unknown ownership, shared configuration, and scopes without complete narrow associations expand to the canonical complete task catalog.
+
+This is a plan preview. The existing CI and CI Full gates still execute, and the plan is not evidence that any test passed. A changed ref, checked-out commit, or source content invalidates the saved plan.
+
 使用 Node.js 24.15+（不含 Node 25），按改动范围选择入口：
 
 ```bash

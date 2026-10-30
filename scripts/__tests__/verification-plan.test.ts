@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { assertPlanCurrent, createRepositoryPlan, planVerification, type ChangedPath } from '../ci/verification-plan'
 
@@ -103,6 +104,21 @@ describe('verification scope planning', () => {
       inventory: { vitest: [], browser: [] }, fullTaskIds: [],
     })).toThrow('canonical full task catalog')
   })
+
+  it.each(['shared/cards/__tests__/setup-register-all.ts', 'client/components/__tests__/fixtures.ts'])('treats shared test setup as global: %s', path => {
+    const plan = planVerification({
+      identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+    })
+    expect(plan.mode).toBe('full')
+    expect(plan.selections).toMatchObject([{ scope: 'global', paths: [path] }])
+  })
+
+  it.each(['server/workshop-validation.ts', 'client/services/workshop-pr.ts'])('retains Workshop ownership for module prefixes: %s', path => {
+    const plan = planVerification({
+      identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+    })
+    expect(plan.selections).toMatchObject([{ scope: 'workshop', paths: [path] }])
+  })
 })
 
 const directories: string[] = []
@@ -187,4 +203,41 @@ describe('repository verification scope', () => {
     git(cwd, '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-qm', 'another commit')
     expect(() => assertPlanCurrent(cwd, plan)).toThrow('Checked-out commit changed')
   })
+
+  it('includes tested-commit changes beyond a documentation-only requested head', () => {
+    const { cwd } = repository()
+    write(cwd, 'README.md', 'Updated guide\n')
+    const requestedHead = commit(cwd, 'documentation')
+    write(cwd, 'shared/domain/example.ts', 'export const changedRule = true\n')
+    const tested = commit(cwd, 'actual tested rule change')
+
+    const plan = createRepositoryPlan({ cwd, base: 'main', head: requestedHead, fullTaskIds: ['quality', 'fast'] })
+
+    expect(plan.identity).toMatchObject({ headSha: requestedHead, testedSha: tested })
+    expect(plan.changes).toContainEqual({ status: 'M', path: 'shared/domain/example.ts' })
+    expect(plan.mode).toBe('full')
+    expect(plan.selections).toContainEqual({ scope: 'rules', paths: ['shared/domain/example.ts'], reason: 'Shared rule mechanisms require complete affected rule groups.' })
+  })
+
+  it('runs the same planner through the CLI, writes a human summary, and replaces stale output on failure', () => {
+    const { cwd } = repository()
+    write(cwd, 'README.md', 'Updated guide\n')
+    commit(cwd, 'documentation')
+    const summary = join(cwd, 'output/summary.md')
+    const cliArgs = [fileURLToPath(import.meta.resolve('tsx/cli')), resolve(import.meta.dirname, '../verification-plan.ts'), '--base', 'main', '--json', '--summary', summary]
+    const success = spawnSync(process.execPath, cliArgs, { cwd, encoding: 'utf8', timeout: 15_000 })
+    expect(success.status, success.stderr).toBe(0)
+    const planned: unknown = JSON.parse(success.stdout)
+    expect(planned).toMatchObject({ status: 'planned', mode: 'scoped', checks: [{ kind: 'vitest', project: 'fast-scripts', files: ['scripts/__tests__/docs-budget.test.ts'] }] })
+    expect(readFileSync(summary, 'utf8')).toContain('Ordinary documentation requires documentation constraints.')
+    expect(readFileSync(summary, 'utf8')).toContain('This plan is not verification evidence.')
+
+    write(cwd, 'client/components/Example.tsx', 'export const =')
+    const failed = spawnSync(process.execPath, cliArgs, { cwd, encoding: 'utf8', timeout: 15_000 })
+    expect(failed.status).toBe(1)
+    const artifact: unknown = JSON.parse(readFileSync(join(cwd, 'output/verification/plan.json'), 'utf8'))
+    expect(artifact).toMatchObject({ status: 'failed' })
+    expect(artifact).not.toHaveProperty('checks')
+    expect(readFileSync(summary, 'utf8')).toContain('Scope planning failed')
+  }, 30_000)
 })
