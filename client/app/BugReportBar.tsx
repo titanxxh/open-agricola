@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../config'
+import { collectBugReportDiagnostics } from '../services/bug-report-diagnostics'
 import { useLocale } from '../contexts/LocaleContext'
 import '../styles/pages/bug-report.css'
 
@@ -278,7 +279,7 @@ export function BugReportBar({
             `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
             {
               method: 'PATCH',
-              body: JSON.stringify({ phenomenon }),
+              body: JSON.stringify({ phenomenon, clientDiagnostics: collectBugReportDiagnostics(roomId) }),
             },
           )
         : await requestJson<ReportResponse>(
@@ -287,6 +288,7 @@ export function BugReportBar({
               method: 'POST',
               body: JSON.stringify({
                 phenomenon,
+                clientDiagnostics: collectBugReportDiagnostics(roomId),
                 ...(stepNo === undefined ? {} : { stepNo }),
                 ...(frameHash === undefined ? {} : { frameHash }),
               }),
@@ -366,6 +368,7 @@ export function BugReportBar({
             body: JSON.stringify(report.status === 'draft' || changingIdentity
               ? {
                   authorIdentity: identity,
+                  ...(report.status === 'draft' ? { clientDiagnostics: collectBugReportDiagnostics(roomId) } : {}),
                   ...(identity === 'github_user' ? { confirmGitHub } : {}),
                   ...(identity === 'hosted' ? { confirmHosted } : {}),
                 }

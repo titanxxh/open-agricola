@@ -278,6 +278,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
   await expect(page.getByRole('link', { name: 'Open Issue #99' })).toBeVisible()
   expect(createBody).toEqual({
     phenomenon: 'The final score is wrong',
+    clientDiagnostics: { deviceType: 'desktop', browser: { name: 'Chrome', version: expect.any(String) }, disconnects: [] },
     stepNo: 0,
     frameHash: fixture.firstStepHash,
   })
@@ -378,3 +379,61 @@ for (const locale of ['en'] as const) {
     })
   }
 }
+
+test('a mobile report retains actual WebSocket close diagnostics after reconnect and reload', async ({ browser, request }) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Version/17.4 Mobile/15E148 Safari/604.1',
+  })
+  try {
+    await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+    await authenticate(context, request, `bug_diagnostics_${Date.now().toString(36)}`)
+    const page = await context.newPage()
+    let closeSocket: (() => void) | undefined
+    let connections = 0
+    await page.routeWebSocket('**/nodes/*/ws', route => {
+      const server = route.connectToServer()
+      connections++
+      closeSocket = () => {
+        server.close({ code: 1012, reason: 'diagnostic test restart' })
+        route.close({ code: 1012, reason: 'diagnostic test restart' })
+      }
+    })
+    await page.route('**/api/v1/issue-submission-connection?**', route =>
+      route.fulfill({ json: { ok: true, enabled: true, connected: false } }))
+    let createBody: unknown
+    await page.route('**/api/v1/game-contexts/*/bug-reports', async route => {
+      createBody = route.request().postDataJSON()
+      const roomId = new URL(page.url()).searchParams.get('room')
+      await route.fulfill({ status: 201, json: { ok: true, report: {
+        submissionId: 'diagnostics-mobile-report', roomId, reporterUserId: 'diagnostic-reporter-id',
+        playerIndex: 0, lifecycle: 'active', roomVersion: 0, stepNo: 0, frameHash: 'a'.repeat(64),
+        phenomenon: 'The board keeps disappearing', authorIdentity: null, status: 'draft',
+        issueNumber: null, issueUrl: null, lastErrorCode: null,
+      } } })
+    })
+    await page.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=1&soloHandMode=random`)
+    await expect(page.locator('.game-layout')).toBeVisible({ timeout: 15_000 })
+    if (!closeSocket) throw new Error('No room WebSocket')
+    closeSocket()
+    await expect.poll(() => connections).toBeGreaterThan(1)
+    await expect(page.locator('.game-layout')).toBeVisible()
+    await page.reload()
+    await expect(page.locator('.game-layout')).toBeVisible()
+    await page.getByRole('button', { name: 'Report a bug' }).click()
+    await page.getByLabel('Describe what happened in one sentence').fill('The board keeps disappearing')
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+    await expect(page.getByText('diagnostic-reporter-id', { exact: true })).toBeVisible()
+    expect(createBody).toMatchObject({
+      phenomenon: 'The board keeps disappearing',
+      clientDiagnostics: {
+        deviceType: 'mobile', browser: { name: 'Safari', version: '17.4' },
+        disconnects: expect.arrayContaining([{
+          occurredAt: expect.any(Number), code: 1012, reason: 'diagnostic test restart', wasClean: true,
+        }]),
+      },
+    })
+    expect(createBody).not.toHaveProperty('reporterUserId')
+    expect(createBody).not.toHaveProperty('playerIndex')
+  } finally { await context.close() }
+})

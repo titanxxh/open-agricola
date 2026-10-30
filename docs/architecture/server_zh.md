@@ -198,6 +198,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-and-delivery.md)：
 
 - 草稿在确认报告者拥有原始座位后冻结 `roomId + stepNo + frameHash`；每个用户最多保留五份未投递的报告。公开 Issue 带清洗过的标题，正文不含截图、日志、Frame payload、其他玩家身份或隐藏信息。
+- Bug Report 客户端诊断按 `shared/contract/bug-report-diagnostics.ts` 解析，随草稿保存，并与服务端认证的 Reporter site ID 一起写入 Issue。设备、浏览器分类和 WebSocket 关闭记录是客户端观察，不代表已证实的原因。未知字段和超限历史会被拒绝，诊断文本不能注入报告 marker 或提及通知。诊断沿用现象说明的保留期限，投递成功、丢弃或删除账号时清除。测试见 `bug-report-routes.test.ts` 和 `bug-report-store.test.ts`。
 - 生产 `github-issue-client` 只接受服务端配置的仓库与安装 ID，并通过稳定的正文标记对账不确定的响应，只接受由所配置 App 在本次尝试之后创建、且以该标记唯一结尾的 Issue。客户端只轮询站内状态，从不直接访问 GitHub。本人提交使用加密的 GitHub App 用户 token（AES-256-GCM 加 `keyId`），并需要确认 GitHub 身份会保持公开；Hosted Issue Identity 使用安装 token。连接失效时从不自动切换作者。
 - 删号时持久化 `deletion_pending`、登出所有会话，并通过安装 adapter 编辑已知 Issue 正文，持续重试直到 GitHub 确认站点用户 ID 已消失。
 - 维护者读取证据需要填写理由，永久审计、限流，并重新应用当前参与者的 tombstone 投影。

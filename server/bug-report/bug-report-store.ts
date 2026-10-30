@@ -1,3 +1,4 @@
+import { parseBugReportDiagnostics, type BugReportDiagnostics } from '../../shared/contract/bug-report-diagnostics'
 import { consumeRateLimit } from '../database/rate-limit'
 import {
   createCipheriv,
@@ -85,6 +86,7 @@ type ReportRow = {
   step_no: number
   frame_hash: string
   phenomenon: string | null
+  client_diagnostics_json: string | null
   author_identity: 'github_user' | 'hosted' | null
   confirmed_github_user_id: string | null
   status: BugReportStatus
@@ -129,6 +131,7 @@ export type BugReportView = {
   stepNo: number
   frameHash: string
   phenomenon: string | null
+  clientDiagnostics: BugReportDiagnostics | null
   authorIdentity: 'github_user' | 'hosted' | null
   status: BugReportStatus
   issueNumber: number | null
@@ -233,6 +236,16 @@ const cleanPhenomenon = (value: unknown): string => {
   return phenomenon
 }
 
+const cleanDiagnostics = (value: unknown): BugReportDiagnostics | null => {
+  if (value === undefined || value === null) return null
+  const diagnostics = parseBugReportDiagnostics(value)
+  if (!diagnostics) throw new BugReportError('invalid_client_diagnostics', 400)
+  return diagnostics
+}
+
+const readDiagnostics = (value: string | null): BugReportDiagnostics | null =>
+  value === null ? null : cleanDiagnostics(JSON.parse(value))
+
 const toView = (row: ReportRow): BugReportView => ({
   submissionId: row.submission_id,
   roomId: row.room_id,
@@ -243,6 +256,7 @@ const toView = (row: ReportRow): BugReportView => ({
   stepNo: row.step_no,
   frameHash: row.frame_hash,
   phenomenon: row.phenomenon,
+  clientDiagnostics: readDiagnostics(row.client_diagnostics_json),
   authorIdentity: row.author_identity,
   status: row.status,
   issueNumber: row.github_issue_number,
@@ -258,7 +272,7 @@ const reportColumns = `
   github_issue_number, github_issue_url, evidence_expires_at, claim_token,
   claimed_at, next_attempt_at, submitted_at, last_error_code, created_at,
   updated_at, discarded_at, github_issue_state, duplicate_confirmed_at,
-  confirmed_github_user_id
+  confirmed_github_user_id, client_diagnostics_json
 `
 
 export class BugReportStore {
@@ -615,6 +629,7 @@ await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId
     userId: string
     roomId: string
     phenomenon: unknown
+    clientDiagnostics?: unknown
     stepNo?: unknown
     frameHash?: unknown
   }): Promise<Awaited<BugReportView>> {
@@ -623,6 +638,7 @@ await this.db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(input.
 await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR UPDATE').get(input.roomId)
 
     const phenomenon = cleanPhenomenon(input.phenomenon)
+    const diagnostics = cleanDiagnostics(input.clientDiagnostics)
     const unfinished = (await this.db.prepare(`
       SELECT COUNT(*) AS count
       FROM bug_reports
@@ -713,9 +729,9 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
       INSERT INTO bug_reports (
         submission_id, reporter_user_id, room_id, player_index, lifecycle,
         room_version, step_no, frame_hash, phenomenon, status,
-        evidence_expires_at, created_at, updated_at
+        evidence_expires_at, created_at, updated_at, client_diagnostics_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)
     `).run(
       submissionId,
       input.userId,
@@ -729,6 +745,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
       null,
       now,
       now,
+      diagnostics ? JSON.stringify(diagnostics) : null,
     ))
     return (await this.getOwned(submissionId, input.userId))
 
@@ -786,6 +803,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = ? FOR U
     userId: string,
     input: {
       phenomenon?: unknown
+      clientDiagnostics?: unknown
       authorIdentity?: unknown
       confirmGitHub?: unknown
       confirmHosted?: unknown
@@ -805,6 +823,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       && row.author_identity === 'github_user'
       && input.confirmGitHub === true
       && input.phenomenon === undefined
+      && input.clientDiagnostics === undefined
       && input.authorIdentity === undefined
       && input.confirmHosted === undefined
       && input.confirmExisting === undefined
@@ -813,6 +832,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       (row.status === 'needs_reconnect' || row.status === 'failed')
       && input.authorIdentity !== undefined
       && input.phenomenon === undefined
+      && input.clientDiagnostics === undefined
       && input.confirmExisting === undefined
     )
     if (
@@ -823,6 +843,9 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       throw new BugReportError('bug_report_update_conflict', 409)
     }
     let phenomenon = row.phenomenon
+    const diagnostics = input.clientDiagnostics === undefined
+      ? readDiagnostics(row.client_diagnostics_json)
+      : cleanDiagnostics(input.clientDiagnostics)
     let author = row.author_identity
     let confirmedGitHubUserId = row.confirmed_github_user_id
     if (githubReconfirmation) {
@@ -874,6 +897,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
     ;(await this.db.prepare(`
       UPDATE bug_reports
       SET phenomenon = ?,
+          client_diagnostics_json = ?,
           author_identity = ?,
           confirmed_github_user_id = ?,
           duplicate_confirmed_at = ?,
@@ -882,6 +906,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       WHERE submission_id = ? AND reporter_user_id = ?
     `).run(
       phenomenon,
+      diagnostics ? JSON.stringify(diagnostics) : null,
       author,
       confirmedGitHubUserId,
       input.confirmExisting === true ? now : row.duplicate_confirmed_at,
@@ -1015,6 +1040,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       ;(await this.db.prepare(`
         UPDATE bug_reports
         SET phenomenon = NULL,
+            client_diagnostics_json = NULL,
             author_identity = NULL,
             confirmed_github_user_id = NULL,
             status = 'failed',
@@ -1145,6 +1171,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       UPDATE bug_reports
       SET status = 'submitted',
           phenomenon = NULL,
+          client_diagnostics_json = NULL,
           confirmed_github_user_id = NULL,
           github_issue_number = ?,
           github_issue_url = ?,
@@ -1173,6 +1200,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
       UPDATE bug_reports
       SET status = 'submitted',
           phenomenon = NULL,
+          client_diagnostics_json = NULL,
           confirmed_github_user_id = NULL,
           github_issue_number = ?,
           github_issue_url = ?,
@@ -1288,6 +1316,7 @@ await this.db.prepare('SELECT room_id FROM game_contexts WHERE room_id = (SELECT
         UPDATE bug_reports
         SET reporter_user_id = NULL,
             phenomenon = NULL,
+            client_diagnostics_json = NULL,
             author_identity = NULL,
             confirmed_github_user_id = NULL,
             status = CASE WHEN status = 'submitted' THEN status ELSE 'failed' END,
@@ -1449,6 +1478,7 @@ export const buildIssue = (
   const summary = Array.from(firstLine).slice(0, 120).join('')
   const marker = `<!-- open-agricola-report:${report.submission_id} -->`
   const link = contextUrl(report, appOrigin)
+  const diagnostics = readDiagnostics(report.client_diagnostics_json)
   const body = [
     '## Phenomenon',
     '',
@@ -1464,6 +1494,17 @@ export const buildIssue = (
     `- Step: ${code(report.step_no)}`,
     `- Frame hash: ${code(report.frame_hash)}`,
     ...(link ? [`- Context link: ${link}`] : []),
+    ...(diagnostics ? [
+      '',
+      '## Client diagnostics',
+      '',
+      `- Device type: ${code(diagnostics.deviceType)}`,
+      `- Browser: ${code([diagnostics.browser.name, diagnostics.browser.version].filter(Boolean).join(' '))}`,
+      '- Recent WebSocket closes (browser observations, newest last):',
+      ...(diagnostics.disconnects.length ? diagnostics.disconnects.map(event =>
+        `  - ${code(new Date(event.occurredAt).toISOString())}: code ${code(event.code)}, clean ${code(String(event.wasClean))}, reason ${code(neutralizeMentions(event.reason || '(none)'))}`)
+        : ['  - None recorded in this tab for this room in the last hour.']),
+    ] : []),
     '',
     marker,
   ].join('\n')

@@ -706,11 +706,12 @@ export async function handleBugReportRoute(
         throw new BugReportError('bug_reports_disabled', 503)
       }
       const body = await readJson(req)
-      assertKeys(body, ['phenomenon', 'stepNo', 'frameHash'])
+      assertKeys(body, ['phenomenon', 'stepNo', 'frameHash', 'clientDiagnostics'])
       const report = (await runtime.store.createDraft({
         userId: current.id,
         roomId: decodeId(draftMatch[1]!),
         phenomenon: body.phenomenon,
+        clientDiagnostics: body.clientDiagnostics,
         ...(body.stepNo === undefined ? {} : { stepNo: body.stepNo }),
         ...(body.frameHash === undefined ? {} : { frameHash: body.frameHash }),
       }))
@@ -745,6 +746,7 @@ export async function handleBugReportRoute(
       const body = await readJson(req)
       assertKeys(body, [
         'phenomenon',
+        'clientDiagnostics',
         'authorIdentity',
         'confirmGitHub',
         'confirmHosted',
