@@ -318,22 +318,27 @@ Under **Settings → Secrets and variables → Actions → Variables**, add:
 
 ### Trigger a Deployment
 
-Publishing a GitHub Release triggers `.github/workflows/deploy-pages.yml` through `release: published`:
+Use the [standard owner-machine release command](#standard-owner-machine-release) to verify the fixed candidate before creating its Release:
 
 ```bash
-gh release create v0.3.0 --generate-notes
+pnpm release vX.Y.Z --ref main
 ```
 
-Alternatively, use **Releases → Draft a new release**, create a `vX.Y.Z` tag, generate release notes, and publish. A release does not deploy the backend. A manual `workflow_dispatch` from the Actions page deploys the latest frontend from `main`.
+Publishing the Release triggers `.github/workflows/deploy-pages.yml` through `release: published`. For a manual deployment, select the workflow and its branch or tag in Actions, then run `workflow_dispatch`.
+
+Both entries fix the event's full `github.sha`, check out that commit, and call `scripts/ci/pages-deployment.ts`. The command checks trusted full GitHub candidate evidence for the same SHA and verification configuration before building. Missing, failed, cancelled, skipped, or incompatible required tasks stop the job before artifact upload or deployment. Ordinary PR checks do not satisfy this gate. The build also checks the actual checkout and `frontend-build.json` identity. A branch or tag moving after the trigger cannot change the deployed candidate.
+
+You can still create a Release through **Releases → Draft a new release** or bare `gh release create`. Those entries can create an unverified Release, but the Pages gate refuses to deploy its candidate until the required evidence passes. Inspect the failed build step for the blocking task and complete candidate verification before rerunning the workflow. A Release does not deploy the backend.
 
 After deployment, the production entry is `https://open-agricola.titanxxh.com/`, served by GitHub Pages. A self-hosted installation can configure its own Pages custom domain with the same topology.
 
-### Manual Build without GitHub Actions
+### Build locally
 
 ```bash
 VITE_API_BASE=https://api.your-domain.com pnpm run build:pages-frontend
-pnpm dlx gh-pages -d dist-pages
 ```
+
+This writes `dist-pages/` for local inspection. Publish through the Release or manual Actions workflow above so the candidate gate runs before deployment.
 
 ### Main-Site Image Assets
 
