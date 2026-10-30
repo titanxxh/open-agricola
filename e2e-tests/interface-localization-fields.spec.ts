@@ -70,7 +70,7 @@ for (const displayName of ['录制玩家', 'PlayerF', 'Player 6']) {
     for (let index = 0; index < 6; index++) {
       await expect(handoff).toBeVisible()
       await expect(handoff).toContainText(index === 0 ? displayName : `Player ${index + 1}`)
-      await handoff.getByRole('button').click()
+      await handoff.getByRole('button', { name: /continue$|，开始$/ }).click()
       const selection = page.locator('.parent-selection-overlay')
       await expect(selection).toBeVisible()
       await selection.locator('[data-section="mother"] .parent-choice-card').first().click()

@@ -41,7 +41,7 @@ async function mockPlatformApis(page: Page, authenticated = true) {
     }
     const json = pathname === '/api/auth/registration-policy'
       ? { ok: true, policy: 'open' }
-      : { ok: true, cards: [], rooms: [], identities: [], hasMore: false, settings: sandboxSettings }
+      : { ok: true, cards: [], rooms: [], games: [], identities: [], hasMore: false, settings: sandboxSettings }
     await route.fulfill({ json })
   })
 }

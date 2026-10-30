@@ -450,7 +450,7 @@ test.describe('Platform: local hotseat game', () => {
     await page.getByRole('button', { name: '开始热座对局', exact: true }).click()
     const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
     await expect(handoff).toBeVisible()
-    await handoff.getByRole('button').click()
+    await handoff.getByRole('button', { name: /continue$|，开始$/ }).click()
     await expect(page.locator('.header-compact')).toBeVisible({ timeout: 15000 })
     const homeLink = page.getByRole('link', { name: '返回大厅' })
     await expect(homeLink).toContainText('Open Agricola')

@@ -47,7 +47,7 @@ test.describe('Mobile tab bar layout', () => {
       await route.fulfill({
         json: pathname === '/api/auth/me'
           ? { ok: true, user: { id: 'u1', username: 'testuser', displayName: 'Test User' } }
-          : { ok: true, rooms: [] },
+          : { ok: true, rooms: [], games: [] },
       })
     })
     await page.goto('/?page=lobby')
