@@ -71,7 +71,8 @@ function finish(req: IncomingMessage, res: ServerResponse, status: number, body:
 
 function immutable(relativePath: string): boolean {
   return relativePath.startsWith('assets/') && /-[\w-]{8,}\.[\w]+$/.test(basename(relativePath))
-    || relativePath.startsWith('i18n/') && /\.[a-f0-9]{16,}\.json$/.test(basename(relativePath))
+    || (relativePath.startsWith('i18n/') || relativePath.startsWith('card-encyclopedia/'))
+      && /\.[a-f0-9]{16,}\.json$/.test(basename(relativePath))
 }
 
 export function createFrontendHosting(env: NodeJS.ProcessEnv = process.env): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {

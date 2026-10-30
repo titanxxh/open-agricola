@@ -22,6 +22,7 @@ beforeEach(() => {
   directory = join(temporary, 'dist')
   mkdirSync(join(directory, 'assets'), { recursive: true })
   mkdirSync(join(directory, 'i18n'), { recursive: true })
+  mkdirSync(join(directory, 'card-encyclopedia'), { recursive: true })
   writeFileSync(join(directory, 'index.html'), HTML)
   writeFileSync(join(directory, 'frontend-build.json'), JSON.stringify({ format: 1, gameBuildId: BUILD_ID, basePath: '/open-agricola/' }))
   writeFileSync(join(directory, 'assets/index-Ab1234Cd.js'), SCRIPT)
@@ -29,6 +30,8 @@ beforeEach(() => {
   writeFileSync(join(directory, 'i18n/zh.0123456789abcdef.json'), '{"locale":"zh"}')
   writeFileSync(join(directory, 'i18n/manifest.json'), '{"version":1}')
   writeFileSync(join(directory, 'cards-manifest.json'), '{"cards":[]}')
+  writeFileSync(join(directory, 'card-encyclopedia/catalog.0123456789abcdef.json'), '{"version":1}')
+  writeFileSync(join(directory, 'card-encyclopedia/manifest.json'), '{"version":1}')
   env = { FRONTEND_ROOT: directory, GAME_BUILD_ID: BUILD_ID, PUBLIC_APP_ORIGIN: APP_URL, PUBLIC_API_BASE: 'https://game.example' }
   servers = []
 })
@@ -187,7 +190,10 @@ describe('frontend hosting', () => {
     const language = await get('/open-agricola/i18n/zh.0123456789abcdef.json')
     expect(language).toMatchObject({ status: 200, body: '{"locale":"zh"}' })
     expect(language.headers['cache-control']).toBe('public, max-age=31536000, immutable')
-    for (const path of ['i18n/manifest.json', 'cards-manifest.json', 'frontend-build.json']) {
+    const catalog = await get('/open-agricola/card-encyclopedia/catalog.0123456789abcdef.json')
+    expect(catalog).toMatchObject({ status: 200, body: '{"version":1}' })
+    expect(catalog.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+    for (const path of ['i18n/manifest.json', 'card-encyclopedia/manifest.json', 'cards-manifest.json', 'frontend-build.json']) {
       const response = await get(`/open-agricola/${path}`)
       expect(response.status).toBe(200)
       expect(response.headers['content-type']).toBe('application/json; charset=utf-8')
