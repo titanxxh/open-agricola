@@ -31,6 +31,7 @@
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
 - `services/room-creation.ts` 使用新的已认证连接和独立的待确认命令记录创建房间。恢复时沿用原创建身份，收到持久回执和新房快照后才导航；来源重开失败时保留旧结果和完整的配置调整信息。大厅与两处完成入口共用这条链路。
 - `card-meta.ts` 拉取 `GET /cards-manifest.json`；`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
+- `card-encyclopedia.ts` 只在首次使用时加载百科目录与检索文件，从不在启动时加载。它校验文件哈希，并发调用共享同一次加载，失败后丢弃缓存以便下次重试；服务端把带哈希的文件标为 immutable（[cards](cards_zh.md)）。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
 - 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。其选色器提供六种颜色，禁用其他玩家已占用的颜色，并等待服务端发布保存后的选择。
 - 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
