@@ -227,7 +227,6 @@ export type ToolTransport = {
 /** Only this closure owns the LLM credential. No GitHub/backend port receives it. */
 export function createToolTransport(config: LlmConfig, options: {
   fetch?: typeof fetch
-  beforePost?: (body: string) => Promise<void>
 } = {}): ToolTransport {
   const captured = { ...config }
   const target = Object.freeze(resolveGenerationTarget(captured))
@@ -247,8 +246,6 @@ export function createToolTransport(config: LlmConfig, options: {
       active = true
       try {
         try {
-          signal.throwIfAborted()
-          await options.beforePost?.(body)
           signal.throwIfAborted()
         } catch (error) {
           throw new ModelTurnError('preflight', error instanceof Error ? error.message : 'The request was stopped before contacting the provider.')

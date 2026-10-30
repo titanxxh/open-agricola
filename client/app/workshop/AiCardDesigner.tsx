@@ -8,11 +8,10 @@ import { t as translateMessage } from '../../../shared/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getLlmConfig, saveLlmConfig, clearLlmConfig,
-  getProvider, listModelsFor, defaultModelFor,
+  getProvider, listProviders, listModelsFor, defaultModelFor, PROVIDERS,
   generateCardArt, buildCardArtPrompt,
   supportsImageGeneration, KEY_LLM_CONFIG_ART,
-  PROVIDER_LABELS, PROVIDER_KEY_HINTS,
-  type LlmConfig, type LlmProvider, type ReferenceImage,
+  type LlmConfig, type ProviderId, type ReferenceImage,
 } from '../../services/llm'
 import { WorkshopAbilityPanel } from './WorkshopAbilityPanel'
 import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
@@ -213,7 +212,8 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
 }) {
   const { locale } = useLocale()
   const [expanded, setExpanded] = useState(!config)
-  const [provider, setProvider] = useState<LlmProvider>(config?.provider ?? 'gemini')
+  const [provider, setProvider] = useState<ProviderId>(config?.provider ?? 'gemini')
+  const providerDef = getProvider(provider)
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState(() => {
     if (!config) return defaultModelFor(getProvider('gemini'), capability) ?? ''
@@ -227,7 +227,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
   })
   const [showKey, setShowKey] = useState(false)
 
-  const handleProviderChange = (p: LlmProvider) => {
+  const handleProviderChange = (p: ProviderId) => {
     setProvider(p)
     const next = defaultModelFor(getProvider(p), capability)
     setModel(next ?? '')
@@ -284,20 +284,19 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
 
       <div className="ai-config-bar-fields">
         <div className="ai-provider-btns">
-          {(['gemini', 'openrouter', 'deepseek', 'aihubmix'] as LlmProvider[]).map(p => (
+          {listProviders().map(p => (
             <button
-              key={p}
+              key={p.id}
               type="button"
-              className={`ai-provider-btn${provider === p ? ' active' : ''}`}
-              onClick={() => handleProviderChange(p)}
+              className={`ai-provider-btn${provider === p.id ? ' active' : ''}`}
+              onClick={() => handleProviderChange(p.id)}
             >
-              {PROVIDER_LABELS[p]}
+              {p.label}
             </button>
           ))}
         </div>
 
         {(() => {
-          const providerDef = getProvider(provider)
           const availableModels = listModelsFor(providerDef, capability)
           if (availableModels.length === 0) {
             // Provider has models but none support this capability.
@@ -339,9 +338,9 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
           </button>
         </div>
 
-        {PROVIDER_KEY_HINTS[provider] && (
+        {providerDef.apiKeyHint && (
           <div className="form-hint">
-            {translateMessage(locale, "ui.copy.client_app_workshop_AiCardDesigner_tsx.get_an_api_key_afb3e8")}<a href={`https://${PROVIDER_KEY_HINTS[provider]}`} target="_blank" rel="noopener noreferrer">{PROVIDER_KEY_HINTS[provider]}</a>
+            {translateMessage(locale, "ui.copy.client_app_workshop_AiCardDesigner_tsx.get_an_api_key_afb3e8")}<a href={`https://${providerDef.apiKeyHint}`} target="_blank" rel="noopener noreferrer">{providerDef.apiKeyHint}</a>
           </div>
         )}
 
@@ -367,7 +366,7 @@ function ConfigStatusSummary({
     if (!config) {
       return translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.separator_64832f", { value0: heading, value1: t('platform.aiConfigStatusMissing') })
     }
-    const provider = PROVIDER_LABELS[config.provider] ?? config.provider
+    const provider = PROVIDERS[config.provider]?.label ?? config.provider
     return translateMessage(locale, "ui.copy.app_workshop_AiCardDesigner.separator_8c963e", { value0: heading, value1: provider, value2: config.model })
   }
 

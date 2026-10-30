@@ -79,7 +79,4 @@ export const aihubmixProvider: ProviderDef = {
   apiKeyHelpUrl: 'https://aihubmix.com/token',
   capabilities: { chat: true, image: true },
   generateImage: aihubmixGenerateImage,
-  // No streamChat override — chat goes through the dispatcher's
-  // default OpenAI-compat path (POST {baseUrl}/chat/completions,
-  // Bearer auth, stream:true).
 }

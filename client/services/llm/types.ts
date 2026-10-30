@@ -48,13 +48,6 @@ export type ProviderDef = {
   /** Override default 8192-token cap for openai-compat chat. */
   maxOutputTokens?: number
 
-  // Optional overrides — dispatcher falls back to openai-compat when omitted.
-  streamChat?: (
-    messages: ChatMessage[],
-    systemPrompt: string,
-    config: LlmConfig,
-  ) => AsyncGenerator<string>
-
   generateImage?: (
     prompt: string,
     config: LlmConfig,

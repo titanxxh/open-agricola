@@ -13,7 +13,4 @@ export const deepseekProvider: ProviderDef = {
   apiKeyHint: 'platform.deepseek.com/api_keys',
   apiKeyHelpUrl: 'https://platform.deepseek.com/api_keys',
   capabilities: { chat: true, image: false },
-  // No overrides — uses openai-compat. Both models may emit
-  // reasoning_content alongside content; we only render content. Final
-  // answers stream correctly either way.
 }

@@ -167,7 +167,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 测试及报告只属于候选与当前私有草稿，不进入公开 cardJson、投稿、Replay、不可变版本溯源或其 contentHash。恢复旧版本会清除测试和报告，必须重新生成并执行；相同卡牌内容仍复用已有不可变版本。浏览器报告只是客户端声明，不是服务端执行证明；采用时服务端独立重编译源码并检查身份与 revision。行为入口见 `workshop-generation.test.ts`、`workshop-drafts.test.ts` 和 `workshop-generation.spec.ts`。
 
-`GET /api/workshop/sandbox-contract` 提供实际部署的 helper 源码、hook/listener 元数据、支持的行动参数、隔离限制与语义约束。其标识来自部署中的 shared/executor 源码、锁文件中解析出的依赖版本及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
+`GET /api/workshop/sandbox-contract` 提供部署中的能力名称数组、运行时标识与隔离限制；模型通过资料工具读取实现细节。其标识来自部署中的 shared/executor 源码、锁文件中解析出的依赖版本及运行时版本，与 GitHub 资料 commit 分开记录。`POST /api/workshop/cards/validate-code` 将成功和失败都绑定到该标识及提交源码指纹；过期契约返回 `sandbox_changed`，要求开始新尝试。主浏览器只接收数据，不导入规则运行时。
 
 #### C1.4 质量与成本验收
 
