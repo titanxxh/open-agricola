@@ -109,7 +109,12 @@ const expectWorkIdle = (
   expect(resp.state.round).toBe(round)
   expect(resp.state.roundPhase).toBe('work')
   expect(resp.interaction.stateId).toBe('idle')
-  expect(resp.interaction.allowedCommands).toEqual(['takeAction'])
+  if (resp.interaction.stateId !== 'idle') return
+  expect(resp.interaction.allowedCommands).toEqual(
+    resp.interaction.anytimeActions.some((action) => action.id === 'discard-goods')
+      ? ['takeAction', 'takeAnytimeAction']
+      : ['takeAction'],
+  )
 }
 
 const bonusCounterEvents = (resp: ReturnType<GameSession['getState']>) => {

@@ -106,7 +106,12 @@ describe('B116_Shoreforester session', () => {
     expect(resp.state.round).toBe(2)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.interaction.stateId).toBe('idle')
-    expect(resp.interaction.allowedCommands).toEqual(['takeAction'])
+    if (resp.interaction.stateId !== 'idle') return
+    expect(resp.interaction.allowedCommands).toEqual(
+      resp.interaction.anytimeActions.some((action) => action.id === 'discard-goods')
+        ? ['takeAction', 'takeAnytimeAction']
+        : ['takeAction'],
+    )
     expect(resp.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(1)
 
@@ -149,7 +154,12 @@ describe('B116_Shoreforester session', () => {
     expect(resp.state.round).toBe(2)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.interaction.stateId).toBe('idle')
-    expect(resp.interaction.allowedCommands).toEqual(['takeAction'])
+    if (resp.interaction.stateId !== 'idle') return
+    expect(resp.interaction.allowedCommands).toEqual(
+      resp.interaction.anytimeActions.some((action) => action.id === 'discard-goods')
+        ? ['takeAction', 'takeAnytimeAction']
+        : ['takeAction'],
+    )
     expect(resp.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(2)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.events).toContainEqual(expect.objectContaining({

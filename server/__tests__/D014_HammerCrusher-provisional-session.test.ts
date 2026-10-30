@@ -803,7 +803,7 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     expect(fallback.ok).toBe(true)
     expect(fallback.interaction).toMatchObject({
       stateId: 'idle',
-      allowedCommands: ['takeAction'],
+      allowedCommands: ['takeAction', 'takeAnytimeAction'],
     })
     expect(fallback.state.players[0]).toMatchObject({
       houseType: 'clay',

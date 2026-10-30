@@ -338,7 +338,7 @@ describe('Workshop Capability Contract listener data fields', () => {
     const session = start(`{ listeners: [{ cardIds: [CARD_ID], actions: ['anytime'], phases: ['anytime'], replacesTurn: true,
       handler: () => ({ sourceCard: CARD_ID, flow: ${GAIN_FOOD} }) }] }`, { workers: [2, 2] })
     const entry = `${CARD_ID}:listener:0`
-    expect(session.getState().interaction.anytimeActions.map(action => action.id)).toEqual([entry])
+    expect(session.getState().interaction.anytimeActions.map(action => action.id)).toEqual(['discard-goods', entry])
 
     const used = session.takeAnytimeAction(0, entry)
 
@@ -359,12 +359,12 @@ describe('Workshop Capability Contract listener data fields', () => {
     ] }`)
     const offered = (interaction: { anytimeActions: Array<{ id: string }> }) => interaction.anytimeActions.map(action => action.id)
 
-    expect(offered(session.getState().interaction)).toEqual([`${CARD_ID}:listener:0`, `${CARD_ID}:listener:1`])
+    expect(offered(session.getState().interaction)).toEqual(['discard-goods', `${CARD_ID}:listener:0`, `${CARD_ID}:listener:1`])
 
     const plowing = session.takeAction(0, 'farmland')
 
     expect(plowing.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
-    expect(offered(plowing.interaction)).toEqual([`${CARD_ID}:listener:1`])
+    expect(offered(plowing.interaction)).toEqual(['discard-goods', `${CARD_ID}:listener:1`])
     expect(session.cardWarnings).toEqual([])
   })
 
