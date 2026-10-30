@@ -12,6 +12,7 @@ import { ReplayResources, validViewerPath } from './storage/replay-resources'
 import { ResourceIntegrityError } from './storage/resource-store'
 import { objectHash } from './storage/s3-store'
 import { ReplayStore } from './game/replay-store.ts'
+import { getRequestOrigin } from './http-origin'
 
 const MANIFEST_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/manifest$/
 const SEGMENT_ROUTE = /^\/api\/v1\/replays\/([^/]+)\/segments\/(\d+)$/
@@ -173,7 +174,7 @@ const viewerUnavailable = (res: ServerResponse, status: number): void => {
   res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
 }
 
-const serveViewerFile = async (res: ServerResponse, resources: ReplayResources, buildId: string, rawPath: string): Promise<void> => {
+const serveViewerFile = async (req: IncomingMessage, res: ServerResponse, resources: ReplayResources, buildId: string, rawPath: string): Promise<void> => {
   let path: string
   try { path = decodeURIComponent(rawPath) } catch { viewerUnavailable(res, 404); return }
   if (!validViewerPath(path)) { viewerUnavailable(res, 404); return }
@@ -183,14 +184,15 @@ const serveViewerFile = async (res: ServerResponse, resources: ReplayResources, 
   const object = await resources.storage.read(`replay-viewers/${buildId}/${path}`)
   const hash = path === 'manifest.json' ? buildId : build.files[path]!
   if (!object || objectHash(object.body) !== hash) { viewerUnavailable(res, 503); return }
-  const headers = publicHeaders(mimeType(path), 'public, max-age=31536000, immutable')
+  const headers = publicHeaders(mimeType(path), path === 'index.html' ? 'no-cache' : 'public, max-age=31536000, immutable')
   headers.ETag = `"${hash}"`
   if (path === 'index.html') {
+    const apiOrigin = new URL(process.env.PUBLIC_API_BASE || getRequestOrigin(req)).origin
     headers['Content-Security-Policy'] = [
       "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
       "font-src 'self' https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
-      "connect-src 'self'", "frame-ancestors *", "base-uri 'none'", "form-action 'none'",
+      `connect-src 'self' ${apiOrigin}`, "frame-ancestors *", "base-uri 'none'", "form-action 'none'",
     ].join('; ')
   }
   res.writeHead(200, headers)
@@ -245,6 +247,7 @@ export async function handleReplayRoute(
   }
   if (viewerMatch) {
     try { await serveViewerFile(
+      req,
       res,
       options.resources,
       viewerMatch[1]!,
