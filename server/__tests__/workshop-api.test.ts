@@ -529,7 +529,10 @@ describe('workshop API', () => {
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/sandbox-contract'), descriptor)
       const { contract } = JSON.parse(descriptor.body)
       expect(contract.id).toMatch(/^sandbox-v1:[a-f0-9]{64}$/)
-      expect(contract.helpers).toContain('function getCardDefinition(_cardId)')
+      expect(contract.format).toBe(2)
+      expect(contract.effects).toContain('onBuy')
+      expect(contract).not.toHaveProperty('helpers')
+      expect(contract).not.toHaveProperty('semantics')
       expect(contract.limits).toEqual({ executionTimeoutMs: 100, memoryLimitMb: 8 })
       const invalid = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {

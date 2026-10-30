@@ -124,7 +124,7 @@ server/custom-code/
 - The main thread keeps only a non-executing mirror of the last successful snapshot, restored through a non-settling path so it never re-probes continuations. Inside the Worker, `client.ts` calls isolated-vm synchronously, so `Atomics.wait()` never blocks the HTTP or WebSocket event loop.
 - Before each command an in-memory checkpoint preserves pending state and undo history. A hook timeout or runtime warning restores it and keeps the diagnostic; a Worker crash or overall timeout rebuilds from the last snapshot.
 - `built_in=1` cards use the built-in implementation without a Worker.
-- Sandbox constraints have one source of truth, [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md), with `prompt-sync` blocks checked by `pnpm run check:prompt-sync`.
+- Shared source constants own capability names, and `workshop-sandbox-contract.ts` exposes their format-2 name arrays with runtime identity and limits. Execution boundaries are documented in [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md).
 
 Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
 

@@ -2,20 +2,20 @@
 
 [English](CUSTOM_CARD_SANDBOX.md) | [中文](CUSTOM_CARD_SANDBOX_zh.md)
 
-This document is the **single source of truth** for what custom-card TypeScript submitted through Workshop or AI Designer can and cannot use inside the isolated-vm sandbox.
+This reference explains the execution boundaries for custom-card TypeScript submitted through Workshop or AI Designer. Linked source files own the allowed names and injected helper implementations.
 
 Read this document if you maintain:
 
-- AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed Workshop Capability Contract returned by `server/workshop-sandbox-contract.ts`. Hook, phase, scope, action-ID, helper and semantic facts come from the running backend and shared source metadata; reference examples are read from GitHub on demand.
+- AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed Workshop Capability Contract returned by `server/workshop-sandbox-contract.ts`. The format-2 contract contains deployed capability names, runtime identity, and limits. The model reads source, tests, and this reference from GitHub on demand.
 - Workshop UI copy in `client/app/workshop/AiCardDesigner.tsx` or `WorkshopPage.tsx`.
 - Sandbox references in [`docs/architecture/shared-other.md`](architecture/shared-other.md) and [`docs/architecture/server.md`](architecture/server.md).
 - LLM automation in `docs/test/llm-card-gen.md`, whose fixtures exercise this contract against a real model.
 
 When this document changes:
 
-1. Treat it as the human-readable mirror of hooks, phases, scopes, and action IDs. Source constants own the name allowlists: `cardEffectHooks`, `sandboxListenerPhases`, `sandboxListenerScopes`, and `SANDBOX_ALLOWED_ACTION_IDS`. Exhaustive maps own descriptions. The deployed Workshop Capability Contract renders them at runtime and the browser includes it in the generation prompt; there is no hand-copied prompt table. CI command `pnpm run check:prompt-sync` checks only that the names in each `prompt-sync` block match source.
+1. Keep the source links current. The deployed Workshop Capability Contract derives capability names from source constants.
 2. Make the architecture module documents point here instead of maintaining another copy.
-3. Name synchronization does not cover payment semantics, hook parameters and return values, or helper data shapes. Update executor and prompt-contract tests and run the fixed browser acceptance batch described by `docs/test/llm-card-gen.md`; historical golden replay remains a separate regression check.
+3. Cover execution changes with executor, parity, and two-player Session tests. Owner-run model quality evaluation follows `docs/test/llm-card-gen.md` and requires an approved budget.
 
 Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject to this sandbox. They may import project helpers directly. This contract applies only to Workshop custom cards.
 
@@ -23,32 +23,9 @@ Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject t
 
 ## 1. Injected globals
 
-The server isolate injects these globals, in `server/custom-code/isolate-runner.ts` for hook and listener calls and in `server/custom-code/engine.ts` for manifest extraction:
+Hook and listener calls are defined in [`isolate-runner.ts`](../server/custom-code/isolate-runner.ts), and manifest extraction in [`engine.ts`](../server/custom-code/engine.ts). Those entries define the constructor and console stubs. Shared injected helper bodies live in [`injected-helpers.ts`](../shared/custom-code/injected-helpers.ts).
 
-<!-- prompt-sync:begin id=sandbox-injections -->
-
-| Global | Shape | Notes |
-|---|---|---|
-| `MinorImprovement(def)` | Function stub | Returns `def` directly; `new MinorImprovement(def)` also works |
-| `Occupation(def)` | Function stub | Same behavior |
-| `console.log(...)` / `console.warn(...)` | Functions | Forward to host `console`; nonstring arguments pass through `JSON.stringify` |
-| `gainLeaf(cardId, resources)` | Function | Returns `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }` |
-| `payLeaf({ cardId, cost })` | Function | Returns `{ type: 'leaf', actionId: 'pay', params: cost, sourceCard: cardId }` |
-| `spaceHasPlayer(space, playerId)` | Function | Tests whether a specific player occupies an action space |
-| `positionKey(pos)` | Function | Converts `{ row, col }` to deterministic string `"row-col"` |
-| `getCardDefinition(cardId)` | Function stub | Always returns `null`; the sandbox cannot access the card registry |
-| `getCardStack(player, cardId)` | Function | Returns a shallow copy of `player.cardStates[cardId].stack` |
-| `readCardExtraData(player, cardId)` | Function | Returns a shallow copy of `player.cardStates[cardId].extraData` |
-
-<!-- prompt-sync:end id=sandbox-injections -->
-
-`registerCardEffect` and `registerCardListener` are no longer injected. The current contract exports `CARD_DEF` and `CARD_IMPL` constants, described in section 7.
-
-No project helper is injected. Calling any of the following throws `ReferenceError`:
-
-`familySize`, `workersAvailable`, `workersAtHome`, `getFenceCount`, `getPalisadeCount`, `countFields`, `countOccupations`, `countPeopleOnSpace`, `fieldHasCrop`, `fieldHasGrain`, `fieldHasVegetable`, `cardCountsAs`, `isEffectivelyMajor`, `holdWorkerOnCard`, `releaseWorkerFromCard`, `initCardState`, `incCounter`, `setCounter`, `setFlag`, and every other export under `shared/domain/player.ts`, `shared/cards/__stubs__/helpers.ts`, or `shared/cards/helpers/`.
-
-Use an injected helper above or read `state` and `player` fields directly as described in section 4.
+Only the helpers declared there are available. Other project exports are not injected. Read `state` and `player` snapshots as described in section 4, and return supported flows to change game state. Source declares `CARD_ID`, `CARD_DEF`, and `CARD_IMPL` as described in section 7.
 
 ### 1.1 Extra normalization from Workshop to repository pull request
 
@@ -149,59 +126,13 @@ Common hallucinated fields that do not exist are `space.params`, `space.target`,
 
 ## 3. Recognized hook, phase, and scope allowlists
 
-The marked blocks below are machine checked against `cardEffectHooks` in `shared/projections/card-effect-hooks.ts`, `sandboxListenerPhases` in `shared/custom-code/sandbox-listener-phases.ts`, and `sandboxListenerScopes` in `shared/custom-code/sandbox-listener-scopes.ts`. Do not alter marker formatting; `pnpm run check:prompt-sync` will fail.
+The linked source constants define the supported hook, listener phase, and scope names. The deployed contract returns those name arrays.
 
 ### 3.1 Hooks available under `CARD_IMPL.effect`
 
 Only keys in `cardEffectHooks` are registered. The AST validator hard-fails an unlisted key when saving, and manifest extraction rejects one that still reaches it instead of dropping it.
 
-<!-- prompt-sync:begin id=card-effect-hooks -->
-- `onBuy`
-- `onBeforeWork`
-- `onRoundStart`
-- `onHarvest`
-- `onRoundEnd`
-- `onEndTurn`
-- `onReturnHome`
-- `onBeforeReturnHome`
-- `onStartReturnHome`
-- `onAfterRoundEnd`
-- `onBeforeHarvest`
-- `onStartHarvest`
-- `onStartHarvestFieldPhase`
-- `onHarvestFieldPhase`
-- `onEndHarvestFieldPhase`
-- `onAfterReap`
-- `onStartHarvestFeedingPhase`
-- `onHarvestFeedingPhase`
-- `onEndHarvestFeedingPhase`
-- `onEndHarvest`
-- `onAfterHarvest`
-- `onBeforeEndGame`
-- `onBeforeStartOfTurn`
-- `onBeforePlayerTurn`
-- `onAllWorkersPlaced`
-- `resolveChoice`
-- `contributeExtraTurn`
-- `computeBonusScore`
-- `computeCostedBonus`
-- `computeSharedPostScore`
-- `computeExtraRoomCapacity`
-- `computeHarvestBreedOrderPriority`
-- `onComputeAnimalZones`
-- `computeLockedFarmTiles`
-- `getInvalidAnimals`
-- `getBuiltSpecialStables`
-- `getRuleContributions`
-- `getStatePresentation`
-- `computeResourceCommitments`
-- `countExtraTurns`
-- `enforceReorganizeOnLastHarvest`
-- `computeBreedThreshold`
-- `computeBreedableAnimalCount`
-- `computeAnimalScoreAdjustment`
-- `onComputeSharedAnimalZones`
-<!-- prompt-sync:end id=card-effect-hooks -->
+The supported hook names are defined in [`cardEffectHooks`](../shared/projections/card-effect-hooks.ts).
 
 `onBeforeWork` runs after round growth and future-meeple actions but before `onRoundStart`. Use it only when the card explicitly acts before the work phase.
 
@@ -278,43 +209,13 @@ Every listener requires explicit, nonempty `actions` and `phases`. Every action 
 
 `actions` accepts only these high-level action IDs. The AST validator rejects an unknown ID:
 
-<!-- prompt-sync:begin id=listener-actions -->
-- `collect`
-- `gain`
-- `receive`
-- `plow`
-- `sow`
-- `construct`
-- `renovate-house`
-- `fence`
-- `stables`
-- `improvement`
-- `occupation`
-- `place-farmer`
-- `family-growth`
-- `bake-bread`
-- `breed`
-- `reap`
-- `anytime`
-- `compute-exchanges`
-<!-- prompt-sync:end id=listener-actions -->
+The supported listener actions are defined in [`sandboxListenerActions`](../shared/custom-code/sandbox-listener-actions.ts).
 
 `sandboxListenerPhases` is the Workshop listener-phase allowlist. The AST validator rejects unsupported phases in new source. Saved executable manifests are checked before session or runtime registration; the isolated session factory checks original cards before stripping executable fields from its parent mirror. An unsupported phase rejects creation before any card effects, listeners, or workers are installed. HTTP game creation returns 400 with `code: 'unsupported_listener_phase'` for an unknown phase or `unsupported_listener_subscription` for an invalid target, missing selector or invalid combination; WS creation reports the error before persisting the Room. `during` is unsupported and is never translated to `after`. Saved drafts and versions remain readable for editing.
 
-<!-- prompt-sync:begin id=action-hook-phases -->
-- `before`
-- `immediatelyAfter`
-- `after`
-- `computeCosts`
-- `computeArgs`
-- `computeReplace`
-- `isDoable`
-- `anytime`
-- `computeChoiceCandidates`
-- `computeExchanges`
-<!-- prompt-sync:end id=action-hook-phases -->
+The supported listener phases are defined in [`sandboxListenerPhases`](../shared/custom-code/sandbox-listener-phases.ts).
 
-A `computeExchanges` listener adds exchanges that depend on the current state to the owner's exchange menu. Omit `actions`. The handler is a pure query that receives the window in `context.extraData.window`, `'anytime'` or `'harvest'`, and returns `{ extraExchanges: [{ from, to, triggers: [window] }], sourceCard: CARD_ID }`.
+A `computeExchanges` listener adds exchanges that depend on the current state to the owner's exchange menu. Declare `actions: ['compute-exchanges']`. The handler is a pure query that receives the window in `context.extraData.window`, `'anytime'` or `'harvest'`, and returns `{ extraExchanges: [{ from, to, triggers: [window] }], sourceCard: CARD_ID }`.
 
 ### 3.3 Payment-mechanism boundary
 
@@ -372,13 +273,8 @@ Do not generate `deriveCardCostCandidate`, `cardCostCandidateMandatory`, `getBas
 
 ### 3.4 `scope` values
 
-`sandboxListenerScopes` permits:
 
-<!-- prompt-sync:begin id=listener-scopes -->
-- `player`
-- `opponent`
-- `any`
-<!-- prompt-sync:end id=listener-scopes -->
+The supported scopes are defined in [`sandboxListenerScopes`](../shared/custom-code/sandbox-listener-scopes.ts).
 
 An unlisted scope fails on save. An omitted scope defaults to `player`.
 
@@ -452,46 +348,11 @@ It also checks that `CARD_IMPL.effect` keys belong to `cardEffectHooks` plus all
 
 ### 5.1 Denied bare identifiers
 
-<!-- prompt-sync:begin id=denied-identifiers -->
-- `eval`
-- `Function`
-- `process`
-- `require`
-- `globalThis`
-- `global`
-- `window`
-- `document`
-- `__dirname`
-- `__filename`
-- `self`
-- `importScripts`
-- `postMessage`
-- `WorkerGlobalScope`
-- `indexedDB`
-- `fetch`
-- `XMLHttpRequest`
-- `WebSocket`
-- `setTimeout`
-- `setInterval`
-- `setImmediate`
-- `clearTimeout`
-- `clearInterval`
-- `Deno`
-- `Bun`
-- `Proxy`
-- `Reflect`
-<!-- prompt-sync:end id=denied-identifiers -->
+The exact identifier denylist is `DENIED_IDENTIFIERS` in [`ast-validator.ts`](../shared/custom-code/ast-validator.ts).
 
 ### 5.2 Denied property access through `obj.x` or `obj['x']`
 
-<!-- prompt-sync:begin id=denied-property-access -->
-- `constructor`
-- `__proto__`
-- `__defineGetter__`
-- `__defineSetter__`
-- `__lookupGetter__`
-- `__lookupSetter__`
-<!-- prompt-sync:end id=denied-property-access -->
+The exact property denylist is `DENIED_PROPERTY_ACCESS` in [`ast-validator.ts`](../shared/custom-code/ast-validator.ts).
 
 ### 5.3 Denied language constructs
 
@@ -614,33 +475,7 @@ Before execution, the AST validator rejects inspectable composite literals that 
 
 These are frequent mistakes. `shared/actions/effects/*` contains the complete repository list.
 
-<!-- prompt-sync:begin id=action-ids -->
-- `gain`
-- `pay`
-- `bonus-vp`
-- `bake-bread`
-- `store-on-card`
-- `take-from-card`
-- `push-to-card-stack`
-- `special-effect`
-- `future-meeples`
-- `plow`
-- `sow`
-- `fence`
-- `stables`
-- `construct`
-- `renovate-house`
-- `improvement`
-- `occupation`
-- `family-growth`
-- `breed`
-- `reap`
-- `exchange`
-- `set-first-player`
-- `selection`
-- `emit-choice`
-- `reorganize`
-<!-- prompt-sync:end id=action-ids -->
+The Workshop action allowlist is [`SANDBOX_ALLOWED_ACTION_IDS`](../shared/custom-code/sandbox-action-ids.ts). Native action implementations live in [`shared/actions/effects/`](../shared/actions/effects/).
 
 These IDs are enforced, not only recommended. Source validation rejects a visible leaf with another ID. Both executors reject a returned `flow`, `alternativeFlow`, `followUpActions` entry, or replacement `actionId` that uses one, including inside nested groups. The whole result is rejected before any node runs; section 9.3 describes what the player then sees.
 
@@ -682,7 +517,7 @@ These sixteen actions are returned as flow leaves only. A listener result's repl
 
 A leaf of a native action counts as that action for other cards. A card that reacts to the Build Rooms action therefore also reacts to a `construct` leaf. Write `actionContext: { trueAction: false }` on the leaf when the card lets the player do the thing without taking that action, as in “build 1 room”; omit it when the card says the player takes the action. Listeners read the flag as `context.trueAction`.
 
-Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. CI `check-prompt-sync` ensures the prompt exposes only allowlisted IDs. A sandbox card must not use another ID.
+Sprint 6b on 2026-04-30 removed five separate mutation IDs, `flag-card`, `unflag-card`, `set-card-infobox`, `clear-card-infobox`, and `write-card-extra-data`, plus three dead IDs, `hold-worker-on-card`, `release-worker-from-card`, and `gain-other-players`. Use the `special-effect` discriminated union. Source admission and both executors reject action IDs outside the source allowlist.
 
 ### 6.1 Allowed sandbox subset of `special-effect.params.kind`
 
@@ -798,22 +633,15 @@ The local sandbox is a dry run for multiplayer play. Semantic divergence would b
 
 ## 9. Synchronization responsibilities
 
-### 9.1 After this document changes
+### 9.1 Deployed contract and references
 
-- `server/workshop-sandbox-contract.ts` derives deployed hooks, phases, scopes, action IDs and helper bodies from shared source and descriptive metadata. `client/services/llm/generation/prompt.ts` includes that contract, guarded by `client/services/__tests__/generation-prompt.test.ts`. CI `pnpm run check:prompt-sync` compares every marked block here with source. The browser reads this document and examples from current GitHub main, pinned per attempt; they are not bundled with the site.
-- `docs/architecture/shared-other.md` and `docs/architecture/server.md` only need to point to this file.
-- `client/app/workshop/AiCardDesigner.tsx` only needs to point to this file.
+[`server/workshop-sandbox-contract.ts`](../server/workshop-sandbox-contract.ts) derives the format-2 contract from source: runtime identity, limits, and capability names. [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) includes that contract. Helper bodies and behavioral guidance stay in source and reference documents, read from GitHub at the commit pinned for the attempt.
 
-### 9.2 After hook, phase, scope, or denylist source changes
+Architecture documents and UI guidance link to this reference instead of maintaining parallel capability tables.
 
-- A change to `cardEffectHooks` in `shared/projections/card-effect-hooks.ts` updates the section 3.1 block.
-- A change to `sandboxListenerPhases` in `shared/custom-code/sandbox-listener-phases.ts` updates section 3.2.
-- A change to `sandboxListenerScopes` in `shared/custom-code/sandbox-listener-scopes.ts` updates section 3.4.
-- A change to `DENIED_IDENTIFIERS` or `DENIED_PROPERTY_ACCESS` in `shared/custom-code/ast-validator.ts` updates sections 5.1 or 5.2.
+### 9.2 Execution changes
 
-CI catches a missing set update.
-
-`check:prompt-sync` prevents only name-set drift. A payment-solver, executor argument, JSON boundary, or injected-helper change also updates `client/services/__tests__/generation-prompt.test.ts`, corresponding executor or parity tests, and semantic contract tests. When generation strategy changes, add or tighten a real `GameSession` fixture, freeze the implementation, and run the complete browser acceptance batch under the approved budget. Preserve earlier failures and distinguish synthetic runs and historical golden replay from model admission; see `docs/test/llm-card-gen.md`.
+Update the relevant executor, parity, and two-player Session tests when payment behavior, hook arguments, JSON boundaries, or injected helpers change. [`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) exercises timing and payment directly. Capability names need the fixed behavior coverage required by ADR 0025. Model quality evaluation and its existing owner-approved budget remain in [`llm-card-gen.md`](test/llm-card-gen.md).
 
 ### 9.3 Workshop Capability Contract rules
 

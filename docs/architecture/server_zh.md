@@ -125,7 +125,7 @@ server/custom-code/
 - 主线程只保留最后一次成功快照的非执行镜像，经不结算的恢复路径载入，因此从不重新探测续行。在 Worker 内，`client.ts` 同步调用 isolated-vm，因此 `Atomics.wait()` 从不阻塞 HTTP 或 WebSocket 事件循环。
 - 每个命令前在内存中建立检查点，保留 pending 状态与撤销历史。hook 超时或运行时警告会恢复它并保留诊断；Worker 崩溃或整体超时会从最后快照重建。
 - `built_in=1` 的卡使用内置实现，不创建 Worker。
-- 沙盒约束只有一个权威来源 [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md)，其 `prompt-sync` 块由 `pnpm run check:prompt-sync` 检查。
+- shared 源码常量拥有能力名称，`workshop-sandbox-contract.ts` 以 format-2 名称数组提供这些名称、运行时标识和限制。执行边界见 [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md)。
 
 测试：`server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`。
 

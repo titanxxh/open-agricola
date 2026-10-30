@@ -50,6 +50,8 @@ pnpm test:llm:live --model deepseek-flash --diagnose M2-per-action-bonus --runti
 
 产品不再维护 provider/endpoint/model 精确白名单，用户可尝试网站已有模型选项，实际错误由协议与工具反馈。固定测试是维护者的回归与质量评估，不作为模型启用开关。合成演练和历史 golden 不能证明新模型质量，历史验收也只对应原批次。
 
+生成 prompt 只提供部署能力名称、运行时标识和限制；模型按需读取真实源码与直接行为或 Session 测试。时序和支付回归位于 `server/__tests__/workshop-timing-payment-session.test.ts`，直接构造测试源码，不从文档样例提取。
+
 每张新卡的浏览器测试由模型编写，以普通 TypeScript / Chai 脚本通过 `run_tests` 在隔离 Worker 内执行。它与固定 fixture 质量判题互不替代。候选采用必须通过源码校验及匹配当前源码、测试、Worker 产物的浏览器 UT；零测试不可通过。浏览器 UT 报告是客户端声明，服务端仍独立校验源码与卡牌身份。运行入口见 `client/local-sandbox/card-tests.ts`，完整网站验证见 `e2e-tests/workshop-generation.spec.ts`，隔离与中断见 `e2e-tests/workshop-browser-card-tests.spec.ts`。
 
 ### 本地产物与预算

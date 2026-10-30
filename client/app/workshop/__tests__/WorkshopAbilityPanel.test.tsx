@@ -39,7 +39,7 @@ beforeEach(() => {
   complete.mockResolvedValue(clarification)
   const ports: AttemptPorts = {
     model: { target: { provider: config.provider, model: config.model, endpoint: 'https://api.deepseek.com/v1/chat/completions' }, complete },
-    loadContract: async () => ({ format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, actions: {}, listeners: { actions: [], phases: {}, scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, helpers: '', semantics: [] }),
+    loadContract: async () => ({ format: 2, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: [], actions: [], listeners: { actions: [], phases: [], scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } } }),
     openReferences: async () => ({ commit: 'b'.repeat(40), reads: [], execute: async () => '' }),
     validate: vi.fn(),
     runTests: async () => ({ browserRuntimeId: 'runtime-ui', outcome: { kind: 'passed', count: 1 } }),

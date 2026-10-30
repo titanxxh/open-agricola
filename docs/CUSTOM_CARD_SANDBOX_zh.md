@@ -2,22 +2,22 @@
 
 [English](CUSTOM_CARD_SANDBOX.md) | [中文](CUSTOM_CARD_SANDBOX_zh.md)
 
-> 本文是 [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) 的中文镜像；英文版是 prompt 同步与沙盒校验的规范文档。
+> 本文是 [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) 的中文镜像；英文版是本文的权威版本，允许的名称与 helper 实现以链接的源码为准。
 
 以下为英文规范文档的中文翻译，描述 Workshop / AI Designer 提交的自定义卡 TS 代码在 isolated-vm 沙盒里**实际能用什么、不能用什么**。
 
 > **谁该读这个文件**：
 >
-> - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署工坊能力契约；hook / phase / scope / actionId、helper 和运行语义来自实际运行的后端及 shared 描述元数据，样例由浏览器按需从 GitHub 读取
+> - **AI 系统提示词作者** — `client/services/llm/generation/prompt.ts` 包含 `server/workshop-sandbox-contract.ts` 返回的已部署工坊能力契约；format-2 契约只包含已部署能力的名字、运行时标识和限制；模型按需从 GitHub 读取源码、测试和本文
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
 > - **设计文档作者** — `docs/architecture/shared-other.md` 与 `docs/architecture/server.md` 中提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证工坊能力契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
-> 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；已部署的工坊能力契约在运行时派生这些内容，由浏览器放入生成 prompt，**不再手工同步 prompt 表格**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
-> 2. 让架构 module 文档引用本文件而不是另行维护一份
-> 3. 支付语义、hook 参数/返回值和 helper 数据形状不是名字同步能覆盖的；同步更新 executor / prompt contract 测试，并按 `docs/test/llm-card-gen.md` 跑固定浏览器验收批次；历史 golden 回放保留为独立回归检查
+> 1. 保持源码链接有效。已部署工坊能力契约从源码常量派生能力名称。
+> 2. 架构文档引用本文，不另行维护能力表。
+> 3. 执行行为变化由 executor、parity 和两人 Session 测试覆盖；模型质量评估遵循 `docs/test/llm-card-gen.md` 及 owner 已批准的预算。
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/domain/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
 
@@ -25,33 +25,9 @@
 
 ## 1. 沙盒注入的全局
 
-服务端 isolate 注入以下全局：hook 和 listener 调用在 `server/custom-code/isolate-runner.ts`，manifest 提取在 `server/custom-code/engine.ts`：
+hook 和 listener 调用定义在 [`isolate-runner.ts`](../server/custom-code/isolate-runner.ts)，manifest 提取定义在 [`engine.ts`](../server/custom-code/engine.ts)。这些入口定义构造函数和 console stub。共享注入 helper 的正文见 [`injected-helpers.ts`](../shared/custom-code/injected-helpers.ts)。
 
-<!-- prompt-sync:begin id=sandbox-injections -->
-
-| 全局                                       | 形态      | 备注                                                                                 |
-| ---------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
-| `MinorImprovement(def)`                  | 函数 stub | 直接 `return def`，`new MinorImprovement(def)` 也能跑                                    |
-| `Occupation(def)`                        | 函数 stub | 同上                                                                                 |
-| `console.log(...)` / `console.warn(...)` | 函数      | 转发到宿主 `console`，参数会被 `JSON.stringify`（非字符串时）                                       |
-| `gainLeaf(cardId, resources)`            | 函数      | 返回 `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }`     |
-| `payLeaf({ cardId, cost })`              | 函数      | 返回 `{ type: 'leaf', actionId: 'pay', params: cost, sourceCard: cardId }`           |
-| `spaceHasPlayer(space, playerId)`        | 函数      | 判断某个行动位是否已被指定玩家占据                                                                  |
-| `positionKey(pos)`                       | 函数      | 将 `{ row, col }` 转为确定性字符串 `"row-col"`                                              |
-| `getCardDefinition(cardId)`              | 函数 stub | 沙盒里始终返回 `null`（无法访问卡牌注册表）                                                          |
-| `getCardStack(player, cardId)`           | 函数      | 读取 `player.cardStates[cardId].stack` 的浅拷贝                                          |
-| `readCardExtraData(player, cardId)`      | 函数      | 读取 `player.cardStates[cardId].extraData` 的浅拷贝                                      |
-
-<!-- prompt-sync:end id=sandbox-injections -->
-
-
-**不再注入** `registerCardEffect` / `registerCardListener`。新契约通过 `CARD_DEF` + `CARD_IMPL` 双常量导出（见 §7）。
-
-**不注入**任何项目内 helper。下面这一组在沙盒里调用会抛 `ReferenceError`：
-
-`familySize`, `workersAvailable`, `workersAtHome`, `getFenceCount`, `getPalisadeCount`, `countFields`, `countOccupations`, `countPeopleOnSpace`, `fieldHasCrop`, `fieldHasGrain`, `fieldHasVegetable`, `cardCountsAs`, `isEffectivelyMajor`, `holdWorkerOnCard`, `releaseWorkerFromCard`, `initCardState`, `incCounter`, `setCounter`, `setFlag`, ...（即 `shared/domain/player.ts` / `shared/cards/__stubs__/helpers.ts` / `shared/cards/helpers/`* 里所有导出）。
-
-**替代方案**：使用上述注入的 helper 函数，或直接读 `state` / `player` 字段（见 §4）。
+沙盒只提供其中声明的 helper，不注入其他项目导出。按 §4 读取 `state` 和 `player` 快照，返回支持的 flow 来修改游戏状态。源码声明 `CARD_ID`、`CARD_DEF` 和 `CARD_IMPL`，见 §7。
 
 ---
 
@@ -162,7 +138,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ## 3. 沙盒识别的 hook / phase / scope 白名单
 
-> **机器可校验段落（CI 会扫）**：本节的三个列表通过下面的标记块与 `shared/projections/card-effect-hooks.ts` 的 `cardEffectHooks`、`shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases`、`shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
+可用 hook、listener phase 和 scope 名称由下方链接的源码常量定义。部署契约返回这些名称数组。
 
 ### 3.1 `CARD_IMPL.effect` 可用 hook
 
@@ -170,53 +146,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 
 
-<!-- prompt-sync:begin id=card-effect-hooks -->
-- `onBuy`
-- `onBeforeWork`
-- `onRoundStart`
-- `onHarvest`
-- `onRoundEnd`
-- `onEndTurn`
-- `onReturnHome`
-- `onBeforeReturnHome`
-- `onStartReturnHome`
-- `onAfterRoundEnd`
-- `onBeforeHarvest`
-- `onStartHarvest`
-- `onStartHarvestFieldPhase`
-- `onHarvestFieldPhase`
-- `onEndHarvestFieldPhase`
-- `onAfterReap`
-- `onStartHarvestFeedingPhase`
-- `onHarvestFeedingPhase`
-- `onEndHarvestFeedingPhase`
-- `onEndHarvest`
-- `onAfterHarvest`
-- `onBeforeEndGame`
-- `onBeforeStartOfTurn`
-- `onBeforePlayerTurn`
-- `onAllWorkersPlaced`
-- `resolveChoice`
-- `contributeExtraTurn`
-- `computeBonusScore`
-- `computeCostedBonus`
-- `computeSharedPostScore`
-- `computeExtraRoomCapacity`
-- `computeHarvestBreedOrderPriority`
-- `onComputeAnimalZones`
-- `computeLockedFarmTiles`
-- `getInvalidAnimals`
-- `getBuiltSpecialStables`
-- `getRuleContributions`
-- `getStatePresentation`
-- `computeResourceCommitments`
-- `countExtraTurns`
-- `enforceReorganizeOnLastHarvest`
-- `computeBreedThreshold`
-- `computeBreedableAnimalCount`
-- `computeAnimalScoreAdjustment`
-- `onComputeSharedAnimalZones`
-<!-- prompt-sync:end id=card-effect-hooks -->
+可用 hook 名称以 [`cardEffectHooks`](../shared/projections/card-effect-hooks.ts) 为准。
 
 
 `onBeforeWork` 在回合资源增长和 future-meeple 行动之后、`onRoundStart` 之前触发；仅用于卡面明确写明“工作阶段开始前”的效果。
@@ -299,43 +229,13 @@ listener 始终属于自己的卡：只有这张卡在 `scope` 选中的玩家�
 
 `actions` 只能使用以下高层 action ID；AST validator 会硬拒绝未知 ID：
 
-<!-- prompt-sync:begin id=listener-actions -->
-- `collect`
-- `gain`
-- `receive`
-- `plow`
-- `sow`
-- `construct`
-- `renovate-house`
-- `fence`
-- `stables`
-- `improvement`
-- `occupation`
-- `place-farmer`
-- `family-growth`
-- `bake-bread`
-- `breed`
-- `reap`
-- `anytime`
-- `compute-exchanges`
-<!-- prompt-sync:end id=listener-actions -->
+可用 listener action 以 [`sandboxListenerActions`](../shared/custom-code/sandbox-listener-actions.ts) 为准。
 
 `sandboxListenerPhases` 是 Workshop listener phase 白名单。AST validator 拒绝新源码中不支持的阶段；已保存的可执行 manifest 在 Session 或 runtime 注册前检查，隔离 Session 工厂先检查原始卡牌，再剥离父进程镜像中的可执行字段。不支持的订阅会在任何卡牌 effect、listener 或 worker 安装前拒绝创建。HTTP 创建对局返回 400，未知阶段用 `code: 'unsupported_listener_phase'`，非法目标、缺少筛选或错误组合用 `unsupported_listener_subscription`；WS 创建在持久化 Room 前返回错误。`during` 不再支持，也不会映射为 `after`；草稿和历史版本仍可读取、编辑。
 
 
 
-<!-- prompt-sync:begin id=action-hook-phases -->
-- `before`
-- `immediatelyAfter`
-- `after`
-- `computeCosts`
-- `computeArgs`
-- `computeReplace`
-- `isDoable`
-- `anytime`
-- `computeChoiceCandidates`
-- `computeExchanges`
-<!-- prompt-sync:end id=action-hook-phases -->
+可用 listener phase 以 [`sandboxListenerPhases`](../shared/custom-code/sandbox-listener-phases.ts) 为准。
 
 `computeExchanges` listener 把依赖当前状态的兑换加进持有者的兑换菜单。不要写 `actions`。handler 是纯查询，从 `context.extraData.window` 读到窗口（`'anytime'` 或 `'harvest'`），返回 `{ extraExchanges: [{ from, to, triggers: [window] }], sourceCard: CARD_ID }`。
 
@@ -403,11 +303,7 @@ return {
 
 
 
-<!-- prompt-sync:begin id=listener-scopes -->
-- `player`
-- `opponent`
-- `any`
-<!-- prompt-sync:end id=listener-scopes -->
+可用 scope 以 [`sandboxListenerScopes`](../shared/custom-code/sandbox-listener-scopes.ts) 为准。
 
 
 
@@ -489,35 +385,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 
 
-<!-- prompt-sync:begin id=denied-identifiers -->
-- `eval`
-- `Function`
-- `process`
-- `require`
-- `globalThis`
-- `global`
-- `window`
-- `document`
-- `__dirname`
-- `__filename`
-- `self`
-- `importScripts`
-- `postMessage`
-- `WorkerGlobalScope`
-- `indexedDB`
-- `fetch`
-- `XMLHttpRequest`
-- `WebSocket`
-- `setTimeout`
-- `setInterval`
-- `setImmediate`
-- `clearTimeout`
-- `clearInterval`
-- `Deno`
-- `Bun`
-- `Proxy`
-- `Reflect`
-<!-- prompt-sync:end id=denied-identifiers -->
+完整标识符禁用列表以 [`ast-validator.ts`](../shared/custom-code/ast-validator.ts) 的 `DENIED_IDENTIFIERS` 为准。
 
 
 
@@ -525,14 +393,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 
 
 
-<!-- prompt-sync:begin id=denied-property-access -->
-- `constructor`
-- `__proto__`
-- `__defineGetter__`
-- `__defineSetter__`
-- `__lookupGetter__`
-- `__lookupSetter__`
-<!-- prompt-sync:end id=denied-property-access -->
+完整属性禁用列表以 [`ast-validator.ts`](../shared/custom-code/ast-validator.ts) 的 `DENIED_PROPERTY_ACCESS` 为准。
 
 
 
@@ -662,33 +523,7 @@ return {
 下面这几个是高频踩坑点。完整 `actionId` 列表见 `shared/actions/effects/*` 目录。
 
 
-<!-- prompt-sync:begin id=action-ids -->
-- `gain`
-- `pay`
-- `bonus-vp`
-- `bake-bread`
-- `store-on-card`
-- `take-from-card`
-- `push-to-card-stack`
-- `special-effect`
-- `future-meeples`
-- `plow`
-- `sow`
-- `fence`
-- `stables`
-- `construct`
-- `renovate-house`
-- `improvement`
-- `occupation`
-- `family-growth`
-- `breed`
-- `reap`
-- `exchange`
-- `set-first-player`
-- `selection`
-- `emit-choice`
-- `reorganize`
-<!-- prompt-sync:end id=action-ids -->
+工坊 action 白名单以 [`SANDBOX_ALLOWED_ACTION_IDS`](../shared/custom-code/sandbox-action-ids.ts) 为准。原生实现位于 [`shared/actions/effects/`](../shared/actions/effects/)。
 
 这些 ID 是强制执行的，不只是推荐。源码校验会拒绝可见的其他 ID 的 leaf。两个执行器会拒绝使用其他 ID 的返回值，包括 `flow`、`alternativeFlow`、`followUpActions` 条目和替换用的 `actionId`，嵌套分组内也一样。整份返回值在任何节点执行前被拒绝；玩家随后看到的行为见 §9.3。
 
@@ -730,7 +565,7 @@ return {
 
 对其他卡来说，原生行动的 leaf 就算作那个行动本身。因此监听“建房行动”的卡，对 `construct` leaf 也会触发。如果卡牌只是让玩家做这件事、而不是执行那个行动（例如“建造 1 间房”），在 leaf 上写 `actionContext: { trueAction: false }`；卡面写明玩家执行该行动时不要写。listener 通过 `context.trueAction` 读到这个标记。
 
-> Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
+> Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。源码准入和两个执行器都会拒绝源码白名单之外的 actionId。
 
 ### 6.1 `special-effect` `params.kind` 沙盒可用子集
 
@@ -848,22 +683,15 @@ const CARD_IMPL = {
 
 ## 9. 同步责任
 
-### 9.1 修改本文件 → 谁会自动同步
+### 9.1 部署契约与参考资料
 
-- `server/workshop-sandbox-contract.ts` 从 shared 真相源和描述元数据派生部署的 hook / phase / scope / actionId 与 helper 正文，`client/services/llm/generation/prompt.ts` 包含该契约，由 `client/services/__tests__/generation-prompt.test.ts` 守卫。CI `pnpm run check:prompt-sync` 校验本文件的全部 `prompt-sync` 块与源码一致。浏览器从 GitHub 当前 main 读取本文和样例，每次尝试固定 SHA，不随站点打包发布。
-- `**docs/architecture/shared-other.md**`、`**docs/architecture/server.md**`：手工同步引用本文件即可。
-- `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
+[`server/workshop-sandbox-contract.ts`](../server/workshop-sandbox-contract.ts) 从源码派生 format-2 契约，包含运行时标识、限制和能力名称。[`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) 包含该契约。helper 正文和行为说明保留在源码与参考文档中，由模型从每次尝试固定 commit 的 GitHub 资料按需读取。
 
-### 9.2 修改 hook / phase / scope / denylist 代码 → 必须更新本文件
+架构文档和 UI 指引引用本文，不维护平行的能力表。
 
-- 在 `shared/projections/card-effect-hooks.ts` 的 `cardEffectHooks` 数组增删一项 → 改本文件 §3.1 同名 `prompt-sync` 块
-- 在 `shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases` 增删 phase → 改本文件 §3.2
-- 在 `shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 增删 scope → 改本文件 §3.4
-- 在 `shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 增删项 → 改本文件 §5.1 / §5.2
+### 9.2 执行行为变化
 
-CI 会拦下漏改的情况。
-
-`check:prompt-sync` 只防名字集合漂移。修改支付器、executor 参数透传、JSON 边界或 injected helper 时，还必须更新 `client/services/__tests__/generation-prompt.test.ts`、对应 executor/parity 测试和语义 contract 测试；涉及生成策略时增加或收紧真实 `GameSession` fixture，冻结实现，并在已批准预算内跑完整浏览器验收批次。保留历史失败，将合成演练、历史 golden 回放与模型准入分开；详见 `docs/test/llm-card-gen.md`。
+修改支付行为、hook 参数、JSON 边界或 injected helper 时，更新对应的 executor、parity 和两人 Session 测试。[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) 直接验证触发时序和支付。能力名称仍须满足 ADR 0025 的固定行为测试要求。模型质量评估及现有 owner 批准预算保留在 [`llm-card-gen.md`](test/llm-card-gen.md)。
 
 ### 9.3 工坊能力契约规则
 
