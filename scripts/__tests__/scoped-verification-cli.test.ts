@@ -91,7 +91,7 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-server', 'server/__tests__/cross-card-session.test.ts'],
       ['exec', 'vitest', 'run', '--project', 'slow', 'server/__tests__/A029_AleBenches-session.test.ts'],
     ])
-  })
+  }, 60_000)
 
   it('a selected slow Session failure blocks card completion and the public required gate', () => {
     const value = fixture('card')

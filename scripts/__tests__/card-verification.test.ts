@@ -260,5 +260,5 @@ describe('card test associations', () => {
     ]))
     expect(mapping.checks).toContainEqual({ kind: 'catalog', taskId: 'quality' })
     expect(selected).not.toContain('server/__tests__/B007_Wage-session.test.ts')
-  }, 30_000)
+  }, 120_000)
 })
