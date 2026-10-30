@@ -469,6 +469,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       await page.getByRole('button', { name: 'Propose ending the game', exact: true }).click()
       await expect.poll(async () => (await getDb().prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?')
         .get<{ lifecycle: string }>(roomId))?.lifecycle).toBe('terminated')
+      await expect(page.getByRole('heading', { name: 'Ended by agreement', exact: true })).toBeVisible()
       await environment.loadLobby(page, () => page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' }))
       await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
       const desktopLogout = page.getByRole('button', { name: 'Sign Out', exact: true })
