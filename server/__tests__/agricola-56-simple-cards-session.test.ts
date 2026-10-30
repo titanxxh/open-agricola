@@ -527,7 +527,6 @@ describe('Agricola 5-6 simple occupation cards', () => {
         ...fenceEdgesForTile(1, 1),
         ...fenceEdgesForTile(1, 3),
       ],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 

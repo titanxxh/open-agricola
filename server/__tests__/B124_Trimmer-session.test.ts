@@ -61,7 +61,7 @@ const fence = (session: GameSession, edges: string[]) => {
   expect(response.interaction.stateId, JSON.stringify(response.interaction)).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
   expect(response.interaction.request.kind, JSON.stringify(response.interaction)).toBe('farm-select')
-  response = session.commitSelectionChoice(0, { edges, palisadeEdges: [], extraWood: 0 })
+  response = session.commitSelectionChoice(0, { edges, palisadeEdges: [] })
   expect(response.ok, response.error).toBe(true)
   return response
 }

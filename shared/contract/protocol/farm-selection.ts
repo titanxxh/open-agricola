@@ -23,11 +23,9 @@ const isSources = (value: unknown): value is Record<string, string> => isRecord(
 export const parseFenceSelectionPayload = (value: unknown): FenceSelectionPayload => {
   if (!isRecord(value) || !isEdges(value.edges)
     || (value.palisadeEdges !== undefined && !isEdges(value.palisadeEdges))
-    || (value.extraWood !== undefined && (typeof value.extraWood !== 'number'
-      || !Number.isSafeInteger(value.extraWood) || value.extraWood < 0))
     || (value.fenceSources !== undefined && !isSources(value.fenceSources))) {
     throw new Error('Invalid fence selection')
   }
   return { edges: value.edges, palisadeEdges: value.palisadeEdges,
-    extraWood: value.extraWood, fenceSources: value.fenceSources }
+    fenceSources: value.fenceSources }
 }

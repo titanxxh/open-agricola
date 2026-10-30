@@ -111,7 +111,7 @@ type ClientCommand = (
   | { type: 'anytime'; actionId }
   | { type: 'commitSelection'; playerIndex; payload: {
       cancel?, positions?, cardIds?, resourceCounts?, resourceBatchExchange?,
-      edges?, palisadeEdges?, extraWood?, rooms?, stables?, tile?, crops?
+      edges?, palisadeEdges?, rooms?, stables?, tile?, crops?
     } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }

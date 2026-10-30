@@ -67,8 +67,7 @@ const buildFences = (session: GameSession, paid: { wood: number; clay: number })
     stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } },
   })
   response = session.commitSelectionChoice(0, {
-    edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0,
-  })
+    edges: ONE_CELL_FENCES, palisadeEdges: [], })
   if (response.interaction.stateId === 'wait'
     && response.interaction.promptKey === 'prompt.selectPayment') {
     const payment = options(response).find((option) => {
@@ -140,8 +139,8 @@ describe('ae-negative-05-fields', () => {
     const s = setup(RAMMED, { resources: { clay: 4 } })
     const r = ok(s.takeAction(0, 'fencing'))
     assert.ok(r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select')
-    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ONE.slice(0,3), palisadeEdges: [], extraWood: 0 }))
-    const built = ok(s.commitSelectionChoice(0, { edges: ONE, palisadeEdges: [], extraWood: 0 }))
+    assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ONE.slice(0,3), palisadeEdges: [] }))
+    const built = ok(s.commitSelectionChoice(0, { edges: ONE, palisadeEdges: [] }))
     assert.equal(built.state.players[0]!.fenceSegments.length, 4)
     assert.equal(built.state.players[0]!.resources.clay, 0)
   })

@@ -163,7 +163,6 @@ describe('farm action events', () => {
     expect(fenceAction.resolveChoice!(context('fencing', fencePlayer, fenceEvents), 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     }).type).toBe('ok')
     expect(fenceEvents).toContainEqual(expect.objectContaining({ type: 'farm.fenceBuilt' }))
   })

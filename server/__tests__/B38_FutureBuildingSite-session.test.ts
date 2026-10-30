@@ -219,7 +219,6 @@ describe('B38 FutureBuildingSite — session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(false)
   })
@@ -264,7 +263,6 @@ describe('B38 FutureBuildingSite — session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
   })
@@ -431,7 +429,7 @@ describe('ae-negative-19-farm', () => {
   afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
   it('B038 N1 actual round four purchase locks only original unused adjacent tiles and scores three while round five refuses',()=>{const s=site(),{pending,r}=buy(s,SITE);assert.deepEqual(r.state.players[0]!.cardStates[SITE]?.extraData?.locked,LOCKED);assert.equal(score(r,SITE,'cards'),3);const late=site(()=>{},5),denied=menu(late);assertRejectedUnchanged(late,()=>late.resolveChoice(0,SITE));const legal=ok(late.resolveChoice(0,'A030_BakingSheet'));assert.equal(score(legal,SITE,'cards'),0);save('B038-N1',{pending,r,denied,legal})})
   it('B038 N2 actual purchase prevents plowing original locked tile while another free tile succeeds',()=>{const s=site();buy(s,SITE);ownerAgain(s);const pending=turn(s,0,'farmland');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{tile:{row:0,col:0}}));const r=ok(s.commitSelectionChoice(0,{tile:{row:0,col:1}}));assert.ok(r.state.players[0]!.fields.some(f=>f.row===0&&f.col===1));const undone=ok(s.undoAction());assert.ok(!undone.state.players[0]!.fields.some(f=>f.row===0&&f.col===1));save('B038-N2',{pending,r,undone})})
-  it('B038 N3 actual purchase excludes locked room stable and pasture targets until remaining farm used',()=>{for(const mode of['room','stable','pasture']){const s=site(state=>{state.round=4;const p=state.players[0]!;p.resources.wood=20;p.resources.reed=2});buy(s,SITE);ownerAgain(s);if(mode==='pasture'){const pending=turn(s,0,'fencing');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:ALL,palisadeEdges:[],extraWood:0}));ok(s.undoAction());const control=turn(s,0,'farmland'),r=ok(s.commitSelectionChoice(0,{tile:{row:0,col:1}}));save(`B038-N3-${mode}`,{pending,control,r})}else{const pending=select(s,turn(s,0,'farm-expansion'),mode==='room'?'actions.construct.name':'actions.stables.name');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,mode==='room'?{rooms:[{row:1,col:1}]}:{stables:[{row:0,col:0}]}));ok(s.undoAction());const control=turn(s,0,'farmland'),r=ok(s.commitSelectionChoice(0,{tile:{row:0,col:1}}));save(`B038-N3-${mode}`,{pending,control,r})}}})
+  it('B038 N3 actual purchase excludes locked room stable and pasture targets until remaining farm used',()=>{for(const mode of['room','stable','pasture']){const s=site(state=>{state.round=4;const p=state.players[0]!;p.resources.wood=20;p.resources.reed=2});buy(s,SITE);ownerAgain(s);if(mode==='pasture'){const pending=turn(s,0,'fencing');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:ALL,palisadeEdges:[]}));ok(s.undoAction());const control=turn(s,0,'farmland'),r=ok(s.commitSelectionChoice(0,{tile:{row:0,col:1}}));save(`B038-N3-${mode}`,{pending,control,r})}else{const pending=select(s,turn(s,0,'farm-expansion'),mode==='room'?'actions.construct.name':'actions.stables.name');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,mode==='room'?{rooms:[{row:1,col:1}]}:{stables:[{row:0,col:0}]}));ok(s.undoAction());const control=turn(s,0,'farmland'),r=ok(s.commitSelectionChoice(0,{tile:{row:0,col:1}}));save(`B038-N3-${mode}`,{pending,control,r})}}})
   it('B038 N4 all other farm spaces used unlock original reserved spaces without changing stored lock set',()=>{const s=site(state=>{const p=state.players[0]!,skip=new Set([...p.roomTiles,...LOCKED].map(t=>`${t.row},${t.col}`));p.fields=[];for(let row=0;row<3;row++)for(let col=0;col<5;col++)if(!skip.has(`${row},${col}`))p.fields.push({row,col,stacks:[]})});buy(s,SITE);ownerAgain(s);const pending=turn(s,0,'farmland'),r=ok(s.commitSelectionChoice(0,{tile:{row:0,col:0}}));assert.ok(r.state.players[0]!.fields.some(f=>f.row===0&&f.col===0));assert.deepEqual(r.state.players[0]!.cardStates[SITE]?.extraData?.locked,LOCKED);save('B038-N4',{pending,r})})
   it('B038 N5 card in hand does not lock tiles and whole purchase undo removes locks and three points',()=>{const hand=site(),pending=turn(hand,0,'farmland'),r=ok(hand.commitSelectionChoice(0,{tile:{row:0,col:0}}));assert.ok(r.state.players[0]!.fields.some(f=>f.row===0&&f.col===0));const s=site(),bought=buy(s,SITE).r,undone=ok(s.undoAction());assert.ok(undone.state.players[0]!.minorHand.includes(SITE));assert.equal(score(undone,SITE,'cards'),0);assert.ok(!undone.state.players[0]!.cardStates[SITE]?.extraData?.locked);save('B038-N5',{pending,r,bought,undone})})
 })

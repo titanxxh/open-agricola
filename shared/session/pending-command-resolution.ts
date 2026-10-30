@@ -43,7 +43,6 @@ export type SelectionCommitPayload = {
   resourceBatchExchange?: ResourceBatchExchangePayload
   edges?: string[]
   palisadeEdges?: string[]
-  extraWood?: number
   fenceSources?: Record<string, string>
   rooms?: FarmTilePosition[]
   stables?: FarmTilePosition[]

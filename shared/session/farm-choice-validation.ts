@@ -37,17 +37,14 @@ export const validateFarmChoice = (
     const fp = payload as {
       edges?: string[]
       palisadeEdges?: string[]
-      extraWood?: number
       fenceSources?: Record<string, string>
     }
     const edges = Array.isArray(fp.edges) ? fp.edges : []
     const palisadeEdges = Array.isArray(fp.palisadeEdges) ? fp.palisadeEdges : []
-    const extraWood = fp.extraWood ?? 0
     const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
     const result = board.farmyard.canBuildFence({
       edges,
       palisadeEdges,
-      extraWood,
       fenceSources: fp.fenceSources,
       freeFences: 0,
       options: { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },

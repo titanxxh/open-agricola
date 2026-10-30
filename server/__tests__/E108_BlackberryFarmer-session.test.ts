@@ -48,7 +48,6 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 

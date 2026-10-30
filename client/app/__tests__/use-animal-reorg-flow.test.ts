@@ -474,7 +474,7 @@ describe('use-animal-reorg-flow helpers', () => {
     expect(wouldExceedZoneOccupancyLimit(zones, 'empty')).toBe(true)
   })
 
-  it('builds pending choice with farm-redevelopment fence bonus', () => {
+  it('preserves the fence prompt and actor after animal reorganization', () => {
     const pending: PendingAnimalReorg = { playerIndex: 1, spaceId: 'farm-redevelopment' }
     const choice = buildPendingChoiceFromReorgProgress(
       {
@@ -483,8 +483,12 @@ describe('use-animal-reorg-flow helpers', () => {
       },
       pending,
     )
-    expect(choice.playerIndex).toBe(1)
-    expect(choice.fenceExtraWood).toBe(1)
+    expect(choice).toEqual({
+      promptKey: 'ui.interactionFenceSelect',
+      options: [{ value: 'x', labelKey: 'x' }],
+      playerIndex: 1,
+      spaceId: 'farm-redevelopment',
+    })
   })
 
   it('requires discard confirmation when animals remain unassigned', () => {
@@ -549,7 +553,6 @@ describe('use-animal-reorg-flow helpers', () => {
     if (plan.type === 'choice') {
       expect(plan.resetFenceSelection).toBe(true)
       expect(plan.resetStableSelection).toBe(false)
-      expect(plan.pendingChoice.fenceExtraWood).toBe(1)
     }
   })
 

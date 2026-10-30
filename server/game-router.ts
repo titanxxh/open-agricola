@@ -307,7 +307,6 @@ const commitSelectionPayloadValidators: Record<string, (value: unknown) => boole
   resourceBatchExchange: isRecord,
   edges: isStringArray,
   palisadeEdges: isStringArray,
-  extraWood: (value) => typeof value === 'number',
   fenceSources: (value) =>
     isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string'),
   rooms: isFarmTilePositionArray,

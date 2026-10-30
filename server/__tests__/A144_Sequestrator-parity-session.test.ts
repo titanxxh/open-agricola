@@ -101,8 +101,7 @@ describe('A144 Sequestrator parity', () => {
       stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } },
     })
     const response = session.commitSelectionChoice(1, {
-      edges: THREE_PASTURES, palisadeEdges: [], extraWood: 0,
-    })
+      edges: THREE_PASTURES, palisadeEdges: [], })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[1]!.pastures).toHaveLength(3)
     expect(response.state.players[1]!.resources.reed).toBe(3)

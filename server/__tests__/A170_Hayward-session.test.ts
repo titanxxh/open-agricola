@@ -42,7 +42,6 @@ describe('A170 Hayward', () => {
 
     resp = session.commitSelectionChoice(0, {
       edges: fenceEdgesForTile(1, 1),
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)

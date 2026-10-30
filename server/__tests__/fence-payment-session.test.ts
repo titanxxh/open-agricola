@@ -68,7 +68,6 @@ describe('fence payment session', () => {
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -136,7 +135,6 @@ describe('fence payment session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-1-1', 'V-0-1', 'V-0-2'],
       palisadeEdges: ['H-0-1'],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')

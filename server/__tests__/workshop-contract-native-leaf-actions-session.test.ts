@@ -100,7 +100,7 @@ describe('Workshop Capability Contract native leaf actions', () => {
 
     const pending = session.takeAction(0, 'forest')
     expect(request(pending)).toMatchObject({ kind: 'farm-select', farm: { farmType: 'fence' } })
-    const fenced = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0 })
+    const fenced = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, palisadeEdges: [] })
 
     expectSettled(session, fenced)
     // 1 wood owned and 3 from Forest pay for the four fences.

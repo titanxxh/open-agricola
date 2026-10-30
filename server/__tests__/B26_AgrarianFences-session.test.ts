@@ -108,7 +108,7 @@ describe('B026_AgrarianFences session', () => {
 
     resp = chooseLabel(session, resp, 'actions.fencing.name')
     expect(farm(resp)?.farmType).toBe('fence')
-    resp = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [], extraWood: 0 })
+    resp = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [] })
     expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.resources).toMatchObject({ grain: 2, wood: 6 })
     expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
@@ -168,7 +168,7 @@ describe('ae-negative-B026', () => {
         const replacement = choose(session, CARD)
         if (replacement.interaction.stateId !== 'wait' || replacement.interaction.request.kind !== 'farm-select'
           || replacement.interaction.request.farm.farmType !== 'fence') choose(session, 'actions.fencing.name')
-        const second = session.commitSelectionChoice(0, { edges: ['H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [], extraWood: 0 })
+        const second = session.commitSelectionChoice(0, { edges: ['H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [] })
         assert.equal(second.ok, true, second.error)
       }
       const second = session.getState()
@@ -181,7 +181,7 @@ describe('ae-negative-B026', () => {
       choose(session, CARD)
       choose(session, 'ui.interactionAgrarianFencesSowAndFence')
       choose(session, 'actions.fencing.name')
-      assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { edges: [...EDGES, 'H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [], extraWood: 0 }))
+      assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { edges: [...EDGES, 'H-2-3', 'H-3-3', 'V-2-3'], palisadeEdges: [] }))
       const undo = session.undoAction()
       assert.equal(undo.ok, true, undo.error)
       assert.deepEqual(totals(undo), { wood: 4, grain: 2, food: 0, fences: 0 })

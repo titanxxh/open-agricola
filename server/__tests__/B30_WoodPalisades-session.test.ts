@@ -51,7 +51,6 @@ describe('B30 Wood Palisades — session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: tile00Fences,
       palisadeEdges: tile00Palisades,
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 
@@ -72,7 +71,6 @@ describe('B30 Wood Palisades — session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['V-0-1', 'H-1-0'],
       palisadeEdges: ['V-0-0', 'H-0-0'],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 
@@ -93,7 +91,6 @@ describe('B30 Wood Palisades — session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: [],
       palisadeEdges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('PALISADES_NOT_UNLOCKED')
@@ -108,7 +105,6 @@ describe('B30 Wood Palisades — session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'V-0-0'],
       palisadeEdges: ['H-1-0'], // internal
-      extraWood: 0,
     })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('PALISADE_NOT_ON_BORDER')
@@ -120,6 +116,6 @@ describe('ae-negative-19-farm', () => {
   afterEach(()=>sessions.splice(0).forEach(s=>s.dispose()))
   it('B030 N1 actual one food purchase unlocks palisades without immediate wood cost or bonus',()=>{const s=setup(PALISADES),{pending,r}=buy(s,PALISADES);assert.equal(r.state.players[0]!.resources.food,19);assert.equal(r.state.players[0]!.resources.wood,20);assert.equal(score(r,PALISADES),0);assert.equal(r.state.players[0]!.fenceSegments.length,0);save('B030-N1',{pending,r})})
   it('B030 N2 two border palisades and two normal fences cost six wood and exactly two bonus points',()=>{const s=setup(PALISADES,state=>state.players[0]!.resources.wood=6,true),pending=turn(s,0,'fencing'),r=fence(s);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(r.state.players[0]!.fenceSegments.filter(e=>e.type==='fence').length,2);assert.equal(r.state.players[0]!.fenceSegments.filter(e=>e.type==='palisade').length,2);assert.equal(r.state.players[0]!.pastures.length,1);assert.equal(score(r,PALISADES),2);save('B030-N2',{pending,r})})
-  it('B030 N3 five wood hand only or internal palisade refuses before four ordinary fences',()=>{for(const mode of['poor','hand','internal']){const s=setup(PALISADES,state=>state.players[0]!.resources.wood=mode==='poor'?5:8,mode!=='hand'),pending=turn(s,0,'fencing');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:mode==='internal'?['H-0-0','V-0-0','V-0-1']:REAL,palisadeEdges:mode==='internal'?['H-1-0']:PALI,extraWood:0}));const r=ok(s.commitSelectionChoice(0,{edges:ALL,palisadeEdges:[],extraWood:0}));assert.equal(r.state.players[0]!.resources.wood,mode==='poor'?1:4);assert.equal(score(r,PALISADES),0);assert.equal(r.state.players[0]!.fenceSegments.filter(e=>e.type==='fence').length,4);save(`B030-N3-${mode}`,{pending,r})}})
-  it('B030 N4 wrong actor and whole fence undo restore wood finite fence pieces and score before retry',()=>{const s=setup(PALISADES,state=>state.players[0]!.resources.wood=6,true),pending=turn(s,0,'fencing');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{edges:REAL,palisadeEdges:PALI,extraWood:0}));const r=fence(s),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,6);assert.equal(undone.state.players[0]!.fenceSegments.length,0);assert.equal(score(undone,PALISADES),0);turn(s,0,'fencing');const retry=fence(s);assert.equal(score(retry,PALISADES),2);save('B030-N4',{pending,r,undone,retry})})
+  it('B030 N3 five wood hand only or internal palisade refuses before four ordinary fences',()=>{for(const mode of['poor','hand','internal']){const s=setup(PALISADES,state=>state.players[0]!.resources.wood=mode==='poor'?5:8,mode!=='hand'),pending=turn(s,0,'fencing');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges:mode==='internal'?['H-0-0','V-0-0','V-0-1']:REAL,palisadeEdges:mode==='internal'?['H-1-0']:PALI}));const r=ok(s.commitSelectionChoice(0,{edges:ALL,palisadeEdges:[]}));assert.equal(r.state.players[0]!.resources.wood,mode==='poor'?1:4);assert.equal(score(r,PALISADES),0);assert.equal(r.state.players[0]!.fenceSegments.filter(e=>e.type==='fence').length,4);save(`B030-N3-${mode}`,{pending,r})}})
+  it('B030 N4 wrong actor and whole fence undo restore wood finite fence pieces and score before retry',()=>{const s=setup(PALISADES,state=>state.players[0]!.resources.wood=6,true),pending=turn(s,0,'fencing');assertRejectedUnchanged(s,()=>s.commitSelectionChoice(1,{edges:REAL,palisadeEdges:PALI}));const r=fence(s),undone=ok(s.undoAction());assert.equal(undone.state.players[0]!.resources.wood,6);assert.equal(undone.state.players[0]!.fenceSegments.length,0);assert.equal(score(undone,PALISADES),0);turn(s,0,'fencing');const retry=fence(s);assert.equal(score(retry,PALISADES),2);save('B030-N4',{pending,r,undone,retry})})
 })

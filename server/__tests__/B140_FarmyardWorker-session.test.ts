@@ -220,8 +220,7 @@ describe('B140 Farmyard Worker parity', () => {
       stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } },
     })
     const built = settleFarmyardWorker(session, session.commitSelectionChoice(0, {
-      edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0,
-    }))
+      edges: ONE_CELL_FENCES, palisadeEdges: [], }))
     expect(built.state.players[0]!.fenceSegments).toHaveLength(4)
 
     const response = finishWorkPhase(session)

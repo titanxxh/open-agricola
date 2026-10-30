@@ -30,19 +30,17 @@ describe('buildStableCommitPayload', () => {
 })
 
 describe('buildFenceCommitPayload', () => {
-  it('keeps ordinary own fencing payload unchanged', () => {
+  it('submits own fence geometry without client-controlled costs', () => {
     expect(
       buildFenceCommitPayload(
         ['H-0-0'],
         ['V-0-0'],
-        1,
         undefined,
         { 'H-0-0': 'p2' },
       ),
     ).toEqual({
       edges: ['H-0-0'],
       palisadeEdges: ['V-0-0'],
-      extraWood: 1,
     })
   })
 
@@ -51,14 +49,12 @@ describe('buildFenceCommitPayload', () => {
       buildFenceCommitPayload(
         ['H-0-0', 'V-0-0'],
         [],
-        0,
         { kind: 'borrowed', donorCaps: { p2: 2, p3: 1 } },
         { 'H-0-0': 'p2', 'V-0-0': 'p3' },
       ),
     ).toEqual({
       edges: ['H-0-0', 'V-0-0'],
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: { 'H-0-0': 'p2', 'V-0-0': 'p3' },
     })
   })

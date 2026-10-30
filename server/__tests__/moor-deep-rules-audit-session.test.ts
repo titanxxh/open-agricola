@@ -449,7 +449,7 @@ describe('Moor clause-level native Session audit', () => {
         response = session.resolveChoice(0, option.value)
       }
       expect(response.ok, response.error).toBe(true)
-      response = session.commitSelectionChoice(0, usage === 'room' ? { rooms: [target] } : usage === 'stable' ? { stables: [target] } : { edges: ['H-1-3', 'H-2-3', 'V-1-3', 'V-1-4'], extraWood: 0 })
+      response = session.commitSelectionChoice(0, usage === 'room' ? { rooms: [target] } : usage === 'stable' ? { stables: [target] } : { edges: ['H-1-3', 'H-2-3', 'V-1-3', 'V-1-4'] })
       expect(response.ok, response.error).toBe(true)
       if (response.interaction.request.kind === 'animal-reorg') response = session.resolveChoice(0, 'confirm', response.interaction.request.zones)
       expect(response.ok, response.error).toBe(true)

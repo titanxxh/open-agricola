@@ -76,7 +76,7 @@ export function turn(s: GameSession, actor: number, space: string) { ready(s, ac
 export function fence(s: GameSession, wood: number, clay: number) {
   const entered = ok(s.takeAction(0, 'fencing'))
   assert.ok(entered.interaction.stateId === 'wait' && entered.interaction.request.kind === 'farm-select' && entered.interaction.request.farm.farmType === 'fence')
-  let r = ok(s.commitSelectionChoice(0, { edges: ONE, palisadeEdges: [], extraWood: 0 }))
+  let r = ok(s.commitSelectionChoice(0, { edges: ONE, palisadeEdges: [] }))
   if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice') {
     const payments = choices(r)
     assert.ok(payments.every(o => o.effectPreview?.kind !== 'payment' || Object.values(o.effectPreview.resourcesPaid ?? {}).reduce<number>((a, n) => a + (n ?? 0), 0) === 4))

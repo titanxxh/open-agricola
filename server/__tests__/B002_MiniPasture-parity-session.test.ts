@@ -60,7 +60,6 @@ describe('B002 Mini Pasture parity', () => {
 
     const response = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
-      extraWood: 0,
     })
 
     expect(response.ok, response.error).toBe(true)
@@ -82,7 +81,6 @@ describe('B002 Mini Pasture parity', () => {
     play(rejectedSession)
     const rejected = rejectedSession.commitSelectionChoice(0, {
       edges: edgesForTile(2, 4),
-      extraWood: 0,
     })
     expect(rejected.ok).toBe(false)
 
@@ -90,7 +88,6 @@ describe('B002 Mini Pasture parity', () => {
     play(acceptedSession)
     const accepted = acceptedSession.commitSelectionChoice(0, {
       edges: edgesForTile(0, 1).filter((edge) => edge !== 'V-0-1'),
-      extraWood: 0,
     })
 
     expect(accepted.ok, accepted.error).toBe(true)
@@ -109,7 +106,6 @@ describe('B002 Mini Pasture parity', () => {
         'H-0-1', 'H-1-1',
         'V-0-0', 'V-0-2',
       ],
-      extraWood: 0,
     })
 
     expect(response.ok).toBe(false)

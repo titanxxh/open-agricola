@@ -83,7 +83,7 @@ const blackberryFences = (round: number) => {
   session.state.players[0]!.resources.wood = 4
   session.loadState(session.state)
   session.takeAction(0, 'fencing')
-  const response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2), extraWood: 0 })
+  const response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2) })
   expect(response.ok, response.error).toBe(true)
   return { session, response }
 }

@@ -19,7 +19,6 @@ type CommitSelectionPayload = {
   resourceBatchExchange?: ResourceBatchExchangePayload
   edges?: string[]
   palisadeEdges?: string[]
-  extraWood?: number
   fenceSources?: Record<string, string>
   rooms?: { row: number; col: number }[]
   stables?: { row: number; col: number }[]

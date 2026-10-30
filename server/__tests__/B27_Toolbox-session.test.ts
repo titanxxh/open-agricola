@@ -479,8 +479,7 @@ describe('B027 Toolbox parity', () => {
     let response = session.takeAction(0, 'fencing')
     expect(response.interaction.stateId).toBe('wait')
     response = session.commitSelectionChoice(0, {
-      edges: ONE_TILE_FENCE, palisadeEdges: [], extraWood: 0,
-    })
+      edges: ONE_TILE_FENCE, palisadeEdges: [], })
     response = resolveToolboxTrigger(session, response)
     return response
   }

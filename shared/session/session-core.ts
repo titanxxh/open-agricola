@@ -2052,20 +2052,11 @@ export class GameCore {
     return playerBoard(this.state, idx).farmInteraction.selectableTiles('sow', { actionContext })
   }
 
-  /**
-   * Refactored from `buildFenceInteraction(pending)` to take the current
-   * player directly (Task 2: pending metadata is read through the envelope).
-   * `selectableTiles('fence', ...)` only needs the active space id (used
-   * to detect the `farm-redevelopment` `extraWood` adjustment).
-   */
   private buildFenceInteractionFromNode(
     player: PlayerState,
   ): InteractionFarmSelection {
-    const frame = this.engineStack.current()
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmInteraction.selectableTiles('fence', {
-      spaceId: frame?.spaceId ?? '',
-    })
+    return playerBoard(this.state, idx).farmInteraction.selectableTiles('fence')
   }
 
   private buildSelectionInteractionFromNode(
@@ -4927,7 +4918,6 @@ export class GameCore {
         farmPayload = {
           edges: payload.edges ?? [],
           palisadeEdges: payload.palisadeEdges ?? [],
-          extraWood: payload.extraWood ?? 0,
           fenceSources: payload.fenceSources ?? undefined,
         }
         break

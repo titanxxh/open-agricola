@@ -138,7 +138,6 @@ const commitFence = (
   expect(resp.interaction.request.kind).toBe('farm-select')
   return session.commitSelectionChoice(resp.interaction.playerIndex ?? 0, {
     edges,
-    extraWood: 0,
   })
 }
 

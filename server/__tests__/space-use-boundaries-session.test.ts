@@ -367,7 +367,7 @@ describe('action-space use boundaries through GameSession', () => {
     response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 2, crop: 'grain' }] })
     expect(spaceProbeCounts(response)).toEqual([1, 0, 0])
     label(session, response, 'actions.fencing.name')
-    response = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [], extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [] })
     expect(response.ok, response.error).toBe(true)
     expect(spaceProbeCounts(response)).toEqual([1, 1, 1])
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1, stone: 1, grain: 0, food: 10 })

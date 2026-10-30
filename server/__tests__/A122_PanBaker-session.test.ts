@@ -111,7 +111,6 @@ describe('A122 Pan Baker session', () => {
     expect(resp.ok).toBe(true)
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')

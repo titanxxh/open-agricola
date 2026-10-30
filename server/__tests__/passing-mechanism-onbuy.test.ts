@@ -64,7 +64,6 @@ describe('passing-mechanism: C001_Overhaul complex onBuy', () => {
     const fenceResp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(fenceResp.ok).toBe(true)
 

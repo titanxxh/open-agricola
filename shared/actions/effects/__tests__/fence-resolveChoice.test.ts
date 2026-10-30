@@ -283,7 +283,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
@@ -311,7 +310,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') return
@@ -328,7 +326,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') return
@@ -360,7 +357,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
-      extraWood: 0,
     })
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') return
@@ -378,7 +374,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
-      extraWood: 0,
     })
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') return
@@ -411,7 +406,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
@@ -454,7 +448,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
     })
 
@@ -514,7 +507,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result).toEqual({
@@ -535,7 +527,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: { ...Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])), 'H-2-2': 'p2' },
     })
 
@@ -557,7 +548,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
     })
 
@@ -579,7 +569,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
     })
 
@@ -623,7 +612,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: { 'H-1-0': 'p2', 'V-0-0': 'p2' },
     })
 
@@ -667,7 +655,6 @@ describe('fenceAction.resolveChoice', () => {
       fenceAction.resolveChoice!(ctx, 'confirm', {
         edges: edgesForTile(0, 0),
         palisadeEdges: [],
-        extraWood: 0,
         fenceSources: Object.fromEntries(edgesForTile(0, 0).map((edge) => [edge, 'p2'])),
       }),
     )
@@ -715,7 +702,6 @@ describe('fenceAction.resolveChoice', () => {
       fenceAction.resolveChoice!(ctx, 'confirm', {
         edges: edgesForTile(0, 0),
         palisadeEdges: [],
-        extraWood: 0,
       }),
     )
 
@@ -764,7 +750,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('request')
     if (result.type !== 'request') return
@@ -772,11 +757,10 @@ describe('fenceAction.resolveChoice', () => {
     if (result.request.kind !== 'choice') return
     expect(result.request.options.length).toBeGreaterThan(1)
     const write = result.extraData?.actionContextWrite as
-      | { farmPayload?: { edges?: string[]; palisadeEdges?: string[]; extraWood?: number } }
+      | { farmPayload?: { edges?: string[]; palisadeEdges?: string[] } }
       | undefined
     expect(write?.farmPayload?.edges).toEqual(edgesForTile(0, 0))
     expect(write?.farmPayload?.palisadeEdges).toEqual([])
-    expect(write?.farmPayload?.extraWood).toBe(0)
     // wood not yet consumed — pending payment selection.
     expect(ctx.player.resources.wood).toBe(1)
     expect(ctx.player.fenceSegments).toHaveLength(0)
@@ -788,7 +772,6 @@ describe('fenceAction.resolveChoice', () => {
         farmPayload: {
           edges: edgesForTile(0, 0),
           palisadeEdges: [],
-          extraWood: 0,
         },
       },
     })
@@ -828,7 +811,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('ok')
     expect(ctx.player.fenceSegments).toHaveLength(4)
@@ -850,7 +832,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result.type).toBe('fail')
@@ -876,7 +857,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result.type).toBe('ok')
@@ -916,7 +896,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: build,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result.type).toBe('fail')
@@ -957,7 +936,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: build,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result.type).toBe('ok')
@@ -990,7 +968,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: twoCellPastureEdges,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result.type).toBe('ok')
@@ -1028,7 +1005,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 1),
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result).toEqual({
@@ -1082,7 +1058,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: ['V-0-2', 'H-2-1', 'H-2-2', 'V-1-1', 'V-1-3'],
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(result).toEqual({
@@ -1099,7 +1074,6 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: ['invalid-edge'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(result.type).toBe('fail')
     expect(ctx.player.fenceSegments).toHaveLength(0)

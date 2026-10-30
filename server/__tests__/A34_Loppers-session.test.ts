@@ -243,7 +243,6 @@ describe('A34 Loppers — supply fence payment', () => {
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
@@ -285,7 +284,6 @@ describe('A34 Loppers — supply fence payment', () => {
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     resp = passTriggerSelectIfPresent(session, resp)
@@ -323,7 +321,6 @@ describe('A34 Loppers — supply fence payment', () => {
     resp = session.commitSelectionChoice(0, {
       edges: build,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)
@@ -368,7 +365,6 @@ describe('A34 Loppers — supply fence payment', () => {
     resp = session.commitSelectionChoice(0, {
       edges: build,
       palisadeEdges: [],
-      extraWood: 0,
     })
     resp = resolveTriggerIfPresent(session, resp, 'E074_AshTrees')
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'select-trigger') {
@@ -451,7 +447,7 @@ describe('A034 Loppers parity', () => {
     let response = session.takeAction(0, 'fencing')
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId).toBe('wait')
-    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 1), extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 1) })
     expect(response.ok, response.error).toBe(true)
     return resolveTriggerIfPresent(session, response, CARD_ID)
   }

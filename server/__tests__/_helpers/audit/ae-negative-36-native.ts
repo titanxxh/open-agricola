@@ -130,7 +130,7 @@ export function plow(s: GameSession, a = 0, forbidden?: string) { let r = take(s
 } assert.fail('Plow menu not reached'); }
 export function fence(s: GameSession) { let r = take(s, 0, 'fencing'); for (let n = 0; n < 15; n++) {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'fence')
-        return finish(s, select(s, 0, { edges: square, palisadeEdges: [], extraWood: 0 }));
+        return finish(s, select(s, 0, { edges: square, palisadeEdges: [] }));
     assert.ok(r.interaction.stateId === 'wait');
     const o = opts(r).find(o => !('disabled' in o && o.disabled) && !['__pass__', '__skip__'].includes(o.value));
     assert.ok(o);

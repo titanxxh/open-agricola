@@ -5,26 +5,22 @@ type BorrowedFenceSource = { kind: 'borrowed'; donorCaps: Record<string, number>
 export const buildFenceCommitPayload = (
   pendingFenceEdges: string[],
   pendingPalisadeEdges: string[],
-  extraWood: number,
   fenceSource: BorrowedFenceSource | undefined,
   pendingFenceSources: Record<string, string>,
 ): {
   edges: string[]
   palisadeEdges: string[]
-  extraWood: number
   fenceSources?: Record<string, string>
 } => {
   if (fenceSource?.kind !== 'borrowed') {
     return {
       edges: pendingFenceEdges,
       palisadeEdges: pendingPalisadeEdges,
-      extraWood,
     }
   }
   return {
     edges: pendingFenceEdges,
     palisadeEdges: pendingPalisadeEdges,
-    extraWood,
     fenceSources: Object.fromEntries(
       pendingFenceEdges
         .filter((edgeId) => pendingFenceSources[edgeId])

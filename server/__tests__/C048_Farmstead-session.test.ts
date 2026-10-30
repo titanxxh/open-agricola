@@ -176,8 +176,7 @@ describe('C048 Farmstead parity', () => {
       stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } },
     })
     response = session.commitSelectionChoice(0, {
-      edges: STABLE_FENCES, palisadeEdges: [], extraWood: 0,
-    })
+      edges: STABLE_FENCES, palisadeEdges: [], })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.pastures).toHaveLength(1)

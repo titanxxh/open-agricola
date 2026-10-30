@@ -1276,7 +1276,6 @@ export type InteractionRequest = (
         | {
             farmType: 'fence'
             selectableEdges: string[]
-            extraWood?: number
             fenceSource?: { kind: 'borrowed'; donorCaps: Record<string, number> }
           }
         | { farmType: 'room'; selectableTiles: FarmTilePosition[]; maxSelections: number }
@@ -1375,7 +1374,6 @@ export type InteractionFarmSelection =
   | {
       farmType: 'fence'
       selectableEdges: string[]
-      extraWood?: number
       fenceSource?: { kind: 'borrowed'; donorCaps: Record<string, number> }
     }
   | {

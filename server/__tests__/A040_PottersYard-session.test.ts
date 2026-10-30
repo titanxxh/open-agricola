@@ -21,12 +21,12 @@ describe('ae-negative-07-spaces', () => {
     const s = boughtPotter(potter({ resources: { wood: 11, reed: 5 } })); farm(s, 'construct'); const r = exchange(s, ok(s.commitSelectionChoice(0, { rooms: pair })), true); assert.equal(r.state.players[0]!.rooms, 4); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.reed, 0); assert.equal(r.state.players[0]!.resources.clay, 1); assert.equal(r.state.players[0]!.resources.food, 42); assert.equal(remaining(r), 5)
   })
   it('A040 N5 new pasture collects clay while opponent plow does not consume holder supply', () => {
-    const s = boughtPotter(potter({ resources: { wood: 5, reed: 1 } }), true); assert.equal(remaining(s.getState()), 7); assert.equal(s.getState().state.players[1]!.resources.clay, 0); turn(s, 0, 'fencing'); const r = finish(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 }))); assert.equal(r.state.players[0]!.pastures.flatMap(p => p.tiles).length, 1); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.clay, 1); assert.equal(r.state.players[0]!.resources.food, 40); assert.equal(remaining(r), 6)
+    const s = boughtPotter(potter({ resources: { wood: 5, reed: 1 } }), true); assert.equal(remaining(s.getState()), 7); assert.equal(s.getState().state.players[1]!.resources.clay, 0); turn(s, 0, 'fencing'); const r = finish(s, ok(s.commitSelectionChoice(0, { edges }))); assert.equal(r.state.players[0]!.pastures.flatMap(p => p.tiles).length, 1); assert.equal(r.state.players[0]!.resources.wood, 0); assert.equal(r.state.players[0]!.resources.clay, 1); assert.equal(r.state.players[0]!.resources.food, 40); assert.equal(remaining(r), 6)
   })
   it('A040 N6 stable in pasture and fencing an existing stable collect no second clay', () => {
     for (const used of ['pasture', 'stable'] satisfies ('pasture' | 'stable')[]) {
       const s = boughtPotter(potter({ fields: 5, used, resources: { wood: used === 'pasture' ? 3 : 5, reed: 1 } })); let r: SessionResponse
-      if (used === 'pasture') { farm(s, 'stables'); r = finish(s, ok(s.commitSelectionChoice(0, { stables: [tile] }))) } else { turn(s, 0, 'fencing'); r = finish(s, ok(s.commitSelectionChoice(0, { edges, extraWood: 0 }))) }
+      if (used === 'pasture') { farm(s, 'stables'); r = finish(s, ok(s.commitSelectionChoice(0, { stables: [tile] }))) } else { turn(s, 0, 'fencing'); r = finish(s, ok(s.commitSelectionChoice(0, { edges }))) }
       assert.equal(r.state.players[0]!.resources.clay, 0); assert.equal(r.state.players[0]!.resources.food, 40); assert.equal(remaining(r), 7)
     }
   })

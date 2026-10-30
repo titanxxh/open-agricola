@@ -100,7 +100,7 @@ Each farm type closes its logic inside its own `ActionDefinition.resolveChoice` 
 - **Fence payment ownership**: the host reserves `paymentId` on `farm.fenceBuilt` and passes it to its internal pay child. Only an actual `resource.paid` with the same identity, actor and fencing purpose supplies costs and seasonal adjustments to that construction's log row. An empty payment without an actual cost or adjustment emits no payment fact.
 - **Sow** (`sow.ts`): no payment combination. `maxSelections` counts Logical Fields, `maxSeedSelections` caps crop slots; action crop permissions intersect the field owner's; `isUnconditionalSow` keeps explicit restrictions.
 
-First-round payloads are `fence: {edges, palisadeEdges, extraWood, fenceSources?}`, `room: {rooms}`, `stable: {stables}`, `plow: {tile}`, `sow: {crops}`, submitted as `{type:'choice', value:'confirm', payload}`. A second payment round persists the payload in `pending.actionContext.farmPayload`. Entry doability for construct and fence rejects states with no reachable commit.
+First-round payloads are `fence: {edges, palisadeEdges, fenceSources?}`, `room: {rooms}`, `stable: {stables}`, `plow: {tile}`, `sow: {crops}`, submitted as `{type:'choice', value:'confirm', payload}`. Fence prices come only from server-owned base costs, `fencePolicy` and cost hooks; clients submit geometry and token sources, never surcharges. A second payment round persists the payload in `pending.actionContext.farmPayload`. Entry doability for construct and fence rejects states with no reachable commit.
 
 ### Fence segments and policy
 

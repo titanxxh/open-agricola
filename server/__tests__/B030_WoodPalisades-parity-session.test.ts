@@ -31,7 +31,6 @@ const fence = (session: GameSession) => {
   return session.commitSelectionChoice(0, {
     edges: FENCES,
     palisadeEdges: PALISADES,
-    extraWood: 0,
   })
 }
 

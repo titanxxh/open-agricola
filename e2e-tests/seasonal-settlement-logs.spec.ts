@@ -201,8 +201,7 @@ for (const locale of ['en'] as const) {
         await driver.ui(0, () => pages[0].locator('[data-action-id="fencing"] button').first().click())
         await driver.command(0, { type: 'commitSelection', playerIndex: 0, payload: {
           edges: free ? ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
-            : ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2'], extraWood: 0,
-        } })
+            : ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2'], } })
         const current = await roomSnapshot(pages[0])
         expect(current.state.players[0]!.resources.wood).toBe(free ? 10 : 5)
         expect(current.state.players[0]!.fenceSegments).toHaveLength(free ? 4 : 7)

@@ -314,9 +314,6 @@ export const buildFarmCardDisplayMap = (
   return map
 }
 
-const getReorgFenceExtraWood = (promptKey: string | undefined, spaceId: string) =>
-  promptKey === 'ui.interactionFenceSelect' && spaceId === 'farm-redevelopment' ? 1 : 0
-
 export const buildPendingChoiceFromReorgProgress = (
   progress: { promptKey?: string; choice: ActionChoiceOption[] },
   pendingAnimalReorg: PendingAnimalReorg,
@@ -325,10 +322,6 @@ export const buildPendingChoiceFromReorgProgress = (
   options: progress.choice,
   playerIndex: pendingAnimalReorg.playerIndex,
   spaceId: pendingAnimalReorg.spaceId,
-  fenceExtraWood: getReorgFenceExtraWood(
-    progress.promptKey,
-    pendingAnimalReorg.spaceId,
-  ),
 })
 
 export type PostReorgPlan =
