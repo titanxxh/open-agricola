@@ -63,7 +63,8 @@
     "check:browser-boundaries": "tsx scripts/check-browser-boundaries.ts",
     "check:test-rule-environments": "tsx scripts/check-test-rule-environments.ts",
     "check:test-state-copies": "tsx scripts/check-test-state-copies.ts",
-    "build:i18n": "tsx scripts/prepare-language-packs.ts"
+    "build:i18n": "tsx scripts/prepare-language-packs.ts",
+    "prototype:encyclopedia": "node scripts/encyclopedia-prototype.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

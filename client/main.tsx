@@ -14,6 +14,14 @@ void (async () => {
   try { saved = localStorage.getItem('open-agricola-locale-v2') } catch { /* storage may be disabled */ }
   const locale = manifest.languages.find(language => language.id === saved)?.id ?? manifest.defaultLocale
   await loadLanguagePack(locale)
+  if (import.meta.env.DEV && new URLSearchParams(location.search).get('page') === 'encyclopedia-prototype') {
+    const [{ default: Prototype }, { loadCardsManifest }] = await Promise.all([
+      import('../docs/prototypes/encyclopedia/EncyclopediaPrototype'), import('./services/card-meta'),
+    ])
+    await Promise.all([loadLanguagePack('zh'), loadCardsManifest()])
+    root.render(<StrictMode><Prototype /></StrictMode>)
+    return
+  }
   const { default: App } = await import('./App.tsx')
   root.render(<StrictMode><App /></StrictMode>)
 })().catch(() => {
