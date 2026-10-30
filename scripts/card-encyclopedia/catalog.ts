@@ -17,6 +17,7 @@ import {
   officialCardDisplayNumber,
 } from '../../shared/projections/card-display-number'
 import type { EncyclopediaSources, MajorCardSource, OrdinaryCardSource } from './sources'
+import { cardTexts, moorSpecialActionTexts, parentTexts, seasonTexts } from './text'
 
 const OFFICIAL_DECKS = new Set<string>(['A', 'B', 'C', 'D', 'E', 'M'])
 const PRINTED_RESOURCES = new Set<string>(PAYMENT_RESOURCE_KEYS)
@@ -104,6 +105,7 @@ const ordinaryEntry = (card: OrdinaryCardSource): EncyclopediaEntry => {
     publicType,
     displayNumber: officialCardDisplayNumber(card.id) ?? null,
     face: { kind: 'card', cardId: card.id, cardType: publicType },
+    text: cardTexts(card),
     cost: projectPrintedCost(card),
     score: cardScore(card),
   })
@@ -123,6 +125,7 @@ const majorEntry = (card: MajorCardSource, sources: EncyclopediaSources): Encycl
   publicType: 'major',
   displayNumber: officialCardDisplayNumber(card.id) ?? null,
   face: { kind: 'card', cardId: card.id, cardType: 'major' },
+  text: cardTexts(card),
   cost: projectPrintedCost(card),
   score: cardScore(card),
 })
@@ -148,6 +151,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       publicType: card.kind,
       displayNumber: card.id,
       face: { kind: 'parent', parentId: card.id },
+      text: parentTexts(card),
       score: parentScore(card),
     })),
     ...sources.moorSpecialActionCards.map((card) => entry({
@@ -157,6 +161,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       publicType: 'moorSpecialAction',
       displayNumber: null,
       face: { kind: 'moorSpecialAction', image: card.image, actions: [...card.actions], players: [...card.players] },
+      text: moorSpecialActionTexts(card),
     })),
     ...sources.moorStartCards.map((card) => entry({
       sourceKind: 'moorStart',
@@ -173,6 +178,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       publicType: 'season',
       displayNumber: null,
       face: { kind: 'season', season, actionId: seasonActionIdBySeason[season] },
+      text: seasonTexts(season),
     })),
   ]
   const seen = new Set<string>()
