@@ -5,11 +5,11 @@ import { createScenarioEvidence } from './_helpers/scenario-evidence'
 import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import type { ActionDefinition, ActionFlow, InteractionRequest } from '../../shared/contract/types'
 import type { ActionRegistry } from '../../shared/engine/registry'
-import type { SelectionCommitPayload } from '../../shared/session/pending-command-resolution'
+import type { CommitSelectionPayload } from '../../shared/contract/protocol/commit-selection'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
 
 const evidence = createScenarioEvidence(import.meta.url)
-const cases: Array<{ kind: string; request: InteractionRequest; context?: Record<string, unknown>; invalid: SelectionCommitPayload; retryable: SelectionCommitPayload; valid: SelectionCommitPayload }> = [
+const cases: Array<{ kind: string; request: InteractionRequest; context?: Record<string, unknown>; invalid: CommitSelectionPayload; retryable: CommitSelectionPayload; valid: CommitSelectionPayload }> = [
   { kind: 'occupation hand', request: { kind: 'selection', selection: { kind: 'occupation-hand', selectableCards: ['A110_HedgeKeeper'], minSelections: 1, maxSelections: 1 } }, context: { selectionKind: 'occupation-hand', minSelections: 1, maxSelections: 1 }, invalid: { cardIds: ['missing'] }, retryable: { cardIds: ['A110_HedgeKeeper'] }, valid: { cardIds: ['A126_Mason'] } },
   { kind: 'farm position', request: { kind: 'selection', selection: { kind: 'farm-position', selectablePositions: [{ row: 0, col: 1 }], minSelections: 1, maxSelections: 1 } }, context: { selectableTiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], minSelections: 1, maxSelections: 1 }, invalid: { positions: [{ row: -1, col: 1 }] }, retryable: { positions: [{ row: 0, col: 1 }] }, valid: { positions: [{ row: 0, col: 2 }] } },
   { kind: 'resource quantity', request: { kind: 'resource-quantity-select', cardId: '__input_contract__', availableByResource: { wood: 3 }, requireAtLeastOne: true }, invalid: { resourceCounts: { wood: 4 } }, retryable: { resourceCounts: { wood: 2 } }, valid: { resourceCounts: { wood: 1 } } },

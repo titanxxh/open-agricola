@@ -3,13 +3,14 @@ import { markRequest, responseReceived, snapshotReceived, observeBrowser } from 
 import type { RoomDiscoveryResponse } from '../../shared/contract/protocol/routing'
 import { RoomCommandJournal } from './room-command-journal'
 import type { CommandScope, InputWindow, CommandOutcome } from '../../shared/contract/protocol/commands'
+import type { CommitSelectionPayload } from '../../shared/contract/protocol/commit-selection'
 import type { RoomHistoryPage } from '../../shared/contract/protocol/history'
 import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-selection'
 import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { SoloHandSelectionSubmission } from '../../shared/contract/solo-hand-selection'
-import type { ParentSelectionSubmission, PlayerState, Resource, ResourceBatchExchangePayload } from '../../shared/contract/types'
+import type { ParentSelectionSubmission, PlayerState } from '../../shared/contract/types'
 import type { MoorSpecialActionId } from '../../shared/moor/types'
 
 export type ValidateResult = {
@@ -30,22 +31,6 @@ export class CommandRejectedError extends Error {
     this.code = outcome.code
     this.creationAdjustment = outcome.creationAdjustment
   }
-}
-
-type CommitSelectionPayload = {
-  cancel?: boolean
-  positions?: { row: number; col: number }[]
-  cardIds?: string[]
-  resourceCounts?: Partial<Record<keyof Resource, number>>
-  resourceBatchExchange?: ResourceBatchExchangePayload
-  edges?: string[]
-  palisadeEdges?: string[]
-  fenceSources?: Record<string, string>
-  rooms?: { row: number; col: number }[]
-  stables?: { row: number; col: number }[]
-  farmHand?: { row: number; col: number }
-  tile?: { row: number; col: number }
-  crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
 }
 
 type MoorSpecialActionPayload = {

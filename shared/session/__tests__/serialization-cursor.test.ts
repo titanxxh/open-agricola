@@ -5,7 +5,11 @@ import { rehydrateState, serializeSessionSnapshot } from '../serialization'
 import { stabilizeRandomHands } from '../../../server/__tests__/_helpers/stabilize-random-hands'
 
 describe('serialization cursor round-trip', () => {
-  const restoredChoiceSession = (options: { value: string; labelKey: string }[], promptKey = 'ui.cursorTestChoice') => {
+  const restoredChoiceSession = (
+    options: { value: string; labelKey: string }[],
+    promptKey = 'ui.cursorTestChoice',
+    actionContext?: Record<string, unknown>,
+  ) => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -31,6 +35,7 @@ describe('serialization cursor round-trip', () => {
               promptKey,
               pendingActionId: 'gain',
               effectiveOwnerPlayerId: state.players[0]!.id,
+              ...(actionContext ? { contextSnapshot: { actionContext } } : {}),
             },
           }],
           compositeEmit: null,
@@ -205,6 +210,20 @@ describe('serialization cursor round-trip', () => {
     expect(rejected.ok).toBe(false)
     expect(rejected.error).toBe('use commitSelectionChoice for selection')
     expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
+  it('rebuilds a plain fence choice with the pending borrowed fence source', () => {
+    const donorCaps = { p2: 4 }
+    const restored = restoredChoiceSession([
+      { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+    ], 'ui.interactionFenceSelect', { fencePolicy: { sourcePolicy: { kind: 'borrowed', donorCaps } } })
+
+    const { interaction } = restored.getState()
+
+    expect(interaction).toMatchObject({
+      stateId: 'wait',
+      request: { kind: 'farm-select', farm: { farmType: 'fence', fenceSource: { kind: 'borrowed', donorCaps } } },
+    })
   })
 
   it('rejects invalid select-trigger values before dispatch', () => {

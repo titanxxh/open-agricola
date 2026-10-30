@@ -213,6 +213,7 @@ describe('HTTP privacy + seat binding', () => {
       [{ positions: [{ row: 0, col: '0' }] }],
       [{ crops: [{ row: 0, col: 0, crop: 'reed' }] }],
       [{ resourceCounts: null }],
+      [{ edges: ['H-0-0'], extraWood: 0 }],
     ])('rejects invalid commit-selection payload %j', async (payload) => {
       const req = mockReq('POST', '/api/game/commit-selection', {
         playerIndex: 0,

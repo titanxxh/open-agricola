@@ -80,6 +80,10 @@ describe('LocalGameTransport', () => {
         requestKey, woodCost: 4, affordable: true, valid: true, error: null,
       })
       expect(snapshots).toHaveLength(count)
+      const stray = { edges, extraWood: 0 } as never
+      await expect(transport.quoteFenceSelection(0, requestKey, stray)).rejects.toThrow('Invalid fence selection')
+      await expect(transport.commitSelection(0, stray)).rejects.toThrow('invalid payload')
+      expect(snapshots).toHaveLength(count)
       expect((await transport.commitSelection(0, { edges })).state.players[0]!.resources.wood).toBe(6)
     } finally { transport.destroy() }
   })

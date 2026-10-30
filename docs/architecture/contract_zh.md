@@ -111,7 +111,7 @@ type ClientCommand = (
   | { type: 'anytime'; actionId }
   | { type: 'commitSelection'; playerIndex; payload: {
       cancel?, positions?, cardIds?, resourceCounts?, resourceBatchExchange?,
-      edges?, palisadeEdges?, rooms?, stables?, tile?, crops?
+      edges?, palisadeEdges?, fenceSources?, rooms?, stables?, farmHand?, tile?, crops?
     } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }
@@ -124,6 +124,7 @@ type ClientCommand = (
 - `newGame.seed` 只在开发房间生效，其他房间忽略它并抽取宽种子。`loadGame` 与 `dev*` 命令在开发房间之外被拒绝。
 - 没有单独的 `reorg`、`feed`、`nextPlayer` 或 `confirmPlayerSwitch` 命令：所有等待形态都经 `choice` 提交，`payload` 由 `InteractionRequest.kind` 决定。
 - `commitSelection` 只用于结构化的定向选择：`interactionSubmitChannel()`（`shared/session/interaction-command-policy.ts`）把 `farm-select`、`selection`（farm-position、occupation-hand）、`resource-quantity-select` 与 `resource-batch-exchange-select` 路由到它。职业手牌选择必须是声明上限内无重复的手牌子集，在任何效果或随机观察之前校验。farm-position 可使用服务端校验的 `validPositionGroups`；携带 `sourceCard` / `cardFieldSlot` / `groupKey` 的位置按组计数，由后端规范化。
+- HTTP、Room WebSocket 与浏览器本地沙盒在进入 session 前用 `parseCommitSelectionPayload()`（`shared/contract/protocol/commit-selection.ts`）解析 payload；未知或格式错误的字段使命令以 `invalid payload` 被拒绝。围栏报价用 `parseFenceSelectionPayload()` 做相同的围栏字段校验，同样拒绝未知字段。测试：`shared/contract/__tests__/commit-selection.test.ts`、`server/connection/__tests__/fence-selection-quote.test.ts`。
 - Game Variant 开关（`enableParentCards` / `draftParents`、`enableThroughTheSeasons`、`enableFarmersOfTheMoor` / `enableMoorBalanceRules`、`enableSnakeOpening`）是 Room 选项，跨 `newGame` 与重启保留；`draftParents: false` 时直接给每位玩家一组父母，不进入 `parent-selection`。Moor 与 balance 两项均为布尔 `true` 时才启用平衡规则，其余或缺省值规范化为 `false`。
 - `RoomAccess` 默认公开，也可指定稳定账号 ID 的邀请名单。邀请只允许加入活动 Room，不分配座位，也不改变完赛 Replay 的公开权限。`RoomSummary.access` 只暴露模式，不暴露邀请名单。
 - `customCardIds` 只在 `enableCommunityDeck: true` 时生效，且只接受已审核并上线的工坊卡（[工坊后端](server_zh.md#工坊后端)）。

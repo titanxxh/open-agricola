@@ -1,4 +1,5 @@
 import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
+import { parseCommitSelectionPayload } from '../../shared/contract/protocol/commit-selection'
 import { playerColorOptions } from '../../shared/contract/state-constants'
 import { measure, measureRule, observeCommand, commandOutcome, roundTag, startObservation, rejectObservedCommand, captureCommandOutcome } from '../observability/metrics'
 import { ExecutionAccess, ExecutionRevokedError } from '../game/execution-access'
@@ -1300,13 +1301,17 @@ function handleRoundEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'commitSelection' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  let payload
+  try { payload = parseCommitSelectionPayload(msg.payload) } catch (error) {
+    sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return
+  }
   const seat = namedSeat(ctx, msg.playerIndex)
   return useSessionResponse(
     executeRoomSession(
       room,
       'commitSelectionChoice',
-      [seat, msg.payload],
-      () => room.session.commitSelectionChoice(seat, msg.payload),
+      [seat, payload],
+      () => room.session.commitSelectionChoice(seat, payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
   )

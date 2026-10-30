@@ -44,6 +44,9 @@ const quote = (session: GameSession, response: SessionResponse, payload = { edge
   return session.quoteFenceSelection(0, response.interaction.requestKey, payload)
 }
 
+const pastureScore = (response: SessionResponse, playerIndex: number) =>
+  response.scores?.[playerIndex]?.categories.find(category => category.key === 'pastures')?.total
+
 describe('farm redevelopment fencing payment', () => {
   it.each([
     { spaceId: 'farm-redevelopment', wood: 10, remaining: 2 },
@@ -75,13 +78,15 @@ describe('farm redevelopment fencing payment', () => {
       }) }),
     }))
     expect(done.state.gameOver).toBe(false)
+    expect([pastureScore(pending, 0), pastureScore(done, 0)]).toEqual([-1, 1])
+    expect(done.scores?.[1]).toEqual(pending.scores?.[1])
   })
 
-  it('does not let a submitted surcharge change the authoritative fence price', () => {
+  it('rejects a submitted surcharge in the quote and never charges it on commit', () => {
     const session = setup(10)
     const pending = startFencing(session)
     const submitted = { edges, extraWood: 1 }
-    expect(quote(session, pending, submitted).woodCost).toBe(8)
+    expect(() => quote(session, pending, submitted)).toThrow('Invalid fence selection')
     const done = session.commitSelectionChoice(0, submitted)
     expect(done.ok, done.error).toBe(true)
     expect(done.state.players[0]!.resources.wood).toBe(2)

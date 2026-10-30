@@ -1,3 +1,4 @@
+import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
 import type { FenceSelectionQuote } from '../shared/contract/protocol/game'
 import { randomUUID } from 'node:crypto'
@@ -6,9 +7,7 @@ import { ExecutionRevokedError, type ExecutionStamp } from './game/execution-acc
 import { RoomOwnershipError } from './game/room-directory'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
-import type { SowSelection } from '../shared/domain/index.ts'
 import type { FarmChoiceType, FarmChoiceValidation } from '../shared/session/farm-choice-validation.ts'
-import type { FarmTilePosition } from '../shared/contract/types.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
@@ -279,54 +278,6 @@ const sendJson = async (res: ServerResponse, status: number, payload: unknown): 
   } else rawJson(res, status, payload)
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const isFarmTilePositionPayload = (value: unknown): value is FarmTilePosition =>
-  isRecord(value) &&
-  typeof value.row === 'number' &&
-  typeof value.col === 'number'
-
-const isFarmTilePositionArray = (value: unknown): value is FarmTilePosition[] =>
-  Array.isArray(value) && value.every(isFarmTilePositionPayload)
-
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((entry) => typeof entry === 'string')
-
-const isSowSelectionPayload = (value: unknown): value is SowSelection => {
-  if (!isFarmTilePositionPayload(value)) return false
-  const crop = (value as { crop?: unknown }).crop
-  return crop === 'grain' || crop === 'vegetable' || crop === 'wood' || crop === 'stone'
-}
-
-const commitSelectionPayloadValidators: Record<string, (value: unknown) => boolean> = {
-  cancel: (value) => value === true,
-  positions: isFarmTilePositionArray,
-  cardIds: isStringArray,
-  resourceCounts: isRecord,
-  resourceBatchExchange: isRecord,
-  edges: isStringArray,
-  palisadeEdges: isStringArray,
-  fenceSources: (value) =>
-    isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string'),
-  rooms: isFarmTilePositionArray,
-  stables: isFarmTilePositionArray,
-  tile: isFarmTilePositionPayload,
-  crops: (value) => Array.isArray(value) && value.every(isSowSelectionPayload),
-}
-
-const isValidCommitSelectionPayload = (
-  payload: unknown,
-): payload is Parameters<GameSession['commitSelectionChoice']>[1] => {
-  if (!isRecord(payload)) return false
-  const keys = Object.keys(payload)
-  if (keys.length === 0) return false
-  return keys.every((key) => {
-    const validate = commitSelectionPayloadValidators[key]
-    return validate ? validate(payload[key]) : false
-  })
-}
-
 const respondWith = (
   resp: import('./game/authoritative-session.ts').SessionResponse,
   session: GameSession,
@@ -483,11 +434,9 @@ const handleAuthorizedGameRoute = async (
       playerIndex?: number
       payload?: unknown
     }
-    const payload = body.payload
-    if (
-      typeof body.playerIndex !== 'number' ||
-      !isValidCommitSelectionPayload(payload)
-    ) {
+    let payload: CommitSelectionPayload | undefined
+    try { payload = parseCommitSelectionPayload(body.payload) } catch { payload = undefined }
+    if (typeof body.playerIndex !== 'number' || !payload) {
       await sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
