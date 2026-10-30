@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { verificationConfiguration } from '../ci/verification-tasks'
+import { candidateRepository, finalSnapshotMetadata } from './_helpers/candidate-provenance'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
 const repository = 'titanxxh/open-agricola'
@@ -65,7 +66,7 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const step = (name: string) => ({ name, status: 'completed', conclusion: 'success' })
   const candidateWorkflow = { id: 100, path: '.github/workflows/candidate-verification.yml' }
   const candidateRun = { id: 1, workflow_id: 100, path: candidateWorkflow.path, event: 'workflow_dispatch', head_sha: sha,
-    repository: { full_name: repository }, status: 'completed', run_attempt: 1,
+    repository: { ...candidateRepository }, head_repository: { ...candidateRepository }, status: 'completed', run_attempt: 1,
     created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: `https://github.com/${repository}/actions/runs/1` }
   const jobs = tasks.map((task, index) => ({ id: index + 2, run_id: 1, run_attempt: 1,
     started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
@@ -82,7 +83,8 @@ function fixture(eventName: 'workflow_run' | 'workflow_dispatch' = 'workflow_run
   const event = { action: 'completed', repository: { full_name: repository, default_branch: 'main' },
     workflow_run: { ...requestRun }, inputs: { candidate_sha: sha } }
   const prefix = `repos/${repository}`
-  const responses = {
+  const responses: Record<string, unknown> = {
+    ...finalSnapshotMetadata(sha, policySha),
     [`${prefix}/actions/workflows/pages-release-request.yml`]: requestWorkflow,
     [`${prefix}/actions/runs/99`]: requestRun,
     [`${prefix}/environments/github-pages`]: environment,
@@ -120,7 +122,7 @@ if (process.env.PAGES_TEST_MOVE_REF) {
 if (process.env.PAGES_TEST_CHANGE_POLICY) fs.writeFileSync('uncommitted-policy.ts', 'export const changed = true');
 if (args.includes('--paginate')) {
   const key = args[args.indexOf('--jq') + 1].split('[]')[0].slice(1);
-  for (const item of response[key]) console.log(JSON.stringify(item));
+  for (const item of key ? response[key] : response) console.log(JSON.stringify(item));
 } else console.log(JSON.stringify(response));
 `)
   writeFileSync(join(bin, 'pnpm'), `#!${process.execPath}
@@ -158,7 +160,7 @@ if (args[0] === 'deploy') fs.copyFileSync(process.env.PAGES_TEST_UPLOAD, process
   const build = () => run('build', '--repository', repository)
   const commands = () => existsSync(log) ? readFileSync(log, 'utf8') : ''
   return { cwd, root, sha, policySha, configuration, env, git, commit, run, build, commands, event,
-    requestRun, requestWorkflow, candidateRun, jobs, environment, policies, save }
+    requestRun, requestWorkflow, candidateRun, jobs, environment, policies, responses, save }
 }
 
 function runWorkflow(value: ReturnType<typeof fixture>) {
@@ -215,6 +217,18 @@ function runWorkflow(value: ReturnType<typeof fixture>) {
 }
 
 describe('Pages trusted broker public CLI', () => {
+  it('rejects an unmerged producer before candidate install, build, upload or deployment', () => {
+    const value = fixture()
+    value.responses[`repos/${repository}/commits/${value.sha}/pulls?per_page=100`] = []
+    value.save()
+    const result = runWorkflow(value)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Candidate is ineligible for formal verification')
+    expect(value.commands()).not.toContain('["pnpm"')
+    expect(existsSync(value.env.PAGES_TEST_UPLOAD ?? '')).toBe(false)
+    expect(existsSync(value.env.PAGES_TEST_DEPLOYMENT ?? '')).toBe(false)
+  })
+
   it('claims the noncanceling Pages lock only after the verified build succeeds', () => {
     const workflow = readFileSync(join(repoRoot, brokerPath), 'utf8')
     const [policy, jobs] = workflow.split('\njobs:')
@@ -305,7 +319,10 @@ describe('Pages trusted broker public CLI', () => {
     value.git('checkout', '--detach', value.sha)
     rmSync(join(value.cwd, '.github/workflows/candidate-verification.yml'))
     const historical = value.commit('candidate predates complete verification')
+    value.git('restore', '--source', value.policySha, '--staged', '--worktree', '--', '.')
+    const laterMain = value.commit('main restores current verification policy')
     value.git('checkout', '--detach', value.policySha)
+    Object.assign(value.responses, finalSnapshotMetadata(historical, laterMain))
     value.event.inputs.candidate_sha = historical
     value.save()
     const result = value.build()

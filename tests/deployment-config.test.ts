@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { finalSnapshotMetadata } from '../scripts/__tests__/_helpers/candidate-provenance'
 
 // Run the public candidate checker against local Git and controlled GitHub evidence.
 // Capture the remote command without executing the deployment body or opening SSH.
@@ -36,7 +37,7 @@ function captureBackendDeployment(args: string[], policy?: string) {
     writeFileSync(join(bin, 'git'), `#!${process.execPath}
 import { spawnSync } from 'node:child_process';
 const args = process.argv.slice(2);
-if (!['cat-file', 'rev-parse', 'ls-tree', 'show', 'status'].includes(args[0])) throw Error('Unexpected fixture git command: ' + args.join(' '));
+if (!['cat-file', 'rev-parse', 'ls-tree', 'show', 'status', 'merge-base'].includes(args[0])) throw Error('Unexpected fixture git command: ' + args.join(' '));
 const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `, { mode: 0o700 })
@@ -65,7 +66,7 @@ printf '%s' "\${ACCOUNT_REGISTRATION_POLICY:-}" > "$OA_DEPLOY_CAPTURE/registrati
     }
     env.OA_DEPLOY_CONFIGURATION = manifest.configuration
     writeFileSync(join(bin, 'gh'), `#!${process.execPath}
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 const args = process.argv.slice(2);
 if (args[0] !== 'api' || args.includes('POST')) throw Error('Unexpected fixture GitHub command: ' + args.join(' '));
@@ -75,14 +76,19 @@ const configuration = process.env.OA_DEPLOY_CONFIGURATION;
 const output = value => console.log(JSON.stringify(value));
 const step = name => ({ name, status: 'completed', conclusion: 'success' });
 const tasks = ['quality', 'fast', 'slow', 'build', 'chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit'];
-if (endpoint.startsWith('commits/')) {
+const provenance = ${JSON.stringify(finalSnapshotMetadata(sha))};
+if (Object.hasOwn(provenance, args[1])) {
+  const metadata = provenance[args[1]];
+  if (Array.isArray(metadata) && args.includes('--paginate')) metadata.forEach(output); else output(metadata);
+  if (endpoint === 'git/ref/heads/main' && !existsSync(join(process.env.OA_DEPLOY_CAPTURE, 'candidate-ref'))) writeFileSync(join(process.env.OA_DEPLOY_CAPTURE, 'candidate-ref'), 'main');
+} else if (endpoint.startsWith('commits/')) {
   writeFileSync(join(process.env.OA_DEPLOY_CAPTURE, 'candidate-ref'), decodeURIComponent(endpoint.slice(8)));
   output({ sha });
 } else if (endpoint === 'actions/workflows/candidate-verification.yml') {
   output({ id: 100, path: '.github/workflows/candidate-verification.yml' });
 } else if (endpoint === 'actions/workflows/100/runs?head_sha=' + sha + '&event=workflow_dispatch&per_page=100') {
   output({ id: 1, workflow_id: 100, path: '.github/workflows/candidate-verification.yml', event: 'workflow_dispatch', head_sha: sha,
-    repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1,
+    repository: { id: 1164782262, full_name: 'titanxxh/open-agricola' }, head_repository: { id: 1164782262 }, status: 'completed', run_attempt: 1,
     created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://example.test/run/1' });
 } else if (endpoint === 'actions/runs/1/jobs?filter=all&per_page=100') {
   output({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: 'https://example.test/job/1',

@@ -1,11 +1,12 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FULL_TASK_IDS, fullSha, selectedTasks, taskCommands, verificationConfiguration, verificationTask, type FullTaskId } from './verification-tasks.ts'
 
 export const CANDIDATE_WORKFLOW = '.github/workflows/candidate-verification.yml'
-export type CandidateIdentity = { repository: string; sha: string; configuration: string; workflowId: number }
+export type CandidateIdentity = { repository: string; repositoryId: number; sha: string; configuration: string; workflowId: number }
 export type CandidateRunEvidence = { run: unknown; jobs: readonly unknown[] }
 export type CandidateTaskResult = {
   id: FullTaskId
@@ -45,9 +46,12 @@ const timestamp = (value: unknown): number | null => {
 
 function parseRun(value: unknown) {
   const run = object(value)
+  const repository = object(run.repository)
+  const headRepository = object(run.head_repository)
   return {
     id: integer(run.id), workflowId: integer(run.workflow_id), path: string(run.path), event: string(run.event),
-    sha: string(run.head_sha), repository: string(object(run.repository).full_name),
+    sha: string(run.head_sha), repository: string(repository.full_name),
+    repositoryId: integer(repository.id), headRepositoryId: integer(headRepository.id),
     status: string(run.status), attempt: integer(run.run_attempt), updatedAt: timestamp(run.updated_at), url: string(run.html_url),
   }
 }
@@ -111,6 +115,7 @@ function manifestSelection(jobs: Job[], identity: CandidateIdentity): { tasks: F
 
 export function evaluateCandidateVerification(identity: CandidateIdentity, evidence: readonly CandidateRunEvidence[]): CandidateVerificationResult {
   fullSha(identity.sha)
+  integer(identity.repositoryId)
   if (!/^[a-f0-9]{64}$/.test(identity.configuration)) throw new Error('Invalid verification configuration hash')
   const results = new Map<FullTaskId, CandidateTaskResult>(FULL_TASK_IDS.map(id => [id, {
     id, status: 'blocked', reason: 'No verified task evidence', runId: null, jobId: null, url: null,
@@ -118,6 +123,7 @@ export function evaluateCandidateVerification(identity: CandidateIdentity, evide
   const executions = new Map<FullTaskId, TaskExecution[]>()
   const runs = evidence.map(entry => ({ run: parseRun(entry.run), jobs: entry.jobs.map(parseJob) }))
     .filter(({ run }) => run.repository.toLowerCase() === identity.repository.toLowerCase()
+      && run.repositoryId === identity.repositoryId && run.headRepositoryId === identity.repositoryId
       && run.sha === identity.sha && run.workflowId === identity.workflowId
       && run.path === CANDIDATE_WORKFLOW && run.event === 'workflow_dispatch')
   for (const { run, jobs } of runs) {
@@ -183,14 +189,81 @@ export function parseGitHubJsonLines(output: string): unknown[] {
 
 function github(endpoint: string, collection?: string): unknown {
   const args = ['api', endpoint, '-H', 'Accept: application/vnd.github+json']
-  if (collection) args.push('--paginate', '--jq', `.${collection}[] | @json`)
+  if (collection) args.push('--paginate', '--jq', collection === '[]' ? '.[] | @json' : `.${collection}[] | @json`)
   const output = execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   return collection ? parseGitHubJsonLines(output) : JSON.parse(output)
+}
+
+function mainCommit(repository: string): string {
+  const ref = object(github(`repos/${repository}/git/ref/heads/main`))
+  const target = object(ref.object)
+  if (ref.ref !== 'refs/heads/main' || target.type !== 'commit') throw new Error('Expected the exact main branch commit')
+  return fullSha(string(target.sha))
+}
+
+function assertMainProtection(repository: string): void {
+  const applied = github(`repos/${repository}/rules/branches/main?per_page=100`, '[]')
+  if (!Array.isArray(applied)) throw new Error('Invalid effective main branch rules')
+  const rules = new Set(applied.map(rule => string(object(rule).type)))
+  const required = ['pull_request', 'non_fast_forward', 'deletion', 'required_linear_history']
+  if (required.every(rule => rules.has(rule))) return
+  const classic = object(github(`repos/${repository}/branches/main/protection`))
+  if (isObject(classic.required_pull_request_reviews)) rules.add('pull_request')
+  if (isObject(classic.allow_force_pushes) && classic.allow_force_pushes.enabled === false) rules.add('non_fast_forward')
+  if (isObject(classic.allow_deletions) && classic.allow_deletions.enabled === false) rules.add('deletion')
+  if (isObject(classic.required_linear_history) && classic.required_linear_history.enabled === true) rules.add('required_linear_history')
+  if (!required.every(rule => rules.has(rule))) throw new Error('Main must require pull requests and linear history, and prevent force updates and deletion')
+}
+
+function assertRawCommit(cwd: string, repository: string, sha: string): void {
+  if (spawnSync('git', ['cat-file', '-e', sha], { cwd, stdio: 'ignore' }).status !== 0) {
+    execFileSync('git', ['fetch', '--no-tags', `https://github.com/${repository}.git`, sha], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  }
+  const type = execFileSync('git', ['cat-file', '-t', sha], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  if (type !== 'commit') throw new Error('Candidate and main must be exact Git commit objects')
+  const body = execFileSync('git', ['cat-file', 'commit', sha], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  if (createHash('sha1').update(`commit ${body.length}\0`).update(body).digest('hex') !== sha) {
+    throw new Error('Git commit object does not match its fixed SHA')
+  }
+}
+
+function admitFinalSnapshot(cwd: string, repository: string, sha: string): number {
+  try {
+    const metadata = object(github(`repos/${repository}`))
+    const repositoryId = integer(metadata.id)
+    if (string(metadata.full_name).toLowerCase() !== repository.toLowerCase() || metadata.default_branch !== 'main') {
+      throw new Error('Expected the requested repository and main default branch')
+    }
+    const main = mainCommit(repository)
+    assertMainProtection(repository)
+    const associated = github(`repos/${repository}/commits/${sha}/pulls?per_page=100`, '[]')
+    if (!Array.isArray(associated)) throw new Error('Invalid associated pull request metadata')
+    const integrated = associated.some(entry => {
+      const number = integer(object(entry).number)
+      const pr = object(github(`repos/${repository}/pulls/${number}`))
+      if (pr.number !== number) throw new Error('Pull request identity does not match its endpoint')
+      const base = object(pr.base)
+      const baseRepository = object(base.repo)
+      return pr.state === 'closed' && pr.merged === true && timestamp(pr.merged_at) !== null
+        && base.ref === 'main' && baseRepository.id === repositoryId && string(baseRepository.full_name).toLowerCase() === repository.toLowerCase()
+        && pr.merge_commit_sha === sha
+    })
+    if (!integrated) throw new Error('Candidate must be a final merged pull request snapshot on protected main')
+    assertRawCommit(cwd, repository, sha)
+    assertRawCommit(cwd, repository, main)
+    if (spawnSync('git', ['merge-base', '--is-ancestor', sha, main], { cwd, stdio: 'ignore' }).status !== 0) {
+      throw new Error('Candidate is not reachable from the explicitly resolved main commit')
+    }
+    return repositoryId
+  } catch (error) {
+    throw new Error(`Candidate is ineligible for formal verification: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
 }
 
 export function checkCandidateVerification(cwd: string, repository: string, sha: string): CandidateVerificationResult {
   repositoryName(repository)
   fullSha(sha)
+  const repositoryId = admitFinalSnapshot(cwd, repository, sha)
   const configuration = verificationConfiguration(cwd, sha)
   const workflow = object(github(`repos/${repository}/actions/workflows/candidate-verification.yml`))
   if (workflow.path !== CANDIDATE_WORKFLOW) throw new Error('Unexpected candidate workflow identity')
@@ -202,7 +275,7 @@ export function checkCandidateVerification(cwd: string, repository: string, sha:
     if (!Array.isArray(jobs)) throw new Error('Invalid GitHub job collection')
     return { run, jobs }
   })
-  return evaluateCandidateVerification({ repository, sha, configuration, workflowId: integer(workflow.id) }, evidence)
+  return evaluateCandidateVerification({ repository, repositoryId, sha, configuration, workflowId: integer(workflow.id) }, evidence)
 }
 
 export function assertCandidateCheckout(cwd: string, sha: string): void {
@@ -250,10 +323,11 @@ export function runCandidateTask(cwd: string, id: string, sha: string, run: Comm
 export function requestCandidateVerification(cwd: string, repository: string, sha: string, ref: string, tasks: string) {
   repositoryName(repository)
   fullSha(sha)
+  admitFinalSnapshot(cwd, repository, sha)
   const configuration = verificationConfiguration(cwd, sha)
   const selected = selectedTasks(tasks)
-  const commit = object(github(`repos/${repository}/commits/${encodeURIComponent(ref)}`))
-  if (commit.sha !== sha) throw new Error('Dispatch ref no longer points to the fixed candidate SHA')
+  const target = ref === 'main' ? mainCommit(repository) : object(github(`repos/${repository}/commits/${encodeURIComponent(ref)}`)).sha
+  if (target !== sha) throw new Error('Dispatch ref no longer points to the fixed candidate SHA')
   const workflow = object(github(`repos/${repository}/actions/workflows/candidate-verification.yml`))
   if (workflow.path !== CANDIDATE_WORKFLOW) throw new Error('Unexpected candidate workflow identity')
   execFileSync('gh', ['api', `repos/${repository}/actions/workflows/${integer(workflow.id)}/dispatches`, '--method', 'POST', '--input', '-'], {
