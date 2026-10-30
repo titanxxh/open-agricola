@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { generateDisplayFile, generateLanguagePatch } from '../code-gen'
+import { generateCardSourceFile, generateLanguagePatch } from '../code-gen'
 
-describe('generateDisplayFile', () => {
+describe('generateCardSourceFile', () => {
   it('emits a minor Card Source file', () => {
     const wcard = {
       id: 'wc1',
@@ -14,7 +14,7 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Foo', deck: 'communi
 const CARD_IMPL = { effect: { id: CARD_ID } }
 `.trim(),
     }
-    const out = generateDisplayFile(wcard, {
+    const out = generateCardSourceFile(wcard, {
       githubLogin: 'alicegh',
       iso: '2026-05-09T00:00:00Z',
     })
@@ -38,7 +38,7 @@ const CARD_DEF = new Occupation({ id: CARD_ID, deck: 'community', number: 0, nam
 const CARD_IMPL = {}
 `.trim(),
     }
-    const out = generateDisplayFile(wcard as any, {
+    const out = generateCardSourceFile(wcard as any, {
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
@@ -66,7 +66,7 @@ const CARD_DEF = new MinorImprovement({ id: CARD_ID, name: 'Localised Card', dec
 const CARD_IMPL = {}
 `.trim(),
     }
-    const out = generateDisplayFile(wcard, {
+    const out = generateCardSourceFile(wcard, {
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
@@ -104,7 +104,7 @@ const CARD_DEF = {
 const CARD_IMPL = {}
 `.trim(),
     }
-    const out = generateDisplayFile(wcard, {
+    const out = generateCardSourceFile(wcard, {
       githubLogin: 'gh',
       iso: '2026-05-09T00:00:00Z',
     })
@@ -116,7 +116,7 @@ const CARD_IMPL = {}
   })
 
   it('generates handoff source from factory-style card definitions', () => {
-    const out = generateDisplayFile({
+    const out = generateCardSourceFile({
       id: 'wc-factory',
       card_id: 'CUSTOM_FactoryCard',
       card_type: 'minor',

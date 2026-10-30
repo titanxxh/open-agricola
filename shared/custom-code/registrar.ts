@@ -1,0 +1,101 @@
+import type { CardEffect } from '../cards/card-effects.ts'
+import type { CardListenerContext } from '../cards/card-listeners.ts'
+import type { GameState, PlayerState } from '../contract/types.ts'
+import { requireActiveCardRegistry } from '../cards/active-registry.ts'
+import { getCurrentSessionContext, type CustomCardData } from '../cards/session-card-context.ts'
+import { setCardListenerSource } from '../cards/card-listener-source.ts'
+import {
+  boundListenerFilters, extraHookArguments, neutralEffectResult, registeredEffectMetadata, registeredListenerData,
+} from './contract-admission.ts'
+import { assertSandboxListenerManifest } from './sandbox-listener-phases.ts'
+import type { CustomCodeEffectInvocation, CustomCodeEffectResult, CustomCodeListenerInvocation, CustomCodeListenerResult } from './types.ts'
+
+export const createCustomCardRegistrar = ({ invokeEffect, invokeListener, logPrefix }: {
+  invokeEffect: (request: CustomCodeEffectInvocation) => CustomCodeEffectResult
+  invokeListener: (request: CustomCodeListenerInvocation) => CustomCodeListenerResult
+  logPrefix: string
+}) => (cardData: CustomCardData): void => {
+  const { cardJson, compiledCode, codeManifest } = cardData
+  if (!compiledCode || !codeManifest) return
+  assertSandboxListenerManifest(cardJson.id, codeManifest)
+
+  const cardId = cardJson.id
+  const sessionCtx = getCurrentSessionContext()
+  const effect: CardEffect = { id: cardId }
+  for (const hook of codeManifest.effectHooks) {
+    ;(effect as Record<string, unknown>)[hook] = (
+      state: GameState,
+      player: PlayerState,
+      thirdArgument?: unknown,
+      ...rest: unknown[]
+    ) => {
+      let sandboxArgument = thirdArgument
+      if (sandboxArgument !== null && typeof sandboxArgument === 'object' && 'actionHooks' in sandboxArgument) {
+        const { actionHooks: _actionHooks, ...data } = sandboxArgument
+        sandboxArgument = data
+      }
+      const response = invokeEffect({
+        compiledCode,
+        cardId,
+        hook,
+        state,
+        player,
+        paymentInfo: sandboxArgument,
+        extraArgs: extraHookArguments(hook, [state, player, thirdArgument, ...rest]),
+      })
+      if (!response.ok) {
+        const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
+        console.warn(`[${logPrefix}] ${warning}`)
+        sessionCtx?.reportWarning(warning)
+        return neutralEffectResult(hook)
+      }
+      return response.result ?? neutralEffectResult(hook)
+    }
+  }
+  // A card may declare metadata without any hook, so the effect is registered for either.
+  const metadata = registeredEffectMetadata(codeManifest)
+  Object.assign(effect, metadata)
+
+  // Register into session context when one is active; otherwise write
+  // directly to the active CardRegistry (test-only path).
+  if (codeManifest.effectHooks.length > 0 || Object.keys(metadata).length > 0) {
+    if (sessionCtx) {
+      sessionCtx.registerEffect(effect)
+    } else {
+      requireActiveCardRegistry('registerCustomCard').setEffect(effect)
+    }
+  }
+
+  for (const listener of codeManifest.listeners) {
+    const reg = {
+      id: listener.registrationId,
+      // Bound here as well, so a manifest saved before ADR 0025 follows the same contract.
+      cardIds: [cardId],
+      ...boundListenerFilters(listener),
+      scope: listener.scope,
+      ...registeredListenerData(listener),
+      handler: (context: CardListenerContext) => {
+        const { actionHooks: _actionHooks, ...sandboxContext } = context
+        const response = invokeListener({
+          compiledCode,
+          cardId,
+          registrationId: listener.registrationId,
+          context: sandboxContext,
+        })
+        if (!response.ok) {
+          const warning = `Custom card ${cardId} listener "${listener.registrationId}" failed: ${response.error}`
+          console.warn(`[${logPrefix}] ${warning}`)
+          sessionCtx?.reportWarning(warning)
+          return undefined
+        }
+        return response.result ?? undefined
+      },
+    }
+    setCardListenerSource(reg, cardId)
+    if (sessionCtx) {
+      sessionCtx.registerListener(reg)
+    } else {
+      requireActiveCardRegistry('registerCustomCard').registerListener(reg)
+    }
+  }
+}

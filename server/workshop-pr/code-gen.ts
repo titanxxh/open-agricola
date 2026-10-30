@@ -572,25 +572,6 @@ function printStatements(sf: ts.SourceFile, stmts: ts.Statement[]): string {
     )
 }
 
-export function extractCardDefSource(source: string): string {
-  const sf = ts.createSourceFile(
-    'in.ts',
-    source,
-    ts.ScriptTarget.ES2022,
-    true,
-    ts.ScriptKind.TS,
-  )
-  const cardId = findTopLevelConst(sf, 'CARD_ID')
-  const cardDef = findTopLevelConst(sf, 'CARD_DEF')
-  if (!cardDef) {
-    throw new Error('CARD_DEF top-level const not found in workshop code')
-  }
-  const stmts: ts.Statement[] = []
-  if (cardId) stmts.push(cardId)
-  stmts.push(cardDef)
-  return printStatements(sf, stmts)
-}
-
 const CARD_BLOCK_NAMES = new Set(['CARD_ID', 'CARD_DEF', 'CARD_IMPL'])
 
 function declaredNames(stmt: ts.Statement): string[] {
@@ -809,8 +790,6 @@ export const ${wcard.card_id}_impl = ${wcard.card_id}.impl
 `
 }
 
-export const generateDisplayFile = generateCardSourceFile
-export const generateImplFile = generateCardSourceFile
 
 // ---------------------------------------------------------------------------
 // C-15: register-all.ts patcher

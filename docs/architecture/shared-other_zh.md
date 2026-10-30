@@ -36,6 +36,7 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 工坊卡只通过已部署的 Workshop Capability Contract 准入（[ADR 0025](../adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)）。
 
 - `ast-validator.ts` 用 AST 校验自定义卡 TypeScript：只允许批准的导入，禁止被禁 API、网络与 I/O；`effect` 必须是对象字面量；listener phase 与 effect key 必须在契约白名单内。
+- `validate-and-compile.ts` 统一源码准入、编译和 manifest 提取脚本，服务端与浏览器只提供各自执行边界。`registrar.ts` 通过传入的执行器注册同一组 hook、metadata 和 listener；适配器不扩大能力契约。
 - `sandbox-listener-actions.ts` 是部署名称契约、validator、服务端与浏览器 manifest 共用的唯一行动列表；GitHub 参考资料不能扩大它。
 - `flow-admission.ts`、`contract-admission.ts` 与 `listener-result-validator.ts` 在进入引擎前拒绝契约之外的输出：未列出的行动、归属其他卡的节点与 listener、未开放的节点字段、类型错误的已开放字段与参数、未文档化的参数、类型错误的查询结果，以及写入其他卡或其他玩家的动物区。原生卡的 flow 不受检查。
 - listener 返回 `costs` 时必须同时返回匹配的 `costAttribution`。沙盒约束记录在 [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md)；运行时隔离位于 `server/custom-code/`（[server/custom-code/ — 隔离执行](server_zh.md#servercustom-code--隔离执行)）。
