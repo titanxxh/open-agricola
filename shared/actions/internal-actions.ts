@@ -20,6 +20,7 @@ import { sowAction } from './effects/sow'
 import { bakeBreadAction } from './effects/bake-bread'
 import { reorganizeAction } from './effects/reorganize'
 import { anytimeExchangeAction } from './effects/exchange'
+import { discardGoodsAction } from './effects/discard-goods'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
 import { payAction } from './effects/pay'
@@ -89,6 +90,7 @@ export const createInternalActionDefinitions = (resolveAction: FlowActionResolve
   bakeBreadAction,
   reorganizeAction,
   anytimeExchangeAction,
+  discardGoodsAction,
   payAction,
   individualFoodCostAction,
   returnToSpaceAction,

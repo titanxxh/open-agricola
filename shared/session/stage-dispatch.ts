@@ -56,6 +56,8 @@ export type StageResumeState = {
     beforeHarvestPlayerOrder?: number[]
     roundPreparationPlayerOrder?: number[]
     roundPreparation?: RoundPreparationContext
+    supplyDiscardOffered?: number[]
+    beforeWorkDiscardComplete?: boolean
   }
 }
 

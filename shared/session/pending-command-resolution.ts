@@ -208,6 +208,12 @@ export const validateResourceQuantityCommit = (input: {
 }): Failure | { ok: true; counts: Partial<Record<keyof Resource, number>> } => {
   const counts = input.resourceCounts ?? {}
   let total = 0
+  for (const [key, raw] of Object.entries(counts)) {
+    const value = raw ?? 0
+    if (!Object.hasOwn(input.request.availableByResource, key) && value !== 0) {
+      return { ok: false, error: `resource-quantity.error.invalid-count-${key}` }
+    }
+  }
   for (const key of Object.keys(input.request.availableByResource) as (keyof Resource)[]) {
     const value = counts[key] ?? 0
     const max = input.request.availableByResource[key] ?? 0

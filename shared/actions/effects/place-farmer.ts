@@ -1,5 +1,6 @@
 import type { PersonUseReceipt } from '../../contract/person-use'
 import type {
+  ActionChoiceOption,
   ActionDefinition,
   ActionExecutionResult,
   ActionFlow,
@@ -24,6 +25,7 @@ import { findSupplyWorker } from '../../domain/supply-workers'
 import type { SupplyWorkerSource } from '../../contract/types'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
+import { missingBuildingResourceSpaceIds } from '../helpers/missing-building-resource-spaces'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 import { collectBeforeActionSpaceUseFlows } from '../../cards/card-listeners'
 import { recordActionSpaceUse } from '../../domain/action-space-use'
@@ -38,6 +40,43 @@ export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
  * respect the "space free" rule must check `isSpaceOccupied(space)` first.
  * (canUseOccupied paths bypass that check intentionally.)
  */
+const usesLiveBuildingResourceConstraints = (
+  actionContext: Record<string, unknown> | undefined,
+): boolean => actionContext?.constraintsMode === 'missing-building-resource'
+
+const constrainPlacements = <T extends { spaceId: string }>(
+  allowed: T[],
+  state: GameState,
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+): T[] => {
+  if (usesLiveBuildingResourceConstraints(actionContext)) {
+    const allowSet = new Set(missingBuildingResourceSpaceIds(state, player))
+    return allowed.filter((placement) => allowSet.has(placement.spaceId))
+  }
+  const constraints = actionContext?.constraints
+  if (!Array.isArray(constraints) || constraints.length === 0) return allowed
+  const allowSet = new Set(constraints.filter((id): id is string => typeof id === 'string'))
+  return allowed.filter((placement) => allowSet.has(placement.spaceId))
+}
+
+const placementOptions = (
+  state: GameState,
+  allowed: { spaceId: string; allowOccupied: boolean; option?: ActionChoiceOption }[],
+): ActionChoiceOption[] => allowed.map((placement) => {
+  const space = findActionSpaceById(state, placement.spaceId)!
+  return {
+    value: placement.allowOccupied ? `${OCCUPIED_SPACE_CHOICE_PREFIX}${placement.spaceId}` : placement.spaceId,
+    labelKey: placement.option?.labelKey ?? space.nameKey,
+    labelParams: placement.option?.labelParams,
+    sourceCard: placement.option?.sourceCard,
+    effectPreview: placement.option?.effectPreview,
+    descriptionPreview: placement.option?.descriptionPreview,
+    disabled: placement.option?.disabled,
+    disabledReasonKey: placement.option?.disabledReasonKey,
+  }
+})
+
 const placeFarmer = (
   state: GameState,
   player: PlayerState,
@@ -96,6 +135,19 @@ export const placeFarmerAction: ActionDefinition = {
   descriptionKey: 'actions.place-farmer.description',
   roundAvailable: 1,
   gainPerRound: {},
+  projectInteractionRequest: (state, player, request, actionContext) => {
+    if (!usesLiveBuildingResourceConstraints(actionContext) || request.kind !== 'choice') return request
+    const options = missingBuildingResourceSpaceIds(state, player).flatMap((spaceId) => {
+      const space = findActionSpaceById(state, spaceId)
+      if (!space) return []
+      const existing = request.options.find((option) =>
+        option.value === spaceId || option.value === `${OCCUPIED_SPACE_CHOICE_PREFIX}${spaceId}`)
+      return [existing ?? { value: spaceId, labelKey: space.nameKey }]
+    })
+    const unchanged = options.length === request.options.length
+      && options.every((option, index) => option.value === request.options[index]?.value)
+    return unchanged ? request : { ...request, options }
+  },
   canBeExecutedByPlayer: (state, player, context) =>
     context?.actionContext?.viaCardJump === true
       ? context.actionContext.workerId === undefined || (
@@ -210,34 +262,13 @@ export const placeFarmerAction: ActionDefinition = {
         returnRound: state.round,
       }
     }
-    let allowed = computeAllowedPlacementSpaces(state, player, { actionHooks,
+    const allowed = constrainPlacements(computeAllowedPlacementSpaces(state, player, { actionHooks,
       sourceCard,
       actionContext,
       ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
-    })
-    // The reference `constraints` (e.g. C125 Nightworker restricts to building-resource
-    // accumulation spaces of types the player has 0 of). Caller passes a
-    // string[] of space ids via `actionContext.constraints`; we intersect it
-    // with the engine-computed allowed set.
-    const constraints = actionContext?.constraints as string[] | undefined
-    if (Array.isArray(constraints) && constraints.length > 0) {
-      const allowSet = new Set(constraints)
-      allowed = allowed.filter((a) => allowSet.has(a.spaceId))
-    }
+    }), state, player, actionContext)
     if (allowed.length === 0) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
-    const options = allowed.map((a) => {
-      const space = findActionSpaceById(state, a.spaceId)!
-      return {
-        value: a.allowOccupied ? `${OCCUPIED_SPACE_CHOICE_PREFIX}${a.spaceId}` : a.spaceId,
-        labelKey: a.option?.labelKey ?? space.nameKey,
-        labelParams: a.option?.labelParams,
-        sourceCard: a.option?.sourceCard,
-        effectPreview: a.option?.effectPreview,
-        descriptionPreview: a.option?.descriptionPreview,
-        disabled: a.option?.disabled,
-        disabledReasonKey: a.option?.disabledReasonKey,
-      }
-    })
+    const options = placementOptions(state, allowed)
     return {
       type: 'request',
       request: { kind: 'choice', options },
@@ -256,16 +287,11 @@ export const placeFarmerAction: ActionDefinition = {
     if (actionContext?.workerSource !== undefined && !temporarySupplyWorker) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
-    let allowed = computeAllowedPlacementSpaces(state, player, { actionHooks,
+    const allowed = constrainPlacements(computeAllowedPlacementSpaces(state, player, { actionHooks,
       sourceCard,
       actionContext,
       ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
-    })
-    const constraints = actionContext?.constraints as string[] | undefined
-    if (Array.isArray(constraints) && constraints.length > 0) {
-      const allowSet = new Set(constraints)
-      allowed = allowed.filter((placement) => allowSet.has(placement.spaceId))
-    }
+    }), state, player, actionContext)
     const allowedPlacement = allowed.find((placement) => placement.spaceId === targetSpaceId)
     if (!allowedPlacement || allowedPlacement.allowOccupied !== allowOccupied) {
       return { type: 'fail', errorKey: 'log.placeFarmerFail' }

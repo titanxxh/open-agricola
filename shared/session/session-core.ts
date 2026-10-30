@@ -1,5 +1,6 @@
 import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
 import { quoteFenceSelection } from '../actions/effects/fencing'
+import { voluntaryDiscardAvailability } from '../actions/effects/discard-goods'
 import { reconcileOrdinaryHousePet } from '../domain/animal-zones'
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
@@ -71,6 +72,7 @@ import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
+  cloneState,
   createInitialState,
   createRoundOpenById,
   emptyResources,
@@ -2207,7 +2209,7 @@ export class GameCore {
       anytimeInteractionKind: interactionKind, ...(preparationWindow ? { includeBasicConversions: true } : {}),
     } : undefined
     for (const action of preScoringWindow ? [] : this.registry.values()) {
-      if (preparationWindow && action.id !== 'exchange') continue
+      if (preparationWindow && action.id !== 'exchange' && action.id !== 'discard-goods') continue
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
       if (activeIds.has(action.id) && action.allowAnytimeReentry !== true) continue
@@ -2287,6 +2289,11 @@ export class GameCore {
     }))
   }
 
+  /** Windows that exist only to offer anytime actions ignore voluntary supply discard. */
+  private hasPausingAnytimeEntry(): boolean {
+    return this.buildAnytimeEntries().some((entry) => entry.descriptor.id !== 'discard-goods')
+  }
+
   private projectPendingInteractionRequest({
     request,
     player,
@@ -2348,7 +2355,12 @@ export class GameCore {
     if (!nativeProject && !project) return
     const player = this.state.players[this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, view)]
     if (!player) return
-    let request = nativeProject?.(this.state, player, envelope.request) ?? envelope.request
+    const snapshot = envelope.contextSnapshot
+    const actionContext = snapshot && typeof snapshot === 'object' && 'actionContext' in snapshot
+      && snapshot.actionContext && typeof snapshot.actionContext === 'object'
+      ? snapshot.actionContext as Record<string, unknown>
+      : undefined
+    let request = nativeProject?.(this.state, player, envelope.request, actionContext) ?? envelope.request
     if (project) request = project(this.state, player, request, envelope.pendingActionId)
     if (request === envelope.request) return
     frame.engine.peekPendingHost()?.setPending({
@@ -3178,7 +3190,7 @@ export class GameCore {
     for (let offset = Math.max(0, start); offset < harvestOrder.length; offset += 1) {
       const playerIndex = harvestOrder[offset]!
       this.startPostReapAnytimeSubFlow(playerIndex)
-      if (this.buildAnytimeEntries().length > 0) return this.respond()
+      if (this.hasPausingAnytimeEntry()) return this.respond()
       this.engineStack.pop()
     }
     return this.startHarvestFeedingPhase()
@@ -3219,7 +3231,7 @@ export class GameCore {
     this.startFeedSubFlow(next.index, remaining, foodUsed, rest)
     if (this.hasAnyHarvestExchange(player) ||
       (remaining > 0 && (player.resources.grain > 0 || player.resources.vegetable > 0 ||
-        this.buildAnytimeEntries().length > 0))) return this.respond()
+        this.hasPausingAnytimeEntry()))) return this.respond()
     this.engineStack.pop()
     if (remaining > 0) player.resources.begging += remaining
     if (foodUsed > 0 || remaining > 0) {
@@ -3402,11 +3414,69 @@ export class GameCore {
     return this.continueAfterFutureMeepleActions(0, 0, { roundPreparation: extra?.roundPreparation })
   }
 
+  private beforeWorkPlayerOrder(extra?: StageResumeState['extra']): number[] {
+    if (extra?.roundPreparationPlayerOrder) return [...extra.roundPreparationPlayerOrder]
+    const count = this.state.players.length
+    const start = Math.max(0, this.state.players.findIndex((player) => player.startPlayer))
+    return Array.from({ length: count }, (_, index) => (start + index) % count)
+  }
+
+  private supplyDiscardCouldEnableBeforeWork(player: PlayerState): boolean {
+    const buildingResources = ['wood', 'clay', 'reed', 'stone'] as const
+    const available = voluntaryDiscardAvailability(this.state, player)
+    if (!buildingResources.some((resource) => (available[resource] ?? 0) > 0)) return false
+    const cardIds = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
+      .filter((cardId) => getCardEffect(cardId)?.onBeforeWork)
+    if (cardIds.length === 0) return false
+    const produces = (state: GameState, subject: PlayerState) => cardIds.some((cardId) =>
+      runCardEffectHook(state, subject, cardId, 'onBeforeWork', undefined, { actionHooks: this.actionHooks }))
+    if (produces(this.state, player)) return false
+    for (const resource of buildingResources) {
+      if ((available[resource] ?? 0) <= 0) continue
+      const cloned = cloneState(this.state)
+      const subject = cloned.players.find((candidate) => candidate.id === player.id)
+      if (!subject) continue
+      subject.resources[resource] = 0
+      if (produces(cloned, subject)) return true
+    }
+    return false
+  }
+
   private continueAfterFutureMeepleActions(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onBeforeWork', playerIndex, cardIndex, extra)) {
+    let resumeExtra = extra
+    if (!resumeExtra?.beforeWorkDiscardComplete && playerIndex === 0 && cardIndex === 0) {
+      const offered = new Set(resumeExtra?.supplyDiscardOffered ?? [])
+      const order = this.beforeWorkPlayerOrder(resumeExtra)
+      const next = order.find((index) => {
+        const player = this.state.players[index]
+        return player !== undefined && !offered.has(index) && this.supplyDiscardCouldEnableBeforeWork(player)
+      })
+      if (next !== undefined) {
+        const player = this.state.players[next]!
+        this.stageDispatch.startFlow({
+          type: 'leaf',
+          actionId: 'discard-goods',
+          optional: true,
+          targetPlayerId: player.id,
+          choiceLabelKey: 'actions.discard-goods.name',
+          anytimeWindow: { allowed: true, blockedIds: ['discard-goods'] },
+        }, 'onBeforeWork', next, 0, 0, {
+          ...resumeExtra,
+          roundPreparationPlayerOrder: order,
+          supplyDiscardOffered: [...offered, next],
+        })
+        return this.respond()
+      }
+      resumeExtra = {
+        ...resumeExtra,
+        beforeWorkDiscardComplete: true,
+        roundPreparation: resumeExtra?.roundPreparation,
+      }
+    }
+    if (this.stageDispatch.continueStageHook('onBeforeWork', playerIndex, cardIndex, resumeExtra)) {
       return this.respond()
     }
-    return this.continueAfterBeforeWork(0, 0, { roundPreparation: extra?.roundPreparation })
+    return this.continueAfterBeforeWork(0, 0, { roundPreparation: resumeExtra?.roundPreparation })
   }
 
   private continueAfterBeforeWork(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
@@ -3596,7 +3666,7 @@ export class GameCore {
 
       if (step.type === 'blocked' && step.mandatory === true) {
         if (this.markProvisionalHostBlocked(frame, step.nodeId)) return
-        if (this.buildAnytimeEntries().length > 0 && frame.engine.offerBeforeAnytimeWindow(step.nodeId)) {
+        if (this.hasPausingAnytimeEntry() && frame.engine.offerBeforeAnytimeWindow(step.nodeId)) {
           frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
           this.flushEngineLog()
           return
@@ -3655,7 +3725,7 @@ export class GameCore {
               frame.harvestSettlementResume.foodUsed, frame.harvestSettlementResume.feedQueue)
             const feedingFrame = this.engineStack.current()!
             feedingFrame.harvestSettlementResume = frame.harvestSettlementResume
-            if (this.buildAnytimeEntries().length > 0) return
+            if (this.hasPausingAnytimeEntry()) return
             this.engineStack.pop()
             this.finishFeedingSettlement(ownerIdx, frame.harvestSettlementResume)
           }
@@ -3736,7 +3806,7 @@ export class GameCore {
           ) {
             frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
             this.flushEngineLog()
-            if (this.buildAnytimeEntries().length === 0) {
+            if (!this.hasPausingAnytimeEntry()) {
               const ownerPlayerIndex = frame.ownerPlayerIndex
               this.engineStack.pop()
               this.continuePostReapAnytimeWindow(ownerPlayerIndex)
