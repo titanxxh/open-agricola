@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState, Resource } from '../../shared/contract/types'
+import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
@@ -64,6 +65,7 @@ describe('discard goods to the general supply', () => {
     expect(request.availableByResource).toEqual({ wood: 3, clay: 1, stone: 2, grain: 4, vegetable: 1, food: 5 })
     expect(request.promptKey).toBe('ui.interactionDiscardGoods')
     expect(request.requireAtLeastOne).toBe(true)
+    expect(request.anytimeWindow).toEqual({ allowed: false })
 
     const over = session.commitSelectionChoice(0, { resourceCounts: { wood: 4 } })
     expect(over.ok).toBe(false)
@@ -176,6 +178,56 @@ describe('discard goods to the general supply', () => {
     expect(placed.state.players[0]!.resources.wood).toBeGreaterThan(0)
   })
 
+  it('offers discard before work when the only current Nightworker space is blocked', () => {
+    const session = sessionFor((state) => {
+      state.round = 5
+      const player = state.players[0]!
+      player.occupationPlayed = ['C125_Nightworker']
+      Object.assign(player.resources, supply({
+        wood: 0, clay: 1, reed: 1, stone: 1, food: 4, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }))
+      for (const occupant of state.players) {
+        Object.assign(occupant.resources, { sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        markAllWorkersUsed(state, occupant)
+      }
+    })
+    const block = { playerId: session.state.players[1]!.id, workerId: '1', sourceSpaceId: 'copse' }
+    session.state.players[0]!.minorPlayed.push('TEST_BlockWoodSpaces')
+    session.withCtx(() => requireActiveCardRegistry('discard blocked nightworker space').setEffect({
+      id: 'TEST_BlockWoodSpaces',
+      onEndPreparation: (state) => {
+        for (const space of state.actionSpaces) {
+          if ((space.gainPerRound.wood ?? 0) <= 0) continue
+          space.resources.wood = Math.max(space.resources.wood ?? 0, 3)
+          space.blockedBy = [block]
+        }
+        const clayPit = state.actionSpaces.find((space) => space.id === 'clay-pit')
+        if (clayPit) {
+          clayPit.resources.clay = Math.max(clayPit.resources.clay ?? 0, 2)
+          clayPit.blockedBy = []
+        }
+      },
+    }))
+    let response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') {
+      throw new Error(`expected discard offer, got ${JSON.stringify(response.interaction)}`)
+    }
+    const discard = response.interaction.request.options.find((option) => option.labelKey === 'actions.discard-goods.name')
+    expect(discard, JSON.stringify(response.interaction.request)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, discard!.value)
+    response = session.commitSelectionChoice(response.interaction.stateId === 'wait' ? response.interaction.playerIndex : 0, {
+      resourceCounts: { clay: 1 },
+    })
+    expect(response.ok, response.error).toBe(true)
+    const placed = acceptNightworker(session, response, 'clay-pit')
+    expect(placed.state.actionSpaces.find((space) => space.id === 'clay-pit')!.takenBy).toEqual([
+      expect.objectContaining({ playerId: placed.state.players[0]!.id }),
+    ])
+    expect(placed.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+  })
+
   it('does not let Nightworker take a resource that is still in supply', () => {
     const session = sessionFor((state) => {
       state.round = 5
@@ -199,9 +251,11 @@ describe('discard goods to the general supply', () => {
   })
 })
 
-function acceptNightworker(session: GameSession, response: SessionResponse): SessionResponse {
+function acceptNightworker(session: GameSession, response: SessionResponse, spaceId = 'forest'): SessionResponse {
   let current = response
   for (let step = 0; step < 8; step += 1) {
+    const taken = current.state.actionSpaces.find((space) => space.id === spaceId)?.takenBy.length ?? 0
+    if (taken > 0) return current
     if (current.interaction.stateId !== 'wait') break
     const interaction = current.interaction
     if (interaction.request.kind === 'confirm-player-switch') {
@@ -209,16 +263,14 @@ function acceptNightworker(session: GameSession, response: SessionResponse): Ses
       continue
     }
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') break
-    const forest = interaction.request.options.find((option) => option.value === 'forest')
-    if (forest) return session.resolveChoice(interaction.playerIndex, forest.value)
+    const target = interaction.request.options.find((option) => option.value === spaceId)
+    if (target) return session.resolveChoice(interaction.playerIndex, target.value)
     const nightworker = interaction.request.options.find((option) =>
       option.value !== '__skip__' && option.value !== '__pass__' && (
         option.sourceCard === 'C125_Nightworker' || interaction.sourceCard === 'C125_Nightworker'
       ))
     expect(nightworker, JSON.stringify(interaction)).toBeDefined()
     current = session.resolveChoice(interaction.playerIndex, nightworker!.value)
-    const taken = current.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy.length ?? 0
-    if (taken > 0) return current
   }
   throw new Error(`Nightworker placement was not offered: ${JSON.stringify(current.interaction)}`)
 }

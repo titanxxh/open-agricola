@@ -77,6 +77,16 @@ const legalPlacements = (
   }), state, player, actionContext)
 }
 
+export function hasLegalPlaceFarmerTargets(
+  state: GameState,
+  player: PlayerState,
+  actionHooks: ActionHookRegistry | undefined,
+  sourceCard: string | undefined,
+  actionContext: Record<string, unknown> | undefined,
+): boolean {
+  return legalPlacements(state, player, actionHooks, sourceCard, actionContext).length > 0
+}
+
 const placementOptions = (
   state: GameState,
   allowed: { spaceId: string; allowOccupied: boolean; option?: ActionChoiceOption }[],

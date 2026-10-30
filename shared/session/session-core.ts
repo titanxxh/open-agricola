@@ -1,6 +1,7 @@
 import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
 import { quoteFenceSelection } from '../actions/effects/fencing'
 import { voluntaryDiscardAvailability } from '../actions/effects/discard-goods'
+import { hasLegalPlaceFarmerTargets } from '../actions/effects/place-farmer'
 import { reconcileOrdinaryHousePet } from '../domain/animal-zones'
 import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import type { AnytimeActivationFlow } from '../contract/anytime-activation'
@@ -3430,18 +3431,28 @@ export class GameCore {
     const cardIds = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
       .filter((cardId) => getCardEffect(cardId)?.onBeforeWork)
     if (cardIds.length === 0) return false
-    const produces = (state: GameState, subject: PlayerState) => cardIds.some((cardId) =>
-      runCardEffectHook(state, subject, cardId, 'onBeforeWork', undefined, { actionHooks: this.actionHooks }))
-    if (produces(this.state, player)) return false
+    const usable = (state: GameState, subject: PlayerState) => cardIds.some((cardId) => {
+      const flow = runCardEffectHook(state, subject, cardId, 'onBeforeWork', undefined, { actionHooks: this.actionHooks })
+      return !!flow && this.beforeWorkFlowIsUsable(state, subject, flow)
+    })
+    if (usable(this.state, player)) return false
     for (const resource of buildingResources) {
       if ((available[resource] ?? 0) <= 0) continue
       const cloned = cloneState(this.state)
       const subject = cloned.players.find((candidate) => candidate.id === player.id)
       if (!subject) continue
       subject.resources[resource] = 0
-      if (produces(cloned, subject)) return true
+      if (usable(cloned, subject)) return true
     }
     return false
+  }
+
+  private beforeWorkFlowIsUsable(state: GameState, player: PlayerState, flow: ActionFlow): boolean {
+    if (flow.type === 'leaf') {
+      if (flow.actionId !== 'place-farmer') return true
+      return hasLegalPlaceFarmerTargets(state, player, this.actionHooks, flow.sourceCard, flow.actionContext)
+    }
+    return flow.children.some((child) => this.beforeWorkFlowIsUsable(state, player, child))
   }
 
   private continueAfterFutureMeepleActions(playerIndex = 0, cardIndex = 0, extra?: StageResumeState['extra']): SessionResponse {
