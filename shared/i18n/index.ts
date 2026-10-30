@@ -53,8 +53,14 @@ export const getLanguagePack = (locale: Locale): LanguagePack | undefined => pac
 
 export const hasLanguagePack = (locale: Locale): boolean => packs.has(locale)
 
-export const t = (locale: Locale, key: string, params: TranslationParams = {}): string => {
-  const messages = packs.get(locale)?.messages
+export const t = (locale: Locale, key: string, params: TranslationParams = {}): string =>
+  formatMessage(packs.get(locale)?.messages, key, params)
+
+export const formatMessage = (
+  messages: Readonly<Record<string, string>> | undefined,
+  key: string,
+  params: TranslationParams = {},
+): string => {
   const template = messages?.[key] ?? key
   return template.replace(/\{([^{}]+)\}/g, (token, name: string) => {
     if (Object.hasOwn(params, name)) return String(params[name])
