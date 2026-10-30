@@ -29,14 +29,13 @@ export type GenerationProvenance = {
   returnedModel?: string
   modelRequests: number
   referenceCalls: number
-  repairs: number
   elapsedMs: number
   usage: GenerationUsage
   references: GenerationReference[]
 }
 
 export type GenerationResult = {
-  kind: 'candidate' | 'failed-source' | 'clarification' | 'capability-gap' | 'failure' | 'interrupted'
+  kind: 'candidate' | 'failed-source' | 'answer' | 'failure' | 'interrupted'
   attemptId: string
   createdAt: number
   message: string
@@ -44,7 +43,7 @@ export type GenerationResult = {
   /** Successful source is stored once, in ability.lastValid. */
   candidateId?: string
   sourceFingerprint?: string
-  /** Only a complete source which failed validation is embedded here. */
+  /** Complete artifacts which failed source validation or browser tests. */
   failedCandidate?: WorkshopAbilityCandidateContract
 }
 

@@ -8,7 +8,7 @@ import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/
 import { corsHeaders } from './http-origin.ts'
 import { getWorkshopSandboxContract } from './workshop-sandbox-contract.ts'
 import { readWorkshopReference, WorkshopReferenceError } from './workshop-references.ts'
-import { projectGenerationProvenance, sourceFingerprint } from '../shared/projections/workshop-generation.ts'
+import { projectAbilityCandidate, projectGenerationProvenance, sourceFingerprint } from '../shared/projections/workshop-generation.ts'
 import {
   WorkshopDraftError,
   adoptCandidate,
@@ -641,6 +641,7 @@ export async function handleWorkshopRoute(
           return true
         }
       }
+      const testing = projectAbilityCandidate(raw)?.testing
       candidate = {
         id: raw.id,
         kind: 'ability',
@@ -650,6 +651,7 @@ export async function handleWorkshopRoute(
         compiledCode: prepared.compiledCode,
         codeManifest: prepared.codeManifest,
         sourceFingerprint: sourceFingerprint(raw.sourceCode),
+        ...(testing ? { testing } : {}),
         ...(typeof raw.inputFingerprint === 'string' ? { inputFingerprint: raw.inputFingerprint } : {}),
         ...(projectGenerationProvenance(raw.provenance) ? { provenance: projectGenerationProvenance(raw.provenance) } : {}),
         validation: { valid: true, sourceFingerprint: sourceFingerprint(raw.sourceCode), sandboxContractId: getWorkshopSandboxContract().id },

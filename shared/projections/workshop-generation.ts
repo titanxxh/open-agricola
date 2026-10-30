@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
-import type { WorkshopAbilityCandidateContract, WorkshopDraftContract } from '../contract/workshop'
+import type { WorkshopAbilityCandidateContract, WorkshopAbilityTestingContract, WorkshopBrowserTestOutcome, WorkshopDraftContract } from '../contract/workshop'
 import type { GenerationProvenance, GenerationResult, WorkshopVisibleMessage } from '../contract/workshop-generation'
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -23,6 +23,56 @@ export function canonicalGenerationJson(value: unknown): string {
   return JSON.stringify(sort(value))
 }
 
+export const abilityArtifactFingerprint = (source: string, tests: string): string =>
+  sourceFingerprint(canonicalGenerationJson({ source, tests }))
+
+export function isAbilityCandidateReady(candidate: WorkshopAbilityCandidateContract, browserRuntimeId?: string): boolean {
+  const { testing, validation } = candidate
+  const run = testing?.lastRun
+  const fingerprint = sourceFingerprint(candidate.sourceCode)
+  return validation.valid && validation.sourceFingerprint === fingerprint
+    && candidate.sourceFingerprint === fingerprint && !!testing?.code.trim()
+    && !!run && run.artifactFingerprint === abilityArtifactFingerprint(candidate.sourceCode, testing.code)
+    && !!run.browserRuntimeId && (!browserRuntimeId || run.browserRuntimeId === browserRuntimeId)
+    && run.outcome.kind === 'passed' && Number.isSafeInteger(run.outcome.count) && run.outcome.count > 0
+}
+
+function projectBrowserTestOutcome(value: unknown): WorkshopBrowserTestOutcome | undefined {
+  const raw = record(value)
+  if (raw.kind === 'passed' && Number.isSafeInteger(raw.count) && typeof raw.count === 'number' && raw.count >= 0) {
+    return { kind: 'passed', count: raw.count }
+  }
+  if (raw.kind === 'failed' && Array.isArray(raw.failures)) return {
+    kind: 'failed', failures: raw.failures.slice(0, 30).flatMap(value => {
+      const failure = record(value)
+      return typeof failure.name === 'string' && typeof failure.error === 'string'
+        ? [{ name: text(failure.name, 200), error: text(failure.error) }] : []
+    }),
+  }
+  if (raw.kind === 'error' && typeof raw.message === 'string') return { kind: 'error', message: text(raw.message) }
+  return undefined
+}
+
+function projectAbilityTesting(value: unknown, source?: string): WorkshopAbilityTestingContract | undefined {
+  const raw = record(value)
+  if (typeof raw.code !== 'string' || raw.code.length > 160000) return undefined
+  const run = record(raw.lastRun)
+  const outcome = projectBrowserTestOutcome(run.outcome)
+  const artifactFingerprint = text(run.artifactFingerprint, 64)
+  const browserRuntimeId = text(run.browserRuntimeId, 200)
+  return {
+    code: raw.code,
+    ...(outcome && /^[a-f0-9]{64}$/.test(artifactFingerprint) && browserRuntimeId
+      && (source === undefined || artifactFingerprint === abilityArtifactFingerprint(source, raw.code))
+      ? { lastRun: { artifactFingerprint, browserRuntimeId, outcome } } : {}),
+  }
+}
+
+export function currentAbilityTesting(draft: WorkshopDraftContract): WorkshopAbilityTestingContract | undefined {
+  const ability = record(draft.generation.ability)
+  return projectAbilityTesting(record(ability.adopted).testing, draft.effectCode ?? '')
+}
+
 /** Preserve authored rules that the metadata editor's numeric cost parser cannot express. */
 export function projectAbilityRequirements(cardJson: Record<string, unknown>): { cost?: string; prerequisite?: string } {
   const draft = record(cardJson._draft)
@@ -40,6 +90,7 @@ export function abilityDraftFingerprint(draft: WorkshopDraftContract): string {
   return sourceFingerprint(canonicalGenerationJson({
     cardId: draft.cardId, cardType: draft.cardType, name: draft.name,
     description: draft.description, cardJson, requirements: projectAbilityRequirements(draft.cardJson), effectCode: draft.effectCode,
+    tests: currentAbilityTesting(draft)?.code ?? null,
   }))
 }
 
@@ -61,7 +112,7 @@ export function projectGenerationProvenance(value: unknown): GenerationProvenanc
     promptVersion: text(raw.promptVersion, 100), toolVersion: text(raw.toolVersion, 100),
     provider: text(raw.provider, 100), endpoint, model: text(raw.model, 200),
     ...(typeof raw.returnedModel === 'string' ? { returnedModel: text(raw.returnedModel, 200) } : {}),
-    modelRequests: count(raw.modelRequests), referenceCalls: count(raw.referenceCalls), repairs: count(raw.repairs), elapsedMs: count(raw.elapsedMs),
+    modelRequests: count(raw.modelRequests), referenceCalls: count(raw.referenceCalls), elapsedMs: count(raw.elapsedMs),
     usage: { inputTokens: tokens(usage.inputTokens), outputTokens: tokens(usage.outputTokens), cachedInputTokens: tokens(usage.cachedInputTokens), reasoningTokens: tokens(usage.reasoningTokens) },
     references: (Array.isArray(raw.references) ? raw.references : []).slice(-24).flatMap(value => {
       const ref = record(value)
@@ -80,6 +131,7 @@ export function projectAbilityCandidate(value: unknown): WorkshopAbilityCandidat
   const validation = record(raw.validation)
   const fingerprint = sourceFingerprint(raw.sourceCode)
   const provenance = projectGenerationProvenance(raw.provenance)
+  const testing = projectAbilityTesting(raw.testing, raw.sourceCode)
   return {
     id: text(raw.id, 200), kind: 'ability', prompt: text(raw.prompt, 16000), createdAt: count(raw.createdAt),
     ...candidateFreshness(raw),
@@ -88,6 +140,7 @@ export function projectAbilityCandidate(value: unknown): WorkshopAbilityCandidat
     ...(typeof raw.provider === 'string' ? { provider: text(raw.provider, 100) } : {}),
     ...(typeof raw.model === 'string' ? { model: text(raw.model, 200) } : {}),
     ...(provenance ? { provenance } : {}),
+    ...(testing ? { testing } : {}),
     validation: {
       valid: validation.valid === true && (!validation.sourceFingerprint || validation.sourceFingerprint === fingerprint),
       errors: (Array.isArray(validation.errors) ? validation.errors : []).filter((entry): entry is string => typeof entry === 'string').slice(0, 30).map(entry => entry.slice(0, 2000)),
@@ -99,7 +152,7 @@ export function projectAbilityCandidate(value: unknown): WorkshopAbilityCandidat
 
 export function projectGenerationResult(value: unknown): GenerationResult | undefined {
   const raw = record(value)
-  const kinds = ['candidate', 'failed-source', 'clarification', 'capability-gap', 'failure', 'interrupted'] as const
+  const kinds = ['candidate', 'failed-source', 'answer', 'failure', 'interrupted'] as const
   const kind = kinds.find(kind => kind === raw.kind)
   if (!kind || !text(raw.attemptId)) return undefined
   const provenance = projectGenerationProvenance(raw.provenance)
@@ -109,7 +162,7 @@ export function projectGenerationResult(value: unknown): GenerationResult | unde
     ...(provenance ? { provenance } : {}),
     ...(typeof raw.candidateId === 'string' ? { candidateId: text(raw.candidateId, 200) } : {}),
     ...(typeof raw.sourceFingerprint === 'string' ? { sourceFingerprint: text(raw.sourceFingerprint, 64) } : {}),
-    ...(failedCandidate ? { failedCandidate: { ...failedCandidate, validation: { ...failedCandidate.validation, valid: false } } } : {}),
+    ...(failedCandidate && !isAbilityCandidateReady(failedCandidate) ? { failedCandidate } : {}),
   }
 }
 
@@ -118,6 +171,7 @@ function projectAdoptedAbility(value: unknown): Record<string, unknown> | undefi
   const raw = candidate ?? record(value)
   if (typeof raw.id !== 'string' || typeof raw.prompt !== 'string') return undefined
   const provenance = projectGenerationProvenance(raw.provenance)
+  const testing = projectAbilityTesting(raw.testing, candidate?.sourceCode)
   return {
     id: text(raw.id, 200), kind: 'ability', prompt: text(raw.prompt, 16000), createdAt: count(raw.createdAt),
     ...(typeof raw.sourceFingerprint === 'string' ? { sourceFingerprint: text(raw.sourceFingerprint, 64) } : {}),
@@ -125,6 +179,7 @@ function projectAdoptedAbility(value: unknown): Record<string, unknown> | undefi
     ...(typeof raw.provider === 'string' ? { provider: text(raw.provider, 100) } : {}),
     ...(typeof raw.model === 'string' ? { model: text(raw.model, 200) } : {}),
     ...(provenance ? { provenance } : {}),
+    ...(testing ? { testing } : {}),
   }
 }
 
@@ -138,8 +193,10 @@ export function projectWorkshopGeneration(value: unknown): Record<string, unknow
   const latestResult = projectGenerationResult(ability.latestResult)
   const revalidatedFailure = latestResult?.failedCandidate
   const invalidatesLastValid = revalidatedFailure?.id === lastValid?.id && revalidatedFailure?.sourceFingerprint === lastValid?.sourceFingerprint
+    && revalidatedFailure?.testing?.code === lastValid?.testing?.code
   if (lastValid || adopted || latestResult) result.ability = {
-    ...(lastValid?.validation.valid && !invalidatesLastValid && !(lastValid.id === adopted?.id && lastValid.sourceFingerprint === adopted.sourceFingerprint) ? { lastValid } : {}),
+    ...(lastValid && isAbilityCandidateReady(lastValid) && !invalidatesLastValid
+      && !(lastValid.id === adopted?.id && lastValid.sourceFingerprint === adopted.sourceFingerprint && lastValid.testing?.code === record(adopted.testing).code) ? { lastValid } : {}),
     ...(adopted ? { adopted } : {}),
     ...(latestResult ? { latestResult } : {}),
   }

@@ -16,7 +16,7 @@ export function browserBoundaryErrors(
   const errors: string[] = []
   for (const edge of edges) {
     if (!edge.typeOnly && edge.to === 'client/sandbox/SandboxApp.tsx' && (edge.from !== 'client/sandbox/index.tsx' || !edge.dynamic)) errors.push('unauthorized sandbox entry: ' + edge.from)
-    if (!edge.typeOnly && edge.to === 'client/local-sandbox/worker.ts') errors.push('worker must be loaded through its isolated Worker entry: ' + edge.from)
+    if (!edge.typeOnly && ['client/local-sandbox/worker.ts', 'client/local-sandbox/card-tests.worker.ts'].includes(edge.to)) errors.push('worker must be loaded through its isolated Worker entry: ' + edge.from)
   }
   for (const root of roots) {
     if (!graph.has(root)) {

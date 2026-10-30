@@ -1,6 +1,6 @@
 import type { WorkshopAbilityCandidateContract, WorkshopDraftContract } from '../../../../shared/contract/workshop'
 import type { WorkshopVisibleMessage } from '../../../../shared/contract/workshop-generation'
-import { abilityDraftFingerprint, canonicalGenerationJson, projectAbilityRequirements, projectVisibleMessages, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
+import { abilityArtifactFingerprint, abilityDraftFingerprint, canonicalGenerationJson, currentAbilityTesting, projectAbilityRequirements, projectVisibleMessages, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
 
 export type PlaytestSource = {
   workspaceId: string
@@ -29,6 +29,7 @@ export type GenerationRequest = {
       | { kind: 'repair'; message: string; failure: Omit<PlaytestFailure, 'source'> }
     card: { id: string; type: 'minor' | 'occupation'; name: string; description: string; definition: Record<string, unknown>; requirements: ReturnType<typeof projectAbilityRequirements> }
     source: string | null
+    tests: string | null
     sourceFingerprint: string | null
     conversation: WorkshopVisibleMessage[]
   }
@@ -63,6 +64,7 @@ export function buildGenerationRequest(options: {
   }
   const selected = intent.kind === 'repair' ? undefined : options.selectedCandidate
   const source = intent.kind === 'repair' ? intent.failure.source : selected?.sourceCode ?? draft.effectCode
+  const tests = intent.kind === 'repair' ? null : selected ? selected.testing?.code ?? null : currentAbilityTesting(draft)?.code ?? null
   const fingerprint = source === null ? null : sourceFingerprint(source)
   // A tested version owns its metadata in the recorded source. The current
   // draft (or another selected candidate) may describe a different version.
@@ -85,6 +87,7 @@ export function buildGenerationRequest(options: {
     } : intent,
     card: { ...identity, description, definition, requirements: projectAbilityRequirements(cardJson) },
     source,
+    tests,
     sourceFingerprint: fingerprint,
     conversation: projectVisibleMessages(options.messages).filter(message => !message.interrupted && !message.isError).slice(-12).map(message => ({
       role: message.role,
@@ -95,44 +98,6 @@ export function buildGenerationRequest(options: {
     attemptId: options.attemptId ?? crypto.randomUUID(), createdAt: options.now ?? Date.now(),
     workspaceId: options.workspaceId, baseRevision: options.baseRevision, draftFingerprint: abilityDraftFingerprint(draft),
     inputFingerprint: sourceFingerprint(canonicalGenerationJson(input)), input,
-    ...(selected ? { sourceCandidate: { id: selected.id, fingerprint: sourceFingerprint(selected.sourceCode) } } : {}),
+    ...(selected ? { sourceCandidate: { id: selected.id, fingerprint: abilityArtifactFingerprint(selected.sourceCode, selected.testing?.code ?? '') } } : {}),
   })
-}
-
-export type GenerationOutput = { kind: 'source'; source: string; message: string }
-  | { kind: 'clarification' | 'capability-gap' | 'reference-continuation'; message: string }
-
-function parseMessageJson(text: string): unknown {
-  try { return JSON.parse(text) } catch {
-    // Models can emit literal line breaks inside a message. Preserve those
-    // characters losslessly; all other JSON syntax still belongs to JSON.parse.
-    let quoted = false
-    let escaped = false
-    let normalized = ''
-    for (const character of text) {
-      normalized += quoted && !escaped && (character === '\n' || character === '\r')
-        ? (character === '\n' ? '\\n' : '\\r')
-        : character
-      if (escaped) escaped = false
-      else if (quoted && character === '\\') escaped = true
-      else if (character === '"') quoted = !quoted
-    }
-    return JSON.parse(normalized)
-  }
-}
-
-export function extractGenerationOutput(text: string): GenerationOutput {
-  const sourceBlocks = [...text.matchAll(/```(?:typescript|ts)\s*\r?\n([\s\S]*?)```/g)]
-  if (sourceBlocks.length === 1) {
-    const source = sourceBlocks[0][1].trim()
-    if (!source.includes('CARD_DEF') || !source.includes('CARD_IMPL')) throw new Error('The completed response did not include a complete CARD_DEF and CARD_IMPL source.')
-    return { kind: 'source', source, message: text.replace(sourceBlocks[0][0], '').trim() }
-  }
-  if (sourceBlocks.length > 1) throw new Error('The completed response contains multiple source candidates; request one complete source.')
-  const json = /```json\s*\r?\n([\s\S]*?)```/.exec(text)?.[1] ?? text
-  try {
-    const value = parseMessageJson(json) as Record<string, unknown>
-    if ((value.kind === 'clarification' || value.kind === 'capability-gap' || value.kind === 'reference-continuation') && typeof value.message === 'string' && value.message.trim()) return { kind: value.kind, message: value.message }
-  } catch { /* A malformed final answer must not become a code candidate. */ }
-  throw new Error('Expected one complete TypeScript source or a structured clarification/capability gap.')
 }

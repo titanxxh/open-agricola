@@ -3,6 +3,7 @@
  * production browser runner and captures unmodified single-file sources.
  */
 import { GenerationAttempt, GenerationStopError, type AttemptSnapshot, type CodeValidation, type RequestAccounting } from '../../../client/services/llm/generation/attempt'
+import { runBrowserCardTests } from '../../../client/local-sandbox/card-tests'
 import { createSandboxPorts } from '../../../client/services/llm/generation/browser'
 import { buildGenerationRequest } from '../../../client/services/llm/generation/request'
 import { createToolTransport, ModelTurnError, UNKNOWN_USAGE, type WireMessage } from '../../../client/services/llm/generation/protocol'
@@ -49,14 +50,12 @@ export async function runBrowserTask(options: {
   let reservation: string | undefined
   let sequence = 0
   const transport = createToolTransport(options.config, {
-    authorize(target) {
-      if (target.provider !== 'deepseek' || target.endpoint !== 'https://api.deepseek.com/v1/chat/completions' || target.model !== options.config.model) throw new Error('Unexpected acceptance destination')
-    },
     beforePost: async body => {
       const payload = JSON.parse(body) as { max_tokens: number }
       reservation = await window.acceptanceReserve({ task: options.task, sequence: ++sequence, inputBytes: new TextEncoder().encode(body).length, maxOutputTokens: payload.max_tokens })
     },
   })
+  if (transport.target.provider !== 'deepseek' || transport.target.endpoint !== 'https://api.deepseek.com/v1/chat/completions' || transport.target.model !== options.config.model) throw new Error('Unexpected acceptance destination')
   const sandbox = createSandboxPorts((path, init) => fetch(path, { ...init, credentials: 'include' }))
   const openReferences = ReferenceSession.createOpener(async (url, init) => {
     const entry: BrowserTaskResult['referenceHttp'][number] = { url: String(url), elapsedMs: 0 }
@@ -100,15 +99,16 @@ export async function runBrowserTask(options: {
       } }
     },
     validate: async (source, cardId, contractId, signal) => {
-      const entry: BrowserTaskResult['sources'][number] = { source }
-      sources.push(entry)
+      const entry: BrowserTaskResult['sources'][number] = [...sources].reverse().find(item => item.source === source) ?? { source }
+      if (!sources.includes(entry)) sources.push(entry)
       const result = await sandbox.validate(source, cardId, contractId, signal)
       entry.validation = result
       return result
     },
+    runTests: (source, tests, signal) => runBrowserCardTests({ source, tests, signal }),
     model: {
       target: transport.target,
-      complete: async (messages, tools, signal, onText, turnOptions) => {
+      complete: async (messages, tools, signal, onText) => {
         for (const prior of previous) {
           const unchanged = JSON.stringify(messages[prior.index]) === JSON.stringify(prior.message)
           const replies = messages.slice(prior.index + 1, prior.index + 1 + prior.callIds.length)
@@ -120,13 +120,13 @@ export async function runBrowserTask(options: {
         }
         reservation = undefined
         let turn
-        try { turn = await transport.complete(messages, tools, signal, onText, turnOptions) } catch (error) {
+        try { turn = await transport.complete(messages, tools, signal, onText) } catch (error) {
           if (reservation) await window.acceptanceSettle({ id: reservation, usage: error instanceof ModelTurnError ? error.usage : UNKNOWN_USAGE, notPosted: error instanceof ModelTurnError && error.kind === 'preflight' })
           throw error
         }
         if (reservation) await window.acceptanceSettle({ id: reservation, usage: turn.usage, notPosted: false })
         if (!turn.calls.length) {
-          // Retain visible final answers even when parsing rejects their format.
+          // Retain visible final answers separately from tool-written artifacts.
           // Opaque provider messages, reasoning and signatures stay page-local.
           const bytes = new TextEncoder().encode(turn.text)
           const truncated = bytes.length > 64 * 1024
@@ -139,7 +139,10 @@ export async function runBrowserTask(options: {
         return turn
       },
     },
-  })
+  }, { onProgress: snapshot => {
+    const source = snapshot.candidate?.sourceCode
+    if (source !== undefined && sources.at(-1)?.source !== source) sources.push({ source })
+  } })
   const snapshot = await attempt.start()
   return { inputFingerprint: request.inputFingerprint, snapshot, requests: attempt.requestAccounting(), answers, sources, referenceReads, referenceOperations, referenceHttp, protocol }
 }

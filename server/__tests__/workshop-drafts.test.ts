@@ -3,6 +3,8 @@ import type { PostgresDatabase } from '../database/postgres'
 import { createTestDatabase } from './_helpers/postgres'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { setReviewDecisionProvider } from '../workshop-review-provider.ts'
+import { abilityArtifactFingerprint, sourceFingerprint } from '../../shared/projections/workshop-generation'
+import type { WorkshopAbilityTestingContract } from '../../shared/contract/workshop'
 import {
   WorkshopDraftError,
   adoptCandidate,
@@ -27,6 +29,14 @@ import {
 } from '../workshop-drafts.ts'
 
 let db: PostgresDatabase
+
+const browserArtifacts = (sourceCode: string, code = 'test("card behavior", () => expect(1).to.equal(1))') => ({
+  sourceFingerprint: sourceFingerprint(sourceCode),
+  validation: { valid: true, sourceFingerprint: sourceFingerprint(sourceCode) },
+  testing: { code, lastRun: { artifactFingerprint: abilityArtifactFingerprint(sourceCode, code), browserRuntimeId: 'browser-runtime-1',
+    outcome: { kind: 'passed', count: 1 },
+  } } satisfies WorkshopAbilityTestingContract,
+})
 
 const baseDraft = (overrides: Partial<WorkshopDraft> = {}): WorkshopDraft => ({
   cardId: 'CUSTOM_FieldKeeper',
@@ -450,13 +460,14 @@ describe('workshop draft aggregate', () => {
     })
   })
 
-  it('only adopts statically validated ability candidates', async () => {
+  it('requires current source validation and passing browser tests even when called without the UI', async () => {
     const created = (await createCard(db, { authorId: 'author', draft: baseDraft() }))
     const invalidCandidate = {
       id: 'ability-1',
       kind: 'ability' as const,
       prompt: 'gain grain',
       sourceCode: 'bad source',
+      cardJson: baseDraft().cardJson,
       compiledCode: '',
       codeManifest: null,
       validation: { valid: false, errors: ['bad source'] },
@@ -486,7 +497,18 @@ describe('workshop draft aggregate', () => {
           },
         },
       },
-      validation: { valid: true as const },
+      ...browserArtifacts('const CARD_IMPL = {}'),
+    }
+    for (const candidate of [
+      { ...validCandidate, testing: undefined },
+      { ...validCandidate, testing: { ...validCandidate.testing, code: 'changed tests' } },
+      { ...validCandidate, sourceCode: 'changed source' },
+      { ...validCandidate, testing: { ...validCandidate.testing, lastRun: { ...validCandidate.testing.lastRun,
+        outcome: { kind: 'passed', count: 0 } satisfies NonNullable<WorkshopAbilityTestingContract['lastRun']>['outcome'],
+      } } },
+    ]) {
+      await expect(adoptCandidate(db, { cardId: created.id, authorId: 'author', baseRevision: 1, candidate }))
+        .rejects.toMatchObject({ code: 'not_ready' })
     }
     const adopted = (await adoptCandidate(db, {
       cardId: created.id,
@@ -540,7 +562,7 @@ describe('workshop draft aggregate', () => {
         cardJson: {
           ...baseDraft().cardJson,
         },
-        validation: { valid: true },
+        ...browserArtifacts('const CARD_IMPL = {}'),
         createdAt: 100,
       },
     }))
@@ -1206,10 +1228,11 @@ it('persists A and failed B privately, strips protocol, and preserves immutable 
     id, kind: 'ability' as const, prompt: `request ${id}`, createdAt: 1,
     baseRevision: 1, stale: true,
     sourceCode: 'const CARD_IMPL = {}', cardJson: baseDraft().cardJson,
-    validation: { valid }, compiledCode: 'const CARD_IMPL = {};', codeManifest: { listeners: [] },
+    ...browserArtifacts('const CARD_IMPL = {}'),
+    validation: { ...browserArtifacts('const CARD_IMPL = {}').validation, valid }, compiledCode: 'const CARD_IMPL = {};', codeManifest: { listeners: [] },
     provenance: { attemptId: id, inputFingerprint: 'a'.repeat(64), promptVersion: 'v1', toolVersion: 'v1',
       provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-v4-flash',
-      modelRequests: 2, referenceCalls: 1, repairs: 0, elapsedMs: 10,
+      modelRequests: 2, referenceCalls: 1, elapsedMs: 10,
       usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: null, reasoningTokens: null }, references: [],
       raw: 'private-canary', apiKey: 'private-canary' },
     tool_calls: ['private-canary'],
@@ -1237,12 +1260,23 @@ it('persists A and failed B privately, strips protocol, and preserves immutable 
   expect(reloaded.draft.generation.ability).not.toHaveProperty('latestResult.failedCandidate')
   expect(reloaded.draft.generation.ability).not.toHaveProperty('lastValid')
   expect(reloaded.draft.generation.art).toHaveProperty('lastCompleted.id', 'old-art')
+  expect(reloaded.draft.generation.ability).toHaveProperty('adopted.testing', a.testing)
+  expect(reloaded.draft.generation.ability).not.toHaveProperty('adopted.sourceCode')
   const first = await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(adopted.versionId)
   expect(JSON.stringify(first)).not.toContain('private-canary')
   expect(JSON.stringify(first)).not.toContain('failedCandidate')
+  expect(JSON.stringify(first)).not.toContain('testing')
   const same = await adoptCandidate(db, { cardId: initial.id, authorId: 'author', baseRevision: adopted.workspace.revision,
-    candidate: { ...a, id: 'new-attempt', provenance: { ...a.provenance, attemptId: 'new-attempt' } },
+    candidate: { ...a, ...browserArtifacts(a.sourceCode, 'test("changed behavior", () => expect(2).to.equal(2))'),
+      id: 'new-attempt', provenance: { ...a.provenance, attemptId: 'new-attempt' } },
   })
   expect(same.versionId).toBe(adopted.versionId)
   expect(await db.prepare('SELECT provenance_json FROM workshop_card_versions WHERE id = ?').get(same.versionId)).toEqual(first)
+  const edited = await checkpointDraft(db, { cardId: initial.id, authorId: 'author', baseRevision: same.workspace.revision,
+    draft: { ...same.workspace.draft, effectCode: `${a.sourceCode};` },
+  })
+  expect(edited.draft.generation.ability).not.toHaveProperty('adopted.testing.lastRun')
+  const restored = await restoreVersion(db, { cardId: initial.id, authorId: 'author', baseRevision: edited.revision, versionId: adopted.versionId })
+  expect(restored.draft.effectCode).toBe(a.sourceCode)
+  expect(restored.draft.generation.ability).not.toHaveProperty('adopted.testing')
 })

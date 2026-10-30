@@ -1,6 +1,18 @@
 import type { GenerationUsage } from '../../../../shared/contract/workshop-generation'
-import type { LlmConfig } from '../types'
-import { assertGenerationAdmission, resolveGenerationTarget, type GenerationTarget } from './admission'
+import type { LlmConfig, ProviderId } from '../types'
+import { getProvider } from '../registry'
+
+export type GenerationTarget = { provider: ProviderId; endpoint: string; model: string }
+
+export function resolveGenerationTarget(config: LlmConfig): GenerationTarget {
+  const base = config.baseUrl ?? getProvider(config.provider).baseUrl
+  if (!base) throw new Error('This provider has no browser generation endpoint.')
+  const url = new URL(`${base.replace(/\/+$/, '')}/chat/completions`)
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    throw new Error('Generation requires an HTTPS provider endpoint without credentials or query parameters.')
+  }
+  return { provider: config.provider, endpoint: url.href, model: config.model }
+}
 
 /** Opaque protocol state: never place these objects in React recovery or drafts. */
 export type WireMessage = Record<string, unknown> & { role: 'system' | 'user' | 'assistant' | 'tool' }
@@ -193,7 +205,6 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
     if ((finishReason === 'tool_calls') !== (calls.length > 0)) throw new ModelTurnError('protocol', 'Tool calls and finish reason disagree.', usage)
     if (calls.length) message.tool_calls = calls
     const text = typeof message.content === 'string' ? message.content : ''
-    if (!calls.length && !text.trim()) throw new ModelTurnError('protocol', 'The provider returned no final content.', usage)
     if (message.content === undefined) message.content = null
     return { message, calls, text, finishReason, returnedModel, requestId, usage, responseWireBytes: bytes }
   } catch (error) {
@@ -210,35 +221,26 @@ export async function readModelTurn(response: Response, signal: AbortSignal, onT
 
 export type ToolTransport = {
   target: GenerationTarget
-  complete(messages: readonly WireMessage[], tools: readonly ToolDefinition[], signal: AbortSignal, onText?: (text: string) => void, options?: { toolChoice: 'auto' | 'none' }): Promise<ModelTurn>
+  complete(messages: readonly WireMessage[], tools: readonly ToolDefinition[], signal: AbortSignal, onText?: (text: string) => void): Promise<ModelTurn>
 }
 
-/** I/O and admission are seams for the browser acceptance harness. Production
- * uses the default exact-tuple policy; there is no product bypass setting.
- * Only this closure owns the LLM credential. No GitHub/backend port receives it.
- */
+/** Only this closure owns the LLM credential. No GitHub/backend port receives it. */
 export function createToolTransport(config: LlmConfig, options: {
   fetch?: typeof fetch
-  authorize?: (target: GenerationTarget) => void
   beforePost?: (body: string) => Promise<void>
 } = {}): ToolTransport {
   const captured = { ...config }
   const target = Object.freeze(resolveGenerationTarget(captured))
-  const authorize = options.authorize ?? assertGenerationAdmission
-  authorize(target)
   const fetchModel = options.fetch ?? fetch
   let active = false
   return {
     target,
-    async complete(messages, tools, signal, onText, turnOptions) {
-      authorize(target) // check the resolved transport destination, not just UI selection
+    async complete(messages, tools, signal, onText) {
       if (!captured.apiKey) throw new Error('Configure your model API key in this browser.')
       if (active) throw new Error('Only one model request may run at a time.')
       const body = JSON.stringify({
         model: target.model, messages, ...GENERATION_MODEL_SETTINGS,
-        // Keep definitions even when closing research: DeepSeek uses the
-        // presence of tools to retain reasoning_content in the context.
-        ...(tools.length ? { tools, tool_choice: turnOptions?.toolChoice ?? 'auto' } : {}),
+        ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
         ...(target.provider === 'deepseek' ? { thinking: { type: 'enabled' } } : { temperature: 0.2 }),
         ...(target.provider === 'openrouter' ? { provider: { require_parameters: true } } : {}),
       })

@@ -13,7 +13,7 @@ it.each([false, true])('rejects the retired DeepSeek alias before loading config
     ...(diagnostic ? ['--diagnose', 'M2-per-action-bonus'] : []),
   ], { cwd: root, encoding: 'utf8', timeout: 15_000, env: { PATH: process.env.PATH } })
   expect(result.status).toBe(1)
-  expect(result.stderr).toContain('Only --model deepseek-flash is approved for paid acceptance')
+  expect(result.stderr).toContain('The local paid harness currently has pricing and credentials for --model deepseek-flash only.')
   expect(result.stderr).not.toContain('ENOENT')
 })
 

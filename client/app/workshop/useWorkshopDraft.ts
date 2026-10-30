@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { WorkshopDraftErrorCode, WorkshopPinnedVersionContract } from '../../../shared/contract/workshop'
-import { projectAbilityCandidate, projectWorkshopGeneration } from '../../../shared/projections/workshop-generation'
+import { isAbilityCandidateReady, projectAbilityCandidate, projectWorkshopGeneration } from '../../../shared/projections/workshop-generation'
 import {
   createWorkshopDraftState,
   resolveWorkshopRecovery,
@@ -390,7 +390,7 @@ export const useWorkshopDraft = ({
     candidate: WorkshopCandidate,
   ): Promise<boolean> => {
     let current = stateRef.current
-    if (!current || current.save.status === 'conflict') return false
+    if (!current || current.save.status === 'conflict' || (candidate.kind === 'ability' && !isAbilityCandidateReady(candidate))) return false
     const pendingSave = saveRequestRef.current
     if (pendingSave) {
       await pendingSave.promise

@@ -6,10 +6,13 @@ export const browserRoots = ['client/main.tsx', 'replay-viewer/src/main.tsx']
 export const privilegedRoots = new Map([
   ['client/sandbox/SandboxApp.tsx', 'Workshop authoring sandbox entry'],
   ['client/local-sandbox/worker.ts', 'Isolated local game worker entry'],
+  ['client/local-sandbox/card-tests.worker.ts', 'Opaque browser card-test worker entry'],
 ])
 export const workerFiles = new Set([
   'client/local-sandbox/worker.ts',
   'client/local-sandbox/worker-core.ts',
+  'client/local-sandbox/card-tests.worker.ts',
+  'client/local-sandbox/card-test-runtime.ts',
   'client/local-sandbox/browser-runtime.ts',
   'client/local-sandbox/browser-executor.ts',
 ])

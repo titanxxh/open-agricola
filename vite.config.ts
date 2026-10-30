@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { browserCardTestsPlugin } from './scripts/vite-browser-card-tests.ts'
 import {
   loadPublicAssetConfig,
   publicAssetUrls,
@@ -46,6 +47,7 @@ const servePublicAssets = (assetRoot: string) => {
 
 const plugins: PluginOption[] = [
   react(),
+  browserCardTestsPlugin(),
   publicAssetUrls(publicAssets, [process.env.VITE_BASE_PATH ?? '/', '/']),
 ]
 if (publicAssets.localDir) {

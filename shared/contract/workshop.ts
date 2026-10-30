@@ -59,6 +59,21 @@ export type WorkshopArtCandidateContract = WorkshopGenerationCandidateBase & {
   referenceImages?: string[]
 }
 
+export type WorkshopBrowserTestOutcome =
+  | { kind: 'passed'; count: number }
+  | { kind: 'failed'; failures: { name: string; error: string }[] }
+  | { kind: 'error'; message: string }
+
+/** Author-private browser results describe a client run, not server execution. */
+export type WorkshopAbilityTestingContract = {
+  code: string
+  lastRun?: {
+    artifactFingerprint: string
+    browserRuntimeId: string
+    outcome: WorkshopBrowserTestOutcome
+  }
+}
+
 export type WorkshopAbilityCandidateContract = WorkshopGenerationCandidateBase & {
   kind: 'ability'
   sourceCode: string
@@ -66,5 +81,6 @@ export type WorkshopAbilityCandidateContract = WorkshopGenerationCandidateBase &
   sourceFingerprint?: string
   inputFingerprint?: string
   provenance?: GenerationProvenance
+  testing?: WorkshopAbilityTestingContract
   validation: { valid: boolean; errors?: string[]; sourceFingerprint?: string; sandboxContractId?: string }
 }

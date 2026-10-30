@@ -1,4 +1,5 @@
 import type { WorkshopSandboxContract } from '../../../../shared/contract/workshop-generation'
+import { runBrowserCardTests } from '../../../local-sandbox/card-tests'
 import type { LlmConfig } from '../types'
 import { createToolTransport } from './protocol'
 import { ReferenceSession } from './references'
@@ -14,6 +15,7 @@ export function createBrowserGenerationPorts(config: LlmConfig, apiFetch: ApiFet
     model: createToolTransport(config),
     openReferences: ReferenceSession.createOpener(fetch, apiFetch),
     ...createSandboxPorts(apiFetch),
+    runTests: (source, tests, signal) => runBrowserCardTests({ source, tests, signal }),
   }
 }
 
