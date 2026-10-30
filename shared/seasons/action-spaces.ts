@@ -27,21 +27,8 @@ const emptyResources: Resource = {
 }
 
 import { seasonActionIdBySeason } from '../projections/season-actions'
+import { seasonDisplay } from '../projections/season-display'
 export { seasonActionIdBySeason, seasonActionIds } from '../projections/season-actions'
-
-const seasonActionNameBySeason: Record<SeasonId, string> = {
-  winter: 'actions.season-winter-romantic-evening.name',
-  spring: 'actions.season-spring-animal-and-fruit.name',
-  summer: 'actions.season-summer-farmers-market.name',
-  autumn: 'actions.season-autumn-thanksgiving.name',
-}
-
-const seasonActionDescriptionBySeason: Record<SeasonId, string> = {
-  winter: 'actions.season-winter-romantic-evening.description',
-  spring: 'actions.season-spring-animal-and-fruit.description',
-  summer: 'actions.season-summer-farmers-market.description',
-  autumn: 'actions.season-autumn-thanksgiving.description',
-}
 
 const canUseSeasonAction = (season: SeasonId): ActionDefinition['canBeExecutedByPlayer'] =>
   (state) =>
@@ -55,8 +42,8 @@ const seasonHostSpace = (
   if (candidate && 'resources' in candidate && 'takenBy' in candidate) return candidate
   return {
     id: seasonActionIdBySeason[season],
-    nameKey: seasonActionNameBySeason[season],
-    descriptionKey: seasonActionDescriptionBySeason[season],
+    nameKey: seasonDisplay[season].action.nameKey,
+    descriptionKey: seasonDisplay[season].action.descriptionKey,
     roundAvailable: 1,
     gainPerRound: {},
     players: [1, 2, 3, 4, 5, 6],
@@ -297,8 +284,8 @@ const createSeasonActionDefinition = (season: SeasonId): ActionDefinition => {
       : season === 'summer' ? summerFlowFactory : autumnFlowFactory
   return {
     id: seasonActionIdBySeason[season],
-    nameKey: seasonActionNameBySeason[season],
-    descriptionKey: seasonActionDescriptionBySeason[season],
+    nameKey: seasonDisplay[season].action.nameKey,
+    descriptionKey: seasonDisplay[season].action.descriptionKey,
     roundAvailable: 1,
     gainPerRound: {},
     players: [1, 2, 3, 4, 5, 6],

@@ -3,6 +3,7 @@ import { t } from '../../../shared/i18n'
 import type { SerializedPlayerState, SerializedGameState } from '../../../shared/session/serialization'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
 import { moorSpecialActionBaseResources } from '../../../shared/domain/moor-special-action-values'
+import { moorSpecialActionBuysImprovement, moorSpecialActionEffectParams } from '../../../shared/projections/moor-special-actions'
 import { ResourceLine } from '../common/ResourceLine'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 
@@ -48,9 +49,7 @@ function SpecialActionEffect({ locale, actionId, playerCount, id }: {
   const improvement = actionId === 'black-market' ? 'minor' : actionId === 'illicit-work' ? 'major' : null
   const resultIcon = improvement ?? (actionId === 'slash-and-burn' ? 'field' : null)
   const hasInput = terrain !== null || Object.values(cost).some((amount) => amount > 0)
-  const description = t(locale, `moor.specialActions.effects.${actionId}`, {
-    ...gain, foodCost: cost.food ?? 0, fuelCost: cost.fuel ?? 0,
-  })
+  const description = t(locale, `moor.specialActions.effects.${actionId}`, moorSpecialActionEffectParams(actionId, playerCount))
 
   return (
     <span id={id} className="special-action-card__effect" role="img" aria-label={description}>
@@ -132,7 +131,7 @@ export function SpecialActionsPanel({
                   <span className="special-action-card__action-label">{label}</span>
                 </span>
                 <SpecialActionEffect locale={locale} actionId={actionId} playerCount={playerCount} id={effectId} />
-                {(actionId === 'black-market' || actionId === 'illicit-work') && (
+                {moorSpecialActionBuysImprovement(actionId) && (
                   <span className="special-action-card__note">{t(locale, 'moor.specialActions.improvementCost')}</span>
                 )}
               </button>

@@ -3,6 +3,13 @@ import { t } from '../../../shared/i18n'
 import type { ActionSpace, PlayerState } from '../../../shared/contract/types'
 import type { SeasonId, ThroughTheSeasonsState } from '../../../shared/seasons/types'
 import { seasonActionIdBySeason } from '../../../shared/projections/season-actions'
+import {
+  seasonActionCardCopy,
+  seasonBoardAdjustments,
+  seasonBoardNotes,
+  seasonDisplay,
+  type SeasonIconToken,
+} from '../../../shared/projections/season-display'
 import { getPlayerDisplayName } from '../../utils/player-name'
 
 type Props = {
@@ -15,14 +22,6 @@ type Props = {
 }
 
 const seasonOrder: SeasonId[] = ['winter', 'spring', 'autumn', 'summer']
-
-const seasonLabelKey: Record<SeasonId, string> = {
-  winter: 'ui.seasons.winter',
-  spring: 'ui.seasons.spring',
-  summer: 'ui.seasons.summer',
-  autumn: 'ui.seasons.autumn',
-}
-
 
 type SeasonIconKind =
   | 'wood'
@@ -71,91 +70,49 @@ const SeasonIconRow = ({ items }: { items: SeasonIconItem[] }) => (
   </span>
 )
 
-const boardLabelKeys = [
-  ['season-winter', 'ui.seasons.winter'],
-  ['season-spring', 'ui.seasons.spring'],
-  ['season-summer', 'ui.seasons.summer'],
-  ['season-autumn', 'ui.seasons.autumn'],
-  ['winter-fishing', 'ui.seasons.boardCopy.winterFishing'],
-  ['summer-no-heating', 'ui.seasons.boardCopy.summerNoHeating'],
-] as const
-
-const seasonResourceAdjustments: SeasonResourceAdjustment[] = [
-  {
-    className: 'winter-basic',
-    accumulation: true,
-    items: [{ icon: 'clay', text: '-1' }, { icon: 'reed', text: '-1' }],
-  },
-  {
-    className: 'winter-plow',
-    labelKey: 'ui.seasons.boardCopy.winterPlowShort',
-    items: [{ icon: 'food', text: '1', arrowAfter: true }, { icon: 'field' }],
-  },
-  {
-    className: 'spring-basic',
-    accumulation: true,
-    items: [{ icon: 'wood', text: '-1' }, { icon: 'stone', text: '+1' }],
-  },
-  {
-    className: 'spring-fences',
-    labelKey: 'ui.seasons.boardCopy.springFencesShort',
-    items: [{ icon: 'fence-icon', text: '+2' }],
-  },
-  {
-    className: 'summer-basic',
-    accumulation: true,
-    items: [{ icon: 'clay', text: '+1' }, { icon: 'stone', text: '-1' }],
-  },
-  {
-    className: 'summer-fishing',
-    labelKey: 'actions.fishing.name',
-    items: [{ icon: 'food', text: '+1' }],
-  },
-  {
-    className: 'summer-build-rooms',
-    labelKey: 'ui.seasons.boardCopy.summerBuildRoomsShort',
-    items: [{ icon: 'barn', text: '1' }],
-  },
-  {
-    className: 'summer-day-laborer',
-    labelKey: 'actions.day-laborer.name',
-    items: [{ icon: 'grain', text: '+1' }],
-  },
-  {
-    className: 'autumn-basic',
-    accumulation: true,
-    items: [{ icon: 'wood', text: '+1' }, { icon: 'reed', text: '+1' }],
-  },
-  {
-    className: 'autumn-major',
-    labelKey: 'ui.seasons.boardCopy.autumnMajorShort',
-    items: [
-      { icon: 'wood', text: '-1', dividerAfter: true },
-      { icon: 'clay', dividerAfter: true },
-      { icon: 'reed', dividerAfter: true },
-      { icon: 'stone' },
-    ],
-  },
+const boardLabelKeys: readonly (readonly [string, string])[] = [
+  ...Object.entries(seasonDisplay).map(([season, display]) => [`season-${season}`, display.nameKey] as const),
+  ...seasonBoardNotes.map((note) => [note.id, note.labelKey] as const),
 ]
+
+const seasonIconByToken: Record<SeasonIconToken, SeasonIconKind> = {
+  WOOD: 'wood',
+  CLAY: 'clay',
+  REED: 'reed',
+  STONE: 'stone',
+  FOOD: 'food',
+  GRAIN: 'grain',
+  FIELD: 'field',
+  FENCE: 'fence-icon',
+  STABLE: 'barn',
+}
+
+const seasonResourceAdjustments: SeasonResourceAdjustment[] = seasonBoardAdjustments.map((adjustment) => ({
+  className: adjustment.id,
+  labelKey: adjustment.labelKey,
+  accumulation: adjustment.accumulation,
+  items: adjustment.items.map(({ token, ...item }) => ({ ...item, icon: seasonIconByToken[token] })),
+}))
 
 const SeasonActionBody = ({ locale, season }: { locale: Locale; season: SeasonId }) => {
   if (season === 'winter') {
+    const copy = seasonActionCardCopy.winter
     return (
       <span className="seasons-board__action-copy seasons-board__action-copy--winter">
         <span className="seasons-board__winter-family">
           <span className="seasons-board__large-plus">+</span>
           <SeasonIcon icon="child-free" />
-          <span>{t(locale, 'ui.seasons.actionCard.winter.family')}</span>
+          <span>{t(locale, copy.family.labelKey)}</span>
         </span>
         <span className="seasons-board__winter-harvest">
-          {t(locale, 'ui.seasons.actionCard.winter.harvestPrefix')}
+          {t(locale, copy.harvestPrefix.labelKey)}
           <span className="seasons-board__inline-icons">
-            <span>1</span>
+            <span>{copy.foodPerHarvest}</span>
             <SeasonIcon icon="food" />
           </span>
-          {t(locale, 'ui.seasons.actionCard.winter.harvestSuffix')}
+          {t(locale, copy.harvestSuffix.labelKey)}
           <span className="seasons-board__inline-icons">
-            <span>2</span>
+            <span>{copy.wood}</span>
             <SeasonIcon icon="wood" />
           </span>
         </span>
@@ -164,12 +121,13 @@ const SeasonActionBody = ({ locale, season }: { locale: Locale; season: SeasonId
   }
 
   if (season === 'spring') {
+    const copy = seasonActionCardCopy.spring
     return (
       <span className="seasons-board__action-copy seasons-board__action-copy--spring">
         <span className="seasons-board__spring-text">
-          <span>{t(locale, 'ui.seasons.actionCard.spring.breeding')}</span>
-          <span>{t(locale, 'ui.seasons.actionCard.spring.andOr')}</span>
-          <strong>{t(locale, 'ui.seasons.actionCard.spring.sow')}</strong>
+          <span>{t(locale, copy.breeding.labelKey)}</span>
+          <span>{t(locale, copy.andOr.labelKey)}</span>
+          <strong>{t(locale, copy.sow.labelKey)}</strong>
         </span>
         <SeasonIcon icon="sow" />
       </span>
@@ -177,23 +135,24 @@ const SeasonActionBody = ({ locale, season }: { locale: Locale; season: SeasonId
   }
 
   if (season === 'summer') {
+    const copy = seasonActionCardCopy.summer
     return (
       <span className="seasons-board__action-copy seasons-board__action-copy--summer">
         <span className="seasons-board__summer-plow">
-          <strong>{t(locale, 'ui.seasons.actionCard.summer.plow')}</strong>
+          <strong>{t(locale, copy.plow.labelKey)}</strong>
           <SeasonIcon icon="field" />
         </span>
-        <span className="seasons-board__action-and-or">{t(locale, 'ui.seasons.actionCard.summer.andOr')}</span>
+        <span className="seasons-board__action-and-or">{t(locale, copy.andOr.labelKey)}</span>
         <span className="seasons-board__summer-market">
-          <strong>{t(locale, 'ui.seasons.actionCard.summer.bakeBread')}</strong>
+          <strong>{t(locale, copy.bakeBread.labelKey)}</strong>
           <SeasonIcon icon="bake" />
-          <span>{t(locale, 'ui.seasons.actionCard.summer.or')}</span>
-          <strong>{t(locale, 'ui.seasons.actionCard.summer.sellGrain')}</strong>
+          <span>{t(locale, copy.or.labelKey)}</span>
+          <strong>{t(locale, copy.sellGrain.labelKey)}</strong>
           <span className="seasons-board__trade-line">
-            <span>-1x</span>
+            <span>{`-${copy.grainSold}x`}</span>
             <SeasonIcon icon="grain" />
             <span>→</span>
-            <span>4</span>
+            <span>{copy.foodPerGrain}</span>
             <SeasonIcon icon="food" />
           </span>
         </span>
@@ -201,14 +160,15 @@ const SeasonActionBody = ({ locale, season }: { locale: Locale; season: SeasonId
     )
   }
 
+  const copy = seasonActionCardCopy.autumn
   return (
     <span className="seasons-board__action-copy seasons-board__action-copy--autumn">
       <span className="seasons-board__autumn-field">
-        <span>{t(locale, 'ui.seasons.actionCard.autumn.fieldPhase')}</span>
-        <span>{t(locale, 'ui.seasons.actionCard.autumn.andOr')}</span>
+        <span>{t(locale, copy.fieldPhase.labelKey)}</span>
+        <span>{t(locale, copy.andOr.labelKey)}</span>
       </span>
       <span className="seasons-board__autumn-vegetable">
-        <span>+1</span>
+        <span>{`+${copy.vegetable}`}</span>
         <SeasonIcon icon="vegetable" />
       </span>
     </span>
@@ -263,7 +223,7 @@ export const SeasonsBoard = ({
         </div>
         {seasonOrder.map((season) => {
           const action = actionById.get(seasonActionIdBySeason[season])
-          const seasonName = t(locale, seasonLabelKey[season])
+          const seasonName = t(locale, seasonDisplay[season].nameKey)
           const actionName = action ? t(locale, action.nameKey) : t(locale, 'ui.seasons.missingAction')
           const isCurrent = currentSeason === season
           const occupantRef = action?.takenBy[0]
