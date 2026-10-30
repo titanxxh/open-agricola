@@ -10,6 +10,7 @@ export const ALLOWED_EFFECT_FILES = [
   'breed.ts',
   'collect.ts',
   'construct.ts',
+  'discard-goods.ts',
   'exchange.ts',
   'family-growth.ts',
   'fencing.ts',

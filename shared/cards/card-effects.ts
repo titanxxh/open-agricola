@@ -223,6 +223,8 @@ export type CardEffect = {
   timedRules?: readonly TimedRule[]
   projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest, actionId: string | undefined) => InteractionRequest
   computeResourceCommitments?: (state: GameState, owner: PlayerState) => readonly ResourceCommitment[]
+  /** Supply goods this played card forbids the owner to return to the general supply. */
+  blockedVoluntaryDiscardResources?: (state: GameState, player: PlayerState) => readonly (keyof Resource)[]
   preHarvestGoodsWanted?: ResourceKey[]
   preHarvestGoodsWantedBeforeReap?: ResourceKey[]
   maySkipHarvestFieldPhase?: boolean

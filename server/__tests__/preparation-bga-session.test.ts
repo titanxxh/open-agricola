@@ -338,8 +338,16 @@ describe('BGA preparation windows', () => {
     if (response.interaction.stateId !== 'wait') throw new Error('Expected the Quarry improvement offer')
     expect(response.interaction.sourceCard).toBe(ARTISAN)
     let next = choose(session, response, '__skip__')
-    for (let step = 0; step < 4 && next.interaction.stateId === 'wait' && next.interaction.request.kind === 'select-trigger'; step++) {
-      expect(next.interaction.request.options?.some(option => option.sourceCard === NIGHTWORKER && !option.disabled)).toBe(false)
+    for (let step = 0; step < 6 && next.interaction.stateId === 'wait'; step++) {
+      if (next.interaction.request.kind === 'choice') {
+        const discard = next.interaction.request.options.find((option) => option.labelKey === 'actions.discard-goods.name')
+        const skip = next.interaction.request.options.find((option) => option.value === '__skip__')
+        if (!discard || !skip) break
+        next = choose(session, next, skip.value)
+        continue
+      }
+      if (next.interaction.request.kind !== 'select-trigger') break
+      expect(next.interaction.request.options?.some((option) => option.sourceCard === NIGHTWORKER && !option.disabled)).toBe(false)
       next = choose(session, next, '__pass__')
     }
     expect(next.state.roundPhase).toBe('work')

@@ -114,6 +114,7 @@ describe('effects architecture guard', () => {
       'construct',
       'consume-card-counter',
       'discard-card-stack',
+      'discard-goods',
       'draw-ordinary-cards',
       'emit-choice',
       'exchange',

@@ -322,6 +322,18 @@ const mapResourceMoved = (
   event: ResourceMovedEvent,
   ctx: EventLogMapperContext,
 ): LogEntry | null => {
+  if (event.reason === 'discard' && event.from.kind === 'player' && event.to.kind === 'supply') {
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    return {
+      key: 'log.discardGoods',
+      playerId: event.from.playerId,
+      params: {
+        player: playerName(ctx, event.from.playerId),
+        resources,
+      },
+    }
+  }
   if (event.to.kind !== 'player') return null
 
   const gain = positiveResources(event.resources)

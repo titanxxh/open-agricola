@@ -272,6 +272,10 @@ describe('stage hook flows', () => {
       markAllWorkersUsed(session.state, player)
     })
     resp = session.performRoundEnd()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice'
+      && resp.interaction.request.options.some((option) => option.labelKey === 'actions.discard-goods.name')) {
+      resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+    }
 
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(3)

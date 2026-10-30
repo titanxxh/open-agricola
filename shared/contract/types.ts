@@ -1124,7 +1124,12 @@ export type ActionDefinition = {
   /** Pure description of this shared primitive, derived from its executable rule parameters. */
   previewEffect?: (context: ActionExecutionContext) => ChoiceEffectPreview | undefined
   /** Pure native pending refresh after an interrupting action changes legality. */
-  projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest) => InteractionRequest
+  projectInteractionRequest?: (
+    state: GameState,
+    player: PlayerState,
+    request: InteractionRequest,
+    actionContext?: Record<string, unknown>,
+  ) => InteractionRequest
   /** Pure executable plan, also used for descriptions. Base mode includes all potential branches. */
   flowFactory?: (context: ActionFlowPlanningContext) => ActionFlow | undefined
   execute: (context: ActionMutationContext) => ActionExecutionResult

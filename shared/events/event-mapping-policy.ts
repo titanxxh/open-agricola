@@ -44,7 +44,7 @@ const metadataOnlyPublicEventTypes = new Set<GameEvent['type']>(['card.stateChan
 
 export const publicEventMappingPolicy = {
   'resource.moved': {
-    log: conditional("to.kind === 'player' && positive resources", 'non-player or empty resource moves do not produce action log rows'),
+    log: conditional("positive resources moved to a player, or discarded from a player's supply to the general supply", 'other non-player or empty resource moves do not produce action log rows'),
     notification: silent('resource movement is too frequent for transient notifications'),
     highlight: conditional('from or to is an action-space endpoint', 'no action-space endpoint to highlight'),
     resourceAnimation: conditional('from and to are supported animation endpoints', 'one or both endpoints cannot be rendered as resource animation endpoints'),

@@ -8,6 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { wood: 2, stone: 2 }),
+  blockedVoluntaryDiscardResources: () => ['wood', 'stone'],
   computeBonusScore: (_state, player) => {
     return -((player.resources.wood ?? 0) + (player.resources.stone ?? 0))
   },

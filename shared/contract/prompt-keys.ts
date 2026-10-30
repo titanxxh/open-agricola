@@ -29,6 +29,7 @@ export type PromptKey =
   | 'ui.interactionCardDraft'
   | 'ui.interactionSleightOfHand'
   | 'ui.interactionExchange' | 'ui.interactionExchangeChoice'
+  | 'ui.interactionDiscardGoods'
   | 'ui.interactionBakeBread' | 'ui.interactionBakeBreadCount' | 'ui.interactionBakeBreadChoice'
   // Other ad-hoc engine / improvement / occupation prompts
   | 'ui.interactionChooseImprovement'

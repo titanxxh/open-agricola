@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { workersAvailable } from '../../domain/player'
+import { missingBuildingResourceSpaceIds } from '../../actions/helpers/missing-building-resource-spaces'
 
 const CARD_ID = 'C125_Nightworker'
 /**
@@ -35,18 +36,7 @@ const cardImpl = {
     )
     if (missingTypes.length === 0) return
 
-    // Accumulation spaces with at least 1 of a missing type, currently
-    // unoccupied (the reference's PLACE_FARMER respects standard occupied rules).
-    const constraints: string[] = []
-    for (const space of state.actionSpaces) {
-      if (space.takenBy.length > 0) continue
-      for (const resource of missingTypes) {
-        if ((space.gainPerRound[resource] ?? 0) <= 0) continue
-        if ((space.resources[resource] ?? 0) <= 0) continue
-        constraints.push(space.id)
-        break
-      }
-    }
+    const constraints = missingBuildingResourceSpaceIds(state, player)
     if (constraints.length === 0) return
 
     return {
@@ -54,7 +44,7 @@ const cardImpl = {
       actionId: 'place-farmer',
       optional: true,
       sourceCard: CARD_ID,
-      actionContext: { constraints },
+      actionContext: { constraints, constraintsMode: 'missing-building-resource' },
     }
   },
 },
