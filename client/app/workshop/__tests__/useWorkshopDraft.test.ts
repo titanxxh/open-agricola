@@ -6,9 +6,20 @@ import {
   useWorkshopDraft,
 } from '../useWorkshopDraft'
 import type {
+  AbilityCandidate,
   WorkshopClientDraft,
   WorkshopWorkspaceDto,
 } from '../workshop-draft-model'
+import { abilityArtifactFingerprint, sourceFingerprint } from '../../../../shared/projections/workshop-generation'
+import type { WorkshopBrowserTestOutcome } from '../../../../shared/contract/workshop'
+
+const testedArtifacts = (sourceCode: string, code = 'test("card behavior", () => expect(1).to.equal(1))') => ({
+  sourceFingerprint: sourceFingerprint(sourceCode),
+  validation: { valid: true, errors: [], sourceFingerprint: sourceFingerprint(sourceCode) },
+  testing: { code, lastRun: { artifactFingerprint: abilityArtifactFingerprint(sourceCode, code), browserRuntimeId: 'browser-runtime-1',
+    outcome: { kind: 'passed', count: 1 },
+  } } satisfies NonNullable<AbilityCandidate['testing']>,
+})
 
 const draft = (name = 'Field Keeper'): WorkshopClientDraft => ({
   cardId: 'CUSTOM_FieldKeeper',
@@ -725,7 +736,7 @@ describe('useWorkshopDraft', () => {
           name: 'Field Keeper',
           card_type: 'occupation',
         },
-        validation: { valid: true, errors: [] },
+        ...testedArtifacts(replacementSource),
         createdAt: 10,
         baseRevision: 1,
         stale: false,
@@ -743,9 +754,30 @@ describe('useWorkshopDraft', () => {
     expect(calls.filter(call => call.path.endsWith('/draft'))).toHaveLength(0)
     expect(calls.find(call => call.path.endsWith('/adopt'))?.body).toMatchObject({
       baseRevision: 1,
-      candidate: { id: 'ability-1', sourceCode: replacementSource },
+      candidate: { id: 'ability-1', sourceCode: replacementSource, testing: testedArtifacts(replacementSource).testing },
     })
     expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toBeNull()
+  })
+
+  it('does not send adoption for missing, failed or obsolete browser test reports', async () => {
+    const apiFetch = vi.fn(async () => Response.json({ ok: true, workspace: workspace(1) }))
+    const { result } = renderHook(() => useWorkshopDraft({ cardId: 'card-1', apiFetch }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    const candidate = { id: 'ability', kind: 'ability', prompt: 'gain food', sourceCode: 'const CARD_IMPL = {}', cardJson: {},
+      ...testedArtifacts('const CARD_IMPL = {}'), createdAt: 1, baseRevision: 1, stale: false,
+    } satisfies AbilityCandidate
+    for (const invalid of [
+      { ...candidate, testing: undefined },
+      { ...candidate, sourceCode: 'changed source' },
+      { ...candidate, testing: { ...candidate.testing, code: 'changed test script' } },
+      { ...candidate, testing: { ...candidate.testing, lastRun: { ...candidate.testing.lastRun,
+        outcome: { kind: 'failed', failures: [{ name: 'gain food', error: 'Expected one food' }] } satisfies WorkshopBrowserTestOutcome,
+      } } },
+    ]) {
+      await act(async () => { expect(await result.current.adoptCandidate(invalid)).toBe(false) })
+    }
+    expect(apiFetch).toHaveBeenCalledTimes(1)
+    expect(result.current.state?.save.status).toBe('saved')
   })
 
   it('includes dirty art inputs in adoption without checkpointing the whole draft', async () => {

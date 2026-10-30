@@ -104,7 +104,8 @@ export function readDependencies(root: string, roots = runtimeRoots): { edges: D
           else if (isSourceFile(argument.text)) {
             const worker = normalizePath(path.relative(root, path.resolve(path.dirname(file), argument.text)))
             workerEntries.add(worker)
-            if (from !== 'client/local-sandbox/local-transport.ts' || worker !== 'client/local-sandbox/worker.ts') errors.push(from + ': unknown worker entry ' + worker)
+            if (!(from === 'client/local-sandbox/local-transport.ts' && worker === 'client/local-sandbox/worker.ts')
+              && !(from === 'client/local-sandbox/card-tests.ts' && worker === 'client/local-sandbox/card-tests.worker.ts')) errors.push(from + ': unknown worker entry ' + worker)
           }
         }
       } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression) {

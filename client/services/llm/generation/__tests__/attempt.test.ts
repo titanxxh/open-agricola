@@ -1,272 +1,174 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { sha1 } from '@noble/hashes/legacy.js'
-import { bytesToHex, concatBytes, utf8ToBytes } from '@noble/hashes/utils.js'
+import type { WorkshopDraftContract } from '../../../../../shared/contract/workshop'
 import type { WorkshopSandboxContract } from '../../../../../shared/contract/workshop-generation'
-import { sourceFingerprint } from '../../../../../shared/projections/workshop-generation'
+import { abilityArtifactFingerprint, isAbilityCandidateReady, sourceFingerprint } from '../../../../../shared/projections/workshop-generation'
 import { GenerationAttempt, type AttemptPorts } from '../attempt'
-import { buildGenerationRequest, extractGenerationOutput } from '../request'
+import { buildGenerationRequest } from '../request'
 import { ModelTurnError, type ModelTurn, type ToolCall, type WireMessage } from '../protocol'
-import { ReferenceSession } from '../references'
-
-afterEach(() => vi.useRealTimers())
 
 const draft = {
-  cardId: 'CUSTOM_Test', cardType: 'minor' as const, name: 'Test', description: 'Gain food',
-  cardJson: { id: 'CUSTOM_Test', card_type: 'minor', name: 'Test', cost: { wood: 2 } },
+  cardId: 'CUSTOM_Test', cardType: 'minor', name: 'Test', description: 'Gain food',
+  cardJson: { id: 'CUSTOM_Test', card_type: 'minor', name: 'Test' },
   effectCode: 'adopted source', artUrl: null, generation: {},
-}
+} satisfies WorkshopDraftContract
 const request = () => buildGenerationRequest({ workspaceId: 'workspace', baseRevision: 1, draft, intent: { kind: 'generate', message: 'gain food' }, attemptId: 'attempt', now: 1 })
 const contract: WorkshopSandboxContract = { format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, listeners: { actions: [], phases: {}, scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, actions: {}, helpers: '', semantics: [] }
-const source = 'const CARD_DEF = { cardType: "minor", meta: {} }; const CARD_IMPL = {}'
-const text = `\`\`\`typescript\n${source}\n\`\`\``
-const call = (id: string): ToolCall => ({ id, type: 'function', function: { name: 'search_references', arguments: '{"query":"wood"}' } })
-const turn = (calls: ToolCall[] = [], content = text): ModelTurn => ({
-  calls, text: content, message: { role: 'assistant', content, ...(calls.length ? { tool_calls: calls, reasoning_content: 'opaque' } : {}) },
+const source = 'const CARD_ID="CUSTOM_Test"; const CARD_DEF={}; const CARD_IMPL={}'
+const tests = "test('gain', () => expect(1).to.equal(1))"
+const call = (name: string, args: unknown = {}, id = name): ToolCall => ({ id, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+const write = (code = source, testCode = tests, id = 'write') => call('write_artifacts', { source: code, tests: testCode }, id)
+const run = (id = 'run') => call('run_tests', {}, id)
+const read = (id = 'read') => call('search_references', { query: 'food' }, id)
+const turn = (calls: ToolCall[] = [], text = ''): ModelTurn => ({
+  calls, text, message: { role: 'assistant', content: text, ...(calls.length ? { tool_calls: calls, reasoning_content: 'opaque', extra_content: { signature: 'private-signature' } } : {}) },
   finishReason: calls.length ? 'tool_calls' : 'stop', returnedModel: 'actual-model',
   usage: { inputTokens: 2, outputTokens: 3, cachedInputTokens: null, reasoningTokens: null },
 })
-
 function ports(): AttemptPorts {
   return {
     model: { target: { provider: 'deepseek', endpoint: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-flash' }, complete: vi.fn(async () => turn()) },
     loadContract: vi.fn(async () => contract),
     openReferences: vi.fn(async () => ({ commit: 'b'.repeat(40), reads: [], execute: vi.fn(async () => 'reference') })),
     validate: vi.fn(async code => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id, cardJson: draft.cardJson })),
+    runTests: vi.fn<AttemptPorts['runTests']>(async () => ({ browserRuntimeId: 'browser-runtime-1', outcome: { kind: 'passed', count: 1 } })),
   }
 }
+function sequence(io: AttemptPorts, ...turns: ModelTurn[]) {
+  let next = 0
+  const history: WireMessage[][] = []
+  io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async messages => { history.push(structuredClone([...messages])); return turns[next++] ?? turn() })
+  return history
+}
+afterEach(() => vi.useRealTimers())
 
-describe('immutable generation input', () => {
-  it('preserves raw cost alternatives for the model and distinguishes them from combined costs', () => {
-    const capture = (costInput: string) => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1,
-      draft: { ...draft, cardJson: { ...draft.cardJson, cost: { wood: 1, clay: 1 },
-        _draft: { costInput, prerequisite: 'At least 2 occupations', unrelated: 'private-internal-field' } } },
-      intent: { kind: 'generate', message: 'Use the edited card requirements' },
-    })
-    const alternative = capture('1 wood or 1 clay')
-    const combined = capture('1 wood and 1 clay')
-    expect(alternative.input.card).toMatchObject({ requirements: { cost: '1 wood or 1 clay', prerequisite: 'At least 2 occupations' } })
-    expect(combined.input.card).toMatchObject({ requirements: { cost: '1 wood and 1 clay' } })
-    expect(alternative.inputFingerprint).not.toBe(combined.inputFingerprint)
-    expect(alternative.draftFingerprint).not.toBe(combined.draftFingerprint)
-    expect(JSON.stringify(alternative)).not.toContain('private-internal-field')
-    expect(alternative.input.card.definition).not.toHaveProperty('_draft')
-  })
-  it('does not apply the adopted draft raw costs to a different selected or tested source', () => {
-    const current = { ...draft, description: 'Draft A: gain clay immediately', cardJson: { ...draft.cardJson, cost: { clay: 2 }, _draft: { costInput: '2 clay', prerequisite: '4 occupations' } } }
-    const selected = { id: 'B', kind: 'ability' as const, sourceCode: 'selected B', cardJson: { cost: { wood: 1 }, desc: ['Selected B: gain wood next round'] }, validation: { valid: true }, prompt: 'B', createdAt: 1 }
-    const base = { workspaceId: 'w', baseRevision: 1, draft: current, selectedCandidate: selected }
-    const followup = buildGenerationRequest({ ...base, intent: { kind: 'follow-up', message: 'Only change the reward; preserve the cost' } })
-    expect(followup.input.card.definition.cost).toEqual({ wood: 1 })
-    expect(followup.input.card.requirements).toEqual({})
-    expect(followup.input.card.description).toBe('Selected B: gain wood next round')
-    expect(buildGenerationRequest({ ...base, selectedCandidate: { ...selected, cardJson: { ...selected.cardJson, _draft: { costInput: '1 wood or 1 reed' } } },
-      intent: { kind: 'follow-up', message: 'Only change the reward' } }).input.card.requirements).toEqual({ cost: '1 wood or 1 reed' })
-    const repair = buildGenerationRequest({ ...base, intent: { kind: 'repair', message: 'Fix the tested code; preserve its cost',
-      failure: { workspaceId: 'w', versionId: 'tested', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['unsupported helper'] } } })
-    expect(repair.input.card.requirements).toEqual({})
-    expect(repair.input.card.definition).toEqual({})
-    expect(repair.input.card.description).toBe('')
-    expect(repair.input.source).toBe('tested B')
-  })
-  it('uses selected B for follow-ups and the adopted draft when selection is absent', () => {
-    const selected = { id: 'B', kind: 'ability' as const, sourceCode: 'selected B', cardJson: draft.cardJson, validation: { valid: true }, prompt: 'old', createdAt: 1 }
-    const options = { workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'follow-up' as const, message: 'make it 2 wood' } }
-    const snapshot = buildGenerationRequest({ ...options, selectedCandidate: selected })
-    selected.sourceCode = 'edited afterward'
-    expect(snapshot.input.source).toBe('selected B')
-    expect(Object.isFrozen(snapshot.input.card.definition)).toBe(true)
-    expect(buildGenerationRequest(options).input.source).toBe('adopted source')
-  })
-
-  it('binds repair to tested version B while C is selected', () => {
-    const snapshot = buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft,
-      selectedCandidate: { id: 'C', kind: 'ability', sourceCode: 'selected C', cardJson: {}, validation: { valid: true }, createdAt: 1, prompt: 'other' },
-      intent: { kind: 'repair', message: 'fix it', failure: { workspaceId: 'w', versionId: 'version-B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'), identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['runtime error'] } },
-    })
-    expect(snapshot.input.source).toBe('tested B')
-    expect(snapshot.sourceCandidate).toBeUndefined()
-    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: { kind: 'repair', message: 'fix', failure: { workspaceId: 'w', versionId: 'B', source: 'B', sourceFingerprint: 'mismatch', identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: [] } } })).toThrow('does not match')
-  })
-
-  it.each([
-    { cardId: 'CUSTOM_Renamed' },
-    { cardType: 'occupation' as const },
-    { name: 'Renamed after playtest' },
-  ])('rejects repair after the pinned card identity changes: %j', change => {
-    expect(() => buildGenerationRequest({ workspaceId: 'w', baseRevision: 2, draft: { ...draft, ...change },
-      intent: { kind: 'repair', message: 'Fix B', failure: {
-        workspaceId: 'w', versionId: 'B', source: 'tested B', sourceFingerprint: sourceFingerprint('tested B'),
-        identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['runtime error'],
-      } },
-    })).toThrow('card identity changed')
-  })
-
-  it('does not extract a partial or ambiguous source as a completed result', () => {
-    expect(() => extractGenerationOutput('```typescript\nconst CARD_IMPL = {}')).toThrow('Expected')
-    expect(() => extractGenerationOutput(text + '\n' + text)).toThrow('multiple')
-    expect(extractGenerationOutput('{"kind":"capability-gap","message":"Missing field construction extension"}').kind).toBe('capability-gap')
-  })
-})
-
-describe('bounded browser generation attempt', () => {
-  it('repairs a large tested source without duplicating it across model messages', async () => {
-    const marker = 'unique-tested-source-marker'
-    const tested = `const CARD_DEF = {}; const CARD_IMPL = {}; /* ${marker}${'x'.repeat(110 * 1024)} */`
-    const repair = buildGenerationRequest({ workspaceId: 'w', baseRevision: 1, draft, intent: {
-      kind: 'repair', message: 'Fix this runtime error', failure: {
-        workspaceId: 'w', versionId: 'tested-version', source: tested, sourceFingerprint: sourceFingerprint(tested),
-        identity: { id: draft.cardId, type: draft.cardType, name: draft.name }, errors: ['invalid reward'], gameSeed: 7,
-      },
-    } })
+describe('four-tool generation loop', () => {
+  it('executes write/run/rewrite/run in model order and carries real failures into the next turn', async () => {
     const io = ports()
-    const history: WireMessage[][] = []
-    io.model.complete = vi.fn(async messages => {
-      history.push(structuredClone([...messages]))
-      return history.length === 1 ? turn([call('reference')], '') : turn()
+    const order: string[] = []
+    io.validate = vi.fn(async code => {
+      order.push(`validate:${code}`)
+      return { valid: true, errors: [], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id, cardJson: draft.cardJson }
     })
-    const result = await new GenerationAttempt(repair, io).start()
-    expect(result).toMatchObject({ status: 'completed', modelRequests: 2, result: { kind: 'candidate' } })
-    for (const messages of history) {
-      expect(JSON.stringify(messages).split(marker)).toHaveLength(2)
-      expect(messages.find(message => message.role === 'user')?.content).toContain('tested-version')
-      expect(messages.find(message => message.role === 'user')?.content).toContain('invalid reward')
-    }
-    expect(repair.input.intent).toMatchObject({ kind: 'repair', failure: { versionId: 'tested-version', gameSeed: 7, identity: { name: 'Test' } } })
-  })
-  it.each([404, 410])('lets the model choose another file at the same commit after a file returns HTTP %i', async status => {
-    const commit = (status === 404 ? '8' : '9').repeat(40)
-    const unavailable = 'docs/CUSTOM_CARD_SANDBOX.md'
-    const alternative = 'docs/community-card-examples.md'
-    const body = utf8ToBytes('A usable reference at the same commit.\n')
-    const sha = bytesToHex(sha1(concatBytes(utf8ToBytes(`blob ${body.length}\0`), body)))
-    const fetchReference = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(Response.json({ object: { sha: commit } }))
-      .mockResolvedValueOnce(Response.json({ tree: [unavailable, alternative].map(path => ({ path, sha, type: 'blob', size: body.length })) }))
-      .mockResolvedValueOnce(new Response('', { status }))
-      .mockResolvedValueOnce(new Response(body))
-    const io = ports()
-    io.openReferences = ReferenceSession.createOpener(fetchReference)
-    const read = (id: string, path: string): ToolCall => ({ id, type: 'function', function: {
-      name: 'read_reference', arguments: JSON.stringify({ path, startLine: 1, lineCount: 2 }),
-    } })
-    let step = 0
-    io.model.complete = vi.fn(async messages => {
-      if (++step === 1) return turn([read('missing', unavailable)], '')
-      const result = messages.findLast(message => message.role === 'tool')!
-      if (step === 2) {
-        expect(result.tool_call_id).toBe('missing')
-        expect(JSON.parse(String(result.content))).toMatchObject({ commit, path: unavailable, error: expect.stringContaining(String(status)) })
-        return turn([read('alternative', alternative)], '')
-      }
-      expect(result.tool_call_id).toBe('alternative')
-      expect(JSON.parse(String(result.content))).toMatchObject({ commit, text: expect.stringContaining('A usable reference') })
-      return turn()
+    io.runTests = vi.fn<AttemptPorts['runTests']>(async (code, testCode) => {
+      order.push(`test:${code}:${testCode}`)
+      return { browserRuntimeId: 'browser-runtime-1', outcome: code === source
+        ? { kind: 'failed', failures: [{ name: 'gain', error: 'expected 2, got 1' }] }
+        : { kind: 'passed', count: 2 } }
     })
+    const history = sequence(io, turn([write(), run()]), turn([write('fixed source', 'fixed tests', 'rewrite'), run('rerun')]), turn([], 'Ready for review'))
     const final = await new GenerationAttempt(request(), io).start()
-    expect(final).toMatchObject({ status: 'completed', modelRequests: 3, referenceCalls: 2, result: { kind: 'candidate' } })
-    expect(final.result?.provenance?.references).toEqual([expect.objectContaining({ path: alternative })])
-    expect(fetchReference).toHaveBeenCalledTimes(4)
-    expect(fetchReference.mock.calls.slice(2).map(([url]) => String(url))).toEqual([
-      `https://raw.githubusercontent.com/titanxxh/open-agricola/${commit}/${unavailable}`,
-      `https://raw.githubusercontent.com/titanxxh/open-agricola/${commit}/${alternative}`,
-    ])
-  })
-  it('does not count an unissued model POST when reservation fails', async () => {
-    const io = ports()
-    io.model.complete = vi.fn(async () => { throw new ModelTurnError('preflight', 'Budget exhausted') })
-    const attempt = new GenerationAttempt(request(), io)
-    expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 0, retry: 'model' })
-    expect(attempt.requestAccounting()).toEqual([])
-  })
-  it('preserves the assistant tool group and original IDs before asking for source', async () => {
-    const io = ports()
-    const history: WireMessage[][] = []
-    io.model.complete = vi.fn(async messages => {
-      history.push(structuredClone([...messages]))
-      return history.length === 1 ? turn([call('first'), call('second')], '') : turn()
-    })
-    const attempt = new GenerationAttempt(request(), io)
-    const result = await attempt.start()
-    expect(history[1].slice(-4).map(message => message.role)).toEqual(['assistant', 'tool', 'tool', 'system'])
-    expect(history[1].at(-4)).toMatchObject({ reasoning_content: 'opaque', tool_calls: [{ id: 'first' }, { id: 'second' }] })
-    expect(history[1].slice(-3, -1).map(message => message.tool_call_id)).toEqual(['first', 'second'])
-    expect(history[0].at(-1)?.content).toContain('model request 1 of 8; 7 model requests remain')
-    expect(history[1].at(-1)?.content).toContain('model request 2 of 8; 6 model requests remain')
-    expect(history[1].at(-1)?.content).toContain('Reference calls used: 2 of 24')
-    expect(result).toMatchObject({ status: 'completed', modelRequests: 2, referenceCalls: 2, candidate: { sourceCode: source, validation: { valid: true } }, result: { kind: 'candidate' }, usage: { inputTokens: 4, outputTokens: 6 } })
-    expect(JSON.stringify(result)).not.toContain('opaque')
+    expect(order).toEqual([`validate:${source}`, `test:${source}:${tests}`, 'validate:fixed source', 'test:fixed source:fixed tests'])
+    expect(JSON.parse(String(history[1].at(-1)?.content))).toMatchObject({ outcome: { kind: 'failed', failures: [{ name: 'gain', error: 'expected 2, got 1' }] } })
+    expect(history[1].slice(-3).map(message => message.role)).toEqual(['assistant', 'tool', 'tool'])
+    expect(history[1].at(-3)).toMatchObject({ reasoning_content: 'opaque', extra_content: { signature: 'private-signature' }, tool_calls: [{ id: 'write' }, { id: 'run' }] })
+    expect(history[1].slice(-2).map(message => message.tool_call_id)).toEqual(['write', 'run'])
+    expect(final).toMatchObject({ status: 'completed', modelRequests: 3, result: { kind: 'candidate', message: 'Ready for review' }, candidate: { sourceCode: 'fixed source', testing: { code: 'fixed tests', lastRun: { artifactFingerprint: abilityArtifactFingerprint('fixed source', 'fixed tests'), browserRuntimeId: 'browser-runtime-1', outcome: { kind: 'passed', count: 2 } } } }, usage: { inputTokens: 6, outputTokens: 9 } })
+    expect(final.candidate && isAbilityCandidateReady(final.candidate)).toBe(true)
+    expect(JSON.stringify(final)).not.toContain('opaque')
+    expect(JSON.stringify(final)).not.toContain('private-signature')
   })
 
-  it('uses at most two static repairs and retains the final failed complete source', async () => {
+  it('lets the model make more than two repairs and skips UT after source validation fails', async () => {
     const io = ports()
-    io.validate = vi.fn(async code => ({ valid: false, errors: ['invalid hook'], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id }))
-    const result = await new GenerationAttempt(request(), io).start()
-    expect(io.model.complete).toHaveBeenCalledTimes(3)
-    expect(io.validate).toHaveBeenCalledTimes(3)
-    expect(result).toMatchObject({ repairs: 2, result: { kind: 'failed-source', failedCandidate: { sourceCode: source, baseRevision: 1, stale: false, validation: { valid: false } } } })
+    io.validate = vi.fn(async code => ({ valid: code === 'fixed', errors: code === 'fixed' ? [] : ['invalid hook'], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id, cardJson: draft.cardJson }))
+    const history = sequence(io, ...[0, 1, 2, 3].map(index => turn([write(`broken ${index}`, tests, `write-${index}`), run(`run-${index}`)])), turn([write('fixed'), run()]), turn())
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(io.validate).toHaveBeenCalledTimes(5)
+    expect(io.runTests).toHaveBeenCalledExactlyOnceWith('fixed', tests, expect.any(AbortSignal))
+    expect(final).toMatchObject({ modelRequests: 6, result: { kind: 'candidate' } })
+    expect(history.at(-1)?.filter(message => message.role === 'user')).toHaveLength(1)
   })
 
-  it('reserves the eighth response for source or an explicit research continuation, retaining the checkpoint', async () => {
+  it.each(['', 'A question about timing', '```typescript\nconst CARD_IMPL={}\n```', '{"kind":"capability-gap","message":"No hook"}'])('keeps a final answer without manufacturing artifacts: %j', async text => {
     const io = ports()
-    let requests = 0
-    const notices: unknown[] = []
-    io.model.complete = vi.fn(async (messages, tools, _signal, _onText, options) => {
-      notices.push(messages.at(-1)?.content)
-      requests++
-      expect(tools.length).toBeGreaterThan(0)
-      expect(options?.toolChoice).toBe(requests === 8 ? 'none' : 'auto')
-      if (requests < 8) return turn([call(`call-${requests}`)], '')
-      if (requests === 8) return turn([], '{"kind":"reference-continuation","message":"Need the remaining payment interface fields"}')
-      return turn()
-    })
-    const attempt = new GenerationAttempt(request(), io)
-    expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 8, needsAllowance: true, reason: 'Need the remaining payment interface fields' })
-    expect(attempt.snapshot().result).toBeUndefined()
+    sequence(io, turn([], text))
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(final).toMatchObject({ status: 'completed', result: { kind: 'answer', message: text } })
+    expect(final.candidate).toBeUndefined()
     expect(io.validate).not.toHaveBeenCalled()
-    expect(await attempt.resume()).toMatchObject({ modelRequests: 8 })
-    const final = await attempt.resume({ extendAllowance: true })
-    expect(final).toMatchObject({ status: 'completed', modelRequests: 9, referenceCalls: 7, allowance: { modelRequests: 16, referenceCalls: 48 } })
-    expect(notices.at(-1)).toContain('model request 9 of 16; 7 model requests remain')
-    expect(notices.at(-1)).toContain('Reference calls used: 7 of 48')
+    expect(io.runTests).not.toHaveBeenCalled()
+  })
+
+  it('accepts empty final text after tools write and test the artifacts', async () => {
+    const io = ports()
+    sequence(io, turn([write(), run()]), turn())
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ result: { kind: 'candidate', message: '' }, candidate: { sourceCode: source } })
+  })
+
+  it('invalidates a passed report when only the tests are rewritten', async () => {
+    const io = ports()
+    sequence(io, turn([write(), run(), write(source, 'changed test', 'change-tests')]), turn())
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(final).toMatchObject({ result: { kind: 'failed-source' }, candidate: { sourceCode: source, validation: { valid: false }, testing: { code: 'changed test' } } })
+    expect(final.candidate?.testing?.lastRun).toBeUndefined()
+  })
+
+  it('preserves static success with a failing UT as a result that cannot be adopted', async () => {
+    const io = ports()
+    io.runTests = vi.fn<AttemptPorts['runTests']>(async () => ({ browserRuntimeId: 'browser-runtime-1', outcome: { kind: 'error', message: 'No tests were registered.' } }))
+    sequence(io, turn([write(source, ''), run()]), turn([], 'Tests need work'))
+    const final = await new GenerationAttempt(request(), io).start()
+    expect(final).toMatchObject({ result: { kind: 'failed-source', failedCandidate: { validation: { valid: true } } }, candidate: { testing: { lastRun: { outcome: { kind: 'error' } } } } })
+    expect(final.candidate && isAbilityCandidateReady(final.candidate)).toBe(false)
+  })
+
+  it('returns tool argument and execution errors to the model without a fabricated repair request', async () => {
+    const io = ports()
+    io.runTests = vi.fn<AttemptPorts['runTests']>(async () => { throw new Error('Worker unavailable') })
+    const invalid: ToolCall = { id: 'invalid', type: 'function', function: { name: 'write_artifacts', arguments: '{bad' } }
+    const history = sequence(io, turn([run('missing'), invalid, call('unknown'), write(), run()]), turn())
+    const final = await new GenerationAttempt(request(), io).start()
+    const results = history[1].filter(message => message.role === 'tool').map(message => JSON.parse(String(message.content)))
+    expect(results).toMatchObject([{ error: expect.stringContaining('first') }, { error: expect.stringContaining('JSON') }, { error: 'Unknown tool: unknown' }, { tested: false }, { error: 'Worker unavailable' }])
+    expect(final).toMatchObject({ status: 'completed', result: { kind: 'failed-source' } })
+  })
+
+  it.each(['source', 'sandbox'])('rejects validation belonging to a different %s', async mismatch => {
+    const io = ports()
+    io.validate = vi.fn(async code => ({ valid: true, errors: [], sourceFingerprint: mismatch === 'source' ? 'other-source' : sourceFingerprint(code), sandboxContractId: mismatch === 'sandbox' ? 'other-contract' : contract.id, cardJson: draft.cardJson }))
+    sequence(io, turn([write(), run()]))
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ result: { kind: 'failure', message: expect.stringContaining('different') } })
+    expect(io.runTests).not.toHaveBeenCalled()
+  })
+
+  it('rejects changing immutable card identity before browser execution', async () => {
+    const io = ports()
+    io.validate = vi.fn(async code => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(code), sandboxContractId: contract.id, cardJson: { ...draft.cardJson, id: 'CUSTOM_Other' } }))
+    sequence(io, turn([write(), run()]), turn())
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ candidate: { validation: { valid: false, errors: [expect.stringContaining('immutable')] } }, result: { kind: 'failed-source' } })
+    expect(io.runTests).not.toHaveBeenCalled()
+  })
+
+  it('keeps tools enabled on the eighth turn, then pauses with written artifacts and resumes explicitly', async () => {
+    const io = ports()
+    let count = 0
+    io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async (_messages, tools) => {
+      expect(tools.map(tool => tool.function.name)).toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
+      count += 1
+      return count < 8 ? turn([read(`read-${count}`)]) : count === 8 ? turn([write(), run()]) : turn()
+    })
+    const attempt = new GenerationAttempt(request(), io)
+    expect(await attempt.start()).toMatchObject({ status: 'paused', needsAllowance: true, modelRequests: 8, candidate: { validation: { valid: true }, testing: { lastRun: { outcome: { kind: 'passed' } } } } })
+    expect(await attempt.resume()).toMatchObject({ status: 'paused', modelRequests: 8 })
+    expect(await attempt.resume({ extendAllowance: true })).toMatchObject({ status: 'completed', modelRequests: 9, allowance: { modelRequests: 16, activeMs: 600000 }, result: { kind: 'candidate' } })
     expect(io.openReferences).toHaveBeenCalledTimes(1)
   })
 
-  it('validates complete source in the final response slot without requesting extra allowance', async () => {
+  it('executes more than 24 reference calls serially without an independent research allowance', async () => {
     const io = ports()
-    let requests = 0
-    io.model.complete = vi.fn(async (_messages, _tools, _signal, _onText, options) => {
-      if (++requests < 8) return turn([call(`read-${requests}`)], '')
-      expect(options?.toolChoice).toBe('none')
-      return turn()
-    })
-    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ status: 'completed', modelRequests: 8, referenceCalls: 7, candidate: { validation: { valid: true } } })
+    let active = 0
+    let maximum = 0
+    const execute = vi.fn(async () => { active += 1; maximum = Math.max(maximum, active); await Promise.resolve(); active -= 1; return 'reference' })
+    io.openReferences = vi.fn(async () => ({ commit: 'b'.repeat(40), reads: [], execute }))
+    sequence(io, turn(Array.from({ length: 25 }, (_, i) => read(`read-${i}`))), turn())
+    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ status: 'completed', referenceCalls: 25, result: { kind: 'answer' } })
+    expect(execute).toHaveBeenCalledTimes(25)
+    expect(maximum).toBe(1)
   })
 
-  it('does not execute a provider tool call that violates the final response slot', async () => {
+  it('requires explicit retry after a failed POST and preserves unknown usage', async () => {
     const io = ports()
-    let requests = 0
-    io.model.complete = vi.fn(async () => turn([call(`read-${++requests}`)], ''))
-    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ status: 'completed', modelRequests: 8, referenceCalls: 7, result: { kind: 'failure', message: expect.stringContaining('disabled') } })
-  })
-
-  it('starts no partial tool group across its budget and caps concurrent reads at three', async () => {
-    const io = ports()
-    let active = 0; let maximum = 0; let requests = 0
-    io.openReferences = vi.fn(async () => ({ commit: 'b'.repeat(40), reads: [], execute: vi.fn(async () => {
-      active++; maximum = Math.max(maximum, active)
-      await new Promise(resolve => setTimeout(resolve, 1)); active--
-      return 'read'
-    }) }))
-    io.model.complete = vi.fn(async () => ++requests === 1 ? turn(Array.from({ length: 25 }, (_, index) => call(`call-${index}`)), '') : turn())
-    const attempt = new GenerationAttempt(request(), io)
-    expect(await attempt.start()).toMatchObject({ status: 'paused', referenceCalls: 0 })
-    expect(await attempt.resume({ extendAllowance: true })).toMatchObject({ status: 'completed', referenceCalls: 25 })
-    expect(maximum).toBe(3)
-  })
-
-  it('requires an explicit retry after a failed POST and retains unknown usage', async () => {
-    const io = ports()
-    io.model.complete = vi.fn().mockRejectedValueOnce(new ModelTurnError('network', 'connection lost')).mockResolvedValueOnce(turn())
+    io.model.complete = vi.fn<AttemptPorts['model']['complete']>().mockRejectedValueOnce(new ModelTurnError('network', 'connection lost')).mockResolvedValueOnce(turn())
     const attempt = new GenerationAttempt(request(), io)
     expect(await attempt.start()).toMatchObject({ status: 'paused', retry: 'model', modelRequests: 1 })
     await attempt.resume({ extendAllowance: true })
@@ -274,19 +176,40 @@ describe('bounded browser generation attempt', () => {
     expect(await attempt.resume({ retry: true })).toMatchObject({ status: 'completed', modelRequests: 2, usage: { inputTokens: null, outputTokens: null } })
   })
 
-  it('does not call a model repair for backend outages and preserves complete source while paused', async () => {
+  it('does not count a POST stopped before its cost reservation', async () => {
     const io = ports()
-    const realValidate = io.validate
-    io.validate = vi.fn().mockRejectedValueOnce(new Error('backend offline')).mockImplementation(realValidate)
+    io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async () => { throw new ModelTurnError('preflight', 'Budget exhausted') })
     const attempt = new GenerationAttempt(request(), io)
-    expect(await attempt.start()).toMatchObject({ status: 'paused', retry: 'validation', candidate: { sourceCode: source, validation: { valid: false } } })
-    expect(await attempt.resume({ retry: true })).toMatchObject({ status: 'completed', modelRequests: 1, repairs: 0 })
+    expect(await attempt.start()).toMatchObject({ status: 'paused', modelRequests: 0, retry: 'model' })
+    expect(attempt.requestAccounting()).toEqual([])
   })
 
-  it('times out an in-flight model request and requires explicit allowance plus retry', async () => {
+  it('retains written artifacts after cancellation and ignores a late test pass', async () => {
+    const io = ports()
+    let finishTests: (value: Awaited<ReturnType<AttemptPorts['runTests']>>) => void = () => { throw new Error('Tests have not started') }
+    let testingStarted: () => void = () => {}
+    const started = new Promise<void>(resolve => { testingStarted = resolve })
+    io.runTests = vi.fn<AttemptPorts['runTests']>((_source, _tests, signal) => new Promise(resolve => {
+      expect(signal.aborted).toBe(false)
+      finishTests = resolve
+      testingStarted()
+    }))
+    sequence(io, turn([write(), run()]), turn())
+    const attempt = new GenerationAttempt(request(), io)
+    const pending = attempt.start()
+    await started
+    attempt.cancel()
+    finishTests({ browserRuntimeId: 'browser-runtime-1', outcome: { kind: 'passed', count: 1 } })
+    const final = await pending
+    expect(final).toMatchObject({ status: 'cancelled', result: { kind: 'interrupted' }, candidate: { sourceCode: source } })
+    expect(final.candidate?.testing?.lastRun).toBeUndefined()
+    expect(io.model.complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('times out a model POST and requires both explicit allowance and retry', async () => {
     vi.useFakeTimers()
     const io = ports()
-    io.model.complete = vi.fn().mockImplementationOnce((_messages, _tools, signal: AbortSignal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new ModelTurnError('cancelled', 'timeout')), { once: true }))).mockResolvedValue(turn())
+    io.model.complete = vi.fn<AttemptPorts['model']['complete']>().mockImplementationOnce((_messages, _tools, signal: AbortSignal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new ModelTurnError('cancelled', 'timeout')), { once: true }))).mockResolvedValue(turn())
     const attempt = new GenerationAttempt(request(), io)
     const pending = attempt.start()
     await vi.advanceTimersByTimeAsync(300001)
@@ -296,30 +219,12 @@ describe('bounded browser generation attempt', () => {
     expect(await attempt.resume({ extendAllowance: true, retry: true })).toMatchObject({ status: 'completed', modelRequests: 2 })
   })
 
-  it('returns capability gaps without pretending they passed code validation', async () => {
+  it('retains written artifacts when complete protocol context exceeds its fixed limit', async () => {
     const io = ports()
-    io.model.complete = vi.fn(async () => turn([], '{"kind":"capability-gap","message":"Missing persistent construction hook"}'))
-    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({ result: { kind: 'capability-gap' } })
-    expect(io.validate).not.toHaveBeenCalled()
-  })
-
-  it('preserves a multiline gap without a candidate, another request, or a static repair', async () => {
-    const io = ports()
-    const message = 'Missing construction hook.\nKeep the field, crop and payment.'
-    io.model.complete = vi.fn(async () => turn([], `{"kind":"capability-gap","message":"${message}"}`))
+    sequence(io, turn([write('x'.repeat(160000), 'x'.repeat(50000))]))
     const result = await new GenerationAttempt(request(), io).start()
-    expect(result).toMatchObject({ status: 'completed', modelRequests: 1, repairs: 0, result: { kind: 'capability-gap', message } })
-    expect(result.candidate).toBeUndefined()
+    expect(result).toMatchObject({ status: 'completed', modelRequests: 1, result: { kind: 'failure', message: expect.stringContaining('size limit') } })
+    expect(result.candidate?.sourceCode).toHaveLength(160000)
     expect(io.model.complete).toHaveBeenCalledTimes(1)
-    expect(io.validate).not.toHaveBeenCalled()
-  })
-
-  it('still rejects a multiline reference continuation before the final response slot', async () => {
-    const io = ports()
-    io.model.complete = vi.fn(async () => turn([], '{"kind":"reference-continuation","message":"Need a field.\nRead its interface."}'))
-    expect(await new GenerationAttempt(request(), io).start()).toMatchObject({
-      status: 'completed', modelRequests: 1, result: { kind: 'failure', message: expect.stringContaining('outside the final response slot') },
-    })
-    expect(io.validate).not.toHaveBeenCalled()
   })
 })

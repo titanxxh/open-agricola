@@ -78,6 +78,9 @@ importers:
       '@types/better-sqlite3':
         specifier: ^9.6.0
         version: 9.6.0
+      '@types/chai':
+        specifier: 5.2.3
+        version: 5.2.3
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -99,6 +102,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^5.0.5
         version: 5.0.5(vitest@5.0.5)
+      chai:
+        specifier: 6.3.0
+        version: 6.3.0
       eslint:
         specifier: ^10.13.0
         version: 10.13.0

@@ -1,4 +1,5 @@
-import { abilityDraftFingerprint, projectAbilityCandidate, projectGenerationResult, projectWorkshopGeneration, projectVisibleMessages, sourceFingerprint } from '../../../shared/projections/workshop-generation'
+import { abilityArtifactFingerprint, isAbilityCandidateReady, abilityDraftFingerprint, projectAbilityCandidate, projectGenerationResult, projectWorkshopGeneration, projectVisibleMessages, sourceFingerprint } from '../../../shared/projections/workshop-generation'
+import type { WorkshopAbilityTestingContract } from '../../../shared/contract/workshop'
 import type { GenerationResult } from '../../../shared/contract/workshop-generation'
 import type {
   WorkshopAbilityCandidateContract,
@@ -134,7 +135,9 @@ const sessionFromGeneration = (
   const lastAbility = candidateFromGeneration('ability', ability.lastValid, workspace.revision)
   const adoptedAbility = asRecord(ability.adopted)
   const pendingArt = lastArt?.id === adoptedArt?.id ? null : lastArt
-  const pendingAbility = lastAbility?.id === adoptedAbility.id && lastAbility?.kind === 'ability' && lastAbility.sourceFingerprint === adoptedAbility.sourceFingerprint ? null : lastAbility
+  const pendingAbility = lastAbility?.id === adoptedAbility.id && lastAbility?.kind === 'ability'
+    && lastAbility.sourceFingerprint === adoptedAbility.sourceFingerprint
+    && lastAbility.testing?.code === asRecord(adoptedAbility.testing).code ? null : lastAbility
   const latestResult = projectGenerationResult(ability.latestResult)
   const failed = candidateFromGeneration('ability', latestResult?.failedCandidate, workspace.revision)
   const abilityCandidates = [pendingAbility, failed].filter((candidate): candidate is AbilityCandidate => candidate?.kind === 'ability')
@@ -159,7 +162,7 @@ const withLastCompleted = (
   if (kind === 'ability') {
     if (candidate?.kind === 'ability') {
       const projected = projectAbilityCandidate(candidate)!
-      if (projected.validation.valid) group.lastValid = projected
+      if (isAbilityCandidateReady(projected)) group.lastValid = projected
       group.latestResult = resultFromCandidate(projected)
     } else {
       delete group.latestResult
@@ -180,16 +183,16 @@ const withLastCompleted = (
 }
 
 const resultFromCandidate = (candidate: WorkshopAbilityCandidateContract): GenerationResult => ({
-  kind: candidate.validation.valid ? 'candidate' : 'failed-source',
+  kind: isAbilityCandidateReady(candidate) ? 'candidate' : 'failed-source',
   attemptId: candidate.provenance?.attemptId ?? candidate.id, createdAt: candidate.createdAt, message: '',
   ...(candidate.provenance ? { provenance: candidate.provenance } : {}),
   candidateId: candidate.id, sourceFingerprint: sourceFingerprint(candidate.sourceCode),
-  ...(!candidate.validation.valid ? { failedCandidate: candidate } : {}),
+  ...(!isAbilityCandidateReady(candidate) ? { failedCandidate: candidate } : {}),
 })
 
 const keepAbilityCandidates = (candidates: AbilityCandidate[]): AbilityCandidate[] => {
   const newest = candidates.slice(-3)
-  const valid = [...candidates].reverse().find(candidate => candidate.validation.valid)
+  const valid = [...candidates].reverse().find(candidate => isAbilityCandidateReady(candidate))
   return valid && !newest.includes(valid) ? [valid, ...newest.slice(-2)] : newest
 }
 
@@ -220,6 +223,7 @@ export type WorkshopDraftAction =
   | { type: 'draftChanged'; draft: WorkshopClientDraft }
   | { type: 'candidateCompleted'; candidate: WorkshopCandidate }
   | { type: 'generationStarted'; attemptId: string }
+  | { type: 'generationCheckpoint'; attemptId: string; candidate: AbilityCandidate }
   | { type: 'generationInvalidated'; attemptId: string }
   | { type: 'abilityValidationStarted'; validationId: string }
   | { type: 'abilityValidationEnded'; validationId: string }
@@ -229,6 +233,7 @@ export type WorkshopDraftAction =
       type: 'abilityCandidateEdited'
       candidateId: string
       sourceCode: string
+      tests?: string
       cardJson?: Record<string, unknown>
     }
   | {
@@ -237,6 +242,7 @@ export type WorkshopDraftAction =
       candidateId: string
       sourceFingerprint: string
       validation: AbilityCandidate['validation']
+      testing?: WorkshopAbilityTestingContract
       cardJson?: Record<string, unknown>
     }
   | { type: 'candidateAdopted'; kind: WorkshopCandidate['kind']; workspace: WorkshopWorkspaceDto }
@@ -288,10 +294,11 @@ const applyWorkspace = (
 export function isCurrentAbilityAttempt(state: WorkshopDraftState, attempt: {
   attemptId: string; draftFingerprint: string; sourceCandidate?: { id: string; fingerprint: string }
 }): boolean {
+  const sourceCandidate = attempt.sourceCandidate
   return state.session.activeAbilityAttemptId === attempt.attemptId
     && abilityDraftFingerprint(state.draft) === attempt.draftFingerprint
-    && (!attempt.sourceCandidate || state.session.abilityCandidates.some(candidate =>
-      candidate.id === attempt.sourceCandidate!.id && sourceFingerprint(candidate.sourceCode) === attempt.sourceCandidate!.fingerprint))
+    && (!sourceCandidate || state.session.abilityCandidates.some(candidate =>
+      candidate.id === sourceCandidate.id && abilityArtifactFingerprint(candidate.sourceCode, candidate.testing?.code ?? '') === sourceCandidate.fingerprint))
 }
 
 export const workshopDraftReducer = (
@@ -322,6 +329,10 @@ export const workshopDraftReducer = (
     }
     case 'generationStarted':
       return { ...state, session: { ...state.session, activeAbilityAttemptId: action.attemptId, activeAbilityValidationId: undefined } }
+    case 'generationCheckpoint':
+      return state.session.activeAbilityAttemptId === action.attemptId
+        ? { ...state, draft: withLastCompleted(state.draft, 'ability', action.candidate), save: { status: 'dirty' } }
+        : state
     case 'abilityValidationStarted':
       return { ...state, session: { ...state.session, activeAbilityValidationId: action.validationId } }
     case 'abilityValidationEnded':
@@ -392,7 +403,7 @@ export const workshopDraftReducer = (
       )
       const ability = { ...asRecord(state.draft.generation.ability) }
       if (asRecord(ability.lastValid).id === action.candidateId) {
-        const fallback = [...remaining].reverse().find(candidate => candidate.validation.valid)
+        const fallback = [...remaining].reverse().find(candidate => isAbilityCandidateReady(candidate))
         if (fallback) ability.lastValid = fallback
         else delete ability.lastValid
       }
@@ -413,7 +424,10 @@ export const workshopDraftReducer = (
     case 'abilityCandidateEdited': {
       const previous = state.session.abilityCandidates.find(candidate => candidate.id === action.candidateId)
       if (!previous) return state
-      const editedId = `${action.candidateId.split(':edit:')[0]}:edit:${sourceFingerprint(action.sourceCode).slice(0, 16)}`
+      const tests = action.tests ?? previous.testing?.code ?? ''
+      if (action.sourceCode === previous.sourceCode && tests === (previous.testing?.code ?? '')) return state
+      const sourceChanged = action.sourceCode !== previous.sourceCode
+      const editedId = `${action.candidateId.split(':edit:')[0]}:edit:${abilityArtifactFingerprint(action.sourceCode, tests).slice(0, 16)}`
       const edited: AbilityCandidate = {
         ...previous,
         id: editedId,
@@ -424,10 +438,11 @@ export const workshopDraftReducer = (
         provider: undefined,
         model: undefined,
         ...(action.cardJson ? { cardJson: action.cardJson } : {}),
-        validation: { valid: false, errors: [] },
+        testing: { code: tests },
+        validation: sourceChanged ? { valid: false, errors: [] } : previous.validation,
       }
       const candidates = state.session.abilityCandidates.filter(candidate =>
-        candidate.id !== editedId && (candidate.id !== previous.id || previous.validation.valid))
+        candidate.id !== editedId && (candidate.id !== previous.id || isAbilityCandidateReady(previous)))
       candidates.push(edited)
       return {
         ...state,
@@ -438,10 +453,12 @@ export const workshopDraftReducer = (
     }
     case 'abilityCandidateValidated': {
       if (state.session.activeAbilityValidationId !== action.validationId) return state
-      if (!state.session.abilityCandidates.some(candidate => candidate.id === action.candidateId && sourceFingerprint(candidate.sourceCode) === action.sourceFingerprint)) return state
+      if (!state.session.abilityCandidates.some(candidate => candidate.id === action.candidateId
+        && sourceFingerprint(candidate.sourceCode) === action.sourceFingerprint
+        && (!action.testing || action.testing.code === candidate.testing?.code))) return state
       const candidates = state.session.abilityCandidates.map(candidate =>
         candidate.id === action.candidateId
-          ? { ...candidate, ...(action.cardJson ? { cardJson: action.cardJson } : {}), validation: { ...action.validation, sourceFingerprint: action.sourceFingerprint } }
+          ? { ...candidate, sourceFingerprint: action.sourceFingerprint, ...(action.cardJson ? { cardJson: action.cardJson } : {}), ...(action.testing ? { testing: action.testing } : {}), validation: { ...action.validation, sourceFingerprint: action.sourceFingerprint } }
           : candidate,
       )
       const validated = candidates.find(candidate => candidate.id === action.candidateId) ?? null

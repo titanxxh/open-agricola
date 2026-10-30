@@ -1,3 +1,4 @@
+import { abilityArtifactFingerprint, sourceFingerprint } from '../shared/projections/workshop-generation'
 import AxeBuilder from '@axe-core/playwright'
 import { PostgresDatabase } from '../server/database/postgres'
 import {
@@ -236,6 +237,8 @@ const adoptArt = async (
   },
 )))
 
+const setupAbilityTests = `test('An unplayed card does not change collection', () => { const session = createSession(); const state = session.getState().state; state.players[0].resources.wood = 0; state.actionSpaces.find(space => space.id === 'forest').resources.wood = 3; const response = session.takeAction(0, 'forest'); expect(response.ok).to.equal(true); expect(response.state.players[0].resources.wood).to.equal(3); });`
+
 const adoptAbility = async (
   request: APIRequestContext,
   account: Account,
@@ -257,7 +260,8 @@ const adoptAbility = async (
         sourceCode,
         provider: 'fake-chat',
         model: 'deterministic-v1',
-        validation: { valid: true, errors: [] },
+        validation: { valid: true, errors: [], sourceFingerprint: sourceFingerprint(sourceCode) },
+        testing: { code: setupAbilityTests, lastRun: { artifactFingerprint: abilityArtifactFingerprint(sourceCode, setupAbilityTests), browserRuntimeId: 'workspace-api-fixture', outcome: { kind: 'passed', count: 1 } } },
         createdAt: Date.now(),
       },
     },
@@ -270,17 +274,11 @@ const setupPage = async (
   options: { llm?: boolean } = {},
 ) => {
   if (options.llm) {
-    await page.route('**/client/services/llm/generation/admission.ts*', async route => {
-      const response = await route.fetch()
-      const body = await response.text()
-      const registry = /ADMITTED_GENERATION_MODELS\s*=\s*\[[\s\S]*?\]/
-      expect(body).toMatch(registry)
-      await route.fulfill({ response, body: body.replace(registry, 'ADMITTED_GENERATION_MODELS = [{provider:"openrouter",endpoint:"https://openrouter.ai/api/v1/chat/completions",model:"qwen/qwen3.6-plus:free",batch:"fixture",evidence:"controlled browser test"}]') })
-    })
     await page.route('**/api/workshop/references/**', route => route.fulfill({ json: route.request().url().endsWith('/main') ? { object: { sha: 'e'.repeat(40) } } : { truncated: false, tree: [] } }))
   }
   await page.setViewportSize(variant.size)
   await page.addInitScript(({ locale, llm }) => {
+    if (window !== window.top) return
     localStorage.setItem('open-agricola-locale-v2', locale)
     if (llm) {
       localStorage.setItem('open-agricola-llm-config-art', JSON.stringify({
@@ -390,18 +388,39 @@ const fakeChatService = async (
   page: Page,
   response: (call: number) => string,
 ) => {
-  let calls = 0
+  let artifactRequests = 0
+  let modelRequests = 0
   await page.route('https://openrouter.ai/**/chat/completions', route => {
-    const content = response(calls++)
-    const body = content
-      ? `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`
-      : 'data: [DONE]\n\n'
+    modelRequests += 1
+    const request = route.request().postDataJSON()
+    expect(request.tool_choice).toBe('auto')
+    expect(request.tools.map((tool: { function: { name: string } }) => tool.function.name))
+      .toEqual(['search_references', 'read_reference', 'write_artifacts', 'run_tests'])
+    const last = request.messages.at(-1)
+    let delta: Record<string, unknown>
+    let finishReason = 'stop'
+    if (last.role === 'tool') {
+      const result = JSON.parse(last.content)
+      delta = { content: result.error ?? 'Review the written source and browser UT report.' }
+    } else {
+      const source = response(artifactRequests++)
+      if (!source) return route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'data: [DONE]\n\n' })
+      delta = { tool_calls: [
+        { index: 0, id: `write-${artifactRequests}`, type: 'function', function: {
+          name: 'write_artifacts', arguments: JSON.stringify({ source, tests: setupAbilityTests }),
+        } },
+        { index: 1, id: `test-${artifactRequests}`, type: 'function', function: { name: 'run_tests', arguments: '{}' } },
+      ] }
+      finishReason = 'tool_calls'
+    }
+    const body = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', ...delta }, finish_reason: finishReason }] })}\n\ndata: [DONE]\n\n`
     return route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
       body,
     })
   })
+  return { modelRequests: () => modelRequests, artifactRequests: () => artifactRequests }
 }
 
 const scenarioNewDraft = async ({
@@ -597,9 +616,7 @@ const CARD_DEF = {
 const CARD_IMPL = {}
 `.trim()
   const invalidSource = sourceFor(workspace.draft.cardId, workspace.draft.name, true)
-  await fakeChatService(page, call =>
-    `\`\`\`typescript\n${call < 3 ? invalidSource : validSource}\n\`\`\``,
-  )
+  const model = await fakeChatService(page, call => call === 0 ? invalidSource : validSource)
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
 
@@ -625,6 +642,7 @@ const CARD_IMPL = {}
   for (const requestText of ['Generate third candidate', 'Generate fourth candidate']) {
     await input.fill(requestText)
     await generate.click()
+    await expect(page.locator('.aicw-generation-progress')).toContainText('Attempt finished')
     await expect(page.locator('.aicw-candidate-section')).toContainText('3 / 3', {
       timeout: 30_000,
     })
@@ -634,6 +652,10 @@ const CARD_IMPL = {}
   await expectSaved(page, variant.locale)
   expect((await loadWorkspace(request, account, workspace.id)).draft.generation)
     .toHaveProperty('ability.lastValid.provider', 'openrouter')
+  expect(model.artifactRequests()).toBe(4)
+  expect(model.modelRequests()).toBe(8)
+  await expect(page.getByRole('textbox', { name: 'UT', exact: true })).toHaveValue(setupAbilityTests)
+  await expect(page.locator('.aicw-ut-report')).toContainText('UT')
 
   const editor = page.getByLabel(
     text(variant.locale, '能力候选源码', 'Ability candidate source'),
@@ -644,9 +666,19 @@ const CARD_IMPL = {}
   })
   await expect(adopt).toBeDisabled()
   await page.getByRole('button', {
-    name: text(variant.locale, '运行静态验证', 'Run static validation'),
+    name: 'Validate Code', exact: true,
   }).click()
   await expect(adopt).toBeEnabled({ timeout: 30_000 })
+  const ut = page.getByRole('textbox', { name: 'UT', exact: true })
+  await ut.fill("test('A failed UT blocks adoption', () => expect(3).to.equal(4))")
+  await expect(adopt).toBeDisabled()
+  await page.getByRole('button', { name: 'Validate Code', exact: true }).click()
+  await expect(page.locator('.aicw-ut-report')).toContainText('expected 3 to equal 4')
+  await expect(adopt).toBeDisabled()
+  await ut.fill(setupAbilityTests)
+  await page.getByRole('button', { name: 'Validate Code', exact: true }).click()
+  await expect(adopt).toBeEnabled({ timeout: 30_000 })
+  expect(model.modelRequests()).toBe(8)
   await expectSaved(page, variant.locale)
   const draftPattern = `**/api/workshop/cards/${workspace.id}/draft`
   let checkpointAttempts = 0
@@ -668,6 +700,8 @@ const CARD_IMPL = {}
     name: text(variant.locale, '导入手动编辑器', 'Open in manual editor'),
   }).click()
   await expect(editor).toHaveValue(`${validSource}\n`)
+  await expect(ut).toHaveValue(setupAbilityTests)
+  await expect(adopt).toBeDisabled()
 
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.effectCode).toContain('CARD_IMPL')
@@ -691,6 +725,8 @@ const CARD_IMPL = {}
     },
   })
   expect(saved.draft.generation).toHaveProperty('ability.adopted.sourceFingerprint')
+  expect(saved.draft.generation).toHaveProperty('ability.adopted.testing.code', setupAbilityTests)
+  expect(saved.draft.generation).toHaveProperty('ability.adopted.testing.lastRun.outcome.kind', 'passed')
   for (const field of ['provider', 'model', 'provenance', 'inputFingerprint']) {
     expect(saved.draft.generation).not.toHaveProperty(`ability.adopted.${field}`)
   }
@@ -866,6 +902,7 @@ const scenarioLocalRecovery = async ({
   const legacySubject = unique('legacy subject')
   const legacyPrompt = unique('legacy prompt')
   await page.addInitScript(({ key, revision, draft, subject, prompt }) => {
+    if (window !== window.top) return
     if (sessionStorage.getItem('legacy-art-recovery-injected')) return
     sessionStorage.setItem('legacy-art-recovery-injected', '1')
     localStorage.setItem(key, JSON.stringify({
@@ -1412,11 +1449,7 @@ const scenarioErrors = async ({
   releaseWorkspaceLoad?.()
   await expect(page.locator('.aicw-loading')).toBeHidden({ timeout: 30_000 })
 
-  await fakeChatService(page, call =>
-    call === 0
-      ? ''
-      : `\`\`\`typescript\n${sourceFor(workspace.draft.cardId, workspace.draft.name)}\n\`\`\``,
-  )
+  const model = await fakeChatService(page, call => call === 0 ? '' : sourceFor(workspace.draft.cardId, workspace.draft.name))
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
   const input = page.getByPlaceholder(
     text(variant.locale, '描述你想要的卡牌效果…', 'Describe the card effect…'),
@@ -1440,13 +1473,18 @@ const scenarioErrors = async ({
     return route.continue()
   })
   await page.getByRole('button', { name: text(variant.locale, '重发', 'Resend') }).click()
-  await expect(page.locator('.aicw-generation-progress')).toContainText('Code validation is unavailable')
-  await expect(page.locator('.aicw-candidate-section')).toBeHidden()
+  await expect(page.locator('.ai-message-assistant').last()).toContainText('Code validation is unavailable')
+  await expect(page.locator('.aicw-candidate-section')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Adopt as current source' })).toBeDisabled()
+  await expect(page.getByRole('textbox', { name: 'UT', exact: true })).toHaveValue(setupAbilityTests)
+  expect(model.modelRequests()).toBe(3)
   validationFailed = false
-  await page.getByRole('button', { name: text(variant.locale, '重试当前步骤', 'Retry this step') }).click()
+  await page.getByRole('button', { name: 'Validate Code', exact: true }).click()
   await expect(page.getByRole('button', {
     name: text(variant.locale, '采用为当前源码', 'Adopt as current source'),
   })).toBeEnabled({ timeout: 30_000 })
+  await expect(page.locator('.aicw-ut-report')).toContainText('UT')
+  expect(model.modelRequests()).toBe(3)
 
   let saveFailed = true
   await page.route(`**/api/workshop/cards/${workspace.id}/draft`, route => {
@@ -1588,10 +1626,19 @@ test.describe('AI card workspace acceptance matrix', () => {
         await setupPage(page, variant, { llm: scenario.llm })
         const account = await createAccount(request, page)
         const pageErrors: string[] = []
+        const credentialLeaks: string[] = []
         page.on('pageerror', error => pageErrors.push(error.message))
+        page.on('request', request => {
+          const url = new URL(request.url())
+          if (url.hostname === 'openrouter.ai' || url.hostname === 'generativelanguage.googleapis.com') return
+          if (JSON.stringify({ url: request.url(), headers: request.headers(), body: request.postData() }).includes('e2e-fake-key')) {
+            credentialLeaks.push(request.url())
+          }
+        })
         try {
           await scenario.run({ page, request, account, variant })
           expect(pageErrors).toEqual([])
+          expect(credentialLeaks).toEqual([])
         } finally {
           await responseJson(await api(request, account, '/api/game/new', {
             method: 'POST',

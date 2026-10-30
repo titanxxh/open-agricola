@@ -13,7 +13,7 @@ import type {
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
 import { canGoLive, isReviewStatus, type ReviewStatus } from './workshop-status.ts'
 import { getReviewDecisionProvider } from './workshop-review-provider.ts'
-import { projectWorkshopGeneration, projectGenerationProvenance, projectGenerationResult } from '../shared/projections/workshop-generation.ts'
+import { currentAbilityTesting, isAbilityCandidateReady, projectWorkshopGeneration, projectGenerationProvenance, projectGenerationResult } from '../shared/projections/workshop-generation.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -143,6 +143,13 @@ const serialiseDraft = (draft: WorkshopDraft): {
   generation: string
 } => {
   const generation = projectWorkshopGeneration(draft.generation)
+  const ability = generation.ability
+  if (ability && typeof ability === 'object' && !Array.isArray(ability)) {
+    const adopted = (ability as Record<string, unknown>).adopted
+    if (adopted && typeof adopted === 'object' && !Array.isArray(adopted)) {
+      Object.assign(adopted, { testing: currentAbilityTesting(draft) })
+    }
+  }
   const art = generation.art
   if (art && typeof art === 'object' && !Array.isArray(art)) {
     const record = art as Record<string, unknown>
@@ -581,12 +588,12 @@ export async function adoptCandidate(
       }
     } else {
       if (
-        !input.candidate.validation.valid
+        !isAbilityCandidateReady(input.candidate)
         || !input.candidate.sourceCode.trim()
         || !input.candidate.compiledCode.trim()
         || !input.candidate.codeManifest
       ) {
-        throw new WorkshopDraftError('not_ready', 'Ability candidate has not passed validation')
+        throw new WorkshopDraftError('not_ready', 'Ability candidate needs source validation and passing browser tests for the current source and tests')
       }
       if (
         input.candidate.cardJson.id !== current.draft.cardId
@@ -730,7 +737,7 @@ const draftFromVersion = (
     compiledCode,
     codeManifest: version.code_manifest ? parseRecord(version.code_manifest) : null,
     artUrl: version.art_url,
-    generation: parseRecord(version.provenance_json),
+    generation: versionProvenance(parseRecord(version.provenance_json)),
   }
 }
 

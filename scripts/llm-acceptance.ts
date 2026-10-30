@@ -7,8 +7,9 @@ import { parseArgs } from 'node:util'
 import { chromium } from '@playwright/test'
 import { ATTEMPT_ALLOWANCE, GENERATION_CONTEXT_BYTES } from '../client/services/llm/generation/attempt'
 import { GENERATION_MODEL_SETTINGS, MODEL_STREAM_LIMITS } from '../client/services/llm/generation/protocol'
+import { GENERATION_TOOL_VERSION } from '../client/services/llm/generation/tools'
 import { GENERATION_PROMPT_VERSION } from '../client/services/llm/generation/prompt'
-import { REFERENCE_LIMITS, REFERENCE_TOOL_VERSION } from '../client/services/llm/generation/references'
+import { REFERENCE_LIMITS } from '../client/services/llm/generation/references'
 import { BudgetFile } from '../tests/llm-card-gen/acceptance/budget-file'
 import { PRICE_BASIS, TOTAL_BUDGET_NANO_USD } from '../tests/llm-card-gen/acceptance/budget'
 import type { BrowserTaskResult, ReservationRequest, Settlement } from '../tests/llm-card-gen/acceptance/browser'
@@ -21,7 +22,7 @@ const { values } = parseArgs({ options: {
 } })
 if (values.live === values['dry-run']) throw new Error('Choose exactly one of --dry-run or --live. Live requires an explicitly approved --model.')
 if (values.live && (process.env.CI || process.env.GITHUB_ACTIONS)) throw new Error('Paid LLM acceptance is owner-local only and cannot run in CI. No model credential was read or paid request issued.')
-if (values.live && values.model !== 'deepseek-flash') throw new Error('Only --model deepseek-flash is approved for paid acceptance; deprecated aliases cannot produce admission evidence.')
+if (values.live && values.model !== 'deepseek-flash') throw new Error('The local paid harness currently has pricing and credentials for --model deepseek-flash only.')
 const live = values.live!
 const model = values.model ?? 'deepseek-flash'
 const endpoint = 'https://api.deepseek.com/v1/chat/completions'
@@ -89,10 +90,10 @@ save('manifest.json', {
   priceBasis: PRICE_BASIS, totalEffortBudgetNanoUsd: TOTAL_BUDGET_NANO_USD,
   settings: { ...GENERATION_MODEL_SETTINGS, thinking: { type: 'enabled' } },
   responseLimits: MODEL_STREAM_LIMITS,
-  promptVersion: GENERATION_PROMPT_VERSION, toolVersion: REFERENCE_TOOL_VERSION, sandboxContractId,
+  promptVersion: GENERATION_PROMPT_VERSION, toolVersion: GENERATION_TOOL_VERSION, sandboxContractId,
   allowance: ATTEMPT_ALLOWANCE, contextBytes: GENERATION_CONTEXT_BYTES, referenceLimits: REFERENCE_LIMITS,
   tasks, inputs: acceptanceInputs,
-  method: diagnostic ? 'One labelled diagnostic run; shares the entire effort budget and cannot admit a model or replace a failed formal sample.' : 'Three repetitions of the fixed fixtures. Save complete source unchanged and run runner.test.ts; no task reruns or behavior-driven repairs. Synthetic results cannot admit a model.',
+  method: diagnostic ? 'One labelled diagnostic run; shares the effort budget and cannot replace a failed formal sample.' : 'Three repetitions of fixed fixtures. Save every tool-written source unchanged. Models may repair using their browser tests; fixed runner assertions and verdicts are never given to the model. No task reruns or sample replacement.',
 })
 
 type TestResult = { ok: boolean; reason?: string }
@@ -209,17 +210,27 @@ try {
     assertFrozen()
     activeTask = task.id
     let responses = 0
-    let sourceResponses = 0
     if (!live) await page.route(endpoint, async route => {
       responses++
-      const tools = responses === 1
-      let content = `\`\`\`typescript\n${acceptanceSeed(input.id)}\n\`\`\``
-      // Exercise exactly two production static repairs in the synthetic M1
-      // tasks. This mutation is never applied to paid model output.
-      if (!tools && input.id.startsWith('M1-') && ++sourceResponses <= 2) content = content.replace('\n```', '\neval("synthetic-invalid-source")\n```')
-      const delta = tools ? { role: 'assistant', reasoning_content: 'synthetic-private-reasoning', tool_calls: [{ index: 0, id: 'read-sandbox', type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 20 }) }, extra_content: { google: { thought_signature: 'synthetic-signature' } } }] }
-        : { role: 'assistant', content }
-      await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ id: `synthetic-${responses}`, model, choices: [{ index: 0, delta, finish_reason: tools ? 'tool_calls' : 'stop' }] })}\n\ndata: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50, prompt_cache_hit_tokens: 20, completion_tokens_details: { reasoning_tokens: 10 } } })}\n\ndata: [DONE]\n\n` })
+      const writing = responses === 2 || (responses === 3 && input.id.startsWith('M1-'))
+      const source = acceptanceSeed(input.id) + (responses === 2 && input.id.startsWith('M1-') ? '\neval("synthetic-invalid-source")' : '')
+      const tests = `test('An unplayed card does not change forest collection', () => {
+        const session = createSession(); const state = session.getState().state;
+        const player = state.players[0]; player.resources.wood = 0;
+        state.actionSpaces.find(space => space.id === 'forest').resources.wood = 3;
+        const response = session.takeAction(0, 'forest');
+        expect(response.ok).to.equal(true);
+        expect(response.state.players[0].resources.wood).to.equal(3);
+      });`
+      const calls = responses === 1
+        ? [{ index: 0, id: 'read-sandbox', type: 'function', function: { name: 'read_reference', arguments: JSON.stringify({ path: referencePath, startLine: 1, lineCount: 20 }) }, extra_content: { google: { thought_signature: 'synthetic-signature' } } }]
+        : writing ? [
+          { index: 0, id: `write-${responses}`, type: 'function', function: { name: 'write_artifacts', arguments: JSON.stringify({ source, tests }) } },
+          { index: 1, id: `run-${responses}`, type: 'function', function: { name: 'run_tests', arguments: '{}' } },
+        ] : []
+      const delta = calls.length ? { role: 'assistant', reasoning_content: 'synthetic-private-reasoning', tool_calls: calls }
+        : { role: 'assistant', content: 'Source and browser tests are ready for review.' }
+      await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ id: `synthetic-${responses}`, model, choices: [{ index: 0, delta, finish_reason: calls.length ? 'tool_calls' : 'stop' }] })}\n\ndata: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50, prompt_cache_hit_tokens: 20, completion_tokens_details: { reasoning_tokens: 10 } } })}\n\ndata: [DONE]\n\n` })
     })
     const startedAt = new Date().toISOString()
     const result: BrowserTaskResult = await page.evaluate(async args => {
@@ -231,7 +242,7 @@ try {
     const evidence: TaskEvidence = { task, startedAt, finishedAt: new Date().toISOString(), result, first: { ok: false }, final: { ok: false } }
     save(`${task.id}.json`, evidence)
     save('destinations.json', Object.fromEntries(destinations))
-    console.log(`${task.id}: generated; POSTs=${result.snapshot.modelRequests}; repairs=${result.snapshot.repairs}`)
+    console.log(`${task.id}: generated; POSTs=${result.snapshot.modelRequests}`)
     return evidence
   }
   if (!diagnostic) {
@@ -274,20 +285,20 @@ try {
     }
   })()
   try { assertFrozen() } catch (error) { fatal ??= String(error) }
-  const admitted = live && !diagnostic && !fatal && completed.length === tasks.length && probe?.final.ok === true && completed.every(row => row.final.ok && row.result.protocol.preserved)
-  const report = { batch, synthetic: !live, diagnostic: Boolean(diagnostic), admitted, finishedAt: new Date().toISOString(), fatal, complete: completed.length === tasks.length,
+  const passed = !fatal && completed.length === tasks.length && (Boolean(diagnostic) || probe?.final.ok === true) && completed.every(row => row.final.ok && row.result.protocol.preserved)
+  const report = { batch, synthetic: !live, diagnostic: Boolean(diagnostic), passed, finishedAt: new Date().toISOString(), fatal, complete: completed.length === tasks.length,
     planned: tasks.length, completed: completed.length, summary, probePassed: probe?.final.ok ?? null,
     totalEffortCommittedNanoUsd: budget.ledger.committedNanoUsd(), totalEffortRemainingNanoUsd: TOTAL_BUDGET_NANO_USD - budget.ledger.committedNanoUsd(),
     failures: completed.filter(row => !row.final.ok).map(row => ({ task: row.task.id, reason: row.final.reason })),
     unrun: tasks.filter(task => !completed.some(row => row.task.id === task.id)).map(task => task.id),
-    note: 'Costs use published peak rates and are estimates, not invoices. Unknown calls keep their full reservations. Passing synthetic output never admits a model; admission registry updates require the actual complete report.',
+    note: 'Costs use published peak rates and are estimates, not invoices. Unknown calls keep their full reservations. Synthetic runs verify the workflow and cannot establish real model quality.',
   }
   save('report.json', report)
   save('budget-snapshot.json', budget.ledger.state)
   budget.close()
   process.removeListener('exit', releaseBudget)
-  console.log(JSON.stringify({ batch, admitted, complete: report.complete, completed: completed.length, directory, summary }))
-  if (fatal || !report.complete || (live && !diagnostic ? !admitted : completed.some(row => !row.final.ok))) process.exitCode = 1
+  console.log(JSON.stringify({ batch, passed, complete: report.complete, completed: completed.length, directory, summary }))
+  if (!passed) process.exitCode = 1
   // GameSession's process-owned executor worker stays alive for reuse. This
   // one-shot owner CLI has finished all writes and closed its browser/DB.
   process.stdout.write('', () => process.exit(process.exitCode ?? 0))

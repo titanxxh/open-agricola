@@ -1,6 +1,6 @@
 # LLM Card Generation Tests
 
-固定 case 的题面、初始状态、交互和断言统一放在 `tests/llm-card-gen/fixtures/`。AI 成功返回一份完整卡牌 TypeScript 源码，包含 `CARD_ID`、`CARD_DEF` 和 `CARD_IMPL`。将这份源码原样交给现有 `runner.test.ts`，在真实两人 `GameSession` 中执行同一套测试；不另建行为判题器或自然语言关键词评分。
+固定 case 的题面、初始状态、交互和断言统一放在 `tests/llm-card-gen/fixtures/`。模型通过 `write_artifacts` 写入完整卡牌 TypeScript 源码及自己的浏览器行为测试，包含 `CARD_ID`、`CARD_DEF` 和 `CARD_IMPL`。将这份源码原样交给现有 `runner.test.ts`，在真实两人 `GameSession` 中执行同一套测试；不另建行为判题器或自然语言关键词评分。
 
 ## 位置
 
@@ -27,7 +27,7 @@ pnpm test:llm:dry --base-url http://127.0.0.1:5913 --runtime-env output/tmp/llm-
 # owner 已确认模型与累计预算后，才运行真实生成
 pnpm test:llm:live --model deepseek-flash --base-url http://127.0.0.1:5913 --runtime-env output/tmp/llm-runtime/local.env
 
-# 单独诊断一个固定 case，不作为完整模型准入
+# 单独诊断一个固定 case，不替代完整质量报告
 pnpm test:llm:live --model deepseek-flash --diagnose M2-per-action-bonus --runtime-env output/tmp/llm-runtime/local.env
 ```
 
@@ -44,11 +44,13 @@ pnpm test:llm:live --model deepseek-flash --diagnose M2-per-action-bonus --runti
 1. 浏览器按产品流程完成一次真实工具往返探测，并将输出源码交给固定测试。
 2. 依次运行 `fixtures/` 的 11 个 case，每题独立生成 3 次，共 33 个任务。
 3. 保存每次首次及最终输出的完整 `.ts` 文件，使用 `runner.test.ts` 执行既有 `setup / scenario / assert`，直接收集 Vitest 的测试结果。
-4. 分别报告首次和最终通过数、请求数、token、耗时、费用及失败。产品的静态校验最多修复两次；行为测试失败不会自动让模型重写或挑选成功样本。
+4. 分别报告首次和最终通过数、请求数、token、耗时、费用及失败。模型可通过 `run_tests` 获得自己编写的浏览器 UT 反馈并修复；固定 fixture 的断言与判题结果不回传模型，不重跑任务或挑选成功样本。
 
 没有旧 prompt 对照组，也没有自然语言关键词判分。固定可实现题目返回能力缺口或澄清时，因为没有可执行源码而失败；对开放式需求的能力缺口说明，产品保留原始文本，不宣称固定测试已证明其语义正确。有限固定测试通过不代表任意需求都正确。
 
-产品准入按精确 provider、endpoint 和 model 登记在 `client/services/llm/generation/admission.ts`。真实工具探测和全部固定测试通过后才可登记；合成演练和历史 golden 都不能作为新的模型准入。`deepseek` / `https://api.deepseek.com/v1/chat/completions` / `deepseek-flash` 以[最新的验收记录](https://github.com/titanxxh/open-agricola/pull/1089#issuecomment-6104006958)为准（工坊能力契约扩大后在 2026-10-11 重新执行）；[首次验收结论](https://github.com/titanxxh/open-agricola/issues/1041#issuecomment-6057596377)保留作历史记录。其他组合待验。
+产品不再维护 provider/endpoint/model 精确白名单，用户可尝试网站已有模型选项，实际错误由协议与工具反馈。固定测试是维护者的回归与质量评估，不作为模型启用开关。合成演练和历史 golden 不能证明新模型质量，历史验收也只对应原批次。
+
+每张新卡的浏览器测试由模型编写，以普通 TypeScript / Chai 脚本通过 `run_tests` 在隔离 Worker 内执行。它与固定 fixture 质量判题互不替代。候选采用必须通过源码校验及匹配当前源码、测试、Worker 产物的浏览器 UT；零测试不可通过。浏览器 UT 报告是客户端声明，服务端仍独立校验源码与卡牌身份。运行入口见 `client/local-sandbox/card-tests.ts`，完整网站验证见 `e2e-tests/workshop-generation.spec.ts`，隔离与中断见 `e2e-tests/workshop-browser-card-tests.spec.ts`。
 
 ### 本地产物与预算
 
@@ -132,7 +134,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 3. 在 `tests/llm-card-gen/fixtures/index.ts` 注册导出
 4. 先让旧 golden 或 known-bad 实现跑出预期红灯，确认断言能捕获机制漂移
 5. 题面和断言只写在 fixture；浏览器输入由 fixtures 派生。用合成浏览器演练及同一份 `runner.test.ts` 验证生成源码。
-6. 如修改正式准入矩阵，先更新决议；重新冻结实现后开始完整付费批次，保留旧失败记录，不覆盖历史 golden
+6. 真实质量批次前重新冻结实现并确认模型与预算，保留旧失败记录，不覆盖历史 golden
 
 ## 历史
 

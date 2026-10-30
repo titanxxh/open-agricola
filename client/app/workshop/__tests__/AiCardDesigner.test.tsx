@@ -420,7 +420,7 @@ describe('AiCardDesigner AI config header', () => {
     expect(screen.queryByText('第一行能力')).not.toBeInTheDocument()
   })
 
-  it('keeps unverified model generation closed without falling back to the old prompt', async () => {
+  it('allows a configured model without a separate admission registry', async () => {
     localStorage.setItem('open-agricola-llm-config', JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-flash', baseUrl: 'https://unverified.example/v1' }))
     const provider = vi.fn()
     vi.stubGlobal('fetch', provider)
@@ -428,8 +428,8 @@ describe('AiCardDesigner AI config header', () => {
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), 'Gain food')
-    expect(screen.getByRole('button', { name: '生成能力候选' })).toBeDisabled()
-    expect(screen.getByText('当前模型或接口尚未通过工具与卡牌行为验收，请换用已验收的组合。')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '生成能力候选' })).toBeEnabled()
+    expect(screen.queryByText('当前模型或接口尚未通过工具与卡牌行为验收，请换用已验收的组合。')).not.toBeInTheDocument()
     expect(provider.mock.calls.some(([url]) => String(url).includes('chat/completions'))).toBe(false)
   })
 

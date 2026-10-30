@@ -12,11 +12,9 @@ import type { ModelTurn, ToolTransport } from '../../../services/llm/generation/
 import type { WorkshopDraftContract } from '../../../../shared/contract/workshop'
 import type { LlmConfig } from '../../../services/llm'
 
-const seams = vi.hoisted(() => ({ create: vi.fn(), sandbox: vi.fn() }))
+const seams = vi.hoisted(() => ({ create: vi.fn(), sandbox: vi.fn(), runtime: vi.fn(), runTests: vi.fn() }))
 vi.mock('../../../services/llm/generation/browser', () => ({ createBrowserGenerationPorts: seams.create, createSandboxPorts: seams.sandbox }))
-vi.mock('../../../services/llm/generation/admission', () => ({
-  ADMITTED_GENERATION_MODELS: [{}], generationAdmission: () => ({}), resolveGenerationTarget: () => ({}),
-}))
+vi.mock('../../../local-sandbox/card-tests', () => ({ getBrowserTestRuntimeId: seams.runtime, runBrowserCardTests: seams.runTests }))
 
 const config = { provider: 'deepseek' as const, model: 'deepseek-flash', apiKey: 'browser-only' }
 const draft = { cardId: 'CUSTOM_UITest', cardType: 'minor' as const, name: 'UI Test', description: '', cardJson: {}, effectCode: 'adopted A', artUrl: null, generation: {} }
@@ -24,7 +22,7 @@ const failure = { workspaceId: 'w', versionId: 'tested-version-B', source: 'actu
 const checkpoint = vi.fn(async () => true)
 const apiFetch = vi.fn()
 const complete = vi.fn<ToolTransport['complete']>()
-const clarification: ModelTurn = { calls: [], text: '{"kind":"clarification","message":"Which round?"}', message: { role: 'assistant', content: 'Which round?' }, finishReason: 'stop', usage: { inputTokens: 1, outputTokens: 1, cachedInputTokens: null, reasoningTokens: null } }
+const clarification: ModelTurn = { calls: [], text: 'Which round?', message: { role: 'assistant', content: 'Which round?' }, finishReason: 'stop', usage: { inputTokens: 1, outputTokens: 1, cachedInputTokens: null, reasoningTokens: null } }
 
 function Harness({ modelConfig = config, currentDraft = draft }: { modelConfig?: LlmConfig; currentDraft?: WorkshopDraftContract } = {}) {
   const initial = createWorkshopDraftState({ id: 'w', authorId: 'author', revision: 1, reviewStatus: 'unsubmitted', live: false, draft: currentDraft, approvedVersionId: null, sandboxPassVersionId: null, sandboxPassedAt: null })
@@ -34,6 +32,8 @@ function Harness({ modelConfig = config, currentDraft = draft }: { modelConfig?:
 
 beforeEach(() => {
   vi.clearAllMocks()
+  seams.runtime.mockResolvedValue('runtime-ui')
+  seams.runTests.mockResolvedValue({ browserRuntimeId: 'runtime-ui', outcome: { kind: 'passed', count: 1 } })
   localStorage.clear()
   Element.prototype.scrollIntoView = vi.fn()
   complete.mockResolvedValue(clarification)
@@ -42,12 +42,53 @@ beforeEach(() => {
     loadContract: async () => ({ format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, actions: {}, listeners: { actions: [], phases: {}, scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, helpers: '', semantics: [] }),
     openReferences: async () => ({ commit: 'b'.repeat(40), reads: [], execute: async () => '' }),
     validate: vi.fn(),
+    runTests: async () => ({ browserRuntimeId: 'runtime-ui', outcome: { kind: 'passed', count: 1 } }),
   }
   seams.create.mockReturnValue(ports)
   seams.sandbox.mockReturnValue({ loadContract: ports.loadContract, validate: ports.validate })
 })
 
 describe('Workshop ability request entry points', () => {
+  it('recovers the adoption gate when initial runtime loading fails but generation later tests successfully', async () => {
+    seams.runtime.mockRejectedValueOnce(new Error('Runtime temporarily unavailable'))
+    const ports: AttemptPorts = seams.create()
+    vi.mocked(ports.validate).mockImplementation(async (source, _id, sandboxContractId) => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(source), sandboxContractId, cardJson: { id: draft.cardId, card_type: draft.cardType, name: draft.name } }))
+    const calls = [
+      { id: 'write', type: 'function' as const, function: { name: 'write_artifacts', arguments: JSON.stringify({ source: 'selected C', tests: 'behavior test' }) } },
+      { id: 'run', type: 'function' as const, function: { name: 'run_tests', arguments: '{}' } },
+    ]
+    complete.mockResolvedValueOnce({ ...clarification, calls, text: '', message: { role: 'assistant', content: null, tool_calls: calls }, finishReason: 'tool_calls' }).mockResolvedValueOnce(clarification)
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Error: Runtime temporarily unavailable')).toBeInTheDocument())
+    await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), 'Implement and test')
+    await userEvent.click(screen.getByRole('button', { name: '生成能力候选' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeEnabled())
+  })
+
+  it('requires current UT and invalidates its report when only the tests change', async () => {
+    const sandbox: Pick<AttemptPorts, 'loadContract' | 'validate'> = seams.sandbox()
+    vi.mocked(sandbox.validate).mockImplementation(async (source, _id, sandboxContractId) => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(source), sandboxContractId, cardJson: { id: draft.cardId, card_type: draft.cardType, name: draft.name } }))
+    render(<Harness />)
+    expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('UT'), 'behavior test')
+    await userEvent.click(screen.getByRole('button', { name: '验证代码' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeEnabled())
+    expect(seams.runTests).toHaveBeenCalledWith(expect.objectContaining({ source: 'selected C', tests: 'behavior test' }))
+    await userEvent.type(screen.getByLabelText('UT'), ' changed')
+    expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeDisabled()
+    expect(document.querySelector('.aicw-ut-report')).toBeNull()
+  })
+  it('keeps statically valid source unadoptable when browser behavior tests fail', async () => {
+    const sandbox: Pick<AttemptPorts, 'loadContract' | 'validate'> = seams.sandbox()
+    vi.mocked(sandbox.validate).mockImplementation(async (source, _id, sandboxContractId) => ({ valid: true, errors: [], sourceFingerprint: sourceFingerprint(source), sandboxContractId, cardJson: { id: draft.cardId, card_type: draft.cardType, name: draft.name } }))
+    seams.runTests.mockResolvedValue({ browserRuntimeId: 'runtime-ui', outcome: { kind: 'failed', failures: [{ name: 'forest', error: 'expected 5 to equal 4' }] } })
+    render(<Harness />)
+    await userEvent.type(screen.getByLabelText('UT'), 'behavior test')
+    await userEvent.click(screen.getByRole('button', { name: '验证代码' }))
+    await waitFor(() => expect(screen.getByText('forest: expected 5 to equal 4')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeDisabled()
+  })
+
   it.each([{ id: 'CUSTOM_Other' }, { card_type: 'occupation' }, { name: 'Other name' }])('keeps a manual identity edit unadoptable after code validation: %j', async change => {
     const sandbox: Pick<AttemptPorts, 'loadContract' | 'validate'> = seams.sandbox()
     vi.mocked(sandbox.validate).mockImplementation(async (code, _cardId, contractId) => ({
@@ -56,7 +97,7 @@ describe('Workshop ability request entry points', () => {
     }))
     render(<Harness />)
     await userEvent.type(screen.getByLabelText('能力候选源码'), ' with edited identity')
-    await userEvent.click(screen.getByRole('button', { name: '运行静态验证' }))
+    await userEvent.click(screen.getByRole('button', { name: '验证代码' }))
     await waitFor(() => expect(checkpoint).toHaveBeenCalledTimes(1))
     expect(screen.getByRole('button', { name: '采用为当前源码' })).toBeDisabled()
     expect(screen.getByText(/id, card type and name must match/)).toBeInTheDocument()
@@ -66,7 +107,7 @@ describe('Workshop ability request entry points', () => {
     let resolve!: (value: Awaited<ReturnType<AttemptPorts['validate']>>) => void
     vi.mocked(sandbox.validate).mockImplementation(() => new Promise(done => { resolve = done }))
     const { unmount } = render(<Harness />)
-    await userEvent.click(screen.getByRole('button', { name: '运行静态验证' }))
+    await userEvent.click(screen.getByRole('button', { name: '验证代码' }))
     await waitFor(() => expect(sandbox.validate).toHaveBeenCalledTimes(1))
     const [, , contractId, signal] = vi.mocked(sandbox.validate).mock.calls[0]
     unmount()
@@ -83,7 +124,7 @@ describe('Workshop ability request entry points', () => {
     const input = JSON.parse(String(complete.mock.calls[0][0][1].content))
     expect(input).toMatchObject({ source: 'actually tested B', intent: { kind: 'repair', failure: { versionId: 'tested-version-B' } } })
     expect(input.intent.failure).not.toHaveProperty('source')
-    await waitFor(() => expect(screen.getByText('需要补充信息')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('Which round?')[0]).toBeInTheDocument())
     expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C')
   })
 
@@ -117,7 +158,7 @@ describe('Workshop ability request entry points', () => {
     await waitFor(() => expect(complete).toHaveBeenCalledTimes(1))
     await userEvent.click(screen.getByRole('button', { name: '停止本次尝试' }))
     await act(async () => { resolve(clarification) })
-    expect(screen.queryByText('需要补充信息')).not.toBeInTheDocument()
+    expect(screen.queryAllByText('Which round?')[0] ?? null).not.toBeInTheDocument()
     expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C')
     expect(complete).toHaveBeenCalledTimes(1)
   })
@@ -152,7 +193,7 @@ describe('Workshop ability request entry points', () => {
     expect(complete.mock.calls[0][2].aborted).toBe(true)
     await act(async () => { resolve(clarification) })
     expect(screen.getByLabelText('能力候选源码')).toHaveValue('selected C with manual edit')
-    expect(screen.queryByText('需要补充信息')).not.toBeInTheDocument()
+    expect(screen.queryAllByText('Which round?')[0] ?? null).not.toBeInTheDocument()
     expect(complete).toHaveBeenCalledTimes(1)
   })
 })

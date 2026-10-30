@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createToolTransport, MODEL_STREAM_LIMITS, readModelTurn } from '../protocol'
+import { createToolTransport, MODEL_STREAM_LIMITS, readModelTurn, resolveGenerationTarget } from '../protocol'
 import { REFERENCE_TOOLS } from '../references'
 
 const signal = () => new AbortController().signal
@@ -37,8 +37,7 @@ describe('browser model protocol', () => {
       frame({ reasoning_details: [{ index: 0, text: 'continued', signature: 'signed' }, { index: 1, type: 'reasoning.encrypted', data: 'encrypted' }] }, 'tool_calls'),
       { choices: [], usage: { prompt_tokens: 5, completion_tokens: 7, prompt_cache_hit_tokens: 2, completion_tokens_details: { reasoning_tokens: 3 } } },
     ])).mockResolvedValueOnce(stream([frame({ content: 'finished' }, 'stop')]))
-    const authorize = vi.fn()
-    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'token-canary' }, { fetch: fetchModel, authorize })
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'token-canary' }, { fetch: fetchModel })
     const visible: string[] = []
     const turn = await transport.complete([{ role: 'user', content: 'request' }], REFERENCE_TOOLS, signal(), text => visible.push(text))
     expect(visible.join('')).toBe('查资料')
@@ -46,16 +45,15 @@ describe('browser model protocol', () => {
     expect(turn.calls[1]).toMatchObject({ function: { arguments: '{"path":"docs/CUSTOM_CARD_SANDBOX.md"}' }, extra_content: { google: { thought_signature: 'opaque-signature' } } })
     expect(turn.message).toMatchObject({ reasoning_content: 'think more', reasoning_details: [{ text: 'reason continued', signature: 'signed' }, { data: 'encrypted' }] })
     expect(turn.usage).toEqual({ inputTokens: 5, outputTokens: 7, cachedInputTokens: 2, reasoningTokens: 3 })
-    await transport.complete([turn.message, ...turn.calls.map(call => ({ role: 'tool' as const, tool_call_id: call.id, content: 'result' }))], REFERENCE_TOOLS, signal(), undefined, { toolChoice: 'none' })
+    await transport.complete([turn.message, ...turn.calls.map(call => ({ role: 'tool' as const, tool_call_id: call.id, content: 'result' }))], REFERENCE_TOOLS, signal(), undefined)
     const [url, init] = fetchModel.mock.calls[1]
     expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
     expect(init?.credentials).toBe('omit')
     expect(init?.redirect).toBe('error')
-    expect(JSON.parse(String(init?.body))).toMatchObject({ tools: REFERENCE_TOOLS, tool_choice: 'none', thinking: { type: 'enabled' } })
+    expect(JSON.parse(String(init?.body))).toMatchObject({ tools: REFERENCE_TOOLS, tool_choice: 'auto', thinking: { type: 'enabled' } })
     expect(JSON.parse(String(init?.body)).messages[0]).toEqual(turn.message)
     expect(JSON.parse(String(init?.body)).messages.slice(1).map((message: { tool_call_id: string }) => message.tool_call_id)).toEqual(['first', 'second'])
     expect(String(init?.body)).not.toContain('token-canary')
-    expect(authorize).toHaveBeenCalledTimes(3)
   })
 
   it.each([
@@ -75,7 +73,7 @@ describe('browser model protocol', () => {
 
   it('cancels a stalled reader and never automatically repeats a failed POST', async () => {
     const fetchModel = vi.fn<typeof fetch>().mockRejectedValue(new Error('network down'))
-    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' }, { fetch: fetchModel, authorize: () => {} })
+    const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' }, { fetch: fetchModel })
     await expect(transport.complete([], [], signal())).rejects.toThrow('not retried')
     expect(fetchModel).toHaveBeenCalledTimes(1)
     const abort = new AbortController()
@@ -84,7 +82,7 @@ describe('browser model protocol', () => {
     await expect(pending).rejects.toMatchObject({ kind: 'cancelled', usage: { inputTokens: null, outputTokens: null } })
   })
 
-  it('sends the admitted request identity even when the provider returns a different model name', async () => {
+  it('sends the requested model identity even when the provider returns a different model name', async () => {
     const fetchModel = vi.fn<typeof fetch>().mockResolvedValue(stream([
       { model: 'synthetic-returned-revision', choices: [{ index: 0, delta: { content: 'complete source' }, finish_reason: 'stop' }] },
     ]))
@@ -97,17 +95,28 @@ describe('browser model protocol', () => {
     expect(JSON.parse(String(init?.body)).model).toBe('deepseek-flash')
   })
 
-  it('checks admission against the actual custom endpoint, provider and exact model', () => {
-    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test', baseUrl: 'https://example.com/v1' })).toThrow('awaiting')
-    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: 'test' })).toThrow('awaiting')
-    expect(() => createToolTransport({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: 'test' })).toThrow('awaiting')
-    expect(() => createToolTransport({ provider: 'openrouter', model: 'deepseek-flash', apiKey: 'test', baseUrl: 'https://api.deepseek.com/v1' })).toThrow('awaiting')
+  it.each([
+    ['deepseek', 'https://api.deepseek.com/v1/chat/completions'],
+    ['openrouter', 'https://openrouter.ai/api/v1/chat/completions'],
+    ['aihubmix', 'https://aihubmix.com/v1/chat/completions'],
+    ['gemini', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'],
+  ] as const)('uses the existing %s compatible endpoint without a model admission gate', (provider, endpoint) => {
+    expect(resolveGenerationTarget({ provider, model: 'user-selected-model', apiKey: 'test' })).toEqual({ provider, endpoint, model: 'user-selected-model' })
+    expect(createToolTransport({ provider, model: 'user-selected-model', apiKey: 'test', baseUrl: 'https://example.com/v1/' }).target.endpoint).toBe('https://example.com/v1/chat/completions')
+  })
+
+  it.each(['http://example.com/v1', 'https://user:password@example.com/v1', 'https://example.com/v1?token=secret', 'https://example.com/v1#fragment'])('rejects unsafe browser endpoints before a request: %s', baseUrl => {
+    expect(() => createToolTransport({ provider: 'deepseek', model: 'selected', apiKey: 'test', baseUrl })).toThrow('HTTPS')
+  })
+
+  it('lets the host decide whether empty final text has written artifacts', async () => {
+    expect(await readModelTurn(stream([frame({}, 'stop')]), signal())).toMatchObject({ calls: [], text: '', finishReason: 'stop' })
   })
 
   it('does not send a request that fails its cost reservation', async () => {
     const fetchModel = vi.fn<typeof fetch>()
     const transport = createToolTransport({ provider: 'deepseek', model: 'deepseek-flash', apiKey: 'test' }, {
-      fetch: fetchModel, authorize: () => {}, beforePost: async () => { throw new Error('Budget exhausted') },
+      fetch: fetchModel, beforePost: async () => { throw new Error('Budget exhausted') },
     })
     await expect(transport.complete([], [], signal())).rejects.toMatchObject({ kind: 'preflight', message: 'Budget exhausted' })
     expect(fetchModel).not.toHaveBeenCalled()

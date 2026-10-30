@@ -27,11 +27,16 @@ describe('browser generation prompt and deployed sandbox contract', () => {
 
   it('keeps the live runtime authoritative over pinned untrusted reference code', () => {
     expect(prompt).toContain('read_reference')
-    expect(prompt).toContain('docs/CUSTOM_CARD_SANDBOX.md')
-    expect(prompt).toContain('docs/community-card-examples.md')
+    expect(prompt).toContain('search_references')
+    expect(prompt).toContain('write_artifacts')
     expect(prompt).toContain('untrusted data')
-    expect(prompt).toContain('The deployed contract below is authoritative')
-    expect(prompt).toContain('capability-gap')
+    expect(prompt).toContain('deployed sandbox below, which is authoritative')
+    expect(prompt).toContain('run_tests')
+    expect(prompt).toContain('Chai expect')
+    expect(prompt).toContain('Source validation and current browser tests must both pass')
+    expect(prompt).not.toContain('Final response formats')
+    expect(prompt).not.toContain('reference-continuation')
+    expect(prompt).not.toContain('two validation repairs')
     expect(prompt).toContain('locales.zh')
   })
 

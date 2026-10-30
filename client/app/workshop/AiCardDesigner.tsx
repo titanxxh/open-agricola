@@ -23,7 +23,6 @@ import {
   type LlmConfig, type LlmProvider, type ReferenceImage,
 } from '../../services/llm'
 import { WorkshopAbilityPanel } from './WorkshopAbilityPanel'
-import { generationAdmission, resolveGenerationTarget } from '../../services/llm/generation/admission'
 import type { PlaytestFailure, PlaytestSource } from '../../services/llm/generation/request'
 import { sandboxFailureFor, type SandboxPlaytest } from './sandbox-playtest'
 import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
@@ -328,7 +327,7 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
                 : translateMessage(locale, "ui.copy.client_app_workshop_AiCardDesigner_tsx.ability_generation_model_c05b7f")}
             >
               {availableModels.map(m => (
-                <option key={m.id} value={m.id}>{m.labelKey ? translateMessage(locale, m.labelKey) : m.label}{capability === 'chat' ? (generationAdmission(resolveGenerationTarget({ provider, model: m.id, apiKey: '' })) ? translateMessage(locale, "ui.copy.client_app_workshop_AiCardDesigner_tsx.verified_f48114") : translateMessage(locale, "ui.copy.client_app_workshop_AiCardDesigner_tsx.pending_84365e")) : ''}</option>
+                <option key={m.id} value={m.id}>{m.labelKey ? translateMessage(locale, m.labelKey) : m.label}</option>
               ))}
             </select>
           )

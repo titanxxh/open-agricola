@@ -19,6 +19,16 @@ import {
 } from '../workshop-drafts.ts'
 import type { WorkshopReviewRuntime } from '../workshop-review/webhook-handler.ts'
 import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
+import { abilityArtifactFingerprint } from '../../shared/projections/workshop-generation'
+import type { WorkshopAbilityTestingContract } from '../../shared/contract/workshop'
+
+const testedCandidate = <T extends { sourceCode: string }>(candidate: T) => {
+  const code = 'test("card behavior", () => expect(1).to.equal(1))'
+  return { ...candidate, testing: { code, lastRun: {
+    artifactFingerprint: abilityArtifactFingerprint(candidate.sourceCode, code), browserRuntimeId: 'browser-runtime-1',
+    outcome: { kind: 'passed', count: 1 },
+  } } satisfies WorkshopAbilityTestingContract }
+}
 
 // ── Mock DB ──────────────────────────────────────────────────────────────────
 
@@ -1191,7 +1201,7 @@ const CARD_IMPL = {
       const adoptRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
         baseRevision: 1,
-        candidate: {
+        candidate: testedCandidate({
           id: 'wrong-identity',
           kind: 'ability',
           prompt: 'regenerate the ability',
@@ -1210,7 +1220,7 @@ const CARD_DEF = {
 const CARD_IMPL = {}
           `.trim(),
           createdAt: 100,
-        },
+        }),
       }, 'tok-alice'), adoptRes)
 
       expect(adoptRes.statusCode).toBe(400)
@@ -1251,10 +1261,7 @@ const CARD_IMPL = {}
       }, 'tok-alice'), createRes)
       const cardDbId = JSON.parse(createRes.body).id
 
-      const adoptRes = mockRes()
-      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
-        baseRevision: 1,
-        candidate: {
+      const candidate = testedCandidate({
           id: 'factory-ability',
           kind: 'ability',
           prompt: 'factory metadata',
@@ -1271,7 +1278,19 @@ const CARD_DEF = MinorImprovement({
 const CARD_IMPL = {}
           `.trim(),
           createdAt: 100,
-        },
+      })
+      for (const testing of [undefined, { ...candidate.testing, code: 'changed tests' }]) {
+        const rejected = mockRes()
+        await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
+          baseRevision: 1, candidate: { ...candidate, testing },
+        }, 'tok-alice'), rejected)
+        expect(rejected.statusCode).toBe(400)
+        expect(JSON.parse(rejected.body)).toMatchObject({ code: 'not_ready' })
+      }
+      const adoptRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
+        baseRevision: 1,
+        candidate,
       }, 'tok-alice'), adoptRes)
 
       expect(adoptRes.statusCode).toBe(200)
@@ -1279,6 +1298,7 @@ const CARD_IMPL = {}
         cardId: 'CUSTOM_FactoryWorkspace',
         cardType: 'minor',
         name: 'Factory Ability',
+        generation: { ability: { adopted: { testing: candidate.testing } } },
         cardJson: {
           id: 'CUSTOM_FactoryWorkspace',
           name: 'Factory Ability',
