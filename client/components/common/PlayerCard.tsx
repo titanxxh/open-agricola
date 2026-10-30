@@ -7,6 +7,7 @@ import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/t
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
+import { moorMajorDisplayNumber, officialCardDeck, officialCardDisplayNumber } from '../../../shared/projections/card-display-number'
 import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy, type CardTouchInteraction } from './CardWithCopy'
@@ -38,49 +39,23 @@ type PlayerCardProps = {
 
 type MoorMajorDisplay = {
   numbering: string
-  imageUrl?: string
+  imageUrl: string
 }
 
-const moorMajorDisplay = (numbering: string, hasArt = true): MoorMajorDisplay => ({
-  numbering,
-  imageUrl: hasArt ? `/assets/moor/major/${numbering}.png` : undefined,
-})
-
-const MOOR_MAJOR_DISPLAY: Record<string, MoorMajorDisplay> = {
-  Major_Moor_HorseSlaughterhouse1: moorMajorDisplay('M001'),
-  Major_Moor_HorseSlaughterhouse2: moorMajorDisplay('M002'),
-  Major_Moor_Cookhouse1: moorMajorDisplay('M003'),
-  Major_Moor_Cookhouse2: moorMajorDisplay('M004'),
-  Major_Moor_VillageChurch: moorMajorDisplay('M005'),
-  Major_Moor_HeatingOven: moorMajorDisplay('M006'),
-  Major_Moor_TiledOven: moorMajorDisplay('M007'),
-  Major_Moor_FurnitureStall: moorMajorDisplay('M008'),
-  Major_Moor_CeramicsStall: moorMajorDisplay('M009'),
-  Major_Moor_BasketStall: moorMajorDisplay('M010'),
-  Major_Moor_PeatCharcoalKiln: moorMajorDisplay('M011'),
-  Major_Moor_ForestersLodge: moorMajorDisplay('M012'),
-  Major_Moor_MuseumOfTheMoors: moorMajorDisplay('M013'),
-  Major_Moor_RidingStables: moorMajorDisplay('M014'),
+const getMoorMajorDisplay = (cardId: string): MoorMajorDisplay | undefined => {
+  const numbering = moorMajorDisplayNumber(cardId)
+  return numbering ? { numbering, imageUrl: `/assets/moor/major/${numbering}.png` } : undefined
 }
-
-const getMoorMajorDisplay = (cardId: string): MoorMajorDisplay | undefined => MOOR_MAJOR_DISPLAY[cardId]
-const OFFICIAL_CARD_ID = /^([A-E]|M)(\d{3})(?:_|$)/
 
 const getCardNumbering = (cardId: string): string => {
-  const moorMajor = getMoorMajorDisplay(cardId)
-  if (moorMajor) return moorMajor.numbering
-  const match = cardId.match(OFFICIAL_CARD_ID)
-  if (match) return `${match[1]}${match[2].padStart(3, '0')}`
+  const official = officialCardDisplayNumber(cardId)
+  if (official) return official
   // Custom cards: O-series numbering (minor O001+, occupation O500+)
   if (cardId.startsWith('CUSTOM_')) return getCustomCardNumbering(cardId) ?? ''
   return cardId
 }
 
-const getDeckFromId = (cardId: string): string | undefined => {
-  if (getMoorMajorDisplay(cardId)) return 'M'
-  const match = cardId.match(OFFICIAL_CARD_ID)
-  return match ? match[1] : undefined
-}
+const getDeckFromId = officialCardDeck
 
 const getPlayer56PortraitUrl = (numbering: string): string => publicAssetUrl(`/assets/player56/${numbering}.png`)
 
