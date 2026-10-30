@@ -66,6 +66,8 @@ pnpm run lint
 pnpm run build
 ```
 
+CI 根据 PR 或 main 的完整改动选择检查。本地调试使用 `pnpm verify focus <file.test.ts>`，需要时可主动运行 `pnpm verify prepush`，覆盖完整 fast 和 lint。发版需要固定候选 SHA 的 GitHub 全量验证。范围规则和命令见 [CI 操作说明](docs/operations/ci-checks.md)。
+
 ## URL Parameters
 
 | 参数 | 说明 |

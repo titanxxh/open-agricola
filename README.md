@@ -66,6 +66,8 @@ pnpm run lint
 pnpm run build
 ```
 
+CI selects checks from the complete PR or main change set. Use `pnpm verify focus <file.test.ts>` for local debugging. `pnpm verify prepush` remains an optional complete fast and lint run. Releases require full GitHub verification for a fixed candidate SHA. See [CI operations](docs/operations/ci-checks.md) for scope rules and commands.
+
 ## URL Parameters
 
 | Parameter | Description |
