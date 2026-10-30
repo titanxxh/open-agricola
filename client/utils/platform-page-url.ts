@@ -1,9 +1,10 @@
 import { buildRoomSearch } from './game-room-url'
 
-export type PlatformPage = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding' | 'operations'
+export type PlatformPage = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding' | 'operations' | 'encyclopedia'
 
 const PAGE_SCOPED_QUERY_KEYS = [
   'card',
+  'entry',
   'view',
   'room',
   'player',
