@@ -465,8 +465,11 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       if (!restored) throw new Error('Original room disappeared during recovery')
       expect(restored.created_by).toBe(environment.userId)
       expect(createHash('sha256').update(restored.state_json).digest('hex')).toBe(savedHash)
+      page.once('dialog', dialog => dialog.accept())
+      await page.getByRole('button', { name: 'Propose ending the game', exact: true }).click()
+      await expect.poll(async () => (await getDb().prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?')
+        .get<{ lifecycle: string }>(roomId))?.lifecycle).toBe('terminated')
       await environment.loadLobby(page, () => page.goto(environment.appUrl, { waitUntil: 'domcontentloaded' }))
-      expect(await page.evaluate(async ({ origin, id }) => (await fetch(`${origin}/api/rooms/${id}/dissolve`, { method: 'POST', credentials: 'include' })).status, { origin: environment.apiOrigin, id: roomId })).toBe(200)
       await expect(page.getByRole('button', { name: 'Create Multiplayer Game', exact: true })).toBeVisible()
       const desktopLogout = page.getByRole('button', { name: 'Sign Out', exact: true })
       if (!await desktopLogout.isVisible()) {
