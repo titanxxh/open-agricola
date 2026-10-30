@@ -336,22 +336,27 @@ CORS_ORIGIN=https://open-agricola.titanxxh.com
 
 ### 触发部署
 
-发布 GitHub Release 后自动部署前端（`.github/workflows/deploy-pages.yml`，`on: release: published`）：
+使用[本机标准发版命令](#本机标准发版)，先固定候选并完成验证，再创建 Release：
 
 ```bash
-gh release create v0.3.0 --generate-notes
+pnpm release vX.Y.Z --ref main
 ```
 
-也可以在 GitHub UI 操作：Releases → Draft a new release → 新建 tag（`vX.Y.Z`）→ Generate release notes → Publish。后端不会由 release 自动部署。Actions 页面手动触发（workflow_dispatch）时部署 `main` 最新前端。
+发布 Release 后，`release: published` 触发 `.github/workflows/deploy-pages.yml`。手动部署时，在 Actions 选择该工作流及目标分支或 tag，再运行 `workflow_dispatch`。
+
+两条入口都固定事件的完整 `github.sha`，检出该提交，再调用 `scripts/ci/pages-deployment.ts`。命令在构建前检查同一 SHA、同一验证配置的可信完整 GitHub 候选证据。必需任务缺失、失败、取消、跳过或不兼容时，任务在上传 artifact 和部署前停止。普通 PR 检查不能满足该门禁。构建还会检查实际 checkout 和 `frontend-build.json` 身份。触发后分支或 tag 移动不会改变实际部署候选。
+
+仍可通过 Releases → Draft a new release 或直接执行 `gh release create` 创建 Release。这些入口可能创建尚未验证的 Release，但 Pages 门禁会在必需证据通过前拒绝部署该候选。查看失败构建步骤中的阻塞任务，补齐候选验证后重新运行工作流。Release 不会自动部署后端。
 
 部署成功后的生产入口是 `https://open-agricola.titanxxh.com/`，由 GitHub Pages 提供。自托管部署可按相同拓扑配置自己的 Pages 自定义域名。
 
-### 手动构建（不用 GitHub Actions）
+### 本地构建
 
 ```bash
-VITE_API_BASE=https://api.your-domain.com pnpm run build
-pnpm dlx gh-pages -d dist
+VITE_API_BASE=https://api.your-domain.com pnpm run build:pages-frontend
 ```
+
+该命令将构建写入 `dist-pages/`，供本地检查。发布时使用上述 Release 或手动 Actions 工作流，在部署前执行候选门禁。
 
 ### 主站图片资源
 

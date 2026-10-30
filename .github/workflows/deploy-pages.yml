@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -19,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-node@v7
         with:
@@ -30,14 +33,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
+      - name: Verify candidate and build frontend
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ github.sha }}
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_ENABLE_COMMUNITY_DECK: ${{ vars.VITE_ENABLE_COMMUNITY_DECK }}
           VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
-        run: pnpm run build:pages-frontend
+        run: pnpm exec tsx scripts/ci/pages-deployment.ts build --sha "$CANDIDATE_SHA" --repository "$GITHUB_REPOSITORY"
 
       - uses: actions/upload-pages-artifact@v5
         with:
