@@ -34,7 +34,9 @@
 
 `scripts/ci/verification-plan.ts` 独立发现测试归属，包含完整分支差异、rename 两侧和实际检出变化。未知归属与共享配置扩大到完整任务清单。普通说明文档选择文档约束测试，运行时可读文档保留所属业务范围。
 
-`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。消费者缺失或前端模块未知时扩大到全量。工坊、卡牌与后端在具备有界映射前保留全量后备。
+`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。消费者缺失或前端模块未知时扩大到全量。
+
+`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、共享规则、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。公共机制保留完整 slow project 和浏览器分道；公开契约还覆盖客户端消费者。工坊覆盖当前行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。未知目录、声明的消费者缺失或 project 缺失时扩大到全量。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
 
 `scripts/ci/scoped-verification.ts` 计算并执行 canonical plan。执行前重新计算计划，核对 digest 与源码身份，将文件名和 selector 作为进程参数传入。浏览器检查调用 `pnpm verify`，保留隔离依赖、`restart-local.sh` 和结构化 case 结果。执行记录与计划摘要属于日常证据，不能充当完整发布回执。
 

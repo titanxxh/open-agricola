@@ -6,6 +6,7 @@ import { globSync } from 'glob'
 import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-globs'
 import { parseSource, sourceExtensions } from '../source-files'
 import { frontendVerification } from './frontend-verification'
+import { businessScopeFor, businessVerification } from './business-verification'
 
 export type VerificationIdentity = {
   baseRef: string
@@ -36,6 +37,7 @@ const scopeReasons = {
   frontend: 'Frontend changes require the complete client group, quality and builds, and the declared module browser consumers.',
   card: 'Card behavior requires explicit direct, Session, and cross-card test associations.',
   server: 'Server changes require their complete backend and multiplayer groups.',
+  recovery: 'Persistence and recovery changes require complete storage, serialization, transport and Replay consumers.',
   rules: 'Shared rule mechanisms require complete affected rule groups.',
   contract: 'Protocol and projection changes require both producers and consumers.',
   workshop: 'Workshop contracts and runtime-readable documentation require sandbox verification.',
@@ -59,6 +61,8 @@ function scopeFor(file: string): VerificationScope {
     || file.startsWith('.github/') || file.startsWith('scripts/') || file.startsWith('tests/')
     || /(?:^|\/)(?:_helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
     || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)) return 'global'
+  const businessScope = businessScopeFor(file)
+  if (businessScope) return businessScope
   if (/^docs\/(?:CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status|community-card-examples)(?:_zh)?\.md$/.test(file)
     || /^docs\/(?:prompts|examples)\//.test(file)
     || /^docs\/(?:architecture|test)\//.test(file)
@@ -118,6 +122,10 @@ export function planVerification(input: {
       })))
     } else if (selection.scope === 'frontend') {
       const mapping = frontendVerification(selection.paths, input.inventory)
+      scopedChecks.push(...mapping.checks)
+      expansionReasons.push(...mapping.expansionReasons)
+    } else if (['server', 'recovery', 'rules', 'contract', 'workshop'].includes(selection.scope)) {
+      const mapping = businessVerification(selection.paths, input.inventory)
       scopedChecks.push(...mapping.checks)
       expansionReasons.push(...mapping.expansionReasons)
     } else expansionReasons.push(`${selection.reason} Full verification is selected for ${selection.paths.length} affected paths.`)
