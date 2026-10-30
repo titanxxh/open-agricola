@@ -63,7 +63,14 @@
   color: var(--color-text-muted);
 }
 
-.encyclopedia-load-error .btn-primary {
+.encyclopedia-load-error__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.encyclopedia-load-error__actions .btn-primary,
+.encyclopedia-load-error__actions .btn-secondary {
   padding: 10px 20px;
 }
 
