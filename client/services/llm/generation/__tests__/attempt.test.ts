@@ -139,7 +139,7 @@ describe('four-tool generation loop', () => {
     expect(io.runTests).not.toHaveBeenCalled()
   })
 
-  it('keeps tools enabled on the eighth turn, then pauses with written artifacts and resumes explicitly', async () => {
+  it('continues beyond eight model turns with tools and preserves written artifacts', async () => {
     const io = ports()
     let count = 0
     io.model.complete = vi.fn<AttemptPorts['model']['complete']>(async (_messages, tools) => {
@@ -148,9 +148,7 @@ describe('four-tool generation loop', () => {
       return count < 8 ? turn([read(`read-${count}`)]) : count === 8 ? turn([write(), run()]) : turn()
     })
     const attempt = new GenerationAttempt(request(), io)
-    expect(await attempt.start()).toMatchObject({ status: 'paused', needsAllowance: true, modelRequests: 8, candidate: { validation: { valid: true }, testing: { lastRun: { outcome: { kind: 'passed' } } } } })
-    expect(await attempt.resume()).toMatchObject({ status: 'paused', modelRequests: 8 })
-    expect(await attempt.resume({ extendAllowance: true })).toMatchObject({ status: 'completed', modelRequests: 9, allowance: { modelRequests: 16, activeMs: 600000 }, result: { kind: 'candidate' } })
+    expect(await attempt.start()).toMatchObject({ status: 'completed', modelRequests: 9, candidate: { validation: { valid: true }, testing: { lastRun: { outcome: { kind: 'passed' } } } }, result: { kind: 'candidate' } })
     expect(io.openReferences).toHaveBeenCalledTimes(1)
   })
 
@@ -171,7 +169,7 @@ describe('four-tool generation loop', () => {
     io.model.complete = vi.fn<AttemptPorts['model']['complete']>().mockRejectedValueOnce(new ModelTurnError('network', 'connection lost')).mockResolvedValueOnce(turn())
     const attempt = new GenerationAttempt(request(), io)
     expect(await attempt.start()).toMatchObject({ status: 'paused', retry: 'model', modelRequests: 1 })
-    await attempt.resume({ extendAllowance: true })
+    await attempt.resume()
     expect(io.model.complete).toHaveBeenCalledTimes(1)
     expect(await attempt.resume({ retry: true })).toMatchObject({ status: 'completed', modelRequests: 2, usage: { inputTokens: null, outputTokens: null } })
   })
@@ -206,25 +204,21 @@ describe('four-tool generation loop', () => {
     expect(io.model.complete).toHaveBeenCalledTimes(1)
   })
 
-  it('times out a model POST and requires both explicit allowance and retry', async () => {
+  it('keeps a model request active beyond five minutes until it completes', async () => {
     vi.useFakeTimers()
     const io = ports()
-    io.model.complete = vi.fn<AttemptPorts['model']['complete']>().mockImplementationOnce((_messages, _tools, signal: AbortSignal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new ModelTurnError('cancelled', 'timeout')), { once: true }))).mockResolvedValue(turn())
+    let finish: (result: ModelTurn) => void = () => { throw new Error('Request has not started') }
+    io.model.complete = vi.fn<AttemptPorts['model']['complete']>((_messages, _tools, signal) => new Promise(resolve => {
+      expect(signal.aborted).toBe(false)
+      finish = resolve
+    }))
     const attempt = new GenerationAttempt(request(), io)
     const pending = attempt.start()
-    await vi.advanceTimersByTimeAsync(300001)
-    expect(await pending).toMatchObject({ status: 'paused', retry: 'model', needsAllowance: true, modelRequests: 1 })
-    await attempt.resume({ extendAllowance: true })
-    expect(io.model.complete).toHaveBeenCalledTimes(1)
-    expect(await attempt.resume({ extendAllowance: true, retry: true })).toMatchObject({ status: 'completed', modelRequests: 2 })
+    await vi.advanceTimersByTimeAsync(300_001)
+    expect(attempt.snapshot()).toMatchObject({ status: 'running', modelRequests: 1 })
+    finish(turn())
+    expect(await pending).toMatchObject({ status: 'completed', modelRequests: 1 })
   })
 
-  it('retains written artifacts when complete protocol context exceeds its fixed limit', async () => {
-    const io = ports()
-    sequence(io, turn([write('x'.repeat(160000), 'x'.repeat(50000))]))
-    const result = await new GenerationAttempt(request(), io).start()
-    expect(result).toMatchObject({ status: 'completed', modelRequests: 1, result: { kind: 'failure', message: expect.stringContaining('size limit') } })
-    expect(result.candidate?.sourceCode).toHaveLength(160000)
-    expect(io.model.complete).toHaveBeenCalledTimes(1)
-  })
+
 })

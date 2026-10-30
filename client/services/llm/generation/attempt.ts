@@ -7,8 +7,6 @@ import type { ReferenceSession } from './references'
 import { ModelTurnError, UNKNOWN_USAGE, type ToolCall, type ToolTransport, type WireMessage } from './protocol'
 import { GENERATION_TOOLS, GENERATION_TOOL_VERSION } from './tools'
 
-export const ATTEMPT_ALLOWANCE = Object.freeze({ modelRequests: 8, activeMs: 5 * 60 * 1000 })
-export const GENERATION_CONTEXT_BYTES = 192 * 1024
 export type CodeValidation = { valid: boolean; errors: string[]; sourceFingerprint: string; sandboxContractId: string; cardJson?: Record<string, unknown> }
 export type AttemptPorts = {
   model: ToolTransport
@@ -25,11 +23,9 @@ export type AttemptSnapshot = {
   stage: Stage
   reason?: string
   retry?: Stage
-  needsAllowance: boolean
   modelRequests: number
   referenceCalls: number
   activeMs: number
-  allowance: { modelRequests: number; activeMs: number }
   usage: GenerationUsage
   referenceCommit?: string
   sandboxContractId?: string
@@ -50,14 +46,12 @@ export class GenerationAttempt {
   private readonly observe: (snapshot: AttemptSnapshot) => void
   private readonly onText: (text: string) => void
   private readonly clock: () => number
-  private readonly allowance: AttemptSnapshot['allowance'] = { ...ATTEMPT_ALLOWANCE }
   private readonly messages: WireMessage[] = []
   private readonly accounting: RequestAccounting[] = []
   private status: AttemptSnapshot['status'] = 'ready'
   private stage: Stage = 'initializing'
   private reason?: string
   private retry?: Stage
-  private needsAllowance = false
   private references?: Awaited<ReturnType<AttemptPorts['openReferences']>>
   private contract?: WorkshopSandboxContract
   private pendingCalls?: { calls: ToolCall[]; next: number }
@@ -89,9 +83,9 @@ export class GenerationAttempt {
     }), { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningTokens: 0 }) : { ...UNKNOWN_USAGE }
     return structuredClone({
       attemptId: this.request.attemptId, status: this.status, stage: this.stage, reason: this.reason, retry: this.retry,
-      needsAllowance: this.needsAllowance, modelRequests: this.accounting.length, referenceCalls: this.referenceCalls,
+      modelRequests: this.accounting.length, referenceCalls: this.referenceCalls,
       activeMs: this.activeMs + (this.startedAt === undefined ? 0 : Math.max(0, this.clock() - this.startedAt)),
-      allowance: this.allowance, usage, referenceCommit: this.references?.commit, sandboxContractId: this.contract?.id,
+      usage, referenceCommit: this.references?.commit, sandboxContractId: this.contract?.id,
       result: this.result, candidate: this.lastCandidate,
     })
   }
@@ -103,14 +97,9 @@ export class GenerationAttempt {
     return this.launch()
   }
 
-  resume(options: { extendAllowance?: boolean; retry?: boolean } = {}): Promise<AttemptSnapshot> {
+  resume(options: { retry?: boolean } = {}): Promise<AttemptSnapshot> {
     if (this.status !== 'paused') return this.running ?? Promise.resolve(this.snapshot())
     if (this.retry && !options.retry) return Promise.resolve(this.snapshot())
-    if (this.needsAllowance && !options.extendAllowance) return Promise.resolve(this.snapshot())
-    if (options.extendAllowance) {
-      this.allowance.modelRequests += ATTEMPT_ALLOWANCE.modelRequests
-      this.allowance.activeMs += ATTEMPT_ALLOWANCE.activeMs
-    }
     return this.launch()
   }
 
@@ -147,25 +136,22 @@ export class GenerationAttempt {
     this.publish()
   }
 
-  private pause(reason: string, retry?: Stage, needsAllowance = false): void {
-    this.status = 'paused'; this.reason = reason; this.retry = retry; this.needsAllowance = needsAllowance
+  private pause(reason: string, retry: Stage): void {
+    this.status = 'paused'; this.reason = reason; this.retry = retry
     this.publish()
   }
 
   private launch(): Promise<AttemptSnapshot> {
     if (this.running) return this.running
-    this.status = 'running'; this.reason = undefined; this.retry = undefined; this.needsAllowance = false
+    this.status = 'running'; this.reason = undefined; this.retry = undefined
     this.startedAt = this.clock()
     this.controller = new AbortController()
     const signal = this.controller.signal
-    const timer = setTimeout(() => this.controller?.abort(), Math.max(1, this.allowance.activeMs - this.activeMs))
     this.running = this.drive(signal).catch(error => {
       if (this.status === 'cancelled') return
       if (error instanceof GenerationStopError) this.finish('failure', error.message)
-      else if (signal.aborted) this.pause('The active time allowance was reached. Continue explicitly; retrying a model request may incur an additional charge.', this.stage, true)
       else this.pause(error instanceof Error ? error.message : 'Generation could not continue.', this.stage)
     }).finally(() => {
-      clearTimeout(timer)
       this.activeMs += Math.max(0, this.clock() - this.startedAt!)
       this.startedAt = undefined; this.running = undefined
       this.publish()
@@ -246,7 +232,6 @@ export class GenerationAttempt {
     )
     while (this.status === 'running') {
       signal.throwIfAborted()
-      if (this.snapshot().activeMs >= this.allowance.activeMs) { this.pause('The active time allowance was reached.', undefined, true); return }
       const pending = this.pendingCalls
       if (pending) {
         while (pending.next < pending.calls.length) {
@@ -260,9 +245,7 @@ export class GenerationAttempt {
         }
         this.pendingCalls = undefined
       }
-      if (this.accounting.length >= this.allowance.modelRequests) { this.pause('The model-request allowance was reached.', undefined, true); return }
       const inputBytes = new TextEncoder().encode(JSON.stringify({ messages: this.messages, tools: GENERATION_TOOLS })).length
-      if (inputBytes > GENERATION_CONTEXT_BYTES) throw new GenerationStopError('The reference and protocol context reached its fixed size limit. Start a new attempt with a narrower request; protocol fields were not truncated.')
       this.stage = 'model'
       const record: RequestAccounting = { sequence: this.accounting.length + 1, inputBytes, startedAt: this.clock(), elapsedMs: 0, usage: { ...UNKNOWN_USAGE }, finishReason: 'unknown' }
       this.accounting.push(record); this.publish()

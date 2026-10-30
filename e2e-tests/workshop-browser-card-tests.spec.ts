@@ -95,6 +95,15 @@ for (const engine of ['chromium', 'webkit'] as const) {
         await expect(page.locator('iframe')).toHaveCount(0)
         await expect(page.locator('body')).toHaveAttribute('data-terminated', 'true')
       }
+      const diagnostic = await run(page, source, `
+test('expected rejection', () => { expect(createSession().performRoundEnd().ok).to.equal(false) })
+test('failed command', () => { expect(createSession().performRoundEnd().state.round).to.equal(2) })
+test('next assertion', () => { expect(0).to.equal(1) })
+`)
+      expect(diagnostic.outcome).toEqual({ kind: 'failed', failures: [
+        { name: 'failed command', error: expect.stringContaining('Last failed GameCore command: performRoundEnd: not all workers used') },
+        { name: 'next assertion', error: 'expected +0 to equal 1' },
+      ] })
       expect(requests).toHaveLength(0)
 
       const cancelRun = run(page, source, infiniteTests)

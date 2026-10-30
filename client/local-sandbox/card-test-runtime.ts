@@ -69,13 +69,20 @@ function compileTests(source: string): string {
   return compiled.outputText
 }
 
-function scopedSession(core: GameCore): GameCore {
+function scopedSession(core: GameCore, onFailure: (method: string, error: string) => void): GameCore {
   return new Proxy(core, {
     get(target, key, receiver) {
       const value: unknown = Reflect.get(target, key, receiver)
       if (typeof value !== 'function') return value
       if (key === 'withCtx' || key === 'dispose') return value.bind(target)
-      return (...args: unknown[]) => target.withCtx(() => Reflect.apply(value, target, args))
+      return (...args: unknown[]) => target.withCtx(() => {
+        const result: unknown = Reflect.apply(value, target, args)
+        if (typeof key === 'string' && result && typeof result === 'object'
+          && 'ok' in result && result.ok === false && 'error' in result && typeof result.error === 'string') {
+          onFailure(key, result.error)
+        }
+        return result
+      })
     },
   })
 }
@@ -85,6 +92,7 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
   let outcome: WorkshopBrowserTestOutcome
   const warnings: string[] = []
   const sessions: GameCore[] = []
+  let lastFailure = ''
   const dispose = (from: number) => {
     for (const session of sessions.splice(from)) {
       warnings.push(...session.cardWarnings)
@@ -118,7 +126,7 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
       const loaded = core.loadState(state)
       if (!loaded.ok || loaded.state.phase !== 'playing' || loaded.state.roundPhase !== 'work'
         || loaded.interaction.stateId !== 'idle') throw new Error('Failed to prepare a clean two-player work Session')
-      return scopedSession(core)
+      return scopedSession(core, (method, error) => { lastFailure = `${method}: ${error}` })
     }
     const registered: Array<{ name: string; run: () => unknown }> = []
     const test = (name: unknown, run: unknown) => {
@@ -130,11 +138,14 @@ export async function runBrowserCardTestScript(request: BrowserCardTestRequest, 
     if (!registered.length) throw new Error('No tests were registered')
     for (const entry of registered) {
       const start = sessions.length
+      lastFailure = ''
       try {
         onTestStart(entry.name)
         await entry.run()
         tests.push({ name: entry.name, ok: true })
-      } catch (error) { tests.push({ name: entry.name, ok: false, error: errorText(error) }) }
+      } catch (error) {
+        tests.push({ name: entry.name, ok: false, error: `${errorText(error)}${lastFailure ? `\nLast failed GameCore command: ${lastFailure}` : ''}` })
+      }
       finally { dispose(start) }
     }
     dispose(0)
