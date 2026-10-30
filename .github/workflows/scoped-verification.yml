@@ -1,0 +1,83 @@
+name: Scoped verification partition
+
+on:
+  workflow_call:
+    inputs:
+      partition:
+        required: true
+        type: string
+      base_ref:
+        required: true
+        type: string
+      head_ref:
+        required: true
+        type: string
+      plan_digest:
+        required: true
+        type: string
+    outputs:
+      status:
+        value: ${{ jobs.execute.outputs.status }}
+      partition_id:
+        value: ${{ jobs.execute.outputs.partition_id }}
+      partition_digest:
+        value: ${{ jobs.execute.outputs.partition_digest }}
+      plan_digest:
+        value: ${{ jobs.execute.outputs.plan_digest }}
+      tested_sha:
+        value: ${{ jobs.execute.outputs.tested_sha }}
+      completed_checks:
+        value: ${{ jobs.execute.outputs.completed_checks }}
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      status: ${{ steps.execute.outputs.status }}
+      partition_id: ${{ steps.execute.outputs.partition_id }}
+      partition_digest: ${{ steps.execute.outputs.partition_digest }}
+      plan_digest: ${{ steps.execute.outputs.plan_digest }}
+      tested_sha: ${{ steps.execute.outputs.tested_sha }}
+      completed_checks: ${{ steps.execute.outputs.completed_checks }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install both browser engines for explicit embedded launches
+        if: startsWith(inputs.partition, 'browser-')
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Execute the canonical selected partition
+        id: execute
+        env:
+          BASE_REF: ${{ inputs.base_ref }}
+          HEAD_REF: ${{ inputs.head_ref }}
+          EXPECTED_PLAN_DIGEST: ${{ inputs.plan_digest }}
+          VERIFICATION_PARTITION: ${{ inputs.partition }}
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm exec tsx scripts/ci/scoped-verification.ts run --base "$BASE_REF" --head "$HEAD_REF" --partition "$VERIFICATION_PARTITION" --expected-digest "$EXPECTED_PLAN_DIGEST" --output "output/verification/scoped-$VERIFICATION_PARTITION.json"
+      - name: Retain selected partition results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scoped-verification-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.partition }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            output/verification/**
+            output/playwright/**/session-lifecycle.json
+            output/playwright/**/session-failure.json
+            output/playwright/**/session-failure.png
+            output/playwright/**/operations-panel-queries.json
+            output/playwright/**/operations-panel-visibility.json
+            output/playwright/**/operations-*.log

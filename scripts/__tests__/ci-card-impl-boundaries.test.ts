@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { verificationPlan } from '../verify'
 import { taskCommands } from '../ci/verification-tasks'
 import { plannedCheckCommands } from '../ci/scoped-verification'
+import { ROUTINE_PARTITION_IDS } from '../ci/routine-partitions'
 
 const repoRoot = path.resolve(__dirname, '../..')
 const architectureChecks = [
@@ -90,18 +91,28 @@ describe('canonical architecture verification wiring', () => {
 
   it('routes selected CI tasks to the canonical runner and always evaluates the stable required gate', () => {
     const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+    const worker = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
     const gate = workflow.slice(workflow.indexOf('\n  verify:'))
     expect(workflow).not.toMatch(/^\s+paths(?:-ignore)?:/m)
     expect(workflow).toContain('scripts/ci/scoped-verification.ts plan --base "$BASE_REF" --head "$HEAD_REF"')
-    expect(workflow).toContain('--partition inline --expected-digest "$EXPECTED_PLAN_DIGEST"')
+    expect(workflow).not.toContain('\n  inline:')
+    expect(worker).toContain('--partition "$VERIFICATION_PARTITION" --expected-digest "$EXPECTED_PLAN_DIGEST"')
+    for (const id of ROUTINE_PARTITION_IDS) {
+      const caller = workflow.split(`\n  ${id}:`)[1].split(/\n {2}[a-z0-9-]+:/)[0]
+      expect(caller).toContain('    needs: plan\n')
+      expect(caller).toContain(`fromJSON(needs.plan.outputs.partitions)['${id}'] != null`)
+      expect(caller).toContain('    uses: ./.github/workflows/scoped-verification.yml\n')
+      expect(caller).toContain(`      partition: ${id}\n`)
+      expect(caller).toContain('      plan_digest: ${{ needs.plan.outputs.plan_digest }}')
+    }
     expect(workflow).toContain('uses: ./.github/workflows/candidate-verification.yml')
     expect(workflow).toContain('tasks: ${{ needs.plan.outputs.catalog_tasks }}')
     expect(workflow).toContain("if: needs.plan.outputs.catalog_tasks != '' && needs.plan.outputs.catalog_tasks != 'none'")
     expect(workflow).toContain('candidate_sha: ${{ github.sha }}')
     expect(workflow).toContain('base_sha:\n        description: Optional full comparison base SHA for a manual scope probe')
-    expect(workflow.match(/BASE_REF: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.base_sha \|\| github.event.pull_request.base.sha \|\| github.event.before \|\| github.sha \}\}/g)).toHaveLength(2)
-    expect(workflow.match(/HEAD_REF: \$\{\{ github.event.pull_request.head.sha \|\| github.sha \}\}/g)).toHaveLength(2)
-    expect(gate).toContain('name: verify\n    if: always()\n    needs: [plan, inline, catalog]')
+    expect(workflow.match(/(?:BASE_REF|base_ref): \$\{\{ github.event_name == 'workflow_dispatch' && inputs.base_sha \|\| github.event.pull_request.base.sha \|\| github.event.before \|\| github.sha \}\}/g)).toHaveLength(6)
+    expect(workflow.match(/(?:HEAD_REF|head_ref): \$\{\{ github.event.pull_request.head.sha \|\| github.sha \}\}/g)).toHaveLength(6)
+    expect(gate).toContain('name: verify\n    if: always()\n    needs: [plan, units, browser-1, browser-2, browser-3, browser-4, catalog]')
     expect(gate).toContain('NEEDS_JSON: ${{ toJSON(needs) }}')
     expect(gate).toContain('scripts/ci/scoped-verification.ts gate --sha "$GITHUB_SHA"')
     expect(workflow).not.toContain('continue-on-error:')
@@ -124,12 +135,11 @@ describe('canonical architecture verification wiring', () => {
 
   it('installs both engines in browser catalog lanes and declared inline browser checks', () => {
     const candidate = fs.readFileSync(path.join(repoRoot, '.github/workflows/candidate-verification.yml'), 'utf8')
-    const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+    const routine = fs.readFileSync(path.join(repoRoot, '.github/workflows/scoped-verification.yml'), 'utf8')
 
     expect(candidate).toContain("if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'")
     expect(candidate).toContain('run: pnpm exec playwright install --with-deps chromium webkit')
-    expect(routine).toContain("if: contains(needs.plan.outputs.browsers, 'chromium')\n        run: pnpm exec playwright install --with-deps chromium")
-    expect(routine).toContain("if: contains(needs.plan.outputs.browsers, 'webkit')\n        run: pnpm exec playwright install --with-deps webkit")
+    expect(routine).toContain("if: startsWith(inputs.partition, 'browser-')\n        run: pnpm exec playwright install --with-deps chromium webkit")
   })
 
   it('verifies public PRs and main with read-only permissions and preserves manual verification', () => {

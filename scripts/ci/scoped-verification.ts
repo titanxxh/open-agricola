@@ -8,8 +8,9 @@ import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { assertPlanCurrent, createRepositoryPlan, formatPlanSummary, type PlannedCheck, type VerificationPlan } from './verification-plan'
 import { FULL_TASK_IDS, selectedTasks, taskCommands, verificationTask, type VerificationCommand } from './verification-tasks'
 import { assertRoutineGate, NO_CATALOG_TASKS } from './routine-verification-gate'
+import { executionPartition, routinePartitionManifest, routinePartitions, type RoutinePartitionId } from './routine-partitions'
 
-export type ExecutionPartition = 'inline' | 'all'
+export type ExecutionPartition = RoutinePartitionId | 'all'
 type CommandRunner = (command: string, args: string[], cwd: string) => number
 type CheckResult = { check: PlannedCheck; status: 'passed' | 'failed'; commands: Array<VerificationCommand & { exitCode: number }> }
 type RoutineResult = {
@@ -17,6 +18,7 @@ type RoutineResult = {
   kind: 'routine'
   status: 'running' | 'passed' | 'failed'
   partition: ExecutionPartition
+  partitionDigest: string
   planDigest: string
   identity: VerificationPlan['identity']
   checks: CheckResult[]
@@ -43,7 +45,7 @@ export function routinePlanManifest(plan: VerificationPlan) {
     mode: plan.mode,
     plan_digest: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
     tested_sha: plan.identity.testedSha,
-    inline_checks: plan.checks.filter(check => check.kind !== 'catalog').length,
+    partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan))),
     catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : NO_CATALOG_TASKS,
     browsers: plan.checks.some(check => check.kind === 'browser') ? 'chromium webkit' : '',
   }
@@ -88,10 +90,12 @@ export function executeRepositoryPlan(input: {
     if (input.expectedDigest !== undefined && input.expectedDigest !== manifest.plan_digest) {
       throw new Error('Verification plan digest changed; regenerate the plan')
     }
-    const checks = plan.checks.filter(check => input.partition === 'all' || check.kind !== 'catalog')
+    const partition = routinePartitions(plan).find(partition => partition.id === input.partition)
+    const checks = input.partition === 'all' ? plan.checks : partition?.checks ?? []
     if (!checks.length) throw new Error('No checks are selected for this execution partition')
     record = {
       schemaVersion: 1, kind: 'routine', status: 'running', partition: input.partition,
+      partitionDigest: partition?.digest ?? manifest.plan_digest,
       planDigest: manifest.plan_digest, identity: plan.identity, checks: [],
     }
     write(input.output, record)
@@ -110,7 +114,8 @@ export function executeRepositoryPlan(input: {
       write(input.output, record)
     }
     record.status = 'passed'
-    outputs({ plan_digest: manifest.plan_digest, tested_sha: plan.identity.testedSha, completed_checks: record.checks.length, status: record.status })
+    outputs({ partition_id: input.partition, partition_digest: record.partitionDigest,
+      plan_digest: manifest.plan_digest, tested_sha: plan.identity.testedSha, completed_checks: record.checks.length, status: record.status })
     return record
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -160,12 +165,12 @@ export function scopedVerificationCli(cwd: string, args: string[]): number {
       if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, formatPlanSummary(plan))
       process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')
     } else if (command === 'run') {
-      if (values.partition !== 'inline' && values.partition !== 'all') throw new Error('Unknown execution partition')
+      const partition = executionPartition(values.partition)
       const expectedPlan: unknown = values.plan ? JSON.parse(readFileSync(resolve(cwd, values.plan), 'utf8')) : undefined
       executionOwnsRecord = true
-      executeRepositoryPlan({ cwd, base: values.base, head: values.head, partition: values.partition,
+      executeRepositoryPlan({ cwd, base: values.base, head: values.head, partition,
         output, expectedPlan, expectedDigest: values['expected-digest'] })
-    } else throw new Error('Usage: scoped-verification.ts plan|run --base <ref> [--head <ref>] [--plan <file>] [--partition inline|all] [--expected-digest <sha256>], or gate --sha <sha>')
+    } else throw new Error('Usage: scoped-verification.ts plan|run --base <ref> [--head <ref>] [--plan <file>] [--partition units|browser-1|browser-2|browser-3|browser-4|all] [--expected-digest <sha256>], or gate --sha <sha>')
     return 0
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

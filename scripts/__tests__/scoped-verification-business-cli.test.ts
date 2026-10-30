@@ -76,8 +76,8 @@ describe('business verification public CLI', () => {
     const planned = value.run('plan', '--base', 'main')
     expect(planned.status, planned.stderr).toBe(0)
     const manifest: unknown = JSON.parse(planned.stdout)
-    expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build', inline_checks: 7, browsers: 'chromium webkit' })
-    const result = value.run('run', '--base', 'main', '--plan', 'output/verification/scoped-plan.json', '--partition', 'inline')
+    expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build', browsers: 'chromium webkit' })
+    const result = value.run('run', '--base', 'main', '--plan', 'output/verification/scoped-plan.json', '--partition', 'all')
     expect(result.status, result.stderr).toBe(0)
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
@@ -93,6 +93,8 @@ describe('business verification public CLI', () => {
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-tests',
         'tests/cost-pay-parity.test.ts', 'tests/game-sync-pipeline.test.ts', 'tests/protocol-types.test.ts', 'tests/serialization.test.ts'],
+      ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
+      ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
       ['verify', 'e2e-tests/hosted-password-login.spec.ts', 'e2e-tests/oauth-onboarding.spec.ts',
         'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@ws'],
@@ -106,7 +108,7 @@ describe('business verification public CLI', () => {
     expect(planned.status, planned.stderr).toBe(0)
     const manifest: unknown = JSON.parse(planned.stdout)
     expect(manifest).toMatchObject({
-      mode: 'scoped', inline_checks: 7,
+      mode: 'scoped',
       catalog_tasks: 'quality,build,chromium-1,chromium-2,chromium-3,chromium-4,browser-sandbox,webkit',
     })
     const result = value.run('run', '--base', 'main')
@@ -158,7 +160,7 @@ describe('business verification public CLI', () => {
   ])('fails the public execution when the required $failure command fails', ({ path, failure, error }) => {
     const value = fixture(path)
     value.env.FAIL_COMMAND = failure
-    const result = value.run('run', '--base', 'main', '--partition', 'inline')
+    const result = value.run('run', '--base', 'main', '--partition', 'all')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain(error)
     const recorded: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
