@@ -109,7 +109,7 @@ export function readCardAssociationIndex(cwd: string, inventory: TestInventory):
           if (specifier && ts.isStringLiteral(specifier)) dependency(specifier.text)
           else result.riskReasons.add(`Computed module consumer: ${file}`)
         }
-        if (ts.isIdentifier(node) && /^(?:ALL_CARD_IMPLS|catalogCardDefinitions|allMinorImprovementCards|allOccupationCards|majorCardDefinitions)$/.test(node.text)) {
+        if (ts.isIdentifier(node) && /^(?:ALL_CARD_IMPLS|catalogCardDefinitions|allMinorImprovementCards|allOccupationCards|majorCardDefinitions|(?:get|lookup|find)Card(?:Definition|Effect|Impl|Modifiers|Listeners)(?:ById)?)$/.test(node.text)) {
           result.safetyReasons.add(`Generic card registry consumer: ${file}`)
         }
         if ((ts.isTemplateExpression(node) && /(?:\b[A-E]\d*|\bM\d*|Major_|CUSTOM_)$/.test(node.head.text))
