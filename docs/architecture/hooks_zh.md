@@ -42,6 +42,7 @@ anytime                  注册额外的 anytime 行动
 
 **事件是规则事实的来源。** `EventStore` 为每个公开行动或内部 leaf 开启 transaction，只在成功时提交（失败、取消、回滚和跳过都不追加），按 `state.nextEventSeq` 重新编号，校验可见性、JSON 安全、大小与已知字段，并追加 `publicEvents.committed` 包。`state.log` 是事件 mapper 派生的 UI 缓存。Listener 读取 `transactionEvents` / `eventQuery`，资源事实不读未提交的全局 `state.events` 或 `context.result`。
 
+- 取得数量阈值读取原宿主的 `actionEvents`；后续返还是单独移动，选择或恢复反应时不以格上余量或净库存替代原回执。
 - 农场修改事件（`farm.fieldPlowed`、`farm.roomBuilt`、`farm.stableBuilt`、`farm.fenceBuilt`）携带 `newlyUsedTiles`，在修改前后、尾随反应之前捕获。围栏提交还携带 `newlyEnclosedPastureTiles`。每个共同农场操作都为新增已用坐标发出 `farm.spacesUsed`；封锁状态修改使用同一事实。地形操作还发出包含层变化和新田的 `farm.terrainChanged`。计划领取的房间同样发出 `farm.roomBuilt`。
 - 建房、建厩、犁地、围栏和地形的行动结果在原宿主完成点保留 `farmOperations`。结果与同一宿主的 `actionEvents` 一起经过支付子流程和持久化等待；嵌套行动各自持有结果，父行动不重新交付子操作。反应复用现有 owner/phase trigger-select，操作内部不另设 dispatcher。见 `server/__tests__/farm-operation-session.test.ts`。
 - 地形消费者使用 `getActionTerrainOperations()`，先读取原结果收据，再回退到事件，避免返回 flow 的 sibling 将嵌套子操作当作父操作变化。Moor 特殊行动的延迟反应序列化自身捕获的地形事实。已用格消费者订阅 `farm.spacesUsed`，通过 `getActionNewlyUsedTiles()` 优先读取原结果收据，只回退到本宿主已提交的 `actionEvents`；围栏范围使用 `getNewlyEnclosedPastureTiles()`，均按玩家过滤；不从后来的几何重建差异，不保存行动前缓存，也不回退到更大的 Turn 范围。

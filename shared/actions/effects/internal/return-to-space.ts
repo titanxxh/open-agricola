@@ -1,4 +1,5 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
+import { applyAnimalPayment, isAnimalResourceKey } from '../../../domain/animal-payment'
 
 const canReturnResourcesToSpace = (
   resources: Partial<Resource>,
@@ -41,7 +42,8 @@ export const returnToSpaceAction: ActionDefinition = {
     Object.entries(params ?? {}).forEach(([key, value]) => {
       if (typeof value !== 'number' || value <= 0) return
       const resourceKey = key as keyof Resource
-      player.resources[resourceKey] -= value
+      if (isAnimalResourceKey(key)) applyAnimalPayment(player, state, key, value)
+      else player.resources[resourceKey] -= value
       target.resources[resourceKey] = (target.resources[resourceKey] ?? 0) + value
       resources[resourceKey] = value
     })

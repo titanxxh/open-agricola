@@ -128,9 +128,9 @@ describe('action-space use identity and Turn admission regressions (#1353–#135
     const foodBefore = session.state.players[0]!.resources.food
     snapshot(session, 'before-third-person')
     let response = ok(session.takeAction(0, 'forest'))
-    response = choose(session, response, option => option.sourceCard === PART)
-    assert.equal(options(response).length, 3, JSON.stringify(response.interaction))
-    const mixed = options(response)[branch]!
+    const returns = options(response).filter(option => option.value !== '__skip__')
+    assert.equal(returns.length, 3, JSON.stringify(response.interaction))
+    const mixed = returns[branch]!
     response = choose(session, response, option => option.value === mixed.value)
     response = settle(session, response)
     snapshot(session, 'after-mixed-take', response)
@@ -138,6 +138,8 @@ describe('action-space use identity and Turn admission regressions (#1353–#135
     assert.deepEqual([response.state.players[0]!.resources.wood, response.state.players[0]!.resources.stone, response.state.players[0]!.resources.boar], [wood, stone, 1])
     assert.deepEqual(response.state.actionSpaces.find(space => space.id === 'forest')!.resources, { wood: 2 - wood, stone: 2 - stone })
     assert.equal(response.state.players[0]!.resources.food - foodBefore, 0, 'Catcher must read the four goods at placement, not three after the first partial take')
+    assert.deepEqual(response.state.events.filter(event => event.type === 'resource.moved' && event.reason === 'collect'
+      && event.from.kind === 'actionSpace' && event.from.spaceId === 'forest').map(event => event.resources), [{ wood: 2, stone: 2 }])
   })
 
   it('#1354 two Piggy Bank oven bakes before placement allow Freshman only once', () => {
