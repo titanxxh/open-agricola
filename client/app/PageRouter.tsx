@@ -16,6 +16,10 @@ import '../App.css'
 
 const OperationsPageLazy = lazy(() => import('./OperationsPage').then(m => ({ default: m.OperationsPage })))
 
+const EncyclopediaPageLazy = lazy(() =>
+  import('./encyclopedia/EncyclopediaPage').then((m) => ({ default: m.EncyclopediaPage })),
+)
+
 const GameContainerApiLazy = lazy(() =>
   import('./GameContainerApi').then((m) => ({ default: m.GameContainerApi })),
 )
@@ -23,7 +27,7 @@ const GameContainerApiLazy = lazy(() =>
 function getPage(): PlatformPage {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
-  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding' || page === 'operations') return page
+  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding' || page === 'operations' || page === 'encyclopedia') return page
   if (params.get('context')) return 'game'
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   if (isHotseatSetupQuery(window.location.search)) return 'game'
@@ -68,6 +72,14 @@ export function PageRouter() {
       setPage('lobby')
     }
   }, [loading, page, user])
+
+  if (page === 'encyclopedia') {
+    return (
+      <Suspense fallback={<AppShellLoadScreen />}>
+        <EncyclopediaPageLazy />
+      </Suspense>
+    )
+  }
 
   if (loading) {
     const { percent, labelKey } = getGameLoadProgress('auth')
