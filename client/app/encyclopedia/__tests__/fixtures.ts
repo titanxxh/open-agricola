@@ -2,6 +2,9 @@ import type { EncyclopediaEntry, EncyclopediaSearchDocument, EncyclopediaTextSta
 import type { CardEncyclopedia } from '../../../services/card-encyclopedia'
 import type { EncyclopediaItem } from '../encyclopedia-item'
 
+/** Keys follow the catalog's `${sourceKind}:${sourceId}` identity. */
+const keyed = (entry: Omit<EncyclopediaEntry, 'key'>): EncyclopediaEntry => ({ key: `${entry.sourceKind}:${entry.sourceId}`, ...entry })
+
 export const cardEntry = (cardId: string, displayNumber: string, overrides: Partial<EncyclopediaEntry> = {}): EncyclopediaEntry => ({
   key: `card:${cardId}`,
   sourceKind: 'card',
@@ -19,8 +22,7 @@ export const cardEntry = (cardId: string, displayNumber: string, overrides: Part
 
 export const BASEBOARDS = cardEntry('A004_Baseboards', 'A004', { cost: { kind: 'printed', paths: [{ food: 2 }, { grain: 1 }] } })
 
-export const COOKING_HEARTH: EncyclopediaEntry = {
-  key: 'major:Major_CookingHearth1',
+export const COOKING_HEARTH = keyed({
   sourceKind: 'major',
   sourceId: 'Major_CookingHearth1',
   group: 'majorStandard',
@@ -31,7 +33,7 @@ export const COOKING_HEARTH: EncyclopediaEntry = {
   text: { name: [{ key: 'cardFaces.Major_CookingHearth1.name' }], body: [{ key: 'cardFaces.Major_CookingHearth1.description' }] },
   cost: { kind: 'printed', paths: [{ clay: 4 }], returnCards: ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'] },
   score: { fixed: 1, extraVp: false },
-}
+})
 
 export const parentEntry = (parentId: string, kind: 'mother' | 'father', fixed: number | null): EncyclopediaEntry => ({
   key: `parent:${parentId}`,
@@ -47,8 +49,7 @@ export const parentEntry = (parentId: string, kind: 'mother' | 'father', fixed: 
   score: { fixed, extraVp: false },
 })
 
-export const WINTER: EncyclopediaEntry = {
-  key: 'season:winter',
+export const WINTER = keyed({
   sourceKind: 'season',
   sourceId: 'winter',
   group: 'seasons',
@@ -66,10 +67,9 @@ export const WINTER: EncyclopediaEntry = {
   },
   cost: { kind: 'notApplicable' },
   score: { fixed: null, extraVp: false },
-}
+})
 
-export const MARKET_WORK: EncyclopediaEntry = {
-  key: 'moorSpecialAction:moor-special-1-5-6-market-work',
+export const MARKET_WORK = keyed({
   sourceKind: 'moorSpecialAction',
   sourceId: 'moor-special-1-5-6-market-work',
   group: 'moor',
@@ -87,7 +87,7 @@ export const MARKET_WORK: EncyclopediaEntry = {
   },
   cost: { kind: 'notApplicable' },
   score: { fixed: null, extraVp: false },
-}
+})
 
 type FieldStatuses = Partial<Record<'name' | 'body' | 'rules' | 'prerequisite', EncyclopediaTextStatus>>
 
