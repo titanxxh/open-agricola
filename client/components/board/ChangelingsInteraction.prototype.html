@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>生灵交互草图</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans CJK SC",sans-serif;color:#283d34;background:#f1f2e9;font-size:15px;--green:#24664d;--line:#d6ded1;--muted:#627367}*{box-sizing:border-box}body{margin:0}button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}button:focus-visible{outline:3px solid #8c590b;outline-offset:3px}button:disabled{cursor:default;opacity:.57}button[aria-disabled=true]{background:#f0f0e9;color:#6c746d;border-style:dashed}h1,h2,h3,p{margin:0}h1{font-size:25px}h2{font-size:19px}h3{font-size:16px}p{line-height:1.65}small,.muted{color:var(--muted)}header{max-width:1240px;margin:auto;padding:26px 24px 14px}.intro{margin-top:9px;max-width:950px;color:var(--muted)}.badge{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;background:#fff;margin-bottom:10px}main{max-width:1240px;margin:auto;padding:0 24px 40px}.tabs{display:flex;gap:7px;overflow:auto;padding:10px 0 16px}.tabs button{white-space:nowrap;min-height:42px;border:1px solid var(--line);border-radius:8px;padding:8px 15px;background:#fff}.tabs button[aria-selected=true]{color:#fff;background:var(--green);border-color:var(--green)}.topline{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}.pill{font-size:12px;white-space:nowrap;background:#e1eadc;border-radius:20px;padding:5px 10px}.layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:16px}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}.panel+.panel{margin-top:16px}.stack{display:grid;gap:16px}.notice{padding:12px 15px;background:#e9f1e7;border-left:3px solid var(--green);border-radius:4px;line-height:1.65;margin-bottom:18px;min-height:48px}.members{display:flex;gap:8px;overflow:auto;padding:5px 3px 10px;margin:10px -3px 8px}.member{min-width:114px;min-height:92px;border:1px solid var(--line);border-radius:9px;display:grid;grid-template-columns:22px 1fr;text-align:left;gap:6px;padding:12px;background:#fafbf7;align-items:center}.member.selected{border:2px solid var(--green);background:#edf6eb;padding:11px}.member .sub{grid-column:1/-1;font-size:12px;color:var(--muted)}.person{width:18px;height:21px;background:#a64a37;border-radius:6px 6px 3px 3px;position:relative;display:inline-block;margin-top:7px;vertical-align:middle}.person:before{content:"";position:absolute;top:-8px;left:5px;width:9px;height:9px;border-radius:50%;background:inherit}.person.white{background:#a64a37;box-shadow:inset 0 0 0 4px #d9e3ff}.person.elf{box-shadow:inset 0 0 0 4px #dbefb7}.person.goblin{box-shadow:inset 0 0 0 4px #e4cff5}.person.silicoid{box-shadow:inset 0 0 0 4px #cdd4d8}.person.troll{box-shadow:inset 0 0 0 4px #f8d29e}.member-summary{font-size:13px;line-height:1.7;min-height:43px;padding:6px 0 12px}.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.space{min-height:110px;background:#f9faf4;border:1px solid var(--line);border-radius:9px;text-align:left;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:9px}.space strong{font-size:16px}.space small{font-size:12px;line-height:1.55}.space .tag{font-size:12px;color:var(--green)}.marker{font-size:12px;border:1px solid var(--line);border-radius:5px;padding:4px 7px;background:#fff}.farm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:14px}.tile{aspect-ratio:1;border:1px solid #d6dfbd;background:#edf2db;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;min-width:0;font-size:12px;padding:2px}.tile.room{background:#e9d7be;border-color:#cfb48b}.tile.field{background:#e2d0a0}.tile.elf-home{background:#d7e7c8;border:2px solid var(--green);font-weight:600}.tile.legal{background:#e3f1de;border:2px dashed var(--green)}.tile small{font-size:10px}.farm-note{font-size:12px;margin-top:11px;line-height:1.6}.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}.primary,.secondary{padding:10px 14px;min-height:43px;border-radius:7px;border:1px solid var(--line);background:#fff}.primary{background:var(--green);border-color:var(--green);color:#fff}.list{display:grid;gap:0;margin-top:10px}.row{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid #edf0e8;line-height:1.5}.row:last-child{border:0}.row b{white-space:nowrap}.log{padding-left:20px;font-size:13px;line-height:1.8;color:var(--muted)}.card-preview{background:#f8f4e8;border:1px solid #e3d9be;border-radius:8px;padding:20px;margin:16px 0}.card-preview h3{margin-bottom:8px}.guide{margin-top:16px}.guide ol{padding-left:21px;line-height:1.75;margin:10px 0}.guide button{margin-top:5px}.receipt{background:#f4f6f0;border-radius:7px;padding:12px;margin-top:12px;font-size:13px;line-height:1.8}.status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 14px;font-size:13px;margin-top:14px;line-height:1.8}.selected-label{font-weight:600;color:var(--green)}.details{margin-top:14px;padding:12px;background:#f2f5ed;font-size:13px;line-height:1.7;border-radius:7px}footer{margin-top:22px;font-size:12px;color:var(--muted);line-height:1.7}input[type=checkbox]{width:19px;height:19px;vertical-align:middle;margin-right:8px}.toggle{display:block;line-height:1.8;margin:14px 0}.wide{grid-column:1/-1}
+@media(max-width:700px){header{padding:20px 16px 8px}h1{font-size:23px}main{padding:0 14px 25px}.layout{grid-template-columns:1fr;gap:12px}.panel{padding:15px}.topline{align-items:start}.pill{white-space:normal;text-align:right;max-width:140px}.member{min-width:112px}.intro{font-size:13px}.space{min-height:116px;padding:12px}.member-summary{min-height:54px}.tile{font-size:11px}.tile small{font-size:9px}.status-grid{font-size:12px}.tabs{margin:0 -2px}.topline h2{font-size:17px}}
+</style>
+<body>
+<header><span class="badge">Wayfinder · 交互演示 · 非真实对局</span><h1>每次派出的，都是具体的一名成员</h1><p class="intro">检验已选方案能否清楚表达选人、合法行动、出生绑定和供养。点击场景，再自由操作或按引导逐步体验。演示使用固定报价与回复，不连接游戏服务，也不验证真实规则引擎。</p></header>
+<main><nav class="tabs" role="tablist" aria-label="演示场景" id="tabs"></nav><div id="app"></div><footer>独立交互草图，可直接双击本 HTML 打开，无需安装。所有状态仅存于当前页面，刷新即重置。正式 UI 将接入服务端交互，不采用这里的演示回复。<br>原型问题：玩家能否一直看清“选了谁、能去哪里、正在处理谁”，以及精灵住所占位与计分未使用的区别？</footer></main>
+<script>
+// Pure interaction model. Quotes and replies below are disposable demonstration fixtures.
+const demo = (() => {
+  const scenes = {
+    work:{name:'选人放置',hint:'点白族 3，观察犁田与他人占据的石矿场；再切换普通 1。',steps:['选中白族 3','点犁田，查看不能直接犁田的原因','切换普通 1，比较合法行动','重新选择白族 3 并派到石矿场']},
+    birth:{name:'生育与住所',hint:'本次新生儿已锁定为精灵 4；抽牌后选择住所，不能换绑其他成员。',steps:['为新生儿 4 抽牌','为精灵 4 选择 A3 住所','查看固定住所及计分说明']},
+    minor:{name:'普通次发',hint:'抽到普通次发后留手或立即打出；切换他人视角检查私有内容。',steps:['查看他人视角','回到本人视角','将本次次发留在手中']},
+    goblin:{name:'哥布林返还',hint:'拿齐 3 木以后必须返还其中 1 木；返还期间不能重新派人。',steps:['派哥布林 3 到森林','从本次取得的木头中返还 1 木','查看取得 3、返还 1、库存增加 2']},
+    feeding:{name:'逐人供养',hint:'示例同时有 Child’s Toy 与 Old Miser。石头人的两配方与两个窗口共享 2 次额度。',steps:['收获开始时以 3 食物换 1 石头','进入本人供养','以 3 食物换 1 分，观察共用额度','支付合计 3 食物与 1 石头']},
+    setup:{name:'建局设置',hint:'生灵是本局规则选项；全桌共用一副 10 张牌的额外牌堆。',steps:['勾选启用生灵','确认本局配置']}
+  };
+  const spaces = [
+    {id:'wood',name:'森林',note:'累积 3 木'},
+    {id:'quarry',name:'石矿场',note:'已有另一位玩家的成员'},
+    {id:'plow',name:'犁田',note:'犁 1 块田'},
+    {id:'grain',name:'谷物利用',note:'播种 / 烤面包'}
+  ];
+  const quotes = {
+    normal:{wood:{ok:true,text:'取得 3 木'},quarry:{ok:false,text:'已被其他玩家占用'},plow:{ok:true,text:'可以犁田'},grain:{ok:true,text:'可以播种或烤面包'}},
+    pale:{wood:{ok:true,text:'取得 3 木'},quarry:{ok:true,text:'可共用石矿场，额外获得 1 石头'},plow:{ok:false,text:'白族不能直接犁田'},grain:{ok:true,text:'只可烤面包，不可直接播种'}},
+    goblin:{wood:{ok:true,text:'取得 3 木，然后必须返还其中 1 木'},quarry:{ok:false,text:'已被其他玩家占用'},plow:{ok:true,text:'可以犁田'},grain:{ok:true,text:'可以播种或烤面包'}}
+  };
+  function start(scene){
+    const s={scene,phase:'work',selected:null,defaultMember:null,view:'self',message:scenes[scene].hint,log:[],step:0,details:false,deck:10,wood:0,food:0,stone:0,points:0,used:0,home:null,hand:0,played:0,noSite:false,enabled:false};
+    if(scene==='work')s.members=[{id:'n1',name:'普通 1',kind:'normal',available:true,status:'在家 · 可用'},{id:'p3',name:'白族 3',kind:'pale',available:true,status:'在家 · 可用'},{id:'e4',name:'精灵 4',kind:'elf',available:false,status:'新生儿 · 本轮不可用'}];
+    if(scene==='goblin'){s.members=[{id:'g3',name:'哥布林 3',kind:'goblin',available:true,status:'在家 · 可用'}];s.selected='g3';s.defaultMember='g3';}
+    if(scene==='birth'){s.phase='draw';s.members=[{id:'e4',name:'新生儿 4',kind:'elf',available:false,status:'本次出生 · 待抽牌'}];}
+    if(scene==='minor'){s.phase='minor';s.deck=9;s.wood=2;}
+    if(scene==='feeding'){s.phase='harvest-start';s.food=12;s.members=[{id:'n1',name:'普通 1',kind:'normal',status:'成年',food:1,stone:0},{id:'t3',name:'巨魔 3',kind:'troll',status:'新生儿',food:2,stone:0},{id:'s4',name:'石头人 4',kind:'silicoid',status:'成年',food:0,stone:1}];}
+    if(scene==='setup')s.phase='setup';
+    return s;
+  }
+  function transition(previous,action){
+    let s=structuredClone(previous);
+    if(action.type==='reset')return start(s.scene);
+    if(action.type==='view'){s.view=s.view==='self'?'other':'self';s.message=s.view==='self'?'本人可查看并选择这张次发。':'其他玩家只看到正在处理一张次发，不显示私有牌面。';return s;}
+    if(action.type==='detail'){s.details=!s.details;return s;}
+    if(action.type==='ordinary'&&s.phase==='work'&&s.scene==='work'){s.members=[{id:'n1',name:'普通 1',kind:'normal',available:true,status:'在家 · 可用'},{id:'n2',name:'普通 2',kind:'normal',available:true,status:'在家 · 可用'}];s.selected='n1';s.defaultMember='n1';s.defaultReason='两名普通成员等价，已默认选中';s.message='演示报价给出默认成员。普通局可直接点行动格，不必增加一次选人操作。';return s;}
+    if(action.type==='select'&&s.phase==='work'){
+      const m=s.members.find(x=>x.id===action.id);
+      if(m?.available){s.selected=m.id;s.message=`本次派出：${m.name}。下方显示该成员可用的行动。`;s.details=false;}
+      return s;
+    }
+    if(action.type==='place'&&s.phase==='work'){
+      const m=s.members.find(x=>x.id===s.selected);
+      if(!m){s.message='先选择本次派出的成员。';return s;}
+      const quote=quotes[m.kind][action.id];
+      if(!quote.ok){s.message=quote.text+'。没有提交行动，也没有改派其他成员。';return s;}
+      s.space=action.id;s.lockedMember=m.name;m.available=false;m.status='已派出';
+      s.log.push(`${m.name} 使用${spaces.find(x=>x.id===action.id).name}`);
+      if(s.scene==='goblin'){s.wood=3;s.phase='return';s.message='哥布林 3 已取得 3 木。现在必须返还其中 1 木，才能继续。';s.log.push('取得 3 木');}
+      else{s.phase='placed';s.message=`${m.name} 已派出，棋盘保留其身份。${quote.text}。`;}
+      return s;
+    }
+    if(action.type==='return'&&s.phase==='return'){s.wood=2;s.phase='returned';s.message='已返还 1 木至公共供应。完整取得仍记为 3 木，库存净增加 2 木。';s.log.push('返还 1 木至公共供应');return s;}
+    if(action.type==='no-site'&&s.phase==='draw'){s.noSite=!s.noSite;s.message=s.noSite?'演示无合法住所：抽到精灵会弃掉并继续抽牌。':'演示存在合法住所。';return s;}
+    if(action.type==='draw'&&s.phase==='draw'){
+      if(s.noSite){s.deck=8;s.phase='minor';s.message='精灵无合法住所，已弃掉并重抽为普通次发。仍然对应新生儿 4，共用牌堆剩 8 张。';s.wood=2;s.log.push('精灵因无合法住所弃掉','同一新生儿重抽普通次发');}
+      else{s.deck=9;s.phase='residence';s.message='新生儿 4 抽到精灵，绑定目标已固定。请选择一处合法住所。';s.members[0].name='精灵 4';s.members[0].status='新生儿 · 住所待定';s.log.push('新生儿 4 抽到精灵');}
+      return s;
+    }
+    if(action.type==='residence'&&s.phase==='residence'&&[2,7,12].includes(action.tile)){
+      s.home=action.tile;s.phase='bound';s.members[0].status='新生儿 · 住所已定';s.message='精灵 4 的住所已确定。标记固定留在这里，不消耗个人围栏；计分仍算未使用。';s.log.push(`精灵 4 住所：${'ABC'[Math.floor(action.tile/5)]}${action.tile%5+1}`);return s;
+    }
+    if(action.type==='minor'&&s.phase==='minor'&&s.view==='self'){
+      s.phase='minor-done';s.decision=action.choice;
+      if(action.choice==='keep'){s.hand=1;s.message='次发已加入本人手牌，其他玩家只看到手牌数增加。';s.log.push('本次次发留手');}
+      else{s.wood=1;s.played=1;s.message='已按演示报价支付 1 木，次发公开打出。';s.log.push('支付 1 木，打出演示次发');}
+      return s;
+    }
+    if(action.type==='feed-window'&&s.phase==='harvest-start'){s.phase='feeding';s.message=`进入本人供养。共享兑换额度仍为 ${s.used}/2，没有重置。`;return s;}
+    if(action.type==='exchange'&&['harvest-start','feeding'].includes(s.phase)&&s.used<2&&s.food>=3){s.food-=3;s.used++;if(action.recipe==='stone')s.stone++;else s.points++;s.message=`石头人兑换已使用 ${s.used}/2。两种配方、两个窗口读取同一额度。`;s.log.push(`${s.phase==='harvest-start'?'收获开始':'供养'}：3 食物换 1 ${action.recipe==='stone'?'石头':'分'}`);return s;}
+    if(action.type==='feed'&&s.phase==='feeding'&&s.food>=3&&s.stone>=1){s.food-=3;s.stone--;s.phase='fed';s.message='三名成员已完成供养：3 食物与 1 石头。';s.log.push('支付 3 食物与 1 石头，完成供养');return s;}
+    if(action.type==='enable'&&s.phase==='setup'){s.enabled=!s.enabled;return s;}
+    if(action.type==='create'&&s.phase==='setup'){s.phase='configured';s.message=s.enabled?'演示配置已确认：全桌共用 10 张额外牌，所有玩家发牌或选牌后准备。':'演示配置已确认：未启用生灵。';return s;}
+    return s;
+  }
+  return {scenes,spaces,quotes,start,transition};
+})();
+</script>
+<script>
+// Thin rendering shell. No production rules or network mutations.
+let state=demo.start(new URLSearchParams(location.search).get('scene') in demo.scenes?new URLSearchParams(location.search).get('scene'):'work');
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const person=kind=>`<span class="person ${kind==='pale'?'white':kind}" aria-hidden="true"></span>`;
+function button(label,action,primary=false,disabled=false){return `<button class="${primary?'primary':'secondary'}" data-action='${JSON.stringify(action)}' ${disabled?'disabled':''}>${label}</button>`;}
+function dispatch(action){state=demo.transition(state,action);render();}
+function farm(){return `<div class="farm">${Array.from({length:15},(_,i)=>{
+  const legal=state.phase==='residence'&&[2,7,12].includes(i),home=state.home===i,label=`${'ABC'[Math.floor(i/5)]}${i%5+1}`;
+  const content=home?'精灵 4<small>固定住所 · 0/1 动物</small>':i===0||i===5?'木屋':i===10?'田地':label;
+  return legal?`<button class="tile legal" aria-label="住所 ${label}" data-action='${JSON.stringify({type:'residence',tile:i})}'>${label}<small>可安置</small></button>`:`<div class="tile ${home?'elf-home':i===0||i===5?'room':i===10?'field':''}">${content}</div>`;
+}).join('')}</div><p class="farm-note">${state.home===null?'住所将显示关联成员；精灵外出后，标记仍留在原格。':'此格游戏中按已占用处理，禁止建设、犁田、围入。计分仍为未使用格，基础扣 1 分。个人围栏消耗 0。'}</p>`;}
+function members(){return `<div class="members" aria-label="家庭成员">${(state.members??[]).map(m=>`<button class="member ${state.selected===m.id?'selected':''}" data-action='${JSON.stringify({type:'select',id:m.id})}' aria-pressed="${state.selected===m.id}" ${!m.available||state.phase!=='work'?'disabled':''}>${person(m.kind)}<strong>${m.name}</strong><span class="sub">${m.status}${state.selected===m.id?' · 已选':''}</span></button>`).join('')}</div>`;}
+function work(){const selected=state.members.find(m=>m.id===state.selected);return `<section class="panel"><h3>本次派出</h3>${members()}<div class="member-summary">${state.phase==='return'?`<span class="selected-label">正在处理：${state.lockedMember} · 强制返还</span>`:state.phase!=='work'?`<span class="selected-label">已派出：${state.lockedMember}</span>`:selected?`<span class="selected-label">${selected.name}</span> · ${state.defaultMember?state.defaultReason??'仅一名可用，已默认选中':'可随时切换，点合法行动格后提交'}`:'选择本次行动的成员，再点行动格。新生儿本轮不可用。'}</div><div class="actions">${demo.spaces.map(space=>{const q=selected?demo.quotes[selected.kind][space.id]:null;const placed=state.space===space.id&&state.phase!=='work';return `<button class="space" data-action='${JSON.stringify({type:'place',id:space.id})}' ${state.phase!=='work'?'disabled':''} aria-disabled="${!q||!q.ok}"><strong>${space.name}</strong><small>${space.note}</small>${placed?`<span class="marker">${person(selected.kind)} ${state.lockedMember}</span>`:`<span class="tag">${q?q.text:'先选择成员'}</span>`}</button>`;}).join('')}</div>${state.phase==='return'?`<div class="receipt">本次取得：3 木<br>当前库存：3 木<br>待返还：1 木，仅限本次取得的种类</div><div class="controls">${button('返还 1 木',{type:'return'},true)}</div>`:''}${state.phase==='returned'?'<div class="receipt">完整取得 3 木 · 返还 1 木 · 库存净增 2 木</div>':''}<div class="controls">${button('查看成员规则',{type:'detail'},false,!selected)}${state.scene==='work'?button('演示普通局自动选人',{type:'ordinary'},false,state.phase!=='work'):''}</div>${state.details?`<div class="details">${selected.kind==='pale'?'白族可共用他人占据的石矿场并多得 1 石头，不能直接犁田或播种。独立卡牌附赠的犁田/播种仍按该效果处理。':selected.kind==='goblin'?'哥布林从累积格取得物品后，必须立即将其中 1 件退回公共供应。不能提前改成少拿。':'普通成员遵循一般行动规则。'}</div>`:''}</section><aside><section class="panel"><h3>我的农场</h3>${farm()}</section>${statePanel()}</aside>`;}
+function birth(){return `<section class="panel"><h3>本次新生儿 4</h3><p class="muted" style="margin-top:9px">此次抽牌只对应这名新生儿，无需也不能改选其他成员。</p>${members()}${state.phase==='draw'?`<div class="controls">${button('为新生儿 4 抽牌',{type:'draw'},true)}${button(state.noSite?'恢复有合法格':'演示无合法住所',{type:'no-site'})}</div>`:`<div class="card-preview"><h3>Elf · 精灵</h3><p>这名成员不占房间。为其选择一个固定住所，可养 1 只动物，不使用个人围栏。</p></div>`}<h3 style="margin-top:22px">选择精灵住所</h3>${farm()}</section><aside>${statePanel()}<section class="panel"><h3>公开身份如何显示</h3><p class="farm-note">成员栏：精灵 4 · 新生儿<br>住所：精灵 4 的住所 · 动物 0/1<br>以后行动格：玩家颜色 + 精灵标记 + 成员编号<br>派出精灵后，住所仍保留，不再显示成空地。</p></section></aside>`;}
+function minor(){const visible=state.view==='self'||state.played>0;return `<section class="panel"><h3>${state.scene==='birth'?'同一新生儿 4 的重抽结果':'本次生育 · 普通次发'}</h3><div class="controls">${button(state.view==='self'?'切换到其他玩家视角':'回到本人视角',{type:'view'})}</div><div class="card-preview"><h3>${visible?'演示次发':'私有次发 · 牌面隐藏'}</h3><p>${visible?'费用 1 木。此牌仅为界面占位数据，不对应真实卡牌。':'当前玩家正在决定留手或立即打出。'}</p></div>${state.phase==='minor'?`<div class="controls">${button('留在手中',{type:'minor',choice:'keep'},true,state.view!=='self')}${button('支付 1 木，立即打出',{type:'minor',choice:'play'},false,state.view!=='self')}</div>`:`<p>${state.view!=='self'&&state.hand?'该玩家手牌数增加 1，牌面保持隐藏。':state.message}</p>`}<div class="receipt">库存 ${state.wood} 木 · 本次新增手牌 ${state.hand} 张 · 本次打出 ${state.played} 张</div></section><aside>${statePanel()}</aside>`;}
+function feeding(){return `<section class="panel"><h3>成员供养需求</h3><p class="farm-note">本例已启用 Child’s Toy 与 Old Miser。下表是此次结算的最终要求。</p><div class="list">${state.members.map(m=>`<div class="row"><span>${person(m.kind)} ${m.name}<br><small>${m.status}</small></span><b>${m.stone?m.stone+' 石头':m.food+' 食物'}</b></div>`).join('')}<div class="row"><strong>合计</strong><b>3 食物 + 1 石头</b></div></div><div class="receipt">可用库存：${state.food} 食物 · ${state.stone} 石头<br>本次兑换加分：${state.points} 分</div><div class="controls">${state.phase==='harvest-start'?button('进入本人供养',{type:'feed-window'},true):button(state.phase==='fed'?'供养已完成':'支付 3 食物与 1 石头',{type:'feed'},true,state.phase!=='feeding'||state.food<3||state.stone<1)}</div></section><aside><section class="panel"><h3>石头人 · 收获共用额度 ${state.used}/2</h3><p class="farm-note">当前窗口：${state.phase==='harvest-start'?'收获开始':state.phase==='fed'?'供养完成':'本人供养'}。更换窗口或配方不重置次数。</p><div class="controls">${button('3 食物换 1 石头',{type:'exchange',recipe:'stone'},false,state.used>=2||state.food<3||state.phase==='fed')}${button('3 食物换 1 分',{type:'exchange',recipe:'point'},false,state.used>=2||state.food<3||state.phase==='fed')}</div>${state.used===2?'<p class="farm-note">本次收获的两次额度已用完。</p>':''}</section>${statePanel()}</aside>`;}
+function setup(){return `<section class="panel"><h3>创建两人游戏 · 扩展设置</h3><label class="toggle"><input type="checkbox" id="enable" ${state.enabled?'checked':''} ${state.phase!=='setup'?'disabled':''}>启用 Changelings 生灵</label><p>每次生育为本次新生儿抽取 1 张扩展牌。原版 5 种生灵与 5 张普通次发组成全桌共用的 10 张额外牌堆。</p><div class="receipt">${state.enabled?'启用生灵 · 两人共用 10 张<br>更多玩家仍共用 10 张，不按人数增加。':'本局暂未启用生灵。'}</div><div class="controls">${button('确认本局配置',{type:'create'},true,state.phase!=='setup')}</div></section><aside><section class="panel"><h3>牌堆准备与公开信息</h3><p class="farm-note">所有玩家发牌或选牌完成后，从已启用的普通次发池取 5 张未使用牌，不与手牌或其他牌堆重复。泥沼专属次发不加入。<br><br>局内公开剩余数量，未抽牌顺序不显示。抽完停止抽牌，生育照常。</p></section>${statePanel()}</aside>`;}
+function statePanel(){return `<section class="panel"><h3>当前状态</h3><div class="status-grid"><span>共用牌堆余牌</span><b>${state.deck} 张</b><span>当前查看</span><b>${state.view==='self'?'本人':'其他玩家'}</b><span>绑定 / 派出成员</span><b>${state.lockedMember??(state.scene==='birth'?state.members[0].name:'未提交')}</b><span>个人围栏消耗</span><b>0</b></div><ol class="log">${state.log.length?state.log.map(item=>`<li>${esc(item)}</li>`).join(''):'<li>尚无已完成操作</li>'}</ol></section>`;}
+function guide(){const scene=demo.scenes[state.scene];return `<section class="panel guide"><h3>引导体验</h3><ol>${scene.steps.map((step,i)=>`<li ${i===state.step?'class="selected-label"':''}>${step}</li>`).join('')}</ol><div class="controls">${button(state.step>=scene.steps.length?'引导完成，可重置重试':'执行下一步引导',{type:'guide'},true,state.step>=scene.steps.length)}${button('重置当前场景',{type:'reset'})}</div></section>`;}
+function guided(){const scene=state.scene,step=state.step;if(step===0)state=demo.start(scene);let actions=[];
+  if(scene==='work')actions=[[{type:'select',id:'p3'}],[{type:'place',id:'plow'}],[{type:'select',id:'n1'}],[{type:'select',id:'p3'},{type:'place',id:'quarry'}]][step];
+  if(scene==='birth')actions=[[{type:'draw'}],[{type:'residence',tile:2}],[{type:'detail'}]][step];
+  if(scene==='minor')actions=[[{type:'view'}],[{type:'view'}],[{type:'minor',choice:'keep'}]][step];
+  if(scene==='goblin')actions=[[{type:'place',id:'wood'}],[{type:'return'}],[{type:'detail'}]][step];
+  if(scene==='feeding')actions=[[{type:'exchange',recipe:'stone'}],[{type:'feed-window'}],[{type:'exchange',recipe:'point'}],[{type:'feed'}]][step];
+  if(scene==='setup')actions=[[{type:'enable'}],[{type:'create'}]][step];
+  for(const action of actions??[])state=demo.transition(state,action);state.step++;render();
+}
+function render(){const scene=demo.scenes[state.scene];$('#tabs').innerHTML=Object.entries(demo.scenes).map(([id,s])=>`<button role="tab" aria-selected="${id===state.scene}" data-scene="${id}">${s.name}</button>`).join('');
+  const body=state.phase==='minor'||state.phase==='minor-done'?minor():state.scene==='birth'?birth():state.scene==='feeding'?feeding():state.scene==='setup'?setup():work();
+  $('#app').innerHTML=`<div class="topline"><h2>${scene.name}</h2><span class="pill">两名玩家 · 固定演示状态</span></div><div class="notice" role="status">${esc(state.message)}</div><div class="layout">${body}</div>${guide()}`;
+  document.querySelectorAll('[data-action]').forEach(el=>el.addEventListener('click',()=>{const action=JSON.parse(el.dataset.action);action.type==='guide'?guided():dispatch(action);}));
+  document.querySelectorAll('[data-scene]').forEach(el=>el.addEventListener('click',()=>{state=demo.start(el.dataset.scene);const url=new URL(location.href);url.searchParams.set('scene',state.scene);history.replaceState(null,'',url);render();}));
+  $('#enable')?.addEventListener('change',()=>dispatch({type:'enable'}));
+}
+render();
+</script>
+</body>
+</html>
