@@ -1,0 +1,109 @@
+name: Candidate Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Full candidate commit SHA; must match the dispatch ref
+        required: true
+        type: string
+      tasks:
+        description: Complete verification task IDs, comma-separated, or all
+        default: all
+        type: string
+  workflow_call:
+    inputs:
+      candidate_sha:
+        required: true
+        type: string
+      tasks:
+        default: all
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-${{ github.sha }}-${{ inputs.tasks }}
+  cancel-in-progress: false
+
+jobs:
+  manifest:
+    name: candidate-manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.manifest.outputs.sha }}
+      configuration: ${{ steps.manifest.outputs.configuration }}
+      matrix: ${{ steps.manifest.outputs.matrix }}
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate candidate manifest
+        id: manifest
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_TASKS: ${{ inputs.tasks }}
+        run: pnpm exec tsx scripts/ci/candidate-verification.ts manifest --sha "$CANDIDATE_SHA" --tasks "$CANDIDATE_TASKS"
+      - name: Candidate manifest / ${{ steps.manifest.outputs.binding }}
+        run: echo 'Candidate identity and verification configuration are bound'
+
+  task:
+    needs: manifest
+    name: candidate / ${{ matrix.task }} / ${{ needs.manifest.outputs.configuration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.manifest.outputs.matrix) }}
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.manifest.outputs.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install browsers
+        if: startsWith(matrix.task, 'chromium-') || matrix.task == 'browser-sandbox' || matrix.task == 'webkit'
+        env:
+          VERIFICATION_TASK: ${{ matrix.task }}
+        run: |
+          if [ "$VERIFICATION_TASK" = webkit ]; then
+            pnpm exec playwright install --with-deps webkit
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
+      - name: Verify candidate checkout
+        env:
+          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
+        run: pnpm exec tsx scripts/ci/candidate-verification.ts source --sha "$CANDIDATE_SHA"
+      - name: Execute verification task
+        env:
+          CANDIDATE_SHA: ${{ needs.manifest.outputs.sha }}
+          VERIFICATION_TASK: ${{ matrix.task }}
+          GH_TOKEN: ${{ github.token }}
+          REPLAY_VIEWER_ROOT: ${{ runner.temp }}/replay-viewers
+        run: pnpm exec tsx scripts/ci/candidate-verification.ts run-task "$VERIFICATION_TASK" --sha "$CANDIDATE_SHA"
+      - name: Retain verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.task }}
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            output/verification/**
+            output/playwright/**/session-lifecycle.json
+            output/playwright/**/session-failure.json
