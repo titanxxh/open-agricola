@@ -198,7 +198,7 @@ for (const { width, height } of [{ width: 1920, height: 1080 }, { width: 390, he
   await other.close()
 })
 
-test('four browser tools preserve protocol through UT repair and explicit allowance continuation', async ({ page }) => {
+test('four browser tools preserve protocol through UT repair beyond eight model requests', async ({ page }) => {
   test.setTimeout(90_000)
   const user = await createLocalUserForTests(`loop_${Date.now().toString(36)}`, 'loop-test-password')
   const cookie = await createSession(user.id)
@@ -246,15 +246,11 @@ test('four browser tools preserve protocol through UT repair and explicit allowa
       intent: { kind: 'generate', message: 'Cost 2 wood; gain 2 food when played.' },
     })
     const attempt = new GenerationAttempt(request, createBrowserGenerationPorts({ provider: 'deepseek', model: 'deepseek-flash', apiKey: modelKey }, (path: string, init?: RequestInit) => fetch(path, { ...init, credentials: 'include' })))
-    const paused = await attempt.start()
-    const withoutConsent = await attempt.resume()
-    const completed = await attempt.resume({ extendAllowance: true })
-    return { paused, withoutConsent, completed }
+    const completed = await attempt.start()
+    return { completed }
   }, { cardId, modelKey })
   expect(posts).toBe(9)
   expect(preservedProtocol).toBe(true)
-  expect(evidence.paused).toMatchObject({ status: 'paused', needsAllowance: true, modelRequests: 8, candidate: { sourceCode: source(2), testing: { lastRun: { outcome: { kind: 'passed', count: 1 } } } } })
-  expect(evidence.withoutConsent).toMatchObject({ status: 'paused', modelRequests: 8 })
   expect(evidence.completed).toMatchObject({ status: 'completed', referenceCommit, modelRequests: 9, referenceCalls: 6,
     candidate: { sourceCode: source(2), cardJson: { id: cardId, cost: { wood: 2 } }, validation: { valid: true }, testing: { code: foodTests(cardId, 2), lastRun: { outcome: { kind: 'passed', count: 1 } } } }, result: { kind: 'candidate', message: '' },
   })

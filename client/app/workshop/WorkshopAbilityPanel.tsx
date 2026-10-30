@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useLocale } from '../../contexts/LocaleContext'
 import type { LlmConfig } from '../../services/llm'
 import { getBrowserTestRuntimeId, runBrowserCardTests } from '../../local-sandbox/card-tests'
-import { GenerationAttempt, ATTEMPT_ALLOWANCE, type AttemptSnapshot } from '../../services/llm/generation/attempt'
+import { GenerationAttempt, type AttemptSnapshot } from '../../services/llm/generation/attempt'
 import { createBrowserGenerationPorts, createSandboxPorts } from '../../services/llm/generation/browser'
 import { buildGenerationRequest, matchesGenerationIdentity, type GenerationIntent, type GenerationRequest, type PlaytestFailure } from '../../services/llm/generation/request'
 import type { WorkshopVisibleMessage } from '../../../shared/contract/workshop-generation'
@@ -168,7 +168,7 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
       setError(translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.the_input_or_source_changed_start_a_b7fe31"))
       return
     }
-    await acceptResult(run, await run.attempt.resume({ extendAllowance: progress?.needsAllowance, retry: Boolean(progress?.retry) }))
+    await acceptResult(run, await run.attempt.resume({ retry: Boolean(progress?.retry) }))
   }
 
   const stop = async () => {
@@ -252,13 +252,12 @@ export function WorkshopAbilityPanel({ state, config, apiFetch, dispatch, checkp
       {activeRequest && <p className="form-hint">{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.fixed_input_for_this_attempt_670013")}: {activeRequest.input.intent.kind === 'repair'
         ? `${translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.playtest_version_37fd1d")} ${activeRequest.input.intent.failure.versionId.slice(0, 10)}`
         : activeRequest.sourceCandidate ? (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.selected_candidate_source_54109c")) : (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.adopted_draft_6101e6"))} · {activeRequest.input.sourceFingerprint?.slice(0, 12) ?? (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.no_source_yet_3bb1af"))}</p>}
-      <p>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.model_requests_249d90")} {progress.modelRequests} / {progress.allowance.modelRequests} · {translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.references_9d957c")} {progress.referenceCalls}</p>
+      <p>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.model_requests_249d90")} {progress.modelRequests} · {translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.references_9d957c")} {progress.referenceCalls}</p>
       <p className="form-hint">{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.input_output_tokens_2ebef1")}: {progress.usage.inputTokens ?? (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.unknown_82d553"))} / {progress.usage.outputTokens ?? (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.unknown_82d553"))}</p>
       {progress.reason && <p>{progress.reason}</p>}
       {progress.status === 'paused' && <>
-        {progress.needsAllowance && <p>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.model_requests_249d90")}: +{ATTEMPT_ALLOWANCE.modelRequests} · 5 min</p>}
         {progress.retry === 'model' && <p>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.usage_of_the_previous_request_may_be_cb870a")}</p>}
-        <button type="button" className="aicw-button" onClick={() => { void resume() }}>{progress.needsAllowance ? (progress.retry === 'model' ? (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.add_allowance_and_retry_request_c6a247")) : (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.add_allowance_and_continue_ac02f5"))) : (translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.retry_this_step_7e6405"))}</button>
+        <button type="button" className="aicw-button" onClick={() => { void resume() }}>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.retry_this_step_7e6405")}</button>
       </>}
       {live && <button type="button" className="aicw-button" onClick={() => { void stop() }}>{translateMessage(locale, "ui.copy.app_workshop_WorkshopAbilityPanel.stop_attempt_56ddbc")}</button>}
     </section>}
