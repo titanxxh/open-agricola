@@ -28,11 +28,21 @@
 
 `scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据；较新的失败会使该任务的旧成功失效。本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
 
-该工作流也支持复用以在合入前执行。正式发布证据要求在准确候选提交上执行其专用手动工作流。新增此入口不会移除日常 CI 门禁。
+该工作流也支持复用以在合入前执行。只有所有选中的 matrix 任务成功后，完成 job 才输出任务 ID 和实际检出提交。正式发布证据要求在准确候选提交上执行其专用手动工作流。
+
+## 日常范围验证
+
+`scripts/ci/verification-plan.ts` 独立发现测试归属，包含完整分支差异、rename 两侧和实际检出变化。未知归属与共享配置扩大到完整任务清单。普通说明文档选择文档约束测试，运行时可读文档保留所属业务范围。
+
+`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。消费者缺失或前端模块未知时扩大到全量。工坊、卡牌与后端在具备有界映射前保留全量后备。
+
+`scripts/ci/scoped-verification.ts` 计算并执行 canonical plan。执行前重新计算计划，核对 digest 与源码身份，将文件名和 selector 作为进程参数传入。浏览器检查调用 `pnpm verify`，保留隔离依赖、`restart-local.sh` 和结构化 case 结果。执行记录与计划摘要属于日常证据，不能充当完整发布回执。
+
+`ci.yml` 在规划、inline 文件与浏览器检查、可复用 catalog 任务之后始终评估必需的 `verify` job。`scripts/ci/routine-verification-gate.ts` 要求所有选中分支在同一计划与检出上完成。选中任务缺失、失败、取消、跳过或不完整都会失败；未选中分支必须跳过。公共边界测试位于 `scripts/__tests__/` 下的 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
 
 ## 架构门禁
 
-`pnpm run check:architecture` 是唯一的架构门禁，每个 CI workflow 调用一次。它运行架构脚本、契约类型检查、经 `check:architecture-tests` 的契约测试，以及沙盒 prompt / 文档同步。检查保持简单：它们捕捉 agent 与开发者的常见错误，不防御刻意绕过，每条诊断都必须可操作。
+`pnpm run check:architecture` 持有架构检查声明。quality 任务读取其中的生产扫描器、类型检查和 lint 命令；测试属于各 Vitest 组。聚合命令也通过 `check:architecture-tests` 运行契约测试和沙盒 prompt、文档检查。各扫描器捕捉 agent 与开发者的常见错误，并提供可操作的诊断。
 
 | 不变量 | 可执行覆盖 | 限制 |
 |---|---|---|
@@ -48,7 +58,7 @@
 | 文档预算 | `scripts/__tests__/docs-budget.test.ts` | Workshop 可读的每份文档都不超过 `REFERENCE_LIMITS.fileBytes`；架构索引 ≤ 16 KiB，每份 module 文档 ≤ 32 KiB，不出现卡牌 ID |
 | 生成目录与 Card Source 一致 | `pnpm run check:generated-cards-sync` | 结构相等 |
 | `GameSession` 持有命令 seam | `CONTEXT.md`、ADR 0014、review 与分层错误 | 是归属关系，不是全程序修改证明 |
-| 架构门禁接线 | `pnpm run check:architecture`、`scripts/__tests__/ci-card-impl-boundaries.test.ts` | 两个 CI workflow 各调用一次聚合命令；prepush 执行同一生产卡牌扫描；契约反例通过 `check:architecture-tests` 执行；必需检查遵循 `docs/operations/ci-checks.md` |
+| 架构门禁接线 | `pnpm run check:architecture`、`scripts/ci/verification-tasks.ts`、`scripts/__tests__/ci-card-impl-boundaries.test.ts` | 范围 CI 选择 canonical task 并始终评估 `verify`；quality 保留生产扫描器；契约反例属于各 Vitest 组；必需检查遵循 `docs/operations/ci-checks.md` |
 
 优先使用源码发现、文件清单、导入边界与小型语法检查。扫描器复用 `scripts/source-files.ts`；必需的根缺失或为空、解析错误或不支持的条目都会失败，不再匹配任何已识别写入的具名豁免视为过期。没有具体的仓库用例，不要把检查器扩展成符号或数据流引擎。
 
