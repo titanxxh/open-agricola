@@ -7,7 +7,7 @@ import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/A/A093_BedMaker'
 import '../../shared/cards/A/A171_Sidekick'

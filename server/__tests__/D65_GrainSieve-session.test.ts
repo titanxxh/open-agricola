@@ -6,7 +6,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D065_GrainSieve'
 import type { ActionFlow } from '../../shared/contract/types'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import assert from 'node:assert/strict'
 import * as audit40Crops from './_helpers/audit/ae-negative-40-crops'
 

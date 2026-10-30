@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/D/D004_CrossCutWood'
 import '../../shared/cards/D/D076_SocialBenefits'

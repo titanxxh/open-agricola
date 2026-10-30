@@ -15,26 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  llm-cards-record:
-    if: github.event_name == 'workflow_dispatch' || github.event.repository.private == false
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      - name: Enable pnpm
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: LLM card-gen (record mode)
-        run: pnpm test:llm
-
   verify:
     if: github.event_name == 'workflow_dispatch' || github.event.repository.private == false
     runs-on: ubuntu-latest

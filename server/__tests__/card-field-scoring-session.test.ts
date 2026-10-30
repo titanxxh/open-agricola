@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { getLogicalFields } from '../../shared/cards/helpers/card-field'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { createWorkSession } from './_helpers/session-fixtures'
 
 const CARDS = [

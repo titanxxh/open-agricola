@@ -102,8 +102,7 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow).not.toContain('secrets.')
     expect(workflow).toContain('group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}')
 
-    const jobCount = name === 'ci.yml' ? 2 : 1
     expect(workflow.match(/if: github.event_name == 'workflow_dispatch' \|\| github.event.repository.private == false/g))
-      .toHaveLength(jobCount)
+      .toHaveLength(1)
   })
 })

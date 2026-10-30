@@ -165,9 +165,7 @@ Tests and reports remain private to candidates and the current draft. They do no
 
 #### C1.4 Quality and cost acceptance
 
-`tests/llm-card-gen/fixtures/` owns the 11 fixed requests and Session assertions; `runner.test.ts` evaluates historical recordings and unmodified tool-written sources. Owner-local quality runs generate three repetitions per case and retain first/final source files, then invoke those same assertions. Models may repair using their authored browser tests; fixed-case verdicts are never fed back to the model and failed samples are not replaced. This quality suite does not enable or block product model choices. Historical model acceptance remains evidence for that frozen batch only.
-
-Reports stay under ignored `output/tmp/`. The cumulative US$20 ledger and owner-local restriction on paid calls remain. See the [LLM test guide](test/llm-card-gen.md#browser-tool-acceptance).
+Local Codex acceptance exercises a tool round trip; see the [LLM test guide](test/llm-card-gen.md).
 
 #### C1.5 Editor interactions
 
@@ -189,7 +187,7 @@ The model reads source, engine consumers, and direct or Session tests from GitHu
 
 `write_artifacts` writes the complete `CARD_ID` / `CARD_DEF` / `CARD_IMPL` source and ordinary TypeScript behavior tests together. `run_tests` returns source-validation and browser-UT feedback for the model to inspect and repair. Source or test edits invalidate the matching report. The final response is ordinary text; source is obtained from tool-written artifacts. A clarification or unsupported request can finish without a candidate.
 
-[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) directly covers timing and payment behavior. Fixed model-quality fixtures, recordings, and the owner-run budget remain in [`llm-card-gen.md`](test/llm-card-gen.md).
+[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) directly covers timing and payment behavior. Local model acceptance is described in [`llm-card-gen.md`](test/llm-card-gen.md).
 
 ### C3. Multi-turn conversation
 

@@ -5,7 +5,7 @@ import { getRoundPersonPlacementDetails } from '../../shared/cards/helpers/round
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/D/D038_MilkingStool'
 import '../../shared/cards/D/D039_TruffleSlicer'

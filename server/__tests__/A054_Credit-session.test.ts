@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 
 import '../../shared/cards/A/A054_Credit'
 import assert from 'node:assert/strict'

@@ -9,13 +9,13 @@ Read this document if you maintain:
 - AI system prompts: `client/services/llm/generation/prompt.ts` includes the deployed Workshop Capability Contract returned by `server/workshop-sandbox-contract.ts`. The format-2 contract contains deployed capability names, runtime identity, and limits. The model reads source, tests, and this reference from GitHub on demand.
 - Workshop UI copy in `client/app/workshop/AiCardDesigner.tsx` or `WorkshopPage.tsx`.
 - Sandbox references in [`docs/architecture/shared-other.md`](architecture/shared-other.md) and [`docs/architecture/server.md`](architecture/server.md).
-- LLM automation in `docs/test/llm-card-gen.md`, whose fixtures exercise this contract against a real model.
+- Local model acceptance in `docs/test/llm-card-gen.md`.
 
 When this document changes:
 
 1. Keep the source links current. The deployed Workshop Capability Contract derives capability names from source constants.
 2. Make the architecture module documents point here instead of maintaining another copy.
-3. Cover execution changes with executor, parity, and two-player Session tests. Owner-run model quality evaluation follows `docs/test/llm-card-gen.md` and requires an approved budget.
+3. Cover execution changes with executor, parity, and two-player Session tests. Local model acceptance follows `docs/test/llm-card-gen.md`.
 
 Official card authors working in `shared/cards/<deck>/<id>.ts` are not subject to this sandbox. They may import project helpers directly. This contract applies only to Workshop custom cards.
 
@@ -641,7 +641,7 @@ Architecture documents and UI guidance link to this reference instead of maintai
 
 ### 9.2 Execution changes
 
-Update the relevant executor, parity, and two-player Session tests when payment behavior, hook arguments, JSON boundaries, or injected helpers change. [`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) exercises timing and payment directly. Capability names need the fixed behavior coverage required by ADR 0025. Model quality evaluation and its existing owner-approved budget remain in [`llm-card-gen.md`](test/llm-card-gen.md).
+Update the relevant executor, parity, and two-player Session tests when payment behavior, hook arguments, JSON boundaries, or injected helpers change. [`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) exercises timing and payment directly. Capability names need the fixed behavior coverage required by ADR 0025. Local model acceptance is described in [`llm-card-gen.md`](test/llm-card-gen.md).
 
 ### 9.3 Workshop Capability Contract rules
 

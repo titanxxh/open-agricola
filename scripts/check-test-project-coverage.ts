@@ -5,8 +5,6 @@ import { globSync } from 'glob'
 import {
   BASE_EXCLUDE,
   SLOW_INCLUDE,
-  SHARED_EXCLUDE,
-  LLM_INCLUDE,
   FAST_PROJECT_GLOBS,
 } from './test-project-globs'
 
@@ -34,7 +32,7 @@ const discovered = new Set(expand(['**/*.{test,spec}.{ts,tsx,js,jsx,mts,mjs,cts,
 const byProject = new Map<string, string[]>()
 const union = new Set<string>()
 
-for (const project of [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: SHARED_EXCLUDE }, { name: 'llm', include: LLM_INCLUDE, exclude: BASE_EXCLUDE }]) {
+for (const project of [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: BASE_EXCLUDE }]) {
   for (const file of expand(project.include, project.exclude)) {
     union.add(file)
     byProject.set(file, [...(byProject.get(file) ?? []), project.name])
@@ -48,7 +46,7 @@ const duplicates = [...byProject.entries()]
   .sort(([a], [b]) => a.localeCompare(b))
 
 if (missing.length === 0 && extra.length === 0 && duplicates.length === 0) {
-  console.log(`[check:test-project-coverage] ok (${discovered.size} test files across fast, slow and llm)`)
+  console.log(`[check:test-project-coverage] ok (${discovered.size} test files across fast and slow)`)
   process.exit(0)
 }
 

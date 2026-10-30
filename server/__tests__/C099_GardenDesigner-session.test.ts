@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 

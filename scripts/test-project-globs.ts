@@ -8,13 +8,10 @@ export const SLOW_INCLUDE = [
   'server/__tests__/[A-E][0-9]*_*-session.test.ts',
   'server/__tests__/M[0-9]*_*-session.test.ts',
 ]
-export const LLM_GLOB = 'tests/llm-card-gen/**'
-export const LLM_INCLUDE = ['tests/llm-card-gen/**/*.test.ts']
 export const BASE_EXCLUDE = isInsideWorktree
   ? BASE_DEFAULT_EXCLUDE
   : [...BASE_DEFAULT_EXCLUDE, '.worktree/**']
-export const SHARED_EXCLUDE = [...BASE_EXCLUDE, LLM_GLOB]
-export const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
+export const FAST_EXCLUDE = [...BASE_EXCLUDE, ...SLOW_INCLUDE]
 
 export const FAST_SHARED_INCLUDE = [
   'shared/**/*.test.ts',
@@ -59,7 +56,6 @@ export const FAST_SERVER_INCLUDE = [
 
 export const FAST_SCRIPTS_INCLUDE = ['scripts/**/__tests__/*.test.ts']
 export const FAST_TESTS_INCLUDE = ['tests/**/*.test.ts']
-export const FAST_TESTS_EXCLUDE = [...FAST_EXCLUDE, LLM_GLOB]
 
 export type TestProjectGlob = {
   name: string
@@ -89,6 +85,6 @@ export const FAST_PROJECT_GLOBS: TestProjectGlob[] = [
   {
     name: 'fast-tests',
     include: FAST_TESTS_INCLUDE,
-    exclude: FAST_TESTS_EXCLUDE,
+    exclude: FAST_EXCLUDE,
   },
 ]

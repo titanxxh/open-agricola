@@ -3,7 +3,7 @@ import { clearCustomCards } from '../../shared/cards/custom-registry'
 import type { GameState } from '../../shared/contract/types'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { GameSession } from '../game/authoritative-session'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { COUNT_LEAF_SOURCE, compileContractCard, createRoundTenSession } from './_helpers/workshop-contract-card'
 

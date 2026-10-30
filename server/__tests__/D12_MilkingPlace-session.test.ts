@@ -5,7 +5,7 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D012_MilkingPlace'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import assert from 'node:assert/strict'
 import { assertRejectedUnchanged } from './_helpers/negative-rule-audit'
 import * as audit27Milking from './_helpers/audit/ae-negative-27-milking'

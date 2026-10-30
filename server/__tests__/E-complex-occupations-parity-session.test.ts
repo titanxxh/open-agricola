@@ -9,7 +9,7 @@ import {
 } from '../../shared/domain/player'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import type { Field } from '../../shared/contract/types'
-import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { autoAdvanceRoundEnd } from './_helpers/round-end'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import {
   resolveNonSkipChoice,

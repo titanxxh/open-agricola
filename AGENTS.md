@@ -24,9 +24,6 @@ pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 只跑 fast project（CI 默认）
 pnpm test:slow              # 只跑 slow project（单卡 session 测试）
-pnpm test:llm               # 固定卡牌测试、历史 golden 与账本回归，不调 API，进 CI
-pnpm test:llm:dry           # 专用本地环境的固定 case 合成浏览器演练，不调付费 API
-pnpm test:llm:live --model <id> # 已确认模型/预算后的完整浏览器验收，保存独立批次
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm verify focus <file.test.ts> # 调试期间定向 Vitest，不启动应用
 pnpm verify prepush         # 全卡实现边界扫描 + 工具类型检查 + 完整 fast + lint，记录源码指纹与结果
@@ -114,7 +111,7 @@ Session 测试默认 2 人，复用 `server/__tests__/_helpers/session-fixtures.
 
 <important if="修改工坊生成流程、prompt 或模型准入">
 
-先读 `docs/test/llm-card-gen.md`，遵循固定测试入口、费用账本与本地产物要求。
+先读 `docs/test/llm-card-gen.md`，遵循本地验收与产物边界。
 
 </important>
 

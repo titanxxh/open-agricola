@@ -18,7 +18,7 @@
 - 不要用 DOM 结构、按钮文案或页面结构证明规则；渲染另用 E2E 测试。
 - 发布验证在隔离 Hosted 前端和显式配置的目标上复用 `scripts/release/` 中的同一浏览器流程。持久化检查使用 PostgreSQL 适配器和 Room／创建配置 codec。`release-rehearsal.spec.ts` 验证真实应用整合，`release-diagnostics.spec.ts` 与 `release-rendering.spec.ts` 验证传输、脱敏和素材就绪；入口见[CI 操作](../operations/ci-checks.md)。
 - 必需浏览器 case 显式声明，并与绑定源码指纹及 requirements hash 的不可变 reporter 证据匹配。reviewer 决定场景范围，`scripts/verify.ts` 和 `verification-requirements.ts` 检查执行是否完整。诊断仅保留有界元数据，首个失败与清理错误分别存储。
-- Vitest project 为 `fast-shared`、`fast-cards`、`fast-card-runtime`、`fast-client`、`fast-server`、`fast-scripts`、`fast-tests`、`slow` 与 `llm`。`pnpm test:fast` 先运行 `check:test-project-coverage`，要求每个测试文件恰好属于一个 project。命令与验证记录见 [`AGENTS.md`](../../AGENTS.md) 与 [`docs/operations/ci-checks.md`](../operations/ci-checks.md)。
+- Vitest project 为 `fast-shared`、`fast-cards`、`fast-card-runtime`、`fast-client`、`fast-server`、`fast-scripts`、`fast-tests` 与 `slow`。`pnpm test:fast` 先运行 `check:test-project-coverage`，要求每个测试文件恰好属于一个 project。命令与验证记录见 [`AGENTS.md`](../../AGENTS.md) 与 [`docs/operations/ci-checks.md`](../operations/ci-checks.md)。
 - 序列化的展示投影（`lockedFarmTileKeys`、`playerPanelSummary`、`moorSpecialActionAvailability`、卡牌状态展示、动物区、特殊马厩）在所属 Session 上下文中派生，rehydrate 时剥离；纯视角过滤位于 `shared/projections/serialized-state.ts`。新增字段只做加法，已有的 Replay Viewer build 与 payload 保持不变。
 - 优先直接调用 `GameSession` 方法；`/api/game/*` 或 WebSocket 消息用于黑盒契约。断言资源、已打出的卡、`cardStates`、行动格、`pending` / `interaction`、`log` 与 `scores`。
 

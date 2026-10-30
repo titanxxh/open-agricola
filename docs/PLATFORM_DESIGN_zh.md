@@ -171,9 +171,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 #### C1.4 质量与成本验收
 
-`tests/llm-card-gen/fixtures/` 保存 11 个固定题面和 Session 断言，`runner.test.ts` 验证历史录音及未经修改的工具写入源码。owner 本机质量运行每题生成 3 次，保存首次与最终源码，再调用相同断言。模型可依据自己编写的浏览器测试修复，但固定判题结果不回传模型，也不替换失败样本。这套质量测试不再决定产品允许使用哪些模型，历史验收仅证明当时冻结批次的结果。
-
-报告保存在已忽略的 `output/tmp/`。累计 20 美元账本及付费调用仅限 owner 本机的限制继续生效，详见 [LLM 测试指南](test/llm-card-gen.md#browser-tool-acceptance)。
+本地 Codex 验收覆盖工具往返，详见 [LLM 测试指南](test/llm-card-gen.md)。
 
 #### C1.5 编辑器交互
 
@@ -195,7 +193,7 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 `write_artifacts` 同时写入完整的 `CARD_ID` / `CARD_DEF` / `CARD_IMPL` 源码与普通 TypeScript 行为测试。`run_tests` 返回源码校验和浏览器 UT 结果，模型据此检查和修复。修改源码或测试后，对应报告失效。最终回复为普通文本，源码来自工具写入的产物。澄清或不支持的请求可以不产生候选。
 
-[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) 直接覆盖时序和支付行为。固定模型质量题库、录音和 owner 运行预算保留在 [`llm-card-gen.md`](test/llm-card-gen.md)。
+[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) 直接覆盖时序和支付行为。本地模型验收见 [`llm-card-gen.md`](test/llm-card-gen.md)。
 
 ### C3. 多轮对话设计
 
