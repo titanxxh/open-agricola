@@ -12,7 +12,7 @@ const draft = {
   effectCode: 'adopted source', artUrl: null, generation: {},
 } satisfies WorkshopDraftContract
 const request = () => buildGenerationRequest({ workspaceId: 'workspace', baseRevision: 1, draft, intent: { kind: 'generate', message: 'gain food' }, attemptId: 'attempt', now: 1 })
-const contract: WorkshopSandboxContract = { format: 1, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: {}, listeners: { actions: [], phases: {}, scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, actions: {}, helpers: '', semantics: [] }
+const contract: WorkshopSandboxContract = { format: 2, id: 'sandbox-v1:' + 'a'.repeat(64), runtime: 'server-isolated-vm', limits: { memoryLimitMb: 8, executionTimeoutMs: 100 }, effects: [], listeners: { actions: [], phases: [], scopes: [], players: { actor: 'player', owner: 'ownerPlayer', effectRecipient: 'effectPlayer' } }, actions: [] }
 const source = 'const CARD_ID="CUSTOM_Test"; const CARD_DEF={}; const CARD_IMPL={}'
 const tests = "test('gain', () => expect(1).to.equal(1))"
 const call = (name: string, args: unknown = {}, id = name): ToolCall => ({ id, type: 'function', function: { name, arguments: JSON.stringify(args) } })

@@ -187,94 +187,15 @@ opaque sandboxed iframe 在禁止联网的 CSP 内创建新的 Blob Worker。`cl
 
 原始单文件资产保留在独立的 `prototype/llm-tool-loop-interaction` 分支；提交、路径和浏览器观察记录在决策票中。它使用模拟响应和源码摘要，不能证明模型准入、规则行为或生产持久化已经完成。场景引导控件与状态转换代码属于可丢弃原型。`WorkshopAbilityPanel` 通过生产请求/结果契约实现这些交互。试玩修复读取实际固定版本的源码，并检查当前沙盒绑定，不会替换成另一个选中候选。
 
-### C2. 系统提示词设计
+### C2. 系统提示词与参考资料
 
-精简提示词位于 `client/services/llm/generation/prompt.ts`，定义任务、不可变输入、资料工具、信任边界和输出格式，并附上实际部署的工坊能力契约。契约从共享真源派生 hook/listener/action 元数据，提供准确的注入 helper。运行时标识与资料 commit 分别记录。
+精简提示词位于 [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts)，定义任务、不可变卡牌身份、信任边界与四个工具：`search_references`、`read_reference`、`write_artifacts` 和 `run_tests`。已部署的 format-2 工坊能力契约提供能力名称数组、运行时标识和执行限制。运行时标识与资料 commit 分别记录。
 
-契约包含 ActionFlow 节点结构，以及引擎调度的未来奖励与卡上存储资源的区别。可静态识别的错误组合节点在试玩前即校验失败，进入与其他编译错误相同的有界修复流程；这不等于完整的类型或行为证明。
+模型从本次尝试固定 commit 的 GitHub 资料读取源码、引擎消费者及直接行为或 Session 测试。[`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) 说明执行边界，并链接源码白名单和注入 helper。站点不另存少样本语料或能力描述 map。
 
-模型按需从 GitHub 读取本次尝试固定 commit 的样例和详细文档，资料集不打包进站点提示词。
+`write_artifacts` 同时写入完整的 `CARD_ID` / `CARD_DEF` / `CARD_IMPL` 源码与普通 TypeScript 行为测试。`run_tests` 返回源码校验和浏览器 UT 结果，模型据此检查和修复。修改源码或测试后，对应报告失效。最终回复为普通文本，源码来自工具写入的产物。澄清或不支持的请求可以不产生候选。
 
-#### 输出格式
-
-源码回复**必须**包含且只包含一个完整 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）。`CARD_DEF` 只接受对象格式，不兼容 `new MinorImprovement(...)` / `new Occupation(...)`：
-
-```typescript
-const CARD_ID = 'CUSTOM_英文驼峰名'
-
-const CARD_DEF = {
-  cardType: 'minor',            // 或 'occupation'
-  meta: {
-    id: CARD_ID,
-    name: 'Card Name',          // 英文，与内置卡风格一致
-    deck: 'CUSTOM',
-    number: 0,
-    desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
-    cost: { wood: 1 },
-    vp: 0,
-    implemented: true,
-    locales: {
-      zh: { name: '卡牌中文名', desc: ['中文描述'] },
-    },
-  },
-}
-
-const CARD_IMPL = {
-  effect: {
-    id: CARD_ID,
-    onRoundStart: (state, player) => gainLeaf(CARD_ID, { food: 1 }),
-  },
-  listeners: [
-    {
-      cardIds: [CARD_ID],
-      actions: ['plow'],
-      phases: ['after'],
-      handler: (context) => ({ flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }),
-    },
-  ],
-}
-```
-
-澄清和能力缺口改为返回含 `kind` 与 `message` 的结构化 JSON，不附源码。
-
-#### 关键规则（prompt 硬性约束）
-
-- `CARD_ID` 必须以 `"CUSTOM_"` 开头，英文驼峰
-- `deck` 固定 `'CUSTOM'`，`number` 固定 `0`，`implemented` 固定 `true`
-- 禁止 `import` / `export` / `require` / `registerCardEffect` / `registerCardListener`
-- 禁止 `class`、generator、`with`、`eval`、`Function`、`fetch` 等
-- 保持传入的卡牌身份与名称；规则说明和前置条件使用英文并提供完整 `locales.zh`，编辑时除明确要求修改外保留原有双语信息
-- 即使只做小修改，也要重新输出完整代码
-
-#### effect hook（`CARD_IMPL.effect`）
-
-常用触发点：`onBuy`、`onRoundStart`、`onRoundEnd`、`onAllWorkersPlaced`、`onReturnHome`、`onHarvestFieldPhase`、`onBeforeEndGame`、`computeBonusScore` 等（完整列表见源文件）。
-
-签名：`(state, player) => ActionFlow | void`（`onBuy` 额外接收 `paymentInfo`）。
-
-#### listener 机制（`CARD_IMPL.listeners`）
-
-监听行动触发：可用 `phases` 包括 `before`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`、`anytime`、`computeChoiceCandidates`。权威白名单见 `shared/custom-code/sandbox-listener-phases.ts`；新源码和已保存的可执行 manifest 均须使用支持的阶段。
-
-可用 `scope`：`player`、`opponent`、`any`；权威白名单见 `shared/custom-code/sandbox-listener-scopes.ts`。
-
-可监听的 `actions` 权威白名单见 `shared/custom-code/sandbox-listener-actions.ts`；prompt、AST validator 与 server/browser manifest 共用该列表。主要或次要改良购买统一使用 `improvement`。
-
-#### 可用 actionId（ActionFlow leaf）
-
-移动物品和写卡牌状态的 9 个：`gain`、`pay`、`bonus-vp`、`bake-bread`、`store-on-card`、`take-from-card`、`push-to-card-stack`、`special-effect`、`future-meeples`。为效果玩家执行原生农场、卡牌或先手行动的 16 个：`plow`、`sow`、`fence`、`stables`、`construct`、`renovate-house`、`improvement`、`occupation`、`family-growth`、`breed`、`reap`、`exchange`、`set-first-player`、`selection`、`emit-choice`、`reorganize`（权威白名单见 `shared/custom-code/sandbox-action-ids.ts` 的 `SANDBOX_ALLOWED_ACTION_IDS`）。旧 id（`pay-resources` / `gain-other-players` / `write-card-extra-data` / `hold-worker-on-card` 等）已从引擎删除。
-
-#### 沙盒注入 helper
-
-`gainLeaf(cardId, {food:2})`、`payLeaf({cardId, cost:{wood:1}})`、`spaceHasPlayer(space, playerId)`、`positionKey({row,col})`、`getCardStack(player, cardId)`、`readCardExtraData(player, cardId)`。
-
-#### 设计平衡参考
-
-1 food ≈ 最弱收益；`onRoundStart` 每轮触发应偏弱；`bonus-vp` 很强需成本或严格条件；`onBuy` 只触发一次可稍强。
-
-#### few-shot 示例来源
-
-模型从 GitHub 按需读取 `docs/community-card-examples.md` 的相关行。可执行样例继续由 `server/__tests__/workshop-prompt-runtime.test.ts` 中的 Session 测试保护。
+[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) 直接覆盖时序和支付行为。固定模型质量题库、录音和 owner 运行预算保留在 [`llm-card-gen.md`](test/llm-card-gen.md)。
 
 ### C3. 多轮对话设计
 

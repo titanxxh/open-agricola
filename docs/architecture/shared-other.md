@@ -33,7 +33,7 @@ Moor Balance Rules are a default-off creation choice, normalized by `contract/ga
 Workshop cards are admitted only through the deployed Workshop Capability Contract ([ADR 0025](../adr/0025-workshop-capability-contract-is-fail-closed-and-opened-by-tests.md)).
 
 - `ast-validator.ts` validates custom-card TypeScript with an AST: approved imports only, no forbidden APIs, network or I/O; `effect` must be an object literal; listener phases and effect keys must be in the contract allowlist.
-- `sandbox-listener-actions.ts` is the single action list shared by prompts, the validator, server and browser manifests and doc sync (`pnpm run check:prompt-sync`); GitHub references cannot widen it.
+- `sandbox-listener-actions.ts` is the single action list shared by the deployed name contract, validator, and server and browser manifests; GitHub references cannot widen it.
 - `flow-admission.ts`, `contract-admission.ts` and `listener-result-validator.ts` reject, before the engine, any output outside the contract: unlisted actions, foreign-card nodes and listeners, unopened node fields, wrong-typed opened fields and parameters, undocumented parameters, query results of the wrong type and writes to another card's or player's animal zones. Native card flows are not checked.
 - Listener `costs` must come with matching `costAttribution`. Sandbox constraints are documented in [`docs/CUSTOM_CARD_SANDBOX.md`](../CUSTOM_CARD_SANDBOX.md); runtime isolation lives in `server/custom-code/` ([server/custom-code/: Isolated execution](server.md#servercustom-code-isolated-execution)).
 

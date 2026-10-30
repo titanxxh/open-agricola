@@ -181,90 +181,15 @@ The author accepted the [interaction prototype](https://github.com/titanxxh/open
 
 The original single-file artifact remains on the separate `prototype/llm-tool-loop-interaction` branch; its commit, path and browser observations are recorded in the decision issue. It uses simulated responses and source summaries, and does not prove model admission, rule behavior or production persistence. The guided scenario controls and reducer are disposable prototype assets. `WorkshopAbilityPanel` implements these interactions using the production request/result contracts. Playtest repair reads the exact pinned version source and checks the active sandbox binding; it never substitutes the selected candidate.
 
-### C2. System prompt design
+### C2. System prompt and references
 
-The compact prompt lives in `client/services/llm/generation/prompt.ts`. It defines the task, immutable input, reference tools, trust boundary and output formats, then includes the actual deployed Workshop Capability Contract. The contract derives hook/listener/action metadata from their shared truth sources and supplies exact injected helpers. Runtime identity and reference commit remain separate.
+The compact prompt in [`generation/prompt.ts`](../client/services/llm/generation/prompt.ts) defines the task, immutable card identity, trust boundary, and four tools: `search_references`, `read_reference`, `write_artifacts`, and `run_tests`. The deployed format-2 Workshop Capability Contract supplies capability name arrays, runtime identity, and execution limits. Runtime identity and reference commit remain separate.
 
-The descriptor includes the ActionFlow node grammar and the distinction between engine-scheduled future rewards and resources stored on a card. Inspectable malformed composite flows fail static validation before play, using the same bounded repair path as other compilation errors; this is not a full type or behavior proof.
+The model reads source, engine consumers, and direct or Session tests from GitHub at the attempt's fixed commit. [`CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) explains the execution boundaries and links to the source allowlists and injected helpers. The site keeps no separate few-shot corpus or descriptive capability maps.
 
-Examples and detailed reference documents are fetched from GitHub on model request, at the attempt's fixed commit. No repository corpus is bundled into the site prompt.
+`write_artifacts` writes the complete `CARD_ID` / `CARD_DEF` / `CARD_IMPL` source and ordinary TypeScript behavior tests together. `run_tests` returns source-validation and browser-UT feedback for the model to inspect and repair. Source or test edits invalidate the matching report. The final response is ordinary text; source is obtained from tool-written artifacts. A clarification or unsupported request can finish without a candidate.
 
-#### Output format
-
-A source response must include exactly one complete `typescript` code fence with `CARD_DEF` and `CARD_IMPL` constants and no imports or exports. `CARD_DEF` accepts only object form, never `new MinorImprovement(...)` or `new Occupation(...)`:
-
-```typescript
-const CARD_ID = 'CUSTOM_EnglishPascalName'
-
-const CARD_DEF = {
-  cardType: 'minor',            // or occupation
-  meta: {
-    id: CARD_ID,
-    name: 'Card Name',          // English, matching built-in style
-    deck: 'CUSTOM',
-    number: 0,
-    desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
-    cost: { wood: 1 },
-    vp: 0,
-    implemented: true,
-    locales: {
-      zh: { name: 'Chinese card name', desc: ['Chinese description'] },
-    },
-  },
-}
-
-const CARD_IMPL = {
-  effect: {
-    id: CARD_ID,
-    onRoundStart: (state, player) => gainLeaf(CARD_ID, { food: 1 }),
-  },
-  listeners: [
-    {
-      cardIds: [CARD_ID],
-      actions: ['plow'],
-      phases: ['after'],
-      handler: (context) => ({ flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }),
-    },
-  ],
-}
-```
-
-Clarifications and capability gaps instead return a structured JSON object with `kind` and `message`, without source.
-
-#### Hard prompt rules
-
-- `CARD_ID` starts with `CUSTOM_` and uses English PascalCase.
-- `deck` is always `CUSTOM`, `number` is zero, and `implemented` is true.
-- `import`, `export`, `require`, `registerCardEffect`, and `registerCardListener` are forbidden.
-- Classes, generators, `with`, `eval`, `Function`, `fetch`, and related constructs are forbidden.
-- Preserve supplied identity and names. Rule descriptions and prerequisites use English with complete `locales.zh`; editing retains existing bilingual metadata unless explicitly changed.
-- Even a small revision returns the complete source.
-
-#### Effect hooks in `CARD_IMPL.effect`
-
-Common hooks are `onBuy`, `onRoundStart`, `onRoundEnd`, `onAllWorkersPlaced`, `onReturnHome`, `onHarvestFieldPhase`, `onBeforeEndGame`, and `computeBonusScore`. The source contains the complete list. The normal signature is `(state, player) => ActionFlow | void`; `onBuy` also receives `paymentInfo`.
-
-#### Listener mechanism in `CARD_IMPL.listeners`
-
-Listener phases include `before`, `immediatelyAfter`, `after`, `computeCosts`, `computeArgs`, `computeReplace`, `isDoable`, `anytime`, and `computeChoiceCandidates`. `shared/custom-code/sandbox-listener-phases.ts` is authoritative; new source and saved executable manifests must both use supported phases.
-
-Scopes are `player`, `opponent`, and `any`; `shared/custom-code/sandbox-listener-scopes.ts` is authoritative. `shared/custom-code/sandbox-listener-actions.ts` authoritatively lists listener `actions`, shared by the prompt, AST validator, and server and browser manifests. Major and minor improvement purchases both use `improvement`.
-
-#### Available ActionFlow leaf action IDs
-
-Nine IDs move goods and write card state: `gain`, `pay`, `bonus-vp`, `bake-bread`, `store-on-card`, `take-from-card`, `push-to-card-stack`, `special-effect`, and `future-meeples`. Sixteen run a native farm, card or turn-order action for the effect player: `plow`, `sow`, `fence`, `stables`, `construct`, `renovate-house`, `improvement`, `occupation`, `family-growth`, `breed`, `reap`, `exchange`, `set-first-player`, `selection`, `emit-choice`, and `reorganize`. `SANDBOX_ALLOWED_ACTION_IDS` in `shared/custom-code/sandbox-action-ids.ts` is authoritative. Old IDs such as `pay-resources`, `gain-other-players`, `write-card-extra-data`, and `hold-worker-on-card` are removed.
-
-#### Injected sandbox helpers
-
-Available helpers include `gainLeaf(cardId, {food:2})`, `payLeaf({cardId, cost:{wood:1}})`, `spaceHasPlayer(space, playerId)`, `positionKey({row,col})`, `getCardStack(player, cardId)`, and `readCardExtraData(player, cardId)`.
-
-#### Balance guidance
-
-One food is approximately the weakest benefit. An `onRoundStart` effect repeats and should remain modest. `bonus-vp` is strong and needs a cost or strict condition. A one-time `onBuy` effect may be somewhat stronger.
-
-#### Few-shot examples
-
-The model reads relevant numbered ranges from `docs/community-card-examples.md` on GitHub. Executable reference examples retain Session tests in `server/__tests__/workshop-prompt-runtime.test.ts`.
+[`workshop-timing-payment-session.test.ts`](../server/__tests__/workshop-timing-payment-session.test.ts) directly covers timing and payment behavior. Fixed model-quality fixtures, recordings, and the owner-run budget remain in [`llm-card-gen.md`](test/llm-card-gen.md).
 
 ### C3. Multi-turn conversation
 

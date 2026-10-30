@@ -33,6 +33,34 @@ describe('project metadata and anonymous pinned source reads', () => {
     expect(fetchReference).toHaveBeenCalledTimes(3)
   })
 
+  it.each([
+    'shared/session/session-core.ts',
+    'shared/session/__tests__/starting-food.test.ts',
+    'shared/engine/engine.ts',
+    'shared/engine/__tests__/engine.test.ts',
+    'client/local-sandbox/card-test-runtime.ts',
+    'client/local-sandbox/card-tests.ts',
+    'client/local-sandbox/card-tests.worker.ts',
+    'client/local-sandbox/browser-executor.ts',
+    'client/local-sandbox/browser-runtime.ts',
+    'client/local-sandbox/__tests__/card-test-runtime.test.ts',
+    'client/local-sandbox/__tests__/card-tests.test.ts',
+  ])('reads a pinned public test or game API from %s', async path => {
+    const commit = bytesToHex(sha1(utf8ToBytes(path)))
+    const text = 'export const PUBLIC_API = true\n'
+    const bytes = utf8ToBytes(text)
+    const sha = bytesToHex(sha1(concatBytes(utf8ToBytes(`blob ${bytes.length}\0`), bytes)))
+    const fetchReference = vi.fn<typeof fetch>().mockImplementation(async url => {
+      if (String(url).endsWith('/main')) return Response.json({ object: { sha: commit } })
+      if (String(url).includes('/tree/')) return Response.json({ tree: [{ path, sha, type: 'blob', size: bytes.length }], truncated: false })
+      return new Response(text)
+    })
+    const refs = await ReferenceSession.createOpener(fetchReference)(signal())
+    const result = JSON.parse(await refs.execute(call('read_reference', { path, startLine: 1, lineCount: 1 }), signal()))
+    expect(result).toMatchObject({ commit, path, startLine: 1, endLine: 1, text: '1: export const PUBLIC_API = true' })
+    expect(fetchReference).toHaveBeenLastCalledWith(`https://raw.githubusercontent.com/titanxxh/open-agricola/${commit}/${path}`, expect.objectContaining({ credentials: 'omit', redirect: 'error' }))
+  })
+
   it('bounds serialized UTF-8 results including escaping, headings and search metadata', async () => {
     const text = '# Details\n' + ('"\\'.repeat(90) + '木'.repeat(40) + '\n').repeat(160)
     const bytes = utf8ToBytes(text)
@@ -126,6 +154,10 @@ describe('project metadata and anonymous pinned source reads', () => {
     expect(allowedReferencePath('shared/cards/../../.env')).toBe(false)
     expect(allowedReferencePath('https://example.com/secret')).toBe(false)
     expect(allowedReferencePath('server/auth.ts')).toBe(false)
+    expect(allowedReferencePath('client/local-sandbox/local-transport.ts')).toBe(false)
+    expect(allowedReferencePath('client/local-sandbox/card-tests-private.ts')).toBe(false)
+    expect(allowedReferencePath('client/local-sandbox/__tests__/hardening.test.ts')).toBe(false)
+    expect(allowedReferencePath('docs/community-card-examples.md')).toBe(false)
     const result = await refs.execute(call('read_reference', { path: '../.env', startLine: 1, lineCount: 1 }), signal())
     expect(JSON.parse(result).error).toBeTruthy()
     await refs.execute({ ...call('read_reference', {}), function: { name: 'read_reference', arguments: '{' } }, signal())

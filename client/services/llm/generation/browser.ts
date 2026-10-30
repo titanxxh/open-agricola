@@ -24,7 +24,7 @@ export function createSandboxPorts(apiFetch: ApiFetch): Pick<AttemptPorts, 'load
     async loadContract(signal) {
       const response = await apiFetch('/api/workshop/sandbox-contract', { signal, cache: 'no-store' })
       const data = await response.json() as { contract?: WorkshopSandboxContract }
-      if (!response.ok || !data.contract || data.contract.format !== 1 || !/^sandbox-v1:[a-f0-9]{64}$/.test(data.contract.id)) throw new Error('The deployed sandbox contract is unavailable. Retry before generating code.')
+      if (!response.ok || !data.contract || data.contract.format !== 2 || !/^sandbox-v1:[a-f0-9]{64}$/.test(data.contract.id)) throw new Error('The deployed sandbox contract is unavailable. Retry before generating code.')
       return data.contract
     },
     async validate(source, cardId, sandboxContractId, signal) {

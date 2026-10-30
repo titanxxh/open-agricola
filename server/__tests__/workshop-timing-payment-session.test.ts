@@ -1,35 +1,31 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-const REFERENCE_EXAMPLES = readFileSync(new URL('../../docs/community-card-examples.md', import.meta.url), 'utf8')
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import type { GameSession } from '../game/authoritative-session'
+import { createWorkSession } from './_helpers/session-fixtures'
 
-const CARD_ID = 'CUSTOM_PromptContract'
+const CARD_ID = 'CUSTOM_TimingPayment'
 const sessions: GameSession[] = []
 
-const sessionFromPrompt = (marker: string) => {
-  const example = [...REFERENCE_EXAMPLES.matchAll(/```typescript\s*([\s\S]*?)```/g)]
-    .map((match) => match[1]!)
-    .find((code) => code.includes(marker))
-  expect(example, `Missing executable reference example: ${marker}`).toBeDefined()
+const start = (implementation: string) => {
   const result = validateAndCompileCustomCode(`
 const CARD_ID = '${CARD_ID}'
-const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Prompt Contract' })
-${example}
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Timing and payment' })
+const CARD_IMPL = ${implementation}
 `, CARD_ID)
   if (!result.valid) throw new Error(result.errors.join('\n'))
-  const session = new GameSession(42, [{
-    cardType: 'minor',
-    cardJson: { id: CARD_ID, name: 'Prompt Contract', deck: 'CUSTOM', number: 0, desc: [] },
-    compiledCode: result.compiledCode,
-    codeManifest: result.manifest,
-  }], { playerCount: 2 })
+  const session = createWorkSession({
+    seed: 42,
+    customCards: [{
+      cardType: 'minor',
+      cardJson: { id: CARD_ID, name: 'Timing and payment', deck: 'CUSTOM', number: 0, desc: [] },
+      compiledCode: result.compiledCode,
+      codeManifest: result.manifest,
+    }],
+    configure: state => { state.players[0]!.minorPlayed = [CARD_ID] },
+  })
   sessions.push(session)
-  stabilizeRandomHands(session.state.players)
-  session.state.players[0]!.minorPlayed.push(CARD_ID)
   return session
 }
 
@@ -37,9 +33,11 @@ afterEach(() => {
   sessions.splice(0).forEach((session) => session.dispose())
 })
 
-describe('executable Workshop reference contracts', () => {
+describe('Workshop card timing and payments', () => {
   it('grants feeding-start food once, after feeding starts and before consumption', () => {
-    const session = sessionFromPrompt('onStartHarvestFeedingPhase:')
+    const session = start(`{ effect: {
+      id: CARD_ID, onStartHarvestFeedingPhase: () => gainLeaf(CARD_ID, { food: 1 }),
+    } }`)
     const state = session.state
     state.round = 4
     state.players.forEach((player) => {
@@ -87,7 +85,13 @@ describe('executable Workshop reference contracts', () => {
     ['stone', true, 5],
     ['clay', false, 5],
   ] as const)('discounts only clay rooms with the card played: %s / %s', (houseType, played, cost) => {
-    const session = sessionFromPrompt("context.player.houseType !== 'clay'")
+    const session = start(`{ listeners: [{
+      cardIds: [CARD_ID], actions: ['construct'], phases: ['computeCosts'],
+      handler: context => {
+        if (context.player.houseType !== 'clay') return
+        return { costs: { clay: -1 }, costAttribution: [{ sourceCard: CARD_ID, costs: { clay: -1 } }], sourceCard: CARD_ID }
+      },
+    }] }`)
     const state = session.state
     const player = state.players[0]!
     player.houseType = houseType

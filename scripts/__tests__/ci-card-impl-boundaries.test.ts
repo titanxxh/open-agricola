@@ -20,7 +20,6 @@ const architectureChecks = [
   'pnpm run check:architecture-types',
   'pnpm run check:verification-types',
   'pnpm run check:architecture-tests',
-  'pnpm run check:prompt-sync -- --strict',
   'pnpm run check:dependencies',
   'pnpm run check:browser-boundaries',
 ]
@@ -43,7 +42,7 @@ describe('canonical architecture verification wiring', () => {
       'shared/cards/__tests__/card-source.test.ts',
       'shared/contract/__tests__/prompt-keys.test.ts',
       'client/services/__tests__/generation-prompt.test.ts',
-      'server/__tests__/workshop-prompt-runtime.test.ts',
+      'server/__tests__/workshop-timing-payment-session.test.ts',
       'scripts/__tests__/ci-card-impl-boundaries.test.ts',
       'scripts/__tests__/check-card-state-boundaries.test.ts',
       'shared/cards/__tests__/listener-purity-guard.test.ts',
@@ -77,7 +76,6 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow.match(/pnpm run check:architecture/g)).toHaveLength(1)
     expect(workflow).not.toContain('pnpm run check:reaches')
     expect(workflow).not.toContain('pnpm run check:card-impl-boundaries')
-    expect(workflow).not.toContain('pnpm run check:prompt-sync')
   })
 
   it.each(workflows)('%s starts isolated dependencies before architecture and storage tests', (name) => {

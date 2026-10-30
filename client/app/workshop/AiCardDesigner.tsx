@@ -1,17 +1,9 @@
 import { t as translateMessage } from '../../../shared/i18n'
 /**
  * Workshop AI Card Designer.
- *
- * Browser generation, prompts and reference tools live in client/services/llm/generation/.
- * Sandbox constraints visible to users (sandbox-error tooltips, "what can I
- * write" hints, etc.) MUST stay consistent with the single source of truth:
- *   docs/CUSTOM_CARD_SANDBOX.md
- *
- * CI runs `pnpm run check:prompt-sync` for whitelist names. Runtime semantics
- * are guarded by deployed sandbox contracts, browser loop tests and card behavior tests.
- *
- * If you add UI copy here that lists hooks / phases / denied identifiers,
- * link to the SANDBOX doc rather than embedding a parallel list.
+ * Browser generation and reference tools live in client/services/llm/generation/.
+ * The deployed contract owns capability names; docs/CUSTOM_CARD_SANDBOX.md
+ * links their source and explains execution boundaries. UI guidance links there.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
