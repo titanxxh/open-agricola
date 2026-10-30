@@ -26,6 +26,29 @@ GitHub Pages 在 `https://open-agricola.titanxxh.com/` 提供生产前端，API 
 
 ---
 
+## 本机标准发版
+
+在 owner 控制的本机准备 Node.js 24.15+（不支持 Node 25）、锁定依赖和已认证的 `gh` CLI，再运行标准发版命令：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm release vX.Y.Z --ref main
+```
+
+命令只解析一次候选，并打印完整 SHA。它复用同一 SHA、同一验证配置的完整 GitHub 成功证据。必需任务缺失或失败时，命令通过 `verification/candidates/<SHA>` 请求这些任务，等待全部通过。该分支固定保留供重试使用。已有同名分支指向其他提交时直接拒绝，不强制更新。
+
+完整证据通过后，命令才创建版本 tag 和 Release。即使验证期间 `main` 移动，Release 目标仍是固定的 SHA。已有 tag 或 Release 指向其他 SHA 时拒绝；同一 SHA 的已发布 Release 直接复用，不重写 tag，也不重复创建 Release。
+
+某次运行中断后，用打印出的候选 SHA 重试：
+
+```bash
+pnpm release vX.Y.Z --ref <full-sha>
+```
+
+fork 仓库可传入 `--repository owner/name`，并在该仓库配置候选验证 workflow。默认仓库为 `titanxxh/open-agricola`。`--poll-seconds` 默认 15 秒，`--timeout-seconds` 默认 7200 秒。超时或任务失败时不发布。修改源码后，按需选择新的候选和版本。
+
+标准命令在发布前核验 GitHub run 和 job 证据。通过网页或裸 `gh release create` 创建的 Release 可能尚无这些证据，Pages 与后端部署会各自拒绝未验证的候选。本机 `pnpm release:rehearse` 记录不能替代 GitHub 证据。
+
 ## 一、部署后端
 
 后端部署分两种情况：
@@ -386,7 +409,15 @@ PUBLIC_ASSET_VALIDATION_DIR=/absolute/path/open-agricola-assets pnpm verify prep
 
 ### 后端
 
-从 owner 控制的本机运行 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]`。脚本拒绝覆盖远端已跟踪文件的本地修改，以安全 checkout 切换目标版本。目标镜像构建时旧应用继续运行；之后停止整组应用，在维护锁内导出 PostgreSQL 和 S3，先在隔离数据库/对象 prefix 中使用目标镜像恢复与校验，再迁移并验证实际目标库，最后启动同一部署代际的全部应用。
+在 owner 控制的本机准备锁定依赖和已认证的 `gh` CLI，再运行 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]`。默认参数为 `ubuntu@ten-kr`、`main` 和 `/home/ubuntu/open-agricola`。
+
+```bash
+./deploy-backend.sh ubuntu@ten-kr <full-sha>
+```
+
+第一次连接生产 SSH 前，脚本只解析一次 ref，并独立核验该 SHA 的完整 GitHub 证据。直接调用和默认 ref 使用同一门禁。证据缺失或失败时停止，不访问生产。fork 仓库可设置 `RELEASE_REPOSITORY=owner/name`。命令拒绝在 CI 中执行，生产 SSH 凭据继续只保存在 owner 本机。
+
+远端按固定 SHA fetch，检查 `FETCH_HEAD` 与 detached checkout 均匹配，再把该 SHA 用作 `GAME_BUILD_ID`，分支移动不能替换源码。脚本拒绝覆盖远端已跟踪文件的本地修改。目标镜像构建时旧应用继续运行；之后停止整组应用，在维护锁内导出 PostgreSQL 和 S3，先在隔离数据库/对象 prefix 中使用目标镜像恢复与校验，再迁移并验证实际目标库，最后启动同一部署代际的全部应用。
 
 预检失败可重启未修改数据的旧容器。实际迁移开始后若校验失败，保持维护状态，不自动把旧程序连到可能已变更的 schema。`data_imports` 持久屏障阻止失败目标启动。脚本等待容器健康检查；这不是生产部署授权，也不是故障恢复认证。
 

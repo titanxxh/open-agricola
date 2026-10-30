@@ -24,6 +24,29 @@ GitHub Pages serves the production frontend at `https://open-agricola.titanxxh.c
 
 ---
 
+## Standard owner-machine release
+
+Run the standard release command on an owner-controlled machine with Node.js 24.15+ excluding Node 25, locked dependencies, and an authenticated `gh` CLI:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm release vX.Y.Z --ref main
+```
+
+The command resolves the candidate once and prints its full SHA. It reuses successful complete GitHub verification for that SHA and configuration. If required tasks are missing or failed, it requests those tasks on `verification/candidates/<SHA>` and waits for all required tasks to pass. This branch stays pinned for retries. An existing branch with a different target is rejected, and the command never force-updates it.
+
+Only after the complete evidence passes does the command create the version tag and Release. The Release target is the fixed SHA even if `main` moves during verification. An existing tag or Release for another SHA is rejected. A matching published Release is reused without rewriting its tag or creating another Release.
+
+If an attempt stops, retry the printed candidate explicitly:
+
+```bash
+pnpm release vX.Y.Z --ref <full-sha>
+```
+
+Use `--repository owner/name` for a fork with its own candidate-verification workflow. The default repository is `titanxxh/open-agricola`. `--poll-seconds` defaults to 15 and `--timeout-seconds` to 7200. A timeout or failed task leaves publication blocked. After fixing the source, select a new candidate and version as needed.
+
+The standard command checks GitHub run and job evidence before publication. A Release created through the website or bare `gh release create` can exist without this evidence. Pages and backend deployment independently reject an unverified candidate. Local `pnpm release:rehearse` results do not replace GitHub evidence.
+
 ## 1. Deploy the Backend
 
 There are two deployment cases:
@@ -370,7 +393,15 @@ To update public assets, first publish `open-agricola-assets` to its Pages site 
 
 ### Backend
 
-Run `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` from an owner-controlled machine. It refuses to overwrite tracked local edits and checks out the target safely. The old application stays online during image build. Under the maintenance lock, it then stops the application group, exports PostgreSQL and S3, restores a copy into an isolated database/object prefix using the target image, migrates and validates the actual target, and starts the whole application generation together.
+Run `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` from an owner-controlled machine with locked dependencies and an authenticated `gh` CLI. The defaults are `ubuntu@ten-kr`, `main`, and `/home/ubuntu/open-agricola`.
+
+```bash
+./deploy-backend.sh ubuntu@ten-kr <full-sha>
+```
+
+Before the first production SSH connection, the script resolves the requested ref once and independently checks complete GitHub verification for that exact SHA. Direct invocation and the default ref use the same gate. Missing or failed evidence stops deployment without production access. For a fork, set `RELEASE_REPOSITORY=owner/name`. The command rejects CI execution. Keep production SSH credentials on the owner's machine.
+
+The remote host fetches the fixed SHA, verifies both `FETCH_HEAD` and the detached checkout, and uses that SHA as `GAME_BUILD_ID`. A moving branch cannot substitute another source. The script refuses to overwrite tracked local edits. The old application stays online during image build. Under the maintenance lock, the script then stops the application group, exports PostgreSQL and S3, restores a copy into an isolated database/object prefix using the target image, migrates and validates the actual target, and starts the whole application generation together.
 
 A preflight failure can restart the unchanged source container. After live migration starts, failure leaves maintenance active instead of starting an old executable against a possibly changed schema. The durable `data_imports` barrier blocks failed targets. Deployment waits for container health; this procedure does not itself authorize a deployment or certify failover.
 

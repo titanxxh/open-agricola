@@ -6,18 +6,23 @@ HOST="${1:-ubuntu@ten-kr}"
 [[ "$HOST" == *@* ]] || HOST="ubuntu@$HOST"
 REF="${2:-main}"
 REMOTE_DIR="${3:-/home/ubuntu/open-agricola}"
+# Verify on the owner's machine before opening even the first production SSH.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+VERIFIED_SHA="$(cd "$SCRIPT_DIR" && pnpm exec tsx scripts/release/backend-candidate.ts "$REF")"
+[[ "$VERIFIED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid verified backend candidate SHA' >&2; exit 1; }
 REMOTE_ENV=()
 if [[ -n "${ACCOUNT_REGISTRATION_POLICY:-}" ]]; then
   REMOTE_ENV+=(ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY")
 fi
-REMOTE_ARGS=(env "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF")
+REMOTE_ARGS=(env "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$VERIFIED_SHA")
 printf -v REMOTE_COMMAND '%q ' "${REMOTE_ARGS[@]}"
 ssh "$HOST" "$REMOTE_COMMAND" <<'REMOTE'
 set -euo pipefail
 # Parse the complete function before detaching stdin from the SSH script.
 deploy_backend() {
 cd "$1"
-REF="$2"
+VERIFIED_SHA="$2"
+[[ "$VERIFIED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid verified backend candidate SHA' >&2; exit 1; }
 export APP_UID="$(id -u)" APP_GID="$(id -g)"
 umask 077
 mkdir -p backups
@@ -27,9 +32,11 @@ flock -w 1800 9
 # Keep local operator configuration and refuse to overwrite tracked edits.
 [[ -z "$(git status --porcelain --untracked-files=no)" ]] || { echo 'Tracked local edits must be resolved before deployment'; exit 1; }
 PREVIOUS_REF="$(git rev-parse HEAD)"
-git fetch origin "$REF"
-TARGET_REF="$(git rev-parse FETCH_HEAD)"
-git checkout --detach "$TARGET_REF"
+git fetch origin "$VERIFIED_SHA"
+TARGET_REF="$(git rev-parse 'FETCH_HEAD^{commit}')"
+[[ "$TARGET_REF" == "$VERIFIED_SHA" ]] || { echo 'Fetched backend candidate mismatch' >&2; exit 1; }
+git checkout --detach "$VERIFIED_SHA"
+[[ "$(git rev-parse HEAD)" == "$VERIFIED_SHA" ]] || { echo 'Checked-out backend candidate mismatch' >&2; exit 1; }
 # Bootstrap host dependencies without requiring any external service account.
 # Node 24.15+ and pnpm are deployment-host prerequisites, as in local development.
 pnpm install --frozen-lockfile
