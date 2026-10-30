@@ -1,5 +1,7 @@
 import { FULL_TASK_IDS, fullSha, selectedTasks } from './verification-tasks'
 
+export const NO_CATALOG_TASKS = 'none'
+
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const object = (value: unknown) => {
   if (!isObject(value)) throw new Error('Missing or invalid verification job evidence')
@@ -32,8 +34,10 @@ export function assertRoutineGate(input: { sha: string; needs: unknown }) {
   }
   const selected = count(plan.outputs.inline_checks)
   const catalog = text(plan.outputs.catalog_tasks)
-  const tasks = catalog ? selectedTasks(catalog).join(',') : ''
-  if (tasks !== catalog || selected === 0 && !tasks) throw new Error('Verification task selection is empty or noncanonical')
+  const tasks = catalog === NO_CATALOG_TASKS ? '' : selectedTasks(catalog).join(',')
+  if (catalog !== NO_CATALOG_TASKS && tasks !== catalog || selected === 0 && !tasks) {
+    throw new Error('Verification task selection is empty or noncanonical')
+  }
   if (mode === 'full' && (selected !== 0 || tasks !== FULL_TASK_IDS.join(','))) throw new Error('Full fallback must execute every canonical task')
   const inline = job(needs.inline)
   if (selected > 0) {

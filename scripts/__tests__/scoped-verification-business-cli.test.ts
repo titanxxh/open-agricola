@@ -106,7 +106,7 @@ describe('business verification public CLI', () => {
     expect(planned.status, planned.stderr).toBe(0)
     const manifest: unknown = JSON.parse(planned.stdout)
     expect(manifest).toMatchObject({
-      mode: 'scoped', inline_checks: 6,
+      mode: 'scoped', inline_checks: 7,
       catalog_tasks: 'quality,build,chromium-1,chromium-2,chromium-3,chromium-4,browser-sandbox,webkit',
     })
     const result = value.run('run', '--base', 'main')
@@ -118,6 +118,8 @@ describe('business verification public CLI', () => {
         'shared/cards/__tests__/A29_AleBenches.test.ts', 'shared/cards/__tests__/listener-purity-guard.test.ts'],
       ['exec', 'vitest', 'run', '--project', 'fast-card-runtime',
         'shared/actions/effects/__tests__/pay-supply-token.test.ts', 'shared/session/__tests__/serialization-cursor.test.ts'],
+      ['exec', 'vitest', 'run', '--project', 'fast-client',
+        'client/services/__tests__/api-contract.test.ts', 'client/services/__tests__/gameTransport-reconnect.test.ts'],
       ['exec', 'vitest', 'run', '--project', 'fast-server',
         'server/__tests__/auth.test.ts', 'server/__tests__/listener-purity-gate-session.test.ts',
         'server/connection/__tests__/ws-server.test.ts', 'server/game/__tests__/room.test.ts'],

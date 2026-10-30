@@ -15,7 +15,7 @@ const browser = (names: string[], grep: string | null = null, engine: BrowserChe
   kind: 'browser', browser: engine, files: names.map(name => `e2e-tests/${name}.spec.ts`), grep,
 })
 
-const ruleProjects = ['fast-shared', 'fast-cards', 'fast-card-runtime', 'fast-server', 'fast-tests', 'slow']
+const ruleProjects = ['fast-shared', 'fast-cards', 'fast-card-runtime', 'fast-client', 'fast-server', 'fast-tests', 'slow']
 const ruleTests = [
   { project: 'fast-shared', file: 'shared/actions/payment/internal/__tests__/pay.test.ts' },
   { project: 'fast-cards', file: 'shared/cards/__tests__/listener-purity-guard.test.ts' },
@@ -34,7 +34,7 @@ const groups: BusinessGroup[] = [{
   name: 'Workshop generation, sandbox contracts and references',
   scope: 'workshop',
   owns: /^(?:docs\/(?:CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status|community-card-examples)(?:_zh)?\.md|docs\/architecture\/[a-z-]+(?:_zh)?\.md|docs\/test\/llm-card-gen\.md|client\/sandbox\/README\.md|(?:client\/(?:local-sandbox\/[^/]+|sandbox\/[^/]+|app\/workshop\/[^/]+|app\/WorkshopPage|services\/(?:workshop-pr|generation-prompt|llm(?:\/(?:generation|providers))?\/[^/]+))|server\/(?:custom-code\/[^/]+|workshop(?:-[^/]+)?|(?:workshop-pr|workshop-review)\/[^/]+|game\/(?:custom-session-[^/]+|sandbox-authority|workshop-room-cards))|shared\/(?:custom-code\/[^/]+|contract\/workshop(?:-[^/]+)?|projections\/workshop-generation))(?:[.-])[^/]*)$/,
-  projects: [...ruleProjects, 'fast-client'],
+  projects: ruleProjects,
   requiredTests: [...ruleTests,
     { project: 'fast-shared', file: 'shared/custom-code/__tests__/contract-admission.test.ts' },
     { project: 'fast-shared', file: 'shared/projections/__tests__/workshop-generation.test.ts' },
@@ -61,7 +61,7 @@ const groups: BusinessGroup[] = [{
   name: 'protocol, serialization and display projections',
   scope: 'contract',
   owns: /^(?:shared\/(?:contract(?:\/protocol)?|projections)\/[^/]+|shared\/session\/(?:serialization|sync-payload|interaction-state-adapter|interaction-privacy)|shared\/events\/(?:log-cache|log-mapper|log-player-names|public-event-presentation)|shared\/domain\/player-panel-summary|server\/(?:payload-validation|connection\/(?:envelope-builder|history-presentation)|game\/(?:replay-codec|command-input))|client\/(?:services\/rehydrate|types\/[^/]+)|replay-viewer\/src\/(?:model|types))(?:[.-])[^/]*$/,
-  projects: [...ruleProjects, 'fast-client'],
+  projects: ruleProjects,
   requiredTests: [...ruleTests,
     { project: 'fast-card-runtime', file: 'shared/session/__tests__/serialization-cursor.test.ts' },
     { project: 'fast-client', file: 'client/services/__tests__/api-contract.test.ts' },

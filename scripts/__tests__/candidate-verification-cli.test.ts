@@ -46,13 +46,15 @@ function githubFixture(value: ReturnType<typeof fixture>, failedTask = '') {
   const workflow = { id: 100, path: '.github/workflows/candidate-verification.yml' }
   const run = { id: 1, workflow_id: 100, path: workflow.path, event: 'workflow_dispatch', head_sha: value.sha,
     repository: { full_name: 'titanxxh/open-agricola' }, status: 'completed', run_attempt: 1,
-    created_at: '2026-10-30T00:00:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' }
+    created_at: '2026-10-30T00:00:00Z', updated_at: '2026-10-30T00:15:00Z', html_url: 'https://github.com/titanxxh/open-agricola/actions/runs/1' }
   const jobs = tasks.map((task, index) => ({
     id: index + 2, run_id: 1, run_attempt: 1, name: `candidate / ${task} / ${configuration}`,
+    started_at: '2026-10-30T00:05:00Z', completed_at: '2026-10-30T00:10:00Z',
     status: 'completed', conclusion: task === failedTask ? 'failure' : 'success', html_url: run.html_url,
     steps: ['Checkout candidate', 'Install dependencies', 'Verify candidate checkout', 'Execute verification task', 'Install browsers'].map(step),
   }))
   jobs.unshift({ id: 1, run_id: 1, run_attempt: 1, name: 'candidate-manifest', status: 'completed', conclusion: 'success', html_url: run.html_url,
+    started_at: '2026-10-30T00:00:00Z', completed_at: '2026-10-30T00:01:00Z',
     steps: [step('Generate candidate manifest'), step(`Candidate manifest / ${value.sha} / ${configuration} / ${tasks.join(',')}`)] })
   const prefix = 'repos/titanxxh/open-agricola'
   writeFileSync(join(value.cwd, 'github-responses.json'), JSON.stringify({
@@ -128,6 +130,16 @@ describe('candidate verification public CLI', () => {
     expect(result.status).toBe(0)
     expect(JSON.parse(result.stdout).status).toBe('passed')
     expect(JSON.parse(result.stdout).tasks).toHaveLength(10)
+  })
+
+  it('checks trusted GitHub evidence with native Node and no tsx loader', () => {
+    const value = fixture()
+    githubFixture(value)
+    const result = spawnSync(process.execPath, [cli, 'check', '--sha', value.sha, '--repository', 'titanxxh/open-agricola'], {
+      cwd: value.cwd, env: value.env, encoding: 'utf8', timeout: 15_000,
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout).status).toBe('passed')
   })
 
   it('returns a failing CLI status when GitHub reports a required task failure', () => {

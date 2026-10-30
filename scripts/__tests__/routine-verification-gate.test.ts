@@ -4,14 +4,37 @@ import { assertRoutineGate } from '../ci/routine-verification-gate'
 const sha = '1'.repeat(40)
 const digest = '2'.repeat(64)
 const documentation = () => ({
-  plan: { result: 'success', outputs: { mode: 'scoped', plan_digest: digest, tested_sha: sha, inline_checks: '1', catalog_tasks: '' } },
+  plan: { result: 'success', outputs: { mode: 'scoped', plan_digest: digest, tested_sha: sha, inline_checks: '1', catalog_tasks: 'none' } },
   inline: { result: 'success', outputs: { status: 'passed', plan_digest: digest, tested_sha: sha, completed_checks: '1' } },
-  catalog: { result: 'skipped', outputs: { verified_tasks: '', verified_sha: '' } },
+  catalog: { result: 'skipped', outputs: {} },
 })
 
 describe('required routine verification gate', () => {
   it('accepts completed documentation constraints and an intentionally unselected catalog branch', () => {
     expect(assertRoutineGate({ sha, needs: documentation() })).toEqual({ status: 'passed', mode: 'scoped', sha, planDigest: digest })
+  })
+
+  it('blocks missing catalog selection when GitHub omits an empty job output', () => {
+    const needs = documentation()
+    const outputs = Object.fromEntries(Object.entries({ ...needs.plan.outputs, catalog_tasks: '' })
+      .filter(([, value]) => value !== ''))
+
+    expect(outputs).not.toHaveProperty('catalog_tasks')
+    expect(() => assertRoutineGate({ sha, needs: { ...needs, plan: { ...needs.plan, outputs } } }))
+      .toThrow('Missing verification job output')
+  })
+
+  it('rejects an empty catalog output instead of treating it as an intentional selection', () => {
+    const needs = documentation()
+    needs.plan.outputs.catalog_tasks = ''
+    expect(() => assertRoutineGate({ sha, needs })).toThrow()
+  })
+
+  it('rejects the no-catalog sentinel in a full verification plan', () => {
+    const needs = documentation()
+    needs.plan.outputs.mode = 'full'
+    needs.plan.outputs.inline_checks = '0'
+    expect(() => assertRoutineGate({ sha, needs })).toThrow()
   })
 
   it.each(['failure', 'cancelled', 'skipped'])('blocks a selected inline branch with result %s', result => {
