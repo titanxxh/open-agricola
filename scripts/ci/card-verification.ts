@@ -168,6 +168,8 @@ export function cardVerification(paths: string[], inventory: TestInventory, asso
   if (!associations) return expand('Card test association evidence is missing')
   if (associations.expansionReasons.length) return { checks: [], expansionReasons: associations.expansionReasons }
   if (associations.inventoryKey !== inventoryKey(inventory)) return expand('Card test association evidence does not match the discovered test inventory')
+  const missingUi = [...cardUiSafety].filter(file => !inventory.browser.includes(file))
+  if (missingUi.length) return expand(`Declared card UI consumers are missing: ${missingUi.join(', ')}`)
   const changed = new Set(paths)
   if (changes.some(change => change.status !== 'M' && (changed.has(change.path) || (change.status === 'R' && changed.has(change.previousPath))))) {
     return expand('Added, deleted or renamed card paths need broader verification before associations can be trusted')
