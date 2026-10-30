@@ -130,7 +130,7 @@ export function choose(session: GameSession, response: SessionResponse, predicat
 export function fencing(session: GameSession, actor = 1) {
   const pending = ok(session.takeAction(actor, 'fencing'))
   assert.ok(pending.interaction.stateId === 'wait' && pending.interaction.request.kind === 'farm-select')
-  return ok(session.commitSelectionChoice(actor, { edges: fenceEdges, palisadeEdges: [], extraWood: 0 }))
+  return ok(session.commitSelectionChoice(actor, { edges: fenceEdges, palisadeEdges: [] }))
 }
 export function count(response: SessionResponse) { return animals.map(animal => response.state.players[0]!.resources[animal]) }
 export function buildStables(session: GameSession, tiles: { row: number; col: number }[]) {

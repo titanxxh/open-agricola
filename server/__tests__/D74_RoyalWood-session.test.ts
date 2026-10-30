@@ -212,8 +212,7 @@ describe('D074 Royal Wood parity', () => {
     let response = session.takeAction(0, 'fencing')
     expect(response.interaction.stateId).toBe('wait')
     response = session.commitSelectionChoice(0, {
-      edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0,
-    })
+      edges: ONE_CELL_FENCES, palisadeEdges: [], })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
@@ -233,7 +232,7 @@ describe('ae-negative-41-resources', () => {
   })
   it('D074 N3 ordinary fencing a held card and a foreign building never refund owner wood',()=>{
    for(const mode of ['fencing','hand','other']){const actor=mode==='other'?1:0,s=setup('D074_RoyalWood',st=>{st.currentPlayerIndex=actor;Object.assign(st.players[actor]!.resources,{wood:mode==='fencing'?4:2,stone:2})},mode!=='hand');let r:SessionResponse
-   if(mode==='fencing'){const p=ok(s.takeAction(0,'fencing'));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select');r=finish(s,ok(s.commitSelectionChoice(0,{edges:['H-0-1','H-1-1','V-0-1','V-0-2'],extraWood:0})),true)}else{r=ok(s.takeAction(actor,'major-improvement'));if(!r.state.players[actor]!.improvements.includes('Major_Joinery'))r=select(s,r,o=>o.value==='Major_Joinery'||o.value==='major:Major_Joinery');r=finish(s,r,true,'D074_RoyalWood')}
+   if(mode==='fencing'){const p=ok(s.takeAction(0,'fencing'));assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select');r=finish(s,ok(s.commitSelectionChoice(0,{edges:['H-0-1','H-1-1','V-0-1','V-0-2']})),true)}else{r=ok(s.takeAction(actor,'major-improvement'));if(!r.state.players[actor]!.improvements.includes('Major_Joinery'))r=select(s,r,o=>o.value==='Major_Joinery'||o.value==='major:Major_Joinery');r=finish(s,r,true,'D074_RoyalWood')}
    assert.equal(r.state.players[0]!.resources.wood,0);if(mode==='other')assert.equal(r.state.players[1]!.resources.wood,0);save(`D074-N3-${mode}`,r)}
   })
   it('D074 N4 undo restores real improvement wood payment and legal retry earns exactly one refund',()=>{

@@ -133,7 +133,7 @@ describe('C015 Trellis parity', () => {
     let response = session.takeAction(0, 'pig-market')
     response = takeFence ? accept(session, response, 'C015_Trellis') : decline(session, response, 'C015_Trellis')
     if (takeFence && response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select') {
-      response = session.commitSelectionChoice(0, { edges: ONE_CELL_EDGES, palisadeEdges: [], extraWood: 0 })
+      response = session.commitSelectionChoice(0, { edges: ONE_CELL_EDGES, palisadeEdges: [] })
     }
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
       response = session.resolveChoice(0, 'confirm', { zones: [{
@@ -166,7 +166,7 @@ describe('C016 Field Fences parity', () => {
     let response = playMinor(session, 'C016_FieldFences')
     response = accept(session, response, 'C016_FieldFences')
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
-    response = session.commitSelectionChoice(0, { edges: ONE_CELL_EDGES, palisadeEdges: [], extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: ONE_CELL_EDGES, palisadeEdges: [] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0 })
     expect(getFenceCount(response.state.players[0]!)).toBe(4)

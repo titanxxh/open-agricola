@@ -205,7 +205,6 @@ describe('C1 Overhaul session', () => {
     const rebuild = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(rebuild.ok).toBe(true)
     const buyer = rebuild.state.players[0]!
@@ -227,7 +226,6 @@ describe('C1 Overhaul session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 
@@ -265,7 +263,6 @@ describe('C1 Overhaul session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 
@@ -339,7 +336,6 @@ describe('C1 Overhaul session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('TOO_FEW_FENCES')
@@ -357,7 +353,6 @@ describe('C1 Overhaul session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-0-1', 'H-0-2', 'H-0-3', 'H-1-0', 'H-1-1', 'H-1-2', 'H-1-3'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('TOO_MANY_FENCES')
@@ -380,7 +375,6 @@ describe('C1 Overhaul session', () => {
     const tooMany = session.commitSelectionChoice(0, {
       edges: TOP_ROW_16,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(tooMany.ok).toBe(false)
     expect(tooMany.error).toBe('TOO_MANY_FENCES')
@@ -390,7 +384,6 @@ describe('C1 Overhaul session', () => {
     const maxOk = session.commitSelectionChoice(0, {
       edges: TOP_ROW_15,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(maxOk.ok).toBe(true)
     const player = maxOk.state.players[0]!
@@ -414,7 +407,6 @@ describe('C1 Overhaul session', () => {
     const tooMany = session.commitSelectionChoice(0, {
       edges: TOP_ROW_15,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(tooMany.ok).toBe(false)
     expect(tooMany.error).toBe('TOO_MANY_FENCES')
@@ -424,7 +416,6 @@ describe('C1 Overhaul session', () => {
     const maxOk = session.commitSelectionChoice(0, {
       edges: TOP_ROW_15.slice(0, 14),
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(maxOk.ok).toBe(true)
     expect(getOwnOrdinaryFenceCount(maxOk.state.players[0]!)).toBe(14)
@@ -445,7 +436,6 @@ describe('C1 Overhaul session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('SEGMENT_TYPE_NOT_ALLOWED')
@@ -460,7 +450,6 @@ describe('C1 Overhaul session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const player = resp.state.players[0]!
@@ -489,8 +478,8 @@ describe('ae-negative-03-multi-step', () => {
       assert.equal(r.state.players[0]!.resources.sheep, 2)
       assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { cancel: true }))
       const eight = ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4']
-      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: eight, palisadeEdges: [], extraWood: 0 }))
-      r = ok(s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: eight, palisadeEdges: [] }))
+      r = ok(s.commitSelectionChoice(0, { edges: one, palisadeEdges: [] }))
       assert.equal(r.state.players[0]!.fenceSegments.length, 4)
       assert.equal(r.state.players[0]!.resources.wood, 0)
       assert.equal(r.state.players[0]!.resources.sheep, 2)
@@ -500,8 +489,8 @@ describe('ae-negative-03-multi-step', () => {
     it('C001 N2 valid four-edge enclosure cannot replace seven returned fences', () => {
       const s = fenceSetup(two)
       play(s, OVERHAUL)
-      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: one, palisadeEdges: [], extraWood: 0 }))
-      const r = ok(s.commitSelectionChoice(0, { edges: two, palisadeEdges: [], extraWood: 0 }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: one, palisadeEdges: [] }))
+      const r = ok(s.commitSelectionChoice(0, { edges: two, palisadeEdges: [] }))
       assert.equal(r.state.players[0]!.fenceSegments.length, 7)
       assert.equal(r.state.players[0]!.resources.wood, 0)
     })
@@ -511,8 +500,8 @@ describe('ae-negative-03-multi-step', () => {
       const sixteen = [...thirteen, 'H-2-3', 'V-1-3', 'V-1-4']
       const fifteen = sixteen.filter(edge => edge !== 'H-1-3')
       play(s, OVERHAUL)
-      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: sixteen, palisadeEdges: [], extraWood: 0 }))
-      const r = ok(s.commitSelectionChoice(0, { edges: fifteen, palisadeEdges: [], extraWood: 0 }))
+      assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: sixteen, palisadeEdges: [] }))
+      const r = ok(s.commitSelectionChoice(0, { edges: fifteen, palisadeEdges: [] }))
       assert.equal(r.state.players[0]!.fenceSegments.length, 15)
       assert.equal(r.state.players[0]!.resources.wood, 0)
     })

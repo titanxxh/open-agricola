@@ -87,6 +87,38 @@ for (const operation of ['room', 'stable', 'plow', 'sow'] as const) {
   })
 }
 
+test('farm redevelopment fences eight edges with exactly eight wood', async ({ page, request }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await prepare(page, request, state => {
+    state.players[0]!.houseType = 'clay'
+    Object.assign(state.players[0]!.resources, { wood: 8, stone: 2, reed: 1 })
+  })
+  const start = await action(page, 'farm-redevelopment')
+  const fence = start.interaction.stateId === 'wait' && start.interaction.request.kind === 'choice'
+    ? start.interaction.request.options.find(option => option.labelKey === 'actions.fencing.name')
+    : undefined
+  if (!fence) throw new Error('Expected fencing after renovation')
+  await choice(page, fence.value)
+  await expectFarmVisible(page)
+  for (const edge of ['V-0-3', 'V-1-3', 'H-2-3', 'H-2-4', 'V-1-5', 'V-0-5', 'H-0-4', 'H-0-3']) {
+    await farm(page).locator(`[data-fence-edge="${edge}"] .farm-fence-hit`).click()
+  }
+  await expect(page.getByTestId('fence-selection-cost')).toHaveText('Cost: 8 wood')
+  const confirm = page.locator('.interaction-bar [data-choice-value="confirm"]')
+  await expect(confirm).toBeEnabled()
+  await page.screenshot({ path: 'output/playwright/farm-redevelopment-eight-wood-selected.png' })
+  const committed = page.waitForResponse(response => response.url().endsWith('/api/game/commit-selection'))
+  await confirm.click()
+  const response = await committed
+  expect(response.request().postDataJSON()).not.toHaveProperty('payload.extraWood')
+  const after: SessionResponse = await response.json()
+  expect(after.ok, after.error).toBe(true)
+  expect(after.state.players[0]!.houseType).toBe('stone')
+  expect(after.state.players[0]!.resources).toMatchObject({ wood: 0, stone: 0, reed: 0 })
+  expect(after.state.players[0]!.fenceSegments).toHaveLength(8)
+  await page.screenshot({ path: 'output/playwright/farm-redevelopment-eight-wood-completed.png' })
+})
+
 for (const viewport of [{ width: 375, height: 812 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
   test(`fence touch targets remain distinct and above the operation bar at ${viewport.width}x${viewport.height}`, async ({ browser, request }) => {
     const context = await browser.newContext({ viewport, hasTouch: true })

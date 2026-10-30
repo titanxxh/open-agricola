@@ -24,7 +24,6 @@ export type CustomCardDef = {
 export type FenceSelectionPayload = {
   edges: string[]
   palisadeEdges?: string[]
-  extraWood?: number
   fenceSources?: Record<string, string>
 }
 

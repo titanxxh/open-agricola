@@ -114,7 +114,7 @@ describe('B130 Full Peasant parity', () => {
   it('B130 S6: Fencing can pay one food and move the same person to Grain Utilization', () => {
     const session = setup()
     let response = session.takeAction(0, 'fencing')
-    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES })
     response = resolveTriggerIfPresent(session, response, CARD_ID)
 
     response = acceptJump(session, response)

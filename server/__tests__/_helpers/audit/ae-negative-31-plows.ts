@@ -180,7 +180,7 @@ export function animalKeep(s: GameSession, r: SessionResponse, assign: (z: Extra
 export function fence(s: GameSession, r: SessionResponse, edges: string[]) {
   for (let n = 0; n < 12; n++) {
     if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'farm-select' && r.interaction.request.farm.farmType === 'fence')
-      return ok(s.commitSelectionChoice(actor(r), { edges, palisadeEdges: [], extraWood: 0 }))
+      return ok(s.commitSelectionChoice(actor(r), { edges, palisadeEdges: [] }))
     r = choose(s, r, o => !['__skip__', '__pass__', '__done__'].includes(o.value))
   }
   throw new Error('no fence pending')

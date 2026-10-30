@@ -314,7 +314,6 @@ export const buildFarmPositionSelectionInteraction = (
 
 export const buildFenceFarmInteraction = (
   player: PlayerState,
-  spaceId: string,
   actionContext?: Record<string, unknown>,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
@@ -322,7 +321,6 @@ export const buildFenceFarmInteraction = (
   const selectableEdges = getAllEdgeIds(normalized).filter(
     (edgeId) => !existing.has(edgeId),
   )
-  const extraWood = spaceId === 'farm-redevelopment' ? 1 : 0
   const fencePolicy =
     typeof actionContext?.fencePolicy === 'object' && actionContext.fencePolicy !== null
       ? actionContext.fencePolicy as { sourcePolicy?: unknown }
@@ -334,7 +332,6 @@ export const buildFenceFarmInteraction = (
   return {
     farmType: 'fence',
     selectableEdges,
-    extraWood,
     ...(fenceSource ? { fenceSource } : {}),
   }
 }
@@ -352,7 +349,6 @@ export type SelectableTilesOpts = {
   costAdjustments?: ConstructCostAdjustments
   exactCost?: ExactCost
   actionContext?: Record<string, unknown>
-  spaceId?: string
   zoneFilter?: 'pasture-1'
   max?: number
 }
@@ -384,7 +380,7 @@ export class FarmInteraction {
       case 'sow':
         return buildSowFarmInteraction(this.player, ctx)
       case 'fence':
-        return buildFenceFarmInteraction(this.player, opts?.spaceId ?? '', ctx)
+        return buildFenceFarmInteraction(this.player, ctx)
       case 'room':
         return buildRoomFarmInteraction(
           this.player,

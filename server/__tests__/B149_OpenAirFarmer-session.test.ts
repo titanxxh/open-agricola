@@ -287,7 +287,6 @@ describe('B149 Open Air Farmer session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)
@@ -312,7 +311,6 @@ describe('B149 Open Air Farmer session', () => {
     const committed = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(committed.ok).toBe(true)
     expect(committed.state.players[0]!.resources.wood).toBe(0)
@@ -341,7 +339,6 @@ describe('B149 Open Air Farmer session', () => {
     const invalid = session.commitSelectionChoice(0, {
       edges: ONE_CELL,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(invalid.ok).toBe(false)
@@ -351,7 +348,6 @@ describe('B149 Open Air Farmer session', () => {
     const valid = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(valid.ok).toBe(true)
@@ -368,7 +364,6 @@ describe('B149 Open Air Farmer session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: ['H-0-0'],
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(false)
@@ -388,7 +383,6 @@ describe('B149 Open Air Farmer session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: LEFT_EDGE_TWO_CELL_FENCES,
       palisadeEdges: LEFT_EDGE_TWO_CELL_PALISADES,
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)
@@ -439,7 +433,6 @@ describe('B149 Open Air Farmer session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(false)
@@ -456,7 +449,6 @@ describe('B149 Open Air Farmer session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: MODIFY_EXISTING_AND_CREATE_TWO,
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(false)
@@ -470,7 +462,6 @@ describe('B149 Open Air Farmer session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 
@@ -550,8 +541,8 @@ describe('B149 Open Air Farmer session', () => {
 describe('ae-negative-30-native', () => {
   const { sessions, twoCell, commands, ok, save, make, select, play, undo, at, res } = audit30Native
   afterEach(() => { sessions.splice(0).forEach(s => s.dispose()); commands.splice(0); });
-  it('B149 N1 real purchase removes three finite stables and fences exactly two cells for two wood', () => { const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = 2; }, false), p = play(s, 'B149_OpenAirFarmer'); assert.equal(s.withCtx(() => getAvailableStableSupplyCount(p.state, p.state.players[0]!)), 1); res(p, { wood: 2 }); const r = select(s, 0, { edges: twoCell, palisadeEdges: [], extraWood: 0 }); res(r, { wood: 0 }); assert.equal(r.state.players[0]!.pastures.length, 1); assert.equal(r.state.players[0]!.pastures[0]!.tiles.length, 2); assert.equal(r.state.players[0]!.fenceSegments.length, 6); save('B149-N1', { p, r }); });
-  it('B149 N2 wrong pasture size and cancellation reject before the legal fence plan', () => { const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = 2; }, false), p = play(s, 'B149_OpenAirFarmer'); const bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], palisadeEdges: [], extraWood: 0 })), large = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4'], palisadeEdges: [], extraWood: 0 })), cancel = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { cancel: true })), r = select(s, 0, { edges: twoCell, palisadeEdges: [], extraWood: 0 }); res(r, { wood: 0 }); save('B149-N2', { p, bad, large, cancel, r }); });
+  it('B149 N1 real purchase removes three finite stables and fences exactly two cells for two wood', () => { const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = 2; }, false), p = play(s, 'B149_OpenAirFarmer'); assert.equal(s.withCtx(() => getAvailableStableSupplyCount(p.state, p.state.players[0]!)), 1); res(p, { wood: 2 }); const r = select(s, 0, { edges: twoCell, palisadeEdges: [] }); res(r, { wood: 0 }); assert.equal(r.state.players[0]!.pastures.length, 1); assert.equal(r.state.players[0]!.pastures[0]!.tiles.length, 2); assert.equal(r.state.players[0]!.fenceSegments.length, 6); save('B149-N1', { p, r }); });
+  it('B149 N2 wrong pasture size and cancellation reject before the legal fence plan', () => { const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = 2; }, false), p = play(s, 'B149_OpenAirFarmer'); const bad = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], palisadeEdges: [] })), large = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { edges: ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4'], palisadeEdges: [] })), cancel = assertRejectedUnchanged(s, () => s.commitSelectionChoice(0, { cancel: true })), r = select(s, 0, { edges: twoCell, palisadeEdges: [] }); res(r, { wood: 0 }); save('B149-N2', { p, bad, large, cancel, r }); });
   it('B149 N3 stable or wood shortage blocks the mandatory continuation and public undo restores the action', () => { for (const mode of ['stable', 'wood']) {
       const s = make('B149_OpenAirFarmer', st => { st.players[0]!.resources.wood = mode === 'wood' ? 1 : 2; if (mode === 'stable')
           st.players[0]!.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]; }, false), before = ok(s.getState()), p = play(s, 'B149_OpenAirFarmer');

@@ -81,7 +81,7 @@ describe('B026 Agrarian Fences parity', () => {
       response = chooseLabel(session, response, 'actions.fencing.name')
     }
     expect(farmSelection(response)?.farmType).toBe('fence')
-    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, palisadeEdges: [], extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, palisadeEdges: [] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)

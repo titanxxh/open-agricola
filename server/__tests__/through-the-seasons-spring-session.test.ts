@@ -204,12 +204,12 @@ describe('Seasons batch 3 spring audit', () => {
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
     session = auditRestore(session)
     const before = auditClone(session.state)
-    expect(session.commitSelectionChoice(0, { edges: ['H-0-0'], extraWood: 0 }).ok).toBe(false)
+    expect(session.commitSelectionChoice(0, { edges: ['H-0-0'] }).ok).toBe(false)
     expect(auditClone(session.state)).toEqual(before)
     const edges = count === 4 ? oneCellFences(0, 0) : ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2']
-    expect(session.commitSelectionChoice(1, { edges, extraWood: 0 }).ok).toBe(false)
+    expect(session.commitSelectionChoice(1, { edges }).ok).toBe(false)
     expect(auditClone(session.state)).toEqual(before)
-    const done = session.commitSelectionChoice(0, { edges, extraWood: 0 })
+    const done = session.commitSelectionChoice(0, { edges })
     expect(done.ok, done.error).toBe(true)
     expect(done.state.players[0]!.resources.wood).toBe(0)
     expect(done.state.players[0]!.fenceSegments).toHaveLength(count)
@@ -281,7 +281,7 @@ describe('Seasons batch 3 spring audit', () => {
     expect(response.ok, response.error).toBe(true)
     if (response.interaction.request.kind === 'choice') expect(chooseByLabel(session, response, 'actions.fencing.name').ok).toBe(true)
     session = auditRestore(session)
-    const response2 = session.commitSelectionChoice(0, { edges: ['H-0-2', 'H-1-2', 'V-0-3'], extraWood: 0 })
+    const response2 = session.commitSelectionChoice(0, { edges: ['H-0-2', 'H-1-2', 'V-0-3'] })
     expect(response2.ok, response2.error).toBe(true)
     expect(response2.state.players[0]!.resources.wood).toBe(0)
     expect(response2.state.players[0]!.fenceSegments).toHaveLength(9)
@@ -487,7 +487,6 @@ describe('Through the Seasons Spring rules', () => {
     expect(resp.ok).toBe(true)
     resp = session.commitSelectionChoice(0, {
       edges: oneCellFences(0, 0),
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)
@@ -511,7 +510,6 @@ describe('Through the Seasons Spring rules', () => {
     resp = session.resolveChoice(0, reserve.value)
     resp = session.commitSelectionChoice(0, {
       edges: oneCellFences(0, 0),
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)
@@ -557,7 +555,6 @@ describe('Through the Seasons Spring rules', () => {
     resp = session.commitSelectionChoice(0, {
       edges: springPalisadeFenceEdges,
       palisadeEdges: springPalisadeEdges,
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(false)

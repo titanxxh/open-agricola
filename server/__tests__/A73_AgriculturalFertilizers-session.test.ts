@@ -66,7 +66,6 @@ describe('A073_AgriculturalFertilizers session', () => {
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForTwoTiles,
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     // After fencing 2 tiles, optional sow should be offered
@@ -85,7 +84,6 @@ describe('A073_AgriculturalFertilizers session', () => {
 
     resp = session.commitSelectionChoice(0, {
       edges: edgesForOneTile,
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     // Only 1 tile fenced, no sow offered

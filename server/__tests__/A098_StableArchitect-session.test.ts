@@ -39,7 +39,7 @@ describe('ae-negative-12-scoring', () => {
     const session = setup(ARCH, state => state.players[0]!.stableTiles = [{ row: 0, col: 1 }])
     const before = session.getState(); assert.equal(bonus(before, ARCH), 1)
     const edges = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
-    function fence() { ok(session.takeAction(0, 'fencing')); return ok(session.commitSelectionChoice(0, { edges, extraWood: 0 })) }
+    function fence() { ok(session.takeAction(0, 'fencing')); return ok(session.commitSelectionChoice(0, { edges })) }
     const response = fence(); assert.equal(bonus(response, ARCH), 0); assert.equal(response.state.players[0]!.resources.wood, 11)
     const undone = ok(session.undoAction()); assert.equal(bonus(undone, ARCH), 1); assert.deepEqual(undone.state.players[0]!.stableTiles, before.state.players[0]!.stableTiles); assert.equal(undone.state.players[0]!.fenceSegments.length, 0); assert.equal(undone.state.players[0]!.resources.wood, 15)
     assert.equal(bonus(fence(), ARCH), 0); save('A098-N5', { response, undone })

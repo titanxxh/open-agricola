@@ -616,7 +616,7 @@ describe('A083 Shepherds Crook parity', () => {
     })
     let response = session.takeAction(0, 'fencing')
     expect(response.interaction.stateId).toBe('wait')
-    response = session.commitSelectionChoice(0, { edges: EDGES_FOR_TWO_BY_TWO, extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: EDGES_FOR_TWO_BY_TWO })
     response = resolveTriggerIfPresent(session, response, 'A083_ShepherdsCrook')
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
       const pasture = response.interaction.request.zones.find((zone) => zone.zoneType === 'pasture')
@@ -637,7 +637,7 @@ describe('A083 Shepherds Crook parity', () => {
     })
     session.takeAction(0, 'fencing')
 
-    const response = session.commitSelectionChoice(0, { edges: EDGES_FOR_ONE, extraWood: 0 })
+    const response = session.commitSelectionChoice(0, { edges: EDGES_FOR_ONE })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)

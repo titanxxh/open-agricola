@@ -124,7 +124,7 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(2)
     resp = chooseLabel(session, resp, 'actions.fencing.name')
     expect(waiting(resp).promptKey).toBe('ui.interactionFenceSelect')
-    resp = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [], extraWood: 0 })
+    resp = session.commitSelectionChoice(0, { edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [] })
     expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 11, clay: 1, grain: 0, food: 2 })
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)

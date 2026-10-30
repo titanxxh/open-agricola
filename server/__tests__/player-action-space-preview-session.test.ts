@@ -345,7 +345,7 @@ describe('player action spaces share runtime plans with full previews', () => {
     expect(offered.interaction.stateId).toBe('wait')
     expect(offered.state.players[0]!.resources.food).toBe(1)
     expect(offered.state.players[1]!.resources.food).toBe(1)
-    const fenced = session.commitSelectionChoice(1, { edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'], extraWood: 0 })
+    const fenced = session.commitSelectionChoice(1, { edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'] })
     expect(fenced.ok, fenced.error).toBe(true)
     expect(fenced.state.players[1]!.pastures).toHaveLength(1)
     expect(fenced.state.players[1]!.resources).toMatchObject({ wood: 0, sheep: 1, food: 1 })

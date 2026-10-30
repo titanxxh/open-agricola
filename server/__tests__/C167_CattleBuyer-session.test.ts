@@ -64,8 +64,7 @@ const useFencing = (session: GameSession, actor = 1) => {
     stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } },
   })
   response = session.commitSelectionChoice(actor, {
-    edges: ONE_CELL, palisadeEdges: [], extraWood: 0,
-  })
+    edges: ONE_CELL, palisadeEdges: [], })
   return response
 }
 

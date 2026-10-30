@@ -17,7 +17,7 @@ export function menu(s:GameSession){let r=turn(s,0,'meeting-place');if(r.interac
 export function buy(s:GameSession,card:string){const pending=menu(s),r=ok(s.resolveChoice(0,card));assert.ok(r.state.players[0]!.minorPlayed.includes(card));return{pending,r}}
 export function score(r:SessionResponse,card:string,key='cardBonusVp'){assert.ok(r.scores);return r.scores[0]!.categories.find(c=>c.key===key)?.entries.filter(e=>'cardId'in e&&e.cardId===card).reduce((n,e)=>n+e.score,0)??0}
 export const REAL=['H-1-0','V-0-1'],PALI=['H-0-0','V-0-0'],ALL=[...REAL,...PALI]
-export function fence(s:GameSession){return ok(s.commitSelectionChoice(0,{edges:REAL,palisadeEdges:PALI,extraWood:0}))}
+export function fence(s:GameSession){return ok(s.commitSelectionChoice(0,{edges:REAL,palisadeEdges:PALI}))}
 export const LOCKED:FarmTilePosition[]=[{row:0,col:0},{row:1,col:1},{row:2,col:1}]
 export function site(configure:(state:GameState)=>void=()=>{},round=4){return setup(SITE,state=>{state.round=round;configure(state)})}
 export function ownerAgain(s:GameSession){turn(s,1,'grain-seeds');return confirmNext(s,s.getState())}

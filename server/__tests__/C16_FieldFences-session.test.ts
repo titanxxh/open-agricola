@@ -93,7 +93,6 @@ describe('C16 FieldFences session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
 
@@ -118,7 +117,6 @@ describe('C16 FieldFences session', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const after = resp.state.players[0]!
@@ -149,7 +147,6 @@ describe('C16 FieldFences session', () => {
     const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const after = resp.state.players[0]!
@@ -166,7 +163,6 @@ describe('C16 FieldFences session', () => {
     let resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     // Used 3 wood (4 - 1 field-adjacent), 5 - 3 = 2 left

@@ -119,7 +119,7 @@ describe('D088 Millwright session', () => {
     const session = setup({ resources: { wood: 2, grain: 2 } })
     expect(session.getActionAvailability(0).fencing).toBe(true)
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
-    const response = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, extraWood: 0 })
+    const response = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 0 })
@@ -221,7 +221,7 @@ describe('D088 Millwright session', () => {
     const selection = session.takeAction(0, 'fencing')
     expect(selection.ok, selection.error).toBe(true)
 
-    const response = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, extraWood: 0 })
+    const response = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)

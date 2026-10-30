@@ -148,7 +148,7 @@ describe('C001 Overhaul parity', () => {
     expect(response.interaction.stateId).toBe('wait')
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : '').toBe('farm-select')
     expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
-    const rebuilt = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0 })
+    const rebuilt = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, palisadeEdges: [] })
     expect(rebuilt.ok, rebuilt.error).toBe(true)
     expect(rebuilt.state.players[0]!.resources.wood).toBe(0)
     expect(rebuilt.state.players[0]!.fenceSegments).toHaveLength(4)

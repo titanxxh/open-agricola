@@ -38,7 +38,7 @@ export function fenceThenSow(session: GameSession) {
   const replacement = choose(session, 'ui.interactionAgrarianFencesSowAndFence')
   if (replacement.interaction.stateId !== 'wait' || replacement.interaction.request.kind !== 'farm-select'
     || replacement.interaction.request.farm.farmType !== 'fence') choose(session, 'actions.fencing.name')
-  const fenced = session.commitSelectionChoice(0, { edges: EDGES, palisadeEdges: [], extraWood: 0 })
+  const fenced = session.commitSelectionChoice(0, { edges: EDGES, palisadeEdges: [] })
   assert.equal(fenced.ok, true, fenced.error)
   assert.equal(fenced.state.players[0]!.fenceSegments.length, 4)
   if (offered(session, 'ui.interactionDoNotReplace')) choose(session, 'ui.interactionDoNotReplace')

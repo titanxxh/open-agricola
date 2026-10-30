@@ -159,8 +159,7 @@ describe('D089 Stablehand parity', () => {
     let response = session.takeAction(0, 'fencing')
     expect(response.ok, response.error).toBe(true)
     response = session.commitSelectionChoice(0, {
-      edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0,
-    })
+      edges: ONE_CELL_FENCES, palisadeEdges: [], })
     expect(response.ok, response.error).toBe(true)
     return resolveTriggerIfPresent(session, response, CARD_ID)
   }
@@ -212,8 +211,7 @@ describe('D089 Stablehand parity', () => {
     expect(response.ok, response.error).toBe(true)
 
     response = session.commitSelectionChoice(0, {
-      edges: [], palisadeEdges: PALISADE_EDGES, extraWood: 0,
-    })
+      edges: [], palisadeEdges: PALISADE_EDGES, })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)

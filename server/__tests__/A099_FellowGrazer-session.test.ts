@@ -103,7 +103,7 @@ describe('ae-negative-12-scoring', () => {
     const session = setup(GRAZER)
     ok(session.takeAction(0, 'fencing'))
     const edges = ['H-0-1', 'H-0-2', 'H-0-3', 'H-1-1', 'H-1-2', 'H-1-3', 'V-0-1', 'V-0-4']
-    const response = ok(session.commitSelectionChoice(0, { edges, extraWood: 0 })); assert.equal(bonus(response, GRAZER), 2); assert.equal(response.state.players[0]!.resources.wood, 7)
+    const response = ok(session.commitSelectionChoice(0, { edges })); assert.equal(bonus(response, GRAZER), 2); assert.equal(response.state.players[0]!.resources.wood, 7)
     const undone = ok(session.undoAction()); assert.equal(bonus(undone, GRAZER), 0); assert.equal(undone.state.players[0]!.pastures.length, 0); assert.equal(undone.state.players[0]!.resources.wood, 15); save('A099-N4', { response, undone })
   })
 })

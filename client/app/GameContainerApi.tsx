@@ -598,7 +598,7 @@ export const GameContainerApi = () => {
     const draft = farmSelectionDraft.submitDraft
     return { playerIndex: interaction.playerIndex, requestKey: interaction.requestKey,
       payload: buildFenceCommitPayload([...(draft.fenceEdges ?? [])], [...(draft.palisadeEdges ?? [])],
-        interaction.request.farm.extraWood ?? 0, interaction.request.farm.fenceSource, draft.fenceSources ?? {}) }
+        interaction.request.farm.fenceSource, draft.fenceSources ?? {}) }
   }, [farmSelectionDraft.submitDraft, interaction, isInteractive])
   const fenceQuote = useFenceSelectionQuote({ snapshot: state, request: fenceQuoteRequest, transport })
   const pendingAnimalReorg = useMemo(

@@ -105,7 +105,6 @@ const buildTile00 = (session: GameSession, sources: Record<string, string>) =>
   session.commitSelectionChoice(0, {
     edges: TILE_00,
     palisadeEdges: [],
-    extraWood: 0,
     fenceSources: sources,
   })
 
@@ -230,7 +229,6 @@ describe('E149 Midnight Fencer', () => {
     const palisade = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
-      extraWood: 0,
       fenceSources: { 'H-1-0': 'p2', 'V-0-1': 'p2' },
     })
     expect(palisade.ok).toBe(false)
@@ -260,7 +258,6 @@ describe('E149 Midnight Fencer', () => {
     resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
-      extraWood: 0,
       fenceSources: { 'H-1-0': 'p2', 'V-0-0': 'p2' },
     })
 
@@ -275,6 +272,6 @@ describe('E149 Midnight Fencer', () => {
 describe('ae-negative-55-phase', () => {
   const { sessions, ok, save, make, finish, choose, end } = audit55Phase
   afterEach(() => sessions.splice(0).forEach(session => session.dispose()))
-  it('E149 N1 last harvest accepts four free fences borrowed at most two from each donor and rejects overlimit donor assignment before retry',()=>{const s=make('E149_MidnightFencer',undefined,true,14);let p=end(s);p=choose(s,p,o=>o.value!=='__skip__');assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='fence');const edges=['H-0-0','H-1-0','V-0-0','V-0-1'],p2=p.state.players[1]!.id,p3=p.state.players[2]!.id,badSources=Object.fromEntries(edges.map(edge=>[edge,p2])),rejected=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges,palisadeEdges:[],extraWood:0,fenceSources:badSources})),sources=Object.fromEntries(edges.map((edge,i)=>[edge,i<2?p2:p3])),r=finish(s,ok(s.commitSelectionChoice(0,{edges,palisadeEdges:[],extraWood:0,fenceSources:sources})));assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.pastures.length,1);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[1]!)),13);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[2]!)),13);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[3]!)),15);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),15);save('E149-N1',{p,rejected,r})})
+  it('E149 N1 last harvest accepts four free fences borrowed at most two from each donor and rejects overlimit donor assignment before retry',()=>{const s=make('E149_MidnightFencer',undefined,true,14);let p=end(s);p=choose(s,p,o=>o.value!=='__skip__');assert.ok(p.interaction.stateId==='wait'&&p.interaction.request.kind==='farm-select'&&p.interaction.request.farm.farmType==='fence');const edges=['H-0-0','H-1-0','V-0-0','V-0-1'],p2=p.state.players[1]!.id,p3=p.state.players[2]!.id,badSources=Object.fromEntries(edges.map(edge=>[edge,p2])),rejected=assertRejectedUnchanged(s,()=>s.commitSelectionChoice(0,{edges,palisadeEdges:[],fenceSources:badSources})),sources=Object.fromEntries(edges.map((edge,i)=>[edge,i<2?p2:p3])),r=finish(s,ok(s.commitSelectionChoice(0,{edges,palisadeEdges:[],fenceSources:sources})));assert.equal(r.state.players[0]!.fenceSegments.length,4);assert.equal(r.state.players[0]!.pastures.length,1);assert.equal(r.state.players[0]!.resources.wood,0);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[1]!)),13);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[2]!)),13);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[3]!)),15);assert.equal(s.withCtx(() => getOwnOrdinaryFenceReserveCount(r.state.players[0]!)),15);save('E149-N1',{p,rejected,r})})
   it('E149 N2 last-harvest decline round thirteen and a hand-only card create no borrowed fence or donor consumption',()=>{for(const mode of['decline','round','hand']){const s=make('E149_MidnightFencer',undefined,mode!=='hand',mode==='round'?13:14),r=finish(s,end(s),false,mode==='decline'?undefined:'E149_MidnightFencer');assert.equal(r.state.players[0]!.fenceSegments.length,0);assert.deepEqual(r.state.players.slice(1).map(p=>s.withCtx(() => getOwnOrdinaryFenceReserveCount(p))),[15,15,15]);save(`E149-N2-${mode}`,r)}})
 })

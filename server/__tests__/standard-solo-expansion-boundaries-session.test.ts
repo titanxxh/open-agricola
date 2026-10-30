@@ -136,7 +136,7 @@ describe('solo expansion boundaries with two-player controls', () => {
     const session = boundary(playerCount, 9, state => { state.round = 7; state.players[0]!.resources.wood = 10 })
     const before = structuredClone(session.state.players[1])
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
-    const response = session.commitSelectionChoice(0, { edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2'], extraWood: 0 })
+    const response = session.commitSelectionChoice(0, { edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2'] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(5)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(7)

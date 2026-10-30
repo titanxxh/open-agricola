@@ -338,7 +338,6 @@ describe('farm interaction builders', () => {
     const rejected = session.commitSelectionChoice(0, {
       edges: [],
       palisadeEdges: [],
-      extraWood: 0,
     })
 
     expect(rejected.ok).toBe(false)

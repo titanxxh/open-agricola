@@ -55,7 +55,7 @@ describe('spring fence payment explanation', () => {
     expect(start.ok, start.error).toBe(true)
     expect(start.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
 
-    const done = session.commitSelectionChoice(0, { edges: sevenFences, extraWood: 0 })
+    const done = session.commitSelectionChoice(0, { edges: sevenFences })
     expect(done.ok, done.error).toBe(true)
     expect(done.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
     expect(done.state.players[0]!.fenceSegments).toHaveLength(7)
@@ -101,7 +101,7 @@ describe('spring fence payment explanation', () => {
     )
     if (!useReserve) throw new Error('missing reserve choice')
     expect(session.resolveChoice(0, useReserve.value).ok).toBe(true)
-    const done = session.commitSelectionChoice(0, { edges: fourFences, extraWood: 0 })
+    const done = session.commitSelectionChoice(0, { edges: fourFences })
     expect(done.ok, done.error).toBe(true)
     expect(done.state.players[0]!.resources.wood).toBe(10 - (4 - reserve - saved))
     expect(done.state.players[0]!.cardStates.E074_AshTrees?.counters?.fences).toBe(0)
@@ -118,7 +118,7 @@ describe('spring fence payment explanation', () => {
       else state.enableThroughTheSeasons = false
     })
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
-    const done = session.commitSelectionChoice(0, { edges: fourFences, extraWood: 0 })
+    const done = session.commitSelectionChoice(0, { edges: fourFences })
     expect(done.ok, done.error).toBe(true)
     expect(done.state.players[0]!.resources.wood).toBe(6)
     expect(done.state.events.filter(event => event.type === 'resource.paid'))
@@ -129,7 +129,7 @@ describe('spring fence payment explanation', () => {
   it('preserves the cost saving when a card trade covers the remaining fee', () => {
     const session = springSession(state => { state.players[0]!.occupationPlayed = ['A088_HedgeKeeper'] })
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
-    const done = session.commitSelectionChoice(0, { edges: fourFences, extraWood: 0 })
+    const done = session.commitSelectionChoice(0, { edges: fourFences })
     expect(done.ok, done.error).toBe(true)
     expect(done.state.players[0]!.resources.wood).toBe(10)
     expect(done.state.events.filter(event => event.type === 'resource.paid')).toEqual([
@@ -149,14 +149,14 @@ describe('spring fence payment explanation', () => {
     const before = undoRuleSnapshot(session.getState())
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
     session = restore(session)
-    assertRejectedUnchanged(session, () => session.commitSelectionChoice(1, { edges: sevenFences, extraWood: 0 }))
-    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { edges: ['H-0-0'], extraWood: 0 }))
-    expect(session.commitSelectionChoice(0, { edges: sevenFences, extraWood: 0 }).ok).toBe(true)
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(1, { edges: sevenFences }))
+    assertRejectedUnchanged(session, () => session.commitSelectionChoice(0, { edges: ['H-0-0'] }))
+    expect(session.commitSelectionChoice(0, { edges: sevenFences }).ok).toBe(true)
     session = restore(session)
     assertUndoRestored(before, session.undoAction())
     expect(session.state.events.filter(event => event.type === 'resource.paid')).toHaveLength(0)
     expect(session.takeAction(0, 'fencing').ok).toBe(true)
-    const done = session.commitSelectionChoice(0, { edges: sevenFences, extraWood: 0 })
+    const done = session.commitSelectionChoice(0, { edges: sevenFences })
     expect(done.ok, done.error).toBe(true)
     expect(done.state.events.filter(event => event.type === 'resource.paid')).toEqual([
       expect.objectContaining({ resources: { wood: 5 }, seasonalAdjustments: [{ season: 'spring', resources: { wood: -2 } }] }),
@@ -177,8 +177,7 @@ describe('spring fence payment explanation', () => {
     const accept = offered.interaction.request.options.find(option => option.value !== '__skip__')
     if (!accept) throw new Error('missing accept option')
     expect(session.resolveChoice(0, accept.value).ok).toBe(true)
-    const done = session.commitSelectionChoice(0, { edges: fourFences.slice(2), extraWood: 0,
-      fenceSources: { 'V-0-0': 'p2', 'V-0-1': 'p2' } })
+    const done = session.commitSelectionChoice(0, { edges: fourFences.slice(2), fenceSources: { 'V-0-0': 'p2', 'V-0-1': 'p2' } })
     expect(done.ok, done.error).toBe(true)
     expect(done.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(done.state.players[0]!.resources.wood).toBe(10)

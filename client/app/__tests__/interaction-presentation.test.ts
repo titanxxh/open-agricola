@@ -358,7 +358,6 @@ describe('Interaction Presentation', () => {
     expect(buildInteractionSubmitCommand(waitFarm({
       farmType: 'fence',
       selectableEdges: ['H-0-0'],
-      extraWood: 1,
       fenceSource: { kind: 'borrowed', donorCaps: { p2: 1 } },
     }), {
       value: 'confirm',
@@ -371,7 +370,6 @@ describe('Interaction Presentation', () => {
       payload: {
         edges: ['H-0-0'],
         palisadeEdges: ['V-0-0'],
-        extraWood: 1,
         fenceSources: { 'H-0-0': 'p2' },
       },
     })
@@ -588,7 +586,7 @@ describe('Interaction Presentation', () => {
         interaction: waitFarm({ farmType: 'fence', selectableEdges: ['H-0-0'] }),
         draft: { value: 'confirm', fenceEdges: ['H-0-0'] },
         playerIndex: 0,
-        payload: { edges: ['H-0-0'], palisadeEdges: [], extraWood: 0 },
+        payload: { edges: ['H-0-0'], palisadeEdges: [] },
       },
       {
         interaction: waitFarm({

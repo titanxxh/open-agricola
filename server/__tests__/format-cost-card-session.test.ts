@@ -336,7 +336,6 @@ describe('formatCost card session regressions', () => {
 
     const fenced = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
-      extraWood: 0,
     })
     expect(fenced.ok).toBe(true)
     expect(fenced.state.players[0]!.resources.food).toBe(0)
@@ -362,7 +361,6 @@ describe('formatCost card session regressions', () => {
 
     const twoCells = session.commitSelectionChoice(0, {
       edges: ['H-0-1', 'H-1-1', 'V-0-0', 'V-0-2'],
-      extraWood: 0,
     })
     expect(twoCells.ok).toBe(false)
   })
@@ -382,13 +380,11 @@ describe('formatCost card session regressions', () => {
 
     const oneCell = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
-      extraWood: 0,
     })
     expect(oneCell.ok).toBe(false)
 
     const twoCells = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'],
-      extraWood: 0,
     })
     expect(twoCells.ok).toBe(true)
     expect(twoCells.state.players[0]!.occupationPlayed).toContain('B149_OpenAirFarmer')
@@ -597,7 +593,6 @@ describe('formatCost card session regressions', () => {
 
     const fenced = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
-      extraWood: 0,
     })
     expect(fenced.ok).toBe(true)
     expect(fenced.state.players[0]!.resources.wood).toBe(0)

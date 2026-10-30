@@ -8,7 +8,6 @@ export type PendingChoice = {
   multiSelect?: ChoiceMultiSelect
   playerIndex: number
   spaceId: string
-  fenceExtraWood?: number
   sourceCard?: string
 }
 

@@ -33,7 +33,7 @@ export const FOUR=['H-0-1','H-1-1','V-0-1','V-0-2'], SIX=['H-0-1','H-0-2','H-1-1
 export function boundary(tiles:{row:number;col:number}[]){const edges=new Map<string,number>();for(const {row,col}of tiles)for(const edge of[`H-${row}-${col}`,`H-${row+1}-${col}`,`V-${row}-${col}`,`V-${row}-${col+1}`])edges.set(edge,(edges.get(edge)??0)+1);return [...edges].filter(([,n])=>n===1).map(([e])=>e)}
 export function closed(state:GameState,tiles:{row:number;col:number}[],individual=false){const p=state.players[0]!;const edges=individual?[...new Set(tiles.flatMap(t=>boundary([t])))]:boundary(tiles);p.fenceSegments=edges.map(edge=>({edge,type:'fence',source:{kind:'own',ownerPlayerId:p.id}}));p.pastures=individual?tiles.map((t,i)=>({id:`closed-${i}`,tiles:[t],animalType:null,animalCount:0})):[{id:'closed',tiles,animalType:null,animalCount:0}]}
 export function fenceEntry(s:GameSession){const r=turn(s,0,'fencing');assert.ok(r.interaction.stateId==='wait'&&r.interaction.request.kind==='farm-select'&&r.interaction.request.farm.farmType==='fence',JSON.stringify(r.interaction));return r}
-export function fenceCommit(s:GameSession,edges:string[]){return complete(ok(s.commitSelectionChoice(0,{edges,palisadeEdges:[],extraWood:0})))}
+export function fenceCommit(s:GameSession,edges:string[]){return complete(ok(s.commitSelectionChoice(0,{edges,palisadeEdges:[]})))}
 export function fence(s:GameSession,edges=FOUR){fenceEntry(s);return fenceCommit(s,edges)}
 export function fields(r:SessionResponse,actor=0){return r.state.players[actor]!.fields.length}
 export function workEnd(s:GameSession){turn(s,0,'forest');turn(s,1,'grain-seeds');turn(s,0,'clay-pit');return confirmNext(s,turn(s,1,'reed-bank'))}

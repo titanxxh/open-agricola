@@ -102,7 +102,7 @@ type ActionDefinition = {
 - **围栏付款归属**：宿主在 `farm.fenceBuilt` 预留 `paymentId`，传给其内部 pay child。只有标识、玩家及 fencing 用途均匹配的实际 `resource.paid`，才为对应建造日志提供费用和季节调整。没有实际费用或调整的空付款不产生支付事实。
 - **播种**（`sow.ts`）：没有支付组合。`maxSelections` 计算 Logical Field，`maxSeedSelections` 限制作物槽；行动作物许可与田地 owner 的许可取交集；`isUnconditionalSow` 保留显式限制。
 
-首轮 payload 为 `fence: {edges, palisadeEdges, extraWood, fenceSources?}`、`room: {rooms}`、`stable: {stables}`、`plow: {tile}`、`sow: {crops}`，以 `{type:'choice', value:'confirm', payload}` 提交。第二轮支付把 payload 保存在 `pending.actionContext.farmPayload`。建房与围栏的入口可执行性会拒绝没有可达提交的状态。
+首轮 payload 为 `fence: {edges, palisadeEdges, fenceSources?}`、`room: {rooms}`、`stable: {stables}`、`plow: {tile}`、`sow: {crops}`，以 `{type:'choice', value:'confirm', payload}` 提交。围栏费用只由后端基础费用、`fencePolicy` 和费用 hooks 决定；客户端只提交几何位置和 token 来源，不提交附加费用。第二轮支付把 payload 保存在 `pending.actionContext.farmPayload`。建房与围栏的入口可执行性会拒绝没有可达提交的状态。
 
 ### 围栏段与 policy
 

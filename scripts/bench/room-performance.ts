@@ -69,7 +69,7 @@ const selectCommand = (session: GameSession, response: SessionResponse): Command
           const occupied = [...player.roomTiles, ...player.fields]
             .some(tile => tile.row === row && tile.col === col)
           if (!occupied && edges.every(edge => farm.selectableEdges.includes(edge))) {
-            return { type: 'selection', actor, payload: { edges, extraWood: 0 } }
+            return { type: 'selection', actor, payload: { edges } }
           }
         }
       }

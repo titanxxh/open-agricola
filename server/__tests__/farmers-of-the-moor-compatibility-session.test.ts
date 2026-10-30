@@ -1206,7 +1206,6 @@ describe('Farmers of the Moor compatibility regressions', () => {
     const tile = firstEmptyFarmyardTile(player)
     resp = session.commitSelectionChoice(0, {
       edges: oneCellFences(tile.row, tile.col),
-      extraWood: 0,
     })
 
     expect(resp.ok).toBe(true)

@@ -132,7 +132,7 @@ describe('Workshop Capability Contract farm and round listeners', () => {
     expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } } })
     expect(counters(session)).toEqual({ 'before:fence': 1 })
 
-    const fenced = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, palisadeEdges: [], extraWood: 0 })
+    const fenced = session.commitSelectionChoice(0, { edges: ONE_CELL_FENCES, palisadeEdges: [] })
 
     expect(fenced.ok).toBe(true)
     expect(fenced.state.players[0]!.fenceSegments).toHaveLength(4)

@@ -48,7 +48,7 @@ export function accept(s: GameSession, r: SessionResponse) { if (r.interaction.s
     r = choose(s, r, o => o.value !== '__pass__'); if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'choice')
     r = choose(s, r, o => o.value !== '__skip__'); return r; }
 export const EDGES = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'];
-export function fences(s: GameSession) { return ok(s.commitSelectionChoice(0, { edges: EDGES, palisadeEdges: [], extraWood: 0 })); }
+export function fences(s: GameSession) { return ok(s.commitSelectionChoice(0, { edges: EDGES, palisadeEdges: [] })); }
 export function fieldfence(food = 2, wood = 3, field = true) { return make('C016_FieldFences', false, 2, s => { Object.assign(s.players[0]!.resources, { food, wood }); if (field)
     s.players[0]!.fields = [{ row: 0, col: 2, stacks: [] }]; }); }
 export function newly(n = 3, cardField = false) { return make('C017_NewlyPlowedField', false, cardField ? 3 : 2, s => { s.players[0]!.fields = Array.from({ length: n }, (_, i) => ({ row: i < 3 ? 0 : 1, col: i < 3 ? i + 1 : 3, stacks: [] })); if (cardField)

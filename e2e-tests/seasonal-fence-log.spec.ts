@@ -31,7 +31,7 @@ for (const locale of ['en'] as const) {
       const edges = free ? ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
         : ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-1', 'V-0-2']
       const committed = await request.post(`${BACKEND_URL}/api/game/commit-selection`, {
-        data: { playerIndex: 0, payload: { edges, extraWood: 0 } },
+        data: { playerIndex: 0, payload: { edges } },
       })
       expect(committed.ok()).toBe(true)
       const response = await committed.json() as GameSyncPayload

@@ -322,7 +322,7 @@ describe('canStartFencing with costOverride', () => {
     ).toBe(false)
   })
 
-  it('uses the fixed extra wood from the farm request', () => {
+  it('does not charge farm redevelopment extra wood for a free fence policy', () => {
     const player = createPlayer()
     player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
     player.fields = [
@@ -347,8 +347,8 @@ describe('canStartFencing with costOverride', () => {
       },
     } as unknown as ActionExecutionContext
     const edges = ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5']
-    expect(fenceAction.resolveChoice!(context, 'confirm', { edges, extraWood: 1 })).toMatchObject({ type: 'fail' })
-    expect(player.fenceSegments).toEqual([])
-    expect(fenceAction.resolveChoice!(context, 'confirm', { edges, extraWood: 0 }).type).toBe('ok')
+    expect(fenceAction.resolveChoice!(context, 'confirm', { edges }).type).toBe('ok')
+    expect(player.fenceSegments).toHaveLength(4)
+    expect(player.resources.wood).toBe(0)
   })
 })

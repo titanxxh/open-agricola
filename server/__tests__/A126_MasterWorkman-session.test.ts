@@ -103,8 +103,7 @@ describe('A126 Master Workman parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.clay).toBe(1)
     response = session.commitSelectionChoice(0, {
-      edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [], extraWood: 0,
-    })
+      edges: ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5'], palisadeEdges: [], })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1 })

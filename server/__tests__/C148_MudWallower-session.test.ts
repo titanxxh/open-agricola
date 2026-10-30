@@ -45,8 +45,7 @@ describe('C148 fencing with existing card animals', () => {
     let response = session.takeAction(0, 'fencing')
     expect(response.ok, response.error).toBe(true)
     response = session.commitSelectionChoice(0, {
-      edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'], extraWood: 0,
-    })
+      edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'], })
     expect(response.ok, response.error).toBe(true)
     const after = response.state.players[0]!
     expect(after.resources.wood).toBe(total === 1 ? 16 : 17)

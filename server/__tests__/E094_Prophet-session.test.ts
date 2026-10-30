@@ -47,7 +47,7 @@ describe('ae-negative-45-prophet', () => {
           r = session.resolveChoice(actorOf(r), o!.value)
         }
         expect(r.interaction.stateId).toBe('wait')
-        const fencePlan = { edges: ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'], palisadeEdges: [], extraWood: 0 }
+        const fencePlan = { edges: ['H-0-2', 'H-1-2', 'V-0-2', 'V-0-3'], palisadeEdges: [] }
         if (wood === 4) {
           r = session.commitSelectionChoice(0, fencePlan)
           expect(r.ok, r.error).toBe(true)

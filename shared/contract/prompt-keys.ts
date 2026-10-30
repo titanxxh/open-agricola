@@ -95,7 +95,6 @@ export type PromptParams<K extends PromptKey> =
   : K extends 'ui.interactionSow' | 'ui.interactionSowSelect'         ? { allowedCrops?: CropType[]; needed?: number }
   : K extends 'ui.interactionRoom' | 'ui.interactionRoomSelect'       ? { needed?: number; maxSelections?: number }
   : K extends 'ui.interactionStable' | 'ui.interactionStableSelect'   ? { needed?: number; maxSelections?: number }
-  : K extends 'ui.interactionFence' | 'ui.interactionFenceSelect'     ? { extraWood?: number }
   : K extends 'ui.interactionSelection'   ? { maxSelections: number; minSelections?: number }
   : K extends 'ui.interactionOccupationHand' ? { maxSelections: number; minSelections: number }
   : K extends 'ui.interactionCollectorSelect' | 'ui.interactionWorkshopAssistantSelect' ? { needed: number }

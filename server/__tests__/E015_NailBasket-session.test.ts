@@ -113,7 +113,7 @@ const buildFourFences = (session: GameSession, response: SessionResponse) => {
   if (response.interaction.stateId !== 'wait') throw new Error('expected fence selection')
   expect(response.interaction.sourceCard).toBe(CARD_ID)
   expect(response.interaction.request.farm?.farmType).toBe('fence')
-  return session.commitSelectionChoice(0, { edges: FENCE_EDGES, extraWood: 0 })
+  return session.commitSelectionChoice(0, { edges: FENCE_EDGES })
 }
 
 describe('E015 Nail Basket parity', () => {
@@ -276,7 +276,7 @@ describe('ae-negative-31-plows', () => {
     const r = accept(t, take(t, 'forest'), card)
     assert.equal(r.state.players[0]!.resources.wood, 3)
     assert.equal(r.state.players[0]!.resources.stone, 0)
-    assertRejectedUnchanged(t, () => t.commitSelectionChoice(actor(r), { edges: boundary([{ row: 0, col: 3 }]), extraWood: 0 }))
+    assertRejectedUnchanged(t, () => t.commitSelectionChoice(actor(r), { edges: boundary([{ row: 0, col: 3 }]) }))
     assert.equal(t.state.players[0]!.fenceSegments.length, 0)
     save('E015-N4-short', t.getState())
   })

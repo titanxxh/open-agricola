@@ -152,8 +152,7 @@ describe('space and rule reaction timing', () => {
     const pending = accept(session, session.takeAction(0, 'forest'), 'B015_CarpentersBench')
     expect(pending.interaction.stateId === 'wait' && pending.interaction.request.kind).toBe('farm-select')
     const response = session.commitSelectionChoice(0, {
-      edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], palisadeEdges: [], extraWood: 0,
-    })
+      edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'], palisadeEdges: [], })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 4, food: 0 })
     expect(response.state.players[0]!.pastures).toHaveLength(1)

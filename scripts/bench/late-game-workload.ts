@@ -169,7 +169,7 @@ const selectCommand = (session: GameSession, response: SessionResponse): Command
           const occupied = [...player.roomTiles, ...player.fields, ...player.pastures.flatMap(pasture => pasture.tiles)].some(tile => tile.row === row && tile.col === col)
           const existing = new Set(player.fenceSegments.map(segment => segment.edge))
           const additions = edges.filter(edge => !existing.has(edge))
-          if (!occupied && additions.length > 0 && additions.length < 4 && existing.size + additions.length <= 15 && additions.every(edge => farm.selectableEdges.includes(edge))) return { type: 'selection', actor, payload: { edges: additions, extraWood: farm.extraWood ?? 0 } }
+          if (!occupied && additions.length > 0 && additions.length < 4 && existing.size + additions.length <= 15 && additions.every(edge => farm.selectableEdges.includes(edge))) return { type: 'selection', actor, payload: { edges: additions } }
         }
       }
     }

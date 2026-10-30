@@ -241,13 +241,9 @@ export const interactionChoiceOptions = (interaction: WaitInteraction): ActionCh
       : option)
 }
 
-const farmFromInteraction = (interaction: WaitInteraction): InteractionFarmSelection | null =>
-  interaction.request.kind === 'farm-select' ? interaction.request.farm : null
-
 const selectionFromRequest = (request: SelectionRequest): InteractionSelection => request.selection
 
 const pendingChoiceFromInteraction = (interaction: WaitInteraction): PendingChoice => {
-  const farm = farmFromInteraction(interaction)
   return {
     promptKey: interaction.promptKey,
     promptParams: interaction.promptParams,
@@ -256,7 +252,6 @@ const pendingChoiceFromInteraction = (interaction: WaitInteraction): PendingChoi
     playerIndex: interaction.playerIndex,
     spaceId: interaction.spaceId ?? '',
     sourceCard: interaction.sourceCard,
-    fenceExtraWood: farm?.farmType === 'fence' ? farm.extraWood ?? 0 : undefined,
   }
 }
 
@@ -537,7 +532,6 @@ const buildInteractionSubmitCommandUnchecked = (
         payload: buildFenceCommitPayload(
           fenceEdges,
           [...(draft.palisadeEdges ?? [])],
-          farm.extraWood ?? 0,
           farm.fenceSource,
           fenceSources,
         ),

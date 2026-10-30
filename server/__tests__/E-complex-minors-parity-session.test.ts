@@ -193,7 +193,7 @@ describe('E074 Ash Trees parity', () => {
       : undefined
     expect(useFour).toBeDefined()
     response = session.resolveChoice(0, useFour!.value)
-    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2), extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2) })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
@@ -205,7 +205,7 @@ describe('E074 Ash Trees parity', () => {
     const session = ashTreesSession(4)
     let response = session.takeAction(0, 'fencing')
     response = session.resolveChoice(0, '__skip__')
-    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2), extraWood: 0 })
+    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 2) })
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)

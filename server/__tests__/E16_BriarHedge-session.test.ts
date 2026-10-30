@@ -103,7 +103,6 @@ describe('E16 BriarHedge — border-fence discount', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
@@ -122,7 +121,6 @@ describe('E16 BriarHedge — border-fence discount', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
@@ -138,7 +136,6 @@ describe('E16 BriarHedge — border-fence discount', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'],
       palisadeEdges: [],
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
@@ -154,7 +151,6 @@ describe('E16 BriarHedge — border-fence discount', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],         // 2 internal fences
       palisadeEdges: ['H-0-0', 'V-0-0'], // 2 border palisades
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
@@ -171,7 +167,6 @@ describe('E16 BriarHedge — border-fence discount', () => {
     resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-1'], // 3 fences (1 border + 2 internal)
       palisadeEdges: ['V-0-0'],           // 1 border palisade
-      extraWood: 0,
     })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
@@ -219,5 +214,5 @@ describe('ae-negative-31-plows', () => {
       save(`E016-N2-${mode}`, r)
     }
   })
-  it('E016 N3 one wood cannot pay two internal edges and finite original fences remain unchanged', () => { const card = 'E016_BriarHedge', s = setup(card, 14, st => st.players[0]!.resources.wood = 1); const r = take(s, 'fencing'); assertRejectedUnchanged(s, () => s.commitSelectionChoice(actor(r), { edges: boundary([{ row: 2, col: 4 }]), palisadeEdges: [], extraWood: 0 })); assert.equal(s.state.players[0]!.resources.wood, 1); assert.equal(s.state.players[0]!.fenceSegments.length, 0); save('E016-N3', s.getState()); })
+  it('E016 N3 one wood cannot pay two internal edges and finite original fences remain unchanged', () => { const card = 'E016_BriarHedge', s = setup(card, 14, st => st.players[0]!.resources.wood = 1); const r = take(s, 'fencing'); assertRejectedUnchanged(s, () => s.commitSelectionChoice(actor(r), { edges: boundary([{ row: 2, col: 4 }]), palisadeEdges: [] })); assert.equal(s.state.players[0]!.resources.wood, 1); assert.equal(s.state.players[0]!.fenceSegments.length, 0); save('E016-N3', s.getState()); })
 })
