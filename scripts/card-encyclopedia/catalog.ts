@@ -11,7 +11,6 @@ import type { CardDefinition } from '../../shared/contract/cards'
 import { PAYMENT_RESOURCE_KEYS } from '../../shared/contract/resource-keys'
 import type { ComplexCost, PaymentResourceMap } from '../../shared/contract/types'
 import type { ParentCardDefinition } from '../../shared/parents'
-import { seasonActionIdBySeason } from '../../shared/projections/season-actions'
 import {
   moorMajorDisplayNumber,
   officialCardDeck,
@@ -189,7 +188,7 @@ export const buildEncyclopediaEntries = (sources: EncyclopediaSources): Encyclop
       group: 'seasons',
       publicType: 'season',
       displayNumber: null,
-      face: { kind: 'season', season, actionId: seasonActionIdBySeason[season] },
+      face: { kind: 'season', season },
       text: seasonTexts(season),
     })),
   ]

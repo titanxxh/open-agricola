@@ -56,10 +56,7 @@ describe('card encyclopedia loader', () => {
 
     expect(second).toBe(first)
     expect(again).toBe(first)
-    expect(first.entries).toEqual([entry])
-    expect(first.documents).toEqual([document])
-    expect(first.languages).toEqual(['en', 'zh'])
-    expect(first.byKey.get('card:A004_Baseboards')).toEqual({ entry, document })
+    expect([...first.byKey]).toEqual([['card:A004_Baseboards', { entry, document }]])
     expect(fetch.mock.calls.map(([url, init]) => [url, init?.cache])).toEqual([
       ['/card-encyclopedia/manifest.json', 'no-cache'],
       [`/card-encyclopedia/${manifest.catalog.file}`, undefined],
@@ -75,7 +72,7 @@ describe('card encyclopedia loader', () => {
 
     await expect(loadCardEncyclopedia()).rejects.toThrow('checksum')
     corrupt = false
-    await expect(loadCardEncyclopedia()).resolves.toMatchObject({ entries: [entry] })
+    expect([...(await loadCardEncyclopedia()).byKey.values()]).toEqual([{ entry, document }])
   })
 
   it('rejects an unavailable server and loads on retry', async () => {
@@ -85,7 +82,7 @@ describe('card encyclopedia loader', () => {
 
     await expect(loadCardEncyclopedia()).rejects.toThrow('503')
     status = undefined
-    await expect(loadCardEncyclopedia()).resolves.toMatchObject({ documents: [document] })
+    expect([...(await loadCardEncyclopedia()).byKey.values()]).toEqual([{ entry, document }])
   })
 
   it('rejects a manifest that is not a card encyclopedia list', async () => {

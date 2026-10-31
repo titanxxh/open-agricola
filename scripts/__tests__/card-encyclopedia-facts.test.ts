@@ -88,7 +88,7 @@ describe('card encyclopedia identity facts', () => {
   it('describes parent, moor and season material with its own face reference', () => {
     expect(entry('parent:PR01')).toMatchObject({ group: 'parents', publicType: 'mother', displayNumber: 'PR01' })
     expect(entry('parent:PS01')).toMatchObject({ publicType: 'father', displayNumber: 'PS01' })
-    expect(entry('season:winter').face).toEqual({ kind: 'season', season: 'winter', actionId: 'season-winter-romantic-evening' })
+    expect(entry('season:winter').face).toEqual({ kind: 'season', season: 'winter' })
     expect(entry('moorSpecialAction:moor-special-1-5-6-market-work').face).toEqual({
       kind: 'moorSpecialAction',
       image: expect.stringMatching(/\.(png|jpg|webp)$/),
