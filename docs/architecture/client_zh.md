@@ -50,6 +50,7 @@
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
 - `FarmBoardView.viewerPlayerId` 决定可见的私有手牌，独立于 Interaction Player。联机座位在其他玩家回合仍能查看自己的手牌，提交仍需本机座位的交互权限。热座沿用已确认的接机身份，浏览公开农场时隐藏手牌。覆盖见 `GameContainerApi.hotseat.test.tsx`、`ws-dual-player.spec.ts` 与 `hotseat-public-farms.spec.ts`。
 - 轮抽与父母卡选择阶段在独立滚动的选卡区域上方保留 `GameHeader`。内嵌模式保留语言切换。测试见 `setup-navigation.spec.ts`。
+- 协商结束与再来一局（`GameEndControls`）在轮抽、父母卡选择、单人手牌、热座交接和普通对局中都放在 `GameHeader` 的菜单里。有待处理提议时，菜单按钮显示标记并打开菜单。覆盖见 `game-end.spec.ts`。
 - `RoomInvitePicker.tsx` 在输入两个字符后搜索用户名或显示名前缀，支持点击与键盘选择，等待输入法组字结束，并丢弃已取消请求的响应。已选玩家显示为带用户名、可移除的名字标签，账号 ID 只用于创建请求。服务端确认 Room 后从 URL 移除创建选项，所有准入决定仍由服务端执行。覆盖：`RoomInvitePicker.test.tsx`、`room-invitations.spec.ts`。
 - `MyActiveGames.tsx` 通过参与者名字和颜色识别对局，显示扩展图标、游戏回合或开局阶段、本地时区的创建或开局时间，以及服务端给出的等待玩家。尚未提交轮抽选牌的所有玩家沿用普通游戏当前行动玩家的颜色标记描边。继续游戏使用 Room ID，但不展示该 ID。覆盖：`LobbyPage.test.tsx`、`room-invitations.spec.ts`、`lobby-active-games.spec.ts`、`draft-opening-order.spec.ts`。
 - `app/solo/SoloHandOverlay.tsx` 按权威候选分组收集一次本地选择并原子提交。重复快照和语言切换保留可编辑勾选；刷新恢复候选并清空未确认勾选。Moor 准备和保留继续使用 `InteractionBar` 原生选择；`SpecialActionsPanel` 读取公开当前牌、弃牌及 `soloSupply` 投影。覆盖见 `standard-solo-ui.spec.ts` 与单人组件测试。

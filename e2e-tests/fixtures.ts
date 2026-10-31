@@ -89,6 +89,18 @@ export async function finishHotseatOpening(page: Page) {
   throw new Error('Hotseat opening did not reach the work phase')
 }
 
+export async function openGameEndControls(page: Page) {
+  const controls = page.locator('.header-menu').getByRole('region', { name: 'End game', exact: true })
+  const menu = page.locator('.header-compact').getByRole('button', { name: 'Menu', exact: true })
+  await expect(menu).toBeVisible()
+  await expect(async () => {
+    if (await controls.isHidden()) await menu.click()
+    expect(await controls.isVisible()).toBe(true)
+  }).toPass()
+  await expect(page.locator('.app > .game-end-controls')).toHaveCount(0)
+  return controls
+}
+
 // ── Output helpers ───────────────────────────────────────────────────────────
 
 export async function saveScreenshot(page: Page, name: string, dir = OUTPUT_DIR) {

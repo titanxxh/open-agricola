@@ -5436,10 +5436,26 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   padding: 8px;
   z-index: 40;
-  min-width: 160px;
+  width: min(280px, calc(100vw - 32px));
+  max-height: min(70dvh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.header-menu[hidden] { display: none !important; }
+.header-action-btn--pending { position: relative; }
+.header-action-btn--pending::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  inset-inline-end: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f6d36b;
+  box-shadow: 0 0 0 2px #2f5d28;
 }
 .header-menu-item {
   display: flex;
@@ -5537,6 +5553,28 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 .app--setup > .header-compact {
   flex-shrink: 0;
   z-index: 41;
+}
+.header-compact.header-compact--menu-open,
+.app--setup > .header-compact.header-compact--menu-open {
+  z-index: 1100;
+}
+.app.app--handoff {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+}
+.app--handoff > .header-compact {
+  position: relative;
+  z-index: 70;
+  flex-shrink: 0;
+}
+.app--handoff > .hotseat-handoff {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-height: 0;
+  z-index: 1;
 }
 .app--setup > :is(.draft-overlay, .parent-selection-overlay) {
   position: relative;

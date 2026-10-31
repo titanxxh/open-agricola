@@ -360,6 +360,7 @@ export const GameContainerApi = () => {
   const isEmbedded = currentUrlParams.get('embedded') === '1'
   // Confirmation is scoped to this room and the seat holding the shared device.
   const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
+  const [gameEndMenuAlert, setGameEndMenuAlert] = useState(false)
 
   const requestedPlayerId = useMemo(() => requestedWsPlayerIdFromQuery(window.location.search), [])
   const lockedViewPlayerId = requestedPlayerId
@@ -1552,7 +1553,7 @@ export const GameContainerApi = () => {
   ) : null
 
   const gameEndControls = wsTransport && !state.gameOver ? (
-    <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} />
+    <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert} />
   ) : null
 
   const gameHeader = (
@@ -1567,7 +1568,19 @@ export const GameContainerApi = () => {
         : selfPlayer ? playerNames[selfPlayer.id] : null}
       isMyTurn={isMyTurn}
       embedded={isEmbedded}
+      menuExtra={gameEndControls}
+      menuAlert={gameEndMenuAlert}
     />
+  )
+  const hotseatHandoff = (playerId: string) => (
+    <div className={`app app--handoff${isEmbedded ? ' app--embedded' : ''}`}>
+      {gameHeader}
+      <HotseatHandoff
+        playerName={playerNames[playerId] ?? playerId}
+        locale={locale}
+        onConfirm={() => confirmHotseatSeat(playerId)}
+      />
+    </div>
   )
 
   if (state.phase === 'solo-hand-selection') {
@@ -1582,7 +1595,6 @@ export const GameContainerApi = () => {
         {bugReportBar}
         {waiting?.canSubmit ? (
           <SoloHandOverlay key={`${wsTransport?.roomId ?? roomId ?? state.gameSeed}:${JSON.stringify(waiting.groups)}`}
-            actions={gameEndControls}
             groups={waiting.groups} locale={locale}
             onSubmit={async selection => {
               const response = await transport.soloHandSubmit(waiting.playerIndex, selection)
@@ -1603,24 +1615,12 @@ export const GameContainerApi = () => {
     const meId = (isWs && localPlayerId && !isHotseat)
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
-    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) {
-      return (
-        <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
-          <HotseatHandoff
-            actions={gameEndControls}
-            playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
-            locale={locale}
-            onConfirm={() => confirmHotseatSeat(hotseatSeatId)}
-          />
-        </div>
-      )
-    }
+    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) return hotseatHandoff(hotseatSeatId)
     return (
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
         {notificationStack}
         {bugReportBar}
-        {gameEndControls}
         <DraftOverlay
           state={state}
           meId={meId}
@@ -1644,24 +1644,12 @@ export const GameContainerApi = () => {
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))
-    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) {
-      return (
-        <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
-          <HotseatHandoff
-            actions={gameEndControls}
-            playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
-            locale={locale}
-            onConfirm={() => confirmHotseatSeat(hotseatSeatId)}
-          />
-        </div>
-      )
-    }
+    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) return hotseatHandoff(hotseatSeatId)
     return (
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
         {notificationStack}
         {bugReportBar}
-        {gameEndControls}
         <ParentSelectionOverlay
           state={state}
           meId={meId}
@@ -1681,18 +1669,7 @@ export const GameContainerApi = () => {
   // Ordinary turns hand the device over too: once the board would start showing
   // a different seat's cards, cover it until that player says they are holding
   // the device. Draft / parent selection are covered by their own branches above.
-  if (isHotseat && activePlayer && hotseatSeatConfirmed !== hotseatAudienceKey) {
-    return (
-      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
-        <HotseatHandoff
-          actions={gameEndControls}
-          playerName={playerNames[activePlayer.id] ?? activePlayer.id}
-          locale={locale}
-          onConfirm={() => confirmHotseatSeat(activePlayer.id)}
-        />
-      </div>
-    )
-  }
+  if (isHotseat && activePlayer && hotseatSeatConfirmed !== hotseatAudienceKey) return hotseatHandoff(activePlayer.id)
 
   const farmBoardView = {
     ...farmBoardProjection,
@@ -2065,7 +2042,6 @@ export const GameContainerApi = () => {
         />
       ) : null}
 
-      {gameEndControls}
       <div ref={headerRef}>
         {gameHeader}
       </div>

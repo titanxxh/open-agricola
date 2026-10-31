@@ -222,4 +222,98 @@ describe('GameHeader', () => {
 
     expect(screen.queryByRole('link', { name: /Back to Lobby/ })).toBeNull()
   })
+
+  it('keeps extra actions mounted in the menu and opens once when a game-end proposal is pending', () => {
+    const extra = <section className="game-end-controls" aria-label="End game"><button type="button">Propose ending the game</button></section>
+    const { rerender } = render(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+          menuExtra={extra}
+        />
+      </LocaleProvider>,
+    )
+    const menu = document.querySelector('.header-menu')
+    expect(menu).toHaveAttribute('hidden')
+    expect(menu?.querySelector('.game-end-controls')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Propose ending the game' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu', exact: true }))
+    expect(menu).not.toHaveAttribute('hidden')
+    expect(screen.getByRole('button', { name: 'Propose ending the game' })).toBeVisible()
+
+    rerender(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+          menuAlert
+          menuExtra={extra}
+        />
+      </LocaleProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Menu', exact: true })).toHaveAttribute('data-game-end-pending', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Menu', exact: true }))
+    expect(menu).toHaveAttribute('hidden')
+
+    rerender(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+          menuAlert
+          menuExtra={extra}
+        />
+      </LocaleProvider>,
+    )
+    expect(menu).toHaveAttribute('hidden')
+
+    rerender(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+          menuExtra={extra}
+        />
+      </LocaleProvider>,
+    )
+    rerender(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+          menuAlert
+          menuExtra={extra}
+        />
+      </LocaleProvider>,
+    )
+    expect(menu).not.toHaveAttribute('hidden')
+    expect(screen.getByRole('button', { name: 'Propose ending the game' })).toBeVisible()
+  })
 })

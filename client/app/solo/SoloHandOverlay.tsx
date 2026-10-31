@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { SoloHandGroupKind, SoloHandSelectionGroup, SoloHandSelectionSubmission } from '../../../shared/contract/solo-hand-selection'
 import { t, type Locale } from '../../../shared/i18n'
 import { PlayerCard } from '../../components/common/PlayerCard'
@@ -9,11 +9,10 @@ const groupLabels: Record<SoloHandGroupKind, string> = {
   occupation: 'solo.groups.occupation', minor: 'solo.groups.minor', 'moor-minor': 'solo.groups.moor-minor',
 }
 
-export function SoloHandOverlay({ groups, locale, onSubmit, actions }: {
+export function SoloHandOverlay({ groups, locale, onSubmit }: {
   groups: readonly SoloHandSelectionGroup[]
   locale: Locale
   onSubmit: (selection: SoloHandSelectionSubmission) => void | Promise<void>
-  actions?: ReactNode
 }) {
   const [selection, setSelection] = useState<SoloHandSelectionSubmission>(() => ({ groups: groups.map(group => ({ kind: group.kind, cardIds: [] })) }))
   const [status, setStatus] = useState<'editing' | 'submitting' | 'error'>('editing')
@@ -41,7 +40,6 @@ export function SoloHandOverlay({ groups, locale, onSubmit, actions }: {
         <p>{t(locale, 'solo.handHint')}</p>
       </header>
       <div className="solo-hand-groups">
-        {actions}
         {groups.map(group => {
           const selected = selection.groups.find(item => item.kind === group.kind)?.cardIds ?? []
           return (
