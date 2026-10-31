@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import pg, { type Pool } from 'pg'
+import { collectOpeningMetrics, openingMetricLines, type OpeningSample } from './opening-metrics.ts'
 
 type Accounts = { total: number; today: number; last_24h: number; last_7d: number }
 
@@ -18,12 +19,14 @@ export function createAccountsHandler({ pool, token, now = Date.now, buildId = '
   let attemptedAt = -Infinity
   let collectedAt = 0
   let accounts: Accounts | undefined
+  let openings: OpeningSample[] | undefined
+  let openingsCollectedAt = 0
   let inflight: Promise<void> | undefined
   const collect = () => {
     if (inflight) return inflight
     if (now() - attemptedAt < 60_000) return Promise.resolve()
     attemptedAt = now()
-    inflight = pool.query<Accounts>(`SELECT count(*)::integer AS total,
+    const accountCollection = pool.query<Accounts>(`SELECT count(*)::integer AS total,
       count(*) FILTER (WHERE created_at >= extract(epoch FROM
         (date_trunc('day', to_timestamp($1 / 1000.0) AT TIME ZONE 'Asia/Singapore') AT TIME ZONE 'Asia/Singapore'))*1000)::integer AS today,
       count(*) FILTER (WHERE created_at >= $1-86400000)::integer AS last_24h,
@@ -31,7 +34,12 @@ export function createAccountsHandler({ pool, token, now = Date.now, buildId = '
       FROM users`, [attemptedAt]).then(result => {
       accounts = result.rows[0]
       collectedAt = now() / 1000
-    }).catch(() => { accounts = undefined }).finally(() => { inflight = undefined })
+    }).catch(() => { accounts = undefined })
+    const openingCollection = collectOpeningMetrics(pool, attemptedAt).then(samples => {
+      openings = samples
+      openingsCollectedAt = now() / 1000
+    }).catch(() => { openings = undefined })
+    inflight = Promise.all([accountCollection, openingCollection]).then(() => {}).finally(() => { inflight = undefined })
     return inflight
   }
   return async (req: IncomingMessage, res: ServerResponse) => {
@@ -61,6 +69,11 @@ export function createAccountsHandler({ pool, token, now = Date.now, buildId = '
       '# HELP agricola_accounts_last_success_unixtime Last successful database observation in Unix seconds.',
       '# TYPE agricola_accounts_last_success_unixtime gauge',
       `agricola_accounts_last_success_unixtime ${collectedAt}`,
+      ...openingMetricLines(openings ?? []),
+      '# TYPE agricola_opening_collection_success gauge',
+      `agricola_opening_collection_success ${openings ? 1 : 0}`,
+      '# TYPE agricola_opening_last_success_unixtime gauge',
+      `agricola_opening_last_success_unixtime ${openingsCollectedAt}`,
     ]
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' })
     res.end(lines.join('\n') + '\n')

@@ -1,0 +1,4407 @@
+{
+  "uid": "open-agricola-players",
+  "title": "Open Agricola 玩家开局与对局情况",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "timezone": "Asia/Singapore",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "tags": [
+    "运行监控",
+    "玩家开局"
+  ],
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "监控看板",
+      "tags": [
+        "运行监控"
+      ],
+      "asDropdown": false,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "window",
+        "label": "开局统计窗口",
+        "type": "custom",
+        "query": "今日（UTC+8） : today,近24小时 : last_24h,近7天 : last_7d",
+        "current": {
+          "text": "近24小时",
+          "value": "last_24h"
+        }
+      },
+      {
+        "name": "cohort",
+        "label": "成熟注册批次",
+        "type": "custom",
+        "query": "近7天注册 : last_7d,近30天注册 : last_30d",
+        "current": {
+          "text": "近7天注册",
+          "value": "last_7d"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "统计覆盖与采集状态",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "title": "永久开局记录启用时间",
+      "type": "stat",
+      "description": "完整统计从此时间开始。更早的过期局没有足够证据，不倒推为零。新注册账号需要观察满 24 小时才进入转化率分母。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_tracking_since_unixtime) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) * 1000",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "开局数据采集状态",
+      "type": "stat",
+      "description": "1 为采集成功，0 为失败。缺少或过期样本显示未知。账户注册采集与开局采集分别报告状态。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min(agricola_opening_collection_success) and on() (time() - max(agricola_opening_last_success_unixtime) < 120)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "开局数量与账号",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "title": "确认开局数",
+      "type": "stat",
+      "description": "只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_games{window=\"$window\",mode=\"all\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "去重开局账号数",
+      "type": "stat",
+      "description": "只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。 按开局时入座的现存账号去重。同一账号多局、热座多个座位都只计一个账号；不代表线下实际人数。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 9,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_accounts{window=\"$window\",mode=\"all\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "开局模式分布",
+      "type": "bargauge",
+      "description": "只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 9,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(mode) ((agricola_opening_games{window=\"$window\",mode=~\"solo|hotseat|multiplayer\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "{{mode}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "当前开局阶段",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "title": "当前在线局阶段",
+      "type": "bargauge",
+      "description": "至少有一个当前有效连接的局。按当前所有者 epoch、存活租约和就绪实例判断在线。开局包括选牌与轮抽；正式游戏单独展示。开发局不计入。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(stage) ((agricola_opening_current{mode=\"all\",presence=\"online\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "{{stage}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "离线保留局阶段",
+      "type": "bargauge",
+      "description": "全员离线但仍可续局的存档。此数量不代表当前有人在玩，也不能单凭当前阶段认定玩家卡住。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(stage) ((agricola_opening_current{mode=\"all\",presence=\"retained\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "{{stage}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "新玩家首次 24 小时",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "title": "已观察满24小时的新账号",
+      "type": "stat",
+      "description": "按注册批次统计现存账号，仅包含记录启用后注册且已观察满 24 小时的账号。分子是在该账号注册后 24 小时内开局或进入正式游戏的账号数。分母为零时转化率显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"eligible\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "24小时内开局转化率",
+      "type": "stat",
+      "description": "按注册批次统计现存账号，仅包含记录启用后注册且已观察满 24 小时的账号。分子是在该账号注册后 24 小时内开局或进入正式游戏的账号数。分母为零时转化率显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"started_24h\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) / max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"eligible\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))) and (max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"eligible\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) > 0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "24小时内正式游戏转化率",
+      "type": "stat",
+      "description": "按注册批次统计现存账号，仅包含记录启用后注册且已观察满 24 小时的账号。分子是在该账号注册后 24 小时内开局或进入正式游戏的账号数。分母为零时转化率显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"playing_24h\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) / max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"eligible\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))) and (max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"eligible\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) > 0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "新玩家转化人数",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "title": "24小时内开局账号数",
+      "type": "stat",
+      "description": "按注册批次统计现存账号，仅包含记录启用后注册且已观察满 24 小时的账号。分子是在该账号注册后 24 小时内开局或进入正式游戏的账号数。分母为零时转化率显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"started_24h\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "24小时内正式游戏账号数",
+      "type": "stat",
+      "description": "按注册批次统计现存账号，仅包含记录启用后注册且已观察满 24 小时的账号。分子是在该账号注册后 24 小时内开局或进入正式游戏的账号数。分母为零时转化率显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 33,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_conversion{cohort=\"$cohort\",milestone=\"playing_24h\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "等人开局耗时",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "title": "等人开局耗时 p50 / p90",
+      "type": "stat",
+      "description": "建房到确认开局。只包含已完成这段等待的局，正在等待的局不当成零秒。 至少 5 个样本才展示分位数。只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(quantile) ((agricola_opening_duration_seconds{window=\"$window\",stage=\"waiting\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) and on() (max((agricola_opening_duration_samples{window=\"$window\",stage=\"waiting\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) >= 5)",
+          "legendFormat": "{{quantile}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^0\\.5$",
+            "renamePattern": "p50"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^0\\.9$",
+            "renamePattern": "p90"
+          }
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "等人开局耗时样本数",
+      "type": "stat",
+      "description": "建房到确认开局。只包含已完成这段等待的局，正在等待的局不当成零秒。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_duration_samples{window=\"$window\",stage=\"waiting\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "选牌准备耗时",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "title": "选牌准备耗时 p50 / p90",
+      "type": "stat",
+      "description": "确认开局到首次进入正式游戏。只包含首次时间均准确记录的局；旧存档恢复不会被算成首次正式游戏。 至少 5 个样本才展示分位数。只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(quantile) ((agricola_opening_duration_seconds{window=\"$window\",stage=\"preparation\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) and on() (max((agricola_opening_duration_samples{window=\"$window\",stage=\"preparation\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) >= 5)",
+          "legendFormat": "{{quantile}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^0\\.5$",
+            "renamePattern": "p50"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^0\\.9$",
+            "renamePattern": "p90"
+          }
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "选牌准备耗时样本数",
+      "type": "stat",
+      "description": "确认开局到首次进入正式游戏。只包含首次时间均准确记录的局；旧存档恢复不会被算成首次正式游戏。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 49,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max((agricola_opening_duration_samples{window=\"$window\",stage=\"preparation\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "title": "同一开局批次的后续情况",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 25,
+      "title": "开局批次当前结局",
+      "type": "bargauge",
+      "description": "按所选窗口内开局的同一批局，观察当前正常完赛、协商结束、过期、下架与仍可续局的数量。仍可续局不算失败。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(outcome) ((agricola_opening_outcomes{window=\"$window\",mode=\"all\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "{{outcome}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "title": "开局批次当前完赛占比",
+      "type": "stat",
+      "description": "分子与分母来自相同开局批次。包含尚未结束的局，因此是截至当前的完赛占比，不能视为最终完局率。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 57,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(max((agricola_opening_outcomes{window=\"$window\",mode=\"all\",outcome=\"completed\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) / max((agricola_opening_games{window=\"$window\",mode=\"all\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))) and (max((agricola_opening_games{window=\"$window\",mode=\"all\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120))) > 0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "title": "人数与扩展偏好",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 28,
+      "title": "开局座位数分布",
+      "type": "bargauge",
+      "description": "只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。 展示开局配置的座位数，热座座位不等于独立账号。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(seats) ((agricola_opening_seats{window=\"$window\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "{{seats}}人",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "title": "开局扩展使用情况",
+      "type": "bargauge",
+      "description": "只统计永久开局记录启用后确认的开局，开发局不计入。今日按 UTC+8，24 小时与 7 天为滚动窗口。采集失败或超过 120 秒显示未知。 每个开关独立计数，同一局可以使用多个扩展，不能将各项相加作为总开局数。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 65,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(variant) ((agricola_opening_variants{window=\"$window\"}) and on(job,instance) ((agricola_opening_collection_success == 1) and on(job,instance) (time() - agricola_opening_last_success_unixtime < 120)))",
+          "legendFormat": "{{variant}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "开局请求处理",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 31,
+      "title": "建房与入房系统错误",
+      "type": "stat",
+      "description": "所选时间范围内的建房、入房和再来一局系统错误尝试。请求重试与重复回执不等于新增开局，规则拒绝单独展示。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 73,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(command) (increase(agricola_commands_total{command=~\"createRoom|joinRoom|newGame\",outcome=\"error\"}[$__range]))",
+          "legendFormat": "{{command}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "title": "建房与入房规则拒绝",
+      "type": "stat",
+      "description": "规则拒绝可能来自座位已满或准入限制，应结合系统错误与真实开局数量判断。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agricola-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 73,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "未知",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(command) (increase(agricola_commands_total{command=~\"createRoom|joinRoom|newGame\",outcome=\"rule_rejected\"}[$__range]))",
+          "legendFormat": "{{command}}",
+          "format": "time_series",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo$",
+            "renamePattern": "单人"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^hotseat$",
+            "renamePattern": "热座"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^multiplayer$",
+            "renamePattern": "联机"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^unknown$",
+            "renamePattern": "未知"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^waiting$",
+            "renamePattern": "等待玩家"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^color_confirmation$",
+            "renamePattern": "确认颜色"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_selection$",
+            "renamePattern": "选择父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^draft$",
+            "renamePattern": "轮抽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^solo_hand_selection$",
+            "renamePattern": "单人选牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^playing$",
+            "renamePattern": "正式游戏"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^active$",
+            "renamePattern": "仍可续局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^completed$",
+            "renamePattern": "正常完赛"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^terminated$",
+            "renamePattern": "协商结束"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^expired$",
+            "renamePattern": "已过期"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^removed$",
+            "renamePattern": "已下架"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^parent_cards$",
+            "renamePattern": "父母牌"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^through_the_seasons$",
+            "renamePattern": "四季"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^farmers_of_the_moor$",
+            "renamePattern": "沼泽"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^snake_opening$",
+            "renamePattern": "蛇形开局"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^moor_balance_rules$",
+            "renamePattern": "沼泽平衡规则"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^community_deck$",
+            "renamePattern": "社区卡"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -21,6 +21,11 @@ try {
   await client.query(`GRANT CONNECT ON DATABASE ${identifier(database)} TO ${role}`)
   await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`)
   await client.query(`GRANT SELECT (id,created_at) ON public.users TO ${role}`)
+  const openingRelations = await client.query<{ relation: string | null }>("SELECT to_regclass('public.game_opening_facts')::text AS relation")
+  if (openingRelations.rows[0]?.relation) {
+    await client.query(`GRANT SELECT ON public.game_opening_facts,public.game_opening_accounts,public.game_opening_tracking,public.operations_current_openings TO ${role}`)
+    await client.query(`GRANT SELECT (room_id,created_at,lifecycle) ON public.game_contexts TO ${role}`)
+  }
   await client.query('COMMIT')
 } catch {
   console.error('Operations database access provisioning failed')

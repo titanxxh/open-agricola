@@ -749,6 +749,27 @@ Administrator authentication remains in the game application's `/ops/` gateway. 
 
 No monitoring service publishes a production host port. Their private dependency network is a trusted server boundary; do not add a Caddy route directly to them. Only `/ops/` through the application gateway is public. The services run without a Docker socket; Node Exporter mounts the host root read only and uses host PID visibility for host observations. Configure `OBSERVABILITY_UID/GID` when the deployment account differs from 1000 and ensure `data/observability/{prometheus,grafana}` and the token file are readable/writable by that account. The application still runs as `APP_UID/GID`.
 
+### Player opening dashboard
+
+The platform dashboard links to **Open Agricola 玩家开局与对局情况** (`open-agricola-players`). Rebuild its checked-in JSON with `node operations/build-player-dashboard.mjs`; use `--check` to verify generated output without writing files. The window selector offers the UTC+8 calendar day, rolling 24 hours and rolling seven days. The mature-registration selector offers registrations from the last seven or 30 days, ending at least 24 hours before observation.
+
+| Panels | Meaning |
+|---|---|
+| Starts and opening accounts | Durable starts and distinct remaining authenticated accounts, split by solo, hotseat and multiplayer. An account across several modes is counted once in the total. Hotseat seats are not distinct people. |
+| Current stages | Waiting, color confirmation, parent selection, draft, solo hand selection and gameplay, split by current online presence and retained offline saves. Development rooms are excluded. |
+| First 24-hour activation | Registered accounts with a complete 24-hour observation, and the fraction that started or reached gameplay within their own first 24 hours. A zero denominator remains unknown. |
+| Waiting and preparation | Creation-to-start and start-to-first-gameplay p50/p90, with sample counts. Only known completed intervals qualify; at least five samples are required for displayed quantiles. |
+| Outcomes by start cohort | Current active, completed, terminated, expired and removed counts for the same set of starts. The current completed fraction includes still-open games and is not a final completion rate. |
+| Seats and variants | Configured seat count and independently enabled variants at start. Variant counts overlap and must not be summed as total games. |
+
+`game_opening_facts` and `game_opening_accounts` preserve confirmed milestones in the existing Room transaction. Waiting rooms do not start merely because their prepared state has `phase=playing`. First gameplay is the first durable final snapshot with a started Room and gameplay phase. Retry, undo and recovery cannot move these timestamps. Legacy already-playing snapshots never acquire a fabricated first-gameplay time. Scalar game facts survive room/Replay cleanup; deleting an account cascades its opening-account links, and content removal erases links for that context.
+
+The tracking timestamp shown on the dashboard is the beginning of complete capture. Counts use starts on or after that timestamp, and activation cohorts use registrations on or after it. Historical backfill records surviving confirmed starts as `legacy`; it does not imply complete past coverage. Before 24 hours of complete capture, the mature activation denominator is naturally zero. Scrape failures or observations older than 120 seconds remain unknown, independently of the existing registration collector.
+
+Deploy the backend containing migration 031 and the new writer **before** deploying the updated operations source. Use the existing maintenance backend deployment so all old application writers stop before migration; the migration timestamp then precedes only the new writers. This first installation requires a backend deployment. Subsequent panel/query changes use `deploy-operations.sh` independently. The operations provisioning step grants SELECT on the scalar facts, tracking marker, limited Game Context columns and the safe stage view. It grants no access to private Room JSON or Replay payloads. If deployed against an older backend, registration metrics remain available and opening metrics report unavailable. Deploy operations again after the backend migration to grant the new relations.
+
+The exporter runs one aggregate SQL statement per observation with the existing one-connection pool, two-second statement timeout and at-most-once-per-minute collection. It never reconstructs private snapshots or creates a per-account Prometheus label.
+
 Prometheus scrapes every 15s (5s timeout), discovers current application leases every 15s, and stores a seven-day TSDB. Global DB queries, authenticated-user presence and cgroup/backup checks run at most every 60s and share in-flight work. Stable per-slot targets avoid process UUID series churn. Prometheus `rate`/`increase` handle restart counter resets; merge buckets with `sum by(le,...)` **before** `histogram_quantile`. The dashboard offers 24h/7d ranges and 15s refresh. Seven-day retention is TSDB block retention, not an exact per-sample erasure timer; no pre-installation history is fabricated. Gaps remain gaps, and quantiles cannot recover exact maxima.
 
 | Metric family / seam | Meaning and aggregation |

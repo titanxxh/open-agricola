@@ -12,6 +12,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('028-moor-balance-rules.sql')
     migrations.push('029-game-termination.sql')
     migrations.push('030-bug-report-client-diagnostics.sql')
+    migrations.push('031-game-opening-facts.sql')
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue

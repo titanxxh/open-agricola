@@ -2,7 +2,7 @@
   "uid": "open-agricola",
   "title": "Open Agricola 平台运行看板",
   "schemaVersion": 39,
-  "version": 4,
+  "version": 5,
   "editable": false,
   "refresh": "15s",
   "timezone": "browser",
@@ -4538,5 +4538,17 @@
       ]
     }
   ],
-  "description": "展示当前运行情况与近七天趋势，每 15 秒刷新。p95 表示约 95% 的样本不超过该值。缺失或过期数据保持未知；WS 包大小按实际返回状态的游戏回合统计。"
+  "description": "展示当前运行情况与近七天趋势，每 15 秒刷新。p95 表示约 95% 的样本不超过该值。缺失或过期数据保持未知；WS 包大小按实际返回状态的游戏回合统计。",
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "监控看板",
+      "tags": [
+        "运行监控"
+      ],
+      "asDropdown": false,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ]
 }

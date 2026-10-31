@@ -269,6 +269,7 @@ const applyEntries = async (
       DELETE FROM game_context_participants
       WHERE room_id = ?
     `).run(entry.roomId))
+    await db.prepare('DELETE FROM game_opening_accounts WHERE room_id=?').run(entry.roomId)
   }
   return removedRoomIds
 })())
