@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ENCYCLOPEDIA_GROUPS } from '../../../shared/contract/card-encyclopedia'
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { t, type Locale } from '../../../shared/i18n'
@@ -251,6 +251,67 @@ export function EncyclopediaFilterPanel({ store, locale, items }: EncyclopediaFi
       </div>
       <FilterFields filters={filters} options={options} locale={locale} onChange={next => store.setFilters(next)} />
     </aside>
+  )
+}
+
+/** Focus targets after the last chip goes away, whichever of them the layout shows. */
+const CHIP_FOCUS_FALLBACKS = ['.encyclopedia-filter-entry', '.encyclopedia-filters--sidebar input']
+
+/** Selected conditions under the results bar, each removable on its own. */
+export function EncyclopediaActiveFilters({ store, locale }: EncyclopediaFiltersProps) {
+  const { filters } = useEncyclopediaBrowseState(store)
+  const chips = filterChips(filters, locale)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const focusChip = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const index = focusChip.current
+    if (index === null) return
+    focusChip.current = null
+    const root = rootRef.current
+    const remaining = root?.querySelectorAll<HTMLButtonElement>('.encyclopedia-active-filters__chip') ?? []
+    const target = remaining[Math.min(index, remaining.length - 1)]
+      ?? CHIP_FOCUS_FALLBACKS
+        .map(selector => root?.closest('.encyclopedia-browser')?.querySelector<HTMLElement>(selector))
+        .find(element => element && element.getClientRects().length > 0)
+    target?.focus()
+  })
+
+  return (
+    <div ref={rootRef} className="encyclopedia-active-filters">
+      {chips.length > 0 ? (
+        <div className="encyclopedia-active-filters__content" role="group" aria-label={t(locale, 'ui.encyclopedia.filters.active')}>
+          <ul className="encyclopedia-active-filters__list">
+            {chips.map((chip, index) => (
+              <li key={chip.id}>
+                <button
+                  type="button"
+                  className="encyclopedia-active-filters__chip"
+                  aria-label={t(locale, 'ui.encyclopedia.filters.remove', { name: chip.label })}
+                  onClick={() => {
+                    focusChip.current = index
+                    store.setFilters(chip.without())
+                  }}
+                >
+                  {chip.label}
+                  <span aria-hidden="true" className="encyclopedia-active-filters__remove">×</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="encyclopedia-active-filters__clear"
+            onClick={() => {
+              focusChip.current = 0
+              store.setFilters(EMPTY_ENCYCLOPEDIA_FILTERS)
+            }}
+          >
+            {t(locale, 'ui.encyclopedia.filters.clear')}
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
