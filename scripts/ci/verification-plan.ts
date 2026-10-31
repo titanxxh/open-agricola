@@ -315,7 +315,7 @@ export function createRepositoryPlan(input: {
   const needsRules = scopes.includes('rules')
   const cardAssociations = scopes.includes('card') || needsRules
     ? readCardAssociationIndex(input.cwd, inventory) : undefined
-  const testConsumers = needsRules || scopes.some(scope => scope === 'browser' || scope === 'test-support')
+  const testConsumers = needsRules || scopes.some(scope => scope === 'card' || scope === 'browser' || scope === 'test-support')
     ? readTestConsumerIndex(input.cwd, inventory) : undefined
   const ruleAssociations = needsRules && cardAssociations && testConsumers
     ? readRuleAssociationIndex(input.cwd, inventory, cardAssociations, testConsumers) : undefined

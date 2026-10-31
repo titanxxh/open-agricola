@@ -242,6 +242,22 @@ describe('repository verification scope', () => {
       .toThrow(/Cannot establish test consumer evidence.*broken\.ts/)
   })
 
+  it('rejects an unreadable card test helper for a card-only production change', () => {
+    const { cwd } = repository()
+    const card = 'shared/cards/A/A029_AleBenches.ts'
+    const source = "export const A029_AleBenches = defineMinorCard({ meta: { id: 'A029_AleBenches' } })\n"
+    write(cwd, card, source)
+    write(cwd, 'shared/cards/__tests__/fixtures/broken.ts', 'export const =')
+    write(cwd, 'shared/cards/__tests__/A29_AleBenches.test.ts', "import './fixtures/broken'\n")
+    commit(cwd, 'card baseline with unreadable helper')
+    git(cwd, 'branch', '-f', 'main', 'HEAD')
+    write(cwd, card, source + '// Changed card source\n')
+    commit(cwd, 'card-only change')
+
+    expect(() => createRepositoryPlan({ cwd, base: 'main', fullTaskIds: ['quality', 'fast'] }))
+      .toThrow(/Cannot establish test consumer evidence.*broken\.ts/)
+  })
+
   it('includes tested-commit changes beyond a documentation-only requested head', () => {
     const { cwd } = repository()
     write(cwd, 'README.md', 'Updated guide\n')
