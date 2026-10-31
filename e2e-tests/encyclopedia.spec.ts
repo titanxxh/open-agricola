@@ -1,55 +1,10 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
-import { FRONTEND_URL } from './fixtures'
+import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import {
+  animationsSettled, CATALOG, copiedLinks, detail, entryParam, entryUrl, expectCatalog, expectNoHorizontalOverflow,
+  galleryEntries, LAYOUTS, LOBBY, newVisitor,
+} from './helpers/encyclopedia'
 
-const CATALOG = `${FRONTEND_URL}/?page=encyclopedia`
-const BASEBOARDS = `${CATALOG}&entry=card%3AA004_Baseboards`
-
-const LAYOUTS = [
-  { name: 'encyclopedia desktop 1400x1000', viewport: { width: 1400, height: 1000 }, phone: false },
-  { name: 'encyclopedia mobile 390x844', viewport: { width: 390, height: 844 }, phone: true },
-] as const
-
-type Layout = typeof LAYOUTS[number]
-
-/** A fresh context has no session cookie, so every test here starts signed out. */
-async function newVisitor(browser: Browser, layout: Layout): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({
-    viewport: layout.viewport,
-    ...(layout.phone ? { isMobile: true, hasTouch: true } : {}),
-  })
-  await context.addInitScript(() => {
-    localStorage.setItem('open-agricola-locale-v2', 'en')
-    const copied: string[] = []
-    Object.defineProperty(window, '__copiedLinks', { value: copied })
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: async (text: string) => { copied.push(text) } },
-    })
-  })
-  expect(await context.cookies()).toEqual([])
-  return { context, page: await context.newPage() }
-}
-
-const gallery = (page: Page) => page.getByRole('list').filter({ has: page.getByRole('button', { name: /^View / }) })
-const galleryEntries = (page: Page) => gallery(page).getByRole('button', { name: /^View / })
-const detail = (page: Page) => page.getByRole('dialog')
-const entryParam = (page: Page) => new URL(page.url()).searchParams.get('entry')
-
-async function expectCatalog(page: Page, pageNumber = 1) {
-  await expect(page.getByRole('heading', { level: 1, name: 'Card Encyclopedia' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^Results: \d+$/ })).toBeVisible()
-  await expect(page.getByText(new RegExp(`^Page ${pageNumber} of \\d+$`))).toBeVisible()
-  await expect(galleryEntries(page)).toHaveCount(24)
-}
-
-async function animationsSettled(page: Page) {
-  await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0)
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
-}
+const BASEBOARDS = entryUrl('card:A004_Baseboards')
 
 for (const layout of LAYOUTS) {
   test.describe(layout.name, () => {
@@ -57,7 +12,7 @@ for (const layout of LAYOUTS) {
     let page: Page
 
     test.beforeEach(async ({ browser }) => {
-      ({ context, page } = await newVisitor(browser, layout))
+      ({ context, page } = await newVisitor(browser, layout, { clipboard: true }))
     })
 
     test.afterEach(async () => {
@@ -175,7 +130,7 @@ for (const layout of LAYOUTS) {
       await page.getByRole('button', { name: 'Copy card link' }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Card link copied' })).toBeVisible()
 
-      const [link] = await page.evaluate(() => (window as unknown as { __copiedLinks: string[] }).__copiedLinks)
+      const [link] = await copiedLinks(page)
       const url = new URL(link)
       expect([...url.searchParams.entries()]).toEqual([['page', 'encyclopedia'], ['entry', 'card:A004_Baseboards']])
 
@@ -224,7 +179,7 @@ for (const layout of LAYOUTS) {
     test('B1 ordinary pages do not request the encyclopedia', async () => {
       const requests: string[] = []
       page.on('request', request => requests.push(new URL(request.url()).pathname))
-      await page.goto(`${FRONTEND_URL}/`)
+      await page.goto(LOBBY)
       await expect(page.getByRole('textbox', { name: 'Username' }).first()).toBeVisible()
 
       expect(requests.filter(path => /card-encyclopedia|\/encyclopedia\/|EncyclopediaPage/.test(path))).toEqual([])

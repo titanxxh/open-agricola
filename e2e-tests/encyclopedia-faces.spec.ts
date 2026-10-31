@@ -1,8 +1,7 @@
-import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { FRONTEND_URL } from './fixtures'
-
-const CATALOG = `${FRONTEND_URL}/?page=encyclopedia`
-const entryUrl = (key: string) => `${CATALOG}&entry=${encodeURIComponent(key)}`
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import {
+  animationsSettled, CATALOG, detail, entryUrl, expectNoHorizontalOverflow, LAYOUTS, newVisitor,
+} from './helpers/encyclopedia'
 
 const WORK_MARKET = { key: 'moorSpecialAction:moor-special-1-3-work-market', name: 'Fell Trees, Hiring Fair, Black Market, Illicit Work' }
 const TERRAIN_1 = { key: 'moorStart:moor-start-1', name: 'Starting Terrain 1' }
@@ -14,35 +13,9 @@ const TERRAIN_1_ROWS = [
   ['', '', '', 'Forest', 'Forest'],
 ]
 
-const LAYOUTS = [
-  { name: 'encyclopedia desktop 1400x1000', viewport: { width: 1400, height: 1000 }, phone: false },
-  { name: 'encyclopedia mobile 390x844', viewport: { width: 390, height: 844 }, phone: true },
-] as const
-
-type Layout = typeof LAYOUTS[number]
-
-async function newVisitor(browser: Browser, layout: Layout): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({
-    viewport: layout.viewport,
-    ...(layout.phone ? { isMobile: true, hasTouch: true } : {}),
-  })
-  await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  return { context, page: await context.newPage() }
-}
-
-const detail = (page: Page) => page.getByRole('dialog')
 const galleryItem = (page: Page, name: string) =>
   page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `View ${name}`, exact: true }) })
 const galleryFace = (page: Page, name: string) => galleryItem(page, name).locator('.encyclopedia-gallery__face')
-
-async function animationsSettled(page: Page) {
-  await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0)
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
-}
 
 /** Pages forward through the whole catalog until the entry shows up in the gallery. */
 async function pageTo(page: Page, name: string) {
