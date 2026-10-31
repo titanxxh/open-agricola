@@ -5,7 +5,6 @@ import { FarmGroundSprite } from '../../components/board/FarmGroundSprite'
 
 const TERRAIN_LABEL_KEYS = { forest: 'ui.tileForest', moor: 'ui.tileMoor' } as const
 
-/** A starting terrain card as the farm it deals: drawn with in-game ground art, or as plain colour blocks without it. */
 export function MoorStartLayout({ locale, tiles, art }: {
   locale: Locale
   tiles: readonly EncyclopediaTerrainTile[]

@@ -195,7 +195,6 @@ const formatBound = (value: number | null): string => (value === null ? '' : Str
 
 type FilterChip = Readonly<{ id: string; label: string; without: () => EncyclopediaFilters }>
 
-/** Every selected condition, each removable on its own. */
 function filterChips(filters: EncyclopediaFilters, locale: Locale): FilterChip[] {
   const { cost, points } = filters
   return [
@@ -257,7 +256,6 @@ function ClearButton({ store, locale, disabled }: { store: EncyclopediaBrowseSto
 
 const useFilterOptions = (items: readonly EncyclopediaItem[]) => useMemo(() => encyclopediaFilterOptions(items), [items])
 
-/** Desktop sidebar beside the results. */
 export function EncyclopediaFilterPanel({ store, locale, items }: EncyclopediaFiltersProps) {
   const { filters } = useEncyclopediaBrowseState(store)
   const options = useFilterOptions(items)
@@ -276,7 +274,6 @@ export function EncyclopediaFilterPanel({ store, locale, items }: EncyclopediaFi
 /** Focus targets after the last chip goes away, whichever of them the layout shows. */
 const CHIP_FOCUS_FALLBACKS = ['.encyclopedia-filter-entry', '.encyclopedia-filters--sidebar input']
 
-/** Selected conditions under the results bar, each removable on its own. */
 export function EncyclopediaActiveFilters({ store, locale }: EncyclopediaFiltersProps) {
   const { filters } = useEncyclopediaBrowseState(store)
   const chips = filterChips(filters, locale)
@@ -334,7 +331,6 @@ export function EncyclopediaActiveFilters({ store, locale }: EncyclopediaFilters
   )
 }
 
-/** Phone entry point in the results bar: opens the filters in a full-screen panel. */
 export function EncyclopediaFilterEntry({ store, locale, items, resultCount }: EncyclopediaFiltersProps) {
   const { filters } = useEncyclopediaBrowseState(store)
   const options = useFilterOptions(items)
