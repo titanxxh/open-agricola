@@ -49,14 +49,14 @@ const operationsLiteral = (literal: string) => /^(?:\.\.?\/)*operations(?:\/|$)/
   || operationsBridge.test(literal) || /^(?:observability|local-services)\.mjs$/.test(literal)
 
 function operationsVerification(paths: string[], inventory: TestInventory, consumers?: TestConsumerIndex): Mapping {
-  const unknown = paths.find(path => !operationsEntry.test(path))
-  if (unknown) return { checks: [], wideningReasons: [], expansionReasons: [
-    `Operations entry ownership is unknown for ${unknown}; full verification is required.`,
-  ] }
   const missing = [...operationsTests.filter(required => !inventory.vitest.some(test =>
     test.file === required.file && test.project === required.project)).map(test => test.file),
   ...operationsBrowsers.filter(file => !inventory.browser.includes(file))]
   if (missing.length) throw new Error(`Required operations consumers are missing: ${missing.join(', ')}`)
+  const unknown = paths.find(path => !operationsEntry.test(path))
+  if (unknown) return { checks: [], wideningReasons: [], expansionReasons: [
+    `Operations entry ownership is unknown for ${unknown}; full verification is required.`,
+  ] }
   const selected = new Set(operationsTests.map(test => test.file))
   operationsBrowsers.forEach(file => selected.add(file))
   const wideningReasons: string[] = []
@@ -64,7 +64,6 @@ function operationsVerification(paths: string[], inventory: TestInventory, consu
     inventory.vitest.forEach(test => selected.add(test.file))
     wideningReasons.push('Operations consumer evidence is missing; verification retains the complete discovered unit inventory and complete browser lanes.')
   } else {
-    assertConsumerCoverage(inventory, consumers)
     for (const test of consumers.tests) {
       const associated = /(?:^|\/)(?:operations|ops)(?:[-/])/.test(test.file)
         || test.dependencies.some(operationsPath) || test.literals.some(operationsLiteral)
@@ -206,18 +205,15 @@ export function businessScopeFor(path: string): BusinessGroup['scope'] | null {
 }
 
 export function businessVerification(paths: string[], inventory: TestInventory, consumers?: TestConsumerIndex): Mapping {
+  if (consumers) assertConsumerCoverage(inventory, consumers)
   const selected = new Set<BusinessGroup>()
+  const expansionReasons: string[] = []
   for (const path of paths) {
     if (path.startsWith('operations/')) continue
     const group = groupFor(path)
-    if (!group) return { checks: [], wideningReasons: [], expansionReasons: [`Business module ownership is unknown for ${path}; full verification is required.`] }
-    selected.add(group)
+    if (group) selected.add(group)
+    else expansionReasons.push(`Business module ownership is unknown for ${path}; full verification is required.`)
   }
-  const operations = paths.filter(path => path.startsWith('operations/'))
-  const mapping = operations.length ? operationsVerification(operations, inventory, consumers)
-    : { checks: [], expansionReasons: [], wideningReasons: [] }
-  if (mapping.expansionReasons.length) return mapping
-  const checks: PlannedCheck[] = [...mapping.checks]
   for (const group of selected) {
     const missingTests = [...group.requiredTests, ...group.files]
       .filter(required => !inventory.vitest.some(test => test.file === required.file && test.project === required.project))
@@ -227,6 +223,14 @@ export function businessVerification(paths: string[], inventory: TestInventory, 
     if (missingTests.length || missingProjects.length || missingBrowsers.length) {
       throw new Error(`Required consumers for ${group.name} are missing: ${[...missingProjects, ...missingTests.map(test => test.file), ...missingBrowsers].join(', ')}`)
     }
+  }
+  const operations = paths.filter(path => path.startsWith('operations/'))
+  const mapping = operations.length ? operationsVerification(operations, inventory, consumers)
+    : { checks: [], expansionReasons: [], wideningReasons: [] }
+  expansionReasons.push(...mapping.expansionReasons)
+  if (expansionReasons.length) return { checks: [], expansionReasons, wideningReasons: mapping.wideningReasons }
+  const checks: PlannedCheck[] = [...mapping.checks]
+  for (const group of selected) {
     checks.push(...group.projects.map((project): PlannedCheck => ({
       kind: 'vitest', project,
       files: inventory.vitest.filter(test => test.project === project).map(test => test.file).sort(),
