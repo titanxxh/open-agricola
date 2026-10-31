@@ -179,12 +179,25 @@ describe('card test associations', () => {
     expect(cardVerification([source], inventory, undefined, []).expansionReasons.join(' ')).toContain('evidence is missing')
   })
 
-  it('expands when a declared generic card UI consumer disappears from the inventory', () => {
+  it('rejects a missing declared generic card UI consumer', () => {
     const { cwd, source, inventory } = fixture()
     inventory.browser = inventory.browser.filter(file => file !== 'e2e-tests/choice-previews.spec.ts')
-    const mapping = cardVerification([source], inventory, readCardAssociationIndex(cwd, inventory), [])
-    expect(mapping.checks).toEqual([])
-    expect(mapping.expansionReasons.join(' ')).toContain('Declared card UI consumers are missing')
+    expect(() => cardVerification([source], inventory, readCardAssociationIndex(cwd, inventory), []))
+      .toThrow('Declared card UI consumers are missing')
+  })
+
+  it('keeps a new regression file for an existing Card Source inside its complete associations', () => {
+    const { cwd, source, inventory } = fixture()
+    const file = 'server/__tests__/A029_AleBenches-regression-session.test.ts'
+    write(cwd, file, "const played = 'A029_AleBenches'\n")
+    inventory.vitest.push({ file, project: 'slow' })
+    const mapping = cardVerification([source, file], inventory, readCardAssociationIndex(cwd, inventory), [
+      { status: 'M', path: source }, { status: 'A', path: file },
+    ])
+    expect(mapping.expansionReasons).toEqual([])
+    expect(mapping.checks).toContainEqual({ kind: 'vitest', project: 'slow', files: [
+      'server/__tests__/A029_AleBenches-regression-session.test.ts', 'server/__tests__/A029_AleBenches-session.test.ts',
+    ] })
   })
 
   it.each(['direct', 'Session'])('accepts declared %s-only behavior coverage without imposing another test layer', layer => {

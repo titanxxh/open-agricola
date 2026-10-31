@@ -6,7 +6,7 @@ const plan = (checks: PlannedCheck[]): VerificationPlan => ({
   schemaVersion: 1, status: 'planned', mode: 'scoped',
   identity: { baseRef: 'main', headRef: 'HEAD', baseSha: '1'.repeat(40), mergeBaseSha: '1'.repeat(40),
     headSha: '2'.repeat(40), testedSha: '2'.repeat(40), sourceFingerprint: '3'.repeat(64) },
-  changes: [], inventory: { vitest: [], browser: [] }, selections: [], expansionReasons: [], checks,
+  changes: [], inventory: { vitest: [], browser: [] }, selections: [], expansionReasons: [], wideningReasons: [], checks,
 })
 
 describe('canonical scoped execution partitions', () => {
