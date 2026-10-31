@@ -55,25 +55,22 @@ export type CardListenerRegistration = ({
   actionSpaces?: never
   events?: never
   globalQuery?: never
-} & ({ settlement?: 'action' | 'completion' } | { settlement: 'body'; mandatory: true; phases: ['after'] }) | {
+} | {
   actionSpaces: 'all' | string[]
   actions?: never
   events?: never
   globalQuery?: never
   phases: ActionSpaceListenerPhase[]
-  settlement?: never
 } | {
   events: CardListenerEvent[]
   actions?: never
   actionSpaces?: never
   globalQuery?: never
-  settlement?: never
 } | {
   globalQuery: true
   actions?: never
   actionSpaces?: never
   events?: never
-  settlement?: never
 }) & {
   id: string
   cardIds?: string[]

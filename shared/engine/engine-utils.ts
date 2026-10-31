@@ -202,7 +202,6 @@ function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineN
   target.ownerPlayerId = source.ownerPlayerId
   target.primaryBodyId = source.primaryBodyId
   target.reactionPhase = source.reactionPhase
-  target.reactionSettlement = source.reactionSettlement
   target.completionBarrier = source.completionBarrier
   target.optional = source.optional
   target.optionalActive = source.optionalActive
@@ -318,10 +317,8 @@ export function buildPhaseTrailingNodes(
     typeof baseEvent.sourceCard === 'string' && baseEvent.sourceCard.length > 0
       ? baseEvent.sourceCard
       : undefined
-  const groups = (['body', 'action', 'completion'] as const).flatMap(settlement =>
-    planListenerOwnerGroups(matchedListeners.filter(entry => (entry.registration.settlement ?? 'completion') === settlement), state, effectiveTriggerPlayerId)
-      .map(group => ({ ...group, settlement })))
-  return groups.map(({ ownerPlayerId, listeners, settlement }) => {
+  const groups = planListenerOwnerGroups(matchedListeners, state, effectiveTriggerPlayerId)
+  return groups.map(({ ownerPlayerId, listeners }) => {
     const group = listeners.map((ml): ActivateCardActionNode => {
       const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
       const cardId = ml.cardId || eventSourceCard || ''
@@ -356,8 +353,7 @@ export function buildPhaseTrailingNodes(
     })
 
     if (group.length === 1) {
-      group[0]!.reactionSettlement = settlement
-      if (settlement === 'completion' && (phase === 'immediatelyAfter' || phase === 'after')) group[0]!.reactionPhase = phase
+      if (phase === 'immediatelyAfter' || phase === 'after') group[0]!.reactionPhase = phase
       return group[0]!
     }
     const ptn = new ParallelNode(
@@ -373,8 +369,7 @@ export function buildPhaseTrailingNodes(
       listenerId: child.params.listenerId,
       mandatory: child.params.mandatory === true,
     }))
-    ptn.reactionSettlement = settlement
-    if (settlement === 'completion' && (phase === 'immediatelyAfter' || phase === 'after')) ptn.reactionPhase = phase
+    if (phase === 'immediatelyAfter' || phase === 'after') ptn.reactionPhase = phase
     return ptn
   })
 }

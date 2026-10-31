@@ -1,7 +1,6 @@
 import { actionSpaceQueryContext } from './space-use-nodes'
 import { inheritPrimaryBody } from './primary-body-nodes'
 import { inheritSpaceEffectSource } from './effect-source'
-import { settleHostReactions } from './reaction-settlement'
 import { captureSpaceUseEvents } from './space-use-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext } from '../actions/flow'
 import type {
@@ -834,7 +833,8 @@ export function engineResolveChoice(
       const insertAnchor = node instanceof XorNode ? node.id : child.id
       const trailingHookNodes = [
         ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state, executionContext.actionContext),
-        ...settleHostReactions(int, child, [...immediateActivateNodes, ...afterActivateNodes]),
+        ...immediateActivateNodes,
+        ...afterActivateNodes,
         ...afterHostNodes,
       ]
       if (child.continuationParentHostNodeId) {
@@ -1229,7 +1229,8 @@ export function engineResolveChoice(
   if (insertionTargetId) {
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state, executionContext.actionContext),
-      ...settleHostReactions(int, pendingActionNode, [...immediateActivateNodes, ...afterActivateNodes]),
+      ...immediateActivateNodes,
+      ...afterActivateNodes,
       ...afterHostNodes,
     ]
     if (pendingActionNode?.continuationParentHostNodeId) {

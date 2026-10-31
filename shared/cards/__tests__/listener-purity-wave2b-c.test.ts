@@ -893,7 +893,7 @@ describe('listener purity wave 2b/c', () => {
       .handler(context(p, {
         state: game,
         actionId: 'collect',
-        phase: 'after',
+        phase: 'immediatelyAfter',
         result: { type: 'ok', resourcesGained: { boar: 1 } },
         transactionEvents: actionEvents,
         actionEvents,

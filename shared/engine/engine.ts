@@ -137,7 +137,6 @@ const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>
   if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
   if (typeof data.primaryBodyId === 'string') node.primaryBodyId = data.primaryBodyId
   if (data.reactionPhase === 'immediatelyAfter' || data.reactionPhase === 'after') node.reactionPhase = data.reactionPhase
-  if (data.reactionSettlement === 'body' || data.reactionSettlement === 'action' || data.reactionSettlement === 'completion') node.reactionSettlement = data.reactionSettlement
   if (typeof data.completionBarrier === 'boolean') node.completionBarrier = data.completionBarrier
   const labeledNode = node as EngineNode & {
     choiceLabelKey?: string
