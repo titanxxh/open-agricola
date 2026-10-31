@@ -20,15 +20,55 @@ describe('canonical scoped execution partitions', () => {
 
     expect(partitions.map(partition => ({ id: partition.id, checks: partition.checks }))).toEqual([
       { id: 'units', checks: [{ kind: 'vitest', project: 'fast-client', files: ['client/a.test.ts', 'client/b.test.ts'] }] },
-      { id: 'browser-1', checks: [{ kind: 'browser', browser: 'chromium', files: ['a.spec.ts', 'e.spec.ts'], grep: null }] },
-      { id: 'browser-2', checks: [
-        { kind: 'browser', browser: 'chromium', files: ['b.spec.ts'], grep: null },
-        { kind: 'browser', browser: 'webkit', files: ['z.spec.ts'], grep: '@webkit' },
-      ] },
+      { id: 'browser-1', checks: [{ kind: 'browser', browser: 'chromium', files: ['a.spec.ts', 'd.spec.ts'], grep: null }] },
+      { id: 'browser-2', checks: [{ kind: 'browser', browser: 'chromium', files: ['b.spec.ts', 'e.spec.ts'], grep: null }] },
       { id: 'browser-3', checks: [{ kind: 'browser', browser: 'chromium', files: ['c.spec.ts'], grep: null }] },
-      { id: 'browser-4', checks: [{ kind: 'browser', browser: 'chromium', files: ['d.spec.ts'], grep: null }] },
+      { id: 'browser-4', checks: [{ kind: 'browser', browser: 'webkit', files: ['z.spec.ts'], grep: '@webkit' }] },
     ])
     for (const partition of partitions) expect(partition.digest).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  it('runs three selector groups in four separate calls when the larger group stays bounded', () => {
+    const checks: PlannedCheck[] = [
+      { kind: 'browser', browser: 'chromium', files: ['choice.spec.ts', 'desktop.spec.ts', 'farm-card.spec.ts', 'farm-select.spec.ts', 'mobile.spec.ts'], grep: null },
+      { kind: 'browser', browser: 'chromium', files: ['matrix.spec.ts'], grep: '@viewport|@ws' },
+      { kind: 'browser', browser: 'webkit', files: ['matrix.spec.ts'], grep: '@webkit' },
+    ]
+    const partitions = routinePartitions(plan(checks))
+    expect(partitions.map(partition => partition.checks)).toEqual([
+      [{ kind: 'browser', browser: 'chromium', files: ['choice.spec.ts', 'farm-card.spec.ts', 'mobile.spec.ts'], grep: null }],
+      [{ kind: 'browser', browser: 'chromium', files: ['desktop.spec.ts', 'farm-select.spec.ts'], grep: null }],
+      [{ kind: 'browser', browser: 'chromium', files: ['matrix.spec.ts'], grep: '@viewport|@ws' }],
+      [{ kind: 'browser', browser: 'webkit', files: ['matrix.spec.ts'], grep: '@webkit' }],
+    ])
+    const reversed = [...checks].reverse().map(check => check.kind === 'catalog' ? check : { ...check, files: [...check.files].reverse() })
+    expect(routinePartitions(plan(reversed))).toEqual(partitions)
+  })
+
+  it('retains round-robin assignment when dedicated slots would not save a verification call', () => {
+    const partitions = routinePartitions(plan([
+      { kind: 'browser', browser: 'chromium', files: ['a.spec.ts', 'b.spec.ts', 'c.spec.ts'], grep: null },
+      { kind: 'browser', browser: 'chromium', files: ['matrix.spec.ts'], grep: '@viewport' },
+    ]))
+    expect(partitions.map(partition => partition.checks)).toEqual([
+      [{ kind: 'browser', browser: 'chromium', files: ['matrix.spec.ts'], grep: '@viewport' }],
+      [{ kind: 'browser', browser: 'chromium', files: ['a.spec.ts'], grep: null }],
+      [{ kind: 'browser', browser: 'chromium', files: ['b.spec.ts'], grep: null }],
+      [{ kind: 'browser', browser: 'chromium', files: ['c.spec.ts'], grep: null }],
+    ])
+  })
+
+  it.each([
+    { files: 90, extra: [{ kind: 'browser', browser: 'chromium', files: ['matrix.spec.ts'], grep: '@viewport' },
+      { kind: 'browser', browser: 'webkit', files: ['matrix.spec.ts'], grep: '@webkit' }] satisfies PlannedCheck[], counts: [23, 23, 23, 23] },
+    { files: 35, extra: [{ kind: 'browser', browser: 'webkit', files: ['matrix.spec.ts'], grep: '@webkit' }] satisfies PlannedCheck[], counts: [9, 9, 9, 9] },
+  ])('keeps round-robin balance for a $files-file group when dedicated slots would overload it', ({ files, extra, counts }) => {
+    const partitions = routinePartitions(plan([
+      { kind: 'browser', browser: 'chromium', files: Array.from({ length: files }, (_, index) => `${index}.spec.ts`), grep: null },
+      ...extra,
+    ]))
+    expect(partitions.map(partition => partition.checks.reduce((total, check) => total + check.files.length, 0)))
+      .toEqual(counts)
   })
 
   it('retains each engine, grep and complete file tuple exactly once and independently of input order', () => {
@@ -44,6 +84,7 @@ describe('canonical scoped execution partitions', () => {
       ? check.files.map(file => [check.browser, check.grep, file]) : []))
 
     expect(actual).toHaveLength(6)
+    expect(partitions.reduce((total, partition) => total + partition.checks.length, 0)).toBe(6)
     expect(actual).toEqual(expect.arrayContaining([
       ['chromium', '@one', 'same.spec.ts'], ['chromium', '@one', 'odd $(touch marker).spec.ts'],
       ['chromium', '@two|@three', 'same.spec.ts'], ['chromium', null, 'full.spec.ts'],

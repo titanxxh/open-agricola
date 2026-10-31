@@ -67,7 +67,7 @@ export function readCardAssociationIndex(cwd: string, inventory: TestInventory):
         if (id) result.cardIds.add(id)
       }
     }
-    const dependency = (specifier: string, typeOnly = false) => {
+    const dependency = (specifier: string, typeOnly = false, bootstrapOnly = false) => {
       if (typeOnly) return
       if (/^(?:glob|fast-glob)$/.test(specifier)) result.riskReasons.add(`Filesystem or glob consumer: ${file}`)
       if (!specifier.startsWith('.')) return
@@ -86,6 +86,7 @@ export function readCardAssociationIndex(cwd: string, inventory: TestInventory):
         return
       }
       if (bootstrap.has(target)) return
+      if (bootstrapOnly && target === 'shared/cards/register-all.ts') return
       if (testLocal(target)) result.dependencies.add(target)
       else if (/^shared\/cards\/(?:catalog|register-all|registry|registry-runtime|custom-registry|major(?:\/index)?)(?:\.|$)/.test(target)) {
         result.safetyReasons.add(`Generic card registry consumer: ${file}`)
@@ -101,7 +102,7 @@ export function readCardAssociationIndex(cwd: string, inventory: TestInventory):
           const bindings = node.importClause?.namedBindings
           const typeOnly = node.importClause?.isTypeOnly || (bindings && ts.isNamedImports(bindings)
             && !node.importClause?.name && bindings.elements.length > 0 && bindings.elements.every(binding => binding.isTypeOnly))
-          dependency(node.moduleSpecifier.text, Boolean(typeOnly))
+          dependency(node.moduleSpecifier.text, Boolean(typeOnly), !node.importClause)
         }
         if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) dependency(node.moduleSpecifier.text, node.isTypeOnly)
         if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) {

@@ -88,6 +88,23 @@ export function verificationConfiguration(cwd: string, sha: string): string {
     if (!files.includes(required)) throw new Error(`Candidate lacks complete verification configuration: ${required}`)
   }
   const hash = createHash('sha256').update('open-agricola-full-verification-v1\0')
-  for (const file of files) hash.update(file + '\0').update(git(['show', `${sha}:${file}`])).update('\0')
+  const blobs = execFileSync('git', ['cat-file', '--batch'], {
+    cwd, input: files.map(file => `${sha}:${file}\n`).join(''), maxBuffer: 64 * 1024 * 1024,
+  })
+  let offset = 0
+  for (const file of files) {
+    const headerEnd = blobs.indexOf(10, offset)
+    const header = headerEnd < 0 ? null : /^[a-f0-9]{40} blob (0|[1-9]\d*)$/.exec(blobs.subarray(offset, headerEnd).toString('utf8'))
+    if (!header) throw new Error(`Invalid verification configuration blob header: ${file}`)
+    const size = Number(header[1])
+    const start = headerEnd + 1
+    const end = start + size
+    if (!Number.isSafeInteger(size) || end >= blobs.length || blobs[end] !== 10) {
+      throw new Error(`Incomplete verification configuration blob: ${file}`)
+    }
+    hash.update(file + '\0').update(blobs.subarray(start, end).toString('utf8')).update('\0')
+    offset = end + 1
+  }
+  if (offset !== blobs.length) throw new Error('Unexpected verification configuration blob output')
   return hash.digest('hex')
 }

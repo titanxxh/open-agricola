@@ -99,7 +99,7 @@ function scopeFor(file: string): VerificationScope {
     || /(?:^|\/)(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/.test(file)
     || file.startsWith('.github/')
     || /^scripts\/(?:ci\/|verification|verify|test-project-globs|check-|architecture-policy|source-files|observability)/.test(file)
-    || /^scripts\/__tests__\/(?:candidate-verification|scoped-verification|verification|routine-verification|card-verification|rule-verification|test-consumers|vitest-results|ci-card-impl-boundaries)/.test(file)
+    || /^scripts\/__tests__\/(?:candidate-verification|scoped-verification|verification|routine-verification|card-verification|rule-verification|operations-verification|test-consumers|vitest-results|ci-card-impl-boundaries)/.test(file)
     || /^(?:restart-local|deploy-backend)\.sh$/.test(file)
     || file === 'shared/cards/__tests__/card-environment.ts'
     || file === 'shared/cards/__tests__/setup-register-all.ts') return 'global'
@@ -186,9 +186,10 @@ export function planVerification(input: {
       expansionReasons.push(...mapping.expansionReasons)
       wideningReasons.push(...mapping.wideningReasons)
     } else if (['server', 'recovery', 'contract', 'workshop', 'operations'].includes(selection.scope)) {
-      const mapping = businessVerification(selection.paths, input.inventory)
+      const mapping = businessVerification(selection.paths, input.inventory, input.testConsumers)
       scopedChecks.push(...mapping.checks)
       expansionReasons.push(...mapping.expansionReasons)
+      wideningReasons.push(...mapping.wideningReasons)
     } else expansionReasons.push(`${selection.reason} Full verification is selected for ${selection.paths.length} affected paths.`)
   }
   if (scopedChecks.some(check => check.kind === 'catalog' && !input.fullTaskIds.includes(check.taskId))) {
@@ -315,7 +316,7 @@ export function createRepositoryPlan(input: {
   const needsRules = scopes.includes('rules')
   const cardAssociations = scopes.includes('card') || needsRules
     ? readCardAssociationIndex(input.cwd, inventory) : undefined
-  const testConsumers = needsRules || scopes.some(scope => scope === 'card' || scope === 'browser' || scope === 'test-support')
+  const testConsumers = needsRules || scopes.some(scope => scope === 'card' || scope === 'browser' || scope === 'test-support' || scope === 'operations')
     ? readTestConsumerIndex(input.cwd, inventory) : undefined
   const ruleAssociations = needsRules && cardAssociations && testConsumers
     ? readRuleAssociationIndex(input.cwd, inventory, cardAssociations, testConsumers) : undefined

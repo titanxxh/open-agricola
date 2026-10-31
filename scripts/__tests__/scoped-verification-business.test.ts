@@ -324,7 +324,6 @@ describe('business verification groups', () => {
   })
 
   it.each([
-    'operations/opening-metrics.ts', 'operations/grafana/dashboards/operations.json',
     'server/operations-accounts.ts', 'server/database/031-game-opening-facts.sql',
   ])('keeps monitoring path %s inside backend and dashboard consumers', path => {
     const tests: TestInventory = {
