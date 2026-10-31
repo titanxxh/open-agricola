@@ -5,8 +5,8 @@ export type OpeningSample = { name: string; labels: Record<string, string>; valu
 type OpeningRow = { name: string; labels: Record<string, string>; value: number | string | null }
 
 
-export async function collectOpeningMetrics(pool: Pick<Pool, 'query'>, now: number): Promise<OpeningSample[]> {
-  const { rows } = await pool.query<OpeningRow>(`SELECT name,labels,value FROM ${openingsFunction}($1::bigint) ORDER BY name,labels::text`, [now])
+export async function collectOpeningMetrics(pool: Pick<Pool, 'query'>): Promise<OpeningSample[]> {
+  const { rows } = await pool.query<OpeningRow>(`SELECT name,labels,value FROM ${openingsFunction}() ORDER BY name,labels::text`)
   if (!rows.some(row => row.name === 'agricola_opening_tracking_since_unixtime')) throw new Error('Opening tracking coverage is unavailable')
   return rows.map(row => {
     if (row.value === null || !Number.isFinite(Number(row.value))) throw new Error('Invalid opening aggregate')

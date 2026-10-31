@@ -161,17 +161,26 @@ export async function provisionOperationsDatabase({ databaseUrl, password, schem
           BEGIN RAISE EXCEPTION 'Opening tracking coverage is unavailable' USING ERRCODE='55000'; END $metrics$`
     await client.query(`CREATE OR REPLACE FUNCTION ${target}.${openingsFunction}(bigint)
       RETURNS TABLE(name text,labels jsonb,value numeric) ${openingBody}`)
+    const observedMinute = '(pg_catalog.floor(EXTRACT(EPOCH FROM pg_catalog.transaction_timestamp())/60)*60000)::bigint'
+    await client.query(`CREATE OR REPLACE FUNCTION ${target}.${accountsFunction}()
+      RETURNS TABLE(total integer,today integer,last_24h integer,last_7d integer)
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp
+      AS $metrics$SELECT * FROM ${target}.${accountsFunction}(${observedMinute})$metrics$`)
+    await client.query(`CREATE OR REPLACE FUNCTION ${target}.${openingsFunction}()
+      RETURNS TABLE(name text,labels jsonb,value numeric)
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp
+      AS $metrics$SELECT * FROM ${target}.${openingsFunction}(${observedMinute})$metrics$`)
     for (const name of [accountsFunction, openingsFunction]) {
-      await client.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${target}.${name}(bigint) FROM PUBLIC`)
-      await client.query(`GRANT EXECUTE ON FUNCTION ${target}.${name}(bigint) TO ${reader}`)
+      await client.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${target}.${name}(bigint) FROM PUBLIC,${reader}`)
+      await client.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${target}.${name}() FROM PUBLIC`)
+      await client.query(`GRANT EXECUTE ON FUNCTION ${target}.${name}() TO ${reader}`)
     }
     const connection = await client.query<{ allowed: boolean }>("SELECT pg_catalog.has_database_privilege($1,$2,'CONNECT') AS allowed", [role, owner.database])
     if (!connection.rows[0]?.allowed) await client.query(`GRANT CONNECT ON DATABASE ${identifier(owner.database)} TO ${reader}`)
     await client.query(`GRANT USAGE ON SCHEMA ${target} TO ${reader}`)
     await client.query(`SET LOCAL ROLE ${reader}`)
-    const observedAt = Date.now()
-    await client.query(`SELECT * FROM ${target}.${accountsFunction}($1)`, [observedAt])
-    if (openingsAvailable) await client.query(`SELECT * FROM ${target}.${openingsFunction}($1)`, [observedAt])
+    await client.query(`SELECT * FROM ${target}.${accountsFunction}()`)
+    if (openingsAvailable) await client.query(`SELECT * FROM ${target}.${openingsFunction}()`)
     await client.query('RESET ROLE')
     await client.query('COMMIT')
     transaction = false

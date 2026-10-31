@@ -27,11 +27,11 @@ export function createAccountsHandler({ pool, token, now = Date.now, buildId = '
     if (inflight) return inflight
     if (now() - attemptedAt < 60_000) return Promise.resolve()
     attemptedAt = now()
-    const accountCollection = pool.query<Accounts>(`SELECT * FROM ${accountsFunction}($1::bigint)`, [attemptedAt]).then(result => {
+    const accountCollection = pool.query<Accounts>(`SELECT * FROM ${accountsFunction}()`).then(result => {
       accounts = result.rows[0]
       collectedAt = now() / 1000
     }).catch(() => { accounts = undefined })
-    const openingCollection = accountCollection.then(() => collectOpeningMetrics(pool, attemptedAt)).then(samples => {
+    const openingCollection = accountCollection.then(() => collectOpeningMetrics(pool)).then(samples => {
       openings = samples
       openingsCollectedAt = now() / 1000
     }).catch(() => { openings = undefined })

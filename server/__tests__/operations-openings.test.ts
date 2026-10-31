@@ -62,6 +62,13 @@ const sample = (samples: OpeningSample[], name: string, labels: Record<string, s
   return result?.value
 }
 
+const ownerOpeningSamples = async (observedAt: number): Promise<OpeningSample[]> => {
+  const { rows } = await db.query<Omit<OpeningSample, 'value'> & { value: string }>(
+    `SELECT name,labels,value FROM ${access.schema}.${openingsFunction}($1::bigint)`, [observedAt],
+  )
+  return rows.map(row => ({ ...row, value: Number(row.value) }))
+}
+
 it('counts inclusive UTC+8 windows, unique accounts across modes, durable expired outcomes and exact preparation samples', async () => {
   await account('private-repeated-player', now - 50 * day)
   await opening('today-solo', { startedAt: now - day / 2, playingAt: now - day / 2 + 30_000, variants: true })
@@ -72,7 +79,7 @@ it('counts inclusive UTC+8 windows, unique accounts across modes, durable expire
   await participate('today-solo', 'private-repeated-player')
   await participate('24h-hotseat', 'private-repeated-player')
   await participate('7d-expired', 'private-repeated-player')
-  const values = await collectOpeningMetrics(pool, now)
+  const values = await ownerOpeningSamples(now)
   expect(sample(values, 'games', { window: 'today', mode: 'all' })).toBe(1)
   expect(sample(values, 'games', { window: 'last_24h', mode: 'all' })).toBe(2)
   expect(sample(values, 'games', { window: 'last_7d', mode: 'all' })).toBe(3)
@@ -89,7 +96,7 @@ it('counts inclusive UTC+8 windows, unique accounts across modes, durable expire
   expect(sample(values, 'variants', { window: 'last_7d', variant: 'farmers_of_the_moor' })).toBe(1)
   expect(JSON.stringify(values)).not.toContain('private-repeated-player')
   await db.prepare('DELETE FROM users WHERE id=?').run('private-repeated-player')
-  const erased = await collectOpeningMetrics(pool, now)
+  const erased = await ownerOpeningSamples(now)
   expect(sample(erased, 'accounts', { window: 'last_7d', mode: 'all' })).toBe(0)
   expect(sample(erased, 'games', { window: 'last_7d', mode: 'all' })).toBe(3)
 })
@@ -106,14 +113,14 @@ it('uses mature registration cohorts and each account\'s own first 24h after the
   await participate('first', 'mature-boundary')
   await participate('exact-deadline', 'mature-two-days')
   await participate('late', 'late-opening')
-  const values = await collectOpeningMetrics(pool, now)
+  const values = await ownerOpeningSamples(now)
   expect(sample(values, 'conversion', { cohort: 'last_7d', milestone: 'eligible' })).toBe(3)
   expect(sample(values, 'conversion', { cohort: 'last_7d', milestone: 'started_24h' })).toBe(2)
   expect(sample(values, 'conversion', { cohort: 'last_7d', milestone: 'playing_24h' })).toBe(1)
   expect(sample(values, 'conversion', { cohort: 'last_30d', milestone: 'eligible' })).toBe(4)
   expect(sample(values, 'conversion', { cohort: 'last_30d', milestone: 'started_24h' })).toBe(2)
   await db.prepare('UPDATE game_opening_tracking SET tracking_since=?').run(now + 1)
-  const uncovered = await collectOpeningMetrics(pool, now)
+  const uncovered = await ownerOpeningSamples(now)
   expect(sample(uncovered, 'games', { window: 'last_7d', mode: 'all' })).toBe(0)
   expect(sample(uncovered, 'conversion', { cohort: 'last_7d', milestone: 'eligible' })).toBe(0)
   expect(sample(uncovered, 'duration_samples', { window: 'last_7d', stage: 'waiting' })).toBe(0)
@@ -138,7 +145,7 @@ it('exports live opening stages through the safe view and distinguishes stale ep
   await current('offline-draft', { epoch: 2 })
   await current('confirm-color', { confirmation: 0 })
   await current('development-draft', { development: true })
-  const values = await collectOpeningMetrics(pool, now)
+  const values = await collectOpeningMetrics(pool)
   expect(sample(values, 'current', { mode: 'all', stage: 'draft', presence: 'online' })).toBe(1)
   expect(sample(values, 'current', { mode: 'multiplayer', stage: 'draft', presence: 'retained' })).toBe(1)
   expect(sample(values, 'current', { mode: 'all', stage: 'color_confirmation', presence: 'online' })).toBe(1)
@@ -158,7 +165,7 @@ it('keeps account metrics healthy when opening collection fails, clears old samp
   const base = `http://127.0.0.1:${address.port}`
   const request = () => fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer opening-test-token' } })
   expect(await (await request()).text()).toContain('agricola_opening_collection_success 1')
-  await db.exec(`ALTER FUNCTION ${openingsFunction}(bigint) RENAME TO unavailable_opening_metrics`)
+  await db.exec(`ALTER FUNCTION ${openingsFunction}() RENAME TO unavailable_opening_metrics`)
   now += 61_000
   const body = await (await request()).text()
   expect(body).toContain('agricola_accounts{kind="total"} 1')
@@ -179,7 +186,7 @@ it('keeps both collections healthy when an allowed account query exceeds the poo
       return (...args: unknown[]) => {
         const text = args[0]
         if (typeof text === 'string' && text.startsWith(`SELECT * FROM ${accountsFunction}(`)) {
-          args[0] = `WITH delay AS MATERIALIZED (SELECT pg_sleep(1.2)) SELECT counts.* FROM ${accountsFunction}($1::bigint) counts CROSS JOIN delay`
+          args[0] = `WITH delay AS MATERIALIZED (SELECT pg_sleep(1.2)) SELECT counts.* FROM ${accountsFunction}() counts CROSS JOIN delay`
         }
         return Reflect.apply(target.query, target, args)
       }
@@ -201,18 +208,19 @@ it('keeps both collections healthy when an allowed account query exceeds the poo
 })
 
 it('collects with a restricted reader while private account fields and raw game snapshots remain inaccessible', async () => {
-  const values = await collectOpeningMetrics(pool, now)
+  const values = await collectOpeningMetrics(pool)
   expect(sample(values, 'games', { window: 'today', mode: 'all' })).toBe(0)
   for (const sql of ['SELECT * FROM operations_current_openings', 'SELECT room_id,user_id FROM game_opening_accounts',
     'SELECT * FROM game_opening_facts', 'SELECT id,created_at FROM users', 'SELECT room_id,created_at,lifecycle FROM game_contexts',
-    'SELECT state_json FROM rooms', 'SELECT username,password_hash FROM users']) {
+    'SELECT state_json FROM rooms', 'SELECT username,password_hash FROM users',
+    `SELECT * FROM ${accountsFunction}(0::bigint)`, `SELECT * FROM ${openingsFunction}(0::bigint)`]) {
     await expect(pool.query(sql)).rejects.toMatchObject({ code: '42501' })
   }
 })
 
 it('removes legacy table, column and inherited access on repeated provisioning while preserving both aggregates', async () => {
   await account('private-upgrade-user', now - 2 * day)
-  await opening('private-upgrade-room', { startedAt: now - 60_000 })
+  await opening('private-upgrade-room', { startedAt: Date.now() - 120_000 })
   await participate('private-upgrade-room', 'private-upgrade-user')
   const legacy = `legacy_${access.schema}`
   await db.exec(`CREATE ROLE ${legacy} NOLOGIN`)
@@ -222,17 +230,19 @@ it('removes legacy table, column and inherited access on repeated provisioning w
     await db.exec(`GRANT SELECT (room_id,created_at,lifecycle) ON game_contexts TO ${access.role}`)
     await db.exec(`GRANT SELECT ON game_opening_accounts,game_opening_facts,operations_current_openings TO ${access.role}`)
     await db.exec(`GRANT ${legacy} TO ${access.role}`)
+    await db.exec(`GRANT EXECUTE ON FUNCTION ${openingsFunction}(bigint),${accountsFunction}(bigint) TO ${access.role}`)
     expect((await pool.query('SELECT room_id,user_id FROM game_opening_accounts')).rows)
       .toEqual([{ room_id: 'private-upgrade-room', user_id: 'private-upgrade-user' }])
     await access.provision()
     await access.provision()
     for (const sql of ['SELECT room_id,user_id FROM game_opening_accounts', 'SELECT id,created_at FROM users',
-      'SELECT room_id,created_at,lifecycle FROM game_contexts', 'SELECT * FROM operations_current_openings']) {
+      'SELECT room_id,created_at,lifecycle FROM game_contexts', 'SELECT * FROM operations_current_openings',
+      `SELECT * FROM ${accountsFunction}(0::bigint)`, `SELECT * FROM ${openingsFunction}(0::bigint)`]) {
       await expect(pool.query(sql)).rejects.toMatchObject({ code: '42501' })
     }
     expect((await pool.query('SELECT pg_has_role($1,\'MEMBER\') AS member', [legacy])).rows).toEqual([{ member: false }])
-    expect((await pool.query(`SELECT total FROM ${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 1 }])
-    expect(sample(await collectOpeningMetrics(pool, now), 'accounts', { window: 'last_24h', mode: 'all' })).toBe(1)
+    expect((await pool.query(`SELECT total FROM ${accountsFunction}()`)).rows).toEqual([{ total: 1 }])
+    expect(sample(await collectOpeningMetrics(pool), 'accounts', { window: 'last_24h', mode: 'all' })).toBe(1)
   } finally {
     await db.exec(`DROP OWNED BY ${legacy}`)
     await db.exec(`DROP ROLE ${legacy}`)
@@ -241,7 +251,7 @@ it('removes legacy table, column and inherited access on repeated provisioning w
 
 it('keeps fixed aggregates unchanged when the reader creates temporary shadow relations', async () => {
   await account('real-user', now - 2 * day)
-  await opening('real-room', { startedAt: now - 60_000 })
+  await opening('real-room', { startedAt: Date.now() - 120_000 })
   await participate('real-room', 'real-user')
   const client = await pool.connect()
   try {
@@ -251,12 +261,27 @@ it('keeps fixed aggregates unchanged when the reader creates temporary shadow re
     await client.query('CREATE TEMP TABLE game_opening_accounts(room_id text,user_id text)')
     await client.query('INSERT INTO game_opening_accounts VALUES(\'real-room\',\'fake-one\'),(\'real-room\',\'fake-two\')')
     await client.query(`SET search_path=pg_temp,${access.schema},pg_catalog`)
-    expect((await client.query(`SELECT total FROM ${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 1 }])
-    expect(sample(await collectOpeningMetrics(client, now), 'accounts', { window: 'last_24h', mode: 'all' })).toBe(1)
+    expect((await client.query(`SELECT total FROM ${accountsFunction}()`)).rows).toEqual([{ total: 1 }])
+    expect(sample(await collectOpeningMetrics(client), 'accounts', { window: 'last_24h', mode: 'all' })).toBe(1)
     await expect(client.query(`SELECT user_id FROM ${access.schema}.game_opening_accounts`)).rejects.toMatchObject({ code: '42501' })
   } finally {
     await client.query('RESET search_path')
     await client.query('RESET default_transaction_read_only')
+    client.release()
+  }
+})
+
+it('uses a database-controlled minute instead of accepting reader-selected historical times', async () => {
+  const client = await pool.connect()
+  await client.query('BEGIN READ ONLY')
+  try {
+    const clock = await client.query<{ started: Date }>('SELECT transaction_timestamp() AS started')
+    const minute = Math.floor(clock.rows[0]!.started.getTime() / 60_000) * 60_000
+    await opening('inside-current-minute', { startedAt: minute + 1 })
+    expect(sample(await collectOpeningMetrics(client), 'games', { window: 'last_24h', mode: 'all' })).toBe(0)
+    expect(sample(await ownerOpeningSamples(minute + 1), 'games', { window: 'last_24h', mode: 'all' })).toBe(1)
+  } finally {
+    await client.query('ROLLBACK')
     client.release()
   }
 })
@@ -270,7 +295,9 @@ it('does not grant PUBLIC execution of either privileged aggregate function', as
     await client.connect()
     await client.query(`SET ROLE ${outsider}`)
     for (const name of [accountsFunction, openingsFunction]) {
-      await expect(client.query(`SELECT * FROM ${access.schema}.${name}($1::bigint)`, [now])).rejects.toMatchObject({ code: '42501' })
+      for (const argumentsSql of ['', '0::bigint']) {
+        await expect(client.query(`SELECT * FROM ${access.schema}.${name}(${argumentsSql})`)).rejects.toMatchObject({ code: '42501' })
+      }
     }
   } finally {
     await client.end()
@@ -283,8 +310,8 @@ it('keeps registration healthy before the game opening schema exists without ins
   await db.exec('DROP VIEW operations_current_openings; DROP TABLE game_opening_accounts; DROP TABLE game_opening_facts; DROP TABLE game_opening_tracking')
   await access.provision()
   await account('pre-opening-schema', now)
-  expect((await pool.query(`SELECT total FROM ${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 1 }])
-  await expect(collectOpeningMetrics(pool, now)).rejects.toMatchObject({ code: '55000' })
+  expect((await pool.query(`SELECT total FROM ${accountsFunction}()`)).rows).toEqual([{ total: 1 }])
+  await expect(collectOpeningMetrics(pool)).rejects.toMatchObject({ code: '55000' })
   expect((await db.query("SELECT to_regclass(current_schema()||'.game_opening_facts') AS relation")).rows).toEqual([{ relation: null }])
   const handler = createAccountsHandler({ pool, token: 'opening-test-token', now: () => now })
   server = createServer((req, res) => { void handler(req, res) })
@@ -309,7 +336,7 @@ it('rolls back failed hardening when shared raw permissions remain, including cr
     const client = new pg.Client({ connectionString: originalUrl })
     try {
       await client.connect()
-      expect((await client.query(`SELECT total FROM ${access.schema}.${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 0 }])
+      expect((await client.query(`SELECT total FROM ${access.schema}.${accountsFunction}()`)).rows).toEqual([{ total: 0 }])
     } finally { await client.end() }
   } finally {
     await db.exec('REVOKE SELECT (created_at) ON users FROM PUBLIC')

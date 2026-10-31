@@ -9,15 +9,10 @@ const db = await createTestDatabase()
 const reader = await createOperationsTestReader(db).catch(async (error: unknown) => { await db.close(); throw error })
 const pool = reader.pool
 let now = Date.parse('2026-10-29T00:30:00+08:00')
-const handler = createAccountsHandler({ pool, token: 'test-scrape-token', now: () => now, buildId: 'test-operations' })
+let handler = createAccountsHandler({ pool, token: 'test-scrape-token', now: () => now, buildId: 'test-operations' })
 const server = createServer((req, res) => { void handler(req, res) })
 let base = ''
 beforeAll(async () => {
-  const times = [now, now - 30 * 60_000, now - 30 * 60_000 - 1, now - 86_400_000, now - 86_400_000 - 1, now - 604_800_000, now - 604_800_000 - 1]
-  for (const [index, createdAt] of times.entries()) {
-    await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
-      .run(`account-${index}`, `private-user-${index}`, `Private player ${index}`, 'unused-test-password', createdAt)
-  }
   await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Expected TCP listener')
@@ -38,20 +33,39 @@ it('requires scrape authorization and refuses writes at both HTTP and database b
 })
 
 it('exports UTC+8 day and inclusive rolling boundaries, removes deleted accounts and clears failed observations', async () => {
-  let body = await (await metrics()).text()
-  for (const sample of ['total"} 7', 'today"} 2', 'last_24h"} 4', 'last_7d"} 6']) expect(body).toContain('agricola_accounts{kind="' + sample)
-  expect(body).not.toContain('private-user')
-  expect(body).not.toContain('Private player')
-  expect(await (await fetch(base + '/health')).json()).toEqual({ status: 'ready', buildId: 'test-operations', collectedAt: now / 1000 })
-  await db.prepare('DELETE FROM users WHERE id=?').run('account-0')
-  now += 61_000
-  body = await (await metrics()).text()
-  expect(body).toContain('agricola_accounts{kind="total"} 6')
-  expect(body).toContain('agricola_accounts{kind="today"} 1')
+  const client = await pool.connect()
+  await client.query('BEGIN READ ONLY')
+  try {
+    const clock = await client.query<{ started: Date }>('SELECT transaction_timestamp() AS started')
+    now = Math.floor(clock.rows[0]!.started.getTime() / 60_000) * 60_000
+    const day = 86_400_000
+    const today = Math.floor((now + 8 * 3_600_000) / day) * day - 8 * 3_600_000
+    const times = [now, today, today - 1, now - day, now - day - 1, now - 7 * day, now - 7 * day - 1]
+    for (const [index, createdAt] of times.entries()) {
+      await db.prepare('INSERT INTO users(id,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)')
+        .run(`account-${index}`, `private-user-${index}`, `Private player ${index}`, 'unused-test-password', createdAt)
+    }
+    handler = createAccountsHandler({ pool: client, token: 'test-scrape-token', now: () => now, buildId: 'test-operations' })
+    let body = await (await metrics()).text()
+    for (const sample of ['total"} 7', 'today"} 2', 'last_24h"} 4', 'last_7d"} 6']) expect(body).toContain('agricola_accounts{kind="' + sample)
+    expect(body).not.toContain('private-user')
+    expect(body).not.toContain('Private player')
+    expect(await (await fetch(base + '/health')).json()).toEqual({ status: 'ready', buildId: 'test-operations', collectedAt: now / 1000 })
+    await db.prepare('DELETE FROM users WHERE id=?').run('account-0')
+    now += 61_000
+    body = await (await metrics()).text()
+    expect(body).toContain('agricola_accounts{kind="total"} 6')
+    expect(body).toContain('agricola_accounts{kind="today"} 1')
+  } finally {
+    await client.query('ROLLBACK')
+    client.release()
+  }
+  handler = createAccountsHandler({ pool, token: 'test-scrape-token', now: () => now, buildId: 'test-operations' })
+  expect(await (await metrics()).text()).toContain('agricola_accounts_collection_success 1')
   const lastSuccess = now / 1000
-  await db.exec(`ALTER FUNCTION ${accountsFunction}(bigint) RENAME TO unavailable_account_metrics`)
+  await db.exec(`ALTER FUNCTION ${accountsFunction}() RENAME TO unavailable_account_metrics`)
   now += 61_000
-  body = await (await metrics()).text()
+  const body = await (await metrics()).text()
   expect(body).not.toContain('agricola_accounts{')
   expect(body).toContain('agricola_accounts_collection_success 0')
   expect(body).toContain(`agricola_accounts_last_success_unixtime ${lastSuccess}`)
