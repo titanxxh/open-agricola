@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import type { EncyclopediaFace as EncyclopediaFaceRef } from '../../../shared/contract/card-encyclopedia'
 import type { Locale } from '../../../shared/i18n'
-import { getParentCardDefinition, type ParentCardId } from '../../../shared/parents'
-import { isMoorSpecialActionId } from '../../../shared/projections/moor-special-actions'
+import { getParentCardDefinition } from '../../../shared/parents'
 import { SpecialActionCardFace } from '../../components/board/SpecialActionCardFace'
 import { specialActionIconArtUrl } from '../../components/board/special-action-art'
 import { ParentCardFace } from '../../components/common/ParentCardFace'
@@ -35,8 +34,6 @@ const SEASON_ART = ['/assets/through-the-seasons/through-the-seasons-clean-backg
 const textFace = ({ item, locale }: { item: EncyclopediaItem; locale: Locale }) =>
   <EncyclopediaTextFace item={item} locale={locale} />
 
-const moorActions = (face: FaceOf<'moorSpecialAction'>) => face.actions.filter(isMoorSpecialActionId)
-
 const FACE_VIEWS: { readonly [K in FaceKind]: FaceView<K> } = {
   card: {
     artUrls: ({ cardId, cardType }) => {
@@ -49,15 +46,15 @@ const FACE_VIEWS: { readonly [K in FaceKind]: FaceView<K> } = {
   },
   parent: {
     artUrls: ({ parentId }) => {
-      const card = getParentCardDefinition(parentId as ParentCardId)
+      const card = getParentCardDefinition(parentId)
       return card ? [resolveParentCardAssetUrls(card.assets).portraitUrl] : []
     },
-    render: ({ face, item, locale }) => getParentCardDefinition(face.parentId as ParentCardId)
-      ? <ParentCardFace id={face.parentId as ParentCardId} locale={locale} />
+    render: ({ face, item, locale }) => getParentCardDefinition(face.parentId)
+      ? <ParentCardFace id={face.parentId} locale={locale} />
       : textFace({ item, locale }),
   },
   moorSpecialAction: {
-    artUrls: (face) => [...new Set([publicAssetUrl(face.image), ...moorActions(face).map(specialActionIconArtUrl)])],
+    artUrls: (face) => [...new Set([publicAssetUrl(face.image), ...face.actions.map(specialActionIconArtUrl)])],
     render: ({ face, item, locale }) => (
       <div className="encyclopedia-moor-action-face">
         <img className="encyclopedia-moor-action-face__art" src={publicAssetUrl(face.image)} alt="" />
@@ -65,7 +62,7 @@ const FACE_VIEWS: { readonly [K in FaceKind]: FaceView<K> } = {
           className="encyclopedia-moor-action-face__card"
           locale={locale}
           players={item.entry.players && 'counts' in item.entry.players ? item.entry.players.counts : []}
-          actions={moorActions(face)}
+          actions={face.actions}
         />
       </div>
     ),
