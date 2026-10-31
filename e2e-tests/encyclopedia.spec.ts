@@ -52,7 +52,7 @@ async function walkRepresentativePath(page: Page, layout: Layout) {
 
   await detail(page).getByRole('button', { name: 'Close details' }).tap()
   await expect(detail(page)).toBeHidden()
-  expect(entryParam(page)).toBeNull()
+  await expect.poll(() => entryParam(page)).toBeNull()
   await expect(opener).toBeFocused()
   await expectResults(page, 12)
   await expect(selectedFilters(page)).toHaveText(['Mother×'])
