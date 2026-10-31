@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEncyclopediaBrowseStore } from '../encyclopedia-browse-store'
 import { EMPTY_ENCYCLOPEDIA_FILTERS, type EncyclopediaFilters } from '../encyclopedia-filters'
 import { createEncyclopediaSessionPersistence } from '../encyclopedia-session-persistence'
+import { forgetEncyclopediaBrowseOnReload } from '../encyclopedia-session-reset'
 
 const memoryStorage = () => {
   const items = new Map<string, string>()
@@ -55,6 +56,40 @@ describe('encyclopedia session persistence', () => {
       expect(store.getState()).toEqual({ query: '', filters: EMPTY_ENCYCLOPEDIA_FILTERS, page: 1 })
       expect(store.getScrollTop()).toBe(0)
     }
+  })
+
+  it('starts empty after a refresh of a page that never loaded the encyclopedia', () => {
+    const storage = memoryStorage()
+    const earlier = storeInTab(storage)
+    earlier.setQuery('fireplace')
+    earlier.setFilters(someFilters)
+    earlier.setPage(3)
+
+    forgetEncyclopediaBrowseOnReload({ storage: () => storage, isReload: () => true })
+    const later = storeInTab(storage)
+
+    expect(later.getState()).toEqual({ query: '', filters: EMPTY_ENCYCLOPEDIA_FILTERS, page: 1 })
+    expect(later.getScrollTop()).toBe(0)
+  })
+
+  it('keeps the saved search when a page that never loaded the encyclopedia is entered without a refresh', () => {
+    const storage = memoryStorage()
+    storeInTab(storage).setQuery('fireplace')
+
+    forgetEncyclopediaBrowseOnReload({ storage: () => storage, isReload: () => false })
+
+    expect(storeInTab(storage).getState().query).toBe('fireplace')
+  })
+
+  it('lets a refreshed page start when storage is blocked', () => {
+    expect(() => forgetEncyclopediaBrowseOnReload({
+      storage: () => { throw new DOMException('The operation is insecure.', 'SecurityError') },
+      isReload: () => true,
+    })).not.toThrow()
+    expect(() => forgetEncyclopediaBrowseOnReload({
+      storage: () => ({ removeItem: () => { throw new Error('denied') } }),
+      isReload: () => true,
+    })).not.toThrow()
   })
 
   it('tells a reload from other arrivals by the navigation timing of the document', () => {
