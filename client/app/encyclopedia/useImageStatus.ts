@@ -24,12 +24,21 @@ const probe = (url: string) => {
   image.src = url
 }
 
-/** One probe per URL for the page's lifetime, so gallery and detail agree without refetching. */
-export function useImageStatus(url: string | undefined): ImageStatus | undefined {
-  const status = useSyncExternalStore(subscribe, () => (url ? settled.get(url) : undefined))
+const combinedStatus = (urls: readonly string[]): ImageStatus => {
+  const statuses = urls.map(url => settled.get(url))
+  if (statuses.includes('failed')) return 'failed'
+  return statuses.every(status => status === 'loaded') ? 'loaded' : 'loading'
+}
+
+/**
+ * One probe per URL for the page's lifetime, so gallery and detail agree without refetching.
+ * Several URLs report `failed` as soon as any of them fails.
+ */
+export function useImageStatus(urls: readonly string[]): ImageStatus | undefined {
+  const key = urls.join('\n')
+  const status = useSyncExternalStore(subscribe, () => combinedStatus(urls))
   useEffect(() => {
-    if (url) probe(url)
-  }, [url])
-  if (!url) return undefined
-  return status ?? 'loading'
+    if (key) for (const url of key.split('\n')) probe(url)
+  }, [key])
+  return urls.length > 0 ? status : undefined
 }
