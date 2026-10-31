@@ -1,8 +1,8 @@
 import { t as translateMessage } from '../../shared/i18n'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
-import { setPage } from '../utils/platform-page-url'
+import { buildPlatformPageUrl, setPage } from '../utils/platform-page-url'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { BrandMark } from '../components/common/BrandMark'
@@ -183,6 +183,12 @@ export function LobbyPage() {
     } catch { /* ignore */ }
   }
 
+  const openEncyclopedia = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    setPage('encyclopedia')
+  }
+
   const handleCopyInviteLink = () => {
     try {
       navigator.clipboard?.writeText(window.location.href)
@@ -199,6 +205,11 @@ export function LobbyPage() {
           titleClassName="site-home-brand__title"
           homeLinkLabel={t('platform.backToLobbyPlain')}
         />
+        <nav className="lobby-header__nav" aria-label={t('platform.mainNavigation')}>
+          <a className="lobby-header__nav-link" href={buildPlatformPageUrl('encyclopedia')} onClick={openEncyclopedia}>
+            {t('ui.encyclopedia.title')}
+          </a>
+        </nav>
         <SiteCommunityLinks />
         <div className="lobby-header__right">
           <LocaleSwitcher />

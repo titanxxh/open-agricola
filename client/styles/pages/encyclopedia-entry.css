@@ -1,0 +1,32 @@
+/* Lobby header entry to the card encyclopedia. Phones reach it from the tab bar instead. */
+.lobby-header__nav {
+  display: flex;
+  align-items: center;
+}
+
+.lobby-header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 247, 230, 0.7);
+  color: var(--color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.lobby-header__nav-link:hover {
+  background: #fff7e6;
+  border-color: var(--color-accent-strong);
+}
+
+@media (max-width: 640px) {
+  .lobby-header__nav {
+    display: none;
+  }
+}
