@@ -20,7 +20,7 @@ const storeInTab = (storage: Storage, { reload = false } = {}) => createEncyclop
   persistence: createEncyclopediaSessionPersistence({ storage: () => storage, isReload: () => reload }),
 })
 
-const someFilters = { groups: ['A'], types: ['minor'] } as unknown as EncyclopediaFilters
+const someFilters: EncyclopediaFilters = { ...EMPTY_ENCYCLOPEDIA_FILTERS, groups: ['A'], types: ['minor'] }
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -37,7 +37,7 @@ describe('encyclopedia session persistence', () => {
 
     const later = storeInTab(storage)
 
-    expect(later.getState()).toEqual({ query: 'fireplace', filters: { groups: ['A'], types: ['minor'] }, page: 3 })
+    expect(later.getState()).toEqual({ query: 'fireplace', filters: someFilters, page: 3 })
     expect(later.getScrollTop()).toBe(840)
   })
 
@@ -126,25 +126,19 @@ describe('encyclopedia session persistence', () => {
     expect(store.getScrollTop()).toBe(120)
   })
 
-  it('hands the saved filters to the injected normalizer and keeps its result', () => {
+  it('drops saved filter options the current build does not know', () => {
     const storage = memoryStorage()
-    storeInTab(storage).setFilters(someFilters)
-    const received: unknown[] = []
-    const normalized = { groups: ['B'] } as unknown as EncyclopediaFilters
+    storeInTab(storage).setPage(2)
+    storage.overwriteAll(JSON.stringify({
+      query: '',
+      filters: { groups: ['A', 'Z'], types: ['minor', 'legendary'], cost: { resources: ['gold'] }, extraVp: 'yes' },
+      page: 1,
+      scrollTop: 0,
+    }))
 
-    const store = createEncyclopediaBrowseStore({
-      persistence: createEncyclopediaSessionPersistence({
-        storage: () => storage,
-        isReload: () => false,
-        normalizeFilters: (value) => {
-          received.push(value)
-          return normalized
-        },
-      }),
-    })
+    const store = storeInTab(storage)
 
-    expect(received).toEqual([{ groups: ['A'], types: ['minor'] }])
-    expect(store.getState().filters).toBe(normalized)
+    expect(store.getState().filters).toEqual({ ...EMPTY_ENCYCLOPEDIA_FILTERS, groups: ['A'], types: ['minor'] })
   })
 
   it('treats a browser without navigation timing as an ordinary arrival', () => {
