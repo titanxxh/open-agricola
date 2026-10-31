@@ -28,10 +28,12 @@ const renderPanel = (attentionWindow: string | null = null) => {
 const panelDialog = () => screen.getByRole('dialog', { name: 'Card Encyclopedia' })
 const cancel = (dialog: HTMLElement) => fireEvent(dialog, new Event('cancel', { cancelable: true }))
 
-beforeAll(() => {
+beforeAll(async () => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
   Element.prototype.scrollIntoView = vi.fn()
+  // The panel content is a lazy chunk; compiling it on first open can outlast a findBy wait on a busy runner.
+  await import('../InGameEncyclopediaContent')
 })
 
 beforeEach(() => {

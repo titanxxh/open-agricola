@@ -130,10 +130,12 @@ const nextFrames = () => act(async () => {
   for (let frame = 0; frame < 3; frame += 1) await new Promise(resolve => window.requestAnimationFrame(resolve))
 })
 
-beforeAll(() => {
+beforeAll(async () => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
   Element.prototype.scrollIntoView = vi.fn()
+  // The panel content is a lazy chunk; compiling it on first open can outlast a findBy wait on a busy runner.
+  await import('../encyclopedia/InGameEncyclopediaContent')
 })
 
 beforeEach(() => {
