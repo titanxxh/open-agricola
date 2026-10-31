@@ -167,6 +167,35 @@ it('keeps account metrics healthy when opening collection fails, clears old samp
   await expect(pool.query('DELETE FROM game_opening_accounts')).rejects.toMatchObject({ code: '25006' })
 })
 
+it('keeps both collections healthy when an allowed account query exceeds the pool acquisition timeout', async () => {
+  await account('slow-account-query', now)
+  const delayedPool = new Proxy(pool, {
+    get(target, property) {
+      if (property !== 'query') return Reflect.get(target, property)
+      return (...args: unknown[]) => {
+        const text = args[0]
+        if (typeof text === 'string' && text.startsWith('SELECT count(*)::integer AS total')) {
+          args[0] = 'WITH delay AS MATERIALIZED (SELECT pg_sleep(1.2)) ' + text.replace('FROM users', 'FROM users CROSS JOIN delay')
+        }
+        return Reflect.apply(target.query, target, args)
+      }
+    },
+  })
+  const handler = createAccountsHandler({ pool: delayedPool, token: 'opening-test-token', now: () => now })
+  server = createServer((req, res) => { void handler(req, res) })
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Expected TCP listener')
+  const response = await fetch(`http://127.0.0.1:${address.port}/internal/metrics`, {
+    headers: { Authorization: 'Bearer opening-test-token' },
+  })
+  const body = await response.text()
+  expect(response.status).toBe(200)
+  expect(body).toContain('agricola_accounts_collection_success 1')
+  expect(body).toContain('agricola_opening_collection_success 1')
+  expect(body).toContain('agricola_opening_games{')
+})
+
 it('collects with a restricted reader while private account fields and raw game snapshots remain inaccessible', async () => {
   const { rows: [row] } = await db.query<{ schema: string }>('SELECT current_schema() AS schema')
   if (!row) throw new Error('Expected test schema')

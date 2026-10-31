@@ -35,11 +35,11 @@ export function createAccountsHandler({ pool, token, now = Date.now, buildId = '
       accounts = result.rows[0]
       collectedAt = now() / 1000
     }).catch(() => { accounts = undefined })
-    const openingCollection = collectOpeningMetrics(pool, attemptedAt).then(samples => {
+    const openingCollection = accountCollection.then(() => collectOpeningMetrics(pool, attemptedAt)).then(samples => {
       openings = samples
       openingsCollectedAt = now() / 1000
     }).catch(() => { openings = undefined })
-    inflight = Promise.all([accountCollection, openingCollection]).then(() => {}).finally(() => { inflight = undefined })
+    inflight = openingCollection.finally(() => { inflight = undefined })
     return inflight
   }
   return async (req: IncomingMessage, res: ServerResponse) => {
