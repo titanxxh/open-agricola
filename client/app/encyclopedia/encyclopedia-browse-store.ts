@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { EMPTY_ENCYCLOPEDIA_FILTERS, type EncyclopediaFilters } from './encyclopedia-filters'
+import { createEncyclopediaSessionPersistence } from './encyclopedia-session-persistence'
 
 export type EncyclopediaBrowseState = Readonly<{
   query: string
@@ -74,7 +75,7 @@ export function createEncyclopediaBrowseStore(
 }
 
 /** Shared by the standalone page and the in-game panel so both see the same search within a tab. */
-export const encyclopediaBrowseStore = createEncyclopediaBrowseStore()
+export const encyclopediaBrowseStore = createEncyclopediaBrowseStore({ persistence: createEncyclopediaSessionPersistence() })
 
 export const useEncyclopediaBrowseState = (store: EncyclopediaBrowseStore = encyclopediaBrowseStore): EncyclopediaBrowseState =>
   useSyncExternalStore(store.subscribe, store.getState)
