@@ -1,29 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import type { EncyclopediaEntry, EncyclopediaTextField } from '../../../../shared/contract/card-encyclopedia'
+import type { EncyclopediaEntry } from '../../../../shared/contract/card-encyclopedia'
 import type { EncyclopediaItem } from '../encyclopedia-item'
 import { queryEncyclopedia } from '../encyclopedia-query'
 import { cardEntry } from './fixtures'
-
-type Texts = Partial<Record<EncyclopediaTextField, string>>
+import { searchable } from './search-fixtures'
 
 const majorEntry = (sourceId: string): EncyclopediaEntry => {
   const entry = { ...cardEntry(sourceId, 'M000', { group: 'majorStandard', publicType: 'major', displayNumber: null }), sourceKind: 'major' as const }
   return { ...entry, key: `${entry.sourceKind}:${sourceId}` }
 }
-
-const fields = (texts: Texts) =>
-  Object.fromEntries(Object.entries(texts).map(([field, text]) => [field, { text, status: 'localized' as const }]))
-
-/** Search documents shaped like the generated ones: plain text per language, icons already named. */
-const searchable = (entry: EncyclopediaEntry, en: Texts, zh: Texts, extraTerms: string[] = []): EncyclopediaItem => ({
-  entry,
-  document: {
-    key: entry.key,
-    identifiers: [entry.sourceId, ...(entry.displayNumber ? [entry.displayNumber] : [])],
-    locales: { en: fields(en), zh: fields(zh) },
-    extraTerms,
-  },
-})
 
 const BASEBOARDS = searchable(
   cardEntry('A004_Baseboards', 'A004'),

@@ -66,6 +66,7 @@ export function EncyclopediaBrowser({ encyclopedia, navigation, locale, store = 
             <h2 id={countId} className="encyclopedia-results__count">
               {t(locale, 'ui.encyclopedia.results.count', { count: slice.total })}
             </h2>
+            <p className="encyclopedia-results__bilingual">{t(locale, 'ui.encyclopedia.search.bilingual')}</p>
             <EncyclopediaFilterEntry {...filterProps} />
           </div>
           {slice.total === 0
