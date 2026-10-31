@@ -28,6 +28,7 @@ import type { GameCreationRecord, SoloHandMode } from '../../../shared/contract/
 import { parseGameCreationRecord } from '../creation-configuration'
 import { GameCreationStore, GameCreationError } from '../game-creation-store'
 import { resolveSoloWorkshopCards } from '../workshop-room-cards'
+import { OpeningFacts } from './opening-facts'
 
 type RoomRow = {
   id: string
@@ -275,6 +276,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
   constructor(db: RoomDatabase, directory?: RoomDirectory) {
     this.directory = directory
     const commands = new CommandStore(db)
+    const openingFacts = new OpeningFacts(db)
     const receiptAlreadyCommitted = async (receipt: CommandReceiptWrite | undefined): Promise<boolean> => {
       if (!receipt) return false
       const prior = await commands.lookup(receipt.request.actorId, receipt.request)
@@ -529,7 +531,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
     }
     this.saveRoom = db.transaction(async (
       values: Record<string, string | number | null>,
-      players: RoomMeta['players'],
+      meta: RoomMeta,
+      state: PersistedSessionSnapshot['state'] | undefined,
       nodes: HistoryNode[],
       recoveryNodes: RecoveryNode[],
       options?: RoomWriteOptions,
@@ -550,7 +553,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (context.changes !== 1) throw new ReplayConflictError('Room context is no longer active')
       ;(await this.upsertRoom.run(values))
       ;(await this.history.write(String(values.id), nodes, recoveryNodes))
-      ;(await savePlayers(String(values.id), Number(values.now), players))
+      ;(await savePlayers(String(values.id), Number(values.now), meta.players))
+      await openingFacts.capture({ roomId: String(values.id), meta, state, committedAt: Number(values.now) })
       if (directory) await directory.markActive(String(values.id), options!.owner!)
       if (options?.retireRoomId && options.retireRoomId !== values.id) {
         if (directory) {
@@ -665,6 +669,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       ;(await this.upsertRoom.run(values))
       packed.writtenBytes = await this.history.write(commit.roomId, packed.nodes, packed.recoveryNodes)
       ;(await savePlayers(commit.roomId, commit.step.createdAt, commit.meta.players))
+      await openingFacts.capture({ roomId: commit.roomId, meta: commit.meta, state: commit.serialized.state, committedAt: commit.step.createdAt })
       ;(await this.insertReplayStep.run({ roomId: commit.roomId, ...commit.step }))
       const advanced = (await this.advanceReplay.run({
         roomId: commit.roomId,
@@ -735,7 +740,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
     const packed = serialized ? this.history.prepare(id, serialized) : { json: null, nodes: [], recoveryNodes: [] }
     const values = roomValues(id, null, meta, now, null)
     values.stateJson = packed.json
-    ;(await this.saveRoom(values, meta.players, packed.nodes, packed.recoveryNodes, options))
+    ;(await this.saveRoom(values, meta, serialized?.state, packed.nodes, packed.recoveryNodes, options))
     this.history.accept(id, packed.nodes, packed.recoveryNodes)
   }
 
