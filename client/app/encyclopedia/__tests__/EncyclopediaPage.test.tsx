@@ -4,7 +4,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { LocaleProvider } from '../../../contexts/LocaleContext'
 import { loadCardEncyclopedia } from '../../../services/card-encyclopedia'
 import { EncyclopediaPage } from '../EncyclopediaPage'
-import { encyclopediaBrowseStore } from '../encyclopedia-browse-store'
+import { createEncyclopediaBrowseStore, encyclopediaBrowseStore } from '../encyclopedia-browse-store'
+import { createEncyclopediaSessionPersistence } from '../encyclopedia-session-persistence'
 import { cardEntry, encyclopediaOf, itemFor } from './fixtures'
 
 vi.mock('../../../services/card-encyclopedia', () => ({ loadCardEncyclopedia: vi.fn() }))
@@ -152,5 +153,21 @@ describe('encyclopedia page', () => {
 
     expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument()
     expect(window.scrollTo).toHaveBeenLastCalledWith(0, 640)
+  })
+
+  it('leaves the page and scroll position in the tab for the next document when the page is left by a full navigation', async () => {
+    load.mockResolvedValue(numbered(30))
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+    await screen.findByText('Page 2 of 2')
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(480)
+
+    window.dispatchEvent(new Event('pagehide'))
+
+    const nextDocument = createEncyclopediaBrowseStore({
+      persistence: createEncyclopediaSessionPersistence({ isReload: () => false }),
+    })
+    expect(nextDocument.getState().page).toBe(2)
+    expect(nextDocument.getScrollTop()).toBe(480)
   })
 })

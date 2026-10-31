@@ -17,7 +17,13 @@ export function EncyclopediaPage() {
   useLayoutEffect(() => {
     if (!ready) return
     window.scrollTo(0, encyclopediaBrowseStore.getScrollTop())
-    return () => encyclopediaBrowseStore.setScrollTop(window.scrollY)
+    const saveScroll = () => encyclopediaBrowseStore.setScrollTop(window.scrollY)
+    // A full navigation away does not unmount the page.
+    window.addEventListener('pagehide', saveScroll)
+    return () => {
+      window.removeEventListener('pagehide', saveScroll)
+      saveScroll()
+    }
   }, [ready])
 
   return (
