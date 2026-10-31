@@ -4,13 +4,13 @@ type BrowserCheck = Extract<PlannedCheck, { kind: 'browser' }>
 const browser = (files: string[], grep: string | null = null, engine: BrowserCheck['browser'] = 'chromium'): BrowserCheck => ({
   kind: 'browser', browser: engine, files: files.map(file => `e2e-tests/${file}.spec.ts`), grep,
 })
-const safari = () => browser(['frontend-browser-scenario-matrix'], '@webkit', 'webkit')
+const safari = (additionalFiles: string[] = []) => browser(['frontend-browser-scenario-matrix', ...additionalFiles], '@webkit', 'webkit')
 const groups = [
   {
     name: 'game shell, header and opening',
-    owns: /^client\/(?:app\/(?:GameContainerApi|GameEndControls|HotseatHandoff|hotseat-seat|game-container-helpers|game-setup-query|game-load-progress|AppShellLoadScreen|GameContextRouter|solo\/|draft\/|parents\/)|components\/header\/|styles\/(?:components\/game-end|pages\/(?:game|draft|solo)))/,
+    owns: /^client\/(?:app\/(?:GameContainerApi|GameEndControls|HotseatHandoff|hotseat-seat|game-container-helpers|game-setup-query|solo\/|draft\/|parents\/)|components\/header\/|styles\/(?:components\/game-end|pages\/(?:game|draft|solo)))/,
     checks: [
-      browser(['game-end', 'hosted-password-login', 'ws-dual-player', 'draft-opening-order', 'hotseat-public-farms', 'standard-solo-ui', 'setup-navigation']),
+      browser(['game-end', 'hosted-password-login', 'ws-dual-player', 'draft-opening-order', 'hotseat-public-farms', 'standard-solo-ui', 'setup-navigation', 'encyclopedia-in-game']),
       browser(['frontend-browser-scenario-matrix'], '@viewport|@ws'), safari(),
     ],
   },
@@ -18,7 +18,7 @@ const groups = [
     name: 'farm board',
     owns: /^(?:client\/components\/board\/|client\/app\/(?:GameContainerApi\.|DesktopPublicFarms|farm-))/,
     checks: [
-      browser(['farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout']),
+      browser(['farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout', 'encyclopedia-faces', 'encyclopedia-in-game']),
       browser(['frontend-browser-scenario-matrix'], '@viewport|@ws'), safari(),
     ],
   },
@@ -31,7 +31,7 @@ const groups = [
     name: 'interaction',
     owns: /^(?:client\/components\/interaction\/|client\/app\/(?:GameContainerApi\.|interaction-)|client\/hooks\/use(?:CardPlayChoice|FarmSelection|RequestActivation))/,
     checks: [
-      browser(['choice-previews', 'online-interaction-completion', 'interaction-focus', 'mobile-interaction-continuity']),
+      browser(['choice-previews', 'online-interaction-completion', 'interaction-focus', 'mobile-interaction-continuity', 'encyclopedia-in-game']),
       browser(['frontend-browser-scenario-matrix'], '@viewport|@ws'), safari(),
     ],
   },
@@ -39,16 +39,16 @@ const groups = [
     name: 'auth and transport',
     owns: /^client\/(?:contexts\/AuthContext|services\/(?:gameTransport|room-command-journal|room-creation|oauth-onboarding)|hooks\/useGameSync|app\/(?:LoginPage|OnboardingPage|PageRouter|RoomInvitePicker|WaitingRoomPlayers|LobbyPage|MyActiveGames|useAccountLinking|auth-errors|ws-status))(?:[.-]|$)/,
     checks: [
-      browser(['hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player']),
-      browser(['frontend-browser-scenario-matrix'], '@ws'), safari(),
+      browser(['hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player', 'encyclopedia-entry', 'encyclopedia', 'encyclopedia-in-game']),
+      browser(['frontend-browser-scenario-matrix'], '@ws'), safari(['encyclopedia']),
     ],
   },
   {
     name: 'locale',
     owns: /^client\/(?:contexts\/LocaleContext|services\/language-pack)(?:[.-]|$)/,
     checks: [
-      browser(['interface-localization', 'interface-localization-fields', 'card-localization']),
-      browser(['frontend-browser-scenario-matrix'], '@locale'), safari(),
+      browser(['interface-localization', 'interface-localization-fields', 'card-localization', 'encyclopedia-search', 'encyclopedia', 'encyclopedia-pages']),
+      browser(['frontend-browser-scenario-matrix'], '@locale'), safari(['encyclopedia']),
     ],
   },
   {
@@ -61,7 +61,7 @@ const groups = [
   },
 ]
 
-const sharedPresentation = /^client\/(?:components\/(?:common|effects|dev)\/|styles\/|hooks\/useElementWidth\.|App\.|app\/(?:AppErrorBoundary|SettingsPage|BugReportBar|OperationsPage|public-event-|private-event-|action-log-|anytime-exchange|bake-exchange|exchange-|animal-reorg-)|services\/(?:observability|bug-report-diagnostics|card-meta|parent-assets|solo-creation-configuration)\.)/
+const sharedPresentation = /^client\/(?:components\/(?:common|effects|dev)\/|styles\/|hooks\/useElementWidth\.|(?:App|main)\.|app\/(?:AppErrorBoundary|AppShellLoadScreen|GameContextRouter|game-load-progress|SettingsPage|BugReportBar|OperationsPage|public-event-|private-event-|action-log-|anytime-exchange|bake-exchange|exchange-|animal-reorg-)|services\/(?:observability|bug-report-diagnostics|card-meta|parent-assets|solo-creation-configuration)\.)/
 
 export function frontendOwnership(path: string): string[] {
   const modulePath = path.replace('/__tests__/', '/')
@@ -77,17 +77,24 @@ export function frontendVerification(paths: string[], inventory: TestInventory):
   }
   const selected = new Set<typeof groups[number]>()
   let completeBrowserLayer = false
+  const expansionReasons: string[] = []
   for (const path of paths) {
     const modulePath = path.replace('/__tests__/', '/')
     const owned = groups.filter(candidate => candidate.owns.test(modulePath))
     if (!owned.length && sharedPresentation.test(modulePath)) completeBrowserLayer = true
-    else if (!owned.length) return { checks: [], expansionReasons: [`Frontend module ownership is unknown for ${path}; full verification is required.`] }
+    else if (!owned.length) expansionReasons.push(`Frontend module ownership is unknown for ${path}; full verification is required.`)
     owned.forEach(group => selected.add(group))
   }
-  const browserChecks = completeBrowserLayer
-    ? [browser(inventory.browser.map(file => file.replace(/^e2e-tests\//, '').replace(/\.spec\.ts$/, ''))), safari()]
-    : [...selected].flatMap(group => group.checks)
-  const missing = browserChecks.flatMap(check => check.files).filter(file => !inventory.browser.includes(file))
+  const declaredChecks = [
+    ...[...selected].flatMap(group => group.checks),
+    ...(completeBrowserLayer ? [safari(['encyclopedia', 'replay-viewer-csp'])] : []),
+  ]
+  const browserChecks: PlannedCheck[] = completeBrowserLayer
+    ? [browser(inventory.browser.map(file => file.replace(/^e2e-tests\//, '').replace(/\.spec\.ts$/, ''))),
+      { kind: 'catalog', taskId: 'webkit' }]
+    : declaredChecks
+  const missing = [...new Set([...declaredChecks, ...browserChecks].flatMap(check => check.kind === 'browser' ? check.files : []))]
+    .filter(file => !inventory.browser.includes(file))
   if (missing.length) throw new Error(`Declared frontend browser consumers are missing: ${[...new Set(missing)].join(', ')}`)
   return {
     checks: [
@@ -95,6 +102,6 @@ export function frontendVerification(paths: string[], inventory: TestInventory):
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
       ...browserChecks,
     ],
-    expansionReasons: [],
+    expansionReasons,
   }
 }

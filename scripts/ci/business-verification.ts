@@ -137,7 +137,13 @@ const groups: BusinessGroup[] = [{
     { project: 'fast-tests', file: 'tests/serialization.test.ts' },
   ],
   requiredBrowsers: ruleBrowsers,
-  files: [],
+  files: [
+    { project: 'fast-scripts', file: 'scripts/__tests__/card-encyclopedia-artifacts.test.ts' },
+    { project: 'fast-scripts', file: 'scripts/__tests__/card-encyclopedia-catalog.test.ts' },
+    { project: 'fast-scripts', file: 'scripts/__tests__/card-encyclopedia-facts.test.ts' },
+    { project: 'fast-scripts', file: 'scripts/__tests__/card-encyclopedia-search.test.ts' },
+    { project: 'fast-scripts', file: 'scripts/__tests__/card-encyclopedia-text.test.ts' },
+  ],
   checks: completeBrowsers,
 }, {
   name: 'storage, recovery and Replay',

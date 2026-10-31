@@ -74,6 +74,11 @@ describe('verification scope planning', () => {
       inventory: {
         vitest: [
           { file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' },
+          { file: 'scripts/__tests__/card-encyclopedia-artifacts.test.ts', project: 'fast-scripts' },
+          { file: 'scripts/__tests__/card-encyclopedia-catalog.test.ts', project: 'fast-scripts' },
+          { file: 'scripts/__tests__/card-encyclopedia-facts.test.ts', project: 'fast-scripts' },
+          { file: 'scripts/__tests__/card-encyclopedia-search.test.ts', project: 'fast-scripts' },
+          { file: 'scripts/__tests__/card-encyclopedia-text.test.ts', project: 'fast-scripts' },
           { file: 'client/services/llm/generation/__tests__/references.test.ts', project: 'fast-client' },
           { file: 'server/__tests__/workshop-timing-payment-session.test.ts', project: 'fast-server' },
           { file: 'server/__tests__/workshop-composed-behaviors-session.test.ts', project: 'fast-server' },

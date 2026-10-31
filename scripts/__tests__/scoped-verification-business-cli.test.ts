@@ -12,6 +12,13 @@ const write = (cwd: string, file: string, content: string) => {
   mkdirSync(dirname(join(cwd, file)), { recursive: true })
   writeFileSync(join(cwd, file), content)
 }
+const encyclopediaProducerFiles = [
+  'scripts/__tests__/card-encyclopedia-artifacts.test.ts',
+  'scripts/__tests__/card-encyclopedia-catalog.test.ts',
+  'scripts/__tests__/card-encyclopedia-facts.test.ts',
+  'scripts/__tests__/card-encyclopedia-search.test.ts',
+  'scripts/__tests__/card-encyclopedia-text.test.ts',
+]
 const files = [
   'shared/actions/payment/internal/__tests__/pay.test.ts', 'shared/contract/__tests__/authoritative-command.test.ts',
   'shared/cards/__tests__/listener-purity-guard.test.ts', 'shared/cards/__tests__/A29_AleBenches.test.ts',
@@ -22,6 +29,7 @@ const files = [
   'client/services/__tests__/gameTransport-reconnect.test.ts', 'client/services/__tests__/api-contract.test.ts',
   'tests/cost-pay-parity.test.ts', 'tests/game-sync-pipeline.test.ts', 'tests/protocol-types.test.ts', 'tests/serialization.test.ts',
   'scripts/__tests__/docs-budget.test.ts',
+  ...encyclopediaProducerFiles,
 ]
 const browserFiles = [
   'hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player', 'frontend-browser-scenario-matrix',
@@ -241,6 +249,32 @@ describe('business verification public CLI', () => {
     expect(value.commands().filter(command => Array.isArray(command) && command.includes('build:cards-manifest'))).toHaveLength(1)
     expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'local-services')).toEqual([['local-services', '--test']])
   }, 30_000)
+
+  it('retains the complete encyclopedia producer group in the public projection plan', () => {
+    const value = fixture('shared/projections/card-encyclopedia-text.ts')
+    const planned = value.run('plan', '--base', 'main')
+    expect(planned.status, planned.stderr).toBe(0)
+    expect(JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-plan.json'), 'utf8'))).toMatchObject({
+      mode: 'scoped', checks: expect.arrayContaining([{
+        kind: 'vitest', project: 'fast-scripts', files: encyclopediaProducerFiles,
+      }]),
+    })
+    const result = value.run('run', '--base', 'main', '--partition', 'units')
+    expect(result.status, result.stderr).toBe(0)
+    expect(value.commands().filter(command => Array.isArray(command)
+      && command[0] === 'exec' && command.includes('fast-scripts'))).toEqual([
+      ['exec', 'vitest', 'run', '--project', 'fast-scripts', ...encyclopediaProducerFiles],
+    ])
+  }, 30_000)
+
+  it('rejects a missing declared encyclopedia producer in the public contract plan', () => {
+    const value = fixture('shared/contract/card-encyclopedia.ts')
+    const missing = 'scripts/__tests__/card-encyclopedia-artifacts.test.ts'
+    rmSync(join(value.cwd, missing))
+    const planned = value.run('plan', '--base', 'main')
+    expect(planned.status).toBe(1)
+    expect(planned.stderr).toContain(missing)
+  })
 
   it('rejects an edited protocol plan that omits its frontend consumers', () => {
     const value = fixture('shared/contract/protocol/ws.ts')

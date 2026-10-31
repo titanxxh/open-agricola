@@ -42,9 +42,9 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览�
 
 `scripts/ci/support-verification.ts` 将文档约束与 Workshop 运行时验证分别选择。英文参考文档还选择参考资料读取器；可执行沙盒与 prompt 文档保留声明的 Session 契约。`test-consumers.ts` 恰好覆盖每个独立发现的测试一次，沿测试本地 import 与 helper 遍历，记录生产依赖但不继续遍历生产代码。测试与浏览器文件改动选择完整文件及其消费者。helper 的不确定归属、删除和 rename 在已知测试层内扩边；没有存活消费者的 helper 保留该层。浏览器文件在 Chromium 下完整执行，并保留完整的既有 `@webkit` 资格组；该静态引擎组不从 diff 行推导单个 case。已确认的 helper 读取或解析失败会使规划失败。未知归属与全局 setup 改动仍要求完整清单。
 
-`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、计分、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。共享展示扩大到完整浏览器层。前端模块未知时扩大到全量；声明的消费者缺失时规划失败。
+`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、计分、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。复用 UI 的路径保留百科入口、局内面板、共享卡面、语言搜索和 WebKit 导航消费者。共享展示扩大到完整浏览器层。前端模块未知时扩大到全量；声明的消费者缺失时规划失败。
 
-`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。工坊保留行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。业务组归属未知时扩大到全量；声明的测试、浏览器消费者或 project 缺失时规划失败。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
+`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。协议/投影改动还保留百科的五个产物测试文件，覆盖目录、牌面事实、搜索、文本与产物生成。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。工坊保留行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。业务组归属未知时扩大到全量；声明的测试、浏览器消费者或 project 缺失时规划失败。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
 
 已知 operations 采集器、数据库访问授权、部署、Compose 与 Grafana 配置选择完整消费者文件，不再选择完整 server project。必需安全消费者为 `operations-accounts.test.ts`、`operations-openings.test.ts`、`opening-facts.test.ts`、`observability-http.test.ts`、`operations-deployment.test.ts`、`local-services.test.ts` 和 `wechat-community.test.ts`，并保留完整的 `operations-dashboard.spec.ts` 与 `wechat-community.spec.ts` 浏览器文件。独立测试索引沿测试本地依赖、operations 测试前缀，以及声明的子进程或路径字面量关联补入消费者。不确定的模块加载器保留其完整测试文件与 operations 安全组，并记录有界扩边；读取或解析失败会使规划失败。直接调用规划器而未提供索引时，保留完整发现的 unit 清单与完整浏览器分道。
 

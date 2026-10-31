@@ -9,6 +9,14 @@ const identity = {
   headSha: '2'.repeat(40), testedSha: '2'.repeat(40), sourceFingerprint: '3'.repeat(64),
 }
 
+const encyclopediaProducerFiles = [
+  'scripts/__tests__/card-encyclopedia-artifacts.test.ts',
+  'scripts/__tests__/card-encyclopedia-catalog.test.ts',
+  'scripts/__tests__/card-encyclopedia-facts.test.ts',
+  'scripts/__tests__/card-encyclopedia-search.test.ts',
+  'scripts/__tests__/card-encyclopedia-text.test.ts',
+]
+
 const inventory: TestInventory = {
   vitest: [
     { project: 'fast-shared', file: 'shared/contract/__tests__/authoritative-command.test.ts' },
@@ -71,6 +79,7 @@ const ruleInventory: TestInventory = {
 const contractInventory: TestInventory = {
   ...ruleInventory,
   vitest: [...ruleInventory.vitest,
+    ...encyclopediaProducerFiles.map(file => ({ project: 'fast-scripts', file })),
     { project: 'fast-client', file: 'client/services/__tests__/api-contract.test.ts' },
     { project: 'fast-tests', file: 'tests/serialization.test.ts' },
     { project: 'fast-tests', file: 'tests/protocol-types.test.ts' },
@@ -244,7 +253,7 @@ describe('business verification groups', () => {
     expect(selected.mode).toBe('scoped')
     expect(selected.selections.map(selection => selection.scope)).toEqual(['contract'])
     expect(selected.checks.filter(check => check.kind === 'vitest').map(check => check.project)).toEqual([
-      'fast-shared', 'fast-cards', 'fast-card-runtime', 'fast-client', 'fast-server', 'fast-tests', 'slow',
+      'fast-shared', 'fast-cards', 'fast-card-runtime', 'fast-client', 'fast-server', 'fast-scripts', 'fast-tests', 'slow',
     ])
     expect(selected.checks.find(check => check.kind === 'vitest' && check.project === 'fast-client')).toEqual({
       kind: 'vitest', project: 'fast-client', files: [
@@ -258,6 +267,25 @@ describe('business verification groups', () => {
       { kind: 'catalog', taskId: 'chromium-3' }, { kind: 'catalog', taskId: 'chromium-4' },
       { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
     ])
+  })
+
+  it.each([
+    'shared/contract/card-encyclopedia.ts', 'shared/projections/card-encyclopedia-text.ts',
+    'shared/projections/card-display-number.ts', 'shared/projections/card-text-icons.ts',
+    'shared/projections/season-display.ts', 'shared/projections/moor-special-actions.ts',
+  ])('retains the complete encyclopedia producer group for %s', path => {
+    const selected = plan([path], contractInventory)
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.expansionReasons).toEqual([])
+    expect(selected.checks.find(check => check.kind === 'vitest' && check.project === 'fast-scripts')).toEqual({
+      kind: 'vitest', project: 'fast-scripts', files: encyclopediaProducerFiles,
+    })
+  })
+
+  it.each(encyclopediaProducerFiles)('rejects a missing encyclopedia producer consumer %s', missing => {
+    const tests = { ...contractInventory, vitest: contractInventory.vitest.filter(test => test.file !== missing) }
+    expect(() => plan(['shared/contract/card-encyclopedia.ts'], tests)).toThrow(missing)
   })
 
   it.each([
