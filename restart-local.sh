@@ -603,10 +603,6 @@ fi
 
 echo "Binding to: $BIND_IP$([ "$INTRANET_ENABLED" -eq 1 ] && echo " (intranet)" || echo " (local only; pass --intranet for LAN access)")"
 PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
-if [[ "${OBSERVABILITY_ENABLED:-true}" == "true" && -n "${OBSERVABILITY_METRICS_TOKEN:-}" ]]; then
-  SHARED_DATA_DIR="$SHARED_DATA_DIR" BACKEND_HOST="$BIND_IP" BACKEND_PORT="$BACKEND_PORT" PUBLIC_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
-    node "$SCRIPT_DIR/scripts/observability.mjs"
-fi
 echo "Stopping existing processes..."
 if [ -n "$OWNED_PROCESSES_FILE" ]; then
   stop_owned_processes
@@ -655,6 +651,11 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   GAME_BUILD_ID="$GAME_BUILD_ID" \
   COMMUNITY_DATA_DIR="${COMMUNITY_DATA_DIR:-$SHARED_DATA_DIR/community}" \
   "$BACKEND_BIN" "$SCRIPT_DIR/scripts/local-backend.ts"
+
+if [[ "${OBSERVABILITY_ENABLED:-true}" == "true" && -n "${OBSERVABILITY_METRICS_TOKEN:-}" ]]; then
+  SHARED_DATA_DIR="$SHARED_DATA_DIR" BACKEND_HOST="$BIND_IP" BACKEND_PORT="$BACKEND_PORT" PUBLIC_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
+    node "$SCRIPT_DIR/scripts/observability.mjs"
+fi
 
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Starting frontend preview (port $FRONTEND_PORT on $BIND_IP)..."
