@@ -155,6 +155,47 @@ describe('verification scope planning', () => {
     expect(plan.selections).toMatchObject([{ scope: 'global', paths: [path] }])
   })
 
+  describe.each(['tests/setup-language-packs.ts', 'shared/cards/__tests__/setup-listener-purity.ts'])('cross-project setup %s', path => {
+    it.each<ChangedPath>([
+      { status: 'M', path },
+      { status: 'D', path },
+      { status: 'R', previousPath: path, path: 'tests/helpers/renamed.ts' },
+    ])('retains the global catalog for $status', change => {
+      const plan = planVerification({
+        identity, changes: [change], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+      })
+      expect(plan.mode).toBe('full')
+      expect(plan.selections).toContainEqual({
+        scope: 'global', paths: [path], reason: 'Shared verification configuration or fixtures require full verification.',
+      })
+      expect(plan.checks).toEqual([{ kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'fast' }])
+    })
+  })
+
+  it.each(['client/__tests__/setup.ts', 'client/__tests__/setup-card-manifest.ts'])('keeps the client-only setup in the complete client layer: %s', path => {
+    const inventory = {
+      vitest: [
+        { file: 'client/components/__tests__/first.test.ts', project: 'fast-client' },
+        { file: 'client/components/__tests__/second.test.ts', project: 'fast-client' },
+        { file: 'server/__tests__/unrelated.test.ts', project: 'fast-server' },
+      ], browser: [],
+    }
+    const plan = planVerification({
+      identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: ['quality', 'fast'],
+      testConsumers: {
+        inventoryKey: JSON.stringify(inventory), expansionReasons: [],
+        tests: inventory.vitest.map(test => ({
+          file: test.file, dependencies: [test.file], symbols: [], literals: [], uncertaintyReasons: [],
+        })),
+      },
+    })
+    expect(plan.mode).toBe('scoped')
+    expect(plan.selections).toMatchObject([{ scope: 'test-support', paths: [path] }])
+    expect(plan.checks).toEqual([{ kind: 'vitest', project: 'fast-client', files: [
+      'client/components/__tests__/first.test.ts', 'client/components/__tests__/second.test.ts',
+    ] }])
+  })
+
   it('uses test support ownership for a client fixture', () => {
     const path = 'client/components/__tests__/fixtures.ts'
     const plan = planVerification({

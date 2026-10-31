@@ -6,9 +6,9 @@ const referenceTest = 'client/services/llm/generation/__tests__/references.test.
 const documentationTest = 'scripts/__tests__/docs-budget.test.ts'
 const sandboxDocuments = /^docs\/(?:CUSTOM_CARD_SANDBOX|community-card-examples)\.md$|^docs\/(?:prompts|examples)\//
 export const isTestSupport = (file: string): boolean =>
-  /(?:^|\/)(?:_helpers|helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
-    && /(?:__tests__|e2e-tests|^tests\/)/.test(file)
-    || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)
+  /(?:^|\/)__tests__\/|^(?:e2e-tests|tests)\//.test(file)
+    && (/(?:^|\/)(?:_helpers|helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
+      || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file))
 
 export function assertConsumerCoverage(inventory: TestInventory, associations: TestConsumerIndex): void {
   if (associations.expansionReasons.length) throw new Error(`Cannot establish test consumer evidence: ${associations.expansionReasons.join('; ')}`)

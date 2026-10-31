@@ -40,7 +40,7 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览�
 
 规划器将混合范围归并为每个 Vitest project 的完整文件并集，以及每种浏览器引擎与相同 grep selector 的文件并集，检查与文件顺序固定。未筛选的文件覆盖同引擎下更窄的 selector；专用 catalog 浏览器任务不会抹去 inline 检查。PR 计划包含 merge 检出，main 计划包含完整 push 集成范围；两者使用相同业务组，并保留声明的集成浏览器消费者。
 
-`scripts/ci/support-verification.ts` 将文档约束与 Workshop 运行时验证分别选择。英文参考文档还选择参考资料读取器；可执行沙盒与 prompt 文档保留声明的 Session 契约。`test-consumers.ts` 恰好覆盖每个独立发现的测试一次，沿测试本地 import 与 helper 遍历，记录生产依赖但不继续遍历生产代码。测试与浏览器文件改动选择完整文件及其消费者。helper 的不确定归属、删除和 rename 在已知测试层内扩边；没有存活消费者的 helper 保留该层。浏览器文件在 Chromium 下完整执行，并保留完整的既有 `@webkit` 资格组；该静态引擎组不从 diff 行推导单个 case。已确认的 helper 读取或解析失败会使规划失败。未知归属与全局 setup 改动仍要求完整清单。
+`scripts/ci/support-verification.ts` 将文档约束与 Workshop 运行时验证分别选择。英文参考文档还选择参考资料读取器；可执行沙盒与 prompt 文档保留声明的 Session 契约。`test-consumers.ts` 恰好覆盖每个独立发现的测试一次，沿测试本地 import 与 helper 遍历，记录生产依赖但不继续遍历生产代码。测试与浏览器文件改动选择完整文件及其消费者。helper 的不确定归属、删除和 rename 在已知测试层内扩边；没有存活消费者的 helper 保留该层。浏览器文件在 Chromium 下完整执行，并保留完整的既有 `@webkit` 资格组；该静态引擎组不从 diff 行推导单个 case。已确认的 helper 读取或解析失败会使规划失败。测试辅助文件识别仅限测试目录；生产 setup 模块沿用所属领域的验证范围。未知归属与全局 setup 改动仍要求完整清单。
 
 `scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、计分、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。复用 UI 的路径保留百科入口、局内面板、共享卡面、语言搜索和 WebKit 导航消费者。共享展示扩大到完整浏览器层。前端模块未知时扩大到全量；声明的消费者缺失时规划失败。
 

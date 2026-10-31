@@ -101,7 +101,9 @@ function scopeFor(file: string): VerificationScope {
     || /^scripts\/(?:ci\/|verification|verify|test-project-globs|check-|architecture-policy|source-files|observability)/.test(file)
     || /^scripts\/__tests__\/(?:candidate-verification|scoped-verification|verification|routine-verification|card-verification|rule-verification|operations-verification|test-consumers|vitest-results|ci-card-impl-boundaries)/.test(file)
     || /^(?:restart-local|deploy-backend)\.sh$/.test(file)
+    || file === 'tests/setup-language-packs.ts'
     || file === 'shared/cards/__tests__/card-environment.ts'
+    || file === 'shared/cards/__tests__/setup-listener-purity.ts'
     || file === 'shared/cards/__tests__/setup-register-all.ts') return 'global'
   if (isTestSupport(file) || /^(?:scripts|tests)\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return 'test-support'
   if (/^(?:README(?:_[a-z]+)?\.md|LICENSE|NOTICE|docs\/.+\.md)$/.test(file)) return 'documentation'
