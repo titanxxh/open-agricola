@@ -7,6 +7,7 @@ import {
   EMPTY_ENCYCLOPEDIA_FILTERS,
   ENCYCLOPEDIA_FILTER_TYPES,
   encyclopediaFilterOptions,
+  type EncyclopediaCostResource,
   type EncyclopediaFilterOptions,
   type EncyclopediaFilters,
 } from './encyclopedia-filters'
@@ -19,6 +20,24 @@ export type EncyclopediaFiltersProps = {
   /** The whole catalog, for building filter options. */
   items: readonly EncyclopediaItem[]
   resultCount: number
+}
+
+const COST_RESOURCE_LABEL_KEYS: Record<EncyclopediaCostResource, string> = {
+  wood: 'resources.wood',
+  clay: 'resources.clay',
+  reed: 'resources.reed',
+  stone: 'resources.stone',
+  food: 'resources.food',
+  grain: 'resources.grain',
+  vegetable: 'resources.vegetable',
+  sheep: 'resources.sheep',
+  boar: 'resources.boar',
+  cattle: 'resources.cattle',
+  horse: 'resources.horse',
+  fuel: 'resources.fuel',
+  begging: 'resources.begging',
+  fence: 'resources.fence',
+  stable: 'resources.stable',
 }
 
 /** Keeps selections in option order so equal choices always make equal filters. */
@@ -79,7 +98,7 @@ function FilterFields({ filters, options, locale, onChange }: FieldsProps) {
           {options.costResources.map(resource => (
             <Option
               key={resource}
-              label={t(locale, `resources.${resource}`)}
+              label={t(locale, COST_RESOURCE_LABEL_KEYS[resource])}
               checked={cost.resources.includes(resource)}
               onToggle={() => onChange({
                 ...filters,
@@ -192,7 +211,7 @@ function filterChips(filters: EncyclopediaFilters, locale: Locale): FilterChip[]
     })),
     ...cost.resources.map(resource => ({
       id: `cost-${resource}`,
-      label: t(locale, `resources.${resource}`),
+      label: t(locale, COST_RESOURCE_LABEL_KEYS[resource]),
       without: () => ({ ...filters, cost: { ...cost, resources: cost.resources.filter(other => other !== resource) } }),
     })),
     ...(cost.upgradeReturn ? [{
