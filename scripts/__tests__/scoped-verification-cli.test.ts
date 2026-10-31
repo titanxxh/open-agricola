@@ -38,7 +38,7 @@ function fixture(change: 'documentation' | 'frontend' | 'card' = 'documentation'
   write(cwd, 'scripts/local-services.mjs', '// External dependencies are supplied by this CLI fixture.\n')
   write(cwd, 'client/components/board/FarmBoard.tsx', 'export const board = 1\n')
   write(cwd, 'client/components/board/__tests__/FarmBoard.test.tsx', '// client group\n')
-  for (const name of ['farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout', 'frontend-browser-scenario-matrix']) {
+  for (const name of ['farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout', 'frontend-browser-scenario-matrix', 'encyclopedia-faces', 'encyclopedia-in-game']) {
     write(cwd, `e2e-tests/${name}.spec.ts`, '// browser consumer\n')
   }
   write(cwd, 'README.md', 'Guide\n')
@@ -207,7 +207,7 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
       ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
       ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
     ])
@@ -248,8 +248,8 @@ describe('scoped verification public CLI', () => {
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
     ])
@@ -278,7 +278,7 @@ describe('scoped verification public CLI', () => {
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Selected browser check failed')
     expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'verify')).toEqual([
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
     ])
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
