@@ -154,7 +154,9 @@ for (const layout of [DESKTOP, PHONE]) {
         for (const phase of ['draft', 'parent-selection', 'work'] as const) {
           await driver.command(0, { type: 'loadGame', state: phase === 'work' ? workState() : setupState(phase) })
           await expect(page.locator(phase === 'draft' ? '.draft-overlay' : phase === 'parent-selection' ? '.parent-selection-overlay' : '.game-layout')).toBeVisible()
-          if (phase === 'work') await page.evaluate(() => window.scrollTo({ top: 600, behavior: 'instant' }))
+          if (phase === 'work') {
+            await entry(page).evaluate(button => window.scrollTo({ top: window.scrollY + button.getBoundingClientRect().top - 20, behavior: 'instant' }))
+          }
           await expectEntryUnobscured(page)
           const offset = await scrollOffset(page)
           if (phase === 'work') expect(offset).toBeGreaterThan(0)
