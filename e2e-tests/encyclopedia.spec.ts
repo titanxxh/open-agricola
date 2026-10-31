@@ -1,10 +1,94 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
+import { FRONTEND_URL } from './fixtures'
 import {
-  animationsSettled, CATALOG, copiedLinks, detail, entryParam, entryUrl, expectCatalog, expectNoHorizontalOverflow,
-  galleryEntries, LAYOUTS, LOBBY, newVisitor,
+  animationsSettled, CATALOG, copiedLinks, DESKTOP, detail, entryParam, entryUrl, expectCatalog, expectNoHorizontalOverflow,
+  expectResults, filterOption, filterPanel, galleryEntries, LANDSCAPE, LAYOUTS, LOBBY, lobbyReady, mainNavigation, MOBILE,
+  NARROW, newVisitor, selectedFilters, type Layout,
 } from './helpers/encyclopedia'
 
 const BASEBOARDS = entryUrl('card:A004_Baseboards')
+
+/** Lobby entry, search, the filter panel, a detail and the way back, with screenshots of each stop. */
+async function walkRepresentativePath(page: Page, layout: Layout) {
+  const shot = (name: string) => page.screenshot({ path: test.info().outputPath(`${name}.png`) })
+  await page.goto(LOBBY)
+  await lobbyReady(page)
+  if (layout.viewport.width <= 640) await mainNavigation(page).getByRole('button', { name: 'Cards' }).tap()
+  else await mainNavigation(page).getByRole('link', { name: 'Card Encyclopedia' }).tap()
+  await expectCatalog(page)
+  await expectNoHorizontalOverflow(page)
+  await shot('catalog')
+
+  const search = page.getByRole('searchbox', { name: 'Search cards' })
+  await search.fill('a004')
+  await expectResults(page, 1)
+  await expect(galleryEntries(page)).toHaveAccessibleName('View Baseboards')
+  await search.fill('')
+  await expectCatalog(page)
+
+  const panel = filterPanel(page)
+  await page.getByRole('button', { name: 'Filters', exact: true }).tap()
+  await filterOption(panel, 'Mother').check()
+  const confirm = panel.getByRole('button', { name: 'Show results (12)' })
+  await expect(confirm).toBeInViewport({ ratio: 1 })
+  await shot('filter-panel')
+  await confirm.tap()
+  await expect(panel).toBeHidden()
+  await expectResults(page, 12)
+  await expect(page.getByRole('button', { name: 'Filters (1)' })).toBeFocused()
+  await expect(selectedFilters(page)).toHaveText(['Mother×'])
+  await expectNoHorizontalOverflow(page)
+
+  const opener = page.getByRole('button', { name: 'View Mother PR01' })
+  await opener.tap()
+  await expect(detail(page)).toHaveAccessibleName('Mother PR01')
+  await animationsSettled(page)
+  const box = (await detail(page).boundingBox())!
+  expect(box.x + box.width).toBe(await page.evaluate(() => document.documentElement.clientWidth))
+  await expect(detail(page).getByRole('button', { name: 'Close details' })).toBeInViewport({ ratio: 1 })
+  await expectNoHorizontalOverflow(page)
+  await shot('detail')
+
+  await detail(page).getByRole('button', { name: 'Close details' }).tap()
+  await expect(detail(page)).toBeHidden()
+  expect(entryParam(page)).toBeNull()
+  await expect(opener).toBeFocused()
+  await expectResults(page, 12)
+  await expect(selectedFilters(page)).toHaveText(['Mother×'])
+  await expectNoHorizontalOverflow(page)
+}
+
+const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
+type LanguageRef = { id: string; file: string; sha256: string }
+
+/** Serves Chinese data in which one card text is still the English original, the way the build marks a fallback. */
+async function serveEnglishFallback(page: Page, entryKey: string, messageKey: string) {
+  const read = async (path: string) => {
+    const response = await page.request.get(`${FRONTEND_URL}${path}`)
+    expect(response.ok()).toBe(true)
+    return response.json()
+  }
+  const languages: { languages: LanguageRef[] } = await read('/i18n/manifest.json')
+  const english = await read(`/i18n/${languages.languages.find(language => language.id === 'en')!.file}`)
+  const chineseRef = languages.languages.find(language => language.id === 'zh')!
+  const chinese = await read(`/i18n/${chineseRef.file}`)
+  chinese.messages[messageKey] = english.messages[messageKey]
+  const chineseText = JSON.stringify(chinese)
+  chineseRef.sha256 = sha256(chineseText)
+  chineseRef.file = `zh.${chineseRef.sha256.slice(0, 16)}.json`
+  await page.route('**/i18n/manifest.json*', route => route.fulfill({ json: languages }))
+  await page.route(`**/i18n/${chineseRef.file}`, route => route.fulfill({ body: chineseText, contentType: 'application/json' }))
+
+  const manifest = await read('/card-encyclopedia/manifest.json')
+  const search = await read(`/card-encyclopedia/${manifest.search.file}`)
+  const document = search.documents.find((candidate: { key: string }) => candidate.key === entryKey)
+  document.locales.zh.body = { ...document.locales.en.body, status: 'fallback' }
+  const searchText = JSON.stringify(search)
+  manifest.search = { file: `search.${sha256(searchText).slice(0, 16)}.json`, sha256: sha256(searchText) }
+  await page.route('**/card-encyclopedia/manifest.json*', route => route.fulfill({ json: manifest }))
+  await page.route(`**/card-encyclopedia/${manifest.search.file}`, route => route.fulfill({ body: searchText, contentType: 'application/json' }))
+}
 
 for (const layout of LAYOUTS) {
   test.describe(layout.name, () => {
@@ -183,6 +267,57 @@ for (const layout of LAYOUTS) {
       await expect(page.getByRole('textbox', { name: 'Username' }).first()).toBeVisible()
 
       expect(requests.filter(path => /card-encyclopedia|\/encyclopedia\/|EncyclopediaPage/.test(path))).toEqual([])
+    })
+  })
+}
+
+test.describe(DESKTOP.name, () => {
+  test('L1 marks a card text that is still English after switching to Chinese and drops the mark in English', async ({ browser }) => {
+    const { context, page } = await newVisitor(browser, DESKTOP)
+    try {
+      await serveEnglishFallback(page, 'card:A004_Baseboards', 'cardFaces.A004_Baseboards.description')
+      await page.goto(BASEBOARDS)
+      await expect(detail(page)).toHaveAccessibleName('Baseboards')
+      await expect(detail(page).getByText('Not translated; shown in English')).toHaveCount(0)
+      await page.getByRole('button', { name: 'Close details' }).click()
+
+      await page.getByRole('button', { name: /^Display language/ }).click()
+      await page.getByRole('option', { name: '简体中文' }).click()
+      await page.getByRole('button', { name: '查看 护壁板' }).click()
+      await expect(detail(page)).toHaveAccessibleName('护壁板')
+      const body = detail(page).getByRole('region', { name: '牌面文字' })
+      await expect(body.getByText('此项暂无中文，显示英文')).toBeVisible()
+      await expect(body).toContainText('You immediately get 1')
+      await expect(detail(page).getByText('此项暂无中文，显示英文')).toHaveCount(1)
+      await animationsSettled(page)
+      await page.screenshot({ path: test.info().outputPath('english-fallback.png') })
+      await page.getByRole('button', { name: '关闭详情' }).click()
+
+      await page.getByRole('button', { name: /^界面语言/ }).click()
+      await page.getByRole('option', { name: 'English' }).click()
+      await page.getByRole('button', { name: 'View Baseboards' }).click()
+      await expect(detail(page)).toHaveAccessibleName('Baseboards')
+      await expect(detail(page).getByRole('region', { name: 'Card text' })).toContainText('You immediately get 1')
+      await expect(detail(page).getByText('Not translated; shown in English')).toHaveCount(0)
+    } finally { await context.close() }
+  })
+})
+
+for (const layout of [NARROW, LANDSCAPE]) {
+  test.describe(layout.name, () => {
+    test('M1 walks from the lobby through search, filters and a detail and back', async ({ browser }) => {
+      const { context, page } = await newVisitor(browser, layout, { signedIn: true })
+      try { await walkRepresentativePath(page, layout) } finally { await context.close() }
+    })
+  })
+}
+
+for (const layout of [MOBILE, LANDSCAPE]) {
+  test.describe(`${layout.name} webkit`, () => {
+    test('M1 walks from the lobby through search, filters and a detail and back @webkit', async ({ browser, browserName }) => {
+      test.skip(browserName !== 'webkit', 'Runs in the WebKit matrix')
+      const { context, page } = await newVisitor(browser, layout, { signedIn: true })
+      try { await walkRepresentativePath(page, layout) } finally { await context.close() }
     })
   })
 }
