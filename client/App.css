@@ -6,6 +6,12 @@
 @import './styles/pages/lobby.css';
 @import './styles/pages/workshop.css';
 @import './styles/pages/settings.css';
+@import './styles/pages/encyclopedia.css';
+@import './styles/pages/encyclopedia-faces.css';
+@import './styles/pages/encyclopedia-entry.css';
+@import './styles/pages/encyclopedia-search.css';
+@import './styles/pages/encyclopedia-filters.css';
+@import './styles/pages/encyclopedia-in-game.css';
 @import './styles/pages/game.css';
 @import './styles/card-sprite.css';
 @import './styles/pages/desktop-table.css';

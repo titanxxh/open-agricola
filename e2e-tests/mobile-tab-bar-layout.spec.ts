@@ -24,6 +24,10 @@ const renderTabBar = async (page: Page) => {
             <span class="mobile-tab-bar__icon" aria-hidden="true"><svg viewBox="0 0 24 24"></svg></span>
             <span class="mobile-tab-bar__label">Workshop</span>
           </button>
+          <button class="mobile-tab-bar__tab" data-tab="encyclopedia" type="button">
+            <span class="mobile-tab-bar__icon" aria-hidden="true"><svg viewBox="0 0 24 24"></svg></span>
+            <span class="mobile-tab-bar__label">Cards</span>
+          </button>
           <button class="mobile-tab-bar__tab" data-tab="settings" type="button">
             <span class="mobile-tab-bar__icon" aria-hidden="true"><svg viewBox="0 0 24 24"></svg></span>
             <span class="mobile-tab-bar__label">Settings</span>
@@ -55,7 +59,7 @@ test.describe('Mobile tab bar layout', () => {
     const navigation = page.getByRole('navigation', { name: 'Main navigation' })
     await expect(navigation).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
-    await expect(navigation.locator('.mobile-tab-bar__icon svg')).toHaveCount(3)
+    await expect(navigation.locator('.mobile-tab-bar__icon svg')).toHaveCount(4)
     expect(await navigation.textContent()).not.toMatch(/\p{Extended_Pictographic}/u)
 
     const lobbyTab = navigation.getByRole('button', { name: 'Lobby' })

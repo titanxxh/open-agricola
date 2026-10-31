@@ -1,5 +1,5 @@
 import { t as translateMessage } from '../../../shared/i18n'
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/contract/types'
@@ -25,6 +25,8 @@ type Props = {
   embedded?: boolean
   menuExtra?: ReactNode
   menuAlert?: boolean
+  onOpenEncyclopedia?: () => void
+  encyclopediaEntryRef?: Ref<HTMLButtonElement>
 }
 
 const shouldShowSnakeOpeningPill = (state: GameState): boolean =>
@@ -41,6 +43,8 @@ export const GameHeader = ({
   embedded = false,
   menuExtra = null,
   menuAlert = false,
+  onOpenEncyclopedia,
+  encyclopediaEntryRef,
 }: Props) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
@@ -141,6 +145,22 @@ export const GameHeader = ({
         <div className="header-actions" ref={menuContainerRef}>
           {!embedded && <SiteCommunityLinks />}
           <LocaleSwitcher className="header-locale-select" />
+          {onOpenEncyclopedia && (
+            <button
+              ref={encyclopediaEntryRef}
+              type="button"
+              className="header-action-btn header-encyclopedia-btn"
+              onClick={onOpenEncyclopedia}
+              aria-haspopup="dialog"
+              aria-label={t(locale, 'ui.encyclopedia.inGame.open')}
+              title={t(locale, 'ui.encyclopedia.inGame.open')}
+            >
+              <span className="header-action-btn__icon" aria-hidden>
+                📖
+              </span>
+              <span className="header-action-btn__label">{t(locale, 'ui.encyclopedia.inGame.open')}</span>
+            </button>
+          )}
           <button
             type="button"
             className={`header-action-btn${menuAlert ? ' header-action-btn--pending' : ''}`}

@@ -79,6 +79,8 @@ pnpm verify status --requirements scripts/release/requirements.json
 pnpm verify e2e-tests/release-rehearsal.spec.ts --browser=chromium --requirements scripts/release/requirements.json
 ```
 
+卡牌百科验收用 `pnpm verify:encyclopedia` 走同一条链：prepush、百科 Chromium spec（含根路径 Pages 产物）、`encyclopedia.spec.ts` 的 `@webkit` 矩阵，最后 `pnpm verify status --requirements e2e-tests/encyclopedia.requirements.json`。新增或改名百科用例时同步该 requirements 文件。
+
 reviewer 在 requirements 文件中声明必需 case 的仓库相对 `file`、完整 `titlePath`（describe 层级和 test 标题）、`project` 和 `browser`；不支持把文件名当成全部用例已执行。实际执行证据在 `output/verification/e2e-runs/<runId>/` 中不可覆盖地保存。相同源码指纹、相同 requirements 内容 hash 的运行可累计；缺失、过滤掉、跳过、预期失败、flaky、后续失败或缺少 reporter 结果都不能满足必需用例。`status --requirements` 还要求当前 prepush 成功。未传 requirements 时，原有 `verify` 和 `status` 契约保持不变。
 
 本机需要代理时设置 `RELEASE_SMOKE_PROXY`；该环境变量计入验证指纹。依赖与语言、素材来源继续使用现有隔离环境及 pin 校验。可选代理不关闭 TLS 校验，也不证明目标生产域名可用。

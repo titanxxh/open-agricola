@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PageRouter } from '../PageRouter'
 import { AuthProvider } from '../../contexts/AuthContext'
@@ -30,13 +30,22 @@ vi.mock('../SettingsPage', () => ({
 }))
 
 vi.mock('../../components/common/MobileTabBar', () => ({
-  MobileTabBar: () => <nav>Mobile Tab Bar</nav>,
+  MobileTabBar: ({ current, onNavigate }: { current: string; onNavigate: (tab: string) => void }) => (
+    <nav data-current={current}>
+      Mobile Tab Bar
+      <button type="button" onClick={() => onNavigate('lobby')}>Lobby tab</button>
+    </nav>
+  ),
 }))
 
 vi.mock('../../components/common/GameLoadScreen', () => ({
   GameLoadScreen: ({ label }: { label: string }) => (
     <a href="/" aria-label="platform.backToLobbyPlain">{label}</a>
   ),
+}))
+
+vi.mock('../encyclopedia/EncyclopediaPage', () => ({
+  EncyclopediaPage: () => <main>Encyclopedia Page</main>,
 }))
 
 vi.mock('../../sandbox', () => ({
@@ -144,6 +153,52 @@ describe('PageRouter auth routes', () => {
     renderWithAuth()
 
     await waitFor(() => expect(screen.queryByText('Lobby Page')).toBeNull())
+  })
+
+  describe('encyclopedia without an account', () => {
+    it.each([
+      ['a signed-out visitor', () => stubMe({ ok: false })],
+      ['an unreachable auth API', () => vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))],
+      ['an auth request that never settles', () => vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))],
+    ])('opens the catalog and a shared card link for %s', async (_case, stubAuth) => {
+      for (const url of ['/?page=encyclopedia', '/?page=encyclopedia&entry=card%3AA004_Baseboards']) {
+        stubAuth()
+        window.history.replaceState(null, '', url)
+
+        const view = renderWithAuth()
+
+        expect(await screen.findByText('Encyclopedia Page')).toBeInTheDocument()
+        expect(screen.queryByLabelText('用户名')).toBeNull()
+        expect(window.location.search).toBe(url.slice(1))
+        view.unmount()
+      }
+    })
+
+    it('shows the main navigation on the encyclopedia and keeps the login gate on the other tabs', async () => {
+      stubMe({ ok: false })
+      window.history.replaceState(null, '', '/?page=encyclopedia')
+
+      renderWithAuth()
+
+      expect(await screen.findByText('Encyclopedia Page')).toBeInTheDocument()
+      expect(screen.getByText('Mobile Tab Bar')).toHaveAttribute('data-current', 'encyclopedia')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lobby tab' }))
+
+      expect(await screen.findByLabelText('用户名')).toBeInTheDocument()
+      expect(screen.queryByText('Encyclopedia Page')).toBeNull()
+      expect(window.location.search).toBe('')
+    })
+
+    it('keeps the encyclopedia for signed-in players', async () => {
+      stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
+      window.history.replaceState(null, '', '/?page=encyclopedia')
+
+      renderWithAuth()
+
+      expect(await screen.findByText('Encyclopedia Page')).toBeInTheDocument()
+      await waitFor(() => expect(screen.queryByText('Lobby Page')).toBeNull())
+    })
   })
 
   it('does not bypass login for arbitrary ws rooms with player and devMode params', async () => {

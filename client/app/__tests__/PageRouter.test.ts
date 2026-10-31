@@ -99,6 +99,30 @@ describe('setPage URL hygiene', () => {
     expect(window.location.pathname + window.location.search).toBe('/open-agricola/')
   })
 
+  it('drops an encyclopedia entry when returning to the lobby', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?page=encyclopedia&entry=card%3AA004_Baseboards&bg=winter',
+    )
+
+    setPage('lobby')
+
+    expect(window.location.pathname + window.location.search).toBe('/open-agricola/?bg=winter')
+  })
+
+  it('opens the encyclopedia without carrying game room params', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?page=game&transport=ws&room=room-1&player=p2&devMode=1',
+    )
+
+    setPage('encyclopedia')
+
+    expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=encyclopedia')
+  })
+
   it('preserves a saved bug report while changing pages', () => {
     window.history.replaceState(
       null,

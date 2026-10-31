@@ -84,6 +84,8 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.roomAccessInvited': 'Invited players only',
     'platform.invitedPlayerIdsLabel': 'Invited players',
     'platform.invitedPlayerCountError': 'Select {count} other players',
+    'platform.mainNavigation': 'Main navigation',
+    'ui.encyclopedia.title': 'Card Encyclopedia',
   }
   return {
     useCurrentLocale: () => 'en',
@@ -107,6 +109,49 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
   myRoomsResponse.rooms = []
+})
+
+describe('LobbyPage main navigation', () => {
+  const encyclopediaLink = () => within(screen.getByRole('navigation', { name: 'Main navigation' }))
+    .getByRole('link', { name: 'Card Encyclopedia' })
+
+  /** Reports whether the browser would follow the link, then stops jsdom from trying. */
+  const clickFollowsLink = (link: HTMLElement, init?: MouseEventInit) => {
+    let follows = false
+    const observe = (event: Event) => {
+      follows = !event.defaultPrevented
+      event.preventDefault()
+    }
+    document.addEventListener('click', observe)
+    try {
+      fireEvent.click(link, init)
+    } finally {
+      document.removeEventListener('click', observe)
+    }
+    return follows
+  }
+
+  it('opens the card encyclopedia from the header without reloading the app', () => {
+    window.history.replaceState(null, '', '/')
+    render(<LobbyPage />)
+
+    expect(encyclopediaLink()).toHaveAttribute('href', '/?page=encyclopedia')
+
+    expect(clickFollowsLink(encyclopediaLink())).toBe(false)
+    expect(setPage).toHaveBeenCalledExactlyOnceWith('encyclopedia')
+  })
+
+  it.each([
+    ['Ctrl', { ctrlKey: true }],
+    ['Cmd', { metaKey: true }],
+    ['Shift', { shiftKey: true }],
+    ['middle-button', { button: 1 }],
+  ])('leaves a %s click to the browser so the encyclopedia can open in another tab', (_case, init) => {
+    render(<LobbyPage />)
+
+    expect(clickFollowsLink(encyclopediaLink(), init)).toBe(true)
+    expect(setPage).not.toHaveBeenCalled()
+  })
 })
 
 describe('LobbyPage my active games', () => {

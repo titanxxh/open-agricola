@@ -1,0 +1,110 @@
+/* In-game encyclopedia: a panel over the game on desktop, the whole visible viewport on phones. */
+
+/* Set on body so it propagates to the viewport and the game keeps its scroll offset. */
+body:has(.encyclopedia-in-game[open]) {
+  overflow: hidden;
+}
+
+.encyclopedia-in-game {
+  box-sizing: border-box;
+  width: min(1120px, calc(100vw - 48px));
+  max-width: none;
+  height: min(900px, calc(100dvh - 48px));
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--color-bg-warm);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: 0 18px 48px rgba(40, 28, 12, 0.32);
+}
+
+.encyclopedia-in-game::backdrop {
+  background: rgba(30, 24, 14, 0.45);
+}
+
+.encyclopedia-in-game__panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.encyclopedia-in-game__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.encyclopedia-in-game__title {
+  margin: 0;
+  font-size: var(--fs-h2);
+}
+
+.encyclopedia-in-game__header .btn-secondary {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: var(--fs-body);
+}
+
+.encyclopedia-in-game__attention {
+  flex-shrink: 0;
+}
+
+.encyclopedia-in-game__attention[data-pending] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 24px;
+  background: var(--color-accent-bg);
+  border-bottom: 1px solid var(--color-accent-border);
+}
+
+.encyclopedia-in-game__status {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.encyclopedia-in-game__attention .btn-primary {
+  padding: 8px 16px;
+  font-size: var(--fs-body);
+}
+
+.encyclopedia-in-game__body {
+  flex: 1;
+  min-height: 0;
+  padding: 20px 24px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 640px) {
+  .encyclopedia-in-game {
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .encyclopedia-in-game__header {
+    padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  }
+
+  .encyclopedia-in-game__attention[data-pending] {
+    padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+  }
+
+  .encyclopedia-in-game__body {
+    padding: 12px max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+}
