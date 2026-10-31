@@ -57,7 +57,7 @@ describe('in-game encyclopedia panel', () => {
     expect(await screen.findByRole('heading', { name: 'Results: 30' })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search cards' }), { target: { value: 'Entry' } })
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
-    fireEvent.click(screen.getByRole('button', { name: 'View Entry 27' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'View Entry 27' }))
     expect(screen.getByRole('dialog', { name: 'Entry 27' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
 
