@@ -18,7 +18,9 @@ const numbered = (count: number) => encyclopediaOf(Array.from({ length: count },
 const renderPanel = (attentionWindow: string | null = null) => {
   const onClose = vi.fn()
   const panel = (window: string | null) => (
-    <LocaleProvider><InGameEncyclopedia locale="en" attentionWindow={window} onClose={onClose} /></LocaleProvider>
+    <LocaleProvider>
+      <InGameEncyclopedia locale="en" openedWindow={attentionWindow} attentionWindow={window} onClose={onClose} />
+    </LocaleProvider>
   )
   const view = render(panel(attentionWindow))
   return { ...view, onClose, update: (window: string | null) => view.rerender(panel(window)) }

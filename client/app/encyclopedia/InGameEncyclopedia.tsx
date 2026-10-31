@@ -10,6 +10,8 @@ let ContentLazy = lazy(loadContent)
 
 type InGameEncyclopediaProps = {
   locale: Locale
+  /** The window when the player opened the panel, so a remount does not swallow a newer one. */
+  openedWindow: string | null
   /** From `encyclopediaAttentionWindow`; the panel only compares successive values. */
   attentionWindow: string | null
   onClose: () => void
@@ -19,11 +21,11 @@ type InGameEncyclopediaProps = {
  * Rendered beside the game tree rather than inside it. It gets no transport and
  * never reads or writes the URL, so opening it cannot remount the game or send a command.
  */
-export function InGameEncyclopedia({ locale, attentionWindow, onClose }: InGameEncyclopediaProps) {
+export function InGameEncyclopedia({ locale, openedWindow, attentionWindow, onClose }: InGameEncyclopediaProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const [contentAttempt, setContentAttempt] = useState(0)
-  const [attention, setAttention] = useState(() => initialEncyclopediaAttention(attentionWindow))
+  const [attention, setAttention] = useState(() => initialEncyclopediaAttention(openedWindow))
   const nextAttention = nextEncyclopediaAttention(attention, attentionWindow)
   if (nextAttention !== attention) setAttention(nextAttention)
 

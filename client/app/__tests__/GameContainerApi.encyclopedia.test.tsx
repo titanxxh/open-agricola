@@ -246,6 +246,51 @@ describe('in-game encyclopedia host', () => {
     expect(ruleCommands()).toEqual([])
   })
 
+  it('comes back open after a short disconnect with the browse state and a still-valid draft', async () => {
+    const user = userEvent.setup()
+    GameSocket.payload = workPayload(farmSelect('rooms', roomTiles([[0, 0], [0, 1], [0, 2]])))
+    const { container } = renderGame()
+    await screen.findByRole('region', { name: 'Action Spaces' })
+    await user.click(tile(container, '0-0'))
+    await user.click(entry())
+    await screen.findByRole('heading', { name: 'Results: 30' })
+    await user.click(screen.getByRole('button', { name: 'Next page' }))
+    const dropped = GameSocket.latest
+
+    act(() => dropped.close())
+    expect(await screen.findByText('Reconnecting and restoring your game…')).toBeInTheDocument()
+
+    expect(await screen.findByText('Page 2 of 2', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(GameSocket.latest).not.toBe(dropped)
+    expect(panel()).toHaveAttribute('open')
+    expect(screen.queryByText('Your action is needed')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Close encyclopedia' }))
+    expect(entry()).toHaveFocus()
+    expect(tile(container, '0-0')).toHaveClass('selected')
+    expect(ruleCommands()).toEqual([])
+  })
+
+  it('reminds the player when the reconnect brings a new window and drops the withdrawn draft', async () => {
+    const user = userEvent.setup()
+    GameSocket.payload = workPayload(farmSelect('rooms', roomTiles([[0, 0], [0, 1], [0, 2]])))
+    const { container } = renderGame()
+    await screen.findByRole('region', { name: 'Action Spaces' })
+    await user.click(tile(container, '0-0'))
+    await user.click(entry())
+    await screen.findByRole('heading', { name: 'Results: 30' })
+
+    GameSocket.payload = workPayload()
+    act(() => GameSocket.latest.close())
+    await screen.findByText('Reconnecting and restoring your game…')
+
+    expect(await screen.findByText('Your action is needed', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(panel()).toHaveAttribute('open')
+    await user.click(screen.getByRole('button', { name: 'Back to game' }))
+    expect(panel()).toBeNull()
+    expect(tile(container, '0-0')).not.toHaveClass('selected')
+    expect(ruleCommands()).toEqual([])
+  })
+
   it('has no entry on the hotseat handoff and closes the panel when the device changes hands', async () => {
     const user = userEvent.setup()
     GameSocket.hotseat = true

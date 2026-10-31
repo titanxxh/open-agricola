@@ -423,7 +423,9 @@ export const GameContainerApi = () => {
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
-  const [encyclopediaOpen, setEncyclopediaOpen] = useState(false)
+  // The reconnect screen unmounts the panel; it comes back comparing against the window it was opened in.
+  const [encyclopediaOpenedIn, setEncyclopediaOpenedIn] = useState<{ window: string | null } | null>(null)
+  const encyclopediaOpen = encyclopediaOpenedIn !== null
   const encyclopediaEntryRef = useRef<HTMLButtonElement | null>(null)
 
   const clearReplayCue = useCallback(() => {
@@ -499,7 +501,7 @@ export const GameContainerApi = () => {
     if (!hotseatAudienceKey || lastHotseatAudienceRef.current === hotseatAudienceKey) return
     lastHotseatAudienceRef.current = hotseatAudienceKey
     setHotseatSeatConfirmed(null)
-    setEncyclopediaOpen(false)
+    setEncyclopediaOpenedIn(null)
   }, [hotseatAudienceKey])
   const confirmHotseatSeat = (playerId: string) => {
     if (!hotseatRoomId) return
@@ -1561,6 +1563,7 @@ export const GameContainerApi = () => {
     <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert} />
   ) : null
 
+  const encyclopediaWindow = encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })
   const renderGameHeader = (encyclopediaEntry: boolean) => (
     <GameHeader
       locale={locale}
@@ -1575,7 +1578,7 @@ export const GameContainerApi = () => {
       embedded={isEmbedded}
       menuExtra={gameEndControls}
       menuAlert={gameEndMenuAlert}
-      onOpenEncyclopedia={encyclopediaEntry ? () => setEncyclopediaOpen(true) : undefined}
+      onOpenEncyclopedia={encyclopediaEntry ? () => setEncyclopediaOpenedIn({ window: encyclopediaWindow }) : undefined}
       encyclopediaEntryRef={encyclopediaEntry ? encyclopediaEntryRef : undefined}
     />
   )
@@ -1593,12 +1596,13 @@ export const GameContainerApi = () => {
   const withEncyclopedia = (game: ReactElement) => (
     <>
       {game}
-      {encyclopediaOpen ? (
+      {encyclopediaOpenedIn ? (
         <InGameEncyclopedia
           locale={locale}
-          attentionWindow={encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })}
+          openedWindow={encyclopediaOpenedIn.window}
+          attentionWindow={encyclopediaWindow}
           onClose={() => {
-            setEncyclopediaOpen(false)
+            setEncyclopediaOpenedIn(null)
             encyclopediaEntryRef.current?.focus({ preventScroll: true })
           }}
         />
