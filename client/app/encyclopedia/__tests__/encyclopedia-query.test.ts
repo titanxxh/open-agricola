@@ -116,6 +116,13 @@ describe('queryEncyclopedia', () => {
     expect(ids('·')).toEqual(ids(''))
   })
 
+  it('finds icon text by the canonical names and the fixed alias without changing the card text', () => {
+    for (const query of ['木头', '木材', 'wood']) expect(ids(query)).toEqual(['A004_Baseboards', 'A027_OvenSite', 'A041_VegetableSlicer'])
+    const [found] = queryEncyclopedia(CATALOG, 'baseboards 木头')
+    expect(found).toBe(BASEBOARDS)
+    expect(found.document.locales.zh.body?.text).not.toContain('木头')
+  })
+
   it('ranks an exact number or id before text that happens to mention it', () => {
     const mentionsA004 = searchable(
       cardEntry('A003_NumberMention', 'A003'),
