@@ -22,7 +22,6 @@ export type EncyclopediaBrowseStore = {
   setQuery(query: string): void
   setFilters(filters: EncyclopediaFilters): void
   setPage(page: number): void
-  /** Clears search and filters and returns to the top of the first page. */
   reset(): void
   /** Not part of the subscribed state: hosts read it when they mount and write it when they leave. */
   getScrollTop(): number

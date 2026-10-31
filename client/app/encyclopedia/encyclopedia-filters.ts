@@ -32,7 +32,6 @@ export const EMPTY_ENCYCLOPEDIA_FILTERS: EncyclopediaFilters = Object.freeze({
   extraVp: false,
 })
 
-/** Option order of the card type group. */
 export const ENCYCLOPEDIA_FILTER_TYPES = [
   'minor', 'occupation', 'major', 'mother', 'father', 'moorSpecialAction', 'moorStart', 'season',
 ] as const satisfies readonly EncyclopediaPublicType[]

@@ -7,7 +7,6 @@ export type EncyclopediaSearchProps = {
   locale: Locale
 }
 
-/** Search box above the results; every edit updates the shared query at once, except unfinished input-method text. */
 export function EncyclopediaSearch({ store, locale }: EncyclopediaSearchProps) {
   const { query } = useEncyclopediaBrowseState(store)
   const [composing, setComposing] = useState<string | null>(null)

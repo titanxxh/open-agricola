@@ -3,7 +3,6 @@ import { seasonBoardAdjustments, seasonBoardNotes, seasonDisplay } from '../../.
 import type { SeasonId } from '../../../shared/seasons/types'
 import { SeasonActionCard, SeasonAdjustment, SeasonBoardCopy } from '../../components/board/SeasonBoardPieces'
 
-/** One season cut from the Through the Seasons board: its action space card and what the season changes on the board. */
 export function SeasonFace({ locale, season }: { locale: Locale; season: SeasonId }) {
   const display = seasonDisplay[season]
   const name = t(locale, display.nameKey)

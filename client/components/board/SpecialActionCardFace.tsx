@@ -55,7 +55,6 @@ export function SpecialActionImprovementNote({ locale, actionId }: { locale: Loc
 const playersLabel = (locale: Locale, playerCounts: readonly number[]) =>
   t(locale, 'moor.specialActions.players', { count: playerCounts.join('/') })
 
-/** A special action card as printed for each of its player counts, outside any game. */
 export function SpecialActionCardFace({ locale, players, actions, className }: {
   locale: Locale
   players: readonly number[]
