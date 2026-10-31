@@ -191,7 +191,8 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
       vegetables: parents.mother === 'PR06' ? 2 : 1, sheeps: parents.mother === 'PR05' ? 1 : -1,
       boars: parents.mother === 'PR04' ? 1 : -1, cattles: parents.mother === 'PR03' ? 1 : -1, horses: -1,
       empty: -(13 - (initialTerrain - 5) - player.fields.length - player.stableTiles.length),
-      stables: player.stableTiles.length, clayRooms: 0, stoneRooms: 0, farmers: 6, cards: 0, beggings: 0, parentCards: motherPoints[parents.mother]! }
+      stables: player.stableTiles.length, clayRooms: 0, stoneRooms: 0, farmers: 6, cards: 0, beggings: 0,
+      ...(motherPoints[parents.mother] === 0 ? {} : { parentCards: motherPoints[parents.mother]! }) }
     expect(Object.fromEntries(d.payload.scores![0]!.categories.map(category => [category.key, category.total || 0]))).toEqual(paperCategories)
     const paperScore = Math.round(Object.values(paperCategories).reduce((sum, points) => sum + points, 0) * 100) / 100
     expect(d.payload.scores![0]!.total).toBe(paperScore)
