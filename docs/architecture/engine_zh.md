@@ -47,6 +47,7 @@ shared/engine/
 - `step(ctx)`：推进到下一个未解决的节点，遇到 pending 输入停止。
 - `resolveChoice(value, ctx, payload?)`：提供玩家输入并继续。
 - `peekPendingEnvelope()`：当前 `PendingEnvelope`，或 null。
+- `getPendingBlockedAnytimeIds()`：未完成 pending 请求的限制，包括挂起的决策；Session 策略跨帧合并这些限制，不会开放已关闭的窗口。
 - `peekPendingHost()`：承载该 envelope 的节点，用于查找 `sourceCard`、`actionContext` 与 owner。
 - `injectBeforeFlows(flows, ctx?)`：插入 hook flow。
 - `snapshot()` / `restore(snapshot)`：序列化与重建节点树，包括节点状态、pending envelope、owner、可选与触发 metadata。

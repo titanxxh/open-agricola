@@ -45,6 +45,7 @@ shared/engine/
 - `step(ctx)`: advance to the next unresolved node and stop at pending input.
 - `resolveChoice(value, ctx, payload?)`: supply player input and continue.
 - `peekPendingEnvelope()`: the current `PendingEnvelope`, or null.
+- `getPendingBlockedAnytimeIds()`: restrictions from unresolved pending requests, including suspended decisions. Session policy combines them across frames without opening a closed window.
 - `peekPendingHost()`: the node hosting that envelope, for `sourceCard`, `actionContext` and owner lookup.
 - `injectBeforeFlows(flows, ctx?)`: insert hook flows.
 - `snapshot()` / `restore(snapshot)`: serialize and rebuild the tree, including node states, pending envelope, owner, optional and trigger metadata.

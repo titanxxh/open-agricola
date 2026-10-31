@@ -25,6 +25,7 @@ describe('Engine surface guard', () => {
     '_internals',
     'getActiveAnytimeActionIds',
     'getActiveAnytimeActivation',
+    'getPendingBlockedAnytimeIds',
     'offerBeforeAnytimeWindow',
     'hasPendingChoiceCompositeAncestor',
     'insertFlowAfterPendingChoice',
