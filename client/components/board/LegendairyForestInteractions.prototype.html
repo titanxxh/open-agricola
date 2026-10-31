@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Legendairy Forest 交互草图</title>
+<style>
+/* Layout: dark prototype control strip; below, a mock screen (left) beside an "integration" card (right); phone = one column.
+   Plum --lf marks Legendairy Forest; tag colours encode reuse / small change / new. */
+:root{
+  --bg:#efe6cf; --paper:#fdf6e3; --card:#fffdf7; --ink:#1e1e1e; --ink2:#5a3a20; --muted:#7f6e55;
+  --line:#cdb996; --line2:#e8d5b7; --green:#3a5a2c; --on-green:#fff; --green-bg:#e4eed6; --gold:#b9860c; --gold-bg:#fff1cf;
+  --lf:#5d3f73; --on-lf:#fff; --lf-bg:#f2e9f6; --lf-line:#cbb3d8; --p1:#c0392b; --p2:#2e5fa8; --p3:#7a6a14;
+  --bad:#b03a2e; --bad-bg:#fbe5e1; --reuse:#2d6a3e; --reuse-bg:#e1f0e3; --tweak:#8a5a00; --tweak-bg:#fbefd2; --new:#5d3f73; --new-bg:#efe3f6;
+  --ctrl:#20291b; --ctrl-fg:#f2ead6; --ctrl-line:#3c4a33; --burnt:#4a3426; --on-burnt:#f3d9c4;
+  --shadow:0 1px 2px rgba(60,40,10,.14),0 6px 18px rgba(60,40,10,.10);
+  --font:"Inter","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083; --line:#5a4e38; --line2:#41392a;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018; --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --p3:#d8c46a; --bad:#f08273; --bad-bg:#46241f; --reuse:#8fd29b; --reuse-bg:#213326; --tweak:#e8bd62; --tweak-bg:#3a2f17; --new:#d6b6ec; --new-bg:#35283f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --burnt:#2a1c14; --on-burnt:#e7c6ad; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083; --line:#5a4e38; --line2:#41392a;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018; --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --p3:#d8c46a; --bad:#f08273; --bad-bg:#46241f; --reuse:#8fd29b; --reuse-bg:#213326; --tweak:#e8bd62; --tweak-bg:#3a2f17; --new:#d6b6ec; --new-bg:#35283f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --burnt:#2a1c14; --on-burnt:#e7c6ad; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--font)}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3,h4,p,ul,ol{margin:0}
+ul,ol{padding-left:18px}
+.tree{width:11px;height:13px;fill:currentColor;vertical-align:-2px}
+.ctrl{position:sticky;top:0;z-index:20;background:var(--ctrl);color:var(--ctrl-fg);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.ctrl h1{font-size:15px;font-weight:650}
+.ctrl .tag{font-size:11px;border:1px solid var(--ctrl-line);border-radius:99px;padding:2px 8px;opacity:.85}
+.ctrl label{display:flex;gap:6px;align-items:center;font-size:13px}
+.ctrl select{background:var(--ctrl);border:1px solid var(--ctrl-line);border-radius:6px;padding:4px 6px;color:var(--ctrl-fg);max-width:230px}
+.ctrl .steps{display:flex;gap:6px;align-items:center}
+.ctrl .steps button{background:transparent;border:1px solid var(--ctrl-line);border-radius:6px;padding:3px 10px;color:var(--ctrl-fg)}
+.ctrl .steps button:disabled{opacity:.35;cursor:default}
+.ctrl .hint{margin-top:6px;font-size:12.5px;opacity:.9;max-width:1100px}
+.ctrl .fork{background:var(--lf);color:var(--on-lf);border-radius:6px;padding:1px 6px;font-size:12px}
+.wrap{max-width:1280px;margin:0 auto;padding-block:16px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:16px;align-items:start}
+.wrap.m{grid-template-columns:minmax(0,1fr)}
+.wrap.frame{grid-template-columns:390px minmax(0,1fr)}
+.screen{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.frame .screen{border:10px solid var(--ctrl);border-radius:30px;max-height:calc(100dvh - 150px)}
+.frame .screen .body{overflow:auto}
+.shead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line2);font-size:13px}
+.shead b{font-size:14px}
+.body{padding:12px;display:grid;gap:12px;min-width:0}
+.ibar{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px;display:grid;gap:8px;box-shadow:0 -4px 14px rgba(60,40,10,.08)}
+.ibar.wait{background:var(--paper)}
+.ibar .t{font-weight:650}
+.ibar .x{font-size:12.5px;color:var(--muted)}
+.bs{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:6px 12px;min-height:38px}
+.btn.pri{background:var(--green);border-color:var(--green);color:var(--on-green);font-weight:600}
+.btn.lfb{background:var(--lf);border-color:var(--lf);color:var(--on-lf);font-weight:600}
+.btn.sm{min-height:30px;padding:2px 9px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+.err{font-size:12.5px;color:var(--bad);background:var(--bad-bg);border-radius:6px;padding:5px 9px}
+.ok{font-size:12.5px;color:var(--reuse);background:var(--reuse-bg);border-radius:6px;padding:5px 9px}
+.banner{font-size:12.5px;background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:8px;padding:6px 9px;color:var(--ink2)}
+.sec h4{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+.side{display:grid;gap:12px;position:sticky;top:120px}
+.m .side,.frame .side{position:static}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px}
+.card h3{font-size:14px}
+.card p,.card li{font-size:12.5px;line-height:1.6}
+.tagline{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 8px;align-items:start;font-size:12.5px;line-height:1.55}
+.tg{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.tg.reuse{background:var(--reuse-bg);color:var(--reuse)}
+.tg.tweak{background:var(--tweak-bg);color:var(--tweak)}
+.tg.new{background:var(--new-bg);color:var(--new)}
+.tg.show{background:var(--line2);color:var(--ink2)}
+.rec{font-size:12.5px;border-left:3px solid var(--gold);padding-left:8px;color:var(--ink2)}
+/* people */
+.members{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px}
+.mem{flex:0 0 auto;min-width:118px;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 9px;text-align:left;display:grid;gap:2px}
+.mem b{font-size:13px;display:flex;gap:5px;align-items:center}
+.mem small{font-size:11.5px;color:var(--muted);line-height:1.35}
+.mem.sel{outline:2px solid var(--green);background:var(--green-bg)}
+.mem.off{opacity:.55}
+.mem.lent{border-style:dashed}
+.badge{font-size:10.5px;font-weight:650;border-radius:4px;padding:0 5px;display:inline-block}
+.badge.lf{background:var(--lf);color:var(--on-lf)}
+.badge.held{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold)}
+.badge.temp{background:var(--new-bg);color:var(--new)}
+.badge.sick{background:var(--bad-bg);color:var(--bad)}
+.pawn{display:inline-block;width:11px;height:13px;border-radius:5px 5px 2px 2px;background:currentColor;vertical-align:-2px}
+.c-p1{color:var(--p1)} .c-p2{color:var(--p2)} .c-p3{color:var(--p3)}
+/* spaces */
+.spaces{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.sp{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 8px;text-align:left;display:grid;gap:3px;min-height:86px;align-content:start}
+.sp b{font-size:13px}
+.sp small{font-size:11.5px;color:var(--muted);line-height:1.4}
+.sp .q{font-size:11.5px;font-weight:600;color:var(--reuse)}
+.sp .q.no{color:var(--bad)}
+.sp.taken{opacity:.6}
+.sp.cand{outline:2px dashed var(--green);outline-offset:-3px}
+.sp.lfsp{border-color:var(--lf)}
+.pop{border:1.5px solid var(--lf);background:var(--card);border-radius:10px;padding:10px;display:grid;gap:8px;box-shadow:var(--shadow)}
+.opt{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 9px;text-align:left;display:grid;gap:2px}
+.opt small{font-size:11.5px;color:var(--muted)}
+.opt[aria-pressed="true"]{outline:2px solid var(--green);background:var(--green-bg)}
+.opt:disabled{opacity:.5;cursor:default}
+.opts{display:grid;gap:6px}
+/* farm */
+.farm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;max-width:420px}
+.tile{aspect-ratio:1;max-width:100%;border-radius:6px;border:1px solid var(--line2);background:var(--green-bg);display:grid;place-items:center;text-align:center;font-size:11px;color:var(--muted);padding:2px;position:relative;line-height:1.2}
+.tile.room{background:var(--gold-bg);color:var(--ink2)}
+.tile.field{background:color-mix(in srgb,var(--gold) 28%,var(--paper));color:var(--ink2)}
+.tile.pasture{background:color-mix(in srgb,var(--green) 22%,var(--paper));color:var(--ink2)}
+.tile.burnt{background:var(--burnt);color:var(--on-burnt);border-color:var(--burnt)}
+.tile.fairy{background:var(--lf-bg);color:var(--lf);border:1.5px solid var(--lf)}
+.tile.cand{outline:2px dashed var(--green);outline-offset:-3px;cursor:pointer}
+.tile.pick{outline:3px solid var(--gold);outline-offset:-3px}
+.tile.no{background:repeating-linear-gradient(135deg,var(--line2) 0 5px,var(--card) 5px 10px)}
+button.tile{font:inherit;font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:var(--muted)}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px;border:1px solid var(--line)}
+/* zones */
+.zones{display:grid;gap:8px}
+.zone{border:1px solid var(--line2);border-radius:8px;padding:7px 9px;background:var(--card);display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.zone .zn{font-size:12.5px;font-weight:600}
+.zone .zn small{font-weight:400;color:var(--muted)}
+.slots{display:flex;gap:6px;flex-wrap:wrap}
+.slot{border:1px dashed var(--line);border-radius:6px;padding:3px 7px;font-size:12px;min-width:58px;text-align:center}
+.slot.full{border-style:solid;background:var(--green-bg)}
+.stepper{display:inline-flex;align-items:center;gap:6px}
+.stepper span{min-width:18px;text-align:center;font-variant-numeric:tabular-nums}
+/* order strip */
+.order{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.ord{flex:0 0 auto;border:1px solid var(--line);border-radius:7px;padding:4px 8px;font-size:12px;background:var(--card);display:grid;gap:1px;text-align:center}
+.ord.done{opacity:.5}
+.ord.now{outline:2px solid var(--green)}
+.ord.held{border-color:var(--gold);background:var(--gold-bg)}
+.log{font-size:12.5px;display:grid;gap:3px}
+.log div{border-left:2px solid var(--line2);padding-left:7px}
+.log div.lf{border-left-color:var(--lf)}
+.cards{display:flex;gap:8px;flex-wrap:wrap}
+.cf{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--card);display:grid;gap:2px;min-width:130px;text-align:left}
+.cf small{font-size:11.5px;color:var(--muted)}
+.cf[aria-pressed="true"]{outline:2px solid var(--bad);background:var(--bad-bg)}
+.cf.gone{opacity:.45;text-decoration:line-through}
+/* overview table */
+.tblwrap{overflow-x:auto}
+.ov{width:100%;border-collapse:collapse;font-size:12.5px}
+.ov th,.ov td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line2);line-height:1.55}
+.ov th{font-size:12px;color:var(--muted);font-weight:600}
+.ov td:first-child{font-weight:600}
+.ov td:last-child{white-space:nowrap}
+.ov .grp td{background:var(--lf-bg);color:var(--lf);font-weight:700}
+.ov a{color:var(--lf)}
+/* fence svg */
+.fence svg{width:100%;max-width:340px;height:auto;display:block}
+.fence .cell{fill:var(--green-bg);stroke:var(--line2)}
+.fence .old{stroke:var(--ink2);stroke-width:5}
+.fence .lbl{font-size:11px;fill:var(--ink)}
+.quote{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--card);display:grid;gap:4px;font-size:13px}
+.quote b{font-size:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="ctrl" id="ctrl"></div>
+<div class="wrap" id="wrap"></div>
+<script>
+// PROTOTYPE · throwaway. Fixed demo data and replies; no game commands, no rules engine.
+// Answers #1542: how each Legendairy Forest people / animal / fairy / farm interaction is shown and entered,
+// and which ones fit existing animal-reorg, farm selection drafts and payment choices.
+const TREE='<svg class="tree" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 0 11 7H8.2L11.5 11.5H.5L3.8 7H1Z"/><rect x="5" y="11.5" width="2" height="2.5"/></svg>';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const P={p1:'玩家1',p2:'玩家2',p3:'玩家3'};
+const pawn=p=>`<span class="pawn c-${p}" aria-hidden="true"></span>`;
+const SCENES={
+ overview:{n:'总表：14 个交互点',steps:['总表']},
+ borrow:{n:'借来的人：放置与交接（10 号）',steps:['选人放置','交给主人结算','回到轮转'],fork:['甲 成员栏（先选人）','乙 点格后再问放谁']},
+ lend:{n:'借出选人（10 号回家阶段）',steps:['选借出的成员','借出之后']},
+ ret:{n:'成员归还（17–19 号）',steps:['回家阶段选人','归还之后']},
+ held:{n:'延后放置与 13 号第二格（3 人局）',steps:['本轮开始','玩家2 被跳过','最后一人放下','选第二格','两格占用']},
+ dragon:{n:'龙之巢穴（19 号）',steps:['使用龙之巢穴','循环结束']},
+ fairy:{n:'妖精安置与挪动',steps:['取得 3 个妖精','之后随时挪动'],fork:['甲 独立妖精面板','乙 动物整理里的“妖精”页签']},
+ breed:{n:'收获繁殖：独角兽与妖精',steps:['繁殖前选择','繁殖结果']},
+ llama:{n:'羊驼与 Camelot',steps:['26 号换羊驼后整理','整理完成']},
+ fence:{n:'特大栅栏按段报价（22 号）',steps:['画栅栏看报价']},
+ show:{n:'农场与人员区显示总览',steps:['第 9 轮局面']},
+};
+const S={scene:'overview',step:0,viewer:'p1',device:'auto',fork:{borrow:0,fairy:0},opt:{moor:true,unicorn:'two',fence:'square',seasons:false}};
+let U={};
+(function(){const q=new URLSearchParams(location.search);const h=location.hash.slice(1);const sc=q.get('scene')||h;if(SCENES[sc])S.scene=sc;})();
+const isM=()=>S.device==='phone'||innerWidth<820;
+
+// ---------- small builders ----------
+const tag=(k,t)=>`<span class="tg ${k}">${{reuse:'复用',tweak:'小改',new:'新增',show:'仅显示'}[k]}</span><span>${t}</span>`;
+function mapCard(items,rec,who){return `<section class="card"><h3>接入现有能力</h3><div class="tagline">${items.map(([k,t])=>tag(k,t)).join('')}</div>${who?`<h3 style="margin-top:4px">谁操作 · 别人看到什么</h3><p>${who}</p>`:''}${rec?`<p class="rec">${rec}</p>`:''}</section>`}
+function bar(b){if(!b)return '';return `<div class="ibar ${b.wait?'wait':''}" role="region" aria-label="交互栏"><div class="t">${b.t}</div>${b.x?`<div class="x">${b.x}</div>`:''}${b.body||''}${b.btns?`<div class="bs">${b.btns.map(([l,a,k,dis])=>`<button class="btn ${k||''}" data-a="${a}" ${dis?'disabled':''}>${l}</button>`).join('')}</div>`:''}</div>`}
+function farm(tiles,opt={}){
+ return `<div class="farm" role="group" aria-label="农场">${tiles.map((t,i)=>{
+  const cls=['tile',t.k,t.cand?'cand':'',t.pick?'pick':''].join(' ');
+  const inner=t.label??{room:'木屋',field:'田',pasture:'牧场',burnt:'烧毁<br>19',fairy:''}[t.k]??'';
+  return t.cand&&opt.act?`<button class="${cls}" data-a="${opt.act}:${i}" aria-pressed="${!!t.pick}">${inner}</button>`:`<div class="${cls}">${inner}</div>`}).join('')}</div>`;
+}
+function baseFarm(){return Array.from({length:15},(_,i)=>({k:i===5||i===10?'room':i===1?'field':'unused'}))}
+function member(m,opt={}){
+ return `<button class="mem ${opt.sel?'sel':''} ${m.off?'off':''} ${m.lent?'lent':''}" data-a="${opt.act||''}" ${opt.act&&!m.off?'':'disabled'} aria-pressed="${!!opt.sel}"><b>${pawn(m.owner||'p1')}${esc(m.name)}${m.badges?m.badges.map(([k,t])=>` <span class="badge ${k}">${t}</span>`).join(''):''}</b><small>${esc(m.st||'')}</small></button>`;
+}
+function shead(round,phase,extra){return `<div class="shead"><span><b>第 ${round} 轮 · ${phase}</b>${extra?` · ${extra}`:''}</span><span>你是 ${pawn(S.viewer)} ${P[S.viewer]}</span></div>`}
+
+// ---------- scenes ----------
+const R={};
+R.overview=()=>{
+ const rows=[
+  ['人员'],
+  ['放自己的人还是借来的人','行动区成员栏列出借来的人：主人颜色和“借自玩家1”。先选人再点格；格上按主人的局面显示能不能放、收益归谁。','<span class="tg new">新增</span> 放人命令带人员 id；按人员的可放报价；成员栏（与 Changelings 已定方案共用）','borrow'],
+  ['借用放置交给主人结算','接收者看到“等待玩家1 结算”。主人收到的就是这一格的普通交互，顶部加一条说明“玩家2 替你放下的成员3”。','<span class="tg reuse">复用</span> 主人那边是现有交互；<span class="tg tweak">小改</span> 来源说明条；交接即撤销边界','borrow'],
+  ['交出者选人（10 号）','候选不等价（泥沼生病）时，回家阶段让交出者从成员卡里选；等价时系统自动选并公告。人员区标“借给玩家2”。','<span class="tg reuse">复用</span> choice（选项带成员身份）','lend'],
+  ['回家阶段选归还对象（17–19 号）','一次列出全部候选，恰好选 N 个，标出新生儿、临时成员；会让正式成员一个不剩的组合整体拒绝并说明原因。','<span class="tg reuse">复用</span> choice 多选（恰好 N 个）；非法组合由服务端拒绝','ret'],
+  ['19 号选对手和他的职业','按对手分组列出已打出职业的卡面，点 1 张。确认前写明“回家阶段你要归还 1 名成员”。','<span class="tg reuse">复用</span> choice 的 targetCard','dragon'],
+  ['13 号的第二个行动格','第一格结算完，行动板上能用的格高亮，点第二格；也可以选“不用第二格”。两格上的人形连在一起显示。','<span class="tg reuse">复用</span> 按行动格点选的 choice；linked occupancy 显示','held'],
+  ['延后放置提示（11、13 号）','成员栏和玩家概览上的“延后”徽标；本轮放置顺序条；日志记“跳过，改为延后放置”。','<span class="tg show">仅显示</span>','held'],
+  ['动物与农场'],
+  ['独角兽在繁殖时选种类','只有多种动物恰好 1 只时才问；选项预览会多出的新生动物。只有一种时自动选，没有时不问。','<span class="tg reuse">复用</span> choice（effectPreview），挂在收获繁殖步骤','breed'],
+  ['妖精安置和随时挪动','农场上点候选格放 1–2 个，剩下的放回或用 16 号换食物；整理入口随时可用。','<span class="tg new">新增</span> 妖精安置请求和面板（模型已定独立提交）；视觉沿用动物整理，入口沿用随时行动栏','fairy'],
+  ['19 号选 3 个格烧毁','农场上恰好选 3 个未使用格；烧毁格画成焦土并标“19”。','<span class="tg reuse">复用</span> farm-position 选择（最少 = 最多 = 3）；显示复用农场地形标记','dragon'],
+  ['26 号羊换羊驼后的整理','能留在原处的羊原地换成羊驼；放不下的作为待安置动物进入动物整理。','<span class="tg reuse">复用</span> animal-reorg（加羊驼键和图标）','llama'],
+  ['Camelot 的单种动物区','动物整理里一张卡、几个单种小格，马和羊驼的格按本局动物集合出现。','<span class="tg reuse">复用</span> 卡牌动物区','llama'],
+  ['羊驼、妖精格、借出人员、临时成员的显示','羊驼图标；妖精格紫框写数量；人员区写“借给 / 借来 / 临时 / 延后 / 已归还”。','<span class="tg show">仅显示</span> 新图标和人员状态','show'],
+  ['22 号按段报价','栅栏草稿里每段着色编号，报价写“4 段 = 4 木（按根要 8 木）”。','<span class="tg reuse">复用</span> 栅栏草稿和报价；<span class="tg tweak">小改</span> 报价带计价方式和分段','fence'],
+ ];
+ const ui=`<div class="body"><p style="font-size:13px">每行对应票里的一个交互点：怎样显示和输入，接入现有能力还是需要新东西。点“场景”可以跳到可操作的演示。</p><div class="tblwrap"><table class="ov"><thead><tr><th>交互点</th><th>显示与输入</th><th>接入</th><th></th></tr></thead><tbody>${rows.map(r=>r.length===1?`<tr class="grp"><td colspan="4">${r[0]}</td></tr>`:`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><a href="#${r[3]}" data-go="${r[3]}">场景</a></td></tr>`).join('')}</tbody></table></div></div>`;
+ const side=`<section class="card"><h3>汇总</h3><div class="tagline">${tag('new','放人时指定人员（含按人员的可放报价、成员栏）')}${tag('new','妖精安置请求和面板')}${tag('tweak','借用交接的来源说明条；栅栏报价带计价方式和分段')}${tag('reuse','其余都并入 choice、按行动格选择、farm-position 选择、animal-reorg、栅栏草稿')}${tag('show','延后、借出、临时成员、羊驼、妖精格、烧毁格的显示')}</div><p class="rec">新请求只有两类：放人指定人员（#1538 已列为差距），妖精安置（#1539 已定为独立交互）。其余不新增请求种类。</p></section><section class="card"><h3>有分歧、要你定的</h3><ul><li><b>借来的人怎么选</b>：甲 成员栏（先选人）／乙 点格后再问。见“借来的人”场景。</li><li><b>妖精面板放哪</b>：甲 独立面板／乙 动物整理里的页签。见“妖精安置”场景。</li></ul></section>`;
+ return {ui,side};
+};
+
+R.borrow=()=>{
+ const fork=S.fork.borrow,st=S.step,v=S.viewer;
+ const mine={id:'m1',name:'成员1',owner:'p2',st:'在家 · 你的人'};
+ const borrowed={id:'b3',name:'成员3',owner:'p1',st:'借自玩家1 · 结果归玩家1',badges:[['lf','借来']],lent:1};
+ const spaces=[['forest','森林','累积 3 木'],['farmland','农田','犁 1 块田'],['lessons','课程','打出 1 张职业'],['reed','芦苇河岸','累积 1 芦苇'],['day','日工','+2 食物','p1']];
+ const quote={m1:{forest:[1,'3 木归你'],farmland:[1,'犁你的田'],lessons:[1,'打出你的职业，1 食物'],reed:[1,'1 芦苇归你']},b3:{forest:[1,'3 木归玩家1'],farmland:[1,'犁玩家1 的田，由玩家1 选格'],lessons:[0,'玩家1 没有职业手牌'],reed:[1,'1 芦苇归玩家1']}};
+ const placed=U.placed||(st>0?{who:'b3',sp:'farmland'}:null);
+ if(v==='p1'){
+  // owner view
+  if(st===0)return {ui:`${shead(7,'工作阶段','轮到 玩家2')}<div class="body"><div class="banner">你的成员3 本轮借给玩家2。玩家2 会在自己的回合决定放不放、放哪格。</div><div class="sec"><h4>你的人员</h4><div class="members">${member({name:'成员1',owner:'p1',st:'已放：日工'})}${member({name:'成员2',owner:'p1',st:'在家'})}${member({name:'成员3',owner:'p1',st:'借给玩家2',badges:[['lf','借出']],lent:1,off:1})}</div></div></div>${bar({wait:1,t:'等待玩家2 放人',x:'玩家2 可以放自己的人，也可以放借来的你的成员3。'})}`,side:sideBorrow()};
+  if(st===1)return {ui:`${shead(7,'工作阶段','玩家2 的回合 · 由你结算')}<div class="body"><div class="banner">${pawn('p2')} 玩家2 替你把 ${pawn('p1')} 成员3 放到了 <b>农田</b>。这是你的行动：选格、收益和后续反应都归你。</div><div class="sec"><h4>你的农场：选 1 块要犁的田</h4>${farm(baseFarm().map((t,i)=>({...t,cand:[2,3,6].includes(i),pick:U.plow===i})),{act:'plow'})}</div></div>${bar({t:'农田：犁 1 块田',x:'点虚线格选择。完成后轮到玩家1（你）的普通回合，从玩家2 的座位往下轮转。',btns:[['犁这块并完成','next','pri',U.plow==null]]})}`,side:sideBorrow()};
+  return {ui:`${shead(7,'工作阶段','轮到 玩家1')}<div class="body"><div class="log"><div class="lf">玩家2 把玩家1 的成员3（借来）放到农田。</div><div class="lf">玩家1 犁 1 块田（由玩家1 结算）。</div></div></div>${bar({t:'轮到你：选择行动格放人',x:'接着从玩家2 的座位往下轮转，到你的普通回合。'})}`,side:sideBorrow()};
+ }
+ // receiver view (p2)
+ if(st===0){
+  const sel=U.sel??(fork===0?null:undefined);
+  const memBar=fork===0?`<div class="sec"><h4>本次放谁</h4><div class="members">${member(mine,{act:'sel:m1',sel:sel==='m1'})}${member(borrowed,{act:'sel:b3',sel:sel==='b3'})}${member({name:'成员2',owner:'p2',st:'已放：森林',off:1})}</div><div class="x" style="font-size:12.5px;color:var(--muted)">${sel?`已选 ${sel==='b3'?'借来的 玩家1 成员3':'你的成员1'}。下面的格按这名人员显示。`:'先选人，再点行动格。只有一名可放或两人等价时会默认选好。'}</div></div>`:'';
+  const tiles=spaces.map(([id,n,d,taken])=>{
+   if(taken)return `<div class="sp taken"><b>${n}</b><small>${d}</small><span>${pawn(taken)} 已占</span></div>`;
+   let q='';
+   if(fork===0&&sel){const [ok,t]=quote[sel][id];q=`<span class="q ${ok?'':'no'}">${ok?'✓':'✗'} ${t}</span>`;}
+   if(fork===1){const a=quote.m1[id][0],b=quote.b3[id][0];q=`<span class="q">${a&&b?'两人都能放':a?'只有你的成员1 能放':'—'}</span>`;}
+   return `<button class="sp ${(fork===0&&sel&&quote[sel][id][0])||fork===1?'cand':''}" data-a="place:${id}"><b>${n}</b><small>${d}</small>${q}</button>`}).join('');
+  const ask=fork===1&&U.ask?`<div class="pop" role="dialog" aria-label="放谁"><b>放谁到 ${spaces.find(s=>s[0]===U.ask)[1]}？</b><div class="opts">${['m1','b3'].map(w=>{const [ok,t]=quote[w][U.ask];return `<button class="opt" data-a="who:${w}" ${ok?'':'disabled'}><span>${pawn(w==='m1'?'p2':'p1')} ${w==='m1'?'你的成员1':'借来的 玩家1 成员3'}</span><small>${ok?t:'不能放：'+t}</small></button>`}).join('')}</div><button class="btn sm" data-a="ask:0">取消</button></div>`:'';
+  const note=U.note?`<div class="${U.noteBad?'err':'ok'}">${U.note}</div>`:'';
+  return {ui:`${shead(7,'工作阶段','轮到 玩家2（你）')}<div class="body">${memBar}<div class="sec"><h4>行动格</h4><div class="spaces">${tiles}</div></div>${ask}${note}</div>${bar({t:'轮到你：放人',x:fork===0?'先在成员栏选人，再点格。':'直接点格。两名人员都能放这一格时才会问放谁。',btns:[['演示：放借来的人到农田','demo','lfb']]})}`,side:sideBorrow()};
+ }
+ if(st===1)return {ui:`${shead(7,'工作阶段','等待 玩家1 结算')}<div class="body"><div class="spaces"><div class="sp"><b>农田</b><small>犁 1 块田</small><span>${pawn('p1')} 成员3 <span class="badge lf">玩家2 放置</span></span></div></div><div class="banner">你把玩家1 的成员3 放到了农田。现在由玩家1 选择要犁的田，收益归玩家1。交接之后不能撤销这次放人。</div></div>${bar({wait:1,t:'等待玩家1 结算农田',x:'玩家1 结算完后，从你的座位往下轮转。'})}`,side:sideBorrow()};
+ return {ui:`${shead(7,'工作阶段','轮到 玩家1')}<div class="body"><div class="log"><div class="lf">你把玩家1 的成员3（借来）放到农田。</div><div class="lf">玩家1 犁 1 块田。</div></div></div>${bar({wait:1,t:'等待玩家1 放人'})}`,side:sideBorrow()};
+};
+function sideBorrow(){return mapCard([['new','放人命令要带人员 id（现在只按最小编号自动选人，只有 Supply Person 能指定）'],['new','按人员给出每格能否放、收益归谁的报价，由服务端按主人的局面判断'],['new','甲：成员栏，与 Changelings 已定的成员栏是同一个组件；乙：点格后的二选一弹层'],['reuse','主人那边就是这一格的现有交互（这里是农田的选格）'],['tweak','主人交互顶部加一条来源说明；交接处是撤销边界']],'推荐甲：和 Changelings 已定的成员栏一致，选人后每格直接显示按主人局面的结果；乙在每次点格时多一步弹层，借来的人只活一轮，不值得为它另做一套。','接收者（玩家2）只选人和格。放下后，主人（玩家1）在自己的交互栏里结算，玩家2 看到等待提示。其他玩家只看到公开日志。')}
+
+R.lend=()=>{
+ const st=S.step,v=S.viewer,moor=S.opt.moor;
+ const ms=[{id:'m1',name:'成员1',st:'成人'},{id:'m2',name:'成员2',st:moor?'成人 · 生病':'成人',badges:moor?[['sick','生病']]:null},{id:'m3',name:'成员3',st:'本轮新生儿'}];
+ const pick=U.pick;
+ if(st===0){
+  if(v==='p1'&&moor)return {ui:`${shead(6,'回家阶段')}<div class="body"><div class="banner">${TREE} 仲夏夜之梦：每人交 1 名成员给左手边玩家。下一轮由对方放置，回家阶段归还。</div><div class="sec"><h4>选 1 名成员借给玩家2</h4><div class="members">${ms.map(m=>member({...m,owner:'p1'},{act:'pick:'+m.id,sel:pick===m.id})).join('')}</div><p style="font-size:12.5px;color:var(--muted)">因为成员2 生病，候选人不等价，由你选。生病状态跟着他走，放置资格按他本人判断。</p></div></div>${bar({t:'仲夏夜之梦：借出 1 名成员',x:'借来的人不能转借；临时家庭成员和 Supply Person 不能借。',btns:[['借出','next','pri',!pick]]})}`,side:sideLend()};
+  if(v==='p1')return {ui:`${shead(6,'回家阶段')}<div class="body"><div class="banner">${TREE} 仲夏夜之梦：候选人没有规则差别，系统已自动借出你的成员1 给玩家2。</div></div>${bar({t:'已自动借出成员1',x:'候选等价时不打断你。',btns:[['继续','next','pri']]})}`,side:sideLend()};
+  return {ui:`${shead(6,'回家阶段')}<div class="body"><div class="banner">${TREE} 仲夏夜之梦：你的候选人等价，系统已自动借出成员2 给玩家1。</div></div>${bar({wait:1,t:moor?'等待玩家1 选择借出的成员':'借出完成'})}`,side:sideLend()};
+ }
+ const lent=moor?(pick?ms.find(m=>m.id===pick).name:'成员1'):'成员1';
+ return {ui:`${shead(7,'准备阶段')}<div class="body"><div class="sec"><h4>${P.p1} 的人员</h4><div class="members">${ms.map(m=>member({...m,owner:'p1',st:m.name===lent?'借给玩家2 · 第 7 轮回家阶段归还':m.st.replace('本轮新生儿','成人'),badges:m.name===lent?[['lf','借出']].concat(m.badges||[]):m.badges,lent:m.name===lent,off:m.name===lent})).join('')}</div></div><div class="sec"><h4>${P.p2} 的人员</h4><div class="members">${member({name:'成员1',owner:'p2',st:'在家'})}${member({name:'成员2',owner:'p2',st:'借给玩家1',badges:[['lf','借出']],lent:1,off:1})}${member({name:lent,owner:'p1',st:'借自玩家1 · 结果归玩家1',badges:[['lf','借来']],lent:1})}</div></div></div>${bar({wait:1,t:'第 7 轮开始',x:'借来的人出现在接收者的成员栏里。'})}`,side:sideLend()};
+};
+function sideLend(){return mapCard([['reuse','候选不等价时用 choice，选项带成员身份（姓名、生病等状态）'],['reuse','候选等价时系统自动选，只发公开事件，不打断'],['show','人员区和成员栏的“借出 / 借来”标记，借来的人用主人颜色']],'顶部“泥沼”开关可切换候选是否等价。','每名玩家只为自己选。所有人都看到谁借给了谁。')}
+
+R.ret=()=>{
+ const st=S.step,v=S.viewer;const sel=U.multi||[];
+ const ms=[{id:'m1',name:'成员1',st:'成人 · 正式成员'},{id:'m2',name:'成员2',st:'成人 · 正式成员'},{id:'m4',name:'成员4',st:'临时 · 野孩，下次收获后归还',badges:[['temp','临时']]}];
+ const bad=sel.length===2&&sel.includes('m1')&&sel.includes('m2');
+ if(st===0){
+  if(v==='p2')return {ui:`${shead(8,'回家阶段')}<div class="body"><div class="banner">玩家1 正在选择归还的 2 名成员（17 丰饶之地、19 龙之巢穴）。</div></div>${bar({wait:1,t:'等待玩家1'})}`,side:sideRet()};
+  return {ui:`${shead(8,'回家阶段')}<div class="body"><div class="banner">${TREE} 本轮要归还 <b>2</b> 名家庭成员到供应区：17 丰饶之地 1 名、19 龙之巢穴（人那一行）1 名。以后可以通过家庭成长取回。</div><div class="sec"><h4>选恰好 2 名（已选 ${sel.length}）</h4><div class="members">${ms.map(m=>member({...m,owner:'p1'},{act:'multi:'+m.id,sel:sel.includes(m.id)})).join('')}</div></div>${bad?'<div class="err">不能这样选：至少要留 1 名正式成员，临时成员4 不算。</div>':''}</div>${bar({t:'回家阶段：归还 2 名成员',x:'在 21 号未选之路之后、人员离开行动格之前结算。',btns:[['归还','next','pri',sel.length!==2||bad]]})}`,side:sideRet()};
+ }
+ const gone=sel.length===2&&!bad?sel:['m1','m4'];
+ return {ui:`${shead(9,'准备阶段')}<div class="body"><div class="sec"><h4>${P.p1} 的人员</h4><div class="members">${ms.map(m=>member({...m,owner:'p1',st:gone.includes(m.id)?'已归还供应区 · 可再成长取回':m.st,off:gone.includes(m.id)})).join('')}</div></div>${gone.includes('m4')?'<div class="ok">成员4 已提前归还，04 号“下次收获后归还”的义务作废。</div>':''}</div>${bar({wait:1,t:'第 9 轮开始'})}`,side:sideRet()};
+}
+function sideRet(){return mapCard([['reuse','choice 多选，恰好 N 个（N = 本轮欠的归还数）'],['reuse','合法性由服务端判断，非法组合整体拒绝，给出原因'],['reuse','候选等价时自动选，不打断'],['show','人员区显示“已归还供应区”']],'试着同时选成员1 和成员2：会提示至少要留 1 名正式成员。','只有主人选。其他人看到等待提示，结束后看到公开日志。')}
+
+R.held=()=>{
+ const st=S.step,v=S.viewer;
+ const ord=[['p1','成员1'],['p2','放 1 人'],['p3','成员1'],['p1','成员2'],['p2','放 1 人'],['p3','成员2'],['p1','成员3','held','亡魂：最后一人'],['p2','补放','held','法国城堡：被跳过的一次']];
+ const cur=[0,1,6,6,7][st];
+ const strip=`<div class="sec"><h4>本轮放置顺序</h4><div class="order">${ord.map(([p,n,h,why],i)=>{const skipped=p==='p2'&&i===1&&st>=1;return `<div class="ord ${i<cur?'done':''} ${i===cur?'now':''} ${h?'held':''}">${pawn(p)} ${P[p]}<small>${skipped?'跳过 → 延后':n}</small>${h?`<span class="badge held">延后</span>`:''}</div>`}).join('')}</div><p style="font-size:12px;color:var(--muted)">延后放置要等其他人都放不了才进行；剩下的都是延后放置时，从当前座位起按顺序进行。</p></div>`;
+ const spaces=[['forest','森林','累积 3 木'],['reed','芦苇河岸','累积 1 芦苇'],['clay','黏土坑','累积 1 黏土'],['fishing','钓鱼','累积 1 食物'],['day','日工','+2 食物','p3']];
+ const mems=`<div class="sec"><h4>${P.p1} 的成员栏</h4><div class="members">${member({name:'成员1',owner:'p1',st:'已放'})}${member({name:'成员2',owner:'p1',st:st>=2?'已放':'在家'})}${member({name:'成员3',owner:'p1',st:st>=2?'已放：森林':'等其他人都放完',badges:[['held','延后 · 13']]})}</div></div>`;
+ let body='',b;
+ if(st<=1){body=strip+mems+(st===1?`<div class="log"><div class="lf">玩家2 的回合被跳过（11 法国城堡），改为本轮的 1 次延后放置。</div></div>`:'');b=st===0?{wait:v!=='p1',t:v==='p1'?'轮到你：放成员1':'等待玩家1',x:'成员3 带“延后”徽标，现在不能选。'}:{wait:1,t:'轮到玩家3',x:'玩家2 这一回合被跳过。'};}
+ if(st===2){body=strip+mems+`<div class="log"><div>其他人都已放完。玩家1 的延后放置先进行（从当前座位起）。</div><div class="lf">玩家1 成员3 使用森林，取得 3 木。</div></div>`;b={wait:v!=='p1',t:v==='p1'?'森林已结算':'玩家1 正在结算',btns:v==='p1'?[['继续','next','pri']]:null};}
+ if(st===3){const pick=U.sp;body=strip+`<div class="banner">${TREE} 亡魂：同一名成员可以再用一个<b>不同</b>的行动格。点高亮的格，或选择不用。</div><div class="sec"><h4>行动板</h4><div class="spaces">${spaces.map(([id,n,d,tk])=>id==='forest'?`<div class="sp taken"><b>${n}</b><small>${d}</small><span>${pawn('p1')} 成员3 · 第一格</span></div>`:tk?`<div class="sp taken"><b>${n}</b><small>${d}</small><span>${pawn(tk)} 已占</span></div>`:`<button class="sp ${v==='p1'?'cand':''}" data-a="${v==='p1'?'sp:'+id:''}" aria-pressed="${pick===id}" ${pick===id?'style="outline:3px solid var(--gold)"':''}><b>${n}</b><small>${d}</small></button>`).join('')}</div></div>`;b=v==='p1'?{t:'亡魂：选第二个行动格',x:'第二次使用按搬迁处理，不推进放置序号。',btns:[['用这一格','next','pri',!pick],['不用第二格','next','']]}:{wait:1,t:'玩家1 正在选第二个行动格'};}
+ if(st===4){const sp=spaces.find(s=>s[0]===(U.sp||'reed'));body=`<div class="sec"><h4>行动板</h4><div class="spaces"><div class="sp"><b>森林</b><small>累积 3 木</small><span>${pawn('p1')} 成员3 <span class="badge lf">↔ ${sp[1]}</span></span></div><div class="sp"><b>${sp[1]}</b><small>${sp[2]}</small><span>${pawn('p1')} 成员3 <span class="badge lf">↔ 森林</span></span></div></div><p style="font-size:12px;color:var(--muted)">回家前这名成员同时占着两格，两处都显示“↔”连到另一格。</p></div>${strip}`;b={wait:v!=='p2',t:v==='p2'?'轮到你：延后放置（法国城堡）':'等待玩家2 的延后放置',x:'可以放自己的人，也可以放借来的人。'};}
+ return {ui:`${shead(8,'工作阶段','3 人局')}<div class="body">${body}</div>${bar(b)}`,side:mapCard([['show','“延后”徽标在成员栏和玩家概览上；本轮放置顺序条；日志记跳过'],['reuse','第二格用按行动格点选的 choice（同 buildPlaceFarmerChoiceMap 那一类），外加“不用第二格”选项'],['reuse','两格占用沿用 linked occupancy 的显示（C023 Job Contract 的做法）']],'13 号在 1–2 人局会移出牌堆，所以这个场景用 3 人局。','只有放人的玩家操作。所有人都看到顺序条和“延后”徽标。')};
+};
+
+R.dragon=()=>{
+ const st=S.step,v=S.viewer;
+ U.d=U.d||{unused:[0,2,3,4,8,9,13,14].filter(i=>i!==13),burnt:[],cattle:1,stone:0,minors:0,removed:[],owe:0,log:[],mode:null,pick:[]};
+ const d=U.d;const unusedN=d.unused.length;
+ const rows=[['sheep','羊 → 烧毁你的 3 个农场格',unusedN>=3?`未使用格 ${unusedN} 个`:'未使用格不足 3 个',unusedN>=3],['boar','野猪 → 抽 2 张次要发展','进入手牌，牌面只有你看得到',true],['cattle','牛 → 3 石',d.cattle?`你有 ${d.cattle} 头牛`:'没有牛',d.cattle>0],['horse','马 → 4 燃料','未启用泥沼农夫',false],['person','人 → 移出对手 1 张职业','回家阶段你要归还 1 名成员；正式成员 3 − 已欠 '+d.owe+' − 1 ≥ 1',3-d.owe-1>=1&&d.removed.length<2]];
+ const tiles=Array.from({length:15},(_,i)=>{if(d.burnt.includes(i))return{k:'burnt'};if(i===5||i===10)return{k:'room'};if(i===1)return{k:'field'};if(i===6||i===7)return{k:'pasture'};if(i===13)return{k:'fairy',label:'妖精 1'};const c=d.mode==='burn'&&d.unused.includes(i);return{k:'unused',cand:c,pick:d.pick.includes(i)}});
+ const occs=[{id:'25',n:'伐木工查克',s:'Legendairy Forest 职业 · 去 LF 弃牌区'},{id:'x1',n:'示例职业 A',s:'普通职业 · 公开记为移出游戏'}];
+ let body='',b;
+ if(st===0){
+  if(v==='p2'){body=`<div class="banner">玩家1 正在使用龙之巢穴。每执行一行，结果都会公开。</div><div class="sec"><h4>你的已打出职业</h4><div class="cards">${occs.map(o=>`<div class="cf ${d.removed.includes(o.id)?'gone':''}"><b>${o.n}</b><small>${o.s}</small></div>`).join('')}</div>${d.removed.length?`<div class="err">你的 ${d.removed.map(id=>occs.find(o=>o.id===id).n).join('、')} 被玩家1 移出游戏。</div>`:''}</div><div class="log">${d.log.map(x=>`<div class="lf">${x}</div>`).join('')||'<div>暂无</div>'}</div>`;b={wait:1,t:'等待玩家1 使用龙之巢穴'};}
+  else if(d.mode==='burn'){body=`<div class="banner">${TREE} 选恰好 3 个未使用农场格烧毁。妖精格、牧场和田都不能选。</div>${farm(tiles,{act:'burn'})}<div class="legend"><span><span class="sw" style="background:var(--burnt)"></span>烧毁</span><span><span class="sw" style="background:var(--lf-bg);border-color:var(--lf)"></span>妖精格</span></div>`;b={t:`烧毁：已选 ${d.pick.length}/3`,btns:[['烧毁这 3 格','burnok','pri',d.pick.length!==3],['取消','burnno','']]};}
+  else if(d.mode==='person'){body=`<div class="banner">${TREE} 选一名对手的一张已打出职业，移出游戏。确认后，回家阶段你要归还 1 名成员。</div><div class="sec"><h4>${pawn('p2')} 玩家2</h4><div class="cards">${occs.filter(o=>!d.removed.includes(o.id)).map(o=>`<button class="cf" data-a="occ:${o.id}" aria-pressed="${U.occ===o.id}"><b>${o.n}</b><small>${o.s}</small></button>`).join('')}</div></div>`;b={t:'移出对手的职业',btns:[['移出这张','occok','pri',!U.occ],['取消','occno','']]};}
+  else{body=`<div class="banner">${TREE} 龙之巢穴：选一行执行，每行可以重复，随时结束。每次选择前按当时局面重新判断。</div><div class="opts">${rows.map(([id,t,why,ok])=>`<button class="opt" data-a="row:${id}" ${ok?'':'disabled'}><span>${t}</span><small>${ok?why:'不能选：'+why}</small></button>`).join('')}</div><div class="sec"><h4>你的农场</h4>${farm(tiles)}</div><div class="log">${d.log.map(x=>`<div class="lf">${x}</div>`).join('')}</div>${d.owe?`<div class="banner">回家阶段要归还 ${d.owe} 名成员</div>`:''}`;b={t:'龙之巢穴：选一行，或结束',x:'after 反应在循环结束后触发一次。',btns:[['结束','next','pri']]};}
+ } else {body=`<div class="log">${(d.log.length?d.log:['玩家1 使用龙之巢穴后结束。']).map(x=>`<div class="lf">${x}</div>`).join('')}<div>龙之巢穴结束；after 反应触发一次。</div></div><div class="sec"><h4>玩家1 的农场</h4>${farm(tiles)}</div>`;b={wait:1,t:'轮到下一名玩家'};}
+ return {ui:`${shead(8,'工作阶段')}<div class="body">${body}</div>${bar(b)}`,side:mapCard([['reuse','行循环：choice，选项带禁用原因和效果预览，外加“结束”'],['reuse','烧毁：farm-position 选择，最少 = 最多 = 3'],['reuse','移出职业：choice 的 targetCard，按对手分组'],['reuse','抽次要发展：现有 draw-ordinary-cards 的私有抽牌'],['reuse','烧毁格显示：农场地形标记（来源牌 19），同 M064 的封锁格']],'先执行“羊”，再执行“人”，看行的可选状态怎样随局面变化。','执行者操作。其他人实时看到每一行的公开结果；被移出职业的玩家收到提示。')};
+};
+
+R.fairy=()=>{
+ const st=S.step,fork=S.fork.fairy,v=S.viewer;
+ U.fa=U.fa||(st===0?{}:{3:2,8:1});U.left=U.left||'return';
+ const placed=Object.values(U.fa).reduce((a,b)=>a+b,0),total=st===0?3:3;const pool=total-placed;
+ const tiles=Array.from({length:15},(_,i)=>{if(i===5||i===10)return{k:'room'};if(i===1)return{k:'field'};if(i===6||i===7)return{k:'pasture'};if(i===9)return{k:'no',label:'马槽<br>有马'};const n=U.fa[i]||0;return n?{k:'fairy',label:`妖精 ${n}`,cand:v==='p1'}:{k:'unused',cand:v==='p1'}});
+ const grid=`${farm(tiles,{act:'fa'})}<div class="legend"><span>点候选格：0 → 1 → 2 → 0</span><span><span class="sw" style="background:var(--lf-bg);border-color:var(--lf)"></span>妖精格（算已使用）</span><span><span class="sw" style="background:repeating-linear-gradient(135deg,var(--line2) 0 3px,var(--card) 3px 6px)"></span>不能放</span></div>`;
+ const leftover=pool>0?`<div class="opts"><b style="font-size:12.5px">没放下的 ${pool} 个妖精</b>${[['return','放回供应区'],['oven',`用 16 火沼烈焰喷射烤炉换成 ${pool*2} 食物`]].map(([k,l])=>`<button class="opt" data-a="left:${k}" aria-pressed="${U.left===k}"><span>${l}</span></button>`).join('')}</div>`:'';
+ const panel=`<div class="sec"><h4>${fork===1?'':''}妖精安置 · 待安置 ${pool}</h4>${grid}</div>${leftover}`;
+ const tabs=fork===1?`<div class="bs" role="tablist"><button class="btn sm" role="tab" aria-selected="false" data-a="tabanimals">动物</button><button class="btn sm lfb" role="tab" aria-selected="true">妖精</button><span style="font-size:12px;color:var(--muted);align-self:center">两页分别确认</span></div>`:'';
+ const anim=U.tab==='animals'&&fork===1?`<div class="banner">（动物页：现有动物整理，这里不展开。）</div><div class="bs"><button class="btn sm" data-a="tabfairy">回到妖精页</button></div>`:'';
+ if(v==='p2')return {ui:`${shead(8,st===0?'工作阶段':'工作阶段')}<div class="body"><div class="banner">${st===0?'玩家1 正在安置 3 个妖精。草稿只有玩家1 看得到，确认后才公开。':'玩家1 的妖精布局（已公开）。'}</div><div class="sec"><h4>玩家1 的农场（公开）</h4>${farm(st===0?tiles.map(t=>t.k==='fairy'?{k:'unused'}:{...t,cand:false}):tiles.map(t=>({...t,cand:false})))}</div></div>${bar({wait:1,t:st===0?'等待玩家1 安置妖精':'轮到玩家1'})}`,side:sideFairy()};
+ if(st===0)return {ui:`${shead(8,'工作阶段')}<div class="body"><div class="banner">${TREE} 你从妖精戒指取得 3 个妖精。放在未使用的农场格上，每格最多 2 个。</div>${tabs}${anim||panel}</div>${bar({t:`${fork===0?'妖精安置':'农场整理 · 妖精页'}`,x:`已放 ${placed} 个；新占用的未使用格会变成已使用。${pool?`剩下 ${pool} 个将${U.left==='oven'?'换成食物':'放回'}。`:''}`,btns:[['确认布局','next','pri']]})}`,side:sideFairy()};
+ return {ui:`${shead(8,'工作阶段')}<div class="body"><div class="sec"><h4>你的农场</h4>${farm(tiles.map(t=>({...t,cand:false})))}</div><div class="bs"><span style="font-size:12.5px;color:var(--muted);align-self:center">随时行动：</span><button class="btn sm lfb" data-a="reopen">${TREE} 整理妖精</button><button class="btn sm">换食物</button></div>${U.reopen?`<div class="banner">已按当前布局重新打开${fork===0?'妖精安置':'农场整理的妖精页'}。挪动、拆分、合并已有妖精，不算“把格变成已使用”。</div>${grid}`:''}</div>${bar({t:'轮到你：选择行动格放人'})}`,side:sideFairy()};
+}
+function sideFairy(){return mapCard([['new','妖精安置请求和提交布局的命令（#1539 已定：与 animal-reorg 分开校验、分开提交）'],['reuse','视觉和格选择沿用动物整理的农场草稿'],['reuse','随时入口放在现有随时行动栏'],['reuse','多出来的换食物用 16 号的 exchanges 列表']],'甲：独立面板，入口和提交都清楚。乙：放进动物整理面板当页签，少一个入口，但两页要分别确认，容易让人以为一次确认就全部保存。推荐甲。','只有拥有者操作。其他人只看到最终布局。')}
+
+R.breed=()=>{
+ const st=S.step,v=S.viewer,u=S.opt.unicorn;
+ const cand=u==='two'?[['sheep','羊','你有 1 只 → 新生 1 只羊'],['cattle','牛','你有 1 头 → 新生 1 头牛']]:u==='one'?[['sheep','羊','你有 1 只 → 新生 1 只羊']]:[];
+ const auto=u==='one'?'只有羊恰好 1 只：独角兽自动算作羊。':u==='none'?'没有恰好 1 只的种类：不问。':'';
+ if(st===0){
+  if(v==='p2')return {ui:`${shead(9,'收获 · 繁殖')}<div class="body"><div class="banner">玩家1 正在选择独角兽算作哪种动物。</div></div>${bar({wait:1,t:'等待玩家1'})}`,side:sideBreed()};
+  return {ui:`${shead(9,'收获 · 繁殖')}<div class="body"><div class="sec"><h4>你的动物</h4><p style="font-size:13px">羊 ${u==='none'?2:1} · 牛 ${u==='two'?1:u==='one'?2:2} · 野猪 2 · 妖精 2（还有 1 个位置） · 独角兽（02 号）</p></div>${cand.length>1?`<div class="sec"><h4>${TREE} 独角兽算作哪种动物？</h4><div class="opts">${cand.map(([k,n,x])=>`<button class="opt" data-a="uni:${k}" aria-pressed="${U.uni===k}"><span>${n}</span><small>${x}</small></button>`).join('')}</div></div>`:`<div class="ok">${auto}</div>`}<div class="sec"><h4>照常繁殖</h4><p style="font-size:13px">野猪 2 → 新生 1 只野猪；妖精 2 个且有位置 → +1 个妖精。</p></div></div>${bar({t:'繁殖',x:'独角兽不占空间、不能换食物，只在这里和终局计分时起作用。',btns:[['确认繁殖','next','pri',cand.length>1&&!U.uni]]})}`,side:sideBreed()};
+ }
+ const kind=cand.length>1?(U.uni==='cattle'?'牛':'羊'):cand.length?'羊':null;
+ return {ui:`${shead(9,'收获 · 繁殖')}<div class="body"><div class="log">${kind?`<div class="lf">独角兽算作${kind}：新生 1 ${kind==='牛'?'头牛':'只羊'}。</div>`:''}<div>野猪繁殖：新生 1 只野猪。</div><div class="lf">妖精繁殖：+1 个妖精。</div></div><div class="banner">接下来：新生动物进入现有的动物整理；新妖精进入妖精安置。</div></div>${bar({t:'安置新生动物',btns:[['打开动物整理','x',''],[`${TREE} 安置新妖精`,'x','lfb']]})}`,side:sideBreed()};
+}
+function sideBreed(){return mapCard([['reuse','有多种候选时用 choice，选项带效果预览（会多出哪只新生动物）'],['reuse','只有一种时自动选，没有时不问'],['reuse','新生动物进入现有的动物整理'],['new','新妖精进入妖精安置（同“妖精安置”场景）']],'顶部“独角兽候选”可切换两种 / 一种 / 没有。','只有拥有者操作。')}
+
+R.llama=()=>{
+ const st=S.step,v=S.viewer;U.z=U.z||{pasture:2,camelot:0,pool:1,food:0};const z=U.z;
+ const adj=(k,dlt)=>`<span class="stepper"><button class="btn sm" data-a="z:${k}:-1" ${v!=='p1'?'disabled':''} aria-label="减少">−</button><span>${z[k]}</span><button class="btn sm" data-a="z:${k}:1" ${v!=='p1'?'disabled':''} aria-label="增加">+</button></span>`;
+ if(st===0)return {ui:`${shead(6,'工作阶段')}<div class="body"><div class="banner">${TREE} 26 秘鲁宗教裁判所：你的 3 只羊换成 3 只羊驼。牧场里的 2 只原地换成羊驼；示例羊圈卡只能放羊，那 1 只变成待安置。</div><div class="sec"><h4>动物整理</h4><div class="zones"><div class="zone"><span class="zn">牧场 A <small>容量 4</small></span>${adj('pasture')}</div><div class="zone"><span class="zn">示例羊圈卡 <small>只能放羊</small></span><span style="font-size:12px;color:var(--muted)">羊驼不能放</span></div><div class="zone"><span class="zn">24 卡米洛 <small>单种动物区，每格 1 只</small></span><span class="slots"><span class="slot">羊 □</span><span class="slot">野猪 □</span><span class="slot">牛 □</span><span class="slot ${z.camelot?'full':''}">羊驼 ${z.camelot?'■':'□'} ${adj('camelot')}</span></span></div><div class="zone"><span class="zn">待安置</span><span>羊驼 ${z.pool}</span></div>${z.pool?`<div class="bs"><button class="btn sm" data-a="zfood">用 16 号换 2 食物</button><button class="btn sm" data-a="zret">放回</button></div>`:''}</div><p style="font-size:12px;color:var(--muted)">没启用泥沼时卡米洛不出现马格；羊驼格在 26 号抽出后出现。卡米洛的“1 名成员”住处是另一回事，不占这些格。</p></div></div>${bar({t:'整理动物',x:z.pool?`还有 ${z.pool} 只没安置。`:'全部安置好了。',btns:[['确认','next','pri',v!=='p1']]})}`,side:sideLlama()};
+ return {ui:`${shead(6,'工作阶段')}<div class="body"><div class="sec"><h4>玩家1 的动物</h4><p style="font-size:13px">牧场 A：羊驼 ${z.pasture} · 卡米洛：羊驼 ${z.camelot}${z.food?` · 换成食物 ${z.food} 只`:''}</p></div><div class="log"><div class="lf">玩家1 交出 3 只羊，得 3 只羊驼。</div><div class="lf">羊驼计分对所有玩家生效。</div></div></div>${bar({wait:1,t:'继续'})}`,side:sideLlama()};
+}
+function sideLlama(){return mapCard([['reuse','animal-reorg：加羊驼键和图标，容量比照羊'],['reuse','卡米洛是卡牌动物区，用现有卡牌区渲染，按本局动物集合出格'],['reuse','16 号换食物沿用 exchanges']],'没有新面板。羊驼只是动物整理里多一种动物。','只有拥有者操作。')}
+
+R.fence=()=>{
+ const o=S.opt.fence,sea=S.opt.seasons;
+ // 3x3 grid cells at 60px; draw new fences coloured by run
+ const runs=o==='square'?[[[0,0,2,0],'#c0392b'],[[0,2,2,2],'#2e5fa8'],[[0,0,0,2],'#2d7a1f'],[[2,0,2,2],'#b9860c']]:[[[0,0,1,0],'#c0392b'],[[2,0,3,0],'#2e5fa8'],[[0,1,3,1],'#2d7a1f'],[[0,0,0,1],'#b9860c'],[[3,0,3,1],'#7a3f8f']];
+ const fences=o==='square'?8:7;const old=o==='square'?[]:[[1,0,2,0]];
+ const svg=`<svg viewBox="-10 -10 ${o==='square'?140:200} ${o==='square'?140:80}" role="img" aria-label="栅栏草稿">${Array.from({length:o==='square'?2:3},(_,i)=>Array.from({length:o==='square'?2:1},(_,j)=>`<rect class="cell" x="${i*60}" y="${j*60}" width="60" height="60"/>`).join('')).join('')}${old.map(([x1,y1,x2,y2])=>`<line class="old" x1="${x1*60}" y1="${y1*60}" x2="${x2*60}" y2="${y2*60}"/>`).join('')}${runs.map(([[x1,y1,x2,y2],c],i)=>`<line x1="${x1*60}" y1="${y1*60}" x2="${x2*60}" y2="${y2*60}" stroke="${c}" stroke-width="5" stroke-linecap="round"/><text class="lbl" x="${(x1+x2)*30+4}" y="${(y1+y2)*30-4}">段${i+1}</text>`).join('')}</svg>`;
+ const n=runs.length;const free=sea?1:0;const cost=Math.max(n-free,sea?1:0);
+ return {ui:`${shead(5,'工作阶段','建造栅栏')}<div class="body"><div class="sec fence"><h4>栅栏草稿（每段一种颜色）</h4>${svg}${o==='split'?'<p style="font-size:12px;color:var(--muted)">上边那条线中间是已有的栅栏（深色），所以左右分成两段。</p>':''}</div><div class="quote"><span>本次需要</span><b>${cost} 木</b><span>特大栅栏：${n} 段 × 1 木${sea?'，春季免费栅栏正好抵满 1 段':''}。按根计价要 ${fences} 木，系统取更省的。</span><span style="font-size:12px;color:var(--muted)">个人栅栏仍按实际根数消耗：${fences} 根。</span></div></div>${bar({t:'建造栅栏',x:'报价随草稿实时更新。',btns:[['确认并支付','x','pri']]})}`,side:mapCard([['reuse','现有栅栏选择草稿和 quoteFenceSelection'],['tweak','报价现在只有 woodCost；要多带“采用哪种计价”和每段的边，用于着色和说明'],['reuse','支付仍走统一支付选择，候选和剪枝在服务端']],'用顶部“栅栏形状”和“春季免费栅栏”切换。','只有建栅栏的玩家看到草稿和报价。')};
+};
+
+R.show=()=>{
+ const v=S.viewer;
+ const tiles=Array.from({length:15},(_,i)=>i===5||i===10?{k:'room'}:i===1?{k:'field'}:i===6||i===7?{k:'pasture',label:'牧场<br>羊驼 3'}:i===3?{k:'fairy',label:'妖精 2'}:i===8?{k:'fairy',label:'妖精 1'}:[12,13,14].includes(i)?{k:'burnt'}:{k:'unused'});
+ return {ui:`${shead(9,'工作阶段')}<div class="body"><div class="sec"><h4>${P.p1} 的农场${v==='p2'?'（你在看对手，全部公开）':''}</h4>${farm(tiles)}<div class="legend"><span><span class="sw" style="background:var(--lf-bg);border-color:var(--lf)"></span>妖精格：算已使用，不扣分</span><span><span class="sw" style="background:var(--burnt)"></span>烧毁格：19 号，算已使用</span><span>牧场里的羊驼用自己的图标</span></div></div><div class="sec"><h4>${P.p1} 的人员</h4><div class="members">${member({name:'成员1',owner:'p1',st:'在家'})}${member({name:'成员2',owner:'p1',st:'借给玩家2 · 本轮回家阶段归还',badges:[['lf','借出']],lent:1,off:1})}${member({name:'成员3',owner:'p1',st:'等其他人都放完',badges:[['held','延后 · 13']]})}${member({name:'成员4',owner:'p1',st:'野孩 · 下次收获供养后归还',badges:[['temp','临时']]})}${member({name:'成员5',owner:'p1',st:'已归还供应区 · 可再成长取回',off:1})}</div></div><div class="sec"><h4>${P.p1} 的已打出牌</h4><div class="cards"><div class="cf"><b>${TREE} 24 卡米洛</b><small>住 1 人 · 羊□ 野猪□ 牛□ 羊驼■</small></div><div class="cf"><b>${TREE} 02 独角兽(第一部)</b><small>繁殖和终局计分时算一种动物</small></div></div></div><div class="banner">回家阶段要归还 1 名成员（17 丰饶之地）</div></div>${bar({wait:v!=='p1',t:v==='p1'?'轮到你：放人':'等待玩家1'})}`,side:mapCard([['show','羊驼图标；妖精格紫框写数量；烧毁格焦土色并标 19'],['show','人员状态：借出 / 借来 / 延后 / 临时 / 已归还；欠归还人数'],['reuse','已打出牌区照常显示 LF 牌，卡米洛显示单种格占用']],'全部是公开信息，两个视角看到的一样。','')};
+};
+
+// ---------- shell ----------
+function renderCtrl(){
+ const sc=SCENES[S.scene],labels=sc.steps;
+ const fork=sc.fork?`<label><span class="fork">方案</span><select id="fork">${sc.fork.map((f,i)=>`<option value="${i}" ${S.fork[S.scene]===i?'selected':''}>${f}</option>`).join('')}</select></label>`:'';
+ const opt=S.scene==='lend'?`<label><input type="checkbox" id="o-moor" ${S.opt.moor?'checked':''}> 泥沼：成员2 生病</label>`:S.scene==='breed'?`<label>独角兽候选 <select id="o-uni"><option value="two" ${S.opt.unicorn==='two'?'selected':''}>两种</option><option value="one" ${S.opt.unicorn==='one'?'selected':''}>一种</option><option value="none" ${S.opt.unicorn==='none'?'selected':''}>没有</option></select></label>`:S.scene==='fence'?`<label>栅栏形状 <select id="o-fence"><option value="square" ${S.opt.fence==='square'?'selected':''}>新建 2×2 牧场</option><option value="split" ${S.opt.fence==='split'?'selected':''}>被已有栅栏隔开</option></select></label><label><input type="checkbox" id="o-sea" ${S.opt.seasons?'checked':''}> 春季免费栅栏</label>`:'';
+ document.getElementById('ctrl').innerHTML=`<div class="row"><h1>Legendairy Forest 交互草图</h1><span class="tag">原型 · 固定演示数据 · 不连游戏服务</span></div><div class="row" style="margin-top:8px"><label>场景 <select id="scene">${Object.entries(SCENES).map(([k,s])=>`<option value="${k}" ${S.scene===k?'selected':''}>${s.n}</option>`).join('')}</select></label>${S.scene==='overview'?'':`<label>视角 <select id="viewer"><option value="p1" ${S.viewer==='p1'?'selected':''}>玩家1</option><option value="p2" ${S.viewer==='p2'?'selected':''}>玩家2</option></select></label>`}<label>设备 <select id="device"><option value="auto" ${S.device==='auto'?'selected':''}>按窗口宽度</option><option value="phone" ${S.device==='phone'?'selected':''}>手机外框</option></select></label>${fork}${opt}${labels.length>1?`<span class="steps"><button data-a="prev" ${S.step===0?'disabled':''} aria-label="上一步">◀</button><span>${S.step+1}/${labels.length} ${labels[S.step]}</span><button data-a="next" ${S.step>=labels.length-1?'disabled':''} aria-label="下一步">▶</button></span>`:''}</div>${S.scene==='borrow'?`<p class="hint">玩家2 视角是接收者，玩家1 视角是被借人员的主人。</p>`:''}`;
+}
+function render(){
+ renderCtrl();
+ const w=document.getElementById('wrap');w.className='wrap'+(S.device==='phone'?' frame':isM()?' m':'');
+ const {ui,side}=R[S.scene]();
+ w.innerHTML=`<div class="screen">${ui}</div><div class="side">${side}</div>`;
+ bind();
+}
+function go(scene){S.scene=scene;S.step=0;U={};try{history.replaceState(null,'',`${location.pathname}#${scene}`)}catch(e){}render();scrollTo(0,0)}
+function act(a){
+ const max=SCENES[S.scene].steps.length-1;const [k,x,y]=a.split(':');
+ if(a==='next'){if(S.step<max){S.step++;keepOrReset();}}
+ else if(a==='prev'){if(S.step>0){S.step--;U={};}}
+ else if(k==='sel'){U.sel=x;U.note=null;}
+ else if(k==='place'){
+  const quote={m1:{forest:1,farmland:1,lessons:1,reed:1},b3:{forest:1,farmland:1,lessons:0,reed:1}};
+  if(S.fork.borrow===0){if(!U.sel){U.note='先在成员栏选人。';U.noteBad=1;}else if(!quote[U.sel][x]){U.note='这名人员不能放这一格，没有自动换人。';U.noteBad=1;}else if(U.sel==='b3'){U.placed={who:'b3',sp:x};S.step=1;U.note=null;}else{U.note='已放你的成员1。（演示只走借来的人这条路，点“演示”按钮。）';U.noteBad=0;}}
+  else{if(quote.m1[x]&&quote.b3[x])U.ask=x;else{U.note='只有你的成员1 能放这一格（借来的人不能去课程：玩家1 没有职业手牌），直接放了成员1。';U.noteBad=0;}}
+ }
+ else if(k==='who'){if(x==='b3'){U.placed={who:'b3',sp:U.ask};U.ask=null;S.step=1;}else{U.ask=null;U.note='已放你的成员1。';U.noteBad=0;}}
+ else if(k==='ask'){U.ask=null;}
+ else if(a==='demo'){U.placed={who:'b3',sp:'farmland'};S.step=1;}
+ else if(k==='plow'){U.plow=+x;}
+ else if(k==='pick'){U.pick=x;}
+ else if(k==='multi'){const s=new Set(U.multi||[]);s.has(x)?s.delete(x):s.add(x);U.multi=[...s];}
+ else if(k==='sp'){U.sp=x;}
+ else if(k==='row'){const d=U.d;
+  if(x==='sheep'){d.mode='burn';d.pick=[];}
+  if(x==='boar'){d.minors+=2;d.log.push('玩家1 抽 2 张次要发展（牌面只有自己看得到）。');}
+  if(x==='cattle'){d.cattle--;d.stone+=3;d.log.push('玩家1 交 1 头牛，得 3 石。');}
+  if(x==='person'){d.mode='person';U.occ=null;}}
+ else if(k==='burn'){const d=U.d,i=+x;if(d.pick.includes(i))d.pick=d.pick.filter(t=>t!==i);else if(d.pick.length<3)d.pick.push(i);}
+ else if(a==='burnok'){const d=U.d;d.burnt.push(...d.pick);d.unused=d.unused.filter(t=>!d.pick.includes(t));d.log.push(`玩家1 烧毁 3 个农场格（19 龙之巢穴）。`);d.mode=null;d.pick=[];}
+ else if(a==='burnno'){U.d.mode=null;U.d.pick=[];}
+ else if(k==='occ'){U.occ=x;}
+ else if(a==='occok'){const d=U.d;d.removed.push(U.occ);d.owe++;d.log.push(`玩家1 把玩家2 的 ${U.occ==='25'?'伐木工查克':'示例职业 A'} 移出游戏；回家阶段玩家1 要归还 1 名成员。`);d.mode=null;}
+ else if(a==='occno'){U.d.mode=null;}
+ else if(k==='fa'){const i=+x;const cur=U.fa[i]||0;const placed=Object.values(U.fa).reduce((p,q)=>p+q,0);const nx=(cur+1)%3;if(nx>cur&&placed>=3){U.fa[i]=0;}else U.fa[i]=nx;if(!U.fa[i])delete U.fa[i];}
+ else if(k==='left'){U.left=x;}
+ else if(a==='tabanimals'){U.tab='animals';}
+ else if(a==='tabfairy'){U.tab=null;}
+ else if(a==='reopen'){U.reopen=!U.reopen;}
+ else if(k==='uni'){U.uni=x;}
+ else if(k==='z'){const z=U.z,d=+y;if(d>0&&z.pool>0&&(x!=='camelot'||z.camelot<1)&&(x!=='pasture'||z.pasture<4)){z[x]++;z.pool--;}else if(d<0&&z[x]>0){z[x]--;z.pool++;}}
+ else if(a==='zfood'){U.z.pool--;U.z.food++;}
+ else if(a==='zret'){U.z.pool--;}
+ render();
+}
+function keepOrReset(){const keep=['borrow','ret','held','dragon','fairy','breed','llama','lend'];if(!keep.includes(S.scene))U={};U.note=null;U.ask=null;}
+function bind(){
+ document.querySelectorAll('[data-a]').forEach(el=>{if(el.dataset.a)el.onclick=e=>{e.preventDefault();act(el.dataset.a)}});
+ document.querySelectorAll('[data-go]').forEach(el=>el.onclick=e=>{e.preventDefault();go(el.dataset.go)});
+ const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onchange=fn};
+ on('scene',e=>go(e.target.value));
+ on('viewer',e=>{S.viewer=e.target.value;render()});
+ on('device',e=>{S.device=e.target.value;render()});
+ on('fork',e=>{S.fork[S.scene]=+e.target.value;S.step=0;U={};render()});
+ on('o-moor',e=>{S.opt.moor=e.target.checked;S.step=0;U={};render()});
+ on('o-uni',e=>{S.opt.unicorn=e.target.value;S.step=0;U={};render()});
+ on('o-fence',e=>{S.opt.fence=e.target.value;render()});
+ on('o-sea',e=>{S.opt.seasons=e.target.checked;render()});
+}
+addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,120)});
+addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(SCENES[h]&&h!==S.scene)go(h)});
+render();
+</script>
+</body>
+</html>
