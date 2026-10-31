@@ -1989,3 +1989,4 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   </section>
   )
 }
+// CI scope probe: frontend.
