@@ -5,6 +5,7 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import '../../shared/cards/C/C125_Nightworker'
 import '../../shared/cards/E/E124_MayorCandidate'
 
@@ -40,6 +41,15 @@ function discardAction(response: SessionResponse) {
   return response.interaction.anytimeActions.find((action) => action.id === 'discard-goods')
 }
 
+function rejectDiscardUnchanged(session: GameSession, command: () => SessionResponse) {
+  const checkpoint = session.createCommandCheckpoint()
+  const frozenCheckpoint = JSON.stringify(checkpoint)
+  const rejected = assertRejectedUnchanged(session, command)
+  expect(session.createCommandCheckpoint()).toEqual(checkpoint)
+  expect(JSON.stringify(session.createCommandCheckpoint())).toBe(frozenCheckpoint)
+  return rejected
+}
+
 function quantityRequest(response: SessionResponse) {
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
@@ -68,16 +78,11 @@ describe('discard goods to the general supply', () => {
     expect(request.requireAtLeastOne).toBe(true)
     expect(request.anytimeWindow).toEqual({ allowed: false })
 
-    const over = session.commitSelectionChoice(0, { resourceCounts: { wood: 4 } })
-    expect(over.ok).toBe(false)
-    expect(session.getState().state.players[0]!.resources.wood).toBe(3)
-
-    const animals = session.commitSelectionChoice(0, { resourceCounts: { sheep: 1, wood: 1 } })
-    expect(animals.ok).toBe(false)
-    expect(session.getState().state.players[0]!.resources).toMatchObject({ wood: 3, sheep: 2 })
-
-    const empty = session.commitSelectionChoice(0, { resourceCounts: {} })
-    expect(empty.ok).toBe(false)
+    for (const resourceCounts of [{ wood: 4 }, { sheep: 1, wood: 1 }, {}]) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        rejectDiscardUnchanged(session, () => session.commitSelectionChoice(0, { resourceCounts }))
+      }
+    }
 
     const discarded = session.commitSelectionChoice(0, { resourceCounts: { wood: 2, grain: 4, food: 1 } })
     expect(discarded.ok, discarded.error).toBe(true)
@@ -107,9 +112,10 @@ describe('discard goods to the general supply', () => {
   it('hides the action when the supply has no discardable goods', () => {
     const session = sessionFor()
     expect(discardAction(session.getState())).toBeUndefined()
-    const rejected = session.takeAnytimeAction(0, 'discard-goods')
-    expect(rejected.ok).toBe(false)
-    expect(rejected.state.players[0]!.resources.sheep).toBe(2)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      rejectDiscardUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    }
+    expect(session.takeAction(0, 'day-laborer').ok).toBe(true)
   })
 
   it('refuses another player discarding on your turn', () => {
@@ -117,9 +123,14 @@ describe('discard goods to the general supply', () => {
       state.players[0]!.resources.wood = 1
       state.players[1]!.resources.clay = 1
     })
-    const rejected = session.takeAnytimeAction(1, 'discard-goods')
-    expect(rejected.ok).toBe(false)
-    expect(session.getState().state.players[1]!.resources.clay).toBe(1)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      rejectDiscardUnchanged(session, () => session.takeAnytimeAction(1, 'discard-goods'))
+    }
+    expect(session.takeAnytimeAction(0, 'discard-goods').ok).toBe(true)
+    const discarded = session.commitSelectionChoice(0, { resourceCounts: { wood: 1 } })
+    expect(discarded.ok, discarded.error).toBe(true)
+    expect(discarded.state.players[0]!.resources.wood).toBe(0)
+    expect(discarded.state.players[1]!.resources.clay).toBe(1)
   })
 
   it.each(['recipe', 'count'] as const)('preserves the grain needed by the pending bake %s choice', (stage) => {
@@ -140,9 +151,9 @@ describe('discard goods to the general supply', () => {
     })
     expect(discardAction(pending)).toBeUndefined()
     const before = structuredClone({ state: captureStateWithHistory(pending.state), interaction: pending.interaction, scores: pending.scores })
-    const rejected = session.takeAnytimeAction(0, 'discard-goods')
-    expect(rejected.ok).toBe(false)
-    expect({ state: captureStateWithHistory(rejected.state), interaction: rejected.interaction, scores: rejected.scores }).toEqual(before)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      rejectDiscardUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    }
 
     if (stage === 'recipe') {
       pending = session.resolveChoice(0, 'Major_Fireplace1')
@@ -173,9 +184,9 @@ describe('discard goods to the general supply', () => {
     const request = quantityRequest(pending)
     expect(request.availableByResource).toEqual({ clay: 3, food: 1 })
 
-    const wood = session.commitSelectionChoice(0, { resourceCounts: { wood: 1 } })
-    expect(wood.ok).toBe(false)
-    expect(session.getState().state.players[0]!.resources).toMatchObject({ wood: 2, stone: 4, clay: 3 })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      rejectDiscardUnchanged(session, () => session.commitSelectionChoice(0, { resourceCounts: { wood: 1 } }))
+    }
 
     const clay = session.commitSelectionChoice(0, { resourceCounts: { clay: 2 } })
     expect(clay.ok, clay.error).toBe(true)
@@ -218,6 +229,102 @@ describe('discard goods to the general supply', () => {
       expect.objectContaining({ playerId: placed.state.players[0]!.id }),
     ])
     expect(placed.state.players[0]!.resources.wood).toBeGreaterThan(0)
+  })
+
+  it('does not execute mutating before-work effects while probing discard eligibility', () => {
+    const cardId = 'TEST_DiscardProbeMutation'
+    const session = sessionFor((state) => {
+      state.round = 5
+      state.players[0]!.occupationPlayed = [cardId, 'C125_Nightworker']
+      Object.assign(state.players[0]!.resources, { wood: 1, clay: 1, reed: 1, stone: 1, food: 4 })
+      for (const player of state.players) {
+        Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        markAllWorkersUsed(state, player)
+      }
+    })
+    session.withCtx(() => requireActiveCardRegistry('discard eligibility preview').setEffect({
+      id: cardId,
+      onBeforeWork: (_state, player) => { player.resources.food += 1 },
+    }))
+
+    let response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(4)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'select-trigger') {
+      throw new Error(`expected before-work activations, got ${JSON.stringify(response.interaction)}`)
+    }
+    const activation = response.interaction.request.options.find((option) => option.sourceCard === cardId)
+    expect(activation).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, activation!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(5)
+    expect(session.getState().state.players[0]!.resources.food).toBe(5)
+  })
+
+  it('offers discard for a before-work effect that mutates without returning a flow', () => {
+    const cardId = 'TEST_DiscardEnablesMutation'
+    const session = sessionFor((state) => {
+      state.round = 5
+      state.players[0]!.occupationPlayed = [cardId]
+      Object.assign(state.players[0]!.resources, { wood: 1, food: 4 })
+      for (const player of state.players) {
+        Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        markAllWorkersUsed(state, player)
+      }
+    })
+    session.withCtx(() => requireActiveCardRegistry('discard enables mutating effect').setEffect({
+      id: cardId,
+      onBeforeWork: (_state, player) => {
+        if (player.resources.wood === 0) player.resources.food += 1
+      },
+    }))
+
+    let response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(4)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') {
+      throw new Error(`expected discard offer, got ${JSON.stringify(response.interaction)}`)
+    }
+    const discard = response.interaction.request.options.find((option) => option.labelKey === 'actions.discard-goods.name')
+    expect(discard).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, discard!.value)
+    quantityRequest(response)
+    response = session.commitSelectionChoice(0, { resourceCounts: { wood: 1 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 5 })
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.moved', reason: 'discard', resources: { wood: 1 },
+    }))
+    expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.discardGoods' }))
+  })
+
+  it('does not offer to discard a committed building resource before work', () => {
+    const cardId = 'TEST_CommittedBeforeWorkWood'
+    const session = sessionFor((state) => {
+      state.round = 5
+      state.players[0]!.occupationPlayed = [cardId]
+      Object.assign(state.players[0]!.resources, { wood: 2, food: 4 })
+      for (const player of state.players) {
+        Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 0, begging: 0 })
+        markAllWorkersUsed(state, player)
+      }
+    })
+    session.withCtx(() => requireActiveCardRegistry('committed before-work wood').setEffect({
+      id: cardId,
+      computeResourceCommitments: (_state, owner) => [{ playerId: owner.id, resources: { wood: 1 } }],
+      onBeforeWork: (_state, player) => player.resources.wood === 0
+        ? { type: 'leaf', actionId: 'gain', params: { food: 1 } } : undefined,
+    }))
+    const response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, food: 4 })
+    const pending = session.takeAnytimeAction(0, 'discard-goods')
+    expect(quantityRequest(pending).availableByResource.wood).toBe(1)
+    rejectDiscardUnchanged(session, () => session.commitSelectionChoice(0, { resourceCounts: { wood: 2 } }))
+    const discarded = session.commitSelectionChoice(0, { resourceCounts: { wood: 1 } })
+    expect(discarded.ok, discarded.error).toBe(true)
+    expect(discarded.state.players[0]!.resources).toMatchObject({ wood: 1, food: 4 })
   })
 
   it('offers discard before work when the only current Nightworker space is blocked', () => {

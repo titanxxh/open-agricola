@@ -41,6 +41,39 @@ const restore = (session: GameSession) => {
 }
 
 describe('winter plow payment explanation', () => {
+  it('protects a pending plow payment from supply discard', () => {
+    const session = winterSession(state => {
+      state.players[0]!.resources.wood = 1
+      state.players[0]!.activeModifiers = [{
+        type: 'trade', cardId: 'TEST_WoodForPlowFood', appliesTo: ['plow'],
+        from: { wood: 1 }, to: { food: 1 }, max: 1,
+      }]
+    })
+    expect(session.takeAction(0, 'farmland').ok).toBe(true)
+    const pending = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
+    expect(pending.ok, pending.error).toBe(true)
+    if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'choice') {
+      throw new Error('expected plow payment choices')
+    }
+    expect(pending.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(pending.interaction.anytimeActions.some(action => action.id === 'discard-goods')).toBe(false)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    }
+    const payment = pending.interaction.request.options.find(option => {
+      const resources = option.labelParams?.resourcesPaid
+      return resources && typeof resources === 'object' && 'food' in resources && resources.food === 1
+    })
+    if (!payment) throw new Error('expected the food payment')
+    const done = session.resolveChoice(0, payment.value)
+    expect(done.ok, done.error).toBe(true)
+    expect(done.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
+    expect(done.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
+    expect(done.state.events).toContainEqual(expect.objectContaining({ type: 'farm.fieldPlowed' }))
+    expect(done.state.log).toContainEqual(expect.objectContaining({ key: 'log.actionDetail' }))
+    expect(done.scores?.[0]?.total).toBe(pending.scores![0]!.total + 1)
+  })
+
   it.each(['A018_WheelPlow', 'B019_MoldboardPlow'])('completes a satisfied host after %s plows the final plot without another payment', card => {
     const session = winterSession(state => {
       const player = state.players[0]!

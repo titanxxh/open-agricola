@@ -1,3 +1,5 @@
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
@@ -19,8 +21,11 @@ describe('construct room payment session', () => {
       wood: 1,
       clay: 5,
       reed: 2,
+      grain: 1,
+      vegetable: 1,
     }
     player.houseType = 'clay'
+    player.improvements.push('Major_Fireplace1')
     player.occupationPlayed.push('A123_FrameBuilder')
     player.occupationPlayed.push('A110_Roughcaster')
     player.activeModifiers = [
@@ -50,6 +55,19 @@ describe('construct room payment session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
     expect(resp.interaction.request.options).toHaveLength(2)
+    expect(resp.interaction.anytimeActions.some(action => action.id === 'discard-goods')).toBe(false)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    }
+
+    const exchanged = session.takeAnytimeAction(0, 'exchange')
+    expect(exchanged.ok, exchanged.error).toBe(true)
+    expect(exchanged.interaction.anytimeActions.some(action => action.id === 'discard-goods')).toBe(false)
+    session.loadState(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+    assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    resp = session.resolveChoice(0, 'cancel')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
 
     const woodSwapOption = resp.interaction.request.options?.find(
       (option) =>

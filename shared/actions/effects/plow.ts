@@ -325,10 +325,9 @@ export const plowAction: ActionDefinition = {
         ctx.state,
       )
       if (payment.type === 'request') {
-        const options = payment.request.kind === 'choice' ? payment.request.options : []
         return {
           type: 'request',
-          request: { kind: 'choice', options },
+          request: payment.request,
           promptKey: payment.promptKey,
           extraData: {
             actionContextWrite: { farmPayload: { tile: selectedTile } },

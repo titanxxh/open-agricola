@@ -208,7 +208,7 @@ export const buildPaymentChoiceResult = (
   }))
   return {
     type: 'request',
-    request: { kind: 'choice', options },
+    request: { kind: 'choice', options, blockedAnytimeIds: ['discard-goods'] },
     promptKey: 'prompt.selectPayment',
   }
 }
