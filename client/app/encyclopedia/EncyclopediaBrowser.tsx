@@ -3,6 +3,7 @@ import { t, type Locale } from '../../../shared/i18n'
 import type { CardEncyclopedia } from '../../services/card-encyclopedia'
 import { EncyclopediaDetail } from './EncyclopediaDetail'
 import { EncyclopediaFace } from './EncyclopediaFace'
+import { EncyclopediaFieldValue } from './EncyclopediaFieldValue'
 import { EncyclopediaActiveFilters, EncyclopediaFilterEntry, EncyclopediaFilterPanel } from './EncyclopediaFilters'
 import { EncyclopediaSearch } from './EncyclopediaSearch'
 import { encyclopediaBrowseStore, useEncyclopediaBrowseState, type EncyclopediaBrowseStore } from './encyclopedia-browse-store'
@@ -108,7 +109,9 @@ export function EncyclopediaBrowser({ encyclopedia, navigation, locale, store = 
 
 function GalleryEntry({ item, locale, onOpen }: { item: EncyclopediaItem; locale: Locale; onOpen: (key: string) => void }) {
   const { entry } = item
-  const name = encyclopediaFieldText(item, 'name', locale)?.text || t(locale, 'ui.encyclopedia.fallback.missing')
+  const markId = useId()
+  const nameField = encyclopediaFieldText(item, 'name', locale)
+  const name = nameField?.text || t(locale, 'ui.encyclopedia.fallback.missing')
   const meta = [entry.displayNumber, encyclopediaTypeLabel(locale, entry.publicType)].filter(Boolean).join(' · ')
   return (
     <li className="encyclopedia-gallery__item">
@@ -120,9 +123,12 @@ function GalleryEntry({ item, locale, onOpen }: { item: EncyclopediaItem; locale
         className="encyclopedia-gallery__open"
         data-entry-key={entry.key}
         aria-label={t(locale, 'ui.encyclopedia.results.open', { name })}
+        aria-describedby={nameField?.status === 'fallback' ? markId : undefined}
         onClick={() => onOpen(entry.key)}
       >
-        <span className="encyclopedia-gallery__name">{name}</span>
+        <span className="encyclopedia-gallery__name">
+          {nameField ? <EncyclopediaFieldValue text={nameField} locale={locale} markId={markId}>{name}</EncyclopediaFieldValue> : name}
+        </span>
         <span className="encyclopedia-gallery__meta">{meta}</span>
       </button>
     </li>

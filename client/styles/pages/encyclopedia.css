@@ -469,6 +469,23 @@
   border-radius: var(--radius-sm);
 }
 
+.encyclopedia-fallback-mark {
+  display: inline-block;
+  margin-inline-end: 4px;
+  padding: 0 4px;
+  color: #7a5208;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: 0.1em;
+  background: var(--color-accent-bg);
+  border-radius: var(--radius-sm);
+}
+
+.encyclopedia-fallback-mark::before {
+  content: 'EN';
+}
+
 .encyclopedia-field-missing {
   margin: 0;
   color: var(--color-text-muted);
