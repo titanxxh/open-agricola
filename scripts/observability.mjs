@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { execFile, execFileSync } from 'node:child_process'
 import { createServer } from 'node:http'
 import { parseEnv, promisify } from 'node:util'
+import { randomBytes } from 'node:crypto'
 import { prometheusConfig } from '../operations/prometheus.mjs'
 const dependencies = parseEnv(readFileSync(resolve(process.env.SHARED_DATA_DIR ?? 'data', 'dependencies.local'), 'utf8'))
 const backendHost = process.env.BACKEND_HOST ?? '127.0.0.1'
@@ -26,9 +27,21 @@ async function hostNetworkingAvailable(env) {
   finally { await new Promise(resolve => probe.close(() => resolve())) }
 }
 if (!process.argv.includes('--prepare-only')) {
-  const env = { ...process.env, PUBLIC_API_BASE: publicApiBase, OBSERVABILITY_DATA_DIR: data, ACCOUNTS_DATABASE_URL: dependencies.DATABASE_URL, OBSERVABILITY_METRICS_TOKEN: dependencies.OBSERVABILITY_METRICS_TOKEN, OBSERVABILITY_UID: String(process.getuid()), OBSERVABILITY_GID: String(process.getgid()) }
+  const passwordFile = resolve(data, 'accounts-password')
+  try { writeFileSync(passwordFile, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' }) }
+  catch (error) { if (error.code !== 'EEXIST') throw error }
+  const password = readFileSync(passwordFile, 'utf8').trim()
+  const database = new URL(dependencies.DATABASE_URL)
+  database.username = 'agricola_operations_accounts'
+  database.password = password
+  const env = { ...process.env, PUBLIC_API_BASE: publicApiBase, OBSERVABILITY_DATA_DIR: data, ACCOUNTS_DATABASE_URL: database.toString(), OBSERVABILITY_METRICS_TOKEN: dependencies.OBSERVABILITY_METRICS_TOKEN, OBSERVABILITY_UID: String(process.getuid()), OBSERVABILITY_GID: String(process.getgid()) }
   if (await hostNetworkingAvailable(env)) {
-    execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--build', '--force-recreate'], { stdio: 'inherit', env })
+    const compose = (args, options = {}) => execFileSync('docker', ['compose', '-f', 'operations/compose.local.yml', ...args], { stdio: 'inherit', env, ...options })
+    compose(['build', 'accounts-exporter'])
+    compose(['run', '--rm', '--no-deps', '-T', 'accounts-exporter', 'node', 'provision.ts'], {
+      input: JSON.stringify({ databaseUrl: dependencies.DATABASE_URL, password }), stdio: ['pipe', 'inherit', 'inherit'],
+    })
+    compose(['up', '-d', '--no-build', '--force-recreate'])
   } else {
     console.warn('Local monitoring skipped: Docker could not complete the host-network loopback probe. On Docker Desktop, enable host networking (4.34+); retry once images are available. The application will still start.')
   }

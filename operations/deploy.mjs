@@ -66,11 +66,15 @@ try {
   writeFileSync(marker, buildId + '\n', { mode: 0o600 })
   console.log(JSON.stringify({ operationsBuildId: buildId, gameContainersUnchanged: true }))
 } catch (error) {
-  console.error('Operations deployment failed; restoring the previous monitoring services')
-  if (previous && previous !== buildId) compose(join(root, 'releases', previous), ['up', '-d', '--remove-orphans', '--no-build', '--wait', '--wait-timeout', '120'])
-  else if (!previous) {
-    compose(release, ['down'])
-    if (legacy.length) docker(['start', ...legacy], { stdio: 'inherit' })
+  console.error('Operations deployment failed; restoring monitoring containers while retaining aggregate-only database access')
+  try {
+    if (previous && previous !== buildId) compose(join(root, 'releases', previous), ['up', '-d', '--remove-orphans', '--no-build', '--wait', '--wait-timeout', '120'])
+    else if (!previous) {
+      compose(release, ['down'])
+      if (legacy.length) docker(['start', ...legacy], { stdio: 'inherit' })
+    }
+  } catch {
+    console.error('Monitoring recovery failed; deploy an operations release that supports the aggregate database functions')
   }
   throw error
 }

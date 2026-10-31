@@ -5,9 +5,10 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { createAccountsHandler, createAccountsPool } from '../operations/accounts-exporter'
+import { createAccountsHandler } from '../operations/accounts-exporter'
 import { createOperationsHandler } from '../server/observability/http'
-import { createTestDatabase, getTestDatabaseUrl } from '../server/__tests__/_helpers/postgres'
+import { createTestDatabase } from '../server/__tests__/_helpers/postgres'
+import { createOperationsTestReader } from '../server/__tests__/_helpers/operations-reader'
 import { allocateTestPort } from '../scripts/test-ports'
 import { BACKEND_URL } from './fixtures'
 
@@ -18,8 +19,12 @@ test('independent dashboards render registration, rooms and durable player openi
   const directory = mkdtempSync(join(tmpdir(), 'oa-ops-browser-'))
   chmodSync(directory, 0o755)
   const db = await createTestDatabase()
-  const schema = (await db.query<{ schema: string }>('SELECT current_schema() AS schema')).rows[0]!.schema
-  const pool = createAccountsPool(getTestDatabaseUrl(), schema)
+  const reader = await createOperationsTestReader(db).catch(async (error: unknown) => {
+    await db.close()
+    rmSync(directory, { recursive: true, force: true })
+    throw error
+  })
+  const pool = reader.pool
   const names: string[] = []
   const servers: Server[] = []
   const panelQueries: Array<{ status: number; expressions: string[]; executedExpressions: string[]; request: unknown; response: unknown }> = []
@@ -366,7 +371,7 @@ test('independent dashboards render registration, rooms and durable player openi
       try { docker(['rm', '-f', name]) } catch { /* Already stopped. */ }
     }
     await Promise.all(servers.map(server => new Promise<void>(done => server.close(() => done()))))
-    await pool.end()
+    await reader.close()
     await db.close()
     rmSync(directory, { recursive: true, force: true })
     for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value }

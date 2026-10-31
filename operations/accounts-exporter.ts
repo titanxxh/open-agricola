@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import pg, { type Pool } from 'pg'
+import { accountsFunction } from './database-access.ts'
 import { collectOpeningMetrics, openingMetricLines, type OpeningSample } from './opening-metrics.ts'
 
 type Accounts = { total: number; today: number; last_24h: number; last_7d: number }
@@ -26,12 +27,7 @@ export function createAccountsHandler({ pool, token, now = Date.now, buildId = '
     if (inflight) return inflight
     if (now() - attemptedAt < 60_000) return Promise.resolve()
     attemptedAt = now()
-    const accountCollection = pool.query<Accounts>(`SELECT count(*)::integer AS total,
-      count(*) FILTER (WHERE created_at >= extract(epoch FROM
-        (date_trunc('day', to_timestamp($1 / 1000.0) AT TIME ZONE 'Asia/Singapore') AT TIME ZONE 'Asia/Singapore'))*1000)::integer AS today,
-      count(*) FILTER (WHERE created_at >= $1-86400000)::integer AS last_24h,
-      count(*) FILTER (WHERE created_at >= $1-604800000)::integer AS last_7d
-      FROM users`, [attemptedAt]).then(result => {
+    const accountCollection = pool.query<Accounts>(`SELECT * FROM ${accountsFunction}($1::bigint)`, [attemptedAt]).then(result => {
       accounts = result.rows[0]
       collectedAt = now() / 1000
     }).catch(() => { accounts = undefined })
