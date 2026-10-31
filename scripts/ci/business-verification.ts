@@ -1,4 +1,6 @@
 import type { PlannedCheck, TestInventory, VerificationScope } from './verification-plan'
+import type { TestConsumerIndex } from './test-consumers'
+import { assertConsumerCoverage } from './support-verification'
 
 type BrowserCheck = Extract<PlannedCheck, { kind: 'browser' }>
 type BusinessGroup = {
@@ -29,11 +31,66 @@ const ruleBrowsers = browser([
 ]).files
 const completeBrowsers: PlannedCheck[] = ['chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']
   .map(taskId => ({ kind: 'catalog', taskId }))
+type Mapping = { checks: PlannedCheck[]; expansionReasons: string[]; wideningReasons: string[] }
+const operationsTests: TestInventory['vitest'] = [
+  { project: 'fast-server', file: 'server/__tests__/operations-accounts.test.ts' },
+  { project: 'fast-server', file: 'server/__tests__/operations-openings.test.ts' },
+  { project: 'fast-server', file: 'server/game/persistence/__tests__/opening-facts.test.ts' },
+  { project: 'fast-server', file: 'server/__tests__/observability-http.test.ts' },
+  { project: 'fast-scripts', file: 'scripts/__tests__/operations-deployment.test.ts' },
+  { project: 'fast-scripts', file: 'scripts/__tests__/local-services.test.ts' },
+  { project: 'fast-scripts', file: 'scripts/__tests__/wechat-community.test.ts' },
+]
+const operationsBrowsers = browser(['operations-dashboard', 'wechat-community']).files
+const operationsEntry = /^operations\/(?:accounts-exporter\.ts|database-access\.ts|opening-metrics\.ts|provision\.ts|prometheus\.mjs|deploy\.mjs|Dockerfile|compose\.(?:local|prod)\.yml|grafana\/.+\.(?:json|ini|ya?ml))$/
+const operationsBridge = /(?:^|\/)(?:deploy-operations\.sh|scripts\/(?:observability|local-services)\.mjs|server\/__tests__\/_helpers\/operations-reader\.ts)$/
+const operationsPath = (file: string) => file.startsWith('operations/') || operationsBridge.test(file)
+const operationsLiteral = (literal: string) => /^(?:\.\.?\/)*operations(?:\/|$)/.test(literal)
+  || operationsBridge.test(literal) || /^(?:observability|local-services)\.mjs$/.test(literal)
+
+function operationsVerification(paths: string[], inventory: TestInventory, consumers?: TestConsumerIndex): Mapping {
+  const unknown = paths.find(path => !operationsEntry.test(path))
+  if (unknown) return { checks: [], wideningReasons: [], expansionReasons: [
+    `Operations entry ownership is unknown for ${unknown}; full verification is required.`,
+  ] }
+  const missing = [...operationsTests.filter(required => !inventory.vitest.some(test =>
+    test.file === required.file && test.project === required.project)).map(test => test.file),
+  ...operationsBrowsers.filter(file => !inventory.browser.includes(file))]
+  if (missing.length) throw new Error(`Required operations consumers are missing: ${missing.join(', ')}`)
+  const selected = new Set(operationsTests.map(test => test.file))
+  operationsBrowsers.forEach(file => selected.add(file))
+  const wideningReasons: string[] = []
+  if (!consumers) {
+    inventory.vitest.forEach(test => selected.add(test.file))
+    wideningReasons.push('Operations consumer evidence is missing; verification retains the complete discovered unit inventory and complete browser lanes.')
+  } else {
+    assertConsumerCoverage(inventory, consumers)
+    for (const test of consumers.tests) {
+      const associated = /(?:^|\/)(?:operations|ops)(?:[-/])/.test(test.file)
+        || test.dependencies.some(operationsPath) || test.literals.some(operationsLiteral)
+      const unknownLoader = test.uncertaintyReasons.some(reason =>
+        /^(?:Computed module|Unresolved module|Unknown module loader|Indirect module)/.test(reason))
+      if (associated || unknownLoader) selected.add(test.file)
+      if (unknownLoader) wideningReasons.push(`Operations retains the complete uncertain module consumer ${test.file} alongside its declared behavior safety group.`)
+    }
+  }
+  const checks: PlannedCheck[] = [...new Set(inventory.vitest.filter(test => selected.has(test.file)).map(test => test.project))]
+    .map(project => ({ kind: 'vitest', project, files: inventory.vitest
+      .filter(test => test.project === project && selected.has(test.file)).map(test => test.file).sort() }))
+  if (!consumers) checks.push(...completeBrowsers)
+  else {
+    const files = inventory.browser.filter(file => selected.has(file)).sort()
+    checks.push({ kind: 'browser', browser: 'chromium', files, grep: null })
+    const webkit = files.filter(file => consumers.tests.find(test => test.file === file)?.literals.some(literal => /@webkit\b/.test(literal)))
+    if (webkit.length) checks.push({ kind: 'browser', browser: 'webkit', files: webkit, grep: '@webkit' })
+  }
+  return { checks, expansionReasons: [], wideningReasons }
+}
 
 const groups: BusinessGroup[] = [{
   name: 'operations metrics and dashboards',
   scope: 'operations',
-  owns: /^(?:operations\/|server\/(?:operations-(?:accounts|openings)|database\/031-game-opening-facts))/,
+  owns: /^(?:operations\/|server\/(?:operations-(?:accounts|openings)\.[cm]?[jt]sx?$|database\/031-game-opening-facts\.sql$))/,
   projects: ['fast-server'],
   requiredTests: [
     { project: 'fast-server', file: 'server/__tests__/operations-accounts.test.ts' },
@@ -148,14 +205,19 @@ export function businessScopeFor(path: string): BusinessGroup['scope'] | null {
   return groupFor(path)?.scope ?? null
 }
 
-export function businessVerification(paths: string[], inventory: TestInventory): { checks: PlannedCheck[]; expansionReasons: string[] } {
+export function businessVerification(paths: string[], inventory: TestInventory, consumers?: TestConsumerIndex): Mapping {
   const selected = new Set<BusinessGroup>()
   for (const path of paths) {
+    if (path.startsWith('operations/')) continue
     const group = groupFor(path)
-    if (!group) return { checks: [], expansionReasons: [`Business module ownership is unknown for ${path}; full verification is required.`] }
+    if (!group) return { checks: [], wideningReasons: [], expansionReasons: [`Business module ownership is unknown for ${path}; full verification is required.`] }
     selected.add(group)
   }
-  const checks: PlannedCheck[] = []
+  const operations = paths.filter(path => path.startsWith('operations/'))
+  const mapping = operations.length ? operationsVerification(operations, inventory, consumers)
+    : { checks: [], expansionReasons: [], wideningReasons: [] }
+  if (mapping.expansionReasons.length) return mapping
+  const checks: PlannedCheck[] = [...mapping.checks]
   for (const group of selected) {
     const missingTests = [...group.requiredTests, ...group.files]
       .filter(required => !inventory.vitest.some(test => test.file === required.file && test.project === required.project))
@@ -180,5 +242,6 @@ export function businessVerification(paths: string[], inventory: TestInventory):
       ...checks.filter(check => check.kind !== 'vitest'),
     ],
     expansionReasons: [],
+    wideningReasons: mapping.wideningReasons,
   }
 }

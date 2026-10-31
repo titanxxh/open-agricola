@@ -108,6 +108,32 @@ describe('test consumer evidence', () => {
     expect(index.tests[0]?.uncertaintyReasons).toEqual(['Non-source fixture consumer in server/__tests__/payment.test.ts: server/__tests__/fixtures/cards.json'])
   })
 
+  it('does not treat browser or page context calls as module loaders', () => {
+    const { cwd, inventory } = fixture()
+    const file = 'e2e-tests/browser-context.spec.ts'
+    inventory.vitest = []
+    inventory.browser = [file]
+    write(cwd, file, 'const browserContext = browser.context()\nconst pageContext = page.context()\n')
+
+    const index = readTestConsumerIndex(cwd, inventory)
+
+    expect(index.expansionReasons).toEqual([])
+    expect(index.tests[0]?.uncertaintyReasons).toEqual([])
+  })
+
+  it('keeps require.context explicitly uncertain as a module loader', () => {
+    const { cwd, file, inventory } = fixture()
+    write(cwd, file, "const modules = require.context('./fixtures', true, /\\.ts$/)\n")
+
+    const index = readTestConsumerIndex(cwd, inventory)
+
+    expect(index.expansionReasons).toEqual([])
+    expect(index.tests[0]?.uncertaintyReasons).toEqual([
+      `Computed module or fixture consumer: ${file}`,
+      `Indirect module consumer: ${file}`,
+    ])
+  })
+
   it('keeps aliased filesystem reads and unknown module loaders explicitly uncertain', () => {
     const { cwd, file, inventory } = fixture()
     write(cwd, file, "import { readFileSync as read } from 'node:fs'\nimport { createRequire } from 'node:module'\nimport 'unresolved-package-alias'\nconst load = require\nconst customLoad = createRequire(import.meta.url)\nread(inputPath)\nload(inputPath)\ncustomLoad(inputPath)\n")

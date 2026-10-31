@@ -7,6 +7,7 @@ export type RoutinePartitionId = typeof ROUTINE_PARTITION_IDS[number]
 type BrowserCheck = Extract<PlannedCheck, { kind: 'browser' }>
 type UnitCheck = Extract<PlannedCheck, { kind: 'vitest' }>
 type BrowserTuple = Pick<BrowserCheck, 'browser' | 'grep'> & { file: string }
+type BrowserSlot = { id: typeof BROWSER_PARTITION_IDS[number]; groups: Map<string, BrowserCheck> }
 export type RoutinePartition =
   | { id: 'units'; digest: string; checks: UnitCheck[] }
   | { id: typeof BROWSER_PARTITION_IDS[number]; digest: string; checks: BrowserCheck[] }
@@ -19,14 +20,9 @@ const tuples = (checks: BrowserCheck[]): BrowserTuple[] => checks.flatMap(check 
   check.files.map(file => ({ browser: check.browser, grep: check.grep, file })))
 const digest = (id: RoutinePartitionId, checks: UnitCheck[] | BrowserCheck[]) =>
   createHash('sha256').update(JSON.stringify({ id, checks })).digest('hex')
+const browserSlots = (): BrowserSlot[] => BROWSER_PARTITION_IDS.map(id => ({ id, groups: new Map() }))
 
-export function routinePartitions(plan: VerificationPlan): RoutinePartition[] {
-  const result: RoutinePartition[] = []
-  const units = plan.checks.filter(check => check.kind === 'vitest')
-  if (units.length) result.push({ id: 'units', checks: units, digest: digest('units', units) })
-  const selected = tuples(plan.checks.filter(check => check.kind === 'browser')).sort((left, right) => compare(key(left), key(right)))
-  if (new Set(selected.map(key)).size !== selected.length) throw new Error('Duplicate scoped browser selection')
-  const slots = BROWSER_PARTITION_IDS.map(id => ({ id, groups: new Map<string, BrowserCheck>() }))
+function distribute(selected: BrowserTuple[], slots: BrowserSlot[]) {
   selected.forEach((tuple, index) => {
     const slot = slots[index % slots.length]
     const group = JSON.stringify([tuple.browser, tuple.grep])
@@ -34,6 +30,49 @@ export function routinePartitions(plan: VerificationPlan): RoutinePartition[] {
     check.files.push(tuple.file)
     slot.groups.set(group, check)
   })
+}
+
+function selectorSlots(selected: BrowserTuple[]): BrowserSlot[] | undefined {
+  const grouped = new Map<string, BrowserTuple[]>()
+  for (const tuple of selected) {
+    const group = JSON.stringify([tuple.browser, tuple.grep])
+    const members = grouped.get(group) ?? []
+    members.push(tuple)
+    grouped.set(group, members)
+  }
+  if (!grouped.size || grouped.size > BROWSER_PARTITION_IDS.length) return undefined
+  const groups = [...grouped].map(([key, tuples]) => ({ key, tuples, slots: 1 }))
+  for (let allocated = groups.length; allocated < BROWSER_PARTITION_IDS.length; allocated++) {
+    const next = [...groups].sort((left, right) =>
+      right.tuples.length / right.slots - left.tuples.length / left.slots || compare(left.key, right.key))
+      .find(group => group.slots < group.tuples.length)
+    if (!next) break
+    next.slots++
+  }
+  groups.sort((left, right) => right.tuples.length - left.tuples.length || compare(left.key, right.key))
+  const slots = browserSlots()
+  let offset = 0
+  for (const group of groups) {
+    distribute(group.tuples, slots.slice(offset, offset + group.slots))
+    offset += group.slots
+  }
+  return slots
+}
+
+export function routinePartitions(plan: VerificationPlan): RoutinePartition[] {
+  const result: RoutinePartition[] = []
+  const units = plan.checks.filter(check => check.kind === 'vitest')
+  if (units.length) result.push({ id: 'units', checks: units, digest: digest('units', units) })
+  const selected = tuples(plan.checks.filter(check => check.kind === 'browser')).sort((left, right) => compare(key(left), key(right)))
+  if (new Set(selected.map(key)).size !== selected.length) throw new Error('Duplicate scoped browser selection')
+  const roundRobin = browserSlots()
+  distribute(selected, roundRobin)
+  const grouped = selectorSlots(selected)
+  const commands = (slots: BrowserSlot[]) => slots.reduce((count, slot) => count + slot.groups.size, 0)
+  const fileLimit = Math.ceil(selected.length / BROWSER_PARTITION_IDS.length) + 1
+  const slots = grouped && commands(grouped) < commands(roundRobin)
+    && grouped.every(slot => [...slot.groups.values()].reduce((count, check) => count + check.files.length, 0) <= fileLimit)
+    ? grouped : roundRobin
   for (const slot of slots) {
     const checks = [...slot.groups.values()]
     if (checks.length) result.push({ id: slot.id, checks, digest: digest(slot.id, checks) })

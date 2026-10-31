@@ -46,17 +46,21 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览�
 
 `scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。工坊保留行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。业务组归属未知时扩大到全量；声明的测试、浏览器消费者或 project 缺失时规划失败。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
 
+已知 operations 采集器、数据库访问授权、部署、Compose 与 Grafana 配置选择完整消费者文件，不再选择完整 server project。必需安全消费者为 `operations-accounts.test.ts`、`operations-openings.test.ts`、`opening-facts.test.ts`、`observability-http.test.ts`、`operations-deployment.test.ts`、`local-services.test.ts` 和 `wechat-community.test.ts`，并保留完整的 `operations-dashboard.spec.ts` 与 `wechat-community.spec.ts` 浏览器文件。独立测试索引沿测试本地依赖、operations 测试前缀，以及声明的子进程或路径字面量关联补入消费者。不确定的模块加载器保留其完整测试文件与 operations 安全组，并记录有界扩边；读取或解析失败会使规划失败。直接调用规划器而未提供索引时，保留完整发现的 unit 清单与完整浏览器分道。
+
+operations 边界不缩小数据库生产写入的验证范围。开局事实迁移与服务端 operations 改动保留完整 server project；持久化、所有权、其他数据库与恢复改动保留原有更广业务组。社区二维码更新、dashboard 生成器和未知 operations 入口要求全量验证。dashboard 浏览器夹具自行提供 Prometheus 抓取配置，通过该测试不能证明生产抓取配置正确；完整 server 测试也不能补齐这项证据。
+
 `scripts/ci/rule-verification.ts` 声明支付、动物、计分、农场/作物、轮次/变体与共享核心的归属。规则路径、Card Source 机制与测试关联选择完整受影响文件、跨卡和 slow Session 消费者，以及保守的共享安全消费者。较小的规则组保留声明的浏览器文件和 WebKit 覆盖；共享核心改动保留完整规则 project 与浏览器分道。关联证据缺失或过期时扩大到完整清单；声明的消费者缺失时规划失败。关联索引记录声明式证据，不证明语义独立。公开边界见 `rule-verification.test.ts` 和 `scoped-verification-business-cli.test.ts`。
 
 `scripts/ci/card-verification.ts` 将权威 Card Source 身份与独立发现的 Vitest、浏览器测试中的字面量、import 和本地测试 helper 关联。索引统一卡号前导零，选择完整文件，包括跨卡和 slow Session 消费者。生产 import 与注册 bootstrap 是归属遍历的终点。通用注册表、文件读取、动态来源、手牌与开局消费者始终保留在保守安全组中，即使同一文件还列有卡牌。有限的卡牌 UI 组、浏览器沙盒、WebKit、质量和构建也保留。已有卡牌新增关联回归测试仍保留在该范围内。生产 Card Source 的新增、删除或 rename、缺少行为关联、身份歧义、helper 证据失效，以及手牌或全局可用卡牌都会扩大到全量。声明的卡牌 UI 消费者缺失时规划失败。公共机制沿用更广的验证范围。索引属于声明式关联契约，不推断语义依赖。公共边界测试位于 `scripts/__tests__/card-verification.test.ts` 和 `scoped-verification-cli.test.ts`。
 
-`scripts/ci/scoped-verification.ts` 在执行前重新计算 canonical plan，核对 digest 与源码身份。`routine-partitions.ts` 将完整 Vitest 检查保留在 `units`，将浏览器 `(engine, grep, file)` 元组排序后轮流分配到四个分区，再按原引擎和 selector 归组，并断言恰好覆盖一次。worker 保留 `pnpm verify`、隔离依赖、`restart-local.sh` 和结构化 case 结果。本机 `all` 模式仍执行完整计划。日常结果不能充当完整发布回执。
+`scripts/ci/scoped-verification.ts` 在执行前重新计算 canonical plan，核对 digest 与源码身份。`routine-partitions.ts` 将完整 Vitest 检查保留在 `units`，将浏览器 `(engine, grep, file)` 元组排序后轮流分配到四个分区。引擎与 selector 组不超过四组时，也尝试为各组分配独立槽位，把剩余槽位分给每槽文件数最多的组。仅当该方案减少 `pnpm verify` 调用，且每槽不超过 `ceil(tupleCount / 4) + 1` 个文件时采用，否则保留轮流分配。两种方案均保留原 selector，并断言恰好覆盖一次。worker 保留 `pnpm verify`、隔离依赖、`restart-local.sh` 和结构化 case 结果。本机 `all` 模式仍执行完整计划。日常结果不能充当完整发布回执。
 
 units 先准备一次所需测试服务，并构建一次卡牌 manifest，再逐 project 串行执行。每次单 project 的 Vitest 命令执行完整文件，保留默认 reporter，并写入独立 JSON 报告。退出成功与源码身份不变仍是必要条件。实际报告必须包含模块，模块名与所选文件恰好对应一次；缺失、额外、重复、失败或未完成的结果都会阻断完成。`vitest-results.ts` 持有该边界，测试见 `vitest-results.test.ts` 与范围执行测试。
 
 执行结果为每条实际命令记录 `startedAt`、`completedAt` 和单调时钟 `durationMs`，包含准备步骤与失败命令。Vitest 原始报告在 `output/verification/vitest-results/` 保留模块与用例耗时；分区 artifact 同时保留两类证据。测量数据与报告路径不进入 canonical plan 或其 digest，也不能替代执行门禁。
 
-`ci.yml` 在规划后独立调度 units、四个明确的浏览器 caller 和 catalog 任务。范围 caller 共用 `scoped-verification.yml`；空分区以 null descriptor 明示并跳过。始终执行的 `verify` 分别核对每个选中 caller 的状态、分区 ID 与 digest、完整计划 digest、SHA 和完成数。其他成功不能补齐失败或缺失的 caller。仅含 units 的计划保留 `catalog_tasks=none`；浏览器 worker 安装两种引擎以支持嵌入式启动。公开测试位于 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
+`ci.yml` 在规划后独立调度 units、四个明确的浏览器 caller 和 catalog 任务。范围 caller 共用 `scoped-verification.yml`；空分区以 null descriptor 明示并跳过。始终执行的 `verify` 分别核对每个选中 caller 的状态、分区 ID 与 digest、完整计划 digest、SHA 和完成数。其他成功不能补齐失败或缺失的 caller。仅含 units 的计划保留 `catalog_tasks=none`；浏览器 worker 安装两种引擎以支持嵌入式启动。浏览器检查失败时，在现有验证产物中保留 Playwright 错误上下文和失败截图。公开测试位于 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
 
 ## 架构门禁
 

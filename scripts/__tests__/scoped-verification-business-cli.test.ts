@@ -29,7 +29,7 @@ const browserFiles = [
   'rule-derived-action-preview', 'seasonal-fence-log', 'heating-exchange',
 ]
 
-function fixture(path: string) {
+function fixture(path: string, additional: Record<string, string> = {}) {
   const cwd = mkdtempSync(join(tmpdir(), 'business-verification-cli-'))
   temporary.push(cwd)
   const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
@@ -41,6 +41,15 @@ function fixture(path: string) {
   for (const directory of ['shared', 'server', 'client', 'scripts', 'tests', 'e2e-tests', 'replay-viewer']) write(cwd, `${directory}/.keep`, '')
   for (const file of files) write(cwd, file, '// behavior consumer\n')
   for (const name of browserFiles) write(cwd, `e2e-tests/${name}.spec.ts`, '// browser consumer\n')
+  if (path.startsWith('operations/')) {
+    for (const file of [
+      'server/__tests__/operations-accounts.test.ts', 'server/__tests__/operations-openings.test.ts',
+      'server/game/persistence/__tests__/opening-facts.test.ts', 'server/__tests__/observability-http.test.ts',
+      'scripts/__tests__/operations-deployment.test.ts', 'scripts/__tests__/local-services.test.ts',
+      'scripts/__tests__/wechat-community.test.ts',
+      'e2e-tests/operations-dashboard.spec.ts', 'e2e-tests/wechat-community.spec.ts',
+    ]) write(cwd, file, '// operations consumer\n')
+  }
   write(cwd, 'shared/cards/A/A029_AleBenches.ts', "export const A029_AleBenches = defineMinorCard({ meta: { id: 'A029_AleBenches', cost: { wood: 1 } }, modifiers: { computeCosts: () => [] } })\n")
   write(cwd, 'shared/cards/__tests__/A29_AleBenches.test.ts', "import '../A/A029_AleBenches'\n")
   write(cwd, 'server/__tests__/A029_AleBenches-session.test.ts', "const card = 'A029_AleBenches'\n")
@@ -48,6 +57,7 @@ function fixture(path: string) {
   write(cwd, 'scripts/local-services.mjs', `import { appendFileSync } from 'node:fs'
 appendFileSync(process.env.COMMAND_LOG, JSON.stringify(['local-services', ...process.argv.slice(2)]) + '\\n')
 `)
+  for (const [file, source] of Object.entries(additional)) write(cwd, file, source)
   write(cwd, 'package.json', JSON.stringify({ scripts: { 'check:architecture': 'pnpm run lint && pnpm run check:dependencies' } }))
   write(cwd, '.gitignore', 'output/\nbin/\ncommands.jsonl\n')
   git('init', '-q', '--template=', '-b', 'main')
@@ -85,6 +95,61 @@ if (args.includes('vitest')) {
 }
 
 describe('business verification public CLI', () => {
+  it('discovers complete operations consumers through direct imports, two helper levels, prefixes and script paths', () => {
+    const value = fixture('operations/opening-metrics.ts', {
+      'client/__tests__/metrics-consumer.test.ts': "import '../../operations/opening-metrics'\n",
+      'server/__tests__/helper-consumer.test.ts': "import './_helpers/first'\n",
+      'server/__tests__/_helpers/first.ts': "export * from './second'\n",
+      'server/__tests__/_helpers/second.ts': "import '../../../operations/opening-metrics'\n",
+      'server/__tests__/operations-new.test.ts': 'export const newBehavior = true\n',
+      'scripts/__tests__/monitoring-command.test.ts': "const command = 'scripts/observability.mjs'\n",
+      'server/__tests__/unknown-loader.test.ts': "const source = './unresolved-at-plan-time'; await import(source)\n",
+      'server/__tests__/_helpers/generic-database.ts': "import { readFileSync } from 'node:fs'; export const read = () => readFileSync('database-fixture')\n",
+      'server/__tests__/unrelated-db.test.ts': "import './_helpers/generic-database'\n",
+    })
+    const planned = value.run('plan', '--base', 'main')
+    expect(planned.status, planned.stderr).toBe(0)
+    expect(JSON.parse(planned.stdout)).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build' })
+    const result = value.run('run', '--base', 'main', '--plan', 'output/verification/scoped-plan.json', '--partition', 'all')
+    expect(result.status, result.stderr).toBe(0)
+    const tests = value.commands().flatMap(command => Array.isArray(command) && command.includes('vitest')
+      ? command.filter((arg: unknown) => typeof arg === 'string' && arg.endsWith('.test.ts')) : [])
+    expect(tests.sort()).toEqual([
+      'client/__tests__/metrics-consumer.test.ts',
+      'scripts/__tests__/local-services.test.ts', 'scripts/__tests__/monitoring-command.test.ts',
+      'scripts/__tests__/operations-deployment.test.ts', 'scripts/__tests__/wechat-community.test.ts',
+      'server/__tests__/helper-consumer.test.ts', 'server/__tests__/observability-http.test.ts',
+      'server/__tests__/operations-accounts.test.ts', 'server/__tests__/operations-new.test.ts',
+      'server/__tests__/operations-openings.test.ts', 'server/__tests__/unknown-loader.test.ts',
+      'server/game/persistence/__tests__/opening-facts.test.ts',
+    ].sort())
+    expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'verify')).toEqual([
+      ['verify', 'e2e-tests/operations-dashboard.spec.ts', 'e2e-tests/wechat-community.spec.ts', '--browser=chromium'],
+    ])
+    expect(readFileSync(join(value.cwd, 'output/verification/scoped-plan.json'), 'utf8')).toContain('complete uncertain module consumer server/__tests__/unknown-loader.test.ts')
+  }, 30_000)
+
+  it('fails malformed operation consumer helpers instead of hiding them behind a full plan', () => {
+    const value = fixture('operations/opening-metrics.ts', {
+      'server/__tests__/helper-consumer.test.ts': "import './_helpers/broken'\n",
+      'server/__tests__/_helpers/broken.ts': 'export const malformed = {\n',
+    })
+    const planned = value.run('plan', '--base', 'main')
+    expect(planned.status).toBe(1)
+    expect(planned.stderr).toContain('Cannot establish test consumer evidence')
+    expect(planned.stderr).toContain('_helpers/broken.ts')
+    expect(JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-plan.json'), 'utf8'))).toMatchObject({ status: 'failed' })
+  })
+
+  it.each(['operations/update-community-qr.mjs', 'operations/unknown-entry.ts'])(
+    'keeps the public repository plan full for %s', path => {
+      const value = fixture(path)
+      const planned = value.run('plan', '--base', 'main')
+      expect(planned.status, planned.stderr).toBe(0)
+      expect(JSON.parse(planned.stdout)).toMatchObject({ mode: 'full' })
+    },
+  )
+
   it('plans and executes complete room groups and declared WebSocket browsers', () => {
     const value = fixture('server/game/room.ts')
     const planned = value.run('plan', '--base', 'main')
