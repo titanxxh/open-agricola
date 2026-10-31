@@ -28,6 +28,7 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 - 真实 Moor 特殊行动共用 `shared/moor/special-action-flow.ts` 的 `buildMoorSpecialActionFlow`：正常与借用取牌行动、卡牌赠送和定时 offer 均先校验选定行动与目标，再进入 before。before 来源按 owner 分组，使用原生 activation 与 trigger-select；主体提交前重新校验。基础提交后，原生完成帧在必须后续开始前冻结 after 来源与原始收据。共享引擎完成边界等待支付、onBuy 与动物整理，再按 owner 合入终点规则反应。仅取牌不进入该生命周期，也不产生放工或行动格使用。见 [ADR 0032](../adr/0032-unified-moor-special-action-lifecycle.md) 与 `server/__tests__/{moor-granted-lifecycle,moor-completion-window}-session.test.ts`。
 - **Snake Opening** 只反转第 1 轮的工作轮转（[轮转、额外回合与供应人物](session_zh.md#轮转额外回合与供应人物)）。
 - 实际参与者为一人时，`shared/moor/solo-supply.ts` 把十张牌保存在一份有序供给中，位置为暗堆、当前牌或已知弃牌。准备阶段翻牌或提供一次保留／替换；耗尽后只在准备阶段取回最后弃牌。真实用牌在必须后续期间锁定当前牌，随后结算弃牌或当轮一次的两食物留牌，再进入共享 after 窗口。留牌记录在全部回合结束效果之后清理。视角投影仅公开当前牌、弃牌与堆顶牌背行动图标，不公开暗牌身份或顺序；新牌面披露同时设置受保护观察与撤销边界。所有 Moor 对局固定首轮大改良，单人包含 Infirmary。测试：`server/__tests__/standard-solo-moor-session.test.ts`。
+- 版图与卡牌百科共用的变体展示文案在 `shared/projections/`：`season-display.ts` 保存季节名称、季节行动文案和版图调整图标；`moor-special-actions.ts` 依据 `domain/moor-special-action-values.ts` 的基础数值，把印有相同效果的人数归为一组。这些投影不做规则裁定。
 
 - 牌面行动候选以权威牌资格和具体行动、目标校验为准。展示区分单人当前牌、市场牌和借用的正面牌，不改变归属。受信任的卡牌后续保留自身时机及人员条件，普通公开特殊行动入口仍检查工作阶段及健康人员。
 
