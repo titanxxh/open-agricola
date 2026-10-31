@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useId, useState, type ReactNode } from 'react'
 import type { EncyclopediaCost, EncyclopediaCostPath, EncyclopediaEntry, EncyclopediaTextField, EncyclopediaTextStatus } from '../../../shared/contract/card-encyclopedia'
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { t, type Locale } from '../../../shared/i18n'
@@ -10,6 +10,7 @@ import type { EncyclopediaItem } from './encyclopedia-item'
 import { encyclopediaGroupLabel, encyclopediaPointsApply, encyclopediaTypeLabel } from './encyclopedia-labels'
 import { encyclopediaFieldText } from './encyclopedia-text'
 import { encyclopediaShareUrl } from './encyclopedia-url'
+import { useModalDialog } from './useModalDialog'
 
 type DetailProps = {
   entryKey: string
@@ -20,14 +21,8 @@ type DetailProps = {
 }
 
 export function EncyclopediaDetail({ entryKey, item, locale, onClose }: DetailProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const dialogRef = useModalDialog()
   const titleId = useId()
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (dialog && !dialog.open) dialog.showModal()
-    return () => { if (dialog?.open) dialog.close() }
-  }, [])
 
   return (
     <dialog

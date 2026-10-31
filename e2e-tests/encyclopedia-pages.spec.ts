@@ -21,7 +21,7 @@ test.beforeAll(async () => {
   const { directory } = buildPagesFrontend()
   const assets = join(directory, 'assets')
   encyclopediaChunks = readdirSync(assets).filter(file => file.endsWith('.js')
-    && (/encyclopedia/i.test(file) || /encyclopedia-gallery|card-encyclopedia\//.test(readFileSync(join(assets, file), 'utf8'))))
+    && (/encyclopedia/i.test(file) || /encyclopedia-gallery|encyclopedia-load-error|card-encyclopedia\//.test(readFileSync(join(assets, file), 'utf8'))))
   expect(encyclopediaChunks.length).toBeGreaterThan(0)
   site = await servePagesFrontend(directory)
 })
