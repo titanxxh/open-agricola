@@ -57,7 +57,7 @@ export const WINTER = keyed({
   publicType: 'season',
   displayNumber: null,
   players: null,
-  face: { kind: 'season', season: 'winter', actionId: 'season-winter-romantic-evening' },
+  face: { kind: 'season', season: 'winter' },
   text: {
     name: [{ key: 'ui.seasons.winter' }],
     body: [
@@ -106,9 +106,6 @@ export const documentFor = (entry: EncyclopediaEntry, zh: FieldStatuses = {}): E
 export const itemFor = (entry: EncyclopediaEntry, zh: FieldStatuses = {}): EncyclopediaItem => ({ entry, document: documentFor(entry, zh) })
 
 export const encyclopediaOf = (items: readonly EncyclopediaItem[]): CardEncyclopedia => ({
-  languages: ['en', 'zh'],
-  entries: items.map(item => item.entry),
-  documents: items.map(item => item.document),
   byKey: new Map(items.map(item => [item.entry.key, item])),
 })
 

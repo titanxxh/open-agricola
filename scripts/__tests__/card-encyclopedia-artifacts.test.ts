@@ -14,7 +14,7 @@ const entry = (sourceId: string): EncyclopediaEntry => ({
   publicType: 'season',
   displayNumber: null,
   players: null,
-  face: { kind: 'season', season: 'winter', actionId: 'season-winter-romantic-evening' },
+  face: { kind: 'season', season: 'winter' },
   text: { name: [{ key: 'ui.seasons.winter' }], body: [{ literal: 'Body' }] },
   cost: { kind: 'notApplicable' },
   score: { fixed: null, extraVp: false },

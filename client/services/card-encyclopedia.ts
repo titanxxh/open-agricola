@@ -10,11 +10,7 @@ import type {
 } from '../../shared/contract/card-encyclopedia'
 
 export type CardEncyclopedia = {
-  readonly languages: readonly string[]
-  /** Default catalog order. */
-  readonly entries: readonly EncyclopediaEntry[]
-  /** Same order and keys as `entries`. */
-  readonly documents: readonly EncyclopediaSearchDocument[]
+  /** In default catalog order. */
   readonly byKey: ReadonlyMap<string, { readonly entry: EncyclopediaEntry; readonly document: EncyclopediaSearchDocument }>
 }
 
@@ -54,7 +50,7 @@ const load = async (): Promise<CardEncyclopedia> => {
     return [entry.key, { entry, document }] as const
   }))
   if (search.documents.length !== catalog.entries.length) throw new Error('Search data does not match the catalog')
-  return { languages: search.languages, entries: catalog.entries, documents: search.documents, byKey }
+  return { byKey }
 }
 
 /** Loads on first use only; a failed load is forgotten so the next call retries. */

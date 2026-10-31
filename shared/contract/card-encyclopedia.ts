@@ -46,7 +46,7 @@ export type EncyclopediaFace =
   | { readonly kind: 'parent'; readonly parentId: ParentCardId }
   | { readonly kind: 'moorSpecialAction'; readonly image: string; readonly actions: readonly MoorSpecialActionId[] }
   | { readonly kind: 'moorStart'; readonly tiles: readonly EncyclopediaTerrainTile[] }
-  | { readonly kind: 'season'; readonly season: SeasonId; readonly actionId: string }
+  | { readonly kind: 'season'; readonly season: SeasonId }
 
 export type EncyclopediaCostPath = Readonly<Partial<Record<keyof PaymentResource, number>>>
 
