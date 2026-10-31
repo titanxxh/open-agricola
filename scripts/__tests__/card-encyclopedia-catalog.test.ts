@@ -34,8 +34,18 @@ describe('card encyclopedia catalog membership (D1)', () => {
     expect(unique(entries.filter((entry) => entry.sourceKind === kind).map((entry) => entry.sourceId))).toEqual(expected)
   })
 
-  it('gives every entry a unique identity made of source kind and stable source id', () => {
-    expect(entries.map((entry) => entry.key)).toEqual(entries.map((entry) => `${entry.sourceKind}:${entry.sourceId}`))
+  it.each([
+    ['card:A004_Baseboards', 'card', 'A004_Baseboards'],
+    ['major:Major_CookingHearth1', 'major', 'Major_CookingHearth1'],
+    ['parent:PR01', 'parent', 'PR01'],
+    ['moorSpecialAction:moor-special-1-3-work-market', 'moorSpecialAction', 'moor-special-1-3-work-market'],
+    ['moorStart:moor-start-1', 'moorStart', 'moor-start-1'],
+    ['season:winter', 'season', 'winter'],
+  ])('keys %s by its source kind and stable source id', (key, sourceKind, sourceId) => {
+    expect(entries.filter((entry) => entry.key === key).map((entry) => [entry.sourceKind, entry.sourceId])).toEqual([[sourceKind, sourceId]])
+  })
+
+  it('gives every entry a unique key', () => {
     expect(new Set(entries.map((entry) => entry.key)).size).toBe(entries.length)
     expect(entries.length).toBe(Object.values(publishedIdentities).reduce((total, ids) => total + ids.length, 0))
   })
