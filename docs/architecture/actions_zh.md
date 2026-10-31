@@ -132,5 +132,7 @@ type ActionDefinition = {
 - 动物整理是系统子流程，从不作为 anytime 条目。工作阶段空闲回合与 `confirm-next-player` 是当前玩家的窗口；`confirm-player-switch` 与阶段 hook 链默认封锁，除非当前节点开启窗口。`computeResourceCommitments()` 的限制在命令边界执行（[ADR 0019](../adr/0019-resource-commitments-preserve-unsettled-trades.md)）。
 - **供应丢弃**：`discard-goods` 把行动玩家个人供应中的木材、砖、芦苇、石头、谷物、蔬菜或食物退回公共供应。动物仍走整理流程。人、栅栏、畜栏、田上的作物和卡上的物资不在此行动内。已打出的卡可以用 `blockedVoluntaryDiscardResources` 禁止某些资源。已承诺的数量不能丢。该行动出现在普通 anytime 窗口，包括回合准备；若丢掉一种建材会让工作阶段前效果变为可执行，则在 `onBeforeWork` 之前额外提供一次。数量提交使用 `resource-quantity-select`。事实是 `reason: 'discard'` 的 `resource.moved`。测试：`server/__tests__/discard-goods-session.test.ts`。
 
+- 烤面包的配方与数量请求同时封锁 `exchange` 和 `discard-goods`，保留已提供选项所需的谷物。
+
 测试：`shared/session/__tests__/anytime-policy.test.ts`、`server/__tests__/{anytime-reentry-session,anytime-nested-pending,anytime-policy-negative,anytime-admission-session,exchange-batch-session}.test.ts`。
 
