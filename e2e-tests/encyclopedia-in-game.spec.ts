@@ -2,6 +2,8 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from '@
 import { createOpeningSession, createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import type { GameState } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
+import { BACKEND_URL, FRONTEND_URL } from './fixtures'
+import { CATALOG, expectCatalog } from './helpers/encyclopedia'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
 
 declare global {
@@ -9,6 +11,7 @@ declare global {
     encyclopediaSent: Array<{ type: string }>
     encyclopediaCopied: string[]
     encyclopediaStatusChanges: number
+    encyclopediaDropped?: WebSocket
   }
 }
 
@@ -123,6 +126,67 @@ async function closeEncyclopedia(page: Page) {
   await expect(entry(page)).toBeFocused()
 }
 
+/** Starts a room build for the first player and selects two farm spaces without confirming them. */
+async function enterRoomSelection(page: Page, driver: ReturnType<typeof roomDriver>) {
+  await driver.command(0, { type: 'loadGame', state: workState(state => {
+    state.currentPlayerIndex = 0
+    Object.assign(state.players[0]!.resources, { wood: 10, reed: 4 })
+  }) })
+  await driver.command(0, { type: 'action', spaceId: 'farm-expansion' })
+  const offer = (await roomSnapshot(page)).interaction
+  if (offer.stateId !== 'wait' || offer.request.kind !== 'choice') throw new Error('Expected the farm expansion choice')
+  const rooms = offer.request.options.find(option => option.value.startsWith('seq-construct'))
+  if (!rooms) throw new Error('Expected the room option')
+  await driver.command(0, { type: 'choice', value: rooms.value })
+  const farm = ownFarm(page, 'p1')
+  await expect(farm).toHaveAttribute('data-interaction-focused', 'true')
+  const tiles = [farm.locator('[data-farm-tile-key="0-0"]'), farm.locator('[data-farm-tile-key="1-1"]')]
+  for (const tile of tiles) await tile.click()
+  for (const tile of tiles) await expect(tile).toHaveClass(/\bselected\b/)
+  return { farm, tiles }
+}
+
+/** Drops the socket and holds the room lookup that starts the reconnect until the test releases it. */
+async function dropConnection(page: Page) {
+  let release!: () => void
+  const released = new Promise<void>(resolve => { release = resolve })
+  let lookedUp!: () => void
+  const lookup = new Promise<void>(resolve => { lookedUp = resolve })
+  await page.route('**/api/rooms/locate', async route => {
+    lookedUp()
+    await released
+    await route.continue()
+  })
+  const received = await page.evaluate(() => {
+    window.encyclopediaDropped = window.lifecycleSocket
+    window.lifecycleSocket.close()
+    return window.lifecycleMessages.length
+  })
+  await lookup
+  return {
+    release,
+    reconnected: async () => {
+      await expect.poll(() => page.evaluate(start => window.lifecycleSocket !== window.encyclopediaDropped
+        && window.lifecycleSocket.readyState === WebSocket.OPEN
+        && window.lifecycleMessages.slice(start).some(message => message.type === 'stateUpdate'), received))
+        .toBe(true)
+      await page.unroute('**/api/rooms/locate')
+    },
+  }
+}
+
+async function signIn(page: Page) {
+  const username = `encyclopedia_${crypto.randomUUID().slice(0, 8)}`
+  const oauth = await page.request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, { data: {
+    providerUserId: username, providerLogin: username, email: `${username}@example.com`, displayName: username,
+  } })
+  expect(oauth.ok()).toBe(true)
+  const account = await page.request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, { data: {
+    username, displayName: username, password: 'encyclopedia-hotseat-pass', confirmPassword: 'encyclopedia-hotseat-pass',
+  } })
+  expect(account.ok(), await account.text()).toBe(true)
+}
+
 async function inRoom(
   { browser, request }: { browser: Browser; request: APIRequestContext },
   layouts: [Layout, Layout],
@@ -141,7 +205,10 @@ async function inRoom(
     await run(pages, driver)
   } finally {
     try {
-      if (joined) await driver.command(0, { type: 'loadGame', state: workState() })
+      if (joined) {
+        await expect.poll(() => pages[0].evaluate(() => window.lifecycleSocket.readyState)).toBe(1)
+        await driver.command(0, { type: 'loadGame', state: workState() })
+      }
     } finally { await Promise.all(pages.map(page => page.close())) }
   }
 }
@@ -222,21 +289,7 @@ function defineRoomScenarios() {
 
   test('G2 keeps a farm draft across the panel, its detail, sharing and paging, and across a same-request snapshot', async ({ browser, request }) => {
     await inRoom({ browser, request }, [DESKTOP, DESKTOP], async ([page], driver) => {
-      await driver.command(0, { type: 'loadGame', state: workState(state => {
-        state.currentPlayerIndex = 0
-        Object.assign(state.players[0]!.resources, { wood: 10, reed: 4 })
-      }) })
-      await driver.command(0, { type: 'action', spaceId: 'farm-expansion' })
-      const offer = (await roomSnapshot(page)).interaction
-      if (offer.stateId !== 'wait' || offer.request.kind !== 'choice') throw new Error('Expected the farm expansion choice')
-      const rooms = offer.request.options.find(option => option.value.startsWith('seq-construct'))
-      if (!rooms) throw new Error('Expected the room option')
-      await driver.command(0, { type: 'choice', value: rooms.value })
-      const farm = ownFarm(page, 'p1')
-      await expect(farm).toHaveAttribute('data-interaction-focused', 'true')
-      const tiles = [farm.locator('[data-farm-tile-key="0-0"]'), farm.locator('[data-farm-tile-key="1-1"]')]
-      for (const tile of tiles) await tile.click()
-      for (const tile of tiles) await expect(tile).toHaveClass(/\bselected\b/)
+      const { farm, tiles } = await enterRoomSelection(page, driver)
       await resetSent(page)
 
       const offset = await openEncyclopedia(page)
@@ -336,5 +389,110 @@ function defineRoomScenarios() {
       expect(await gameWrites(page)).toEqual([])
       expect((await roomSnapshot(page)).interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, request: { kind: 'confirm-next-player' } })
     })
+  })
+
+  test('G4 recovers the connection, the snapshot and a still-valid farm draft after a short disconnect with the panel open', async ({ browser, request }, testInfo) => {
+    await inRoom({ browser, request }, [DESKTOP, DESKTOP], async ([page]) => {
+      const { tiles } = await enterRoomSelection(page, roomDriver([page, page]))
+      await resetSent(page)
+      await openEncyclopedia(page)
+      await searchBox(page).fill('wood')
+      await panel(page).getByRole('button', { name: 'Next page' }).click()
+      await expect(pageStatus(page, 2)).toBeVisible()
+      const version = await page.evaluate(() => window.lifecycleUpdate!.version)
+
+      const connection = await dropConnection(page)
+      try {
+        await expect(page.getByText('Reconnecting and restoring your game…')).toBeVisible()
+        await page.screenshot({ path: testInfo.outputPath('g4-reconnecting.png') })
+      } finally { connection.release() }
+      await connection.reconnected()
+
+      expect(await page.evaluate(() => window.lifecycleUpdate!.version)).toBeGreaterThanOrEqual(version)
+      await expect(panel(page)).toBeVisible()
+      await expect(searchBox(page)).toHaveValue('wood')
+      await expect(pageStatus(page, 2)).toBeVisible()
+      await expect(attention(page)).toBeEmpty()
+      await closeEncyclopedia(page)
+      for (const tile of tiles) await expect(tile).toHaveClass(/\bselected\b/)
+      expect(await gameWrites(page)).toEqual([])
+      expect((await roomSnapshot(page)).interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'farm-select' } })
+    })
+  })
+
+  test('G4 drops a withdrawn farm draft and reminds the player when the room moved on during the disconnect', async ({ browser, request }) => {
+    await inRoom({ browser, request }, [DESKTOP, DESKTOP], async ([page, peer], driver) => {
+      const { tiles } = await enterRoomSelection(page, driver)
+      await resetSent(page)
+      await openEncyclopedia(page)
+      await searchBox(page).fill('wood')
+      await expect(attention(page)).toBeEmpty()
+
+      const connection = await dropConnection(page)
+      try {
+        await roomDriver([peer, peer]).command(0, { type: 'loadGame', state: workState(state => { state.currentPlayerIndex = 0 }) })
+      } finally { connection.release() }
+      await connection.reconnected()
+
+      expect((await roomSnapshot(page)).interaction).toMatchObject({ stateId: 'idle' })
+      await expect(panel(page)).toBeVisible()
+      await expect(searchBox(page)).toHaveValue('wood')
+      await expect(attention(page)).toHaveText('Your action is needed')
+      await panel(page).getByRole('button', { name: 'Back to game' }).click()
+      await expect(panel(page)).toHaveCount(0)
+      for (const tile of tiles) await expect(tile).not.toHaveClass(/\bselected\b/)
+      await expect(page.locator('[data-interaction-focus="actions"]')).toHaveAttribute('data-interaction-focused', 'true', { timeout: 3000 })
+      expect(await gameWrites(page)).toEqual([])
+    })
+  })
+
+  test('G4 hotseat keeps the encyclopedia behind seat confirmation and shares only the page and the entry', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: DESKTOP.viewport })
+    try {
+      await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+      await observeClient(page)
+      await signIn(page)
+      await page.goto(`${FRONTEND_URL}/?transport=ws&hotseat=1&maxPlayers=2&draftMode=simultaneous&draftPoolSize=7`)
+      const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
+      const anyEntry = page.getByRole('button', { name: 'Look up cards' })
+      const hand = page.locator('.draft-overlay')
+      await expect(handoff).toBeVisible()
+      await expect(anyEntry).toHaveCount(0)
+      await expect(hand).toHaveCount(0)
+      await handoff.getByRole('button', { name: /continue$/ }).click()
+      await expect(hand).toBeVisible()
+
+      await page.goto(CATALOG)
+      await expectCatalog(page)
+      await page.goBack()
+      await expect(handoff).toBeVisible()
+      await expect(anyEntry).toHaveCount(0)
+      await expect(hand).toHaveCount(0)
+      await handoff.getByRole('button', { name: /continue$/ }).click()
+      await expect(hand).toBeVisible()
+
+      const roomUrl = page.url()
+      await resetSent(page)
+      await openEncyclopedia(page)
+      await panel(page).getByRole('button', { name: /^View / }).first().click()
+      const detail = panel(page).locator('dialog.encyclopedia-detail')
+      await detail.getByRole('button', { name: 'Copy card link' }).click()
+      await expect.poll(() => page.evaluate(() => window.encyclopediaCopied.length)).toBe(1)
+      const shared = new URL(await page.evaluate(() => window.encyclopediaCopied[0]!))
+      expect(shared.pathname).toBe('/')
+      expect([...shared.searchParams.entries()]).toEqual([['page', 'encyclopedia'], ['entry', 'card:A001_Shelter']])
+      expect(page.url()).toBe(roomUrl)
+      await detail.getByRole('button', { name: 'Close details' }).click()
+      await closeEncyclopedia(page)
+      expect(await gameWrites(page)).toEqual([])
+
+      await page.locator('.draft-pool-row-occ .draft-card').first().click()
+      await page.locator('.draft-pool-row-minor .draft-card').first().click()
+      await page.locator('.draft-confirm-btn').click()
+      await expect(handoff).toBeVisible()
+      await expect(anyEntry).toHaveCount(0)
+      await expect(panel(page)).toHaveCount(0)
+      await expect(hand).toHaveCount(0)
+    } finally { await page.close() }
   })
 }
