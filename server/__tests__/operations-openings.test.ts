@@ -62,12 +62,13 @@ const sample = (samples: OpeningSample[], name: string, labels: Record<string, s
   return result?.value
 }
 
-const ownerOpeningSamples = async (observedAt: number): Promise<OpeningSample[]> => {
+const ownerOpeningSamples = (observedAt: number): Promise<OpeningSample[]> => db.transaction(async () => {
+  await db.exec("SET LOCAL jit=off; SET LOCAL statement_timeout='2s'")
   const { rows } = await db.query<Omit<OpeningSample, 'value'> & { value: string }>(
     `SELECT name,labels,value FROM ${access.schema}.${openingsFunction}($1::bigint)`, [observedAt],
   )
   return rows.map(row => ({ ...row, value: Number(row.value) }))
-}
+})()
 
 it('counts inclusive UTC+8 windows, unique accounts across modes, durable expired outcomes and exact preparation samples', async () => {
   await account('private-repeated-player', now - 50 * day)
