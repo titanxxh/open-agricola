@@ -13,16 +13,22 @@ import { resolveParentCardAssetUrls } from '../../services/parent-assets'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import type { EncyclopediaItem } from './encyclopedia-item'
 import { EncyclopediaTextFace } from './EncyclopediaTextFace'
+import { MoorStartLayout } from './MoorStartLayout'
 import { useImageStatus } from './useImageStatus'
 
 type FaceKind = EncyclopediaFaceRef['kind']
 type FaceOf<K extends FaceKind> = Extract<EncyclopediaFaceRef, { kind: K }>
+type FaceProps<K extends FaceKind> = { face: FaceOf<K>; item: EncyclopediaItem; locale: Locale }
 
 type FaceView<K extends FaceKind> = {
   /** Every image the face draws; when any fails to load, the entry shows its text face instead. */
   artUrls?: (face: FaceOf<K>) => readonly string[]
-  render: (props: { face: FaceOf<K>; item: EncyclopediaItem; locale: Locale }) => ReactNode
+  render: (props: FaceProps<K>) => ReactNode
+  /** What the text face still shows of the card once its art is gone. */
+  withoutArt?: (props: FaceProps<K>) => ReactNode
 }
+
+const FARM_GROUND_ART = ['/assets/moor/terrain/forest.webp', '/assets/moor/terrain/moor.webp', '/assets/revised/empty_slots.png']
 
 const textFace = ({ item, locale }: { item: EncyclopediaItem; locale: Locale }) =>
   <EncyclopediaTextFace item={item} locale={locale} />
@@ -62,7 +68,11 @@ const FACE_VIEWS: { readonly [K in FaceKind]: FaceView<K> } = {
       </div>
     ),
   },
-  moorStart: { render: textFace },
+  moorStart: {
+    artUrls: () => FARM_GROUND_ART.map(publicAssetUrl),
+    render: ({ face, locale }) => <MoorStartLayout locale={locale} tiles={face.tiles} art />,
+    withoutArt: ({ face, locale }) => <MoorStartLayout locale={locale} tiles={face.tiles} art={false} />,
+  },
   season: { render: textFace },
 }
 
@@ -72,6 +82,12 @@ export function EncyclopediaFace({ item, locale }: { item: EncyclopediaItem; loc
   const face = item.entry.face
   const view = faceView(face)
   const status = useImageStatus(view.artUrls?.(face) ?? [])
-  if (status === 'failed') return <EncyclopediaTextFace item={item} locale={locale} imageMissing />
+  if (status === 'failed') {
+    return (
+      <EncyclopediaTextFace item={item} locale={locale} imageMissing>
+        {view.withoutArt?.({ face, item, locale })}
+      </EncyclopediaTextFace>
+    )
+  }
   return view.render({ face, item, locale })
 }
