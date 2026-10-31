@@ -1,7 +1,6 @@
 import type { EncyclopediaBrowsePersistence, EncyclopediaBrowseSnapshot } from './encyclopedia-browse-store'
 import { normalizeEncyclopediaFilters } from './encyclopedia-filters'
-
-const STORAGE_KEY = 'open-agricola:encyclopedia-browse'
+import { ENCYCLOPEDIA_BROWSE_STORAGE_KEY, forgetEncyclopediaBrowseOnReload } from './encyclopedia-session-reset'
 
 type SessionStorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
@@ -14,15 +13,6 @@ export type EncyclopediaSessionPersistenceOptions = {
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype
 
-const documentWasReloaded = (): boolean => {
-  try {
-    const [navigation] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[]
-    return navigation?.type === 'reload'
-  } catch {
-    return false
-  }
-}
-
 const parseJson = (raw: string): unknown => {
   try {
     return JSON.parse(raw)
@@ -33,7 +23,7 @@ const parseJson = (raw: string): unknown => {
 
 export function createEncyclopediaSessionPersistence({
   storage = () => window.sessionStorage,
-  isReload = documentWasReloaded,
+  isReload,
 }: EncyclopediaSessionPersistenceOptions = {}): EncyclopediaBrowsePersistence {
   const withStorage = <T>(access: (target: SessionStorageLike) => T): T | undefined => {
     try {
@@ -46,11 +36,8 @@ export function createEncyclopediaSessionPersistence({
 
   return {
     load(): EncyclopediaBrowseSnapshot | undefined {
-      if (isReload()) {
-        withStorage(target => target.removeItem(STORAGE_KEY))
-        return undefined
-      }
-      const raw = withStorage(target => target.getItem(STORAGE_KEY))
+      forgetEncyclopediaBrowseOnReload({ storage, isReload })
+      const raw = withStorage(target => target.getItem(ENCYCLOPEDIA_BROWSE_STORAGE_KEY))
       const saved = raw ? parseJson(raw) : undefined
       if (!isPlainObject(saved)) return undefined
       const { query, filters, page, scrollTop } = saved
@@ -62,7 +49,7 @@ export function createEncyclopediaSessionPersistence({
       }
     },
     save(snapshot) {
-      withStorage(target => target.setItem(STORAGE_KEY, JSON.stringify(snapshot)))
+      withStorage(target => target.setItem(ENCYCLOPEDIA_BROWSE_STORAGE_KEY, JSON.stringify(snapshot)))
     },
   }
 }

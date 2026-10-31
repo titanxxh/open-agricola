@@ -8,6 +8,8 @@ import {
 } from './helpers/encyclopedia'
 
 const BASEBOARDS = entryUrl('card:A004_Baseboards')
+/** The application entry loads this on every page so that a refresh clears the tab's search. */
+const EVERY_PAGE_RESET = '/client/app/encyclopedia/encyclopedia-session-reset.ts'
 
 /** Lobby entry, search, the filter panel, a detail and the way back, with screenshots of each stop. */
 async function walkRepresentativePath(page: Page, layout: Layout) {
@@ -266,7 +268,7 @@ for (const layout of LAYOUTS) {
       await page.goto(LOBBY)
       await expect(page.getByRole('textbox', { name: 'Username' }).first()).toBeVisible()
 
-      expect(requests.filter(path => /card-encyclopedia|\/encyclopedia\/|EncyclopediaPage/.test(path))).toEqual([])
+      expect(requests.filter(path => path !== EVERY_PAGE_RESET && /card-encyclopedia|\/encyclopedia\/|EncyclopediaPage/.test(path))).toEqual([])
     })
   })
 }

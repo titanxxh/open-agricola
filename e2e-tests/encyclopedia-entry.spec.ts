@@ -191,6 +191,35 @@ for (const layout of LAYOUTS) {
       await expect(selectedFilters(page)).toHaveCount(0)
     })
 
+    test('U2 clears the query and the filters when the lobby is refreshed before the encyclopedia is entered again', async ({ browser }) => {
+      const { page } = await visit(browser, true)
+      await page.goto(CATALOG)
+      await expectCatalog(page)
+      const total = await resultsHeading(page).textContent()
+      await searchBox(page).fill('mother')
+      await filterBy(page, layout, 'Occupation')
+      await expect(selectedFilters(page)).toHaveText(['Occupation×'])
+      const heading = await resultsHeading(page).textContent()
+      expect(heading).not.toBe(total)
+
+      await page.goto(LOBBY)
+      await lobbyReady(page)
+      await page.goto(CATALOG)
+      await expect(searchBox(page)).toHaveValue('mother')
+      await expect(resultsHeading(page)).toHaveText(heading!)
+
+      await page.goto(LOBBY)
+      await lobbyReady(page)
+      await page.reload()
+      await lobbyReady(page)
+      await page.goto(CATALOG)
+
+      await expect(resultsHeading(page)).toHaveText(total!)
+      await expect(searchBox(page)).toHaveValue('')
+      await expect(selectedFilters(page)).toHaveCount(0)
+      await expect(page.getByText(/^Page 1 of \d+$/)).toBeVisible()
+    })
+
     test('U2 a card refreshed from the second page stays open while the browse state starts over', async ({ browser }) => {
       const { page } = await visit(browser, false)
       await page.goto(CATALOG)

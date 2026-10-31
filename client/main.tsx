@@ -2,10 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/card-sprite.css'
+import { forgetEncyclopediaBrowseOnReload } from './app/encyclopedia/encyclopedia-session-reset'
 import { installStaleChunkRecovery } from './app/stale-chunk-recovery'
 import { loadLanguageManifest, loadLanguagePack } from './services/language-pack'
 
 installStaleChunkRecovery()
+forgetEncyclopediaBrowseOnReload()
 
 const root = createRoot(document.getElementById('root')!)
 void (async () => {
