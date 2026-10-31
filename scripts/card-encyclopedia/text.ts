@@ -4,7 +4,7 @@ import type { MoorStartCardDefinition } from '../../shared/moor/start-cards'
 import type { ParentCardDefinition } from '../../shared/parents'
 import {
   moorSpecialActionBuysImprovement,
-  moorSpecialActionEffectParams,
+  moorSpecialActionEffectGroups,
 } from '../../shared/projections/moor-special-actions'
 import { seasonDisplay, seasonRuleText } from '../../shared/projections/season-display'
 import type { SeasonId } from '../../shared/seasons/types'
@@ -45,20 +45,13 @@ export const moorSpecialActionTexts = (card: MoorSpecialActionCardSource): Encyc
   name: joinWith(card.actions.map((actionId) => [{ key: `moor.specialActions.${actionId}` }]), LIST_SEPARATOR),
   body: joinLines([
     ...card.actions.flatMap((actionId) => {
-      const byEffect = new Map<string, { params: ReturnType<typeof moorSpecialActionEffectParams>; counts: number[] }>()
-      for (const count of card.players) {
-        const params = moorSpecialActionEffectParams(actionId, count)
-        const signature = JSON.stringify(params)
-        const group = byEffect.get(signature) ?? { params, counts: [] }
-        group.counts.push(count)
-        byEffect.set(signature, group)
-      }
+      const groups = moorSpecialActionEffectGroups(actionId, card.players)
       const note: EncyclopediaText = moorSpecialActionBuysImprovement(actionId)
         ? [SEPARATOR, { key: 'moor.specialActions.improvementCost' }]
         : []
-      return [...byEffect.values()].map(({ params, counts }) => [
+      return groups.map(({ params, playerCounts }) => [
         { key: `moor.specialActions.${actionId}` },
-        ...(byEffect.size > 1 ? [SEPARATOR, ...playerCountText(counts)] : []),
+        ...(groups.length > 1 ? [SEPARATOR, ...playerCountText(playerCounts)] : []),
         SEPARATOR,
         { key: `moor.specialActions.effects.${actionId}`, params },
         ...note,
