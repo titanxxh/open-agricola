@@ -75,9 +75,12 @@ export function PageRouter() {
 
   if (page === 'encyclopedia') {
     return (
-      <Suspense fallback={<AppShellLoadScreen />}>
-        <EncyclopediaPageLazy />
-      </Suspense>
+      <>
+        <Suspense fallback={<AppShellLoadScreen />}>
+          <EncyclopediaPageLazy />
+        </Suspense>
+        <MobileTabBar current="encyclopedia" onNavigate={(t) => setPage(t)} />
+      </>
     )
   }
 

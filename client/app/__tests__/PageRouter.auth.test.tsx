@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PageRouter } from '../PageRouter'
 import { AuthProvider } from '../../contexts/AuthContext'
@@ -30,7 +30,12 @@ vi.mock('../SettingsPage', () => ({
 }))
 
 vi.mock('../../components/common/MobileTabBar', () => ({
-  MobileTabBar: () => <nav>Mobile Tab Bar</nav>,
+  MobileTabBar: ({ current, onNavigate }: { current: string; onNavigate: (tab: string) => void }) => (
+    <nav data-current={current}>
+      Mobile Tab Bar
+      <button type="button" onClick={() => onNavigate('lobby')}>Lobby tab</button>
+    </nav>
+  ),
 }))
 
 vi.mock('../../components/common/GameLoadScreen', () => ({
@@ -167,6 +172,22 @@ describe('PageRouter auth routes', () => {
         expect(window.location.search).toBe(url.slice(1))
         view.unmount()
       }
+    })
+
+    it('shows the main navigation on the encyclopedia and keeps the login gate on the other tabs', async () => {
+      stubMe({ ok: false })
+      window.history.replaceState(null, '', '/?page=encyclopedia')
+
+      renderWithAuth()
+
+      expect(await screen.findByText('Encyclopedia Page')).toBeInTheDocument()
+      expect(screen.getByText('Mobile Tab Bar')).toHaveAttribute('data-current', 'encyclopedia')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lobby tab' }))
+
+      expect(await screen.findByLabelText('用户名')).toBeInTheDocument()
+      expect(screen.queryByText('Encyclopedia Page')).toBeNull()
+      expect(window.location.search).toBe('')
     })
 
     it('keeps the encyclopedia for signed-in players', async () => {
