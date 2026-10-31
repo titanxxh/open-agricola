@@ -31,7 +31,7 @@
 - `gameTransport.ts`（`WsGameTransport`）在服务层持有 WebSocket。它按标签页记录未确认的命令，隔离旧 socket 回调，重连期间暂停输入，查询回执，等待完整的过滤后快照，并只以原身份重试仍然有效的输入。
 - `services/room-creation.ts` 使用新的已认证连接和独立的待确认命令记录创建房间。恢复时沿用原创建身份，收到持久回执和新房快照后才导航；来源重开失败时保留旧结果和完整的配置调整信息。大厅与两处完成入口共用这条链路。
 - `card-meta.ts` 拉取 `GET /cards-manifest.json`；`rehydrate.ts` rehydrate 快照时不导入 `shared/actions` 或卡牌目录。
-- `card-encyclopedia.ts` 只在首次使用时加载百科目录与检索文件，从不在启动时加载。它校验文件哈希，并发调用共享同一次加载，失败后丢弃缓存以便下次重试；服务端把带哈希的文件标为 immutable（[cards](cards_zh.md)）。
+- `card-encyclopedia.ts` 在首次使用时加载并校验百科文件的哈希，从不在启动时加载；加载失败时下次调用重试（[cards](cards_zh.md)）。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
 - 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。其选色器提供六种颜色，禁用其他玩家已占用的颜色，并等待服务端发布保存后的选择。
 - 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
@@ -65,9 +65,9 @@
 
 ### 卡牌百科
 
-- **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`；普通页面不请求它的 chunk、数据或卡图，图库只请求当前页的卡图。每打开一个详情都会压入一条历史记录，只有本文档打开的详情才用 `history.back()` 关闭。复制的链接从 base path 重新构造，只带 `page` 与 `entry`，不会带上房间、座位、手牌或对局参数。搜索词、筛选、页码和滚动位置保存在 `sessionStorage`，刷新时重置。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 以静态文件方式提供根路径 Pages 产物，核对其数据、语言包和卡图来源及各自的失败处理。
-- **局内面板。** `GameHeader` 打开 `InGameEncyclopedia`。这是一个模态面板，懒加载 `InGameEncyclopediaContent`，详情导航只保存在内存里，从不写 URL，也不发送游戏命令。面板打开期间不展示交互聚焦；本地草稿留在容器中，按普通快照规则处理。`encyclopedia-attention.ts` 把玩家当前的输入窗口与打开面板时的窗口比较，出现新窗口时只提醒一次，重连页重新挂载面板后同样如此。热座接机身份变化会关闭面板，交接页不提供入口。覆盖见 `GameContainerApi.encyclopedia.test.tsx` 与 `encyclopedia-in-game.spec.ts`。
-- **牌面。** `EncyclopediaFace` 为目录中的每种牌面类型指定一个视图，视图列出所需卡图 URL，并通过游戏自身的组件（`PlayerCard`、`ParentCardFace`、`SpecialActionCardFace`）和 `shared/projections/` 渲染。`useImageStatus` 每个页面对同一 URL 只探测一次；任一卡图失败时，该条目改用 `EncyclopediaTextFace`，显示本地化文字和图片暂缺提示。字段文字由语言包 key 解析，检索文档中的回退状态会追加“显示英文”的说明。覆盖见 `encyclopedia-faces.spec.ts`。
+- **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`。普通页面不加载它的 chunk、数据或卡图。复制的链接只带 `page` 与 `entry`，不带房间、座位、手牌或对局参数。浏览状态按标签页保存，任一页面刷新后重新开始；`client/main.tsx` 在首次渲染前清除它。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 针对静态 Pages 产物运行。
+- **局内面板。** `GameHeader` 打开模态的 `InGameEncyclopedia`。它从不写 URL，也不发送游戏命令；本地草稿留在容器中，按普通快照规则处理。`encyclopedia-attention.ts` 对每个新输入窗口只提醒一次，重连页重新挂载面板后同样如此。热座接机身份变化会关闭面板，交接页不提供入口。覆盖见 `GameContainerApi.encyclopedia.test.tsx` 与 `encyclopedia-in-game.spec.ts`。
+- **牌面。** `EncyclopediaFace` 用游戏自身的组件和 `shared/projections/` 绘制目录中的每种牌面，任一卡图失败时改用 `EncyclopediaTextFace`。某语言仍显示英文的文字，在出现的每处都加标注。覆盖见 `encyclopedia-faces.spec.ts` 与 `client/app/encyclopedia/__tests__/`。
 
 ### 交互展示不变量
 
