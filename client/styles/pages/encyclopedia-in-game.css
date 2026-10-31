@@ -1,7 +1,7 @@
 /* In-game encyclopedia: a panel over the game on desktop, the whole visible viewport on phones. */
 
-/* Keeps the game where it was; overflow: hidden preserves the scroll offset. */
-:root:has(.encyclopedia-in-game[open]) {
+/* Set on body so it propagates to the viewport and the game keeps its scroll offset. */
+body:has(.encyclopedia-in-game[open]) {
   overflow: hidden;
 }
 
