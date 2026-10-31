@@ -136,3 +136,4 @@ describe('A029_AleBenches', () => {
     })
   })
 })
+// CI scope probe: card.
