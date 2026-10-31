@@ -2,7 +2,7 @@ import { GameEndControls } from './GameEndControls'
 import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
 import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from '../utils/platform-page-url'
@@ -53,6 +53,8 @@ import { buildFarmTargetChoiceBindings, getFarmTargetChoices } from './farm-targ
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
+import { InGameEncyclopedia } from './encyclopedia/InGameEncyclopedia'
+import { encyclopediaAttentionWindow } from './encyclopedia/encyclopedia-attention'
 import { SoloHandOverlay } from './solo/SoloHandOverlay'
 import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
@@ -421,6 +423,8 @@ export const GameContainerApi = () => {
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
+  const [encyclopediaOpen, setEncyclopediaOpen] = useState(false)
+  const encyclopediaEntryRef = useRef<HTMLButtonElement | null>(null)
 
   const clearReplayCue = useCallback(() => {
     setSelectedReplayKey(null)
@@ -495,6 +499,7 @@ export const GameContainerApi = () => {
     if (!hotseatAudienceKey || lastHotseatAudienceRef.current === hotseatAudienceKey) return
     lastHotseatAudienceRef.current = hotseatAudienceKey
     setHotseatSeatConfirmed(null)
+    setEncyclopediaOpen(false)
   }, [hotseatAudienceKey])
   const confirmHotseatSeat = (playerId: string) => {
     if (!hotseatRoomId) return
@@ -557,7 +562,7 @@ export const GameContainerApi = () => {
   )
   const improvementSelection = getImprovementSelection(interaction, activePlayer?.minorHand ?? [], state?.availableMajorImprovements ?? [])
   const canPresentInteractionFocus = hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
-    (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey)
+    (!isHotseat || hotseatSeatConfirmed === hotseatAudienceKey) && !encyclopediaOpen
   const interactionFocus = useInteractionFocus({
     interaction,
     targetOverride: improvementSelection?.target,
@@ -1556,7 +1561,7 @@ export const GameContainerApi = () => {
     <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert} />
   ) : null
 
-  const gameHeader = (
+  const renderGameHeader = (encyclopediaEntry: boolean) => (
     <GameHeader
       locale={locale}
       state={state}
@@ -1570,11 +1575,14 @@ export const GameContainerApi = () => {
       embedded={isEmbedded}
       menuExtra={gameEndControls}
       menuAlert={gameEndMenuAlert}
+      onOpenEncyclopedia={encyclopediaEntry ? () => setEncyclopediaOpen(true) : undefined}
+      encyclopediaEntryRef={encyclopediaEntry ? encyclopediaEntryRef : undefined}
     />
   )
+  const gameHeader = renderGameHeader(true)
   const hotseatHandoff = (playerId: string) => (
     <div className={`app app--handoff${isEmbedded ? ' app--embedded' : ''}`}>
-      {gameHeader}
+      {renderGameHeader(false)}
       <HotseatHandoff
         playerName={playerNames[playerId] ?? playerId}
         locale={locale}
@@ -1582,13 +1590,28 @@ export const GameContainerApi = () => {
       />
     </div>
   )
+  const withEncyclopedia = (game: ReactElement) => (
+    <>
+      {game}
+      {encyclopediaOpen ? (
+        <InGameEncyclopedia
+          locale={locale}
+          attentionWindow={encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })}
+          onClose={() => {
+            setEncyclopediaOpen(false)
+            encyclopediaEntryRef.current?.focus({ preventScroll: true })
+          }}
+        />
+      ) : null}
+    </>
+  )
 
   if (state.phase === 'solo-hand-selection') {
     const waiting = interaction.stateId === 'wait' && interaction.request.kind === 'solo-hand-selection'
       ? { groups: interaction.request.groups, playerIndex: interaction.playerIndex,
           canSubmit: interaction.allowedCommands.some(command => command === 'submitSoloHandSelection') }
       : null
-    return (
+    return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
         {notificationStack}
@@ -1616,7 +1639,7 @@ export const GameContainerApi = () => {
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) return hotseatHandoff(hotseatSeatId)
-    return (
+    return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
         {notificationStack}
@@ -1645,7 +1668,7 @@ export const GameContainerApi = () => {
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))
     if (hotseatSeatId && hotseatSeatConfirmed !== hotseatAudienceKey) return hotseatHandoff(hotseatSeatId)
-    return (
+    return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
         {notificationStack}
@@ -1970,7 +1993,7 @@ export const GameContainerApi = () => {
     </>
   )
 
-  return (
+  return withEncyclopedia(
     <div className={`app${isEmbedded ? ' app--embedded' : ''}${isDesktopTable ? ' app--desktop-table' : ''}`}>
       {notificationStack}
       <PublicEventResourceAnimations
