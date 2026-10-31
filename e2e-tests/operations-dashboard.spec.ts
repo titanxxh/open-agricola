@@ -259,6 +259,12 @@ test('independent dashboards render registration, rooms and durable player openi
       if (!expression) throw new Error('Missing provisioned expression for ' + title)
       return expression.replaceAll('$window', 'last_24h').replaceAll('$cohort', 'last_7d').replaceAll('$__range', '300s')
     }
+    await expect.poll(() => queryPlayerSamples('agricola_opening_collection_success'), {
+      timeout: 30_000, message: 'Opening collector successfully observed the prepared fixture',
+    }).toEqual([{ label: '', value: 1 }])
+    await expect.poll(() => queryPlayerSamples('agricola_opening_tracking_since_unixtime'), {
+      timeout: 30_000, message: 'Prometheus scraped the updated opening fixture',
+    }).toEqual([{ label: '', value: trackingSince / 1000 }])
     for (const panel of panelExpectations) {
       const expected = Object.entries(panel.values).map(([label, value]) => ({ label, value }))
         .sort((left, right) => left.label.localeCompare(right.label))
