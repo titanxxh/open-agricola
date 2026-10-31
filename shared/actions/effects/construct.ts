@@ -351,10 +351,9 @@ export const constructAction: ActionDefinition = {
         readConstructCostAdjustments(ctx),
       )
       if (payment.type === 'request') {
-        const options = payment.request.kind === 'choice' ? payment.request.options : []
         return {
           type: 'request',
-          request: { kind: 'choice', options },
+          request: payment.request,
           promptKey: payment.promptKey,
           extraData: {
             actionContextWrite: { farmPayload: { rooms } },

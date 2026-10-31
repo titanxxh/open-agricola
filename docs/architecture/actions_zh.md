@@ -120,6 +120,7 @@ type ActionDefinition = {
 `shared/session/anytime-policy.ts` 的 `computeAnytimePolicy()` 在每次 `buildInteraction()` 时计算一次 card listener 的 anytime 可用性；客户端从不导入它。`GameCore.getAnytimePolicyInput()` 提供活动上下文、`stageResume`、请求类型与请求的 `anytimeWindow`。
 
 - flow 或请求可声明 `{ allowed: true, blockedIds? }` 或 `{ allowed: false }`。声明只属于当前等待节点；父节点、兄弟节点和续行都不授予权限。
+- 请求可用 `blockedAnytimeIds` 收窄已开放的窗口；Session 合并所有引擎帧中未完成 pending 请求的限制，嵌套 anytime 行动不能绕过挂起的支付或烤面包选择。它不会开放已关闭的阶段窗口或显式窗口。支付选择请求封锁 `discard-goods`，建房、畜栏、围栏和犁田包装保留完整请求。
 - 优先级：无上下文；供暖；engine-blocked；下一玩家确认（禁用 exchange）；玩家切换确认；动物整理；当前节点的显式窗口；默认的阶段 hook 链封锁；普通允许。metadata 不能覆盖前面的硬封锁；格式错误的窗口关闭。
 - 三个消费者共享同一快照：`buildAnytimeEntries()` 过滤条目；`buildInteraction()` 只在允许且非空时暴露 `takeAnytimeAction`；`takeAnytimeAction()` 在注入前执行该策略。
 - 卡牌条目共用当前步骤准入（[当前步骤准入与 blocked 恢复](hooks_zh.md#当前步骤准入与-blocked-恢复)）；根 `optional` 不能绕过，新行动使用自身的来源、参数、费用与执行者。
@@ -130,7 +131,7 @@ type ActionDefinition = {
 - **兑换批次**：`effects/exchange.ts` 的 `executeExchangeBatch()` 在任何支付前，按原数量和顺序校验配方与来源额度、资源和已安置动物余额。前项配方所得可支付后项，未领取的反应奖励不可预支。任一项非法即拒绝整份提交，不截断次数或部分成交。普通 direct、单项、bulk 和已提交的喂食、供暖配方共用该执行器，每项收据记录其支付前库存。引擎先执行批次反应，再执行必要的动物整理。配方可在指定交互类型中禁用 anytime（`blockedAnytimeInteractionKinds`）；繁殖期间动物烹饪配方不可用。`bulk:` 这类紧凑选项值使用请求的 `structuredChoicePrefixes`。
 - **兑换目录**：`getExchangeCatalog()` 按显式窗口解析声明配方与运行时配方。声明查询与收获次数账本位于 `helpers/exchange-recipes.ts`，供普通兑换、收获工坊机会和喂食共用，取消不消耗次数。每个已解析配方持有自身的收获使用轮次，anytime 配方不因外层喂食获得收获限次。普通 anytime 兑换仅在 feeding phase 或有显式 `harvestExchangeRound` 授权时纳入收获配方；更宽泛的 harvest 大相位本身不授予权限。木材换燃料作为变体启用时的基础 anytime 配方归属该目录。`feed` 和 `heating` 请求按 `(sourceId, exchangeIndex)` 发布 `exchangeCatalog`；提交同时匹配已提供目录与实时目录。
 - 动物整理是系统子流程，从不作为 anytime 条目。工作阶段空闲回合与 `confirm-next-player` 是当前玩家的窗口；`confirm-player-switch` 与阶段 hook 链默认封锁，除非当前节点开启窗口。`computeResourceCommitments()` 的限制在命令边界执行（[ADR 0019](../adr/0019-resource-commitments-preserve-unsettled-trades.md)）。
-- **供应丢弃**：`discard-goods` 把行动玩家个人供应中的木材、砖、芦苇、石头、谷物、蔬菜或食物退回公共供应。动物仍走整理流程。人、栅栏、畜栏、田上的作物和卡上的物资不在此行动内。已打出的卡可以用 `blockedVoluntaryDiscardResources` 禁止某些资源。已承诺的数量不能丢。该行动出现在普通 anytime 窗口，包括回合准备；若丢掉一种建材会让工作阶段前效果变为可执行，则在 `onBeforeWork` 之前额外提供一次。数量提交使用 `resource-quantity-select`。事实是 `reason: 'discard'` 的 `resource.moved`。测试：`server/__tests__/discard-goods-session.test.ts`。
+- **供应丢弃**：`discard-goods` 把行动玩家个人供应中的木材、砖、芦苇、石头、谷物、蔬菜或食物退回公共供应。动物仍走整理流程。人、栅栏、畜栏、田上的作物和卡上的物资不在此行动内。已打出的卡可以用 `blockedVoluntaryDiscardResources` 禁止某些资源。已承诺的数量不能丢。该行动出现在普通 anytime 窗口，包括回合准备；若丢掉一种建材会让工作阶段前效果变为可执行，则在 `onBeforeWork` 之前额外提供一次。数量提交使用 `resource-quantity-select`。事实是 `reason: 'discard'` 的 `resource.moved`。测试：`server/__tests__/discard-goods-session.test.ts`。 工作阶段前的资格探测为每个候选效果单独克隆状态，保留仅修改状态而不返回 flow 的效果，并只在假设丢弃时扣除未承诺的数量。
 
 - 烤面包的配方与数量请求同时封锁 `exchange` 和 `discard-goods`，保留已提供选项所需的谷物。
 

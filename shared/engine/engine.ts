@@ -497,6 +497,11 @@ export class Engine {
     return null
   }
 
+  getPendingBlockedAnytimeIds(): string[] {
+    return this.tree.allNodes().flatMap((node) => node.getState() === 'resolved'
+      ? [] : node.getPending()?.request.blockedAnytimeIds ?? [])
+  }
+
   /**
    * @internal Package-internal coordination surface for EngineStack.
    */

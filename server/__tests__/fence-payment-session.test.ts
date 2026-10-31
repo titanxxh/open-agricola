@@ -1,3 +1,4 @@
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { descriptionEffects } from './_helpers/choice-description'
@@ -73,6 +74,10 @@ describe('fence payment session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.anytimeActions.some(action => action.id === 'discard-goods')).toBe(false)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    }
 
     const stoneOption = resp.interaction.request.options?.find(
       (option) => typeof option.labelParams === 'object' && option.labelParams?.resourcesPaid?.stone === 2,

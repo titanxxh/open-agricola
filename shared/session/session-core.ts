@@ -1,4 +1,5 @@
 import type { FenceSelectionPayload, FenceSelectionQuote } from '../contract/protocol/game'
+import type { RoundPreparationContext } from '../contract/card-effect-hooks'
 import { quoteFenceSelection } from '../actions/effects/fencing'
 import { voluntaryDiscardAvailability } from '../actions/effects/discard-goods'
 import { hasLegalPlaceFarmerTargets } from '../actions/effects/place-farmer'
@@ -757,6 +758,7 @@ export class GameCore {
       stageResume: this.stageResume,
       interactionKind: request?.kind,
       anytimeWindow: request?.anytimeWindow,
+      blockedAnytimeIds: this.engineStack.allFrames().flatMap((frame) => frame.engine.getPendingBlockedAnytimeIds()),
     }
   }
 
@@ -3424,25 +3426,27 @@ export class GameCore {
     return Array.from({ length: count }, (_, index) => (start + index) % count)
   }
 
-  private supplyDiscardCouldEnableBeforeWork(player: PlayerState): boolean {
+  private supplyDiscardCouldEnableBeforeWork(player: PlayerState, roundPreparation?: RoundPreparationContext): boolean {
     const buildingResources = ['wood', 'clay', 'reed', 'stone'] as const
     const available = voluntaryDiscardAvailability(this.state, player)
     if (!buildingResources.some((resource) => (available[resource] ?? 0) > 0)) return false
     const cardIds = [...player.improvements, ...player.minorPlayed, ...player.occupationPlayed]
       .filter((cardId) => getCardEffect(cardId)?.onBeforeWork)
     if (cardIds.length === 0) return false
-    const usable = (state: GameState, subject: PlayerState) => cardIds.some((cardId) => {
-      const flow = runCardEffectHook(state, subject, cardId, 'onBeforeWork', undefined, { actionHooks: this.actionHooks })
-      return !!flow && this.beforeWorkFlowIsUsable(state, subject, flow)
+    const usable = (discardResource?: typeof buildingResources[number]) => cardIds.some((cardId) => {
+      const state = cloneState(this.state)
+      const subject = state.players.find((candidate) => candidate.id === player.id)
+      if (!subject) return false
+      if (discardResource) subject.resources[discardResource] -= available[discardResource] ?? 0
+      const before = JSON.stringify({ state, player: subject })
+      const flow = runCardEffectHook(state, subject, cardId, 'onBeforeWork', undefined, { actionHooks: this.actionHooks, roundPreparation })
+      return flow ? this.beforeWorkFlowIsUsable(state, subject, flow)
+        : JSON.stringify({ state, player: subject }) !== before
     })
-    if (usable(this.state, player)) return false
+    if (usable()) return false
     for (const resource of buildingResources) {
       if ((available[resource] ?? 0) <= 0) continue
-      const cloned = cloneState(this.state)
-      const subject = cloned.players.find((candidate) => candidate.id === player.id)
-      if (!subject) continue
-      subject.resources[resource] = 0
-      if (usable(cloned, subject)) return true
+      if (usable(resource)) return true
     }
     return false
   }
@@ -3462,7 +3466,7 @@ export class GameCore {
       const order = this.beforeWorkPlayerOrder(resumeExtra)
       const next = order.find((index) => {
         const player = this.state.players[index]
-        return player !== undefined && !offered.has(index) && this.supplyDiscardCouldEnableBeforeWork(player)
+        return player !== undefined && !offered.has(index) && this.supplyDiscardCouldEnableBeforeWork(player, resumeExtra?.roundPreparation)
       })
       if (next !== undefined) {
         const player = this.state.players[next]!

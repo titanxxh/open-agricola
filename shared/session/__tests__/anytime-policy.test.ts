@@ -11,6 +11,29 @@ const base = (over: Partial<AnytimePolicyInput> = {}): AnytimePolicyInput => ({
 })
 
 describe('computeAnytimePolicy', () => {
+  it('only narrows an open window with request-level blocked ids', () => {
+    expect(computeAnytimePolicy(base({
+      interactionKind: 'choice', blockedAnytimeIds: ['discard-goods'],
+    }))).toEqual({ allowed: true, blockedIds: ['discard-goods'] })
+    expect(computeAnytimePolicy(base({
+      interactionKind: 'choice', anytimeWindow: { allowed: true, blockedIds: ['exchange', 'discard-goods'] },
+      blockedAnytimeIds: ['discard-goods'],
+    }))).toEqual({ allowed: true, blockedIds: ['exchange', 'discard-goods'] })
+    expect(computeAnytimePolicy(base({
+      interactionKind: 'confirm-next-player', blockedAnytimeIds: ['discard-goods'],
+    }))).toEqual({ allowed: true, blockedIds: ['exchange', 'discard-goods'] })
+  })
+
+  it('does not open a closed stage or explicit window with request-level blocked ids', () => {
+    expect(computeAnytimePolicy(base({
+      stageResume: { hook: 'onBeforeEndGame', playerIndex: 0, cardIndex: 0 },
+      interactionKind: 'choice', blockedAnytimeIds: ['discard-goods'],
+    }))).toEqual({ allowed: false, reason: 'stage-hook-chain' })
+    expect(computeAnytimePolicy(base({
+      interactionKind: 'choice', anytimeWindow: { allowed: false }, blockedAnytimeIds: ['discard-goods'],
+    }))).toEqual({ allowed: false, reason: 'closed-window' })
+  })
+
   it('uses an explicit window at a stage wait without recognizing its prompt', () => {
     expect(computeAnytimePolicy(base({
       stageResume: { hook: 'onBeforeEndGame', playerIndex: 0, cardIndex: 0 },

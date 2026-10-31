@@ -1336,7 +1336,7 @@ export type InteractionRequest = (
       promptKey?: string
       requireAtLeastOne?: boolean
     }
-) & { anytimeWindow?: AnytimeWindow }
+) & { anytimeWindow?: AnytimeWindow; blockedAnytimeIds?: string[] }
 
 export type InteractionCommand =
   | 'submitSoloHandSelection'

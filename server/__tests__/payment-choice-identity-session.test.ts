@@ -1,3 +1,4 @@
+import { assertRejectedUnchanged } from './_helpers/session-assertions'
 import { describe, expect, it } from 'vitest'
 import { createWorkSession } from './_helpers/session-fixtures'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
@@ -48,6 +49,10 @@ describe('#1070 payment menu choice after an anytime action', () => {
     expect(logs(r, 'log.cardEffectPay')).toEqual([])
     expect(scoreOf(r, 'grains')).toBe(1)
     expect(scoreOf(r, 'vegetables')).toBe(1)
+    expect(r.interaction.anytimeActions.some(action => action.id === 'discard-goods')).toBe(false)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assertRejectedUnchanged(session, () => session.takeAnytimeAction(0, 'discard-goods'))
+    }
     const issued = choiceOptions(r).map((option) => option.value)
     const grain = choiceOptions(r).find((option) => paid(option) === '{"grain":1}')!
 

@@ -20,9 +20,14 @@ export type AnytimePolicyInput = {
   stageResume: StageResumeState | null
   interactionKind: AnytimeInteractionKind | undefined
   anytimeWindow?: AnytimeWindow
+  blockedAnytimeIds?: readonly string[]
 }
 
 export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
+  const allow = (blockedIds: readonly string[] = []): AnytimePolicy => ({
+    allowed: true,
+    blockedIds: [...new Set([...blockedIds, ...(input.blockedAnytimeIds ?? [])])],
+  })
   if (!input.hasActiveContext) {
     return { allowed: false, reason: 'no-active-interaction' }
   }
@@ -33,13 +38,13 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
     return { allowed: false, reason: 'engine-blocked' }
   }
   if (input.interactionKind === 'confirm-next-player') {
-    return { allowed: true, blockedIds: ['exchange'] }
+    return allow(['exchange'])
   }
   if (input.interactionKind === 'confirm-player-switch') {
     return { allowed: false, reason: 'confirm-window' }
   }
   if (input.interactionKind === 'animal-reorg') {
-    return { allowed: true, blockedIds: [] }
+    return allow()
   }
   if (input.anytimeWindow) {
     const window = input.anytimeWindow
@@ -47,11 +52,11 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
     if (window.blockedIds !== undefined && (!Array.isArray(window.blockedIds) || window.blockedIds.some((id) => typeof id !== 'string'))) {
       return { allowed: false, reason: 'closed-window' }
     }
-    return { allowed: true, blockedIds: [...(window.blockedIds ?? [])] }
+    return allow(window.blockedIds)
   }
   if (input.stageResume !== null) {
-    if (input.stageResume.extra?.roundPreparation) return { allowed: true, blockedIds: [] }
+    if (input.stageResume.extra?.roundPreparation) return allow()
     return { allowed: false, reason: 'stage-hook-chain' }
   }
-  return { allowed: true, blockedIds: [] }
+  return allow()
 }
