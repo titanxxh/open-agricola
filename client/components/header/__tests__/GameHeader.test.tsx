@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
+import { createRef } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -315,5 +316,42 @@ describe('GameHeader', () => {
     )
     expect(menu).not.toHaveAttribute('hidden')
     expect(screen.getByRole('button', { name: 'Propose ending the game' })).toBeVisible()
+  })
+
+  it.each([
+    { phase: 'work', headerState: state, embedded: false },
+    { phase: 'draft', headerState: snakeOpeningState({ phase: 'draft' }), embedded: false },
+    { phase: 'parent selection', headerState: snakeOpeningState({ phase: 'parent-selection' }), embedded: true },
+  ])('offers the encyclopedia entry during $phase', ({ headerState, embedded }) => {
+    const open = vi.fn()
+    const entry = createRef<HTMLButtonElement>()
+    render(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={headerState}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={false}
+          embedded={embedded}
+          onOpenEncyclopedia={open}
+          encyclopediaEntryRef={entry}
+        />
+      </LocaleProvider>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Look up cards' })
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(button).toHaveAttribute('title', 'Look up cards')
+    expect(entry.current).toBe(button)
+    fireEvent.click(button)
+    expect(open).toHaveBeenCalledOnce()
+  })
+
+  it('leaves the encyclopedia entry out when the game does not host the panel', () => {
+    renderHeader(state)
+    expect(screen.queryByRole('button', { name: 'Look up cards' })).toBeNull()
   })
 })
