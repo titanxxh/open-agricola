@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { GameState, Resource } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import { captureStateWithHistory } from '../../shared/session/history-streams'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { createWorkSession } from './_helpers/session-fixtures'
 import '../../shared/cards/C/C125_Nightworker'
@@ -119,6 +120,47 @@ describe('discard goods to the general supply', () => {
     const rejected = session.takeAnytimeAction(1, 'discard-goods')
     expect(rejected.ok).toBe(false)
     expect(session.getState().state.players[1]!.resources.clay).toBe(1)
+  })
+
+  it.each(['recipe', 'count'] as const)('preserves the grain needed by the pending bake %s choice', (stage) => {
+    const session = sessionFor((state) => {
+      state.round = 4
+      for (const player of state.players) {
+        Object.assign(player.resources, { sheep: 0, boar: 0, cattle: 0, begging: 0 })
+      }
+      const player = state.players[0]!
+      player.improvements = stage === 'recipe' ? ['Major_Fireplace1', 'Major_CookingHearth1'] : ['Major_Fireplace1']
+      Object.assign(player.resources, { grain: 2, food: 5 })
+    })
+    let pending = session.takeAction(0, 'grain-utilization')
+    expect(pending.ok, pending.error).toBe(true)
+    expect(pending.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0,
+      promptKey: stage === 'count' ? 'ui.interactionBakeBreadCount' : 'ui.interactionBakeBreadChoice',
+    })
+    expect(discardAction(pending)).toBeUndefined()
+    const before = structuredClone({ state: captureStateWithHistory(pending.state), interaction: pending.interaction, scores: pending.scores })
+    const rejected = session.takeAnytimeAction(0, 'discard-goods')
+    expect(rejected.ok).toBe(false)
+    expect({ state: captureStateWithHistory(rejected.state), interaction: rejected.interaction, scores: rejected.scores }).toEqual(before)
+
+    if (stage === 'recipe') {
+      pending = session.resolveChoice(0, 'Major_Fireplace1')
+      expect(pending.ok, pending.error).toBe(true)
+    }
+    const baked = session.resolveChoice(0, 'count-Major_Fireplace1-2')
+    expect(baked.ok, baked.error).toBe(true)
+    expect(baked.state.players[0]!.resources).toMatchObject({ grain: 0, food: 9 })
+    expect(baked.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.exchanged', exchangeSource: 'Major_Fireplace1', paid: { grain: 2 }, gained: { food: 4 },
+    }))
+    expect(baked.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.bakeBread', params: expect.objectContaining({ count: 2, food: 4 }),
+    }))
+    const previousScore = before.scores?.[0]
+    if (!previousScore) throw new Error('expected the pending bake score')
+    expect(baked.scores?.[0]?.total).toBe(previousScore.total - 2)
+    expect(baked.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
   })
 
   it('keeps wood and stone when Mayor Candidate forbids discarding them', () => {
