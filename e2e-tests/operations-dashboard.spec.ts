@@ -107,10 +107,21 @@ test('independent dashboards render registration, rooms and durable player openi
       '-e', 'GF_SERVER_HTTP_ADDR=127.0.0.1', '-e', `GF_SERVER_HTTP_PORT=${grafanaPort}`, '-e', `GF_SERVER_ROOT_URL=${base}/ops/`,
       '-e', `PROMETHEUS_URL=http://127.0.0.1:${prometheusPort}`, '-v', `${resolve('operations/grafana/grafana.ini')}:/etc/grafana/grafana.ini:ro`,
       '-v', `${resolve('operations/grafana/provisioning')}:/etc/grafana/provisioning:ro`, '-v', `${resolve('operations/grafana/dashboards')}:/etc/grafana/dashboards:ro`, 'grafana/grafana:13.2.3'])
+    const bundledPrometheus: { info: { version: string } } = JSON.parse(docker([
+      'exec', grafanaName, 'cat', '/usr/share/grafana/data/plugins-bundled/prometheus/plugin.json',
+    ]))
     await expect.poll(async () => { try { return (await request.get(grafanaBase + '/ops/api/health')).status() } catch { return 0 } }, { timeout: 60_000 }).toBe(200)
     const handoff = await request.post(base + '/api/admin/observability/session', { headers: { Authorization: 'Bearer visual-session' } })
     const { path } = await handoff.json()
     await page.goto(base + path)
+    const expectBundledPrometheus = async () => {
+      const response = await page.request.get(base + '/ops/api/plugins/prometheus/settings')
+      expect(response.ok(), await response.text()).toBe(true)
+      const settings: { info: { version: string } } = await response.json()
+      expect(settings.info.version).toBe(bundledPrometheus.info.version)
+      panelViews.push({ prometheusPluginVersion: settings.info.version })
+    }
+    await expectBundledPrometheus()
     for (const title of ['现存注册账户', '今日新增注册（UTC+8）', '近24小时新增注册', '近7天新增注册', '房间数量']) {
       await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible({ timeout: 30_000 })
     }
@@ -339,6 +350,8 @@ test('independent dashboards render registration, rooms and durable player openi
       await expect(region.getByText('未知', { exact: true })).toBeVisible({ timeout: 30_000 })
     }
     await page.screenshot({ path: 'output/players-dashboard-empty-cohort.png', fullPage: true })
+    await expectBundledPrometheus()
+    expect(docker(['logs', grafanaName])).not.toMatch(/logger=plugin\.installer .*msg="Updating plugin"/)
   } finally {
     page.off('requestfinished', capturePanel)
     await page.close()
