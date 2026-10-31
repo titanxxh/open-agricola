@@ -3,6 +3,7 @@ import type { EncyclopediaCost, EncyclopediaCostPath, EncyclopediaEntry, Encyclo
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { t, type Locale } from '../../../shared/i18n'
 import { getCardDisplayName } from '../../components/common/cardText'
+import { paymentResourceIconClass } from '../../components/common/resource-icon-class'
 import { ResourceText } from '../../components/common/ResourceText'
 import { EncyclopediaFace } from './EncyclopediaFace'
 import type { EncyclopediaItem } from './encyclopedia-item'
@@ -156,15 +157,13 @@ function TextSection({ item, field, label, locale }: { item: EncyclopediaItem; f
 const playersText = (players: NonNullable<EncyclopediaEntry['players']>, locale: Locale): string =>
   'minimum' in players ? `${players.minimum}+` : players.counts.join(t(locale, 'ui.listSeparator'))
 
-const ICON_CLASSES: Readonly<Partial<Record<string, string>>> = { fence: 'fence-icon', stable: 'barn' }
-
 function CostPath({ path, locale }: { path: EncyclopediaCostPath; locale: Locale }) {
   return (
     <span className="encyclopedia-cost__path">
       {PAYMENT_RESOURCE_KEYS.filter(key => (path[key] ?? 0) > 0).map(key => (
         <span key={key} className="encyclopedia-cost__resource">
           {path[key]}
-          <span className={`res-icon res-icon-${ICON_CLASSES[key] ?? key}`} role="img" aria-label={t(locale, `resources.${key}`)} title={t(locale, `resources.${key}`)} />
+          <span className={`res-icon res-icon-${paymentResourceIconClass(key)}`} role="img" aria-label={t(locale, `resources.${key}`)} title={t(locale, `resources.${key}`)} />
         </span>
       ))}
     </span>
