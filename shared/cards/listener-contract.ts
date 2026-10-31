@@ -6,7 +6,6 @@ import { getCardListenerSource, setCardListenerSource } from './card-listener-so
 const actionPhases = ['before', 'immediatelyAfter', 'after', 'computeCosts', 'computeArgs', 'computeChoiceCandidates', 'computeReplace', 'isDoable'] as const
 export const actionSpaceListenerPhases = ['before', 'immediatelyAfter', 'after', 'computeReplace', 'isDoable'] as const
 export type ActionSpaceListenerPhase = typeof actionSpaceListenerPhases[number]
-export type ReactionSettlement = 'body' | 'action' | 'completion'
 
 /** Subscription permission is deliberate; registering an executable action does not grant it. */
 export const listenerActionContract = {
@@ -59,8 +58,6 @@ type ListenerFilters = {
   events?: unknown
   phases?: unknown
   globalQuery?: unknown
-  settlement?: unknown
-  mandatory?: unknown
 }
 
 export function listenerContractError(listener: ListenerFilters): string | undefined {
@@ -69,11 +66,7 @@ export function listenerContractError(listener: ListenerFilters): string | undef
   if (!Array.isArray(phases) || phases.length === 0) return fail('explicit nonempty phases are required')
   const selectors = [listener.actions, listener.actionSpaces, listener.events, listener.globalQuery].filter(value => value !== undefined).length
   if (selectors !== 1) return fail('declare exactly one actions, actionSpaces, events or globalQuery selector')
-  if (listener.settlement !== undefined) {
-    if (!listener.actions || (listener.settlement !== 'body' && listener.settlement !== 'action' && listener.settlement !== 'completion')) return fail('settlement requires rule-action targets and a known boundary')
-    if (!phases.every(phase => phase === 'after' || phase === 'immediatelyAfter')) return fail('settlement requires completion phases')
-    if (listener.settlement === 'body' && (listener.mandatory !== true || !phases.every(phase => phase === 'after'))) return fail('body settlement requires mandatory after')
-  }
+  if ('settlement' in listener) return fail('settlement is unsupported; use listener phases and reaction windows')
   if (listener.actionSpaces !== undefined) {
     if (listener.actionSpaces !== 'all' && (!Array.isArray(listener.actionSpaces) || listener.actionSpaces.length === 0
       || !listener.actionSpaces.every(id => typeof id === 'string' && id.trim().length > 0))) {

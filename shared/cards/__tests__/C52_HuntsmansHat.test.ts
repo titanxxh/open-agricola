@@ -117,7 +117,7 @@ describe('C052_HuntsmansHat', () => {
   })
 
   // The reference C52 listens to **any** Gain event with `fromActionSpace`. We mirror
-  // that with a `phase: 'after'` listener on { gain | collect | receive } and
+  // that with a `phase: 'immediatelyAfter'` listener on { gain | collect | receive } and
   // gate on action-space resource.moved boar events.
 
   it('adds food equal to boar gained from pig-market collect', () => {
@@ -131,7 +131,7 @@ describe('C052_HuntsmansHat', () => {
       player,
       space: { ...createSpace('pig-market'), resources: { ...createSpace('pig-market').resources, boar: 2 } },
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok' },
       transactionEvents: [event],
       actionEvents: [event],
@@ -157,7 +157,7 @@ describe('C052_HuntsmansHat', () => {
       player,
       space: createSpace('day-laborer'),
       actionId: 'gain',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok' },
       transactionEvents: [event],
       actionEvents: [event],
@@ -179,7 +179,7 @@ describe('C052_HuntsmansHat', () => {
       player,
       space: createSpace('day-laborer'),
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok' },
       transactionEvents: [],
       actionEvents: [],

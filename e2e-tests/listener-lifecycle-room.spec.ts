@@ -30,6 +30,72 @@ const assertReadOnly = async (observer: Page) => {
   await expect(observer.locator('.exchange-confirm:enabled')).toHaveCount(0)
 }
 
+test('Hat, Spear and Steam Machine share a player-ordered window across room reloads', async ({ browser, request }, testInfo) => {
+  const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
+  const hat = 'C052_HuntsmansHat', spear = 'E053_BoarSpear', steam = 'C025_SteamMachine'
+  try {
+    await joinRoomClients(pages, request)
+    const driver = roomDriver(pages)
+    const fixture = createWorkSession({ seed: 42, configure: state => {
+      state.round = 10
+      for (const player of state.players) {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+        for (const key of Object.keys(player.resources)) Reflect.set(player.resources, key, 0)
+      }
+      for (const space of state.actionSpaces) space.takenBy = []
+      const owner = state.players[0]!
+      owner.minorPlayed = [hat, spear, steam]
+      owner.improvements = ['Major_Fireplace1']
+      owner.resources.grain = 1
+      state.actionSpaces.find(space => space.id === 'grain-seeds')!.takenBy = [{ playerId: owner.id, workerId: owner.workers[1]!.id }]
+      state.actionSpaces.find(space => space.id === 'pig-market')!.resources.boar = 1
+    } })
+    try {
+      await driver.command(0, { type: 'loadGame', state: fixture.withCtx(() => serializeState(fixture.state, {})) })
+    } finally { fixture.dispose() }
+    await driver.command(0, { type: 'action', spaceId: 'pig-market' })
+    let current = await roomSnapshot(pages[0])
+    while (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'animal-reorg') {
+      await driver.command(0, { type: 'choice', value: 'confirm', payload: { zones: current.interaction.request.zones } })
+      current = await roomSnapshot(pages[0])
+    }
+    current = await assertClientsAgree(pages)
+    expect(current.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'select-trigger' } })
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 0, boar: 1, grain: 1 })
+    expect(options(current).map(option => option.sourceCard)).toEqual(expect.arrayContaining([hat, spear, steam]))
+    await assertReadOnly(pages[1])
+    await pages[0].screenshot({ path: testInfo.outputPath('shared-immediate-window.png') })
+    await driver.ui(0, () => pages[0].locator(`.interaction-bar [data-choice-value="${steam}"]`).click())
+    await driver.ui(0, () => pages[0].locator('.interaction-bar [data-choice-value="__skip__"]').click())
+    current = await assertClientsAgree(pages)
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 0, boar: 1, grain: 1 })
+    expect(options(current).map(option => option.sourceCard)).not.toContain(steam)
+    const pending = { public: publicRoomState(current), interaction: current.interaction }
+    await driver.reload()
+    current = await assertClientsAgree(pages)
+    expect(publicRoomState(current)).toEqual(pending.public)
+    expect(current.interaction).toEqual(pending.interaction)
+    await driver.ui(0, () => pages[0].locator(`.interaction-bar [data-choice-value="${hat}"]`).click())
+    current = await assertClientsAgree(pages)
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 1, boar: 1, grain: 1 })
+    await driver.ui(0, () => pages[0].locator(`.interaction-bar [data-choice-value="${spear}"]`).click())
+    const accept = nonSkip(await roomSnapshot(pages[0]))
+    await driver.ui(0, () => pages[0].locator(`.interaction-bar [data-choice-value="${accept.value}"]`).click())
+    await pages[0].locator('[data-testid^="anytime-exchange-option-E053_BoarSpear-"]')
+      .getByRole('button', { name: '+', exact: true }).click()
+    await driver.ui(0, () => pages[0].locator('.exchange-confirm').click())
+    current = await assertClientsAgree(pages)
+    expect(current.state.players[0]!.resources).toMatchObject({ food: 5, boar: 0, grain: 1 })
+    expect(current.state.events.filter(event => event.type === 'card.triggered' &&
+      [hat, spear, steam].includes(event.sourceCardId ?? '')).map(event => event.sourceCardId)).toEqual([hat, spear])
+    expect(current.state.log.filter(entry => entry.key === 'log.cardTriggered' && entry.params?.cardId === hat)).toHaveLength(1)
+    const finished = publicRoomState(current)
+    await driver.reload()
+    expect(publicRoomState(await assertClientsAgree(pages))).toEqual(finished)
+  } finally { await Promise.all(pages.map(page => page.close())) }
+})
+
 test('C094 drains Potter\'s Yard before Toolbox and preserves both room clients across child and purchase reloads', async ({ browser, request }) => {
   const pages: [Page, Page] = [await browser.newPage(), await browser.newPage()]
   try {

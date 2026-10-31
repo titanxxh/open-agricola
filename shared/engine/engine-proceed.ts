@@ -2,7 +2,6 @@ import { createMoorSpecialActionSpace } from '../moor/special-action-space'
 import { actionSpaceQueryContext } from './space-use-nodes'
 import { inheritPrimaryBody } from './primary-body-nodes'
 import { inheritSpaceEffectSource } from './effect-source'
-import { settleHostReactions } from './reaction-settlement'
 import { captureSpaceUseEvents } from './space-use-runtime'
 import { preparePrimaryCompletions, executeCompletionPhase } from './completion-runtime'
 import { evaluateFlowDoable, isActionDoableInFlowContext, isActionVetoedInFlowContext } from '../actions/flow'
@@ -863,7 +862,8 @@ const executeDeferredHostAction = (
   )
   const trailingHookNodes = [
     ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state, executionContext.actionContext),
-    ...settleHostReactions(int, node, [...immediateActivateNodes, ...afterActivateNodes]),
+    ...immediateActivateNodes,
+    ...afterActivateNodes,
     ...afterHostNodes,
   ]
   const leadingNodes = [
@@ -1513,7 +1513,8 @@ export function engineProceed(
     // insertAfter), and trailing hooks AFTER the flow.
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state, executionContext.actionContext),
-      ...settleHostReactions(int, node, [...immediateActivateNodes, ...afterActivateNodes]),
+      ...immediateActivateNodes,
+      ...afterActivateNodes,
       ...afterHostNodes,
     ]
     const leadingNodes = [

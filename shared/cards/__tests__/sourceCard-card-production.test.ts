@@ -193,7 +193,7 @@ describe('sourceCard card production contract', () => {
       player,
       space: createSpace('boar-market'),
       actionId: 'gain',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { boar: 2 } },
       transactionEvents: actionEvents,
       actionEvents,

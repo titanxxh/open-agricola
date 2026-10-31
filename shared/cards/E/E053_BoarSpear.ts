@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { DraftGameEvent, ResourceExchangedEvent, ResourceMovedEvent } from '../../contract/events'
@@ -88,9 +88,8 @@ const animalPaymentPreference = (context: CardListenerContext) => {
 const obtainListener: CardListenerRegistration = {
   id: 'E53-boar-spear-after-obtain',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['gain', 'collect', 'receive'],
-  settlement: 'action',
+  phases: ['immediatelyAfter'],
+  actions: [...TRACKED_ACTIONS],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!(TRACKED_ACTIONS as readonly string[]).includes(context.actionId)) return
 
@@ -117,7 +116,7 @@ const obtainListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [obtainListener, { ...obtainListener, id: 'E53-boar-spear-after-exchange', actions: ['exchange'], settlement: 'completion' }],
+  listeners: [obtainListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

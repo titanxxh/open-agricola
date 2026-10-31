@@ -107,15 +107,7 @@ describe('C052_HuntsmansHat server session', () => {
   })
 })
 
-/**
- * The reference C52 listens to **any** Gain event with `fromActionSpace`, summing
- * obtained PIG and emitting `gainNode([FOOD => N])`. Our previous
- * implementation only handled `pig-market` collect; we now match the reference by
-   * listening to `phase: 'after', actions: ['gain','collect','receive']` and
-   * inspecting action-space resource.moved boar events. AnimalMarket flow modification
- * (sheep+food / boar+food / pay-food→cattle xor) is NOT implemented since
- * we have no AnimalMarket action space — registered as §2.5.
- */
+
 describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)', () => {
   const setupListenerContext = (
     actionId: string,
@@ -137,7 +129,7 @@ describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)',
       player,
       space: { id: spaceId } as never,
       actionId,
-      phase: 'after' as const,
+      phase: 'immediatelyAfter' as const,
       result,
       transactionEvents: boarGained > 0
         ? [moved({ resources: { boar: boarGained }, from: { kind: 'actionSpace', spaceId } })]
@@ -236,7 +228,7 @@ describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)',
       player,
       space: { id: 'unrelated' } as never,
       actionId: 'plow',
-      phase: 'after' as const,
+      phase: 'immediatelyAfter' as const,
       result: { type: 'ok', resourcesGained: { boar: 5 } } as ActionExecutionResult,
     } as unknown as CardListenerContext
     // Listener is filtered by `actions: ['gain','collect','receive']`, so

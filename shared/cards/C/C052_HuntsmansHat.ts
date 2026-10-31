@@ -11,8 +11,7 @@ const TRACKED_ACTIONS = ['gain', 'collect', 'receive'] as const
 const huntsmansHatListener: CardListenerRegistration = {
   id: 'C52-huntsmans-hat-after-boar-gain',
   cardIds: [CARD_ID],
-  phases: ['after'],
-  settlement: 'body',
+  phases: ['immediatelyAfter'],
   mandatory: true,
   actions: [...TRACKED_ACTIONS],
   handler: (context: CardListenerContext): ActionHookResult | void => {

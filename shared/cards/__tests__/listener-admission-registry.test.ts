@@ -89,12 +89,10 @@ describe('listener registration admission', () => {
     }
   })
 
-  it.each(['action', 'body', 'completion'] as const)('retains the %s settlement boundary through clone and merge', settlement => {
+  it.each(['action', 'body', 'completion'] as const)('rejects the removed %s settlement option', settlement => {
     const registry = new CardRegistry()
-    registry.registerListener({ ...valid(), settlement, mandatory: true, phases: ['after'] })
-    const merged = new CardRegistry()
-    merged.mergeFrom(registry.clone())
-    expect(merged.getAllListeners()[0]?.settlement).toBe(settlement)
+    expect(() => Reflect.apply(registry.registerListener, registry, [{ ...valid(), settlement, mandatory: true }])).toThrow(/settlement/)
+    expect(registry.getAllListeners()).toEqual([])
   })
 
   it.each(['before', 'immediatelyAfter', 'after', 'computeReplace', 'isDoable'] as const)('admits explicit IDs and all at the action-space %s boundary', phase => {
