@@ -1,0 +1,698 @@
+<meta charset="utf-8">
+<title>Legendairy Forest 牌区草图</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+/* Layout: dark prototype control strip, then a mock game page (desktop: board | farm | rail+log; phone: one column).
+   Legendairy Forest surfaces use the plum --lf hue so they read apart from the green base board. */
+:root{
+  --bg:#efe6cf; --paper:#fdf6e3; --card:#fffdf7; --ink:#1e1e1e; --ink2:#5a3a20; --muted:#7f6e55;
+  --line:#cdb996; --line2:#e8d5b7; --board:#88a862; --board-ink:#23361a;
+  --green:#3a5a2c; --on-green:#ffffff; --green-bg:#e4eed6; --gold:#b9860c; --gold-bg:#fff1cf;
+  --lf:#5d3f73; --on-lf:#ffffff; --lf-bg:#f2e9f6; --lf-line:#cbb3d8;
+  --p1:#c0392b; --p2:#2e5fa8; --danger:#b03a2e; --danger-bg:#fbe5e1;
+  --ctrl:#20291b; --ctrl-fg:#f2ead6; --ctrl-line:#3c4a33; --scrim:rgba(24,18,8,.48);
+  --shadow:0 1px 2px rgba(60,40,10,.14),0 6px 18px rgba(60,40,10,.10);
+  --font:"Inter","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083;
+  --line:#5a4e38; --line2:#41392a; --board:#34472a; --board-ink:#dfe9d2;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018;
+  --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --danger:#f08273; --danger-bg:#46241f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --scrim:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083;
+  --line:#5a4e38; --line2:#41392a; --board:#34472a; --board-ink:#dfe9d2;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018;
+  --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --danger:#f08273; --danger-bg:#46241f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --scrim:rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--font)}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3,h4,p,ul,ol{margin:0}
+ul,ol{padding-left:18px}
+.tree{width:11px;height:13px;fill:currentColor;vertical-align:-2px;flex:none}
+
+/* prototype controls */
+.ctrl{position:relative;z-index:70;background:var(--ctrl);color:var(--ctrl-fg);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ctrl-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.ctrl h1{font-size:15px;font-weight:650;letter-spacing:.02em;margin-right:6px}
+.ctrl .tag{font-size:11px;border:1px solid var(--ctrl-line);border-radius:99px;padding:2px 8px;opacity:.85}
+.ctrl label{display:flex;gap:6px;align-items:center;font-size:13px}
+.ctrl select{background:var(--ctrl);border:1px solid var(--ctrl-line);border-radius:6px;padding:4px 6px;color:var(--ctrl-fg);max-width:220px}
+.ctrl .steps{display:flex;gap:6px;align-items:center}
+.ctrl .steps button{background:transparent;border:1px solid var(--ctrl-line);border-radius:6px;padding:3px 10px;color:var(--ctrl-fg)}
+.ctrl .steps button:disabled{opacity:.35;cursor:default}
+.ctrl .steplabel{font-size:13px;font-variant-numeric:tabular-nums}
+.ctrl .hint{margin-top:8px;font-size:12.5px;line-height:1.6;opacity:.9;max-width:1100px}
+.ctrl .hint b{color:var(--gold)}
+
+/* variant switcher pill (prototype chrome) */
+.vpill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;align-items:center;gap:4px;background:var(--ctrl);color:var(--ctrl-fg);border-radius:99px;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:13px;white-space:nowrap}
+.vpill button{background:transparent;border:0;color:inherit;width:34px;height:34px;border-radius:50%;font-size:16px}
+.vpill button:hover{background:var(--ctrl-line)}
+.vpill span{padding:0 6px;font-variant-numeric:tabular-nums}
+
+/* stage around the mock app */
+.stage{padding-block:16px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.shell{position:relative;max-width:1360px;margin:0 auto}
+.shell.frame{width:390px;max-width:100%;height:min(820px,calc(100dvh - 190px));min-height:520px;border:10px solid var(--ctrl);border-radius:32px;overflow:hidden;transform:translateZ(0);background:var(--paper);box-shadow:var(--shadow)}
+.shell.frame .scroller{height:100%;overflow:auto;padding:0 10px 150px}
+.shell:not(.frame) .scroller{padding-bottom:120px}
+.flayer>*{position:fixed}
+.frame .flayer>*{position:absolute}
+
+/* mock game chrome */
+.ghead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:10px}
+.ghead strong{font-size:15px}
+.ghead .who{font-size:12px;color:var(--muted)}
+.stagebar{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px;margin:8px 0}
+.stagebar span{font-size:11px;text-align:center;border-radius:4px;padding:2px 0;background:var(--line2);color:var(--muted);font-variant-numeric:tabular-nums}
+.stagebar span.past{background:var(--green-bg);color:var(--green)}
+.stagebar span.now{background:var(--green);color:var(--on-green);font-weight:650}
+.stagebar span.h{box-shadow:inset 0 -2px 0 var(--gold)}
+.cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr) minmax(250px,.8fr);gap:12px;align-items:start}
+.m .cols{display:flex;flex-direction:column;gap:10px}
+.col{display:grid;gap:12px;min-width:0}
+.m .col{gap:10px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.panel>h3{font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.panel h4{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600;margin:12px 0 6px}
+.sub{font-size:12px;color:var(--muted);font-weight:400}
+
+/* action board */
+.board{background:var(--board);border-radius:12px;padding:10px;color:var(--board-ink)}
+.board .bh{display:flex;justify-content:space-between;font-size:12px;margin:2px 2px 8px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:10px}
+.m .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.m .rgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sp{position:relative;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 7px;min-height:74px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.sp b{font-size:12.5px;line-height:1.3}
+.sp small{font-size:11px;color:var(--muted);line-height:1.35}
+.sp .goods{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.sp .rn{position:absolute;top:4px;right:6px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sp.future{background:transparent;border:1px dashed var(--board-ink);color:var(--board-ink);opacity:.75;align-items:center;justify-content:center;text-align:center}
+.sp.future small{color:inherit}
+.sp.hl{outline:3px solid var(--gold);outline-offset:1px}
+.sp.withdrawn{background:repeating-linear-gradient(135deg,var(--line2) 0 6px,var(--card) 6px 12px)}
+.sp.withdrawn b{text-decoration:line-through;text-decoration-thickness:1.5px}
+.stamp{display:inline-flex;gap:4px;align-items:center;font-size:10.5px;font-weight:650;color:var(--lf);background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:4px;padding:1px 5px;align-self:flex-start;line-height:1.4}
+.sp.lfsp{border:1.5px solid var(--lf);background:linear-gradient(var(--lf-bg),var(--card) 60%)}
+.sp .badge{font-size:10px;color:var(--on-lf);background:var(--lf);border-radius:3px;padding:0 4px;align-self:flex-start;display:inline-flex;gap:3px;align-items:center}
+.note-gold{font-size:10.5px;color:var(--gold);font-weight:600;line-height:1.35}
+.mp{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600}
+.mp i{display:inline-block;width:11px;height:13px;border-radius:5px 5px 2px 2px;position:relative;background:currentColor}
+.mp.p1{color:var(--p1)} .mp.p2{color:var(--p2)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
+.dot.p1{background:var(--p1)} .dot.p2{background:var(--p2)}
+.cardrow{margin-top:10px;background:var(--paper);border-radius:9px;padding:8px;color:var(--ink)}
+.cardrow h4{margin:0 0 6px}
+.hscroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.hscroll>*{flex:0 0 150px}
+
+/* card faces */
+.cf{background:var(--card);border:1px solid var(--lf-line);border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0;color:var(--ink)}
+.cf .top{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;color:var(--lf);font-weight:650}
+.cf .nm{font-weight:650;font-size:13px;line-height:1.3}
+.cf .tx{font-size:11.5px;color:var(--muted);line-height:1.45}
+.cf .dest{font-size:10.5px;color:var(--ink2);border-top:1px dashed var(--line2);padding-top:4px;margin-top:auto}
+.cf.lg{padding:14px;gap:8px;border:2px solid var(--lf);box-shadow:var(--shadow)}
+.cf.lg .nm{font-size:20px}
+.cf.lg .tx{font-size:13.5px}
+.cf.mini{padding:5px 7px;gap:2px}
+.cf.mini .nm{font-size:12px}
+.typ{font-size:10.5px;border:1px solid var(--lf-line);border-radius:3px;padding:0 4px;color:var(--lf);font-weight:500}
+.back{background:repeating-linear-gradient(45deg,var(--lf) 0 5px,color-mix(in srgb,var(--lf) 80%,var(--paper)) 5px 10px);border-radius:8px;border:2px solid var(--lf-line);display:grid;place-items:center;color:var(--on-lf);font-weight:700;font-size:13px;text-align:center;line-height:1.3}
+
+/* farm & players */
+.farm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.tile{aspect-ratio:1;max-width:100%;border-radius:5px;background:var(--green-bg);border:1px solid var(--line2);display:grid;place-items:center;font-size:11px;color:var(--muted)}
+.tile.room{background:var(--gold-bg);color:var(--ink2)}
+.tile.field{background:color-mix(in srgb,var(--gold) 28%,var(--paper));color:var(--ink2)}
+.tile.plow{outline:2px dashed var(--gold);outline-offset:-3px}
+.owned{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.owned .cf{flex:1 1 140px;max-width:220px}
+.lfmark{display:inline-flex;gap:3px;align-items:center;font-size:10.5px;color:var(--lf);font-weight:600}
+.markers{letter-spacing:2px;color:var(--lf);font-size:12px}
+.plist{display:grid;gap:6px}
+.prow{display:grid;gap:3px;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--card)}
+.prow .pn{display:flex;justify-content:space-between;gap:6px;font-weight:600;font-size:13px}
+.prow .res{display:flex;flex-wrap:wrap;gap:3px 9px;font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.prow.act{border-color:var(--green)}
+.crown{font-size:10.5px;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:0 6px;font-weight:650;white-space:nowrap;align-self:start}
+.m .players-strip .plist{grid-template-columns:1fr 1fr}
+
+/* log */
+.log{display:grid;gap:2px;max-height:360px;overflow:auto;font-size:12.5px}
+.m .log{max-height:none}
+.log .rh{font-size:11px;color:var(--muted);font-weight:650;margin-top:6px;letter-spacing:.04em}
+.log .le{padding:2px 0 2px 8px;border-left:2px solid var(--line2);line-height:1.5}
+.log .le.lf{border-left-color:var(--lf)}
+.log .le .src{color:var(--lf);font-weight:600}
+.chips{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);border-radius:99px;padding:2px 10px;font-size:12px;background:var(--card)}
+.chip[aria-pressed="true"]{background:var(--lf);color:var(--on-lf);border-color:var(--lf)}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:6px 12px;min-height:36px}
+.btn.pri{background:var(--green);border-color:var(--green);color:var(--on-green);font-weight:600}
+.btn.lfb{background:var(--lf);border-color:var(--lf);color:var(--on-lf);font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.sm{min-height:30px;padding:3px 9px;font-size:12px}
+.linkbtn{background:none;border:0;color:var(--lf);padding:0;text-decoration:underline;font-size:12px}
+
+/* interaction bar */
+.ibar{left:50%;transform:translateX(-50%);bottom:calc(58px + env(safe-area-inset-bottom,0px));width:min(760px,calc(100% - 32px));z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;display:grid;gap:6px}
+.frame .ibar{bottom:8px;width:calc(100% - 16px)}
+.ibar .t{font-weight:650;font-size:13.5px}
+.ibar .x{font-size:12.5px;color:var(--muted);line-height:1.5}
+.ibar .bs{display:flex;gap:8px;flex-wrap:wrap}
+.ibar.wait{background:var(--paper)}
+.tlist{display:grid;gap:4px;font-size:12.5px}
+.tlist div{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line2);border-radius:6px;padding:4px 8px;background:var(--paper)}
+.tlist .must{color:var(--lf);font-weight:600}
+
+/* toasts */
+.toasts{top:calc(12px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));z-index:40;display:grid;gap:8px;width:min(360px,calc(100% - 32px))}
+.frame .toasts{top:8px;right:8px;width:calc(100% - 16px)}
+.toast{background:var(--card);border:1px solid var(--lf-line);border-left:4px solid var(--lf);border-radius:9px;padding:9px 11px;box-shadow:var(--shadow);font-size:13px;display:grid;gap:4px;animation:drop .35s ease-out}
+.toast .tt{display:flex;justify-content:space-between;gap:8px;align-items:start}
+@keyframes drop{from{transform:translateY(-8px);opacity:.3}}
+@keyframes glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--lf) 70%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+.glow{animation:glow 1.2s ease-out 2}
+@keyframes flyin{from{transform:translateX(-40px) rotateY(80deg);opacity:0}}
+.flyin{animation:flyin .5s ease-out}
+@media (prefers-reduced-motion:reduce){.toast,.glow,.flyin{animation:none}}
+
+/* overlays */
+.scrim{inset:0;background:var(--scrim);z-index:50;display:grid;place-items:center;padding:16px}
+.modal{background:var(--paper);border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);padding:16px;width:min(620px,100%);max-height:100%;overflow:auto;display:grid;gap:12px}
+.modal h2{font-size:17px}
+.peek{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.m .peek,.frame .peek{grid-template-columns:1fr}
+.peek .slot{display:grid;gap:6px}
+.peek .pos{font-size:11px;font-weight:650;color:var(--lf)}
+.peek .mv{display:flex;gap:6px}
+.privacy{font-size:12px;color:var(--ink2);background:var(--gold-bg);border-radius:6px;padding:6px 9px;line-height:1.5}
+.memo{font-size:12px;border:1px dashed var(--lf);border-radius:8px;padding:7px 9px;color:var(--ink2);background:var(--lf-bg);line-height:1.55}
+
+/* A: expansion panel */
+.lfA{border-color:var(--lf-line);background:linear-gradient(var(--lf-bg),var(--paper) 140px)}
+.lfA>h3{color:var(--lf)}
+.lfA-top{display:grid;grid-template-columns:96px minmax(0,1fr) 96px;gap:10px;align-items:stretch}
+.m .lfA-top{grid-template-columns:80px minmax(0,1fr)}
+.m .lfA-top .disc{grid-column:1/-1}
+.deckbox{display:grid;gap:4px;align-content:start;font-size:11.5px;color:var(--muted);text-align:center}
+.deckbox .back{height:112px}
+.m .deckbox .back{height:96px}
+.slotA{border:1.5px dashed var(--lf-line);border-radius:10px;padding:8px;display:grid;gap:6px;align-content:start;min-width:0}
+.slotA .cap{font-size:11.5px;color:var(--muted)}
+.status{font-size:11px;font-weight:650;border-radius:99px;padding:1px 8px;justify-self:start}
+.status.res{background:var(--gold-bg);color:var(--gold)}
+.status.done{background:var(--green-bg);color:var(--green)}
+.res-lines{font-size:12px;line-height:1.55;color:var(--ink2);padding-left:16px}
+.rules{list-style:none;padding:0;display:grid;gap:6px}
+.rule{border:1px solid var(--line2);background:var(--card);border-radius:8px;padding:6px 9px;display:grid;gap:2px}
+.rule .rt{font-weight:650;font-size:12.5px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.rule .rx{font-size:11.5px;color:var(--muted);line-height:1.45}
+.srcchip{font-size:10.5px;font-weight:600;color:var(--lf);white-space:nowrap}
+.lfspaces{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.discbox{display:grid;gap:4px;align-content:start;text-align:center;font-size:11.5px;color:var(--muted)}
+.discbox .back{height:70px;background:var(--line2);color:var(--muted);border-color:var(--line)}
+
+/* B: stage + rail */
+.stageB{width:min(520px,100%);background:var(--paper);border-radius:16px;border:2px solid var(--lf);padding:16px;display:grid;gap:12px;box-shadow:var(--shadow);max-height:100%;overflow:auto}
+.stageB .who{font-size:13px;color:var(--ink2);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.stageB .kick{font-size:11px;letter-spacing:.12em;color:var(--lf);font-weight:700}
+.railB{border-color:var(--lf-line)}
+.railB>h3{color:var(--lf)}
+.deckline{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.thumbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.drawtbl{width:100%;border-collapse:collapse;font-size:11.5px;font-variant-numeric:tabular-nums}
+.drawtbl th,.drawtbl td{text-align:left;padding:3px 4px;border-bottom:1px solid var(--line2);vertical-align:top}
+.drawtbl th{color:var(--muted);font-weight:600}
+.tblwrap{overflow-x:auto}
+.fab{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(170px + env(safe-area-inset-bottom,0px));z-index:35;background:var(--lf);color:var(--on-lf);border:0;border-radius:99px;padding:9px 14px;font-weight:650;box-shadow:var(--shadow);display:flex;gap:6px;align-items:center}
+.frame .fab{bottom:150px}
+.sheet{left:0;right:0;bottom:0;z-index:55;background:var(--paper);border-radius:16px 16px 0 0;border-top:2px solid var(--lf);max-height:78%;overflow:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+.sheet-scrim{inset:0;background:var(--scrim);z-index:54}
+
+/* C: track */
+.trackC{background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:12px;padding:10px;display:grid;grid-template-columns:110px 24px minmax(160px,1fr) 24px minmax(0,2.6fr) 96px;gap:8px;align-items:stretch;margin-bottom:8px}
+.trackC .arrow{display:grid;place-items:center;color:var(--lf);font-size:18px}
+.zone{display:grid;gap:5px;align-content:start;min-width:0}
+.zone .zh{font-size:11px;font-weight:700;color:var(--lf);letter-spacing:.06em;display:flex;justify-content:space-between;gap:6px}
+.zone .back{height:96px}
+.zone.empty .ph{border:1.5px dashed var(--lf-line);border-radius:9px;min-height:96px;display:grid;place-items:center;font-size:12px;color:var(--muted);text-align:center;padding:6px}
+.disp{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.disp>.dwrap{flex:0 0 150px;display:grid;gap:4px;align-content:start}
+.ruletag{font-size:10.5px;line-height:1.4;color:var(--ink2);background:var(--card);border:1px solid var(--lf-line);border-radius:5px;padding:2px 6px}
+.offcard{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
+.offcard .ruletag{font-size:11.5px}
+.trackMini{position:sticky;top:0;z-index:5;background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:10px;padding:8px 10px;display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;margin-bottom:8px;width:100%;text-align:left;color:var(--ink)}
+.trackMini b{color:var(--lf)}
+.m .trackC{grid-template-columns:1fr;gap:10px}
+.m .trackC .arrow{display:none}
+.m .zone.deckz{grid-template-columns:72px minmax(0,1fr);align-items:start}
+.m .zone.deckz .zh{grid-column:1/-1}
+.m .zone .back{height:84px}
+
+/* lobby */
+.lobby{max-width:640px;margin:16px auto;display:grid;gap:12px}
+.toggle{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line2)}
+.toggle input{width:18px;height:18px;margin-top:2px;accent-color:var(--green)}
+.toggle .h{display:block;font-size:12px;color:var(--muted);line-height:1.5}
+.toggle.lfon{background:var(--lf-bg);border-radius:8px;padding:8px;border-bottom:0}
+details.sum{font-size:12.5px;color:var(--ink2);margin-top:4px}
+details.sum summary{cursor:pointer;color:var(--lf);font-weight:600}
+details.sum ul{margin-top:4px;line-height:1.6}
+.cfglist{display:grid;gap:4px;font-size:13px}
+.cfglist div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line2);padding:3px 0}
+.pillrow{display:flex;flex-wrap:wrap;gap:6px}
+.pillrow span{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:2px 9px;background:var(--card)}
+.pillrow span.lf{border-color:var(--lf);color:var(--lf);font-weight:600}
+
+/* score pad */
+.score{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.score th,.score td{padding:4px 6px;border-bottom:1px solid var(--line2);text-align:right}
+.score th:first-child,.score td:first-child{text-align:left}
+.score .grp td{background:var(--lf-bg);color:var(--lf);font-weight:700;font-size:11.5px;letter-spacing:.04em}
+.score .tot td{font-weight:700;border-top:2px solid var(--line)}
+.score small{color:var(--muted)}
+.unowned{display:grid;gap:8px}
+.unowned .u{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:start}
+.m .unowned .u,.frame .unowned .u{grid-template-columns:1fr}
+.evals{display:grid;gap:3px;font-size:12.5px}
+.evals div{display:flex;justify-content:space-between;gap:8px}
+</style>
+
+<div class="ctrl" id="ctrl"></div>
+<div class="stage"><div id="shell" class="shell"></div></div>
+<div class="vpill" id="vpill"></div>
+
+<script>
+// PROTOTYPE · throwaway. Fixed demo data, no game commands, no rules engine.
+// Answers #1531: how players see Legendairy Forest draws, the Display, persistent rules and public action spaces.
+const CARDS={
+ '01':['湖中仙女(第一部)','event','立即犁至多 3 块田。','discard'],
+ '02':['独角兽(第一部)','minor','繁殖步骤和终局计分时，独角兽视为任意一种动物。','player'],
+ '03':['独角兽(第二部)','minor','抽到时立即进行一次无需空房间的家庭成长。-3 分。','player'],
+ '04':['野孩','event','立即进行一次无需空房间的家庭成长；下一次收获供养后归还。','discard'],
+ '05':['隐士','event','交出全部羊，得同等数量的木。','discard'],
+ '06':['湖中仙女(第二部)','event','拿起始玩家标记并成为国王；聚会所只剩次要发展。','shuffle'],
+ '07':['野猪王','event','野猪翻倍；没有野猪就交出田里的蔬菜；都没有可犁 1 块田。','shuffle'],
+ '08':['绿林好汉','event','每种建材：最多者交 1 个给最少者。','shuffle'],
+ '09':['贵族义务','event','谷物翻倍；没有谷物则蔬菜翻倍；都没有得 1 谷 1 菜。','discard'],
+ '10':['仲夏夜之梦','event','本轮回家阶段，每人交 1 名成员给左手玩家，下一轮由对方放置。','shuffle'],
+ '11':['法国城堡','event','得 3 食物 3 石；下一次放人延后到本轮最后。','discard'],
+ '12':['诸位的木头我们全部收下了','event','交出全部木；田里已种的谷物和蔬菜翻倍。','shuffle'],
+ '13':['亡魂','occupation','提供 1 人住处；最后 1 人最后放，可依次用 2 格。','player'],
+ '14':['狼人','occupation','每轮回家前交 1 只动物。','player'],
+ '15':['贵族骑士','occupation','每次使用钓鱼，额外得 2 木。','player'],
+ '16':['火沼烈焰喷射烤炉','major','羊／野猪／牛／马／羊驼／妖精 → 2 食物。1 分。','player'],
+ '17':['丰饶之地','space','得 10 食物；回家阶段归还 1 名家庭成员。','display'],
+ '18':['战斗公主','space','得 5 奖励分；回家阶段归还 1 名家庭成员。替换“希望增加家庭成员”。','display'],
+ '19':['龙之巢穴','space','任选若干行，每行可重复：烧毁农场格、抽次要发展、换石、换燃料、移除职业。','display'],
+ '20':['妖精戒指','space','累积妖精：进场 2 个，每轮 +1。终局妖精最多者 +5。','display'],
+ '21':['未选之路','space','选“芦苇+石”或“黏土”一边；回家阶段取走所有对应累积格上的建材。','display'],
+ '22':['特大栅栏','minor','建栅栏时，每条直线段只付 1 木。','player'],
+ '23':['女巫','minor','交 1 木，放 3 个占卜标志；随时移除 1 个，查看并重排牌堆顶 3 张。','player'],
+ '24':['卡米洛','minor','容纳 1 名成员和羊、野猪、牛、马、羊驼各 1 只。','player'],
+ '25':['伐木工查克','occupation','只从行动得到木时，额外得 1 木。','player'],
+ '26':['秘鲁宗教裁判所','event','羊全部换成羊驼；终局所有人按羊驼计分，没有羊驼 -1。','display'],
+};
+const TYPE={event:'事件',occupation:'职业',minor:'次要发展',major:'主要发展',space:'行动格'};
+const DEST={discard:'结算后弃置',shuffle:'结算后洗回牌堆',display:'进入公共牌区',player:'归抽牌者'};
+const VARIANTS={A:'扩展面板',B:'翻牌舞台 + 规则栏',C:'牌区轨道'};
+const VDESC={
+ A:'<b>A 扩展面板</b>：行动板下方新增 Legendairy Forest 面板，和泥沼、四季的扩展面板同位。牌堆、最近翻出、公共行动格、持续规则集中在一处。翻牌用浮动提示，女巫用弹层。',
+ B:'<b>B 翻牌舞台 + 规则栏</b>：翻牌时所有人看到大牌和结算结果，可收起。右栏常驻“正在生效”和翻牌记录。公共行动格并入行动板下方的卡牌行动格。手机上规则栏改成浮动按钮和底部抽屉。',
+ C:'<b>C 牌区轨道</b>：阶段条下方一条轨道，按“牌堆 → 结算中 → 公共牌区 → 弃牌”排列，牌在区之间移动。持续规则挂在来源牌下面，公共行动格直接画进行动板。手机上轨道收成一行，点开展开。'};
+const SCENES={setup:'建局开关',draw:'翻牌公开',display:'公共牌区与持续规则',replace:'替换行动格（18 号）',witch:'女巫窥牌与排序',log:'日志与计分来源'};
+const SHINT={
+ setup:'建局时怎么开启、等待房间怎么显示、开局第一帧牌堆长什么样。',
+ draw:'玩家1 从森林取 4 木，触发 Legendairy Forest Draw。用右侧下拉切换翻出的牌，比较事件、需选择的事件、行动格、职业、主要发展、持续事件六条路径。切到玩家2 视角看旁观者体验。',
+ display:'第 9 轮的常态局面：公共牌区 4 张、国王（06 已洗回但仍生效）、本轮的仲夏夜之梦、撤下的行动格、弃牌和牌堆计数。',
+ replace:'18 战斗公主替换“希望增加家庭成员”。切换“未进场 / 已进场”两种情况。',
+ witch:'玩家1 持有女巫。玩家1 视角可以重排牌堆顶 3 张，玩家2 视角只看到公开信息。勾选“最后 1 个标志”看洗回后顺序作废的提示。',
+ log:'终局。行动记录里的 Legendairy Forest 条目，以及计分板里无主牌（26、20）和自有牌（18 奖励分、16、03）的来源。'};
+const P={p1:'玩家1',p2:'玩家2'};
+const BASE=[['farm-expansion','农场扩建','建房间和/或马厩'],['meeting-place','聚会所','起始玩家 + 次要发展'],['grain-seeds','谷物种子','+1 谷物'],['farmland','农田','犁 1 块田'],['lessons','课程','打出 1 张职业'],['day-laborer','日工','+2 食物'],['forest','森林','累积 3 木'],['clay-pit','黏土坑','累积 1 黏土'],['reed-bank','芦苇河岸','累积 1 芦苇'],['fishing','钓鱼','累积 1 食物']];
+const ROUNDS=['羊市场','建造栅栏','主要或次要发展','播种和/或烤面包','希望增加家庭成员','西部石场','翻修','野猪市场','蔬菜种子','东部石场','牛市场','紧急希望增加家庭成员','耕种','翻修并建栅栏'];
+const TREE='<svg class="tree" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 0 11 7H8.2L11.5 11.5H.5L3.8 7H1Z"/><rect x="5" y="11.5" width="2" height="2.5"/></svg>';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nm=id=>`${id} ${CARDS[id][0]}`;
+const RULES={
+ king:w=>({src:'06',t:`国王：${P[w]}`,x:'起始玩家标记不能被转移；聚会所只提供次要发展。',where:'牌已洗回牌堆'}),
+ dream:{src:'10',t:'本轮回家阶段交换成员',x:'每人交 1 名成员给左手玩家；下一轮由对方放置，回家阶段归还。',where:'牌已洗回牌堆',until:'到第 10 轮回家阶段'},
+ llama:{src:'26',t:'羊驼计分',x:'终局所有人按羊驼计分：0 只 -1，1–3 只 +1，4–5 只 +2，6–7 只 +3，8+ 只 +4。',where:'公共牌区'},
+ fairy:{src:'20',t:'妖精最多者 +5',x:'终局妖精最多且至少 1 个的玩家各 +5。',where:'公共牌区'},
+ wish:{src:'18',t:'“希望增加家庭成员”已撤下',x:'第 5 轮行动格不再接受放人。',where:'公共牌区'}};
+
+const S={variant:'A',scene:'draw',viewer:'p1',device:'auto',step:0,drawCard:'08',replaceCase:'late',witchLast:false,witchOrder:['19','07','14'],lobbyOn:false,discardOpen:false,stageClosed:false,toastClosed:false,sheetOpen:false,trackOpen:false,logFilter:'all',scoreOpen:false};
+(function readUrl(){
+ const q=new URLSearchParams(location.search);const h=(location.hash||'').slice(1).split('-');
+ const v=(q.get('variant')||h[0]||'').toUpperCase();if(VARIANTS[v])S.variant=v;
+ const sc=q.get('scene')||h[1];if(SCENES[sc])S.scene=sc;
+})();
+function writeUrl(){try{history.replaceState(null,'',`${location.pathname}${location.search}#${S.variant.toLowerCase()}-${S.scene}`)}catch(e){}}
+
+function stepLabels(){
+ const sc=S.scene;
+ if(sc==='setup')return['建局','等待房间','开局第一帧'];
+ if(sc==='draw')return['放人前','取木后：安排 after 效果','翻牌公开','结算完成后'];
+ if(sc==='replace')return S.replaceCase==='early'?['第 4 轮翻出 18','翻出之后','进入第 5 轮']:['第 6 轮翻出 18','翻出之后','回家阶段'];
+ if(sc==='witch')return['持有女巫','查看牌堆顶 3 张','确认顺序后'];
+ if(sc==='display')return['第 9 轮局面'];
+ return['终局计分'];
+}
+
+// ---------- demo world per scene/step ----------
+function players(){return{p1:{res:{木:3,黏土:1,芦苇:2,石:0,食物:4,羊:3},cards:[]},p2:{res:{木:2,黏土:3,芦苇:2,石:0,食物:5,羊:1},cards:[]}}}
+function world(){
+ const w={round:6,phase:'工作阶段',active:'p1',deck:23,shuffles:1,resolving:[],display:[],discard:[],last:null,pending:null,rules:[],sp:{},pl:players(),log:[],bar:{},reveal:null,peek:null,memo:null,king:null,revealedTo:6,draws:[],farmPlow:false,gameOver:false};
+ const sc=S.scene,st=S.step;
+ if(sc==='setup'){
+  w.round=1;w.deck=25;w.shuffles=0;w.revealedTo=1;w.draws=[];w.sp.forest={goods:'3 木'};
+  w.log=[{r:1,t:'开局：Legendairy Forest 牌堆洗匀。2 人局移出 13 亡魂，剩 25 张。',lf:1},{r:1,t:'第 1 轮开始：羊市场翻开。'}];
+  w.bar={p1:{t:'轮到你：选择行动格放人',x:'从累积格取得至少 3 木时，会翻 1 张 Legendairy Forest 牌。'},p2:{wait:1,t:'等待玩家1 放人'}};
+  return w;}
+ if(sc==='draw'){
+  const c=S.drawCard,[cn,ct,,cd]=CARDS[c];
+  w.display=['17'];w.discard=['05'];w.king='p2';w.rules=[RULES.king('p2')];
+  w.draws=[{r:3,by:'p2',from:'森林 · 4 木',card:'05',dest:'弃置'},{r:4,by:'p1',from:'森林 · 5 木',card:'17',dest:'公共牌区'},{r:5,by:'p2',from:'森林 · 3 木',card:'06',dest:'洗回'}];
+  w.log=[{r:5,t:'玩家2 翻出 06 湖中仙女(第二部)，成为国王；06 洗回牌堆。',lf:1,src:'06'},{r:6,t:'第 6 轮开始：西部石场翻开。'},{r:6,t:'玩家2 使用丰饶之地，得 10 食物。'}];
+  w.sp['17']={occ:['p2']};w.sp['meeting-place']={note:'国王生效：只提供次要发展'};
+  w.sp.forest={goods:'4 木'};
+  if(st===0){w.bar={p1:{t:'轮到你：选择行动格放人',x:'森林上有 4 木。',btns:[['放到森林','next',1]]},p2:{wait:1,t:'等待玩家1 放人'}};w.sp.forest.hl=1;return w;}
+  w.sp.forest={occ:['p1']};w.pl.p1.res.木=7;
+  w.log.push({r:6,t:'玩家1 使用森林，取得 4 木。'});
+  if(st===1){w.pending={by:'p1',from:'森林',wood:4};
+   w.bar={p1:{t:'取木后的效果：安排结算顺序',list:[['Legendairy Forest 翻牌','必须结算，不能跳过',1],['示例卡牌：取木后 +1 食物','可跳过',0]],btns:[['先翻牌','next',1],['先结算示例卡','next',0]]},p2:{wait:1,t:'玩家1 正在安排取木后的效果',x:'其中有 1 次 Legendairy Forest 翻牌。'}};return w;}
+  w.deck=22;
+  const draw={r:6,by:'p1',from:'森林 · 4 木',card:c,dest:cd==='shuffle'?'洗回':cd==='discard'?'弃置':cd==='display'?'公共牌区':'玩家1'};
+  w.draws.push(draw);
+  const res=[];
+  if(c==='08'){res.push('木：玩家1 有 7（最多），交 1 给玩家2（2，最少）','黏土：玩家2 有 3（最多），交 1 给玩家1（1，最少）','芦苇：两人都是 2，无事','石：两人都是 0，无事');w.pl.p1.res.木=6;w.pl.p2.res.木=3;w.pl.p1.res.黏土=2;w.pl.p2.res.黏土=2;}
+  if(c==='01'){res.push(st===2?'玩家1 正在选择要犁的田（至多 3 块）':'玩家1 犁了 2 块田');}
+  if(c==='17'){res.push('成为公共行动格，本轮就能放人');}
+  if(c==='25'){res.push('归玩家1，自动获得，不算打出，不付学费');w.pl.p1.cards.push({id:'25',lf:1});}
+  if(c==='16'){res.push('归玩家1，不从主要发展供应区拿；1 分');w.pl.p1.cards.push({id:'16',lf:1});}
+  if(c==='26'){res.push('玩家1 交出 3 羊，得 3 羊驼','从现在起，终局所有人按羊驼计分');w.pl.p1.res.羊=0;w.pl.p1.res.羊驼=3;}
+  w.reveal={card:c,by:'p1',from:'森林',wood:4,res,dest:cd};
+  w.log.push({r:6,t:`玩家1 从森林取得 4 木，翻出 ${nm(c)}。`,lf:1,src:c});
+  if(st===2){
+   if(c==='01'){w.resolving=['01'];w.farmPlow=true;w.bar={p1:{t:`${nm('01')}：犁至多 3 块田`,x:'点农场上的虚线格选择要犁的田，选完后确认。',btns:[['犁 2 块并完成','next',1]]},p2:{wait:1,t:`玩家1 正在结算 ${nm('01')}`,x:'这张牌在“结算中”，结算完成后弃置。'}};}
+   else{w.resolving=[c];w.bar={p1:{t:`${nm(c)} 已结算`,x:res.join('；')+'。',btns:[['继续','next',1]]},p2:{wait:1,t:`玩家1 翻出 ${nm(c)}`,x:res.join('；')+'。'}};}
+   if(cd==='display'){w.display.push(c);w.resolving=[];}
+   if(c==='26')w.rules.push(RULES.llama);
+   w.last={...w.reveal,status:c==='01'?'结算中':'结算完成'};
+   return w;}
+  // st 3: settled
+  if(c==='01')w.log.push({r:6,t:'玩家1 犁 2 块田。01 湖中仙女(第一部) 弃置。',lf:1,src:'01'});
+  if(cd==='shuffle'){w.deck=23;w.shuffles=2;w.log.push({r:6,t:`${nm(c)} 洗回牌堆，剩余牌重新洗匀（第 2 次洗牌）。`,lf:1,src:c});}
+  if(cd==='discard')w.discard.push(c);
+  if(cd==='display'){w.display.push(c);if(c==='26')w.log.push({r:6,t:'26 秘鲁宗教裁判所进入公共牌区，羊驼计分对所有人生效。',lf:1,src:'26'});else w.log.push({r:6,t:`${nm(c)} 进入公共牌区，成为公共行动格。`,lf:1,src:c});}
+  if(c==='26')w.rules.push(RULES.llama);
+  if(cd==='player')w.log.push({r:6,t:`${nm(c)} 归玩家1（自动获得，不算打出）。`,lf:1,src:c});
+  w.last={...w.reveal,status:cd==='shuffle'?'已洗回牌堆':cd==='discard'?'已弃置':cd==='display'?'在公共牌区':'在玩家1 面前'};
+  w.reveal=null;w.active='p2';
+  w.bar={p2:{t:'轮到你：选择行动格放人',x:''},p1:{wait:1,t:'等待玩家2 放人'}};
+  return w;}
+ if(sc==='display'){
+  Object.assign(w,{round:9,deck:16,shuffles:3,display:['18','20','21','26'],discard:['01','05','09'],king:'p2',revealedTo:9});
+  w.rules=[RULES.king('p2'),RULES.dream,RULES.llama,RULES.fairy,RULES.wish];
+  w.sp['wish']={withdrawn:'18'};w.sp['meeting-place']={note:'国王生效：只提供次要发展'};
+  w.sp['20']={goods:'3 妖精'};w.sp['21']={occ:['p2'],note:'玩家2 选了芦苇+石一边'};w.sp.forest={goods:'3 木'};
+  w.pl.p1.cards=[{id:'23',lf:1,markers:2}];w.pl.p2.cards=[{id:'25',lf:1}];
+  Object.assign(w.pl.p1.res,{羊:0,羊驼:3,妖精:2});Object.assign(w.pl.p2.res,{妖精:1});
+  w.draws=[{r:2,by:'p1',from:'森林 · 5 木',card:'01',dest:'弃置'},{r:3,by:'p2',from:'森林 · 4 木',card:'05',dest:'弃置'},{r:5,by:'p2',from:'森林 · 3 木',card:'06',dest:'洗回'},{r:5,by:'p1',from:'芦苇河岸 · 3 木',card:'23',dest:'玩家1'},{r:6,by:'p1',from:'森林 · 3 木',card:'26',dest:'公共牌区'},{r:6,by:'p2',from:'森林 · 4 木',card:'18',dest:'公共牌区'},{r:7,by:'p2',from:'森林 · 4 木',card:'20',dest:'公共牌区'},{r:7,by:'p1',from:'森林 · 3 木',card:'09',dest:'弃置'},{r:8,by:'p2',from:'森林 · 3 木',card:'25',dest:'玩家2'},{r:8,by:'p1',from:'森林 · 3 木',card:'21',dest:'公共牌区'},{r:9,by:'p2',from:'森林 · 3 木',card:'10',dest:'洗回'}];
+  w.log=[{r:8,t:'玩家1 从森林取得 3 木，翻出 21 未选之路；进入公共牌区。',lf:1,src:'21'},{r:9,t:'第 9 轮开始：蔬菜种子翻开；妖精戒指 +1 妖精。',lf:1,src:'20'},{r:9,t:'玩家2 从森林取得 3 木，翻出 10 仲夏夜之梦；洗回牌堆（第 3 次洗牌）。',lf:1,src:'10'},{r:9,t:'玩家2 使用未选之路，选芦苇+石。',lf:1,src:'21'}];
+  w.bar={p1:{t:'轮到你：选择行动格放人',x:'公共行动格和普通行动格一样放人。'},p2:{wait:1,t:'等待玩家1 放人'}};
+  return w;}
+ if(sc==='replace'){
+  const early=S.replaceCase==='early';
+  Object.assign(w,{round:early?4:6,deck:21,display:['17'],discard:['05'],revealedTo:early?4:6});
+  w.draws=[{r:2,by:'p1',from:'森林 · 4 木',card:'05',dest:'弃置'},{r:3,by:'p2',from:'森林 · 3 木',card:'17',dest:'公共牌区'}];
+  w.log=[{r:3,t:'玩家2 从森林取得 3 木，翻出 17 丰饶之地；进入公共牌区。',lf:1,src:'17'}];
+  if(!early){w.sp.wish={occ:['p1']};w.log.push({r:6,t:'玩家1 使用希望增加家庭成员：家庭成长。'});}
+  w.sp.forest={occ:['p2']};w.active='p2';
+  w.log.push({r:w.round,t:'玩家2 使用森林，取得 3 木。'});
+  const d={r:w.round,by:'p2',from:'森林 · 3 木',card:'18',dest:'公共牌区'};
+  w.draws.push(d);w.deck=20;
+  const res=early?['成为公共行动格，本轮就能放人','“希望增加家庭成员”还没进场，以后不会翻开']:['成为公共行动格，本轮就能放人','“希望增加家庭成员”撤下：格上的玩家1 照常完成，之后不能再放人'];
+  w.log.push({r:w.round,t:'玩家2 从森林取得 3 木，翻出 18 战斗公主。',lf:1,src:'18'});
+  w.display.push('18');w.rules=[RULES.wish];
+  w.sp.wish=Object.assign(w.sp.wish||{},{withdrawn:'18'});
+  if(st===0){w.reveal={card:'18',by:'p2',from:'森林',wood:3,res,dest:'display'};w.last={...w.reveal,status:'结算完成'};
+   w.bar={p2:{t:'18 战斗公主已进入公共牌区',x:res.join('；')+'。',btns:[['继续','next',1]]},p1:{wait:1,t:'玩家2 翻出 18 战斗公主',x:res.join('；')+'。'}};return w;}
+  w.last={card:'18',by:'p2',from:'森林',wood:3,res,dest:'display',status:'在公共牌区'};
+  w.log.push({r:w.round,t:early?'“希望增加家庭成员”被 18 战斗公主替换，以后不会翻开。':'“希望增加家庭成员”被 18 战斗公主撤下，已在格上的人照常完成。',lf:1,src:'18'});
+  if(st===1){w.active='p1';w.bar={p1:{t:'轮到你：选择行动格放人',x:early?'':'“希望增加家庭成员”已撤下，不能再放人。'},p2:{wait:1,t:'等待玩家1 放人'}};return w;}
+  if(early){w.round=5;w.revealedTo=5;w.phase='准备阶段';w.log.push({r:5,t:'第 5 轮开始：该轮行动格“希望增加家庭成员”已被 18 战斗公主替换，不翻开。',lf:1,src:'18'});w.bar={p1:{t:'第 5 轮：轮到你放人',x:'第 5 轮没有新翻开的行动格。'},p2:{wait:1,t:'等待玩家1 放人'}};}
+  else{w.phase='回家阶段';w.sp.wish={withdrawn:'18'};w.sp.forest={goods:''};w.log.push({r:6,t:'回家阶段：所有人回家。“希望增加家庭成员”保持撤下。'});w.bar={p1:{wait:1,t:'回家阶段',x:'人员回家，撤下的格留在版图上作记录。'},p2:{wait:1,t:'回家阶段'}};}
+  return w;}
+ if(sc==='witch'){
+  const last=S.witchLast,mk=last?1:3;
+  Object.assign(w,{round:8,deck:18,shuffles:2,display:['17','20'],discard:['05','09'],revealedTo:8});
+  w.sp['20']={goods:'2 妖精'};w.pl.p1.cards=[{id:'23',lf:1,markers:mk}];
+  w.log=[{r:7,t:'玩家1 从森林取得 3 木，翻出 23 女巫；交 1 木，放 3 个占卜标志。',lf:1,src:'23'}];
+  if(last)w.log.push({r:8,t:'玩家1 使用女巫，查看并重排了牌堆顶 3 张（剩 1 个标志）。',lf:1,src:'23'});
+  w.draws=[{r:3,by:'p2',from:'森林 · 4 木',card:'05',dest:'弃置'},{r:4,by:'p1',from:'森林 · 3 木',card:'17',dest:'公共牌区'},{r:6,by:'p2',from:'森林 · 3 木',card:'20',dest:'公共牌区'},{r:6,by:'p1',from:'森林 · 4 木',card:'09',dest:'弃置'},{r:7,by:'p1',from:'森林 · 3 木',card:'23',dest:'玩家1'}];
+  w.active='p2';
+  if(st===0){w.bar={p1:{t:'随时可用',x:`女巫上还有 ${mk} 个占卜标志。${last?'这是最后 1 个：查看后女巫洗回牌堆，整副重洗，你排的顺序会作废。':''}`,btns:[['移除 1 个标志，查看牌堆顶 3 张','next',2]]},p2:{t:'轮到你：选择行动格放人',x:''}};
+   return w;}
+  if(st===1){w.peek={holder:'p1',cards:S.witchOrder,left:mk-1,last};
+   w.bar={p1:{t:'女巫：重排牌堆顶 3 张',x:'在女巫的查看区里排好顺序后确认。只有你能看到这 3 张牌。'},p2:{wait:1,t:'玩家1 正在用女巫查看牌堆顶 3 张',x:`女巫剩 ${mk-1} 个标志。你看不到牌面和顺序。`}};
+   w.pl.p1.cards[0].markers=mk-1;return w;}
+  w.pl.p1.cards[0].markers=mk-1;
+  if(last){w.pl.p1.cards=[];w.deck=19;w.shuffles=3;w.log.push({r:8,t:'玩家1 使用女巫，查看了牌堆顶 3 张（最后 1 个标志）。',lf:1,src:'23'},{r:8,t:'女巫没有标志了，洗回牌堆；剩余牌重新洗匀（第 3 次洗牌）。',lf:1,src:'23'});w.memo={void:1};}
+  else{w.log.push({r:8,t:'玩家1 使用女巫，查看并重排了牌堆顶 3 张（剩 2 个标志）。',lf:1,src:'23'});w.memo={order:S.witchOrder};}
+  w.bar={p2:{t:'轮到你：选择行动格放人',x:''},p1:{wait:1,t:'等待玩家2 放人'}};
+  return w;}
+ // log scene
+ Object.assign(w,{round:14,phase:'终局',deck:9,shuffles:4,display:['18','20','21','26'],discard:['01','04','05','09','11'],king:'p2',revealedTo:14,gameOver:true});
+ w.rules=[RULES.king('p2'),RULES.llama,RULES.fairy,RULES.wish];w.sp.wish={withdrawn:'18'};w.sp['20']={goods:'1 妖精'};
+ w.pl.p1.cards=[{id:'16',lf:1}];w.pl.p2.cards=[{id:'03',lf:1},{id:'25',lf:1}];
+ Object.assign(w.pl.p1.res,{羊驼:3,妖精:4});Object.assign(w.pl.p2.res,{羊驼:0,妖精:1});
+ w.draws=[{r:6,by:'p2',from:'森林 · 3 木',card:'18',dest:'公共牌区'},{r:6,by:'p1',from:'森林 · 3 木',card:'26',dest:'公共牌区'},{r:7,by:'p2',from:'森林 · 4 木',card:'20',dest:'公共牌区'},{r:9,by:'p2',from:'森林 · 3 木',card:'03',dest:'玩家2'},{r:11,by:'p1',from:'钓鱼 · 3 木',card:'16',dest:'玩家1'},{r:13,by:'p2',from:'森林 · 3 木',card:'08',dest:'洗回'}];
+ w.log=[{r:6,t:'玩家2 从森林取得 3 木，翻出 18 战斗公主；“希望增加家庭成员”撤下。',lf:1,src:'18'},{r:6,t:'玩家1 从森林取得 3 木，翻出 26 秘鲁宗教裁判所：交出 3 羊，得 3 羊驼。',lf:1,src:'26'},{r:7,t:'玩家1 使用战斗公主，得 5 奖励分；回家阶段归还 1 名家庭成员。',lf:1,src:'18'},{r:11,t:'玩家1 从钓鱼取得 3 木（格上另有效果放的木），翻出 16 火沼烈焰喷射烤炉，自动获得。',lf:1,src:'16'},{r:13,t:'玩家2 从森林取得 3 木，翻出 08 绿林好汉。',lf:1,src:'08'},{r:13,t:'木：玩家1 交 1 给玩家2。其余建材无事。08 洗回牌堆（第 4 次洗牌）。',lf:1,src:'08'},{r:14,t:'终局计分。',lf:0}];
+ w.bar={p1:{wait:1,t:'游戏结束',x:'点“计分板”查看来源。'},p2:{wait:1,t:'游戏结束',x:'点“计分板”查看来源。'}};
+ return w;
+}
+
+// ---------- shared pieces ----------
+const isMobile=()=>S.device==='phone'||window.innerWidth<760;
+const mp=p=>`<span class="mp ${p}"><i></i>${P[p]}</span>`;
+const srcChip=(id,extra='')=>`<span class="srcchip">${TREE} ${nm(id)}${extra?` · ${extra}`:''}</span>`;
+function cardFace(id,size='md',opt={}){
+ const [n,t,x,d]=CARDS[id];
+ return `<div class="cf ${size} ${opt.cls||''}"><div class="top"><span>${TREE} ${id}</span><span class="typ">${TYPE[t]}</span></div><div class="nm">${n}</div>${size==='mini'?'':`<div class="tx">${x}</div>`}${opt.dest===false||size==='mini'?'':`<div class="dest">${opt.destText||DEST[d]}</div>`}${opt.after||''}</div>`;
+}
+function spaceTile(s,w){
+ const o=w.sp[s.id]||{};
+ const cls=['sp',s.lf?'lfsp':'',s.future?'future':'',o.withdrawn?'withdrawn':'',o.hl?'hl':''].join(' ');
+ if(s.future)return `<div class="${cls}"><small>第 ${s.r} 轮</small><b>?</b>${o.withdrawn?`<span class="stamp">${TREE} 已被 18 替换 · 不会翻开</span>`:''}</div>`;
+ return `<div class="${cls}">${s.r?`<span class="rn">${s.r}</span>`:''}${s.lf?`<span class="badge">${TREE} 公共 · ${s.id}</span>`:''}<b>${esc(s.name)}</b><small>${esc(s.desc)}</small>${o.goods?`<span class="goods">${o.goods}</span>`:''}${o.note?`<span class="note-gold">${o.note}</span>`:''}${o.withdrawn?`<span class="stamp">${TREE} 已撤下 · 18 战斗公主</span>`:''}${(o.occ||[]).map(mp).join('')}</div>`;
+}
+const lfSpace=id=>({id,name:CARDS[id][0],desc:CARDS[id][2],lf:1});
+function board(w,opt={}){
+ const base=BASE.map(([id,name,desc])=>spaceTile({id,name,desc},w)).join('');
+ const rounds=ROUNDS.map((name,i)=>{const r=i+1;const id=r===5?'wish':`r${r}`;
+  const replacedFuture=r===5&&w.sp.wish&&w.sp.wish.withdrawn&&r>w.revealedTo;
+  const hiddenNow=r===5&&S.scene==='replace'&&S.replaceCase==='early'&&r<=w.revealedTo;
+  if(r>w.revealedTo||hiddenNow)return spaceTile({id,r,future:1},{sp:{[id]:replacedFuture||hiddenNow?{withdrawn:'18'}:{}}});
+  return spaceTile({id,name,desc:'',r},w);}).join('');
+ const lf=opt.inline&&w.display.some(id=>CARDS[id][1]==='space')?`<div class="bh" style="margin-top:12px"><span>${TREE} Legendairy Forest 行动格（公共，无拥有者）</span><span>${w.display.filter(id=>CARDS[id][1]==='space').length} 个</span></div><div class="grid">${w.display.filter(id=>CARDS[id][1]==='space').map(id=>spaceTile(lfSpace(id),w)).join('')}</div>`:'';
+ return `<section class="board" aria-label="行动板"><div class="bh"><span>行动板</span><span>第 ${w.round} 轮</span></div><div class="grid">${base}</div><div class="rgrid">${rounds}</div>${lf}${opt.row||''}</section>`;
+}
+function stagebar(w){return `<div class="stagebar">${Array.from({length:14},(_,i)=>{const r=i+1;return `<span class="${r<w.round?'past':r===w.round?'now':''} ${[4,7,9,11,13,14].includes(r)?'h':''}">${r}</span>`}).join('')}</div>`}
+function header(w){return `<div class="ghead"><div><strong>第 ${w.round} 轮 · ${w.phase}</strong> <span class="who">${w.gameOver?'':`轮到 ${P[w.active]}`}</span></div><div class="who">你是 <span class="dot ${S.viewer}"></span>${P[S.viewer]} · 2 人局</div></div>`}
+function playersPanel(w){
+ const row=p=>{const r=w.pl[p].res;return `<div class="prow ${w.active===p?'act':''}"><div class="pn"><span><span class="dot ${p}"></span>${P[p]}</span>${w.king===p?`<span class="crown">国王 · 06</span>`:''}</div><div class="res">${Object.entries(r).map(([k,v])=>`<span>${k} ${v}</span>`).join('')}</div></div>`};
+ return `<section class="panel players-strip"><h3>玩家</h3><div class="plist">${row('p1')}${row('p2')}</div></section>`;
+}
+function farmPanel(w){
+ const p=S.viewer;const tiles=Array.from({length:15},(_,i)=>{const room=i===5||i===10;const field=p==='p1'?i===1:i===2;const plow=w.farmPlow&&p==='p1'&&[2,3,7].includes(i);return `<div class="tile ${room?'room':field?'field':''} ${plow?'plow':''}">${room?'木屋':field?'田':plow?'可犁':''}</div>`}).join('');
+ const cards=w.pl[p].cards;
+ const owned=cards.length?`<h4>已打出</h4><div class="owned">${cards.map(c=>cardFace(c.id,'md',{destText:`<span class="lfmark">${TREE} Legendairy Forest 获得 · 不算打出</span>`,after:c.markers!==undefined?`<div class="markers" aria-label="占卜标志 ${c.markers} 个">${'◆'.repeat(c.markers)}${'◇'.repeat(3-c.markers)} <span class="sub">${c.markers} 个标志</span></div>`:''})).join('')}</div>`:'';
+ return `<section class="panel"><h3>${P[p]} 的农场 <span class="sub">示意</span></h3><div class="farm">${tiles}</div>${owned}</section>`;
+}
+function logPanel(w,filter){
+ const items=filter&&S.logFilter==='lf'?w.log.filter(e=>e.lf):w.log;
+ let lastR=null;const out=items.map(e=>{const rh=e.r!==lastR?`<div class="rh">第 ${e.r} 轮</div>`:'';lastR=e.r;return rh+`<div class="le ${e.lf?'lf':''}">${e.lf?`<span class="src">${TREE}</span> `:''}${esc(e.t)}</div>`}).join('');
+ const chips=filter?`<div class="chips"><button class="chip" data-act="logf:all" aria-pressed="${S.logFilter==='all'}">全部</button><button class="chip" data-act="logf:lf" aria-pressed="${S.logFilter==='lf'}">${TREE} Legendairy Forest</button></div>`:'';
+ return `<section class="panel"><h3>行动记录</h3>${chips}<div class="log">${out||'<div class="sub">暂无</div>'}</div></section>`;
+}
+function rulesList(w,compact){
+ if(!w.rules.length)return `<p class="sub">暂无持续生效的 Legendairy Forest 规则。</p>`;
+ return `<ul class="rules">${w.rules.map(r=>`<li class="rule"><div class="rt"><span>${esc(r.t)}</span>${srcChip(r.src,r.where)}</div>${compact?'':`<div class="rx">${esc(r.x)}${r.until?` <b>${r.until}</b>`:''}</div>`}</li>`).join('')}</ul>`;
+}
+function drawTable(w){
+ if(!w.draws.length)return `<p class="sub">还没有翻牌。</p>`;
+ return `<div class="tblwrap"><table class="drawtbl"><thead><tr><th>轮</th><th>玩家</th><th>来源格</th><th>牌</th><th>去向</th></tr></thead><tbody>${w.draws.slice().reverse().map(d=>`<tr><td>${d.r}</td><td><span class="dot ${d.by}"></span>${P[d.by]}</td><td>${d.from}</td><td>${nm(d.card)}</td><td>${d.dest}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function resultBlock(rv){return rv&&rv.res.length?`<ul class="res-lines">${rv.res.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+function peekBlock(w,style){
+ if(!w.peek&&!w.memo)return '';
+ if(S.viewer!=='p1'){
+  if(w.peek)return `<div class="memo">${mp('p1')} 正在用女巫查看牌堆顶 3 张 · 女巫剩 ${w.peek.left} 个标志。你看不到牌面和顺序。</div>`;
+  return '';}
+ if(w.memo){return w.memo.void?`<div class="memo">女巫已洗回，牌堆整副重洗。你刚看到的顺序作废。</div>`:`<div class="memo"><b>只有你看得到</b>：你排定的牌堆顶依次是 ${w.memo.order.map(nm).join(' → ')}。下次洗牌后失效。</div>`;}
+ const cards=w.peek.cards;
+ const slots=cards.map((id,i)=>`<div class="slot"><span class="pos">${i===0?'牌堆顶 · 下一张':`第 ${i+1} 张`}</span>${cardFace(id,style==='inline'?'mini':'md',{dest:false})}<div class="mv"><button class="btn sm" data-act="mv:${i}:-1" ${i===0?'disabled':''} aria-label="上移 ${nm(id)}">${isMobile()||style==='inline'?'↑':'←'}</button><button class="btn sm" data-act="mv:${i}:1" ${i===cards.length-1?'disabled':''} aria-label="下移 ${nm(id)}">${isMobile()||style==='inline'?'↓':'→'}</button></div></div>`).join('');
+ return `<div class="privacy">只有你能看到这 3 张牌。其他玩家只知道你查看过一次，以及女巫剩 ${w.peek.left} 个标志。${w.peek.last?'<br><b>这是最后 1 个标志</b>：确认后女巫洗回牌堆，整副重洗，这个顺序会作废。':''}</div><div class="peek" style="${style==='inline'?'grid-template-columns:1fr':''}">${slots}</div><div><button class="btn lfb" data-act="next">确认顺序</button></div>`;
+}
+function interactionBar(w){
+ const b=w.bar[S.viewer];if(!b)return '';
+ const list=b.list?`<div class="tlist">${b.list.map(([a,x,must])=>`<div><span>${must?`${TREE} `:''}${esc(a)}</span><span class="${must?'must':'sub'}">${esc(x)}</span></div>`).join('')}</div>`:'';
+ return `<div class="ibar ${b.wait?'wait':''}" role="region" aria-label="交互栏"><div class="t">${esc(b.t)}</div>${b.x?`<div class="x">${esc(b.x)}</div>`:''}${list}${b.btns?`<div class="bs">${b.btns.map(([l,a,p])=>`<button class="btn ${p===1?'pri':p===2?'lfb':''}" data-act="${a}">${esc(l)}</button>`).join('')}</div>`:''}</div>`;
+}
+const SCORE={base:[['田地',2,3],['牧场',3,2],['谷物',2,1],['蔬菜',1,2],['羊',0,2],['野猪',2,1],['牛',1,1],['未使用农场格',-2,0],['房间',4,6],['家庭成员',12,12]],
+ unowned:[{src:'26',label:'羊驼',ev:['3 只 → +1','0 只 → -1'],pts:[1,-1]},{src:'20',label:'妖精最多',ev:['4 个，最多 → +5','1 个 → 0'],pts:[5,0]}],
+ own:[{src:'18',label:'奖励分 · 使用战斗公主',ev:['1 次 → +5','—'],pts:[5,0]},{src:'16',label:'火沼烈焰喷射烤炉',ev:['+1','—'],pts:[1,0]},{src:'03',label:'独角兽(第二部)',ev:['—','-3'],pts:[0,-3]}]};
+function scorePad(){
+ const v=S.variant,sumBase=i=>SCORE.base.reduce((a,r)=>a+r[i+1],0);
+ const tot=i=>sumBase(i)+SCORE.unowned.reduce((a,r)=>a+r.pts[i],0)+SCORE.own.reduce((a,r)=>a+r.pts[i],0);
+ const baseRows=SCORE.base.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+ const row=(r,label)=>`<tr><td>${label}</td><td>${r.pts[0]} <small>${r.ev[0]}</small></td><td>${r.pts[1]} <small>${r.ev[1]}</small></td></tr>`;
+ let body;
+ if(v==='A'){body=`<table class="score"><thead><tr><th>项目</th><th>${P.p1}</th><th>${P.p2}</th></tr></thead><tbody>${baseRows}<tr class="grp"><td colspan="3">卡牌（玩家自己的牌和用格所得）</td></tr>${SCORE.own.map(r=>row(r,`${r.label} <small>${r.src}</small>`)).join('')}<tr class="grp"><td colspan="3">${TREE} Legendairy Forest 无主牌（对所有玩家生效）</td></tr>${SCORE.unowned.map(r=>row(r,`${r.label} <small>${r.src} · 公共牌区</small>`)).join('')}<tr class="tot"><td>合计</td><td>${tot(0)}</td><td>${tot(1)}</td></tr></tbody></table>`;}
+ else if(v==='B'){body=`<table class="score"><thead><tr><th>项目</th><th>${P.p1}</th><th>${P.p2}</th></tr></thead><tbody>${baseRows}${SCORE.own.map(r=>row(r,`${r.label}<br>${srcChip(r.src,r.src==='18'?'用格所得':'自己的牌')}`)).join('')}${SCORE.unowned.map(r=>row(r,`${r.label}<br>${srcChip(r.src,'无主 · 公共牌区')}`)).join('')}<tr class="tot"><td>合计</td><td>${tot(0)}</td><td>${tot(1)}</td></tr></tbody></table>`;}
+ else{body=`<table class="score"><thead><tr><th>项目</th><th>${P.p1}</th><th>${P.p2}</th></tr></thead><tbody>${baseRows}${SCORE.own.map(r=>row(r,`${r.label} <small>${r.src}</small>`)).join('')}<tr><td>无主牌规则 <small>见下</small></td><td>${SCORE.unowned.reduce((a,r)=>a+r.pts[0],0)}</td><td>${SCORE.unowned.reduce((a,r)=>a+r.pts[1],0)}</td></tr><tr class="tot"><td>合计</td><td>${tot(0)}</td><td>${tot(1)}</td></tr></tbody></table><h4>${TREE} 无主牌规则 · 对每名玩家分别计分</h4><div class="unowned">${SCORE.unowned.map(r=>`<div class="u">${cardFace(r.src,'mini')}<div class="evals"><div><span>${mp('p1')}</span><span>${r.ev[0]}</span></div><div><span>${mp('p2')}</span><span>${r.ev[1]}</span></div></div></div>`).join('')}</div>`;}
+ return `<div class="scrim" role="dialog" aria-modal="true" aria-label="计分板"><div class="modal"><h2>计分板</h2>${body}<div><button class="btn" data-act="score:0">关闭</button></div></div></div>`;
+}
+
+// ---------- variant surfaces ----------
+function deckBox(w){return `<div class="deckbox"><div class="back">${TREE}<br>${w.deck} 张</div><span>牌堆 · 已洗 ${w.shuffles} 次</span></div>`}
+function lfPanelA(w){
+ const spaces=w.display.filter(id=>CARDS[id][1]==='space');const others=w.display.filter(id=>CARDS[id][1]!=='space');
+ let slot;
+ if(w.pending)slot=`<div class="slotA"><span class="status res">即将翻牌</span><div class="cap">${mp(w.pending.by)} 从${w.pending.from}取得 ${w.pending.wood} 木，满足翻牌条件。由${P[w.pending.by]}安排取木后效果的顺序。</div></div>`;
+ else if(w.last){const L=w.last;slot=`<div class="slotA ${w.reveal?'glow':''}"><div class="cap">最近翻出 · 第 ${w.round} 轮 · ${mp(L.by)} · ${L.from} ${L.wood} 木</div>${cardFace(L.card,'md',{cls:w.reveal?'flyin':''})}<span class="status ${L.status==='结算中'?'res':'done'}">${L.status}</span>${resultBlock(L)}</div>`;}
+ else slot=`<div class="slotA"><div class="cap">从累积格取得至少 3 木时，翻 1 张牌，向所有人公开。</div></div>`;
+ const disc=`<div class="discbox disc"><div class="back">弃牌<br>${w.discard.length} 张</div><button class="linkbtn" data-act="disc">${S.discardOpen?'收起':'查看弃牌'}</button></div>`;
+ return `<section class="panel lfA"><h3><span>${TREE} Legendairy Forest</span><span class="sub">取 ≥3 木翻 1 张</span></h3><div class="lfA-top">${deckBox(w)}${slot}${disc}</div>${S.discardOpen?`<h4>弃牌</h4><div class="hscroll">${w.discard.map(id=>cardFace(id,'mini')).join('')}</div>`:''}${peekBlock(w,'note')&&S.viewer!=='p1'?`<h4>女巫</h4>${peekBlock(w,'note')}`:''}${w.memo&&S.viewer==='p1'?`<h4>女巫</h4>${peekBlock(w)}`:''}<h4>公共行动格</h4>${spaces.length?`<div class="lfspaces">${spaces.map(id=>spaceTile(lfSpace(id),w)).join('')}</div>`:'<p class="sub">还没有。翻出 17–21 号时出现在这里，当轮就能放人。</p>'}${others.length?`<h4>公共牌区里的其他牌</h4><div class="hscroll">${others.map(id=>cardFace(id,'md',{destText:'持续生效，不洗回'})).join('')}</div>`:''}<h4>持续规则</h4>${rulesList(w)}</section>`;
+}
+function railB(w,inSheet){
+ return `<section class="panel railB"><h3><span>${TREE} Legendairy Forest</span>${inSheet?'<button class="btn sm" data-act="sheet:0">关闭</button>':''}</h3><div class="deckline"><span>牌堆 ${w.deck} 张</span><span>已洗 ${w.shuffles} 次</span><span>弃牌 ${w.discard.length} 张</span></div>${w.pending?`<div class="memo" style="margin-top:8px">${mp(w.pending.by)} 从${w.pending.from}取得 ${w.pending.wood} 木，即将翻牌。</div>`:''}${w.last&&S.stageClosed&&w.reveal?`<div style="margin-top:8px"><button class="linkbtn" data-act="stage:1">再次查看刚翻出的 ${nm(w.last.card)}</button></div>`:''}${(w.peek||w.memo)?`<h4>女巫</h4>${peekBlock(w,'inline')}`:''}<h4>正在生效</h4>${rulesList(w)}<h4>公共牌区</h4>${w.display.length?`<div class="thumbs">${w.display.map(id=>cardFace(id,'mini')).join('')}</div>`:'<p class="sub">空</p>'}<h4>翻牌记录</h4>${drawTable(w)}</section>`;
+}
+function stageB(w){
+ const rv=w.reveal;
+ return `<div class="scrim" role="dialog" aria-modal="true" aria-label="Legendairy Forest 翻牌"><div class="stageB"><div class="kick">${TREE} LEGENDAIRY FOREST 翻牌</div><div class="who">${mp(rv.by)} 从${rv.from}取得 ${rv.wood} 木 · 第 ${w.round} 轮</div>${cardFace(rv.card,'lg',{cls:'flyin'})}${resultBlock(rv)}<div class="bs" style="display:flex;gap:8px;flex-wrap:wrap">${S.viewer===rv.by&&w.resolving.length?`<button class="btn pri" data-act="stage:0">去处理</button>`:`<button class="btn pri" data-act="stage:0">收起</button>`}<span class="sub" style="align-self:center">${S.viewer===rv.by?'':'只是展示，不影响你的操作'}</span></div></div></div>`;
+}
+function trackC(w){
+ const res=w.resolving.length?w.resolving:[];
+ const resZone=w.pending?`<div class="zone empty"><div class="zh"><span>结算中</span></div><div class="ph">${mp(w.pending.by)} 从${w.pending.from}取得 ${w.pending.wood} 木<br>即将翻牌</div></div>`:
+  (w.reveal||res.length)?`<div class="zone glow"><div class="zh"><span>${res.length?'结算中':'刚翻出'}</span><span>${mp(w.reveal?w.reveal.by:'p1')}</span></div>${cardFace((w.reveal||{}).card||res[0],'md',{cls:'flyin'})}${resultBlock(w.reveal)}</div>`:
+  `<div class="zone empty"><div class="zh"><span>结算中</span></div><div class="ph">${w.last?`上一张：${nm(w.last.card)}<br>${w.last.status}`:'取 ≥3 木时翻牌'}</div></div>`;
+ const disp=`<div class="zone"><div class="zh"><span>公共牌区</span><span>${w.display.length} 张</span></div>${w.display.length?`<div class="disp">${w.display.map(id=>{const r=w.rules.find(x=>x.src===id);return `<div class="dwrap">${cardFace(id,'mini')}${r?`<span class="ruletag">${esc(r.t)}</span>`:CARDS[id][1]==='space'?'<span class="ruletag">公共行动格 · 见行动板</span>':''}</div>`}).join('')}</div>`:'<div class="ph" style="border:1.5px dashed var(--lf-line);border-radius:9px;min-height:60px;display:grid;place-items:center;font-size:12px;color:var(--muted)">空</div>'}</div>`;
+ const off=w.rules.filter(r=>r.where==='牌已洗回牌堆');
+ const offRow=off.length?`<div class="offcard"><span class="sub">牌已洗回、规则仍生效：</span>${off.map(r=>`<span class="ruletag">${esc(r.t)} · ${TREE} ${r.src}${r.until?` · ${r.until}`:''}</span>`).join('')}</div>`:'';
+ const peek=(w.peek||w.memo)?`<div style="grid-column:1/-1">${peekBlock(w,'inline')}</div>`:'';
+ return `<section class="trackC" aria-label="Legendairy Forest 牌区"><div class="zone deckz"><div class="zh"><span>${TREE} 牌堆</span><span>洗 ${w.shuffles} 次</span></div><div class="back">${w.deck} 张${w.peek?'<br>👁':''}</div></div><div class="arrow">→</div>${resZone}<div class="arrow">→</div>${disp}<div class="zone"><div class="zh"><span>弃牌</span><span>${w.discard.length}</span></div><button class="back" style="height:70px;background:var(--line2);color:var(--muted);border-color:var(--line)" data-act="disc">${S.discardOpen?'收起':'查看'}</button></div>${S.discardOpen?`<div style="grid-column:1/-1" class="hscroll">${w.discard.map(id=>cardFace(id,'mini')).join('')}</div>`:''}${offRow}${peek}</section>`;
+}
+function trackMini(w){
+ return `<button class="trackMini" data-act="track" aria-expanded="${S.trackOpen}"><span>${TREE} <b>牌堆 ${w.deck}</b> · 结算中 ${w.reveal||w.resolving.length?`<b>${nm((w.reveal||{}).card||w.resolving[0])}</b>`:'—'} · 公共 ${w.display.length} · 弃 ${w.discard.length}${w.rules.length?` · 规则 ${w.rules.length}`:''}</span><span>${S.trackOpen?'收起 ▴':'展开 ▾'}</span></button>`;
+}
+
+// ---------- lobby ----------
+function lobby(){
+ const v=S.variant,st=S.step;
+ if(st===0){
+  const lfToggle=`<label class="toggle ${S.lobbyOn?'lfon':''}"><input type="checkbox" id="lf-toggle" ${S.lobbyOn?'checked':''}><span>${TREE} 启用 Legendairy Forest${v==='A'?`<span class="h">取得至少 3 木时翻 1 张牌，共 26 张。1–6 人可用；1–2 人局移出 13 亡魂。</span>`:''}${v==='B'?`<details class="sum" open><summary>规则摘要</summary><ul><li>每次从累积格取得至少 3 木，翻 1 张，向所有人公开。</li><li>26 张：事件、职业、次要发展、主要发展、行动格。</li><li>翻出的职业和发展免费归抽牌者，不算打出。</li><li>1–6 人可用（含单人）；1–2 人局移出 13 亡魂。</li></ul></details>`:''}${v==='C'?`<span class="h">翻牌规则在开局后的牌区轨道里随时可查。</span>`:''}</span></label>`;
+  const others=[['蛇形开局',0],['父母牌',0],['Through the Seasons 四季',0],['Farmers of the Moor 泥沼农夫',0]].map(([l])=>`<label class="toggle"><input type="checkbox" disabled><span>${l}</span></label>`).join('');
+  const confirm=v==='C'&&S.lobbyOn?`<section class="panel"><h3>本局配置</h3><div class="cfglist"><div><span>人数</span><b>2 人</b></div><div><span>选牌方式</span><b>标准发牌</b></div><div><span>${TREE} Legendairy Forest</span><b>开启 · 25 张（移出 13）</b></div><div><span>四季 / 泥沼 / 父母牌</span><b>关闭</b></div></div></section>`:'';
+  return `<div class="lobby"><section class="panel"><h3>创建游戏 <span class="sub">示意</span></h3><div class="cfglist" style="margin-bottom:8px"><div><span>人数</span><b>2 人</b></div></div>${others}${lfToggle}<div style="margin-top:12px;display:flex;gap:8px"><button class="btn pri" data-act="next">创建游戏</button></div></section>${confirm}</div>`;}
+ const on=S.lobbyOn;
+ return `<div class="lobby"><section class="panel"><h3>等待房间 · 房间 4721</h3><div class="pillrow" style="margin-bottom:10px"><span>2 人</span><span>标准发牌</span>${on?`<span class="lf">${TREE} Legendairy Forest</span>`:''}</div><div class="plist"><div class="prow"><div class="pn"><span><span class="dot p1"></span>玩家1（房主）</span><span class="sub">已就绪</span></div></div><div class="prow"><div class="pn"><span><span class="dot p2"></span>玩家2</span><span class="sub">已就绪</span></div></div></div>${on?`<p class="sub" style="margin-top:10px">${v==='B'?'Legendairy Forest：取 ≥3 木翻 1 张。':''}同配置重开时会重新洗牌。</p>`:`<p class="sub" style="margin-top:10px">本局未启用 Legendairy Forest。回到“建局”勾选后再看。</p>`}<div style="margin-top:12px"><button class="btn pri" data-act="next">开始游戏</button></div></section></div>`;
+}
+
+// ---------- page assembly ----------
+function render(){
+ const m=isMobile(),w=world(),v=S.variant;
+ renderCtrl();
+ const shell=document.getElementById('shell');
+ shell.className='shell'+(S.device==='phone'?' frame':'')+(m?' m':'');
+ if(S.scene==='setup'&&S.step<2){shell.innerHTML=`<div class="scroller">${lobby()}</div><div class="flayer"></div>`;bind();return;}
+ if(S.scene==='setup'&&!S.lobbyOn){shell.innerHTML=`<div class="scroller"><div class="lobby"><section class="panel"><p>本局未启用 Legendairy Forest，对局里不会出现任何相关界面。回到第 1 步勾选后再看。</p></section></div></div><div class="flayer"></div>`;bind();return;}
+ const showB=v==='B',showC=v==='C';
+ const rowSpaces=showB&&w.display.some(id=>CARDS[id][1]==='space')?`<div class="cardrow"><h4>卡牌行动格</h4><div class="lfspaces">${w.display.filter(id=>CARDS[id][1]==='space').map(id=>spaceTile(lfSpace(id),w)).join('')}</div></div>`:'';
+ const boardHtml=board(w,{inline:showC,row:rowSpaces});
+ const top=showC?(m?trackMini(w)+(S.trackOpen?trackC(w):''):trackC(w)):'';
+ const left=`<div class="col">${boardHtml}${v==='A'?lfPanelA(w):''}</div>`;
+ const center=`<div class="col">${farmPanel(w)}</div>`;
+ const scoreBtn=`<button class="btn" data-act="score:1">计分板</button>`;
+ const right=`<div class="col">${m?'':playersPanel(w)}${showB&&!m?railB(w):''}${scoreBtn}${logPanel(w,showC)}</div>`;
+ const page=m?`${header(w)}${playersPanel(w)}${stagebar(w)}${top}${left}${center}${right}`:`${header(w)}${stagebar(w)}${top}<div class="cols">${left}${center}${right}</div>`;
+ // floating layer
+ let fl='';
+ if(v==='A'&&w.reveal&&!S.toastClosed){fl+=`<div class="toasts" role="status"><div class="toast"><div class="tt"><span>${TREE} ${mp(w.reveal.by)} 从${w.reveal.from}取得 ${w.reveal.wood} 木，翻出 <b>${nm(w.reveal.card)}</b></span><button class="linkbtn" data-act="toast:0" aria-label="关闭提示">关闭</button></div><span class="sub">${esc(w.reveal.res[0]||'')}${w.reveal.res.length>1?' 等':''} · 详见 Legendairy Forest 面板</span></div></div>`;}
+ if(v==='A'&&w.peek&&S.viewer==='p1'){fl+=`<div class="scrim" role="dialog" aria-modal="true" aria-label="女巫查看牌堆"><div class="modal"><h2>${TREE} 女巫：查看并重排牌堆顶 3 张</h2>${peekBlock(w,'modal')}</div></div>`;}
+ if(v==='A'&&w.peek&&S.viewer!=='p1'){fl+=`<div class="toasts" role="status"><div class="toast"><span>${TREE} ${mp('p1')} 正在用女巫查看牌堆顶 3 张 · 剩 ${w.peek.left} 个标志</span></div></div>`;}
+ if(v==='B'&&w.reveal&&!S.stageClosed)fl+=stageB(w);
+ if(v==='B'&&m){fl+=`<button class="fab" data-act="sheet:1" aria-label="打开 Legendairy Forest 规则栏">${TREE} 牌堆 ${w.deck} · 生效 ${w.rules.length}${w.peek&&S.viewer==='p1'?' · 女巫':''}</button>`;
+  if(S.sheetOpen)fl+=`<div class="sheet-scrim" data-act="sheet:0"></div><div class="sheet" role="dialog" aria-label="Legendairy Forest"><div class="grab"></div>${railB(w,true)}</div>`;}
+ if(S.scoreOpen)fl+=scorePad();
+ fl+=interactionBar(w);
+ shell.innerHTML=`<div class="scroller">${page}</div><div class="flayer">${fl}</div>`;
+ bind();
+}
+function renderCtrl(){
+ const labels=stepLabels();
+ const extra=S.scene==='draw'?`<label>翻出 <select id="drawCard">${[['08','08 绿林好汉 · 事件，洗回'],['01','01 湖中仙女(第一部) · 事件，需选择'],['17','17 丰饶之地 · 行动格'],['25','25 伐木工查克 · 职业'],['16','16 烤炉 · 主要发展'],['26','26 秘鲁宗教裁判所 · 持续事件']].map(([k,l])=>`<option value="${k}" ${S.drawCard===k?'selected':''}>${l}</option>`).join('')}</select></label>`:
+  S.scene==='replace'?`<label>情况 <select id="replaceCase"><option value="late" ${S.replaceCase==='late'?'selected':''}>已进场（格上有人）</option><option value="early" ${S.replaceCase==='early'?'selected':''}>未进场</option></select></label>`:
+  S.scene==='witch'?`<label><input type="checkbox" id="witchLast" ${S.witchLast?'checked':''}> 最后 1 个标志</label>`:'';
+ document.getElementById('ctrl').innerHTML=`<div class="ctrl-row"><h1>Legendairy Forest 牌区草图</h1><span class="tag">原型 · 固定演示数据 · 不连游戏服务</span></div>
+ <div class="ctrl-row" style="margin-top:8px"><label>场景 <select id="scene">${Object.entries(SCENES).map(([k,l])=>`<option value="${k}" ${S.scene===k?'selected':''}>${l}</option>`).join('')}</select></label>
+ <label>视角 <select id="viewer"><option value="p1" ${S.viewer==='p1'?'selected':''}>玩家1</option><option value="p2" ${S.viewer==='p2'?'selected':''}>玩家2</option></select></label>
+ <label>设备 <select id="device"><option value="auto" ${S.device==='auto'?'selected':''}>按窗口宽度</option><option value="phone" ${S.device==='phone'?'selected':''}>手机外框</option></select></label>
+ ${extra}
+ <span class="steps"><button data-act="prev" ${S.step===0?'disabled':''} aria-label="上一步">◀</button><span class="steplabel">${S.step+1}/${labels.length} ${labels[S.step]}</span><button data-act="next" ${S.step>=labels.length-1?'disabled':''} aria-label="下一步">▶</button></span></div>
+ <p class="hint">${VDESC[S.variant]}<br>${SHINT[S.scene]}</p>`;
+ document.getElementById('vpill').innerHTML=`<button data-act="vprev" aria-label="上一个方案">‹</button><span>${S.variant} · ${VARIANTS[S.variant]}</span><button data-act="vnext" aria-label="下一个方案">›</button>`;
+}
+function resetTransient(){S.stageClosed=false;S.toastClosed=false;S.sheetOpen=false;S.scoreOpen=S.scene==='log';}
+function act(a){
+ const max=stepLabels().length-1;
+ if(a==='next'){if(S.step<max){S.step++;resetTransient();}}
+ else if(a==='prev'){if(S.step>0){S.step--;resetTransient();}}
+ else if(a==='vnext'||a==='vprev'){const ks=Object.keys(VARIANTS);S.variant=ks[(ks.indexOf(S.variant)+(a==='vnext'?1:ks.length-1))%ks.length];resetTransient();writeUrl();}
+ else if(a==='disc')S.discardOpen=!S.discardOpen;
+ else if(a==='track')S.trackOpen=!S.trackOpen;
+ else if(a.startsWith('stage:'))S.stageClosed=a.endsWith('0');
+ else if(a.startsWith('toast:'))S.toastClosed=true;
+ else if(a.startsWith('sheet:'))S.sheetOpen=a.endsWith('1');
+ else if(a.startsWith('score:'))S.scoreOpen=a.endsWith('1');
+ else if(a.startsWith('logf:'))S.logFilter=a.slice(5);
+ else if(a.startsWith('mv:')){const[,i,d]=a.split(':');const o=S.witchOrder.slice();const j=+i+ +d;if(j>=0&&j<o.length){[o[+i],o[j]]=[o[j],o[+i]];S.witchOrder=o;}}
+ render();
+}
+function bind(){
+ document.querySelectorAll('[data-act]').forEach(el=>el.onclick=e=>{e.preventDefault();act(el.dataset.act)});
+ const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onchange=fn;};
+ on('scene',e=>{S.scene=e.target.value;S.step=0;S.discardOpen=false;resetTransient();writeUrl();render();});
+ on('viewer',e=>{S.viewer=e.target.value;render();});
+ on('device',e=>{S.device=e.target.value;render();});
+ on('drawCard',e=>{S.drawCard=e.target.value;resetTransient();render();});
+ on('replaceCase',e=>{S.replaceCase=e.target.value;S.step=0;resetTransient();render();});
+ on('witchLast',e=>{S.witchLast=e.target.checked;S.step=0;S.witchOrder=['19','07','14'];render();});
+ on('lf-toggle',e=>{S.lobbyOn=e.target.checked;render();});
+}
+document.addEventListener('keydown',e=>{
+ const t=e.target;if(t&&(t.matches('input,textarea,select,[contenteditable]')))return;
+ if(e.key==='ArrowRight'){act('vnext');}else if(e.key==='ArrowLeft'){act('vprev');}
+});
+window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(render,120)});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1).split('-');const v=(h[0]||'').toUpperCase();if(VARIANTS[v])S.variant=v;if(SCENES[h[1]]&&h[1]!==S.scene){S.scene=h[1];S.step=0;}resetTransient();render();});
+resetTransient();render();
+</script>
