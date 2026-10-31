@@ -175,11 +175,31 @@ describe('encyclopedia card faces', () => {
     expect(container.querySelector('.farm-terrain-sprite, .empty-node')).toBeNull()
   })
 
-  it('reads season rules from a text face', () => {
+  it('shows a season with its action card and the board changes it brings', async () => {
     const { container } = render(<EncyclopediaFace item={itemFor(WINTER)} locale="en" />)
+    await settleImages()
 
+    const season = screen.getByRole('group', { name: 'Winter' })
+    const actionCard = container.querySelector('.seasons-board__season-action-card')
+    expect(actionCard?.querySelector('.seasons-board__action-header')?.textContent).toBe('Romantic Evening')
+    expect(actionCard?.textContent).toContain('even without room')
+    expect(within(season).getByText('plowing a field:')).toBeInTheDocument()
+    expect(within(season).getByText('Fishing: not until Round 11')).toBeInTheDocument()
+    expect(container.querySelectorAll('.seasons-board__resource-adjustment')).toHaveLength(2)
+    expect(container.querySelector('.seasons-board__accumulation-arrow')).not.toBeNull()
+    expect(screen.queryByText('Houses need no heating')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByText('Image unavailable')).toBeNull()
+  })
+
+  it('reads the season rules from the text face when the board art fails', async () => {
+    broken.add('through-the-seasons-clean-background.jpg')
+    const FreshFace = await faceOnFreshPage()
+    const { container } = render(<FreshFace item={itemFor(WINTER)} locale="en" />)
+
+    expect(await screen.findByText('Image unavailable')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Winter' })).toBeInTheDocument()
     expect(container.textContent).toContain('Romantic Evening · ')
-    expect(screen.queryByText('Image unavailable')).toBeNull()
+    expect(container.querySelector('.seasons-board__season-action-card')).toBeNull()
   })
 })

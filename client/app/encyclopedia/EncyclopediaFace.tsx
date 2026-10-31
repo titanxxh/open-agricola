@@ -14,6 +14,7 @@ import { publicAssetUrl } from '../../utils/public-asset-url'
 import type { EncyclopediaItem } from './encyclopedia-item'
 import { EncyclopediaTextFace } from './EncyclopediaTextFace'
 import { MoorStartLayout } from './MoorStartLayout'
+import { SeasonFace } from './SeasonFace'
 import { useImageStatus } from './useImageStatus'
 
 type FaceKind = EncyclopediaFaceRef['kind']
@@ -29,6 +30,7 @@ type FaceView<K extends FaceKind> = {
 }
 
 const FARM_GROUND_ART = ['/assets/moor/terrain/forest.webp', '/assets/moor/terrain/moor.webp', '/assets/revised/empty_slots.png']
+const SEASON_ART = ['/assets/through-the-seasons/through-the-seasons-clean-background.jpg', '/assets/revised/action_frame.png']
 
 const textFace = ({ item, locale }: { item: EncyclopediaItem; locale: Locale }) =>
   <EncyclopediaTextFace item={item} locale={locale} />
@@ -73,7 +75,10 @@ const FACE_VIEWS: { readonly [K in FaceKind]: FaceView<K> } = {
     render: ({ face, locale }) => <MoorStartLayout locale={locale} tiles={face.tiles} art />,
     withoutArt: ({ face, locale }) => <MoorStartLayout locale={locale} tiles={face.tiles} art={false} />,
   },
-  season: { render: textFace },
+  season: {
+    artUrls: () => SEASON_ART.map(publicAssetUrl),
+    render: ({ face, locale }) => <SeasonFace locale={locale} season={face.season} />,
+  },
 }
 
 const faceView = <K extends FaceKind>(face: FaceOf<K>): FaceView<K> => FACE_VIEWS[face.kind as K]
