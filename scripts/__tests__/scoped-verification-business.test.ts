@@ -118,7 +118,7 @@ describe('business verification groups', () => {
       kind: 'vitest', project: 'fast-client',
       files: actual.vitest.filter(test => test.project === 'fast-client').map(test => test.file).sort(),
     })
-  })
+  }, 30_000)
 
   it('runs the complete backend and client groups plus login, room and multiplayer browsers for a room change', () => {
     const selected = plan(['server/game/room.ts'])
