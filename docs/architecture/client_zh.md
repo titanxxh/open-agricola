@@ -20,7 +20,7 @@
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、cookie、WebSocket 或命令；只读取公开 Replay JSON，使用归档时编译的展示过滤。 |
 
 - 精确的入口与文件授权记录在 `scripts/architecture-policy.mjs`；没有目录级的豁免。ESLint `architecture/imports` 与 `pnpm run check:browser-boundaries` 把它们作为 CI 错误执行。
-- `scripts/check-bundle-size.ts` 把主 bundle 预算定为原始 550 KB、gzip 170 KB，作为单独的构建后检查。
+- `scripts/check-bundle-size.ts` 把主 bundle 预算定为原始 1024 KB、gzip 236 KB，工坊 chunk 定为原始 400 KB，作为单独的构建后检查。
 
 ## 服务与同步状态
 
@@ -62,6 +62,12 @@
 - `FarmBoard` 在格盘旁显示当前 Card Field 与牌上动物控件。`farm-board-projection.ts` 保留权威槽位 metadata；托盘与按时序排列的牌面共用草稿回调及动物区域 ID，包含借用的牌上区域。多个不透明选项继续使用既有目标选项器。统一农场聚焦区域包含格盘与托盘，短屏横屏时并排显示在固定操作栏上方。公开浏览不展示交互玩家草稿或可操作托盘。覆盖见 `farm-card-slots-session.test.ts`、`FarmBoard.test.tsx`、`GameContainerApi.presentation.test.tsx` 与 `farm-card-targets.spec.ts`。
 - 默认试玩路径是后端 `POST /api/game/new-sandbox`。设置 `VITE_SANDBOX_EXECUTOR=browser` 时，工坊试玩在浏览器中运行：`LocalGameTransport` 实现 `GameTransport`，Worker 用本地校验过的自定义代码组装共享的 `GameCore`，`server/__tests__/local-sandbox-parity.test.ts` 把行为锁定到服务端执行器。十秒超时会从最后持久化的快照（含 `engineStackCursor`）重建 Worker，并告知 UI 已回滚。对局保存在一个 IndexedDB 槽中，schema 不匹配时删除。固定到 `exactVersionId` 的试玩仍使用后端沙盒。
 - `AuthContext` 是站点登录会话（密码、GitHub 或 Google），不保存 Issue 写入授权；`LocaleContext` 切换语言。
+
+### 卡牌百科
+
+- **公开路由。** `PageRouter` 在等待登录状态和登录拦截之前，通过懒加载的 `EncyclopediaPage` chunk 提供 `?page=encyclopedia[&entry=<key>]`；普通页面不请求它的 chunk、数据或卡图，图库只请求当前页的卡图。每打开一个详情都会压入一条历史记录，只有本文档打开的详情才用 `history.back()` 关闭。复制的链接从 base path 重新构造，只带 `page` 与 `entry`，不会带上房间、座位、手牌或对局参数。搜索词、筛选、页码和滚动位置保存在 `sessionStorage`，刷新时重置。覆盖见 `encyclopedia*.spec.ts`；`encyclopedia-pages.spec.ts` 以静态文件方式提供根路径 Pages 产物，核对其数据、语言包和卡图来源及各自的失败处理。
+- **局内面板。** `GameHeader` 打开 `InGameEncyclopedia`。这是一个模态面板，懒加载 `InGameEncyclopediaContent`，详情导航只保存在内存里，从不写 URL，也不发送游戏命令。面板打开期间不展示交互聚焦；本地草稿留在容器中，按普通快照规则处理。`encyclopedia-attention.ts` 把玩家当前的输入窗口与打开面板时的窗口比较，出现新窗口时只提醒一次，重连页重新挂载面板后同样如此。热座接机身份变化会关闭面板，交接页不提供入口。覆盖见 `GameContainerApi.encyclopedia.test.tsx` 与 `encyclopedia-in-game.spec.ts`。
+- **牌面。** `EncyclopediaFace` 为目录中的每种牌面类型指定一个视图，视图列出所需卡图 URL，并通过游戏自身的组件（`PlayerCard`、`ParentCardFace`、`SpecialActionCardFace`）和 `shared/projections/` 渲染。`useImageStatus` 每个页面对同一 URL 只探测一次；任一卡图失败时，该条目改用 `EncyclopediaTextFace`，显示本地化文字和图片暂缺提示。字段文字由语言包 key 解析，检索文档中的回退状态会追加“显示英文”的说明。覆盖见 `encyclopedia-faces.spec.ts`。
 
 ### 交互展示不变量
 
