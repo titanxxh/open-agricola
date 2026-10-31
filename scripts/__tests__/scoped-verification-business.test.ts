@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import type { RuleAssociationIndex } from '../ci/rule-verification'
 import { planVerification, readTestInventory, type PlannedCheck, type TestInventory } from '../ci/verification-plan'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
@@ -30,6 +31,10 @@ const inventory: TestInventory = {
 
 const plan = (paths: string[], tests = inventory) => planVerification({
   identity, changes: paths.map(path => ({ status: 'M', path })), inventory: tests, fullTaskIds: FULL_TASK_IDS,
+  ruleAssociations: {
+    inventoryKey: JSON.stringify(tests), cards: [], expansionReasons: [],
+    tests: [...tests.vitest.map(test => test.file), ...tests.browser].map(file => ({ file, subsystems: ['core'], safetyReasons: [] })),
+  } satisfies RuleAssociationIndex,
 })
 
 const recoveryInventory: TestInventory = {
@@ -104,8 +109,8 @@ const workshopInventory: TestInventory = {
 describe('business verification groups', () => {
   it.each([
     ['shared/i18n/index.ts', 'client/services/__tests__/language-pack.test.ts'],
-    ['shared/domain/farm.ts', 'client/hooks/__tests__/useFarmSelection.test.ts'],
-  ])('selects the real complete client project for shared contract %s', (path, consumer) => {
+    ['shared/engine/engine.ts', 'client/hooks/__tests__/useFarmSelection.test.ts'],
+  ])('selects the real complete client project for shared rule core %s', (path, consumer) => {
     const actual = readTestInventory(resolve(import.meta.dirname, '../..'))
     const selected = plan([path], actual)
 
@@ -191,7 +196,7 @@ describe('business verification groups', () => {
   })
 
   it.each([
-    'shared/actions/payment/internal/execute.ts', 'shared/actions/hooks.ts', 'shared/actions/effects/pay.ts',
+    'shared/actions/hooks.ts', 'shared/actions/new-business/handler.ts',
     'shared/engine/engine.ts', 'shared/session/session-core.ts', 'server/game/authoritative-session.ts',
   ])('keeps every affected rule project, slow Session and complete browser lane for %s', path => {
     const selected = plan([path], ruleInventory)
@@ -257,7 +262,7 @@ describe('business verification groups', () => {
 
   it.each([
     'client/services/llm/generation/prompt.ts', 'shared/contract/workshop.ts', 'server/workshop-sandbox-contract.ts',
-    'client/local-sandbox/card-test-runtime.ts', 'docs/CUSTOM_CARD_SANDBOX.md', 'docs/architecture/payment.md',
+    'client/local-sandbox/card-test-runtime.ts',
   ])('runs current Workshop behavior, sandbox and prompt checks without paid model calls for %s', path => {
     const selected = plan([path], workshopInventory)
 
@@ -298,6 +303,49 @@ describe('business verification groups', () => {
       { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@workshop' },
       { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
     ] satisfies PlannedCheck[])
+  })
+
+  it.each([
+    { path: 'README.md', consumers: ['scripts/__tests__/docs-budget.test.ts'] },
+    { path: 'docs/test/new-workflow.md', consumers: ['scripts/__tests__/docs-budget.test.ts'] },
+    { path: 'docs/CUSTOM_CARD_SANDBOX_zh.md', consumers: ['scripts/__tests__/docs-budget.test.ts'] },
+    { path: 'docs/architecture/payment.md', consumers: ['client/services/llm/generation/__tests__/references.test.ts', 'scripts/__tests__/docs-budget.test.ts'] },
+    { path: 'docs/CUSTOM_CARD_SANDBOX.md', consumers: [
+      'client/services/llm/generation/__tests__/references.test.ts', 'scripts/__tests__/docs-budget.test.ts',
+      'server/__tests__/workshop-composed-behaviors-session.test.ts', 'server/__tests__/workshop-timing-payment-session.test.ts',
+    ] },
+  ])('selects documentation readers and executable-contract consumers for $path', ({ path, consumers }) => {
+    const selected = plan([path], workshopInventory)
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.selections.map(selection => selection.scope)).toEqual(['documentation'])
+    expect(selected.checks.flatMap(check => check.kind === 'vitest' ? check.files : []).sort()).toEqual(consumers)
+    expect(selected.checks.every(check => check.kind === 'vitest')).toBe(true)
+  })
+
+  it.each([
+    'server/operations-accounts.ts', 'server/database/031-game-opening-facts.sql',
+  ])('keeps monitoring path %s inside backend and dashboard consumers', path => {
+    const tests: TestInventory = {
+      vitest: [...inventory.vitest,
+        { project: 'fast-server', file: 'server/__tests__/operations-accounts.test.ts' },
+        { project: 'fast-server', file: 'server/__tests__/operations-openings.test.ts' },
+      ],
+      browser: [...inventory.browser, 'e2e-tests/operations-dashboard.spec.ts'],
+    }
+    const selected = plan([path], tests)
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.selections.map(selection => selection.scope)).toEqual(['operations'])
+    expect(selected.checks.filter(check => check.kind === 'vitest')).toEqual([{
+      kind: 'vitest', project: 'fast-server', files: tests.vitest.filter(test => test.project === 'fast-server').map(test => test.file).sort(),
+    }])
+    expect(selected.checks.filter(check => check.kind === 'catalog')).toEqual([
+      { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
+    ])
+    expect(selected.checks.filter(check => check.kind === 'browser')).toEqual([{
+      kind: 'browser', browser: 'chromium', files: ['e2e-tests/operations-dashboard.spec.ts'], grep: null,
+    }])
   })
 
   it('unions room and recovery groups across one mixed diff', () => {
@@ -369,12 +417,11 @@ describe('business verification groups', () => {
   })
 
   it.each([
-    'server/new-business/handler.ts', 'server/game/new-business/handler.ts', 'shared/new-business/handler.ts',
-    'shared/actions/new-business/handler.ts', 'shared/contract/new-protocol/codec.ts',
-    'client/services/llm/new-provider/client.ts', 'docs/test/new-workflow.md', 'e2e-tests/new-consumer.spec.ts',
+    'server/new-business/handler.ts', 'server/game/new-business/handler.ts', 'shared/new-business/handler.ts', 'shared/contract/new-protocol/codec.ts',
+    'client/services/llm/new-provider/client.ts', 'e2e-tests/new-consumer.spec.ts',
     'shared/actions/payment/__tests__/fixtures.ts', 'server/__tests__/_helpers/session-fixtures.ts', 'server/database/schema.sql',
     'server/game/room-policy.json', 'shared/contract/runtime.yml',
-  ])('expands unknown ownership, undeclared browser associations and global inputs for %s', path => {
+  ])('expands unknown ownership or absent test consumer evidence for %s', path => {
     const selected = plan(['server/game/room.ts', path], contractInventory)
 
     expect(selected.mode).toBe('full')
@@ -391,42 +438,32 @@ describe('business verification groups', () => {
   it.each([
     { path: 'server/game/room.ts', tests: inventory, missing: 'client/services/__tests__/gameTransport-reconnect.test.ts' },
     { path: 'server/game/replay-store.ts', tests: recoveryInventory, missing: 'scripts/__tests__/publish-replay-viewer.test.ts' },
-    { path: 'shared/actions/hooks.ts', tests: ruleInventory, missing: 'shared/actions/effects/__tests__/pay-supply-token.test.ts' },
     { path: 'shared/contract/protocol/ws.ts', tests: contractInventory, missing: 'client/services/__tests__/api-contract.test.ts' },
     { path: 'server/workshop-sandbox-contract.ts', tests: workshopInventory, missing: 'server/__tests__/workshop-timing-payment-session.test.ts' },
     { path: 'docs/CUSTOM_CARD_SANDBOX.md', tests: workshopInventory, missing: 'scripts/__tests__/docs-budget.test.ts' },
+    { path: 'docs/architecture/payment.md', tests: workshopInventory, missing: 'client/services/llm/generation/__tests__/references.test.ts' },
+    { path: 'docs/CUSTOM_CARD_SANDBOX.md', tests: workshopInventory, missing: 'server/__tests__/workshop-composed-behaviors-session.test.ts' },
   ])('cannot omit the declared test $missing', ({ path, tests, missing }) => {
-    const selected = plan([path], { ...tests, vitest: tests.vitest.filter(test => test.file !== missing) })
-
-    expect(selected.mode).toBe('full')
-    expect(selected.expansionReasons).toEqual([expect.stringContaining(missing)])
+    expect(() => plan([path], { ...tests, vitest: tests.vitest.filter(test => test.file !== missing) })).toThrow(missing)
   })
 
   it.each([
     { path: 'server/game/room.ts', tests: inventory, missing: 'e2e-tests/frontend-browser-scenario-matrix.spec.ts' },
     { path: 'server/game/replay-store.ts', tests: recoveryInventory, missing: 'e2e-tests/replay-viewer.spec.ts' },
-    { path: 'shared/actions/hooks.ts', tests: ruleInventory, missing: 'e2e-tests/choice-previews.spec.ts' },
     { path: 'shared/contract/protocol/ws.ts', tests: contractInventory, missing: 'e2e-tests/replay-viewer-csp.spec.ts' },
     { path: 'server/workshop-sandbox-contract.ts', tests: workshopInventory, missing: 'e2e-tests/workshop-generation.spec.ts' },
   ])('cannot omit the declared browser $missing', ({ path, tests, missing }) => {
-    const selected = plan([path], { ...tests, browser: tests.browser.filter(file => file !== missing) })
-
-    expect(selected.mode).toBe('full')
-    expect(selected.expansionReasons).toEqual([expect.stringContaining(missing)])
+    expect(() => plan([path], { ...tests, browser: tests.browser.filter(file => file !== missing) })).toThrow(missing)
   })
 
-  it('cannot drop the slow project or misclassify a required consumer', () => {
-    const missingSlow = plan(['shared/actions/hooks.ts'], {
-      ...ruleInventory, vitest: ruleInventory.vitest.filter(test => test.project !== 'slow'),
-    })
-    expect(missingSlow.mode).toBe('full')
-    expect(missingSlow.expansionReasons).toEqual([expect.stringContaining('slow')])
+  it('rejects a missing slow project and reassigned required protocol consumer', () => {
+    expect(() => plan(['shared/contract/protocol/ws.ts'], {
+      ...contractInventory, vitest: contractInventory.vitest.filter(test => test.project !== 'slow'),
+    })).toThrow('slow')
 
-    const wrongOwner = plan(['shared/contract/protocol/ws.ts'], {
+    expect(() => plan(['shared/contract/protocol/ws.ts'], {
       ...contractInventory, vitest: contractInventory.vitest.map(test => test.file === 'client/services/__tests__/api-contract.test.ts'
         ? { ...test, project: 'fast-shared' } : test),
-    })
-    expect(wrongOwner.mode).toBe('full')
-    expect(wrongOwner.expansionReasons).toEqual([expect.stringContaining('client/services/__tests__/api-contract.test.ts')])
+    })).toThrow('client/services/__tests__/api-contract.test.ts')
   })
 })

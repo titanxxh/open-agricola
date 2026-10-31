@@ -1,18 +1,23 @@
 #!/usr/bin/env tsx
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { assertPlanCurrent, createRepositoryPlan, formatPlanSummary, type PlannedCheck, type VerificationPlan } from './verification-plan'
 import { FULL_TASK_IDS, selectedTasks, taskCommands, verificationTask, type VerificationCommand } from './verification-tasks'
 import { assertRoutineGate, NO_CATALOG_TASKS } from './routine-verification-gate'
 import { executionPartition, routinePartitionManifest, routinePartitions, type RoutinePartitionId } from './routine-partitions'
+import { assertVitestResults } from './vitest-results'
+import { readTestConsumerIndex } from './test-consumers'
 
 export type ExecutionPartition = RoutinePartitionId | 'all'
 type CommandRunner = (command: string, args: string[], cwd: string) => number
-type CheckResult = { check: PlannedCheck; status: 'passed' | 'failed'; commands: Array<VerificationCommand & { exitCode: number }> }
+type CommandResult = VerificationCommand & {
+  startedAt: string; completedAt: string; durationMs: number
+} & ({ exitCode: number } | { exitCode: null; error: string })
+type CheckResult = { check: PlannedCheck; status: 'passed' | 'failed'; commands: CommandResult[] }
 type RoutineResult = {
   schemaVersion: 1
   kind: 'routine'
@@ -21,6 +26,7 @@ type RoutineResult = {
   partitionDigest: string
   planDigest: string
   identity: VerificationPlan['identity']
+  preparation: CommandResult[]
   checks: CheckResult[]
   error?: string
 }
@@ -66,14 +72,23 @@ export function plannedCheckCommands(cwd: string, check: PlannedCheck): Verifica
       ...taskCommands(cwd, check.taskId),
     ]
     case 'vitest': return [
-      ...(['fast-server', 'slow'].includes(check.project) ? [{ command: process.execPath, args: ['scripts/local-services.mjs', '--test'] }] : []),
-      { command: 'pnpm', args: ['run', 'build:cards-manifest'] },
       { command: 'pnpm', args: ['exec', 'vitest', 'run', '--project', check.project, ...check.files] },
     ]
     case 'browser': return [{
       command: 'pnpm', args: ['verify', ...check.files, `--browser=${check.browser}`, ...(check.grep ? ['--grep', check.grep] : [])],
     }]
   }
+}
+
+function unitServicesRequired(cwd: string, checks: Array<Extract<PlannedCheck, { kind: 'vitest' }>>): boolean {
+  if (checks.some(check => check.project === 'fast-server' || check.project === 'slow')) return true
+  const consumers = readTestConsumerIndex(cwd, {
+    vitest: checks.flatMap(check => check.files.map(file => ({ file, project: check.project }))), browser: [],
+  })
+  if (consumers.expansionReasons.length) throw new Error(`Cannot establish selected test service requirements: ${consumers.expansionReasons.join('; ')}`)
+  return consumers.tests.some(test => test.dependencies.some(file =>
+    /^server\/(?:__tests__\/_helpers\/(?:postgres|objects)\.|database\/|db\.|storage\/s3-store\.)/.test(file))
+    || test.uncertaintyReasons.some(reason => /^(?:Computed module|Unresolved module|Unknown module loader|Indirect module)/.test(reason)))
 }
 
 export function executeRepositoryPlan(input: {
@@ -96,19 +111,53 @@ export function executeRepositoryPlan(input: {
     record = {
       schemaVersion: 1, kind: 'routine', status: 'running', partition: input.partition,
       partitionDigest: partition?.digest ?? manifest.plan_digest,
-      planDigest: manifest.plan_digest, identity: plan.identity, checks: [],
+      planDigest: manifest.plan_digest, identity: plan.identity, preparation: [], checks: [],
     }
     write(input.output, record)
+    const current = record
+    const runCommand = (command: VerificationCommand, commands: CommandResult[], kind: string) => {
+      assertPlanCurrent(input.cwd, plan)
+      const startedAt = new Date().toISOString()
+      const started = performance.now()
+      let outcome: { exitCode: number } | { exitCode: null; error: string }
+        = { exitCode: null, error: 'Command did not complete' }
+      try {
+        const exitCode = run(command.command, command.args, input.cwd)
+        outcome = { exitCode }
+        if (exitCode !== 0) throw new Error(`Selected ${kind} check failed (exit ${exitCode})`)
+      } catch (error) {
+        if (outcome.exitCode === null) outcome = { exitCode: null, error: error instanceof Error ? error.message : String(error) }
+        throw error
+      } finally {
+        commands.push({ ...command, ...outcome, startedAt, completedAt: new Date().toISOString(), durationMs: performance.now() - started })
+        write(input.output, current)
+      }
+      assertPlanCurrent(input.cwd, plan)
+    }
+    const units = checks.filter(check => check.kind === 'vitest')
+    let reports: string | undefined
+    if (units.length) {
+      if (unitServicesRequired(input.cwd, units)) {
+        runCommand({ command: process.execPath, args: ['scripts/local-services.mjs', '--test'] }, record.preparation, 'preparation')
+      }
+      runCommand({ command: 'pnpm', args: ['run', 'build:cards-manifest'] }, record.preparation, 'preparation')
+      const directory = join(input.cwd, 'output/verification/vitest-results')
+      mkdirSync(directory, { recursive: true })
+      reports = mkdtempSync(join(directory, 'run-'))
+    }
     for (const check of checks) {
       const result: CheckResult = { check, status: 'failed', commands: [] }
       record.checks.push(result)
+      const report = check.kind === 'vitest' && reports ? join(reports, `${record.checks.length}-${check.project}.json`) : undefined
       for (const command of plannedCheckCommands(input.cwd, check)) {
-        assertPlanCurrent(input.cwd, plan)
-        const exitCode = run(command.command, command.args, input.cwd)
-        result.commands.push({ ...command, exitCode })
-        write(input.output, record)
-        if (exitCode !== 0) throw new Error(`Selected ${check.kind} check failed (exit ${exitCode})`)
-        assertPlanCurrent(input.cwd, plan)
+        runCommand(report ? { ...command, args: [...command.args,
+          '--reporter=default', '--reporter=json', ...(process.env.GITHUB_ACTIONS === 'true' ? ['--reporter=github-actions'] : []),
+          `--outputFile.json=${report}`,
+        ] } : command, result.commands, check.kind)
+      }
+      if (check.kind === 'vitest') {
+        if (!report) throw new Error('Selected Vitest check has no report destination')
+        assertVitestResults({ cwd: input.cwd, report, files: check.files })
       }
       result.status = 'passed'
       write(input.output, record)

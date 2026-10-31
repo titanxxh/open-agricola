@@ -65,10 +65,23 @@ function fixture(change: 'documentation' | 'frontend' | 'card' = 'documentation'
   const log = join(cwd, 'commands.jsonl')
   write(cwd, 'bin/pnpm', `#!/usr/bin/env node
 const fs = require('node:fs');
+const path = require('node:path');
 const args = process.argv.slice(2);
-fs.appendFileSync(process.env.COMMAND_LOG, JSON.stringify(args) + '\\n');
+fs.appendFileSync(process.env.COMMAND_LOG, JSON.stringify(args.filter(arg => !arg.startsWith('--reporter=') && !arg.startsWith('--outputFile.json='))) + '\\n');
 if (process.env.FAIL_COMMAND && args.includes(process.env.FAIL_COMMAND)) process.exit(7);
 if (process.env.MUTATE_SOURCE) fs.appendFileSync('README.md', 'changed during execution\\n');
+if (args.includes('vitest')) {
+  const reports = args.filter(arg => arg.startsWith('--outputFile.json='));
+  if (reports.length !== 1 || !args.includes('--reporter=default') || !args.includes('--reporter=json') || args.filter(arg => arg === '--project').length !== 1) process.exit(8);
+  if (process.env.REPORT_MODE !== 'missing') {
+    const files = args.filter(arg => /\\.test\\.[cm]?[jt]sx?$/.test(arg));
+    if (process.env.REPORT_MODE === 'extra') files.push('copy/' + files[0]);
+    fs.writeFileSync(reports[0].slice('--outputFile.json='.length), JSON.stringify({
+      success: true, numFailedTests: 0, numFailedTestSuites: 0, numPendingTestSuites: 0,
+      testResults: files.map(file => ({ name: path.join(process.cwd(), file), status: 'passed', assertionResults: [{ status: 'passed' }] })),
+    }));
+  }
+}
 `)
   chmodSync(join(bin, 'pnpm'), 0o755)
   const env: NodeJS.ProcessEnv = { ...process.env, GITHUB_SHA: sha, GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '', COMMAND_LOG: log, PATH: bin + delimiter + process.env.PATH }
@@ -91,6 +104,7 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-server', 'server/__tests__/cross-card-session.test.ts'],
       ['exec', 'vitest', 'run', '--project', 'slow', 'server/__tests__/A029_AleBenches-session.test.ts'],
     ])
+    expect(value.commands().filter(command => Array.isArray(command) && command.includes('build:cards-manifest'))).toHaveLength(1)
   }, 60_000)
 
   it('a selected slow Session failure blocks card completion and the public required gate', () => {
@@ -150,6 +164,18 @@ describe('scoped verification public CLI', () => {
     expect(missing.status).toBe(1)
     expect(missing.stderr).toContain('Missing verification job output')
   }, 60_000)
+
+  it.each(['missing', 'extra'])('rejects %s module evidence even when the selected command exits successfully', mode => {
+    const value = fixture()
+    value.env.REPORT_MODE = mode
+    value.env.GITHUB_OUTPUT = join(value.cwd, 'output/execution-outputs.txt')
+    const result = value.run('run', '--base', 'main', '--partition', 'units')
+    expect(result.status).toBe(1)
+    expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
+    expect(JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))).toMatchObject({
+      status: 'failed', checks: [{ status: 'failed', commands: [{ exitCode: 0 }] }],
+    })
+  })
 
   it('cannot erase required checks from a saved plan while preserving its source fingerprint', () => {
     const value = fixture()
@@ -222,12 +248,10 @@ describe('scoped verification public CLI', () => {
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
-      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
-      ['verify', 'e2e-tests/farm-card-targets.spec.ts', '--browser=chromium'],
     ])
     value.env.NEEDS_JSON = JSON.stringify(needs)
     expect(value.run('gate', '--sha', value.sha).status).toBe(0)
@@ -250,13 +274,17 @@ describe('scoped verification public CLI', () => {
     const value = fixture('frontend')
     value.env.FAIL_COMMAND = 'verify'
     value.env.GITHUB_OUTPUT = join(value.cwd, 'output/execution-outputs.txt')
-    const result = value.run('run', '--base', 'main', '--partition', 'browser-1')
+    const result = value.run('run', '--base', 'main', '--partition', 'all')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Selected browser check failed')
-    expect(value.commands()).toEqual([['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws']])
+    expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'verify')).toEqual([
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+    ])
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
-    expect(record).toMatchObject({ status: 'failed', checks: [{ status: 'failed' }] })
+    expect(record).toMatchObject({ status: 'failed', checks: [
+      { status: 'passed' }, { status: 'passed' }, { status: 'passed' }, { status: 'failed' },
+    ] })
   })
 
   it('rejects a plan digest from another source and does not execute any command', () => {

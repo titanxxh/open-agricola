@@ -8,6 +8,9 @@ import { parseSource, sourceExtensions } from '../source-files'
 import { frontendVerification } from './frontend-verification'
 import { businessScopeFor, businessVerification } from './business-verification'
 import { cardVerification, readCardAssociationIndex, type CardAssociationIndex } from './card-verification'
+import { readTestConsumerIndex, type TestConsumerIndex } from './test-consumers'
+import { readRuleAssociationIndex, ruleVerification, type RuleAssociationIndex } from './rule-verification'
+import { assertConsumerCoverage, documentationVerification, isTestSupport, supportVerification } from './support-verification'
 
 export type VerificationIdentity = {
   baseRef: string
@@ -76,6 +79,8 @@ const scopeReasons = {
   contract: 'Protocol and projection changes require both producers and consumers.',
   workshop: 'Workshop contracts and runtime-readable documentation require sandbox verification.',
   browser: 'Browser test changes require the corresponding browser scenarios.',
+  'test-support': 'Test and helper changes require their complete established consumers.',
+  operations: 'Monitoring changes require database, aggregate and dashboard consumers.',
   global: 'Shared verification configuration or fixtures require full verification.',
   unknown: 'Unclassified ownership requires full verification.',
 }
@@ -91,28 +96,30 @@ export type ScopeSelection = {
 function scopeFor(file: string): VerificationScope {
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(?:tsconfig|vite|vitest|playwright|eslint)[^/]*|AGENTS\.md|CLAUDE\.md|CONTEXT\.md|\.env[^/]*)$/.test(file)
     || /(?:^|\/)(?:tsconfig[^/]*\.json|(?:vite|vitest|playwright|eslint)\.config\.[^/]+)$/.test(file)
-    || /^docs\/(?:operations\/|agents\/|adr\/|(?:PLATFORM_DESIGN|DEPLOY_PLAN|HOW_TO_DEPLOY)(?:_zh)?\.md$)/.test(file)
-    || file.startsWith('.github/') || file.startsWith('scripts/') || file.startsWith('tests/')
+    || /(?:^|\/)(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/.test(file)
+    || file.startsWith('.github/')
+    || /^scripts\/(?:ci\/|verification|verify|test-project-globs|check-|architecture-policy|source-files|observability)/.test(file)
+    || /^scripts\/__tests__\/(?:candidate-verification|scoped-verification|verification|routine-verification|card-verification|rule-verification|operations-verification|test-consumers|vitest-results|ci-card-impl-boundaries)/.test(file)
+    || /^(?:restart-local|deploy-backend)\.sh$/.test(file)
     || file === 'shared/cards/__tests__/card-environment.ts'
-    || /(?:^|\/)(?:_helpers|fixtures|__fixtures__)(?:\/|\.)/.test(file)
-    || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)) return 'global'
+    || file === 'shared/cards/__tests__/setup-register-all.ts') return 'global'
+  if (isTestSupport(file) || /^(?:scripts|tests)\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return 'test-support'
+  if (/^(?:README(?:_[a-z]+)?\.md|LICENSE|NOTICE|docs\/.+\.md)$/.test(file)) return 'documentation'
+  if (file.startsWith('scripts/')) return 'global'
   const businessScope = businessScopeFor(file)
   if (businessScope) return businessScope
-  if (/^docs\/(?:CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status|community-card-examples)(?:_zh)?\.md$/.test(file)
-    || /^docs\/(?:prompts|examples)\//.test(file)
-    || /^docs\/(?:architecture|test)\//.test(file)
-    || /^client\/(?:local-sandbox|sandbox|app\/workshop|services\/(?:llm|workshop))(?:\/|[-.])/.test(file)
+  if (/^client\/(?:local-sandbox|sandbox|app\/workshop|services\/(?:llm|workshop))(?:\/|[-.])/.test(file)
     || /^server\/(?:custom-code|workshop)(?:\/|[-.])/.test(file)
     || /^shared\/(?:custom-code|projections\/workshop)/.test(file)) return 'workshop'
   if (/^shared\/(?:contract|projections)\//.test(file)) return 'contract'
   if (/^shared\/cards\/(?:[A-Z]+|major|community)\//.test(file)
     || /^shared\/cards\/__tests__\/[A-Z]\d/.test(file)
     || /^server\/__tests__\/[A-Z]\d.*-session\.test\.ts$/.test(file)) return 'card'
+  if (file.startsWith('server/') && /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return 'test-support'
   if (file === 'server/game/authoritative-session.ts' || file.startsWith('shared/')) return 'rules'
   if (file.startsWith('server/')) return 'server'
   if (file.startsWith('client/') || file.startsWith('replay-viewer/')) return 'frontend'
   if (file.startsWith('e2e-tests/')) return 'browser'
-  if (/^(?:README(?:_[a-z]+)?\.md|LICENSE|NOTICE|docs\/.+\.md)$/.test(file)) return 'documentation'
   return 'unknown'
 }
 
@@ -125,6 +132,7 @@ export type VerificationPlan = {
   inventory: TestInventory
   selections: ScopeSelection[]
   expansionReasons: string[]
+  wideningReasons: string[]
   checks: PlannedCheck[]
 }
 
@@ -134,6 +142,8 @@ export function planVerification(input: {
   inventory: TestInventory
   fullTaskIds: readonly string[]
   cardAssociations?: CardAssociationIndex
+  testConsumers?: TestConsumerIndex
+  ruleAssociations?: RuleAssociationIndex
 }): VerificationPlan {
   if (!input.fullTaskIds.length || new Set(input.fullTaskIds).size !== input.fullTaskIds.length) {
     throw new Error('A nonempty, unique canonical full task catalog is required')
@@ -148,14 +158,15 @@ export function planVerification(input: {
     }
   }
   const selections = [...grouped].map(([scope, paths]) => ({ scope, paths: [...paths].sort(), reason: scopeReasons[scope] }))
-  const documentationTests = input.inventory.vitest.filter(test => test.file === 'scripts/__tests__/docs-budget.test.ts')
   const scopedChecks: PlannedCheck[] = []
   const expansionReasons: string[] = []
+  const wideningReasons: string[] = []
+  if (input.testConsumers) assertConsumerCoverage(input.inventory, input.testConsumers)
   for (const selection of selections) {
     if (selection.scope === 'documentation') {
-      scopedChecks.push(...[...new Set(documentationTests.map(test => test.project))].map(project => ({
-        kind: 'vitest' as const, project, files: documentationTests.filter(test => test.project === project).map(test => test.file),
-      })))
+      const mapping = documentationVerification(selection.paths, input.inventory)
+      scopedChecks.push(...mapping.checks)
+      wideningReasons.push(...mapping.wideningReasons)
     } else if (selection.scope === 'frontend') {
       const mapping = frontendVerification(selection.paths, input.inventory)
       scopedChecks.push(...mapping.checks)
@@ -164,19 +175,27 @@ export function planVerification(input: {
       const mapping = cardVerification(selection.paths, input.inventory, input.cardAssociations, input.changes)
       scopedChecks.push(...mapping.checks)
       expansionReasons.push(...mapping.expansionReasons)
-    } else if (['server', 'recovery', 'rules', 'contract', 'workshop'].includes(selection.scope)) {
-      const mapping = businessVerification(selection.paths, input.inventory)
+    } else if (selection.scope === 'browser' || selection.scope === 'test-support') {
+      const mapping = supportVerification(selection.paths, input.inventory, input.testConsumers, input.changes)
       scopedChecks.push(...mapping.checks)
       expansionReasons.push(...mapping.expansionReasons)
+      wideningReasons.push(...mapping.wideningReasons)
+    } else if (selection.scope === 'rules') {
+      const mapping = ruleVerification(selection.paths, input.inventory, input.ruleAssociations)
+      scopedChecks.push(...mapping.checks)
+      expansionReasons.push(...mapping.expansionReasons)
+      wideningReasons.push(...mapping.wideningReasons)
+    } else if (['server', 'recovery', 'contract', 'workshop', 'operations'].includes(selection.scope)) {
+      const mapping = businessVerification(selection.paths, input.inventory, input.testConsumers)
+      scopedChecks.push(...mapping.checks)
+      expansionReasons.push(...mapping.expansionReasons)
+      wideningReasons.push(...mapping.wideningReasons)
     } else expansionReasons.push(`${selection.reason} Full verification is selected for ${selection.paths.length} affected paths.`)
   }
   if (scopedChecks.some(check => check.kind === 'catalog' && !input.fullTaskIds.includes(check.taskId))) {
     expansionReasons.push('The canonical catalog cannot execute the selected scope; full verification is required.')
   }
   if (!input.changes.length) expansionReasons.push('No changes were established; full verification is required.')
-  if (selections.some(selection => selection.scope === 'documentation') && !documentationTests.length) {
-    expansionReasons.push('Documentation constraint tests are missing; full verification is required.')
-  }
   const full = expansionReasons.length > 0
   return {
     schemaVersion: 1,
@@ -187,6 +206,7 @@ export function planVerification(input: {
     inventory: input.inventory,
     selections,
     expansionReasons,
+    wideningReasons: [...new Set(wideningReasons)].sort(),
     checks: full ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId }))
       : normalizeChecks(scopedChecks, input.fullTaskIds),
   }
@@ -292,9 +312,15 @@ export function createRepositoryPlan(input: {
       parseSource(file)
     }
   }
-  const cardAssociations = uniqueChanges.some(change => scopeFor(change.path) === 'card' || (change.status === 'R' && scopeFor(change.previousPath) === 'card'))
+  const scopes = uniqueChanges.flatMap(change => change.status === 'R' ? [scopeFor(change.previousPath), scopeFor(change.path)] : [scopeFor(change.path)])
+  const needsRules = scopes.includes('rules')
+  const cardAssociations = scopes.includes('card') || needsRules
     ? readCardAssociationIndex(input.cwd, inventory) : undefined
-  const plan = planVerification({ identity, changes: uniqueChanges, inventory, fullTaskIds: input.fullTaskIds, cardAssociations })
+  const testConsumers = needsRules || scopes.some(scope => scope === 'card' || scope === 'browser' || scope === 'test-support' || scope === 'operations')
+    ? readTestConsumerIndex(input.cwd, inventory) : undefined
+  const ruleAssociations = needsRules && cardAssociations && testConsumers
+    ? readRuleAssociationIndex(input.cwd, inventory, cardAssociations, testConsumers) : undefined
+  const plan = planVerification({ identity, changes: uniqueChanges, inventory, fullTaskIds: input.fullTaskIds, cardAssociations, testConsumers, ruleAssociations })
   assertPlanCurrent(input.cwd, plan)
   return plan
 }
@@ -322,6 +348,7 @@ export function formatPlanSummary(plan: VerificationPlan): string {
     '## Selected scopes', '',
     ...plan.selections.map(selection => `- **${selection.scope}**: ${selection.reason} ${paths(selection.paths)}`), '',
     ...(plan.expansionReasons.length ? ['## Why verification expands', '', ...plan.expansionReasons.map(reason => `- ${reason}`), ''] : []),
+    ...(plan.wideningReasons.length ? ['## Bounded scope expansion', '', ...plan.wideningReasons.map(reason => `- ${reason}`), ''] : []),
     '## Planned checks', '',
     ...plan.checks.map(check => {
       switch (check.kind) {

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { assertPlanCurrent, createRepositoryPlan, planVerification, type ChangedPath } from '../ci/verification-plan'
+import { businessScopeFor } from '../ci/business-verification'
 
 const identity = {
   baseRef: 'main', headRef: 'HEAD',
@@ -70,25 +71,54 @@ describe('verification scope planning', () => {
         { status: 'M', path: 'docs/CUSTOM_CARD_SANDBOX.md' },
         { status: 'M', path: 'package.json' },
       ],
-      inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+      inventory: {
+        vitest: [
+          { file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' },
+          { file: 'client/services/llm/generation/__tests__/references.test.ts', project: 'fast-client' },
+          { file: 'server/__tests__/workshop-timing-payment-session.test.ts', project: 'fast-server' },
+          { file: 'server/__tests__/workshop-composed-behaviors-session.test.ts', project: 'fast-server' },
+          { file: 'shared/actions/payment/internal/__tests__/pay.test.ts', project: 'fast-shared' },
+          { file: 'shared/cards/__tests__/listener-purity-guard.test.ts', project: 'fast-cards' },
+          { file: 'shared/actions/effects/__tests__/pay-supply-token.test.ts', project: 'fast-card-runtime' },
+          { file: 'server/__tests__/listener-purity-gate-session.test.ts', project: 'fast-server' },
+          { file: 'tests/cost-pay-parity.test.ts', project: 'fast-tests' },
+          { file: 'shared/session/__tests__/serialization-cursor.test.ts', project: 'fast-card-runtime' },
+          { file: 'client/services/__tests__/api-contract.test.ts', project: 'fast-client' },
+          { file: 'tests/protocol-types.test.ts', project: 'fast-tests' },
+          { file: 'tests/serialization.test.ts', project: 'fast-tests' },
+          { file: 'shared/contract/__tests__/authoritative-command.test.ts', project: 'fast-shared' },
+          { file: 'client/services/__tests__/gameTransport-reconnect.test.ts', project: 'fast-client' },
+          { file: 'server/__tests__/auth.test.ts', project: 'fast-server' },
+          { file: 'server/connection/__tests__/ws-server.test.ts', project: 'fast-server' },
+          { file: 'server/game/__tests__/room.test.ts', project: 'fast-server' },
+          { file: 'tests/game-sync-pipeline.test.ts', project: 'fast-tests' },
+          { file: 'server/__tests__/A029_AleBenches-session.test.ts', project: 'slow' },
+        ],
+        browser: [
+          'e2e-tests/choice-previews.spec.ts', 'e2e-tests/listener-lifecycle-room.spec.ts',
+          'e2e-tests/room-animal-holders.spec.ts', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts',
+          'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts',
+          'e2e-tests/local-sandbox.spec.ts', 'e2e-tests/hosted-password-login.spec.ts',
+          'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
+        ],
+      },
+      fullTaskIds: ['quality', 'fast'],
     })
 
     expect(plan.mode).toBe('full')
     expect(plan.selections.map(selection => ({ scope: selection.scope, paths: selection.paths }))).toEqual([
-      { scope: 'documentation', paths: ['README.md'] },
+      { scope: 'documentation', paths: ['README.md', 'docs/CUSTOM_CARD_SANDBOX.md'] },
       { scope: 'frontend', paths: ['client/components/Help.tsx'] },
       { scope: 'card', paths: ['shared/cards/A/A029_AleBenches.ts'] },
       { scope: 'server', paths: ['server/game/room.ts'] },
       { scope: 'rules', paths: ['shared/actions/payment/solver.ts'] },
       { scope: 'contract', paths: ['shared/contract/interaction.ts'] },
-      { scope: 'workshop', paths: ['docs/CUSTOM_CARD_SANDBOX.md'] },
       { scope: 'global', paths: ['package.json'] },
     ])
   })
 
   it.each<{ changes: ChangedPath[]; reason: string }>([
     { changes: [], reason: 'No changes were established; full verification is required.' },
-    { changes: [{ status: 'M', path: 'README.md' }], reason: 'Documentation constraint tests are missing; full verification is required.' },
   ])('never turns an unprovable scope into an empty successful plan: $reason', ({ changes, reason }) => {
     const plan = planVerification({
       identity, changes, inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
@@ -98,6 +128,13 @@ describe('verification scope planning', () => {
     expect(plan.expansionReasons).toContain(reason)
   })
 
+  it('rejects a missing declared documentation consumer', () => {
+    expect(() => planVerification({
+      identity, changes: [{ status: 'M', path: 'README.md' }],
+      inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+    })).toThrow('Declared documentation consumer is missing')
+  })
+
   it('rejects an absent canonical full task catalog', () => {
     expect(() => planVerification({
       identity, changes: [{ status: 'M', path: 'package.json' }],
@@ -105,7 +142,7 @@ describe('verification scope planning', () => {
     })).toThrow('canonical full task catalog')
   })
 
-  it.each(['shared/cards/__tests__/setup-register-all.ts', 'shared/cards/__tests__/card-environment.ts', 'client/components/__tests__/fixtures.ts'])('treats shared test setup as global: %s', path => {
+  it.each(['shared/cards/__tests__/setup-register-all.ts', 'shared/cards/__tests__/card-environment.ts'])('treats global card bootstrap as global: %s', path => {
     const plan = planVerification({
       identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
     })
@@ -113,11 +150,30 @@ describe('verification scope planning', () => {
     expect(plan.selections).toMatchObject([{ scope: 'global', paths: [path] }])
   })
 
-  it.each(['server/workshop-validation.ts', 'client/services/workshop-pr.ts'])('retains Workshop ownership for module prefixes: %s', path => {
+  it('uses test support ownership for a client fixture', () => {
+    const path = 'client/components/__tests__/fixtures.ts'
     const plan = planVerification({
       identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
     })
-    expect(plan.selections).toMatchObject([{ scope: 'workshop', paths: [path] }])
+    expect(plan.selections).toMatchObject([{ scope: 'test-support', paths: [path] }])
+    expect(plan.expansionReasons).toContain('Test consumer evidence is missing; full verification is required.')
+  })
+
+  it.each(['server/workshop-validation.ts', 'client/services/workshop-pr.ts'])('retains Workshop ownership for module prefixes: %s', path => {
+    expect(businessScopeFor(path)).toBe('workshop')
+  })
+
+  it('includes a new rule regression without requiring a production filename twin', () => {
+    const file = 'server/__tests__/payment-new-regression.test.ts'
+    const inventory = { vitest: [{ file, project: 'fast-server' }], browser: [] }
+    const plan = planVerification({
+      identity, changes: [{ status: 'A', path: file }], inventory, fullTaskIds: ['quality', 'fast'],
+      testConsumers: { inventoryKey: JSON.stringify(inventory), expansionReasons: [], tests: [
+        { file, dependencies: [file], symbols: [], literals: [], uncertaintyReasons: [] },
+      ] },
+    })
+    expect(plan.mode).toBe('scoped')
+    expect(plan.checks).toEqual([{ kind: 'vitest', project: 'fast-server', files: [file] }])
   })
 })
 
@@ -202,6 +258,35 @@ describe('repository verification scope', () => {
     git(cwd, 'branch', '-f', 'main', plan.identity.baseSha)
     git(cwd, '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-qm', 'another commit')
     expect(() => assertPlanCurrent(cwd, plan)).toThrow('Checked-out commit changed')
+  })
+
+  it('rejects an unparsable transitive helper even when the helper itself is unchanged', () => {
+    const { cwd } = repository()
+    write(cwd, 'e2e-tests/helpers/broken.ts', 'export const =')
+    write(cwd, 'e2e-tests/example.spec.ts', "import './helpers/broken'\n")
+    commit(cwd, 'baseline with unreadable helper')
+    git(cwd, 'branch', '-f', 'main', 'HEAD')
+    write(cwd, 'e2e-tests/example.spec.ts', "import './helpers/broken'\n// Changed browser test\n")
+    commit(cwd, 'browser change')
+
+    expect(() => createRepositoryPlan({ cwd, base: 'main', fullTaskIds: ['quality', 'fast'] }))
+      .toThrow(/Cannot establish test consumer evidence.*broken\.ts/)
+  })
+
+  it('rejects an unreadable card test helper for a card-only production change', () => {
+    const { cwd } = repository()
+    const card = 'shared/cards/A/A029_AleBenches.ts'
+    const source = "export const A029_AleBenches = defineMinorCard({ meta: { id: 'A029_AleBenches' } })\n"
+    write(cwd, card, source)
+    write(cwd, 'shared/cards/__tests__/fixtures/broken.ts', 'export const =')
+    write(cwd, 'shared/cards/__tests__/A29_AleBenches.test.ts', "import './fixtures/broken'\n")
+    commit(cwd, 'card baseline with unreadable helper')
+    git(cwd, 'branch', '-f', 'main', 'HEAD')
+    write(cwd, card, source + '// Changed card source\n')
+    commit(cwd, 'card-only change')
+
+    expect(() => createRepositoryPlan({ cwd, base: 'main', fullTaskIds: ['quality', 'fast'] }))
+      .toThrow(/Cannot establish test consumer evidence.*broken\.ts/)
   })
 
   it('includes tested-commit changes beyond a documentation-only requested head', () => {
