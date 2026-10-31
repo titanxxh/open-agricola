@@ -14,6 +14,7 @@ import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy, type CardTouchInteraction } from './CardWithCopy'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
 import { ResourceText } from './ResourceText'
+import { paymentResourceIconClass } from './resource-icon-class'
 import { getCardDisplayText, type CardType } from './cardText'
 
 export type { CardType } from './cardText'
@@ -108,9 +109,8 @@ const formatReturnCards = (cardIds: string[], locale: Locale): string => {
 
 const renderCost = (cost: PaymentResourceMap, locale: Locale) => {
   const parts = PAYMENT_RESOURCE_KEYS.filter(key => (cost[key] ?? 0) > 0).map(key => {
-    const icon = key === 'fence' ? 'fence-icon' : key === 'stable' ? 'barn' : key
     return <div key={key} className="card-cost-item">{cost[key]} <span
-      className={`card-res-icon ${key} res-icon res-icon-${icon}`} title={t(locale, `resources.${key}`)} /></div>
+      className={`card-res-icon ${key} res-icon res-icon-${paymentResourceIconClass(key)}`} title={t(locale, `resources.${key}`)} /></div>
   })
   return parts.length > 0 ? <div className="card-cost-text">{parts}</div> : null
 }

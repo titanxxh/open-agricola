@@ -2,6 +2,7 @@ import { t, type Locale } from '../../../shared/i18n'
 import type { PaymentResourceKey, PaymentResourceMap } from '../../../shared/contract/types'
 import { PAYMENT_RESOURCE_KEYS, isCardProvidedPaymentResourceKey } from '../../../shared/contract/resource-keys'
 import { extendedResourceKeyList } from '../../../shared/contract/state-constants'
+import { paymentResourceIconClass } from './resource-icon-class'
 
 type ResourceLineMode = 'inventory' | 'payment'
 
@@ -15,11 +16,6 @@ type Props = {
   className?: string
 }
 
-const RESOURCE_ICON_CLASS: Partial<Record<PaymentResourceKey | 'bonusVp', string>> = {
-  fence: 'fence-icon',
-  stable: 'barn',
-}
-
 const paymentResourceKeys = (resources: PaymentResourceMap): PaymentResourceKey[] => [
   ...PAYMENT_RESOURCE_KEYS,
   ...Object.keys(resources)
@@ -29,14 +25,13 @@ const paymentResourceKeys = (resources: PaymentResourceMap): PaymentResourceKey[
 ]
 
 const iconClassForKey = (key: PaymentResourceKey | 'bonusVp'): string => {
-  const direct = RESOURCE_ICON_CLASS[key]
-  if (direct) return direct
-  if (key !== 'bonusVp' && isCardProvidedPaymentResourceKey(key)) {
+  if (key === 'bonusVp') return key
+  if (isCardProvidedPaymentResourceKey(key)) {
     const localId = key.split(':')[1] ?? ''
     const representedResource = PAYMENT_RESOURCE_KEYS.find((paymentKey) => localId.includes(paymentKey))
-    return representedResource ? RESOURCE_ICON_CLASS[representedResource] ?? representedResource : 'bonusVp'
+    return representedResource ? paymentResourceIconClass(representedResource) : 'bonusVp'
   }
-  return key
+  return paymentResourceIconClass(key)
 }
 
 const labelKeyForResource = (key: PaymentResourceKey | 'bonusVp'): string => {
