@@ -88,6 +88,28 @@ describe('SpecialActionsPanel', () => {
     })
   })
 
+  it('draws the terrain each action removes, what it yields and when it buys an improvement', () => {
+    const drawn = {
+      'cut-peat': ['moor'], 'fell-trees': ['forest'], 'slash-and-burn': ['forest', 'field'],
+      'horse-market': [], 'hiring-fair': [], 'black-market': ['minor'], 'illicit-work': ['major'],
+    }
+    const { container } = render(
+      <SpecialActionsPanel locale="en" playerCount={2}
+        cards={moorSpecialActionCardDefinitions.map((card) => ({ ...card, location: { kind: 'market' } }))}
+        currentPlayerId="p1" availability={{}} canTakeSpecialAction={() => false}
+        selected={null} onTakeAction={() => {}} />,
+    )
+
+    const actions = moorSpecialActionCardDefinitions.flatMap((card) => card.actions)
+    expect(new Set(actions)).toEqual(new Set(Object.keys(drawn)))
+    container.querySelectorAll('button').forEach((button, index) => {
+      const action = actions[index]!
+      expect([...button.querySelectorAll('.special-action-card__token .res-icon')].map((icon) => icon.className))
+        .toEqual(drawn[action].map((token) => `res-icon res-icon-${token}`))
+      expect(button.querySelector('.special-action-card__note') !== null).toBe(action === 'black-market' || action === 'illicit-work')
+    })
+  })
+
   it('renders localized action diagrams and sends card/action ids', () => {
     const onTake = vi.fn()
 
