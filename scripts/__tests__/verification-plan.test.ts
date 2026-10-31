@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { assertPlanCurrent, createRepositoryPlan, planVerification, readTestInventory, type ChangedPath } from '../ci/verification-plan'
+import { assertPlanCurrent, createRepositoryPlan, planVerification, type ChangedPath } from '../ci/verification-plan'
 import { businessScopeFor } from '../ci/business-verification'
 
 const identity = {
@@ -71,7 +71,38 @@ describe('verification scope planning', () => {
         { status: 'M', path: 'docs/CUSTOM_CARD_SANDBOX.md' },
         { status: 'M', path: 'package.json' },
       ],
-      inventory: readTestInventory(resolve(import.meta.dirname, '../..')), fullTaskIds: ['quality', 'fast'],
+      inventory: {
+        vitest: [
+          { file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' },
+          { file: 'client/services/llm/generation/__tests__/references.test.ts', project: 'fast-client' },
+          { file: 'server/__tests__/workshop-timing-payment-session.test.ts', project: 'fast-server' },
+          { file: 'server/__tests__/workshop-composed-behaviors-session.test.ts', project: 'fast-server' },
+          { file: 'shared/actions/payment/internal/__tests__/pay.test.ts', project: 'fast-shared' },
+          { file: 'shared/cards/__tests__/listener-purity-guard.test.ts', project: 'fast-cards' },
+          { file: 'shared/actions/effects/__tests__/pay-supply-token.test.ts', project: 'fast-card-runtime' },
+          { file: 'server/__tests__/listener-purity-gate-session.test.ts', project: 'fast-server' },
+          { file: 'tests/cost-pay-parity.test.ts', project: 'fast-tests' },
+          { file: 'shared/session/__tests__/serialization-cursor.test.ts', project: 'fast-card-runtime' },
+          { file: 'client/services/__tests__/api-contract.test.ts', project: 'fast-client' },
+          { file: 'tests/protocol-types.test.ts', project: 'fast-tests' },
+          { file: 'tests/serialization.test.ts', project: 'fast-tests' },
+          { file: 'shared/contract/__tests__/authoritative-command.test.ts', project: 'fast-shared' },
+          { file: 'client/services/__tests__/gameTransport-reconnect.test.ts', project: 'fast-client' },
+          { file: 'server/__tests__/auth.test.ts', project: 'fast-server' },
+          { file: 'server/connection/__tests__/ws-server.test.ts', project: 'fast-server' },
+          { file: 'server/game/__tests__/room.test.ts', project: 'fast-server' },
+          { file: 'tests/game-sync-pipeline.test.ts', project: 'fast-tests' },
+          { file: 'server/__tests__/A029_AleBenches-session.test.ts', project: 'slow' },
+        ],
+        browser: [
+          'e2e-tests/choice-previews.spec.ts', 'e2e-tests/listener-lifecycle-room.spec.ts',
+          'e2e-tests/room-animal-holders.spec.ts', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts',
+          'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts',
+          'e2e-tests/local-sandbox.spec.ts', 'e2e-tests/hosted-password-login.spec.ts',
+          'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
+        ],
+      },
+      fullTaskIds: ['quality', 'fast'],
     })
 
     expect(plan.mode).toBe('full')
