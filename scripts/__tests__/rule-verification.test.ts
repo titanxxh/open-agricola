@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { readCardAssociationIndex } from '../ci/card-verification'
 import { readRuleAssociationIndex, ruleSubsystemsForPath, ruleVerification } from '../ci/rule-verification'
 import { readTestConsumerIndex } from '../ci/test-consumers'
-import type { PlannedCheck, TestInventory } from '../ci/verification-plan'
+import { planVerification, type PlannedCheck, type TestInventory } from '../ci/verification-plan'
+import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const temporary: string[] = []
@@ -62,6 +63,35 @@ function fixture() {
 const selectedFiles = (checks: PlannedCheck[]) => checks.flatMap(check => check.kind === 'catalog' ? [] : check.files)
 
 describe('rule subsystem ownership', () => {
+  it('retains round rule consumers when the production setup phase changes', () => {
+    const value = fixture()
+    const selected = planVerification({
+      identity: {
+        baseRef: 'main', headRef: 'HEAD', baseSha: '1'.repeat(40), mergeBaseSha: '1'.repeat(40),
+        headSha: '2'.repeat(40), testedSha: '2'.repeat(40), sourceFingerprint: '3'.repeat(64),
+      },
+      changes: [{ status: 'M', path: 'shared/session/phases/setup.ts' }],
+      inventory: value.inventory,
+      fullTaskIds: FULL_TASK_IDS,
+      testConsumers: readTestConsumerIndex(value.cwd, value.inventory),
+      ruleAssociations: value.index(),
+    })
+
+    expect(selected.mode).toBe('scoped')
+    expect(selected.selections).toMatchObject([{ scope: 'rules', paths: ['shared/session/phases/setup.ts'] }])
+    expect(selected.checks).toEqual(expect.arrayContaining([
+      { kind: 'catalog', taskId: 'quality' },
+      { kind: 'catalog', taskId: 'build' },
+      { kind: 'catalog', taskId: 'browser-sandbox' },
+      { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
+    ]))
+    const chromium = selected.checks.find(check => check.kind === 'browser' && check.browser === 'chromium')
+    expect(chromium).toMatchObject({
+      files: expect.arrayContaining(['e2e-tests/bga-preparation-order.spec.ts', 'e2e-tests/seasonal-settlement-logs.spec.ts']),
+    })
+    expect(selectedFiles(selected.checks)).toContain('shared/cards/__tests__/registry-audit.test.ts')
+  })
+
   it.each([
     ['shared/actions/payment/internal/future-solver.ts', ['payment']],
     ['shared/domain/animal-new-holder.ts', ['animals']],
