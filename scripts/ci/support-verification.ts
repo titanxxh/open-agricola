@@ -11,6 +11,7 @@ export const isTestSupport = (file: string): boolean =>
     || /(?:^|\/)setup(?:[-.][^/]*)?\.[cm]?[jt]sx?$/.test(file)
 
 export function assertConsumerCoverage(inventory: TestInventory, associations: TestConsumerIndex): void {
+  if (associations.expansionReasons.length) throw new Error(`Cannot establish test consumer evidence: ${associations.expansionReasons.join('; ')}`)
   if (associations.inventoryKey !== JSON.stringify(inventory)) throw new Error('Test consumer evidence does not match the discovered inventory')
   const expected = [...inventory.vitest.map(test => test.file), ...inventory.browser].sort()
   const actual = associations.tests.map(test => test.file).sort()
@@ -57,7 +58,6 @@ export function supportVerification(paths: string[], inventory: TestInventory, a
   const full = (reason: string): Mapping => ({ checks: [], expansionReasons: [reason], wideningReasons: [] })
   if (!associations) return full('Test consumer evidence is missing; full verification is required.')
   assertConsumerCoverage(inventory, associations)
-  if (associations.expansionReasons.length) return full(associations.expansionReasons.join('; '))
   const selected = new Set<string>()
   const wideningReasons: string[] = []
   for (const path of paths) {

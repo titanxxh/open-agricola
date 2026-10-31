@@ -229,6 +229,19 @@ describe('repository verification scope', () => {
     expect(() => assertPlanCurrent(cwd, plan)).toThrow('Checked-out commit changed')
   })
 
+  it('rejects an unparsable transitive helper even when the helper itself is unchanged', () => {
+    const { cwd } = repository()
+    write(cwd, 'e2e-tests/helpers/broken.ts', 'export const =')
+    write(cwd, 'e2e-tests/example.spec.ts', "import './helpers/broken'\n")
+    commit(cwd, 'baseline with unreadable helper')
+    git(cwd, 'branch', '-f', 'main', 'HEAD')
+    write(cwd, 'e2e-tests/example.spec.ts', "import './helpers/broken'\n// Changed browser test\n")
+    commit(cwd, 'browser change')
+
+    expect(() => createRepositoryPlan({ cwd, base: 'main', fullTaskIds: ['quality', 'fast'] }))
+      .toThrow(/Cannot establish test consumer evidence.*broken\.ts/)
+  })
+
   it('includes tested-commit changes beyond a documentation-only requested head', () => {
     const { cwd } = repository()
     write(cwd, 'README.md', 'Updated guide\n')
