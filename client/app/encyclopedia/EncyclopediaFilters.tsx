@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ENCYCLOPEDIA_GROUPS } from '../../../shared/contract/card-encyclopedia'
 import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { t, type Locale } from '../../../shared/i18n'
@@ -254,7 +254,84 @@ export function EncyclopediaFilterPanel({ store, locale, items }: EncyclopediaFi
   )
 }
 
-/** Phone entry point slot in the results bar; renders nothing until filters ship. */
-export function EncyclopediaFilterEntry(_props: EncyclopediaFiltersProps) {
-  return null
+/** Phone entry point in the results bar: opens the filters in a full-screen panel. */
+export function EncyclopediaFilterEntry({ store, locale, items, resultCount }: EncyclopediaFiltersProps) {
+  const { filters } = useEncyclopediaBrowseState(store)
+  const options = useFilterOptions(items)
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const restoreFocus = useRef(false)
+  const count = filterChips(filters, locale).length
+
+  useEffect(() => {
+    if (open || !restoreFocus.current) return
+    restoreFocus.current = false
+    buttonRef.current?.focus()
+  }, [open])
+
+  const close = () => {
+    restoreFocus.current = true
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="btn-secondary encyclopedia-filter-entry"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        {count > 0
+          ? t(locale, 'ui.encyclopedia.filters.titleWithCount', { count })
+          : t(locale, 'ui.encyclopedia.filters.title')}
+      </button>
+      {open ? (
+        <FilterDialog locale={locale} resultCount={resultCount} onClose={close}>
+          <ClearButton store={store} locale={locale} disabled={count === 0} />
+          <FilterFields filters={filters} options={options} locale={locale} onChange={next => store.setFilters(next)} />
+        </FilterDialog>
+      ) : null}
+    </>
+  )
+}
+
+function FilterDialog({ locale, resultCount, onClose, children }: {
+  locale: Locale
+  resultCount: number
+  onClose: () => void
+  children: ReactNode
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (dialog && !dialog.open) dialog.showModal()
+    return () => { if (dialog?.open) dialog.close() }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="encyclopedia-filter-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => { event.preventDefault(); onClose() }}
+    >
+      <div className="encyclopedia-filter-dialog__header">
+        <h2 id={titleId}>{t(locale, 'ui.encyclopedia.filters.dialogTitle')}</h2>
+        <button type="button" className="btn-secondary" aria-label={t(locale, 'ui.encyclopedia.filters.close')} onClick={onClose}>
+          {t(locale, 'ui.close')}
+        </button>
+      </div>
+      <div className="encyclopedia-filter-dialog__body">{children}</div>
+      <div className="encyclopedia-filter-dialog__footer">
+        <button type="button" className="btn-primary" onClick={onClose}>
+          {t(locale, 'ui.encyclopedia.filters.showResults', { count: resultCount })}
+        </button>
+      </div>
+    </dialog>
+  )
 }

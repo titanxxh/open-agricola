@@ -115,3 +115,48 @@ describe('encyclopedia filter sidebar', () => {
     expect(panel.getByRole('button', { name: 'Clear filters' })).toBeDisabled()
   })
 })
+
+describe('encyclopedia phone filter panel', () => {
+  const panel = () => within(screen.getByRole('dialog', { name: 'Filter cards' }))
+
+  it('updates the results while open and keeps the conditions whichever way it closes', async () => {
+    const store = renderBrowser()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
+    fireEvent.click(panel().getByRole('checkbox', { name: 'Mother' }))
+    expect(await panel().findByRole('button', { name: 'Show results (1)' })).toBeInTheDocument()
+    await results(1)
+    fireEvent.click(panel().getByRole('checkbox', { name: 'Season Rule' }))
+    fireEvent.click(await panel().findByRole('button', { name: 'Show results (2)' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filters (2)' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'View Winter' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters (2)' }))
+    expect(panel().getByRole('checkbox', { name: 'Mother' })).toBeChecked()
+    fireEvent.change(panel().getByRole('spinbutton', { name: 'Minimum fixed points' }), { target: { value: '-0.75' } })
+    expect(await panel().findByRole('button', { name: 'Show results (1)' })).toBeInTheDocument()
+    fireEvent.click(panel().getByRole('button', { name: 'Close filters' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filters (3)' })).toHaveFocus()
+    await results(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters (3)' }))
+    expect(panel().getByRole('spinbutton', { name: 'Minimum fixed points' })).toHaveValue(-0.75)
+    fireEvent.click(panel().getByRole('checkbox', { name: 'Mother' }))
+    await panel().findByRole('button', { name: 'Show results (0)' })
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await results(0)
+    expect(store.getState().filters).toEqual({
+      groups: [],
+      types: ['season'],
+      cost: { resources: [], upgradeReturn: false },
+      points: { min: -0.75, max: null, unlisted: false },
+      extraVp: false,
+    })
+  })
+})
