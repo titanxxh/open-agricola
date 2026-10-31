@@ -1,4 +1,4 @@
-import { expect, test, type Response } from '@playwright/test'
+import { expect, test, type Request } from '@playwright/test'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -34,17 +34,19 @@ test('independent dashboards render registration, rooms and durable player openi
     navigations.push(url.origin + url.pathname + (params.size ? '?' + params.toString() : ''))
     if (navigations.length > 64) navigations.shift()
   })
-  const capturePanel = (response: Response) => {
-    if (new URL(response.url()).pathname !== '/ops/api/ds/query' || response.request().method() !== 'POST' || panelQueries.length >= 200) return
-    const payload: unknown = response.request().postDataJSON()
+  const capturePanel = (request: Request) => {
+    if (new URL(request.url()).pathname !== '/ops/api/ds/query' || request.method() !== 'POST' || panelQueries.length >= 200) return
+    const payload: unknown = request.postDataJSON()
     if (!payload || typeof payload !== 'object' || !('queries' in payload) || !Array.isArray(payload.queries)) return
     const rangeSeconds = 'from' in payload && 'to' in payload ? (Number(payload.to) - Number(payload.from)) / 1000 : NaN
     const expressions = payload.queries.flatMap(query => query && typeof query === 'object' && typeof query.expr === 'string'
       ? [query.expr.replaceAll('$__range', Number.isFinite(rangeSeconds) && rangeSeconds > 0 ? `${rangeSeconds}s` : '$__range')] : [])
     if (!expressions.some(expression => /agricola_(accounts|platform|opening_|commands_total)/.test(expression))) return
-    const entry: (typeof panelQueries)[number] = { status: response.status(), expressions, executedExpressions: [], request: payload, response: 'pending' }
-    panelQueries.push(entry)
     panelCaptures.push((async () => {
+      const response = await request.response()
+      if (!response) throw new Error('Completed panel request has no response')
+      const entry: (typeof panelQueries)[number] = { status: response.status(), expressions, executedExpressions: [], request: payload, response: 'pending' }
+      panelQueries.push(entry)
       try {
         const body: { results?: Record<string, { frames?: Array<{ schema?: { meta?: { executedQueryString?: string } } }> }> } = await response.json()
         entry.response = body
@@ -57,7 +59,7 @@ test('independent dashboards render registration, rooms and durable player openi
       catch { entry.response = 'unreadable' }
     })())
   }
-  page.on('response', capturePanel)
+  page.on('requestfinished', capturePanel)
   const previous = { ADMIN_USERS: process.env.ADMIN_USERS, GRAFANA_URL: process.env.GRAFANA_URL }
   const listen = async (server: Server) => {
     servers.push(server)
@@ -338,7 +340,7 @@ test('independent dashboards render registration, rooms and durable player openi
     }
     await page.screenshot({ path: 'output/players-dashboard-empty-cohort.png', fullPage: true })
   } finally {
-    page.off('response', capturePanel)
+    page.off('requestfinished', capturePanel)
     await page.close()
     await Promise.allSettled(panelCaptures)
     writeFileSync(testInfo.outputPath('operations-panel-queries.json'), JSON.stringify(panelQueries, null, 2))
