@@ -14,8 +14,22 @@ const MOOR_SPECIAL_ACTION_IDS = new Set<string>([
 export const isMoorSpecialActionId = (value: string): value is MoorSpecialActionId =>
   MOOR_SPECIAL_ACTION_IDS.has(value)
 
+const REMOVED_TERRAIN: Partial<Record<MoorSpecialActionId, 'moor' | 'forest'>> = {
+  'cut-peat': 'moor',
+  'fell-trees': 'forest',
+  'slash-and-burn': 'forest',
+}
+
+const BOUGHT_IMPROVEMENT: Partial<Record<MoorSpecialActionId, 'minor' | 'major'>> = {
+  'black-market': 'minor',
+  'illicit-work': 'major',
+}
+
+export const moorSpecialActionRemovedTerrain = (actionId: MoorSpecialActionId): 'moor' | 'forest' | null =>
+  REMOVED_TERRAIN[actionId] ?? null
+
 export const isMoorTerrainAction = (actionId: MoorSpecialActionId): boolean =>
-  actionId === 'cut-peat' || actionId === 'fell-trees' || actionId === 'slash-and-burn'
+  moorSpecialActionRemovedTerrain(actionId) !== null
 
 /** Parameters of `moor.specialActions.effects.<actionId>` for the printed values at a player count. */
 export const moorSpecialActionEffectParams = (actionId: MoorSpecialActionId, playerCount: number) => {
@@ -36,5 +50,8 @@ export const moorSpecialActionEffectGroups = (actionId: MoorSpecialActionId, pla
   return [...groups.values()]
 }
 
+export const moorSpecialActionBoughtImprovement = (actionId: MoorSpecialActionId): 'minor' | 'major' | null =>
+  BOUGHT_IMPROVEMENT[actionId] ?? null
+
 export const moorSpecialActionBuysImprovement = (actionId: MoorSpecialActionId): boolean =>
-  actionId === 'black-market' || actionId === 'illicit-work'
+  moorSpecialActionBoughtImprovement(actionId) !== null

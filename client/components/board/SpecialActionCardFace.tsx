@@ -4,9 +4,11 @@ import { t } from '../../../shared/i18n'
 import type { MoorSpecialActionId } from '../../../shared/moor/types'
 import { moorSpecialActionBaseResources } from '../../../shared/domain/moor-special-action-values'
 import {
+  moorSpecialActionBoughtImprovement,
   moorSpecialActionBuysImprovement,
   moorSpecialActionEffectGroups,
   moorSpecialActionEffectParams,
+  moorSpecialActionRemovedTerrain,
 } from '../../../shared/projections/moor-special-actions'
 import { ResourceLine } from '../common/ResourceLine'
 import { specialActionIconStyle, specialActionLabel } from './special-action-art'
@@ -27,9 +29,8 @@ export function SpecialActionEffect({ locale, actionId, playerCount, id }: {
   id?: string
 }) {
   const { cost, gain } = moorSpecialActionBaseResources(actionId, playerCount)
-  const terrain = actionId === 'cut-peat' ? 'moor'
-    : actionId === 'fell-trees' || actionId === 'slash-and-burn' ? 'forest' : null
-  const improvement = actionId === 'black-market' ? 'minor' : actionId === 'illicit-work' ? 'major' : null
+  const terrain = moorSpecialActionRemovedTerrain(actionId)
+  const improvement = moorSpecialActionBoughtImprovement(actionId)
   const resultIcon = improvement ?? (actionId === 'slash-and-burn' ? 'field' : null)
   const hasInput = terrain !== null || Object.values(cost).some((amount) => amount > 0)
   const description = t(locale, `moor.specialActions.effects.${actionId}`, moorSpecialActionEffectParams(actionId, playerCount))
