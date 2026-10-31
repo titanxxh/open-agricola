@@ -456,6 +456,31 @@ exec node "$TEST_SERVER" "$port"
     expect(repeated.output).toContain('No recorded processes are running')
   }, 60_000)
 
+  it('starts monitoring after backend readiness on a fresh launch', async () => {
+    const { root, run, recordedGroups } = await launcher()
+    writeFileSync(join(root, 'scripts/local-services.mjs'), `
+      import { mkdirSync, writeFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      mkdirSync(process.env.SHARED_DATA_DIR, { recursive: true })
+      writeFileSync(join(process.env.SHARED_DATA_DIR, 'dependencies.local'), 'OBSERVABILITY_ENABLED=true\\nOBSERVABILITY_METRICS_TOKEN=startup-test\\n')
+    `)
+    writeFileSync(join(root, 'scripts/observability.mjs'), `
+      import { createConnection } from 'node:net'
+      import { writeFileSync } from 'node:fs'
+      const socket = createConnection({ host: process.env.BACKEND_HOST, port: Number(process.env.BACKEND_PORT) })
+      await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject) })
+      socket.destroy()
+      writeFileSync('monitoring-started', 'backend-ready')
+    `)
+    const started = run([])
+    expect(started.status, started.output).toBe(0)
+    const groups = recordedGroups()
+    processGroups.push(...groups)
+    expect(groups).toHaveLength(2)
+    expect(readFileSync(join(root, 'monitoring-started'), 'utf8')).toBe('backend-ready')
+    expect(run(['--kill-only']).status).toBe(0)
+  })
+
   it('stops a recorded group whose leader exited while its children still run', async () => {
     const { root, run, recordedGroups } = await launcher()
 
