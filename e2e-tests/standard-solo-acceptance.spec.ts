@@ -187,7 +187,8 @@ test('formal three-expansion choose-7 reaches natural scoring and both owner rem
     expect(player.resources.cattle).toBe(parents.mother === 'PR03' ? 1 : 0)
     const motherPoints: Record<string, number> = { PR01: -0.75, PR02: -0.25, PR03: 0, PR04: 0.1, PR05: 0.2, PR06: 0.3, PR07: 0.4, PR08: 0.5, PR09: 0.6, PR10: 0.7, PR11: 0.8, PR12: 0.9 }
     const grainPoints = expectedGrain <= 3 ? 1 : expectedGrain <= 5 ? 2 : 3
-    const paperCategories = { fields: player.fields.length ? 1 : -1, pastures: -1, grains: grainPoints,
+    expect(player.fields).toHaveLength(parents.mother === 'PR02' ? 1 : 0)
+    const paperCategories = { fields: -1, pastures: -1, grains: grainPoints,
       vegetables: parents.mother === 'PR06' ? 2 : 1, sheeps: parents.mother === 'PR05' ? 1 : -1,
       boars: parents.mother === 'PR04' ? 1 : -1, cattles: parents.mother === 'PR03' ? 1 : -1, horses: -1,
       empty: -(13 - (initialTerrain - 5) - player.fields.length - player.stableTiles.length),
