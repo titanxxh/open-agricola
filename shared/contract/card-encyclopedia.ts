@@ -1,4 +1,6 @@
 import type { PaymentResource } from './types'
+import type { MoorSpecialActionId } from '../moor/types'
+import type { ParentCardId } from '../parents/types'
 import type { SeasonId } from '../seasons/types'
 
 export type EncyclopediaSourceKind = 'card' | 'major' | 'parent' | 'moorSpecialAction' | 'moorStart' | 'season'
@@ -41,8 +43,8 @@ export type EncyclopediaTerrainTile = { readonly row: number; readonly col: numb
 
 export type EncyclopediaFace =
   | { readonly kind: 'card'; readonly cardId: string; readonly cardType: 'occupation' | 'minor' | 'major' }
-  | { readonly kind: 'parent'; readonly parentId: string }
-  | { readonly kind: 'moorSpecialAction'; readonly image: string; readonly actions: readonly string[] }
+  | { readonly kind: 'parent'; readonly parentId: ParentCardId }
+  | { readonly kind: 'moorSpecialAction'; readonly image: string; readonly actions: readonly MoorSpecialActionId[] }
   | { readonly kind: 'moorStart'; readonly tiles: readonly EncyclopediaTerrainTile[] }
   | { readonly kind: 'season'; readonly season: SeasonId; readonly actionId: string }
 

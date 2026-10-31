@@ -1,4 +1,5 @@
 import type { EncyclopediaEntry, EncyclopediaSearchDocument, EncyclopediaTextStatus } from '../../../../shared/contract/card-encyclopedia'
+import type { ParentCardId } from '../../../../shared/parents/types'
 import type { CardEncyclopedia } from '../../../services/card-encyclopedia'
 import type { EncyclopediaItem } from '../encyclopedia-item'
 
@@ -35,7 +36,7 @@ export const COOKING_HEARTH = keyed({
   score: { fixed: 1, extraVp: false },
 })
 
-export const parentEntry = (parentId: string, kind: 'mother' | 'father', fixed: number | null): EncyclopediaEntry => ({
+export const parentEntry = (parentId: ParentCardId, kind: 'mother' | 'father', fixed: number | null): EncyclopediaEntry => ({
   key: `parent:${parentId}`,
   sourceKind: 'parent',
   sourceId: parentId,
