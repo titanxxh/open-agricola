@@ -443,11 +443,13 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 }
 ```
 
-阶段按牌面选择（[ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md)）。牌面写明 “immediately before” 或 “before” 用 `before`，“immediately after” 用 `immediatelyAfter`，“after” 用 `after`。牌面未写明时：
+阶段按卡牌要求和 OA 自身的生命周期语义选择（[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)）。牌面写明 “immediately before” 或 “before” 用 `before`，“immediately after” 用 `immediatelyAfter`，“after” 用 `after`。参考实现的回调名称和先后不决定阶段。牌面未写明时，根据资源可用时点、结果依赖及 OA 同类触发的惯例选择。常见情况包括：
 
 - 使用某格时的附加收益（额外获得货物、可以购买或兑换），与该格产出无关，用 `place-farmer` 的 `before`。
 - 从累积格拿走至少 N 个货物，用 `collect` 的 `after`，读取实际拿走的货物。
 - 执行某个动作，例如犁地、建造、翻修、围栏、播种或家庭成长，用该动作的 `after`。
+
+同一 Reaction Window 的来源使用玩家自选顺序和实时重新判断。同窗中的一个来源提供资源后，可以使另一个已在窗口中的来源变为可用。能够表达卡牌要求时，使用这套既有排序能力。
 
 特殊行动名 `harvest-feed` **不是** listener 可监听项 —— 收获阶段的 feeding 走直接资源 mutation，不进 listener pipeline。要在喂食阶段开始时补食物，用 `onStartHarvestFeedingPhase` 返回 `gainLeaf(CARD_ID, { food: N })`；flow 在进入 feeding 阶段后、实际扣除食物前完成。`onHarvest` 更早，在收割后的 anytime 窗口之前执行。
 

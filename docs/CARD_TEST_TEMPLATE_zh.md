@@ -97,9 +97,10 @@
 - `cardId`
 - 卡牌名称
 - 卡牌类型：职业 / 小改良 / 大改良附带效果
-- 触发时机，listener 阶段按 [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) 选择：
+- 触发时机，listener 阶段按 [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)，从 OA 自身的生命周期和 Reaction Window 语义选择：
   - `before`：断言奖励在同一次宿主行动内可用，例如用于支付该行动或使其可执行。
   - `immediatelyAfter` / `after`：断言与同一完成点其他反应的先后；所有 `immediatelyAfter` 反应先于普通 `after` 完成。
+  - 同窗来源：断言玩家自选顺序，以及另一个来源提供所需资源后的重新判断。预期来自卡牌要求和 OA 语义，不来自参考实现的回调名称或先后。
 - 生效对象：自己 / 对手 / 任意玩家
 - 是否会产生等待交互
 - 是否会修改 `cardStates`

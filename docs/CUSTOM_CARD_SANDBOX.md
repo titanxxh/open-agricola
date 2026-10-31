@@ -396,11 +396,13 @@ To react when a player uses a particular action space, listen on `actions: ['pla
 }
 ```
 
-Choose the phase from the card text ([ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md)). Printed "immediately before" or "before" is `before`, "immediately after" is `immediatelyAfter` and "after" is `after`. Without printed timing:
+Choose the phase from the card requirements and OA's lifecycle semantics ([ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)). Printed "immediately before" or "before" is `before`, "immediately after" is `immediatelyAfter` and "after" is `after`. Reference callback names and order do not select the phase. When timing is unspecified, use resource availability, result dependencies and OA conventions for equivalent triggers. Common cases include:
 
 - An extra benefit for using a space, such as also getting goods or being able to buy or exchange, that does not depend on what the space yields, is `place-farmer` `before`.
 - Taking at least N goods from an accumulating space is `collect` `after`, which reads the goods actually taken.
 - Performing an action, such as plowing, building, renovating, fencing, sowing or family growth, is `after` on that action.
+
+Sources in the same Reaction Window use player-chosen order and live reevaluation. A resource granted by one source can enable another source already in that window. Use this ordering when it expresses the card's requirements.
 
 `harvest-feed` is not a listenable action. Harvest feeding performs direct resource mutation outside the listener pipeline. For food granted at the start of feeding, return `gainLeaf(CARD_ID, { food: N })` from `onStartHarvestFeedingPhase`. Its flow completes after the feeding phase starts and before food is consumed. `onHarvest` runs earlier, before the post-reap anytime window.
 

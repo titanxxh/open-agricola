@@ -92,9 +92,10 @@ A card test description must explicitly provide the following information.
 - `cardId`
 - Card name
 - Card type: occupation, minor improvement, or an effect attached to a major improvement
-- Trigger timing, with the listener phase chosen by [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md):
+- Trigger timing, with the listener phase chosen from OA's lifecycle and Reaction Window semantics under [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md):
   - `before`: assert that the reward is usable inside the same host action, for example to pay for or enable it.
   - `immediatelyAfter` / `after`: assert the order relative to other reactions at the same completion; every `immediatelyAfter` reaction completes before ordinary `after`.
+  - Same-window sources: assert player-chosen order and reevaluation when another source supplies a required resource. Derive expectations from card requirements and OA semantics, not reference callback names or ordering.
 - Affected player: self, opponent, or any player
 - Whether the card creates a waiting interaction
 - Whether the card modifies `cardStates`
