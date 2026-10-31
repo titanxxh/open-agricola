@@ -97,7 +97,8 @@ export function readTestConsumerIndex(cwd: string, inventory: TestInventory): Te
         if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) literalDependency(node.moduleReference.expression)
         if (ts.isCallExpression(node)) {
           if (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require')) literalDependency(node.arguments[0])
-          if (ts.isPropertyAccessExpression(node.expression) && /^(?:glob|globSync|context)$/.test(node.expression.name.text)) {
+          if (ts.isPropertyAccessExpression(node.expression) && (/^(?:glob|globSync)$/.test(node.expression.name.text)
+            || (node.expression.name.text === 'context' && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === 'require'))) {
             evidence.uncertaintyReasons.add(`Computed module or fixture consumer: ${file}`)
           }
         }

@@ -248,12 +248,10 @@ describe('scoped verification public CLI', () => {
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
-      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', '--browser=chromium'],
       ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
-      ['verify', 'e2e-tests/farm-card-targets.spec.ts', '--browser=chromium'],
     ])
     value.env.NEEDS_JSON = JSON.stringify(needs)
     expect(value.run('gate', '--sha', value.sha).status).toBe(0)
@@ -276,13 +274,17 @@ describe('scoped verification public CLI', () => {
     const value = fixture('frontend')
     value.env.FAIL_COMMAND = 'verify'
     value.env.GITHUB_OUTPUT = join(value.cwd, 'output/execution-outputs.txt')
-    const result = value.run('run', '--base', 'main', '--partition', 'browser-1')
+    const result = value.run('run', '--base', 'main', '--partition', 'all')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Selected browser check failed')
-    expect(value.commands()).toEqual([['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws']])
+    expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'verify')).toEqual([
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+    ])
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
-    expect(record).toMatchObject({ status: 'failed', checks: [{ status: 'failed' }] })
+    expect(record).toMatchObject({ status: 'failed', checks: [
+      { status: 'passed' }, { status: 'passed' }, { status: 'passed' }, { status: 'failed' },
+    ] })
   })
 
   it('rejects a plan digest from another source and does not execute any command', () => {

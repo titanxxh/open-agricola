@@ -233,6 +233,60 @@ describe('card test associations', () => {
     expect(cardVerification([source], inventory, readCardAssociationIndex(cwd, inventory), []).expansionReasons.join(' ')).toContain('Ambiguous Card Source identity')
   })
 
+  it('keeps side-effect registration imports within their actual card associations', () => {
+    const { cwd, source, other, inventory } = fixture()
+    write(cwd, 'shared/cards/register-all.ts', "export const ALL_CARD_IMPLS = {}\n")
+    const ale = 'server/__tests__/bootstrap-ale-session.test.ts'
+    const lodger = 'server/__tests__/bootstrap-lodger-session.test.ts'
+    inventory.vitest.push({ file: ale, project: 'slow' }, { file: lodger, project: 'slow' })
+    write(cwd, ale, "import '../../shared/cards/register-all'\nconst played = 'A029_AleBenches'\n")
+    write(cwd, lodger, "import '../../shared/cards/register-all.ts'\nconst played = 'A127_Lodger'\n")
+    const index = readCardAssociationIndex(cwd, inventory)
+    expect(index.tests.find(test => test.file === lodger)).toEqual({ file: lodger, cardIds: ['A127_Lodger'], safetyReasons: [] })
+    const selected = (path: string) => cardVerification([path], inventory, index, []).checks
+      .flatMap(check => check.kind === 'catalog' ? [] : check.files)
+    expect(selected(source)).toContain(ale)
+    expect(selected(source)).not.toContain(lodger)
+    expect(selected(other)).toContain(lodger)
+  })
+
+  it.each([
+    "import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'\nObject.values(ALL_CARD_IMPLS)\n",
+    "import * as registry from '../../shared/cards/register-all'\nObject.values(registry)\n",
+    "export { ALL_CARD_IMPLS } from '../../shared/cards/register-all'\n",
+    "const registry = require('../../shared/cards/register-all')\n",
+    "const registry = await import('../../shared/cards/register-all')\n",
+    "import { getCardDefinition } from '../../shared/cards/registry'\ngetCardDefinition(inputId)\n",
+  ])('retains real registry access instead of treating it as side-effect bootstrap: %s', contents => {
+    const { cwd, source, inventory } = fixture()
+    write(cwd, 'shared/cards/register-all.ts', "export const ALL_CARD_IMPLS = {}\n")
+    write(cwd, 'shared/cards/registry.ts', 'export function getCardDefinition(id) { return id }\n')
+    const file = 'server/__tests__/registry-consumer.test.ts'
+    inventory.vitest.push({ file, project: 'fast-server' })
+    write(cwd, file, `${contents}const played = 'A127_Lodger'\n`)
+    const index = readCardAssociationIndex(cwd, inventory)
+    expect(index.tests.find(test => test.file === file)?.safetyReasons).toContain(`Generic card registry consumer: ${file}`)
+    expect(cardVerification([source], inventory, index, []).checks.flatMap(check => check.kind === 'catalog' ? [] : check.files)).toContain(file)
+  })
+
+  it.each([
+    ['Filesystem or glob consumer', "import { readFileSync } from 'node:fs'\nreadFileSync(inputPath, 'utf8')\n"],
+    ['Unbounded opening-card fixture', 'createOpeningSession()\n'],
+    ['Computed module consumer', 'await import(inputPath)\n'],
+    ['Unresolved local dependency', "import './_helpers/missing'\n"],
+  ])('preserves independent %s evidence beside side-effect bootstrap', (reason, contents) => {
+    const { cwd, source, inventory } = fixture()
+    write(cwd, 'shared/cards/register-all.ts', "export const ALL_CARD_IMPLS = {}\n")
+    const file = 'server/__tests__/bootstrap-uncertain.test.ts'
+    inventory.vitest.push({ file, project: 'fast-server' })
+    write(cwd, file, `import '../../shared/cards/register-all'\nconst played = 'A127_Lodger'\n${contents}`)
+    const index = readCardAssociationIndex(cwd, inventory)
+    const reasons = index.tests.find(test => test.file === file)?.safetyReasons ?? []
+    expect(reasons.some(value => value.startsWith(reason))).toBe(true)
+    expect(reasons).not.toContain(`Generic card registry consumer: ${file}`)
+    expect(cardVerification([source], inventory, index, []).checks.flatMap(check => check.kind === 'catalog' ? [] : check.files)).toContain(file)
+  })
+
   it('does not traverse production register-all or bootstrap into every card owner', () => {
     const { cwd, source, inventory } = fixture()
     write(cwd, 'shared/cards/register-all.ts', "import './A/A029_AleBenches'\nimport './A/A127_Lodger'\n")
