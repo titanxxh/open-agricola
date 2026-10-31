@@ -3,7 +3,7 @@ import { t, type Locale } from '../../../shared/i18n'
 import type { CardEncyclopedia } from '../../services/card-encyclopedia'
 import { EncyclopediaDetail } from './EncyclopediaDetail'
 import { EncyclopediaFace } from './EncyclopediaFace'
-import { EncyclopediaFilterEntry, EncyclopediaFilterPanel } from './EncyclopediaFilters'
+import { EncyclopediaActiveFilters, EncyclopediaFilterEntry, EncyclopediaFilterPanel } from './EncyclopediaFilters'
 import { EncyclopediaSearch } from './EncyclopediaSearch'
 import { encyclopediaBrowseStore, useEncyclopediaBrowseState, type EncyclopediaBrowseStore } from './encyclopedia-browse-store'
 import { encyclopediaItems, type EncyclopediaItem } from './encyclopedia-item'
@@ -69,6 +69,7 @@ export function EncyclopediaBrowser({ encyclopedia, navigation, locale, store = 
             <p className="encyclopedia-results__bilingual">{t(locale, 'ui.encyclopedia.search.bilingual')}</p>
             <EncyclopediaFilterEntry {...filterProps} />
           </div>
+          <EncyclopediaActiveFilters {...filterProps} />
           {slice.total === 0
             ? <EmptyResults locale={locale} onClear={() => store.reset()} />
             : (

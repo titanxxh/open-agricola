@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { EncyclopediaBrowser } from '../EncyclopediaBrowser'
 import { createEncyclopediaBrowseStore, type EncyclopediaBrowseStore } from '../encyclopedia-browse-store'
@@ -113,6 +113,63 @@ describe('encyclopedia filter sidebar', () => {
     expect(maximum).toHaveValue(null)
     expect(panel.getByRole('checkbox', { name: 'No fixed points listed' })).not.toBeChecked()
     expect(panel.getByRole('button', { name: 'Clear filters' })).toBeDisabled()
+  })
+})
+
+describe('selected encyclopedia filters', () => {
+  const selected = () => screen.findByRole('group', { name: 'Selected filters' })
+  const removeButtons = async () => within(within(await selected()).getByRole('list')).getAllByRole('button').map(button => button.getAttribute('aria-label'))
+
+  it('names every selected condition', async () => {
+    const store = renderBrowser()
+    expect(screen.queryByRole('group', { name: 'Selected filters' })).toBeNull()
+
+    act(() => store.setFilters({
+      groups: ['B', 'parents'],
+      types: ['mother'],
+      cost: { resources: ['clay', 'food'], upgradeReturn: true },
+      points: { min: -0.75, max: 2.5, unlisted: true },
+      extraVp: true,
+    }))
+
+    expect(await removeButtons()).toEqual([
+      'Remove filter: Deck B',
+      'Remove filter: Parent Cards',
+      'Remove filter: Mother',
+      'Remove filter: Clay',
+      'Remove filter: Food',
+      'Remove filter: Upgrade by returning a card',
+      'Remove filter: Fixed points ≥ -0.75',
+      'Remove filter: Fixed points ≤ 2.5',
+      'Remove filter: No fixed points listed',
+      'Remove filter: Marked with bonus points',
+    ])
+    expect(screen.getByRole('button', { name: 'Remove filter: Fixed points ≥ -0.75' })).toHaveTextContent('Fixed points ≥ -0.75')
+  })
+
+  it('removes one condition at a time or all of them', async () => {
+    const store = renderBrowser()
+    act(() => store.setFilters({
+      ...store.getState().filters,
+      groups: ['A', 'parents'],
+      points: { min: -0.75, max: 1, unlisted: false },
+    }))
+    await results(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Fixed points ≥ -0.75' }))
+    await results(1)
+    expect(screen.getByRole('button', { name: 'Remove filter: Fixed points ≤ 1' })).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Fixed points ≤ 1' }))
+    await results(26)
+    expect(await removeButtons()).toEqual(['Remove filter: Deck A', 'Remove filter: Parent Cards'])
+    expect(within(sidebar()).getByRole('spinbutton', { name: 'Maximum fixed points' })).toHaveValue(null)
+
+    fireEvent.click(within(await selected()).getByRole('button', { name: 'Clear filters' }))
+
+    await results(29)
+    expect(screen.queryByRole('group', { name: 'Selected filters' })).toBeNull()
+    expect(within(sidebar()).getByRole('checkbox', { name: 'Deck A' })).not.toBeChecked()
   })
 })
 
