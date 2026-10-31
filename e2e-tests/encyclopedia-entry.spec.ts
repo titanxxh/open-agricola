@@ -1,56 +1,22 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
-import { FRONTEND_URL } from './fixtures'
+import {
+  CATALOG, detail, expectCatalog, expectNoHorizontalOverflow, filterOption, filterPanel, filterSidebar,
+  galleryNames, LAYOUTS, LOBBY, lobbyReady, mainNavigation, newVisitor, resultsHeading, scrollTo, selectedFilters,
+  type Layout,
+} from './helpers/encyclopedia'
 
-const LOBBY = `${FRONTEND_URL}/`
-const CATALOG = `${FRONTEND_URL}/?page=encyclopedia`
+const searchBox = (page: Page) => page.getByRole('searchbox', { name: 'Search cards' })
 
-const LAYOUTS = [
-  { name: 'encyclopedia desktop 1400x1000', viewport: { width: 1400, height: 1000 }, phone: false },
-  { name: 'encyclopedia mobile 390x844', viewport: { width: 390, height: 844 }, phone: true },
-] as const
-
-type Layout = typeof LAYOUTS[number]
-
-/** A fresh context has its own session storage; signed-in visitors get a stubbed account API. */
-async function newVisitor(browser: Browser, layout: Layout, { signedIn }: { signedIn: boolean }) {
-  const context = await browser.newContext({
-    viewport: layout.viewport,
-    ...(layout.phone ? { isMobile: true, hasTouch: true } : {}),
-  })
-  await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  if (signedIn) {
-    await context.route('**/api/**', route => route.fulfill({
-      json: new URL(route.request().url()).pathname === '/api/auth/me'
-        ? { ok: true, user: { id: 'u1', username: 'reader', displayName: 'Reader' } }
-        : { ok: true, rooms: [], games: [] },
-    }))
+/** Desktop edits the sidebar in place; phones edit in the filter panel and confirm with the result count. */
+async function filterBy(page: Page, layout: Layout, name: string) {
+  if (!layout.phone) {
+    await filterOption(filterSidebar(page), name).check()
+    return
   }
-  return { context, page: await context.newPage() }
-}
-
-const galleryEntries = (page: Page) => page.getByRole('list')
-  .filter({ has: page.getByRole('button', { name: /^View / }) })
-  .getByRole('button', { name: /^View / })
-const detail = (page: Page) => page.getByRole('dialog')
-const mainNavigation = (page: Page) => page.getByRole('navigation', { name: 'Main navigation' })
-const lobbyReady = (page: Page) => expect(page.getByRole('button', { name: 'Create Multiplayer Game' })).toBeVisible()
-
-async function expectCatalog(page: Page, pageNumber = 1) {
-  await expect(page.getByRole('heading', { level: 1, name: 'Card Encyclopedia' })).toBeVisible()
-  await expect(page.getByText(new RegExp(`^Page ${pageNumber} of \\d+$`))).toBeVisible()
-  await expect(galleryEntries(page)).toHaveCount(24)
-}
-
-async function scrollTo(page: Page, top: number) {
-  await page.evaluate(y => window.scrollTo(0, y), top)
-  const scrollY = await page.evaluate(() => window.scrollY)
-  expect(scrollY).toBeGreaterThan(0)
-  return scrollY
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
+  await page.getByRole('button', { name: 'Filters', exact: true }).click()
+  await filterOption(filterPanel(page), name).check()
+  await filterPanel(page).getByRole('button', { name: /^Show results \(\d+\)$/ }).click()
+  await expect(filterPanel(page)).toBeHidden()
 }
 
 for (const layout of LAYOUTS) {
@@ -191,6 +157,39 @@ for (const layout of LAYOUTS) {
         await expectCatalog(page, 1)
       })
     }
+
+    test('U2 keeps the query and the filters after a round trip through the lobby and clears them on refresh', async ({ browser }) => {
+      const { page } = await visit(browser, true)
+      await page.goto(CATALOG)
+      await expectCatalog(page)
+      const total = await resultsHeading(page).textContent()
+      await searchBox(page).fill('mother')
+      await expect(resultsHeading(page)).not.toHaveText(total!)
+      const queried = await resultsHeading(page).textContent()
+      await filterBy(page, layout, 'Occupation')
+      await expect(resultsHeading(page)).not.toHaveText(queried!)
+      await expect(selectedFilters(page)).toHaveText(['Occupation×'])
+      const heading = await resultsHeading(page).textContent()
+      const results = await galleryNames(page)
+      expect(results).toContain('View Autumn Mother')
+      expect(results).not.toContain('View Mother PR01')
+
+      if (layout.phone) await mainNavigation(page).getByRole('button', { name: 'Lobby' }).tap()
+      else await page.getByRole('link', { name: 'Open Agricola: Back to Lobby' }).click()
+      await lobbyReady(page)
+      if (layout.phone) await mainNavigation(page).getByRole('button', { name: 'Cards' }).tap()
+      else await mainNavigation(page).getByRole('link', { name: 'Card Encyclopedia' }).click()
+
+      await expect(searchBox(page)).toHaveValue('mother')
+      await expect(selectedFilters(page)).toHaveText(['Occupation×'])
+      await expect(resultsHeading(page)).toHaveText(heading!)
+      expect(await galleryNames(page)).toEqual(results)
+
+      await page.reload()
+      await expect(resultsHeading(page)).toHaveText(total!)
+      await expect(searchBox(page)).toHaveValue('')
+      await expect(selectedFilters(page)).toHaveCount(0)
+    })
 
     test('U2 a card refreshed from the second page stays open while the browse state starts over', async ({ browser }) => {
       const { page } = await visit(browser, false)

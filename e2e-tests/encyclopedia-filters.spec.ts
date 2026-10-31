@@ -1,54 +1,12 @@
-import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { FRONTEND_URL } from './fixtures'
-
-const CATALOG = `${FRONTEND_URL}/?page=encyclopedia`
-
-type Layout = { name: string; viewport: { width: number; height: number }; phone: boolean }
-
-const DESKTOP: Layout = { name: 'encyclopedia desktop 1400x1000', viewport: { width: 1400, height: 1000 }, phone: false }
-const MOBILE: Layout = { name: 'encyclopedia mobile 390x844', viewport: { width: 390, height: 844 }, phone: true }
-const NARROW: Layout = { name: 'encyclopedia mobile 320x844', viewport: { width: 320, height: 844 }, phone: true }
-const LANDSCAPE: Layout = { name: 'encyclopedia mobile 844x390', viewport: { width: 844, height: 390 }, phone: true }
-
-async function newVisitor(browser: Browser, layout: Layout): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({
-    viewport: layout.viewport,
-    ...(layout.phone ? { isMobile: true, hasTouch: true } : {}),
-  })
-  await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  return { context, page: await context.newPage() }
-}
-
-const galleryEntries = (page: Page) => page.getByRole('list')
-  .filter({ has: page.getByRole('button', { name: /^View / }) })
-  .getByRole('button', { name: /^View / })
-const galleryNames = (page: Page) => galleryEntries(page).evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))
-const resultsHeading = (page: Page) => page.getByRole('heading', { name: /^Results: \d+$/ })
-const sidebar = (page: Page) => page.getByRole('complementary', { name: 'Filters' })
-const filterPanel = (page: Page) => page.getByRole('dialog', { name: 'Filter cards' })
-const option = (scope: Locator, name: string) => scope.getByRole('checkbox', { name, exact: true })
-const selectedFilters = (page: Page) => page.getByRole('group', { name: 'Selected filters' }).getByRole('listitem')
-
-async function expectResults(page: Page, count: number) {
-  await expect(page.getByRole('heading', { name: `Results: ${count}` })).toBeVisible()
-}
+import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import {
+  CATALOG, DESKTOP, expectNoHorizontalOverflow, expectResults, filterOption as option, filterPanel, filterSidebar as sidebar,
+  galleryEntries, galleryNames, LANDSCAPE, MOBILE, NARROW, newVisitor, resultsHeading, selectedFilters, tabTo,
+} from './helpers/encyclopedia'
 
 async function openCatalog(page: Page) {
   await page.goto(CATALOG)
   await expect(resultsHeading(page)).toBeVisible()
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
-}
-
-async function tabTo(page: Page, target: Locator, limit = 120) {
-  for (let presses = 0; presses < limit; presses++) {
-    if (await target.evaluate(element => element === document.activeElement)) return
-    await page.keyboard.press('Tab')
-  }
-  throw new Error(`Tab never reached ${target}`)
 }
 
 test.describe(DESKTOP.name, () => {

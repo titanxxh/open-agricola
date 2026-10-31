@@ -1,33 +1,11 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
-import { FRONTEND_URL } from './fixtures'
-
-const CATALOG = `${FRONTEND_URL}/?page=encyclopedia`
-
-const LAYOUTS = [
-  { name: 'encyclopedia desktop 1400x1000', viewport: { width: 1400, height: 1000 }, phone: false },
-  { name: 'encyclopedia mobile 390x844', viewport: { width: 390, height: 844 }, phone: true },
-] as const
-
-type Layout = typeof LAYOUTS[number]
-
-async function newVisitor(browser: Browser, layout: Layout): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({
-    viewport: layout.viewport,
-    ...(layout.phone ? { isMobile: true, hasTouch: true } : {}),
-  })
-  await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
-  return { context, page: await context.newPage() }
-}
+import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { CATALOG, expectCatalog as expectCatalogPage, galleryEntries, galleryNames, LAYOUTS, newVisitor } from './helpers/encyclopedia'
 
 const searchBox = (page: Page) => page.getByRole('searchbox')
 const resultCount = (page: Page) => page.getByRole('heading', { name: /^Results: \d+$|^\d+ 条结果$/ })
-const gallery = (page: Page) => page.getByRole('list').filter({ has: page.getByRole('button', { name: /^(View|查看) / }) })
-const galleryEntries = (page: Page) => gallery(page).getByRole('button', { name: /^(View|查看) / })
-const galleryNames = (page: Page) => galleryEntries(page).evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))
 
 async function expectCatalog(page: Page) {
-  await expect(page.getByText(/^Page 1 of \d+$/)).toBeVisible()
-  await expect(galleryEntries(page)).toHaveCount(24)
+  await expectCatalogPage(page)
   await expect(galleryEntries(page).first()).toHaveAccessibleName('View Shelter')
 }
 
