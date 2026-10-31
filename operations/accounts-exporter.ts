@@ -87,3 +87,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.once('SIGTERM', stop)
   process.once('SIGINT', stop)
 }
+// CI scope probe: operations.
