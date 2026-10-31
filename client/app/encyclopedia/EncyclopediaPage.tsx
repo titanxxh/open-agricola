@@ -8,10 +8,15 @@ import { encyclopediaBrowseStore } from './encyclopedia-browse-store'
 import { useEncyclopediaUrlNavigation } from './encyclopedia-navigation'
 import { useCardEncyclopedia } from './useCardEncyclopedia'
 
+const startOverFromLanding = () => {
+  encyclopediaBrowseStore.reset()
+  window.scrollTo(0, 0)
+}
+
 export function EncyclopediaPage() {
   const { locale, t } = useLocale()
   const load = useCardEncyclopedia()
-  const navigation = useEncyclopediaUrlNavigation()
+  const navigation = useEncyclopediaUrlNavigation({ onCloseLanding: startOverFromLanding })
   const ready = load.status === 'ready'
 
   useLayoutEffect(() => {

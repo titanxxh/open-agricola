@@ -23,12 +23,17 @@ const DETAIL_STATE_KEY = 'encyclopediaDetail'
  */
 const DOCUMENT_TOKEN = `${Date.now()}-${Math.random()}`
 
-const openedHere = () => {
+const detailToken = (): unknown => {
   const state: unknown = window.history.state
-  return typeof state === 'object' && state !== null && (state as Record<string, unknown>)[DETAIL_STATE_KEY] === DOCUMENT_TOKEN
+  return typeof state === 'object' && state !== null ? (state as Record<string, unknown>)[DETAIL_STATE_KEY] : undefined
 }
 
-export function useEncyclopediaUrlNavigation(): EncyclopediaNavigation {
+export type EncyclopediaUrlNavigationOptions = {
+  /** Called when a detail the visitor landed on from a link closes, rather than one opened from the results. */
+  onCloseLanding?: () => void
+}
+
+export function useEncyclopediaUrlNavigation({ onCloseLanding }: EncyclopediaUrlNavigationOptions = {}): EncyclopediaNavigation {
   const [selectedKey, setSelectedKey] = useState(() => readEncyclopediaEntry(window.location.search))
 
   useEffect(() => {
@@ -44,9 +49,14 @@ export function useEncyclopediaUrlNavigation(): EncyclopediaNavigation {
 
   const closeEntry = useCallback(() => {
     setSelectedKey(null)
-    if (openedHere()) window.history.back()
-    else window.history.replaceState(null, '', encyclopediaEntryHref(window.location, null))
-  }, [])
+    const token = detailToken()
+    if (token === DOCUMENT_TOKEN) {
+      window.history.back()
+      return
+    }
+    window.history.replaceState(null, '', encyclopediaEntryHref(window.location, null))
+    if (token === undefined) onCloseLanding?.()
+  }, [onCloseLanding])
 
   return useMemo(() => ({ selectedKey, openEntry, closeEntry }), [selectedKey, openEntry, closeEntry])
 }

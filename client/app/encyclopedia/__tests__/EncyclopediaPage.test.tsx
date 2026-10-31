@@ -5,6 +5,7 @@ import { LocaleProvider } from '../../../contexts/LocaleContext'
 import { loadCardEncyclopedia } from '../../../services/card-encyclopedia'
 import { EncyclopediaPage } from '../EncyclopediaPage'
 import { createEncyclopediaBrowseStore, encyclopediaBrowseStore } from '../encyclopedia-browse-store'
+import { EMPTY_ENCYCLOPEDIA_FILTERS } from '../encyclopedia-filters'
 import { createEncyclopediaSessionPersistence } from '../encyclopedia-session-persistence'
 import { cardEntry, encyclopediaOf, itemFor } from './fixtures'
 
@@ -21,6 +22,17 @@ const galleryNames = () => within(screen.getByRole('list'))
   .map(button => button.getAttribute('aria-label'))
 
 const renderPage = () => render(<LocaleProvider><EncyclopediaPage /></LocaleProvider>)
+
+/** Fresh modules stand for the next document of the tab: same history and session storage, new page script. */
+const pageOfNextDocument = async () => {
+  vi.resetModules()
+  await import('../../../../tests/setup-language-packs')
+  const services = await import('../../../services/card-encyclopedia')
+  vi.mocked(services.loadCardEncyclopedia).mockResolvedValue(numbered(30))
+  const { EncyclopediaPage: NextPage } = await import('../EncyclopediaPage')
+  const { LocaleProvider: NextLocaleProvider } = await import('../../../contexts/LocaleContext')
+  return () => render(<NextLocaleProvider><NextPage /></NextLocaleProvider>)
+}
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
@@ -117,6 +129,50 @@ describe('encyclopedia page', () => {
     expect(window.history.length).toBe(historyLength)
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+  })
+
+  it('drops the search, filters, page and scroll position the tab kept when a shared link closes', async () => {
+    encyclopediaBrowseStore.setQuery('entry')
+    encyclopediaBrowseStore.setFilters({ ...EMPTY_ENCYCLOPEDIA_FILTERS, groups: ['A'] })
+    encyclopediaBrowseStore.setPage(2)
+    encyclopediaBrowseStore.setScrollTop(640)
+    window.history.replaceState(null, '', '/?page=encyclopedia&entry=card%3AT05_Entry')
+    load.mockResolvedValue(numbered(30))
+    renderPage()
+    expect(await screen.findByRole('dialog')).toHaveAccessibleName('Entry 05')
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
+
+    expect(window.location.search).toBe('?page=encyclopedia')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('searchbox', { name: 'Search cards' })).toHaveValue('')
+    expect(screen.queryByRole('group', { name: 'Selected filters' })).toBeNull()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+    expect(window.scrollTo).toHaveBeenLastCalledWith(0, 0)
+    expect(encyclopediaBrowseStore.getScrollTop()).toBe(0)
+  })
+
+  it('keeps the filters and page when a detail an earlier page of the tab opened from the results closes', async () => {
+    load.mockResolvedValue(numbered(30))
+    const earlier = renderPage()
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Deck A' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'View Entry 27' }))
+    earlier.unmount()
+
+    const renderLaterPage = await pageOfNextDocument()
+    renderLaterPage()
+    expect(await screen.findByRole('dialog')).toHaveAccessibleName('Entry 27')
+    const historyLength = window.history.length
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
+
+    expect(window.location.search).toBe('?page=encyclopedia')
+    expect(window.history.length).toBe(historyLength)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Selected filters' })).getAllByRole('listitem')).toHaveLength(1)
   })
 
   it('reports an unknown entry and returns to the catalog', async () => {

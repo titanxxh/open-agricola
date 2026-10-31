@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto'
 import { FRONTEND_URL } from './fixtures'
 import {
   animationsSettled, CATALOG, copiedLinks, DESKTOP, detail, entryParam, entryUrl, expectCatalog, expectNoHorizontalOverflow,
-  expectResults, filterOption, filterPanel, galleryEntries, LANDSCAPE, LAYOUTS, LOBBY, lobbyReady, mainNavigation, MOBILE,
-  NARROW, newVisitor, selectedFilters, type Layout,
+  expectResults, filterOption, filterPanel, filterSidebar, galleryEntries, LANDSCAPE, LAYOUTS, LOBBY, lobbyReady, mainNavigation,
+  MOBILE, NARROW, newVisitor, resultsHeading, scrollTo, selectedFilters, type Layout,
 } from './helpers/encyclopedia'
 
 const BASEBOARDS = entryUrl('card:A004_Baseboards')
@@ -189,6 +189,35 @@ for (const layout of LAYOUTS) {
       await expect(detail(page)).toBeHidden()
       expect(new URL(page.url()).search).toBe('?page=encyclopedia')
       await expectCatalog(page)
+    })
+
+    test('U2 closing a shared card opened over saved filters lands on the whole catalog', async () => {
+      await page.goto(CATALOG)
+      await expectCatalog(page)
+      const total = await resultsHeading(page).textContent()
+      if (layout.phone) {
+        await page.getByRole('button', { name: 'Filters', exact: true }).click()
+        await filterOption(filterPanel(page), 'Occupation').check()
+        await filterPanel(page).getByRole('button', { name: /^Show results \(\d+\)$/ }).click()
+        await expect(filterPanel(page)).toBeHidden()
+      } else {
+        await filterOption(filterSidebar(page), 'Occupation').check()
+      }
+      await expect(selectedFilters(page)).toHaveText(['Occupation×'])
+      await page.getByRole('button', { name: 'Next page' }).click()
+      await expectCatalog(page, 2)
+      await scrollTo(page, 700)
+
+      await page.goto(BASEBOARDS)
+      await expect(detail(page)).toHaveAccessibleName('Baseboards')
+      await page.getByRole('button', { name: 'Close details' }).click()
+
+      await expect(detail(page)).toBeHidden()
+      expect(entryParam(page)).toBeNull()
+      await expect(resultsHeading(page)).toHaveText(total!)
+      await expect(selectedFilters(page)).toHaveCount(0)
+      await expectCatalog(page, 1)
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
     })
 
     test('U2 refresh clears the browse state but keeps a shared card open', async () => {
