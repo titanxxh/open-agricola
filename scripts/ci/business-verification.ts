@@ -3,7 +3,7 @@ import type { PlannedCheck, TestInventory, VerificationScope } from './verificat
 type BrowserCheck = Extract<PlannedCheck, { kind: 'browser' }>
 type BusinessGroup = {
   name: string
-  scope: Extract<VerificationScope, 'server' | 'recovery' | 'rules' | 'contract' | 'workshop'>
+  scope: Extract<VerificationScope, 'server' | 'recovery' | 'rules' | 'contract' | 'workshop' | 'operations'>
   owns: RegExp
   projects: string[]
   requiredTests: TestInventory['vitest']
@@ -31,6 +31,18 @@ const completeBrowsers: PlannedCheck[] = ['chromium-1', 'chromium-2', 'chromium-
   .map(taskId => ({ kind: 'catalog', taskId }))
 
 const groups: BusinessGroup[] = [{
+  name: 'operations metrics and dashboards',
+  scope: 'operations',
+  owns: /^(?:operations\/|server\/(?:operations-(?:accounts|openings)|database\/031-game-opening-facts))/,
+  projects: ['fast-server'],
+  requiredTests: [
+    { project: 'fast-server', file: 'server/__tests__/operations-accounts.test.ts' },
+    { project: 'fast-server', file: 'server/__tests__/operations-openings.test.ts' },
+  ],
+  requiredBrowsers: ['e2e-tests/operations-dashboard.spec.ts'],
+  files: [],
+  checks: [browser(['operations-dashboard'])],
+}, {
   name: 'Workshop generation, sandbox contracts and references',
   scope: 'workshop',
   owns: /^(?:docs\/(?:CUSTOM_CARD_SANDBOX|CARD_TEST_TEMPLATE|ARCHITECTURE|card_implementation_status|community-card-examples)(?:_zh)?\.md|docs\/architecture\/[a-z-]+(?:_zh)?\.md|docs\/test\/llm-card-gen\.md|client\/sandbox\/README\.md|(?:client\/(?:local-sandbox\/[^/]+|sandbox\/[^/]+|app\/workshop\/[^/]+|app\/WorkshopPage|services\/(?:workshop-pr|generation-prompt|llm(?:\/(?:generation|providers))?\/[^/]+))|server\/(?:custom-code\/[^/]+|workshop(?:-[^/]+)?|(?:workshop-pr|workshop-review)\/[^/]+|game\/(?:custom-session-[^/]+|sandbox-authority|workshop-room-cards))|shared\/(?:custom-code\/[^/]+|contract\/workshop(?:-[^/]+)?|projections\/workshop-generation))(?:[.-])[^/]*)$/,
@@ -127,7 +139,8 @@ const groups: BusinessGroup[] = [{
 }]
 
 function groupFor(path: string): BusinessGroup | undefined {
-  if (!/\.[cm]?[jt]sx?$/.test(path) && !/^(?:docs\/.+|client\/sandbox\/README)\.md$/.test(path)) return undefined
+  if (!/^(?:operations\/|server\/database\/031-game-opening-facts\.sql$)/.test(path)
+    && !/\.[cm]?[jt]sx?$/.test(path) && !/^(?:docs\/.+|client\/sandbox\/README)\.md$/.test(path)) return undefined
   return groups.find(group => group.owns.test(path.replaceAll('/__tests__/', '/')))
 }
 
@@ -150,9 +163,7 @@ export function businessVerification(paths: string[], inventory: TestInventory):
     const missingBrowsers = [...group.requiredBrowsers, ...group.checks.flatMap(check => check.kind === 'browser' ? check.files : [])]
       .filter(file => !inventory.browser.includes(file))
     if (missingTests.length || missingProjects.length || missingBrowsers.length) {
-      return { checks: [], expansionReasons: [
-        `Required consumers for ${group.name} are missing: ${[...missingProjects, ...missingTests.map(test => test.file), ...missingBrowsers].join(', ')}; full verification is required.`,
-      ] }
+      throw new Error(`Required consumers for ${group.name} are missing: ${[...missingProjects, ...missingTests.map(test => test.file), ...missingBrowsers].join(', ')}`)
     }
     checks.push(...group.projects.map((project): PlannedCheck => ({
       kind: 'vitest', project,

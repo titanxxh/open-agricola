@@ -7,16 +7,29 @@ const browser = (files: string[], grep: string | null = null, engine: BrowserChe
 const safari = () => browser(['frontend-browser-scenario-matrix'], '@webkit', 'webkit')
 const groups = [
   {
+    name: 'game shell, header and opening',
+    owns: /^client\/(?:app\/(?:GameContainerApi|GameEndControls|HotseatHandoff|hotseat-seat|game-container-helpers|game-setup-query|game-load-progress|AppShellLoadScreen|GameContextRouter|solo\/|draft\/|parents\/)|components\/header\/|styles\/(?:components\/game-end|pages\/(?:game|draft|solo)))/,
+    checks: [
+      browser(['game-end', 'hosted-password-login', 'ws-dual-player', 'draft-opening-order', 'hotseat-public-farms', 'standard-solo-ui', 'setup-navigation']),
+      browser(['frontend-browser-scenario-matrix'], '@viewport|@ws'), safari(),
+    ],
+  },
+  {
     name: 'farm board',
-    owns: /^(?:client\/components\/board\/(?:FarmBoard|PlayerFarmPanel|farmHandCenter)(?:[.-]|$)|client\/app\/(?:DesktopPublicFarms|farm-))/,
+    owns: /^(?:client\/components\/board\/|client\/app\/(?:GameContainerApi\.|DesktopPublicFarms|farm-))/,
     checks: [
       browser(['farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout']),
       browser(['frontend-browser-scenario-matrix'], '@viewport|@ws'), safari(),
     ],
   },
   {
+    name: 'scoring presentation',
+    owns: /^client\/(?:components\/board\/Scoring|app\/(?:GameContainerApi\.|.*scor)|styles\/components\/scor)/i,
+    checks: [browser(['source-aware-scoring', 'mobile-scoring-pad']), safari()],
+  },
+  {
     name: 'interaction',
-    owns: /^(?:client\/components\/interaction\/|client\/app\/interaction-|client\/hooks\/use(?:CardPlayChoice|FarmSelection|RequestActivation))/,
+    owns: /^(?:client\/components\/interaction\/|client\/app\/(?:GameContainerApi\.|interaction-)|client\/hooks\/use(?:CardPlayChoice|FarmSelection|RequestActivation))/,
     checks: [
       browser(['choice-previews', 'online-interaction-completion', 'interaction-focus', 'mobile-interaction-continuity']),
       browser(['frontend-browser-scenario-matrix'], '@viewport|@ws'), safari(),
@@ -48,21 +61,34 @@ const groups = [
   },
 ]
 
+const sharedPresentation = /^client\/(?:components\/(?:common|effects|dev)\/|styles\/|hooks\/useElementWidth\.|App\.|app\/(?:AppErrorBoundary|SettingsPage|BugReportBar|OperationsPage|public-event-|private-event-|action-log-|anytime-exchange|bake-exchange|exchange-|animal-reorg-)|services\/(?:observability|bug-report-diagnostics|card-meta|parent-assets|solo-creation-configuration)\.)/
+
+export function frontendOwnership(path: string): string[] {
+  const modulePath = path.replace('/__tests__/', '/')
+  const owners = groups.filter(candidate => candidate.owns.test(modulePath)).map(group => group.name)
+  if (!owners.length && sharedPresentation.test(modulePath)) owners.push('shared frontend presentation')
+  return owners
+}
+
 export function frontendVerification(paths: string[], inventory: TestInventory): { checks: PlannedCheck[]; expansionReasons: string[] } {
   const files = inventory.vitest.filter(test => test.project === 'fast-client').map(test => test.file)
   if (!files.length || !inventory.browser.length) {
     return { checks: [], expansionReasons: ['Frontend test or browser consumers are missing; full verification is required.'] }
   }
   const selected = new Set<typeof groups[number]>()
+  let completeBrowserLayer = false
   for (const path of paths) {
     const modulePath = path.replace('/__tests__/', '/')
-    const group = groups.find(candidate => candidate.owns.test(modulePath))
-    if (!group) return { checks: [], expansionReasons: [`Frontend module ownership is unknown for ${path}; full verification is required.`] }
-    selected.add(group)
+    const owned = groups.filter(candidate => candidate.owns.test(modulePath))
+    if (!owned.length && sharedPresentation.test(modulePath)) completeBrowserLayer = true
+    else if (!owned.length) return { checks: [], expansionReasons: [`Frontend module ownership is unknown for ${path}; full verification is required.`] }
+    owned.forEach(group => selected.add(group))
   }
-  const browserChecks = [...selected].flatMap(group => group.checks)
+  const browserChecks = completeBrowserLayer
+    ? [browser(inventory.browser.map(file => file.replace(/^e2e-tests\//, '').replace(/\.spec\.ts$/, ''))), safari()]
+    : [...selected].flatMap(group => group.checks)
   const missing = browserChecks.flatMap(check => check.files).filter(file => !inventory.browser.includes(file))
-  if (missing.length) return { checks: [], expansionReasons: [`Declared frontend browser consumers are missing: ${[...new Set(missing)].join(', ')}; full verification is required.`] }
+  if (missing.length) throw new Error(`Declared frontend browser consumers are missing: ${[...new Set(missing)].join(', ')}`)
   return {
     checks: [
       { kind: 'vitest', project: 'fast-client', files },
