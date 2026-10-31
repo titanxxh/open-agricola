@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { EncyclopediaEntry } from '../../../../shared/contract/card-encyclopedia'
-import { EMPTY_ENCYCLOPEDIA_FILTERS, filterEncyclopedia, type EncyclopediaFilters } from '../encyclopedia-filters'
+import {
+  EMPTY_ENCYCLOPEDIA_FILTERS,
+  encyclopediaFilterOptions,
+  filterEncyclopedia,
+  normalizeEncyclopediaFilters,
+  type EncyclopediaFilters,
+} from '../encyclopedia-filters'
 import type { EncyclopediaItem } from '../encyclopedia-item'
 import { BASEBOARDS, COOKING_HEARTH, MARKET_WORK, WINTER, cardEntry, itemFor, parentEntry } from './fixtures'
 
@@ -155,5 +161,74 @@ describe('filterEncyclopedia', () => {
     expect(filtered({ extraVp: true })).toEqual(['B033_Mantlepiece', 'C030_HalfTimberedHouse', 'Major_Joinery'])
     expect(filtered({ types: ['major'], points: { min: 2, max: 2, unlisted: false } })).toEqual(['Major_Joinery'])
     expect(filtered({ points: { min: 2, max: 2, unlisted: false }, extraVp: true })).toEqual(['Major_Joinery'])
+  })
+})
+
+const NOTHING_SELECTED = {
+  groups: [],
+  types: [],
+  cost: { resources: [], upgradeReturn: false },
+  points: { min: null, max: null, unlisted: false },
+  extraVp: false,
+}
+
+describe('normalizeEncyclopediaFilters', () => {
+  it.each([undefined, null, 'A', 42, true, ['A']])('starts from no selection for %j', value => {
+    expect(normalizeEncyclopediaFilters(value)).toEqual(NOTHING_SELECTED)
+  })
+
+  it('keeps a stored selection as it was', () => {
+    const stored = {
+      groups: ['A', 'majorMoor'],
+      types: ['mother'],
+      cost: { resources: ['wood', 'stone'], upgradeReturn: true },
+      points: { min: -0.75, max: 2.5, unlisted: true },
+      extraVp: true,
+    }
+    expect(normalizeEncyclopediaFilters(JSON.parse(JSON.stringify(stored)))).toEqual(stored)
+  })
+
+  it('drops unknown options and duplicates and lists the rest in option order', () => {
+    expect(normalizeEncyclopediaFilters({
+      groups: ['seasons', 'Z', 'B', 'A', 'B', 3],
+      types: ['father', 'wizard', 'mother', 'minor'],
+      cost: { resources: ['clay', 'gold', 'wood', 'clay'] },
+    })).toEqual({
+      ...NOTHING_SELECTED,
+      groups: ['A', 'B', 'seasons'],
+      types: ['minor', 'mother', 'father'],
+      cost: { resources: ['wood', 'clay'], upgradeReturn: false },
+    })
+  })
+
+  it('drops values of the wrong kind', () => {
+    expect(normalizeEncyclopediaFilters({
+      groups: 'A',
+      types: { 0: 'minor' },
+      cost: { resources: 'wood', upgradeReturn: 'yes' },
+      points: { min: '-0.75', max: Number.POSITIVE_INFINITY, unlisted: 1 },
+      extraVp: 'true',
+    })).toEqual(NOTHING_SELECTED)
+    expect(normalizeEncyclopediaFilters({ cost: ['wood'], points: [1, 2], extraVp: true }))
+      .toEqual({ ...NOTHING_SELECTED, extraVp: true })
+    expect(normalizeEncyclopediaFilters({ points: { min: Number.NaN, max: 0 } }))
+      .toEqual({ ...NOTHING_SELECTED, points: { min: null, max: 0, unlisted: false } })
+  })
+})
+
+describe('encyclopediaFilterOptions', () => {
+  it('offers the options the catalog uses, in option order', () => {
+    expect(encyclopediaFilterOptions(CATALOG)).toEqual({
+      groups: ['A', 'B', 'C', 'majorStandard', 'parents', 'moor', 'seasons'],
+      types: ['minor', 'occupation', 'major', 'mother', 'father', 'moorSpecialAction', 'moorStart', 'season'],
+      costResources: ['wood', 'clay', 'reed', 'stone', 'food', 'grain'],
+      upgradeReturn: true,
+    })
+    expect(encyclopediaFilterOptions([itemFor(PAPER_KNIFE), itemFor(HOMEKEEPER)])).toEqual({
+      groups: ['A'],
+      types: ['minor', 'occupation'],
+      costResources: ['wood'],
+      upgradeReturn: false,
+    })
   })
 })
