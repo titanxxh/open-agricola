@@ -23,5 +23,18 @@ export const moorSpecialActionEffectParams = (actionId: MoorSpecialActionId, pla
   return { ...gain, foodCost: cost.food ?? 0, fuelCost: cost.fuel ?? 0 }
 }
 
+/** Player counts of a card that print the same effect, in the order the card lists them. */
+export const moorSpecialActionEffectGroups = (actionId: MoorSpecialActionId, playerCounts: readonly number[]) => {
+  const groups = new Map<string, { playerCounts: number[]; params: ReturnType<typeof moorSpecialActionEffectParams> }>()
+  for (const count of playerCounts) {
+    const params = moorSpecialActionEffectParams(actionId, count)
+    const signature = JSON.stringify(params)
+    const group = groups.get(signature) ?? { playerCounts: [], params }
+    group.playerCounts.push(count)
+    groups.set(signature, group)
+  }
+  return [...groups.values()]
+}
+
 export const moorSpecialActionBuysImprovement = (actionId: MoorSpecialActionId): boolean =>
   actionId === 'black-market' || actionId === 'illicit-work'
