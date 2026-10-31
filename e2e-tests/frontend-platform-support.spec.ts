@@ -234,7 +234,7 @@ test('mobile shell controls safe area, background, glyphs, and asset readiness',
   expect(shell.safeAreaGap).toBeGreaterThanOrEqual(34)
   expect(shell.navigationBackground).not.toBe('none')
 
-  await expect(navigation.locator('.mobile-tab-bar__icon svg')).toHaveCount(3)
+  await expect(navigation.locator('.mobile-tab-bar__icon svg')).toHaveCount(4)
   expect(await navigation.textContent()).not.toMatch(/\p{Extended_Pictographic}|\uFFFD/u)
   const logo = page.getByRole('img', { name: 'Open Agricola logo' })
   await expect(logo).toHaveJSProperty('complete', true)
