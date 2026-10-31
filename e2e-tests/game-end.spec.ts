@@ -75,6 +75,7 @@ test('hotseat can end from the handoff screen after one confirmation', async ({ 
     await authenticateSolo(context, request, `end_hotseat_${Date.now().toString(36)}`)
     const page = await context.newPage()
     await page.goto(`${FRONTEND_URL}/?transport=ws&maxPlayers=3&hotseat=1`)
+    await expect(page).toHaveURL(/\?room=[^&]+/)
     const roomId = new URL(page.url()).searchParams.get('room')
     page.once('dialog', dialog => dialog.accept())
     await (await openGameEndControls(page)).getByRole('button', { name: 'Propose ending the game', exact: true }).click()
