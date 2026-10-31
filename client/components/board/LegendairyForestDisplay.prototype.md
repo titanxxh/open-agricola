@@ -4,7 +4,7 @@
 
 ## 查看
 
-双击同目录的 `LegendairyForestDisplay.prototype.html`，不需要启动应用。也可以打开私有 Artifact：<https://claude.ai/artifact/7iJugRaTEuzSQ1xfC3amKE>（手机可直接打开）。
+owner 本机在 Tailscale IP 上托管：<http://100.86.148.26:8531/>（MagicDNS：<http://spark-f1e4.taild3ff84.ts.net:8531/>），tailnet 内的桌面和手机都能打开。服务只返回这一个文件，每次请求从本 worktree 现读。也可以直接双击同目录的 `LegendairyForestDisplay.prototype.html`，不需要启动应用。
 
 页面只有固定演示数据：不发游戏命令，不连房间，不验证随机流、视角投影、规则计算、撤销边界或恢复。牌名用中文贴条牌图的译名，正式文案按项目 i18n 流程处理。
 
