@@ -133,7 +133,10 @@ describe('card test associations', () => {
     const { cwd, source, inventory } = fixture()
     inventory.vitest.push({ file: 'client/services/__tests__/gameTransport.test.ts', project: 'fast-client' })
     write(cwd, 'client/services/__tests__/gameTransport.test.ts', 'export {}\n')
-    for (const name of ['hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player']) {
+    for (const name of [
+      'hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player',
+      'encyclopedia-entry', 'encyclopedia', 'encyclopedia-in-game',
+    ]) {
       const file = `e2e-tests/${name}.spec.ts`
       inventory.browser.push(file)
       write(cwd, file, 'export {}\n')
@@ -146,11 +149,13 @@ describe('card test associations', () => {
     expect(selected.mode).toBe('scoped')
     expect(selected.checks.filter(check => check.kind === 'browser')).toEqual([
       { kind: 'browser', browser: 'chromium', files: [
-        'e2e-tests/card-localization.spec.ts', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts',
+        'e2e-tests/card-localization.spec.ts', 'e2e-tests/choice-previews.spec.ts',
+        'e2e-tests/encyclopedia-entry.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/encyclopedia.spec.ts',
+        'e2e-tests/farm-card-targets.spec.ts',
         'e2e-tests/frontend-browser-scenario-matrix.spec.ts', 'e2e-tests/hosted-password-login.spec.ts',
         'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/room-invitations.spec.ts', 'e2e-tests/ws-dual-player.spec.ts',
       ], grep: null },
-      { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
+      { kind: 'browser', browser: 'webkit', files: ['e2e-tests/encyclopedia.spec.ts', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
     ])
     expect(selected.checks.filter(check => check.kind === 'catalog')).toEqual([
       { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
