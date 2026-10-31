@@ -1,12 +1,14 @@
+import type { ReactNode } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import { ResourceText } from '../../components/common/ResourceText'
 import type { EncyclopediaItem } from './encyclopedia-item'
 import { encyclopediaFieldText } from './encyclopedia-text'
 
-export function EncyclopediaTextFace({ item, locale, imageMissing = false }: {
+export function EncyclopediaTextFace({ item, locale, imageMissing = false, children }: {
   item: EncyclopediaItem
   locale: Locale
   imageMissing?: boolean
+  children?: ReactNode
 }) {
   const name = encyclopediaFieldText(item, 'name', locale)
   const body = encyclopediaFieldText(item, 'body', locale)
@@ -21,6 +23,7 @@ export function EncyclopediaTextFace({ item, locale, imageMissing = false }: {
           {body.text ? <ResourceText text={body.text} /> : missing}
         </div>
       ) : null}
+      {children}
     </article>
   )
 }

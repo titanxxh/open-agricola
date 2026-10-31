@@ -28,11 +28,43 @@ const WORK_MARKET = special({
   },
 })
 
+const moorStart = (number: number, tiles: Extract<EncyclopediaEntry['face'], { kind: 'moorStart' }>['tiles']) => special({
+  sourceKind: 'moorStart',
+  sourceId: `moor-start-${number}`,
+  group: 'moor',
+  publicType: 'moorStart',
+  face: { kind: 'moorStart', tiles },
+  text: { name: [{ key: 'ui.encyclopedia.moorStart.name', params: { number } }] },
+})
+
+const MOOR_START_1 = moorStart(1, [
+  { row: 0, col: 3, kind: 'forest' }, { row: 1, col: 2, kind: 'forest' }, { row: 1, col: 3, kind: 'forest' },
+  { row: 2, col: 3, kind: 'forest' }, { row: 2, col: 4, kind: 'forest' },
+  { row: 0, col: 0, kind: 'moor' }, { row: 0, col: 1, kind: 'moor' }, { row: 1, col: 1, kind: 'moor' },
+])
+
+const terrainRows = () => within(screen.getByRole('table', { name: 'Starting terrain layout' }))
+  .getAllByRole('row')
+  .map(row => within(row).getAllByRole('cell').map(cell => cell.getAttribute('aria-label') ?? ''))
+
+const MOOR_START_1_ROWS = [
+  ['Moor', 'Moor', '', 'Forest', ''],
+  ['', 'Moor', 'Forest', 'Forest', ''],
+  ['', '', '', 'Forest', 'Forest'],
+]
+
 const broken = new Set<string>()
 vi.stubGlobal('Image', stubImages(url => ([...broken].some(part => url.includes(part)) ? 'error' : 'load')))
 afterEach(() => broken.clear())
 
 const settleImages = () => act(async () => { await Promise.resolve() })
+
+/** Image probes are cached for the page's lifetime; faces whose art every entry shares need a fresh page to fail. */
+const faceOnFreshPage = async () => {
+  vi.resetModules()
+  await import('../../../../tests/setup-language-packs')
+  return (await import('../EncyclopediaFace')).EncyclopediaFace
+}
 
 describe('encyclopedia card faces', () => {
   it('shows the printed card face when its art loads', async () => {
@@ -119,6 +151,28 @@ describe('encyclopedia card faces', () => {
     expect(container.textContent).toContain('Cut Peat · Remove 1 moor to gain 3 fuel')
     expect(container.querySelector('img')).toBeNull()
     expect(screen.queryByRole('group')).toBeNull()
+  })
+
+  it('lays out a starting terrain card on the farm ground used in game', async () => {
+    const { container } = render(<EncyclopediaFace item={itemFor(MOOR_START_1)} locale="en" />)
+    await settleImages()
+
+    expect(terrainRows()).toEqual(MOOR_START_1_ROWS)
+    expect(container.querySelectorAll('.farm-terrain-sprite-forest')).toHaveLength(5)
+    expect(container.querySelectorAll('.farm-terrain-sprite-moor')).toHaveLength(3)
+    expect(container.querySelectorAll('.empty-node')).toHaveLength(7)
+    expect(screen.queryByText('Image unavailable')).toBeNull()
+  })
+
+  it('keeps the starting terrain layout on the text face when the terrain art fails', async () => {
+    broken.add('/moor/terrain/forest.webp')
+    const FreshFace = await faceOnFreshPage()
+    const { container } = render(<FreshFace item={itemFor(MOOR_START_1)} locale="en" />)
+
+    expect(await screen.findByText('Image unavailable')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Starting Terrain 1' })).toBeInTheDocument()
+    expect(terrainRows()).toEqual(MOOR_START_1_ROWS)
+    expect(container.querySelector('.farm-terrain-sprite, .empty-node')).toBeNull()
   })
 
   it('reads season rules from a text face', () => {

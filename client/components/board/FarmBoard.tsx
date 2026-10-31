@@ -30,6 +30,8 @@ import { PlayerCard, type CardType } from '../common/PlayerCard'
 import { getCardDisplayName } from '../common/cardText'
 import type { FarmBoardProjectionCardFieldTarget } from '../../app/farm-board-projection'
 import { farmHandTopLeftFromCenterKey } from './farmHandCenter'
+import { tileVariant } from './farm-tile-variants'
+import { FarmGroundSprite } from './FarmGroundSprite'
 import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import { sumAnimalCounts } from '../../../shared/domain/animal-holder-state'
 import { wouldExceedZoneOccupancyLimit } from '../../app/hooks/use-animal-reorg-flow'
@@ -330,12 +332,6 @@ type FarmCell = FarmCellTileRenderState & {
   fenceId?: string
 }
 
-const EMPTY_SLOT_VARIANTS = [
-  [4, 0, 1, 2, 6],
-  [5, 1, 6, 5, 4],
-  [3, 3, 2, 1, 0],
-] as const
-
 const ROOM_LAYOUT_VARIANTS: Record<PlayerState['color'], readonly (readonly number[])[]> = {
   red: [
     [0, 12, 4, 9, 10],
@@ -368,15 +364,6 @@ const ROOM_LAYOUT_VARIANTS: Record<PlayerState['color'], readonly (readonly numb
     [8, 11, 10, 9, 6],
   ],
 }
-
-const tileVariant = (matrix: readonly (readonly number[])[], row: number, col: number): number => {
-  const r = ((row % matrix.length) + matrix.length) % matrix.length
-  const c = ((col % matrix[r].length) + matrix[r].length) % matrix[r].length
-  return matrix[r][c] ?? 0
-}
-
-const emptySlotClass = (row: number, col: number) =>
-  `empty-node-${tileVariant(EMPTY_SLOT_VARIANTS, row, col)}`
 
 const roomLayoutClass = (color: PlayerState['color'], row: number, col: number) =>
   `room-layout-${tileVariant(ROOM_LAYOUT_VARIANTS[color], row, col)}`
@@ -1444,10 +1431,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
                   <div className={`${roomSpriteClass(displayPlayer.houseType)} ${roomLayoutClass(displayPlayer.color, tileRow, tileCol)}`} />
                 ) : isField ? (
                   <div className="meeple-field" />
-                ) : terrain ? (
-                  <div className={`farm-terrain-sprite farm-terrain-sprite-${terrain.kind}`} />
                 ) : (
-                  <div className={`empty-node ${emptySlotClass(tileRow, tileCol)}`} />
+                  <FarmGroundSprite terrain={terrain?.kind} row={tileRow} col={tileCol} />
                 )}
               </div>
               {isFieldSelected ? (
