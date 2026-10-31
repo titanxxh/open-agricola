@@ -36,17 +36,25 @@
 
 GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览器复现用于开发反馈，完整本机 `prepush` 是可选入口。`ci.yml` 是 PR 与 main 的唯一自动验证入口，旧全量测试与浏览器工作流不再重复执行选中任务，也不配置定时全量。
 
-`scripts/ci/verification-plan.ts` 独立发现测试归属，包含完整分支差异、rename 两侧和实际检出变化。未知归属与共享配置扩大到完整任务清单。普通说明文档选择文档约束测试，运行时可读文档保留所属业务范围。
+`scripts/ci/verification-plan.ts` 独立发现测试归属，包含完整分支差异、rename 两侧和实际检出变化。未知归属、全局配置和缺少可缩小范围的证据时，扩大到完整任务清单。根缺失、源码无法解析或测试未归类时，规划直接失败。`wideningReasons` 记录已知范围内的扩边；`expansionReasons` 记录完整清单回退。
 
 规划器将混合范围归并为每个 Vitest project 的完整文件并集，以及每种浏览器引擎与相同 grep selector 的文件并集，检查与文件顺序固定。未筛选的文件覆盖同引擎下更窄的 selector；专用 catalog 浏览器任务不会抹去 inline 检查。PR 计划包含 merge 检出，main 计划包含完整 push 集成范围；两者使用相同业务组，并保留声明的集成浏览器消费者。
 
-`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。消费者缺失或前端模块未知时扩大到全量。
+`scripts/ci/support-verification.ts` 将文档约束与 Workshop 运行时验证分别选择。英文参考文档还选择参考资料读取器；可执行沙盒与 prompt 文档保留声明的 Session 契约。`test-consumers.ts` 恰好覆盖每个独立发现的测试一次，沿测试本地 import 与 helper 遍历，记录生产依赖但不继续遍历生产代码。测试与浏览器文件改动选择完整文件及其消费者。helper 的不确定归属、删除和 rename 在已知测试层内扩边；没有存活消费者的 helper 保留该层。浏览器文件保留 Chromium 执行和声明的 WebKit case。未知归属与全局 setup 改动仍要求完整清单。
 
-`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、共享规则、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。公共机制保留完整 slow project、client project 和浏览器分道，包含公开 i18n 与农场 helper 的消费者。工坊覆盖当前行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。未知目录、声明的消费者缺失或 project 缺失时扩大到全量。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
+`scripts/ci/frontend-verification.ts` 声明完整前端业务组及其浏览器消费者。已知棋盘、计分、交互、认证、传输、语言与 Replay 模块选择完整 client 测试组、质量与构建，以及明确的浏览器文件或 matrix 标签。共享展示扩大到完整浏览器层。前端模块未知时扩大到全量；声明的消费者缺失时规划失败。
 
-`scripts/ci/card-verification.ts` 将权威 Card Source 身份与独立发现的 Vitest、浏览器测试中的字面量、import 和本地测试 helper 关联。索引统一卡号前导零，选择完整文件，包括跨卡和 slow Session 消费者。生产 import 与注册 bootstrap 是归属遍历的终点。通用注册表、文件读取、动态来源、手牌与开局消费者始终保留在保守安全组中，即使同一文件还列有卡牌。有限的卡牌 UI 组、浏览器沙盒、WebKit、质量和构建也保留。新增或删除卡牌路径、缺少行为关联、身份歧义、helper 证据失效，以及手牌或全局可用卡牌都会扩大到全量。公共机制沿用更广的验证范围。索引属于声明式关联契约，不推断语义依赖。公共边界测试位于 `scripts/__tests__/card-verification.test.ts` 和 `scoped-verification-cli.test.ts`。
+`scripts/ci/business-verification.ts` 声明认证/连接/Room、存储/恢复/Replay、协议/投影及工坊业务组。各组选择完整受影响 Vitest project 与 canonical 质量/构建任务。恢复覆盖序列化、客户端传输、Replay 模型和存储/发布测试。工坊保留行为回归、参考资料/prompt/文档约束和两种沙盒执行器，不调用模型。业务组归属未知时扩大到全量；声明的测试、浏览器消费者或 project 缺失时规划失败。公开计划及进程级 CLI 测试位于 `scoped-verification-business*.test.ts`。
+
+`scripts/ci/rule-verification.ts` 声明支付、动物、计分、农场/作物、轮次/变体与共享核心的归属。规则路径、Card Source 机制与测试关联选择完整受影响文件、跨卡和 slow Session 消费者，以及保守的共享安全消费者。较小的规则组保留声明的浏览器文件和 WebKit 覆盖；共享核心改动保留完整规则 project 与浏览器分道。关联证据缺失或过期时扩大到完整清单；声明的消费者缺失时规划失败。关联索引记录声明式证据，不证明语义独立。公开边界见 `rule-verification.test.ts` 和 `scoped-verification-business-cli.test.ts`。
+
+`scripts/ci/card-verification.ts` 将权威 Card Source 身份与独立发现的 Vitest、浏览器测试中的字面量、import 和本地测试 helper 关联。索引统一卡号前导零，选择完整文件，包括跨卡和 slow Session 消费者。生产 import 与注册 bootstrap 是归属遍历的终点。通用注册表、文件读取、动态来源、手牌与开局消费者始终保留在保守安全组中，即使同一文件还列有卡牌。有限的卡牌 UI 组、浏览器沙盒、WebKit、质量和构建也保留。已有卡牌新增关联回归测试仍保留在该范围内。生产 Card Source 的新增、删除或 rename、缺少行为关联、身份歧义、helper 证据失效，以及手牌或全局可用卡牌都会扩大到全量。声明的卡牌 UI 消费者缺失时规划失败。公共机制沿用更广的验证范围。索引属于声明式关联契约，不推断语义依赖。公共边界测试位于 `scripts/__tests__/card-verification.test.ts` 和 `scoped-verification-cli.test.ts`。
 
 `scripts/ci/scoped-verification.ts` 在执行前重新计算 canonical plan，核对 digest 与源码身份。`routine-partitions.ts` 将完整 Vitest 检查保留在 `units`，将浏览器 `(engine, grep, file)` 元组排序后轮流分配到四个分区，再按原引擎和 selector 归组，并断言恰好覆盖一次。worker 保留 `pnpm verify`、隔离依赖、`restart-local.sh` 和结构化 case 结果。本机 `all` 模式仍执行完整计划。日常结果不能充当完整发布回执。
+
+units 先准备一次所需测试服务，并构建一次卡牌 manifest，再逐 project 串行执行。每次单 project 的 Vitest 命令执行完整文件，保留默认 reporter，并写入独立 JSON 报告。退出成功与源码身份不变仍是必要条件。实际报告必须包含模块，模块名与所选文件恰好对应一次；缺失、额外、重复、失败或未完成的结果都会阻断完成。`vitest-results.ts` 持有该边界，测试见 `vitest-results.test.ts` 与范围执行测试。
+
+执行结果为每条实际命令记录 `startedAt`、`completedAt` 和单调时钟 `durationMs`，包含准备步骤与失败命令。Vitest 原始报告在 `output/verification/vitest-results/` 保留模块与用例耗时；分区 artifact 同时保留两类证据。测量数据与报告路径不进入 canonical plan 或其 digest，也不能替代执行门禁。
 
 `ci.yml` 在规划后独立调度 units、四个明确的浏览器 caller 和 catalog 任务。范围 caller 共用 `scoped-verification.yml`；空分区以 null descriptor 明示并跳过。始终执行的 `verify` 分别核对每个选中 caller 的状态、分区 ID 与 digest、完整计划 digest、SHA 和完成数。其他成功不能补齐失败或缺失的 caller。仅含 units 的计划保留 `catalog_tasks=none`；浏览器 worker 安装两种引擎以支持嵌入式启动。公开测试位于 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
 

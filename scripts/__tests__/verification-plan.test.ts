@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { assertPlanCurrent, createRepositoryPlan, planVerification, type ChangedPath } from '../ci/verification-plan'
+import { assertPlanCurrent, createRepositoryPlan, planVerification, readTestInventory, type ChangedPath } from '../ci/verification-plan'
+import { businessScopeFor } from '../ci/business-verification'
 
 const identity = {
   baseRef: 'main', headRef: 'HEAD',
@@ -70,25 +71,23 @@ describe('verification scope planning', () => {
         { status: 'M', path: 'docs/CUSTOM_CARD_SANDBOX.md' },
         { status: 'M', path: 'package.json' },
       ],
-      inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+      inventory: readTestInventory(resolve(import.meta.dirname, '../..')), fullTaskIds: ['quality', 'fast'],
     })
 
     expect(plan.mode).toBe('full')
     expect(plan.selections.map(selection => ({ scope: selection.scope, paths: selection.paths }))).toEqual([
-      { scope: 'documentation', paths: ['README.md'] },
+      { scope: 'documentation', paths: ['README.md', 'docs/CUSTOM_CARD_SANDBOX.md'] },
       { scope: 'frontend', paths: ['client/components/Help.tsx'] },
       { scope: 'card', paths: ['shared/cards/A/A029_AleBenches.ts'] },
       { scope: 'server', paths: ['server/game/room.ts'] },
       { scope: 'rules', paths: ['shared/actions/payment/solver.ts'] },
       { scope: 'contract', paths: ['shared/contract/interaction.ts'] },
-      { scope: 'workshop', paths: ['docs/CUSTOM_CARD_SANDBOX.md'] },
       { scope: 'global', paths: ['package.json'] },
     ])
   })
 
   it.each<{ changes: ChangedPath[]; reason: string }>([
     { changes: [], reason: 'No changes were established; full verification is required.' },
-    { changes: [{ status: 'M', path: 'README.md' }], reason: 'Documentation constraint tests are missing; full verification is required.' },
   ])('never turns an unprovable scope into an empty successful plan: $reason', ({ changes, reason }) => {
     const plan = planVerification({
       identity, changes, inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
@@ -98,6 +97,13 @@ describe('verification scope planning', () => {
     expect(plan.expansionReasons).toContain(reason)
   })
 
+  it('rejects a missing declared documentation consumer', () => {
+    expect(() => planVerification({
+      identity, changes: [{ status: 'M', path: 'README.md' }],
+      inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
+    })).toThrow('Declared documentation consumer is missing')
+  })
+
   it('rejects an absent canonical full task catalog', () => {
     expect(() => planVerification({
       identity, changes: [{ status: 'M', path: 'package.json' }],
@@ -105,7 +111,7 @@ describe('verification scope planning', () => {
     })).toThrow('canonical full task catalog')
   })
 
-  it.each(['shared/cards/__tests__/setup-register-all.ts', 'shared/cards/__tests__/card-environment.ts', 'client/components/__tests__/fixtures.ts'])('treats shared test setup as global: %s', path => {
+  it.each(['shared/cards/__tests__/setup-register-all.ts', 'shared/cards/__tests__/card-environment.ts'])('treats global card bootstrap as global: %s', path => {
     const plan = planVerification({
       identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
     })
@@ -113,11 +119,30 @@ describe('verification scope planning', () => {
     expect(plan.selections).toMatchObject([{ scope: 'global', paths: [path] }])
   })
 
-  it.each(['server/workshop-validation.ts', 'client/services/workshop-pr.ts'])('retains Workshop ownership for module prefixes: %s', path => {
+  it('uses test support ownership for a client fixture', () => {
+    const path = 'client/components/__tests__/fixtures.ts'
     const plan = planVerification({
       identity, changes: [{ status: 'M', path }], inventory: { vitest: [], browser: [] }, fullTaskIds: ['quality', 'fast'],
     })
-    expect(plan.selections).toMatchObject([{ scope: 'workshop', paths: [path] }])
+    expect(plan.selections).toMatchObject([{ scope: 'test-support', paths: [path] }])
+    expect(plan.expansionReasons).toContain('Test consumer evidence is missing; full verification is required.')
+  })
+
+  it.each(['server/workshop-validation.ts', 'client/services/workshop-pr.ts'])('retains Workshop ownership for module prefixes: %s', path => {
+    expect(businessScopeFor(path)).toBe('workshop')
+  })
+
+  it('includes a new rule regression without requiring a production filename twin', () => {
+    const file = 'server/__tests__/payment-new-regression.test.ts'
+    const inventory = { vitest: [{ file, project: 'fast-server' }], browser: [] }
+    const plan = planVerification({
+      identity, changes: [{ status: 'A', path: file }], inventory, fullTaskIds: ['quality', 'fast'],
+      testConsumers: { inventoryKey: JSON.stringify(inventory), expansionReasons: [], tests: [
+        { file, dependencies: [file], symbols: [], literals: [], uncertaintyReasons: [] },
+      ] },
+    })
+    expect(plan.mode).toBe('scoped')
+    expect(plan.checks).toEqual([{ kind: 'vitest', project: 'fast-server', files: [file] }])
   })
 })
 
