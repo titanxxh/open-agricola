@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TestConsumerIndex } from '../ci/test-consumers'
+import { businessVerification } from '../ci/business-verification'
 import { planVerification, type TestInventory } from '../ci/verification-plan'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
@@ -119,6 +120,47 @@ describe('operations behavior verification', () => {
   it.each([...serverFiles, ...scriptFiles, ...inventory.browser.slice(0, 2)])('fails rather than hiding a missing declared consumer %s', missing => {
     const tests = { vitest: inventory.vitest.filter(test => test.file !== missing), browser: inventory.browser.filter(file => file !== missing) }
     expect(() => plan('operations/opening-metrics.ts', index(tests), tests)).toThrow(missing)
+  })
+
+  it('rejects a removed declared consumer before an accompanying QR change can expand the public plan', () => {
+    const missing = 'server/__tests__/operations-accounts.test.ts'
+    const tests = { ...inventory, vitest: inventory.vitest.filter(test => test.file !== missing) }
+    expect(() => planVerification({
+      identity, changes: [
+        { status: 'M', path: 'operations/opening-metrics.ts' },
+        { status: 'M', path: 'operations/update-community-qr.mjs' },
+        { status: 'D', path: missing },
+      ], inventory: tests, fullTaskIds: FULL_TASK_IDS, testConsumers: index(tests),
+    })).toThrow(missing)
+  })
+
+  it.each(['operations/update-community-qr.mjs', 'server/new-unowned.ts'])(
+    'rejects invalid direct-mapper consumer evidence before the full fallback for %s', path => {
+      const consumers = index()
+      consumers.tests.pop()
+      expect(() => businessVerification([path], inventory, consumers)).toThrow('does not cover every discovered test exactly once')
+    },
+  )
+
+  it.each([
+    ['server/new-unowned.ts', 'server/operations-accounts.ts'],
+    ['server/new-unowned.ts', 'operations/opening-metrics.ts'],
+    ['operations/update-community-qr.mjs', 'server/operations-accounts.ts'],
+  ])('validates every recognized group before unknown paths can return full: %j', (...paths) => {
+    const missing = 'server/__tests__/operations-accounts.test.ts'
+    const tests = { ...inventory, vitest: inventory.vitest.filter(test => test.file !== missing) }
+    expect(() => businessVerification(paths, tests, index(tests))).toThrow(missing)
+  })
+
+  it('does not let an unknown operations entry conceal missing consumers in another declared business group', () => {
+    expect(() => businessVerification(['operations/update-community-qr.mjs', 'server/game/room.ts'], inventory, index()))
+      .toThrow('Required consumers for authentication, connections and rooms are missing')
+  })
+
+  it('keeps a normal unknown-only direct mapping full when its evidence is valid', () => {
+    expect(businessVerification(['server/new-unowned.ts'], inventory, index())).toMatchObject({
+      checks: [], expansionReasons: [expect.stringContaining('server/new-unowned.ts')],
+    })
   })
 
   it.each(['server/database/031-game-opening-facts.sql', 'server/operations-accounts.ts', 'server/operations-openings.ts'])(
