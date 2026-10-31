@@ -9,7 +9,7 @@ type Accounts = { total: number; today: number; last_24h: number; last_7d: numbe
 export function createAccountsPool(connectionString: string, schema = 'public') {
   if (!/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error('Invalid database schema')
   return new pg.Pool({ connectionString, max: 1, connectionTimeoutMillis: 1000, statement_timeout: 2000,
-    options: `-c search_path=${schema} -c default_transaction_read_only=on` })
+    options: `-c search_path=${schema} -c default_transaction_read_only=on -c jit=off` })
 }
 
 export function createAccountsHandler({ pool, token, now = Date.now, buildId = 'development' }: {

@@ -52,6 +52,13 @@ const opening = async (id: string, {
 }
 
 const participate = (room: string, user: string) => db.prepare('INSERT INTO game_opening_accounts(room_id,user_id) VALUES(?,?)').run(room, user)
+
+it('uses a read-only two-second connection without JIT compilation for short monitoring queries', async () => {
+  const settings = await pool.query(`SELECT current_setting('jit') AS jit,
+    current_setting('statement_timeout') AS timeout, current_setting('default_transaction_read_only') AS readonly`)
+  expect(settings.rows).toEqual([{ jit: 'off', timeout: '2s', readonly: 'on' }])
+})
+
 const sample = (samples: OpeningSample[], name: string, labels: Record<string, string> = {}) => {
   const result = samples.find(row => row.name === `agricola_opening_${name}` && Object.keys(row.labels).length === Object.keys(labels).length
     && Object.entries(labels).every(([key, value]) => row.labels[key] === value))

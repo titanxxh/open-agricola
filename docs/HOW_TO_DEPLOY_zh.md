@@ -765,7 +765,7 @@ pnpm install
 
 首次部署必须先通过现有后端维护部署安装迁移 031 和新写入逻辑，再独立部署运维源码。维护部署应在迁移前停止所有旧应用写入者，保证迁移时间之后只有新版本记录开局。这次首次安装需要部署后端；之后只改面板或查询继续使用 `deploy-operations.sh`。运维 provisioning 只授予标量事实、覆盖时间、必要 Game Context 列和安全阶段视图的 SELECT 权限，不授予 Room 私有 JSON 或 Replay payload 访问权。若先部署到旧后端，注册指标仍可用，开局指标报告不可用；后端升级后需再次部署运维以授予新表权限。
 
-exporter 沿用单连接池、两秒 SQL 超时和每分钟最多一次的采集，单次用一条聚合 SQL 获得一致快照，不重建私有状态，也不为每个账号创建 Prometheus 标签。
+exporter 沿用单连接池、两秒 SQL 超时和每分钟最多一次的采集，单次用一条聚合 SQL 获得一致快照，不重建私有状态，也不为每个账号创建 Prometheus 标签。 监控连接关闭 PostgreSQL JIT，避免聚合计划的编译开销在资源受限的机器上消耗短查询预算。
 
 Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租约，TSDB 保留 7 天。全站 DB 查询、认证用户 presence、cgroup/备份检查最多每 60 秒执行一次，复用进行中的采集。稳定 slot target 避免进程 UUID 产生长期 series。用 `rate`/`increase` 处理重启 counter reset，**先** `sum by(le,...)` 合并桶，再 `histogram_quantile`。看板提供 24h/7d 范围和 15 秒刷新。7 天属于 TSDB block 保留，不是逐样本精确删除时钟；部署前历史不补造，停机缺口保留为空，分布不能还原精确最大值。
 
