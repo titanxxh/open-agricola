@@ -104,10 +104,10 @@ describe('bounded test and document support scope', () => {
     expect(() => assertConsumerCoverage(inventory, detached)).toThrow('source identity')
   })
 
-  it('retains full fallback when a new helper has no established ownership or index parsing failed', () => {
+  it('retains full fallback for unknown ownership but rejects failed index reads', () => {
     expect(supportVerification(['new-service/helper.ts'], inventory, evidence(), []).expansionReasons).toHaveLength(1)
     const failed = evidence()
     failed.expansionReasons.push('Cannot parse helper')
-    expect(supportVerification(['e2e-tests/fixtures.ts'], inventory, failed, []).expansionReasons).toEqual(['Cannot parse helper'])
+    expect(() => supportVerification(['e2e-tests/fixtures.ts'], inventory, failed, [])).toThrow('Cannot parse helper')
   })
 })
