@@ -21,7 +21,7 @@
 | 类别 | 卡牌 |
 |---|---|
 | [#1407](https://github.com/titanxxh/open-agricola/issues/1407) 采纳的项目规则解释，用于现有来源未能确定的单人交互。这些是单卡 OA 决定，不是官方裁定，也不替代全局 other-player 或 neighbour 条件。 | `E014_WoodSaw`, `M027_GardenPath`, `M054_AgriculturalImplement`, `M056_PeatCuttingRights` |
-| 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) |
+| 维护者方案 B：可开始的 before 流程可能让宿主无法完成的格子可选，此时需要撤销。准入不模拟奖励，各卡不加准入守卫。 | 用格 before 收益；[ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md) |
 | 维护者于 2026-10-30 确认的项目解释：完整取得格上货物，再可选返还一半换动物，保留原始取得事实和阈值判断。取得动物后先正常完成整理，包括弃养，再进入返还；不能通过返还绕过该结算。按 [#1481](https://github.com/titanxxh/open-agricola/issues/1481) 取代本卡 #1336 的旧口径，不作为新查证的官方裁定，不改变其他卡按数量或类型取物的能力。 | `D180_PartTimeWorker` |
 | 同一 Turn 内，放人末尾反应再授予 Bake Bread 时不能再次替代，不受参考实现清标记反应顺序影响。维护者裁定见 [#1331](https://github.com/titanxxh/open-agricola/issues/1331)。 | `A097_Freshman` |
 | 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
@@ -65,7 +65,7 @@
 - fencing 主路径不得为 C1 / B30 / E149 增加卡牌 id 分支或 `noWoodPalisades` / `midnightFencer` 一类单卡开关；用 `FenceSegment.type` / `source` 与通用 `fencePolicy` 表达差异。
 - 不照抄 mutable PHP args 和原地 cost rewrite；OA 保留结构化 modifiers 和 payment enumeration。
 - 可从权威计数派生的 infobox 使用卡牌自己的 `getStatePresentation`，不要用内部存取动作 listener 维护同步副本。
-- 不要把参考实现在宿主之前结算的用格奖励放到 `after`。listener 阶段按 [ADR 0033](adr/0033-card-listener-timing-follows-the-reference.md) 选择，使 `before` 奖励在同一次行动内可用。
+- listener 时机按 [ADR 0033](adr/0033-card-listener-timing-follows-project-semantics.md)，从 OA 自身的生命周期和 Reaction Window 语义选择，保留卡牌要求的资源可用时点与玩家自选顺序。参考实现的回调名称和先后不决定阶段。
 - 行动格使用前 / 完整结束后的反应订阅既有 `place-farmer` 生命周期并筛选 `context.space`，不得用内部节点通配反应近似整格完成。
 - listener 资格由共享的封闭目标 / 阶段契约规定，不得从可执行动作注册推断，不得省略筛选条件或修改已注册的筛选对象。
 - 参考实现平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
