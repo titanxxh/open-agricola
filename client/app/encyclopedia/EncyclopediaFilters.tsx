@@ -13,6 +13,7 @@ import {
 } from './encyclopedia-filters'
 import type { EncyclopediaItem } from './encyclopedia-item'
 import { encyclopediaGroupLabel, encyclopediaTypeLabel } from './encyclopedia-labels'
+import { useModalDialog } from './useModalDialog'
 
 export type EncyclopediaFiltersProps = {
   store: EncyclopediaBrowseStore
@@ -380,14 +381,8 @@ function FilterDialog({ locale, resultCount, onClose, children }: {
   onClose: () => void
   children: ReactNode
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const dialogRef = useModalDialog()
   const titleId = useId()
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (dialog && !dialog.open) dialog.showModal()
-    return () => { if (dialog?.open) dialog.close() }
-  }, [])
 
   return (
     <dialog

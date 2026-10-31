@@ -1,8 +1,9 @@
-import { lazy, Suspense, useId, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useId, useState } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import { AppErrorBoundary } from '../AppErrorBoundary'
 import { EncyclopediaLoadError } from './EncyclopediaLoadError'
 import { initialEncyclopediaAttention, nextEncyclopediaAttention } from './encyclopedia-attention'
+import { useModalDialog } from './useModalDialog'
 
 const loadContent = () => import('./InGameEncyclopediaContent').then(m => ({ default: m.InGameEncyclopediaContent }))
 // A rejected lazy component stays rejected, so a retry needs a fresh one.
@@ -22,18 +23,12 @@ type InGameEncyclopediaProps = {
  * never reads or writes the URL, so opening it cannot remount the game or send a command.
  */
 export function InGameEncyclopedia({ locale, openedWindow, attentionWindow, onClose }: InGameEncyclopediaProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const dialogRef = useModalDialog()
   const titleId = useId()
   const [contentAttempt, setContentAttempt] = useState(0)
   const [attention, setAttention] = useState(() => initialEncyclopediaAttention(openedWindow))
   const nextAttention = nextEncyclopediaAttention(attention, attentionWindow)
   if (nextAttention !== attention) setAttention(nextAttention)
-
-  useLayoutEffect(() => {
-    const dialog = dialogRef.current
-    if (dialog && !dialog.open) dialog.showModal()
-    return () => { if (dialog?.open) dialog.close() }
-  }, [])
 
   // The entry outside stays inert until the modal is closed.
   const close = () => {
