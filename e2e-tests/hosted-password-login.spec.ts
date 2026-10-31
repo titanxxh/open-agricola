@@ -13,7 +13,7 @@ import { clearSessionCookie, readCookie, serializeSessionCookie, SESSION_COOKIE 
 import { getDb } from '../server/db'
 import { createFrontendHosting } from '../server/frontend-hosting'
 import { HOSTED_APP_PATH } from '../shared/contract/protocol/app-location'
-import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening } from './fixtures'
+import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, openGameEndControls } from './fixtures'
 import { test } from './server-fixtures'
 
 type Topology = 'legacy-cross-site' | 'same-site-pages'
@@ -466,7 +466,7 @@ for (const engine of ['webkit', 'chromium'] satisfies Engine[]) {
       expect(restored.created_by).toBe(environment.userId)
       expect(createHash('sha256').update(restored.state_json).digest('hex')).toBe(savedHash)
       page.once('dialog', dialog => dialog.accept())
-      await page.getByRole('button', { name: 'Propose ending the game', exact: true }).click()
+      await (await openGameEndControls(page)).getByRole('button', { name: 'Propose ending the game', exact: true }).click()
       await expect.poll(async () => (await getDb().prepare('SELECT lifecycle FROM game_contexts WHERE room_id = ?')
         .get<{ lifecycle: string }>(roomId))?.lifecycle).toBe('terminated')
       await expect(page.getByRole('heading', { name: 'Ended by agreement', exact: true })).toBeVisible()

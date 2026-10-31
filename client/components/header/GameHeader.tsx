@@ -1,5 +1,5 @@
 import { t as translateMessage } from '../../../shared/i18n'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/contract/types'
@@ -23,6 +23,8 @@ type Props = {
   myPlayerName: string | null
   isMyTurn: boolean
   embedded?: boolean
+  menuExtra?: ReactNode
+  menuAlert?: boolean
 }
 
 const shouldShowSnakeOpeningPill = (state: GameState): boolean =>
@@ -37,9 +39,12 @@ export const GameHeader = ({
   myPlayerName,
   isMyTurn,
   embedded = false,
+  menuExtra = null,
+  menuAlert = false,
 }: Props) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
+  const menuAlertSeen = useRef(false)
   const snakePopoverId = useId()
   const isSetup = state.phase === 'draft' || state.phase === 'parent-selection'
   const isHarvestRound = harvestRounds.includes(state.round)
@@ -68,8 +73,18 @@ export const GameHeader = ({
     }
   }, [menuOpen])
 
+  useEffect(() => {
+    if (!menuAlert) {
+      menuAlertSeen.current = false
+      return
+    }
+    if (menuAlertSeen.current) return
+    menuAlertSeen.current = true
+    setMenuOpen(true)
+  }, [menuAlert])
+
   return (
-    <header className={`header-compact${isSetup ? '' : isMyTurn ? ' my-turn' : ' not-my-turn'}`}>
+    <header className={`header-compact${menuOpen ? ' header-compact--menu-open' : ''}${isSetup ? '' : isMyTurn ? ' my-turn' : ' not-my-turn'}`}>
       <div className="header-left">
         {!embedded && (
           <BrandMark
@@ -128,10 +143,11 @@ export const GameHeader = ({
           <LocaleSwitcher className="header-locale-select" />
           <button
             type="button"
-            className="header-action-btn"
+            className={`header-action-btn${menuAlert ? ' header-action-btn--pending' : ''}`}
             onClick={() => setMenuOpen(!menuOpen)}
             aria-expanded={menuOpen}
             aria-haspopup="true"
+            data-game-end-pending={menuAlert ? 'true' : 'false'}
             title={t(locale, 'ui.headerMenu')}
           >
             <span className="header-action-btn__icon" aria-hidden>
@@ -139,19 +155,18 @@ export const GameHeader = ({
             </span>
             <span className="header-action-btn__label">{t(locale, 'ui.headerMenu')}</span>
           </button>
-          {menuOpen && (
-            <div className="header-menu">
-              {devMode ? (
-                <label className="header-menu-item">
-                  <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
-                  {t(locale, 'ui.devMode')}
-                </label>
-              ) : null}
-              {myPlayerName && (
-                <div className="header-menu-item header-menu-identity">{translateMessage(locale, "ui.copy.components_header_GameHeader.you_are_8f0fa0", { value0: myPlayerName })}</div>
-              )}
-            </div>
-          )}
+          <div className="header-menu" hidden={!menuOpen}>
+            {devMode ? (
+              <label className="header-menu-item">
+                <input type="checkbox" checked={devMode} onChange={(e) => setDevMode(e.target.checked)} />
+                {t(locale, 'ui.devMode')}
+              </label>
+            ) : null}
+            {myPlayerName && (
+              <div className="header-menu-item header-menu-identity">{translateMessage(locale, "ui.copy.components_header_GameHeader.you_are_8f0fa0", { value0: myPlayerName })}</div>
+            )}
+            {menuExtra}
+          </div>
         </div>
       </div>
     </header>

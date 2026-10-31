@@ -5,11 +5,12 @@ import { WsGameTransport } from '../services/gameTransport'
 import { GAME_CONTEXT_CHANGED_EVENT } from './GameContextRouter'
 import '../styles/components/game-end.css'
 
-export function GameEndControls({ transport, locale, playerNames, disabled = false }: {
+export function GameEndControls({ transport, locale, playerNames, disabled = false, onProposalChange }: {
   transport: WsGameTransport
   locale: Locale
   playerNames: string[]
   disabled?: boolean
+  onProposalChange?: (pending: boolean) => void
 }) {
   const [proposal, setProposal] = useState<GameEndProposal | null>(null)
   const [sending, setSending] = useState(false)
@@ -42,6 +43,8 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
     refresh()
     return () => { offEvent(); offConnection(); offSnapshot() }
   }, [transport])
+  useEffect(() => { onProposalChange?.(proposal !== null) }, [onProposalChange, proposal])
+  useEffect(() => () => { onProposalChange?.(false) }, [onProposalChange])
 
   const send = (type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', options: Record<string, unknown>) => {
     setError('')

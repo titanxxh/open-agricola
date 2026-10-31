@@ -10,6 +10,7 @@ import { createWorkSession } from '../../../server/__tests__/_helpers/session-fi
 import { EngineStack } from '../../../shared/engine'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
 import { serializeState } from '../../../shared/session/serialization'
+import { t } from '../../../shared/i18n'
 import { AuthProvider } from '../../contexts/AuthContext'
 import { LocaleProvider } from '../../contexts/LocaleContext'
 import { GameContainerApi } from '../GameContainerApi'
@@ -133,6 +134,20 @@ const choicePayload = (playerIndex: number): GameSyncPayload => ({
 const ruleCommands = () => GameSocket.sent.filter(message =>
   !['getCommandScope', 'joinRoom', 'getState', 'getHistory', 'getGameEndProposal'].includes(String(message.type)),
 )
+const expectEndControlsInHeaderMenu = async (user: ReturnType<typeof userEvent.setup>) => {
+  const menu = document.querySelector('.header-menu')
+  expect(menu).toHaveAttribute('hidden')
+  expect(menu?.querySelector('.game-end-controls')).toBeTruthy()
+  expect(document.querySelector('.app > .game-end-controls')).toBeNull()
+  expect(document.querySelector('.hotseat-handoff .game-end-controls')).toBeNull()
+  expect(document.querySelector('.draft-overlay .game-end-controls')).toBeNull()
+  expect(document.querySelector('.parent-selection-overlay .game-end-controls')).toBeNull()
+  expect(document.querySelector('.solo-hand-overlay .game-end-controls')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Menu', exact: true }))
+  expect(screen.getByRole('region', { name: t('en', 'platform.gameEnd.controls'), exact: true })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Menu', exact: true }))
+  expect(menu).toHaveAttribute('hidden')
+}
 
 beforeEach(() => {
   window.localStorage.setItem('open-agricola-locale-v2', 'en')
@@ -432,6 +447,7 @@ describe('hotseat public farm browsing', () => {
     expect(container.querySelector(phase === 'draft' ? '.draft-overlay' : '.parent-selection-overlay')).toBeVisible()
     expect(container.querySelector('.farm-grid')).not.toBeInTheDocument()
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    await expectEndControlsInHeaderMenu(user)
   })
 
   it('leaves ordinary multiplayer browsing and own-seat command permissions unchanged', async () => {
@@ -565,5 +581,49 @@ describe('hotseat public farm browsing', () => {
     expect(screen.getByRole('tab', { name: /Alice/ })).toHaveAttribute('aria-selected', 'true')
     expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
     expect(ruleCommands()).toEqual([])
+  })
+})
+
+describe('consensual game end placement', () => {
+  it('keeps end controls in the header menu on the hotseat handoff and during play', async () => {
+    const user = userEvent.setup()
+    renderGame()
+    await screen.findByRole('dialog', { name: 'Hotseat handoff' })
+    await expectEndControlsInHeaderMenu(user)
+    await confirmAlice(user)
+    await expectEndControlsInHeaderMenu(user)
+  })
+
+  it('keeps end controls in the header menu for an online game without the dev panel', async () => {
+    GameSocket.hotseat = false
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098&player=p1')
+    const user = userEvent.setup()
+    const { container } = renderGame()
+    await screen.findByRole('region', { name: 'Action Spaces' })
+    expect(container.querySelector('.dev-panel')).not.toBeInTheDocument()
+    await expectEndControlsInHeaderMenu(user)
+  })
+
+  it('keeps end controls in the header menu during solo hand selection', async () => {
+    GameSocket.hotseat = false
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098')
+    const state = createInitialState(1098, { playerCount: 1, soloHandMode: 'choose-7' })
+    state.players[0]!.name = 'Alice'
+    state.players[0]!.nameIsDefault = false
+    const groups = state.soloHandSelection?.groups
+    if (!groups) throw new Error('Expected solo hand groups')
+    GameSocket.payload = {
+      ...workPayload(),
+      state: withActiveRegistry(createOfficialCardRegistry(), () => serializeState(state, { actionHooks: undefined, engineStack: new EngineStack() })),
+      interaction: {
+        stateId: 'wait', playerIndex: 0, allowedCommands: ['submitSoloHandSelection'], anytimeActions: [],
+        request: { kind: 'solo-hand-selection', groups },
+      },
+    }
+    const user = userEvent.setup()
+    const { container } = renderGame()
+    await screen.findByRole('dialog', { name: t('en', 'solo.handTitle') })
+    expect(container.querySelector('.solo-hand-overlay > .game-end-controls, .solo-hand-groups > .game-end-controls')).toBeNull()
+    await expectEndControlsInHeaderMenu(user)
   })
 })

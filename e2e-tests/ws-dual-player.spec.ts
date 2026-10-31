@@ -139,7 +139,7 @@ test.describe('WS dual-player sync', () => {
         const firstPlayer = creatorSeat.index === 0 ? p1 : p2
         const openingForest = firstPlayer.locator('[data-action-id="forest"] button:enabled').first()
         const skips = [p1, p2].map(page => page.locator('.interaction-bar')
-          .getByRole('button', { name: /^(Skip|Do not use Elder)$/ }))
+          .getByRole('button', { name: /^(Skip|跳过|Do not use|不使用)/ }).first())
         for (let step = 0; step < 8; step++) {
           await expect.poll(async () => await openingForest.isVisible() ||
             (await Promise.all(skips.map(skip => skip.isVisible()))).some(Boolean)).toBe(true)
@@ -237,12 +237,15 @@ test.describe('WS dual-player sync', () => {
     // before exercising action/undo synchronization.
     const firstAction = p1.locator('.action-card-holder button:not([disabled])').first()
     const setupSkips = [p1, p2].map(page =>
-      page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use Elder|不使用长者)$/ }),
+      page.locator('.interaction-bar').getByRole('button', { name: /^(Skip|跳过|Do not use|不使用)/ }).first(),
     )
-    await expect.poll(async () =>
-      await firstAction.isVisible() || (await Promise.all(setupSkips.map(skip => skip.isVisible()))).some(Boolean),
-    ).toBe(true)
-    for (const skip of setupSkips) if (await skip.isVisible()) await skip.click()
+    for (let step = 0; step < 8; step++) {
+      await expect.poll(async () =>
+        await firstAction.isVisible() || (await Promise.all(setupSkips.map(skip => skip.isVisible()))).some(Boolean),
+      { timeout: 20_000 }).toBe(true)
+      if (await firstAction.isVisible()) break
+      for (const skip of setupSkips) if (await skip.isVisible()) await skip.click()
+    }
     await expect(firstAction).toBeVisible()
     await saveScreenshot(p1, '02-p1-board')
     await saveScreenshot(p2, '02-p2-board')
