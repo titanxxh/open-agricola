@@ -1,25 +1,27 @@
 import { createServer, type Server } from 'node:http'
 import type { Pool } from 'pg'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import { createAccountsHandler, createAccountsPool } from '../../operations/accounts-exporter'
+import pg from 'pg'
+import { createAccountsHandler } from '../../operations/accounts-exporter'
+import { accountsFunction, openingsFunction, provisionOperationsDatabase } from '../../operations/database-access'
 import { collectOpeningMetrics, type OpeningSample } from '../../operations/opening-metrics'
 import type { PostgresDatabase } from '../database/postgres'
 import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
+import { createOperationsTestReader } from './_helpers/operations-reader'
 
 const day = 86_400_000
 const observedAt = Date.parse('2026-10-31T12:00:00+08:00')
 let db: PostgresDatabase
 let pool: Pool
 let server: Server | undefined
-let readerRole: string | undefined
+let access: Awaited<ReturnType<typeof createOperationsTestReader>>
 let now = observedAt
 
 beforeEach(async () => {
   now = observedAt
   db = await createTestDatabase()
-  const { rows: [row] } = await db.query<{ schema: string }>('SELECT current_schema() AS schema')
-  if (!row) throw new Error('Expected test schema')
-  pool = createAccountsPool(getTestDatabaseUrl(), row.schema)
+  access = await createOperationsTestReader(db)
+  pool = access.pool
   await db.prepare('UPDATE game_opening_tracking SET tracking_since=?').run(now - 40 * day)
 })
 afterEach(async () => {
@@ -27,12 +29,7 @@ afterEach(async () => {
     await new Promise<void>((resolve, reject) => server!.close(error => error ? reject(error) : resolve()))
     server = undefined
   }
-  await pool?.end()
-  if (readerRole) {
-    await db.exec(`DROP OWNED BY ${readerRole}`)
-    await db.exec(`DROP ROLE ${readerRole}`)
-    readerRole = undefined
-  }
+  await access?.close()
   await db?.close()
 })
 
@@ -161,7 +158,7 @@ it('keeps account metrics healthy when opening collection fails, clears old samp
   const base = `http://127.0.0.1:${address.port}`
   const request = () => fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer opening-test-token' } })
   expect(await (await request()).text()).toContain('agricola_opening_collection_success 1')
-  await db.exec('ALTER TABLE game_opening_facts RENAME TO unavailable_opening_facts')
+  await db.exec(`ALTER FUNCTION ${openingsFunction}(bigint) RENAME TO unavailable_opening_metrics`)
   now += 61_000
   const body = await (await request()).text()
   expect(body).toContain('agricola_accounts{kind="total"} 1')
@@ -181,8 +178,8 @@ it('keeps both collections healthy when an allowed account query exceeds the poo
       if (property !== 'query') return Reflect.get(target, property)
       return (...args: unknown[]) => {
         const text = args[0]
-        if (typeof text === 'string' && text.startsWith('SELECT count(*)::integer AS total')) {
-          args[0] = 'WITH delay AS MATERIALIZED (SELECT pg_sleep(1.2)) ' + text.replace('FROM users', 'FROM users CROSS JOIN delay')
+        if (typeof text === 'string' && text.startsWith(`SELECT * FROM ${accountsFunction}(`)) {
+          args[0] = `WITH delay AS MATERIALIZED (SELECT pg_sleep(1.2)) SELECT counts.* FROM ${accountsFunction}($1::bigint) counts CROSS JOIN delay`
         }
         return Reflect.apply(target.query, target, args)
       }
@@ -204,24 +201,139 @@ it('keeps both collections healthy when an allowed account query exceeds the poo
 })
 
 it('collects with a restricted reader while private account fields and raw game snapshots remain inaccessible', async () => {
-  const { rows: [row] } = await db.query<{ schema: string }>('SELECT current_schema() AS schema')
-  if (!row) throw new Error('Expected test schema')
-  readerRole = `opening_reader_${row.schema}`
-  await db.exec(`CREATE ROLE ${readerRole} NOLOGIN`)
-  await db.exec(`GRANT USAGE ON SCHEMA ${row.schema} TO ${readerRole}`)
-  await db.exec(`GRANT SELECT ON game_opening_facts,game_opening_accounts,game_opening_tracking,operations_current_openings TO ${readerRole}`)
-  await db.exec(`GRANT SELECT (room_id,created_at,lifecycle) ON game_contexts TO ${readerRole}`)
-  await db.exec(`GRANT SELECT (id,created_at) ON users TO ${readerRole}`)
-  const reader = await pool.connect()
-  try {
-    await reader.query(`SET ROLE ${readerRole}`)
-    const values = await collectOpeningMetrics(reader, now)
-    expect(sample(values, 'games', { window: 'today', mode: 'all' })).toBe(0)
-    expect((await reader.query('SELECT * FROM operations_current_openings')).rows).toEqual([])
-    await expect(reader.query('SELECT state_json FROM rooms')).rejects.toMatchObject({ code: '42501' })
-    await expect(reader.query('SELECT username,password_hash FROM users')).rejects.toMatchObject({ code: '42501' })
-  } finally {
-    await reader.query('RESET ROLE')
-    reader.release()
+  const values = await collectOpeningMetrics(pool, now)
+  expect(sample(values, 'games', { window: 'today', mode: 'all' })).toBe(0)
+  for (const sql of ['SELECT * FROM operations_current_openings', 'SELECT room_id,user_id FROM game_opening_accounts',
+    'SELECT * FROM game_opening_facts', 'SELECT id,created_at FROM users', 'SELECT room_id,created_at,lifecycle FROM game_contexts',
+    'SELECT state_json FROM rooms', 'SELECT username,password_hash FROM users']) {
+    await expect(pool.query(sql)).rejects.toMatchObject({ code: '42501' })
   }
+})
+
+it('removes legacy table, column and inherited access on repeated provisioning while preserving both aggregates', async () => {
+  await account('private-upgrade-user', now - 2 * day)
+  await opening('private-upgrade-room', { startedAt: now - 60_000 })
+  await participate('private-upgrade-room', 'private-upgrade-user')
+  const legacy = `legacy_${access.schema}`
+  await db.exec(`CREATE ROLE ${legacy} NOLOGIN`)
+  try {
+    await db.exec(`GRANT USAGE ON SCHEMA ${access.schema} TO ${legacy}`)
+    await db.exec(`GRANT SELECT (id,created_at) ON users TO ${legacy},${access.role}`)
+    await db.exec(`GRANT SELECT (room_id,created_at,lifecycle) ON game_contexts TO ${access.role}`)
+    await db.exec(`GRANT SELECT ON game_opening_accounts,game_opening_facts,operations_current_openings TO ${access.role}`)
+    await db.exec(`GRANT ${legacy} TO ${access.role}`)
+    expect((await pool.query('SELECT room_id,user_id FROM game_opening_accounts')).rows)
+      .toEqual([{ room_id: 'private-upgrade-room', user_id: 'private-upgrade-user' }])
+    await access.provision()
+    await access.provision()
+    for (const sql of ['SELECT room_id,user_id FROM game_opening_accounts', 'SELECT id,created_at FROM users',
+      'SELECT room_id,created_at,lifecycle FROM game_contexts', 'SELECT * FROM operations_current_openings']) {
+      await expect(pool.query(sql)).rejects.toMatchObject({ code: '42501' })
+    }
+    expect((await pool.query('SELECT pg_has_role($1,\'MEMBER\') AS member', [legacy])).rows).toEqual([{ member: false }])
+    expect((await pool.query(`SELECT total FROM ${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 1 }])
+    expect(sample(await collectOpeningMetrics(pool, now), 'accounts', { window: 'last_24h', mode: 'all' })).toBe(1)
+  } finally {
+    await db.exec(`DROP OWNED BY ${legacy}`)
+    await db.exec(`DROP ROLE ${legacy}`)
+  }
+})
+
+it('keeps fixed aggregates unchanged when the reader creates temporary shadow relations', async () => {
+  await account('real-user', now - 2 * day)
+  await opening('real-room', { startedAt: now - 60_000 })
+  await participate('real-room', 'real-user')
+  const client = await pool.connect()
+  try {
+    await client.query('SET default_transaction_read_only=off')
+    await client.query('CREATE TEMP TABLE users(id text,created_at bigint)')
+    await client.query('INSERT INTO users VALUES(\'fake-one\',$1),(\'fake-two\',$1)', [now])
+    await client.query('CREATE TEMP TABLE game_opening_accounts(room_id text,user_id text)')
+    await client.query('INSERT INTO game_opening_accounts VALUES(\'real-room\',\'fake-one\'),(\'real-room\',\'fake-two\')')
+    await client.query(`SET search_path=pg_temp,${access.schema},pg_catalog`)
+    expect((await client.query(`SELECT total FROM ${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 1 }])
+    expect(sample(await collectOpeningMetrics(client, now), 'accounts', { window: 'last_24h', mode: 'all' })).toBe(1)
+    await expect(client.query(`SELECT user_id FROM ${access.schema}.game_opening_accounts`)).rejects.toMatchObject({ code: '42501' })
+  } finally {
+    await client.query('RESET search_path')
+    await client.query('RESET default_transaction_read_only')
+    client.release()
+  }
+})
+
+it('does not grant PUBLIC execution of either privileged aggregate function', async () => {
+  const outsider = `outside_${access.schema}`
+  await db.exec(`CREATE ROLE ${outsider} NOLOGIN`)
+  await db.exec(`GRANT USAGE ON SCHEMA ${access.schema} TO ${outsider}`)
+  const client = new pg.Client({ connectionString: getTestDatabaseUrl() })
+  try {
+    await client.connect()
+    await client.query(`SET ROLE ${outsider}`)
+    for (const name of [accountsFunction, openingsFunction]) {
+      await expect(client.query(`SELECT * FROM ${access.schema}.${name}($1::bigint)`, [now])).rejects.toMatchObject({ code: '42501' })
+    }
+  } finally {
+    await client.end()
+    await db.exec(`DROP OWNED BY ${outsider}`)
+    await db.exec(`DROP ROLE ${outsider}`)
+  }
+})
+
+it('keeps registration healthy before the game opening schema exists without installing game relations', async () => {
+  await db.exec('DROP VIEW operations_current_openings; DROP TABLE game_opening_accounts; DROP TABLE game_opening_facts; DROP TABLE game_opening_tracking')
+  await access.provision()
+  await account('pre-opening-schema', now)
+  expect((await pool.query(`SELECT total FROM ${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 1 }])
+  await expect(collectOpeningMetrics(pool, now)).rejects.toMatchObject({ code: '55000' })
+  expect((await db.query("SELECT to_regclass(current_schema()||'.game_opening_facts') AS relation")).rows).toEqual([{ relation: null }])
+  const handler = createAccountsHandler({ pool, token: 'opening-test-token', now: () => now })
+  server = createServer((req, res) => { void handler(req, res) })
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Expected TCP listener')
+  const response = await fetch(`http://127.0.0.1:${address.port}/internal/metrics`, { headers: { Authorization: 'Bearer opening-test-token' } })
+  const body = await response.text()
+  expect(body).toContain('agricola_accounts_collection_success 1')
+  expect(body).toContain('agricola_opening_collection_success 0')
+  expect(body).not.toContain('agricola_opening_games{')
+  expect((await fetch(`http://127.0.0.1:${address.port}/health`)).status).toBe(200)
+})
+
+it('rolls back failed hardening when shared raw permissions remain, including credential rotation', async () => {
+  await db.exec('GRANT SELECT (created_at) ON users TO PUBLIC')
+  const originalUrl = pool.options.connectionString
+  if (!originalUrl) throw new Error('Expected restricted connection URL')
+  try {
+    await expect(provisionOperationsDatabase({ databaseUrl: getTestDatabaseUrl(), password: 'a'.repeat(64), schema: access.schema, role: access.role }))
+      .rejects.toThrow('shared privileges')
+    const client = new pg.Client({ connectionString: originalUrl })
+    try {
+      await client.connect()
+      expect((await client.query(`SELECT total FROM ${access.schema}.${accountsFunction}($1)`, [now])).rows).toEqual([{ total: 0 }])
+    } finally { await client.end() }
+  } finally {
+    await db.exec('REVOKE SELECT (created_at) ON users FROM PUBLIC')
+  }
+  await access.provision()
+  await expect(pool.query('SELECT created_at FROM users')).rejects.toMatchObject({ code: '42501' })
+})
+
+it('refuses reader-owned objects without dropping or transferring them', async () => {
+  await db.exec(`GRANT CREATE ON SCHEMA ${access.schema} TO ${access.role}`)
+  const client = await pool.connect()
+  try {
+    await client.query('SET default_transaction_read_only=off')
+    await client.query(`CREATE TABLE ${access.schema}.reader_owned_probe(value integer)`)
+  } finally {
+    await client.query('RESET default_transaction_read_only')
+    client.release()
+  }
+  try {
+    await expect(access.provision()).rejects.toThrow('must not own')
+    expect((await db.query(`SELECT to_regclass('${access.schema}.reader_owned_probe') IS NOT NULL AS present`)).rows).toEqual([{ present: true }])
+  } finally {
+    await db.exec('DROP TABLE reader_owned_probe')
+    await db.exec(`REVOKE CREATE ON SCHEMA ${access.schema} FROM ${access.role}`)
+  }
+  await access.provision()
 })

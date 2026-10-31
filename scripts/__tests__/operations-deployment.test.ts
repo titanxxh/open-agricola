@@ -76,7 +76,7 @@ it('preserves readable source permissions under the non-root deployment umask wh
   expect(statSync(join(root, 'accounts-password')).mode & 0o777).toBe(0o600)
 })
 
-it('rebuilds the local accounts image when the normal restart prepares monitoring', () => {
+it('builds and provisions the restricted local reader before starting monitoring', () => {
   const root = mkdtempSync(join(tmpdir(), 'oa-operations-local-'))
   roots.push(root)
   const bin = join(root, 'bin')
@@ -91,13 +91,20 @@ const args=process.argv.slice(2);
 fs.appendFileSync(process.env.OPS_TEST_CALLS,JSON.stringify(args)+'\\n');
 if(args.includes('config')) process.stdout.write(JSON.stringify({services:{grafana:{image:'fixture-grafana'}}}));
 else if(args[0]==='run') fetch(args.at(-1)).then(r=>r.text()).then(body=>process.stdout.write(body));
+else if(args.includes('up')) fs.writeFileSync(process.env.OPS_TEST_ACCESS,process.env.ACCOUNTS_DATABASE_URL);
 `)
   chmodSync(join(bin, 'docker'), 0o755)
   const result = spawnSync(process.execPath, ['scripts/observability.mjs'], {
     cwd: repository, encoding: 'utf8', timeout: 10_000,
-    env: { ...process.env, PATH: bin + ':' + process.env.PATH, SHARED_DATA_DIR: data, OPS_TEST_CALLS: calls },
+    env: { ...process.env, PATH: bin + ':' + process.env.PATH, SHARED_DATA_DIR: data, OPS_TEST_CALLS: calls, OPS_TEST_ACCESS: join(root, 'reader-url') },
   })
   expect(result.status, result.stderr).toBe(0)
   const recorded: string[][] = readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line))
-  expect(recorded.at(-1)).toEqual(['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--build', '--force-recreate'])
+  expect(recorded.slice(-3)).toEqual([
+    ['compose', '-f', 'operations/compose.local.yml', 'build', 'accounts-exporter'],
+    ['compose', '-f', 'operations/compose.local.yml', 'run', '--rm', '--no-deps', '-T', 'accounts-exporter', 'node', 'provision.ts'],
+    ['compose', '-f', 'operations/compose.local.yml', 'up', '-d', '--no-build', '--force-recreate'],
+  ])
+  expect(new URL(readFileSync(join(root, 'reader-url'), 'utf8')).username).toBe('agricola_operations_accounts')
+  expect(statSync(join(data, 'observability/accounts-password')).mode & 0o777).toBe(0o600)
 })

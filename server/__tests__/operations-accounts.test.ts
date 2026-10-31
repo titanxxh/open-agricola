@@ -1,11 +1,13 @@
 import { createServer } from 'node:http'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { createAccountsHandler, createAccountsPool } from '../../operations/accounts-exporter'
-import { createTestDatabase, getTestDatabaseUrl } from './_helpers/postgres'
+import { createAccountsHandler } from '../../operations/accounts-exporter'
+import { accountsFunction } from '../../operations/database-access'
+import { createTestDatabase } from './_helpers/postgres'
+import { createOperationsTestReader } from './_helpers/operations-reader'
 
 const db = await createTestDatabase()
-const schema = (await db.query<{ schema: string }>('SELECT current_schema() AS schema')).rows[0]!.schema
-const pool = createAccountsPool(getTestDatabaseUrl(), schema)
+const reader = await createOperationsTestReader(db).catch(async (error: unknown) => { await db.close(); throw error })
+const pool = reader.pool
 let now = Date.parse('2026-10-29T00:30:00+08:00')
 const handler = createAccountsHandler({ pool, token: 'test-scrape-token', now: () => now, buildId: 'test-operations' })
 const server = createServer((req, res) => { void handler(req, res) })
@@ -23,7 +25,7 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   await new Promise<void>(done => server.close(() => done()))
-  await pool.end()
+  await reader.close()
   await db.close()
 })
 const metrics = () => fetch(base + '/internal/metrics', { headers: { Authorization: 'Bearer test-scrape-token' } })
@@ -47,7 +49,7 @@ it('exports UTC+8 day and inclusive rolling boundaries, removes deleted accounts
   expect(body).toContain('agricola_accounts{kind="total"} 6')
   expect(body).toContain('agricola_accounts{kind="today"} 1')
   const lastSuccess = now / 1000
-  await db.exec('ALTER TABLE users RENAME TO unavailable_users')
+  await db.exec(`ALTER FUNCTION ${accountsFunction}(bigint) RENAME TO unavailable_account_metrics`)
   now += 61_000
   body = await (await metrics()).text()
   expect(body).not.toContain('agricola_accounts{')

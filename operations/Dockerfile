@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && NODE_USE_ENV_PROXY=1 corepack prepare pnpm@10.33.0 --activate \
     && pnpm install --prod --frozen-lockfile --ignore-scripts
-COPY accounts-exporter.ts opening-metrics.ts provision.ts ./
+COPY accounts-exporter.ts opening-metrics.ts database-access.ts provision.ts ./
 ARG OPERATIONS_BUILD_ID=development
 ENV OPERATIONS_BUILD_ID=$OPERATIONS_BUILD_ID NODE_ENV=production
 USER node
