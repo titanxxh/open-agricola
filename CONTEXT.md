@@ -895,6 +895,14 @@ _Avoid_: 前端主 bundle 可见
 主前端可读的卡牌展示投影，只描述 UI metadata。
 _Avoid_: 规则执行逻辑
 
+**Card Action Reference（牌面行动引用）**:
+卡牌描述或补充规则中明确指向一个或多个 Action Space 或 Moor Special Action 的名称。普通 Rule Action 和其他卡牌名称不属于此引用。
+_Avoid_: 所有斜体文字、按名称相同推断规则身份
+
+**Static Action Preview（静态行动预览）**:
+供玩家辨认 Card Action Reference 目标的印刷牌面与当前语言说明，按适用人数区分版本，不包含当前累积资源、人员占用或行动可用性。
+_Avoid_: 当前局面快照、执行行动、可执行性判断
+
 **Player Tableau（玩家桌面）**:
 同一玩家的公开农场、父母卡、已打出牌及牌上公开状态组成的展示区域；Private Hand 保持该玩家自己的可见权限，展示位置不改变信息归属或行动权限。
 _Avoid_: 当前行动玩家、InteractionState、完整玩家私有状态

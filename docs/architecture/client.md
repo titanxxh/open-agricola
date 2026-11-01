@@ -39,6 +39,18 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ## Views and local sandbox
 
+### Card action references: agreed design, not implemented
+
+Card descriptions and supplemental rules distinguish references to Action Spaces and Moor Special Actions from ordinary Rule Actions and card names. References use an underline instead of italics and open a Static Action Preview. The preview shows printed content and localized explanations for the applicable player count, without live accumulation, occupancy or availability. Without game context, it shows the relevant versions. References to several targets show those targets together.
+
+All complete card faces share this behavior, including hands, played cards, enlarged details, drafting, the encyclopedia and replay views. Standalone names in logs and buttons are outside this change. Pointer hover, keyboard focus and a touch tap open the preview; a tap outside closes it. Reference interaction must not select or play the containing card.
+
+Multiple targets and player-count versions share one scrollable preview, with each target's name and applicable counts. Unrevealed round spaces expose only their public printed content, never this game's reveal order. Missing art retains the name, player counts and localized rules. Invalid reference targets fail official-content build checks and produce an author-facing error in Workshop previews.
+
+Reference targets follow the English source meaning, independently of their translated labels. An ordinary Rule Action does not become an Action Space reference because their names match. BGA's `__text__` markup expresses emphasis and is insufficient by itself to identify a reference target. Official text receives explicit reference targets; Workshop authors can use the same mechanism, while unmarked text keeps its existing presentation.
+
+### Existing views
+
 - `exchange-overlay-presentation.tsx` and `exchange-draft-presentation.ts` own the shared Exchange Center for ordinary exchanges, feeding and heating. Heating uses the same recipe rows, ordered quantity controls and reset path, with a fuel-payment row and projected sickness; `InteractionBar` keeps only a confirmation entry. The overlay fits above the measured interaction bar, and long recipe lists scroll within the modal so confirmation and anytime responses remain reachable. Coverage: `heating-exchange.spec.ts`, `listener-lifecycle-room.spec.ts`, `issue-893-rules.spec.ts`.
 
 - `interaction-focus.ts` maps the local Interaction Player's authoritative request to a display target. Occupation selection reveals the private hand after seat confirmation; payment continuations retain the action focus, and completion returns to Action Spaces. The Session interaction adapter publishes an opaque waiting-step `requestKey` to its responder, stable across candidate refreshes and cursor restoration; manual browsing does not trigger another scroll. The shared target anchors and return shortcut cover hand, supply, and farm selection paths.
