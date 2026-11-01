@@ -44,9 +44,9 @@ Moor Balance Rules 是默认关闭的开局选项，由 `contract/game-variants.
 
 测试：`shared/custom-code/__tests__/`、`server/__tests__/workshop-contract-*-session.test.ts`。
 
-## `shared/i18n/` 与 卡牌描述用 `__space:id[,id]|文字__` 或 `__moor:id[,id]|文字__` 明确记录引用目标。显示名称参与翻译，目标身份不翻译；普通规则动作保留普通强调。语言仓库负责引用维护、迁移及 BGA 导入时的目标保留。`shared/contract/action-reference.ts` 解析标记，搜索投影只保留显示名称；游戏目录构建检查官方目标身份是否存在。
+## `shared/i18n/` 与 `shared/utils/`
 
-`shared/utils/`
+卡牌描述用 `__space:id[,id]|文字__` 或 `__moor:id[,id]|文字__` 明确记录引用目标。显示名称参与翻译，目标身份不翻译；普通规则动作保留普通强调。语言仓库负责引用维护、迁移及 BGA 导入时的目标保留。`shared/contract/action-reference.ts` 解析标记，搜索投影只保留显示名称；游戏目录构建检查官方目标身份是否存在。
 
 `shared/i18n/` 负责同步翻译/catalog API 与语言包校验；`PromptKey` 位于 `shared/contract/prompt-keys.ts`。译文与 BGA 导入工具由独立的 [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n) 仓库维护，每种语言只有一个源 JSON 和一个完整运行时 JSON。`i18n.ref` 固定提交与清单哈希；`scripts/prepare-language-packs.ts` 校验语言包/源文件后写入被 Git 忽略的构建缓存。`AGRICOLA_I18N_DIR` 可提供内容与引用一致的本地语言仓库。
 

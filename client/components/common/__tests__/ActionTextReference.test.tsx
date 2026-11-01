@@ -5,7 +5,9 @@ import { CardDescriptionText } from '../CardDescriptionText'
 import { ActionReferencePlayerCount } from '../../../contexts/ActionReferenceContext'
 
 vi.mock('../../../services/action-references', () => ({
-  loadActionReferences: async () => ({ version: 1, moorCards: [], spaces: [
+  loadActionReferences: async () => ({ version: 1, moorCards: [
+    { id: 'moor-three', players: [1, 3], actions: ['hiring-fair'], image: '/assets/moor/special-action-card/three.webp' },
+  ], spaces: [
     { id: 'fishing', players: [2], nameKey: 'actions.fishing.name', descriptionKey: 'actions.fishing.description' },
     { id: 'fishing', players: [4], nameKey: 'actions.fishing.name', descriptionKey: 'actions.fishing.description' },
   ] }),
@@ -48,5 +50,18 @@ describe('card reference inspection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Author draft' }))
     await expect(screen.findByRole('alert')).resolves.toHaveTextContent('Unknown action reference')
     expect(screen.queryByText('Gain food')).toBeNull()
+  })
+  it('shows only the current count effect when a Moor card is shared by solo and three players', async () => {
+    render(<ActionReferencePlayerCount.Provider value={3}>
+      <CardDescriptionText locale="en" text="__moor:hiring-fair|Hiring Fair__" />
+    </ActionReferencePlayerCount.Provider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Hiring Fair' }))
+    await expect(screen.findByRole('img', { name: 'Gain 2 food' })).resolves.toBeVisible()
+    expect(screen.queryByRole('img', { name: 'Gain 1 food' })).toBeNull()
+  })
+  it('reports malformed Workshop references immediately instead of rendering their internal markup', () => {
+    render(<CardDescriptionText locale="en" text="__space:|Workshop draft__" />)
+    expect(screen.getByRole('alert')).toHaveTextContent('Workshop draft: Unknown action reference')
+    expect(screen.queryByText('space:')).toBeNull()
   })
 })
