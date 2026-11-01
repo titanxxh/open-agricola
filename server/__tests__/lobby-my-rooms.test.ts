@@ -145,6 +145,38 @@ describe('my active room summaries', () => {
     },
   )
 
+  it('lists players who have not chosen parents without revealing the cards', async () => {
+    const { db, persistence, snapshot, meta } = await setup()
+    const [alice, bob] = snapshot.state.players
+    if (!alice || !bob) throw new Error('Expected two players')
+    await persistence.save('parents', {
+      ...snapshot,
+      state: {
+        ...snapshot.state,
+        phase: 'parent-selection',
+        parentSelection: {
+          candidates: {
+            [alice.id]: { mother: ['PR01', 'PR02'], father: ['PS01', 'PS02'] },
+            [bob.id]: { mother: ['PR03', 'PR04'], father: ['PS03', 'PS04'] },
+          },
+          submissions: {
+            [alice.id]: { mother: 'PR01', father: 'PS01' },
+            [bob.id]: null,
+          },
+        },
+      },
+    }, meta)
+    const [room] = await listMyActiveRooms(db, 'alice')
+    expect(room).toMatchObject({
+      progress: { phase: 'parent-selection' },
+      waiting_player_indexes: [1],
+      current_player_index: null,
+      my_turn: 0,
+    })
+    expect(JSON.stringify(room)).not.toContain('PR01')
+    expect(JSON.stringify(room)).not.toContain('PS01')
+  })
+
   it('keeps all hotseat players and suppresses turn badges outside normal play', async () => {
     const { db, persistence, snapshot, meta } = await setup()
     const phases: Array<typeof snapshot.state.phase> = ['draft', 'parent-selection']

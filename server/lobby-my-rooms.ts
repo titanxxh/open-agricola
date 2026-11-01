@@ -20,6 +20,10 @@ function lobbyDetails(json: string | null, seats: number[], status: RoomRow['sta
   const players = Array.isArray(state.players) ? state.players : []
   const draft = isRecord(state.draft) ? state.draft : null
   const pendingPicks = draft && isRecord(draft.pendingPicks) ? draft.pendingPicks : {}
+  const parentSelection = isRecord(state.parentSelection) ? state.parentSelection : null
+  const parentSubmissions = parentSelection && isRecord(parentSelection.submissions)
+    ? parentSelection.submissions
+    : null
   const waiting: number[] = []
   const participants: MyActiveRoom['players'] = players.flatMap((player: unknown, playerIndex) => {
     if (!seats.includes(playerIndex) || !isRecord(player) || typeof player.name !== 'string') return []
@@ -31,6 +35,8 @@ function lobbyDetails(json: string | null, seats: number[], status: RoomRow['sta
         : draft.stage === 'farmersOfTheMoorMinor' || draft.stage === 'publishedMinor' ? typeof pick.minor === 'string'
           : typeof pick.occ === 'string' && typeof pick.minor === 'string')
       if (!submitted) waiting.push(playerIndex)
+    } else if (status === 'playing' && state.phase === 'parent-selection' && parentSubmissions && typeof player.id === 'string') {
+      if (!isRecord(parentSubmissions[player.id])) waiting.push(playerIndex)
     } else if (playerIndex === actor) waiting.push(playerIndex)
     return [{ playerIndex, name: player.name, color, nameIsDefault: 'nameIsDefault' in player && player.nameIsDefault === true }]
   })
