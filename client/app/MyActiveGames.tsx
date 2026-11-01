@@ -54,7 +54,7 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
                   </span>
                 </div>
                 <span className="my-game__turn" data-my-turn={room.my_turn === 1}>
-                  {progress?.phase === 'draft' && waitingPlayers.length > 0
+                  {(progress?.phase === 'draft' || progress?.phase === 'parent-selection') && waitingPlayers.length > 0
                     ? t('ui.draft.waitingForPlayers', { players: new Intl.ListFormat(locale).format(waitingPlayers.map(name)) })
                     : room.my_turn === 1 ? t('platform.yourTurn')
                     : currentPlayer ? t('ui.waitingForPlayerAction', { player: name(currentPlayer) })

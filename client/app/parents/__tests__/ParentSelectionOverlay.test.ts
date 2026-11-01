@@ -130,6 +130,7 @@ describe('ParentSelectionOverlay', () => {
     }))
 
     expect(screen.getByText('Waiting for other players (1/2)...')).toBeInTheDocument()
+    expect(screen.getByText('Waiting for: Player 2')).toBeInTheDocument()
     expect(screen.getByText('Parent Cards selection submitted.')).toBeInTheDocument()
   })
 
@@ -223,6 +224,7 @@ describe('ParentSelectionOverlay', () => {
     }))
 
     expect(screen.getByText('等待其他玩家（1/2）…')).toBeInTheDocument()
+    expect(screen.getByText('正在等待：玩家 2')).toBeInTheDocument()
     expect(screen.getByText('已提交父母卡选择。')).toBeInTheDocument()
   })
 

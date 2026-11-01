@@ -79,6 +79,7 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.playerColors.red': 'Red',
     'platform.playerColors.blue': 'Blue',
     'ui.waitingForPlayerAction': 'Waiting for {player} to act',
+    'ui.draft.waitingForPlayers': 'Waiting for: {players}',
     'platform.roomAccessLabel': 'Who can enter',
     'platform.roomAccessPublic': 'Public',
     'platform.roomAccessInvited': 'Invited players only',
@@ -179,6 +180,25 @@ describe('LobbyPage my active games', () => {
     expect(screen.queryByText(/96725f41/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
     expect(setPage).toHaveBeenCalledWith('game', { room: '96725f41-b719-4474-a3df-90e5d239108b' })
+  })
+
+  it('names the players still choosing parents the same way a draft names unsubmitted seats', async () => {
+    myRoomsResponse.rooms = [{
+      id: 'parents', status: 'playing', max_players: 2,
+      updated_at: 2, created_at: 1, started_at: 1,
+      player_index: 0, my_turn: 0, current_player_index: null,
+      waiting_player_indexes: [1], progress: { phase: 'parent-selection' }, expansions: [],
+      players: [
+        { playerIndex: 0, name: 'Alice', color: 'red' },
+        { playerIndex: 1, name: 'Bob', color: 'blue' },
+      ],
+    }]
+
+    render(<LobbyPage />)
+
+    expect(await screen.findByText('Waiting for: Bob')).toBeInTheDocument()
+    expect(document.querySelector('.my-game__player[data-current="true"]')).toHaveTextContent('Bob')
+    expect(screen.queryByText('Playing')).toBeNull()
   })
 
   it('creates solo through its fixed one-player settings without navigating before commitment', async () => {

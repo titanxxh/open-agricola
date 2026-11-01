@@ -8,6 +8,7 @@ import type {
 import { t, type Locale } from '../../../shared/i18n'
 import type { FatherParentCardId, MotherParentCardId, ParentCardId } from '../../../shared/parents'
 import { ParentCardFace } from '../../components/common/ParentCardFace'
+import { getPlayerDisplayName } from '../../utils/player-name'
 import { DraftHistoryPanel } from '../draft/DraftHistoryPanel'
 
 type VisibleParentId = ParentCardId | '?'
@@ -117,6 +118,11 @@ function ActiveParentSelectionOverlay({
     }
   }, [meId, state.players])
   const canSubmit = canSubmitParentSelection(vm, selMother, selFather)
+  const waitingNames = state.players.flatMap((player, index) => (
+    state.parentSelection?.submissions[player.id]
+      ? []
+      : [getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)]
+  ))
 
   const handleConfirm = () => {
     if (!canSubmit || selMother === null || selFather === null) return
@@ -136,6 +142,11 @@ function ActiveParentSelectionOverlay({
               })
               : t(locale, 'ui.parentSelection.prompt')}
           </div>
+          {waitingNames.length > 0 ? (
+            <p className="draft-opening-hint" role="status">
+              {t(locale, 'ui.draft.waitingForPlayers', { players: waitingNames.join(' · ') })}
+            </p>
+          ) : null}
         </header>
 
         {!vm.alreadySubmitted && vm.canSeeCandidates ? (
