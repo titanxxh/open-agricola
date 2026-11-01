@@ -254,7 +254,12 @@ export const CardWithCopy = ({
         onClick={handleClick}
         onPointerEnter={handleCardEnter}
         onPointerOver={event => {
-          if (!(event.target instanceof Element) || !event.target.closest('[data-action-reference]')) return
+          if (!(event.target instanceof Element) || !event.currentTarget.contains(event.target)) return
+          if (!event.target.closest('[data-action-reference]')) {
+            handleCardEnter(event)
+            return
+          }
+          stateRef.current.card = false
           clearShowTimer()
           clearHideTimer()
           setAnchor(null)

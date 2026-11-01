@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import en from '../../output/i18n/locales/en.json'
 import zh from '../../output/i18n/locales/zh.json'
+import { parseActionReference } from '../../shared/contract/action-reference'
 import { buildCardsManifest } from '../build-cards-manifest'
 
 const strings = (node: unknown, path = ''): Array<[string, string]> => {
@@ -77,7 +78,8 @@ describe('localized card-name references', () => {
         const translated = dictionary.get(`${prefix}.${id}.${field}`)
         expect(translated, `${id}.${field}`).toBeTruthy()
         expect(tags(translated!), `${id}.${field}`).toEqual(tags(source))
-        expect(translated!.replace(/<[A-Z0-9_-]+>|\{[^}]+\}/g, ''), `${id}.${field}`).not.toMatch(/[a-z]/i)
+        const visible = translated!.replace(/__([^_]+)__/g, (_, token: string) => parseActionReference(token)?.label ?? token)
+        expect(visible.replace(/<[A-Z0-9_-]+>|\{[^}]+\}/g, ''), `${id}.${field}`).not.toMatch(/[a-z]/i)
       }
     }
   })
