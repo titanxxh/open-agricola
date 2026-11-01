@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>X-Deck 交互草图</title>
+<!-- PROTOTYPE · throwaway (#1554). Interaction table plus operable scenes; built on the Legendairy Forest interaction prototype (#1542). -->
+<style>
+/* Layout: dark prototype control strip; below, a mock screen (left) beside an "integration" card (right); phone = one column.
+   Plum --lf marks Legendairy Forest; tag colours encode reuse / small change / new. */
+:root{
+  --bg:#efe6cf; --paper:#fdf6e3; --card:#fffdf7; --ink:#1e1e1e; --ink2:#5a3a20; --muted:#7f6e55;
+  --line:#cdb996; --line2:#e8d5b7; --green:#3a5a2c; --on-green:#fff; --green-bg:#e4eed6; --gold:#b9860c; --gold-bg:#fff1cf;
+  --lf:#5d3f73; --on-lf:#fff; --lf-bg:#f2e9f6; --lf-line:#cbb3d8; --p1:#c0392b; --p2:#2e5fa8; --p3:#7a6a14;
+  --bad:#b03a2e; --bad-bg:#fbe5e1; --reuse:#2d6a3e; --reuse-bg:#e1f0e3; --tweak:#8a5a00; --tweak-bg:#fbefd2; --new:#5d3f73; --new-bg:#efe3f6;
+  --ctrl:#20291b; --ctrl-fg:#f2ead6; --ctrl-line:#3c4a33; --burnt:#4a3426; --on-burnt:#f3d9c4;
+  --shadow:0 1px 2px rgba(60,40,10,.14),0 6px 18px rgba(60,40,10,.10);
+  --font:"Inter","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083; --line:#5a4e38; --line2:#41392a;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018; --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --p3:#d8c46a; --bad:#f08273; --bad-bg:#46241f; --reuse:#8fd29b; --reuse-bg:#213326; --tweak:#e8bd62; --tweak-bg:#3a2f17; --new:#d6b6ec; --new-bg:#35283f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --burnt:#2a1c14; --on-burnt:#e7c6ad; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083; --line:#5a4e38; --line2:#41392a;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018; --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --p3:#d8c46a; --bad:#f08273; --bad-bg:#46241f; --reuse:#8fd29b; --reuse-bg:#213326; --tweak:#e8bd62; --tweak-bg:#3a2f17; --new:#d6b6ec; --new-bg:#35283f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --burnt:#2a1c14; --on-burnt:#e7c6ad; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--font)}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3,h4,p,ul,ol{margin:0}
+ul,ol{padding-left:18px}
+.tree{width:11px;height:13px;fill:currentColor;vertical-align:-2px}
+.ctrl{position:sticky;top:0;z-index:20;background:var(--ctrl);color:var(--ctrl-fg);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.ctrl h1{font-size:15px;font-weight:650}
+.ctrl .tag{font-size:11px;border:1px solid var(--ctrl-line);border-radius:99px;padding:2px 8px;opacity:.85}
+.ctrl label{display:flex;gap:6px;align-items:center;font-size:13px}
+.ctrl select{background:var(--ctrl);border:1px solid var(--ctrl-line);border-radius:6px;padding:4px 6px;color:var(--ctrl-fg);max-width:230px}
+.ctrl .steps{display:flex;gap:6px;align-items:center}
+.ctrl .steps button{background:transparent;border:1px solid var(--ctrl-line);border-radius:6px;padding:3px 10px;color:var(--ctrl-fg)}
+.ctrl .steps button:disabled{opacity:.35;cursor:default}
+.ctrl .hint{margin-top:6px;font-size:12.5px;opacity:.9;max-width:1100px}
+.ctrl .fork{background:var(--lf);color:var(--on-lf);border-radius:6px;padding:1px 6px;font-size:12px}
+.wrap{max-width:1280px;margin:0 auto;padding-block:16px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:16px;align-items:start}
+.wrap.m{grid-template-columns:minmax(0,1fr)}
+.wrap.frame{grid-template-columns:390px minmax(0,1fr)}
+.screen{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.frame .screen{border:10px solid var(--ctrl);border-radius:30px;max-height:calc(100dvh - 150px)}
+.frame .screen .body{overflow:auto}
+.shead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line2);font-size:13px}
+.shead b{font-size:14px}
+.body{padding:12px;display:grid;gap:12px;min-width:0}
+.ibar{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px;display:grid;gap:8px;box-shadow:0 -4px 14px rgba(60,40,10,.08)}
+.ibar.wait{background:var(--paper)}
+.ibar .t{font-weight:650}
+.ibar .x{font-size:12.5px;color:var(--muted)}
+.bs{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:6px 12px;min-height:38px}
+.btn.pri{background:var(--green);border-color:var(--green);color:var(--on-green);font-weight:600}
+.btn.lfb{background:var(--lf);border-color:var(--lf);color:var(--on-lf);font-weight:600}
+.btn.sm{min-height:30px;padding:2px 9px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+.err{font-size:12.5px;color:var(--bad);background:var(--bad-bg);border-radius:6px;padding:5px 9px}
+.ok{font-size:12.5px;color:var(--reuse);background:var(--reuse-bg);border-radius:6px;padding:5px 9px}
+.banner{font-size:12.5px;background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:8px;padding:6px 9px;color:var(--ink2)}
+.sec h4{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+.side{display:grid;gap:12px;position:sticky;top:120px}
+.m .side,.frame .side{position:static}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px}
+.card h3{font-size:14px}
+.card p,.card li{font-size:12.5px;line-height:1.6}
+.tagline{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 8px;align-items:start;font-size:12.5px;line-height:1.55}
+.tg{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.tg.reuse{background:var(--reuse-bg);color:var(--reuse)}
+.tg.tweak{background:var(--tweak-bg);color:var(--tweak)}
+.tg.new{background:var(--new-bg);color:var(--new)}
+.tg.show{background:var(--line2);color:var(--ink2)}
+.rec{font-size:12.5px;border-left:3px solid var(--gold);padding-left:8px;color:var(--ink2)}
+/* people */
+.members{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px}
+.mem{flex:0 0 auto;min-width:118px;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 9px;text-align:left;display:grid;gap:2px}
+.mem b{font-size:13px;display:flex;gap:5px;align-items:center}
+.mem small{font-size:11.5px;color:var(--muted);line-height:1.35}
+.mem.sel{outline:2px solid var(--green);background:var(--green-bg)}
+.mem.off{opacity:.55}
+.mem.lent{border-style:dashed}
+.badge{font-size:10.5px;font-weight:650;border-radius:4px;padding:0 5px;display:inline-block}
+.badge.lf{background:var(--lf);color:var(--on-lf)}
+.badge.held{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold)}
+.badge.temp{background:var(--new-bg);color:var(--new)}
+.badge.sick{background:var(--bad-bg);color:var(--bad)}
+.pawn{display:inline-block;width:11px;height:13px;border-radius:5px 5px 2px 2px;background:currentColor;vertical-align:-2px}
+.c-p1{color:var(--p1)} .c-p2{color:var(--p2)} .c-p3{color:var(--p3)}
+/* spaces */
+.spaces{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.sp{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 8px;text-align:left;display:grid;gap:3px;min-height:86px;align-content:start}
+.sp b{font-size:13px}
+.sp small{font-size:11.5px;color:var(--muted);line-height:1.4}
+.sp .q{font-size:11.5px;font-weight:600;color:var(--reuse)}
+.sp .q.no{color:var(--bad)}
+.sp.taken{opacity:.6}
+.sp.cand{outline:2px dashed var(--green);outline-offset:-3px}
+.sp.lfsp{border-color:var(--lf)}
+.pop{border:1.5px solid var(--lf);background:var(--card);border-radius:10px;padding:10px;display:grid;gap:8px;box-shadow:var(--shadow)}
+.opt{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 9px;text-align:left;display:grid;gap:2px}
+.opt small{font-size:11.5px;color:var(--muted)}
+.opt[aria-pressed="true"]{outline:2px solid var(--green);background:var(--green-bg)}
+.opt:disabled{opacity:.5;cursor:default}
+.opts{display:grid;gap:6px}
+/* farm */
+.farm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;max-width:420px}
+.tile{aspect-ratio:1;max-width:100%;border-radius:6px;border:1px solid var(--line2);background:var(--green-bg);display:grid;place-items:center;text-align:center;font-size:11px;color:var(--muted);padding:2px;position:relative;line-height:1.2}
+.tile.room{background:var(--gold-bg);color:var(--ink2)}
+.tile.field{background:color-mix(in srgb,var(--gold) 28%,var(--paper));color:var(--ink2)}
+.tile.pasture{background:color-mix(in srgb,var(--green) 22%,var(--paper));color:var(--ink2)}
+.tile.burnt{background:var(--burnt);color:var(--on-burnt);border-color:var(--burnt)}
+.tile.fairy{background:var(--lf-bg);color:var(--lf);border:1.5px solid var(--lf)}
+.tile.cand{outline:2px dashed var(--green);outline-offset:-3px;cursor:pointer}
+.tile.pick{outline:3px solid var(--gold);outline-offset:-3px}
+.tile.no{background:repeating-linear-gradient(135deg,var(--line2) 0 5px,var(--card) 5px 10px)}
+button.tile{font:inherit;font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:var(--muted)}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px;border:1px solid var(--line)}
+/* zones */
+.zones{display:grid;gap:8px}
+.zone{border:1px solid var(--line2);border-radius:8px;padding:7px 9px;background:var(--card);display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.zone .zn{font-size:12.5px;font-weight:600}
+.zone .zn small{font-weight:400;color:var(--muted)}
+.slots{display:flex;gap:6px;flex-wrap:wrap}
+.slot{border:1px dashed var(--line);border-radius:6px;padding:3px 7px;font-size:12px;min-width:58px;text-align:center}
+.slot.full{border-style:solid;background:var(--green-bg)}
+.stepper{display:inline-flex;align-items:center;gap:6px}
+.stepper span{min-width:18px;text-align:center;font-variant-numeric:tabular-nums}
+/* order strip */
+.order{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.ord{flex:0 0 auto;border:1px solid var(--line);border-radius:7px;padding:4px 8px;font-size:12px;background:var(--card);display:grid;gap:1px;text-align:center}
+.ord.done{opacity:.5}
+.ord.now{outline:2px solid var(--green)}
+.ord.held{border-color:var(--gold);background:var(--gold-bg)}
+.log{font-size:12.5px;display:grid;gap:3px}
+.log div{border-left:2px solid var(--line2);padding-left:7px}
+.log div.lf{border-left-color:var(--lf)}
+.cards{display:flex;gap:8px;flex-wrap:wrap}
+.cf{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--card);display:grid;gap:2px;min-width:130px;text-align:left}
+.cf small{font-size:11.5px;color:var(--muted)}
+.cf[aria-pressed="true"]{outline:2px solid var(--bad);background:var(--bad-bg)}
+.cf.gone{opacity:.45;text-decoration:line-through}
+/* overview table */
+.tblwrap{overflow-x:auto}
+.ov{width:100%;border-collapse:collapse;font-size:12.5px}
+.ov th,.ov td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line2);line-height:1.55}
+.ov th{font-size:12px;color:var(--muted);font-weight:600}
+.ov td:first-child{font-weight:600}
+.ov td:last-child{white-space:nowrap}
+.ov .grp td{background:var(--lf-bg);color:var(--lf);font-weight:700}
+.ov a{color:var(--lf)}
+/* fence svg */
+.fence svg{width:100%;max-width:340px;height:auto;display:block}
+.fence .cell{fill:var(--green-bg);stroke:var(--line2)}
+.fence .old{stroke:var(--ink2);stroke-width:5}
+.fence .lbl{font-size:11px;fill:var(--ink)}
+.quote{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--card);display:grid;gap:4px;font-size:13px}
+.quote b{font-size:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ===== X-Deck additions ===== */
+:root{--xd:#14707a;--on-xd:#fff;--xd-bg:#e1f2f2;--xd-line:#9dcfd2;--candy:#d2477b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--xd:#7fd3da;--on-xd:#0b2224;--xd-bg:#1c3436;--xd-line:#2f5a5d;--candy:#f08ab1}}
+:root[data-theme="dark"]{--xd:#7fd3da;--on-xd:#0b2224;--xd-bg:#1c3436;--xd-line:#2f5a5d;--candy:#f08ab1}
+.xg{display:inline-block;font-weight:800;font-size:11px;color:var(--xd)}
+.sp .mkx{font-size:10.5px;font-weight:650;color:var(--candy)}
+.sp.xpick{outline:3px solid var(--xd);outline-offset:1px}
+.sp.xsp{border-color:var(--xd);background:var(--xd-bg)}
+.stepper-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.stp{display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:8px;padding:4px 8px;background:var(--card);font-size:13px}
+.stp small{color:var(--muted)}
+.panelx{border:1.5px solid var(--xd);border-radius:10px;padding:10px;display:grid;gap:6px;background:var(--xd-bg)}
+.panelx h4{margin:4px 0 0}
+.tile.circle{background:repeating-radial-gradient(circle at 50% 50%,var(--gold-bg) 0 3px,color-mix(in srgb,var(--gold) 40%,var(--paper)) 3px 5px);color:var(--ink2);font-weight:650}
+.tile.warnt{outline:3px solid var(--bad);outline-offset:-3px}
+.tile.stable{background:var(--card);color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="ctrl" id="ctrl"></div>
+<div class="wrap" id="wrap"></div>
+<script>
+// PROTOTYPE · throwaway. Fixed demo data and replies; no game commands, no rules engine.
+// Answers #1554: how each X-Deck cross-player, adoption, farm-placement and rebuild interaction is shown and entered,
+// and which ones fit existing choice, farm-position selection, payment, animal-reorg and the Legendairy Forest member bar.
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const P={p1:'玩家1',p2:'玩家2',p3:'玩家3'};
+const pawn=p=>`<span class="pawn c-${p}" aria-hidden="true"></span>`;
+const XG='<span class="xg" aria-hidden="true">X</span>';
+const SCENES={
+ overview:{n:'总表：X-Deck 的交互点',steps:['总表']},
+ x16:{n:'指定放置（X16）',steps:['轮到玩家2：交给玩家1 选格','交回玩家2 选人放下','结果']},
+ x18:{n:'收养（X18）',steps:['选收养对象','付 5 个货物','对方安置收到的动物','结果'],fork:['甲 分步（交互栏）','乙 合并面板']},
+ x17:{n:'放糖果（X17）',steps:['放糖果','之后：用格时移除'],fork:['甲 先选分数再点格','乙 点格时自动算分']},
+ x08:{n:'回家前：燃料罐（X08）与草叉（X09）',steps:['X08：选空格','执行该格（不放人）','X09：拿 1 个货物']},
+ merchant:{n:'商人购买（X06）',steps:['用围栏格：after 窗口','支付 2 石','买到后']},
+ x03:{n:'变形器（X03）',steps:['选方式','换自己的货物','换累积格']},
+ x15:{n:'回家末进贡（X15）',steps:['玩家1 选择（抽牌者先）','玩家2 选择']},
+ x22:{n:'冻结与解冻（X22）、反抗军（X24）',steps:['回家时选冻结的成员','第 13 轮开头：可先放他']},
+ x23:{n:'麦田怪圈落位（X23）',steps:['选两个相邻格','拆除后整理动物']},
+ x21:{n:'烧房与重建（X21）',steps:['烧房后：逐人整理宠物','翻修格：选择重建','选两个相邻空格并支付']},
+ x12:{n:'毛球供养（X12）',steps:['喂养结算']},
+};
+const S={scene:'overview',step:0,viewer:'p1',device:'auto',fork:{x18:0,x17:0}};
+let U={};
+(function(){const q=new URLSearchParams(location.search);const h=location.hash.slice(1);const sc=q.get('scene')||h;if(SCENES[sc])S.scene=sc;})();
+const isM=()=>S.device==='phone'||innerWidth<820;
+
+/* ---------- builders ---------- */
+const tag=(k,t)=>`<span class="tg ${k}">${{reuse:'复用',tweak:'小改',new:'新增',show:'仅显示'}[k]}</span><span>${t}</span>`;
+function mapCard(items,rec,who){return `<section class="card"><h3>接入现有能力</h3><div class="tagline">${items.map(([k,t])=>tag(k,t)).join('')}</div>${who?`<h3 style="margin-top:4px">谁操作 · 别人看到什么</h3><p>${who}</p>`:''}${rec?`<p class="rec">${rec}</p>`:''}</section>`}
+function bar(b){if(!b)return '';return `<div class="ibar ${b.wait?'wait':''}" role="region" aria-label="交互栏"><div class="t">${b.t}</div>${b.x?`<div class="x">${b.x}</div>`:''}${b.body||''}${b.btns?`<div class="bs">${b.btns.map(([l,a,k,dis])=>`<button class="btn ${k||''}" data-a="${a}" ${dis?'disabled':''}>${l}</button>`).join('')}</div>`:''}</div>`}
+function shead(round,phase,extra){return `<div class="shead"><span><b>第 ${round} 轮 · ${phase}</b>${extra?` · ${extra}`:''}</span><span>你是 ${pawn(S.viewer)} ${P[S.viewer]}</span></div>`}
+function member(m,opt={}){return `<button class="mem ${opt.sel?'sel':''} ${m.off?'off':''}" data-a="${opt.act||''}" ${opt.act&&!m.off?'':'disabled'} aria-pressed="${!!opt.sel}"><b>${pawn(m.owner||'p1')}${esc(m.name)}${(m.badges||[]).map(([k,t])=>` <span class="badge ${k}">${t}</span>`).join('')}</b><small>${esc(m.st||'')}</small></button>`}
+function spaces(list,opt={}){return `<div class="spaces">${list.map(s=>{const taken=s.taken;const cand=opt.cand&&opt.cand.includes(s.id);const pick=opt.pick&&opt.pick.includes(s.id);
+ const inner=`<b>${esc(s.n)}</b><small>${esc(s.d||'')}</small>${s.mk?`<span class="mkx">${s.mk}</span>`:''}${s.q?`<span class="q ${s.qno?'no':''}">${s.q}</span>`:''}${taken?`<span>${pawn(taken)} 已占</span>`:''}`;
+ return cand?`<button class="sp cand ${pick?'xpick':''}" data-a="${opt.act}:${s.id}" aria-pressed="${!!pick}">${inner}</button>`:`<div class="sp ${taken?'taken':''} ${s.x?'xsp':''}">${inner}</div>`}).join('')}</div>`}
+function farm(tiles,opt={}){return `<div class="farm" role="group" aria-label="农场">${tiles.map((t,i)=>{
+ const cls=['tile',t.k,t.cand?'cand':'',t.pick?'pick':'',t.warn?'warnt':''].join(' ');
+ const inner=t.label??{room:'木屋',field:'田',pasture:'牧场',circle:'怪圈',stable:'畜棚'}[t.k]??'';
+ return t.cand&&opt.act?`<button class="${cls}" data-a="${opt.act}:${i}" aria-pressed="${!!t.pick}">${inner}</button>`:`<div class="${cls}">${inner}</div>`}).join('')}</div>`}
+function baseFarm(){return Array.from({length:15},(_,i)=>({k:i===5||i===10?'room':i===1?'field':'unused'}))}
+const card=(id,name,st)=>`<div class="cf"><b>${XG} ${id} ${esc(name)}</b><small>${esc(st)}</small></div>`;
+
+/* ---------- scenes ---------- */
+const R={};
+R.overview=()=>{
+ const rows=[
+  ['人员与跨玩家'],
+  ['X16 抽牌者为对方选格','轮到对方放人时，交给抽牌者：行动板高亮对方能合法放人的格，点一格；交互栏写明“你只选格，格里的选择和收益归对方”。对方看到等待提示。','<span class="tg tweak">小改</span> choice 选项可绑定行动格目标（板上高亮、点选）；<span class="tg tweak">小改</span> 交接说明条（与 Legendairy Forest 借用交接同款）；交接处是撤销边界','x16'],
+  ['X16 对方在指定格放人','交回对方：格已锁定，成员栏只列能放进这一格的人（只有一名时自动），然后照常结算这一格。这一次不能改用沼泽特殊行动。','<span class="tg reuse">复用</span> Legendairy Forest 已定的成员栏和放人命令（带人员 id）','x16'],
+  ['X18 收养','可选，抽到时当场决定：选对方的一名成员（带位置：在行动格上 / 在家 / 新生儿）→ 任选 5 个货物 → 确认。对方收到动物时交给对方安置。','<span class="tg reuse">复用</span> choice（按玩家分组、带成员身份）；<span class="tg tweak">小改</span> resource-quantity-select 支持“恰好 N 个”；<span class="tg reuse">复用</span> 对方的 animal-reorg','x18'],
+  ['X19 / X22 / X24 回家时选人','回家阶段由主人从成员卡里选 1 名；候选等价时系统自动选并公告；保底不满足时公告“该部分不生效”。','<span class="tg reuse">复用</span> choice（选项带成员身份），同 Legendairy Forest 17–19 号','x22'],
+  ['X22 解冻放人','目标轮工作阶段开头，交互栏写“可以先放被冻结的成员”，成员栏预选他，点格放下；或选“这次不放”。','<span class="tg reuse">复用</span> 放人流程和成员栏；轮转之外的 Turn','x22'],
+  ['X15 回家末进贡','从抽牌者起逐人：一个 choice 列出可付的货物种类和可归还的在家成员；只剩一种选法时自动。','<span class="tg reuse">复用</span> choice（货物选项 + 成员选项）；逐人交接是撤销边界','x15'],
+  ['物品与行动格'],
+  ['X08 燃料罐','回家前的 select-trigger 里是可选项；选用后行动板高亮合法的空格，点一格，进入这一格的普通交互，顶部说明“X08 不放人用格”。','<span class="tg reuse">复用</span> select-trigger 与该格现有交互；<span class="tg tweak">小改</span> 行动格目标（同上）与来源说明条','x08'],
+  ['X09 标记与拿货','抽到时在行动板上点一个累积格；回家前是可选项，格上有多种货物时选一种。','<span class="tg tweak">小改</span> 行动格目标；<span class="tg reuse">复用</span> select-trigger、choice','x08'],
+  ['X17 放糖果','甲：先选分数，再在行动板上点恰好 2N 个格。乙：直接点格，实时显示“已选 6 格 = 3 分”。','甲 <span class="tg reuse">复用</span> choice + choice 多选（恰好 2N）；乙 <span class="tg tweak">小改</span> 多选支持允许的数量 4/6/…/12','x17'],
+  ['X03 变形器','选方式；换自己的货物时选换出 / 换入种类（带预览）；换累积格时在行动板上点格再选种类。换成动物进入动物整理。','<span class="tg reuse">复用</span> choice（effectPreview）、animal-reorg；<span class="tg tweak">小改</span> 行动格目标','x03'],
+  ['商人购买','满足条件的行动完成后，after 窗口出现可选项“额外付 2 石 → 冥王星商人 2 分”；选中后走统一支付，不买可以跳过。','<span class="tg reuse">复用</span> select-trigger 可选项 + 统一支付','merchant'],
+  ['X02 自制火箭','放人时就按统一支付付一整组货物；付不起的格不可放。','<span class="tg reuse">复用</span> 统一支付与严格入口',''],
+  ['X-Deck 翻牌排序','取石后的 select-trigger 里“X-Deck 翻牌”是必须项，可以排序，不能跳过。','<span class="tg reuse">复用</span> select-trigger',''],
+  ['农场与动物'],
+  ['X23 麦田怪圈落位','农场上选两个相邻格（房间不可选）；选中时预览会被拆除的田与作物、畜棚、栅栏、动物；确认后进入动物整理或妖精安置。','<span class="tg reuse">复用</span> farm-position 选择（validPositionGroups 给出相邻对）；<span class="tg tweak">小改</span> 选中时的拆除预览','x23'],
+  ['X21 烧房后整理宠物','从抽牌者起逐人进入动物整理，放得下时自动完成。','<span class="tg reuse">复用</span> animal-reorg；逐人交接是撤销边界','x21'],
+  ['X21 无房重建','翻修类格的 choice 里出现 Action Replacement“重建 2 个木房间”；选两个相邻空格；统一支付显示 2 木 1 芦苇和减免来源（如 X锉刀 −1 木）。','<span class="tg reuse">复用</span> Action Replacement choice、farm-position 选择、统一支付与成本来源','x21'],
+  ['X12 毛球供养','喂养结算里多一行“太空毛球：留 n 个（每个 1 食物）”，实时显示离开数和扣分；乞讨只抵家庭成员。','<span class="tg tweak">小改</span> feed 请求加毛球一行','x12'],
+  ['仅显示'],
+  ['X10、X14、X01、X13、X20、X11','X10 自动加倍并提示转手；X14 新生儿画在西采石场；X01 作物增加；X13 胜负说明；X20 兑换目录里动物换食物标“减半 · X20”；X11 支付预览的成本来源写“X锉刀 −1 木”。','<span class="tg show">仅显示</span>',''],
+ ];
+ const ui=`<div class="body"><p style="font-size:13px">每行对应一个交互点：怎样显示和输入，接入现有能力还是需要新东西。点“场景”跳到可操作的演示。</p><div class="tblwrap"><table class="ov"><thead><tr><th>交互点</th><th>显示与输入</th><th>接入</th><th></th></tr></thead><tbody>${rows.map(r=>r.length===1?`<tr class="grp"><td colspan="4">${r[0]}</td></tr>`:`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]?`<a href="#${r[3]}" data-go="${r[3]}">场景</a>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
+ const side=`<section class="card"><h3>汇总</h3><div class="tagline">${tag('reuse','不新增请求类型：人员交互用 Legendairy Forest 已定的成员栏和放人命令，其余并入 choice、select-trigger、farm-position 选择、animal-reorg、统一支付')}${tag('tweak','choice 选项可绑定行动格目标（X08、X09、X16、X17、X03 共用）')}${tag('tweak','resource-quantity-select 支持“恰好 N 个”（X18 付 5 个，X15 付 1 个时可复用）')}${tag('tweak','farm-position 选择时预览拆除后果（X23）')}${tag('tweak','feed 请求加毛球一行（X12）')}${tag('tweak','来源说明条：X16 交接、X08 用格（与 Legendairy Forest 借用交接同款）')}</div><p class="rec">两处分歧：X18 收养用分步还是合并面板；X17 放糖果先选分数还是点格时自动算分。见对应场景。</p></section>`;
+ return {ui,side};
+};
+
+R.x16=()=>{
+ const st=S.step,v=S.viewer;
+ const list=[{id:'forest',n:'森林',d:'累积 3 木',taken:'p1'},{id:'reed',n:'芦苇河岸',d:'累积 1 芦苇'},{id:'fish',n:'钓鱼',d:'累积 1 食物'},{id:'sheep',n:'羊市场',d:'累积 1 羊'},{id:'lessons',n:'课程',d:'打出 1 张职业',q:'玩家2 没有职业手牌',qno:1},{id:'x01',n:'异星粪便',d:'公共区 · X01',x:1}];
+ const legal=['reed','fish','sheep','x01'];
+ const side=mapCard([['tweak','choice 选项绑定行动格目标：行动板上高亮候选格，点格即选，服务端按目标玩家的局面给出候选'],['tweak','交接说明条：“玩家1 用 X16 为你指定了钓鱼”'],['reuse','交回目标玩家后，用 Legendairy Forest 已定的成员栏和带人员 id 的放人命令'],['reuse','选格结果作为公开事件进入日志；每次交接都是撤销边界']],'课程格灰掉并写明原因（对方没有职业手牌），不会出现选了格对方却放不下的情况。','抽牌者（玩家1）只选格；目标玩家（玩家2）选人、放下、结算这一格。其他玩家看到公开日志“玩家1 为玩家2 指定了钓鱼（X16）”。');
+ if(st===0){
+  if(v==='p1')return {ui:`${shead(9,'工作阶段','玩家2 的回合 · 由你选格')}<div class="body"><div class="banner">${XG} X16 把我传送下去：轮到 ${pawn('p2')} 玩家2 放人。由你为他选行动格。</div><div class="sec"><h4>玩家2 能合法放人的格</h4>${spaces(list,{cand:legal,pick:U.sp?[U.sp]:[],act:'sp'})}</div></div>${bar({t:'为玩家2 选择行动格（X16）',x:'你只选格；格里的选择、付费和收益都归玩家2。灰掉的格玩家2 现在放不下。',btns:[['确定','next','pri',!U.sp]]})}`,side};
+  return {ui:`${shead(9,'工作阶段','你的回合 · 等待玩家1 指定')}<div class="body"><div class="banner">${XG} 玩家1 翻出过 X16：你这次放人的行动格由玩家1 指定。选好后由你选人并放下。</div>${spaces(list)}</div>${bar({wait:1,t:'等待玩家1 为你选择行动格',x:'这一次不能改用沼泽特殊行动。'})}`,side};
+ }
+ const target=U.sp||'fish';const tn=list.find(s=>s.id===target).n;
+ if(st===1){
+  if(v==='p2')return {ui:`${shead(9,'工作阶段','你的回合')}<div class="body"><div class="banner">${XG} 玩家1 用 X16 为你指定了 <b>${tn}</b>。格里的选择和收益归你。</div><div class="sec"><h4>放谁（成员栏）</h4><div class="members">${member({name:'成员1',owner:'p2',st:'在家'},{act:'sel:m1',sel:(U.sel||'m1')==='m1'})}${member({name:'成员2',owner:'p2',st:'已放：森林',off:1})}</div></div>${spaces(list.filter(s=>s.id===target).map(s=>({...s,q:'已指定'})))}</div>${bar({t:`把成员1 放到${tn}`,x:'只有一名可放时默认选好。',btns:[['放下','next','pri']]})}`,side};
+  return {ui:`${shead(9,'工作阶段','玩家2 的回合')}<div class="body"><div class="log"><div class="lf">${XG} 玩家1 为玩家2 指定了${tn}（X16）。</div></div></div>${bar({wait:1,t:'等待玩家2 放人'})}`,side};
+ }
+ return {ui:`${shead(9,'工作阶段','轮到 玩家1')}<div class="body"><div class="log"><div class="lf">${XG} 玩家1 为玩家2 指定了${tn}（X16）。</div><div>玩家2 把成员1 放到${tn}，取得收益。</div><div class="lf">${XG} X16：玩家2 已完成；本牌进入弃牌区。</div></div></div>${bar({t:v==='p1'?'轮到你：选择行动格放人':'等待玩家1 放人',wait:v!=='p1'})}`,side};
+};
+
+R.x18=()=>{
+ const fork=S.fork.x18,st=S.step,v=S.viewer;
+ const cands=[{id:'b1',name:'成员1',owner:'p2',st:'在行动格上：羊市场（收益已归玩家2）'},{id:'b2',name:'成员2',owner:'p2',st:'在家，本轮还没放'},{id:'b3',name:'成员3',owner:'p2',st:'新生儿（本轮出生）',badges:[['temp','新生儿']]}];
+ const goods=U.goods||{木:0,黏土:0,芦苇:0,石:0,食物:0,羊:0};const avail={木:3,黏土:2,芦苇:2,石:1,食物:4,羊:1};const total=Object.values(goods).reduce((a,b)=>a+b,0);
+ const goodsUI=`<div class="stepper-grid">${Object.keys(avail).map(k=>`<div class="stp"><span>${k} <small>有 ${avail[k]}</small></span><span class="stepper"><button class="btn sm" data-a="g:${k}:-1" ${goods[k]<=0?'disabled':''}>−</button><span>${goods[k]}</span><button class="btn sm" data-a="g:${k}:1" ${goods[k]>=avail[k]||total>=5?'disabled':''}>+</button></span></div>`).join('')}</div><p class="x" style="font-size:12.5px">已选 ${total} / 5 ${total===5?'✓':''}</p>`;
+ const side=mapCard(fork===0?[['reuse','第 1 步：choice，按玩家分组，每名成员一个选项，写明位置与后果；有“放弃收养”'],['tweak','第 2 步：resource-quantity-select 加“恰好 5 个”约束'],['reuse','对方收到动物时，跨玩家交给对方的 animal-reorg；放得下时自动'],['reuse','全程可在第 1 步放弃；确认后才付货物']]:[['new','合并面板需要新的请求类型（对象 + 成员 + 货物一次提交）'],['reuse','视觉可沿用成员卡和货物步进'],['reuse','对方安置动物同甲']],'推荐甲：每一步都是现有请求，只给货物选择加一个“恰好 N 个”约束，X15 付 1 个货物也能用。乙一次看全，但要新增请求类型，只为一张牌不值得。','只有抽牌者操作。对方在收到动物时才需要输入。其他人看到公开日志“玩家1 付 5 个货物给玩家2，收养了成员2”。');
+ if(v==='p2'&&st<2)return {ui:`${shead(8,'工作阶段','玩家1 正在结算 X18')}<div class="body"><div class="banner">${XG} 玩家1 翻出 X18 我是你的父亲：可以付 5 个货物给你，收养你的 1 名成员。</div></div>${bar({wait:1,t:'等待玩家1 决定是否收养'})}`,side};
+ if(st===0){
+  const pick=U.pick;
+  if(fork===0)return {ui:`${shead(8,'工作阶段','结算 X18')}<div class="body"><div class="sec"><h4>选择要收养的成员（另一位玩家需至少 3 名成员）</h4><div class="members">${cands.map(c=>member(c,{act:'pick:'+c.id,sel:pick===c.id})).join('')}</div><p class="x" style="font-size:12.5px">在行动格上的人留在格上，回家时进你家；在家未放的人本轮成为你的可放人员；新生儿仍是新生儿。</p></div></div>${bar({t:'X18 我是你的父亲（可选）',x:'必须现在决定，否则作废。下一步付 5 个货物。',btns:[['下一步：付货物','next','pri',!pick],['放弃收养','skip','']]})}`,side};
+  return {ui:`${shead(8,'工作阶段','结算 X18')}<div class="body"><div class="panelx"><h4>收养（X18）</h4><div class="members">${cands.map(c=>member(c,{act:'pick:'+c.id,sel:pick===c.id})).join('')}</div><h4>付给玩家2 的 5 个货物</h4>${goodsUI}</div></div>${bar({t:'X18 我是你的父亲（可选）',x:'在一个面板里选人和货物，一次确认。',btns:[['确认收养','jump2','pri',!pick||total!==5],['放弃收养','skip','']]})}`,side};
+ }
+ if(U.skipped)return {ui:`${shead(8,'工作阶段')}<div class="body"><div class="log"><div class="lf">${XG} 玩家1 放弃收养；X18 作废，进入弃牌区。</div></div></div>${bar({t:'继续本回合'})}`,side};
+ if(st===1)return {ui:`${shead(8,'工作阶段','结算 X18')}<div class="body"><div class="banner">收养：玩家2 的${cands.find(c=>c.id===(U.pick||'b2')).name}。</div><div class="sec"><h4>任选 5 个货物付给玩家2</h4>${goodsUI}</div></div>${bar({t:'付 5 个货物',x:'恰好 5 个；动物也算货物，对方要自己安置。',btns:[['确认','next','pri',total!==5],['上一步','prev','']]})}`,side};
+ if(st===2){
+  if(v==='p2')return {ui:`${shead(8,'工作阶段','玩家1 收养后 · 由你安置')}<div class="body"><div class="banner">${XG} 玩家1 付给你 5 个货物（含 1 只羊），收养了你的成员。请安置收到的羊。</div><div class="zones"><div class="zone"><div class="zn">牧场 <small>2/4</small></div></div><div class="zone"><div class="zn">待安置 <small>羊 1</small></div></div></div></div>${bar({t:'动物整理',x:'放得下时会自动完成，这里演示需要手动的情况。',btns:[['放进牧场并完成','next','pri']]})}`,side};
+  return {ui:`${shead(8,'工作阶段','等待玩家2 安置动物')}<div class="body"><div class="log"><div class="lf">${XG} 玩家1 付 5 个货物给玩家2，收养了成员。</div></div></div>${bar({wait:1,t:'等待玩家2 安置收到的动物'})}`,side};
+ }
+ return {ui:`${shead(8,'工作阶段','轮到 玩家2')}<div class="body"><div class="sec"><h4>${v==='p1'?'你的':'玩家1 的'}人员</h4><div class="members">${member({name:'成员1',owner:'p1',st:'已放：西采石场'})}${member({name:'成员2',owner:'p1',st:'在家'})}${member({name:'成员4',owner:'p1',st:'收养自玩家2 · 在家，本轮可放',badges:[['held','收养']]})}</div></div><div class="log"><div class="lf">${XG} 玩家1 付 5 个货物给玩家2，收养了成员2（在家未放 → 成为玩家1 本轮的可放人员）。</div></div></div>${bar({wait:v!=='p2',t:v==='p2'?'轮到你：选择行动格放人':'等待玩家2 放人'})}`,side};
+};
+
+R.x17=()=>{
+ const fork=S.fork.x17,st=S.step;
+ const list=[['forest','森林'],['clay','黏土坑'],['reed','芦苇河岸'],['fish','钓鱼'],['day','日工'],['grain','谷物种子'],['farmland','农田'],['lessons','课程'],['sheep','羊市场'],['sow','播种'],['x02','自制火箭']].map(([id,n])=>({id,n,d:id==='x02'?'公共区 · X02':'',x:id==='x02'}));
+ const pick=U.multi||[];const n=U.n||3;
+ const side=mapCard(fork===0?[['reuse','第 1 步：choice 选 2–6 分（超过可放格数一半的选项灰掉）'],['tweak','第 2 步：choice 多选，恰好 2N 个；选项绑定行动格目标，在行动板上点选'],['reuse','之后自动移除，不需要输入']]:[['tweak','一步：choice 多选，允许的数量 4/6/8/10/12，需要给多选加“允许的数量”'],['reuse','分数 = 格数 ÷ 2，实时显示']],'推荐甲：两步都是现有 choice，只用到“行动格目标”这一个共用小改；乙少一步，但为一张牌给多选加新约束。','只有抽牌者操作。确认后糖果位置公开。');
+ if(st===1)return {ui:`${shead(10,'工作阶段')}<div class="body">${spaces(list.map(s=>({...s,mk:['fish','day','sheep','sow'].includes(s.id)?'● 糖果 · 玩家1':''})))}<div class="log"><div class="lf">${XG} 玩家1 使用森林，移除森林上的糖果（剩 4 个）。</div></div></div>${bar({t:'糖果会在你用格时自动移除',x:'不需要输入；终局每剩 1 个扣 1 分。'})}`,side};
+ if(fork===0){
+  if(U.n==null)return {ui:`${shead(9,'工作阶段','结算 X17')}<div class="body"><div class="sec"><h4>选择计分（之后要放两倍数量的糖果）</h4><div class="opts">${[2,3,4,5,6].map(k=>`<button class="opt" data-a="n:${k}" ${k>5?'disabled':''}><span>${k} 分 → 放 ${2*k} 个糖果</span><small>${k>5?'可放的格不足 12 个':''}</small></button>`).join('')}</div></div></div>${bar({t:'X17 糖果追踪',x:'先选分数。'})}`,side};
+  return {ui:`${shead(9,'工作阶段','结算 X17')}<div class="body"><div class="banner">已选 ${n} 分：在行动板上点恰好 ${2*n} 个不同的格（可以有人占着）。</div>${spaces(list,{cand:list.map(s=>s.id),pick,act:'multi'})}</div>${bar({t:`放糖果：已选 ${pick.length} / ${2*n}`,btns:[['确定','next','pri',pick.length!==2*n],['重选分数','resetn','']]})}`,side};
+ }
+ const ok=pick.length>=4&&pick.length<=12&&pick.length%2===0;
+ return {ui:`${shead(9,'工作阶段','结算 X17')}<div class="body"><div class="banner">在行动板上点选要放糖果的格，分数 = 格数 ÷ 2（4–12 格）。</div>${spaces(list,{cand:list.map(s=>s.id),pick,act:'multi'})}</div>${bar({t:`已选 ${pick.length} 格 = ${ok?pick.length/2+' 分':'—'}`,x:ok?'':'需要 4、6、8、10 或 12 格。',btns:[['确定','next','pri',!ok]]})}`,side};
+};
+
+R.x08=()=>{
+ const st=S.step,v=S.viewer;
+ const list=[{id:'forest',n:'森林',d:'累积 3 木',taken:'p2'},{id:'fish',n:'钓鱼',d:'累积 2 食物',mk:'● 糖果 · 玩家1'},{id:'wq',n:'西采石场',d:'累积 1 石',q:'取石会翻 X-Deck'},{id:'reed',n:'芦苇河岸',d:'累积 2 芦苇',mk:'⑂ 草叉 · 玩家2'},{id:'improve',n:'主要或次要发展',d:'',q:'你买不起任何发展',qno:1}];
+ const side=mapCard([['reuse','回家前的 select-trigger：X08、X09 和其他回家前效果，由各自主人排序'],['tweak','行动格目标：高亮合法空格；买不起的格灰掉并写原因（Action Completion Reachability）'],['reuse','选格后进入该格现有交互；顶部来源说明“X08 不放人用格”'],['reuse','X09：格上有多种货物时用 choice 选种类，只有一种时直接拿']],'X08 用格算一次 Action Space Use：钓鱼格上玩家1 的糖果会一起移除。','玩家之间沿用 onBeforeReturnHome 的顺序；轮到谁谁操作，其他人看等待提示。');
+ if(st===0){
+  if(v==='p1')return {ui:`${shead(11,'回家阶段前','你的回家前效果')}<div class="body"><div class="cards">${card('X08','奇异外星能量','燃料罐 ●●○（剩 2）')}</div>${spaces(list,{cand:['fish','wq','reed'],pick:U.sp?[U.sp]:[],act:'sp'})}</div>${bar({t:'X08：归还 1 个燃料罐，不放人使用一个空格？',x:'可选。每个回家阶段至多一次。',btns:[['使用','next','pri',!U.sp],['这次不用','next','']]})}`,side};
+  return {ui:`${shead(11,'回家阶段前')}<div class="body">${spaces(list)}</div>${bar({wait:1,t:'等待玩家1 处理回家前效果',x:'之后轮到你的 X09 外星雇农。'})}`,side};
+ }
+ if(st===1){const sp=U.sp||'fish';const n=list.find(s=>s.id===sp).n;
+  return {ui:`${shead(11,'回家阶段前',`${v==='p1'?'你':'玩家1'}用 X08 使用${n}`)}<div class="body"><div class="banner">${XG} X08 不放人用格：${n}。${sp==='fish'?'拿走 2 食物，并移除格上的糖果。':sp==='wq'?'拿走 1 石，并触发 X-Deck 翻牌。':'拿走 2 芦苇。'}</div><div class="log"><div class="lf">${XG} 玩家1 归还 1 个燃料罐（剩 1），使用${n}（不放人）。</div></div></div>${bar(v==='p1'?{t:`${n}：确认取得`,btns:[['完成','next','pri']]}:{wait:1,t:'等待玩家1'})}`,side};}
+ if(v==='p2')return {ui:`${shead(11,'回家阶段前','你的回家前效果')}<div class="body"><div class="cards">${card('X09','外星雇农','标记：芦苇河岸')}</div>${spaces(list.filter(s=>s.id==='reed'))}<div class="opts">${['芦苇'].map(g=>`<button class="opt" data-a="noop"><span>拿 1 ${g}</span><small>格上只有一种货物，直接拿</small></button>`).join('')}</div></div>${bar({t:'X09：芦苇河岸无人，拿 1 个货物？',x:'可选；这是部分拿取，不算使用该格。',btns:[['拿 1 芦苇','noop','pri'],['不拿','noop','']]})}`,side};
+ return {ui:`${shead(11,'回家阶段前')}<div class="body">${spaces(list)}</div>${bar({wait:1,t:'等待玩家2 的 X09'})}`,side};
+};
+
+R.merchant=()=>{
+ const st=S.step,v=S.viewer;
+ const side=mapCard([['reuse','after 窗口的 select-trigger：商人是可选项，写清条件与奖励'],['reuse','选中后走统一支付，额外费用是整次费用，不受建造减费影响'],['reuse','同时满足多张商人时，各是一个可选项'],['show','买到后牌进入买家的“持有的变体牌”托盘，公共区移除，所有人收到提示']],'没有新面板。商人的提示条在行动格上（#1553 已定），真正购买发生在 after 窗口。','只有满足条件的行动者看到可选项；其他人看到等待提示和之后的公开日志。');
+ if(v==='p2')return {ui:`${shead(10,'工作阶段','玩家1 的回合')}<div class="body"><div class="log"><div>玩家1 使用围栏，建了 3 段栅栏。</div>${st>=2?`<div class="lf">${XG} 玩家1 额外付 2 石，买下 X06 冥王星商人（2 分）。</div>`:''}</div></div>${bar({wait:1,t:'等待玩家1'})}`,side};
+ if(st===0)return {ui:`${shead(10,'工作阶段','围栏结算完成')}<div class="body"><div class="tlist"><div><span>${XG} X06 冥王星商人：额外付 2 石 → 2 分</span><span>可选</span></div><div><span>你的卡牌：建栅栏后 +1 食物（示意）</span><span>可选</span></div></div></div>${bar({t:'安排使用围栏后的反应',x:'商人是可选项；不买就跳过，之后的人仍可以买。',btns:[['买 X06','next','pri'],['跳过','jump2','']]})}`,side};
+ if(st===1)return {ui:`${shead(10,'工作阶段','购买 X06')}<div class="body"><div class="quote"><b>额外支付：2 石</b><br><small>整次费用，不受建造减费影响；可用通用支付替代。</small></div></div>${bar({t:'支付 2 石',btns:[['支付','next','pri'],['返回','prev','']]})}`,side};
+ return {ui:`${shead(10,'工作阶段')}<div class="body"><div class="cards">${card('X06','冥王星商人','买到 · 2 分 · 持有的变体牌')}</div><div class="log"><div class="lf">${XG} 玩家1 额外付 2 石，买下 X06 冥王星商人（2 分）。</div></div></div>${bar({t:'轮到下一位玩家'})}`,side};
+};
+
+R.x03=()=>{
+ const st=S.step;
+ const side=mapCard([['reuse','choice 选方式，选项带效果预览'],['reuse','换自己的货物：choice 选换出种类，再选换入种类，预览“木 3 → 黏土 3”'],['tweak','换累积格：行动格目标点选累积格，再选种类'],['reuse','换成动物时进入动物整理，放不下的可以烹饪或放回']],'换累积格不是 Collect，不改每轮补充；面板写明“之后照原样补充”。','只有使用者操作。');
+ if(st===0)return {ui:`${shead(9,'工作阶段','使用 X03 变形器')}<div class="body"><div class="opts"><button class="opt" data-a="next"><span>换自己的某种货物</span><small>全部换完，至少 1 个</small></button><button class="opt" data-a="jump2"><span>换一个累积格上的全部货物</span><small>换完仍留在格上</small></button></div></div>${bar({t:'X03：选择方式'})}`,side};
+ if(st===1)return {ui:`${shead(9,'工作阶段','X03 · 换自己的货物')}<div class="body"><div class="sec"><h4>换出</h4><div class="opts">${['木 3','黏土 2','羊 2','食物 4'].map(t=>`<button class="opt" data-a="noop"><span>${t}</span></button>`).join('')}</div></div><div class="sec"><h4>换入</h4><div class="opts">${['芦苇','石','野猪','谷物'].map(t=>`<button class="opt" data-a="noop"><span>${t}</span><small>预览：木 3 → ${t} 3</small></button>`).join('')}</div></div></div>${bar({t:'选择换出与换入的种类',btns:[['确定','noop','pri']]})}`,side};
+ const list=[{id:'forest',n:'森林',d:'4 木'},{id:'wq',n:'西采石场',d:'2 石'},{id:'sheep',n:'羊市场',d:'1 羊'},{id:'fish',n:'钓鱼',d:'—（无货物）'}];
+ return {ui:`${shead(9,'工作阶段','X03 · 换累积格')}<div class="body">${spaces(list,{cand:['forest','wq','sheep'],pick:U.sp?[U.sp]:[],act:'sp'})}<p class="x" style="font-size:12.5px">${U.sp?`已选${list.find(s=>s.id===U.sp).n}：接着选换成哪种货物。之后照原样补充。`:'点一个累积格。'}</p></div>${bar({t:'选择累积格',btns:[['下一步','noop','pri',!U.sp]]})}`,side};
+};
+
+R.x15=()=>{
+ const st=S.step,v=S.viewer;const me=st===0?'p1':'p2';
+ const side=mapCard([['reuse','choice：每种可付的货物一个选项，每名在家的成员一个选项（成员卡同 Legendairy Forest）'],['reuse','只剩一种选法时自动执行；都不行时记日志跳过'],['reuse','从抽牌者起逐人；每次交接是撤销边界'],['show','保底：只剩 1 名可放置正式成员时，归还选项灰掉并写明原因']],'没有新面板。','轮到谁谁选，其他人看到“等待玩家N 进贡”。');
+ if(v!==me)return {ui:`${shead(10,'回家阶段结束','X15 进贡')}<div class="body"><div class="log">${st===1?`<div class="lf">${XG} 玩家1 付 1 木（X15 进贡）。</div>`:''}</div></div>${bar({wait:1,t:`等待${P[me]} 进贡（X15）`,x:'从抽牌者起按座次逐人选择。'})}`,side};
+ const goods=me==='p1'?['木','黏土','食物','羊']:['芦苇'];
+ const mem=me==='p1'?[{name:'成员1',owner:'p1',st:'在家'},{name:'成员2',owner:'p1',st:'在家'},{name:'成员3',owner:'p1',st:'在家 · 新生儿',badges:[['temp','新生儿']]}]:[{name:'成员1',owner:'p2',st:'只剩 1 名可放置成员，不能归还',off:1}];
+ return {ui:`${shead(10,'回家阶段结束','X15 进贡')}<div class="body"><div class="sec"><h4>付 1 个货物</h4><div class="opts">${goods.map(g=>`<button class="opt" data-a="next"><span>付 1 ${g}</span></button>`).join('')}</div></div><div class="sec"><h4>或归还 1 名在家的成员</h4><div class="members">${mem.map(m=>member(m,{act:'next'})).join('')}</div></div></div>${bar({t:'X15 三脚入侵者：进贡',x:me==='p2'?'只剩付芦苇这一种选法时会自动执行；这里展示时机。':'二选一，自由选择。'})}`,side};
+};
+
+R.x22=()=>{
+ const st=S.step,v=S.viewer;
+ const side=mapCard([['reuse','回家时选人：choice（成员身份），候选等价时自动选并公告'],['reuse','保底不满足时公告“该部分不生效”'],['reuse','解冻：onBeforeWork 的可选放人，成员栏预选被冻结的人，选格同普通放人'],['show','阶段条 ❄ 标记、X24 牌上的人、人员区状态']],'X24 反抗军选人同第 1 步，只是去向是“上牌，此后不能行动”。','只有主人操作。其他人看到公开日志。');
+ if(st===0){
+  if(v!=='p1')return {ui:`${shead(9,'回家阶段','玩家1 选冻结的成员')}<div class="body"></div>${bar({wait:1,t:'等待玩家1 选择 X22 冻结的成员'})}`,side};
+  return {ui:`${shead(9,'回家阶段','X22 碳凝表亲')}<div class="body"><div class="sec"><h4>选 1 名成员冻结到第 13 轮</h4><div class="members">${member({name:'成员1',owner:'p1',st:'从森林回家'},{act:'pick:m1',sel:U.pick==='m1'})}${member({name:'成员2',owner:'p1',st:'从西采石场回家'},{act:'pick:m2',sel:U.pick==='m2'})}${member({name:'成员3',owner:'p1',st:'新生儿',badges:[['temp','新生儿']]},{act:'pick:m3',sel:U.pick==='m3'})}</div><p class="x" style="font-size:12.5px">冻结期间仍占住房、计入家庭分，不需要供养。候选等价时系统会自动选。</p></div></div>${bar({t:'X22：选择冻结的成员',btns:[['确定','next','pri',!U.pick]]})}`,side};
+ }
+ const sp=[{id:'forest',n:'森林',d:'累积 6 木'},{id:'reed',n:'芦苇河岸',d:'累积 3 芦苇'},{id:'urgent',n:'紧急希望增加家庭成员',d:''}];
+ if(v!=='p1')return {ui:`${shead(13,'工作阶段开头','起始玩家放人前')}<div class="body">${spaces(sp)}</div>${bar({wait:1,t:'等待玩家1：X22 解冻的成员可以先放一次'})}`,side};
+ return {ui:`${shead(13,'工作阶段开头','起始玩家放人前')}<div class="body"><div class="banner">❄ 你被 X22 冻结的成员今天解冻：可以在起始玩家第一次放人前先放他一次。</div><div class="members">${member({name:'成员2',owner:'p1',st:'解冻 · 已预选',badges:[['held','解冻']]},{sel:true})}</div>${spaces(sp,{cand:['forest','reed','urgent'],pick:U.sp?[U.sp]:[],act:'sp'})}</div>${bar({t:'X22：先放解冻的成员？',x:'不放的话他本轮不能再放，回家阶段直接回家。',btns:[['放下','noop','pri',!U.sp],['这次不放','noop','']]})}`,side};
+};
+
+R.x23=()=>{
+ const st=S.step;
+ const pairs=[[3,4],[4,9],[8,9],[13,14],[12,13]];
+ const tiles=Array.from({length:15},(_,i)=>({k:i===5||i===10?'room':i===1?'field':[8,9,13,14].includes(i)?'pasture':i===3?'stable':'unused',label:i===1?'田 · 2 谷':[8,9,13,14].includes(i)?'牧场 · 羊':undefined}));
+ const pick=U.pair||null;
+ const side=mapCard([['reuse','farm-position 选择：validPositionGroups 给出所有相邻的两格组合，房间不在候选里'],['tweak','选中一组时预览拆除后果：田连同作物、畜棚、不再成立的栅栏、要重新安置的动物'],['reuse','确认后进入 animal-reorg；有妖精时进入妖精安置']],'候选格用虚线框标出。点第一格后再点与它相邻的一格；点到不相邻的格就从那一格重新开始。','只有抽牌者操作。其他人确认后看到农场变化和日志。');
+ if(st===1)return {ui:`${shead(9,'工作阶段','X23 拆除后')}<div class="body">${farm(tiles.map((t,i)=>[8,9].includes(i)?{k:'circle'}:t))}<div class="zones"><div class="zone"><div class="zn">牧场 <small>2 格 · 容量 4</small></div></div><div class="zone"><div class="zn">待安置 <small>羊 2</small></div></div></div></div>${bar({t:'动物整理',x:'牧场缩小后放不下的羊变成待安置动物；可以放到别处、烹饪或放回。',btns:[['完成','noop','pri']]})}`,side};
+ const sel=new Set(pick||[]);
+ const prev=pick?(pick.includes(8)||pick.includes(9)||pick.includes(13)||pick.includes(14)?'会被拆除：牧场格 2 个（羊 2 只要重新安置），不再成立的栅栏 4 段退回':pick.includes(3)?'会被拆除：畜棚 1 个':'两格都是空格，没有东西被拆除'):'先点一个格。';
+ return {ui:`${shead(9,'工作阶段','结算 X23 麦田怪圈')}<div class="body">${farm(tiles.map((t,i)=>({...t,cand:t.k!=='room'&&pairs.some(p=>p.includes(i)),pick:sel.has(i),warn:sel.has(i)&&t.k!=='unused'})),{act:'tile'})}<div class="quote"><b>预览</b><br><small>${prev}</small></div></div>${bar({t:'X23：选两个相邻格（不能选房间）',btns:[['确定','next','pri',!pick||pick.length!==2]]})}`,side};
+};
+
+R.x21=()=>{
+ const st=S.step,v=S.viewer;
+ const side=mapCard([['reuse','烧房：全桌一次结算；之后从抽牌者起逐人 animal-reorg（宠物），放得下自动'],['reuse','重建：翻修类格的 choice 里出现 Action Replacement；不可用的“翻修”灰掉并写原因'],['reuse','farm-position 选择（validPositionGroups = 相邻空格对）'],['reuse','统一支付：显示 2 木 1 芦苇和成本来源（如 X锉刀 −1 木）'],['show','农场提示“无房”（#1553 已定）']],'没有新面板。','烧房后逐人整理；重建只有无房玩家操作。');
+ if(st===0){
+  if(v==='p1')return {ui:`${shead(10,'工作阶段','X21 结算后')}<div class="body"><div class="banner">${XG} X21 小心喷嘴!：你的 2 个木房间烧毁，房间里的宠物羊要重新安置。</div>${farm(baseFarm().map((t,i)=>t.k==='room'?{k:'unused',label:'空格'}:t))}<div class="zones"><div class="zone"><div class="zn">待安置 <small>羊 1</small></div></div></div></div>${bar({t:'动物整理（玩家1，从抽牌者起）',x:'没有牧场放不下：可以烹饪或放回。',btns:[['烹饪换 2 食物','noop','pri'],['放回','noop','']]})}`,side};
+  return {ui:`${shead(10,'工作阶段','X21 结算后')}<div class="body"><div class="log"><div class="lf">${XG} 玩家1 翻出 X21：玩家1 的木房间烧毁（无房）；玩家2 的黏土房间变成石房间。</div></div></div>${bar({wait:1,t:'等待玩家1 整理宠物'})}`,side};
+ }
+ if(v!=='p1')return {ui:`${shead(11,'工作阶段','玩家1 的回合')}<div class="body"></div>${bar({wait:1,t:'等待玩家1'})}`,side};
+ if(st===1)return {ui:`${shead(11,'工作阶段','使用“翻修”')}<div class="body"><div class="opts"><button class="opt" disabled><span>翻修房屋</span><small>你无房，不能翻修</small></button><button class="opt" data-a="next"><span>${XG} 重建：付 2 木 1 芦苇，建 2 个木房间（X21）</span><small>不算翻修；算建房</small></button></div></div>${bar({t:'翻修：选择',x:'翻修之后的“主要或次要发展”照常可用。'})}`,side};
+ const pairs=[[0,5],[5,10],[5,6],[10,11],[6,11]];const sel=new Set(U.pair||[]);
+ return {ui:`${shead(11,'工作阶段','重建 2 个木房间')}<div class="body">${farm(baseFarm().map((t,i)=>({...(t.k==='room'?{k:'unused',label:'空格'}:t),cand:pairs.some(p=>p.includes(i)),pick:sel.has(i)})),{act:'tile'})}<div class="quote"><b>费用：2 木 1 芦苇 → 实付 1 木 1 芦苇</b><br><small>成本来源：X21 重建总价 2 木 1 芦苇；X锉刀 −1 木。</small></div></div>${bar({t:'选两个相邻的空格',btns:[['支付并建造','noop','pri',sel.size!==2]]})}`,side};
+};
+
+R.x12=()=>{
+ const keep=U.keep??4;const food=8;const fam=4;
+ const side=mapCard([['tweak','feed 请求加“太空毛球”一行：步进选择留几个，每个 1 食物'],['reuse','家庭成员的喂养、兑换和乞讨照旧；乞讨只抵家庭成员'],['show','实时显示离开数和终局扣分']],'毛球那一行可以随时调整，确认喂养时一并提交。','只有拥有者操作；所有人看到离开数。');
+ return {ui:`${shead(9,'收获 · 供养','你的喂养结算')}<div class="body"><div class="quote"><b>食物 ${food}</b> · 家庭需要 ${fam}（2 名成人）</div><div class="stp" style="margin-top:8px"><span>${XG} 太空毛球（X12）：现有 5 个</span><span class="stepper"><button class="btn sm" data-a="keep:-1" ${keep<=0?'disabled':''}>−</button><span>留 ${keep}</span><button class="btn sm" data-a="keep:1" ${keep>=5?'disabled':''}>+</button></span></div><p class="x" style="font-size:12.5px">留 ${keep} 个付 ${keep} 食物；离开 ${5-keep} 个，终局 −${5-keep} 分。${fam+keep>food?'<b style="color:var(--bad)">食物不够：毛球不能用乞讨补。</b>':''}</p></div>${bar({t:'喂养',x:`共需 ${fam+keep} 食物，现有 ${food}。`,btns:[['确认喂养','noop','pri',fam+keep>food]]})}`,side};
+};
+
+/* ---------- shell ---------- */
+function renderCtrl(){
+ const sc=SCENES[S.scene],labels=sc.steps;
+ const fork=sc.fork?`<label><span class="fork">方案</span><select id="fork">${sc.fork.map((f,i)=>`<option value="${i}" ${S.fork[S.scene]===i?'selected':''}>${f}</option>`).join('')}</select></label>`:'';
+ document.getElementById('ctrl').innerHTML=`<div class="row"><h1>X-Deck 交互草图</h1><span class="tag">原型 · 固定演示数据 · 不连游戏服务</span></div><div class="row" style="margin-top:8px"><label>场景 <select id="scene">${Object.entries(SCENES).map(([k,s])=>`<option value="${k}" ${S.scene===k?'selected':''}>${s.n}</option>`).join('')}</select></label>${S.scene==='overview'?'':`<label>视角 <select id="viewer"><option value="p1" ${S.viewer==='p1'?'selected':''}>玩家1</option><option value="p2" ${S.viewer==='p2'?'selected':''}>玩家2</option></select></label>`}<label>设备 <select id="device"><option value="auto" ${S.device==='auto'?'selected':''}>按窗口宽度</option><option value="phone" ${S.device==='phone'?'selected':''}>手机外框</option></select></label>${fork}${labels.length>1?`<span class="steps"><button data-a="prev" ${S.step===0?'disabled':''} aria-label="上一步">◀</button><span>${S.step+1}/${labels.length} ${labels[S.step]}</span><button data-a="next" ${S.step>=labels.length-1?'disabled':''} aria-label="下一步">▶</button></span>`:''}</div><p class="hint">左边是模拟界面，右边是它接入哪些现有能力。人员交互沿用 Legendairy Forest 已定的成员栏；呈现基线见 #1553。</p>`;
+}
+function render(){
+ renderCtrl();
+ const w=document.getElementById('wrap');w.className='wrap'+(S.device==='phone'?' frame':isM()?' m':'');
+ const {ui,side}=R[S.scene]();
+ w.innerHTML=`<div class="screen">${ui}</div><div class="side">${side}</div>`;
+ bind();
+}
+function go(scene){S.scene=scene;S.step=0;U={};try{history.replaceState(null,'',`${location.pathname}#${scene}`)}catch(e){}render();scrollTo(0,0)}
+function act(a){
+ const max=SCENES[S.scene].steps.length-1;const [k,x,y]=a.split(':');
+ if(a==='next'){if(S.step<max)S.step++;}
+ else if(a==='prev'){if(S.step>0)S.step--;if(U.skipped)U={};}
+ else if(a==='jump2'){S.step=Math.min(2,max);}
+ else if(a==='jump3'){S.step=Math.min(3,max);}
+ else if(a==='skip'){U={skipped:true};S.step=max;}
+ else if(k==='sp'){U.sp=x;}
+ else if(k==='sel'){U.sel=x;}
+ else if(k==='pick'){U.pick=x;}
+ else if(k==='n'){U.n=+x;U.multi=[];}
+ else if(a==='resetn'){U.n=null;U.multi=[];}
+ else if(k==='multi'){const s=new Set(U.multi||[]);const lim=S.fork.x17===0?2*(U.n||3):12;if(s.has(x))s.delete(x);else if(s.size<lim)s.add(x);U.multi=[...s];}
+ else if(k==='g'){const g={木:0,黏土:0,芦苇:0,石:0,食物:0,羊:0,...(U.goods||{})};g[x]=Math.max(0,g[x]+(+y));U.goods=g;}
+ else if(k==='keep'){U.keep=Math.max(0,Math.min(5,(U.keep??4)+(+x)));}
+ else if(k==='tile'){const i=+x;const cur=U.pair||[];
+  const pairs=S.scene==='x23'?[[3,4],[4,9],[8,9],[13,14],[12,13]]:[[0,5],[5,10],[5,6],[10,11],[6,11]];
+  if(cur.includes(i))U.pair=cur.filter(t=>t!==i);
+  else if(cur.length===0)U.pair=[i];
+  else if(cur.length===1&&pairs.some(p=>p.includes(i)&&p.includes(cur[0])))U.pair=[cur[0],i];
+  else U.pair=[i];}
+ else if(a==='noop'){return;}
+ render();
+}
+function bind(){
+ document.querySelectorAll('[data-a]').forEach(el=>{if(el.dataset.a)el.onclick=e=>{e.preventDefault();act(el.dataset.a)}});
+ document.querySelectorAll('[data-go]').forEach(el=>el.onclick=e=>{e.preventDefault();go(el.dataset.go)});
+ const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onchange=fn};
+ on('scene',e=>go(e.target.value));
+ on('viewer',e=>{S.viewer=e.target.value;render()});
+ on('device',e=>{S.device=e.target.value;render()});
+ on('fork',e=>{S.fork[S.scene]=+e.target.value;S.step=0;U={};render()});
+}
+addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,120)});
+addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(SCENES[h]&&h!==S.scene)go(h)});
+render();
+</script>
+</body>
+</html>
