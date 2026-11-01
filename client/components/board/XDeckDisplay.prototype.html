@@ -1,0 +1,737 @@
+<!-- PROTOTYPE · throwaway (#1553). Three variants of how X-Deck surfaces on the game page, built on the confirmed
+     Legendairy Forest extension panel (#1531). Switch with the bottom pill, ←/→, or ?variant=A|B|C&scene=… . -->
+<meta charset="utf-8">
+<title>X-Deck 牌区草图</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+/* Layout: dark prototype control strip, then a mock game page (desktop: board | farm | rail+log; phone: one column).
+   Legendairy Forest surfaces use the plum --lf hue so they read apart from the green base board. */
+:root{
+  --bg:#efe6cf; --paper:#fdf6e3; --card:#fffdf7; --ink:#1e1e1e; --ink2:#5a3a20; --muted:#7f6e55;
+  --line:#cdb996; --line2:#e8d5b7; --board:#88a862; --board-ink:#23361a;
+  --green:#3a5a2c; --on-green:#ffffff; --green-bg:#e4eed6; --gold:#b9860c; --gold-bg:#fff1cf;
+  --lf:#5d3f73; --on-lf:#ffffff; --lf-bg:#f2e9f6; --lf-line:#cbb3d8;
+  --p1:#c0392b; --p2:#2e5fa8; --danger:#b03a2e; --danger-bg:#fbe5e1;
+  --ctrl:#20291b; --ctrl-fg:#f2ead6; --ctrl-line:#3c4a33; --scrim:rgba(24,18,8,.48);
+  --shadow:0 1px 2px rgba(60,40,10,.14),0 6px 18px rgba(60,40,10,.10);
+  --font:"Inter","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083;
+  --line:#5a4e38; --line2:#41392a; --board:#34472a; --board-ink:#dfe9d2;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018;
+  --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --danger:#f08273; --danger-bg:#46241f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --scrim:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17150f; --paper:#221f17; --card:#2b271d; --ink:#efe6d2; --ink2:#e2caa6; --muted:#b0a083;
+  --line:#5a4e38; --line2:#41392a; --board:#34472a; --board-ink:#dfe9d2;
+  --green:#93c178; --on-green:#13200d; --green-bg:#2a3822; --gold:#e6b545; --gold-bg:#3a3018;
+  --lf:#cfaee6; --on-lf:#24142f; --lf-bg:#33283c; --lf-line:#5f4b70;
+  --p1:#ec7a69; --p2:#80aaf0; --danger:#f08273; --danger-bg:#46241f;
+  --ctrl:#0e120b; --ctrl-fg:#efe6d2; --ctrl-line:#2f3a28; --scrim:rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--font)}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3,h4,p,ul,ol{margin:0}
+ul,ol{padding-left:18px}
+.tree{width:11px;height:13px;fill:currentColor;vertical-align:-2px;flex:none}
+
+/* prototype controls */
+.ctrl{position:relative;z-index:70;background:var(--ctrl);color:var(--ctrl-fg);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ctrl-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.ctrl h1{font-size:15px;font-weight:650;letter-spacing:.02em;margin-right:6px}
+.ctrl .tag{font-size:11px;border:1px solid var(--ctrl-line);border-radius:99px;padding:2px 8px;opacity:.85}
+.ctrl label{display:flex;gap:6px;align-items:center;font-size:13px}
+.ctrl select{background:var(--ctrl);border:1px solid var(--ctrl-line);border-radius:6px;padding:4px 6px;color:var(--ctrl-fg);max-width:220px}
+.ctrl .steps{display:flex;gap:6px;align-items:center}
+.ctrl .steps button{background:transparent;border:1px solid var(--ctrl-line);border-radius:6px;padding:3px 10px;color:var(--ctrl-fg)}
+.ctrl .steps button:disabled{opacity:.35;cursor:default}
+.ctrl .steplabel{font-size:13px;font-variant-numeric:tabular-nums}
+.ctrl .hint{margin-top:8px;font-size:12.5px;line-height:1.6;opacity:.9;max-width:1100px}
+.ctrl .hint b{color:var(--gold)}
+
+/* variant switcher pill (prototype chrome) */
+.vpill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;align-items:center;gap:4px;background:var(--ctrl);color:var(--ctrl-fg);border-radius:99px;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:13px;white-space:nowrap}
+.vpill button{background:transparent;border:0;color:inherit;width:34px;height:34px;border-radius:50%;font-size:16px}
+.vpill button:hover{background:var(--ctrl-line)}
+.vpill span{padding:0 6px;font-variant-numeric:tabular-nums}
+
+/* stage around the mock app */
+.stage{padding-block:16px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.shell{position:relative;max-width:1360px;margin:0 auto}
+.shell.frame{width:390px;max-width:100%;height:min(820px,calc(100dvh - 190px));min-height:520px;border:10px solid var(--ctrl);border-radius:32px;overflow:hidden;transform:translateZ(0);background:var(--paper);box-shadow:var(--shadow)}
+.shell.frame .scroller{height:100%;overflow:auto;padding:0 10px 150px}
+.shell:not(.frame) .scroller{padding-bottom:120px}
+.flayer>*{position:fixed}
+.frame .flayer>*{position:absolute}
+
+/* mock game chrome */
+.ghead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:10px}
+.ghead strong{font-size:15px}
+.ghead .who{font-size:12px;color:var(--muted)}
+.stagebar{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px;margin:8px 0}
+.stagebar span{font-size:11px;text-align:center;border-radius:4px;padding:2px 0;background:var(--line2);color:var(--muted);font-variant-numeric:tabular-nums}
+.stagebar span.past{background:var(--green-bg);color:var(--green)}
+.stagebar span.now{background:var(--green);color:var(--on-green);font-weight:650}
+.stagebar span.h{box-shadow:inset 0 -2px 0 var(--gold)}
+.cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr) minmax(250px,.8fr);gap:12px;align-items:start}
+.m .cols{display:flex;flex-direction:column;gap:10px}
+.col{display:grid;gap:12px;min-width:0}
+.m .col{gap:10px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.panel>h3{font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.panel h4{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600;margin:12px 0 6px}
+.sub{font-size:12px;color:var(--muted);font-weight:400}
+
+/* action board */
+.board{background:var(--board);border-radius:12px;padding:10px;color:var(--board-ink)}
+.board .bh{display:flex;justify-content:space-between;font-size:12px;margin:2px 2px 8px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:10px}
+.m .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.m .rgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sp{position:relative;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 7px;min-height:74px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.sp b{font-size:12.5px;line-height:1.3}
+.sp small{font-size:11px;color:var(--muted);line-height:1.35}
+.sp .goods{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.sp .rn{position:absolute;top:4px;right:6px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sp.future{background:transparent;border:1px dashed var(--board-ink);color:var(--board-ink);opacity:.75;align-items:center;justify-content:center;text-align:center}
+.sp.future small{color:inherit}
+.sp.hl{outline:3px solid var(--gold);outline-offset:1px}
+.sp.withdrawn{background:repeating-linear-gradient(135deg,var(--line2) 0 6px,var(--card) 6px 12px)}
+.sp.withdrawn b{text-decoration:line-through;text-decoration-thickness:1.5px}
+.stamp{display:inline-flex;gap:4px;align-items:center;font-size:10.5px;font-weight:650;color:var(--lf);background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:4px;padding:1px 5px;align-self:flex-start;line-height:1.4}
+.sp.lfsp{border:1.5px solid var(--lf);background:linear-gradient(var(--lf-bg),var(--card) 60%)}
+.sp .badge{font-size:10px;color:var(--on-lf);background:var(--lf);border-radius:3px;padding:0 4px;align-self:flex-start;display:inline-flex;gap:3px;align-items:center}
+.note-gold{font-size:10.5px;color:var(--gold);font-weight:600;line-height:1.35}
+.mp{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600}
+.mp i{display:inline-block;width:11px;height:13px;border-radius:5px 5px 2px 2px;position:relative;background:currentColor}
+.mp.p1{color:var(--p1)} .mp.p2{color:var(--p2)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
+.dot.p1{background:var(--p1)} .dot.p2{background:var(--p2)}
+.cardrow{margin-top:10px;background:var(--paper);border-radius:9px;padding:8px;color:var(--ink)}
+.cardrow h4{margin:0 0 6px}
+.hscroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.hscroll>*{flex:0 0 150px}
+
+/* card faces */
+.cf{background:var(--card);border:1px solid var(--lf-line);border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0;color:var(--ink)}
+.cf .top{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;color:var(--lf);font-weight:650}
+.cf .nm{font-weight:650;font-size:13px;line-height:1.3}
+.cf .tx{font-size:11.5px;color:var(--muted);line-height:1.45}
+.cf .dest{font-size:10.5px;color:var(--ink2);border-top:1px dashed var(--line2);padding-top:4px;margin-top:auto}
+.cf.lg{padding:14px;gap:8px;border:2px solid var(--lf);box-shadow:var(--shadow)}
+.cf.lg .nm{font-size:20px}
+.cf.lg .tx{font-size:13.5px}
+.cf.mini{padding:5px 7px;gap:2px}
+.cf.mini .nm{font-size:12px}
+.typ{font-size:10.5px;border:1px solid var(--lf-line);border-radius:3px;padding:0 4px;color:var(--lf);font-weight:500}
+.back{background:repeating-linear-gradient(45deg,var(--lf) 0 5px,color-mix(in srgb,var(--lf) 80%,var(--paper)) 5px 10px);border-radius:8px;border:2px solid var(--lf-line);display:grid;place-items:center;color:var(--on-lf);font-weight:700;font-size:13px;text-align:center;line-height:1.3}
+
+/* farm & players */
+.farm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.tile{aspect-ratio:1;max-width:100%;border-radius:5px;background:var(--green-bg);border:1px solid var(--line2);display:grid;place-items:center;font-size:11px;color:var(--muted)}
+.tile.room{background:var(--gold-bg);color:var(--ink2)}
+.tile.field{background:color-mix(in srgb,var(--gold) 28%,var(--paper));color:var(--ink2)}
+.tile.plow{outline:2px dashed var(--gold);outline-offset:-3px}
+.owned{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.owned .cf{flex:1 1 140px;max-width:220px}
+.lfmark{display:inline-flex;gap:3px;align-items:center;font-size:10.5px;color:var(--lf);font-weight:600}
+.markers{letter-spacing:2px;color:var(--lf);font-size:12px}
+.plist{display:grid;gap:6px}
+.prow{display:grid;gap:3px;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--card)}
+.prow .pn{display:flex;justify-content:space-between;gap:6px;font-weight:600;font-size:13px}
+.prow .res{display:flex;flex-wrap:wrap;gap:3px 9px;font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.prow.act{border-color:var(--green)}
+.crown{font-size:10.5px;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:0 6px;font-weight:650;white-space:nowrap;align-self:start}
+.m .players-strip .plist{grid-template-columns:1fr 1fr}
+
+/* log */
+.log{display:grid;gap:2px;max-height:360px;overflow:auto;font-size:12.5px}
+.m .log{max-height:none}
+.log .rh{font-size:11px;color:var(--muted);font-weight:650;margin-top:6px;letter-spacing:.04em}
+.log .le{padding:2px 0 2px 8px;border-left:2px solid var(--line2);line-height:1.5}
+.log .le.lf{border-left-color:var(--lf)}
+.log .le .src{color:var(--lf);font-weight:600}
+.chips{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);border-radius:99px;padding:2px 10px;font-size:12px;background:var(--card)}
+.chip[aria-pressed="true"]{background:var(--lf);color:var(--on-lf);border-color:var(--lf)}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:6px 12px;min-height:36px}
+.btn.pri{background:var(--green);border-color:var(--green);color:var(--on-green);font-weight:600}
+.btn.lfb{background:var(--lf);border-color:var(--lf);color:var(--on-lf);font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.sm{min-height:30px;padding:3px 9px;font-size:12px}
+.linkbtn{background:none;border:0;color:var(--lf);padding:0;text-decoration:underline;font-size:12px}
+
+/* interaction bar */
+.ibar{left:50%;transform:translateX(-50%);bottom:calc(58px + env(safe-area-inset-bottom,0px));width:min(760px,calc(100% - 32px));z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;display:grid;gap:6px}
+.frame .ibar{bottom:8px;width:calc(100% - 16px)}
+.ibar .t{font-weight:650;font-size:13.5px}
+.ibar .x{font-size:12.5px;color:var(--muted);line-height:1.5}
+.ibar .bs{display:flex;gap:8px;flex-wrap:wrap}
+.ibar.wait{background:var(--paper)}
+.tlist{display:grid;gap:4px;font-size:12.5px}
+.tlist div{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line2);border-radius:6px;padding:4px 8px;background:var(--paper)}
+.tlist .must{color:var(--lf);font-weight:600}
+
+/* toasts */
+.toasts{top:calc(12px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));z-index:40;display:grid;gap:8px;width:min(360px,calc(100% - 32px))}
+.frame .toasts{top:8px;right:8px;width:calc(100% - 16px)}
+.toast{background:var(--card);border:1px solid var(--lf-line);border-left:4px solid var(--lf);border-radius:9px;padding:9px 11px;box-shadow:var(--shadow);font-size:13px;display:grid;gap:4px;animation:drop .35s ease-out}
+.toast .tt{display:flex;justify-content:space-between;gap:8px;align-items:start}
+@keyframes drop{from{transform:translateY(-8px);opacity:.3}}
+@keyframes glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--lf) 70%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+.glow{animation:glow 1.2s ease-out 2}
+@keyframes flyin{from{transform:translateX(-40px) rotateY(80deg);opacity:0}}
+.flyin{animation:flyin .5s ease-out}
+@media (prefers-reduced-motion:reduce){.toast,.glow,.flyin{animation:none}}
+
+/* overlays */
+.scrim{inset:0;background:var(--scrim);z-index:50;display:grid;place-items:center;padding:16px}
+.modal{background:var(--paper);border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);padding:16px;width:min(620px,100%);max-height:100%;overflow:auto;display:grid;gap:12px}
+.modal h2{font-size:17px}
+.peek{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.m .peek,.frame .peek{grid-template-columns:1fr}
+.peek .slot{display:grid;gap:6px}
+.peek .pos{font-size:11px;font-weight:650;color:var(--lf)}
+.peek .mv{display:flex;gap:6px}
+.privacy{font-size:12px;color:var(--ink2);background:var(--gold-bg);border-radius:6px;padding:6px 9px;line-height:1.5}
+.memo{font-size:12px;border:1px dashed var(--lf);border-radius:8px;padding:7px 9px;color:var(--ink2);background:var(--lf-bg);line-height:1.55}
+
+/* A: expansion panel */
+.lfA{border-color:var(--lf-line);background:linear-gradient(var(--lf-bg),var(--paper) 140px)}
+.lfA>h3{color:var(--lf)}
+.lfA-top{display:grid;grid-template-columns:96px minmax(0,1fr) 96px;gap:10px;align-items:stretch}
+.m .lfA-top{grid-template-columns:80px minmax(0,1fr)}
+.m .lfA-top .disc{grid-column:1/-1}
+.deckbox{display:grid;gap:4px;align-content:start;font-size:11.5px;color:var(--muted);text-align:center}
+.deckbox .back{height:112px}
+.m .deckbox .back{height:96px}
+.slotA{border:1.5px dashed var(--lf-line);border-radius:10px;padding:8px;display:grid;gap:6px;align-content:start;min-width:0}
+.slotA .cap{font-size:11.5px;color:var(--muted)}
+.status{font-size:11px;font-weight:650;border-radius:99px;padding:1px 8px;justify-self:start}
+.status.res{background:var(--gold-bg);color:var(--gold)}
+.status.done{background:var(--green-bg);color:var(--green)}
+.res-lines{font-size:12px;line-height:1.55;color:var(--ink2);padding-left:16px}
+.rules{list-style:none;padding:0;display:grid;gap:6px}
+.rule{border:1px solid var(--line2);background:var(--card);border-radius:8px;padding:6px 9px;display:grid;gap:2px}
+.rule .rt{font-weight:650;font-size:12.5px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.rule .rx{font-size:11.5px;color:var(--muted);line-height:1.45}
+.srcchip{font-size:10.5px;font-weight:600;color:var(--lf);white-space:nowrap}
+.lfspaces{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.discbox{display:grid;gap:4px;align-content:start;text-align:center;font-size:11.5px;color:var(--muted)}
+.discbox .back{height:70px;background:var(--line2);color:var(--muted);border-color:var(--line)}
+
+/* B: stage + rail */
+.stageB{width:min(520px,100%);background:var(--paper);border-radius:16px;border:2px solid var(--lf);padding:16px;display:grid;gap:12px;box-shadow:var(--shadow);max-height:100%;overflow:auto}
+.stageB .who{font-size:13px;color:var(--ink2);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.stageB .kick{font-size:11px;letter-spacing:.12em;color:var(--lf);font-weight:700}
+.railB{border-color:var(--lf-line)}
+.railB>h3{color:var(--lf)}
+.deckline{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.thumbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.drawtbl{width:100%;border-collapse:collapse;font-size:11.5px;font-variant-numeric:tabular-nums}
+.drawtbl th,.drawtbl td{text-align:left;padding:3px 4px;border-bottom:1px solid var(--line2);vertical-align:top}
+.drawtbl th{color:var(--muted);font-weight:600}
+.tblwrap{overflow-x:auto}
+.fab{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(170px + env(safe-area-inset-bottom,0px));z-index:35;background:var(--lf);color:var(--on-lf);border:0;border-radius:99px;padding:9px 14px;font-weight:650;box-shadow:var(--shadow);display:flex;gap:6px;align-items:center}
+.frame .fab{bottom:150px}
+.sheet{left:0;right:0;bottom:0;z-index:55;background:var(--paper);border-radius:16px 16px 0 0;border-top:2px solid var(--lf);max-height:78%;overflow:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+.sheet-scrim{inset:0;background:var(--scrim);z-index:54}
+
+/* C: track */
+.trackC{background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:12px;padding:10px;display:grid;grid-template-columns:110px 24px minmax(160px,1fr) 24px minmax(0,2.6fr) 96px;gap:8px;align-items:stretch;margin-bottom:8px}
+.trackC .arrow{display:grid;place-items:center;color:var(--lf);font-size:18px}
+.zone{display:grid;gap:5px;align-content:start;min-width:0}
+.zone .zh{font-size:11px;font-weight:700;color:var(--lf);letter-spacing:.06em;display:flex;justify-content:space-between;gap:6px}
+.zone .back{height:96px}
+.zone.empty .ph{border:1.5px dashed var(--lf-line);border-radius:9px;min-height:96px;display:grid;place-items:center;font-size:12px;color:var(--muted);text-align:center;padding:6px}
+.disp{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.disp>.dwrap{flex:0 0 150px;display:grid;gap:4px;align-content:start}
+.ruletag{font-size:10.5px;line-height:1.4;color:var(--ink2);background:var(--card);border:1px solid var(--lf-line);border-radius:5px;padding:2px 6px}
+.offcard{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
+.offcard .ruletag{font-size:11.5px}
+.trackMini{position:sticky;top:0;z-index:5;background:var(--lf-bg);border:1px solid var(--lf-line);border-radius:10px;padding:8px 10px;display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;margin-bottom:8px;width:100%;text-align:left;color:var(--ink)}
+.trackMini b{color:var(--lf)}
+.m .trackC{grid-template-columns:1fr;gap:10px}
+.m .trackC .arrow{display:none}
+.m .zone.deckz{grid-template-columns:72px minmax(0,1fr);align-items:start}
+.m .zone.deckz .zh{grid-column:1/-1}
+.m .zone .back{height:84px}
+
+/* lobby */
+.lobby{max-width:640px;margin:16px auto;display:grid;gap:12px}
+.toggle{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line2)}
+.toggle input{width:18px;height:18px;margin-top:2px;accent-color:var(--green)}
+.toggle .h{display:block;font-size:12px;color:var(--muted);line-height:1.5}
+.toggle.lfon{background:var(--lf-bg);border-radius:8px;padding:8px;border-bottom:0}
+details.sum{font-size:12.5px;color:var(--ink2);margin-top:4px}
+details.sum summary{cursor:pointer;color:var(--lf);font-weight:600}
+details.sum ul{margin-top:4px;line-height:1.6}
+.cfglist{display:grid;gap:4px;font-size:13px}
+.cfglist div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line2);padding:3px 0}
+.pillrow{display:flex;flex-wrap:wrap;gap:6px}
+.pillrow span{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:2px 9px;background:var(--card)}
+.pillrow span.lf{border-color:var(--lf);color:var(--lf);font-weight:600}
+
+/* score pad */
+.score{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.score th,.score td{padding:4px 6px;border-bottom:1px solid var(--line2);text-align:right}
+.score th:first-child,.score td:first-child{text-align:left}
+.score .grp td{background:var(--lf-bg);color:var(--lf);font-weight:700;font-size:11.5px;letter-spacing:.04em}
+.score .tot td{font-weight:700;border-top:2px solid var(--line)}
+.score small{color:var(--muted)}
+.unowned{display:grid;gap:8px}
+.unowned .u{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:start}
+.m .unowned .u,.frame .unowned .u{grid-template-columns:1fr}
+.evals{display:grid;gap:3px;font-size:12.5px}
+.evals div{display:flex;justify-content:space-between;gap:8px}
+
+/* ===== X-Deck additions (teal --xd hue; Legendairy Forest keeps plum --lf) ===== */
+:root{--xd:#14707a;--on-xd:#ffffff;--xd-bg:#e1f2f2;--xd-line:#9dcfd2;--candy:#d2477b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--xd:#7fd3da;--on-xd:#0b2224;--xd-bg:#1c3436;--xd-line:#2f5a5d;--candy:#f08ab1}}
+:root[data-theme="dark"]{--xd:#7fd3da;--on-xd:#0b2224;--xd-bg:#1c3436;--xd-line:#2f5a5d;--candy:#f08ab1}
+.xg{display:inline-block;font-weight:800;font-size:10.5px;letter-spacing:-.02em;color:var(--xd)}
+.cf.x{border-color:var(--xd-line)}
+.cf.x .top{color:var(--xd)}
+.cf.x .typ{border-color:var(--xd-line);color:var(--xd)}
+.cf.x.lg{border-color:var(--xd)}
+.backx{background:repeating-linear-gradient(-45deg,var(--xd) 0 5px,color-mix(in srgb,var(--xd) 78%,var(--paper)) 5px 10px);border-radius:8px;border:2px solid var(--xd-line);display:grid;place-items:center;color:var(--on-xd);font-weight:700;font-size:13px;text-align:center;line-height:1.3}
+.sp.xsp{border:1.5px solid var(--xd);background:linear-gradient(var(--xd-bg),var(--card) 60%)}
+.sp .xbadge{font-size:10px;color:var(--on-xd);background:var(--xd);border-radius:3px;padding:0 4px;align-self:flex-start}
+.mk{display:inline-flex;gap:3px;align-items:center;font-size:10.5px;font-weight:650;border-radius:4px;padding:0 5px;line-height:1.5;align-self:flex-start}
+.mk.candy{color:var(--candy);border:1px solid var(--candy);background:var(--card)}
+.mk.fork{color:var(--xd);border:1px solid var(--xd)}
+.mk.newborn{color:var(--ink2);border:1px dashed var(--line)}
+.hintx{font-size:10.5px;line-height:1.35;color:var(--xd);background:var(--xd-bg);border:1px solid var(--xd-line);border-radius:4px;padding:1px 5px;align-self:stretch}
+.hintx.warn{color:var(--danger);background:var(--danger-bg);border-color:var(--danger)}
+.stagebar span.frozen{outline:2px solid var(--xd);outline-offset:-2px;color:var(--xd);font-weight:700}
+.tile.circle{background:repeating-radial-gradient(circle at 50% 50%,var(--gold-bg) 0 3px,color-mix(in srgb,var(--gold) 40%,var(--paper)) 3px 5px);color:var(--ink2);font-weight:650}
+.tile.homeless{background:var(--line2);color:var(--muted);outline:1px dashed var(--danger);outline-offset:-3px}
+.xA{border-color:var(--xd-line);background:linear-gradient(var(--xd-bg),var(--paper) 140px)}
+.xA>h3{color:var(--xd)}
+.xA .slotA{border-color:var(--xd-line)}
+.xA .srcchip,.xrule .srcchip{color:var(--xd)}
+.rule.xrule{border-left:3px solid var(--xd)}
+.rule.lrule{border-left:3px solid var(--lf)}
+.merch{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.merch .cf .cond{font-size:11.5px;color:var(--ink2);background:var(--gold-bg);border-radius:5px;padding:3px 6px}
+.heldtag{display:inline-flex;gap:3px;align-items:center;font-size:10.5px;color:var(--xd);font-weight:600}
+.tray{border:1.5px dashed var(--xd-line);border-radius:10px;padding:8px;margin-top:10px;display:grid;gap:6px}
+.tray>.th{font-size:12px;font-weight:650;color:var(--xd);display:flex;justify-content:space-between;gap:6px}
+.tray .owned{margin-top:0}
+.cstate{font-size:11.5px;color:var(--ink2)}
+.decks{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.deckmini{display:grid;grid-template-columns:54px minmax(0,1fr);gap:8px;align-items:center;border:1px solid var(--line2);border-radius:9px;padding:6px;background:var(--card)}
+.deckmini .back,.deckmini .backx{height:64px;font-size:11px}
+.deckmini b{font-size:12.5px}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:8px;background:var(--paper);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;align-items:stretch}
+.strip .lead{font-size:11px;font-weight:700;color:var(--muted);align-self:center;white-space:nowrap;letter-spacing:.06em}
+.rchip{flex:0 0 auto;max-width:280px;border:1px solid var(--xd-line);border-left:4px solid var(--xd);border-radius:8px;background:var(--card);padding:4px 8px;font-size:12px;display:grid;gap:1px;text-align:left}
+.rchip.lf{border-color:var(--lf-line);border-left-color:var(--lf)}
+.rchip.merchant{border-left-color:var(--gold)}
+.rchip .rx{font-size:11px;color:var(--muted);line-height:1.4}
+.rchip[aria-expanded="false"] .rx{display:none}
+.tl{display:grid;gap:4px;font-size:12.5px}
+.tl .ev{display:grid;grid-template-columns:44px minmax(0,1fr);gap:6px;align-items:start;border-left:3px solid var(--xd);padding:3px 6px;background:var(--card);border-radius:0 6px 6px 0}
+.tl .ev.lf{border-left-color:var(--lf)}
+.tl .ev .sq{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tl .ev .dd{font-size:11px;color:var(--ink2)}
+.win{border:2px solid var(--gold);background:var(--gold-bg);border-radius:10px;padding:10px 12px;display:grid;gap:4px}
+.win b{font-size:15px}
+.dk{display:inline-block;font-size:10px;font-weight:700;border-radius:3px;padding:0 4px;line-height:1.5}
+.dk.x{background:var(--xd);color:var(--on-xd)}
+.dk.lf{background:var(--lf);color:var(--on-lf)}
+.score .grp.xg td{background:var(--xd-bg);color:var(--xd)}
+.toast.x{border-color:var(--xd-line);border-left-color:var(--xd)}
+.toggle.xon{background:var(--xd-bg);border-radius:8px;padding:8px;border-bottom:0}
+.pillrow span.x{border-color:var(--xd);color:var(--xd);font-weight:600}
+.pnote{font-size:11px;color:var(--xd)}
+.toasts{z-index:75}
+</style>
+
+<div class="ctrl" id="ctrl"></div>
+<div class="stage"><div id="shell" class="shell"></div></div>
+<div class="vpill" id="vpill"></div>
+<script>
+// PROTOTYPE · throwaway. Fixed demo data, no game commands, no rules engine.
+// Answers #1553: how players see X-Deck draws, waiting merchants, persistent rules and board markers,
+// on top of the confirmed Legendairy Forest extension panel (#1531).
+const XC={
+ X01:['异星粪便','space','所有玩家可用的行动格：每块已种的谷物、蔬菜田各加 1 个同种作物。'],
+ X02:['自制火箭','space','所有玩家可用的行动格：付 2 木 2 黏土 1 芦苇 1 石，得 4 分。'],
+ X03:['变形器','space','所有玩家可用的行动格：把自己某种货物全部换种，或把一个累积格上的货物全部换种。'],
+ X04:['木星商人','merchant','第一位建造畜棚并额外支付 2 芦苇的玩家获得本牌。2 分。'],
+ X05:['火星商人','merchant','第一位执行需要空房间的家庭增长并额外支付 2 食物的玩家获得本牌。2 分。'],
+ X06:['冥王星商人','merchant','第一位使用“围栏”行动格并额外支付 2 石的玩家获得本牌。2 分。'],
+ X07:['灵脉','artifact','终局：每一列含 3 个房间、3 块田或同一牧场的 3 格，得 1 分。'],
+ X08:['奇异外星能量','artifact','每个回家阶段前，可以归还 1 个燃料罐，不放人使用一个空着的行动格。−3 分。'],
+ X09:['外星雇农','artifact','标记一个累积格；每个回家阶段前，若该格无人，可从上面拿 1 个货物。'],
+ X10:['复制器','artifact','下一次你使用累积格时，拿到的货物翻倍；然后把本牌交给左手边玩家。'],
+ X11:['X锉刀','artifact','每次建造栅栏、畜棚或木房间，总计少付 1 木。'],
+ X12:['毛茸朋友','artifact','太空毛球每次收获繁殖；供养时每个付 1 食物，否则离开并扣 1 分；终局每个 1 分。'],
+ X13:['银河尽头的餐馆','event','游戏结束时，正好 42 分的玩家获胜；否则分数最高者获胜。'],
+ X14:['异星奇缘','event','立即执行无需空房间的家庭增长；新生儿放在西采石场的人员旁。'],
+ X15:['三脚入侵者','event','每个回家阶段结束时，每人付 1 个货物或归还房屋中 1 人；家庭增长额外付 1 食物。'],
+ X16:['把我传送下去，威尔士人','event','你决定每位其他玩家下一个人员放在哪儿。'],
+ X17:['糖果追踪','event','立即选 2–6 分，把两倍数量的糖果放到不同行动格；你用格时拿走糖果；终局每剩 1 个 −1 分。'],
+ X18:['我是你的父亲','event','可以付 5 个货物给另一位玩家，收养他的 1 名成员。'],
+ X19:['外星人绑架','event','立即获得 1 羊 1 野猪 1 牛；本轮回家时归还 1 名成员。'],
+ X20:['亲爱的，我把这缩小了……','event','你的牧场和畜棚容量翻倍；动物换食物减半（向下取整）。'],
+ X21:['小心喷嘴!','event','所有木房间烧毁，黏土房间变石房间；无房者可用翻修以 2 木 1 芦苇建 2 个木房间。'],
+ X22:['碳凝表亲','event','本轮回家时冻结 1 名成员到第“当前轮 + 4”轮；那一轮开头可先放他一次。3 分。'],
+ X23:['麦田怪圈','event','把本牌盖在你农场的两个相邻格上；这两格算已使用，不能再用。'],
+ X24:['反抗军','occupation','立即得 5 分；本轮回家时 1 名成员上牌，此后不能行动，但仍占房间、要供养。'],
+};
+const LC={
+ LF20:['妖精戒指','space','累积妖精：进场 2 个，每轮 +1。终局妖精最多者 +5。'],
+ LF21:['未选之路','space','选“芦苇+石”或“黏土”一边；回家阶段取走所有对应累积格上的建材。'],
+ LF26:['秘鲁宗教裁判所','event','羊全部换成羊驼；终局所有人按羊驼计分，没有羊驼 −1。'],
+};
+const TYPE={space:'行动格',merchant:'商人',artifact:'物品',event:'事件',occupation:'职业'};
+const XDEST=id=>{const t=XC[id][1];
+ if(t==='space')return '公共区 · 公共区行动格';
+ if(t==='merchant')return '公共区 · 等待购买';
+ if(['X13','X15','X21'].includes(id))return '公共区 · 持续规则';
+ if(t==='artifact')return '抽牌者持有 · 不算发展';
+ if(['X16','X19'].includes(id))return '抽牌者持有 · 义务完成后弃置';
+ if(['X14','X18'].includes(id))return '结算后弃置';
+ if(id==='X24')return '抽牌者职业 · 不算打出';
+ return '抽牌者持有 · 到终局';};
+const MERCH={X04:{on:'farm-expansion',t:'建畜棚时可多付 2 芦苇 → 木星商人 2 分'},X05:{on:'wish',t:'家庭增长时可多付 2 食物 → 火星商人 2 分'},X06:{on:'fencing',t:'用此格时可多付 2 石 → 冥王星商人 2 分'}};
+const XRULE={
+ X13:{t:'正好 42 分获胜',x:'游戏结束时正好 42 分的玩家获胜；没有人正好 42 分时，最高分获胜。'},
+ X15:{t:'回家末进贡；家庭增长 +1 食物',x:'每个回家阶段结束时，从抽牌者起每人付 1 个货物或归还房屋中 1 人。任何家庭增长额外付 1 食物。'},
+ X21:{t:'无房者可用翻修重建',x:'无房玩家执行翻修时，可改为付 2 木 1 芦苇，在两个相邻空格上建 2 个木房间。'},
+};
+const VARIANTS={A:'独立面板',B:'合并面板 + 就地提示',C:'规则带 + 时间线'};
+const VDESC={
+ A:'<b>A 独立面板</b>：沿用 Legendairy Forest 已定的扩展面板，X-Deck 另起一块同构面板：牌堆、最近翻出、弃牌、公共区行动格、等待中的商人、持续规则、翻牌记录集中一处。行动板上只画实物标记（糖果、草叉、新生儿）。两副牌同局时两块面板上下排列。',
+ B:'<b>B 合并面板 + 就地提示</b>：一块“变体牌堆”面板并列两副牌，最近翻出与翻牌记录合并。商人和持续规则除了在面板里列出，还贴到它们影响的位置：围栏、扩建、家庭增长、翻修格上的提示条，计分按钮旁的 42 分规则，农场上的“容量 ×2 / 食物减半”。',
+ C:'<b>C 规则带 + 时间线</b>：行动板上方一条“正在生效”规则带，两副牌的持续规则和等待中的商人都是可展开的条目。两副牌的公共区行动格画进行动板的同一行。右栏用一条按全局序号排列的翻牌时间线代替各自的记录。玩家持有的变体牌放在单独的“持有的变体牌”托盘里。'};
+const SCENES={setup:'建局与开局',draw:'翻牌公开',rules:'商人与持续规则',markers:'版图标记',both:'两副牌同局',score:'计分与胜负'};
+const SHINT={
+ setup:'建局怎么勾选、等待房间怎么显示、开局第一帧的空状态。三个方案在这一场景相同。',
+ draw:'第 8 轮，玩家1 从西采石场取得 2 石，触发 X-Deck 翻牌。用右侧下拉切换翻出的牌，比较商人、物品、事件（新生儿）、行动格、持续事件和跨玩家指定放置六条路径。切到玩家2 看旁观者体验。',
+ rules:'第 10 轮常态：公共区有 X02 行动格、两张等待中的商人、X13 与 X15 两条持续规则。第 2 步 X21 刚结算，玩家2 无房，看重建提示出现在哪里。',
+ markers:'第 11 轮：糖果、草叉、冻结在第 13 轮的人员、麦田怪圈、反抗军、燃料罐、太空毛球、缩小。第 2 步回家前，X08 与 X09 的交互。',
+ both:'第 9 轮，同时启用 Legendairy Forest。玩家1 的未选之路在回家阶段开头取走所有芦苇和石头累积格的建材，其中从西采石场取得石头，嵌套触发 X-Deck 翻牌。看两副牌怎么并列、记录怎么交错。',
+ score:'终局。玩家1 47 分、玩家2 正好 42 分，X13 让玩家2 获胜。看胜负说明和各类得分的来源。'};
+const STEPS={setup:['建局勾选','等待房间配置','开局第一帧'],draw:['放人到西采石场，取得 2 石','安排取石后的 after 反应','翻出并结算','结算完成'],rules:['第 10 轮常态','X21 结算后：玩家2 无房'],markers:['第 11 轮工作阶段','回家前：X08 / X09'],both:['回家阶段开头：未选之路收取建材','嵌套触发 X-Deck 翻牌','结算完成：两副牌的记录'],score:['终局计分']};
+const P={p1:'玩家1',p2:'玩家2'};
+const BASE=[['farm-expansion','农场扩建','建房间和/或畜棚'],['meeting-place','聚会所','起始玩家 + 次要发展'],['grain-seeds','谷物种子','+1 谷物'],['farmland','农田','犁 1 块田'],['lessons','课程','打出 1 张职业'],['day-laborer','日工','+2 食物'],['forest','森林','累积 3 木'],['clay-pit','黏土坑','累积 1 黏土'],['reed-bank','芦苇河岸','累积 1 芦苇'],['fishing','钓鱼','累积 1 食物']];
+const ROUNDS=[['sheep','羊市场'],['fencing','围栏'],['improve','主要或次要发展'],['sow','播种和/或烤面包'],['wish','希望增加家庭成员'],['wq','西采石场'],['reno','翻修'],['boar','野猪市场'],['veg','蔬菜种子'],['eq','东采石场'],['cattle','牛市场'],['urgent','紧急希望增加家庭成员'],['cultivate','耕种'],['farmreno','翻修并建栅栏']];
+const SNAME=Object.fromEntries([...BASE.map(([i,n])=>[i,n]),...ROUNDS]);
+const TREE='<svg class="tree" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 0 11 7H8.2L11.5 11.5H.5L3.8 7H1Z"/><rect x="5" y="11.5" width="2" height="2.5"/></svg>';
+const XG='<span class="xg" aria-hidden="true">X</span>';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isX=id=>id in XC;
+const cname=id=>isX(id)?XC[id][0]:LC[id][0];
+const nm=id=>`${id} ${cname(id)}`;
+const mp=p=>`<span class="mp ${p.replace('new','')}"><i></i>${p.endsWith('new')?'新生儿':P[p]}</span>`;
+const DRAWS=[['X06','X06 冥王星商人 · 商人'],['X10','X10 复制器 · 物品'],['X14','X14 异星奇缘 · 事件，新生儿'],['X01','X01 异星粪便 · 行动格'],['X15','X15 三脚入侵者 · 持续事件'],['X16','X16 把我传送下去 · 跨玩家指定放置']];
+
+const S={variant:'A',scene:'draw',viewer:'p1',device:'auto',step:0,drawCard:'X06',lobbyOn:true,lfOn:false,scoreOpen:false,toastClosed:false,discOpen:false,chips:{}};
+(function readUrl(){
+ const q=new URLSearchParams(location.search);const h=(location.hash||'').slice(1).split('-');
+ const v=(q.get('variant')||h[0]||'').toUpperCase();if(VARIANTS[v])S.variant=v;
+ const sc=q.get('scene')||h[1];if(SCENES[sc])S.scene=sc;
+})();
+function writeUrl(){try{history.replaceState(null,'',`${location.pathname}${location.search}#${S.variant.toLowerCase()}-${S.scene}`)}catch(e){}}
+const isMobile=()=>S.device==='phone'||window.innerWidth<820;
+
+/* ---------- fixed demo worlds ---------- */
+function blank(round,phase){return{round,phase,active:'p1',revealedTo:round,sp:{},frozen:null,
+ xd:{deck:24,disc:[],recent:null,spaces:[],merch:[],rules:[],log:[]},lf:null,
+ pl:{p1:{res:{木:3,黏土:2,芦苇:1,石:0,食物:4,羊:2},held:[],house:'木屋',rooms:[5,10],fields:[1],circle:[],shrink:false,notes:[]},
+     p2:{res:{木:2,黏土:1,芦苇:2,石:1,食物:5,野猪:1},held:[],house:'木屋',rooms:[5,10],fields:[2],circle:[],shrink:false,notes:[]}},
+ log:[],reveal:null,ibar:null,score:null}}
+const sp=(w,id)=>w.sp[id]||(w.sp[id]={occ:[],marks:[]});
+function addLog(w,r,t,deck){w.log.push({r,t,deck})}
+function xlog(w,seq,r,by,card,from,dest){w.xd.log.push({seq,r,by,card,from,dest})}
+function world(){
+ const sc=S.scene,st=S.step;
+ if(sc==='setup'){const w=blank(1,'工作阶段');w.revealedTo=1;addLog(w,1,'本局启用 X-Deck：牌堆 24 张，西采石场进场后开始翻牌。','x');return w;}
+ if(sc==='draw'){
+  const w=blank(8,'工作阶段');
+  w.xd.deck=22;w.xd.spaces=['X02'];w.xd.merch=['X04'];
+  xlog(w,1,6,'p2','X02','西采石场','公共区行动格');xlog(w,2,7,'p1','X04','西采石场','公共区 · 等待购买');
+  addLog(w,6,'玩家2 从西采石场取得 1 石，翻出 X02 自制火箭 → 公共区行动格。','x');
+  addLog(w,7,'玩家1 从西采石场取得 1 石，翻出 X04 木星商人 → 等待购买。','x');
+  sp(w,'forest').occ=['p2'];sp(w,'wq').occ=['p1'];sp(w,'wq').goods=st===0?'2 石 → 玩家1':'';sp(w,'wq').hl=st<=1;
+  addLog(w,8,'玩家2 在森林取得 4 木。');addLog(w,8,'玩家1 在西采石场取得 2 石。');
+  w.pl.p1.res.石=2;
+  if(st===1){w.ibar={p1:{t:'安排取石后的反应',x:'同一窗口里的反应由你排序；X-Deck 翻牌必须执行，不能跳过。',list:[[`${XG} X-Deck 翻牌`,'必须'],['你的卡牌：取得石头后 +1 食物（示意）','可选']],bs:['先翻牌','先结算卡牌']},p2:{wait:'等待玩家1 安排取石后的反应'}};}
+  if(st>=2){const c=S.drawCard;w.xd.deck=21;
+   const R={X06:['冥王星商人进入公共区，等待购买','条件：使用“围栏”行动格并额外付 2 石'],
+    X10:['归玩家1 持有，不算发展','下一次玩家1 使用累积格时货物翻倍，然后交给玩家2'],
+    X14:['玩家1 执行无需空房间的家庭增长','新生儿画在西采石场的人员旁，本轮不行动'],
+    X01:['异星粪便成为公共区行动格，本轮就能用'],
+    X15:['三脚入侵者进入公共区：每轮回家末付 1 货物或归还 1 人','任何家庭增长额外付 1 食物'],
+    X16:['玩家2 下一次放人时，由玩家1 为他选行动格']}[c];
+   const pending=c==='X16'&&st===2;
+   w.xd.recent={card:c,by:'p1',from:'西采石场',stone:2,status:pending?'结算中':'结算完成',res:R};
+   w.reveal={card:c,by:'p1',from:'西采石场',stone:2,res:R};
+   xlog(w,3,8,'p1',c,'西采石场',XDEST(c));
+   addLog(w,8,`玩家1 从西采石场取得 2 石，翻出 ${nm(c)}：${R[0]}。`,'x');
+   if(c==='X06')w.xd.merch.push('X06');
+   if(c==='X10')w.pl.p1.held.push({id:'X10',st:'等待下一次使用累积格'});
+   if(c==='X14'){sp(w,'wq').occ=['p1','p1new'];w.xd.disc.push('X14');}
+   if(c==='X01')w.xd.spaces.push('X01');
+   if(c==='X15')w.xd.rules.push('X15');
+   if(c==='X16'){w.pl.p1.held.push({id:'X16',st:'待指定：玩家2'});
+    if(st===3){w.active='p2';w.xd.recent.status='等待指定';w.ibar={p1:{t:'为玩家2 选择行动格（把我传送下去）',x:'下面是玩家2 现在能合法放人的格。你只选格；格里的选择、付费和收益归玩家2。',list:[['芦苇河岸','可放'],['钓鱼','可放'],['羊市场','可放'],['异星粪便以外的公共区行动格','按合法性']],bs:['选“钓鱼”']},p2:{wait:'轮到你放人：等待玩家1 为你选择行动格（X16）。选好后由你选人并放下。'}};
+     addLog(w,8,'轮到玩家2 放人：交给玩家1 选格（X16）。','x');}}
+   if(st===2&&c!=='X16'){}
+   if(st===2&&pending)w.ibar={p1:{t:'X16 已登记',x:'玩家2 下一次轮到放人时，会先交给你选格。',list:[],bs:['知道了']},p2:{wait:'玩家1 翻出 X16：你的下一个人员由玩家1 指定行动格。'}};
+  }
+  return w;}
+ if(sc==='rules'){
+  const w=blank(10,'工作阶段');w.xd.deck=18;w.xd.spaces=['X02'];w.xd.merch=['X04','X06'];w.xd.rules=['X13','X15'];w.xd.disc=['X14'];
+  w.pl.p1.held=[{id:'X10',st:'等待下一次使用累积格'}];w.pl.p2.held=[{id:'X11',st:'本次行动可减 1 木'}];
+  w.pl.p1.house='黏土屋';
+  [[1,6,'p2','X02'],[2,7,'p1','X04'],[3,8,'p1','X10'],[4,8,'p2','X14'],[5,9,'p2','X11'],[6,9,'p1','X13'],[7,10,'p2','X06'],[8,10,'p1','X15']].forEach(([q,r,b,c])=>xlog(w,q,r,b,c,'西采石场',XDEST(c)));
+  sp(w,'forest').occ=['p1'];sp(w,'fishing').occ=['p2'];sp(w,'X02').occ=['p1'];
+  addLog(w,10,'玩家2 从西采石场取得 1 石，翻出 X06 冥王星商人 → 等待购买。','x');
+  addLog(w,10,'玩家1 从西采石场取得 1 石，翻出 X15 三脚入侵者 → 公共区持续规则。','x');
+  if(S.step===1){w.xd.deck=17;w.xd.rules.push('X21');xlog(w,9,10,'p2','X21','西采石场',XDEST('X21'));
+   w.pl.p2.house='无房';w.pl.p2.rooms=[];w.pl.p1.house='石屋';
+   w.xd.recent={card:'X21',by:'p2',from:'西采石场',stone:1,status:'结算完成',res:['玩家2 的 2 个木房间烧毁，变为空格；玩家2 无房','玩家1 的黏土房间变成石房间','无房期间：翻修可改为 2 木 1 芦苇建 2 个木房间']};
+   w.reveal={card:'X21',by:'p2',from:'西采石场',stone:1,res:w.xd.recent.res};
+   addLog(w,10,'玩家2 翻出 X21 小心喷嘴!：玩家2 的木房间烧毁（无房）；玩家1 的黏土房间变成石房间。','x');}
+  return w;}
+ if(sc==='markers'){
+  const w=blank(11,S.step===0?'工作阶段':'回家阶段前');w.revealedTo=11;w.xd.deck=13;w.frozen={p:'p1',round:13};
+  w.xd.spaces=['X02','X01'];w.xd.merch=['X06'];w.xd.rules=['X13','X15'];w.xd.disc=['X14','X18'];
+  [[1,6,'p2','X02'],[2,7,'p1','X08'],[3,7,'p2','X09'],[4,8,'p1','X01'],[5,8,'p2','X14'],[6,9,'p1','X17'],[7,9,'p1','X22'],[8,9,'p2','X12'],[9,10,'p2','X20'],[10,10,'p1','X13'],[11,10,'p2','X24'],[12,10,'p1','X06'],[13,10,'p2','X18'],[14,11,'p1','X23'],[15,11,'p2','X15']].forEach(([q,r,b,c])=>xlog(w,q,r,b,c,'西采石场',XDEST(c)));
+  ['fishing','sheep','sow','day-laborer'].forEach(id=>sp(w,id).marks.push('candy'));
+  sp(w,'reed-bank').marks.push('fork');sp(w,'reed-bank').goods='2 芦苇';
+  w.pl.p1.held=[{id:'X08',st:'燃料罐 ●●○（剩 2）'},{id:'X17',st:'已选 3 分 · 糖果剩 4 个'},{id:'X22',st:'冻结 1 人 → 第 13 轮'},{id:'X23',st:'覆盖 (1,4)(1,5)'}];
+  w.pl.p1.circle=[3,4];w.pl.p1.notes=['冻结 1 人 → 第 13 轮'];
+  w.pl.p2.held=[{id:'X09',st:'标记：芦苇河岸'},{id:'X12',st:'毛球 5 个 · 已离开 1'},{id:'X20',st:'牧场 / 畜棚容量 ×2 · 动物换食物减半'},{id:'X24',st:'牌上 1 人（不能行动）',occ:true}];
+  w.pl.p2.shrink=true;w.pl.p2.notes=['反抗军上 1 人'];
+  sp(w,'forest').occ=['p1'];sp(w,'lessons').occ=['p2'];sp(w,'X01').occ=['p1'];sp(w,'clay-pit').occ=['p2'];
+  addLog(w,11,'玩家1 使用森林，移除森林上的糖果。','x');
+  if(S.step===1){w.active='p1';
+   w.ibar={p1:{t:'回家前：X08 奇异外星能量（燃料罐剩 2）',x:'可以归还 1 个燃料罐，不放人使用一个空着的行动格。算一次用格：会移除你在该格的糖果、触发按用格写的卡；不触发按放人写的卡。',list:[['钓鱼（有糖果）','可选'],['羊市场（有糖果）','可选'],['西采石场','可选 · 取石会翻 X-Deck'],['芦苇河岸','可选']],bs:['使用燃料罐','这次不用']},
+    p2:{wait:'等待玩家1 处理回家前效果；之后轮到你的 X09 外星雇农：芦苇河岸无人，可拿 1 个芦苇。'}};}
+  return w;}
+ if(sc==='both'){
+  const w=blank(9,S.step===0?'回家阶段开头':'回家阶段');w.revealedTo=9;S.lfOn=true;
+  w.lf={deck:20,shuffles:1,spaces:['LF21','LF20'],rules:[{src:'LF20',t:'妖精最多者 +5',x:'终局妖精最多且至少 1 个的玩家各 +5。'}],log:[[1,5,'p2','LF20','森林','公共牌区'],[3,7,'p1','LF21','森林','公共牌区']],recent:null};
+  w.xd.deck=20;w.xd.spaces=['X01'];w.xd.merch=['X06'];w.xd.rules=['X15'];
+  [[2,6,'p1','X01'],[4,8,'p2','X06'],[5,8,'p1','X15']].forEach(([q,r,b,c])=>xlog(w,q,r,b,c,'西采石场',XDEST(c)));
+  sp(w,'LF21').occ=['p1'];sp(w,'LF21').note='已选：芦苇 + 石';sp(w,'reed-bank').goods=S.step===0?'3 芦苇 → 玩家1':'';sp(w,'wq').goods=S.step===0?'2 石 → 玩家1':'';sp(w,'wq').hl=S.step===0;
+  addLog(w,9,'回家阶段开头：玩家1 的未选之路取走芦苇河岸 3 芦苇、西采石场 2 石（算 Collect）。','lf');
+  if(S.step>=1){w.ibar=S.step===1?{p1:{t:'安排取物后的反应',x:'未选之路的收取从西采石场取得了石头，嵌套触发 X-Deck 翻牌；它和同一窗口的其他反应由你排序，不能跳过。',list:[[`${XG} X-Deck 翻牌（来自西采石场）`,'必须']],bs:['翻牌']},p2:{wait:'等待玩家1 结算未选之路触发的 X-Deck 翻牌'}}:null;}
+  if(S.step>=2){w.xd.deck=19;const R=['玩家1 获得 1 羊 1 野猪 1 牛','本轮回家时（onReturnHome），玩家1 归还 1 名成员到供应区'];
+   w.xd.recent={card:'X19',by:'p1',from:'西采石场（未选之路）',stone:2,status:'结算完成',res:R};w.reveal={card:'X19',by:'p1',from:'西采石场（未选之路）',stone:2,res:R};
+   w.pl.p1.held=[{id:'X19',st:'本轮回家时归还 1 人'}];xlog(w,6,9,'p1','X19','西采石场（未选之路）',XDEST('X19'));
+   addLog(w,9,'玩家1 从西采石场取得 2 石（未选之路），翻出 X19 外星人绑架。','x');}
+  return w;}
+ if(sc==='score'){
+  const w=blank(14,'游戏结束');w.gameOver=true;w.revealedTo=14;w.xd.deck=6;w.xd.spaces=['X02','X01'];w.xd.merch=['X04'];w.xd.rules=['X13','X15'];
+  w.pl.p1.held=[{id:'X06',st:'买到 · 2 分'},{id:'X08',st:'−3 分'},{id:'X17',st:'选 3 分 · 剩 2 糖果'}];
+  w.pl.p2.held=[{id:'X12',st:'毛球 4 个 · 离开 1'},{id:'X22',st:'3 分'},{id:'X07',st:'2 列'}];
+  w.score={p1:{base:41,printed:-1,bonus:1,marker:4,unowned:0,total:47},p2:{base:34,printed:3,bonus:5,marker:0,unowned:0,total:42}};
+  addLog(w,14,'终局：玩家1 47 分，玩家2 42 分。X13 银河尽头的餐馆：正好 42 分的玩家2 获胜。','x');
+  return w;}
+}
+
+/* ---------- pieces ---------- */
+function face(id,size='md',opt={}){
+ const x=isX(id),[n,t,tx]=x?XC[id]:LC[id];
+ const top=x?`<span>${XG} ${id}</span>`:`<span>${TREE} ${id}</span>`;
+ return `<div class="cf ${x?'x':''} ${size} ${opt.cls||''}"><div class="top">${top}<span class="typ">${TYPE[t]}</span></div><div class="nm">${n}</div>${size==='mini'?'':`<div class="tx">${tx}</div>`}${opt.dest===false||size==='mini'?'':`<div class="dest">${opt.destText||(x?XDEST(id):'')}</div>`}${opt.after||''}</div>`;
+}
+function hintsFor(id,w){
+ if(S.variant!=='B')return '';
+ const out=[];
+ Object.entries(MERCH).forEach(([c,m])=>{if(m.on===id&&w.xd.merch.includes(c))out.push(`<span class="hintx">${XG} ${m.t}</span>`)});
+ if(w.xd.rules.includes('X15')&&(id==='wish'||id==='urgent'))out.push(`<span class="hintx">${XG} 家庭增长 +1 食物（X15）</span>`);
+ if(w.xd.rules.includes('X21')&&(id==='reno'||id==='farmreno')&&w.pl[S.viewer].house==='无房')out.push(`<span class="hintx warn">${XG} 你无房：可改为 2 木 1 芦苇建 2 个木房间（X21）</span>`);
+ return out.join('');
+}
+function tile(id,name,desc,w,opt={}){
+ const o=w.sp[id]||{occ:[],marks:[]};
+ const cls=['sp',opt.x?'xsp':'',opt.lf?'lfsp':'',o.hl?'hl':''].join(' ');
+ const marks=(o.marks||[]).map(m=>m==='candy'?`<span class="mk candy">● 糖果 · 玩家1</span>`:`<span class="mk fork">⑂ 草叉 · 玩家2</span>`).join('');
+ return `<div class="${cls}">${opt.r?`<span class="rn">${opt.r}</span>`:''}${opt.x?`<span class="xbadge">X · 公共 · ${id}</span>`:''}${opt.lf?`<span class="badge">${TREE} 公共 · ${id}</span>`:''}<b>${esc(name)}</b>${desc?`<small>${esc(desc)}</small>`:''}${o.goods?`<span class="goods">${o.goods}</span>`:''}${o.note?`<span class="note-gold">${o.note}</span>`:''}${marks}${hintsFor(id,w)}${(o.occ||[]).map(mp).join(' ')}</div>`;
+}
+function displaySpaceTiles(w,includeLf){
+ const xs=w.xd.spaces.map(id=>tile(id,XC[id][0],XC[id][2],w,{x:1}));
+ const ls=includeLf&&w.lf?w.lf.spaces.map(id=>tile(id,LC[id][0],LC[id][2],w,{lf:1})):[];
+ return [...ls,...xs].join('');
+}
+function board(w){
+ const base=BASE.map(([id,n,d])=>tile(id,n,d,w)).join('');
+ const rounds=ROUNDS.map(([id,n],i)=>{const r=i+1;if(r>w.revealedTo)return `<div class="sp future"><small>第 ${r} 轮</small><b>?</b></div>`;return tile(id,n,'',w,{r});}).join('');
+ const inline=S.variant==='C'&&(w.xd.spaces.length||(w.lf&&w.lf.spaces.length))?`<div class="bh" style="margin-top:12px"><span>公共区行动格（两副牌，按翻出顺序）</span><span>${w.xd.spaces.length+(w.lf?w.lf.spaces.length:0)} 个</span></div><div class="grid">${displaySpaceTiles(w,true)}</div>`:'';
+ return `<section class="board" aria-label="行动板"><div class="bh"><span>行动板</span><span>第 ${w.round} 轮</span></div><div class="grid">${base}</div><div class="rgrid">${rounds}</div>${inline}</section>`;
+}
+function stagebar(w){return `<div class="stagebar">${Array.from({length:14},(_,i)=>{const r=i+1;const fz=w.frozen&&w.frozen.round===r;return `<span class="${r<w.round?'past':r===w.round?'now':''} ${[4,7,9,11,13,14].includes(r)?'h':''} ${fz?'frozen':''}" ${fz?`title="玩家1 冻结的成员在第 ${r} 轮解冻"`:''}>${r}${fz?' ❄':''}</span>`}).join('')}</div>${w.frozen?`<p class="pnote">❄ 第 ${w.frozen.round} 轮格上：${P[w.frozen.p]} 被 X22 冻结的成员，那一轮开头可先放他一次。</p>`:''}`}
+function header(w){return `<div class="ghead"><div><strong>第 ${w.round} 轮 · ${w.phase}</strong> <span class="who">${w.gameOver?'':`轮到 ${P[w.active]}`}</span></div><div class="who">你是 <span class="dot ${S.viewer}"></span>${P[S.viewer]} · 2 人局${w.lf?' · Legendairy Forest + X-Deck':' · X-Deck'}</div></div>`}
+function playersPanel(w){
+ const row=p=>{const pl=w.pl[p];return `<div class="prow ${w.active===p?'act':''}"><div class="pn"><span><span class="dot ${p}"></span>${P[p]}</span><span class="sub">${pl.house}</span></div><div class="res">${Object.entries(pl.res).map(([k,v])=>`<span>${k} ${v}</span>`).join('')}</div>${pl.notes.map(n=>`<span class="pnote">${XG} ${n}</span>`).join('')}</div>`};
+ return `<section class="panel players-strip"><h3>玩家</h3><div class="plist">${row('p1')}${row('p2')}</div></section>`;
+}
+function farmPanel(w){
+ const p=S.viewer,pl=w.pl[p];
+ const tiles=Array.from({length:15},(_,i)=>{const room=pl.rooms.includes(i);const burnt=pl.house==='无房'&&(i===5||i===10);const field=pl.fields.includes(i);const circ=pl.circle.includes(i);
+  return `<div class="tile ${room?'room':field?'field':''} ${circ?'circle':''} ${burnt?'homeless':''}">${circ?'怪圈':room?pl.house.replace('屋',''):burnt?'空格':field?'田':''}</div>`}).join('');
+ const shrink=pl.shrink&&S.variant==='B'?`<p class="hintx" style="margin-top:6px">${XG} X20：牧场与畜棚容量 ×2；动物换食物减半（向下取整）</p>`:'';
+ const homeless=pl.house==='无房'&&S.variant==='B'?`<p class="hintx warn" style="margin-top:6px">${XG} 无房：住房容量只剩卡牌提供的部分；翻修可改为重建（X21）</p>`:'';
+ const cardsHtml=pl.held.map(h=>face(h.id,'md',{destText:`<span class="heldtag">${XG} ${h.id==='X24'?'X-Deck 获得 · 不算打出':'X-Deck 持有 · 不算职业或发展'}</span>`,after:`<div class="cstate">${esc(h.st)}</div>`})).join('');
+ let held='';
+ if(pl.held.length){held=S.variant==='C'?`<div class="tray"><div class="th"><span>${XG} 持有的变体牌</span><span class="sub">不算职业或发展</span></div><div class="owned">${cardsHtml}</div></div>`:`<h4>已打出</h4><div class="owned">${cardsHtml}</div>`;}
+ return `<section class="panel"><h3>${P[p]} 的农场 <span class="sub">${pl.house} · 示意</span></h3><div class="farm">${tiles}</div>${shrink}${homeless}${held}</section>`;
+}
+function logPanel(w){
+ let lastR=null;const out=w.log.map(e=>{const rh=e.r!==lastR?`<div class="rh">第 ${e.r} 轮</div>`:'';lastR=e.r;return rh+`<div class="le ${e.deck?'lf':''}" ${e.deck==='x'?'style="border-left-color:var(--xd)"':''}>${e.deck==='x'?`<span class="dk x">X</span> `:e.deck==='lf'?`<span class="dk lf">LF</span> `:''}${esc(e.t)}</div>`}).join('');
+ return `<section class="panel"><h3>行动记录</h3><div class="log">${out||'<div class="sub">暂无</div>'}</div></section>`;
+}
+function ruleItem(id,cls='xrule'){const r=XRULE[id];return `<li class="rule ${cls}"><div class="rt"><span>${esc(r.t)}</span><span class="srcchip">${XG} ${id} ${XC[id][0]}</span></div><div class="rx">${esc(r.x)}</div></li>`}
+function merchItem(id){return face(id,'md',{destText:'公共区 · 等待购买',after:`<div class="cond">${MERCH[id].t}</div>`})}
+function drawTable(w){
+ const rows=w.xd.log.map(e=>`<tr><td>${e.r}</td><td>${mp(e.by)}</td><td>${esc(e.from)}</td><td>${nm(e.card)}</td><td>${esc(e.dest)}</td></tr>`).join('');
+ return `<div class="tblwrap"><table class="drawtbl"><thead><tr><th>轮</th><th>玩家</th><th>来源</th><th>牌</th><th>去向</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="sub">还没有翻牌</td></tr>'}</tbody></table></div>`;
+}
+function recentSlot(w){
+ const rv=w.xd.recent;
+ if(!rv)return `<div class="slotA"><span class="cap">最近翻出</span><span class="sub">${w.round<5?'西采石场第 5–7 轮进场；从那里取得石头就翻 1 张。':'本轮还没有翻牌'}</span></div>`;
+ return `<div class="slotA ${S.toastClosed?'':'glow'}"><span class="cap">最近翻出 · ${mp(rv.by)} 从${esc(rv.from)}取得 ${rv.stone} 石</span>${face(rv.card)}<span class="status ${rv.status==='结算完成'?'done':'res'}">${rv.status}</span><ul class="res-lines">${rv.res.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+}
+function xPanelA(w){
+ const disc=`<div class="discbox"><div class="back" style="height:70px">弃牌<br>${w.xd.disc.length} 张</div>${w.xd.disc.length?`<button class="linkbtn" data-act="disc">${S.discOpen?'收起':'展开'}</button>`:''}</div>`;
+ const discOpen=S.discOpen&&w.xd.disc.length?`<div class="owned">${w.xd.disc.map(id=>face(id,'mini')).join('')}</div>`:'';
+ return `<section class="panel xA" aria-label="X-Deck 面板"><h3><span>${XG} X-Deck</span><span class="sub">牌堆 ${w.xd.deck} 张 · 不洗回</span></h3>
+ <div class="lfA-top"><div class="deckbox"><div class="backx" style="height:112px">X<br>${w.xd.deck} 张</div><span>牌堆</span></div>${recentSlot(w)}${disc}</div>${discOpen}
+ <h4>公共区行动格</h4>${w.xd.spaces.length?`<div class="lfspaces">${displaySpaceTiles(w,false)}</div>`:'<p class="sub">暂无</p>'}
+ <h4>等待中的商人</h4>${w.xd.merch.length?`<div class="merch">${w.xd.merch.map(merchItem).join('')}</div>`:'<p class="sub">暂无</p>'}
+ <h4>持续规则</h4>${w.xd.rules.length?`<ul class="rules">${w.xd.rules.map(id=>ruleItem(id)).join('')}</ul>`:'<p class="sub">暂无</p>'}
+ <h4>翻牌记录</h4>${drawTable(w)}</section>`;
+}
+function lfPanelCompact(w){
+ if(!w.lf)return '';
+ return `<section class="panel lfA" aria-label="Legendairy Forest 面板"><h3><span>${TREE} Legendairy Forest</span><span class="sub">牌堆 ${w.lf.deck} 张 · 已洗 ${w.lf.shuffles} 次</span></h3>
+ <h4>公共行动格</h4><div class="lfspaces">${w.lf.spaces.map(id=>tile(id,LC[id][0],LC[id][2],w,{lf:1})).join('')}</div>
+ <h4>持续规则</h4><ul class="rules">${w.lf.rules.map(r=>`<li class="rule lrule"><div class="rt"><span>${esc(r.t)}</span><span class="srcchip">${TREE} ${r.src}</span></div><div class="rx">${esc(r.x)}</div></li>`).join('')}</ul>
+ <h4>翻牌记录</h4><div class="tblwrap"><table class="drawtbl"><thead><tr><th>轮</th><th>玩家</th><th>牌</th><th>去向</th></tr></thead><tbody>${w.lf.log.map(([q,r,b,c,f,d])=>`<tr><td>${r}</td><td>${mp(b)}</td><td>${nm(c)}</td><td>${d}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+function mergedPanelB(w){
+ const decks=`<div class="decks">${w.lf?`<div class="deckmini"><div class="back">${TREE}<br>${w.lf.deck}</div><div><b>Legendairy Forest</b><div class="sub">剩 ${w.lf.deck} 张 · 已洗 ${w.lf.shuffles} 次</div></div></div>`:''}<div class="deckmini"><div class="backx">X<br>${w.xd.deck}</div><div><b>X-Deck</b><div class="sub">剩 ${w.xd.deck} 张 · 弃牌 ${w.xd.disc.length} 张 · 不洗回</div></div></div></div>`;
+ const spaces=(w.xd.spaces.length||(w.lf&&w.lf.spaces.length))?`<h4>公共区行动格</h4><div class="lfspaces">${displaySpaceTiles(w,true)}</div>`:'';
+ const merch=w.xd.merch.length?`<h4>等待中的商人 <span class="sub">提示也贴在对应行动格上</span></h4><div class="pillrow">${w.xd.merch.map(id=>`<span class="x">${id} ${XC[id][0]} · 2 分</span>`).join('')}</div>`:'';
+ const rules=(w.xd.rules.length||(w.lf&&w.lf.rules.length))?`<h4>持续规则 <span class="sub">受影响的位置另有提示</span></h4><ul class="rules">${(w.lf?w.lf.rules:[]).map(r=>`<li class="rule lrule"><div class="rt"><span>${esc(r.t)}</span><span class="srcchip">${TREE} ${r.src}</span></div></li>`).join('')}${w.xd.rules.map(id=>`<li class="rule xrule"><div class="rt"><span>${esc(XRULE[id].t)}</span><span class="srcchip">${XG} ${id}</span></div></li>`).join('')}</ul>`:'';
+ const allLog=[...w.xd.log.map(e=>({...e,deck:'x'})),...(w.lf?w.lf.log.map(([seq,r,by,card,from,dest])=>({seq,r,by,card,from,dest,deck:'lf'})):[])].sort((a,b)=>a.r-b.r||a.seq-b.seq);
+ const tbl=`<div class="tblwrap"><table class="drawtbl"><thead><tr><th>轮</th><th>牌堆</th><th>玩家</th><th>牌</th><th>去向</th></tr></thead><tbody>${allLog.map(e=>`<tr><td>${e.r}</td><td><span class="dk ${e.deck}">${e.deck==='x'?'X':'LF'}</span></td><td>${mp(e.by)}</td><td>${nm(e.card)}</td><td>${esc(e.dest)}</td></tr>`).join('')||'<tr><td colspan="5" class="sub">还没有翻牌</td></tr>'}</tbody></table></div>`;
+ return `<section class="panel xA" aria-label="变体牌堆面板"><h3><span>变体牌堆</span><span class="sub">${w.lf?'两副牌':'X-Deck'}</span></h3>${decks}<div style="margin-top:10px">${recentSlot(w)}</div>${spaces}${merch}${rules}<h4>翻牌记录（合并）</h4>${tbl}</section>`;
+}
+function stripC(w){
+ const chips=[];
+ (w.lf?w.lf.rules:[]).forEach(r=>chips.push({k:'lf-'+r.src,cls:'lf',t:`${TREE} ${r.t}`,x:`${r.x}（来源 ${r.src}）`}));
+ w.xd.merch.forEach(id=>chips.push({k:id,cls:'merchant',t:`${XG} ${XC[id][0]} · 等待购买`,x:MERCH[id].t}));
+ w.xd.rules.forEach(id=>chips.push({k:id,cls:'',t:`${XG} ${XRULE[id].t}`,x:`${XRULE[id].x}（来源 ${id} ${XC[id][0]}）`}));
+ if(!chips.length)return `<div class="strip"><span class="lead">正在生效</span><span class="sub">暂无</span></div>`;
+ return `<div class="strip" role="list"><span class="lead">正在生效</span>${chips.map(c=>`<button class="rchip ${c.cls}" role="listitem" data-act="chip:${c.k}" aria-expanded="${!!S.chips[c.k]}"><span>${c.t}</span><span class="rx">${esc(c.x)}</span></button>`).join('')}</div>`;
+}
+function timelineC(w){
+ const all=[...w.xd.log.map(e=>({...e,deck:'x'})),...(w.lf?w.lf.log.map(([seq,r,by,card,from,dest])=>({seq,r,by,card,from,dest,deck:'lf'})):[])].sort((a,b)=>a.r-b.r||a.seq-b.seq);
+ const deckline=`<div class="deckline">${w.lf?`<span><span class="dk lf">LF</span> 剩 ${w.lf.deck} · 已洗 ${w.lf.shuffles}</span>`:''}<span><span class="dk x">X</span> 剩 ${w.xd.deck} · 弃 ${w.xd.disc.length}</span></div>`;
+ const rv=w.xd.recent?`<div style="margin:8px 0">${face(w.xd.recent.card,'md',{after:`<span class="status ${w.xd.recent.status==='结算完成'?'done':'res'}">${w.xd.recent.status}</span>`})}</div>`:'';
+ return `<section class="panel"><h3>翻牌时间线 <span class="sub">两副牌按全局序号</span></h3>${deckline}${rv}<div class="tl">${all.map(e=>`<div class="ev ${e.deck==='lf'?'lf':''}"><span class="sq">#${e.seq}<br>第${e.r}轮</span><span><span class="dk ${e.deck}">${e.deck==='x'?'X':'LF'}</span> ${mp(e.by)} ${nm(e.card)}<br><span class="dd">${esc(e.from)} → ${esc(e.dest)}</span></span></div>`).join('')||'<span class="sub">还没有翻牌</span>'}</div>${w.xd.merch.length?`<h4>等待中的商人</h4><div class="merch">${w.xd.merch.map(merchItem).join('')}</div>`:''}</section>`;
+}
+function interactionBar(w){
+ if(w.gameOver)return '';
+ const b=w.ibar&&w.ibar[S.viewer];
+ if(!b)return `<div class="ibar wait"><span class="x">${w.active===S.viewer?'轮到你：在行动板上选择行动格':`等待${P[w.active]}行动`}</span></div>`;
+ if(b.wait)return `<div class="ibar wait"><span class="t">等待</span><span class="x">${b.wait}</span></div>`;
+ return `<div class="ibar"><span class="t">${b.t}</span><span class="x">${b.x}</span>${b.list.length?`<div class="tlist">${b.list.map(([a,c])=>`<div><span>${a}</span><span class="${c==='必须'?'must':''}">${c}</span></div>`).join('')}</div>`:''}<div class="bs">${b.bs.map((t,i)=>`<button class="btn ${i===0?'pri':''}" data-act="noop">${t}</button>`).join('')}</div></div>`;
+}
+function scorePad(w){
+ const s=w.score;if(!s)return '';
+ const rows=[['基础计分（田、牧场、作物、动物、房间、家庭、空格）','base'],['卡牌印刷分（买到的商人 +2、X08 −3、X22 +3）','printed'],['卡牌奖励分 Card Bonus VP（X17、X12、X07）','bonus'],['公共计分标记（X02 自制火箭 +4）','marker']];
+ const win=`<div class="win"><b>玩家2 获胜</b><span>${XG} X13 银河尽头的餐馆：正好 42 分的玩家获胜。玩家2 正好 42 分；玩家1 47 分但不是 42。</span>${S.variant==='B'?'<span class="sub">没有 X13 时，按最高分判定，玩家1 获胜。</span>':''}</div>`;
+ return `<div class="scrim" role="dialog" aria-modal="true" aria-label="计分板"><div class="modal"><h2>终局计分</h2>${win}<table class="score"><thead><tr><th>项目</th><th>${P.p1}</th><th>${P.p2}</th></tr></thead><tbody>${rows.map(([l,k])=>`<tr><td>${l}</td><td>${s.p1[k]}</td><td>${s.p2[k]}</td></tr>`).join('')}<tr class="tot"><td>总分</td><td>${s.p1.total}</td><td>${s.p2.total} ${XG}</td></tr></tbody></table><p class="sub">胜者由同一个判定函数给出：游戏结束界面和对局归档的胜者标记一致。原始分类分数和总分照常保留。</p><button class="btn" data-act="score:0">关闭</button></div></div>`;
+}
+function lobby(){
+ if(S.step===0)return `<div class="lobby"><section class="panel"><h3>创建房间 · 变体</h3>
+ <label class="toggle"><input type="checkbox" checked disabled><span>Farmers of the Moor<span class="h">示意：已有选项</span></span></label>
+ <label class="toggle ${S.lfOn?'lfon':''}"><input type="checkbox" id="lf-toggle" ${S.lfOn?'checked':''}><span>${TREE} Legendairy Forest<span class="h">取得至少 3 木时翻 1 张，1–6 人可用，1–2 人局移出 13 号。</span></span></label>
+ <label class="toggle ${S.lobbyOn?'xon':''}"><input type="checkbox" id="x-toggle" ${S.lobbyOn?'checked':''}><span>${XG} X-Deck<span class="h">从西采石场取得石头后翻 1 张公开，24 张全用，不洗回；1–6 人可用。可与 Legendairy Forest 同开。</span></span></label>
+ <details class="sum"><summary>X-Deck 会带来什么</summary><ul><li>公共区行动格、等待购买的商人、持续规则（如正好 42 分获胜）</li><li>物品和事件会改变农场、人员和动物</li><li>翻牌对所有人公开；需要选择时只打断相关玩家</li></ul></details></section></div>`;
+ return `<div class="lobby"><section class="panel"><h3>等待房间 · 公开配置</h3><div class="cfglist"><div><span>人数</span><span>2 人</span></div><div><span>变体</span><span class="pillrow"><span>Farmers of the Moor</span>${S.lfOn?'<span class="lf">Legendairy Forest</span>':''}${S.lobbyOn?'<span class="x">X-Deck</span>':''}</span></div></div><p class="sub" style="margin-top:8px">同配置重开会继承 X-Deck，并重新洗牌。</p></section></div>`;
+}
+function render(){
+ const m=isMobile(),v=S.variant;
+ renderCtrl();
+ const shell=document.getElementById('shell');
+ shell.className='shell'+(S.device==='phone'?' frame':'')+(m?' m':'');
+ if(S.scene==='setup'&&S.step<2){shell.innerHTML=`<div class="scroller">${lobby()}</div><div class="flayer"></div>`;bind();return;}
+ if(S.scene==='setup'&&!S.lobbyOn){shell.innerHTML=`<div class="scroller"><div class="lobby"><section class="panel"><p>本局未启用 X-Deck，对局里不会出现任何相关界面。回到第 1 步勾选后再看。</p></section></div></div><div class="flayer"></div>`;bind();return;}
+ const w=world();
+ const panel=v==='A'?`${lfPanelCompact(w)}${xPanelA(w)}`:v==='B'?mergedPanelB(w):'';
+ const left=`<div class="col">${board(w)}${panel}</div>`;
+ const center=`<div class="col">${farmPanel(w)}</div>`;
+ const scoreBtn=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" data-act="score:1" ${w.score?'':'disabled'}>计分板</button>${v==='B'&&w.xd.rules.includes('X13')?`<span class="hintx">${XG} X13：终局正好 42 分获胜</span>`:''}</div>`;
+ const right=`<div class="col">${m?'':playersPanel(w)}${v==='C'?timelineC(w):''}${scoreBtn}${logPanel(w)}</div>`;
+ const top=v==='C'?stripC(w):'';
+ const page=m?`${header(w)}${playersPanel(w)}${stagebar(w)}${top}${left}${center}${right}`:`${header(w)}${stagebar(w)}${top}<div class="cols">${left}${center}${right}</div>`;
+ let fl='';
+ if(w.reveal&&!S.toastClosed){fl+=`<div class="toasts" role="status"><div class="toast x"><div class="tt"><span>${XG} ${mp(w.reveal.by)} 从${esc(w.reveal.from)}取得 ${w.reveal.stone} 石，翻出 <b>${nm(w.reveal.card)}</b></span><button class="linkbtn" data-act="toast" aria-label="关闭提示">关闭</button></div><span class="sub">${esc(w.reveal.res[0])}${w.reveal.res.length>1?' 等':''}</span></div></div>`;}
+ if(S.scoreOpen)fl+=scorePad(w);
+ fl+=interactionBar(w);
+ shell.innerHTML=`<div class="scroller">${page}</div><div class="flayer">${fl}</div>`;
+ bind();
+}
+function renderCtrl(){
+ const labels=STEPS[S.scene];
+ const extra=S.scene==='draw'?`<label>翻出 <select id="drawCard">${DRAWS.map(([k,l])=>`<option value="${k}" ${S.drawCard===k?'selected':''}>${l}</option>`).join('')}</select></label>`:'';
+ document.getElementById('ctrl').innerHTML=`<div class="ctrl-row"><h1>X-Deck 牌区草图</h1><span class="tag">原型 · 固定演示数据 · 不连游戏服务</span></div>
+ <div class="ctrl-row" style="margin-top:8px"><label>场景 <select id="scene">${Object.entries(SCENES).map(([k,l])=>`<option value="${k}" ${S.scene===k?'selected':''}>${l}</option>`).join('')}</select></label>
+ <label>视角 <select id="viewer"><option value="p1" ${S.viewer==='p1'?'selected':''}>玩家1</option><option value="p2" ${S.viewer==='p2'?'selected':''}>玩家2</option></select></label>
+ <label>设备 <select id="device"><option value="auto" ${S.device==='auto'?'selected':''}>按窗口宽度</option><option value="phone" ${S.device==='phone'?'selected':''}>手机外框</option></select></label>
+ ${extra}
+ <span class="steps"><button data-act="prev" ${S.step===0?'disabled':''} aria-label="上一步">◀</button><span class="steplabel">${S.step+1}/${labels.length} ${labels[S.step]}</span><button data-act="next" ${S.step>=labels.length-1?'disabled':''} aria-label="下一步">▶</button></span></div>
+ <p class="hint">${VDESC[S.variant]}<br>${SHINT[S.scene]}</p>`;
+ document.getElementById('vpill').innerHTML=`<button data-act="vprev" aria-label="上一个方案">‹</button><span>${S.variant} · ${VARIANTS[S.variant]}</span><button data-act="vnext" aria-label="下一个方案">›</button>`;
+}
+function resetTransient(){S.toastClosed=false;S.scoreOpen=S.scene==='score';}
+function act(a){
+ const max=STEPS[S.scene].length-1;
+ if(a==='next'){if(S.step<max){S.step++;resetTransient();}}
+ else if(a==='prev'){if(S.step>0){S.step--;resetTransient();}}
+ else if(a==='vnext'||a==='vprev'){const ks=Object.keys(VARIANTS);S.variant=ks[(ks.indexOf(S.variant)+(a==='vnext'?1:ks.length-1))%ks.length];resetTransient();writeUrl();}
+ else if(a==='disc')S.discOpen=!S.discOpen;
+ else if(a==='toast')S.toastClosed=true;
+ else if(a.startsWith('score:'))S.scoreOpen=a.endsWith('1');
+ else if(a.startsWith('chip:')){const k=a.slice(5);S.chips[k]=!S.chips[k];}
+ else if(a==='noop')return;
+ render();
+}
+function bind(){
+ document.querySelectorAll('[data-act]').forEach(el=>el.onclick=e=>{e.preventDefault();act(el.dataset.act)});
+ const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onchange=fn;};
+ on('scene',e=>{S.scene=e.target.value;S.step=0;S.discOpen=false;S.lfOn=S.scene==='both'?true:S.lfOn&&S.scene==='setup';resetTransient();writeUrl();render();});
+ on('viewer',e=>{S.viewer=e.target.value;render();});
+ on('device',e=>{S.device=e.target.value;render();});
+ on('drawCard',e=>{S.drawCard=e.target.value;resetTransient();render();});
+ on('x-toggle',e=>{S.lobbyOn=e.target.checked;render();});
+ on('lf-toggle',e=>{S.lfOn=e.target.checked;render();});
+}
+document.addEventListener('keydown',e=>{
+ const t=e.target;if(t&&(t.matches('input,textarea,select,[contenteditable]')))return;
+ if(e.key==='ArrowRight'){act('vnext');}else if(e.key==='ArrowLeft'){act('vprev');}
+});
+window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(render,120)});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1).split('-');const v=(h[0]||'').toUpperCase();if(VARIANTS[v])S.variant=v;if(SCENES[h[1]]&&h[1]!==S.scene){S.scene=h[1];S.step=0;}resetTransient();render();});
+resetTransient();render();
+</script>
