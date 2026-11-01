@@ -68,7 +68,7 @@ type Part =
   | { type: 'icon'; resource: string; tag: string }
   | { type: 'label'; children: Part[] }
   | { type: 'em'; children: Part[] }
-  | { type: 'reference'; reference: ActionReference }
+  | { type: 'reference'; reference: ActionReference | { kind: 'invalid'; label: string } }
 
 function parseDescription(text: string): Part[] {
   const re = makeTokenRegex()
@@ -89,7 +89,11 @@ function parseDescription(text: string): Part[] {
       parts.push({ type: 'label', children: parseDescription(match[2]) })
     } else if (match[3]) {
       const reference = parseActionReference(match[3])
-      parts.push(reference ? { type: 'reference', reference } : { type: 'em', children: parseDescription(match[3]) })
+      if (reference) parts.push({ type: 'reference', reference })
+      else if (/^(space|moor):/.test(match[3])) {
+        const separator = match[3].indexOf('|')
+        parts.push({ type: 'reference', reference: { kind: 'invalid', label: separator < 0 ? '' : match[3].slice(separator + 1) } })
+      } else parts.push({ type: 'em', children: parseDescription(match[3]) })
     }
     last = re.lastIndex
   }
@@ -99,7 +103,7 @@ function parseDescription(text: string): Part[] {
   return parts
 }
 
-type RenderReference = (reference: ActionReference) => ReactNode
+type RenderReference = (reference: ActionReference | { kind: 'invalid'; label: string }) => ReactNode
 
 function renderParts(parts: Part[], keyPrefix: Key, renderReference?: RenderReference): ReactNode {
   return parts.map((p, i) => {

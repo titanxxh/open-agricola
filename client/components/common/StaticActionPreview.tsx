@@ -35,10 +35,11 @@ export function StaticActionPreview({ reference, locale, playerCount }: {
   const groups = new Map<string, { entry: typeof entries[number]; players: number[] }>()
   for (const entry of entries) {
     const { players, ...printed } = entry
+    const displayedPlayers = playerCount && players.includes(playerCount) ? [playerCount] : players
     const key = JSON.stringify(printed)
     const existing = groups.get(key)
-    if (existing) existing.players.push(...players)
-    else groups.set(key, { entry, players: [...players] })
+    if (existing) existing.players.push(...displayedPlayers)
+    else groups.set(key, { entry, players: [...displayedPlayers] })
   }
   return <div className="action-reference-preview__entries">
     {[...groups.values()].map(({ entry, players }) => (
