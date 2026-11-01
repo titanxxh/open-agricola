@@ -56,11 +56,12 @@ export function SpecialActionImprovementNote({ locale, actionId }: { locale: Loc
 const playersLabel = (locale: Locale, playerCounts: readonly number[]) =>
   t(locale, 'moor.specialActions.players', { count: playerCounts.join('/') })
 
-export function SpecialActionCardFace({ locale, players, actions, className }: {
+export function SpecialActionCardFace({ locale, players, actions, className, highlightedActions }: {
   locale: Locale
   players: readonly number[]
   actions: readonly MoorSpecialActionId[]
   className?: string
+  highlightedActions?: readonly string[]
 }) {
   return (
     <div
@@ -73,7 +74,7 @@ export function SpecialActionCardFace({ locale, players, actions, className }: {
         {actions.map((actionId) => {
           const groups = moorSpecialActionEffectGroups(actionId, players)
           return (
-            <div key={actionId} className="special-action-card__action">
+            <div key={actionId} className="special-action-card__action" data-reference-highlight={highlightedActions?.includes(actionId) || undefined}>
               <SpecialActionHeading locale={locale} actionId={actionId} />
               {groups.map(({ playerCounts }) => (
                 <Fragment key={playerCounts.join('/')}>

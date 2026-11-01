@@ -39,7 +39,9 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 
 ## Views and local sandbox
 
-### Card action references: agreed design, not implemented
+### Card action references
+
+Target identity and static preview ownership follow [ADR 0038](../adr/0038-printed-action-references-use-explicit-targets.md).
 
 Card descriptions and supplemental rules distinguish references to Action Spaces and Moor Special Actions from ordinary Rule Actions and card names. References use an underline instead of italics and open a Static Action Preview. The preview shows printed content and localized explanations for the applicable player count, without live accumulation, occupancy or availability. Without game context, it shows the relevant versions. References to several targets show those targets together.
 
@@ -47,7 +49,7 @@ All complete card faces share this behavior, including hands, played cards, enla
 
 Multiple targets and player-count versions share one scrollable preview, with each target's name and applicable counts. Unrevealed round spaces expose only their public printed content, never this game's reveal order. Missing art retains the name, player counts and localized rules. Invalid reference targets fail official-content build checks and produce an author-facing error in Workshop previews.
 
-Reference targets follow the English source meaning, independently of their translated labels. An ordinary Rule Action does not become an Action Space reference because their names match. BGA's `__text__` markup expresses emphasis and is insufficient by itself to identify a reference target. Official text receives explicit reference targets; Workshop authors can use the same mechanism, while unmarked text keeps its existing presentation.
+Reference targets follow the English source meaning, independently of their translated labels. An ordinary Rule Action does not become an Action Space reference because their names match. BGA's `__text__` markup expresses emphasis and is insufficient by itself to identify a reference target. Official text receives explicit reference targets; Workshop authors can use the same mechanism, while unmarked text keeps its existing presentation. `CardDescriptionText` enables references in `ResourceText`; generic resource text renders only their labels. `ActionTextReference` uses a native popover within its containing dialog when present. `GameContainerApi` and `ReplayBoard` supply player-count context. `scripts/build-action-references.ts` projects printed rules and validates official targets during the catalog build; `client/services/action-references.ts` loads that static file on first inspection. Tests: `e2e-tests/card-action-references.spec.ts`, `client/components/common/__tests__/ActionTextReference.test.tsx`, `scripts/__tests__/build-action-references.test.ts`.
 
 ### Existing views
 

@@ -1,3 +1,5 @@
+import { parseActionReference } from '../contract/action-reference'
+
 type IconName = { readonly nameKey: string }
 
 /** What each inline card-text icon means, as existing language-pack names; arrows are typography only. */
@@ -55,7 +57,7 @@ export const searchableCardText = (text: string, iconWords: (token: CardTextIcon
       return ` ${iconWords(token)} `
     })
     .replace(/\[([^\]]*)\]/g, ' $1 ')
-    .replace(/__([^_]+)__/g, '$1')
+    .replace(/__([^_]+)__/g, (_, content: string) => parseActionReference(content)?.label ?? content)
     .replace(/__/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

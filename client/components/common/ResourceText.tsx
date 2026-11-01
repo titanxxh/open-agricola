@@ -1,15 +1,18 @@
 import { Fragment, type Key, type ReactNode } from 'react'
 import type { CardTextIconToken } from '../../../shared/projections/card-text-icons'
+import { parseActionReference, type ActionReference } from '../../../shared/contract/action-reference'
 
 /**
  * Renders card description text with inline resource icons and
- * markup. Three token kinds are recognised:
+ * markup. Tokens include:
  *
  *   `<TAG>`     — resource / arrow / action sprite (see `RESOURCE_TAGS`)
  *   `[text]` — section label, rendered as an italic block (the reference's
  *                 `formatStringMeeples` `<span class="text">…</span>`).
  *   `__text__`  — italic emphasis used for in-line action references
  *                 (the reference's `<span class="action-card-name-reference">…</span>`).
+ *   `__space:id|label__` / `__moor:id|label__` — typed references, rendered
+ *                 interactively only by card-description callers.
  *
  * Tokens may nest — e.g. `[__Bake Bread__ action:]` becomes a labelled
  * block whose `Bake Bread` portion is additionally emphasised.
@@ -65,6 +68,7 @@ type Part =
   | { type: 'icon'; resource: string; tag: string }
   | { type: 'label'; children: Part[] }
   | { type: 'em'; children: Part[] }
+  | { type: 'reference'; reference: ActionReference }
 
 function parseDescription(text: string): Part[] {
   const re = makeTokenRegex()
@@ -84,8 +88,8 @@ function parseDescription(text: string): Part[] {
       // [text] — recurse so nested tokens still get parsed.
       parts.push({ type: 'label', children: parseDescription(match[2]) })
     } else if (match[3]) {
-      // __text__ emphasis — also recurse.
-      parts.push({ type: 'em', children: parseDescription(match[3]) })
+      const reference = parseActionReference(match[3])
+      parts.push(reference ? { type: 'reference', reference } : { type: 'em', children: parseDescription(match[3]) })
     }
     last = re.lastIndex
   }
@@ -95,7 +99,9 @@ function parseDescription(text: string): Part[] {
   return parts
 }
 
-function renderParts(parts: Part[], keyPrefix: Key): ReactNode {
+type RenderReference = (reference: ActionReference) => ReactNode
+
+function renderParts(parts: Part[], keyPrefix: Key, renderReference?: RenderReference): ReactNode {
   return parts.map((p, i) => {
     const key = `${keyPrefix}-${i}`
     switch (p.type) {
@@ -112,27 +118,29 @@ function renderParts(parts: Part[], keyPrefix: Key): ReactNode {
       case 'label':
         return (
           <span key={key} className="card-desc-label">
-            {renderParts(p.children, key)}
+            {renderParts(p.children, key, renderReference)}
           </span>
         )
+      case 'reference':
+        return <Fragment key={key}>{renderReference ? renderReference(p.reference) : p.reference.label}</Fragment>
       case 'em':
         return (
           <em key={key} className="card-desc-em">
-            {renderParts(p.children, key)}
+            {renderParts(p.children, key, renderReference)}
           </em>
         )
     }
   })
 }
 
-export function ResourceText({ text, className }: { text: string; className?: string }) {
+export function ResourceText({ text, className, renderReference }: { text: string; className?: string; renderReference?: RenderReference }) {
   const lines = text.split('\n')
   return (
     <span className={className}>
       {lines.map((line, lineIdx) => (
         <Fragment key={lineIdx}>
           {lineIdx > 0 && <br />}
-          {renderParts(parseDescription(line), `l${lineIdx}`)}
+          {renderParts(parseDescription(line), `l${lineIdx}`, renderReference)}
         </Fragment>
       ))}
     </span>

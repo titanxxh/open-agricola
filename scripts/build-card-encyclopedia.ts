@@ -4,9 +4,11 @@ import { writeCardEncyclopedia } from './card-encyclopedia/artifacts'
 import { buildEncyclopediaEntries } from './card-encyclopedia/catalog'
 import { buildSearchDocuments, loadEncyclopediaLanguages } from './card-encyclopedia/search'
 import { loadEncyclopediaSources } from './card-encyclopedia/sources'
+import { buildActionReferences } from './build-action-references'
 
 /** Runs after `prepare-language-packs`, which provides the pinned packs and their source dictionaries. */
 export function buildCardEncyclopedia(root = resolve('.')) {
+  buildActionReferences(root)
   const languages = loadEncyclopediaLanguages(root)
   const entries = buildEncyclopediaEntries(loadEncyclopediaSources())
   const manifest = writeCardEncyclopedia({

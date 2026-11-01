@@ -42,7 +42,9 @@
 
 ## 视图与本地沙盒
 
-### 牌面行动引用：已确认设计，尚未实现
+### 牌面行动引用
+
+目标身份与静态预览的归属见 [ADR 0038](../adr/0038-printed-action-references-use-explicit-targets.md)。
 
 卡牌描述与补充规则区分行动格、沼泽特殊行动的引用，以及普通规则动作和卡名。引用使用下划线替代斜体，打开静态行动预览。预览按适用人数展示印刷内容与当前语言说明，不包含实时累积资源、人员占用或可用性。没有对局上下文时展示相关版本；引用多个目标时一起展示这些目标。
 
@@ -50,7 +52,7 @@
 
 多个目标与人数版本在同一个可滚动浮层中分项展示，并标明名称与适用人数。尚未揭示的轮次行动格仅展示公开的印刷内容，不透露本局揭示顺序。图片缺失时仍展示名称、人数和当前语言规则。无效引用目标由官方内容构建检查拦截，工坊预览向作者报错。
 
-引用目标按英文原文含义确定，独立于译文名称。普通规则动作不会因为与行动格同名而成为行动格引用。BGA 的 `__文字__` 标记表达强调，仅凭该标记不能确定引用目标。官方文字明确记录引用目标；工坊作者可使用同一机制，未标记文字保留现有展示。
+引用目标按英文原文含义确定，独立于译文名称。普通规则动作不会因为与行动格同名而成为行动格引用。BGA 的 `__文字__` 标记表达强调，仅凭该标记不能确定引用目标。官方文字明确记录引用目标；工坊作者可使用同一机制，未标记文字保留现有展示。 `CardDescriptionText` 启用 `ResourceText` 的引用交互，普通资源文字只显示引用名称。`ActionTextReference` 使用原生 popover；位于弹窗中时，浮层也挂在该弹窗内。`GameContainerApi` 与 `ReplayBoard` 提供人数上下文。`scripts/build-action-references.ts` 在目录构建时投影印刷规则并校验官方引用目标；`client/services/action-references.ts` 在首次查看时加载该静态文件。测试见 `e2e-tests/card-action-references.spec.ts`、`client/components/common/__tests__/ActionTextReference.test.tsx` 与 `scripts/__tests__/build-action-references.test.ts`。
 
 ### 现有视图
 

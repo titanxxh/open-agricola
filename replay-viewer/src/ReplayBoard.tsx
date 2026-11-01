@@ -1,3 +1,4 @@
+import { ActionReferencePlayerCount } from '../../client/contexts/ActionReferenceContext'
 import { t as translateMessage } from '../../shared/i18n'
 import { getPlayerDisplayName } from '../../client/utils/player-name'
 import { useEffect, useMemo, useState } from 'react'
@@ -166,7 +167,7 @@ function ReplayParentSelectionPhase({
   )
 }
 
-export function ReplayBoard({
+function ReplayBoardContent({
   frame,
   locale,
   perspective,
@@ -367,4 +368,10 @@ export function ReplayBoard({
       </section>
     </div>
   )
+}
+
+export function ReplayBoard(props: Parameters<typeof ReplayBoardContent>[0]) {
+  return <ActionReferencePlayerCount.Provider value={props.frame.players.length}>
+    <ReplayBoardContent {...props} />
+  </ActionReferencePlayerCount.Provider>
 }

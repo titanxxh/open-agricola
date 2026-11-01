@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { t } from '..'
+import { parseActionReference } from '../../contract/action-reference'
 import en from '../../../output/i18n/locales/en.json'
 import zh from '../../../output/i18n/locales/zh.json'
 import { catalogCardDefinitions } from '../../cards/catalog.generated'
@@ -71,7 +72,8 @@ describe('zh platform translations', () => {
     const visit = (value: unknown, key: string) => {
       if (typeof value === 'string') {
         for (const reference of value.matchAll(/__([^_]+)__/g)) {
-          if (/[a-z]/i.test(reference[1])) untranslated.push(`${key}: ${reference[1]}`)
+          const label = parseActionReference(reference[1])?.label ?? reference[1]
+          if (/[a-z]/i.test(label)) untranslated.push(`${key}: ${label}`)
         }
       } else if (value && typeof value === 'object') {
         for (const [child, entry] of Object.entries(value)) visit(entry, `${key}.${child}`)

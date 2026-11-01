@@ -14,6 +14,7 @@ import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy, type CardTouchInteraction } from './CardWithCopy'
 import type { CardPlayOutcome } from '../../hooks/useCardPlayChoice'
 import { ResourceText } from './ResourceText'
+import { CardDescriptionText } from './CardDescriptionText'
 import { paymentResourceIconClass } from './resource-icon-class'
 import { getCardDisplayText, type CardType } from './cardText'
 
@@ -363,13 +364,13 @@ export const PlayerCard = ({
 
         <div className="card-desc">
           <div className="card-desc-scroller">
-            <ResourceText text={cardData.description} />
+            <CardDescriptionText locale={locale} text={cardData.description} />
             {cardData.rules && (
               <div className="card-rules">
                 <strong className="card-rules-label">
                   {t(locale, 'ui.supplementalRules')}
                 </strong>
-                <ResourceText text={cardData.rules} />
+                <CardDescriptionText locale={locale} text={cardData.rules} />
               </div>
             )}
           </div>
