@@ -142,7 +142,7 @@ function ActiveParentSelectionOverlay({
               })
               : t(locale, 'ui.parentSelection.prompt')}
           </div>
-          {waitingNames.length > 0 ? (
+          {vm.alreadySubmitted && waitingNames.length > 0 ? (
             <p className="draft-opening-hint" role="status">
               {t(locale, 'ui.draft.waitingForPlayers', { players: waitingNames.join(' · ') })}
             </p>
