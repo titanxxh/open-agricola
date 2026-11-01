@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import en from '../../output/i18n/locales/en.json'
 import zh from '../../output/i18n/locales/zh.json'
+import { parseActionReference } from '../../shared/contract/action-reference'
 import { fatherParentCards } from '../../shared/parents/cards/fathers'
 import { motherParentCards } from '../../shared/parents/cards/mothers'
 import { buildCardsManifest } from '../build-cards-manifest'
@@ -125,7 +126,7 @@ const REQUIRED_DOUBLE_UNDERSCORE_REFERENCES = [
 const DOUBLE_UNDERSCORE_RE = /__([^_]+)__/g
 
 const doubleUnderscoreLabels = (text: string) =>
-  [...text.matchAll(DOUBLE_UNDERSCORE_RE)].map((match) => match[1])
+  [...text.matchAll(DOUBLE_UNDERSCORE_RE)].map((match) => parseActionReference(match[1])?.label ?? match[1])
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
