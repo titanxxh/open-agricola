@@ -4,7 +4,7 @@
 
 ## 查看
 
-页面托管在 owner 本机的 Tailscale IP 上：<http://100.86.148.26:8554/>（MagicDNS：<http://spark-f1e4.taild3ff84.ts.net:8554/>），tailnet 内的桌面和手机都能打开。服务只返回这一个文件，每次请求都从本 worktree 现读。也可以直接双击同目录的 `XDeckInteractions.prototype.html`。
+规划期间曾在 owner 本机 Tailscale IP 的 8554 端口临时托管，该预览服务已于 2026-11-01 地图完成时停止。现在请直接双击同目录的 HTML 文件，不需要启动应用。
 
 页面只用固定演示数据和固定回应：不发游戏命令，不连房间，也不验证规则计算、撤销边界或恢复。
 
