@@ -1,0 +1,13 @@
+.action-space-face { position: relative; background-image: none; }
+.action-space-face > .action-space-face__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  object-fit: fill;
+  pointer-events: none;
+}
+.action-space-face > .action-header,
+.action-space-face > .action-desc { position: relative; z-index: 1; }

@@ -41,7 +41,9 @@ Workshop cards are admitted only through the deployed Workshop Capability Contra
 
 Tests: `shared/custom-code/__tests__/`, `server/__tests__/workshop-contract-*-session.test.ts`.
 
-## `shared/i18n/` and `shared/utils/`
+## `shared/i18n/` and Card descriptions encode explicit targets as `__space:id[,id]|label__` or `__moor:id[,id]|label__`. Labels are translated; target identities are not. Ordinary Rule Actions retain plain emphasis. The language repository owns reference authoring, migration and BGA-import preservation. `shared/contract/action-reference.ts` parses the markup; search projections retain only its label. The game catalog build checks that official target identities exist.
+
+`shared/utils/`
 
 `shared/i18n/` owns the synchronous translation/catalog API and package validation; `PromptKey` lives in `shared/contract/prompt-keys.ts`. Authored translations and the BGA importer belong to [open-agricola-i18n](https://github.com/titanxxh/open-agricola-i18n), with one source JSON and one complete runtime JSON per language. `i18n.ref` pins its commit and manifest checksum. `scripts/prepare-language-packs.ts` verifies package/source checksums and stages ignored build caches; `AGRICOLA_I18N_DIR` supplies a local checkout with the same pinned content.
 

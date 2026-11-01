@@ -4,7 +4,7 @@ import { PAYMENT_RESOURCE_KEYS } from '../../../shared/contract/resource-keys'
 import { t, type Locale } from '../../../shared/i18n'
 import { getCardDisplayName } from '../../components/common/cardText'
 import { paymentResourceIconClass } from '../../components/common/resource-icon-class'
-import { ResourceText } from '../../components/common/ResourceText'
+import { CardDescriptionText } from '../../components/common/CardDescriptionText'
 import { EncyclopediaFace } from './EncyclopediaFace'
 import type { EncyclopediaItem } from './encyclopedia-item'
 import { encyclopediaGroupLabel, encyclopediaPointsApply, encyclopediaTypeLabel } from './encyclopedia-labels'
@@ -143,7 +143,7 @@ function TextSection({ item, field, label, locale }: { item: EncyclopediaItem; f
       <h3 id={headingId}>{label}</h3>
       <FieldNote locale={locale} status={text.status} />
       {text.text
-        ? <p className="encyclopedia-detail__text"><ResourceText text={text.text} /></p>
+        ? <p className="encyclopedia-detail__text"><CardDescriptionText locale={locale} text={text.text} /></p>
         : <p className="encyclopedia-field-missing">{t(locale, 'ui.encyclopedia.fallback.missing')}</p>}
     </section>
   )

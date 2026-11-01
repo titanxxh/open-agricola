@@ -146,6 +146,7 @@ export const CardWithCopy = ({
   }
 
   const handleCardEnter = (e: React.PointerEvent) => {
+    if (e.target instanceof Element && e.target.closest('[data-action-reference]')) return
     if (!enablePreview || !previewCard) return
     if (e.pointerType && e.pointerType !== 'mouse') return
     stateRef.current.card = true
@@ -252,6 +253,12 @@ export const CardWithCopy = ({
         className={className}
         onClick={handleClick}
         onPointerEnter={handleCardEnter}
+        onPointerOver={event => {
+          if (!(event.target instanceof Element) || !event.target.closest('[data-action-reference]')) return
+          clearShowTimer()
+          clearHideTimer()
+          setAnchor(null)
+        }}
         onPointerLeave={handleCardLeave}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -263,6 +270,7 @@ export const CardWithCopy = ({
         aria-disabled={disabled}
         tabIndex={keyboardPreview ? 0 : undefined}
         onFocus={(event) => {
+          if (event.target !== event.currentTarget) return
           if (!keyboardPreview || !rootRef.current || !event.currentTarget.matches(':focus-visible')) return
           stateRef.current.card = true
           setAnchor(rootRef.current.getBoundingClientRect())

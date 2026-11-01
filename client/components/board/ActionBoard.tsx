@@ -10,6 +10,7 @@ import { getCardMeta } from '../../services/card-meta'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import { renderDescriptionPreview } from '../interaction/ActionDescription'
 import { ActionSpaceDescription } from './ActionSpaceDescription'
+import { ActionSpaceFace } from './ActionSpaceFace'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
@@ -1040,15 +1041,9 @@ export const ActionBoard = ({
         >
           {tooltip.kind === 'action' && tooltip.spritePos ? (
             <>
-              <div
-                className="tooltip-action-card"
-                data-action-id={tooltip.actionId}
-              >
-                <h4 className="action-header">{translateCardText(locale, tooltip.nameKey!)}</h4>
-                <div className="action-desc">{tooltip.action.baseDescriptionPreview
-                  ? <ActionSpaceDescription locale={locale} preview={tooltip.action.baseDescriptionPreview} />
-                  : renderTooltipBody(tooltip)}</div>
-              </div>
+              <ActionSpaceFace locale={locale} nameKey={tooltip.nameKey!} actionId={tooltip.actionId}
+                preview={tooltip.action.baseDescriptionPreview} gainPerRound={tooltip.action.gainPerRound}
+                fallback={t(locale, tooltip.action.descriptionKey)} />
               <div className="tooltip-text">
                 {tooltip.action.baseDescriptionPreview ? <div>{renderTooltipBody(tooltip)}</div> : null}
                 {tooltip.leftActionName && (

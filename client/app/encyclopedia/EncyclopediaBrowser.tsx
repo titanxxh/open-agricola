@@ -115,7 +115,7 @@ function GalleryEntry({ item, locale, onOpen }: { item: EncyclopediaItem; locale
   const meta = [entry.displayNumber, encyclopediaTypeLabel(locale, entry.publicType)].filter(Boolean).join(' · ')
   return (
     <li className="encyclopedia-gallery__item">
-      <div className="encyclopedia-gallery__face" aria-hidden="true">
+      <div className="encyclopedia-gallery__face" aria-hidden="true" inert>
         <EncyclopediaFace item={item} locale={locale} />
       </div>
       <button

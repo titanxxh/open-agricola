@@ -42,6 +42,7 @@ __pycache__/
 
 # Build product from scripts/build-cards-manifest.ts
 public/cards-manifest.json
+public/action-references*.json
 public/card-encyclopedia/
 
 # superpowers skill artifacts (spec/plan/notes) — never commit

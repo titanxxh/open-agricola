@@ -5,6 +5,7 @@ import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { ActionReferencePlayerCount } from '../contexts/ActionReferenceContext'
 import { setPage } from '../utils/platform-page-url'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { t, type Locale } from '../../shared/i18n'
@@ -1594,7 +1595,7 @@ export const GameContainerApi = () => {
     </div>
   )
   const withEncyclopedia = (game: ReactElement) => (
-    <>
+    <ActionReferencePlayerCount.Provider value={state.players.length}>
       {game}
       {encyclopediaOpenedIn ? (
         <InGameEncyclopedia
@@ -1607,7 +1608,7 @@ export const GameContainerApi = () => {
           }}
         />
       ) : null}
-    </>
+    </ActionReferencePlayerCount.Provider>
   )
 
   if (state.phase === 'solo-hand-selection') {
