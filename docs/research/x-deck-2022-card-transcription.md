@@ -2,7 +2,7 @@
 
 研究日期：2026-11-01。目标版本：Lookout Games 2022 年《Agricola 15》周年版（Agricola 15 / 15 Years of Agricola）中的 X-Deck。仓库基线：`2cf5c21be`。
 
-本报告回答 [#1546](https://github.com/titanxxh/open-agricola/issues/1546)，属于地图 [#1544](https://github.com/titanxxh/open-agricola/issues/1544)。并行的出版规则研究见 [#1545 的固定 commit 报告](https://github.com/titanxxh/open-agricola/blob/13fbbe4893f32154df685c02d1ce92bf61bc2c56/docs/research/x-deck-2022-published-rules.md)（下称“#1545 报告”）。本报告只记录牌面能确认什么、不能确认什么，不采纳 Project Rule Interpretation，也不核对本仓库代码能力。牌图只转录文字，没有复制进仓库。
+本报告回答 [#1546](https://github.com/titanxxh/open-agricola/issues/1546)，并按 [#1547](https://github.com/titanxxh/open-agricola/issues/1547) 补入 X08、X11、X12、X14、X15、X18、X21 七张英文实物牌原文（2026-11-01，见第四节），属于地图 [#1544](https://github.com/titanxxh/open-agricola/issues/1544)。并行的出版规则研究见 [#1545 的固定 commit 报告](https://github.com/titanxxh/open-agricola/blob/13fbbe4893f32154df685c02d1ce92bf61bc2c56/docs/research/x-deck-2022-published-rules.md)（下称“#1545 报告”）。本报告只记录牌面能确认什么、不能确认什么，不采纳 Project Rule Interpretation，也不核对本仓库代码能力。牌图只转录文字，没有复制进仓库。
 
 ## 证据等级
 
@@ -11,9 +11,9 @@
 | 标记 | 含义 |
 | --- | --- |
 | **官方规则** | Lookout 2022 年出版的规则书、附录或出版社官网文字。 |
-| **官方牌面** | 2022 版英文牌面原文。出版社官网图片标为“官方牌面（出版社图片）”；第三方拍摄的实物照片标为“官方牌面（社区照片）”，清晰度另行说明。 |
+| **官方牌面** | 2022 版英文牌面原文。出版社官网图片标为“官方牌面（出版社图片）”；第三方拍摄的实物照片标为“官方牌面（社区照片）”，用户提供的实物照片标为“官方牌面（用户实物照片）”，清晰度另行说明。 |
 | **官方裁定** | 出版社 FAQ 或勘误。X-Deck 没有找到任何一条（见 #1545 报告第六节）。 |
-| **中文贴条实物牌图** | 本机 BGA 参考快照中的 24 张牌图（下称“中文牌图”）。版式、牌号、图标、分值与 2022 英文实物牌一致（已用 X01、X02、X06、X09、X14、X19、X20 对照），文字区是中文译文，译者与出版方不明。弱于英文官方牌面。 |
+| **中文贴条实物牌图** | 本机 BGA 参考快照中的 24 张牌图（下称“中文牌图”）。版式、牌号、图标、分值与 2022 英文实物牌一致（已用 X01、X02、X06、X08、X09、X11、X12、X14、X15、X18、X19、X20、X21 对照），文字区是中文译文，译者与出版方不明。弱于英文官方牌面。 |
 | **日文官方译本（社区照片）** | Hobby Japan 日文版的实物牌照片。日文是 2022 版的官方译本，不是英文原文；与中文同为译文，两者冲突时不能单独定案。 |
 | **社区线索** | BGG 论坛、评测、玩家转引的牌面文字。设计者或出版社编辑在论坛上的个人回复也归此级，不升级为官方裁定。 |
 | **旁证（2008）** | 2008 年原版 X-Deck 的英文牌面与论坛回复。原版按初版 Agricola 写成，2022 附录说明牌面已按修订版改写，只能在 2022 文本有歧义或缺失时作旁证。 |
@@ -32,6 +32,7 @@
 | [BGG 图 7254822](https://boardgamegeek.com/image/7254822)，出自 [Silver Duck 评测](https://boardgamegeek.com/blogpost/142069/agricola-15-agricola-x-and-legendairy-forest-deck)（2022-12-29 上传） | X02、X06、X09、X14 的 2022 英文牌面和牌背。 | 原图只有 567×207 像素，放大后可读，但不保证每个字符。 |
 | [日文开箱博客](https://boardgame-replay.com/archives/unboxing-agricola15-230614.html)（2023） | 日文版 X01、X04、X07、X13、X23 的完整牌面，X12 的大部分，其余牌的残片。 | 社区照片，多数牌相互遮挡；日文是译本。 |
 | [BGG 帖 3027136](https://boardgamegeek.com/thread/3027136)（2023-02）、[BGG 帖 2990858](https://boardgamegeek.com/thread/2990858)（2022-12） | 玩家 Kazuki Asakura 转引的 X03、X10、X12 英文文字，以及 Geoff Burkman、Grzegorz Kobiela 等人的回复。 | 社区线索。转引者说他对照了德文和英文版，没有说明转引文字逐字抄自英文牌面。 |
+| 用户提供的 2022 英文实物牌照片（2026-11-01，本机 `/home/xxh/x-deck-2022-photos/X08-X11-X12-X14-X15-X18-X21-english-cards.png`，4096×3072） | X08、X11、X12、X14、X15、X18、X21 七张完整英文牌面，正面完整入镜，印刷编号、分值、图标与全部文字清晰可读；X08、X18、X21 的正文另按原分辨率裁切逐字核对。 | 本机照片，不是公开链接，不提交仓库；只有这七张。 |
 | [BGG 图 420914](https://boardgamegeek.com/image/420914)、[420922](https://boardgamegeek.com/image/420922)、[420923](https://boardgamegeek.com/image/420923)（2009 年上传，“English Edition”） | 2008 原版英文 24 张牌面全文。 | 旁证（2008）。 |
 | BGG X-Deck 论坛旧帖（逐条链接见下文） | 2008 版设计者 Hanno Girke、Dave Fair 等人对旧牌的回复。 | 社区线索，且针对旧版牌面。 |
 
@@ -42,10 +43,10 @@
 - 24 张中文牌图齐全、清晰，已逐张转录印刷编号、名称、牌框、分值、角标、类别图标、全文与括注（第二节）。**中文贴条实物牌图**。
 - 牌框分五组，与附录分类一致，只有一处例外：X01–X03 与 X23 用米色羊皮纸牌框，X04–X06 红框，X07–X12 绿框，X13–X22 蓝框，X24 黄框。X23 的牌框与行动格相同，但附录把它列在事件下，牌面也没有“行动格”字样。米色牌框的四张没有右侧的 X 圆章，其余 20 张都有。
 - 印刷分值：X04、X05、X06 各 2 分，X08 为 −3 分，X22 为 3 分。人数标记只有 X24 的紫色“1+”。24 张都没有费用栏，也**都没有洗回句**（#1545 报告列出的核对项）。
-- 可对照的英文牌面有 7 张：X01、X06、X19 清晰全文，X02、X09、X14 低清全文，X20 出版社图片右半；另有 X03、X10、X12 的玩家转引英文。日文官方译本有 X01、X04、X07、X13、X23 全文和 X12 的大部分。中文与这些英文逐句一致，与日文全文也一致，只有 X12 的喂养规则与日文冲突，转引英文支持中文。
-- 已由英文解答的候选：X14 的“和家庭成员”指已经在西采石场上的那个人员，英文原文为“Place the newborn with the person on the "Western Quarry" accumulation space.”（低清）。
+- 可对照的英文牌面有 13 张：X01、X06、X19 清晰全文（社区照片），X08、X11、X12、X14、X15、X18、X21 清晰全文（用户实物照片，[#1547](https://github.com/titanxxh/open-agricola/issues/1547)），X02、X09 低清全文，X20 出版社图片右半；另有 X03、X10 的玩家转引英文。日文官方译本有 X01、X04、X07、X13、X23 全文和 X12 的大部分。中文与这些英文逐句一致，与日文全文也一致；X12 的喂养规则与日文冲突，英文牌面支持中文。
+- X14 的“和家庭成员”指已经在西采石场上的那个人员，英文原文为“Place the newborn with the person on the "Western Quarry" accumulation space.”，已由用户实物照片清晰确认。
 - `NarrativeDefinitions.php` 与牌图的差异已逐张核对，地图列出的 X03、X09、X10、X11、X12、X13、X14、X15、X18 九处都属实；另有 X02、X08、X15、X16、X21、X22、X24 等处会改变理解（第三节）。
-- 仍需英文原牌确认的 5 张：**X08、X11、X15、X18、X21**；建议顺带拍 X12、X14，把社区转引或低清证据换成清晰的官方牌面（第六、七节）。
+- 原列为需英文原牌确认的 5 张 **X08、X11、X15、X18、X21** 和建议顺带拍的 X12、X14，已于 2026-11-01 由用户实物照片补齐（第四至七节）。英文原文回答了译文问题；英文同样没有写明的部分，转为第八节的规则空白。
 - 其余问题来自牌面本身的规则空白，英文原文也未必回答，交 #1548（第八节）。
 
 ## 一、牌面版式与图标
@@ -186,20 +187,20 @@
 | X05 | Merchants of Mars | — | 日文残片 | The first player to use the standard Family Growth action (with space in their Home) and pay 2 additional Food receives this card. |
 | X06 | Merchants of Pluto | 全文清晰（8137342）与低清（7254822） | — | The first player to use the simple Build Fences action and pay 2 additional Stone receives this card. |
 | X07 | Ley Lines | — | 日文全文 | 每竖列 3 个房间、3 块田或占满一列的 3 格牧场各 1 分 |
-| X08 | Strange Alien Energy | — | 日文残片（可见“未占有”） | Place three Guest markers on this card. At the start of the Returning Home phase of any Round, before players take back their Family members, you may move one marker from this card to take any unused action. |
+| X08 | Strange Alien Energy | 全文清晰（用户实物照片），**官方牌面（用户实物照片）** | 日文残片（可见“未占有”） | Place three Guest markers on this card. At the start of the Returning Home phase of any Round, before players take back their Family members, you may move one marker from this card to take any unused action. |
 | X09 | Alien Farmhand | 全文低清（7254822） | — | 在提供资源或动物的行动格上放 1 个标记；回家阶段若该行动没有人用，可拿 1 个货物 |
 | X10 | Replicator | — | 玩家转引英文首句（BGG 帖 3027136） | The next time you take Goods from an Action space, you receive twice as many Goods of that type. As soon as you have received the goods, pass this card to the player to your left. |
-| X11 | The X File | — | 日文残片（可见“柵1本以…”“木の部屋1…”“合計から”） | Whenever you pay Wood to build Fences, Stables or Rooms **as an Action**, you pay 1 less Wood in total. |
-| X12 | Furry Friends | — | 玩家转引英文（BGG 帖 3027136）；日文大部分 | 每次收成每 2 个毛球繁殖 1 个；喂不起或不想喂的毛球逃走，每逃走 1 个扣 1 分 |
+| X11 | The X File | 全文清晰（用户实物照片） | 日文残片（可见“柵1本以…”“木の部屋1…”“合計から”） | Whenever you pay Wood to build Fences, Stables or Rooms **as an Action**, you pay 1 less Wood in total. |
+| X12 | Furry Friends | 全文清晰（用户实物照片） | 玩家转引英文（BGG 帖 3027136）；日文大部分 | 每次收成每 2 个毛球繁殖 1 个；喂不起或不想喂的毛球逃走，每逃走 1 个扣 1 分 |
 | X13 | Space Diner at the End of the Galaxy | — | 日文全文 | A player whose final score is 42 automatically wins the game. |
-| X14 | Earthlings Are Easy | 全文低清（7254822） | — | Immediately carry out the Family Growth even without Room in your Home action.（名为 Earth Girls Are Easy） |
-| X15 | Tripods | — | 日文残片 | Every player must pay 1 Good in tribute. **If a player cannot pay the Good**, the Aliens kill one of his or her Family members. Players must pay 1 Food whenever they use **any** Family growth action. |
+| X14 | Earthlings Are Easy | 全文清晰（用户实物照片）；全文低清（7254822） | — | Immediately carry out the Family Growth even without Room in your Home action.（名为 Earth Girls Are Easy） |
+| X15 | Tripods | 全文清晰（用户实物照片） | 日文残片 | Every player must pay 1 Good in tribute. **If a player cannot pay the Good**, the Aliens kill one of his or her Family members. Players must pay 1 Food whenever they use **any** Family growth action. |
 | X16 | Beam Me Down, Welshie | — | 日文残片 | You decide where each other player places their next Family member. (…) Resistance is futile. |
 | X17 | Candy Trail | — | 日文残片 | Your Family members must collect these markers by taking an action on the marked spaces. |
-| X18 | I Am Your Father | — | 附录澄清；日文残片 | You may adopt one child from another player's family. You must pay him or her 5 resources to do so. Exchange this Person disc for one of your own. You need not have an empty room in your home. (You must carry out this action immediately, or it has no effect.) |
+| X18 | I Am Your Father | 全文清晰（用户实物照片） | 附录澄清；日文残片 | You may adopt one child from another player's family. You must pay him or her 5 resources to do so. Exchange this Person disc for one of your own. You need not have an empty room in your home. (You must carry out this action immediately, or it has no effect.) |
 | X19 | Alien Abduction | 全文清晰（8137342） | — | You immediately lose the Family member who took this action, and he or she is never seen again. |
 | X20 | Darling, I Shrunk ... | 右半（英文官网拼图），**官方牌面（出版社图片）** | 附录澄清；德文官网拼图右半 | 同义 |
-| X21 | Mind the Jets! | — | 附录澄清（英德不一致）；日文残片 | (Any player who is left with no hut can "renovate" to a 2-room Wooden hut for 2 Wood and 1 Reed) |
+| X21 | Mind the Jets! | 全文清晰（用户实物照片） | 附录澄清（英德不一致）；日文残片 | (Any player who is left with no hut can "renovate" to a 2-room Wooden hut for 2 Wood and 1 Reed) |
 | X22 | Carbonite Cousin | — | 日文残片（可见分值 3） | The family member **taking this action** is frozen in Carbonite. He will be rescued in the Returning home phase 3 Rounds from now. (…) |
 | X23 | Crop Circles | — | 日文全文 | Place this card on your Farm board in such a way that it covers 2 spaces. These spaces count as used, but can't be used in any other way. |
 | X24 | Rebel | — | 日文残片（可见“1+”） | The Family member **taking this Action** decides to devote the rest of the game to fighting for the Rebels. Place it on this card. (…) 印 5 分 |
@@ -209,8 +210,14 @@
 - **X01 Extraterrestrial Excrement**（清晰）：“This is an action space for all. When you use it, immediately add 1 grain and 1 vegetable from the general supply to each of your grain and vegetable fields, respectively.” 类别麦穗。
 - **X02 Homemade Space Rocket**（低清）：“This is an action space for all. When you use it, immediately exchange exactly one set of goods comprising 2 wood, 2 clay, 1 reed, and 1 stone for 4 bonus points.” 兑换图示与中文相同。
 - **X06 Merchants of Pluto**（清晰）：“Place this card next to the game board. The first player to use the "Fencing" action space and pay an additional 2 stone gets this card.” 印 2 分。
+- **X08 Strange Alien Energy**（清晰，用户实物照片）：“Place three fuel tanks on this card. Immediately before each returning home phase, you can return exactly one fuel tank from this card to use the effects of an unoccupied action space.” 印 −3 分。
 - **X09 Alien Farmhand**（低清）：“Immediately mark an accumulation space of your choice. Immediately before each returning home phase, if the marked space is unoccupied, you can take one good from it.”
-- **X14 Earthlings Are Easy**（低清）：“Immediately take the "Family Growth without Room" action. *(Place the newborn with the person on the "Western Quarry" accumulation space.)*”
+- **X11 The X File**（清晰，用户实物照片）：“Each time you build at least 1 fence, 1 stable, or 1 wood room, you pay 1 wood less in total.”
+- **X12 Furry Friends**（清晰，用户实物照片）：“Place 2 space woozles on this card and, in the field phase of each harvest, an additional 1 space woozle for every 2 space woozles on it *(rounded down)*. In each feeding phase, you must pay 1 food for each space woozle or let it go, losing 1 point if you do the latter. During scoring, you get 1 bonus point for each space woozle on this card.” 与第四节下文的玩家转引逐字一致。
+- **X14 Earthlings Are Easy**（清晰，用户实物照片；另有低清社区照片）：“Immediately take the "Family Growth without Room" action. *(Place the newborn with the person on the "Western Quarry" accumulation space.)*”
+- **X15 Tripods**（清晰，用户实物照片）：“At the end of each returning home phase, each player must pay 1 good of their choice or return a person from their house to their supply. Taking the "Family Growth" action costs an additional 1 food.”
+- **X18 I Am Your Father**（清晰，用户实物照片）：“You can immediately pay 5 goods of your choice to another player to adopt one of their offspring, i.e., exchange their person for yours, regardless of whether you have room in your house or not. *(You must carry out this action immediately, or it has no effect.)*”
+- **X21 Mind the Jets!**（清晰，用户实物照片）：“Flying saucers visit each farm. Their jets burn down all wood rooms, harden all clay rooms to stone rooms, and have no effect on stone rooms. Any player who is left with no house can use a "Renovation" action to get two wood rooms for a total of 2 wood and 1 reed.”
 - **X19 Alien Abduction**（清晰）：“You immediately get an additional 1 sheep, 1 wild boar, and 1 cattle. However, in the returning home phase of this round, you must return one of your people to your supply *(instead of your house)*.”
 - **X20 Darling, I Shrunk ...**（右半）：“…shrunk your animals to …ir size. Your pastures …es can now hold twice …nimals. *(Your house …* Unfortunately, your …o provide only half … amount of food …*ded down)*.” 德文右半：“…schrumpfen deine Tiere … Größe. Deine Weiden …lle können ab sofort …o viele Tiere halten. (…nicht für dein Haus.) …rhältst du nur noch …le Nährwerte für … (abgerundet).”
 
@@ -233,29 +240,30 @@
 
 | 牌 | 对照来源 | 结果 |
 | --- | --- | --- |
+| X08、X11、X12、X14、X15、X18、X21 | 英文清晰照片（用户实物照片） | 逐句一致，没有增删规则。X08“正好1个燃料罐”“未被占据的行动格的效果”对应“exactly one fuel tank”“the effects of an unoccupied action space”；X11“至少”“总计”对应“at least”“in total”；X15“任意1个货物”“自己房屋中的”对应“1 good of their choice”“from their house”；X18“后代”“交换”对应“offspring”“exchange their person for yours”；X21“木造房间”“没有房屋剩下”“‘翻新’行动”对应“wood rooms”“left with no house”“"Renovation" action”。只有 X21 末句的“2个木造房屋”在英文是“two wood rooms”，译文把 rooms 译成了“房屋”。 |
 | X01、X06、X19 | 英文清晰照片 | 逐句一致。X01 中文“分别增加1个谷物或1个蔬菜”对应“add 1 grain and 1 vegetable … respectively”，意思相同。X19“你的1个家庭成员”对应“one of your people”。 |
 | X02、X09、X14 | 英文低清照片 | 意思一致。X02“正好一组”对应“exactly one set”；X09“在每个回家阶段开始前”对应“Immediately before each returning home phase”。X14 见下行。 |
 | X14 | 英文低清照片 | 英文“Place the newborn with the person on the "Western Quarry" accumulation space”：新生儿放到西采石场上已有的那个人员旁边。中文“将新生儿和家庭成员放到……”的“家庭成员”就是这个人员；中文语序容易读成把另一个家庭成员也放过去，但没有增删规则。 |
 | X20 | 英文、德文出版社图片右半 | 可见部分一致。 |
-| X03、X10、X12 | 玩家转引英文 | 逐句一致，包括 X03 括注、X10“每拿取1个货物额外获得1个”、X12“为每个太空毛球支付1个食物，或任该太空毛球离去并失去1点分数”。 |
+| X03、X10、X12 | 玩家转引英文 | 逐句一致，包括 X03 括注、X10“每拿取1个货物额外获得1个”、X12“为每个太空毛球支付1个食物，或任该太空毛球离去并失去1点分数”。X12 的转引已由用户实物照片逐字确认。 |
 | X01、X04、X07、X13、X23 | 日文全文 | 意思一致。X13 两版都写“否则，分数最高的玩家获胜”。 |
-| X12 | 日文大部分 | **冲突**：日文写“支付每个毛球 1 食物，或者让全部毛球离开”，中文和转引英文都是逐个选择。 |
+| X12 | 日文大部分 | **冲突**：日文写“支付每个毛球 1 食物，或者让全部毛球离开”，中文和英文牌面都是逐个选择。 |
 
-结论：在可对照的 14 张牌上，中文译文贴近英文，没有找到增删规则的地方；与日文冲突的 X12，转引英文和 2008 旧版都支持中文。中文的弱点在于少数句子语序或用词可以有两种读法，而英文原文还没找到，见第六节。
+结论：在可对照的 19 张牌上，中文译文贴近英文，没有找到增删规则的地方；与日文冲突的 X12，英文牌面（用户实物照片）支持中文。原先因英文缺失而列为歧义的 5 张，英文原文已补齐，见第六节。
 
 ## 六、歧义表
 
-只列中文译文可能改变规则结果、且没有英文官方牌面消除的句子。“需英文”表示要拍英文原牌；“已解答”表示现有英文证据已经回答；“规则空白”表示英文原文大概率同样不回答，交 #1548。
+列出中文译文可能改变规则结果的句子。“已解答”表示英文证据已经回答；“规则空白”表示英文原文同样不回答，交 #1548。2026-11-01 起，原“需英文”的 X08、X11、X15、X18、X21 和“建议拍照”的 X12、X14 都已有清晰英文实物牌（用户实物照片），下表“英文原文”一栏逐问作答。
 
 | 牌 | 中文牌图句子 | 已有证据 | 问题 | 状态 |
 | --- | --- | --- | --- | --- |
-| X08 | “在每个回家阶段开始前，你可以立即归还本卡牌上正好1个燃料罐以使用一个未被占据的行动格的效果。” | 无 2022 英文。2008：“move one marker … to take any unused action”，用访客标记。`desc` 另加“无需派遣家庭成员”。日文残片可见“未占有”。 | ①英文是“use an unoccupied action space”、“the effect/action of an unoccupied action space”，还是写明不放人？②是否要求该行动格当前能合法放人（例如该格本轮已进场、满足行动本身的前提条件）？③是否只限版图上的行动格，还是包括版图旁的 X01–X03 行动格牌和其他牌堆的行动格牌？④“正好1个”是否意味着每个回家阶段至多用 1 个燃料罐？ | **需英文**（①④）；②③英文若未写明则交 #1548 |
-| X11 | “每次你建造至少1个栅栏、1个畜棚或1个木造房间时，你总计少支付1个木材。” | 无 2022 英文。2008：“Whenever you pay Wood to build Fences, Stables or Rooms **as an Action**, you pay 1 less Wood in total.” 日文残片可见“柵1本以…”“合計から”。 | ①英文是否保留“as an action”？中文没有，若英文有，经卡牌效果建造时不减费。②同一次行动既建房间又建畜棚（扩建农场）时，减 1 木还是每类各减 1 木？③“木造房间”在英文里是否限定 wooden，还是只写 rooms？ | **需英文** |
-| X12 | “你必须为每个太空毛球支付1个食物，或任该太空毛球离去并失去1点分数。” | 转引英文与 2008 都是逐个选择；日文是全部离开。 | 逐个喂养，还是一个喂不起就全部离开；每个离开的毛球各扣 1 分。 | 已由转引英文支持中文；**建议拍照**把证据升为官方牌面 |
-| X14 | “(将新生儿和家庭成员放到‘西采石场’累积格上。)” | 英文低清：“Place the newborn with the person on the "Western Quarry" accumulation space.” 2008 版设计者 Hanno Girke 回复旧牌：新生儿直接从供应堆进入农场，不需要另派人员执行家庭增长，并调侃去采石的人员“不仅采到石头，还采到一个孩子”（[BGG 帖 480359](https://boardgamegeek.com/thread/480359)，社区线索）。 | “家庭成员”指谁。 | **已解答**：指已在西采石场上的人员。原图低清，**建议顺带拍照** |
-| X15 | “每位玩家必须支付任意1个货物，或将自己房屋中的1个家庭成员归还到自己供应堆中。执行‘家庭增长’行动额外花费1个食物。” | 无 2022 英文。2008：先付 1 个货物，付不起才失去 1 名家庭成员；“whenever they use **any** Family growth action”。日文残片不足以判断。 | ①有货物时能否自愿选择归还家庭成员（中文读作自由二选一，2008 是付不起才归还）？②“自己房屋中的”原文如何限定？③食物附加费是否写“any”，是否覆盖无需空房间的家庭增长和卡牌给的家庭增长？ | **需英文** |
-| X18 | “以收养其1个后代——就是将其1个家庭成员交换给你，无论你房屋中是否有房间。” | 无 2022 英文。附录澄清“You cannot use this action if you have 5 people already”，说明你的人数会增加。2008：“adopt one child … Exchange this Person disc for one of your own”；原版设计者 Dave Fair 回复为“把你一个未用的人员放回盒子，拿走对方一个人员当作你的”，已放出的和未放出的都可以选（[BGG 帖 620923](https://boardgamegeek.com/thread/620923)，社区线索）。 | ①英文是“offspring/child”还是“person”，是否只能收养新生儿？②“交换”是用你供应堆里的人员替换对方的那个人员，还是双方互换？③是否限定对方在房屋中或尚未放出的人员？④“任意5个货物”原文是 goods 还是 resources？ | **需英文**（①②④）；③英文若未写明则交 #1548 |
-| X21 | “任何没有房屋剩下的玩家可以使用一个‘翻新’行动，用总计2个木材和1个芦苇获得2个木造房屋。” | 无 2022 英文。附录英德澄清不一致（见 #1545 报告第五节）。2008：“can "renovate" to a 2-room Wooden hut for 2 Wood and 1 Reed”。旧版论坛对是否须占用翻新行动格意见不一（[BGG 帖 599311](https://boardgamegeek.com/thread/599311)，社区线索）。 | ①“使用一个‘翻新’行动”原文是占用翻新行动格（House Redevelopment），还是执行任何含翻修的行动，或单独执行一次翻修？②“获得2个木造房屋”是“一座 2 个房间的木屋”还是 2 个木造房间（在哪里建）？③“总计2个木材和1个芦苇”是否取代正常翻修费用？④“没有房屋剩下”原文是 no house 还是 no rooms？ | **需英文** |
+| X08 | “在每个回家阶段开始前，你可以立即归还本卡牌上正好1个燃料罐以使用一个未被占据的行动格的效果。” | 英文（用户实物照片）：“Immediately before each returning home phase, you can return exactly one fuel tank from this card to use the effects of an unoccupied action space.” 2008 用访客标记“take any unused action”。`desc` 另加的“无需派遣家庭成员”不在英文中。 | ①英文写“use the effects of an unoccupied action space”，没有写放人，也没有明文写“不放人”。②未写明是否要求该格当前能合法放人。③未写明是否限版图上的行动格。④“Immediately before each returning home phase, you can return exactly one fuel tank”：每个回家阶段前至多归还 1 个。 | ①④**已解答**（措辞已定；是否放人仍交 #1548）；②③**规则空白**，交 #1548 |
+| X11 | “每次你建造至少1个栅栏、1个畜棚或1个木造房间时，你总计少支付1个木材。” | 英文（用户实物照片）：“Each time you build at least 1 fence, 1 stable, or 1 wood room, you pay 1 wood less in total.” 2008 有“as an Action”。 | ①2022 英文**没有**“as an action”。②“Each time you build … you pay 1 wood less in total”没有说同一次行动建造两类设施时算一次还是两次。③写明“wood room”。 | ①③**已解答**；②**规则空白**，交 #1548 |
+| X12 | “你必须为每个太空毛球支付1个食物，或任该太空毛球离去并失去1点分数。” | 英文（用户实物照片）：“you must pay 1 food for each space woozle or let it go, losing 1 point if you do the latter.” 日文是全部离开。 | 逐个喂养，还是一个喂不起就全部离开；每个离开的毛球各扣 1 分。 | **已解答**：逐个选择，每离开 1 个扣 1 分；日文是误译 |
+| X14 | “(将新生儿和家庭成员放到‘西采石场’累积格上。)” | 英文（用户实物照片）：“Immediately take the "Family Growth without Room" action. *(Place the newborn with the person on the "Western Quarry" accumulation space.)*” 2008 版设计者 Hanno Girke 的旧牌回复见 [BGG 帖 480359](https://boardgamegeek.com/thread/480359)（社区线索）。 | “家庭成员”指谁。 | **已解答**：指已在西采石场上的人员 |
+| X15 | “每位玩家必须支付任意1个货物，或将自己房屋中的1个家庭成员归还到自己供应堆中。执行‘家庭增长’行动额外花费1个食物。” | 英文（用户实物照片）：“At the end of each returning home phase, each player must pay 1 good of their choice or return a person from their house to their supply. Taking the "Family Growth" action costs an additional 1 food.” 2008 是付不起才失去家庭成员，并写“any Family growth action”。 | ①英文写“must pay 1 good of their choice or return a person”，没有 2008 的“付不起才归还”条件。②原文“from their house”。③英文写“Taking the "Family Growth" action”，没有“any”；X14 另把“Family Growth without Room”写成一个单独命名的行动，是否覆盖它和卡牌给的家庭增长，英文未写明。 | ①②**已解答**；③**规则空白**，交 #1548 |
+| X18 | “以收养其1个后代——就是将其1个家庭成员交换给你，无论你房屋中是否有房间。” | 英文（用户实物照片）：“You can immediately pay 5 goods of your choice to another player to adopt one of their offspring, i.e., exchange their person for yours, regardless of whether you have room in your house or not. *(You must carry out this action immediately, or it has no effect.)*” 附录澄清“You cannot use this action if you have 5 people already”。2008：“Exchange this Person disc for one of your own”。 | ①英文写“offspring”，紧接着用“i.e., exchange their person”解释，没有限定只能收养新生儿。②“exchange their person for yours”，与 2008“Exchange this Person disc for one of your own”同义，没有写双方互换；结合附录澄清，你的人数加 1。③未限定对方哪类人员（已放出、在房屋中、新生儿）。④原文是“goods”。 | ②④**已解答**；①③**规则空白**，交 #1548 |
+| X21 | “任何没有房屋剩下的玩家可以使用一个‘翻新’行动，用总计2个木材和1个芦苇获得2个木造房屋。” | 英文（用户实物照片）：“Their jets burn down all wood rooms, harden all clay rooms to stone rooms, and have no effect on stone rooms. Any player who is left with no house can use a "Renovation" action to get two wood rooms for a total of 2 wood and 1 reed.” 附录英德澄清不一致（见 #1545 报告第五节）。2008：“"renovate" to a 2-room Wooden hut”。 | ①英文写“use a "Renovation" action”，与 X15“Taking the "Family Growth" action”同一种写法；是否须占用含翻修的行动格，未写明。②“two wood rooms”：2 个木造房间（中文“房屋”是 rooms 的译法），建在哪里未写明。③“for a total of 2 wood and 1 reed”是取得两个木造房间的总价；未提正常翻修费用。④原文“left with no house”。 | ②③④措辞**已解答**；①及②的位置**规则空白**，交 #1548 |
 | X10 | “将本卡牌放到你左手边的玩家面前。” | 2008 同义；转引英文首句一致。[规则书 p.4](https://www.lookout-spiele.de/upload/en_15yearsofagricolaanniversarybox.html_Argicola_Aniversery_Rules_155_EN_WEB.pdf#page=4) 规定顺时针轮流，左手边即下家。 | 牌传过去后接手玩家是否同样生效；单人局没有左手边玩家。 | 译文无歧义；规则空白交 #1548 |
 | X16 | “你决定每位其他玩家下一个家庭成员必须放置在哪儿。” | 2008 同义。 | 是抽牌时一次决定，还是轮到对方放人时再决定；所选行动格在放人时已不合法怎么办；单人局。 | 译文无歧义；规则空白交 #1548 |
 | X17 | “当你使用一个行动格时，移除其上的糖果。” | 2008：“Your Family members must collect these markers”。 | 只有抽牌者使用才移除，中文与 2008 一致。糖果能否放在版图旁的行动格牌上、未进场的轮次格上；剩余糖果在行动格牌被替换时如何计算。 | 译文无歧义；规则空白交 #1548 |
@@ -264,6 +272,8 @@
 | X03 | “或者，将一个累积格上的全部货物交换为相同数量的另一种货物。” | 转引英文一致；Kobiela 回复作物也算货物。 | 换出的货物留在累积格上还是归你；换成动物时的安置。 | 译文无歧义；规则空白交 #1548 |
 
 ## 七、拍照清单（供 [#1547](https://github.com/titanxxh/open-agricola/issues/1547)）
+
+**已完成（2026-11-01）**：用户提供了下列七张牌的 2022 英文实物牌合照，保存在本机 `/home/xxh/x-deck-2022-photos/X08-X11-X12-X14-X15-X18-X21-english-cards.png`，不提交仓库。原文见第四节，逐问回答见第六节。以下保留原清单作记录。
 
 正面完整入镜，清晰到能逐字转录，含角标与图标。照片放在本机 `/home/xxh/x-deck-2022-photos/`，文件名以牌号开头，不提交仓库。
 
@@ -292,19 +302,20 @@
 | X03 | 换成动物时须能安置还是可以立即烹饪（2008 写须能安置或烹饪）；累积格上换出的货物留在格上；作物是否算货物（Kobiela 回复算，社区线索）。 |
 | X04–X06 | X04 经卡牌建畜棚、扩建农场同时建多个畜棚是否算；X05 经卡牌执行的需要空房间的家庭增长是否算；X06 只写“使用‘围栏’行动格”；额外费用是否可选；抽到商人的那一次行动是否已能满足条件；无人购买的商人终局如何处理。 |
 | X07 | “五列”在 Farmers of the Moor 农场地形下的含义；同一牧场跨两列时如何计分。 |
-| X08 | 能否用需要额外条件的行动格（例如家庭增长需空房间）；能否用累积格并取走其上全部货物；能否用当轮尚未进场的行动格。 |
+| X08 | 英文只写“use the effects of an unoccupied action space”：是否放人、是否算“使用该行动格”（触发放人或使用行动格相关的卡牌）；是否要求该格当前能合法放人；是否限版图上的行动格，还是包括版图旁的行动格牌；能否用需要额外条件的行动格（例如家庭增长需空房间）；能否用累积格并取走其上全部货物；能否用当轮尚未进场的行动格。 |
 | X09 | 标记的累积格被替换或移除时如何处理；格上有多种货物时拿哪种。 |
+| X11 | 英文“Each time you build at least 1 fence, 1 stable, or 1 wood room, you pay 1 wood less in total”没有“as an action”：经卡牌效果建造是否同样减费；同一次行动建造两类设施（例如扩建农场同时建房间和畜棚）时减一次还是各减一次；建造无需木材的设施（例如免费栅栏）时如何处理。 |
 | X10 | 接手玩家是否同样生效、能否一直传递；单人局；与 X-Deck 翻牌同一行动时的先后。 |
 | X12 | 毛球是否算动物或货物；与 X20 等动物效果的关系。 |
 | X13 | 多名玩家正好 42 分；单人局胜负。 |
 | X14 | 新生儿在西采石场上当轮能否再行动（它已经在行动格上）；没有人员在西采石场时（例如经卡牌效果取石）如何处理。 |
-| X15 | 回家阶段结束时付货物的顺序；X22、X24 等不在房屋中的人员是否计入。 |
+| X15 | 回家阶段结束时付货物的顺序；X22、X24 等不在房屋中的人员是否计入；英文“Taking the "Family Growth" action”是否覆盖无需空房间的家庭增长（X14 单独命名为“Family Growth without Room”）以及卡牌给的家庭增长；英文写自由二选一，与 2008“付不起才归还”不同，有货物时也可选择归还人员。 |
 | X16 | 决定时点；所选行动格不再合法时；单人局。 |
 | X17 | 糖果能否放在版图旁的行动格牌、尚未进场的行动格上；其他玩家使用该格是否移除糖果（牌面写“你”）。 |
-| X18 | 收养的人员当轮能否行动；对方只剩 1 人时能否收养；单人局。 |
+| X18 | 英文“adopt one of their offspring, i.e., exchange their person for yours”：只能收养新生儿，还是对方任意人员；可选对方已放出、在房屋中还是新生儿的人员；收养的人员当轮能否行动；对方只剩 1 人时能否收养；单人局。 |
 | X19、X22、X24 | “你的1个家庭成员”是否必须是抽牌的那个人员；X22 冻结期间是否需要房间与食物（2008 版设计者 Melissa Rogerson 回复须保留房间，[BGG 帖 354265](https://boardgamegeek.com/thread/354265)，社区线索）；轮数加 4 超过第 14 轮时如何处理。 |
 | X20 | “一半数量的食物（向下取整）”按每次兑换还是每只动物取整；房屋中的宠物、牌上的动物容量是否翻倍；附录：计分照常、以后获得的动物也缩小。 |
-| X21 | 附录英德澄清冲突（“unused”是否只在计分时适用；“rebuilt”与“搬进新木屋 / 翻修”）；房屋烧毁期间家庭增长与房间数；附录只说把预印木房间标记为烧毁，另建的木造房间如何标记、12 块烧毁标记是否为上限，未提及；Farmers of the Moor 下的取暖。 |
+| X21 | 英文“use a "Renovation" action to get two wood rooms for a total of 2 wood and 1 reed”：是否须占用含翻修的行动格，还是单独执行一次；两个木造房间建在哪里（原房屋位置或任意格）；附录英德澄清冲突（“unused”是否只在计分时适用；“rebuilt”与“搬进新木屋 / 翻修”）；房屋烧毁期间家庭增长与房间数；附录只说把预印木房间标记为烧毁，另建的木造房间如何标记、12 块烧毁标记是否为上限，未提及；Farmers of the Moor 下的取暖。 |
 | X22 | 印刷的 3 分归谁、事件牌结算后放在哪里。 |
 | X23 | 能否覆盖房间、牧场或已有动物的格子；被移除的设施如何处理。 |
 | X24 | 1+ 职业在单人局照常；放上卡牌的人员是否仍计入家庭成员数。 |
@@ -320,4 +331,4 @@
 
 ## 交接
 
-24 张中文牌图已逐张转录，版式与附录分类一致：X23 用行动格牌框但属事件，X24 印 1+，没有一张印洗回句。可对照的 2022 英文牌面有 7 张（X01、X06、X19 清晰，X02、X09、X14 低清，X20 局部），另有 3 张玩家转引；中文与这些英文逐句一致，与日文官方译本只在 X12 冲突，转引英文支持中文。`NarrativeDefinitions.php` 是改写，丢了 X03、X08、X11、X14、X15、X18 等处的规则细节，不能当牌面文本。需要拍英文原牌确认的是 X08、X11、X15、X18、X21，建议顺带拍 X12、X14。后续决策不应把 2008 牌面、论坛回复、评测、日文译本或第三方实现当作 2022 官方裁定。
+24 张中文牌图已逐张转录，版式与附录分类一致：X23 用行动格牌框但属事件，X24 印 1+，没有一张印洗回句。可对照的 2022 英文牌面有 13 张（X01、X06、X19 与用户拍摄的 X08、X11、X12、X14、X15、X18、X21 清晰，X02、X09 低清，X20 局部），另有 X03、X10 的玩家转引；中文与这些英文逐句一致，与日文官方译本只在 X12 冲突，英文牌面支持中文。`NarrativeDefinitions.php` 是改写，丢了 X03、X08、X11、X14、X15、X18 等处的规则细节，不能当牌面文本。原先需要拍英文原牌确认的 X08、X11、X15、X18、X21，以及建议顺带拍的 X12、X14，已于 2026-11-01 由用户实物照片补齐：译文问题均已回答，英文同样没写明的部分转入第八节。后续决策不应把 2008 牌面、论坛回复、评测、日文译本或第三方实现当作 2022 官方裁定。
