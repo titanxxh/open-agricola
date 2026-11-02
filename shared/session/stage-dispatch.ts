@@ -71,6 +71,8 @@ export type StageDispatchHost = {
   popEngineFrame(): EngineFrame | undefined
   driveEngineSteps(): void
   withDeferredPrivateEventDrain(fn: () => void): void
+  /** The dispatch ended without another stage frame; seal the Handoff Source's responses. */
+  handBackFromStageDispatch(handoffSourcePlayerIndex: number): void
   reportProtectedObservation(observation: ProtectedObservation): void
   getRoundStartScheduleFlows?(playerIndex: number): ActionFlow[]
   getPreparationCompletionFlow?(hook: RoundPreparationHook, playerIndex: number, sourceCardIds: string[]): ActionFlow | null
@@ -94,7 +96,7 @@ export class StageDispatch {
   private readonly host: StageDispatchHost
   private readonly continuations: StageContinuationTable
   /** Handoff Source carried from a completed frame into the next frame of the same dispatch. */
-  private pendingHandoffSourcePlayerIndex: number | null = null
+  private pendingHandoff: { playerIndex: number | null } | null = null
 
   constructor(host: StageDispatchHost, continuations: StageContinuationTable) {
     this.host = host
@@ -121,11 +123,18 @@ export class StageDispatch {
         }
       : stageResume
     this.host.popEngineFrame()
-    this.pendingHandoffSourcePlayerIndex = frame.handoffSourcePlayerIndex ?? null
+    const handoff = { playerIndex: frame.handoffSourcePlayerIndex ?? null }
+    let handedBack: boolean
+    this.pendingHandoff = handoff
     try {
       this.host.withDeferredPrivateEventDrain(() => this.resume(completedStageResume))
+      // No later stage frame took the Handoff Source: control returns to ordinary flow.
+      handedBack = this.pendingHandoff === handoff
     } finally {
-      this.pendingHandoffSourcePlayerIndex = null
+      this.pendingHandoff = null
+    }
+    if (handedBack && frame.reason === 'stage-hook' && handoff.playerIndex !== null) {
+      this.host.handBackFromStageDispatch(handoff.playerIndex)
     }
     return true
   }
@@ -142,8 +151,8 @@ export class StageDispatch {
     resumePlayerIndex = playerIndex,
     extra?: StageResumeState['extra'],
   ): void {
-    const handoffSourcePlayerIndex = this.pendingHandoffSourcePlayerIndex
-    this.pendingHandoffSourcePlayerIndex = null
+    const handoffSourcePlayerIndex = this.pendingHandoff?.playerIndex ?? null
+    this.pendingHandoff = null
     this.host.pushEngineFrame({
       engine: this.host.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
