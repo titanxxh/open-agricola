@@ -16,7 +16,10 @@ import { createWorkSession } from './_helpers/session-fixtures'
 // - discard: its owner commits a goods selection to discard.
 // - sheep: settles automatically (+3 sheep), more than an empty farm can house.
 // - foodOrSheep: its owner chooses 1 food or 3 sheep.
-type StageCard = 'gain' | 'choice' | 'twoChoices' | 'targetsNext' | 'discard' | 'sheep' | 'foodOrSheep' | null
+// - targetsNextSheep: a food-or-3-sheep choice that the next seat answers.
+// - aroundNextSingle: owner choice, a single-option choice for the next seat, owner choice.
+type StageCard = 'gain' | 'choice' | 'twoChoices' | 'targetsNext' | 'discard' | 'sheep' | 'foodOrSheep'
+  | 'targetsNextSheep' | 'aroundNextSingle' | null
 
 const cardId = (kind: Exclude<StageCard, null>, seat: number) => `TEST_StageHandoff_${kind}_${seat}`
 
@@ -31,8 +34,20 @@ const foodOrWood = (id: string, targetPlayerId?: string): ActionFlow => ({
   ],
 })
 
+const foodOrSheep = (id: string, targetPlayerId?: string): ActionFlow => ({
+  type: 'xor',
+  ...(targetPlayerId ? { targetPlayerId } : {}),
+  children: [
+    { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: id, choiceLabelKey: 'test.food',
+      ...(targetPlayerId ? { targetPlayerId } : {}) },
+    { type: 'leaf', actionId: 'gain', params: { sheep: 3 }, sourceCard: id, choiceLabelKey: 'test.sheep',
+      ...(targetPlayerId ? { targetPlayerId } : {}) },
+  ],
+})
+
 const effectFor = (kind: Exclude<StageCard, null>, seat: number, playerIds: string[]): CardEffect => {
   const id = cardId(kind, seat)
+  const next = playerIds[(seat + 1) % playerIds.length]
   switch (kind) {
     case 'gain':
       return { id, onBeforeReturnHome: () => ({ type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: id }) }
@@ -41,15 +56,22 @@ const effectFor = (kind: Exclude<StageCard, null>, seat: number, playerIds: stri
     case 'twoChoices':
       return { id, onBeforeReturnHome: () => ({ type: 'seq', children: [foodOrWood(id), foodOrWood(id)] }) }
     case 'targetsNext':
-      return { id, onBeforeReturnHome: () => foodOrWood(id, playerIds[(seat + 1) % playerIds.length]) }
+      return { id, onBeforeReturnHome: () => foodOrWood(id, next) }
     case 'discard':
       return { id, onBeforeReturnHome: () => ({ type: 'leaf', actionId: 'discard-goods', sourceCard: id }) }
     case 'sheep':
       return { id, onBeforeReturnHome: () => ({ type: 'leaf', actionId: 'gain', params: { sheep: 3 }, sourceCard: id }) }
     case 'foodOrSheep':
-      return { id, onBeforeReturnHome: () => ({ type: 'xor', children: [
-        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: id, choiceLabelKey: 'test.food' },
-        { type: 'leaf', actionId: 'gain', params: { sheep: 3 }, sourceCard: id, choiceLabelKey: 'test.sheep' },
+      return { id, onBeforeReturnHome: () => foodOrSheep(id) }
+    case 'targetsNextSheep':
+      return { id, onBeforeReturnHome: () => foodOrSheep(id, next) }
+    case 'aroundNextSingle':
+      return { id, onBeforeReturnHome: () => ({ type: 'seq', children: [
+        foodOrWood(id),
+        { type: 'xor', targetPlayerId: next, children: [
+          { type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: id, choiceLabelKey: 'test.clay', targetPlayerId: next },
+        ] },
+        foodOrWood(id),
       ] }) }
   }
 }
@@ -300,6 +322,20 @@ describe('stage dispatch handoff source', () => {
     expectSwitch(resp, 1, 2)
   })
 
+  it('[aroundNextSingle, none]: a choice the next seat never sees needs no confirm and keeps seat 0 undo', () => {
+    const session = setupSession(['aroundNextSingle', null])
+
+    let resp = pick(session, session.invokeBeforeReturnHomeHooks(), 'test.wood')
+    const wait = expectStageChoice(resp, 0)
+    expect(resources(resp, 'clay')).toEqual([0, 1])
+    expect(wait.allowedCommands).toContain('undoStep')
+
+    resp = session.undoStep()
+    expectStageChoice(resp, 0)
+    expect(resources(resp, 'clay')).toEqual([0, 0])
+    expect(resources(resp, 'wood')).toEqual([0, 0])
+  })
+
   it('[discard, choice]: a committed selection makes seat 0 the Handoff Source', () => {
     const session = setupSession(['discard', 'choice'])
 
@@ -361,6 +397,21 @@ describe('stage dispatch handoff source', () => {
       expectStageChoice(resp, 2)
       expectNoUndo(resp)
       expect(trace).toEqual(['1:animal-reorg', '1:confirm->2', '2:choice'])
+    })
+
+    it('[targetsNextSheep, none]: seat 1 houses the sheep it chose and may still undo that choice', () => {
+      const session = setupSession(['targetsNextSheep', null])
+
+      let resp = session.invokeBeforeReturnHomeHooks()
+      expectStageChoice(resp, 1)
+      resp = pick(session, resp, 'test.sheep')
+      const wait = expectReorg(resp, 1)
+      expect(wait.allowedCommands).toContain('undoStep')
+
+      resp = session.undoStep()
+      expect(resp.ok, resp.error).toBe(true)
+      expectStageChoice(resp, 1)
+      expect(resp.state.players[1]!.resources.sheep).toBe(0)
     })
 
     it('[foodOrSheep, none]: seat 0 houses its own animals and may still undo its choice', () => {
