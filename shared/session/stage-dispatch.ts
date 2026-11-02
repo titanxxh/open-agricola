@@ -95,8 +95,11 @@ const containsOptionalFlow = (flow: ActionFlow): boolean => flow.optional === tr
 export class StageDispatch {
   private readonly host: StageDispatchHost
   private readonly continuations: StageContinuationTable
-  /** Handoff Source carried from a completed frame into the next frame of the same dispatch. */
-  private pendingHandoff: { playerIndex: number | null } | null = null
+  /**
+   * Handoff Source carried from a completed frame into the next frame of the
+   * same dispatch. `passedOn` turns true once a later stage frame took it over.
+   */
+  private pendingHandoff: { playerIndex: number | null; passedOn: boolean } | null = null
 
   constructor(host: StageDispatchHost, continuations: StageContinuationTable) {
     this.host = host
@@ -123,17 +126,19 @@ export class StageDispatch {
         }
       : stageResume
     this.host.popEngineFrame()
-    const handoff = { playerIndex: frame.handoffSourcePlayerIndex ?? null }
-    let handedBack: boolean
+    const outerHandoff = this.pendingHandoff
+    const handoff = { playerIndex: frame.handoffSourcePlayerIndex ?? null, passedOn: false }
     this.pendingHandoff = handoff
     try {
       this.host.withDeferredPrivateEventDrain(() => this.resume(completedStageResume))
-      // No later stage frame took the Handoff Source: control returns to ordinary flow.
-      handedBack = this.pendingHandoff === handoff
     } finally {
-      this.pendingHandoff = null
+      this.pendingHandoff = outerHandoff
     }
-    if (handedBack && frame.reason === 'stage-hook' && handoff.playerIndex !== null) {
+    if (frame.reason !== 'stage-hook') return true
+    // This later stage frame now owns any hand-back of an outer one.
+    if (outerHandoff) outerHandoff.passedOn = true
+    // No later stage frame took the Handoff Source: control returns to ordinary flow.
+    if (!handoff.passedOn && handoff.playerIndex !== null) {
       this.host.handBackFromStageDispatch(handoff.playerIndex)
     }
     return true
@@ -151,8 +156,10 @@ export class StageDispatch {
     resumePlayerIndex = playerIndex,
     extra?: StageResumeState['extra'],
   ): void {
-    const handoffSourcePlayerIndex = this.pendingHandoff?.playerIndex ?? null
+    const handoff = this.pendingHandoff
     this.pendingHandoff = null
+    if (handoff) handoff.passedOn = true
+    const handoffSourcePlayerIndex = handoff?.playerIndex ?? null
     this.host.pushEngineFrame({
       engine: this.host.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
