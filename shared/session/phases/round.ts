@@ -560,6 +560,7 @@ export const takeAnytimeAction = (
   }
 
   core.appendHistory(entry.replacesTurn === true)
+  core.getEngineStack().recordHandoffSource(playerIndex)
   if (entry.replacesTurn) {
     const owner = core.state.players[playerIndex]
     if (!owner) return core.emitResponse(false, 'invalid player')

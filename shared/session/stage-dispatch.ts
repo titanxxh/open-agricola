@@ -93,7 +93,8 @@ const containsOptionalFlow = (flow: ActionFlow): boolean => flow.optional === tr
 export class StageDispatch {
   private readonly host: StageDispatchHost
   private readonly continuations: StageContinuationTable
-  private pendingStageSwitchFromPlayerIndex: number | null = null
+  /** Handoff Source carried from a completed frame into the next frame of the same dispatch. */
+  private pendingHandoffSourcePlayerIndex: number | null = null
 
   constructor(host: StageDispatchHost, continuations: StageContinuationTable) {
     this.host = host
@@ -120,11 +121,11 @@ export class StageDispatch {
         }
       : stageResume
     this.host.popEngineFrame()
-    this.pendingStageSwitchFromPlayerIndex = frame.ownerPlayerIndex
+    this.pendingHandoffSourcePlayerIndex = frame.handoffSourcePlayerIndex ?? null
     try {
       this.host.withDeferredPrivateEventDrain(() => this.resume(completedStageResume))
     } finally {
-      this.pendingStageSwitchFromPlayerIndex = null
+      this.pendingHandoffSourcePlayerIndex = null
     }
     return true
   }
@@ -141,18 +142,16 @@ export class StageDispatch {
     resumePlayerIndex = playerIndex,
     extra?: StageResumeState['extra'],
   ): void {
-    const stageSwitchFromPlayerIndex = this.pendingStageSwitchFromPlayerIndex
-    this.pendingStageSwitchFromPlayerIndex = null
-    const deferredPlayerSwitch = stageSwitchFromPlayerIndex !== null && stageSwitchFromPlayerIndex !== playerIndex
-      ? { fromPlayerIndex: stageSwitchFromPlayerIndex, toPlayerIndex: playerIndex }
-      : null
+    const handoffSourcePlayerIndex = this.pendingHandoffSourcePlayerIndex
+    this.pendingHandoffSourcePlayerIndex = null
     this.host.pushEngineFrame({
       engine: this.host.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
       stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex, ...(extra ? { extra } : {}) },
-      deferredPlayerSwitch,
+      deferredPlayerSwitch: null,
+      handoffSourcePlayerIndex,
       reason: 'stage-hook',
     })
     this.host.driveEngineSteps()

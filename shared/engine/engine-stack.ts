@@ -66,6 +66,8 @@ export type EngineFrame = {
     confirmed?: boolean
     returnPlayerStack?: number[]
   } | null
+  /** Handoff Source: latest player who personally responded in this Stage Dispatch. */
+  handoffSourcePlayerIndex?: number | null
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
   harvestSettlementResume?: HarvestSettlementResume
@@ -85,6 +87,8 @@ export type EngineFrameCursor = {
     confirmed?: boolean
     returnPlayerStack?: number[]
   } | null
+  /** Handoff Source: latest player who personally responded in this Stage Dispatch. */
+  handoffSourcePlayerIndex?: number | null
   undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
   harvestSettlementResume?: HarvestSettlementResume
@@ -171,6 +175,13 @@ export class EngineStack {
     return true
   }
 
+  /** Record a personal response as the Handoff Source on every frame that resumes stage dispatch. */
+  recordHandoffSource(playerIndex: number): void {
+    for (const frame of this.frames) {
+      if (frame.stageResume) frame.handoffSourcePlayerIndex = playerIndex
+    }
+  }
+
   depth(): number {
     return this.frames.length
   }
@@ -250,6 +261,7 @@ export class EngineStack {
         spaceId: f.spaceId,
         stageResume: f.stageResume,
         deferredPlayerSwitch: f.deferredPlayerSwitch,
+        ...(f.handoffSourcePlayerIndex != null ? { handoffSourcePlayerIndex: f.handoffSourcePlayerIndex } : {}),
         undoBoundaryOnResolve: f.undoBoundaryOnResolve,
         reason: f.reason,
         ...(f.harvestSettlementResume ? { harvestSettlementResume: f.harvestSettlementResume } : {}),
@@ -277,6 +289,7 @@ export class EngineStack {
         spaceId: fc.spaceId,
         stageResume: fc.stageResume,
         deferredPlayerSwitch: fc.deferredPlayerSwitch,
+        ...(fc.handoffSourcePlayerIndex != null ? { handoffSourcePlayerIndex: fc.handoffSourcePlayerIndex } : {}),
         undoBoundaryOnResolve: fc.undoBoundaryOnResolve,
         reason: fc.reason,
         ...(fc.harvestSettlementResume ? { harvestSettlementResume: fc.harvestSettlementResume } : {}),
