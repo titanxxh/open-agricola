@@ -2415,21 +2415,32 @@ export class GameCore {
     return Scoring.computeAll(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
-  private respond(
-    ok = true,
-    error?: string,
-    privateEvents?: PrivateGameEvent[],
-    metadata: ResponseMetadata = {},
-  ): SessionResponse {
+  /** The current InteractionState without building a full response. */
+  getInteraction(): InteractionState {
+    return this.withCtx(() => this.currentInteraction())
+  }
+
+  private currentInteraction(): InteractionState {
     // While the top-level game phase is 'draft', the client uses
     // DraftOverlay (which reads `state.draft` directly), so surface an
     // idle interaction. Otherwise let `buildInteraction()` derive the
     // wait/idle/gameover shape from the engine stack.
     const isDrafting = this.state.phase === 'draft' && this.state.draft != null
     const isParentSelecting = this.state.phase === 'parent-selection' && this.state.parentSelection != null
-    const interaction: InteractionState = isDrafting || isParentSelecting
+    return isDrafting || isParentSelecting
       ? { stateId: 'idle', allowedCommands: [], anytimeActions: [] }
       : this.buildInteraction()
+  }
+
+  private respond(
+    ok = true,
+    error?: string,
+    privateEvents?: PrivateGameEvent[],
+    metadata: ResponseMetadata = {},
+  ): SessionResponse {
+    const isDrafting = this.state.phase === 'draft' && this.state.draft != null
+    const isParentSelecting = this.state.phase === 'parent-selection' && this.state.parentSelection != null
+    const interaction = this.currentInteraction()
     const resp: SessionResponse = {
       ok,
       state: this.state,

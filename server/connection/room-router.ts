@@ -13,6 +13,7 @@ import { withRoomParticipantNames } from './history-presentation'
 import { buildRoomHistoryPage, HistoryBranchChangedError, HistoryProjectionChangedError } from '../../shared/session/history-window'
 import { enqueueRoomCommand, enqueueRoomTask, waitForConnection } from '../game/room-queue.ts'
 import { serializeState } from '../../shared/session/serialization'
+import { interactionRecipientPlayerId } from '../../shared/session/interaction-state-adapter'
 import { randomUUID } from 'node:crypto'
 import { agreeToGameEnd, buildGameTermination, createGameEndProposal, hasUnanimousAgreement } from '../game/game-end'
 import type { GameEndProposal, GameTermination } from '../../shared/contract/protocol/game-termination'
@@ -433,11 +434,10 @@ const actingSeat = (ctx: ConnectionCtx): number => {
 
 /** The Interaction Player while an interaction is pending, otherwise the current rotation player. */
 const waitingSeat = (room: Room): number => {
-  const { state, interaction } = room.session.getState()
-  if (interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number') {
-    return interaction.playerIndex
-  }
-  return state.currentPlayerIndex
+  const { players, currentPlayerIndex } = room.session.state
+  const playerIds = players.map(player => player.id)
+  const recipient = interactionRecipientPlayerId(room.session.getInteraction(), playerIds)
+  return recipient === null ? currentPlayerIndex : playerIds.indexOf(recipient)
 }
 
 /**
