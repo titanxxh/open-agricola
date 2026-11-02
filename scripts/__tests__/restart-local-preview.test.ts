@@ -1,8 +1,72 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const scanner = readFileSync('scripts/local-rooms.ts', 'utf8')
 const script = readFileSync('restart-local.sh', 'utf8')
+const argumentsBlock = script.slice(script.indexOf('KILL_ONLY=0'), script.indexOf('\ncd "$SCRIPT_DIR"'))
+const bindingBlock = script.slice(script.indexOf('if [ "$INTRANET_ENABLED" -eq 1 ]; then'), script.indexOf('\necho "Preparing local dependencies..."'))
+const publicApiBlock = script.slice(script.indexOf('echo "Binding to:'), script.indexOf('\necho "Stopping existing processes..."'))
+
+function resolveBinding(args: string[], tailscaleMode = 'online') {
+  return spawnSync('bash', ['-c', `
+    set -euo pipefail
+    tailscale() {
+      [ "$*" = 'ip -4' ] || return 1
+      case "$TEST_TAILSCALE_MODE" in
+        online) echo '100.64.0.42' ;;
+        empty) return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    command() {
+      if [ "$*" = '-v tailscale' ] && [ "$TEST_TAILSCALE_MODE" = missing ]; then return 1; fi
+      builtin command "$@"
+    }
+    get_lan_ip() { echo '192.0.2.42'; }
+    ${argumentsBlock}
+    ${bindingBlock}
+    ${publicApiBlock}
+    echo "PUBLIC_API_BASE=$PUBLIC_API_BASE"
+  `, 'restart-binding-test', ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, TEST_TAILSCALE_MODE: tailscaleMode, PUBLIC_API_BASE: 'https://production.example', BACKEND_PORT: '5175' },
+  })
+}
+
+describe('restart-local network binding', () => {
+  it('binds preview and advertises the local API on the Tailscale IPv4', () => {
+    const result = resolveBinding(['--preview', '--tailscale'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('Binding to: 100.64.0.42 (Tailscale)')
+    expect(result.stdout).toContain('PUBLIC_API_BASE=http://100.64.0.42:5175')
+  })
+
+  it('keeps loopback as the default', () => {
+    const result = resolveBinding([])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('Binding to: 127.0.0.1')
+  })
+
+  it('preserves LAN binding', () => {
+    const result = resolveBinding(['--intranet'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('Binding to: 192.0.2.42 (intranet)')
+  })
+
+  it('rejects conflicting network flags', () => {
+    const result = resolveBinding(['--intranet', '--tailscale'])
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('--intranet and --tailscale cannot be combined')
+  })
+
+  it.each(['missing', 'offline', 'empty'])('rejects a %s Tailscale address', mode => {
+    const result = resolveBinding(['--tailscale'], mode)
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('--tailscale requires a running Tailscale client with an IPv4 address')
+    expect(result.stdout).not.toContain('Binding to:')
+  })
+})
 
 describe('restart-local preview mode', () => {
   it('documents and parses --preview', () => {

@@ -56,6 +56,7 @@ brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
 pnpm install
 ./restart-local.sh    # 在 127.0.0.1 上启动后端 (5175) + 前端 (5173)
 ./restart-local.sh --intranet   # 改绑局域网 IP，同网段其他机器可访问
+./restart-local.sh --preview --tailscale   # 在 Tailscale IPv4 上提供预览，访问启动器输出的链接
 ```
 
 常用验证命令：
