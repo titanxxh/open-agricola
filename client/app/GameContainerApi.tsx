@@ -1569,7 +1569,7 @@ export const GameContainerApi = () => {
     <GameHeader
       locale={locale}
       state={state}
-      currentPlayer={currentPlayer}
+      currentPlayer={activePlayer ?? currentPlayer}
       devMode={devMode}
       setDevMode={setDevMode}
       myPlayerName={isHotseat && hotseatAudienceId

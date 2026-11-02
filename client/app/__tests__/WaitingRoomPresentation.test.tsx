@@ -358,10 +358,47 @@ describe('waiting room presentation', () => {
     })
   })
 
-  it('lets the outgoing websocket seat confirm a player switch', async () => {
+  it('shows the interaction player in the header until ordinary work resumes', async () => {
+    const payload = playingPayload(1)
+    payload.state.currentPlayerIndex = 0
+    Object.assign(payload.state.players[0]!, { name: 'xxh', nameIsDefault: false, color: 'yellow' })
+    Object.assign(payload.state.players[1]!, { name: 'zero21', nameIsDefault: false, color: 'blue' })
+    payload.interaction = {
+      stateId: 'wait', playerIndex: 1, promptKey: 'ui.confirmPlayerSwitch',
+      request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 },
+      allowedCommands: ['resolveChoice'], anytimeActions: [],
+    }
+    WaitingRoomWebSocket.joinStatus = 'playing'
+    WaitingRoomWebSocket.statePayload = payload
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?room=room-1')
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ok: true, wsPath: '/nodes/presentation-test/ws',
+      user: { id: 'u1', username: 'xxh', displayName: 'xxh' },
+    }))))
+    render(<LocaleProvider><AuthProvider><AuthenticatedGame /></AuthProvider></LocaleProvider>)
+
+    expect(await screen.findByText('Waiting for zero21 to act')).toHaveClass('waiting-turn')
+    expect(document.querySelector('.waiting-turn')).toHaveStyle({ backgroundColor: 'rgb(0, 0, 255)' })
+    expect(screen.queryByRole('button', { name: 'Confirm switch' })).toBeNull()
+
+    act(() => {
+      WaitingRoomWebSocket.emit({
+        type: 'stateUpdate', roomId: 'room-1', version: 2, sync: 'snapshot', cause: 'command',
+        payload: { ...payload, interaction: { stateId: 'idle', allowedCommands: ['takeAction'], anytimeActions: [] } },
+        emittedAt: Date.now(),
+      })
+    })
+    await waitFor(() => expect(document.querySelector('.your-turn')).toBeVisible())
+    expect(document.querySelector('.waiting-turn')).toBeNull()
+  })
+
+  it('lets the outgoing websocket seat confirm a switch during another player\'s turn', async () => {
     const user = userEvent.setup()
     const payload = playingPayload(7)
-    payload.state.currentPlayerIndex = 1
+    payload.state.currentPlayerIndex = 0
     payload.interaction = {
       stateId: 'wait',
       playerIndex: 1,
