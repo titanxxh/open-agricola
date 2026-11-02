@@ -156,7 +156,7 @@ anytime                  注册额外的 anytime 行动
 - **Trigger-select**（`ParallelNode`）负责 select、pass、mandatory 与 independent 语义，没有 listener 专用节点。结构暂不适用的 child 本轮隐藏，sibling 执行后重新评估；适用但付不起的 child 保持可见并禁用。`mandatory: true` 只在必选 child 适用且可执行时禁用 Pass。Card listener 的适用性只来自返回结果；阶段卡牌效果仍在克隆上预览。
 - 全部 `before` 反应使用已捕获的 `activate-card` 来源和 owner/trigger-select 调度。handler 在选中时读取实时状态，休眠 sibling 保留供重新判断，可选反应保留 Pass。用格和放人 before 保留原 flow 的义务：非可选返回 flow 禁用 Pass，可选根仍可跳过。未指定目标的返回效果归行动者，选序和计次归持卡人。新卡不回填已捕获窗口。规则动作可达性放宽在 `skipBeforeTriggers` 下让开；Pass 带该标记检查真实宿主和行动者，再检查通用替换回退。用格准入保留 ADR 0033 的当前步骤策略。
 - **逐配方分发**：`trade-applied` 执行确定性 `seq` / `parallel` flow 中的非可选 `special-effect` 与 `gain` leaf（`executeImmediateSpecialEffectFlows()`）。完整喂食批次使用普通 `exchange` 反应，支付与交互 flow 完成后才恢复喂食结算。
-- **Owner 与切换**：owner 与触发玩家显式传递；跨玩家确认和撤销边界由运行时负责。`confirm-player-switch` 由交出控制的玩家提交，并建立撤销边界。阶段效果派发中，交出控制的玩家是 `stage-hook` 帧携带的交接来源玩家；下一位回应者是其他玩家时由它确认。没有交接来源时直接交接并建立撤销边界。阶段帧结束时不把控制交回其所有者；交回普通流程时只在下一位等待的玩家是其他人时写入撤销边界，不新增确认。
+- **Owner 与切换**：owner 与触发玩家显式传递；跨玩家确认和撤销边界由运行时负责。`confirm-player-switch` 由交出控制的玩家提交，并建立撤销边界。阶段效果派发中，交出控制的玩家是 `stage-hook` 帧携带的交接来源玩家；其他玩家作选择前由它确认。没有交接来源或交给其他玩家整理动物时，直接交接并建立撤销边界。阶段帧结束时不把控制交回其所有者；交回普通流程时只在下一位等待的玩家是其他人时写入撤销边界，不新增确认。
 - **暂定续行**（[ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)）：每个修改命令都经过一个结算边界，带规范化身份与检查点；作用域、守卫、受保护观察和失败记忆保存在私有会话游标中。
 - 不要给 `CardListenerRegistration` 增加 `order` 字段；稳定的回退顺序来自 `playOrderIndex`。
 

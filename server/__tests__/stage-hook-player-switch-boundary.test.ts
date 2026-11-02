@@ -14,7 +14,9 @@ import { createWorkSession } from './_helpers/session-fixtures'
 // - twoChoices: two food-or-wood choices in a row for its owner.
 // - targetsNext: a food-or-wood choice that the next seat answers.
 // - discard: its owner commits a goods selection to discard.
-type StageCard = 'gain' | 'choice' | 'twoChoices' | 'targetsNext' | 'discard' | null
+// - sheep: settles automatically (+3 sheep), more than an empty farm can house.
+// - foodOrSheep: its owner chooses 1 food or 3 sheep.
+type StageCard = 'gain' | 'choice' | 'twoChoices' | 'targetsNext' | 'discard' | 'sheep' | 'foodOrSheep' | null
 
 const cardId = (kind: Exclude<StageCard, null>, seat: number) => `TEST_StageHandoff_${kind}_${seat}`
 
@@ -42,6 +44,13 @@ const effectFor = (kind: Exclude<StageCard, null>, seat: number, playerIds: stri
       return { id, onBeforeReturnHome: () => foodOrWood(id, playerIds[(seat + 1) % playerIds.length]) }
     case 'discard':
       return { id, onBeforeReturnHome: () => ({ type: 'leaf', actionId: 'discard-goods', sourceCard: id }) }
+    case 'sheep':
+      return { id, onBeforeReturnHome: () => ({ type: 'leaf', actionId: 'gain', params: { sheep: 3 }, sourceCard: id }) }
+    case 'foodOrSheep':
+      return { id, onBeforeReturnHome: () => ({ type: 'xor', children: [
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: id, choiceLabelKey: 'test.food' },
+        { type: 'leaf', actionId: 'gain', params: { sheep: 3 }, sourceCard: id, choiceLabelKey: 'test.sheep' },
+      ] }) }
   }
 }
 
@@ -113,7 +122,7 @@ const expectNoUndo = (resp: SessionResponse) => {
   expect(resp.historyLength).toBe(0)
 }
 
-const pick = (session: GameSession, resp: SessionResponse, label: 'test.food' | 'test.wood') => {
+const pick = (session: GameSession, resp: SessionResponse, label: 'test.food' | 'test.wood' | 'test.sheep') => {
   const wait = waitOf(resp)
   const option = wait.request.kind === 'choice'
     ? wait.request.options.find((candidate) => candidate.labelKey === label)
@@ -307,6 +316,66 @@ describe('stage dispatch handoff source', () => {
     resp = confirmPlayerSwitch(session)
     expectStageChoice(resp, 1)
     expectNoUndo(resp)
+  })
+
+  describe('animal reorganization', () => {
+    const expectReorg = (resp: SessionResponse, playerIndex: number) => {
+      const wait = waitOf(resp)
+      expect(wait.playerIndex).toBe(playerIndex)
+      expect(wait.request.kind).toBe('animal-reorg')
+      return wait
+    }
+    const commitReorg = (session: GameSession, resp: SessionResponse) => {
+      const wait = waitOf(resp)
+      if (wait.request.kind !== 'animal-reorg') throw new Error('expected animal-reorg')
+      return session.resolveChoice(wait.playerIndex, 'confirm', { zones: wait.request.zones })
+    }
+
+    it('[choice, sheep]: seat 1 houses its animals directly and cannot undo seat 0 choice', () => {
+      const session = setupSession(['choice', 'sheep'])
+
+      let resp = pick(session, session.invokeBeforeReturnHomeHooks(), 'test.wood')
+      expectReorg(resp, 1)
+      expectNoUndo(resp)
+      const undo = session.undoStep()
+      expect(undo.ok).toBe(false)
+      expect(undo.ok ? '' : undo.error).toBe('cannot undo past boundary')
+      expect(resources(session.getState(), 'wood')).toEqual([1, 0])
+
+      resp = commitReorg(session, resp)
+      expect(resp.ok, resp.error).toBe(true)
+      expect(resp.interaction.stateId).toBe('idle')
+      expect(resources(resp, 'wood')).toEqual([1, 0])
+    })
+
+    it('3 players [choice, sheep, choice]: the housing seat becomes the Handoff Source', () => {
+      const session = setupSession(['choice', 'sheep', 'choice'])
+
+      let resp = pick(session, session.invokeBeforeReturnHomeHooks(), 'test.wood')
+      const trace = [step(resp)]
+      resp = commitReorg(session, resp)
+      trace.push(step(resp))
+      expectSwitch(resp, 1, 2)
+      resp = confirmPlayerSwitch(session)
+      trace.push(step(resp))
+      expectStageChoice(resp, 2)
+      expectNoUndo(resp)
+      expect(trace).toEqual(['1:animal-reorg', '1:confirm->2', '2:choice'])
+    })
+
+    it('[foodOrSheep, none]: seat 0 houses its own animals and may still undo its choice', () => {
+      const session = setupSession(['foodOrSheep', null])
+
+      let resp = pick(session, session.invokeBeforeReturnHomeHooks(), 'test.sheep')
+      const wait = expectReorg(resp, 0)
+      expect(wait.allowedCommands).toContain('undoStep')
+
+      resp = session.undoStep()
+      expect(resp.ok, resp.error).toBe(true)
+      const choice = expectStageChoice(resp, 0)
+      expect(choice.request.kind === 'choice' && choice.request.options.map((option) => option.labelKey))
+        .toEqual(['test.food', 'test.sheep'])
+    })
   })
 
   describe('hand-back to ordinary flow', () => {

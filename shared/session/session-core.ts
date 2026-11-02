@@ -1636,7 +1636,13 @@ export class GameCore {
     const visiblePlayerIndex = visibleFrame
       ? this.visiblePlayerIndexForFrame(visibleFrame)
       : this.state.currentPlayerIndex
+    // In a Stage Dispatch, housing animals for another player than the
+    // Handoff Source is a direct handoff: an undo boundary, no confirmation.
+    const handoffSource = visibleFrame?.reason === 'stage-hook'
+      ? visibleFrame.handoffSourcePlayerIndex ?? null
+      : null
     const foreignResponse = visiblePlayerIndex !== playerIndex
+      || (handoffSource !== null && handoffSource !== playerIndex)
     if (foreignResponse) {
       this.openProvisionalScopesForRisk()
       this.appendHistoryWithUndoBoundary()
