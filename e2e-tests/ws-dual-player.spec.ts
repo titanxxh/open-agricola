@@ -8,6 +8,8 @@ import {
 } from '@playwright/test'
 import { BACKEND_URL, saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
 import type { ServerEvent } from '../shared/contract/protocol/ws'
+import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
+import { serializeSessionSnapshot } from '../shared/session/serialization'
 
 test.use({ viewport: { width: 1920, height: 1080 } })
 
@@ -61,6 +63,56 @@ const observeSeat = (page: Page) => {
 }
 
 test.describe('WS dual-player sync', () => {
+  for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
+    test(`header follows the interaction player through a cross-player reaction at ${viewport.width}px`, async ({ browser, request }, testInfo) => {
+      const context = await browser.newContext({ viewport })
+      const session = createWorkSession({ configure(state) {
+        Object.assign(state.players[0]!, { name: 'xxh', nameIsDefault: false, color: 'yellow' })
+        const responder = state.players[1]!
+        Object.assign(responder, { name: 'zero21', nameIsDefault: false, color: 'blue', houseType: 'clay' })
+        responder.occupationPlayed = ['A128_RiparianBuilder']
+        Object.assign(responder.resources, { wood: 5, clay: 10, reed: 6 })
+        state.actionSpaces.find(space => space.id === 'reed-bank')!.resources.reed = 3
+      } })
+      try {
+        expect(session.takeAction(0, 'reed-bank').interaction).toMatchObject({
+          stateId: 'wait', request: { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 },
+        })
+        expect(session.resolveChoice(0, 'confirm').interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
+        expect(session.state.currentPlayerIndex).toBe(0)
+        const saved = session.withCtx(() => serializeSessionSnapshot(session.state, session))
+        await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+        await authenticate(context, request, `header_${Date.now().toString(36)}`)
+        const observer = await context.newPage()
+        const responder = await context.newPage()
+        await observer.goto(`${FRONTEND_URL}/?transport=ws&room=dev2&player=p1&devMode=1`)
+        await expect(observer.locator('.game-layout')).toBeVisible()
+        await responder.goto(`${FRONTEND_URL}/?transport=ws&room=dev2&player=p2&devMode=1`)
+        await expect(responder.locator('.game-layout')).toBeVisible()
+        await observer.locator('.dev-panel input[type="file"]').setInputFiles({
+          name: 'header-reaction.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)),
+        })
+        const waiting = observer.locator('.header-compact .waiting-turn')
+        await expect(waiting).toHaveText('Waiting for zero21 to act')
+        await expect(waiting).toHaveAttribute('data-player-color', 'blue')
+        await expect(responder.locator('.header-compact .your-turn')).toBeVisible()
+        await expect(observer.locator('[data-action-id="forest"] button').first()).toBeDisabled()
+        await observer.screenshot({ path: testInfo.outputPath('waiting-for-reaction.png') })
+
+        await responder.locator('.interaction-bar [data-choice-value="__skip__"]').click()
+        const confirm = responder.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
+        await expect(confirm).toBeEnabled()
+        await expect(waiting).toHaveText('Waiting for zero21 to act')
+        await observer.reload()
+        await expect(waiting).toHaveText('Waiting for zero21 to act')
+        await observer.screenshot({ path: testInfo.outputPath('waiting-for-switch.png') })
+        await confirm.click()
+        await expect(observer.locator('.header-compact .your-turn')).toBeVisible()
+        await expect(responder.locator('.header-compact .waiting-turn')).toHaveText('Waiting for xxh to act')
+      } finally { session.dispose(); await context.close() }
+    })
+  }
+
   test('one account keeps separate seats through every development context link', async ({ browser, request }) => {
     const context = await browser.newContext()
     await authenticate(context, request, `dev_seats_${Date.now().toString(36)}`)
