@@ -11,6 +11,8 @@
 
 `community-qr.ts` 提供公开只读的微信和飞书群图片接口，每次请求读取通过原子替换更新的宿主机文件，响应禁用缓存。`deploy-operations.sh --wechat-qr` 或 `--feishu-qr` 调用 `operations/update-community-qr.mjs` 校验原图并经维护者 SSH 发布；应用只读挂载持久的社区目录。测试见 `wechat-community.test.ts` 和 `wechat-community.spec.ts`。
 
+`whats-new.ts` 从同一社区目录提供维护者手写的最新版本说明，每次请求重新读取 `whats-new.json`，并用 `shared/contract/whats-new.ts` 校验。`deploy-operations.sh --whats-new` 调用 `scripts/update-whats-new.ts`，上传前使用同一解析器，再经 SSH 原子替换。测试见 `whats-new.test.ts` 和 `whats-new.spec.ts`。
+
 
 ## server/connection/ — WebSocket 入口
 

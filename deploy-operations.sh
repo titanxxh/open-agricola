@@ -6,6 +6,10 @@ if [[ "${1:-}" == '--wechat-qr' || "${1:-}" == '--feishu-qr' ]]; then
   shift
   exec node "$(dirname "$0")/operations/update-community-qr.mjs" "$QR_PLATFORM" "$@"
 fi
+if [[ "${1:-}" == '--whats-new' ]]; then
+  shift
+  exec node "$(dirname "$0")/scripts/update-whats-new.ts" "$@"
+fi
 HOST="${1:-ubuntu@ten-kr}"
 [[ "$HOST" == *@* ]] || HOST="ubuntu@$HOST"
 REF="${2:-main}"

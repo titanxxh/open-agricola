@@ -91,6 +91,11 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
   LocaleSwitcher: () => <div />,
 }))
 
+// The header's release-notes request would consume the ordered fetch responses below.
+vi.mock('../../components/common/WhatsNew', () => ({
+  WhatsNewButton: () => null,
+}))
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()

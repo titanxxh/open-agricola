@@ -721,6 +721,36 @@ The public endpoints permit only GET/HEAD and return `Cache-Control: no-store`, 
 
 Replace an image before the expiry shown by its platform. These commands do not renew the underlying invitation. The dialogs preserve the full exported image, including any expiry caption. After updating, reopen the corresponding dialog and compare the endpoint's bytes or SHA-256 with the source image.
 
+## What's New notes
+
+The header's What's New button lists the five newest player-facing releases from `/api/whats-new`. Write these notes by hand for players; they are host data, not source, and independent of Release notes. They live in `<game-dir>/data/community/whats-new.json` on the existing read-only community mount, and the server rereads the file on every request. Publishing or editing notes needs no Release, Pages rebuild, game image build or application restart.
+
+```json
+{
+  "releases": [
+    {
+      "version": "v0.11.9",
+      "date": "2026-11-02",
+      "items": [
+        { "zh": "卡牌描述中的行动格名称可以点开预览", "en": "Tap action-space names in card text to preview them" }
+      ]
+    }
+  ]
+}
+```
+
+List releases newest first; dates may not increase down the list. `version` is a unique label of at most 32 characters. Each release has 1–30 notes. Each note maps language ids such as `zh` and `en` to one line of at most 500 characters. The dialog shows the viewer's language, then English, then the first language written. The file may keep up to 200 releases and 256 KiB; only the first five are served.
+
+```bash
+./deploy-operations.sh --whats-new ubuntu@ten-kr /absolute/path/whats-new.json [game-dir]
+# Local application, using its COMMUNITY_DATA_DIR or SHARED_DATA_DIR/community:
+./deploy-operations.sh --whats-new --local /absolute/path/whats-new.json /absolute/path/data/community
+```
+
+`scripts/update-whats-new.ts` validates the file with the server's parser before upload, then uses the same checksum-verified atomic replacement as the QR images. An invalid file is rejected with the offending field, such as `releases[1].date`, and the live notes stay unchanged. Successful output includes `whatsNewSha256`, the release count and the latest version. Keep the source file; republishing an earlier copy restores the earlier notes.
+
+The endpoint permits only GET/HEAD and returns `Cache-Control: no-store`. A missing file returns 404 and an invalid hand-edited file returns 503; the button stays hidden in both cases. The browser loads the notes once per page load. A red dot marks releases above the last one the viewer opened, which is stored per browser; on a first visit only the newest release counts as unread.
+
 ## Operations monitoring
 
 The provisioned Grafana dashboard uses Chinese titles, metric explanations, legends and round-selector display labels. Grafana's default UI language is Simplified Chinese (`zh-Hans`); metric names, label values and PromQL remain unchanged.

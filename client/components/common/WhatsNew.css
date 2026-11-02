@@ -1,0 +1,58 @@
+.whats-new-button {
+  position: relative;
+}
+
+.whats-new-button__dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger, #c0392b);
+  box-shadow: 0 0 0 2px var(--bg-parchment, #fffaf0);
+}
+
+.whats-new-dialog__releases {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.whats-new-dialog__releases > li + li {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border, #d4c6ad);
+}
+
+.whats-new-dialog h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.whats-new-dialog time {
+  color: var(--color-text-muted, #6b6152);
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.whats-new-dialog__badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  /* Darker than --color-danger so the small white label keeps 4.5:1 contrast. */
+  background: #a93226;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.whats-new-dialog ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

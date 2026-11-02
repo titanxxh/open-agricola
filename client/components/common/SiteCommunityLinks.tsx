@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { API_BASE } from '../../config'
 import { useLocale } from '../../contexts/LocaleContext'
 import { GitHubRepoLink } from './GitHubRepoLink'
+import { WhatsNewButton } from './WhatsNew'
 import feishuIcon from './feishu-icon.svg'
 import './SiteCommunityLinks.css'
 
@@ -72,6 +73,7 @@ export function SiteCommunityLinks() {
           <path d="M17 8c-3.9 0-7 2.5-7 5.5s3.1 5.5 7 5.5c.8 0 1.7-.1 2.4-.4l2.3 1.2-.6-2c1.8-1 2.9-2.6 2.9-4.3C24 10.5 20.9 8 17 8Zm-2.5 3a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6Zm5 0a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6Z" />
         </svg> : <img src={feishuIcon} alt="" aria-hidden="true" />}
       </button>)}
+      <WhatsNewButton />
       {open && <CommunityGroupDialog platform={open} onClose={() => setOpen(null)} />}
     </div>
   )

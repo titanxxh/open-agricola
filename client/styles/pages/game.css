@@ -5514,6 +5514,11 @@
       display: none;
     }
 
+  /* A waiting badge already fills the phone game header; release notes stay in the lobby. */
+  .header-actions .whats-new-button {
+      display: none;
+    }
+
   .sow-choice-button {
       width: 36px;
       height: 36px;
