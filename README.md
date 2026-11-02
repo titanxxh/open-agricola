@@ -56,6 +56,7 @@ Docker Engine with Compose is also required. The launcher prepares persistent lo
 pnpm install
 ./restart-local.sh    # Start the backend (5175) and frontend (5173) on 127.0.0.1
 ./restart-local.sh --intranet   # Same, but bind to the LAN IP so other machines can connect
+./restart-local.sh --preview --tailscale   # Serve a preview on the Tailscale IPv4 printed by the launcher
 ```
 
 Common verification commands:

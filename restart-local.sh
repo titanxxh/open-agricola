@@ -77,7 +77,7 @@ usage() {
 Usage: ./restart-local.sh [--kill-only|--kill_only|-k]
                           [--players N | -p N | --players=N | -p=N]
                           [--parents] [--seasons] [--moor] [--draft] [--preview]
-                          [--snake] [--intranet] [--instances 1|2] [-h|--help]
+                          [--snake] [--intranet] [--tailscale] [--instances 1|2] [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
 fresh backend (tsx) and frontend (vite) bound to 127.0.0.1, reachable only
@@ -104,6 +104,10 @@ are created automatically; each survives backend restarts independently.
                                  Linux eth0) so other machines on the network
                                  can reach the dev server. Fails if that
                                  address cannot be determined.
+  --tailscale                    Bind to this host's Tailscale IPv4 for access
+                                 from other devices on the tailnet. Requires
+                                 Tailscale to be running. Cannot combine with
+                                 --intranet.
   --instances N                  Start 1 (default) or 2 local app instances behind
                                  the same public entry. PostgreSQL/S3 stay shared.
   -h, --help                     Show this help.
@@ -127,6 +131,7 @@ SNAKE_ENABLED=0
 DRAFT_ENABLED=0
 PREVIEW_ENABLED=0
 INTRANET_ENABLED=0
+TAILSCALE_ENABLED=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --kill-only|--kill_only|-k)
@@ -182,6 +187,10 @@ while [ $# -gt 0 ]; do
       INTRANET_ENABLED=1
       shift
       ;;
+    --tailscale)
+      TAILSCALE_ENABLED=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -196,6 +205,11 @@ done
 
 case "$APP_INSTANCES" in 1|2) ;; *) echo "--instances must be 1 or 2"; exit 1 ;; esac
 
+if [ "$INTRANET_ENABLED" -eq 1 ] && [ "$TAILSCALE_ENABLED" -eq 1 ]; then
+  echo "Error: --intranet and --tailscale cannot be combined."
+  exit 1
+fi
+
 case "$PLAYERS" in
   2|3|4|5|6) ;;
   *)
@@ -206,8 +220,7 @@ esac
 
 cd "$SCRIPT_DIR"
 
-# Bind address for Vite / backend. Loopback by default; --intranet asks for
-# this host's LAN IPv4 (macOS: en0; Linux: eth0) so other machines can connect.
+# --intranet uses the host's LAN IPv4 (macOS: en0; Linux: eth0).
 get_lan_ip() {
   case "$(uname -s)" in
     Darwin)
@@ -530,6 +543,24 @@ if [ "$KILL_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+if [ "$INTRANET_ENABLED" -eq 1 ]; then
+  BIND_IP=$(get_lan_ip)
+  if [ -z "$BIND_IP" ]; then
+    echo "Error: --intranet could not determine the LAN IP. On macOS use en0 (ipconfig getifaddr en0); on Linux ensure eth0 exists."
+    exit 1
+  fi
+  BIND_SCOPE="intranet"
+elif [ "$TAILSCALE_ENABLED" -eq 1 ]; then
+  if ! command -v tailscale >/dev/null 2>&1 || ! BIND_IP=$(tailscale ip -4) || [ -z "$BIND_IP" ]; then
+    echo "Error: --tailscale requires a running Tailscale client with an IPv4 address."
+    exit 1
+  fi
+  BIND_SCOPE="Tailscale"
+else
+  BIND_IP="127.0.0.1"
+  BIND_SCOPE="local only; pass --intranet or --tailscale for remote access"
+fi
+
 echo "Preparing local dependencies..."
 SHARED_DATA_DIR="$SHARED_DATA_DIR" node "$SCRIPT_DIR/scripts/local-services.mjs"
 set -a
@@ -546,16 +577,6 @@ REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
 )}"
 GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 env REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" "$PNPM_BIN" exec tsx scripts/upload-replay-viewer.ts
-
-if [ "$INTRANET_ENABLED" -eq 1 ]; then
-  BIND_IP=$(get_lan_ip)
-  if [ -z "$BIND_IP" ]; then
-    echo "Error: --intranet could not determine the LAN IP. On macOS use en0 (ipconfig getifaddr en0); on Linux ensure eth0 exists."
-    exit 1
-  fi
-else
-  BIND_IP="127.0.0.1"
-fi
 
 RESET_CONFIRMED=0
 RESET_REASON=""
@@ -601,8 +622,12 @@ if [ -n "$RESET_REASON" ]; then
   RESET_CONFIRMED=1
 fi
 
-echo "Binding to: $BIND_IP$([ "$INTRANET_ENABLED" -eq 1 ] && echo " (intranet)" || echo " (local only; pass --intranet for LAN access)")"
-PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
+echo "Binding to: $BIND_IP ($BIND_SCOPE)"
+if [ "$TAILSCALE_ENABLED" -eq 1 ]; then
+  PUBLIC_API_BASE="http://$BIND_IP:$BACKEND_PORT"
+else
+  PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
+fi
 echo "Stopping existing processes..."
 if [ -n "$OWNED_PROCESSES_FILE" ]; then
   stop_owned_processes
@@ -683,7 +708,7 @@ echo "  REPLAY_VIEWER_ID   = $REPLAY_VIEWER_BUILD_ID"
 echo "  FRONTEND_MODE      = $([ "$PREVIEW_ENABLED" -eq 1 ] && echo preview || echo dev)"
 [ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"
 echo ""
-echo "=== Open Agricola (intranet) ==="
+echo "=== Open Agricola ==="
 echo ""
 echo "WS persistent dev rooms (each survives backend restart):"
 DEV_ROOM_QUERY_SUFFIX=""
