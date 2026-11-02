@@ -871,6 +871,150 @@ describe('room-manager ws sync', () => {
     expect(resync.payload.publicEventCancellations).toBeUndefined()
   })
 
+  describe('undo seat', () => {
+    const seatMismatch = 'seat mismatch: you cannot act on another player'
+
+    const connect = async (): Promise<TestSocket> => {
+      const ws = new WebSocket(baseUrl) as TestSocket
+      ws.received = []
+      attachCollector(ws)
+      sockets.push(ws)
+      await waitForOpen(ws)
+      return ws
+    }
+
+    const startTwoSeatGame = async () => {
+      const seat0 = await connect()
+      await sendCommand(seat0, { type: 'createRoom', name: 'P1', maxPlayers: 2 })
+      const { roomId } = await waitForEvent(seat0, (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
+        event.type === 'roomCreated')
+      const seat1 = await connect()
+      await sendCommand(seat1, { type: 'joinRoom', roomId, requestedPlayerIndex: 1, name: 'P2' })
+      const started = (ws: TestSocket) => waitForEvent(ws, (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.cause === 'reconnect')
+      const initial = await started(seat0)
+      await started(seat1)
+      return { seat0, seat1, initial }
+    }
+
+    /** Sends a command and resolves with the caller's own reply once its receipt has also arrived. */
+    const issue = async (ws: TestSocket, command: ClientCommand) => {
+      const requestId = randomUUID()
+      await sendCommand(ws, { ...command, requestId } as ClientCommand)
+      const reply = await waitForEvent(ws, (event): event is StateUpdateEnvelope | Extract<ServerEvent, { type: 'error' }> =>
+        (event.type === 'stateUpdate' || event.type === 'error') && event.requestId === requestId)
+      if (command.type !== 'getState') {
+        await waitForEvent(ws, (event): event is Extract<ServerEvent, { type: 'commandReceipt' }> =>
+          event.type === 'commandReceipt' && event.requestId === requestId)
+      }
+      return reply
+    }
+
+    const applied = async (ws: TestSocket, command: ClientCommand): Promise<StateUpdateEnvelope> => {
+      const reply = await issue(ws, command)
+      if (reply.type !== 'stateUpdate') throw new Error(`${command.type} was rejected: ${reply.error}`)
+      return reply
+    }
+
+    const currentState = (ws: TestSocket) => applied(ws, { type: 'getState' })
+
+    /**
+     * Each command is refused only to its sender: the room keeps its version and
+     * state, and the other seat hears nothing about it.
+     */
+    const expectRefusedPrivately = async (
+      sender: TestSocket,
+      peer: TestSocket,
+      commands: ClientCommand[],
+      before: StateUpdateEnvelope,
+    ) => {
+      const peerSeen = peer.received.length
+      for (const command of commands) {
+        const reply = await issue(sender, command)
+        expect(reply).toMatchObject({ type: 'error', error: seatMismatch })
+      }
+      const peerView = await currentState(peer)
+      expect(peer.received.slice(peerSeen)).toEqual([peerView])
+      const senderView = await currentState(sender)
+      for (const view of [peerView, senderView]) {
+        expect(view.version).toBe(before.version)
+        expect(view.payload.state.actionSpaces).toEqual(before.payload.state.actionSpaces)
+      }
+      expect(peerView.payload.interaction).toEqual(before.payload.interaction)
+    }
+
+    it('refuses undo from seat 1 after seat 0 places a person, then lets seat 0 undo it', async () => {
+      const { seat0, seat1, initial } = await startTwoSeatGame()
+      const spaceId = initial.payload.state.actionSpaces.find((space) => space.takenBy.length === 0)!.id
+      const placed = await applied(seat0, { type: 'action', spaceId })
+      expect(placed.payload.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0 })
+      expect(placed.payload.interaction.allowedCommands).toEqual(expect.arrayContaining(['undoStep', 'undoAction']))
+
+      await expectRefusedPrivately(seat1, seat0, [{ type: 'undoStep' }, { type: 'undoAction' }], placed)
+
+      const undone = await applied(seat0, { type: 'undoStep' })
+      expect(undone.cause).toBe('undo')
+      expect(findTakenBy(undone, spaceId)).toEqual([])
+      const peerUndone = await waitForEvent(seat1, (event): event is StateUpdateEnvelope =>
+        event.type === 'stateUpdate' && event.version === undone.version && event.cause === 'undo')
+      expect(peerUndone.payload.state.actionSpaces).toEqual(undone.payload.state.actionSpaces)
+    })
+
+    it('refuses undo from seat 0 while seat 1 owns the pending interaction', async () => {
+      const { seat0, seat1 } = await startTwoSeatGame()
+      await applied(seat0, { type: 'action', spaceId: 'day-laborer' })
+      const handedOver = await applied(seat0, { type: 'choice', value: 'confirm' })
+      expect(handedOver.payload.state.currentPlayerIndex).toBe(1)
+      const plowing = await applied(seat1, { type: 'action', spaceId: 'farmland' })
+      expect(plowing.payload.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
+      expect(plowing.payload.interaction.allowedCommands).toEqual(expect.arrayContaining(['undoStep', 'undoAction']))
+
+      await expectRefusedPrivately(seat0, seat1, [{ type: 'undoStep' }, { type: 'undoAction' }], plowing)
+
+      const undone = await applied(seat1, { type: 'undoAction' })
+      expect(undone.cause).toBe('undo')
+      expect(findTakenBy(undone, 'farmland')).toEqual([])
+    })
+
+    it('lets the hotseat connection undo for the seat that owns the pending interaction', async () => {
+      const table = await connect()
+      await sendCommand(table, { type: 'createRoom', name: 'Table', maxPlayers: 2, hotseat: true })
+      const created = await waitForEvent(table, (event): event is Extract<ServerEvent, { type: 'roomCreated' }> =>
+        event.type === 'roomCreated')
+      expect(created).toMatchObject({ hotseat: true, playerIndex: 0 })
+      await waitForEvent(table, (event): event is StateUpdateEnvelope => event.type === 'stateUpdate')
+      await applied(table, { type: 'action', spaceId: 'day-laborer' })
+      await applied(table, { type: 'choice', value: 'confirm' })
+
+      for (const command of [{ type: 'undoStep' }, { type: 'undoAction' }] as const) {
+        const plowing = await applied(table, { type: 'action', spaceId: 'farmland' })
+        expect(plowing.payload.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
+        const undone = await applied(table, command)
+        expect(undone.cause).toBe('undo')
+        expect(findTakenBy(undone, 'farmland')).toEqual([])
+        expect(undone.payload.state.currentPlayerIndex).toBe(1)
+      }
+    })
+
+    it('keeps accepting undo from any seat of a development room', async () => {
+      const seats: TestSocket[] = []
+      for (const requestedPlayerIndex of [0, 1]) {
+        const ws = await connect()
+        await sendCommand(ws, { type: 'joinRoom', roomId: 'dev2', requestedPlayerIndex, name: `P${requestedPlayerIndex + 1}` })
+        seats.push(ws)
+      }
+      const initial = await currentState(seats[0]!)
+      expect(initial.payload.interaction.stateId).toBe('idle')
+      const mover = initial.payload.state.currentPlayerIndex
+      const placed = await applied(seats[mover]!, { type: 'action', spaceId: 'day-laborer' })
+      expect(placed.payload.interaction).toMatchObject({ stateId: 'wait', playerIndex: mover })
+
+      const undone = await applied(seats[1 - mover]!, { type: 'undoStep' })
+      expect(undone.cause).toBe('undo')
+      expect(findTakenBy(undone, 'day-laborer')).toEqual([])
+    })
+  })
+
   it('broadcasts devSetResources and devSetRound updates over ws', async () => {
     const p1 = new WebSocket(baseUrl) as TestSocket
     p1.received = []

@@ -428,11 +428,28 @@ const namedSeat = (ctx: ConnectionCtx, playerIndex: number): number =>
 const actingSeat = (ctx: ConnectionCtx): number => {
   const room = ctx.currentRoom
   if (room?.hotseat !== true) return ctx.currentPlayerIndex
+  return waitingSeat(room)
+}
+
+/** The Interaction Player while an interaction is pending, otherwise the current rotation player. */
+const waitingSeat = (room: Room): number => {
   const { state, interaction } = room.session.getState()
   if (interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number') {
     return interaction.playerIndex
   }
   return state.currentPlayerIndex
+}
+
+/**
+ * Undo names no seat, so an ordinary room accepts it only from the seat that
+ * may undo now. Hotseat and development rooms keep accepting it from any of
+ * their connections; a solo room's only seat always passes.
+ */
+const assertMayUndo = (ctx: ConnectionCtx, room: Room, requestId?: string): boolean => {
+  if (room.hotseat === true || isDevRoom(room.id)) return true
+  if (waitingSeat(room) === ctx.currentPlayerIndex) return true
+  sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
+  return false
 }
 
 const assertOwnSeat = (ctx: ConnectionCtx, expectedPlayerIndex: unknown, requestId?: string): boolean => {
@@ -1345,6 +1362,7 @@ function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
 
 function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoStep' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  if (!assertMayUndo(ctx, room, msg.requestId)) return
   const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(room, 'undoStep', [], () => room.session.undoStep()),
@@ -1354,6 +1372,7 @@ function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 
 function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoAction' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  if (!assertMayUndo(ctx, room, msg.requestId)) return
   const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(room, 'undoAction', [], () => room.session.undoAction()),
