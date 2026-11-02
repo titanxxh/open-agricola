@@ -1636,13 +1636,11 @@ export class GameCore {
     const visiblePlayerIndex = visibleFrame
       ? this.visiblePlayerIndexForFrame(visibleFrame)
       : this.state.currentPlayerIndex
-    // In a Stage Dispatch, housing animals for another player than the
-    // Handoff Source is a direct handoff: an undo boundary, no confirmation.
-    const handoffSource = visibleFrame?.reason === 'stage-hook'
-      ? visibleFrame.handoffSourcePlayerIndex ?? null
-      : null
-    const foreignResponse = visiblePlayerIndex !== playerIndex
-      || (handoffSource !== null && handoffSource !== playerIndex)
+    // A stage frame decides from its Handoff Source; housing animals is a
+    // direct handoff behind an undo boundary, never a confirmation.
+    const foreignResponse = visibleFrame?.reason === 'stage-hook'
+      ? this.stageHandoff(visibleFrame, playerIndex) !== null
+      : visiblePlayerIndex !== playerIndex
     if (foreignResponse) {
       this.openProvisionalScopesForRisk()
       this.appendHistoryWithUndoBoundary()
@@ -3630,21 +3628,53 @@ export class GameCore {
   }
 
   /**
-   * Stage Dispatch handoff before `toPlayerIndex` answers a stage-frame choice.
-   * The Handoff Source confirms when it is another player; otherwise control
-   * passes directly behind an undo boundary. `null` keeps the current holder.
+   * Stage Dispatch handoff before `toPlayerIndex` gets a prompt in a stage
+   * frame, decided from the Handoff Source: another source confirms, the
+   * source itself keeps control. Without a source, a player other than the one
+   * the frame shows gets control directly behind an undo boundary. `null`
+   * means no handoff, including when control was already handed to this player.
    */
-  private planStageHandoff(
+  private stageHandoff(
     frame: EngineFrame,
     toPlayerIndex: number,
   ): { kind: 'confirm' | 'direct'; fromPlayerIndex: number } | null {
+    const deferred = frame.deferredPlayerSwitch
+    if (deferred?.confirmed && deferred.toPlayerIndex === toPlayerIndex) return null
     const source = frame.handoffSourcePlayerIndex ?? null
-    const holder = frame.deferredPlayerSwitch?.confirmed
-      ? frame.deferredPlayerSwitch.toPlayerIndex
-      : source ?? frame.ownerPlayerIndex
-    if (holder === toPlayerIndex) return null
-    if (source !== null && source !== toPlayerIndex) return { kind: 'confirm', fromPlayerIndex: source }
-    return { kind: 'direct', fromPlayerIndex: holder }
+    if (source !== null) return source === toPlayerIndex ? null : { kind: 'confirm', fromPlayerIndex: source }
+    const visiblePlayerIndex = this.visiblePlayerIndexForFrame(frame)
+    return visiblePlayerIndex === toPlayerIndex ? null : { kind: 'direct', fromPlayerIndex: visiblePlayerIndex }
+  }
+
+  /**
+   * Hand a stage frame's pending prompt to its player. Returns true when a
+   * `confirm-player-switch` now waits for the Handoff Source.
+   */
+  private handOffStagePrompt(frame: EngineFrame, player: PlayerState, space: ActionSpace): boolean {
+    if (frame.reason !== 'stage-hook') return false
+    const toPlayerIndex = this.effectiveOwnerIndexForFrame(
+      frame,
+      this.engineStack.peekPendingCursor()?.hostNodeId,
+      this.engineStack.peekPendingView(),
+    )
+    const handoff = this.stageHandoff(frame, toPlayerIndex)
+    if (!handoff) return false
+    frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
+    this.flushEngineLog()
+    if (handoff.kind === 'confirm') {
+      this.engineStack.setDeferredPlayerSwitch({ fromPlayerIndex: handoff.fromPlayerIndex, toPlayerIndex })
+      this.startConfirmPlayerSwitch(handoff.fromPlayerIndex, toPlayerIndex)
+      return true
+    }
+    this.openProvisionalScopesForRisk()
+    this.appendHistoryWithUndoBoundary()
+    this.engineStack.confirmDeferredPlayerSwitch(handoff.fromPlayerIndex, toPlayerIndex)
+    return false
+  }
+
+  /** An accepted player response makes that player the Handoff Source of the current Stage Dispatch. */
+  private recordAcceptedResponse(playerIndex: number, result: { type: string } | undefined): void {
+    if (result?.type !== 'fail') this.engineStack.recordHandoffSource(playerIndex)
   }
 
   /**
@@ -3884,64 +3914,51 @@ export class GameCore {
         }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The parent pending host stays unresolved in the engine.
-        const choiceOwnerIndex = this.effectiveOwnerIndexForFrame(
-          frame,
-          pendingCursor?.hostNodeId,
-          pendingView,
-        )
-        const stageHandoff = frame.reason === 'stage-hook'
-          ? this.planStageHandoff(frame, choiceOwnerIndex)
-          : null
-        if (stageHandoff) {
-          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
-          this.flushEngineLog()
-          if (stageHandoff.kind === 'confirm') {
+        if (frame.reason !== 'stage-hook') {
+          const choiceOwnerIndex = this.effectiveOwnerIndexForFrame(
+            frame,
+            pendingCursor?.hostNodeId,
+            pendingView,
+          )
+          const visiblePlayerIndex = frame.deferredPlayerSwitch?.confirmed
+            ? frame.deferredPlayerSwitch.toPlayerIndex
+            : frame.deferredPlayerSwitch?.fromPlayerIndex ?? frame.ownerPlayerIndex
+          if (choiceOwnerIndex !== visiblePlayerIndex) {
+            const returnPlayerStack = frame.deferredPlayerSwitch?.returnPlayerStack
             this.engineStack.setDeferredPlayerSwitch({
-              fromPlayerIndex: stageHandoff.fromPlayerIndex,
+              fromPlayerIndex: visiblePlayerIndex,
               toPlayerIndex: choiceOwnerIndex,
+              returnPlayerStack,
             })
-            this.startConfirmPlayerSwitch(stageHandoff.fromPlayerIndex, choiceOwnerIndex)
+          }
+          if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
+            const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
+            frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
+            this.flushEngineLog()
+            this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
             return
           }
-          this.openProvisionalScopesForRisk()
-          this.appendHistoryWithUndoBoundary()
-          this.engineStack.confirmDeferredPlayerSwitch(stageHandoff.fromPlayerIndex, choiceOwnerIndex)
         }
-        const visiblePlayerIndex = frame.deferredPlayerSwitch?.confirmed
-          ? frame.deferredPlayerSwitch.toPlayerIndex
-          : frame.deferredPlayerSwitch?.fromPlayerIndex ?? frame.ownerPlayerIndex
-        if (frame.reason !== 'stage-hook' && choiceOwnerIndex !== visiblePlayerIndex) {
-          const returnPlayerStack = frame.deferredPlayerSwitch?.returnPlayerStack
-          this.engineStack.setDeferredPlayerSwitch({
-            fromPlayerIndex: visiblePlayerIndex,
-            toPlayerIndex: choiceOwnerIndex,
-            returnPlayerStack,
-          })
-        }
-        if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
-          const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
-          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
-          this.flushEngineLog()
-          this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
-          return
-        }
-        if (
-          hostRequestKind === 'farm-select' ||
+        const selectionPrompt = hostRequestKind === 'farm-select' ||
           hostRequestKind === 'selection' ||
           !!this.isSelectionPromptKey(pendingView?.promptKey)
-        ) {
-          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
-          this.flushEngineLog()
-          return
-        }
         const pendingActionId = pendingCursor?.pendingActionId
         const pendingActionCanResolve = pendingActionId
           ? this.registry.get(pendingActionId)?.resolveChoice !== undefined
           : false
-        if (frame.engine.hasPendingHostRequiringExternalResolution(pendingActionCanResolve)) {
+        const externalResolution = !selectionPrompt &&
+          frame.engine.hasPendingHostRequiringExternalResolution(pendingActionCanResolve)
+        const explicitChoice = pendingView?.request.kind === 'choice' && pendingView.request.requiresExplicitChoice
+        const autoResolves = !selectionPrompt && !externalResolution && !explicitChoice &&
+          step.choice.options.length === 1 && step.choice.options[0]?.disabled !== true
+        // Stage frames hand off only before a choice that will actually prompt.
+        if (!autoResolves && this.handOffStagePrompt(frame, player, space)) return
+        if (selectionPrompt) {
+          frame.engine.flushEventTransaction({ actionHooks: this.actionHooks, state: this.state, player, space })
+          this.flushEngineLog()
           return
         }
-        if (pendingView?.request.kind === 'choice' && pendingView.request.requiresExplicitChoice) return
+        if (externalResolution || explicitChoice) return
         if (step.choice.options.length === 1) {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
@@ -3962,10 +3979,12 @@ export class GameCore {
               this.flushLeafActionDetail(resolvedActionId, false)
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
-              if (result.request.requiresExplicitChoice) return
               const requestOptions = result.request.options
-              if (requestOptions.length === 1) {
-                if (requestOptions[0]?.disabled === true) return
+              if (!result.request.requiresExplicitChoice && requestOptions.length === 1) {
+                if (requestOptions[0]?.disabled === true) {
+                  this.handOffStagePrompt(frame, player, space)
+                  return
+                }
                 autoOptions = requestOptions
                 continue
               }
@@ -3973,6 +3992,7 @@ export class GameCore {
               // (applyInteractionRequest -> pending envelope). The previous
               // GameCore pending-field mirror is gone (Task 10): every
               // consumer reads the live pending envelope.
+              this.handOffStagePrompt(frame, player, space)
               return
             }
             if (result.type === 'fail') {
@@ -4269,10 +4289,14 @@ export class GameCore {
     return this.respond(false, error)
   }
 
+  /**
+   * `playerResponse` is false only for a system decline after a provisional
+   * rollback: it neither records undo history nor makes a Handoff Source.
+   */
   private resolveEngineChoice(
     playerIndex: number,
     value: string,
-    pushHistoryEntry: boolean,
+    playerResponse: boolean,
     payload?: Record<string, unknown>,
   ): SessionResponse {
     const view = this.engineStack.peekPendingView()
@@ -4313,15 +4337,15 @@ export class GameCore {
     const resolvedActionId = this.peekHostPendingActionId()
     const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
 
-    if (pushHistoryEntry && !protectedDirectCancel) {
+    if (playerResponse && !protectedDirectCancel) {
       this.pushHistory(false, frame?.undoBoundaryOnResolve === true)
     }
-    this.engineStack.recordHandoffSource(pendingPlayerIndex)
     const result = this.engine.resolveChoice(
       value,
       this.buildEngineExecutionContext(player, space),
       payload,
     )
+    if (playerResponse) this.recordAcceptedResponse(pendingPlayerIndex, result)
     this.flushEngineLog()
     if (frame && (result.type === 'flow' || (result.type === 'ok' && result.extraData?.cardChoiceFollowUp === true))) {
       this.pushNestedReturnPointForFrame(frame, pendingPlayerIndex)
@@ -5095,6 +5119,7 @@ export class GameCore {
       this.buildEngineExecutionContext(player, space),
       farmPayload,
     )
+    this.recordAcceptedResponse(playerIndex, result)
     this.flushEngineLog()
 
     if (result.type === 'request') {
@@ -5167,7 +5192,6 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
     const pendingSourceCard = this.peekPendingSourceCard()
-    this.engineStack.recordHandoffSource(playerIndex)
 
     if (plan.isFarmSelection) {
       return this.resolveFarmSelectionChoice(playerIndex, payload, true)
@@ -5189,6 +5213,7 @@ export class GameCore {
       const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(player, space),
       }, { resourceCounts: counts })
+      this.recordAcceptedResponse(playerIndex, result)
       // Explicit input rejection restores this command; accepted failure keeps its blocking contract.
       if (result?.type === 'fail') {
         if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
@@ -5223,6 +5248,7 @@ export class GameCore {
       const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(player, space),
       }, { resourceBatchExchange: batch })
+      this.recordAcceptedResponse(playerIndex, result)
       if (result?.type === 'fail') {
         if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
         if (!result.recoverable) this.blockFailedMandatoryAction()
@@ -5267,6 +5293,7 @@ export class GameCore {
       const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
+      this.recordAcceptedResponse(playerIndex, result)
       if (result?.type === 'fail') {
         if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
         if (!result.recoverable) this.blockFailedMandatoryAction()
@@ -5303,6 +5330,7 @@ export class GameCore {
     const result = this.engine?.resolveChoice('confirm', {
       ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: validation.positionStrings })
+    this.recordAcceptedResponse(playerIndex, result)
     if (result?.type === 'fail') {
       if (result.disposition === 'rejected-input') return this.rejectInput(result.errorKey)
       if (!result.recoverable) this.blockFailedMandatoryAction()

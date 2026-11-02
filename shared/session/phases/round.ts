@@ -560,7 +560,6 @@ export const takeAnytimeAction = (
   }
 
   core.appendHistory(entry.replacesTurn === true)
-  core.getEngineStack().recordHandoffSource(playerIndex)
   if (entry.replacesTurn) {
     const owner = core.state.players[playerIndex]
     if (!owner) return core.emitResponse(false, 'invalid player')
@@ -571,6 +570,9 @@ export const takeAnytimeAction = (
     recordActionSnapshot(owner, core.allocActionToken())
   }
   const owner = core.state.players[playerIndex]!
+  // The accepted action makes its player the Handoff Source before its flow
+  // can hand any prompt to another player.
+  core.getEngineStack().recordHandoffSource(playerIndex)
   const anytimeTurn = captureAnytimeTurn(core, owner)
   const parent = core.getEngineStack().getActiveAnytimeActivation()
   const anytimeActivation = { id: `anytime-${core.allocActionToken()}`, turn: anytimeTurn,
