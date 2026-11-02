@@ -20,7 +20,7 @@ server/connection/
 ```
 
 - One Room owns exactly one `GameSession`. The WebSocket handler awaits `dispatch()` through the Room and connection queues, and the Room's `ready | blocked` gate sits at command entry.
-- `room-router` validates commands, authorizes seats and calls `GameSession`; it never writes `GameState`. `payload-validation.ts` is pure validation that returns normalized values.
+- `room-router` validates commands, authorizes seats and calls `GameSession`; it never writes `GameState`. An ordinary Room accepts the seatless `undoStep` / `undoAction` only from the Interaction Player, or the current work-rotation player when idle; hotseat and development Rooms accept any of their connections (`ws-server.test.ts`). `payload-validation.ts` is pure validation that returns normalized values.
 - A rules command returning `ok=false` without `durableTransition` answers only its origin connection and creates no version or Replay Step. A durable rejection commits; only its error is private to the origin ([ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)).
 
 ## `server/game/`: Room and GameSession
