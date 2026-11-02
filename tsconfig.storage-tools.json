@@ -13,6 +13,7 @@
     "scripts/storage-archive.ts",
     "scripts/storage-archive-cli.ts",
     "scripts/container-entry.ts",
+    "scripts/update-whats-new.ts",
     "scripts/bench/room-performance.ts",
     "scripts/bench/room-commit-equivalence.ts",
     "scripts/bench/room-cpu-attribution.ts",

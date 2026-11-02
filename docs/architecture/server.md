@@ -9,6 +9,8 @@ The server owns connections, Rooms, durable commit, persistence and the product 
 
 `community-qr.ts` owns the public read-only WeChat and Feishu image endpoints. It rereads the atomically replaced host file for every request with no-store caching. `operations/update-community-qr.mjs`, invoked by `deploy-operations.sh --wechat-qr` or `--feishu-qr`, validates original images and publishes them through owner SSH access; the application mounts only the persistent community directory read only. Coverage: `wechat-community.test.ts` and `wechat-community.spec.ts`.
 
+`whats-new.ts` serves the newest host-maintained release notes from the same community directory, rereading `whats-new.json` per request and validating it with `shared/contract/whats-new.ts`. `deploy-operations.sh --whats-new` runs `scripts/update-whats-new.ts`, which applies the same parser before an atomic SSH replacement. Coverage: `whats-new.test.ts` and `whats-new.spec.ts`.
+
 
 ## `server/connection/`: WebSocket entry
 

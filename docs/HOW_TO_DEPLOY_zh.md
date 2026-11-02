@@ -821,3 +821,33 @@ Prometheus 每 15 秒 scrape（超时 5 秒），每 15 秒发现有效应用租
 公开接口只允许 GET/HEAD，成功和错误响应均带 `Cache-Control: no-store`。未配置图片时返回 404，图片不可读时返回 503，弹窗提供重试。每次打开弹窗也使用新的请求 URL。没有公开上传接口。更新应用时保留 `data/community`，另存各群最新原图供恢复；数据库/S3 归档备份不包含该宿主机目录。本地 `restart-local.sh` 默认将 `COMMUNITY_DATA_DIR` 设为 `$SHARED_DATA_DIR/community`。
 
 按对应平台标注的有效期及时换图。这些命令不会延长群邀请本身的有效期。弹窗保留导出原图及其中的有效期文字。换图后重新打开相应弹窗，并核对接口字节或 SHA-256 与原图一致。
+
+## 更新内容
+
+顶部的“更新内容”按钮通过 `/api/whats-new` 展示最近 5 个面向玩家的版本说明。说明由维护者为玩家手写，属于宿主机数据而非源码，与 Release notes 无关。文件位于现有只读社区目录的 `<game-dir>/data/community/whats-new.json`，服务端每次请求重新读取。发布或修改说明无需 Release、Pages 构建、游戏镜像构建或应用重启。
+
+```json
+{
+  "releases": [
+    {
+      "version": "v0.11.9",
+      "date": "2026-11-02",
+      "items": [
+        { "zh": "卡牌描述中的行动格名称可以点开预览", "en": "Tap action-space names in card text to preview them" }
+      ]
+    }
+  ]
+}
+```
+
+版本按从新到旧排列，日期自上而下不得递增。`version` 是唯一标签，最多 32 个字符。每个版本 1–30 条说明；每条说明以 `zh`、`en` 等语言 id 映射到不超过 500 个字符的单行文本。弹窗依次使用玩家当前语言、英文、首个已写语言。文件最多保留 200 个版本、256 KiB，接口只返回前 5 个。
+
+```bash
+./deploy-operations.sh --whats-new ubuntu@ten-kr /absolute/path/whats-new.json [game-dir]
+# 本地应用，使用其 COMMUNITY_DATA_DIR 或 SHARED_DATA_DIR/community：
+./deploy-operations.sh --whats-new --local /absolute/path/whats-new.json /absolute/path/data/community
+```
+
+`scripts/update-whats-new.ts` 上传前用服务端同一解析器校验文件，再沿用二维码的哈希校验与原子替换。无效文件会报出具体字段（如 `releases[1].date`）并被拒绝，线上说明保持不变。成功输出包含 `whatsNewSha256`、版本数和最新版本。保留源文件；重新发布旧副本即可恢复旧说明。
+
+接口只允许 GET/HEAD，并返回 `Cache-Control: no-store`。文件缺失返回 404，手工改坏返回 503，两种情况都隐藏按钮。浏览器每次加载页面读取一次。红点标记玩家上次打开之后的新版本，记录保存在各自浏览器；首次访问只把最新版本计为未读。

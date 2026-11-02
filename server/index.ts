@@ -89,9 +89,11 @@ import { adminTakedownCard, markBuiltInMergedCards, reconcilePendingMerges } fro
 import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
 import { createFrontendHosting } from './frontend-hosting'
 import { createCommunityQrHandler } from './community-qr'
+import { createWhatsNewHandler } from './whats-new'
 
 const handleFrontend = createFrontendHosting()
 const handleCommunityQr = createCommunityQrHandler()
+const handleWhatsNew = createWhatsNewHandler()
 
 const serverCorsHeaders = () => corsHeaders({
   methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
@@ -446,6 +448,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   if (rejectUntrustedOrigin(req, res)) return
 
   if (await handleCommunityQr(req, res)) return
+  if (await handleWhatsNew(req, res)) return
   if (await handleOperations(req, res)) return
 
   // ── Health ─────────────────────────────────────────────

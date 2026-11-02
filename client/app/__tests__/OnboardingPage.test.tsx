@@ -57,6 +57,11 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
   LocaleSwitcher: () => <div />,
 }))
 
+// The header's release-notes request would consume the ordered fetch responses below.
+vi.mock('../../components/common/WhatsNew', () => ({
+  WhatsNewButton: () => null,
+}))
+
 function policyResponse(policy: 'invite_only' | 'open' | 'disabled' = 'invite_only'): Response {
   return new Response(JSON.stringify({ ok: true, policy }))
 }
