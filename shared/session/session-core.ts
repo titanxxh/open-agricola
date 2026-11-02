@@ -857,6 +857,7 @@ export class GameCore {
           this.deferPrivateEventDrainDepth -= 1
         }
       },
+      handBackFromStageDispatch: (handoffSourcePlayerIndex) => this.sealStageHandBack(handoffSourcePlayerIndex),
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
       getRoundStartScheduleFlows: (playerIndex) => this.buildRoundStartScheduleFlows(playerIndex),
       getPreparationCompletionFlow: (hook, playerIndex, sourceCardIds) => this.buildPreparationCompletionFlow(hook, playerIndex, sourceCardIds),
@@ -3638,6 +3639,24 @@ export class GameCore {
     if (holder === toPlayerIndex) return null
     if (source !== null && source !== toPlayerIndex) return { kind: 'confirm', fromPlayerIndex: source }
     return { kind: 'direct', fromPlayerIndex: holder }
+  }
+
+  /**
+   * A Stage Dispatch handed back to ordinary flow without a confirmation. When
+   * the player that flow waits on is not the Handoff Source, an undo boundary
+   * keeps them from undoing the Handoff Source's responses.
+   */
+  private sealStageHandBack(handoffSourcePlayerIndex: number): void {
+    if (this.state.gameOver) return
+    const frame = this.engineStack.current()
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
+    const waitingPlayerIndex = !frame || !view || !cursor
+      ? this.state.currentPlayerIndex
+      : view.request.kind === 'confirm-player-switch'
+        ? view.request.fromPlayerIndex
+        : this.effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
+    if (waitingPlayerIndex !== handoffSourcePlayerIndex) this.appendHistoryWithUndoBoundary()
   }
 
   private returnTargetIndexForFrame(frame: EngineFrame): {

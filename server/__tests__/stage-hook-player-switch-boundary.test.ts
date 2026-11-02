@@ -6,6 +6,7 @@ import type { ActionFlow, PlayerState } from '../../shared/contract/types'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { emptyResources } from '../../shared/session/state-bootstrap'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { createWorkSession } from './_helpers/session-fixtures'
 
 // Each seat may hold one test-registered onBeforeReturnHome effect:
 // - gain: settles automatically (+1 clay), no input.
@@ -308,6 +309,70 @@ describe('stage dispatch handoff source', () => {
     expectNoUndo(resp)
   })
 
+  describe('hand-back to ordinary flow', () => {
+    const END_TURN = 'TEST_StageHandoff_endTurn'
+    // Seat 0 takes Day Laborer; its end-of-turn effect asks `chooser` for food or wood.
+    const endTurnSession = (chooser: 'self' | 'next') => {
+      const session = createWorkSession({ seed: 42, configure(state) {
+        state.players.forEach((player) => {
+          player.minorHand = ['__test_placeholder__']
+          player.occupationHand = ['__test_placeholder__']
+        })
+        state.currentPlayerIndex = 0
+        state.players[0]!.occupationPlayed = [END_TURN]
+      } })
+      const target = chooser === 'next' ? session.state.players[1]!.id : undefined
+      session.withCtx(() => requireActiveCardRegistry('stage handoff source test').setEffect({
+        id: END_TURN, onEndTurn: () => foodOrWood(END_TURN, target),
+      }))
+      return session
+    }
+    // Pass through any player-switch prompt so the assertions hold for every switch policy.
+    const throughSwitches = (session: GameSession, resp: SessionResponse) => {
+      let current = resp
+      for (let guard = 0; guard < 4 && step(current).includes(':confirm->'); guard++) current = confirmPlayerSwitch(session)
+      return current
+    }
+
+    it('seat 0 cannot undo the answer seat 1 gave to its end-of-turn effect', () => {
+      const session = endTurnSession('next')
+
+      let resp = throughSwitches(session, session.takeAction(0, 'day-laborer'))
+      expectStageChoice(resp, 1)
+      resp = throughSwitches(session, pick(session, resp, 'test.wood'))
+
+      const wait = waitOf(resp)
+      expect(wait.playerIndex).toBe(0)
+      expect(wait.request.kind).toBe('confirm-next-player')
+      expect(wait.allowedCommands).not.toContain('undoStep')
+      expect(wait.allowedCommands).not.toContain('undoAction')
+      expect(resources(resp, 'wood')).toEqual([0, 1])
+      const undoStep = session.undoStep()
+      expect(undoStep.ok).toBe(false)
+      expect(undoStep.ok ? '' : undoStep.error).toBe('cannot undo past boundary')
+      const undoAction = session.undoAction()
+      expect(undoAction.ok).toBe(false)
+      expect(resources(session.getState(), 'wood')).toEqual([0, 1])
+    })
+
+    it('seat 0 may still undo its own end-of-turn answer at confirm-next-player', () => {
+      const session = endTurnSession('self')
+
+      let resp = session.takeAction(0, 'day-laborer')
+      expectStageChoice(resp, 0)
+      resp = pick(session, resp, 'test.wood')
+
+      const wait = waitOf(resp)
+      expect(wait.playerIndex).toBe(0)
+      expect(wait.request.kind).toBe('confirm-next-player')
+      expect(wait.allowedCommands).toContain('undoStep')
+      expect(resources(resp, 'wood')).toEqual([1, 0])
+      resp = session.undoStep()
+      expectStageChoice(resp, 0)
+      expect(resources(resp, 'wood')).toEqual([0, 0])
+    })
+  })
+
   describe('parent cards opening', () => {
     const OPTIONAL = 'TEST_StageHandoff_roundStartOptional'
     const registerOptional = (session: GameSession) => session.withCtx(() =>
@@ -403,6 +468,13 @@ describe('stage dispatch handoff source', () => {
       expect(resources(resp, 'clay')).toEqual([1, 0])
       expect(resources(resp, 'food')).toEqual([5, 6])
       expect(resources(resp, 'wood')).toEqual([0, 1])
+      // Work starts with seat 0, who cannot undo seat 1's round-start answers.
+      expect(resp.state.currentPlayerIndex).toBe(0)
+      if (resp.interaction.stateId !== 'idle') throw new Error('expected idle')
+      expect(resp.interaction.allowedCommands).not.toContain('undoStep')
+      expect(resp.interaction.allowedCommands).not.toContain('undoAction')
+      expect(session.undoStep().ok).toBe(false)
+      expect(resources(session.getState(), 'wood')).toEqual([0, 1])
     })
   })
 
