@@ -26,7 +26,7 @@
 
 按需执行的 `candidate-verification.yml` 使用 `scripts/ci/verification-tasks.ts` 中的完整任务清单。fast、slow、构建、质量检查和浏览器分道各自执行，失败任务可独立重试。契约和社区卡测试由正常 Vitest project 覆盖，不额外重复执行。浏览器任务复用 `scripts/verify.ts` 及其结构化结果。
 
-`chromium-1` 到 `chromium-4` 的任务 ID 不变。四者合起来运行完整 Chromium 套件，每份 spec 恰好属于一个任务。分配读取随规划器提交的 `scripts/ci/verification-durations.json`，不访问 GitHub。同一代码树得到同一份 spec 列表。没有测量的 spec 使用已测量 spec 的中位耗时。表内数字来自最近一次完整目录：每个 Chromium 分片的 Playwright 时间分摊到该分片跑到的用例上。修改这张表是规划器改动，因此选择完整目录。日常验证的选择逻辑不变。
+`scripts/ci/verification-tasks.ts` 保持 `chromium-1` 到 `chromium-4` 的任务 ID，并用 `scripts/ci/verification-durations.json` 平衡完整 Chromium 套件。平衡规则见 [CI 检查](../operations/ci-checks.md) 与 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。测试：`scripts/__tests__/catalog-chromium-balance.test.ts`。
 
 正式 request/check 首先确认所选仓库受保护 main 上的最终 PR 快照，核对原生数字身份、明确的 main ref 与原始 Git 可达性。已确认的代码树批准 producer，配置哈希只标识兼容执行。该新增实现策略及原生治理信任边界见 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。
 
@@ -36,19 +36,21 @@
 
 ## 日常范围验证
 
-GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览器复现用于开发反馈，完整本机 `prepush` 是可选入口。`ci.yml` 是 PR 与 main 的唯一自动验证入口，旧全量测试与浏览器工作流不再重复执行选中任务，也不配置定时全量。
+GitHub Actions 是集成与发布的正式证据。本机定向检查提供开发反馈。`ci.yml` 是 PR 与 main 的唯一自动验证入口。
 
-`scripts/ci/verification-plan.ts` 的 `createRepositoryPlan` 是 CI 执行的日常计划。它包含完整分支差异、rename 两侧和实际检出变化，并保留 base、merge base、head、实际检出提交和源码指纹。选择由 `scripts/ci/routine-verification-plan.ts` 的 `planRoutineVerification` 完成，导入图在 `scripts/ci/import-graph.ts`。该图与依赖检查共用 `parseSource`，不跑架构违规扫描。值导入、CSS import 和字面量动态 import 会选中测试；只导入类型的边不会。遍历在四份生成的卡牌注册表停下，不进入它们的导入者。改注册表本身时，只选中直接导入它的 Vitest 文件。改动在截断的卡牌一侧时，还会选中注册键字面量和直接导入这些注册表的测试。`shared/actions/internal-actions.ts` 和 `shared/actions/index.ts` 仍是普通节点。非代码文件或生成产物只选直接读取它的测试，以及读取它的生产模块自己的直接测试。`i18n.ref` 选中语言包的读取者。卡牌源文件还会选中卡牌 manifest、百科和行动引用的读取者。非文档改动同时选中 quality 和 build。纯文档改动只选中读取这些文档的测试。只有根级依赖清单、根级测试与构建配置、CI workflow，以及验证规划器与门禁才选择完整目录。单张卡或未登记的前端文件不会。import 无法解析、源文件无法解析，或读取没有可匹配字面量时给出警告，并把选择扩大到受影响的 Vitest project；浏览器侧证据则扩大到 `ROUTINE_BROWSER_SMOKE_SET`。有界扩大不使规划失败，也不选择完整目录。规划器抛异常时选择完整目录并报告错误。浏览器 spec 用顶部 `// @covers` 声明它实际覆盖的目录，不写 `shared/` 这样的整层前缀。改动路径匹配声明时选中对应 spec。对不上任何文件的前缀只警告并忽略。没有声明的 spec 只在自身被改或直接导入改动文件时选中，经由共享测试 helper 导入的源码不因此选中它。否则沿着导入方向上查找，停在第一个有声明的文件。走到 `client/main.tsx`，或命中超过全部 spec 的三分之一，改为冒烟集。走到 `replay-viewer/src/main.tsx` 时选中回放查看器自己的 spec。`client/sandbox/SandboxApp.tsx` 不是入口。冒烟集最多五个按耗时表选定的文件加已有 grep。发现根缺失或测试未归类时规划失败。`wideningReasons` 记录警告。`expansionReasons` 记录完整目录选择。检查按 Vitest project，以及浏览器引擎和相同 grep 合并。未筛选的文件覆盖同引擎下更窄的 selector。选中的 Vitest 文件按耗时装入最多三个任务 `units-1`、`units-2` 和 `units-3`，空槽位跳过。浏览器检查仍使用 `browser-1` 到 `browser-4`，并按同一张耗时表装箱。未选中的分区被跳过。覆盖见 `scripts/__tests__/routine-verification-plan.test.ts` 和 `scripts/__tests__/routine-verification-replay.test.ts`。本机 `pnpm verify affected` 在 `scripts/verify.ts` 复用这份计划：比较 `HEAD` 与 `origin/main` 的 merge-base，并加上已暂存、未暂存和未被忽略的未跟踪文件。它运行选中的 Vitest 文件，默认只打印浏览器选择，传入 `--run-browser` 才执行；完整触发项只打印原因，不启动完整目录。merge-base 无法解析时，命令在运行测试前失败。覆盖见 `scripts/__tests__/verify-affected.test.ts`。
+日常选择按依赖证据进行。证据不全时在有界层内扩大，只有完整触发项才选择完整目录。发布候选验证仍是完整性保证。选择规则见 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md) 与 [CI 检查](../operations/ci-checks.md)。
 
-`test-consumers.ts` 仍把已发现的测试各索引一次，沿测试本地 import 记录生产依赖。units 只用这份索引判断选中的测试是否需要数据库服务。
+| 职责 | 入口 |
+|---|---|
+| 规划分支、检出和源码指纹 | `scripts/ci/verification-plan.ts` 的 `createRepositoryPlan`；`scripts/ci/routine-verification-plan.ts` 的 `planRoutineVerification`；导入图在 `scripts/ci/import-graph.ts` |
+| 按耗时分区 | `scripts/ci/routine-partitions.ts` 的 `routinePartitions`；`scripts/ci/verification-durations.json` |
+| 执行与 Vitest 报告 | `scripts/ci/scoped-verification.ts`；`scripts/ci/vitest-results.ts` |
+| 本机受影响检查 | `scripts/verify.ts` 的 `pnpm verify affected` |
+| 必需门禁 | `scripts/ci/routine-verification-gate.ts`；`.github/workflows/ci.yml` 调用 `.github/workflows/scoped-verification.yml` |
 
-`scripts/ci/scoped-verification.ts` 在执行前重新计算 canonical plan，核对 digest 与源码身份。`routine-partitions.ts` 读取 `scripts/ci/verification-durations.json`，把选中的 Vitest 文件装入 `units-1`、`units-2` 和 `units-3`，把浏览器 `(engine, grep, file)` 元组装入 `browser-1` 到 `browser-4`。没有测量的 Vitest 文件使用所属 project 的中位耗时；没有测量的浏览器 spec 使用已测量且被选中的 spec 的中位耗时。空槽位省略。两种分配都保留原 selector，并恰好覆盖每个选中元组一次。每个浏览器分区只准备一次语言包、卡牌 manifest、百科和行动引用，应用和服务只启动一次。只有分区里有依赖托管构建的 spec 时才构建托管前端，且该构建不做单独的类型检查。日常浏览器对用例重试一次；只在重试后通过的用例写进该分区的 job summary，分区仍然通过。发布候选验证的浏览器检查不重试。本机 `all` 模式仍执行完整计划。日常结果不能充当完整发布回执。
+`test-consumers.ts` 记录选中的测试是否需要数据库服务。
 
-每个 Vitest 槽位先准备一次所需测试服务，并构建一次卡牌 manifest，再逐 project 串行执行。每次单 project 的 Vitest 命令执行完整文件，保留默认 reporter，并写入独立 JSON 报告。退出成功与源码身份不变仍是必要条件。实际报告必须包含模块，模块名与所选文件恰好对应一次；缺失、额外、重复、失败或未完成的结果都会阻断完成。`vitest-results.ts` 持有该边界，测试见 `vitest-results.test.ts` 与范围执行测试。
-
-执行结果为每条实际命令记录 `startedAt`、`completedAt` 和单调时钟 `durationMs`，包含准备步骤与失败命令。Vitest 原始报告在 `output/verification/vitest-results/` 保留模块与用例耗时；分区 artifact 同时保留两类证据。测量数据与报告路径不进入 canonical plan 或其 digest，也不能替代执行门禁。
-
-`ci.yml` 在规划后独立调度 `units-1`、`units-2`、`units-3`、四个明确的浏览器 caller 和 catalog 任务。范围 caller 共用 `scoped-verification.yml`；空分区以 null descriptor 明示并跳过。始终执行的 `verify` 分别核对每个选中 caller 的状态、分区 ID 与 digest、完整计划 digest、SHA 和完成数。其他成功不能补齐失败或缺失的 caller。仅含 Vitest 槽位的计划保留 `catalog_tasks=none`；浏览器 worker 安装两种引擎以支持嵌入式启动。浏览器检查失败时，在现有验证产物中保留 Playwright 错误上下文和失败截图。公开测试位于 `scoped-verification*.test.ts`、`routine-verification-gate.test.ts` 和 `ci-card-impl-boundaries.test.ts`。
+测试：`scripts/__tests__/routine-verification-plan.test.ts`、`scripts/__tests__/routine-verification-replay.test.ts`、`scripts/__tests__/verify-affected.test.ts`、`scripts/__tests__/scoped-verification-partitions.test.ts`、`scripts/__tests__/scoped-verification.test.ts`、`scripts/__tests__/scoped-verification-cli.test.ts`、`scripts/__tests__/routine-verification-gate.test.ts`、`scripts/__tests__/vitest-results.test.ts`、`scripts/__tests__/ci-card-impl-boundaries.test.ts`。
 
 ## 架构门禁
 

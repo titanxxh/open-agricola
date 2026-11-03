@@ -181,10 +181,6 @@ function affectedProjects(file: string, graph: ImportGraph, inventory: ReadonlyM
   return [...found].sort()
 }
 
-function isBrowserEvidence(file: string): boolean {
-  return file.startsWith('e2e-tests/') || /\.spec\.[cm]?[jt]sx?$/.test(file)
-}
-
 function widenIncomplete(
   graph: ImportGraph,
   inventory: ReadonlyMap<string, string>,
@@ -196,13 +192,9 @@ function widenIncomplete(
   for (const evidence of graph.incomplete) {
     if (!relevant.has(evidence.file)) continue
     const projectsForEvidence = affectedProjects(evidence.file, graph, inventory)
-    if (projectsForEvidence.length === 0 && isBrowserEvidence(evidence.file)) {
+    if (projectsForEvidence.length === 0) {
       smoke = true
       warnings.push(`${evidence.file}: ${evidence.reason}; widened to the routine browser smoke set`)
-      continue
-    }
-    if (projectsForEvidence.length === 0) {
-      warnings.push(`${evidence.file}: ${evidence.reason}`)
       continue
     }
     for (const [file, project] of inventory) {
@@ -354,14 +346,19 @@ function browserSelectionForPath(
   return [...declared, ...replay, ...direct, ...self]
 }
 
-function completeCatalog(): RoutineVerificationPlan {
+function completeCatalog(warnings: string[] = []): RoutineVerificationPlan {
   return {
     vitestFiles: [],
     catalogTasks: [...FULL_TASK_IDS],
     browserFiles: [],
-    warnings: [],
+    warnings,
     fullTrigger: true,
   }
+}
+
+function fullTriggerWarnings(changes: readonly RoutineChange[]): string[] {
+  return [...new Set(changes.flatMap(changedPaths).filter(isFullTrigger))].sort()
+    .map(path => `The complete catalog is selected by ${path}`)
 }
 
 const preparedByRoot = new Map<string, {
@@ -388,7 +385,8 @@ export function planRoutineVerification(input: {
   changes: readonly RoutineChange[]
 }): RoutineVerificationPlan {
   try {
-    if (input.changes.flatMap(changedPaths).some(isFullTrigger)) return completeCatalog()
+    const triggers = fullTriggerWarnings(input.changes)
+    if (triggers.length) return completeCatalog(triggers)
     const { graph, inventory, files, covers } = prepare(input.root)
     const tests = new Set(inventory.keys())
     const selected = new Set<string>()

@@ -25,21 +25,25 @@ const tupleKey = (tuple: BrowserTuple) => JSON.stringify([tuple.browser, tuple.g
 const digest = (id: RoutinePartitionId, checks: UnitCheck[] | BrowserCheck[]) =>
   createHash('sha256').update(JSON.stringify({ id, checks })).digest('hex')
 
-function durations(cwd: string): Map<string, number> {
+const PROJECT_DURATION_PREFIX = 'vitest-project:'
+
+function durations(cwd: string): { files: Map<string, number>; projects: Map<string, number> } {
   const path = join(cwd, 'scripts/ci/verification-durations.json')
-  if (!existsSync(path)) return new Map()
+  const files = new Map<string, number>()
+  const projects = new Map<string, number>()
+  if (!existsSync(path)) return { files, projects }
   const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Verification durations must be a path map')
-  const recorded = new Map<string, number>()
-  for (const [file, duration] of Object.entries(value)) {
-    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) throw new Error(`Invalid verification duration: ${file}`)
-    recorded.set(file, duration)
+  for (const [key, duration] of Object.entries(value)) {
+    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) throw new Error(`Invalid verification duration: ${key}`)
+    if (key.startsWith(PROJECT_DURATION_PREFIX)) projects.set(key.slice(PROJECT_DURATION_PREFIX.length), duration)
+    else files.set(key, duration)
   }
-  return recorded
+  return { files, projects }
 }
 
-function median(values: number[]): number {
-  if (!values.length) return 1
+function median(values: number[]): number | undefined {
+  if (!values.length) return undefined
   const ordered = [...values].sort((left, right) => left - right)
   const middle = Math.floor(ordered.length / 2)
   return ordered.length % 2 === 1 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2
@@ -62,17 +66,18 @@ export function routinePartitions(plan: VerificationPlan, cwd = repoRoot): Routi
   const result: RoutinePartition[] = []
   const units = plan.checks.filter(check => check.kind === 'vitest')
   const files = units.flatMap(check => check.files.map(file => ({ project: check.project, file })))
-  const projectMedian = new Map<string, number>()
+  const measuredMedian = new Map<string, number | undefined>()
   for (const file of files) {
-    if (projectMedian.has(file.project)) continue
-    projectMedian.set(file.project, median(files.flatMap(candidate => {
+    if (measuredMedian.has(file.project)) continue
+    measuredMedian.set(file.project, median(files.flatMap(candidate => {
       if (candidate.project !== file.project) return []
-      const duration = recorded.get(candidate.file)
+      const duration = recorded.files.get(candidate.file)
       return duration === undefined ? [] : [duration]
     })))
   }
   const unitBins = pack(files, UNIT_PARTITION_IDS.length,
-    file => recorded.get(file.file) ?? projectMedian.get(file.project) ?? 1, file => file.file)
+    file => recorded.files.get(file.file) ?? measuredMedian.get(file.project) ?? recorded.projects.get(file.project) ?? 1,
+    file => file.file)
   unitBins.forEach((bin, index) => {
     if (!bin.length) return
     const grouped = new Map<string, string[]>()
@@ -91,11 +96,11 @@ export function routinePartitions(plan: VerificationPlan, cwd = repoRoot): Routi
     .sort((left, right) => compare(tupleKey(left), tupleKey(right)))
   if (new Set(selected.map(tupleKey)).size !== selected.length) throw new Error('Duplicate scoped browser selection')
   const browserMedian = median([...new Set(selected.map(tuple => tuple.file))].flatMap(file => {
-    const duration = recorded.get(file)
+    const duration = recorded.files.get(file)
     return duration === undefined ? [] : [duration]
-  }))
+  })) ?? 1
   const browserBins = pack(selected, BROWSER_PARTITION_IDS.length,
-    tuple => recorded.get(tuple.file) ?? browserMedian,
+    tuple => recorded.files.get(tuple.file) ?? browserMedian,
     tuple => JSON.stringify([tuple.file, tuple.browser, tuple.grep]))
   browserBins.forEach((bin, index) => {
     if (!bin.length) return

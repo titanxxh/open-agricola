@@ -52,7 +52,7 @@ pnpm run lint               # ESLint，error 必须清零
 
 调试期间针对受影响行为跑定向测试，纯测试、工具和文档改动不要求每次重启应用。本机复现应用、UI 或 WebSocket 时，通过 `./restart-local.sh` 重启；`pnpm verify <file.spec.ts>` 会在隔离环境完成这些步骤。写明本机实际检查范围，`pnpm verify prepush` 保留为可选的完整 fast 门禁。
 
-PR 与 main CI 使用同一范围规则，并始终评估必需的 `verify` 检查。公共机制选择完整受影响组，未知范围执行完整任务清单，选中的浏览器检查在 GitHub 上运行。GitHub Actions 是集成与发布的正式证据，本机检查不是前置条件。发布要求同一提交与验证配置的完整候选成功证据，见[部署操作](docs/HOW_TO_DEPLOY.md)。
+PR 与 main CI 使用同一范围规则，并始终评估必需的 `verify` 检查。日常验证按依赖证据尽力选择，证据不全做有界扩大，只有完整触发项才跑完整目录。选中的浏览器检查在 GitHub 上运行。GitHub Actions 是集成与发布的正式证据，本机检查不是前置条件。发布要求同一提交与验证配置的完整候选成功证据，见[部署操作](docs/HOW_TO_DEPLOY.md)。
 
 Session 夹具区分真实开局和预设工作阶段场景，见[卡牌测试模板](docs/CARD_TEST_TEMPLATE_zh.md#52-状态准备方式)。验证记录、测试依赖准备与本机全量 CI 见 [CI 操作文档](docs/operations/ci-checks.md)。记录用于识别过期结果，不会自动跳过检查。
 
