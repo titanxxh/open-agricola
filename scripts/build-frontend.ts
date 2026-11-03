@@ -14,10 +14,14 @@ const gameBuildId = process.env.GAME_BUILD_ID?.trim()
   || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
 if (!gameBuildId) throw new Error('Hosted frontend requires a game build identity')
 
-const build = spawnSync('pnpm', ['run', 'build', '--outDir', outputDirectory], {
+const skipTypecheck = process.argv.includes('--no-typecheck')
+const build = spawnSync('pnpm', skipTypecheck
+  ? ['exec', 'vite', 'build', '--outDir', outputDirectory]
+  : ['run', 'build', '--outDir', outputDirectory], {
   cwd: repoRoot,
   env: {
     ...process.env,
+    ...(skipTypecheck ? { NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=4096' } : {}),
     NODE_ENV: 'production',
     GAME_BUILD_ID: gameBuildId,
     VITE_BASE_PATH: basePath,

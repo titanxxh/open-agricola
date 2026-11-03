@@ -19,10 +19,9 @@ const githubJobOutputs = (file: string): Record<string, string> => Object.fromEn
   }).filter(([, value]) => value !== ''),
 )
 
-const skippedBrowserJobs = () => ({
-  'browser-1': { result: 'skipped', outputs: {} }, 'browser-2': { result: 'skipped', outputs: {} },
-  'browser-3': { result: 'skipped', outputs: {} }, 'browser-4': { result: 'skipped', outputs: {} },
-})
+const slotIds = ['units-1', 'units-2', 'units-3', 'browser-1', 'browser-2', 'browser-3', 'browser-4']
+const skippedSlots = (selected: string[] = []) => Object.fromEntries(slotIds.filter(id => !selected.includes(id))
+  .map(id => [id, { result: 'skipped', outputs: {} }]))
 
 function fixture(change: 'documentation' | 'frontend' | 'card' = 'documentation') {
   const cwd = mkdtempSync(join(tmpdir(), 'scoped-verification-cli-'))
@@ -69,6 +68,11 @@ const path = require('node:path');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.COMMAND_LOG, JSON.stringify(args.filter(arg => !arg.startsWith('--reporter=') && !arg.startsWith('--outputFile.json='))) + '\\n');
 if (process.env.FAIL_COMMAND && args.includes(process.env.FAIL_COMMAND)) process.exit(7);
+const reportAt = args.indexOf('--report');
+if (reportAt >= 0 && args[reportAt + 1]) {
+  fs.mkdirSync(path.dirname(args[reportAt + 1]), { recursive: true });
+  fs.writeFileSync(args[reportAt + 1], '{"suites":[]}\\n');
+}
 if (process.env.MUTATE_SOURCE) fs.appendFileSync('README.md', 'changed during execution\\n');
 if (args.includes('vitest')) {
   const reports = args.filter(arg => arg.startsWith('--outputFile.json='));
@@ -97,14 +101,16 @@ describe('scoped verification public CLI', () => {
     expect(planned.status, planned.stderr).toBe(0)
     const manifest: unknown = JSON.parse(planned.stdout)
     expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build' })
-    const result = value.run('run', '--base', 'main', '--partition', 'units')
-    expect(result.status, result.stderr).toBe(0)
+    for (const partition of ['units-1', 'units-2', 'units-3']) {
+      const result = value.run('run', '--base', 'main', '--partition', partition)
+      expect(result.status, result.stderr).toBe(0)
+    }
     expect(value.commands().filter(command => Array.isArray(command) && command.includes('vitest'))).toEqual([
-      ['exec', 'vitest', 'run', '--project', 'fast-cards', 'shared/cards/__tests__/A29_AleBenches.test.ts'],
-      ['exec', 'vitest', 'run', '--project', 'fast-server', 'server/__tests__/cross-card-session.test.ts'],
       ['exec', 'vitest', 'run', '--project', 'slow', 'server/__tests__/A029_AleBenches-session.test.ts'],
+      ['exec', 'vitest', 'run', '--project', 'fast-server', 'server/__tests__/cross-card-session.test.ts'],
+      ['exec', 'vitest', 'run', '--project', 'fast-cards', 'shared/cards/__tests__/A29_AleBenches.test.ts'],
     ])
-    expect(value.commands().filter(command => Array.isArray(command) && command.includes('build:cards-manifest'))).toHaveLength(1)
+    expect(value.commands().filter(command => Array.isArray(command) && command.includes('build:cards-manifest'))).toHaveLength(3)
   }, 60_000)
 
   it('a selected slow Session failure blocks card completion and the public required gate', () => {
@@ -117,16 +123,16 @@ describe('scoped verification public CLI', () => {
     }))
     value.env.GITHUB_OUTPUT = join(value.cwd, 'output/card-execution.txt')
     value.env.FAIL_COMMAND = 'slow'
-    const result = value.run('run', '--base', 'main', '--partition', 'units')
+    const result = value.run('run', '--base', 'main', '--partition', 'units-1')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Selected vitest check failed')
     expect(value.commands()).toContainEqual(['exec', 'vitest', 'run', '--project', 'slow', 'server/__tests__/A029_AleBenches-session.test.ts'])
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const summary = value.run('gate', '--sha', value.sha, '--needs', JSON.stringify({
-      plan: { result: 'success', outputs }, units: { result: 'failure', outputs: {} }, ...skippedBrowserJobs(), catalog: { result: 'skipped', outputs: {} },
+      plan: { result: 'success', outputs }, 'units-1': { result: 'failure', outputs: {} }, ...skippedSlots(['units-1']), catalog: { result: 'skipped', outputs: {} },
     }))
     expect(summary.status).toBe(1)
-    expect(summary.stderr).toContain('Selected units partition did not all succeed')
+    expect(summary.stderr).toContain('Selected units-1 partition did not all succeed')
   }, 60_000)
 
   it('executes documentation constraints and passes the gate with GitHub job output omission', () => {
@@ -138,20 +144,20 @@ describe('scoped verification public CLI', () => {
     expect(JSON.parse(planned.stdout)).toMatchObject({ mode: 'scoped', catalog_tasks: 'none' })
     const executionOutput = join(value.cwd, 'output/documentation-execution.txt')
     value.env.GITHUB_OUTPUT = executionOutput
-    const result = value.run('run', '--base', 'main', '--plan', 'output/verification/scoped-plan.json', '--partition', 'units')
+    const result = value.run('run', '--base', 'main', '--plan', 'output/verification/scoped-plan.json', '--partition', 'units-1')
     expect(result.status, result.stderr).toBe(0)
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-scripts', 'scripts/__tests__/docs-budget.test.ts'],
     ])
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
-    expect(record).toMatchObject({ kind: 'routine', status: 'passed', partition: 'units', checks: [{ status: 'passed' }] })
+    expect(record).toMatchObject({ kind: 'routine', status: 'passed', partition: 'units-1', checks: [{ status: 'passed' }] })
     const plan = githubJobOutputs(planOutput)
     expect(plan).not.toHaveProperty('browsers')
     const needs = {
       plan: { result: 'success', outputs: plan },
-      units: { result: 'success', outputs: githubJobOutputs(executionOutput) },
-      ...skippedBrowserJobs(), catalog: { result: 'skipped', outputs: {} },
+      'units-1': { result: 'success', outputs: githubJobOutputs(executionOutput) },
+      ...skippedSlots(['units-1']), catalog: { result: 'skipped', outputs: {} },
     }
     value.env.NEEDS_JSON = JSON.stringify(needs)
     const accepted = value.run('gate', '--sha', value.sha)
@@ -169,7 +175,7 @@ describe('scoped verification public CLI', () => {
     const value = fixture()
     value.env.REPORT_MODE = mode
     value.env.GITHUB_OUTPUT = join(value.cwd, 'output/execution-outputs.txt')
-    const result = value.run('run', '--base', 'main', '--partition', 'units')
+    const result = value.run('run', '--base', 'main', '--partition', 'units-1')
     expect(result.status).toBe(1)
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     expect(JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))).toMatchObject({
@@ -186,7 +192,7 @@ describe('scoped verification public CLI', () => {
     write(value.cwd, path, JSON.stringify({ ...saved, checks: [] }))
     write(value.cwd, 'output/verification/scoped-result.json', JSON.stringify({ status: 'passed' }))
 
-    const result = value.run('run', '--base', 'main', '--plan', path, '--partition', 'units')
+    const result = value.run('run', '--base', 'main', '--plan', path, '--partition', 'units-1')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('differs from the canonical repository plan')
     expect(value.commands()).toEqual([])
@@ -207,7 +213,10 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
       ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
       ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
-      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
+      ['run', 'build:cards-manifest'],
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'start', 'output/verification/browser-session'],
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session', '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--', 'e2e-tests/farm-select.spec.ts'],
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'stop', 'output/verification/browser-session'],
     ])
   }, 60_000)
 
@@ -216,9 +225,12 @@ describe('scoped verification public CLI', () => {
     const test = 'client/components/board/__tests__/FarmBoard.$(touch SHELL_EXECUTED).test.tsx'
     write(value.cwd, test, '// added client test\n')
     value.env.GITHUB_SHA = value.commit('additional frontend test')
-    const result = value.run('run', '--base', 'main', '--partition', 'units')
-    expect(result.status, result.stderr).toBe(0)
-    expect(value.commands()).toContainEqual(['exec', 'vitest', 'run', '--project', 'fast-client', test, 'client/components/board/__tests__/FarmBoard.test.tsx'])
+    for (const partition of ['units-1', 'units-2']) {
+      const result = value.run('run', '--base', 'main', '--partition', partition)
+      expect(result.status, result.stderr).toBe(0)
+    }
+    expect(value.commands()).toContainEqual(['exec', 'vitest', 'run', '--project', 'fast-client', test])
+    expect(value.commands()).toContainEqual(['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'])
     expect(existsSync(join(value.cwd, 'SHELL_EXECUTED'))).toBe(false)
   })
 
@@ -233,7 +245,7 @@ describe('scoped verification public CLI', () => {
       catalog: { result: 'success', outputs: { verified_tasks: 'quality,build', verified_sha: value.sha } },
     }
     const partitions = JSON.parse(plan.partitions) as Record<string, unknown>
-    for (const id of ['units', 'browser-1', 'browser-2', 'browser-3', 'browser-4']) {
+    for (const id of slotIds) {
       if (partitions[id] === null) {
         needs[id] = { result: 'skipped', outputs: {} }
         continue
@@ -248,13 +260,17 @@ describe('scoped verification public CLI', () => {
       expect(outputs.partition_digest).toMatch(/^[a-f0-9]{64}$/)
       needs[id] = { result: 'success', outputs }
     }
-    expect(partitions.units).not.toBeNull()
+    expect(partitions['units-1']).not.toBeNull()
+    expect(partitions['units-2']).toBeNull()
     expect(partitions['browser-1']).not.toBeNull()
     expect(partitions['browser-2']).toBeNull()
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
-      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
+      ['run', 'build:cards-manifest'],
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'start', 'output/verification/browser-session'],
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session', '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--', 'e2e-tests/farm-select.spec.ts'],
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'stop', 'output/verification/browser-session'],
     ])
     value.env.NEEDS_JSON = JSON.stringify(needs)
     expect(value.run('gate', '--sha', value.sha).status).toBe(0)
@@ -281,13 +297,13 @@ describe('scoped verification public CLI', () => {
 
   it('blocks a selected browser failure and never reports completion of later checks', () => {
     const value = fixture('frontend')
-    value.env.FAIL_COMMAND = 'verify'
+    value.env.FAIL_COMMAND = '--retries'
     value.env.GITHUB_OUTPUT = join(value.cwd, 'output/execution-outputs.txt')
     const result = value.run('run', '--base', 'main', '--partition', 'all')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Selected browser check failed')
-    expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'verify')).toEqual([
-      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
+    expect(value.commands().filter(command => Array.isArray(command) && command.includes('--retries'))).toEqual([
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session', '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--', 'e2e-tests/farm-select.spec.ts'],
     ])
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
@@ -298,7 +314,7 @@ describe('scoped verification public CLI', () => {
 
   it('rejects a plan digest from another source and does not execute any command', () => {
     const value = fixture()
-    const result = value.run('run', '--base', 'main', '--expected-digest', '9'.repeat(64), '--partition', 'units')
+    const result = value.run('run', '--base', 'main', '--expected-digest', '9'.repeat(64), '--partition', 'units-1')
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Verification plan digest changed')
     expect(value.commands()).toEqual([])
@@ -306,7 +322,7 @@ describe('scoped verification public CLI', () => {
 
   it('replaces a previous passed execution when the supplied plan JSON is malformed', () => {
     const value = fixture()
-    expect(value.run('run', '--base', 'main', '--partition', 'units').status).toBe(0)
+    expect(value.run('run', '--base', 'main', '--partition', 'units-1').status).toBe(0)
     write(value.cwd, 'output/broken-plan.json', '{')
     const result = value.run('run', '--base', 'main', '--plan', 'output/broken-plan.json')
     expect(result.status).toBe(1)
@@ -338,15 +354,15 @@ describe('scoped verification public CLI', () => {
     }))
     value.env.GITHUB_OUTPUT = join(value.cwd, 'output/execution-outputs.txt')
     value.env.FAIL_COMMAND = 'vitest'
-    const failed = value.run('run', '--base', 'main', '--partition', 'units')
+    const failed = value.run('run', '--base', 'main', '--partition', 'units-1')
     expect(failed.status).toBe(1)
     expect(failed.stderr).toContain('Selected vitest check failed')
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const summary = value.run('gate', '--sha', value.sha, '--needs', JSON.stringify({
-      plan: { result: 'success', outputs }, units: { result: 'failure', outputs: {} }, ...skippedBrowserJobs(), catalog: { result: 'skipped', outputs: {} },
+      plan: { result: 'success', outputs }, 'units-1': { result: 'failure', outputs: {} }, ...skippedSlots(['units-1']), catalog: { result: 'skipped', outputs: {} },
     }))
     expect(summary.status).toBe(1)
-    expect(summary.stderr).toContain('Selected units partition did not all succeed')
+    expect(summary.stderr).toContain('Selected units-1 partition did not all succeed')
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
     expect(record).toMatchObject({ kind: 'routine', status: 'failed', checks: [{ status: 'failed' }] })
   }, 60_000)
@@ -354,13 +370,13 @@ describe('scoped verification public CLI', () => {
   it('rejects source mutation during selected commands and a workflow checkout mismatch', () => {
     const value = fixture()
     value.env.GITHUB_SHA = '9'.repeat(40)
-    const mismatch = value.run('run', '--base', 'main', '--partition', 'units')
+    const mismatch = value.run('run', '--base', 'main', '--partition', 'units-1')
     expect(mismatch.status).toBe(1)
     expect(mismatch.stderr).toContain('actual checkout does not match')
     expect(value.commands()).toEqual([])
     value.env.GITHUB_SHA = value.sha
     value.env.MUTATE_SOURCE = '1'
-    const changed = value.run('run', '--base', 'main', '--partition', 'units')
+    const changed = value.run('run', '--base', 'main', '--partition', 'units-1')
     expect(changed.status).toBe(1)
     expect(changed.stderr).toContain('Source contents changed')
     expect(value.commands()).toEqual([['run', 'build:cards-manifest']])

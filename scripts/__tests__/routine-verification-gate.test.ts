@@ -3,16 +3,17 @@ import { assertRoutineGate } from '../ci/routine-verification-gate'
 
 const sha = '1'.repeat(40)
 const digest = '2'.repeat(64)
-const ids = ['units', 'browser-1', 'browser-2', 'browser-3', 'browser-4']
+const ids = ['units-1', 'units-2', 'units-3', 'browser-1', 'browser-2', 'browser-3', 'browser-4']
 const hashes: Record<string, string> = {
-  units: '3'.repeat(64), 'browser-1': '4'.repeat(64), 'browser-2': '5'.repeat(64),
+  'units-1': '3'.repeat(64), 'units-2': 'a'.repeat(64), 'units-3': 'b'.repeat(64),
+  'browser-1': '4'.repeat(64), 'browser-2': '5'.repeat(64),
   'browser-3': '6'.repeat(64), 'browser-4': '7'.repeat(64),
 }
 type Needs = Record<string, { result: string; outputs: Record<string, string> }>
-const manifest = (selected = ['units']) => Object.fromEntries(ids.map(id => [id,
-  selected.includes(id) ? { id, digest: hashes[id], checks: id === 'units' ? 1 : 2 } : null,
+const manifest = (selected = ['units-1']) => Object.fromEntries(ids.map(id => [id,
+  selected.includes(id) ? { id, digest: hashes[id], checks: id === 'units-1' ? 1 : 2 } : null,
 ]))
-function evidence(selected = ['units']): Needs {
+function evidence(selected = ['units-1']): Needs {
   const needs: Needs = {
     plan: { result: 'success', outputs: { mode: 'scoped', plan_digest: digest, tested_sha: sha,
       partitions: JSON.stringify(manifest(selected)), catalog_tasks: 'none' } },
@@ -20,13 +21,13 @@ function evidence(selected = ['units']): Needs {
   }
   for (const id of ids) needs[id] = selected.includes(id)
     ? { result: 'success', outputs: { status: 'passed', partition_id: id, partition_digest: hashes[id],
-      plan_digest: digest, tested_sha: sha, completed_checks: id === 'units' ? '1' : '2' } }
+      plan_digest: digest, tested_sha: sha, completed_checks: id === 'units-1' ? '1' : '2' } }
     : { result: 'skipped', outputs: {} }
   return needs
 }
 
 describe('required routine verification gate', () => {
-  it('accepts documentation units and explicit skipped browser and catalog branches', () => {
+  it('accepts one Vitest slot when the unused slots and browser jobs are skipped', () => {
     expect(assertRoutineGate({ sha, needs: evidence() })).toEqual({ status: 'passed', mode: 'scoped', sha, planDigest: digest })
   })
 
@@ -80,7 +81,7 @@ describe('required routine verification gate', () => {
     expect(() => assertRoutineGate({ sha, needs })).toThrow()
   })
 
-  it.each(['browser-1', 'browser-2', 'browser-3', 'browser-4'])('requires the intentionally unselected %s caller to be skipped', id => {
+  it.each(['units-2', 'units-3', 'browser-1', 'browser-2', 'browser-3', 'browser-4'])('requires the intentionally unselected %s caller to be skipped', id => {
     const needs = evidence()
     needs[id].result = 'success'
     expect(() => assertRoutineGate({ sha, needs })).toThrow(`unselected ${id} partition`)
@@ -94,9 +95,10 @@ describe('required routine verification gate', () => {
     delete missing['browser-4']
     for (const partitions of [
       '', 'null', JSON.stringify(missing), JSON.stringify({ ...allEmpty, extra: null }),
-      JSON.stringify({ ...allEmpty, units: { id: 'browser-1', digest: hashes.units, checks: 1 } }),
-      JSON.stringify({ ...allEmpty, units: { id: 'units', digest: 'bad', checks: 1 } }),
-      JSON.stringify({ ...allEmpty, units: { id: 'units', digest: hashes.units, checks: 0 } }),
+      JSON.stringify({ ...allEmpty, 'units-1': { id: 'browser-1', digest: hashes['units-1'], checks: 1 } }),
+      JSON.stringify({ ...allEmpty, 'units-1': { id: 'units-1', digest: 'bad', checks: 1 } }),
+      JSON.stringify({ ...allEmpty, 'units-1': { id: 'units-1', digest: hashes['units-1'], checks: 0 } }),
+      JSON.stringify({ ...allEmpty, units: { id: 'units', digest: hashes['units-1'], checks: 1 } }),
     ]) {
       const needs = evidence()
       needs.plan.outputs.partitions = partitions

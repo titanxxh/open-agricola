@@ -66,12 +66,32 @@ jobs:
           if-no-files-found: error
           path: output/verification/scoped-plan.json
 
-  units:
+  units-1:
     needs: plan
-    if: needs.plan.outputs.partitions != '' && fromJSON(needs.plan.outputs.partitions)['units'] != null
+    if: needs.plan.outputs.partitions != '' && fromJSON(needs.plan.outputs.partitions)['units-1'] != null
     uses: ./.github/workflows/scoped-verification.yml
     with:
-      partition: units
+      partition: units-1
+      base_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.base_sha || github.event.pull_request.base.sha || github.event.before || github.sha }}
+      head_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      plan_digest: ${{ needs.plan.outputs.plan_digest }}
+
+  units-2:
+    needs: plan
+    if: needs.plan.outputs.partitions != '' && fromJSON(needs.plan.outputs.partitions)['units-2'] != null
+    uses: ./.github/workflows/scoped-verification.yml
+    with:
+      partition: units-2
+      base_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.base_sha || github.event.pull_request.base.sha || github.event.before || github.sha }}
+      head_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      plan_digest: ${{ needs.plan.outputs.plan_digest }}
+
+  units-3:
+    needs: plan
+    if: needs.plan.outputs.partitions != '' && fromJSON(needs.plan.outputs.partitions)['units-3'] != null
+    uses: ./.github/workflows/scoped-verification.yml
+    with:
+      partition: units-3
       base_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.base_sha || github.event.pull_request.base.sha || github.event.before || github.sha }}
       head_ref: ${{ github.event.pull_request.head.sha || github.sha }}
       plan_digest: ${{ needs.plan.outputs.plan_digest }}
@@ -127,7 +147,7 @@ jobs:
   verify:
     name: verify
     if: always()
-    needs: [plan, units, browser-1, browser-2, browser-3, browser-4, catalog]
+    needs: [plan, units-1, units-2, units-3, browser-1, browser-2, browser-3, browser-4, catalog]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

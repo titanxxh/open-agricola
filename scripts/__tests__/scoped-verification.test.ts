@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeRepositoryPlan, routinePlanManifest } from '../ci/scoped-verification'
+import { taskCommands } from '../ci/verification-tasks'
 import type { VerificationPlan } from '../ci/verification-plan'
 
 const identity = {
@@ -72,8 +73,46 @@ function executionFixture(change: 'card' | 'script-database' | 'script-pure' | '
   git('add', '--', '.', ':(exclude)docs/superpowers/**')
   git('-c', 'user.name=Scope', '-c', 'user.email=scope@example.test', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-qm', change)
   const output = join(cwd, 'output/verification/scoped-result.json')
-  return { cwd, output, execute: (run: (command: string, args: string[], cwd: string) => number) =>
-    executeRepositoryPlan({ cwd, base: 'main', head: 'HEAD', partition: 'units', output }, run) }
+  return { cwd, output, execute: (run: (command: string, args: string[], cwd: string) => number,
+    partition: 'units-1' | 'units-2' | 'units-3' | 'browser-1' | 'browser-2' | 'browser-3' | 'browser-4' = 'units-1') =>
+    executeRepositoryPlan({ cwd, base: 'main', head: 'HEAD', partition, output }, run) }
+}
+
+function browserFixture() {
+  vi.stubEnv('GITHUB_SHA', '')
+  vi.stubEnv('GITHUB_OUTPUT', '')
+  const summary = join(mkdtempSync(join(tmpdir(), 'routine-summary-')), 'summary.md')
+  vi.stubEnv('GITHUB_STEP_SUMMARY', summary)
+  const cwd = mkdtempSync(join(tmpdir(), 'scoped-browser-'))
+  executionDirectories.push(cwd)
+  const write = (file: string, contents: string) => {
+    mkdirSync(dirname(join(cwd, file)), { recursive: true })
+    writeFileSync(join(cwd, file), contents)
+  }
+  const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] as const })
+  for (const directory of ['shared', 'server', 'client', 'scripts', 'tests', 'e2e-tests', 'replay-viewer']) write(`${directory}/.keep`, '')
+  write('.gitignore', 'output/\n')
+  write('client/components/board/FarmBoard.tsx', 'export const board = 1\n')
+  write('client/components/board/__tests__/FarmBoard.test.tsx', "import '../FarmBoard'\n")
+  write('package.json', '{}\n')
+  for (let index = 0; index < 10; index += 1) write(`e2e-tests/pad-${index}.spec.ts`, '// not selected\n')
+  for (const name of ['pack-a', 'pack-b', 'pack-c', 'pack-d']) {
+    write(`e2e-tests/${name}.spec.ts`, '// @covers client/components/board\n')
+  }
+  write('e2e-tests/pack-e.spec.ts', '// @covers client/components/board\nthrow new Error("Build the production frontend with pnpm run build:hosted-frontend before this spec")\n')
+  git('init', '-q', '--template=', '-b', 'main')
+  git('add', '--', '.', ':(exclude)docs/superpowers/**')
+  git('-c', 'user.name=Scope', '-c', 'user.email=scope@example.test', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'baseline')
+  git('checkout', '-qb', 'feature')
+  write('client/components/board/FarmBoard.tsx', 'export const board = 2\n')
+  git('add', '--', '.', ':(exclude)docs/superpowers/**')
+  git('-c', 'user.name=Scope', '-c', 'user.email=scope@example.test', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'frontend')
+  const output = join(cwd, 'output/verification/scoped-result.json')
+  return {
+    cwd, summary, output,
+    execute: (run: (command: string, args: string[], cwd: string) => number, partition: 'browser-1' | 'browser-2') =>
+      executeRepositoryPlan({ cwd, base: 'main', head: 'HEAD', partition, output }, run),
+  }
 }
 
 function writeRunnerReport(cwd: string, args: string[], names?: string[]) {
@@ -111,29 +150,32 @@ describe('scoped check execution', () => {
     }])
   })
 
-  it('prepares services and the manifest once while retaining every complete project check and measured command', () => {
+  it('prepares services and the manifest once in each Vitest slot while covering every selected file once', () => {
     const value = executionFixture()
-    const result = value.execute((_command, args, cwd) => {
+    const run = (_command: string, args: string[], cwd: string) => {
       writeRunnerReport(cwd, args)
       return 0
-    })
-    expect(result.status).toBe('passed')
-    expect(result.preparation.map(command => command.args)).toEqual([
-      ['scripts/local-services.mjs', '--test'], ['run', 'build:cards-manifest'],
+    }
+    const results = (['units-1', 'units-2', 'units-3'] as const).map(partition => value.execute(run, partition))
+    expect(results.map(result => result.status)).toEqual(['passed', 'passed', 'passed'])
+    expect(results.map(result => result.preparation.map(command => command.args))).toEqual([
+      [['scripts/local-services.mjs', '--test'], ['run', 'build:cards-manifest']],
+      [['scripts/local-services.mjs', '--test'], ['run', 'build:cards-manifest']],
+      [['run', 'build:cards-manifest']],
     ])
-    expect(result.checks.map(entry => entry.check)).toEqual([
-      { kind: 'vitest', project: 'fast-cards', files: ['shared/cards/__tests__/A29_AleBenches.test.ts'] },
-      { kind: 'vitest', project: 'fast-server', files: ['server/__tests__/cross-card-session.test.ts'] },
-      { kind: 'vitest', project: 'slow', files: ['server/__tests__/A029_AleBenches-session.test.ts'] },
+    expect(results.map(result => result.checks.map(entry => entry.check))).toEqual([
+      [{ kind: 'vitest', project: 'slow', files: ['server/__tests__/A029_AleBenches-session.test.ts'] }],
+      [{ kind: 'vitest', project: 'fast-server', files: ['server/__tests__/cross-card-session.test.ts'] }],
+      [{ kind: 'vitest', project: 'fast-cards', files: ['shared/cards/__tests__/A29_AleBenches.test.ts'] }],
     ])
-    const commands = result.checks.flatMap(check => check.commands)
+    const commands = results.flatMap(result => result.checks.flatMap(check => check.commands))
     expect(new Set(commands.map(command => command.args.find(arg => arg.startsWith('--outputFile.json=')))).size).toBe(3)
     for (const command of commands) {
       expect(command.args).toContain('--reporter=default')
       expect(command.args).toContain('--reporter=json')
       expect(command.args.filter(arg => arg === '--project')).toHaveLength(1)
     }
-    for (const command of [...result.preparation, ...result.checks.flatMap(check => check.commands)]) {
+    for (const command of results.flatMap(result => [...result.preparation, ...result.checks.flatMap(check => check.commands)])) {
       expect(command).toMatchObject({ exitCode: 0, startedAt: expect.any(String), completedAt: expect.any(String), durationMs: expect.any(Number) })
       expect(Date.parse(command.completedAt)).toBeGreaterThanOrEqual(Date.parse(command.startedAt))
       expect(command.durationMs).toBeGreaterThanOrEqual(0)
@@ -178,5 +220,85 @@ describe('scoped check execution', () => {
     expect(value.execute((_command, args, cwd) => { writeRunnerReport(cwd, args); return 0 }).status).toBe('passed')
     expect(() => value.execute(() => 0)).toThrow()
     expect(JSON.parse(readFileSync(value.output, 'utf8'))).toMatchObject({ status: 'failed', checks: [{ status: 'failed' }] })
+  })
+
+  it('prepares browser artifacts once and starts the app and services once for every spec in the slot', () => {
+    const value = browserFixture()
+    const result = value.execute((_command, args, cwd) => {
+      const index = args.indexOf('--report')
+      if (index >= 0) writeFileSync(join(cwd, args[index + 1] ?? ''), '{"suites":[]}\n')
+      return 0
+    }, 'browser-1')
+    const commands = [...result.preparation, ...result.checks.flatMap(check => check.commands)].map(command => command.args)
+    expect(commands.filter(args => args.join(' ') === 'scripts/local-services.mjs --test')).toHaveLength(1)
+    expect(commands.filter(args => args.join(' ') === 'run build:cards-manifest')).toHaveLength(1)
+    expect(commands.filter(args => args[0] === 'exec' && args[2] === 'scripts/ci/isolated-browser.ts' && args[3] === 'start')).toHaveLength(1)
+    expect(commands.filter(args => args[0] === 'exec' && args[2] === 'scripts/ci/isolated-browser.ts' && args[3] === 'test')).toEqual([
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session',
+        '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--',
+        'e2e-tests/pack-a.spec.ts', 'e2e-tests/pack-e.spec.ts'],
+    ])
+    expect(commands.filter(args => args[3] === 'stop')).toHaveLength(1)
+    expect(result.status).toBe('passed')
+  })
+
+  it('builds the hosted frontend without a typecheck only when a selected spec depends on it', () => {
+    const value = browserFixture()
+    const accept = (_command: string, args: string[], cwd: string) => {
+      const index = args.indexOf('--report')
+      if (index >= 0) writeFileSync(join(cwd, args[index + 1] ?? ''), '{"suites":[]}\n')
+      return 0
+    }
+    const hosted = value.execute(accept, 'browser-1')
+    const plain = value.execute(accept, 'browser-2')
+    const hostedBuild = ['run', 'build:hosted-frontend', '--', '--no-typecheck']
+    expect(hosted.preparation.map(command => command.args).filter(args => args.includes('build:hosted-frontend'))).toEqual([hostedBuild])
+    expect(hosted.preparation.some(command => command.args.includes('tsc') || command.args.join(' ') === 'run build')).toBe(false)
+    expect(plain.preparation.map(command => command.args).some(args => args.includes('build:hosted-frontend'))).toBe(false)
+    expect(plain.checks.flatMap(check => check.commands).map(command => command.args)).toEqual([
+      ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session',
+        '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--',
+        'e2e-tests/pack-b.spec.ts'],
+    ])
+  })
+
+  it('names only a browser case that passed on retry and still passes the partition', () => {
+    const value = browserFixture()
+    const result = value.execute((_command, args) => {
+      const index = args.indexOf('--report')
+      const report = index < 0 ? undefined : args[index + 1]
+      if (!report) return 0
+      writeFileSync(join(value.cwd, report), JSON.stringify({ suites: [{ specs: [
+        { title: 'opens the login form', file: 'e2e-tests/pack-b.spec.ts', tests: [{ status: 'expected', results: [{ status: 'passed', retry: 0 }] }] },
+        { title: 'keeps the room after the socket drops', file: 'e2e-tests/pack-b.spec.ts', tests: [{ status: 'flaky', results: [{ status: 'failed', retry: 0 }, { status: 'passed', retry: 1 }] }] },
+      ] }] }))
+      return 0
+    }, 'browser-2')
+    expect(result.status).toBe('passed')
+    const summary = readFileSync(value.summary, 'utf8')
+    expect(summary).toContain('e2e-tests/pack-b.spec.ts › keeps the room after the socket drops')
+    expect(summary).not.toContain('opens the login form')
+  })
+
+  it('fails the browser partition when the retry also fails and does not record that case as passed', () => {
+    const value = browserFixture()
+    expect(() => value.execute((_command, args) => {
+      const index = args.indexOf('--report')
+      const report = index < 0 ? undefined : args[index + 1]
+      if (!report) return 0
+      writeFileSync(join(value.cwd, report), JSON.stringify({ suites: [{ specs: [
+        { title: 'keeps the room after the socket drops', file: 'e2e-tests/pack-b.spec.ts', tests: [{ status: 'unexpected', results: [{ status: 'failed', retry: 0 }, { status: 'failed', retry: 1 }] }] },
+      ] }] }))
+      return 1
+    }, 'browser-2')).toThrow()
+    expect(readFileSync(value.summary, 'utf8')).not.toContain('keeps the room after the socket drops')
+    expect(JSON.parse(readFileSync(value.output, 'utf8'))).toMatchObject({ status: 'failed' })
+  })
+
+  it('does not retry release-candidate browser tasks', () => {
+    const root = join(import.meta.dirname, '../..')
+    for (const id of ['chromium-1', 'chromium-2', 'chromium-3', 'chromium-4', 'browser-sandbox', 'webkit']) {
+      expect(taskCommands(root, id).flatMap(command => command.args)).not.toContain('--retries')
+    }
   })
 })
