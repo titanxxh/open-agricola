@@ -1,91 +1,129 @@
 import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { PlannedCheck, VerificationPlan } from './verification-plan'
 
+export const UNIT_PARTITION_IDS = ['units-1', 'units-2', 'units-3'] as const
 export const BROWSER_PARTITION_IDS = ['browser-1', 'browser-2', 'browser-3', 'browser-4'] as const
-export const ROUTINE_PARTITION_IDS = ['units', ...BROWSER_PARTITION_IDS] as const
+export const ROUTINE_PARTITION_IDS = [...UNIT_PARTITION_IDS, ...BROWSER_PARTITION_IDS] as const
 export type RoutinePartitionId = typeof ROUTINE_PARTITION_IDS[number]
 type BrowserCheck = Extract<PlannedCheck, { kind: 'browser' }>
 type UnitCheck = Extract<PlannedCheck, { kind: 'vitest' }>
 type BrowserTuple = Pick<BrowserCheck, 'browser' | 'grep'> & { file: string }
-type BrowserSlot = { id: typeof BROWSER_PARTITION_IDS[number]; groups: Map<string, BrowserCheck> }
 export type RoutinePartition =
-  | { id: 'units'; digest: string; checks: UnitCheck[] }
+  | { id: typeof UNIT_PARTITION_IDS[number]; digest: string; checks: UnitCheck[] }
   | { id: typeof BROWSER_PARTITION_IDS[number]; digest: string; checks: BrowserCheck[] }
 export type RoutinePartitionDescriptor = { id: RoutinePartitionId; digest: string; checks: number }
 export type RoutinePartitionManifest = Record<RoutinePartitionId, RoutinePartitionDescriptor | null>
 
-const key = (tuple: BrowserTuple) => JSON.stringify([tuple.browser, tuple.grep, tuple.file])
+const repoRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
 const compare = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
 const tuples = (checks: BrowserCheck[]): BrowserTuple[] => checks.flatMap(check =>
   check.files.map(file => ({ browser: check.browser, grep: check.grep, file })))
+const tupleKey = (tuple: BrowserTuple) => JSON.stringify([tuple.browser, tuple.grep, tuple.file])
 const digest = (id: RoutinePartitionId, checks: UnitCheck[] | BrowserCheck[]) =>
   createHash('sha256').update(JSON.stringify({ id, checks })).digest('hex')
-const browserSlots = (): BrowserSlot[] => BROWSER_PARTITION_IDS.map(id => ({ id, groups: new Map() }))
 
-function distribute(selected: BrowserTuple[], slots: BrowserSlot[]) {
-  selected.forEach((tuple, index) => {
-    const slot = slots[index % slots.length]
-    const group = JSON.stringify([tuple.browser, tuple.grep])
-    const check = slot.groups.get(group) ?? { kind: 'browser', browser: tuple.browser, grep: tuple.grep, files: [] }
-    check.files.push(tuple.file)
-    slot.groups.set(group, check)
-  })
+function durations(cwd: string): Map<string, number> {
+  const path = join(cwd, 'scripts/ci/verification-durations.json')
+  if (!existsSync(path)) return new Map()
+  const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Verification durations must be a path map')
+  const recorded = new Map<string, number>()
+  for (const [file, duration] of Object.entries(value)) {
+    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) throw new Error(`Invalid verification duration: ${file}`)
+    recorded.set(file, duration)
+  }
+  return recorded
 }
 
-function selectorSlots(selected: BrowserTuple[]): BrowserSlot[] | undefined {
-  const grouped = new Map<string, BrowserTuple[]>()
-  for (const tuple of selected) {
-    const group = JSON.stringify([tuple.browser, tuple.grep])
-    const members = grouped.get(group) ?? []
-    members.push(tuple)
-    grouped.set(group, members)
-  }
-  if (!grouped.size || grouped.size > BROWSER_PARTITION_IDS.length) return undefined
-  const groups = [...grouped].map(([key, tuples]) => ({ key, tuples, slots: 1 }))
-  for (let allocated = groups.length; allocated < BROWSER_PARTITION_IDS.length; allocated++) {
-    const next = [...groups].sort((left, right) =>
-      right.tuples.length / right.slots - left.tuples.length / left.slots || compare(left.key, right.key))
-      .find(group => group.slots < group.tuples.length)
-    if (!next) break
-    next.slots++
-  }
-  groups.sort((left, right) => right.tuples.length - left.tuples.length || compare(left.key, right.key))
-  const slots = browserSlots()
-  let offset = 0
-  for (const group of groups) {
-    distribute(group.tuples, slots.slice(offset, offset + group.slots))
-    offset += group.slots
-  }
-  return slots
+function median(values: number[]): number {
+  if (!values.length) return 1
+  const ordered = [...values].sort((left, right) => left - right)
+  const middle = Math.floor(ordered.length / 2)
+  return ordered.length % 2 === 1 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2
 }
 
-export function routinePartitions(plan: VerificationPlan): RoutinePartition[] {
+function pack<T>(items: T[], slots: number, weight: (item: T) => number, tie: (item: T) => string): T[][] {
+  const ranked = [...items].sort((left, right) => weight(right) - weight(left) || compare(tie(left), tie(right)))
+  const bins = Array.from({ length: slots }, () => ({ total: 0, items: [] as T[] }))
+  for (const item of ranked) {
+    let chosen = 0
+    for (let index = 1; index < bins.length; index++) if (bins[index].total < bins[chosen].total) chosen = index
+    bins[chosen].items.push(item)
+    bins[chosen].total += weight(item)
+  }
+  return bins.map(bin => bin.items)
+}
+
+export function routinePartitions(plan: VerificationPlan, cwd = repoRoot): RoutinePartition[] {
+  const recorded = durations(cwd)
   const result: RoutinePartition[] = []
   const units = plan.checks.filter(check => check.kind === 'vitest')
-  if (units.length) result.push({ id: 'units', checks: units, digest: digest('units', units) })
-  const selected = tuples(plan.checks.filter(check => check.kind === 'browser')).sort((left, right) => compare(key(left), key(right)))
-  if (new Set(selected.map(key)).size !== selected.length) throw new Error('Duplicate scoped browser selection')
-  const roundRobin = browserSlots()
-  distribute(selected, roundRobin)
-  const grouped = selectorSlots(selected)
-  const commands = (slots: BrowserSlot[]) => slots.reduce((count, slot) => count + slot.groups.size, 0)
-  const fileLimit = Math.ceil(selected.length / BROWSER_PARTITION_IDS.length) + 1
-  const slots = grouped && commands(grouped) < commands(roundRobin)
-    && grouped.every(slot => [...slot.groups.values()].reduce((count, check) => count + check.files.length, 0) <= fileLimit)
-    ? grouped : roundRobin
-  for (const slot of slots) {
-    const checks = [...slot.groups.values()]
-    if (checks.length) result.push({ id: slot.id, checks, digest: digest(slot.id, checks) })
+  const files = units.flatMap(check => check.files.map(file => ({ project: check.project, file })))
+  const projectMedian = new Map<string, number>()
+  for (const file of files) {
+    if (projectMedian.has(file.project)) continue
+    projectMedian.set(file.project, median(files.flatMap(candidate => {
+      if (candidate.project !== file.project) return []
+      const duration = recorded.get(candidate.file)
+      return duration === undefined ? [] : [duration]
+    })))
   }
-  const actual = tuples(result.flatMap(partition => partition.id === 'units' ? [] : partition.checks)).map(key).sort(compare)
-  if (actual.length !== selected.length || selected.some((tuple, index) => key(tuple) !== actual[index])) {
+  const unitBins = pack(files, UNIT_PARTITION_IDS.length,
+    file => recorded.get(file.file) ?? projectMedian.get(file.project) ?? 1, file => file.file)
+  unitBins.forEach((bin, index) => {
+    if (!bin.length) return
+    const grouped = new Map<string, string[]>()
+    for (const file of bin) {
+      const members = grouped.get(file.project) ?? []
+      members.push(file.file)
+      grouped.set(file.project, members)
+    }
+    const checks = [...grouped.entries()].sort((left, right) => compare(left[0], right[0]))
+      .map(([project, members]) => ({ kind: 'vitest' as const, project, files: members.sort(compare) }))
+    const id = UNIT_PARTITION_IDS[index]
+    result.push({ id, checks, digest: digest(id, checks) })
+  })
+
+  const selected = tuples(plan.checks.filter(check => check.kind === 'browser'))
+    .sort((left, right) => compare(tupleKey(left), tupleKey(right)))
+  if (new Set(selected.map(tupleKey)).size !== selected.length) throw new Error('Duplicate scoped browser selection')
+  const browserMedian = median([...new Set(selected.map(tuple => tuple.file))].flatMap(file => {
+    const duration = recorded.get(file)
+    return duration === undefined ? [] : [duration]
+  }))
+  const browserBins = pack(selected, BROWSER_PARTITION_IDS.length,
+    tuple => recorded.get(tuple.file) ?? browserMedian,
+    tuple => JSON.stringify([tuple.file, tuple.browser, tuple.grep]))
+  browserBins.forEach((bin, index) => {
+    if (!bin.length) return
+    const grouped = new Map<string, BrowserCheck>()
+    for (const tuple of bin) {
+      const key = JSON.stringify([tuple.browser, tuple.grep])
+      const check = grouped.get(key) ?? { kind: 'browser', browser: tuple.browser, grep: tuple.grep, files: [] }
+      check.files.push(tuple.file)
+      grouped.set(key, check)
+    }
+    const checks = [...grouped.entries()].sort((left, right) => compare(left[0], right[0]))
+      .map(([, check]) => ({ ...check, files: check.files.sort(compare) }))
+    const id = BROWSER_PARTITION_IDS[index]
+    result.push({ id, checks, digest: digest(id, checks) })
+  })
+  const actual = result.flatMap(partition => {
+    if (partition.id !== 'browser-1' && partition.id !== 'browser-2' && partition.id !== 'browser-3' && partition.id !== 'browser-4') return []
+    return tuples(partition.checks)
+  }).map(tupleKey).sort(compare)
+  const expected = selected.map(tupleKey).sort(compare)
+  if (actual.length !== expected.length || expected.some((key, index) => key !== actual[index])) {
     throw new Error('Scoped browser partitions do not cover the selected files exactly once')
   }
   return result
 }
 
 export function routinePartitionManifest(partitions: RoutinePartition[]): RoutinePartitionManifest {
-  const manifest: RoutinePartitionManifest = { units: null, 'browser-1': null, 'browser-2': null, 'browser-3': null, 'browser-4': null }
+  const manifest = Object.fromEntries(ROUTINE_PARTITION_IDS.map(id => [id, null])) as RoutinePartitionManifest
   for (const partition of partitions) manifest[partition.id] = { id: partition.id, digest: partition.digest, checks: partition.checks.length }
   return manifest
 }

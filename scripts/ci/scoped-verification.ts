@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
@@ -45,13 +45,13 @@ const execute: CommandRunner = (command, args, cwd) => {
   return result.status ?? 1
 }
 
-export function routinePlanManifest(plan: VerificationPlan) {
+export function routinePlanManifest(plan: VerificationPlan, cwd?: string) {
   const tasks = plan.checks.flatMap(check => check.kind === 'catalog' ? [check.taskId] : [])
   return {
     mode: plan.mode,
     plan_digest: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
     tested_sha: plan.identity.testedSha,
-    partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan))),
+    partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan, cwd))),
     catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : NO_CATALOG_TASKS,
     browsers: plan.checks.some(check => check.kind === 'browser') ? 'chromium webkit' : '',
   }
@@ -80,6 +80,40 @@ export function plannedCheckCommands(cwd: string, check: PlannedCheck): Verifica
   }
 }
 
+const browserSession = 'output/verification/browser-session'
+
+function specNeedsHostedBuild(cwd: string, file: string): boolean {
+  try {
+    const source = readFileSync(join(cwd, file), 'utf8')
+    return source.includes('build:hosted-frontend') || source.includes('startHostedReleaseApp') || source.includes('hosted-release-app')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
+}
+
+function passedOnRetry(report: string): string[] {
+  if (!existsSync(report)) throw new Error('Browser retry report is missing')
+  const value: unknown = JSON.parse(readFileSync(report, 'utf8'))
+  const names: string[] = []
+  const visit = (node: unknown, file?: string) => {
+    if (typeof node !== 'object' || node === null) return
+    const record = node as Record<string, unknown>
+    const ownFile = typeof record.file === 'string' ? record.file : file
+    for (const spec of Array.isArray(record.specs) ? record.specs : []) {
+      if (typeof spec !== 'object' || spec === null) continue
+      const item = spec as Record<string, unknown>
+      const tests = Array.isArray(item.tests) ? item.tests : []
+      if (!tests.some(test => typeof test === 'object' && test !== null && (test as Record<string, unknown>).status === 'flaky')) continue
+      const specFile = typeof item.file === 'string' ? item.file : ownFile
+      names.push(`${specFile ?? 'browser spec'} › ${typeof item.title === 'string' ? item.title : 'unnamed case'}`)
+    }
+    for (const suite of Array.isArray(record.suites) ? record.suites : []) visit(suite, ownFile)
+  }
+  visit(value)
+  return names
+}
+
 function unitServicesRequired(cwd: string, checks: Array<Extract<PlannedCheck, { kind: 'vitest' }>>): boolean {
   if (checks.some(check => check.project === 'fast-server' || check.project === 'slow')) return true
   const consumers = readTestConsumerIndex(cwd, {
@@ -96,16 +130,17 @@ export function executeRepositoryPlan(input: {
   expectedPlan?: unknown; expectedDigest?: string
 }, run: CommandRunner = execute): RoutineResult {
   let record: RoutineResult | undefined
+  const retried: string[] = []
   try {
     const plan = repositoryPlan(input)
-    const manifest = routinePlanManifest(plan)
+    const manifest = routinePlanManifest(plan, input.cwd)
     if (input.expectedPlan !== undefined && !isDeepStrictEqual(input.expectedPlan, plan)) {
       throw new Error('Submitted verification plan differs from the canonical repository plan')
     }
     if (input.expectedDigest !== undefined && input.expectedDigest !== manifest.plan_digest) {
       throw new Error('Verification plan digest changed; regenerate the plan')
     }
-    const partition = routinePartitions(plan).find(partition => partition.id === input.partition)
+    const partition = routinePartitions(plan, input.cwd).find(partition => partition.id === input.partition)
     const checks = input.partition === 'all' ? plan.checks : partition?.checks ?? []
     if (!checks.length) throw new Error('No checks are selected for this execution partition')
     record = {
@@ -145,7 +180,9 @@ export function executeRepositoryPlan(input: {
       mkdirSync(directory, { recursive: true })
       reports = mkdtempSync(join(directory, 'run-'))
     }
+    const browserChecks = checks.filter(check => check.kind === 'browser')
     for (const check of checks) {
+      if (check.kind === 'browser') continue
       const result: CheckResult = { check, status: 'failed', commands: [] }
       record.checks.push(result)
       const report = check.kind === 'vitest' && reports ? join(reports, `${record.checks.length}-${check.project}.json`) : undefined
@@ -161,6 +198,32 @@ export function executeRepositoryPlan(input: {
       }
       result.status = 'passed'
       write(input.output, record)
+    }
+    if (browserChecks.length) {
+      mkdirSync(join(input.cwd, browserSession), { recursive: true })
+      runCommand({ command: process.execPath, args: ['scripts/local-services.mjs', '--test'] }, record.preparation, 'preparation')
+      runCommand({ command: 'pnpm', args: ['run', 'build:cards-manifest'] }, record.preparation, 'preparation')
+      if (browserChecks.some(check => check.files.some(file => specNeedsHostedBuild(input.cwd, file)))) {
+        runCommand({ command: 'pnpm', args: ['run', 'build:hosted-frontend', '--', '--no-typecheck'] }, record.preparation, 'preparation')
+      }
+      runCommand({ command: 'pnpm', args: ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'start', browserSession] }, record.preparation, 'preparation')
+      try {
+        browserChecks.forEach((check, index) => {
+          const result: CheckResult = { check, status: 'failed', commands: [] }
+          current.checks.push(result)
+          const report = `${browserSession}/${index + 1}.json`
+          const args = ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', browserSession,
+            '--report', report, '--retries', '1', '--browser', check.browser]
+          if (check.grep) args.push('--grep', check.grep)
+          args.push('--', ...check.files)
+          runCommand({ command: 'pnpm', args }, result.commands, 'browser')
+          retried.push(...passedOnRetry(join(input.cwd, report)))
+          result.status = 'passed'
+          write(input.output, current)
+        })
+      } finally {
+        runCommand({ command: 'pnpm', args: ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'stop', browserSession] }, record.preparation, 'preparation')
+      }
     }
     record.status = 'passed'
     outputs({ partition_id: input.partition, partition_digest: record.partitionDigest,
@@ -180,6 +243,7 @@ export function executeRepositoryPlan(input: {
       `Status: **${record.status}**. Partition: \`${input.partition}\`. Plan: \`${record.planDigest}\`.`, '',
       'This routine result is not a dedicated full candidate receipt.', '',
       ...record.checks.map(result => `- ${result.status}: \`${JSON.stringify(result.check)}\``), '',
+      ...(retried.length ? ['Passed on retry:', ...retried.map(name => `- \`${name}\``), ''] : []),
     ].join('\n'))
   }
 }
@@ -209,7 +273,7 @@ export function scopedVerificationCli(cwd: string, args: string[]): number {
     } else if (command === 'plan') {
       const plan = repositoryPlan({ cwd, base: values.base, head: values.head })
       write(output, plan)
-      const manifest = routinePlanManifest(plan)
+      const manifest = routinePlanManifest(plan, cwd)
       outputs(manifest)
       if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, formatPlanSummary(plan))
       process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')
@@ -219,7 +283,7 @@ export function scopedVerificationCli(cwd: string, args: string[]): number {
       executionOwnsRecord = true
       executeRepositoryPlan({ cwd, base: values.base, head: values.head, partition,
         output, expectedPlan, expectedDigest: values['expected-digest'] })
-    } else throw new Error('Usage: scoped-verification.ts plan|run --base <ref> [--head <ref>] [--plan <file>] [--partition units|browser-1|browser-2|browser-3|browser-4|all] [--expected-digest <sha256>], or gate --sha <sha>')
+    } else throw new Error('Usage: scoped-verification.ts plan|run --base <ref> [--head <ref>] [--plan <file>] [--partition units-1|units-2|units-3|browser-1|browser-2|browser-3|browser-4|all] [--expected-digest <sha256>], or gate --sha <sha>')
     return 0
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
