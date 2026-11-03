@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -216,6 +216,322 @@ describe('dependency routine verification plan', () => {
     expect(source.fullTrigger).toBe(false)
     expect(mixed.catalogTasks).toEqual(['quality', 'build'])
     expect(mixed.vitestFiles).toEqual(['shared/domain/__tests__/prod.test.ts'])
+  })
+
+  it('selects a test that directly reads a changed document and skips quality and build', () => {
+    const root = writeTree({
+      'docs/ARCHITECTURE.md': '# Architecture\n',
+      'scripts/__tests__/architecture.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('docs/ARCHITECTURE.md', 'utf8')\n",
+      'scripts/__tests__/other.test.ts': 'export const other = 1\n',
+      'shared/domain/prod.ts': 'export const prod = 1\n',
+      'shared/domain/__tests__/prod.test.ts': "import { prod } from '../prod'\nexport const used = prod\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'docs/ARCHITECTURE.md' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['scripts/__tests__/architecture.test.ts'])
+    expect(plan.catalogTasks).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('selects direct tests of a production module that reads a changed document and not its dependents', () => {
+    const root = writeTree({
+      'docs/ARCHITECTURE.md': '# Architecture\n',
+      'shared/domain/load.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('docs/ARCHITECTURE.md', 'utf8')\n",
+      'shared/domain/mid.ts': "import { text } from './load'\nexport const mid = text\n",
+      'shared/domain/__tests__/load.test.ts': "import { text } from '../load'\nexport const used = text\n",
+      'shared/domain/__tests__/mid.test.ts': "import { mid } from '../mid'\nexport const used = mid\n",
+      'shared/domain/__tests__/other.test.ts': 'export const other = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'docs/ARCHITECTURE.md' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['shared/domain/__tests__/load.test.ts'])
+    expect(plan.catalogTasks).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('matches a directory prefix or glob literal and does not follow the scanning module', () => {
+    const root = writeTree({
+      'notes/rules/scoring.md': '# Scoring\n',
+      'shared/domain/scan.ts': "import { readdirSync } from 'node:fs'\nexport const names = readdirSync('notes')\n",
+      'shared/domain/wrap.ts': "import { names } from './scan'\nexport const wrapped = names\n",
+      'shared/domain/__tests__/scan.test.ts': "import { names } from '../scan'\nexport const used = names\n",
+      'shared/domain/__tests__/wrap.test.ts': "import { wrapped } from '../wrap'\nexport const used = wrapped\n",
+      'shared/domain/__tests__/glob.test.ts': "export const files = globSync('notes/**/*.md')\n",
+      'shared/domain/__tests__/other.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('notes/other.md', 'utf8')\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'notes/rules/scoring.md' }],
+    })
+
+    expect(plan.vitestFiles).toEqual([
+      'shared/domain/__tests__/glob.test.ts',
+      'shared/domain/__tests__/scan.test.ts',
+    ])
+    expect(plan.catalogTasks).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('selects direct readers of language packs when i18n.ref changes', () => {
+    const root = writeTree({
+      'i18n.ref': '{}\n',
+      'server/language.ts': "import { readFileSync } from 'node:fs'\nexport const pack = readFileSync('public/i18n/en.json', 'utf8')\n",
+      'server/wrap.ts': "import { pack } from './language'\nexport const wrapped = pack\n",
+      'server/__tests__/language.test.ts': "import { pack } from '../language'\nexport const used = pack\n",
+      'server/__tests__/wrap.test.ts': "import { wrapped } from '../wrap'\nexport const used = wrapped\n",
+      'server/__tests__/manifest-reader.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('public/i18n/manifest.json', 'utf8')\n",
+      'server/__tests__/cards.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('public/cards-manifest.json', 'utf8')\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'i18n.ref' }],
+    })
+
+    expect(plan.vitestFiles).toEqual([
+      'server/__tests__/language.test.ts',
+      'server/__tests__/manifest-reader.test.ts',
+    ])
+    expect(plan.catalogTasks).toEqual(['quality', 'build'])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('selects direct readers of the cards manifest, encyclopedia, and action references when a card source changes', () => {
+    const root = writeTree({
+      'shared/cards/A/A001_Probe.ts': 'export const A001_Probe = { impl: {} }\n',
+      'shared/cards/register-all.ts': 'export const ALL_CARD_IMPLS = {}\n',
+      'server/manifest.ts': "import { readFileSync } from 'node:fs'\nexport const manifest = readFileSync('public/cards-manifest.json', 'utf8')\n",
+      'server/wrap.ts': "import { manifest } from './manifest'\nexport const wrapped = manifest\n",
+      'server/__tests__/manifest.test.ts': "import { manifest } from '../manifest'\nexport const used = manifest\n",
+      'server/__tests__/wrap.test.ts': "import { wrapped } from '../wrap'\nexport const used = wrapped\n",
+      'server/__tests__/encyclopedia.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('public/card-encyclopedia/manifest.json', 'utf8')\n",
+      'server/__tests__/actions.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('public/action-references.json', 'utf8')\n",
+      'server/__tests__/language.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('public/i18n/manifest.json', 'utf8')\n",
+      'server/__tests__/card.test.ts': "import { A001_Probe } from '../../shared/cards/A/A001_Probe'\nexport const used = A001_Probe\n",
+    })
+
+    const card = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/cards/A/A001_Probe.ts' }],
+    })
+    const registry = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/cards/register-all.ts' }],
+    })
+
+    expect(card.vitestFiles).toEqual([
+      'server/__tests__/actions.test.ts',
+      'server/__tests__/card.test.ts',
+      'server/__tests__/encyclopedia.test.ts',
+      'server/__tests__/manifest.test.ts',
+    ])
+    expect(card.catalogTasks).toEqual(['quality', 'build'])
+    expect(card.warnings).toEqual([])
+    expect(card.fullTrigger).toBe(false)
+    expect(registry.vitestFiles).toEqual([])
+    expect(registry.fullTrigger).toBe(false)
+  })
+
+  it('follows a literal new URL to a source module as a dependency', () => {
+    const root = writeTree({
+      'shared/domain/score.ts': 'export const score = 1\n',
+      'shared/domain/load.ts': "export const text = readFileSync(fileURLToPath(new URL('./score.ts', import.meta.url)), 'utf8')\n",
+      'shared/domain/mid.ts': "import { text } from './load'\nexport const mid = text\n",
+      'shared/domain/__tests__/load.test.ts': "import { text } from '../load'\nexport const used = text\n",
+      'shared/domain/__tests__/mid.test.ts': "import { mid } from '../mid'\nexport const used = mid\n",
+      'shared/domain/__tests__/other.test.ts': 'export const other = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/domain/score.ts' }],
+    })
+
+    expect(plan.vitestFiles).toEqual([
+      'shared/domain/__tests__/load.test.ts',
+      'shared/domain/__tests__/mid.test.ts',
+    ])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('treats a literal new URL to another repository path as a direct read', () => {
+    const root = writeTree({
+      'docs/ARCHITECTURE.md': '# Architecture\n',
+      'shared/domain/load.ts': "export const text = readFileSync(fileURLToPath(new URL('../../docs/ARCHITECTURE.md', import.meta.url)), 'utf8')\n",
+      'shared/domain/mid.ts': "import { text } from './load'\nexport const mid = text\n",
+      'shared/domain/locate.ts': "export const located = new URL('../../docs/ARCHITECTURE.md', import.meta.url)\n",
+      'shared/domain/__tests__/load.test.ts': "import { text } from '../load'\nexport const used = text\n",
+      'shared/domain/__tests__/mid.test.ts': "import { mid } from '../mid'\nexport const used = mid\n",
+      'shared/domain/__tests__/locate.test.ts': "import { located } from '../locate'\nexport const used = located\n",
+      'scripts/__tests__/direct.test.ts': "export const text = readFileSync(fileURLToPath(new URL('../../docs/ARCHITECTURE.md', import.meta.url)), 'utf8')\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'docs/ARCHITECTURE.md' }],
+    })
+
+    expect(plan.vitestFiles).toEqual([
+      'scripts/__tests__/direct.test.ts',
+      'shared/domain/__tests__/load.test.ts',
+      'shared/domain/__tests__/locate.test.ts',
+    ])
+    expect(plan.catalogTasks).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('warns and widens a filesystem read with no matchable path, directory prefix, or glob literal', () => {
+    const root = writeTree({
+      'shared/domain/load.ts': "import { readFileSync } from 'node:fs'\nexport const load = (file: string) => readFileSync(file, 'utf8')\n",
+      'shared/domain/__tests__/load.test.ts': "import { load } from '../load'\nexport const used = load\n",
+      'shared/domain/__tests__/other.test.ts': 'export const other = 1\n',
+      'server/__tests__/room.test.ts': 'export const room = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/domain/load.ts' }],
+    })
+
+    expect(plan.fullTrigger).toBe(false)
+    expect(plan.catalogTasks).toEqual(['quality', 'build'])
+    expect(plan.vitestFiles).toEqual([
+      'shared/domain/__tests__/load.test.ts',
+      'shared/domain/__tests__/other.test.ts',
+    ])
+    expect(plan.warnings).toEqual([
+      'shared/domain/load.ts: filesystem read has no matchable literal; widened to fast-shared',
+    ])
+  })
+
+  it('does not widen an unmatchable read outside the changed dependency cone', () => {
+    const root = writeTree({
+      'shared/domain/prod.ts': 'export const prod = 1\n',
+      'shared/domain/__tests__/prod.test.ts': "import { prod } from '../prod'\nexport const used = prod\n",
+      'client/load.ts': "import { readFileSync } from 'node:fs'\nexport const load = (file: string) => readFileSync(file, 'utf8')\n",
+      'client/load.test.ts': "import { load } from './load'\nexport const used = load\n",
+      'client/other.test.ts': 'export const other = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/domain/prod.ts' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['shared/domain/__tests__/prod.test.ts'])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('resolves a dot-relative read literal from the file that reads it', () => {
+    const root = writeTree({
+      'docs/ARCHITECTURE.md': '# Architecture\n',
+      'server/load.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('../docs/ARCHITECTURE.md', 'utf8')\n",
+      'server/wrap.ts': "import { text } from './load'\nexport const wrapped = text\n",
+      'server/__tests__/load.test.ts': "import { text } from '../load'\nexport const used = text\n",
+      'server/__tests__/wrap.test.ts': "import { wrapped } from '../wrap'\nexport const used = wrapped\n",
+      'server/__tests__/elsewhere.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('../other/ARCHITECTURE.md', 'utf8')\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'docs/ARCHITECTURE.md' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['server/__tests__/load.test.ts'])
+    expect(plan.catalogTasks).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('matches a glob that reads files inside a generated directory', () => {
+    const root = writeTree({
+      'i18n.ref': '{}\n',
+      'server/__tests__/packs.test.ts': "export const files = globSync('public/i18n/**/*.json')\n",
+      'server/__tests__/any-json.test.ts': "export const files = globSync('**/*.json')\n",
+      'server/__tests__/docs.test.ts': "export const files = globSync('docs/**/*.md')\n",
+      'server/__tests__/public-json.test.ts': "export const files = globSync('public/*.json')\n",
+      'server/__tests__/ignored.test.ts': "export const files = globSync('client/**/*.ts', { ignore: ['**/__tests__/**'] })\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'i18n.ref' }],
+    })
+
+    expect(plan.vitestFiles).toEqual([
+      'server/__tests__/any-json.test.ts',
+      'server/__tests__/packs.test.ts',
+    ])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('keeps a non-source symlink from forcing the complete catalog', () => {
+    const root = writeTree({
+      'docs/ARCHITECTURE.md': '# Architecture\n',
+      'scripts/__tests__/architecture.test.ts': "import { readFileSync } from 'node:fs'\nexport const text = readFileSync('docs/ARCHITECTURE.md', 'utf8')\n",
+    })
+    symlinkSync(join(root, 'docs/ARCHITECTURE.md'), join(root, 'CLAUDE.md'))
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'docs/ARCHITECTURE.md' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['scripts/__tests__/architecture.test.ts'])
+    expect(plan.catalogTasks).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('selects the complete catalog when a source file symlink cannot be scanned', () => {
+    const root = writeTree({
+      'shared/domain/score.ts': 'export const score = 1\n',
+      'docs/ARCHITECTURE.md': '# Architecture\n',
+    })
+    symlinkSync(join(root, 'shared/domain/score.ts'), join(root, 'shared/domain/linked.ts'))
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'docs/ARCHITECTURE.md' }],
+    })
+
+    expect(plan.fullTrigger).toBe(true)
+    expect(plan.vitestFiles).toEqual([])
+    expect(plan.warnings.join('\n')).toContain('source symlink')
+  })
+
+  it('does not treat a lone parent segment as a read of the parent directory', () => {
+    const root = writeTree({
+      'shared/cards/A/A001_Probe.ts': 'export const card = 1\n',
+      'shared/cards/__tests__/other-card.test.ts': "import { readFileSync } from 'node:fs'\nimport { resolve } from 'node:path'\nexport const src = readFileSync(resolve(__dirname, '..', 'E', 'E005_Other.ts'), 'utf8')\n",
+      'shared/cards/__tests__/same.test.ts': "import { readFileSync } from 'node:fs'\nexport const src = readFileSync('../A/A001_Probe.ts', 'utf8')\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/cards/A/A001_Probe.ts' }],
+    })
+
+    expect(plan.vitestFiles).toEqual(['shared/cards/__tests__/same.test.ts'])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
   })
 
   it('selects no catalog tasks for a documentation-only change', () => {
