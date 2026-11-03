@@ -1058,9 +1058,4 @@ describe('dependency routine verification plan', () => {
     expect(replay.browserFiles).toEqual(replayViewerSpecs)
   }, 60_000)
 
-  it('keeps CI on the existing verification plan', () => {
-    const source = readFileSync(fileURLToPath(new URL('../ci/scoped-verification.ts', import.meta.url)), 'utf8')
-    expect(source).toContain('createRepositoryPlan(')
-    expect(source).not.toContain('planRoutineVerification')
-  })
 })

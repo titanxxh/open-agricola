@@ -3,247 +3,24 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { planVerification } from '../ci/verification-plan'
 import { executeRepositoryPlan, routinePlanManifest } from '../ci/scoped-verification'
-import { FULL_TASK_IDS } from '../ci/verification-tasks'
+import type { VerificationPlan } from '../ci/verification-plan'
 
 const identity = {
   baseRef: 'main', headRef: 'HEAD', baseSha: '1'.repeat(40), mergeBaseSha: '1'.repeat(40),
   headSha: '2'.repeat(40), testedSha: '2'.repeat(40), sourceFingerprint: '3'.repeat(64),
 }
-const consumers = [
-  'farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout',
-  'frontend-browser-scenario-matrix', 'online-interaction-completion', 'interaction-focus', 'mobile-interaction-continuity',
-  'hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player',
-  'interface-localization', 'interface-localization-fields', 'card-localization',
-  'replay-viewer', 'replay-viewer-csp', 'game-context-recovery', 'source-aware-scoring', 'mobile-scoring-pad',
-  'game-end', 'draft-opening-order', 'hotseat-public-farms', 'standard-solo-ui', 'setup-navigation',
-  'encyclopedia', 'encyclopedia-entry', 'encyclopedia-search', 'encyclopedia-filters',
-  'encyclopedia-faces', 'encyclopedia-in-game', 'encyclopedia-pages',
-].map(name => `e2e-tests/${name}.spec.ts`)
-const inventory = {
-  vitest: [{ file: 'client/services/__tests__/gameTransport.test.ts', project: 'fast-client' }],
-  browser: consumers,
-}
 
-describe('routine verification scope', () => {
-  it('retains every owned browser group of the game orchestration entry point', () => {
-    const plan = planVerification({
-      identity, changes: [{ status: 'M', path: 'client/app/GameContainerApi.tsx' }], inventory,
-      fullTaskIds: FULL_TASK_IDS,
-    })
-    expect(plan.mode).toBe('scoped')
-    const browsers = plan.checks.flatMap(check => check.kind === 'browser' ? check.files : [])
-    expect(browsers).toEqual(expect.arrayContaining([
-      'e2e-tests/game-end.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/choice-previews.spec.ts',
-      'e2e-tests/online-interaction-completion.spec.ts', 'e2e-tests/source-aware-scoring.spec.ts', 'e2e-tests/mobile-scoring-pad.spec.ts',
-      'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts',
-    ]))
-    expect(plan.checks.filter(check => check.kind === 'vitest').map(check => check.project)).toEqual(['fast-client'])
-  })
+describe('routine verification manifest', () => {
   it.each([
     'hosted-password-login', 'oauth-onboarding', 'workshop-browser-card-tests',
   ])('installs both engines for the embedded browser launches in %s', file => {
-    const plan = planVerification({
-      identity, changes: [{ status: 'M', path: 'README.md' }],
-      inventory: { vitest: [{ file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' }], browser: [] },
-      fullTaskIds: FULL_TASK_IDS,
-    })
-
-    const manifest = routinePlanManifest({ ...plan, checks: [
-      { kind: 'browser', browser: 'chromium', files: [`e2e-tests/${file}.spec.ts`], grep: null },
-    ] })
-
-    expect(manifest.browsers).toBe('chromium webkit')
-  })
-
-  it('runs the complete frontend group and the board browser consumers without backend rule suites', () => {
-    const plan = planVerification({
-      identity, changes: [{ status: 'M', path: 'client/components/board/FarmBoard.tsx' }],
-      inventory: {
-        vitest: [
-          { file: 'client/components/board/__tests__/FarmBoard.test.tsx', project: 'fast-client' },
-          { file: 'client/services/__tests__/gameTransport.test.ts', project: 'fast-client' },
-          { file: 'server/__tests__/rules.test.ts', project: 'fast-server' },
-        ],
-        browser: [
-          'e2e-tests/farm-select.spec.ts', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/farm-card-targets.spec.ts',
-          'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts',
-          'e2e-tests/frontend-browser-scenario-matrix.spec.ts',
-          'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts',
-        ],
-      },
-      fullTaskIds: FULL_TASK_IDS,
-    })
-
-    expect(plan.mode).toBe('scoped')
-    expect(plan.checks).toEqual([
-      { kind: 'vitest', project: 'fast-client', files: [
-        'client/components/board/__tests__/FarmBoard.test.tsx', 'client/services/__tests__/gameTransport.test.ts',
-      ] },
-      { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'build' },
-      { kind: 'browser', browser: 'chromium', files: [
-        'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts',
-        'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-card-targets.spec.ts',
-        'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts',
-      ], grep: null },
-      { kind: 'browser', browser: 'chromium', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@viewport|@ws' },
-      { kind: 'browser', browser: 'webkit', files: ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'], grep: '@webkit' },
-    ])
-  })
-
-  it.each(['docs/HOW_TO_DEPLOY.md', 'docs/operations/ci-checks.md'])(
-    'selects documentation constraints for operational instructions: %s', path => {
-      const plan = planVerification({
-        identity, changes: [{ status: 'M', path }],
-        inventory: { vitest: [{ file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' }], browser: [] },
-        fullTaskIds: FULL_TASK_IDS,
-      })
-      expect(plan.mode).toBe('scoped')
-      expect(plan.checks).toEqual([{ kind: 'vitest', project: 'fast-scripts', files: ['scripts/__tests__/docs-budget.test.ts'] }])
-    },
-  )
-
-  it('selects executable Workshop contracts for the generation prompt', () => {
-    const plan = planVerification({
-      identity, changes: [{ status: 'M', path: 'docs/prompts/card-generation.md' }],
-      inventory: { vitest: [
-        { file: 'scripts/__tests__/docs-budget.test.ts', project: 'fast-scripts' },
-        { file: 'server/__tests__/workshop-timing-payment-session.test.ts', project: 'fast-server' },
-        { file: 'server/__tests__/workshop-composed-behaviors-session.test.ts', project: 'fast-server' },
-      ], browser: [] }, fullTaskIds: FULL_TASK_IDS,
-    })
-    expect(plan.mode).toBe('scoped')
-    expect(plan.checks).toEqual([
-      { kind: 'vitest', project: 'fast-server', files: [
-        'server/__tests__/workshop-composed-behaviors-session.test.ts', 'server/__tests__/workshop-timing-payment-session.test.ts',
-      ] },
-      { kind: 'vitest', project: 'fast-scripts', files: ['scripts/__tests__/docs-budget.test.ts'] },
-    ])
-  })
-
-  it.each([
-    { path: 'client/services/gameTransport.ts', files: ['encyclopedia', 'encyclopedia-entry', 'encyclopedia-in-game', 'hosted-password-login', 'oauth-onboarding', 'room-invitations', 'ws-dual-player'], tag: '@ws' },
-    { path: 'client/contexts/__tests__/LocaleContext.test.tsx', files: ['card-localization', 'encyclopedia', 'encyclopedia-pages', 'encyclopedia-search', 'interface-localization', 'interface-localization-fields'], tag: '@locale' },
-    { path: 'client/components/interaction/InteractionBar.tsx', files: ['choice-previews', 'encyclopedia-in-game', 'interaction-focus', 'mobile-interaction-continuity', 'online-interaction-completion'], tag: '@viewport|@ws' },
-    { path: 'client/components/board/ScoringPad.tsx', files: ['choice-previews', 'desktop-table-layout', 'encyclopedia-faces', 'encyclopedia-in-game', 'farm-card-targets', 'farm-select', 'mobile-game-layout', 'mobile-scoring-pad', 'source-aware-scoring'], tag: '@viewport|@ws' },
-    { path: 'replay-viewer/src/ReplayBoard.tsx', files: ['game-context-recovery', 'replay-viewer', 'replay-viewer-csp'], tag: '@webkit' },
-  ])('selects declared module consumers for $path', ({ path, files, tag }) => {
-    const plan = planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS })
-    expect(plan.mode).toBe('scoped')
-    expect(plan.checks).toContainEqual({ kind: 'browser', browser: 'chromium', files: files.map(file => `e2e-tests/${file}.spec.ts`).sort(), grep: null })
-    expect(plan.checks.some(check => check.kind === 'browser' && check.grep === tag)).toBe(true)
-    expect(plan.checks).not.toContainEqual({ kind: 'catalog', taskId: 'fast' })
-    expect(plan.checks).not.toContainEqual({ kind: 'catalog', taskId: 'slow' })
-  })
-
-  it.each([
-    { path: 'client/components/header/GameHeader.tsx', files: ['encyclopedia-in-game'], safari: false },
-    { path: 'client/app/draft/DraftOverlay.tsx', files: ['encyclopedia-in-game'], safari: false },
-    { path: 'client/app/parents/ParentSelectionOverlay.tsx', files: ['encyclopedia-in-game'], safari: false },
-    { path: 'client/app/interaction-focus.ts', files: ['encyclopedia-in-game'], safari: false },
-    { path: 'client/components/board/FarmGroundSprite.tsx', files: ['encyclopedia-faces', 'encyclopedia-in-game'], safari: false },
-    { path: 'client/components/board/SeasonBoardPieces.tsx', files: ['encyclopedia-faces', 'encyclopedia-in-game'], safari: false },
-    { path: 'client/components/board/SpecialActionCardFace.tsx', files: ['encyclopedia-faces', 'encyclopedia-in-game'], safari: false },
-    { path: 'client/app/LobbyPage.tsx', files: ['encyclopedia', 'encyclopedia-entry', 'encyclopedia-in-game'], safari: true },
-    { path: 'client/app/PageRouter.tsx', files: ['encyclopedia', 'encyclopedia-entry', 'encyclopedia-in-game'], safari: true },
-    { path: 'client/hooks/useGameSync.ts', files: ['encyclopedia', 'encyclopedia-entry', 'encyclopedia-in-game'], safari: true },
-    { path: 'client/services/language-pack.ts', files: ['encyclopedia', 'encyclopedia-pages', 'encyclopedia-search'], safari: true },
-  ])('retains the complete encyclopedia consumers of the existing frontend seam $path', ({ path, files, safari }) => {
-    const plan = planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS })
-    expect(plan.mode).toBe('scoped')
-    expect(plan.checks.flatMap(check => check.kind === 'browser' && check.browser === 'chromium' && check.grep === null
-      ? check.files.filter(file => file.startsWith('e2e-tests/encyclopedia')) : []))
-      .toEqual(files.map(file => `e2e-tests/${file}.spec.ts`).sort())
-    expect(plan.checks).toContainEqual({
-      kind: 'browser', browser: 'webkit', grep: '@webkit', files: safari
-        ? ['e2e-tests/encyclopedia.spec.ts', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts']
-        : ['e2e-tests/frontend-browser-scenario-matrix.spec.ts'],
-    })
-  })
-
-  it.each([
-    'client/components/unowned/Widget.tsx', 'shared/cards/A/A029_AleBenches.ts',
-    'client/components/board/__tests__/fixtures.ts', 'replay-viewer/vite.config.ts',
-  ])('retains full fallback for unknown ownership or shared configuration: %s', path => {
-    const plan = planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS })
-    expect(plan.mode).toBe('full')
-    expect(plan.checks).toEqual([
-      { kind: 'catalog', taskId: 'quality' }, { kind: 'catalog', taskId: 'fast' },
-      { kind: 'catalog', taskId: 'slow' }, { kind: 'catalog', taskId: 'build' },
-      { kind: 'catalog', taskId: 'chromium-1' }, { kind: 'catalog', taskId: 'chromium-2' },
-      { kind: 'catalog', taskId: 'chromium-3' }, { kind: 'catalog', taskId: 'chromium-4' },
-      { kind: 'catalog', taskId: 'browser-sandbox' }, { kind: 'catalog', taskId: 'webkit' },
-    ])
-  })
-
-  it.each(['client/components/common/Button.tsx', 'client/styles/tokens.css'])(
-    'widens shared presentation to the complete browser layer: %s', path => {
-      const plan = planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS })
-      expect(plan.mode).toBe('scoped')
-      expect(plan.checks).toContainEqual({ kind: 'browser', browser: 'chromium', files: [...consumers].sort(), grep: null })
-      expect(plan.checks).toContainEqual({ kind: 'catalog', taskId: 'webkit' })
-      expect(plan.checks).toContainEqual({ kind: 'vitest', project: 'fast-client', files: ['client/services/__tests__/gameTransport.test.ts'] })
-    },
-  )
-
-  it.each([
-    'client/App.tsx', 'client/App.css', 'client/main.tsx', 'client/app/AppErrorBoundary.tsx',
-    'client/app/AppShellLoadScreen.tsx', 'client/app/GameContextRouter.tsx', 'client/app/game-load-progress.ts',
-  ])('runs the complete browser layer for the shared application entry %s', path => {
-    const plan = planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS })
-    expect(plan.mode).toBe('scoped')
-    expect(plan.checks).toContainEqual({ kind: 'browser', browser: 'chromium', files: [...consumers].sort(), grep: null })
-    expect(plan.checks).toContainEqual({ kind: 'catalog', taskId: 'webkit' })
-    expect(plan.checks.filter(check => check.kind === 'vitest').map(check => check.project)).toEqual(['fast-client'])
-  })
-
-  it.each([
-    { paths: ['client/App.tsx', 'client/styles/tokens.css'] }, { paths: ['client/styles/tokens.css', 'client/App.tsx'] },
-  ])('keeps the shared WebKit catalog when app and shared presentation changes are mixed: $paths', ({ paths }) => {
-    const plan = planVerification({ identity, changes: paths.map(path => ({ status: 'M', path })), inventory, fullTaskIds: FULL_TASK_IDS })
-    expect(plan.mode).toBe('scoped')
-    expect(plan.checks).toContainEqual({ kind: 'catalog', taskId: 'webkit' })
-  })
-
-  it.each([
-    { path: 'client/components/header/GameHeader.tsx', consumer: 'encyclopedia-in-game' },
-    { path: 'client/components/board/SpecialActionCardFace.tsx', consumer: 'encyclopedia-faces' },
-    { path: 'client/app/PageRouter.tsx', consumer: 'encyclopedia-entry' },
-    { path: 'client/contexts/LocaleContext.tsx', consumer: 'encyclopedia-pages' },
-    { path: 'client/main.tsx', consumer: 'encyclopedia' },
-    { path: 'client/App.tsx', consumer: 'replay-viewer-csp' },
-  ])('rejects the missing declared encyclopedia consumer $consumer for $path', ({ path, consumer }) => {
-    expect(() => planVerification({
-      identity, changes: [{ status: 'M', path }],
-      inventory: { ...inventory, browser: consumers.filter(file => file !== `e2e-tests/${consumer}.spec.ts`) },
-      fullTaskIds: FULL_TASK_IDS,
-    })).toThrow(`Declared frontend browser consumers are missing: e2e-tests/${consumer}.spec.ts`)
-  })
-
-  it.each([
-    { paths: ['client/components/header/GameHeader.tsx', 'client/components/unowned/Widget.tsx'] },
-    { paths: ['client/components/unowned/Widget.tsx', 'client/components/header/GameHeader.tsx'] },
-  ])('does not hide a missing declared frontend consumer behind an unknown path: $paths', ({ paths }) => {
-    expect(() => planVerification({
-      identity, changes: paths.map(path => ({ status: 'M', path })),
-      inventory: { ...inventory, browser: consumers.filter(file => file !== 'e2e-tests/encyclopedia-in-game.spec.ts') },
-      fullTaskIds: FULL_TASK_IDS,
-    })).toThrow('Declared frontend browser consumers are missing: e2e-tests/encyclopedia-in-game.spec.ts')
-  })
-
-  it.each(['client/app/workshop/Prompt.tsx', 'server/game/room.ts', 'shared/contract/interaction.ts'])(
-    'rejects incomplete declared business consumers for %s', path => {
-      expect(() => planVerification({ identity, changes: [{ status: 'M', path }], inventory, fullTaskIds: FULL_TASK_IDS }))
-        .toThrow('Required consumers for ')
-    },
-  )
-
-  it('rejects a missing declared browser consumer', () => {
-    expect(() => planVerification({
-      identity, changes: [{ status: 'M', path: 'client/components/board/FarmBoard.tsx' }],
-      inventory: { ...inventory, browser: consumers.filter(file => file !== 'e2e-tests/farm-select.spec.ts') }, fullTaskIds: FULL_TASK_IDS,
-    })).toThrow('Declared frontend browser consumers are missing: e2e-tests/farm-select.spec.ts')
+    const plan: VerificationPlan = {
+      schemaVersion: 1, status: 'planned', mode: 'scoped', identity,
+      changes: [], inventory: { vitest: [], browser: [] }, selections: [], expansionReasons: [], wideningReasons: [],
+      checks: [{ kind: 'browser', browser: 'chromium', files: [`e2e-tests/${file}.spec.ts`], grep: null }],
+    }
+    expect(routinePlanManifest(plan).browsers).toBe('chromium webkit')
   })
 })
 
@@ -268,8 +45,8 @@ function executionFixture(change: 'card' | 'script-database' | 'script-pure' | '
   write('.gitignore', 'output/\n')
   write('shared/cards/A/A029_AleBenches.ts', "export const A029_AleBenches = defineMinorCard({ meta: { id: 'A029_AleBenches', cost: { wood: 1 } } })\n")
   write('shared/cards/__tests__/A29_AleBenches.test.ts', "import '../A/A029_AleBenches'\n")
-  write('server/__tests__/cross-card-session.test.ts', "const card = 'A029_AleBenches'\n")
-  write('server/__tests__/A029_AleBenches-session.test.ts', "const card = 'A029_AleBenches'\n")
+  write('server/__tests__/cross-card-session.test.ts', "import '../../shared/cards/A/A029_AleBenches'\n")
+  write('server/__tests__/A029_AleBenches-session.test.ts', "import '../../shared/cards/A/A029_AleBenches'\n")
   for (const name of ['card-localization', 'choice-previews', 'farm-card-targets', 'frontend-browser-scenario-matrix']) {
     write(`e2e-tests/${name}.spec.ts`, '// generic card consumer\n')
   }

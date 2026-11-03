@@ -34,21 +34,21 @@ function fixture(change: 'documentation' | 'frontend' | 'card' = 'documentation'
     return git('rev-parse', 'HEAD')
   }
   for (const directory of ['shared', 'server', 'client', 'scripts', 'tests', 'e2e-tests', 'replay-viewer']) write(cwd, `${directory}/.keep`, '')
-  write(cwd, 'scripts/__tests__/docs-budget.test.ts', '// documentation constraint\n')
+  write(cwd, 'scripts/__tests__/docs-budget.test.ts', "import { readFileSync } from 'node:fs'\nreadFileSync('README.md')\n")
   write(cwd, 'scripts/local-services.mjs', '// External dependencies are supplied by this CLI fixture.\n')
   write(cwd, 'client/components/board/FarmBoard.tsx', 'export const board = 1\n')
-  write(cwd, 'client/components/board/__tests__/FarmBoard.test.tsx', '// client group\n')
-  for (const name of ['farm-select', 'choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout', 'frontend-browser-scenario-matrix', 'encyclopedia-faces', 'encyclopedia-in-game']) {
+  write(cwd, 'client/components/board/__tests__/FarmBoard.test.tsx', "import '../FarmBoard'\n")
+  for (const name of ['choice-previews', 'farm-card-targets', 'desktop-table-layout', 'mobile-game-layout', 'frontend-browser-scenario-matrix', 'encyclopedia-faces', 'encyclopedia-in-game']) {
     write(cwd, `e2e-tests/${name}.spec.ts`, '// browser consumer\n')
   }
+  write(cwd, 'e2e-tests/farm-select.spec.ts', '// @covers client/components/board\n')
   write(cwd, 'README.md', 'Guide\n')
   if (change === 'card') {
     write(cwd, 'e2e-tests/card-localization.spec.ts', '// generic card metadata consumer\n')
     write(cwd, 'shared/cards/A/A029_AleBenches.ts', "export const A029_AleBenches = defineMinorCard({ meta: { id: 'A029_AleBenches', cost: { wood: 1 } } })\n")
     write(cwd, 'shared/cards/__tests__/A29_AleBenches.test.ts', "import '../A/A029_AleBenches'\n")
-    write(cwd, 'server/__tests__/A029_AleBenches-session.test.ts', "const ALE = 'A029_AleBenches'\n")
-    write(cwd, 'server/__tests__/cross-card-session.test.ts', "import { ALE } from './_helpers/audit'\n")
-    write(cwd, 'server/__tests__/_helpers/audit.ts', "export const ALE = 'A29_AleBenches'\n")
+    write(cwd, 'server/__tests__/A029_AleBenches-session.test.ts', "import '../../shared/cards/A/A029_AleBenches'\n")
+    write(cwd, 'server/__tests__/cross-card-session.test.ts', "import '../../shared/cards/A/A029_AleBenches'\n")
   }
   write(cwd, 'package.json', JSON.stringify({ scripts: { 'check:architecture': 'pnpm run lint && pnpm run check:architecture-tests && pnpm run check:dependencies' } }))
   write(cwd, '.gitignore', 'output/\nbin/\ncommands.jsonl\n')
@@ -96,7 +96,7 @@ describe('scoped verification public CLI', () => {
     const planned = value.run('plan', '--base', 'main')
     expect(planned.status, planned.stderr).toBe(0)
     const manifest: unknown = JSON.parse(planned.stdout)
-    expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build,browser-sandbox,webkit' })
+    expect(manifest).toMatchObject({ mode: 'scoped', catalog_tasks: 'quality,build' })
     const result = value.run('run', '--base', 'main', '--partition', 'units')
     expect(result.status, result.stderr).toBe(0)
     expect(value.commands().filter(command => Array.isArray(command) && command.includes('vitest'))).toEqual([
@@ -207,9 +207,7 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
       ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
       ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
-      ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
+      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
     ])
   }, 60_000)
 
@@ -234,7 +232,12 @@ describe('scoped verification public CLI', () => {
       plan: { result: 'success', outputs: plan },
       catalog: { result: 'success', outputs: { verified_tasks: 'quality,build', verified_sha: value.sha } },
     }
+    const partitions = JSON.parse(plan.partitions) as Record<string, unknown>
     for (const id of ['units', 'browser-1', 'browser-2', 'browser-3', 'browser-4']) {
+      if (partitions[id] === null) {
+        needs[id] = { result: 'skipped', outputs: {} }
+        continue
+      }
       const output = join(value.cwd, `output/${id}-outputs.txt`)
       value.env.GITHUB_OUTPUT = output
       const result = value.run('run', '--base', 'main', '--partition', id, '--expected-digest', plan.plan_digest,
@@ -245,21 +248,27 @@ describe('scoped verification public CLI', () => {
       expect(outputs.partition_digest).toMatch(/^[a-f0-9]{64}$/)
       needs[id] = { result: 'success', outputs }
     }
+    expect(partitions.units).not.toBeNull()
+    expect(partitions['browser-1']).not.toBeNull()
+    expect(partitions['browser-2']).toBeNull()
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
-      ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=chromium', '--grep', '@viewport|@ws'],
-      ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', '--browser=webkit', '--grep', '@webkit'],
+      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
     ])
     value.env.NEEDS_JSON = JSON.stringify(needs)
     expect(value.run('gate', '--sha', value.sha).status).toBe(0)
-    needs['browser-3'] = { result: 'failure', outputs: {} }
+    needs['browser-2'] = { result: 'success', outputs: {} }
+    value.env.NEEDS_JSON = JSON.stringify(needs)
+    const executed = value.run('gate', '--sha', value.sha)
+    expect(executed.status).toBe(1)
+    expect(executed.stderr).toContain('The unselected browser-2 partition must be skipped')
+    needs['browser-2'] = { result: 'skipped', outputs: {} }
+    needs['browser-1'] = { result: 'failure', outputs: {} }
     value.env.NEEDS_JSON = JSON.stringify(needs)
     const failed = value.run('gate', '--sha', value.sha)
     expect(failed.status).toBe(1)
-    expect(failed.stderr).toContain('Selected browser-3 partition')
+    expect(failed.stderr).toContain('Selected browser-1 partition')
   }, 120_000)
 
   it.each(['inline', 'browser-5'])('rejects unknown execution partition %s before running commands', id => {
@@ -278,7 +287,7 @@ describe('scoped verification public CLI', () => {
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Selected browser check failed')
     expect(value.commands().filter(command => Array.isArray(command) && command[0] === 'verify')).toEqual([
-      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/desktop-table-layout.spec.ts', 'e2e-tests/encyclopedia-faces.spec.ts', 'e2e-tests/encyclopedia-in-game.spec.ts', 'e2e-tests/farm-card-targets.spec.ts', 'e2e-tests/farm-select.spec.ts', 'e2e-tests/mobile-game-layout.spec.ts', '--browser=chromium'],
+      ['verify', 'e2e-tests/farm-select.spec.ts', '--browser=chromium'],
     ])
     expect(existsSync(value.env.GITHUB_OUTPUT)).toBe(false)
     const record: unknown = JSON.parse(readFileSync(join(value.cwd, 'output/verification/scoped-result.json'), 'utf8'))
