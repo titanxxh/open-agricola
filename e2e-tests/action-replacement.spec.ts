@@ -1,3 +1,4 @@
+// @covers client/components/interaction/
 import { test, expect } from '@playwright/test'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
 

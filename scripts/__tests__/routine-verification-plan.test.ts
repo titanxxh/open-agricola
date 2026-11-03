@@ -6,6 +6,18 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { planRoutineVerification } from '../ci/routine-verification-plan'
 import { FULL_TASK_IDS } from '../ci/verification-tasks'
 
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
+const routineBrowserSmokeSet = [
+  { file: 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', grep: '@viewport' },
+  { file: 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', grep: '@webkit' },
+  { file: 'e2e-tests/hosted-password-login.spec.ts', grep: 'password session' },
+  { file: 'e2e-tests/ws-dual-player.spec.ts', grep: 'create room' },
+]
+const replayViewerSpecs = [
+  { file: 'e2e-tests/replay-viewer-csp.spec.ts', grep: null },
+  { file: 'e2e-tests/replay-viewer.spec.ts', grep: null },
+]
+
 const roots: string[] = []
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -382,7 +394,7 @@ describe('dependency routine verification plan', () => {
     ])
   })
 
-  it('widens unparseable browser evidence to the empty routine browser smoke set', () => {
+  it('widens unparseable browser evidence to the routine browser smoke set', () => {
     const root = writeTree({
       'e2e-tests/login.spec.ts': 'export const =\n',
       'shared/domain/__tests__/other.test.ts': 'export const other = 1\n',
@@ -395,7 +407,7 @@ describe('dependency routine verification plan', () => {
 
     expect(plan.fullTrigger).toBe(false)
     expect(plan.vitestFiles).toEqual([])
-    expect(plan.browserFiles).toEqual([])
+    expect(plan.browserFiles).toEqual(routineBrowserSmokeSet)
     expect(plan.warnings).toEqual([
       'e2e-tests/login.spec.ts: source file cannot be parsed; widened to the routine browser smoke set',
     ])
@@ -416,6 +428,319 @@ describe('dependency routine verification plan', () => {
     ])
     expect(plan.warnings.join('\n')).toContain('routine-plan-missing-root')
   })
+
+  it('selects a browser spec whose covers declaration matches the changed path', () => {
+    const root = writeTree({
+      'client/components/board/tile.ts': 'export const tile = 1\n',
+      'client/components/board/panel.ts': "import { tile } from './tile'\nexport const panel = tile\n",
+      'client/components/header/bar.ts': 'export const bar = 1\n',
+      'client/somewhere/marker.ts': 'export const marker = 1\n',
+      'e2e-tests/board.spec.ts': '// @covers client/components/board/\nexport const board = 1\n',
+      'e2e-tests/header.spec.ts': '// @covers client/components/header/\nexport const header = 1\n',
+      'e2e-tests/extra.spec.ts': "// @covers client/somewhere/\nimport { panel } from '../client/components/board/panel'\nexport const used = panel\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/components/board/tile.ts' }],
+    })
+    const edited = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'e2e-tests/board.spec.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([{ file: 'e2e-tests/board.spec.ts', grep: null }])
+    expect(plan.fullTrigger).toBe(false)
+    expect(edited.browserFiles).toEqual([{ file: 'e2e-tests/board.spec.ts', grep: null }])
+  })
+
+  it('warns about a covers prefix that matches no file and does not widen selection', () => {
+    const root = writeTree({
+      'client/components/board/tile.ts': 'export const tile = 1\n',
+      'e2e-tests/board.spec.ts': '// @covers client/components/board/\n// @covers client/missing/\nexport const board = 1\n',
+      'e2e-tests/wide.spec.ts': 'export const wide = 1\n',
+      'e2e-tests/filler.spec.ts': 'export const filler = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/components/board/tile.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([{ file: 'e2e-tests/board.spec.ts', grep: null }])
+    expect(plan.warnings).toEqual([
+      "e2e-tests/board.spec.ts: @covers prefix 'client/missing/' matches no file",
+    ])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('selects a spec with no covers declaration only when it changes or directly imports the changed file', () => {
+    const root = writeTree({
+      'client/board/tile.ts': 'export const tile = 1\nexport type Tile = number\n',
+      'client/board/other.ts': 'export const other = 1\n',
+      'e2e-tests/direct.spec.ts': "import { tile } from '../client/board/tile'\nexport const used = tile\n",
+      'e2e-tests/typed.spec.ts': "import type { Tile } from '../client/board/tile'\nexport const marker: Tile = 1\n",
+      'e2e-tests/plain.spec.ts': 'export const plain = 1\n',
+    })
+
+    const imported = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/board/tile.ts' }],
+    })
+    const self = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'e2e-tests/plain.spec.ts' }],
+    })
+    const untouched = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/board/other.ts' }],
+    })
+
+    expect(imported.browserFiles).toEqual([{ file: 'e2e-tests/direct.spec.ts', grep: null }])
+    expect(imported.warnings).toEqual([])
+    expect(self.browserFiles).toEqual([{ file: 'e2e-tests/plain.spec.ts', grep: null }])
+    expect(untouched.browserFiles).toEqual([])
+    expect(untouched.warnings).toEqual([])
+  })
+
+  it('does not select a spec that imports the changed file only through a shared test helper', () => {
+    const root = writeTree({
+      'client/board/tile.ts': 'export const tile = 1\n',
+      'e2e-tests/helpers/board.ts': "import { tile } from '../../client/board/tile'\nexport const used = tile\n",
+      'e2e-tests/board.spec.ts': "import { used } from './helpers/board'\nexport const spec = used\n",
+      'e2e-tests/direct.spec.ts': "import { tile } from '../client/board/tile'\nexport const used = tile\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/board/tile.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([{ file: 'e2e-tests/direct.spec.ts', grep: null }])
+  })
+
+  it('stops the importer walk at the first file with a covers declaration', () => {
+    const root = writeTree({
+      'client/feature/widget.ts': 'export const widget = 1\n',
+      'client/feature/panel.ts': "import { widget } from './widget'\nexport const panel = widget\n",
+      'client/unrelated/marker.ts': 'export const marker = 1\n',
+      'client/also-unrelated/marker.ts': 'export const marker = 1\n',
+      'e2e-tests/near.spec.ts': "// @covers client/unrelated/\nimport { panel } from '../client/feature/panel'\nexport const used = panel\n",
+      'e2e-tests/far.spec.ts': "// @covers client/also-unrelated/\nimport { used } from './near.spec'\nexport const far = used\n",
+      'e2e-tests/filler.spec.ts': 'export const filler = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/feature/widget.ts' }],
+    })
+    const throughNear = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'e2e-tests/near.spec.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([{ file: 'e2e-tests/near.spec.ts', grep: null }])
+    expect(throughNear.browserFiles).toEqual([
+      { file: 'e2e-tests/far.spec.ts', grep: null },
+      { file: 'e2e-tests/near.spec.ts', grep: null },
+    ])
+  })
+
+  it('uses the routine browser smoke set when the walk reaches the main app entry or the matched specs exceed one third', () => {
+    const mainRoot = writeTree({
+      'client/feature/widget.ts': 'export const widget = 1\n',
+      'client/app/shell.ts': "import { widget } from '../feature/widget'\nexport const shell = widget\n",
+      'client/main.tsx': "import { shell } from './app/shell'\nexport const main = shell\n",
+      'client/unrelated/marker.ts': 'export const marker = 1\n',
+      'e2e-tests/app.spec.ts': "// @covers client/unrelated/\nimport { main } from '../client/main'\nexport const used = main\n",
+      'e2e-tests/filler.spec.ts': 'export const filler = 1\n',
+      'e2e-tests/filler-b.spec.ts': 'export const filler = 1\n',
+    })
+    const thirdRoot = writeTree({
+      'client/components/board/tile.ts': 'export const tile = 1\n',
+      'client/components/header/bar.ts': 'export const bar = 1\n',
+      'e2e-tests/a.spec.ts': '// @covers client/components/board/\nexport const a = 1\n',
+      'e2e-tests/b.spec.ts': '// @covers client/components/board/\nexport const b = 1\n',
+      'e2e-tests/c.spec.ts': '// @covers client/components/header/\nexport const c = 1\n',
+    })
+    const walkRoot = writeTree({
+      'client/feature/widget.ts': 'export const widget = 1\n',
+      'client/a/marker.ts': 'export const marker = 1\n',
+      'client/b/marker.ts': 'export const marker = 1\n',
+      'client/c/marker.ts': 'export const marker = 1\n',
+      'e2e-tests/walk-a.spec.ts': "// @covers client/a/\nimport { widget } from '../client/feature/widget'\nexport const used = widget\n",
+      'e2e-tests/walk-b.spec.ts': "// @covers client/b/\nimport { widget } from '../client/feature/widget'\nexport const used = widget\n",
+      'e2e-tests/walk-c.spec.ts': "// @covers client/c/\nimport { widget } from '../client/feature/widget'\nexport const used = widget\n",
+    })
+    const durations = JSON.parse(readFileSync(fileURLToPath(new URL('../ci/verification-durations.json', import.meta.url)), 'utf8')) as Record<string, number>
+
+    const main = planRoutineVerification({
+      root: mainRoot,
+      changes: [{ status: 'M', path: 'client/feature/widget.ts' }],
+    })
+    const broad = planRoutineVerification({
+      root: thirdRoot,
+      changes: [{ status: 'M', path: 'client/components/board/tile.ts' }],
+    })
+    const narrow = planRoutineVerification({
+      root: thirdRoot,
+      changes: [{ status: 'M', path: 'client/components/header/bar.ts' }],
+    })
+    const walked = planRoutineVerification({
+      root: walkRoot,
+      changes: [{ status: 'M', path: 'client/feature/widget.ts' }],
+    })
+
+    expect(main.browserFiles).toEqual(routineBrowserSmokeSet)
+    expect(main.browserFiles.length).toBeLessThanOrEqual(5)
+    const smokeFiles = [...new Set(main.browserFiles.map(entry => entry.file))]
+    const smokeDuration = smokeFiles.reduce((total, file) => total + durations[file], 0)
+    expect(smokeDuration).toBeGreaterThanOrEqual(90_000)
+    expect(smokeDuration).toBeLessThanOrEqual(150_000)
+    for (const entry of main.browserFiles) {
+      expect(entry.grep).toEqual(expect.any(String))
+      const source = readFileSync(fileURLToPath(new URL(`../../${entry.file}`, import.meta.url)), 'utf8')
+      expect(source).toContain(entry.grep)
+      if (durations[entry.file] >= 30_000) {
+        const headings = source.split('\n').filter(line => /^\s*test(?:\.describe)?\(/.test(line))
+        expect(headings.some(line => !line.includes(entry.grep ?? ''))).toBe(true)
+      }
+    }
+    expect(broad.browserFiles).toEqual(routineBrowserSmokeSet)
+    expect(narrow.browserFiles).toEqual([{ file: 'e2e-tests/c.spec.ts', grep: null }])
+    expect(walked.browserFiles).toEqual(routineBrowserSmokeSet)
+  })
+
+  it('selects the replay viewer specs when the walk reaches the replay viewer entry', () => {
+    const root = writeTree({
+      'replay-viewer/src/pane.ts': 'export const pane = 1\n',
+      'replay-viewer/src/main.tsx': "import { pane } from './pane'\nexport const main = pane\n",
+      'e2e-tests/other.spec.ts': 'export const other = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'replay-viewer/src/pane.ts' }],
+    })
+    const entry = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'replay-viewer/src/main.tsx' }],
+    })
+
+    expect(plan.browserFiles).toEqual(replayViewerSpecs)
+    expect(entry.browserFiles).toEqual(replayViewerSpecs)
+  })
+
+  it('keeps walking past the sandbox app until it finds a covers declaration', () => {
+    const root = writeTree({
+      'client/feature/widget.ts': 'export const widget = 1\n',
+      'client/sandbox/SandboxApp.tsx': "import { widget } from '../feature/widget'\nexport const sandbox = widget\n",
+      'client/shell/app.ts': "import { sandbox } from '../sandbox/SandboxApp'\nexport const app = sandbox\n",
+      'client/shell/marker.ts': 'export const marker = 1\n',
+      'e2e-tests/shell.spec.ts': "// @covers client/shell/\nimport { app } from '../client/shell/app'\nexport const used = app\n",
+      'e2e-tests/filler.spec.ts': 'export const filler = 1\n',
+      'e2e-tests/filler-b.spec.ts': 'export const filler = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'client/feature/widget.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([{ file: 'e2e-tests/shell.spec.ts', grep: null }])
+  })
+
+  it('selects both the smoke set and the replay viewer specs when the walk reaches both entries', () => {
+    const root = writeTree({
+      'shared/util/value.ts': 'export const value = 1\n',
+      'client/app/shell.ts': "import { value } from '../../shared/util/value'\nexport const shell = value\n",
+      'client/main.tsx': "import { shell } from './app/shell'\nexport const main = shell\n",
+      'replay-viewer/src/app.ts': "import { value } from '../../shared/util/value'\nexport const app = value\n",
+      'replay-viewer/src/main.tsx': "import { app } from './app'\nexport const main = app\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'M', path: 'shared/util/value.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([
+      { file: 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', grep: '@viewport' },
+      { file: 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', grep: '@webkit' },
+      { file: 'e2e-tests/hosted-password-login.spec.ts', grep: 'password session' },
+      { file: 'e2e-tests/replay-viewer-csp.spec.ts', grep: null },
+      { file: 'e2e-tests/replay-viewer.spec.ts', grep: null },
+      { file: 'e2e-tests/ws-dual-player.spec.ts', grep: 'create room' },
+    ])
+  })
+
+  it('selects no browser spec for a new file that nothing imports', () => {
+    const root = writeTree({
+      'client/feature/new-widget.ts': 'export const widget = 1\n',
+      'client/components/board/tile.ts': 'export const tile = 1\n',
+      'e2e-tests/board.spec.ts': '// @covers client/components/board/\nexport const board = 1\n',
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'A', path: 'client/feature/new-widget.ts' }],
+    })
+
+    expect(plan.browserFiles).toEqual([])
+    expect(plan.warnings).toEqual([])
+    expect(plan.fullTrigger).toBe(false)
+  })
+
+  it('selects repository browser evidence from covers, entries, and the smoke set', () => {
+    const board = [
+      'e2e-tests/a040-clay-positions.spec.ts',
+      'e2e-tests/action-log-source.spec.ts',
+      'e2e-tests/action-space-icons.spec.ts',
+      'e2e-tests/action-space-use.spec.ts',
+      'e2e-tests/apiary-sow-budget.spec.ts',
+      'e2e-tests/card-cost-icons.spec.ts',
+      'e2e-tests/card-state-presentation.spec.ts',
+      'e2e-tests/crop-scoring.spec.ts',
+      'e2e-tests/encyclopedia-in-game.spec.ts',
+      'e2e-tests/expansion-display.spec.ts',
+      'e2e-tests/farm-card-targets.spec.ts',
+      'e2e-tests/farm-interaction-focus.spec.ts',
+      'e2e-tests/farm-select.spec.ts',
+      'e2e-tests/frontend-browser-scenario-matrix.spec.ts',
+      'e2e-tests/garden-path-marker.spec.ts',
+      'e2e-tests/grain-distillery-scoring.spec.ts',
+      'e2e-tests/hotseat-public-farms.spec.ts',
+      'e2e-tests/issue1201-lover-settlement.spec.ts',
+      'e2e-tests/mobile-scoring-pad.spec.ts',
+      'e2e-tests/played-card-chronology.spec.ts',
+      'e2e-tests/room-animal-holders.spec.ts',
+      'e2e-tests/seasons-worker-icons.spec.ts',
+      'e2e-tests/source-aware-scoring.spec.ts',
+      'e2e-tests/special-actions-localization.spec.ts',
+      'e2e-tests/visual-support-regression.spec.ts',
+      'scripts/test-actions.spec.ts',
+    ].map(file => ({ file, grep: null }))
+    const farm = planRoutineVerification({
+      root: repoRoot,
+      changes: [{ status: 'M', path: 'client/components/board/FarmBoard.tsx' }],
+    })
+    const main = planRoutineVerification({
+      root: repoRoot,
+      changes: [{ status: 'M', path: 'client/main.tsx' }],
+    })
+    const replay = planRoutineVerification({
+      root: repoRoot,
+      changes: [{ status: 'M', path: 'replay-viewer/src/main.tsx' }],
+    })
+
+    expect(farm.fullTrigger).toBe(false)
+    expect(farm.warnings.filter(warning => warning.includes('@covers'))).toEqual([])
+    expect(farm.browserFiles).toEqual(board)
+    expect(main.fullTrigger).toBe(false)
+    expect(main.browserFiles).toEqual(routineBrowserSmokeSet)
+    expect(replay.fullTrigger).toBe(false)
+    expect(replay.browserFiles).toEqual(replayViewerSpecs)
+  }, 60_000)
 
   it('keeps CI on the existing verification plan', () => {
     const source = readFileSync(fileURLToPath(new URL('../ci/scoped-verification.ts', import.meta.url)), 'utf8')

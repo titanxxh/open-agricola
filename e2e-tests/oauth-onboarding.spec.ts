@@ -1,3 +1,5 @@
+// @covers server/oauth/
+// @covers client/contexts/
 import { expect, devices, type BrowserContext, type Request } from '@playwright/test'
 import { createServer } from 'node:https'
 import { createServer as createHttpServer } from 'node:http'

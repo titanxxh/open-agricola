@@ -1,3 +1,5 @@
+// @covers client/app/workshop/
+// @covers client/services/llm/
 import { createHash } from 'node:crypto'
 import { expect, type Route } from '@playwright/test'
 import { test } from './server-fixtures'

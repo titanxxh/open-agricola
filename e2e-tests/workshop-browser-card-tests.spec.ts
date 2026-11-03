@@ -1,3 +1,5 @@
+// @covers client/local-sandbox/
+// @covers client/sandbox/
 import { createHash } from 'node:crypto'
 import { test, expect, chromium, webkit, type Page } from '@playwright/test'
 import { source, passingTests, choiceSource, choiceTests, handshakeTests, infiniteTests, isolationTests } from './fixtures/browser-card-tests.ts'

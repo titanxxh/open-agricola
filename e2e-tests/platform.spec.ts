@@ -1,3 +1,4 @@
+// @covers client/styles/pages/
 import { test, expect, type APIRequestContext, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 

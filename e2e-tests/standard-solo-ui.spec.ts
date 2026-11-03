@@ -1,3 +1,4 @@
+// @covers client/app/solo/
 import { expect, test, type APIRequestContext, type APIResponse, type BrowserContext, type Page } from '@playwright/test'
 import type { StateUpdateEnvelope } from '../shared/contract/protocol/game'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'

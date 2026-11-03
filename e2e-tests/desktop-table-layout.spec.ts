@@ -1,3 +1,4 @@
+// @covers client/styles/pages/
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'

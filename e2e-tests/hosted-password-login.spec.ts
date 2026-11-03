@@ -1,3 +1,5 @@
+// @covers shared/contract/protocol/
+// @covers client/contexts/
 import { expect, devices, type BrowserContext, type Page, type PlaywrightWorkerArgs, type Request } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'

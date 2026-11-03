@@ -1,3 +1,4 @@
+// @covers shared/cards/D/
 import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'

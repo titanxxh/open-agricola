@@ -1,3 +1,4 @@
+// @covers client/components/interaction/
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { BACKEND_URL } from './fixtures'

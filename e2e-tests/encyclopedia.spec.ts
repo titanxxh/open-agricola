@@ -1,3 +1,4 @@
+// @covers client/app/encyclopedia/
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { FRONTEND_URL } from './fixtures'

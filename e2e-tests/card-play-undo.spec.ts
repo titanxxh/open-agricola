@@ -1,3 +1,5 @@
+// @covers client/components/interaction/
+// @covers shared/cards/major/
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import type { GameState, Resource } from '../shared/contract/types'
 import { createInitialState } from '../shared/session/state-bootstrap'

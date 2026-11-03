@@ -1,3 +1,4 @@
+// @covers client/contexts/
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 

@@ -1,3 +1,4 @@
+// @covers scripts/release/
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { expect } from '@playwright/test'

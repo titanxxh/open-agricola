@@ -1,3 +1,5 @@
+// @covers operations/grafana/
+// @covers server/observability/
 import { expect, test, type Request } from '@playwright/test'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'

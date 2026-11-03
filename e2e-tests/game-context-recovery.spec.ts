@@ -1,3 +1,5 @@
+// @covers server/game/persistence/
+// @covers client/hooks/
 import {
   expect,
   test,

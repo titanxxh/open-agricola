@@ -1,3 +1,4 @@
+// @covers shared/seasons/
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL } from './fixtures'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'

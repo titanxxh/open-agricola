@@ -1,3 +1,4 @@
+// @covers client/app/encyclopedia/
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import {
   animationsSettled, CATALOG, detail, entryUrl, expectNoHorizontalOverflow, LAYOUTS, newVisitor,

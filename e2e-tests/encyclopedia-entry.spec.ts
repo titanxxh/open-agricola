@@ -1,3 +1,4 @@
+// @covers client/app/encyclopedia/
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import {
   CATALOG, detail, expectCatalog, expectNoHorizontalOverflow, filterOption, filterPanel, filterSidebar,

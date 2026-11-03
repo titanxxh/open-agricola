@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { dirname, relative, resolve } from 'node:path'
 import ts from 'typescript'
-import { parseSource, walkSourceFiles } from '../source-files'
+import { parseSource, sourceExtensions, walkSourceFiles } from '../source-files'
 
 export const CARD_REGISTRIES = [
   'shared/cards/register-all.ts',
@@ -145,7 +145,7 @@ export function readImportGraph(root: string): ImportGraph {
     values.add(value)
     literals.set(from, values)
   }
-  for (const absolute of walkSourceFiles(root)) {
+  for (const absolute of walkSourceFiles(root, sourceExtensions, true, 'skip-non-source')) {
     const from = normalize(relative(root, absolute))
     let source: ts.SourceFile
     try {

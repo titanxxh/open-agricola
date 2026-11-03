@@ -1,3 +1,4 @@
+// @covers client/app/workshop/
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { test, expect } from '@playwright/test'
 

@@ -1,3 +1,4 @@
+// @covers client/components/board/
 import { expect, test } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { BACKEND_URL, getJson, postJson } from './fixtures'

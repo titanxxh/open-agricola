@@ -1,3 +1,4 @@
+// @covers client/components/interaction/
 import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 
 const openEnglishPage = async (page: Page, url: string) => {

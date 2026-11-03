@@ -1,3 +1,5 @@
+// @covers server/game/persistence/
+// @covers client/hooks/
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'

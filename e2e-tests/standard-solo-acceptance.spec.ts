@@ -1,3 +1,4 @@
+// @covers client/app/solo/
 import { expect, test } from '@playwright/test'
 import { authenticateSolo, recordSoloEvidence, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
 import { BACKEND_URL } from './fixtures'

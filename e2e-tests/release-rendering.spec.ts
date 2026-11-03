@@ -1,3 +1,4 @@
+// @covers scripts/release/
 import { createServer } from 'node:http'
 import { expect, test } from '@playwright/test'
 import { verifyVisibleReleaseAssets } from '../scripts/release/render'

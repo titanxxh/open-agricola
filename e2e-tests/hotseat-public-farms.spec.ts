@@ -1,3 +1,4 @@
+// @covers client/components/board/
 import { expect, test, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'

@@ -1,3 +1,4 @@
+// @covers client/app/encyclopedia/
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

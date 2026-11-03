@@ -1,3 +1,4 @@
+// @covers scripts/release/
 import { expect, test } from '@playwright/test'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'

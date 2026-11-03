@@ -5,13 +5,21 @@ import ts from 'typescript'
 export const sourceExtensions = /\.[cm]?[jt]sx?$/
 const ignoredDirectories = new Set(['node_modules', '.git', '.worktree', 'dist', '.build', 'coverage', 'playwright-report', 'test-results'])
 
-export function walkSourceFiles(directory: string, extensions = sourceExtensions, recursive = true): string[] {
+export function walkSourceFiles(
+  directory: string,
+  extensions = sourceExtensions,
+  recursive = true,
+  symlink: 'reject' | 'skip-non-source' = 'reject',
+): string[] {
   if (fs.lstatSync(directory).isSymbolicLink()) throw new Error(`source symlink requires explicit ownership: ${directory}`)
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     if (ignoredDirectories.has(entry.name)) return []
     const file = path.join(directory, entry.name)
-    if (entry.isDirectory()) return recursive ? walkSourceFiles(file, extensions) : []
-    if (entry.isSymbolicLink()) throw new Error(`source symlink requires explicit ownership: ${file}`)
+    if (entry.isDirectory()) return recursive ? walkSourceFiles(file, extensions, recursive, symlink) : []
+    if (entry.isSymbolicLink()) {
+      if (symlink === 'skip-non-source' && !extensions.test(entry.name)) return []
+      throw new Error(`source symlink requires explicit ownership: ${file}`)
+    }
     if (!entry.isFile()) throw new Error(`unsupported source entry: ${file}`)
     return extensions.test(entry.name) ? [file] : []
   }).sort()

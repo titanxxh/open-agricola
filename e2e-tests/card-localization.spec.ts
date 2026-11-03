@@ -1,3 +1,4 @@
+// @covers client/contexts/
 import { expect, test } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
