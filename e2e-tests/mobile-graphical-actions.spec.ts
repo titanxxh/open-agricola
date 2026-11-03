@@ -1,3 +1,4 @@
+// @covers client/components/interaction/
 import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 import { FRONTEND_URL } from './fixtures'
 

@@ -1,3 +1,4 @@
+// @covers replay-viewer/src/
 import { expect, test } from '@playwright/test'
 
 const backend = process.env.BACKEND_URL ?? 'http://localhost:5175'

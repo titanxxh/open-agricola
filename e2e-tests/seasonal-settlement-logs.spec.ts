@@ -1,3 +1,4 @@
+// @covers shared/seasons/
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
 import type { GameState } from '../shared/contract/types'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'

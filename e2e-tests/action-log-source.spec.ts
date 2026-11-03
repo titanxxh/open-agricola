@@ -1,3 +1,4 @@
+// @covers client/components/board/
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ReplaySegment } from '../shared/contract/protocol/replay'

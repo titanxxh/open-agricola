@@ -1,3 +1,4 @@
+// @covers client/components/interaction/
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { serializeState } from '../shared/session/serialization'

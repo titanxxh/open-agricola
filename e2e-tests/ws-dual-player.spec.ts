@@ -1,3 +1,5 @@
+// @covers client/components/header/
+// @covers server/connection/
 import {
   test,
   expect,

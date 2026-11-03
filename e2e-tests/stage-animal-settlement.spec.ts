@@ -1,3 +1,4 @@
+// @covers shared/seasons/
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
 

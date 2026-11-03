@@ -1,3 +1,4 @@
+// @covers client/components/board/
 import { test, expect, type Page } from '@playwright/test';
 import { giveResource, advanceRound, BACKEND_URL, getJson, postJson } from './fixtures';
 

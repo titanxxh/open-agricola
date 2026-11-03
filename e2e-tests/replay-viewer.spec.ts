@@ -1,3 +1,4 @@
+// @covers replay-viewer/src/
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type APIRequestContext } from '@playwright/test'
 

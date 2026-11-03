@@ -1,3 +1,5 @@
+// @covers server/oauth/
+// @covers client/contexts/
 import { expect } from '@playwright/test'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'

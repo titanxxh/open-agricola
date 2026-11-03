@@ -1,3 +1,4 @@
+// @covers client/styles/pages/
 import { expect, test } from '@playwright/test'
 import type { MyActiveRoom } from '../shared/contract/lobby'
 

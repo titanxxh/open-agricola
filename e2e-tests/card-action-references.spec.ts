@@ -1,3 +1,4 @@
+// @covers client/app/encyclopedia/
 import { expect, test, type Page } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
 

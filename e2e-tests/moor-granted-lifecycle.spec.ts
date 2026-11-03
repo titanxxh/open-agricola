@@ -1,3 +1,4 @@
+// @covers shared/moor/
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { setWorkersAtHome } from '../shared/domain/player'

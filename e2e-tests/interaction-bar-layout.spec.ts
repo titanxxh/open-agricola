@@ -1,3 +1,5 @@
+// @covers client/components/interaction/
+// @covers client/styles/pages/
 import { expect, test, type Page } from '@playwright/test'
 
 const bottomGap = async (page: Page) => {

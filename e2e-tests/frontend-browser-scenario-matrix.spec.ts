@@ -1,3 +1,5 @@
+// @covers client/components/board/
+// @covers client/components/interaction/
 import {
   devices,
   expect,

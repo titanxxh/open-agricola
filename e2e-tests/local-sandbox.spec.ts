@@ -1,3 +1,5 @@
+// @covers client/local-sandbox/
+// @covers client/sandbox/
 import { test, expect, type Page } from '@playwright/test'
 
 // Browser-local workshop sandbox (VITE_SANDBOX_EXECUTOR=browser). The engine

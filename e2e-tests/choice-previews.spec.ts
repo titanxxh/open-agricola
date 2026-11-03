@@ -1,3 +1,4 @@
+// @covers client/components/interaction/
 import { expect, test } from '@playwright/test'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import type { SessionResponse } from '../server/game/authoritative-session'

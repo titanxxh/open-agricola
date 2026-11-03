@@ -1,3 +1,4 @@
+// @covers client/app/encyclopedia/
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { CATALOG, expectCatalog as expectCatalogPage, galleryEntries, galleryNames, LAYOUTS, newVisitor } from './helpers/encyclopedia'
 

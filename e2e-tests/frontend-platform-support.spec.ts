@@ -1,3 +1,4 @@
+// @covers client/styles/pages/
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 

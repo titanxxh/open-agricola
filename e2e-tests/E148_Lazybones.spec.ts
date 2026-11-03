@@ -1,3 +1,4 @@
+// @covers shared/cards/E/
 import { expect, test } from '@playwright/test'
 import type { SerializedGameState } from '../shared/session/serialization'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'

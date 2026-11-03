@@ -1,3 +1,4 @@
+// @covers client/styles/pages/
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { LOCAL_PUBLIC_ASSET_BASE_URL, publicAssetBaseUrl } from '../scripts/public-assets'

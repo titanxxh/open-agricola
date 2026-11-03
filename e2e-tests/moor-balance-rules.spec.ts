@@ -1,3 +1,4 @@
+// @covers shared/moor/
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { FRONTEND_URL } from './fixtures'
 import { authenticateSolo, recordSoloEvidence, SoloBrowserDriver } from './helpers/standard-solo-acceptance'

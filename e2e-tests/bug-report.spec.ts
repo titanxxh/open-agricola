@@ -1,3 +1,4 @@
+// @covers server/bug-report/
 import {
   expect,
   test,

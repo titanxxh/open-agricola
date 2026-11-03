@@ -1,3 +1,4 @@
+// @covers server/connection/
 import { expect, test, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import { serializeState } from '../shared/session/serialization'

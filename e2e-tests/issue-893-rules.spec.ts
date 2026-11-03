@@ -1,3 +1,4 @@
+// @covers shared/contract/protocol/
 import { expect, test, type Page, type APIResponse } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import type { ServerEvent } from '../shared/contract/protocol/ws'

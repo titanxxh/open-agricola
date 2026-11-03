@@ -1,3 +1,5 @@
+// @covers client/app/draft/
+// @covers client/components/header/
 import { expect, test, type BrowserContext } from '@playwright/test'
 import { authenticateSolo, SoloBrowserDriver } from './helpers/standard-solo-acceptance'
 import { FRONTEND_URL } from './fixtures'

@@ -1,3 +1,5 @@
+// @covers shared/cards/A/
+// @covers client/components/board/
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { ServerEvent } from '../shared/contract/protocol/ws'

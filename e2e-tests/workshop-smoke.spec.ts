@@ -1,3 +1,4 @@
+// @covers client/app/workshop/
 import { test, expect } from '@playwright/test'
 
 /**

@@ -1,3 +1,4 @@
+// @covers client/styles/pages/
 import { expect, test } from '@playwright/test'
 import { BACKEND_URL, FRONTEND_URL, openGameEndControls } from './fixtures'
 import { authenticateSolo } from './helpers/standard-solo-acceptance'

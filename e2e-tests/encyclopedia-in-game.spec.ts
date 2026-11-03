@@ -1,3 +1,5 @@
+// @covers client/app/encyclopedia/
+// @covers client/components/board/
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
 import { createOpeningSession, createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import type { GameState } from '../shared/contract/types'

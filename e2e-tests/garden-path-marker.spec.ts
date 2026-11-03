@@ -1,3 +1,4 @@
+// @covers client/components/board/
 import assert from 'node:assert/strict'
 import { expect, test } from '@playwright/test'
 import type { GameSession } from '../server/game/authoritative-session'
