@@ -1,11 +1,9 @@
 # 37. Scope routine verification and gate releases
 
-- Status: Implemented
-- Date: 2026-10-30
+- Status: Accepted
+- Date: 2026-10-30, revised 2026-11-02
 
-Routine changes use verification selected for their affected scope. Changes to shared mechanisms require the complete affected subsystem's tests before integration. When the impact cannot be bounded, verification expands to the whole repository. This replaces the requirement to run every test for every routine change.
-
-The initial selection unit is a complete test file or a business test group. Cards have explicit test associations. UI changes select the relevant module's tests, and shared mechanisms select complete affected groups. Each pull request exposes the selected scope and the reasons for that selection. Unknown ownership expands verification.
+Routine changes run verification selected from their dependency evidence instead of every test. Selection is best effort: incomplete evidence widens it to a bounded layer, and only a short list of repository-wide inputs selects full verification. Full release-candidate verification is the only completeness guarantee. Each pull request exposes the selected tests and the reasons for that selection.
 
 Full verification is required for a release candidate. The standard release and frontend and backend deployment entry points must check successful full-verification evidence for the exact candidate commit before publication or deployment. Establish this machine gate before reducing the current routine checks.
 
@@ -23,70 +21,26 @@ Full verification covers the union of the former CI, CI Full, and E2E checks: fa
 
 Successful results may be combined across compatible runs for the same candidate commit and verification configuration. Retry failed tasks without repeating other successful tasks. Every required task must actually succeed. Missing, failed, cancelled, or skipped required tasks do not establish a successful release result.
 
-Do not add scheduled full-verification runs. This saves routine execution at the cost of later discovery: a regression outside the selected scope may remain undetected until release-candidate verification. Shared-mechanism changes and unknown impact still require the broader checks described above.
+Do not add scheduled full-verification runs. This saves routine execution at the cost of later discovery: a regression outside the selected tests may remain undetected until release-candidate verification.
 
 The scope planner, always-running `verify` gate, canonical candidate catalog, and release/deployment gates implement this policy. The former automatic CI Full, E2E, and duplicate scope-preview workflows are retired. Commands and evidence requirements are in [CI checks operations](../operations/ci-checks.md).
 
-## Precision refinement, 2026-10-31
+## Routine selection
 
-Status: accepted on 2026-10-31, including the user's extension to shared rule subsystems. The following records the investigation and implementation contract; remote latency targets require measurement after delivery.
+Path-ownership rules left most changes without narrow evidence. After the 2026-10-31 rules, five of the next six merged PRs still ran the complete catalog because a single new, unlisted or global path fell back to full verification. Development latency outweighs routine completeness, because release-candidate verification already catches what routine selection misses.
 
-### Observed problem
+- **Unit of selection.** Select complete Vitest files and Playwright spec files, optionally with an existing tag filter, and keep both runners. Individual test cases, coverage instrumentation, and historical coverage maps are not used.
+- **Dependency evidence.** Each plan computes a repository-wide static import graph from the head tree, including CSS imports, literal dynamic imports, and a literal `new URL(..., import.meta.url)` that resolves to a source module. A changed file selects every test that depends on it transitively, so new modules, tests, and specs take part without registration. A type-only edge selects no test. Traversal stops at the four generated card registries and does not continue into their importers: `shared/cards/register-all.ts`, `shared/cards/catalog.generated.ts`, `shared/cards/major/generated.ts`, and `shared/cards/major/runtime.generated.ts`. A change on that side of the cut selects the tests that reach the changed module without crossing a registry, the tests that literally name its registry key, and the tests that import one of the four registries directly. Mechanism aggregators, including `shared/actions/internal-actions.ts` and `shared/actions/index.ts`, are ordinary graph nodes. The former card-safety set, rule-safety set, and rule browser set are not added.
+- **Reads and generated files.** A non-code file or generated artifact selects only the tests that read it directly and the direct tests of a production module that reads it, not that module's transitive dependents. One short list ties generated outputs to their inputs: language packs from `i18n.ref`, and the cards manifest, encyclopedia, and action references from the card sources. A filesystem read matches when the source contains the changed path, a directory prefix, or a glob literal, including a literal `new URL(..., import.meta.url)` that resolves to some other repository path. A read with no such literal is incomplete evidence.
+- **Browser evidence.** An import from a spec to source counts only when it is direct, not when it passes through a shared test helper. A spec declares the path prefixes it covers with a leading `// @covers` comment. A declaration names directories that spec exercises and does not name a whole layer such as `shared/`. A prefix that matches nothing warns and is ignored. A changed file selects specs whose declaration matches. Otherwise the plan walks importers and stops at the first file with a declaration. The walk uses the routine browser smoke set when it reaches `client/main.tsx`, or the matched specs exceed one third of all specs. Reaching `replay-viewer/src/main.tsx` selects `e2e-tests/replay-viewer.spec.ts` and `e2e-tests/replay-viewer-csp.spec.ts` instead of that smoke set. `client/sandbox/SandboxApp.tsx` is not an entry, so the walk continues. A file that reaches both entries selects both results. A file imported by nothing selects no spec. A spec that declares nothing is not incomplete evidence. The smoke-set list lives with the planner, so changing it is a full trigger.
+- **Bounded widening.** An unresolved import, a source file that cannot be parsed, or a filesystem read with no matchable literal adds a warning and widens the affected selection to its Vitest project or the routine browser smoke set. Widening never fails planning and never selects the complete catalog.
+- **Full triggers.** Only dependency and workspace manifests, root test and build configuration, CI workflows, and the verification planner and gate select the complete catalog. Every other file selects through the rules above.
+- **Always-on tasks.** A change that is not documentation-only also selects the quality and build catalog tasks. A documentation-only change selects only the tests that read those documents.
+- **Failures.** A planner exception selects the complete catalog and reports the error. `verify` fails only for a failing selected test, a missing or skipped selected task, or execution evidence that differs from the plan.
+- **Execution.** Vitest selection runs in at most three duration-balanced jobs, `units-1`, `units-2`, and `units-3`. Unused slots are skipped. Browser work stays in `browser-1` through `browser-4` and is packed into those slots by the same duration table. `verify` stays the only required check and still checks partition identity and execution evidence. Each browser partition prepares language packs, the cards manifest, the encyclopedia, and action references once, and starts the app and its services once. It builds the hosted frontend, without a separate typecheck, only when a selected spec depends on that build. Routine browser runs retry once; a test that passes only on retry is named in that partition's job summary, counts as flaky, and still passes. Release-candidate browser runs do not retry.
+- **Routine browser smoke set.** At most five file-and-grep entries, taking about two minutes, covering login, a two-player WebSocket game that builds a room, one game screen, and the WebKit scenario matrix. The entries are chosen from the duration table and do not run an entire long spec.
+- **Latency targets.** Measured from a push to the `verify` conclusion, excluding GitHub queueing and manual retries: 8 minutes for a single-area change and 12 minutes for a cross-module change. These targets require hosted measurement. A full trigger takes the complete catalog's duration.
+- **Catalog balance.** The complete catalog keeps its task IDs and coverage. Its Chromium shards, the routine Vitest jobs, and the four routine browser partitions balance by a duration table committed with the planner. A Vitest file without a measurement uses its project median. A browser spec without a measurement uses the median of the measured specs. Changing the table is a planner change, so it is a full trigger.
+- **Local reuse.** `pnpm verify affected` compares `HEAD` with its merge-base against `origin/main`, plus staged, unstaged, and untracked files that are not gitignored. It runs the plan's Vitest selection locally and prints the browser selection unless asked to run it. A full trigger prints the reason and does not launch the complete catalog locally.
 
-The review used main `92efb51e2259caa44683fbbda072f40b2bab8668` and the retained plans and jobs for PRs #1534, #1540, #1541 and #1537. All four final PR plans selected the complete ten-task catalog. The final successful runs for #1540, #1541 and #1537 took 16m19s, 16m42s and 17m14s respectively. These are different changes, not a controlled performance comparison.
-
-The previous planner classified changed browser tests but had no browser selection branch, so they requested full verification. It treated every expansion reason as a repository-wide requirement. Global path rules also captured all scripts, test helpers and fixtures before business ownership could apply. The frontend declaration omitted the game container, header and end-game controls. Architecture documentation, including Chinese mirrors that the Workshop reference reader rejects, selected the complete Workshop/rule group. These paths combined during ordinary code, test and documentation updates.
-
-In [PR #1540's final run](https://github.com/titanxxh/open-agricola/actions/runs/41169565026), the longest browser job took 906 seconds. Browser execution accounted for about 738 seconds, while dependency installation took eight seconds. Reducing unrelated test selection is the first performance question. Dependency caching alone cannot meet a five-minute routine-run target.
-
-### Accepted selection principles
-
-- Keep complete test files and complete affected business groups as the selection units. A business group declares production ownership, its behavior tests and its browser consumers. Mixed changes take the union.
-- Distinguish bounded expansion to a complete business group or layer from uncertainty requiring the complete repository. Report both with affected paths and reasons.
-- Select a changed browser spec in full for Chromium and retain its complete existing WebKit eligibility group (`@webkit`). Static engine eligibility is a declared business group; selection does not infer individual cases from changed lines. A shared browser fixture selects all established consumers. Incomplete consumer evidence widens to the complete browser layer; unresolved cross-layer impact still requires full verification.
-- A new test in an established business group joins that group automatically. A new production Card Source retains the conservative availability and registration checks; adding a regression test for an existing card is a separate case.
-- Ordinary documentation and Chinese mirrors select document constraints. Runtime-readable English documentation additionally selects its reference and behavior contracts. Its owning business scope must be explicit.
-- Independently audit business ownership and consumer declarations. The existing test-project inventory and execution digest prove different properties and cannot establish selection sufficiency.
-- Unknown ownership continues to request broader verification. A declared consumer that has disappeared is a plan error requiring its declaration to be updated; running a larger suite cannot execute a missing test.
-- Retain complete-branch and merge-checkout changes, rename and deletion handling, exact source identity, selected-check completeness, and dedicated full candidate receipts. Cross-commit result reuse and per-test-case selection are outside this proposed first step.
-
-### Required acceptance evidence
-
-| Replay or counterexample | Required observation |
-|---|---|
-| #1540 frontend controls, documentation and browser changes | All changed tests and header, handoff, game-end, authentication and WS consumers remain selected; each additional subsystem has a concrete dependency reason. |
-| #1537 monitoring and persistence changes | Monitoring, opening facts, database and recovery consumers remain selected, including `operations-openings.test.ts` and `operations-dashboard.spec.ts`. |
-| #1534 payment and preparation changes; #1541 shared listener changes | Preserve complete affected rule and cross-card consumers. A genuine global dependency may still select full verification. |
-| New test under a known business directory | The discovered test is automatically selected. |
-| Changed shared helper; incomplete or dynamic consumer evidence | All established consumers remain selected; the uncertainty explicitly widens verification. |
-| Missing declared consumer, source root or unparsable source | Planning fails instead of reporting successful selection. |
-| Intentionally failing selected test or missing selected partition | The required `verify` result fails. |
-| Lockfile, test discovery, scope planner or repository-wide configuration change | Full verification remains selected. |
-
-Historical failures are retained when their dependency is within the affected scope. An unrelated historical flaky failure is not a requirement to run its entire subsystem on every PR. Full release-candidate verification retains the broader regression check accepted above.
-
-### Accepted interview decisions
-
-1. Target routine required-CI latency: a five-minute budget for ordinary frontend or single-card changes and eight minutes for bounded cross-module changes. Include setup and execution; exclude GitHub queueing and human retry delays. These are design targets requiring measurement, not demonstrated guarantees. Genuine full-verification changes may take longer.
-2. Accept bounded expansion for browser tests, helpers, fixtures and documentation, with full verification reserved for global or unresolved impact.
-3. Use complete business groups with directory ownership and independent coverage checks rather than source-file whitelists alone.
-
-The user's answer, "OK", accepted decisions 1–3. A new module with unknown ownership retains full-verification fallback; a missing declared test or consumer fails planning. Existing release-candidate and deployment evidence requirements remain in force.
-
-### Accepted implementation boundary
-
-The implementation fixes selection for frontend controls, documentation, changed browser specs, local helpers and fixtures, new regression tests for existing cards, and monitoring ownership. It introduces independent consumer coverage checks and the distinction between bounded expansion and full verification.
-
-The user additionally requested shared rule subsystems in this iteration. Payment, animals, scoring, farm/crop operations, and round/variant rules have explicit, overlapping ownership. A mechanism change selects its complete direct and cross-card behavior consumers, plus public rule safety consumers whose mechanism cannot be narrowed. Hook, action, helper and Card Source associations bridge production ownership to tests; shared test setup does not by itself make every Session test a consumer of every mechanism. Unknown rule seams retain the complete rule group. Protocol changes retain complete producer and consumer groups; repository-wide configuration and unresolved cross-layer impact retain full verification.
-
-Measure selected test counts, setup and execution time, and the critical path for the accepted ordinary-change budgets. Historical PR replays must preserve required consumers and explain remaining broad selections; a genuine global change does not have to become narrow to pass acceptance. Share preparation once within a job where its environment is unchanged, while preserving writable-environment isolation between browser workers.
-
-PR #1540 changes a widely shared browser fixture, so its complete diff may still select most or all browser tests. Its selection must retain the login and dual-player WS regressions without selecting all slow card tests solely because of frontend documentation. Validate the ordinary frontend budget separately with an explicitly identified narrow menu-change probe. Do not present that probe as the complete historical PR. Compare actual selected files, tasks and executed tests; `mode: scoped` alone is insufficient evidence of improvement.
-
-The implementation PR itself changes the scope planner and therefore requires full verification. Likewise, historical #1534 changes verification tools, #1537 changes application startup and deployment inputs, and #1533 changes the package configuration; their complete diffs may legitimately retain full verification under the accepted global-input rules.
-
-Cross-commit result reuse, selection of individual test cases, a new test runner, and broad test rewrites are outside this first implementation. Duration-based partition balancing can follow measurements if selection alone misses the ordinary-change budgets.
-
-The user's request to include shared rule subsystems completes the implementation-boundary decision. Local validation must report actual selected files and execution evidence. It cannot establish the five/eight-minute hosted-CI targets without successful remote runs.
-
-Known operations collectors, access provisioning, deployment, Compose, and Grafana configuration use complete consumer files plus declared database, HTTP, deployment, local-service, and community-delivery safety tests. Independent test-local dependencies, operations prefixes, and declared subprocess or literal-path bridges include new consumers. Uncertain module loaders retain complete files and the safety group with bounded widening; unreadable or malformed evidence fails planning. Planner calls without the index retain the complete discovered unit inventory and browser lanes. Community QR updates, the dashboard generator, and unknown operations entry points retain full verification. The opening-facts SQL migration, server-side producers, and other database or recovery changes keep their previous broader scopes. The dashboard browser fixture does not use the production Prometheus scrape configuration; neither that test nor a complete server run proves the production scrape configuration. Required files and operational boundaries are maintained in the testing architecture and CI operations documents.
+The routine planner, partitioning, and execution may be restructured. `verify` remains the only required check. The complete catalog's task IDs and coverage, and the release and deployment gates, stay unchanged. Cross-commit result reuse is out of scope.
