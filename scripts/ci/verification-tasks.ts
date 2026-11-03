@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const FULL_TASK_IDS = [
@@ -45,6 +45,62 @@ function architectureCommands(cwd: string): VerificationCommand[] {
     })
 }
 
+function chromiumSuite(cwd: string): string[] {
+  const found: string[] = []
+  const visit = (relativeDirectory: string) => {
+    for (const name of readdirSync(join(cwd, relativeDirectory)).sort()) {
+      const relative = `${relativeDirectory}/${name}`
+      if (statSync(join(cwd, relative)).isDirectory()) visit(relative)
+      else if (/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(name)) found.push(relative)
+    }
+  }
+  visit('e2e-tests')
+  return found
+}
+
+function recordedDurations(cwd: string): Map<string, number> {
+  const path = join(cwd, 'scripts/ci/verification-durations.json')
+  if (!existsSync(path)) return new Map()
+  const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Browser spec durations must be a path map')
+  const durations = new Map<string, number>()
+  for (const [spec, duration] of Object.entries(value)) {
+    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) throw new Error(`Invalid browser spec duration: ${spec}`)
+    durations.set(spec, duration)
+  }
+  return durations
+}
+
+function medianDuration(durations: number[]): number {
+  if (!durations.length) return 1
+  const ordered = [...durations].sort((left, right) => left - right)
+  const middle = Math.floor(ordered.length / 2)
+  return ordered.length % 2 === 1 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2
+}
+
+function chromiumCommands(cwd: string, shard: number): VerificationCommand[] {
+  const recorded = recordedDurations(cwd)
+  const specs = chromiumSuite(cwd)
+  const median = medianDuration(specs.flatMap(spec => {
+    const duration = recorded.get(spec)
+    return duration === undefined ? [] : [duration]
+  }))
+  const ranked = specs
+    .map(spec => ({ spec, duration: recorded.get(spec) ?? median }))
+    .sort((left, right) => right.duration - left.duration || (left.spec < right.spec ? -1 : left.spec > right.spec ? 1 : 0))
+  const bins: { total: number; specs: string[] }[] = [
+    { total: 0, specs: [] }, { total: 0, specs: [] }, { total: 0, specs: [] }, { total: 0, specs: [] },
+  ]
+  for (const item of ranked) {
+    let chosen = 0
+    for (let index = 1; index < bins.length; index++) if (bins[index].total < bins[chosen].total) chosen = index
+    bins[chosen].specs.push(item.spec)
+    bins[chosen].total += item.duration
+  }
+  const selected = bins[shard].specs.sort()
+  return selected.length ? [{ command: 'pnpm', args: ['verify', ...selected] }] : []
+}
+
 export function taskCommands(cwd: string, input: string): VerificationCommand[] {
   const task = verificationTask(input)
   switch (task.id) {
@@ -56,10 +112,10 @@ export function taskCommands(cwd: string, input: string): VerificationCommand[] 
       { command: 'pnpm', args: ['run', 'build:replay-viewer'] },
       { command: 'pnpm', args: ['run', 'check:bundle-size'] },
     ]
-    case 'chromium-1': return [{ command: 'pnpm', args: ['verify', '--shard=1/4'] }]
-    case 'chromium-2': return [{ command: 'pnpm', args: ['verify', '--shard=2/4'] }]
-    case 'chromium-3': return [{ command: 'pnpm', args: ['verify', '--shard=3/4'] }]
-    case 'chromium-4': return [{ command: 'pnpm', args: ['verify', '--shard=4/4'] }]
+    case 'chromium-1': return chromiumCommands(cwd, 0)
+    case 'chromium-2': return chromiumCommands(cwd, 1)
+    case 'chromium-3': return chromiumCommands(cwd, 2)
+    case 'chromium-4': return chromiumCommands(cwd, 3)
     case 'browser-sandbox': return [{ command: 'pnpm', args: ['run', 'verify:e2e:browser-sandbox'] }]
     case 'webkit': return [{ command: 'pnpm', args: ['run', 'verify:e2e:webkit'] }]
   }

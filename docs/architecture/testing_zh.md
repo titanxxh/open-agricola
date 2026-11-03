@@ -26,6 +26,8 @@
 
 按需执行的 `candidate-verification.yml` 使用 `scripts/ci/verification-tasks.ts` 中的完整任务清单。fast、slow、构建、质量检查和浏览器分道各自执行，失败任务可独立重试。契约和社区卡测试由正常 Vitest project 覆盖，不额外重复执行。浏览器任务复用 `scripts/verify.ts` 及其结构化结果。
 
+`chromium-1` 到 `chromium-4` 的任务 ID 不变。四者合起来运行完整 Chromium 套件，每份 spec 恰好属于一个任务。分配读取随规划器提交的 `scripts/ci/verification-durations.json`，不访问 GitHub。同一代码树得到同一份 spec 列表。没有测量的 spec 使用已测量 spec 的中位耗时。表内数字来自最近一次完整目录：每个 Chromium 分片的 Playwright 时间分摊到该分片跑到的用例上。修改这张表是规划器改动，因此选择完整目录。日常验证的选择逻辑不变。
+
 正式 request/check 首先确认所选仓库受保护 main 上的最终 PR 快照，核对原生数字身份、明确的 main ref 与原始 Git 可达性。已确认的代码树批准 producer，配置哈希只标识兼容执行。该新增实现策略及原生治理信任边界见 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。
 
 `scripts/ci/candidate-verification.ts` 绑定实际干净检出、工作流提交和验证配置。check 命令读取 GitHub run、job 和 step 元数据，每个必需任务都必须有兼容的成功证据。跨 run 和重跑按任务自身的执行时间排序；重跑其他任务不会推进未重跑 job 的时间。新 manifest 要求但未执行的任务持续阻断旧成功，直到 run 完成。执行时间缺失时，已完成 run 的可信 `updated_at` 可约束未通过证据的最晚时间，允许后续正常执行替代它。时间无界或执行区间重叠时不能复用。本地成功 JSON 和普通范围 CI 不能充当完整候选验证。
