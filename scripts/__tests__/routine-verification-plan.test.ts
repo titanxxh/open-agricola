@@ -625,6 +625,29 @@ describe('dependency routine verification plan', () => {
     expect(nestedConfig.catalogTasks).toEqual(['quality', 'build'])
   })
 
+  it('names each path that selects the complete catalog', () => {
+    const root = writeTree({
+      'shared/domain/prod.ts': 'export const prod = 1\n',
+      'shared/domain/__tests__/prod.test.ts': "import { prod } from '../prod'\nexport const used = prod\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [
+        { status: 'M', path: 'package.json' },
+        { status: 'M', path: 'shared/domain/prod.ts' },
+        { status: 'A', path: '.github/workflows/ci.yml' },
+      ],
+    })
+
+    expect(plan.fullTrigger).toBe(true)
+    expect(plan.vitestFiles).toEqual([])
+    expect(plan.warnings).toEqual([
+      'The complete catalog is selected by .github/workflows/ci.yml',
+      'The complete catalog is selected by package.json',
+    ])
+  })
+
   it('warns and widens an unresolved import to its Vitest project', () => {
     const root = writeTree({
       'shared/domain/score.ts': "import { missing } from './missing'\nexport const score = missing\n",
@@ -727,6 +750,44 @@ describe('dependency routine verification plan', () => {
     expect(plan.warnings).toEqual([
       'e2e-tests/login.spec.ts: source file cannot be parsed; widened to the routine browser smoke set',
     ])
+  })
+
+  it('widens incomplete evidence with no Vitest project to the routine browser smoke set', () => {
+    const cases = [
+      {
+        file: 'scripts/orphan.ts',
+        source: "import { missing } from './missing'\nexport const orphan = missing\n",
+        reason: "unresolved import './missing'",
+      },
+      {
+        file: 'client/orphan.ts',
+        source: 'export const =\n',
+        reason: 'source file cannot be parsed',
+      },
+      {
+        file: 'server/orphan.ts',
+        source: "import { readFileSync } from 'node:fs'\nexport const load = (file: string) => readFileSync(file, 'utf8')\n",
+        reason: 'filesystem read has no matchable literal',
+      },
+    ]
+
+    for (const entry of cases) {
+      const root = writeTree({
+        [entry.file]: entry.source,
+        'shared/domain/__tests__/other.test.ts': 'export const other = 1\n',
+      })
+      const plan = planRoutineVerification({
+        root,
+        changes: [{ status: 'M', path: entry.file }],
+      })
+
+      expect(plan.fullTrigger, entry.file).toBe(false)
+      expect(plan.vitestFiles, entry.file).toEqual([])
+      expect(plan.browserFiles, entry.file).toEqual(routineBrowserSmokeSet)
+      expect(plan.warnings, entry.file).toEqual([
+        `${entry.file}: ${entry.reason}; widened to the routine browser smoke set`,
+      ])
+    }
   })
 
   it('selects the complete catalog and reports the error when planning throws', () => {

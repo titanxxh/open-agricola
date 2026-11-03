@@ -224,7 +224,7 @@ export function createRepositoryPlan(input: {
     changes,
     inventory,
     selections: [],
-    expansionReasons: full ? (routine.warnings.length ? [...routine.warnings] : ['The complete catalog is selected.']) : [],
+    expansionReasons: full ? [...routine.warnings] : [],
     wideningReasons: full ? [] : [...routine.warnings],
     checks: full
       ? input.fullTaskIds.map(taskId => ({ kind: 'catalog', taskId }))

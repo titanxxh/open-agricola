@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { assertPlanCurrent, createRepositoryPlan } from '../ci/verification-plan'
+import { assertPlanCurrent, createRepositoryPlan, formatPlanSummary } from '../ci/verification-plan'
 
 const directories: string[] = []
 afterEach(() => directories.splice(0).forEach(directory => rmSync(directory, { recursive: true, force: true })))
@@ -111,6 +111,27 @@ describe('repository verification scope', () => {
     expect(plan.changes).toContainEqual({ status: 'M', path: 'shared/domain/example.ts' })
     expect(plan.mode).toBe('scoped')
     expect(plan.checks.flatMap(check => check.kind === 'catalog' ? [check.taskId] : [])).toEqual(['quality'])
+  })
+
+  it('names the triggering paths in the full-catalog plan summary', () => {
+    const { cwd } = repository()
+    write(cwd, 'package.json', '{ "name": "fixture" }\n')
+    write(cwd, '.github/workflows/ci.yml', 'name: CI\n')
+    write(cwd, 'shared/domain/example.ts', 'export const also = true\n')
+    commit(cwd, 'trigger the complete catalog')
+
+    const plan = createRepositoryPlan({ cwd, base: 'main', fullTaskIds: ['quality', 'fast', 'build'] })
+    const summary = formatPlanSummary(plan)
+
+    expect(plan.mode).toBe('full')
+    expect(plan.expansionReasons).toEqual([
+      'The complete catalog is selected by .github/workflows/ci.yml',
+      'The complete catalog is selected by package.json',
+    ])
+    expect(summary).toContain('The complete catalog is selected by .github/workflows/ci.yml')
+    expect(summary).toContain('The complete catalog is selected by package.json')
+    expect(summary).not.toContain('The complete catalog is selected.')
+    expect(summary).not.toContain('shared/domain/example.ts')
   })
 
   it('runs the same planner through the CLI, writes a human summary, and replaces stale output on failure', () => {

@@ -156,7 +156,8 @@ describe('pnpm verify affected', () => {
     } finally {
       spy.mockRestore()
     }
-    expect(logs).toContain('[verify] full trigger: The complete catalog is selected.')
+    expect(logs).toContain('[verify] full trigger: The complete catalog is selected by package.json')
+    expect(logs).not.toContain('[verify] full trigger: The complete catalog is selected.')
     expect(calls).toEqual([])
   })
 })
