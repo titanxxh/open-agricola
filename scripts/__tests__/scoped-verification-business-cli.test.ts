@@ -218,7 +218,10 @@ describe('business verification public CLI', () => {
     expect(value.commands().filter(command => Array.isArray(command) && (command[0] === 'verify' || command[0] === 'run' && command[1] !== 'build:cards-manifest'))).toEqual([
       ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
       ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
-      ['verify', '--shard=1/4'], ['verify', '--shard=2/4'], ['verify', '--shard=3/4'], ['verify', '--shard=4/4'],
+      ['verify', 'e2e-tests/choice-previews.spec.ts', 'e2e-tests/hosted-password-login.spec.ts', 'e2e-tests/replay-viewer-csp.spec.ts', 'e2e-tests/seasonal-fence-log.spec.ts'],
+      ['verify', 'e2e-tests/frontend-browser-scenario-matrix.spec.ts', 'e2e-tests/listener-lifecycle-room.spec.ts', 'e2e-tests/room-animal-holders.spec.ts', 'e2e-tests/ws-dual-player.spec.ts'],
+      ['verify', 'e2e-tests/game-context-recovery.spec.ts', 'e2e-tests/local-sandbox.spec.ts', 'e2e-tests/room-invitations.spec.ts'],
+      ['verify', 'e2e-tests/heating-exchange.spec.ts', 'e2e-tests/oauth-onboarding.spec.ts', 'e2e-tests/rule-derived-action-preview.spec.ts'],
       ['run', 'verify:e2e:browser-sandbox'], ['run', 'verify:e2e:webkit'],
     ])
   }, 30_000)

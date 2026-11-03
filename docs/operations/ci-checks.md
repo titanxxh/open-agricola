@@ -6,7 +6,7 @@ GitHub Actions 是集成与发布的正式证据。本机按需定向调试或�
 
 选中的浏览器检查在 GitHub runner 上通过 `pnpm verify` 运行。本机同一入口用于调试与复现，不能补齐正式 CI 结果。工作流使用只读 `contents` 权限、`ubuntu-latest`，按 workflow + PR/ref 隔离 concurrency，并取消同一 PR 的过期 run。
 
-完整 catalog 保留四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立浏览器 runner，以及 quality、fast、slow、build，合计十个任务。每个浏览器 runner 使用独立应用、数据库 schema、S3 前缀和构建目录。任务失败不取消其余任务，诊断保留 7 天，catalog 产物名为 `candidate-<run-id>-<attempt>-<task>`。日常范围执行按计划选择这些任务或明确的文件与标签。
+完整 catalog 保留四个 Chromium shard、browser-local sandbox 和 Linux WebKit 六个独立浏览器 runner，以及 quality、fast、slow、build，合计十个任务。四个 Chromium 任务的 ID 不变，合起来仍跑完整 Chromium spec 套件，每份 spec 恰好一次。它们不再按用例数切片，而是读取随规划器提交的 `scripts/ci/verification-durations.json`：按其中的 spec 耗时分配，没有记录的 spec 使用已测量 spec 的中位耗时。同一代码树重复规划得到同一组成员。规划只读这张表，不访问 GitHub。表内数字来自最近一次完整目录，把每个 Chromium 分片的 Playwright 时间分摊到该分片跑到的用例上。改这张表是规划器改动，因此选择完整目录。每个浏览器 runner 使用独立应用、数据库 schema、S3 前缀和构建目录。任务失败不取消其余任务，诊断保留 7 天，catalog 产物名为 `candidate-<run-id>-<attempt>-<task>`。日常范围执行按计划选择这些任务或明确的文件与标签。
 
 ## 调试与最终验证
 
@@ -67,7 +67,7 @@ Hosted 和 Pages 构建入口固定 `NODE_ENV=production`。隔离后端继续�
 
 E2E 使用英文界面，业务流程不再按英文 / 中文重复展开；桌面、移动端、玩家人数和浏览器差异继续覆盖。产品仍提供中英文，语言包缺键检查继续由 `lint:i18n` 执行。
 
-`verify:parallel` 先生成收集测试所需的卡牌和语言产物，准备一次共享测试依赖，再在 `.worktree/` 下从当前 HEAD 创建独立工作树。每片自行安装锁定的依赖、构建前端并通过原有 `pnpm verify --shard=i/N --workers=1` 运行。工作树、Vite 缓存、固定开发房间、应用端口、数据库 schema、S3 前缀和 Replay 目录互相隔离，因此一片中的房间重置或后端重启不会打断其他片。不要在同一个应用环境直接增大 worker 数。
+`verify:parallel` 先生成收集测试所需的卡牌和语言产物，准备一次共享测试依赖，再在 `.worktree/` 下从当前 HEAD 创建独立工作树。每片自行安装锁定的依赖、构建前端并通过原有 `pnpm verify --shard=i/N --workers=1` 运行。这是本机并行入口，仍按 Playwright 的用例数切片；完整 catalog 的 Chromium 任务不使用 `--shard`。工作树、Vite 缓存、固定开发房间、应用端口、数据库 schema、S3 前缀和 Replay 目录互相隔离，因此一片中的房间重置或后端重启不会打断其他片。不要在同一个应用环境直接增大 worker 数。
 
 Linux 浏览器验收默认使用 `LIBGL_ALWAYS_SOFTWARE=1` 和 `WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`，与 [WebKit 自身的 WPE 测试入口](https://github.com/WebKit/WebKit/blob/main/Tools/Scripts/webkitpy/port/wpe.py)一致；本机有 Mesa EGL vendor JSON 时仅选择 Mesa，让 headless 测试独立于桌面和计算任务的 NVIDIA 图形资源。显式环境配置会保留并计入验证指纹。普通开发启动及生产浏览器不受该测试入口影响。
 
