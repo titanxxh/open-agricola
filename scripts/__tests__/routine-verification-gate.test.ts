@@ -136,8 +136,14 @@ describe('required routine verification gate', () => {
     expect(() => assertRoutineGate({ sha, needs })).toThrow('every canonical task')
   })
 
-  it('never accepts an empty plan or unexpected execution of an unselected catalog', () => {
-    expect(() => assertRoutineGate({ sha, needs: evidence([]) })).toThrow('empty or noncanonical')
+  it('accepts a scoped plan that selects nothing when every job is skipped', () => {
+    expect(assertRoutineGate({ sha, needs: evidence([]) }).status).toBe('passed')
+  })
+
+  it('rejects a full plan that selects nothing and unexpected execution of an unselected catalog', () => {
+    const needs = evidence([])
+    needs.plan.outputs.mode = 'full'
+    expect(() => assertRoutineGate({ sha, needs })).toThrow('empty or noncanonical')
     expect(() => assertRoutineGate({ sha, needs: { ...evidence(), catalog: { result: 'success', outputs: {} } } })).toThrow('unselected catalog')
   })
 })

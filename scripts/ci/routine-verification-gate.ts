@@ -53,9 +53,8 @@ export function assertRoutineGate(input: { sha: string; needs: unknown }) {
   const catalog = text(plan.outputs.catalog_tasks)
   const tasks = catalog === NO_CATALOG_TASKS ? '' : selectedTasks(catalog).join(',')
   const hasPartitions = selected.some(partition => partition.expected !== null)
-  if (catalog !== NO_CATALOG_TASKS && tasks !== catalog || !hasPartitions && !tasks) {
-    throw new Error('Verification task selection is empty or noncanonical')
-  }
+  if (catalog !== NO_CATALOG_TASKS && tasks !== catalog) throw new Error('Verification task selection is empty or noncanonical')
+  if (mode === 'full' && !hasPartitions && !tasks) throw new Error('Verification task selection is empty or noncanonical')
   if (mode === 'full' && (hasPartitions || tasks !== FULL_TASK_IDS.join(','))) throw new Error('Full fallback must execute every canonical task')
   for (const { id, expected } of selected) {
     const execution = job(needs[id])

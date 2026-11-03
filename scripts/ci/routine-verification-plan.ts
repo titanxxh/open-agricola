@@ -211,7 +211,7 @@ function widenIncomplete(
 const normalize = (file: string) => file.split(/[\\/]/).join('/')
 
 function isSpec(file: string): boolean {
-  return /\.spec\.[cm]?[jt]sx?$/.test(file)
+  return /^e2e-tests\/.+\.spec\.[cm]?[jt]sx?$/.test(file)
 }
 
 function prefixMatches(prefix: string, path: string): boolean {
