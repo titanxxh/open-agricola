@@ -24,6 +24,7 @@
     "scripts/__tests__/test-consumers.test.ts",
     "scripts/__tests__/vitest-results.test.ts",
     "scripts/__tests__/routine-verification-gate.test.ts",
+    "scripts/__tests__/routine-verification-plan.test.ts",
     "scripts/__tests__/verification-requirements.test.ts",
     "scripts/__tests__/hosted-release-app.test.ts",
     "scripts/__tests__/release-smoke.test.ts",

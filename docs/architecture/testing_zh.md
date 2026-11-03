@@ -38,6 +38,8 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查与浏览�
 
 `scripts/ci/verification-plan.ts` 独立发现测试归属，包含完整分支差异、rename 两侧和实际检出变化。未知归属、全局配置和缺少可缩小范围的证据时，扩大到完整任务清单。根缺失、源码无法解析或测试未归类时，规划直接失败。`wideningReasons` 记录已知范围内的扩边；`expansionReasons` 记录完整清单回退。
 
+`scripts/ci/routine-verification-plan.ts` 的 `planRoutineVerification` 是另一条日常计划入口。它按给定路径，从 `scripts/ci/import-graph.ts` 的导入图选择 Vitest 文件。该图与依赖检查共用 `parseSource`，不跑架构违规扫描。值导入、CSS import 和字面量动态 import 会选中测试；只导入类型的边不会。遍历在四份生成的卡牌注册表停下，不进入它们的导入者。改注册表本身时，只选中直接导入它的 Vitest 文件。改动在截断的卡牌一侧时，还会选中注册键字面量和直接导入这些注册表的测试。`shared/actions/internal-actions.ts` 和 `shared/actions/index.ts` 仍是普通节点。非文档改动同时选中 quality 和 build。只有根级依赖清单、根级测试与构建配置、CI workflow，以及验证规划器与门禁才选择完整目录。import 无法解析或源文件无法解析时给出警告，并把选择扩大到受影响的 Vitest project；浏览器侧证据则扩大到空的占位 `ROUTINE_BROWSER_SMOKE_SET`。规划器抛异常时选择完整目录并报告错误。CI 仍通过 `createRepositoryPlan` 做计划。覆盖见 `scripts/__tests__/routine-verification-plan.test.ts`。
+
 规划器将混合范围归并为每个 Vitest project 的完整文件并集，以及每种浏览器引擎与相同 grep selector 的文件并集，检查与文件顺序固定。未筛选的文件覆盖同引擎下更窄的 selector；专用 catalog 浏览器任务不会抹去 inline 检查。PR 计划包含 merge 检出，main 计划包含完整 push 集成范围；两者使用相同业务组，并保留声明的集成浏览器消费者。
 
 `scripts/ci/support-verification.ts` 将文档约束与 Workshop 运行时验证分别选择。英文参考文档还选择参考资料读取器；可执行沙盒与 prompt 文档保留声明的 Session 契约。`test-consumers.ts` 恰好覆盖每个独立发现的测试一次，沿测试本地 import 与 helper 遍历，记录生产依赖但不继续遍历生产代码。测试与浏览器文件改动选择完整文件及其消费者。helper 的不确定归属、删除和 rename 在已知测试层内扩边；没有存活消费者的 helper 保留该层。浏览器文件在 Chromium 下完整执行，并保留完整的既有 `@webkit` 资格组；该静态引擎组不从 diff 行推导单个 case。已确认的 helper 读取或解析失败会使规划失败。测试辅助文件识别仅限测试目录；生产 setup 模块沿用所属领域的验证范围。未知归属与全局 setup 改动仍要求完整清单。
