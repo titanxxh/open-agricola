@@ -1,4 +1,3 @@
-// @covers client/components/board/
 import { test, expect } from '@playwright/test';
 
 /**

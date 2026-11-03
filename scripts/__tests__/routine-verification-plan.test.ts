@@ -534,6 +534,23 @@ describe('dependency routine verification plan', () => {
     expect(plan.fullTrigger).toBe(false)
   })
 
+  it('selects tests that still import a deleted module', () => {
+    const root = writeTree({
+      'shared/domain/kept.ts': 'export const kept = 1\n',
+      'shared/domain/__tests__/kept.test.ts': "import { kept } from '../kept'\nexport const used = kept\n",
+      'shared/domain/__tests__/gone.test.ts': "import { gone } from '../gone'\nexport const used = gone\n",
+    })
+
+    const plan = planRoutineVerification({
+      root,
+      changes: [{ status: 'D', path: 'shared/domain/gone.ts' }],
+    })
+
+    expect(plan.vitestFiles).toContain('shared/domain/__tests__/gone.test.ts')
+    expect(plan.vitestFiles).not.toContain('shared/domain/__tests__/kept.test.ts')
+    expect(plan.fullTrigger).toBe(false)
+  })
+
   it('selects no catalog tasks for a documentation-only change', () => {
     const root = writeTree({
       'docs/ARCHITECTURE.md': '# Architecture\n',
@@ -1095,7 +1112,6 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/source-aware-scoring.spec.ts',
       'e2e-tests/special-actions-localization.spec.ts',
       'e2e-tests/visual-support-regression.spec.ts',
-      'scripts/test-actions.spec.ts',
     ].map(file => ({ file, grep: null }))
     const farm = planRoutineVerification({
       root: repoRoot,

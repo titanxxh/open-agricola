@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
-import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import ts from 'typescript'
 import { parseSource, sourceExtensions, walkSourceFiles } from '../source-files'
 
@@ -185,6 +185,28 @@ function classifySpecifier(specifier: string, fromFile: string, root: string): {
   return { target: null, unresolved: true }
 }
 
+const SOURCE_IMPORT_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']
+
+function missingRelativeTargets(specifier: string, fromAbsolute: string, root: string): string[] {
+  if (!specifier.startsWith('.')) return []
+  const bare = (specifier.split(/[?#]/)[0] ?? specifier)
+  const base = resolve(dirname(fromAbsolute), bare)
+  const candidates = [
+    base,
+    ...SOURCE_IMPORT_EXTENSIONS.filter(ext => !base.endsWith(ext)).map(ext => `${base}${ext}`),
+    ...SOURCE_IMPORT_EXTENSIONS.map(ext => join(base, `index${ext}`)),
+  ]
+  const seen = new Set<string>()
+  const targets: string[] = []
+  for (const candidate of candidates) {
+    const target = normalize(relative(root, candidate))
+    if (!target || target.startsWith('..') || isAbsolute(target) || seen.has(target)) continue
+    seen.add(target)
+    targets.push(target)
+  }
+  return targets
+}
+
 function resolveSpecifier(specifier: string, fromFile: string, root: string): string | null {
   return classifySpecifier(specifier, fromFile, root).target
 }
@@ -244,7 +266,11 @@ export function readImportGraph(root: string): ImportGraph {
       if (specifier && ts.isStringLiteralLike(specifier)) {
         const classified = classifySpecifier(specifier.text, absolute, root)
         if (classified.target) add(from, classified.target)
-        else if (classified.unresolved) note(from, `unresolved import '${specifier.text}'`)
+        else if (classified.unresolved) {
+          const missing = missingRelativeTargets(specifier.text, absolute, root)
+          for (const target of missing) add(from, target)
+          if (!missing.length) note(from, `unresolved import '${specifier.text}'`)
+        }
       } else if (ts.isCallExpression(node) && readCallName(node)) {
         const found = new Set<string>()
         let explained = false
@@ -267,7 +293,11 @@ export function readImportGraph(root: string): ImportGraph {
         if (argument && ts.isStringLiteralLike(argument)) {
           const classified = classifySpecifier(argument.text, absolute, root)
           if (classified.target) add(from, classified.target)
-          else if (classified.unresolved) note(from, `unresolved import '${argument.text}'`)
+          else if (classified.unresolved) {
+            const missing = missingRelativeTargets(argument.text, absolute, root)
+            for (const target of missing) add(from, target)
+            if (!missing.length) note(from, `unresolved import '${argument.text}'`)
+          }
         } else note(from, 'unresolved import')
       }
       ts.forEachChild(node, visit)
