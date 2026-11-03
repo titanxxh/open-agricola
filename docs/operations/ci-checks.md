@@ -14,6 +14,8 @@ GitHub Actions 是集成与发布的正式证据。本机按需定向调试或�
 
 Run `pnpm exec tsx scripts/verification-plan.ts --base origin/main` to preview the whole branch's verification scope. Use `--head <ref>` when comparing another committed head. Differences between that head and the actual checked-out commit are also included, along with staged, unstaged, and untracked changes. It writes `output/verification/plan.json`; `--json` also prints the plan, and `--summary <file>` writes its human-readable summary.
 
+`pnpm verify affected` runs that plan's Vitest files on the local checkout. It compares `HEAD` with its merge-base against `origin/main`, plus staged, unstaged, and untracked files that are not gitignored. Browser selection is printed unless `--run-browser` is passed. A full trigger prints the reason and does not launch the complete catalog. An unresolved merge-base fails the command before any test runs.
+
 The `CI` workflow computes this plan for the actual checkout, including the complete branch diff and the PR merge commit. Main uses the push event's before/after range, including every commit in that integration. `createRepositoryPlan` keeps the base, merge base, head, actual checked-out commit, and source fingerprint, then selects with `planRoutineVerification`. A changed file selects the Vitest files that depend on it. Type-only imports select nothing. Traversal stops at the four generated card registries. A card change also selects tests that literally name its registry key and tests that import one of those registries directly. A non-code file selects tests that read it directly and the direct tests of a production module that reads it. `i18n.ref` selects language-pack readers. A card source also selects readers of the cards manifest, encyclopedia, and action references. A change that is not documentation-only also selects quality and build. A documentation-only change selects only tests that read those documents. Only root dependency manifests, root test and build configuration, CI workflows, and the verification planner and gate select the complete catalog. One card, an unregistered frontend file, a script, or a local startup script does not. An unresolved import, an unparseable source file, or a filesystem read with no matchable literal warns and widens to the affected Vitest project, or to the routine browser smoke set when the evidence is browser-side. Widening does not fail planning and does not select the complete catalog. A planner exception selects the complete catalog and reports the error. Browser specs declare the directories they exercise with a leading `// @covers` comment. A prefix that matches no file warns and is ignored. Missing discovery roots and unclassified tests still fail planning. `wideningReasons` records warnings. `expansionReasons` records complete-catalog selection. See [testing architecture](../architecture/testing.md).
 
 Selected Vitest files are packed into at most three duration-balanced jobs, `units-1`, `units-2`, and `units-3`. Empty slots are skipped. Browser checks stay in `browser-1` through `browser-4` and are packed by the same duration table. Checks still merge Vitest files per project and browser files per engine and identical grep, in stable order. An unfiltered browser file covers its narrower selectors for the same engine. Browser-sandbox and WebKit catalog tasks do not by themselves cover inline file selectors, so their presence cannot erase those checks.
@@ -31,6 +33,10 @@ For a manual scope probe, dispatch `ci.yml` on the desired ref with an optional 
 使用 Node.js 24.15+（不含 Node 25），按改动范围选择入口：
 
 ```bash
+# 本机运行日常计划选中的 Vitest。浏览器选择默认只打印；完整触发项只打印原因
+pnpm verify affected
+pnpm verify affected --run-browser
+
 # 调试：生成卡牌 manifest，只跑指定 Vitest 文件；不启动应用
 pnpm verify focus server/__tests__/session-fixtures.test.ts
 pnpm verify focus server/__tests__/first-round-start-session.test.ts --testNamePattern 'direct deal'
