@@ -1096,6 +1096,26 @@ _Avoid_: 线上多人主链路
 后端边界测试，直接实例化 `GameSession` 并断言 `state`、`pending`、`interaction`、`log`、`scores`。
 _Avoid_: 用 DOM 断言规则正确性
 
+**Routine Verification（日常验证）**:
+PR 与 main 上按单次改动的依赖证据尽力选出的验证。它不保证覆盖完整，选择之外的回归可能直到 Release Candidate Verification 才暴露。
+_Avoid_: 完整验证、发布证据、scoped / units 等实现名
+
+**Release Candidate Verification（发布候选验证）**:
+对固定候选提交运行的完整验证任务集，是发布与部署唯一认可的完整性证据。Routine Verification 因 Full Trigger 跑同一任务集时也不构成发布候选验证。
+_Avoid_: full10、日常全量、本机 prepush
+
+**Full Trigger（完整触发项）**:
+改动后会让 Routine Verification 运行完整验证任务集的仓库输入：依赖与工作区清单、根级测试与构建配置、CI workflow，以及验证规划器与门禁自身。归属未知的文件不是 Full Trigger。
+_Avoid_: global、unknown、未知即全量
+
+**Bounded Widening（有界扩大）**:
+Routine Verification 在依赖证据不完整时，把选择扩大到证据所在的有限一层，例如一个测试项目或 **Routine Browser Smoke Set**。
+_Avoid_: 扩大到完整验证、规划失败
+
+**Routine Browser Smoke Set（日常浏览器冒烟集）**:
+浏览器依赖证据过宽时，Routine Verification 改跑的那组固定、少量的浏览器规格。
+_Avoid_: 完整浏览器套件、发布候选里的 WebKit 任务
+
 **Newborn（后代）**:
 family growth 当轮新增的工人。当轮不计入可放置工人，要到下一轮才回家可用；喂食阶段只需 1 食物（成人需 2）。
 _Avoid_: 把 newborn 当普通可用工人
@@ -1148,6 +1168,7 @@ _Avoid_: 永久放弃、全局出局名单
 - 只有已审核并上线的 Workshop Card 能进入正式多人局，其 **Replay Card Snapshot** 随发布公开；未审核的卡只能在 **Workshop Sandbox** 使用。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
+- **Routine Verification** 证据不全时做 **Bounded Widening**，只有 **Full Trigger** 才让它运行完整验证任务集；完整性只由 **Release Candidate Verification** 保证。浏览器证据过宽时，扩大落到 **Routine Browser Smoke Set**。
 - **Promote** 一个 **Newborn** 使其成为可放置工人，是 **Adoptive Available** 玩家把后代换成一次 **Extra Turn** 的前提；**Forfeit** 则让该玩家放弃 **Extra Turn** 并退出本轮后续行动。
 
 ## Example dialogue
