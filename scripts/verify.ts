@@ -3,6 +3,9 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { plannedCheckCommands } from './ci/scoped-verification'
+import { createRepositoryPlan, type ChangedPath } from './ci/verification-plan'
+import { FULL_TASK_IDS } from './ci/verification-tasks'
 import {
   createBrowserRun, loadRequirements, readBrowserRunResult, reporterContextEnvironment,
   requirementsArgument, requiredCasesStatus, writeImmutableJson,
@@ -173,6 +176,56 @@ export function verificationRequirementsStatus(cwd: string, requirementsPath: st
   return { ...required, prepush, passed: prepush && required.passed }
 }
 
+function formatAffectedChange(change: ChangedPath): string {
+  return change.status === 'R'
+    ? `[verify] change: R ${change.previousPath} -> ${change.path}`
+    : `[verify] change: ${change.status} ${change.path}`
+}
+
+function affectedBrowserRequested(args: string[]): boolean {
+  const rest = [...(args[0] === 'affected' ? args.slice(1) : args)]
+  if (rest[0] === '--') rest.shift()
+  if (rest.some(arg => arg !== '--run-browser' && arg !== '--')) {
+    throw new Error('Usage: pnpm verify affected [--run-browser]')
+  }
+  return rest.includes('--run-browser')
+}
+
+export function runAffectedVerification(cwd: string, args: string[] = [], run: RunCommand = runCommand): void {
+  const runBrowser = affectedBrowserRequested(args)
+  try {
+    git(cwd, ['merge-base', 'HEAD', 'origin/main'])
+  } catch {
+    throw new Error('Cannot resolve merge-base of HEAD and origin/main')
+  }
+  const plan = createRepositoryPlan({ cwd, base: 'origin/main', fullTaskIds: FULL_TASK_IDS })
+  for (const change of plan.changes) console.log(formatAffectedChange(change))
+  if (plan.mode === 'full') {
+    for (const reason of plan.expansionReasons) console.log(`[verify] full trigger: ${reason}`)
+    return
+  }
+  const browserChecks = plan.checks.filter(check => check.kind === 'browser')
+  for (const check of browserChecks) {
+    const grep = check.grep ? ` --grep ${check.grep}` : ''
+    console.log(`[verify] browser: ${check.browser} ${check.files.join(' ')}${grep}`)
+  }
+  for (const check of plan.checks) {
+    if (check.kind !== 'vitest') continue
+    for (const command of plannedCheckCommands(cwd, check)) {
+      console.log(`[verify] vitest: ${command.command} ${command.args.join(' ')}`)
+      const exitCode = run(command.command, command.args, cwd)
+      if (exitCode !== 0) throw new Error(`vitest failed (exit ${exitCode})`)
+    }
+  }
+  if (!runBrowser) return
+  for (const check of browserChecks) {
+    for (const command of plannedCheckCommands(cwd, check)) {
+      const exitCode = run(command.command, command.args, cwd)
+      if (exitCode !== 0) throw new Error(`browser failed (exit ${exitCode})`)
+    }
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const cwd = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   const args = process.argv.slice(2).filter((arg, index) => !(index === 0 && arg === '--'))
@@ -191,7 +244,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         for (const entry of required.cases) console.log(`  ${entry.status}: ${entry.identity.file} ${JSON.stringify(entry.identity.titlePath)} [${entry.identity.project}/${entry.identity.browser}]`)
         process.exitCode = required.passed ? 0 : 1
       } else process.exitCode = statuses.some(({ mode, current, record }) => mode === 'prepush' && current && record?.status === 'passed') ? 0 : 1
-    } else runVerification(cwd, verificationPlan(cwd, args))
+    } else if (args[0] === 'affected') runAffectedVerification(cwd, args)
+    else runVerification(cwd, verificationPlan(cwd, args))
   } catch (error) {
     console.error(`[verify] ${error instanceof Error ? error.message : String(error)}`)
     process.exitCode = 1
