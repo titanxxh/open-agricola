@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, matchesGlob, relative } from 'node:path'
 import { globSync } from 'glob'
 import { CARD_REGISTRIES, readImportGraph, type ImportGraph } from './import-graph'
 import { FULL_TASK_IDS } from './verification-tasks'
@@ -84,6 +84,60 @@ function cardSideSelection(graph: ImportGraph, path: string, tests: ReadonlySet<
     if (literals && [...keys].some(key => literals.has(key))) selected.add(test)
   }
   return selected
+}
+
+function isGlobLiteral(value: string): boolean {
+  return /[*?[]/.test(value)
+}
+
+function globMatchesTarget(literal: string, target: string, targetIsDirectory: boolean): boolean {
+  if (matchesGlob(target, literal)) return true
+  if (!targetIsDirectory) return false
+  if (matchesGlob(`${target}/file.json`, literal) || matchesGlob(`${target}/nested/file.json`, literal)) return true
+  const meta = literal.search(/[*?[]/)
+  if (meta <= 0) return false
+  const prefix = literal.slice(0, meta).replace(/\/$/, '')
+  if (!prefix) return false
+  if (prefix === target || prefix.startsWith(`${target}/`)) return true
+  return target.startsWith(`${prefix}/`) && literal.includes('**')
+}
+
+function literalMatches(literal: string, target: string, targetIsDirectory = false): boolean {
+  if (isGlobLiteral(literal)) return globMatchesTarget(literal, target, targetIsDirectory)
+  if (literal === target) return true
+  if (target.startsWith(`${literal}/`)) return true
+  return targetIsDirectory && literal.startsWith(`${target}/`)
+}
+
+function readSelection(graph: ImportGraph, path: string, tests: ReadonlySet<string>, targetIsDirectory = false): Set<string> {
+  const selected = new Set<string>()
+  for (const [file, literals] of graph.reads) {
+    if (![...literals].some(literal => literalMatches(literal, path, targetIsDirectory))) continue
+    if (tests.has(file)) {
+      selected.add(file)
+      continue
+    }
+    for (const importer of graph.dependents.get(file) ?? []) {
+      if (tests.has(importer)) selected.add(importer)
+    }
+  }
+  return selected
+}
+
+const CARD_SOURCE = /^shared\/cards\/(?:A|B|C|D|E|M|major|community|__stubs__)\/[^/]+\.ts$/
+
+function isCardSource(path: string): boolean {
+  return CARD_SOURCE.test(path) && !path.endsWith('.test.ts')
+}
+
+function generatedOutputs(path: string): { path: string; directory: boolean }[] {
+  if (path === 'i18n.ref') return [{ path: 'public/i18n', directory: true }]
+  if (!isCardSource(path)) return []
+  return [
+    { path: 'public/cards-manifest.json', directory: false },
+    { path: 'public/card-encyclopedia', directory: true },
+    { path: 'public/action-references.json', directory: false },
+  ]
 }
 
 function changedPaths(change: RoutineChange): string[] {
@@ -310,14 +364,32 @@ function completeCatalog(): RoutineVerificationPlan {
   }
 }
 
+const preparedByRoot = new Map<string, {
+  graph: ImportGraph
+  inventory: ReadonlyMap<string, string>
+  files: string[]
+  covers: ReturnType<typeof readCoverIndex>
+}>()
+
+function prepare(root: string) {
+  const cached = preparedByRoot.get(root)
+  if (cached) return cached
+  const graph = readImportGraph(root)
+  const inventory = vitestInventory(root)
+  const files = sourcePaths(root)
+  const covers = readCoverIndex(root, files.filter(isSpec), repositoryFiles(root))
+  const prepared = { graph, inventory, files, covers }
+  preparedByRoot.set(root, prepared)
+  return prepared
+}
+
 export function planRoutineVerification(input: {
   root: string
   changes: readonly RoutineChange[]
 }): RoutineVerificationPlan {
   try {
     if (input.changes.flatMap(changedPaths).some(isFullTrigger)) return completeCatalog()
-    const graph = readImportGraph(input.root)
-    const inventory = vitestInventory(input.root)
+    const { graph, inventory, files, covers } = prepare(input.root)
     const tests = new Set(inventory.keys())
     const selected = new Set<string>()
     const relevant = new Set<string>()
@@ -328,11 +400,13 @@ export function planRoutineVerification(input: {
           if (tests.has(file)) selected.add(file)
         }
         for (const file of cardSideSelection(graph, path, tests)) selected.add(file)
+        for (const file of readSelection(graph, path, tests)) selected.add(file)
+        for (const output of generatedOutputs(path)) {
+          for (const file of readSelection(graph, output.path, tests, output.directory)) selected.add(file)
+        }
       }
     }
     const widened = widenIncomplete(graph, inventory, selected, relevant)
-    const files = sourcePaths(input.root)
-    const covers = readCoverIndex(input.root, files.filter(isSpec), repositoryFiles(input.root))
     const unparseable = new Set(graph.incomplete.filter(item => item.reason === 'source file cannot be parsed').map(item => item.file))
     const specCount = files.filter(isSpec).length
     const browsers = input.changes.flatMap(change => changedPaths(change).flatMap(path =>

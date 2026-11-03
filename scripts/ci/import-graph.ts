@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
-import { dirname, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import ts from 'typescript'
 import { parseSource, sourceExtensions, walkSourceFiles } from '../source-files'
 
@@ -18,10 +18,80 @@ export type ImportGraph = {
   imports: Map<string, Set<string>>
   literals: Map<string, Set<string>>
   keysByModule: Map<string, Set<string>>
+  reads: Map<string, Set<string>>
   incomplete: IncompleteEvidence[]
 }
 
 const normalize = (file: string) => file.split(/[\\/]/).join('/')
+const READ_CALLS = new Set(['readFile', 'readFileSync', 'readdir', 'readdirSync', 'createReadStream', 'glob', 'globSync'])
+const NON_PATH_LITERALS = new Set([
+  'utf8', 'utf-8', 'ascii', 'latin1', 'binary', 'base64', 'hex', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le',
+  'r', 'rs', 'sr', 'r+', 'w', 'wx', 'xw', 'a', 'ax', 'xa', 'a+', 'w+',
+])
+
+function normalizeReadLiteral(value: string): string {
+  let text = value.replaceAll('\\', '/').trim()
+  if (text.startsWith('./')) text = text.slice(2)
+  if (text.endsWith('/')) text = text.slice(0, -1)
+  return text
+}
+
+function isMatchableReadLiteral(value: string): boolean {
+  const text = value.trim()
+  if (!text || NON_PATH_LITERALS.has(text)) return false
+  if (/[*?[]/.test(text)) return true
+  if (text.includes('/') || text.includes('\\') || text.startsWith('.')) return true
+  return /^[A-Za-z0-9._@+-]+$/.test(text)
+}
+
+function readCallName(node: ts.CallExpression): string | null {
+  if (ts.isIdentifier(node.expression)) return READ_CALLS.has(node.expression.text) ? node.expression.text : null
+  if (ts.isPropertyAccessExpression(node.expression)) return READ_CALLS.has(node.expression.name.text) ? node.expression.name.text : null
+  return null
+}
+
+function isImportMetaUrl(node: ts.Expression): boolean {
+  return ts.isPropertyAccessExpression(node)
+    && node.name.text === 'url'
+    && ts.isMetaProperty(node.expression)
+    && node.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+}
+
+function literalNewUrl(node: ts.Node): string | null {
+  if (!ts.isNewExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== 'URL') return null
+  const [spec, base] = node.arguments ?? []
+  if (!spec || !base || !ts.isStringLiteralLike(spec) || !isImportMetaUrl(base)) return null
+  return spec.text
+}
+
+function repoPathFromUrl(spec: string, fromAbsolute: string, root: string): string | null {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(spec) && !spec.startsWith('file:')) return null
+  const bare = spec.split(/[?#]/)[0] ?? spec
+  const absolute = isAbsolute(bare) ? bare : resolve(dirname(fromAbsolute), bare)
+  const target = normalize(relative(root, absolute))
+  if (!target || target.startsWith('..') || isAbsolute(target)) return null
+  return target
+}
+
+function readLiteralForms(value: string, fromAbsolute: string, root: string): string[] {
+  const text = value.replaceAll('\\', '/').trim()
+  if (!isMatchableReadLiteral(text)) return []
+  const forms = new Set<string>()
+  const normalized = normalizeReadLiteral(text)
+  if (normalized) forms.add(normalized)
+  if (text.startsWith('.') && text.includes('/')) {
+    const resolved = repoPathFromUrl(text, fromAbsolute, root)
+    if (resolved) forms.add(resolved)
+  }
+  return [...forms]
+}
+
+function dynamicImportMetaUrl(node: ts.Node): boolean {
+  if (!ts.isNewExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== 'URL') return false
+  const [spec, base] = node.arguments ?? []
+  if (!base || !isImportMetaUrl(base)) return false
+  return !spec || !ts.isStringLiteralLike(spec)
+}
 
 function importIsTypeOnly(node: ts.ImportDeclaration): boolean {
   const clause = node.importClause
@@ -124,6 +194,7 @@ export function readImportGraph(root: string): ImportGraph {
   const imports = new Map<string, Set<string>>()
   const literals = new Map<string, Set<string>>()
   const keysByModule = new Map<string, Set<string>>()
+  const reads = new Map<string, Set<string>>()
   const incomplete: IncompleteEvidence[] = []
   const seenIncomplete = new Set<string>()
   const note = (file: string, reason: string) => {
@@ -145,6 +216,11 @@ export function readImportGraph(root: string): ImportGraph {
     values.add(value)
     literals.set(from, values)
   }
+  const addRead = (from: string, value: string) => {
+    const values = reads.get(from) ?? new Set<string>()
+    values.add(value)
+    reads.set(from, values)
+  }
   for (const absolute of walkSourceFiles(root, sourceExtensions, true, 'skip-non-source')) {
     const from = normalize(relative(root, absolute))
     let source: ts.SourceFile
@@ -156,6 +232,12 @@ export function readImportGraph(root: string): ImportGraph {
     }
     const visit = (node: ts.Node): void => {
       if (ts.isStringLiteralLike(node)) addLiteral(from, node.text)
+      const urlSpec = literalNewUrl(node)
+      if (urlSpec) {
+        const target = repoPathFromUrl(urlSpec, absolute, root)
+        if (target && sourceExtensions.test(target)) add(from, target)
+        else if (target) addRead(from, target)
+      } else if (dynamicImportMetaUrl(node)) note(from, 'filesystem read has no matchable literal')
       const specifier = ts.isImportDeclaration(node) && !importIsTypeOnly(node) ? node.moduleSpecifier
         : ts.isExportDeclaration(node) && !exportIsTypeOnly(node) ? node.moduleSpecifier
           : undefined
@@ -163,6 +245,23 @@ export function readImportGraph(root: string): ImportGraph {
         const classified = classifySpecifier(specifier.text, absolute, root)
         if (classified.target) add(from, classified.target)
         else if (classified.unresolved) note(from, `unresolved import '${specifier.text}'`)
+      } else if (ts.isCallExpression(node) && readCallName(node)) {
+        const found = new Set<string>()
+        let explained = false
+        const walk = (child: ts.Node): void => {
+          const spec = literalNewUrl(child)
+          if (spec) {
+            if (repoPathFromUrl(spec, absolute, root)) explained = true
+            return
+          }
+          if (ts.isStringLiteralLike(child)) {
+            for (const form of readLiteralForms(child.text, absolute, root)) found.add(form)
+          }
+          ts.forEachChild(child, walk)
+        }
+        for (const argument of node.arguments) walk(argument)
+        for (const literal of found) addRead(from, literal)
+        if (found.size === 0 && !explained) note(from, 'filesystem read has no matchable literal')
       } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
         const argument = node.arguments[0]
         if (argument && ts.isStringLiteralLike(argument)) {
@@ -182,5 +281,5 @@ export function readImportGraph(root: string): ImportGraph {
       }
     }
   }
-  return { dependents, imports, literals, keysByModule, incomplete }
+  return { dependents, imports, literals, keysByModule, reads, incomplete }
 }
