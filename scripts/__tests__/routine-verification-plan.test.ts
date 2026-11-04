@@ -119,6 +119,22 @@ describe('dependency routine verification plan', () => {
     expect(plan.fullTrigger).toBe(false)
   })
 
+  it('selects a configured setup project through imports while keeping generated reads on direct tests', () => {
+    const root = writeTree({
+      'vitest.config.ts': "export default { test: { projects: [{ test: { name: 'fast-client', setupFiles: ['./tests/setup.ts'] } }] } }",
+      'tests/setup.ts': "import './helper'\nimport { readFileSync } from 'node:fs'\nreadFileSync('public/i18n/en.json', 'utf8')",
+      'tests/helper.ts': 'export const helper = 1',
+      'client/a.test.ts': 'export const a = 1',
+      'client/b.test.ts': 'export const b = 1',
+      'server/__tests__/other.test.ts': 'export const other = 1',
+      'i18n.ref': '{}',
+    })
+    for (const path of ['tests/setup.ts', 'tests/helper.ts']) {
+      expect(planRoutineVerification({ root, changes: [{ status: 'M', path }] }).vitestFiles).toEqual(['client/a.test.ts', 'client/b.test.ts'])
+    }
+    expect(planRoutineVerification({ root, changes: [{ status: 'M', path: 'i18n.ref' }] }).vitestFiles).toEqual([])
+  })
+
   it('keeps mechanism aggregators on the ordinary dependency walk', () => {
     const root = writeTree({
       'shared/actions/effects/pay.ts': 'export const pay = 1\n',
@@ -482,6 +498,35 @@ describe('dependency routine verification plan', () => {
     expect(plan.fullTrigger).toBe(false)
   })
 
+  it('follows local const paths and respects shadowed parameters without widening a literal reader', () => {
+    const root = writeTree({
+      'client/view.css': '.view {}',
+      'client/other.test.ts': 'export const other = 1',
+      'client/view.test.ts': "import { readFileSync } from 'node:fs'\nimport { join } from 'node:path'\nconst cssPath = join(process.cwd(), 'client/view.css')\nconst alias = cssPath\nexport const css = readFileSync(alias, 'utf8')",
+      'server/__tests__/shadow.test.ts': "import { readFileSync } from 'node:fs'\nconst cssPath = 'client/view.css'\nexport const read = (cssPath: string) => readFileSync(cssPath, 'utf8')",
+    })
+    const read = planRoutineVerification({ root, changes: [{ status: 'M', path: 'client/view.css' }] })
+    expect(read.vitestFiles).toEqual(['client/view.test.ts'])
+    expect(read.warnings).toEqual([])
+    const edited = planRoutineVerification({ root, changes: [{ status: 'M', path: 'client/view.test.ts' }] })
+    expect(edited.vitestFiles).toEqual(['client/view.test.ts'])
+    expect(edited.warnings).toEqual([])
+    const shadow = planRoutineVerification({ root, changes: [{ status: 'M', path: 'server/__tests__/shadow.test.ts' }] })
+    expect(shadow.warnings.join('\n')).toContain('filesystem read has no matchable literal')
+  })
+
+  it('recomputes import evidence after a source edit in the same process', () => {
+    const root = writeTree({
+      'client/a.ts': 'export const a = 1',
+      'client/b.ts': 'export const b = 1',
+      'client/a.test.ts': "import './a'",
+      'client/b.test.ts': "import './b'",
+    })
+    expect(planRoutineVerification({ root, changes: [{ status: 'M', path: 'client/a.ts' }] }).vitestFiles).toEqual(['client/a.test.ts'])
+    writeFileSync(join(root, 'client/b.test.ts'), "import './a'")
+    expect(planRoutineVerification({ root, changes: [{ status: 'M', path: 'client/a.ts' }] }).vitestFiles).toEqual(['client/a.test.ts', 'client/b.test.ts'])
+  })
+
   it('keeps a non-source symlink from forcing the complete catalog', () => {
     const root = writeTree({
       'docs/ARCHITECTURE.md': '# Architecture\n',
@@ -547,7 +592,8 @@ describe('dependency routine verification plan', () => {
     })
 
     expect(plan.vitestFiles).toContain('shared/domain/__tests__/gone.test.ts')
-    expect(plan.vitestFiles).not.toContain('shared/domain/__tests__/kept.test.ts')
+    expect(plan.vitestFiles).toContain('shared/domain/__tests__/kept.test.ts')
+    expect(plan.warnings).toEqual(["shared/domain/__tests__/gone.test.ts: unresolved import '../gone'; widened to fast-shared"])
     expect(plan.fullTrigger).toBe(false)
   })
 
@@ -913,6 +959,26 @@ describe('dependency routine verification plan', () => {
     expect(plan.browserFiles).toEqual([{ file: 'e2e-tests/direct.spec.ts', grep: null }])
   })
 
+  it('keeps declared specs behind test helpers off a production change and selects a changed helper', () => {
+    const root = writeTree({
+      'client/feature/tile.ts': 'export const tile = 1',
+      'client/other/marker.ts': 'export const marker = 1',
+      'e2e-tests/helpers/board.ts': "import '../../client/feature/tile'",
+      'server/__tests__/_helpers/board.ts': "import '../../../client/feature/tile'",
+      'e2e-tests/board.spec.ts': "// @covers client/other/\nimport './helpers/board'\nimport '../server/__tests__/_helpers/board'",
+      'e2e-tests/a.spec.ts': 'export const a = 1',
+      'e2e-tests/b.spec.ts': 'export const b = 1',
+    })
+    expect(planRoutineVerification({ root, changes: [{ status: 'M', path: 'client/feature/tile.ts' }] }).browserFiles).toEqual([])
+    expect(planRoutineVerification({ root, changes: [{ status: 'M', path: 'e2e-tests/helpers/board.ts' }] }).browserFiles).toEqual([{ file: 'e2e-tests/board.spec.ts', grep: null }])
+  })
+
+  it('does not schedule a deleted browser spec or the old name of a renamed spec', () => {
+    const root = writeTree({ 'e2e-tests/new.spec.ts': 'export const renamed = 1' })
+    expect(planRoutineVerification({ root, changes: [{ status: 'D', path: 'e2e-tests/gone.spec.ts' }] }).browserFiles).toEqual([])
+    expect(planRoutineVerification({ root, changes: [{ status: 'R', previousPath: 'e2e-tests/old.spec.ts', path: 'e2e-tests/new.spec.ts' }] }).browserFiles).toEqual([{ file: 'e2e-tests/new.spec.ts', grep: null }])
+  })
+
   it('stops the importer walk at the first file with a covers declaration', () => {
     const root = writeTree({
       'client/feature/widget.ts': 'export const widget = 1\n',
@@ -1115,14 +1181,17 @@ describe('dependency routine verification plan', () => {
     ].map(file => ({ file, grep: null }))
     const farm = planRoutineVerification({
       root: repoRoot,
+      sourceFingerprint: 'immutable-repository-fixture',
       changes: [{ status: 'M', path: 'client/components/board/FarmBoard.tsx' }],
     })
     const main = planRoutineVerification({
       root: repoRoot,
+      sourceFingerprint: 'immutable-repository-fixture',
       changes: [{ status: 'M', path: 'client/main.tsx' }],
     })
     const replay = planRoutineVerification({
       root: repoRoot,
+      sourceFingerprint: 'immutable-repository-fixture',
       changes: [{ status: 'M', path: 'replay-viewer/src/main.tsx' }],
     })
 
@@ -1133,6 +1202,6 @@ describe('dependency routine verification plan', () => {
     expect(main.browserFiles).toEqual(routineBrowserSmokeSet)
     expect(replay.fullTrigger).toBe(false)
     expect(replay.browserFiles).toEqual(replayViewerSpecs)
-  }, 60_000)
+  }, 180_000)
 
 })

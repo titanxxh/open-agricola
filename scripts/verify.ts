@@ -3,8 +3,8 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { plannedCheckCommands } from './ci/scoped-verification'
-import { createRepositoryPlan, type ChangedPath } from './ci/verification-plan'
+import { plannedCheckCommands, unitServicesRequired } from './ci/scoped-verification'
+import { assertPlanCurrent, createRepositoryPlan, type ChangedPath } from './ci/verification-plan'
 import { FULL_TASK_IDS } from './ci/verification-tasks'
 import {
   createBrowserRun, loadRequirements, readBrowserRunResult, reporterContextEnvironment,
@@ -204,24 +204,35 @@ export function runAffectedVerification(cwd: string, args: string[] = [], run: R
     for (const reason of plan.expansionReasons) console.log(`[verify] full trigger: ${reason}`)
     return
   }
+  for (const reason of plan.selectionReasons ?? []) console.log(`[verify] selection: ${reason}`)
+  for (const warning of plan.wideningReasons) console.log(`[verify] warning: ${warning}`)
+  const execute = (command: string, commandArgs: string[]): void => {
+    assertPlanCurrent(cwd, plan)
+    const exitCode = run(command, commandArgs, cwd)
+    if (exitCode !== 0) throw new Error(`affected check failed (exit ${exitCode})`)
+    assertPlanCurrent(cwd, plan)
+  }
   const browserChecks = plan.checks.filter(check => check.kind === 'browser')
   for (const check of browserChecks) {
     const grep = check.grep ? ` --grep ${check.grep}` : ''
     console.log(`[verify] browser: ${check.browser} ${check.files.join(' ')}${grep}`)
   }
-  for (const check of plan.checks) {
+  const units = plan.checks.filter(check => check.kind === 'vitest')
+  if (units.length) {
+    if (unitServicesRequired(cwd, units)) execute(process.execPath, ['scripts/local-services.mjs', '--test'])
+    execute('pnpm', ['run', 'build:cards-manifest'])
+  }
+  for (const check of units) {
     if (check.kind !== 'vitest') continue
     for (const command of plannedCheckCommands(cwd, check)) {
       console.log(`[verify] vitest: ${command.command} ${command.args.join(' ')}`)
-      const exitCode = run(command.command, command.args, cwd)
-      if (exitCode !== 0) throw new Error(`vitest failed (exit ${exitCode})`)
+      execute(command.command, command.args)
     }
   }
   if (!runBrowser) return
   for (const check of browserChecks) {
     for (const command of plannedCheckCommands(cwd, check)) {
-      const exitCode = run(command.command, command.args, cwd)
-      if (exitCode !== 0) throw new Error(`browser failed (exit ${exitCode})`)
+      execute(command.command, command.args)
     }
   }
 }

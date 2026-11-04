@@ -562,14 +562,16 @@ else
 fi
 
 echo "Preparing local dependencies..."
-SHARED_DATA_DIR="$SHARED_DATA_DIR" node "$SCRIPT_DIR/scripts/local-services.mjs"
-set -a
-# shellcheck disable=SC1090
-. "$SHARED_DATA_DIR/dependencies.local"
-set +a
+if [ "${LOCAL_DEPENDENCIES_READY:-0}" != 1 ]; then
+  SHARED_DATA_DIR="$SHARED_DATA_DIR" node "$SCRIPT_DIR/scripts/local-services.mjs"
+  set -a
+  # shellcheck disable=SC1090
+  . "$SHARED_DATA_DIR/dependencies.local"
+  set +a
+fi
 
 echo "Ensuring immutable replay viewer..."
-"$PNPM_BIN" run build:cards-manifest
+if [ -n "${REPLAY_VIEWER_BUILD_ID:-}" ]; then "$PNPM_BIN" run build:cards-manifest; fi
 REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
   env \
     REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \

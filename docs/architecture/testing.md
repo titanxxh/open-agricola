@@ -48,7 +48,9 @@ Routine selection follows dependency evidence. Incomplete evidence widens inside
 
 `test-consumers.ts` records which selected tests need database services.
 
-Tests: `scripts/__tests__/routine-verification-plan.test.ts`, `scripts/__tests__/routine-verification-replay.test.ts`, `scripts/__tests__/verify-affected.test.ts`, `scripts/__tests__/scoped-verification-partitions.test.ts`, `scripts/__tests__/scoped-verification.test.ts`, `scripts/__tests__/scoped-verification-cli.test.ts`, `scripts/__tests__/routine-verification-gate.test.ts`, `scripts/__tests__/vitest-results.test.ts`, and `scripts/__tests__/ci-card-impl-boundaries.test.ts`.
+Runtime import selection includes configured Vitest setup consumers. Artifact reads stay on direct readers and direct tests, with local const path aliases resolved. Cached graphs require a matching source fingerprint. Browser walks stop at shared test helpers. `restart-local.sh` prepares the Replay Viewer and its artifacts in one build; the isolated browser runner owns environment creation through tsx, startup failure cleanup, and credential removal. Completed browser JSON results must cover the selected specs. A valid empty documentation plan skips all execution slots. Selection evidence is included in the plan summary.
+
+Tests: `scripts/__tests__/routine-verification-plan.test.ts`, `scripts/__tests__/routine-verification-replay.test.ts`, `scripts/__tests__/verify-affected.test.ts`, `scripts/__tests__/scoped-verification-partitions.test.ts`, `scripts/__tests__/scoped-verification.test.ts`, `scripts/__tests__/scoped-verification-cli.test.ts`, `scripts/__tests__/routine-verification-gate.test.ts`, `scripts/__tests__/isolated-browser.test.ts`, `scripts/__tests__/vitest-results.test.ts`, and `scripts/__tests__/ci-card-impl-boundaries.test.ts`.
 
 ## Architecture fitness
 

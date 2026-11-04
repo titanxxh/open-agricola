@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, matchesGlob, relative } from 'node:path'
 import { globSync } from 'glob'
+import ts from 'typescript'
 import { CARD_REGISTRIES, readImportGraph, type ImportGraph } from './import-graph'
 import { FULL_TASK_IDS } from './verification-tasks'
-import { sourceExtensions, walkSourceFiles } from '../source-files'
+import { parseSource, sourceExtensions, walkSourceFiles } from '../source-files'
 import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-globs'
 
 export type RoutineChange =
@@ -18,6 +19,7 @@ export type RoutineVerificationPlan = {
   browserFiles: RoutineBrowserEntry[]
   warnings: string[]
   fullTrigger: boolean
+  selectionReasons?: string[]
 }
 
 export const ROUTINE_BROWSER_SMOKE_SET: readonly RoutineBrowserEntry[] = [
@@ -36,6 +38,33 @@ const REPLAY_BROWSER_SPECS: readonly RoutineBrowserEntry[] = [
 ]
 
 const projects = [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: BASE_EXCLUDE }]
+
+function withSetupDependents(root: string, graph: ImportGraph, inventory: ReadonlyMap<string, string>): ImportGraph {
+  const config = join(root, 'vitest.config.ts')
+  if (!existsSync(config)) return graph
+  const dependents = new Map(graph.dependents)
+  const visit = (node: ts.Node): void => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const property = (name: string) => node.properties.find(member => ts.isPropertyAssignment(member)
+        && (ts.isIdentifier(member.name) || ts.isStringLiteralLike(member.name)) && member.name.text === name)
+      const name = property('name')
+      const setup = property('setupFiles')
+      if (name && ts.isPropertyAssignment(name) && ts.isStringLiteralLike(name.initializer)
+        && setup && ts.isPropertyAssignment(setup) && ts.isArrayLiteralExpression(setup.initializer)) {
+        for (const entry of setup.initializer.elements) {
+          if (!ts.isStringLiteralLike(entry)) continue
+          const path = entry.text.replace(/^\.\//, '')
+          const consumers = new Set(dependents.get(path))
+          for (const [file, project] of inventory) if (project === name.initializer.text) consumers.add(file)
+          dependents.set(path, consumers)
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(parseSource(config))
+  return { ...graph, dependents }
+}
 
 function vitestInventory(root: string): Map<string, string> {
   const discovered = projects.map(project => ({
@@ -308,10 +337,13 @@ function walkImporters(
       for (const importer of graph.dependents.get(file) ?? []) visit(importer)
       return
     }
+    if (!isSpec(file) && (file.startsWith('e2e-tests/') || file.includes('/__tests__/'))
+      && !start.startsWith('e2e-tests/') && !start.includes('/__tests__/')) return
     if (declarations.has(file)) {
       if (isSpec(file)) state.specs.add(file)
       return
     }
+    if (isSpec(file)) return
     for (const importer of graph.dependents.get(file) ?? []) visit(importer)
   }
   if (start === MAIN_ENTRY) state.main = true
@@ -362,59 +394,74 @@ function fullTriggerWarnings(changes: readonly RoutineChange[]): string[] {
 }
 
 const preparedByRoot = new Map<string, {
+  fingerprint: string
   graph: ImportGraph
+  readGraph: ImportGraph
   inventory: ReadonlyMap<string, string>
   files: string[]
   covers: ReturnType<typeof readCoverIndex>
 }>()
 
-function prepare(root: string) {
+function prepare(root: string, fingerprint?: string) {
   const cached = preparedByRoot.get(root)
-  if (cached) return cached
-  const graph = readImportGraph(root)
+  if (fingerprint && cached?.fingerprint === fingerprint) return cached
+  const readGraph = readImportGraph(root)
   const inventory = vitestInventory(root)
+  const graph = withSetupDependents(root, readGraph, inventory)
   const files = sourcePaths(root)
   const covers = readCoverIndex(root, files.filter(isSpec), repositoryFiles(root))
-  const prepared = { graph, inventory, files, covers }
-  preparedByRoot.set(root, prepared)
+  const prepared = { graph, readGraph, inventory, files, covers, fingerprint: fingerprint ?? '' }
+  if (fingerprint) preparedByRoot.set(root, prepared)
   return prepared
 }
 
 export function planRoutineVerification(input: {
   root: string
   changes: readonly RoutineChange[]
+  sourceFingerprint?: string
 }): RoutineVerificationPlan {
   try {
     const triggers = fullTriggerWarnings(input.changes)
     if (triggers.length) return completeCatalog(triggers)
-    const { graph, inventory, files, covers } = prepare(input.root)
+    const { graph, readGraph, inventory, files, covers } = prepare(input.root, input.sourceFingerprint)
     const tests = new Set(inventory.keys())
     const selected = new Set<string>()
     const relevant = new Set<string>()
+    const selectionReasons: string[] = []
     for (const change of input.changes) {
       for (const path of changedPaths(change)) {
+        let dependentTests = 0
         for (const file of reachableDependents(graph, path)) {
           relevant.add(file)
-          if (tests.has(file)) selected.add(file)
+          if (tests.has(file)) { selected.add(file); dependentTests++ }
         }
-        for (const file of cardSideSelection(graph, path, tests)) selected.add(file)
-        for (const file of readSelection(graph, path, tests)) selected.add(file)
+        const cards = cardSideSelection(graph, path, tests)
+        for (const file of cards) selected.add(file)
+        const readers = readSelection(readGraph, path, tests)
         for (const output of generatedOutputs(path)) {
-          for (const file of readSelection(graph, output.path, tests, output.directory)) selected.add(file)
+          for (const file of readSelection(readGraph, output.path, tests, output.directory)) readers.add(file)
         }
+        for (const file of readers) selected.add(file)
+        selectionReasons.push(`${path}: ${dependentTests} Vitest files through runtime imports; ${cards.size} through registry keys or direct registry imports; ${readers.size} through direct reads`)
       }
     }
     const widened = widenIncomplete(graph, inventory, selected, relevant)
     const unparseable = new Set(graph.incomplete.filter(item => item.reason === 'source file cannot be parsed').map(item => item.file))
     const specCount = files.filter(isSpec).length
-    const browsers = input.changes.flatMap(change => changedPaths(change).flatMap(path =>
-      browserSelectionForPath(path, graph, covers.declarations, specCount, unparseable)))
+    const browsers = input.changes.flatMap(change => changedPaths(change).flatMap(path => {
+        const selected = browserSelectionForPath(path, graph, covers.declarations, specCount, unparseable)
+        const entries = change.status === 'D' || (change.status === 'R' && path === change.previousPath)
+          ? selected.filter(entry => entry.file !== path) : selected
+        selectionReasons.push(`${path}: ${entries.length} browser entries through self, direct imports, @covers, or app entries`)
+        return entries
+      }))
     return {
       vitestFiles: [...selected].sort(),
       catalogTasks: documentationOnly(input.changes) ? [] : ['quality', 'build'],
       browserFiles: sortBrowsers([...browsers, ...widened.browserFiles]),
       warnings: [...widened.warnings, ...covers.warnings].sort(),
       fullTrigger: false,
+      selectionReasons: selectionReasons.sort(),
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

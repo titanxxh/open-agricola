@@ -50,7 +50,9 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查提供开�
 
 `test-consumers.ts` 记录选中的测试是否需要数据库服务。
 
-测试：`scripts/__tests__/routine-verification-plan.test.ts`、`scripts/__tests__/routine-verification-replay.test.ts`、`scripts/__tests__/verify-affected.test.ts`、`scripts/__tests__/scoped-verification-partitions.test.ts`、`scripts/__tests__/scoped-verification.test.ts`、`scripts/__tests__/scoped-verification-cli.test.ts`、`scripts/__tests__/routine-verification-gate.test.ts`、`scripts/__tests__/vitest-results.test.ts`、`scripts/__tests__/ci-card-impl-boundaries.test.ts`。
+运行时依赖选择包含 Vitest 配置中的 setup 消费者；生成产物读取仍停在直接读取者及其直接测试，并解析局部 const 路径别名。依赖图缓存必须匹配源码指纹。浏览器查找停在共享测试 helper。`restart-local.sh` 一次构建 Replay Viewer 及其产物，隔离浏览器入口通过 tsx 创建环境，负责启动失败清理及凭据文件移除。浏览器 JSON 必须证明所选 spec 的实际完成结果。合法的空文档计划跳过全部执行槽位。计划摘要包含选择依据。
+
+测试：`scripts/__tests__/routine-verification-plan.test.ts`、`scripts/__tests__/routine-verification-replay.test.ts`、`scripts/__tests__/verify-affected.test.ts`、`scripts/__tests__/scoped-verification-partitions.test.ts`、`scripts/__tests__/scoped-verification.test.ts`、`scripts/__tests__/scoped-verification-cli.test.ts`、`scripts/__tests__/routine-verification-gate.test.ts`、`scripts/__tests__/isolated-browser.test.ts`、`scripts/__tests__/vitest-results.test.ts`、`scripts/__tests__/ci-card-impl-boundaries.test.ts`。
 
 ## 架构门禁
 

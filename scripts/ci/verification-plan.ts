@@ -4,7 +4,6 @@ import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { globSync } from 'glob'
 import { BASE_EXCLUDE, FAST_PROJECT_GLOBS, SLOW_INCLUDE } from '../test-project-globs'
-import { parseSource } from '../source-files'
 import { planRoutineVerification, type RoutineVerificationPlan } from './routine-verification-plan'
 
 export type VerificationIdentity = {
@@ -85,6 +84,7 @@ export type VerificationPlan = {
   expansionReasons: string[]
   wideningReasons: string[]
   checks: PlannedCheck[]
+  selectionReasons?: string[]
 }
 
 function routineChecks(routine: RoutineVerificationPlan, inventory: TestInventory): PlannedCheck[] {
@@ -147,7 +147,6 @@ export function readTestInventory(cwd: string): TestInventory {
     const stat = lstatSync(join(cwd, file), { throwIfNoEntry: false })
     if (!stat) continue
     if (!stat.isFile()) throw new Error(`Test sources must be regular files: ${file}`)
-    parseSource(join(cwd, file))
     if (/^e2e-tests\/.+\.spec\.[cm]?[jt]sx?$/.test(file)) {
       inventory.browser.push(file)
       continue
@@ -214,7 +213,7 @@ export function createRepositoryPlan(input: {
       .map(path => ({ status: 'A', path } satisfies ChangedPath)),
   ]
   const changes = input.changes ?? [...new Map(discovered.map(change => [JSON.stringify(change), change])).values()]
-  const routine = planRoutineVerification({ root: input.cwd, changes })
+  const routine = planRoutineVerification({ root: input.cwd, changes, sourceFingerprint: identity.sourceFingerprint })
   const full = routine.fullTrigger
   const plan: VerificationPlan = {
     schemaVersion: 1,
@@ -224,6 +223,7 @@ export function createRepositoryPlan(input: {
     changes,
     inventory,
     selections: [],
+    selectionReasons: routine.selectionReasons ?? [],
     expansionReasons: full ? [...routine.warnings] : [],
     wideningReasons: full ? [] : [...routine.warnings],
     checks: full
@@ -254,6 +254,7 @@ export function formatPlanSummary(plan: VerificationPlan): string {
     `Head: ${code(plan.identity.headSha)}`,
     `Checked-out commit: ${code(plan.identity.testedSha)}`, '',
     `Discovered tests: ${plan.inventory.vitest.length} Vitest files and ${plan.inventory.browser.length} browser files.`, '',
+    ...(plan.selectionReasons?.length ? ['## Selection evidence', '', ...plan.selectionReasons.map(reason => `- ${reason}`), ''] : []),
     ...(plan.selections.length ? ['## Selected scopes', '', ...plan.selections.map(selection => `- **${selection.scope}**: ${selection.reason} ${paths(selection.paths)}`), ''] : []),
     ...(plan.expansionReasons.length ? ['## Why verification expands', '', ...plan.expansionReasons.map(reason => `- ${reason}`), ''] : []),
     ...(plan.wideningReasons.length ? ['## Warnings', '', ...plan.wideningReasons.map(reason => `- ${reason}`), ''] : []),

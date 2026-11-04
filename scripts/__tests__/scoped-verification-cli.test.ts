@@ -71,7 +71,10 @@ if (process.env.FAIL_COMMAND && args.includes(process.env.FAIL_COMMAND)) process
 const reportAt = args.indexOf('--report');
 if (reportAt >= 0 && args[reportAt + 1]) {
   fs.mkdirSync(path.dirname(args[reportAt + 1]), { recursive: true });
-  fs.writeFileSync(args[reportAt + 1], '{"suites":[]}\\n');
+  const files = args.slice(args.indexOf('--') + 1);
+  fs.writeFileSync(args[reportAt + 1], JSON.stringify({ suites: [{ specs: files.map(file => ({
+    title: 'renders the farm', file, tests: [{ status: 'expected', results: [{ status: 'passed' }] }],
+  })) }] }));
 }
 if (process.env.MUTATE_SOURCE) fs.appendFileSync('README.md', 'changed during execution\\n');
 if (args.includes('vitest')) {
@@ -213,7 +216,6 @@ describe('scoped verification public CLI', () => {
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
       ['run', 'lint'], ['run', 'check:dependencies'], ['run', 'lint:i18n'],
       ['run', 'build'], ['run', 'build:replay-viewer'], ['run', 'check:bundle-size'],
-      ['run', 'build:cards-manifest'],
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'start', 'output/verification/browser-session'],
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session', '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--', 'e2e-tests/farm-select.spec.ts'],
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'stop', 'output/verification/browser-session'],
@@ -267,7 +269,6 @@ describe('scoped verification public CLI', () => {
     expect(value.commands()).toEqual([
       ['run', 'build:cards-manifest'],
       ['exec', 'vitest', 'run', '--project', 'fast-client', 'client/components/board/__tests__/FarmBoard.test.tsx'],
-      ['run', 'build:cards-manifest'],
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'start', 'output/verification/browser-session'],
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session', '--report', 'output/verification/browser-session/1.json', '--retries', '1', '--browser', 'chromium', '--', 'e2e-tests/farm-select.spec.ts'],
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'stop', 'output/verification/browser-session'],
