@@ -73,7 +73,7 @@
     "@prometheus-io/client": "0.16.1",
     "better-sqlite3": "^13.0.3",
     "canvas": "^3.2.1",
-    "isolated-vm": "^7.0.1",
+    "isolated-vm": "^7.0.2",
     "nanoid": "^6.0.2",
     "pg": "^8.23.1",
     "react": "^19.3.1",
