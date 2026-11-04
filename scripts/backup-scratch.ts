@@ -84,6 +84,7 @@ function decodeRecord(value: unknown, filename: string): ScratchRecord {
 
 async function connect(connectionString: string, statementTimeout = 10_000): Promise<Client> {
   const client = new Client({ connectionString, connectionTimeoutMillis: 10_000, statement_timeout: statementTimeout,
+    options: statementTimeout === 0 ? '-c statement_timeout=0' : undefined,
     application_name: 'agricola-backup-scratch' })
   client.on('error', () => {})
   try { await client.connect(); return client } catch (error) { await client.end().catch(() => {}); throw error }
@@ -127,14 +128,16 @@ async function claimProvided(client: Client, directory: string, record: ScratchR
   } catch (error) { await client.query('ROLLBACK'); throw error }
 }
 
-async function cleanOwned(record: ScratchRecord, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<void> {
+async function cleanOwned(record: ScratchRecord, env: NodeJS.ProcessEnv, mode: 'finished' | 'expired', signal?: AbortSignal): Promise<void> {
   if (record.environment !== environmentIdentity(env)) throw new Error('Backup scratch belongs to a different environment')
   if ((record.target.kind === 'provided') !== Boolean(env.VALIDATION_DATABASE_URL)) throw new Error('Backup scratch target configuration changed')
   const url = targetUrl(record, env)
   signal?.throwIfAborted()
   if (record.target.kind === 'created') {
     const admin = await connect(sourceUrl(env).toString(), 0)
-    try { await admin.query(`DROP DATABASE IF EXISTS "${databaseName(record.token)}" WITH (FORCE)`) }
+    // A pool can resolve end() before its sockets finish closing. Normal cleanup
+    // lets PostgreSQL drain them; only expired, abandoned workers require FORCE.
+    try { await admin.query(`DROP DATABASE IF EXISTS "${databaseName(record.token)}"${mode === 'expired' ? ' WITH (FORCE)' : ''}`) }
     finally { await admin.end() }
   } else {
     const client = await connect(url.toString())
@@ -207,7 +210,7 @@ export async function withBackupScratch<T>(request: {
     objects.close()
     await keeper?.end()
     if (recorded) {
-      await cleanOwned(record, env)
+      await cleanOwned(record, env, 'finished')
       await rm(join(directory, recordName(token)))
     }
   }
@@ -226,7 +229,7 @@ export async function cleanupBackupScratch(directory: string, env: NodeJS.Proces
     signal?.throwIfAborted()
     const record = decodeRecord(JSON.parse(await readFile(join(directory, filename), 'utf8')), filename)
     if (record.deadlineEpochMs > now) continue
-    await cleanOwned(record, env, signal)
+    await cleanOwned(record, env, 'expired', signal)
     await rm(join(directory, filename))
     cleaned++
   }

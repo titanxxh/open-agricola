@@ -145,7 +145,7 @@ await withBackupScratch({ directory: process.env.SCRATCH_TEST_DIRECTORY, env: pr
   } finally {
     await kill(worker)
     await target.close()
-    await admin.exec(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`)
+    await admin.exec(`DROP DATABASE IF EXISTS "${database}"`)
     await admin.close()
   }
 })
@@ -168,7 +168,31 @@ it('leaves someone else\'s nonempty validation schema untouched when admission f
       deadlineEpochMs: Date.now() + 60_000, signal: new AbortController().signal }, async () => {})).rejects.toThrow('source database')
   } finally {
     await target.close()
-    await admin.exec(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`)
+    await admin.exec(`DROP DATABASE IF EXISTS "${database}"`)
+    await admin.close()
+  }
+})
+
+it('ignores inherited statement timeouts for scratch creation and cleanup', async () => {
+  const directory = join(root, 'maintenance-timeout')
+  const database = `scratch_source_${randomUUID().replaceAll('-', '')}`
+  const admin = databaseMaintenance()
+  await admin.exec(`CREATE DATABASE "${database}"`)
+  await admin.exec(`ALTER DATABASE "${database}" SET statement_timeout='1ms'`)
+  const url = new URL(getTestDatabaseUrl()); url.pathname = `/${database}`
+  const isolated = { ...env, DATABASE_URL: url.toString() }
+  const deadline = Date.now() + 60_000
+  try {
+    expect(await withBackupScratch({ directory, env: isolated, schema: 'public', deadlineEpochMs: deadline,
+      signal: new AbortController().signal }, async scratch => {
+      await scratch.db.exec('CREATE TABLE validated(value text)')
+      return 'validated'
+    })).toBe('validated')
+    expect(await readdir(directory)).toEqual([])
+  } finally {
+    await admin.exec(`ALTER DATABASE "${database}" RESET statement_timeout`)
+    await cleanupBackupScratch(directory, isolated, deadline + 1)
+    await admin.exec(`DROP DATABASE IF EXISTS "${database}"`)
     await admin.close()
   }
 })
