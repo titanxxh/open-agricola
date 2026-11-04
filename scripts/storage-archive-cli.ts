@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PostgresDatabase } from '../server/database/postgres'
 import { S3ObjectStore } from '../server/storage/s3-store'
@@ -10,53 +9,48 @@ import { migratePostgres } from '../server/database/migrations'
 import { applyReplayRemovalLedger } from '../server/game/replay-removal'
 import { validateStorage } from './storage-validation'
 import { decodeLedger, exportStorageArchive, mergeLedger, restoreStorageArchive, type StorageArchive } from './storage-archive'
+import { cleanupBackupScratch, withBackupScratch } from './backup-scratch'
 
 /** Target-build validation never connects an application to historical data. */
-export async function validateArchiveInIsolation(root: string, env: NodeJS.ProcessEnv = process.env) {
+export async function validateArchiveInIsolation(root: string, env: NodeJS.ProcessEnv = process.env, signal?: AbortSignal) {
   if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required')
   const manifest = JSON.parse(await readFile(join(root, 'archive.json'), 'utf8')) as StorageArchive
-  const sourceObjects = S3ObjectStore.fromEnv(env)
-  const targetObjects = S3ObjectStore.fromEnv(env, `test/backup-${randomUUID()}/`)
-  // CREATE/DROP DATABASE can wait for a cluster checkpoint under normal load, and
-  // a cancelled DROP leaves an invalid database that stops autovacuum. This
-  // maintenance connection therefore disables statement timeouts, including
-  // role and database defaults.
-  const admin = new PostgresDatabase({ connectionString: env.DATABASE_URL, max: 1, statement_timeout: 0 })
-  const name = `backup_${randomUUID().replaceAll('-', '')}`
-  const url = new URL(env.VALIDATION_DATABASE_URL || env.DATABASE_URL)
-  if (!env.VALIDATION_DATABASE_URL) url.pathname = `/${name}`
-  if (url.toString() === new URL(env.DATABASE_URL).toString()) throw new Error('Validation must use a separate empty database')
-  const target = new PostgresDatabase({ connectionString: url.toString(), schema: manifest.schema })
-  let created = false
+  const sourceObjects = S3ObjectStore.fromEnv(env, env.S3_PREFIX ?? '', signal)
   try {
-    // On managed PostgreSQL a separately provisioned empty validation database
-    // can be supplied instead of granting CREATEDB to the runtime account.
-    if (!env.VALIDATION_DATABASE_URL) { await admin.exec(`CREATE DATABASE "${name}"`); created = true }
-    const ledger = await new ErasureLedger(sourceObjects).read()
-    const { validation } = await restoreStorageArchive(url.toString(), target, targetObjects, root, ledger)
-    return { formatVersion: 2, sourceBuildId: manifest.sourceBuildId, targetBuildId: env.GAME_BUILD_ID ?? 'development',
-      createdAt: manifest.createdAt, validatedAt: new Date().toISOString(), database: manifest.database, ...validation }
-  } finally {
-    await target.close()
-    try { if (created) await admin.exec(`DROP DATABASE "${name}"`) }
-    finally {
-      await admin.close(); sourceObjects.close()
-      try { await targetObjects.clearPrefix() } finally { targetObjects.close() }
-    }
-  }
+    return await withBackupScratch({ directory: env.BACKUP_SCRATCH_DIRECTORY || dirname(resolve(root)), env,
+      schema: manifest.schema, deadlineEpochMs: Number(env.BACKUP_DEADLINE_EPOCH_MS || Date.now() + 30 * 60 * 1000),
+      signal: signal ?? new AbortController().signal }, async target => {
+      const ledger = await new ErasureLedger(sourceObjects).read()
+      const { validation } = await restoreStorageArchive(target.connectionString, target.db, target.objects, root, ledger, target.signal)
+      return { formatVersion: 2, sourceBuildId: manifest.sourceBuildId, targetBuildId: env.GAME_BUILD_ID ?? 'development',
+        createdAt: manifest.createdAt, validatedAt: new Date().toISOString(), database: manifest.database, ...validation }
+    })
+  } finally { sourceObjects.close() }
 }
 
 export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const [command, path, flag] = args
-  if (!path || !['export', 'validate', 'restore', 'check-live', 'ledger-export', 'ledger-merge'].includes(command)) {
-    throw new Error('Usage: storage-archive-cli.ts export|validate|restore <directory> [--applications-stopped] | check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
+  if (!path || !['export-online', 'export', 'validate', 'restore', 'check-live', 'ledger-export', 'ledger-merge', 'cleanup-scratch'].includes(command)) {
+    throw new Error('Usage: storage-archive-cli.ts export-online|validate <directory> | cleanup-scratch <record-directory> | export|restore <directory> --applications-stopped | check-live <build-id> --applications-stopped | ledger-export|ledger-merge <ledger.json>')
   }
-  if (command === 'validate') {
-    console.log(JSON.stringify(await validateArchiveInIsolation(resolve(path), env), null, 2)); return
-  }
-  const objects = S3ObjectStore.fromEnv(env)
+  const controller = new AbortController()
+  const deadline = env.BACKUP_DEADLINE_EPOCH_MS === undefined ? undefined : Number(env.BACKUP_DEADLINE_EPOCH_MS)
+  if (deadline !== undefined && (!Number.isSafeInteger(deadline) || deadline <= Date.now() || deadline - Date.now() > 30 * 60 * 1000)) throw new Error('Invalid or expired backup deadline')
+  if (command === 'export-online' && deadline === undefined) throw new Error('Online backup requires BACKUP_DEADLINE_EPOCH_MS')
+  const interrupted = () => controller.abort(new Error('Storage operation interrupted'))
+  for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.on(event, interrupted)
+  const timer = deadline === undefined ? undefined : setTimeout(() => controller.abort(new Error('Backup deadline exceeded')), deadline - Date.now())
+  timer?.unref()
+  let objects: S3ObjectStore | undefined
   let db: PostgresDatabase | undefined
   try {
+    if (command === 'cleanup-scratch') {
+      console.log(JSON.stringify({ cleaned: await cleanupBackupScratch(resolve(path), env, Date.now(), controller.signal) })); return
+    }
+    if (command === 'validate') {
+      console.log(JSON.stringify(await validateArchiveInIsolation(resolve(path), env, controller.signal), null, 2)); return
+    }
+    objects = S3ObjectStore.fromEnv(env, env.S3_PREFIX ?? '', controller.signal)
     if (command === 'ledger-merge') { await mergeLedger(objects, decodeLedger(await readFile(path, 'utf8'))); return }
     if (command === 'ledger-export') {
       // Union the existing independent copy before refreshing it. A restored
@@ -66,9 +60,15 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       const batches = await new ErasureLedger(objects).read()
       await writeFile(path, JSON.stringify({ version: 1, batches }) + '\n', { mode: 0o600 }); return
     }
-    if (flag !== '--applications-stopped') throw new Error('Stop all applications and pass --applications-stopped')
+    if (command !== 'export-online' && flag !== '--applications-stopped') throw new Error('Stop all applications and pass --applications-stopped')
     if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required')
     db = new PostgresDatabase({ connectionString: env.DATABASE_URL, schema: env.DATABASE_SCHEMA })
+    if (command === 'export-online') {
+      if (deadline === undefined) throw new Error('Online backup requires a deadline')
+      await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path),
+        sourceBuildId: env.SOURCE_BUILD_ID || env.GAME_BUILD_ID || '', mode: 'online', deadlineEpochMs: deadline, signal: controller.signal })
+      return
+    }
     if (command === 'check-live') {
       const existing = await db.prepare("SELECT to_regclass('app_instances') AS instances").get<{ instances: string | null }>()
       if (existing?.instances && await db.prepare("SELECT 1 FROM app_instances WHERE status!='stopped' AND lease_until>(extract(epoch FROM clock_timestamp())*1000)::bigint LIMIT 1").get()) throw new Error('Stop all applications before validating the target build')
@@ -88,15 +88,21 @@ export async function archiveCommand(args: string[], env: NodeJS.ProcessEnv = pr
       }
     }
     if (command === 'export') {
-      await exportStorageArchive(env.DATABASE_URL, db, objects, resolve(path), env.GAME_BUILD_ID ?? '')
+      await exportStorageArchive({ connectionString: env.DATABASE_URL, db, objects, root: resolve(path),
+        sourceBuildId: env.SOURCE_BUILD_ID || env.GAME_BUILD_ID || '', mode: 'maintenance',
+        signal: controller.signal, ...(deadline === undefined ? {} : { deadlineEpochMs: deadline }) })
     } else {
       // An authoritative, separately retained ledger is mandatory even when it
       // is empty. Ordinary archives intentionally cannot supply this input.
       if (!env.CURRENT_ERASURE_LEDGER) throw new Error('CURRENT_ERASURE_LEDGER must point to the latest independent ledger copy')
       const ledger = decodeLedger(await readFile(env.CURRENT_ERASURE_LEDGER, 'utf8'))
-      console.log(JSON.stringify(await restoreStorageArchive(env.DATABASE_URL, db, objects, resolve(path), ledger), null, 2))
+      console.log(JSON.stringify(await restoreStorageArchive(env.DATABASE_URL, db, objects, resolve(path), ledger, controller.signal), null, 2))
     }
-  } finally { objects.close(); await db?.close() }
+  } finally {
+    if (timer) clearTimeout(timer)
+    for (const event of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.off(event, interrupted)
+    objects?.close(); await db?.close()
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

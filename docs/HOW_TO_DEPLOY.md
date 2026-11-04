@@ -603,7 +603,13 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 ./backup-offsite.sh ledger-only     # Refresh deletion facts without stopping applications
 ```
 
-The backup helper stops applications for export, resumes service, and validates the archive using the target build in an isolated PostgreSQL database and S3 prefix. Its report identifies source/target builds and binds the archive hash/length. By default validation needs `CREATEDB`; a managed service can instead supply a separate empty `VALIDATION_DATABASE_URL` dedicated to that validation. Historical SQLite write/capacity numbers do not establish these storage capabilities.
+Daily and ordinary manual backups run online. They inspect the running application image and its resource-deletion protocol, then use that immutable image for capture and isolated restore validation. Deploy the complete generation supporting online backup before enabling these scripts. A legacy image or mixed generation fails backup without stopping or restarting applications.
+
+Capture protects resource bytes from physical collection, then fixes one PostgreSQL snapshot for both the native dump and object catalog. Game commands and uploads continue. Logical takedowns still deny access immediately, and current deletion facts take precedence during restoration. Objects created after the snapshot belong to a later backup. Pre-deployment callers pass `--already-stopped`; only the deployment caller owns that maintenance window.
+
+One 30-minute budget covers capture, validation, packaging, offsite synchronization and bounded cleanup. Acquiring resource deletion protection waits at most 60 seconds. Timeout fails the attempt without a maintenance fallback or automatic immediate retry. Named tool containers have their own deadline supervisors, and subsequent backups reap expired tools and recorded scratch resources. Private scratch records under `backups/.backup-scratch-*.json` contain resource identities and deadlines, not credentials; retain them until cleanup succeeds.
+
+Validation uses an isolated PostgreSQL database and S3 prefix. Its report identifies source/target builds and binds the archive and configuration hashes and lengths. Data and configuration are published first and their manifest last. Only complete validated sets enter offsite staging, where hashes are checked before the remote manifest is committed. Incomplete transfers do not count toward retention or replace the last validated report. By default validation needs `CREATEDB`; a managed service can instead supply a separate empty `VALIDATION_DATABASE_URL` dedicated to validation, which the tool exclusively claims and returns to empty after use. Historical SQLite write/capacity numbers do not establish these capabilities.
 
 Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; offsite retains 30 daily and 10 pre-deploy archives. All ordinary archives and corresponding configuration snapshots expire within 30 days. Keep the autonomous offsite cron for `deploy/offsite-retention.sh`; ledger copies are never ordinary archive-retention targets. Configure `OFFSITE_BACKUP_TARGET` and `OFFSITE_BACKUP_REMOTE_DIR`, then install `deploy/open-agricola-backup.cron` and its logrotate file. Manual local backups do not require an offsite host.
 
@@ -626,7 +632,7 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps app \
 docker compose -f docker-compose.prod.yml up -d --no-build --wait app caddy
 ```
 
-Restore merges current deletion facts before placing allowed historical objects, restores PostgreSQL, applies target migrations, and verifies Room-owned recovery, complete Replay chains, and resources. A failed target must stay detached; preserve the source and resolve the error. Changing endpoints is not data migration and cannot replace export/restore/validation. Current single-host functionality makes no fault-timing or physical-host availability claim.
+Restore merges current deletion facts before placing allowed historical objects, restores PostgreSQL, applies target migrations, and verifies Room-owned recovery, complete Replay chains, and resources. Restored routing leases are detached from the source's running processes; ownership epochs, game records and seats remain intact. A failed target must stay detached; preserve the source and resolve the error. Changing endpoints is not data migration and cannot replace export/restore/validation. Current single-host functionality makes no fault-timing or physical-host availability claim.
 
 ### Remove a Replay
 

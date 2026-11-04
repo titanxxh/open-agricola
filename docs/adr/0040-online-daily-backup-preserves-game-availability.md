@@ -1,0 +1,20 @@
+# 40. Online daily backup preserves game availability
+
+- Status: Accepted
+- Date: 2026-11-05
+
+Daily and ordinary manual backups must leave the applications and WebSocket connections running and allow game commands and uploads to commit. A backup captures one consistent database snapshot; later commands belong to a later backup. Failure never falls back to stopping the applications. Pre-deployment backups, live migrations and actual disaster recovery retain the maintenance procedure.
+
+An administrator takedown takes effect immediately through the independent erasure ledger and access restrictions. Physical resource deletion may wait until the backup has copied the required immutable objects. Every restore continues to apply current erasure facts before serving data, as required by ADR 0010.
+
+The full daily job, including isolated restore validation and offsite synchronization, has a 30-minute limit. It waits at most 60 seconds to obtain resource deletion protection. Timeout or failure ends the attempt, releases protection and leaves retry to the next scheduled run or an operator. An incomplete capture cannot replace a validated backup or its successful verification report.
+
+The backup obtains schema-scoped PostgreSQL advisory transaction protection on a dedicated connection before creating a Repeatable Read snapshot on another connection. The dump imports that snapshot and the resource catalog reads it. Collectors try the shared protection before claiming and before physically deleting an object; contention defers cleanup without waiting or taking resource row locks. Ordinary writes, uploads and logical takedowns do not acquire the protection. PostgreSQL transaction timeouts bound protection independently of the backup client's lifetime.
+
+The owner runs capture tools from the inspected running application's immutable image and checks the deletion protocol and deployment generation. Supported deployment and backup entry points share the maintenance lock; a full generation containing the collector protocol must be deployed before online backup is enabled. A backup never stops an older generation to make this prerequisite true.
+
+Capture, configuration and verification files stay private until isolated restoration succeeds. The final manifest binds the archive and configuration hashes and sizes and is published last. Offsite synchronization transfers only complete sets, verifies them in staging and commits their manifest last. Partial sets cannot count toward retention. A single deadline follows the whole job into its named tool containers; cancellation removes only that job's tools, and their own supervisors also enforce the deadline.
+
+Validation records its exclusive scratch database and object prefix outside transient capture directories before writing them. Expired records allow a later job to reclaim resources after a killed worker. Actual restoration detaches saved routing leases, without changing ownership epochs, game data or seats; live source leases and ordinary startup are unaffected.
+
+This preserves the current archive and restore model without a persistent resource-pin table, lease renewal or fencing state. In exchange, physical garbage collection is deferred during capture and short-lived database snapshots retain old row versions. Implementation tests must prove ordinary game commits during capture, snapshot consistency, immediate logical takedown, actual restoration, and release after failure or timeout. A database snapshot alone does not capture S3 objects.
