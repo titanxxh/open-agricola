@@ -2,6 +2,7 @@ import { ErasureLedger } from './erasure-ledger'
 import { randomUUID } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
 import { ObjectConflictError, objectHash, S3ObjectStore, type StoredObject } from './s3-store'
+import { tryResourceDeletion } from './backup-coordination'
 
 export class ResourceIntegrityError extends Error {}
 
@@ -91,6 +92,7 @@ export class ResourceStore {
     for (let index = 0; index < limit; index++) {
       const token = randomUUID()
       const row = await this.db.transaction(async () => {
+        if (!await tryResourceDeletion(this.db)) return null
         const candidate = await this.db.prepare(`SELECT o.object_key FROM stored_objects o
           WHERE (?::text[] IS NULL OR o.object_key = ANY(?::text[])) AND ((state IN ('staging', 'ready') AND retain_until <= ? AND NOT EXISTS (
             SELECT 1 FROM object_references r WHERE r.object_key = o.object_key))
@@ -102,6 +104,7 @@ export class ResourceStore {
       })()
       if (!row) break
       await this.db.transaction(async () => {
+        if (!await tryResourceDeletion(this.db)) return
         const claimed = await this.db.prepare("SELECT 1 FROM stored_objects WHERE object_key = ? AND state = 'deleting' AND claim_token = ? FOR UPDATE").get(row.object_key, token)
         if (!claimed) return
         await this.objects.delete(row.object_key)

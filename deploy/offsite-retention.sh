@@ -8,9 +8,34 @@ set -e
 DIR="${1:-/root/open-agricola-backups}"
 MAX_AGE_MINUTES=$((30 * 24 * 60))
 cd "$DIR"
+committed() {
+  local report stem
+  for report in "$1"*.manifest.json; do
+    [[ -f "$report" ]] || continue
+    stem="${report%.manifest.json}"
+    [[ -f "$stem.tgz" && -f "env-$stem" ]] || continue
+    printf '%s %s\n' "$(stat -c '%Y' "$stem.tgz")" "$stem.tgz"
+  done
+}
+{
+  committed daily- | sort -nr | tail -n +31 | cut -d ' ' -f 2-
+  committed pre- | sort -nr | tail -n +11 | cut -d ' ' -f 2-
+} | while IFS= read -r OLD; do
+  STEM="${OLD%.tgz}"
+  rm -f -- "$OLD" "$STEM.manifest.json" "env-$STEM"
+done
 find . -maxdepth 1 -name '*.tgz' -mmin "+$MAX_AGE_MINUTES" 2>/dev/null | sed 's|^\./||' \
   | while read -r OLD; do
       STEM="${OLD%.tgz}"
       rm -f "$OLD" "$STEM.manifest.json" "env-$STEM"
       echo ">>> 已删除超期备份 $STEM"
+    done
+find . -maxdepth 1 -type d -name '.incoming-*' -mmin "+$MAX_AGE_MINUTES" -exec rm -rf -- {} +
+# A failed fresh transfer can contain rsync-preserved files from an older backup.
+# Expire those bytes by the archive's age, not the new transfer directory's age.
+find . -maxdepth 1 -type d -name '.incoming-*' -print0 \
+  | while IFS= read -r -d '' INCOMING; do
+      if [[ -n "$(find "$INCOMING" -type f \( -name '*.tgz' -o -name 'env-*' -o -name '*.manifest.json' \) -mmin "+$MAX_AGE_MINUTES" -print -quit)" ]]; then
+        rm -rf -- "$INCOMING"
+      fi
     done

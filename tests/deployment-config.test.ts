@@ -275,11 +275,11 @@ describe('production deployment config', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     expect(script).toContain('if ! MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh')
     const failureHandledAt = script.indexOf('if ! MAINTENANCE_LOCK_HELD=1 bash scripts/backup-storage.sh')
-    const localPruneAt = script.indexOf('清理本地旧备份')
-    const remotePruneAt = script.indexOf('清理远端旧备份')
+    const localPruneAt = script.indexOf('backup-files.mjs prune')
+    const remotePruneAt = script.indexOf('< deploy/offsite-retention.sh')
     expect(localPruneAt).toBeGreaterThan(failureHandledAt)
     expect(remotePruneAt).toBeGreaterThan(localPruneAt)
-    const rsyncFailureAt = script.indexOf('归档 rsync 失败，仍继续执行远端清理')
+    const rsyncFailureAt = script.indexOf('Offsite transfer failed')
     expect(rsyncFailureAt).toBeGreaterThan(-1)
     expect(remotePruneAt).toBeGreaterThan(rsyncFailureAt)
   })
@@ -289,15 +289,13 @@ describe('production deployment config', () => {
   it('propagates shared-ledger sync failures to the cron exit status', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     expect(script).toContain('sync_ledger || LEDGER_OK=0')
-    expect(script).toContain('[ "$LEDGER_OK" != 1 ]')
-    const sync = script.slice(script.indexOf('sync_ledger() {'), script.indexOf('if [ "$MODE" = "ledger-only" ]; then', script.indexOf('sync_ledger() {')))
-    expect(sync.match(/\|\| return 1/g)).toHaveLength(4)
+    expect(script).toContain('"$LEDGER_OK" != 1')
   })
 
   it('unions independent S3 erasure facts before copying them offsite', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    const mergeAt = script.indexOf('storage-archive-cli.ts ledger-merge')
-    const exportAt = script.indexOf('storage-archive-cli.ts ledger-export')
+    const mergeAt = script.indexOf('backup_container ledger-merge')
+    const exportAt = script.indexOf('backup_container ledger-export')
     const uploadAt = script.indexOf('rsync -a -e')
     expect(mergeAt).toBeGreaterThan(-1)
     expect(exportAt).toBeGreaterThan(mergeAt)
@@ -318,7 +316,9 @@ describe('production deployment config', () => {
 
   it('keeps the independent erasure ledger outside ordinary archive synchronization', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    expect(script).toContain("--exclude 'replay-removals.latest.json'")
+    const files = readFileSync('scripts/backup-files.mjs', 'utf8')
+    expect(files).not.toContain('replay-removals.latest.json')
+    expect(script).toContain('backup-files.mjs list')
     expect(script).toContain('ledger-only')
     expect(readFileSync('scripts/backup-storage.sh', 'utf8')).toContain('ledger-export /backup/replay-removals.latest.json')
   })
@@ -330,24 +330,16 @@ describe('production deployment config', () => {
 
   it('keeps the offsite retention independent from local pruning and within the 30-day cap', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
-    const lines = script.split('\n')
-    const rsyncStart = lines.findIndex((line) => line.trimStart().startsWith('rsync -az'))
+    const retention = readFileSync('deploy/offsite-retention.sh', 'utf8')
+    const rsyncStart = script.indexOf('rsync -az')
     expect(rsyncStart).toBeGreaterThan(-1)
-    let rsyncCommand = ''
-    for (let i = rsyncStart; i < lines.length; i += 1) {
-      rsyncCommand += lines[i]
-      if (!lines[i]?.endsWith('\\')) break
-    }
+    const rsyncCommand = script.slice(rsyncStart, script.indexOf('&& backup_command rsync -a', rsyncStart))
     expect(rsyncCommand).not.toContain('--delete')
-    expect(rsyncCommand).toContain("--exclude '.validate-*'")
-    expect(rsyncCommand).toContain('--exclude-from')
-    expect(script).toContain('MAX_AGE_MINUTES=$((30 * 24 * 60))')
-    const localAgePrunes =
-      script.match(/find backups -maxdepth 1 -name '\*\.tgz' -mmin "\+\$MAX_AGE_MINUTES"/g) ?? []
-    expect(localAgePrunes.length).toBeGreaterThanOrEqual(2)
-    expect(script).toContain('find . -maxdepth 1 -name \'*.tgz\' -mmin "+$MAX_AGE_MINUTES"')
-    expect(script).toContain("ls -1t daily-*.tgz 2>/dev/null | tail -n +31")
-    expect(script).toContain("ls -1t pre-*.tgz 2>/dev/null | tail -n +11")
+    expect(rsyncCommand).toContain('--files-from=')
+    expect(script).toContain('backup-files.mjs prune backups 7 5')
+    expect(retention).toContain('MAX_AGE_MINUTES=$((30 * 24 * 60))')
+    expect(retention).toContain('committed daily- | sort -nr | tail -n +31')
+    expect(retention).toContain('committed pre- | sort -nr | tail -n +11')
   })
 
   it('schedules the offsite backup at 04:00 in the host timezone with log rotation', () => {

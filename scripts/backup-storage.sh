@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# Native PostgreSQL + immutable S3 backup, validated by the selected app image.
+# Online by default; deployment callers explicitly own the maintenance stop.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/backup-process.sh
+MODE=online
+if [[ "${2:-}" == --already-stopped ]]; then MODE=maintenance
+elif [[ -n "${2:-}" ]]; then echo 'Unknown backup mode' >&2; exit 1; fi
+backup_job_begin "$MODE" "$@"
 export APP_UID="$(id -u)" APP_GID="$(id -g)"
 umask 077
 STEM="${1:?Usage: backup-storage.sh <daily-|pre-|manual-name> [--already-stopped]}"
@@ -9,51 +14,47 @@ STEM="${1:?Usage: backup-storage.sh <daily-|pre-|manual-name> [--already-stopped
 mkdir -p backups
 if [[ "${MAINTENANCE_LOCK_HELD:-0}" != 1 ]]; then
   exec 9>backups/.maintenance.lock
-  flock -w 1800 9
+  backup_command flock -w 60 9
 fi
 COMPOSE=(docker compose -f docker-compose.prod.yml)
-TOOLS=("${COMPOSE[@]}" run --rm --no-deps --user "$(id -u):$(id -g)" -v "$PWD/backups:/backup" app node --import tsx scripts/storage-archive-cli.ts)
-CAPTURE="backups/.capture-$STEM"
-[[ ! -e "$CAPTURE" && ! -e "backups/$STEM.tgz" ]] || { echo 'Backup already exists'; exit 1; }
-RESTART=0
 SUCCESS=0
-if [[ -z "${SOURCE_BUILD_ID:-}" ]]; then
-  SOURCE_BUILD_ID="$("${COMPOSE[@]}" exec -T app node -p 'process.env.GAME_BUILD_ID' 2>/dev/null || git rev-parse HEAD)"
-fi
 cleanup() {
-  if [[ "$RESTART" == 1 ]]; then "${COMPOSE[@]}" start app || true; fi
-  rm -rf -- "$CAPTURE"
+  backup_job_cleanup
+  rm -rf -- "$BACKUP_PENDING"
   if [[ "$SUCCESS" != 1 ]]; then rm -f "backups/$STEM.tgz" "backups/$STEM.manifest.json" "backups/env-$STEM"; fi
 }
+# Never remove a previously committed stem, including on a failed retry.
+[[ ! -e "backups/$STEM.tgz" && ! -e "backups/$STEM.manifest.json" && ! -e "backups/env-$STEM" ]] || { echo 'Backup already exists'; exit 1; }
 trap cleanup EXIT
-trap 'exit 130' INT TERM HUP
-if [[ "${2:-}" != '--already-stopped' ]]; then
-  RESTART=1
-  "${COMPOSE[@]}" stop app
+trap 'exit 124' INT TERM HUP
+backup_reap_tools
+mkdir -p "$BACKUP_PENDING/capture"
+if [[ "$MODE" == online ]]; then
+  backup_running_image
+else
+  SOURCE_BUILD_ID="${SOURCE_BUILD_ID:-$(git rev-parse HEAD)}"
+  export SOURCE_BUILD_ID
 fi
-"${TOOLS[@]}" ledger-export /backup/replay-removals.latest.json
-"${COMPOSE[@]}" run --rm --no-deps --user "$(id -u):$(id -g)"   -e GAME_BUILD_ID="$SOURCE_BUILD_ID" -v "$PWD/backups:/backup" app   node --import tsx scripts/storage-archive-cli.ts export "/backup/.capture-$STEM" --applications-stopped
-# Credentials/encryption keys are kept separately from the ordinary archive.
+backup_container cleanup-scratch /backup
+backup_container ledger-export /backup/replay-removals.latest.json
+if [[ "$MODE" == online ]]; then
+  backup_container export-online "/backup/.pending-$BACKUP_JOB_ID/capture"
+else
+  backup_container export "/backup/.pending-$BACKUP_JOB_ID/capture" --applications-stopped
+fi
 ENV_FILES=(.env data/dependencies.compose.env)
 [[ ! -f data/local-services.env ]] || ENV_FILES+=(data/local-services.env)
-tar -czf "backups/env-$STEM" "${ENV_FILES[@]}"
-tar -C "$CAPTURE" -czf "backups/$STEM.tgz" .
-if [[ "$RESTART" == 1 ]]; then "${COMPOSE[@]}" start app; RESTART=0; fi
-"${TOOLS[@]}" validate "/backup/.capture-$STEM" > "backups/$STEM.manifest.json"
-# Bind the portable archive to the target-build validation report.
-node --input-type=module - "$STEM" <<'NODE'
-import { createHash } from 'node:crypto'
-import { createReadStream, readFileSync, statSync, writeFileSync } from 'node:fs'
-const stem = process.argv[2], file = `backups/${stem}.tgz`, reportPath = `backups/${stem}.manifest.json`
-const hash = createHash('sha256')
-for await (const bytes of createReadStream(file)) hash.update(bytes)
-const report = JSON.parse(readFileSync(reportPath, 'utf8'))
-Object.assign(report, { backupStem: stem, archiveSha256: hash.digest('hex'), archiveSizeBytes: statSync(file).size })
-writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
-NODE
-chmod 600 "backups/$STEM.tgz" "backups/$STEM.manifest.json" "backups/env-$STEM" backups/replay-removals.latest.json
+backup_command tar -czf "$BACKUP_PENDING/env" "${ENV_FILES[@]}"
+backup_command tar -C "$BACKUP_PENDING/capture" -czf "$PWD/$BACKUP_PENDING/archive.tgz" .
+backup_container ledger-export /backup/replay-removals.latest.json
+backup_container validate "/backup/.pending-$BACKUP_JOB_ID/capture" > "$BACKUP_PENDING/report.json"
+backup_command node scripts/backup-files.mjs seal "$BACKUP_PENDING" "$STEM"
+chmod 600 "$BACKUP_PENDING/archive.tgz" "$BACKUP_PENDING/env" "$BACKUP_PENDING/manifest.json" backups/replay-removals.latest.json
+mv "$BACKUP_PENDING/archive.tgz" "backups/$STEM.tgz"
+mv "$BACKUP_PENDING/env" "backups/env-$STEM"
+mv "$BACKUP_PENDING/manifest.json" "backups/$STEM.manifest.json"
 SUCCESS=1
-cp "backups/$STEM.manifest.json" backups/.observability-manifest.tmp
-mv backups/.observability-manifest.tmp backups/observability.latest.json
+cp "backups/$STEM.manifest.json" "$BACKUP_PENDING/observability.json"
+mv "$BACKUP_PENDING/observability.json" backups/observability.latest.json
 chmod 600 backups/observability.latest.json
 echo "Validated native backup: backups/$STEM.tgz"

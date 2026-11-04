@@ -15,14 +15,16 @@ export class S3ObjectStore {
   private readonly client: S3Client
   private readonly bucket: string
   private readonly prefix: string
+  private readonly signal?: AbortSignal
 
-  constructor(client: S3Client, bucket: string, prefix = '') {
+  constructor(client: S3Client, bucket: string, prefix = '', signal?: AbortSignal) {
     this.client = client
     this.bucket = bucket
     this.prefix = prefix
+    this.signal = signal
   }
 
-  static fromEnv(env: NodeJS.ProcessEnv = process.env, prefix = env.S3_PREFIX ?? ''): S3ObjectStore {
+  static fromEnv(env: NodeJS.ProcessEnv = process.env, prefix = env.S3_PREFIX ?? '', signal?: AbortSignal): S3ObjectStore {
     const required = (key: string): string => {
       const value = env[key]
       if (!value) throw new Error(`Missing object storage configuration: ${key}`)
@@ -34,20 +36,20 @@ export class S3ObjectStore {
       credentials: { accessKeyId: required('S3_ACCESS_KEY_ID'), secretAccessKey: required('S3_SECRET_ACCESS_KEY') },
       // Bound service calls so a dead endpoint cannot occupy a DB claim indefinitely.
       requestHandler: { requestTimeout: 30_000, connectionTimeout: 5_000 }, maxAttempts: 3,
-    }), required('S3_BUCKET'), prefix)
+    }), required('S3_BUCKET'), prefix, signal)
   }
 
-  async get(key: string): Promise<StoredObject | null> {
+  async get(key: string, signal = this.signal): Promise<StoredObject | null> {
     return measure('s3_get', async () => {
-      const result = await this.getBody(key)
+      const result = await this.getBody(key, signal)
       if (result) safe(() => operationsMetrics.s3Bytes.inc({ kind: 'get' }, result.body.length))
       return result
     })
   }
 
-  private async getBody(key: string): Promise<StoredObject | null> {
+  private async getBody(key: string, signal?: AbortSignal): Promise<StoredObject | null> {
     try {
-      const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }))
+      const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }), { abortSignal: signal })
       if (!result.Body || !result.ETag) throw new Error('Object store returned incomplete content')
       return { body: Buffer.from(await result.Body.transformToByteArray()), contentType: result.ContentType ?? 'application/octet-stream', etag: result.ETag }
     } catch (error) {
@@ -66,7 +68,7 @@ export class S3ObjectStore {
 
   private async putImmutableBody(key: string, body: Buffer, contentType: string): Promise<void> {
     try {
-      await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: this.prefix + key, Body: body, ContentType: contentType, IfNoneMatch: '*' }))
+      await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: this.prefix + key, Body: body, ContentType: contentType, IfNoneMatch: '*' }), { abortSignal: this.signal })
     } catch (error) {
       if (status(error) !== 412 && status(error) !== 409) throw error
       const existing = await this.get(key)
@@ -88,7 +90,7 @@ export class S3ObjectStore {
       const result = await this.client.send(new PutObjectCommand({
         Bucket: this.bucket, Key: this.prefix + key, Body: body, ContentType: 'application/json',
         ...(previousEtag === null ? { IfNoneMatch: '*' } : { IfMatch: previousEtag }),
-      }))
+      }), { abortSignal: this.signal })
       if (!result.ETag) throw new Error('Object store returned no ETag')
       return result.ETag
     } catch (error) {
@@ -105,7 +107,7 @@ export class S3ObjectStore {
   }
 
   private async deleteBody(key: string): Promise<void> {
-    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }))
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.prefix + key }), { abortSignal: this.signal })
   }
 
   /** Intended for test teardown and explicit namespace migration tooling only. */
