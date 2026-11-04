@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const FULL_TASK_IDS = [
@@ -55,49 +55,11 @@ function chromiumSuite(cwd: string): string[] {
     }
   }
   visit('e2e-tests')
-  return found
-}
-
-function recordedDurations(cwd: string): Map<string, number> {
-  const path = join(cwd, 'scripts/ci/verification-durations.json')
-  if (!existsSync(path)) return new Map()
-  const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Browser spec durations must be a path map')
-  const durations = new Map<string, number>()
-  for (const [spec, duration] of Object.entries(value)) {
-    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) throw new Error(`Invalid browser spec duration: ${spec}`)
-    durations.set(spec, duration)
-  }
-  return durations
-}
-
-function medianDuration(durations: number[]): number {
-  if (!durations.length) return 1
-  const ordered = [...durations].sort((left, right) => left - right)
-  const middle = Math.floor(ordered.length / 2)
-  return ordered.length % 2 === 1 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2
+  return found.sort()
 }
 
 function chromiumCommands(cwd: string, shard: number): VerificationCommand[] {
-  const recorded = recordedDurations(cwd)
-  const specs = chromiumSuite(cwd)
-  const median = medianDuration(specs.flatMap(spec => {
-    const duration = recorded.get(spec)
-    return duration === undefined ? [] : [duration]
-  }))
-  const ranked = specs
-    .map(spec => ({ spec, duration: recorded.get(spec) ?? median }))
-    .sort((left, right) => right.duration - left.duration || (left.spec < right.spec ? -1 : left.spec > right.spec ? 1 : 0))
-  const bins: { total: number; specs: string[] }[] = [
-    { total: 0, specs: [] }, { total: 0, specs: [] }, { total: 0, specs: [] }, { total: 0, specs: [] },
-  ]
-  for (const item of ranked) {
-    let chosen = 0
-    for (let index = 1; index < bins.length; index++) if (bins[index].total < bins[chosen].total) chosen = index
-    bins[chosen].specs.push(item.spec)
-    bins[chosen].total += item.duration
-  }
-  const selected = bins[shard].specs.sort()
+  const selected = chromiumSuite(cwd).filter((_, index) => index % 4 === shard)
   return selected.length ? [{ command: 'pnpm', args: ['verify', ...selected] }] : []
 }
 

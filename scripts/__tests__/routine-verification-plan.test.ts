@@ -1032,7 +1032,6 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/walk-b.spec.ts': "// @covers client/b/\nimport { widget } from '../client/feature/widget'\nexport const used = widget\n",
       'e2e-tests/walk-c.spec.ts': "// @covers client/c/\nimport { widget } from '../client/feature/widget'\nexport const used = widget\n",
     })
-    const durations = JSON.parse(readFileSync(fileURLToPath(new URL('../ci/verification-durations.json', import.meta.url)), 'utf8')) as Record<string, number>
 
     const main = planRoutineVerification({
       root: mainRoot,
@@ -1053,18 +1052,12 @@ describe('dependency routine verification plan', () => {
 
     expect(main.browserFiles).toEqual(routineBrowserSmokeSet)
     expect(main.browserFiles.length).toBeLessThanOrEqual(5)
-    const smokeFiles = [...new Set(main.browserFiles.map(entry => entry.file))]
-    const smokeDuration = smokeFiles.reduce((total, file) => total + durations[file], 0)
-    expect(smokeDuration).toBeGreaterThanOrEqual(90_000)
-    expect(smokeDuration).toBeLessThanOrEqual(150_000)
     for (const entry of main.browserFiles) {
       expect(entry.grep).toEqual(expect.any(String))
       const source = readFileSync(fileURLToPath(new URL(`../../${entry.file}`, import.meta.url)), 'utf8')
       expect(source).toContain(entry.grep)
-      if (durations[entry.file] >= 30_000) {
-        const headings = source.split('\n').filter(line => /^\s*test(?:\.describe)?\(/.test(line))
-        expect(headings.some(line => !line.includes(entry.grep ?? ''))).toBe(true)
-      }
+      const headings = source.split('\n').filter(line => /^\s*test(?:\.describe)?\(/.test(line))
+      expect(headings.some(line => !line.includes(entry.grep ?? ''))).toBe(true)
     }
     expect(broad.browserFiles).toEqual(routineBrowserSmokeSet)
     expect(narrow.browserFiles).toEqual([{ file: 'e2e-tests/c.spec.ts', grep: null }])

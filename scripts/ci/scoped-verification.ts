@@ -45,13 +45,13 @@ const execute: CommandRunner = (command, args, cwd) => {
   return result.status ?? 1
 }
 
-export function routinePlanManifest(plan: VerificationPlan, cwd?: string) {
+export function routinePlanManifest(plan: VerificationPlan) {
   const tasks = plan.checks.flatMap(check => check.kind === 'catalog' ? [check.taskId] : [])
   return {
     mode: plan.mode,
     plan_digest: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
     tested_sha: plan.identity.testedSha,
-    partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan, cwd))),
+    partitions: JSON.stringify(routinePartitionManifest(routinePartitions(plan))),
     catalog_tasks: tasks.length ? selectedTasks(tasks.join(',')).join(',') : NO_CATALOG_TASKS,
     browsers: plan.checks.some(check => check.kind === 'browser') ? 'chromium webkit' : '',
   }
@@ -154,14 +154,14 @@ export function executeRepositoryPlan(input: {
   const retried: string[] = []
   try {
     const plan = repositoryPlan(input)
-    const manifest = routinePlanManifest(plan, input.cwd)
+    const manifest = routinePlanManifest(plan)
     if (input.expectedPlan !== undefined && !isDeepStrictEqual(input.expectedPlan, plan)) {
       throw new Error('Submitted verification plan differs from the canonical repository plan')
     }
     if (input.expectedDigest !== undefined && input.expectedDigest !== manifest.plan_digest) {
       throw new Error('Verification plan digest changed; regenerate the plan')
     }
-    const partition = routinePartitions(plan, input.cwd).find(partition => partition.id === input.partition)
+    const partition = routinePartitions(plan).find(partition => partition.id === input.partition)
     const checks = input.partition === 'all' ? plan.checks : partition?.checks ?? []
     if (!checks.length) throw new Error('No checks are selected for this execution partition')
     record = {
@@ -293,7 +293,7 @@ export function scopedVerificationCli(cwd: string, args: string[]): number {
     } else if (command === 'plan') {
       const plan = repositoryPlan({ cwd, base: values.base, head: values.head })
       write(output, plan)
-      const manifest = routinePlanManifest(plan, cwd)
+      const manifest = routinePlanManifest(plan)
       outputs(manifest)
       if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, formatPlanSummary(plan))
       process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')

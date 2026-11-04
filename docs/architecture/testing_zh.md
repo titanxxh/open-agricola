@@ -26,7 +26,7 @@
 
 按需执行的 `candidate-verification.yml` 使用 `scripts/ci/verification-tasks.ts` 中的完整任务清单。fast、slow、构建、质量检查和浏览器分道各自执行，失败任务可独立重试。契约和社区卡测试由正常 Vitest project 覆盖，不额外重复执行。浏览器任务复用 `scripts/verify.ts` 及其结构化结果。
 
-`scripts/ci/verification-tasks.ts` 保持 `chromium-1` 到 `chromium-4` 的任务 ID，并用 `scripts/ci/verification-durations.json` 平衡完整 Chromium 套件。平衡规则见 [CI 检查](../operations/ci-checks.md) 与 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。测试：`scripts/__tests__/catalog-chromium-balance.test.ts`。
+`scripts/ci/verification-tasks.ts` 保持 `chromium-1` 到 `chromium-4` 的任务 ID，将排序后的完整 Chromium spec 清单按文件数量均分。分组只依赖源码与验证配置，兼容重试保持相同成员。实际耗时保存在生成的执行记录中。规则见 [CI 检查](../operations/ci-checks.md) 与 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。测试：`scripts/__tests__/catalog-chromium-balance.test.ts`。
 
 正式 request/check 首先确认所选仓库受保护 main 上的最终 PR 快照，核对原生数字身份、明确的 main ref 与原始 Git 可达性。已确认的代码树批准 producer，配置哈希只标识兼容执行。该新增实现策略及原生治理信任边界见 [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md)。
 
@@ -43,7 +43,7 @@ GitHub Actions 是集成与发布的正式证据。本机定向检查提供开�
 | 职责 | 入口 |
 |---|---|
 | 规划分支、检出和源码指纹 | `scripts/ci/verification-plan.ts` 的 `createRepositoryPlan`；`scripts/ci/routine-verification-plan.ts` 的 `planRoutineVerification`；导入图在 `scripts/ci/import-graph.ts` |
-| 按耗时分区 | `scripts/ci/routine-partitions.ts` 的 `routinePartitions`；`scripts/ci/verification-durations.json` |
+| 确定性文件分组 | `scripts/ci/routine-partitions.ts` 的 `routinePartitions` |
 | 执行与 Vitest 报告 | `scripts/ci/scoped-verification.ts`；`scripts/ci/vitest-results.ts` |
 | 本机受影响检查 | `scripts/verify.ts` 的 `pnpm verify affected` |
 | 必需门禁 | `scripts/ci/routine-verification-gate.ts`；`.github/workflows/ci.yml` 调用 `.github/workflows/scoped-verification.yml` |
