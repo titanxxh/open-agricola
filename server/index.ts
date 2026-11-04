@@ -90,6 +90,8 @@ import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
 import { createFrontendHosting } from './frontend-hosting'
 import { createCommunityQrHandler } from './community-qr'
 import { createWhatsNewHandler } from './whats-new'
+import { createRetentionPolicyHandler } from './retention-policy-routes'
+import { RoomRetentionStore } from './game/room-retention-store'
 
 const handleFrontend = createFrontendHosting()
 const handleCommunityQr = createCommunityQrHandler()
@@ -205,6 +207,7 @@ const directory = new RoomDirectory(getDb())
 const invalidations = new InvalidationStore(getDb())
 const persistence = new PostgresRoomPersistence(getDb(), directory)
 const gameContextStore = new GameContextStore(getDb())
+const handleRetentionPolicy = createRetentionPolicyHandler({ store: new RoomRetentionStore(getDb()), requireAdmin })
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
 const bugReportCipher = TokenCipher.fromEnv()
@@ -449,6 +452,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (await handleCommunityQr(req, res)) return
   if (await handleWhatsNew(req, res)) return
+  if (await handleRetentionPolicy(req, res)) return
   if (await handleOperations(req, res)) return
 
   // ── Health ─────────────────────────────────────────────

@@ -502,6 +502,8 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 ## 五、环境变量参考
 
+房间保留时间通过管理员的 **设置 → 平台运行看板 → 房间保留时间** 配置，不使用环境变量。等待房间默认 3 天，进行中对局默认 7 天，允许 1 到 90 天的整数。保存后两个应用实例共享配置，无需重启；新值从下次全员离线时生效，已有截止时间保持不变。离线 Session 可在闲置 30 分钟后卸载内存，存档仍保留。见 [ADR 0039](adr/0039-runtime-room-retention-policy.md)。
+
 ### 后端（Docker / .env）
 
 | 变量 | 默认值 | 说明 |

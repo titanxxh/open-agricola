@@ -13,7 +13,7 @@ With one game per `roomId` (ADR 0009), public Replays (ADR 0010) and delta archi
 
 - The canonical link is `${PUBLIC_APP_ORIGIN}?room=<roomId>`, optionally with a paired `step=<stepNo>&frame=<sha256>` and a completed-game `perspective=pN|open`. It never carries transport, seat, site `userId` or credentials.
 - Every created Room keeps a minimal Game Context Record forever. Lifecycles are `active` (phases `waiting`, `playing`), `completed`, `expired` and `removed`; only never-created IDs are `unknown_context`.
-- A waiting Room is retained 30 minutes and a playing Room 7 days after everyone disconnects; any reconnection resets the timer. Expiry, dissolution, deletion and unfinished rematches delete only the recoverable snapshot and mark the context `expired`. Removed Replay payloads resolve as `removed` with a Tombstone (ADR 0010). Old Rooms never redirect to a rematch.
+- Room retention is an administrator policy, defaulting to 3 days while waiting and 7 days while playing ([ADR 0039](0039-runtime-room-retention-policy.md)). The deadline is fixed when everyone disconnects; reconnection clears it. Expiry, dissolution, deletion and unfinished rematches delete only the recoverable snapshot and mark the context `expired`. Removed Replay payloads resolve as `removed` with a Tombstone (ADR 0010). Old Rooms never redirect to a rematch.
 
 **HTTP and WebSocket contract.**
 

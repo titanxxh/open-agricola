@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto'
+import { DEFAULT_ROOM_RETENTION_DAYS } from '../../shared/contract/room-retention'
 import type { ExecutionStamp } from './execution-access'
 import { RoomCapacityError, type OwnerToken } from './room-directory'
 import { nextInputWindow, type RoomInputWindow } from './command-input'
@@ -172,8 +173,8 @@ export const buildFixedDevRoomInitialStateOptions = (
     : {}),
 })
 
-export const WAITING_EMPTY_ROOM_TTL_MS = 30 * 60 * 1000
-export const PLAYING_EMPTY_ROOM_TTL_MS = 7 * 24 * 60 * 60 * 1000
+export const WAITING_EMPTY_ROOM_TTL_MS = DEFAULT_ROOM_RETENTION_DAYS.waiting * 24 * 60 * 60 * 1000
+export const PLAYING_EMPTY_ROOM_TTL_MS = DEFAULT_ROOM_RETENTION_DAYS.playing * 24 * 60 * 60 * 1000
 
 export const emptyRoomTtlMs = (room: Pick<Room, 'status'>): number =>
   room.status === 'playing' ? PLAYING_EMPTY_ROOM_TTL_MS : WAITING_EMPTY_ROOM_TTL_MS

@@ -1,5 +1,6 @@
 import type { PostgresDatabase as Database } from '../database/postgres'
-import { emptyRoomTtlMs, isDevRoom } from './room.ts'
+import { isDevRoom } from './room.ts'
+import { RoomRetentionStore } from './room-retention-store'
 import { persistedRoomAccessError } from './room-access'
 import { GameCreationStore } from './game-creation-store'
 import type { SoloCreationConfigurationResponse } from '../../shared/contract/game-creation'
@@ -89,14 +90,14 @@ export class GameContextStore {
     `).get(roomId)) as ContextRow | undefined) ?? null
   }
 
-  private async expireActive(roomId: string, now: number): Promise<Awaited<void>> {
-    ;(await this.db.transaction(async () => {
+  async expireIfDue(roomId: string, now: number): Promise<boolean> {
+    return this.db.transaction(async () => {
       await this.db.prepare('SELECT room_id FROM room_ownership WHERE room_id=? FOR UPDATE').get(roomId)
       const context = await this.db.prepare('SELECT lifecycle, expires_at FROM game_contexts WHERE room_id = ? FOR UPDATE').get<{ lifecycle: string; expires_at: number | null }>(roomId)
-      if (!context || context.lifecycle !== 'active') return
-      if (await this.hasLiveWork(roomId, now)) return
+      if (!context || context.lifecycle !== 'active') return false
+      if (await this.hasLiveWork(roomId, now)) return false
       const exists = await this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId)
-      if (exists && (context.expires_at === null || context.expires_at > now)) return
+      if (exists && (context.expires_at === null || context.expires_at > now)) return false
       await this.db.prepare("UPDATE room_ownership SET status='retired', lease_until=0 WHERE room_id=?").run(roomId)
       ;(await this.db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId))
       ;(await this.db.prepare(`
@@ -107,7 +108,8 @@ export class GameContextStore {
             updated_at = ?
         WHERE room_id = ? AND lifecycle = 'active'
       `).run(now, now, roomId))
-    })())
+      return true
+    })()
   }
 
   private async hasLiveWork(roomId: string, now: number): Promise<boolean> {
@@ -128,7 +130,7 @@ export class GameContextStore {
         AND (o.room_id IS NULL OR o.instance_id=? OR o.lease_until<=? OR i.lease_until<=? OR i.status NOT IN ('starting','ready'))`)
       .all<{ room_id: string; status: 'waiting' | 'playing' }>(now, JSON.stringify(loadedIds), instanceId, now, now)
     for (const candidate of candidates) {
-      await this.db.transaction(async () => {
+      const due = await this.db.transaction(async () => {
         const owner = await this.db.prepare('SELECT admission_until,lease_until FROM room_ownership WHERE room_id=? FOR UPDATE')
           .get<{ admission_until: number; lease_until: number }>(candidate.room_id)
         if (owner && owner.lease_until > now && owner.admission_until > now) return
@@ -137,11 +139,11 @@ export class GameContextStore {
           .get<{ lifecycle: string; expires_at: number | null }>(candidate.room_id)
         if (!context || context.lifecycle !== 'active') return
         if (context.expires_at === null) {
-          await this.setActiveExpiry(candidate.room_id, now + emptyRoomTtlMs(candidate))
-        } else if (context.expires_at <= now) {
-          await this.expireActive(candidate.room_id, now)
-        }
+          await this.ensureActiveExpiry(candidate.room_id, candidate.status, now)
+        } else return context.expires_at <= now
+        return false
       })()
+      if (due) await this.expireIfDue(candidate.room_id, now)
     }
   }
 
@@ -151,7 +153,7 @@ export class GameContextStore {
     const now = this.now()
     const roomExists = (await this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
     if (!roomExists || (context.expires_at !== null && context.expires_at <= now)) {
-      ;(await this.expireActive(roomId, now))
+      ;(await this.expireIfDue(roomId, now))
       return (await this.loadContext(roomId))
     }
     return context
@@ -164,6 +166,30 @@ export class GameContextStore {
   async activeExpiresAt(roomId: string): Promise<Awaited<number | null>> {
     const context = (await this.currentContext(roomId))
     return context?.lifecycle === 'active' ? context.expires_at : null
+  }
+
+  async readActiveRetention(roomId: string): Promise<
+    { kind: 'active'; expiresAt: number | null } | { kind: 'inactive' }
+  > {
+    const context = await this.loadContext(roomId)
+    return context?.lifecycle === 'active'
+      ? { kind: 'active', expiresAt: context.expires_at }
+      : { kind: 'inactive' }
+  }
+
+  async ensureActiveExpiry(roomId: string, status: 'waiting' | 'playing', disconnectedAt: number): Promise<number | null> {
+    return this.db.transaction(async () => {
+      const context = await this.db.prepare('SELECT lifecycle,expires_at FROM game_contexts WHERE room_id=? FOR UPDATE')
+        .get<{ lifecycle: GameContextLifecycle; expires_at: number | null }>(roomId)
+      if (!context || context.lifecycle !== 'active' || isDevRoom(roomId)) return null
+      if (context.expires_at !== null) return context.expires_at
+      const policy = await new RoomRetentionStore(this.db).read()
+      const days = status === 'playing' ? policy.playingDays : policy.waitingDays
+      const row = await this.db.prepare(`UPDATE game_contexts
+        SET expires_at=COALESCE(expires_at,?),updated_at=? WHERE room_id=? AND lifecycle='active'
+        RETURNING expires_at`).get<{ expires_at: number }>(disconnectedAt + days * 24 * 60 * 60 * 1000, this.now(), roomId)
+      return row?.expires_at ?? null
+    })()
   }
 
   async setActiveExpiry(roomId: string, expiresAt: number): Promise<Awaited<void>> {

@@ -22,6 +22,7 @@ import { afterAll } from 'vitest'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
+import { enqueueRoomTask } from '../../game/room-queue'
 
 vi.mock('../../db.ts', async () => {
   const { createTestDatabase } = await import('../../__tests__/_helpers/postgres')
@@ -36,6 +37,8 @@ beforeEach(async () => {
   // A timed-out hook keeps running; never reuse its database until it finishes.
   await pendingCleanup
   vi.stubEnv('ALLOW_ANONYMOUS_WS', 'true')
+  await getDb().prepare(`INSERT INTO room_retention_policy(singleton,revision,waiting_days,playing_days)
+    VALUES(TRUE,1,3,7) ON CONFLICT DO NOTHING`).run()
   recording = await recordingResources(getDb())
 }, cleanupTimeout)
 afterEach(async () => {
@@ -1277,6 +1280,44 @@ it('checks warm resumes and starts with more than thirty retained saves without 
   }
 }, 30_000)
 
+it('uses the settled playing status when sockets close behind a queued color confirmation', async () => {
+  const owned = await ownedBackend()
+  let release = () => {}
+  const pause = new Promise<void>(resolve => { release = resolve })
+  try {
+    const host = await owned.connect(), roomId = await owned.create(host), guest = await owned.connect()
+    guest.send(JSON.stringify({ type: 'joinRoom', roomId, name: 'Other player' }))
+    await waitForEvent(guest, (event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined')
+    const room = owned.backend.registry.get(roomId)!
+    expect(room.status).toBe('waiting')
+    let enter = () => {}
+    const entered = new Promise<void>(resolve => { enter = resolve })
+    const blocking = enqueueRoomTask(room, async () => { enter(); await pause })
+    await entered
+    const pins = vi.spyOn(owned.backend.authority!, 'withRooms')
+    const scope = await new CommandStore(getDb()).issueScope('development-anonymous')
+    guest.send(JSON.stringify({ type: 'confirmPlayerColor', commandContext: {
+      scopeId: scope.scopeId, commandId: randomUUID(), roomId, expectedVersion: room.version,
+    } }))
+    await vi.waitFor(() => expect(pins).toHaveBeenCalled())
+    const hostClosed = new Promise<void>(done => host.once('close', done))
+    host.close(); await hostClosed
+    const guestClosed = new Promise<void>(done => guest.once('close', done))
+    guest.close(); await guestClosed
+    await vi.waitFor(async () => expect(await getDb().prepare('SELECT connected_count FROM room_presence WHERE room_id=?').get(roomId)).toEqual({ connected_count: 0 }))
+    expect(room.status).toBe('waiting')
+    expect(await recording.gameContextStore.readActiveRetention(roomId)).toEqual({ kind: 'active', expiresAt: null })
+    release()
+    await blocking
+    await vi.waitFor(() => expect(room.status).toBe('playing'))
+    await vi.waitFor(() => expect(room.players).toEqual([]))
+    const now = Date.now(), retention = await recording.gameContextStore.readActiveRetention(roomId)
+    if (retention.kind !== 'active' || retention.expiresAt === null) throw new Error('Expected playing retention')
+    expect(retention.expiresAt - now).toBeGreaterThan(7 * 24 * 60 * 60 * 1000 - 2000)
+    expect(retention.expiresAt - now).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000)
+  } finally { release(); await owned.close() }
+}, 15_000)
+
 it('records zero OPEN presence while a closed connection is still queued behind its frozen commit', async () => {
   const resolveSeed = rng.resolveSeed
   vi.spyOn(rng, 'resolveSeed').mockImplementation(seed => resolveSeed(seed ?? 42))
@@ -1307,12 +1348,13 @@ it('records zero OPEN presence while a closed connection is still queued behind 
     expect(owned.backend.committer!.isRetrying(roomId)).toBe(true)
     expect(owned.backend.registry.get(roomId)!.players).toHaveLength(2)
     const expiresAt = await recording.gameContextStore.activeExpiresAt(roomId)
+    expect(expiresAt).toBeNull()
     expect((await owned.persistence.loadReplayHead(roomId))?.latestStepNo).toBe(0)
     retry = false
     await vi.waitFor(() => expect(owned.backend.committer!.isRetrying(roomId)).toBe(false), { timeout: 5000 })
     expect((await owned.persistence.loadReplayHead(roomId))?.latestStepNo).toBe(1)
     await vi.waitFor(() => expect(owned.backend.registry.get(roomId)!.players).toEqual([]))
-    expect(await recording.gameContextStore.activeExpiresAt(roomId)).toBeGreaterThanOrEqual(expiresAt!)
+    expect(await recording.gameContextStore.activeExpiresAt(roomId)).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000)
     expect((await owned.persistence.load(roomId))?.serialized?.state.players[playerIndex]?.resources.wood)
       .toBe(initial.payload.state.players[playerIndex]!.resources.wood + 3)
     const receipt = await getDb().prepare('SELECT outcome_json FROM command_requests WHERE scope_id=? AND command_id=?')

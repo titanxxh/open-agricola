@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { API_BASE } from '../config'
 import { setPage } from '../utils/platform-page-url'
+import { RoomRetentionSettings } from './RoomRetentionSettings'
 import './OperationsPage.css'
 
 type Overview = { reasons: string[]; components: Record<string, string>; level: string; values: Record<string, number | null>; lastSample: number | null; refreshSeconds: number; retentionDays: number }
@@ -63,5 +64,6 @@ export function OperationsPage() {
     <p>{data?.lastSample ? `${t('platform.operationsUpdated')}: ${new Date(data.lastSample).toLocaleTimeString()}` : t('platform.operationsNoData')}</p>
     <button className="btn btn-primary" onClick={() => { void openGrafana() }}>{t('platform.operationsGrafana')}</button>
     <p>{t('platform.operationsFootnote')}</p>
+    <RoomRetentionSettings />
   </main>
 }
