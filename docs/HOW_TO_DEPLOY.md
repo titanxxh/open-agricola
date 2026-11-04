@@ -484,6 +484,8 @@ Never set these in production:
 
 ## 5. Environment Variable Reference
 
+Room retention is configured by administrators under **Settings → Operations dashboard → Room retention**, rather than through environment variables. Waiting and playing defaults are 3 and 7 days, with integer values from 1 to 90 days. Saved settings are shared by both application instances without a restart. They apply when the next offline cycle starts; existing deadlines are unchanged. Offline cached sessions can unload after 30 minutes without deleting their saved game. See [ADR 0039](adr/0039-runtime-room-retention-policy.md).
+
 ### Backend: Docker and `.env`
 
 | Variable | Default | Description |

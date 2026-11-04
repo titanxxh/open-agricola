@@ -317,6 +317,13 @@ export class RoomCommitter {
     await this.resources?.releasePreparation(roomId)
   }
 
+  forgetRoom(roomId: string): boolean {
+    if (this.isBlocked(roomId)) return false
+    this.heads.delete(roomId)
+    this.knownReplayIds.delete(roomId)
+    return true
+  }
+
   async prepareRoom(
     room: Room,
     options: PrepareRoomOptions,

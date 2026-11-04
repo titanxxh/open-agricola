@@ -25,7 +25,6 @@ import {
   resolveJoinRequestPlayerIndex,
   roomOccupiedSeatCount,
   roomConnectedPlayerCount,
-  emptyRoomTtlMs,
   toRoomMeta,
   type Room,
 } from '../game/room.ts'
@@ -565,8 +564,8 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
   const lifecycle = await ctx.gameContextStore?.lifecycle(previous.id)
   if (lifecycle && lifecycle !== 'active') return
   if (roomConnectedPlayerCount(previous) === 0) {
-    if (ctx.authority) await ctx.authority.setExpiry(previous, now + emptyRoomTtlMs(previous))
-    else await ctx.gameContextStore?.setActiveExpiry(previous.id, now + emptyRoomTtlMs(previous))
+    if (ctx.authority) await ctx.authority.retainOffline(previous, now)
+    else await ctx.gameContextStore?.ensureActiveExpiry(previous.id, previous.status === 'playing' ? 'playing' : 'waiting', now)
   }
   if (player) await ctx.broadcaster.broadcastEvent(previous, { type: 'playerDisconnected', playerIndex: player.playerIndex })
 }
@@ -1710,7 +1709,10 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
 }
 
 export async function dispatch(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
-  return observeCommand({ command: msg.type, requestId: msg.requestId, socket: ctx.ws, round: roundTag(ctx.currentRoom?.session.state) }, () => dispatchCommand(ctx, msg))
+  const run = () => observeCommand({ command: msg.type, requestId: msg.requestId, socket: ctx.ws, round: roundTag(ctx.currentRoom?.session.state) }, () => dispatchCommand(ctx, msg))
+  const ids = ctx.currentRoom ? [ctx.currentRoom.id] : []
+  if (msg.type === 'joinRoom') ids.push(msg.roomId)
+  return ctx.authority ? ctx.authority.withRooms(ids, run) : run()
 }
 async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
   refreshConnectionSeat(ctx)
@@ -1815,7 +1817,14 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
 
 /** Disconnect is ordered after already accepted work on this connection. */
 export async function finishConnection(ctx: ConnectionCtx, work: () => void | Promise<void>): Promise<void> {
-  await waitForConnection(ctx)
-  if (ctx.currentRoom) await enqueueRoomTask(ctx.currentRoom, work)
-  else await work()
+  const finish = async () => {
+    await waitForConnection(ctx)
+    const room = ctx.currentRoom
+    if (!room) { await work(); return }
+    const queued = () => enqueueRoomTask(room, work)
+    if (ctx.authority) await ctx.authority.withRooms([room.id], queued)
+    else await queued()
+  }
+  if (ctx.authority) await ctx.authority.withRooms(ctx.currentRoom ? [ctx.currentRoom.id] : [], finish)
+  else await finish()
 }

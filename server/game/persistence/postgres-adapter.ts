@@ -708,6 +708,10 @@ export class PostgresRoomPersistence implements RoomPersistence {
     })
   }
 
+  forgetRoom(id: string): void {
+    this.history.forget(id)
+  }
+
   async load(id: string): Promise<Awaited<RoomSnapshot | null>> {
     try {
       const row = (await this.loadRoom.get(id)) as RoomRow | undefined
