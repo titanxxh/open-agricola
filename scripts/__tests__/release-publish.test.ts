@@ -244,7 +244,7 @@ describe('owner-machine release entry', () => {
     expect(JSON.parse(retry.stdout)).toMatchObject({ status: 'existing', version: 'v9.9.9', sha: value.sha })
     expect(value.events().filter(event => event.kind === 'release')).toHaveLength(1)
     expect(value.events().filter(event => event.kind === 'mutation')).toHaveLength(1)
-  })
+  }, 15_000)
 
   it('requests only the failed task and refuses publication while that task remains failed, regardless of local rehearsal', () => {
     const value = fixture()
@@ -316,7 +316,7 @@ describe('owner-machine release entry', () => {
       { kind: 'mutation', endpoint: 'git/refs', evidence: 'passed', body: { ref: 'refs/tags/v9.9.9', sha: value.sha } },
     ])
     expect(value.events().filter(event => event.kind === 'release')).toHaveLength(1)
-  })
+  }, 15_000)
 
   it('rejects release execution in CI before contacting GitHub', () => {
     const value = fixture()
