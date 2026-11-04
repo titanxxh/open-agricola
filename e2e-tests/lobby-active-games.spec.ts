@@ -14,7 +14,7 @@ for (const width of [320, 390, 1280]) {
       const names = ['Alice', 'LongUnbrokenPlayerName'.repeat(3), '农场玩家张三', 'José', '🌾 Farmer', '玩家六']
       const room: MyActiveRoom = {
         id: '96725f41-b719-4474-a3df-90e5d239108b', status: 'playing', max_players: 6,
-        player_index: 0, my_turn: 0, current_player_index: 1,
+        player_index: 0, my_turn: 0, current_player_index: 1, hotseat: false,
         waiting_player_indexes: [1], progress: { phase: 'playing', round: 8 },
         expansions: ['enableParentCards', 'enableThroughTheSeasons', 'enableFarmersOfTheMoor', 'enableCommunityDeck'],
         created_at: Date.UTC(2026, 9, 27, 8), started_at: Date.UTC(2026, 9, 27, 8, 30), updated_at: Date.UTC(2026, 9, 27, 8, 40),

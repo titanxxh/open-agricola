@@ -17,6 +17,7 @@ export type MyActiveRoom = {
   my_turn: number
   current_player_index: number | null
   waiting_player_indexes: number[]
+  hotseat: boolean
   progress: LobbyGameProgress | null
   expansions: LobbyExpansion[]
   players: Array<Pick<PlayerState, 'name' | 'nameIsDefault' | 'color'> & { playerIndex: number }>

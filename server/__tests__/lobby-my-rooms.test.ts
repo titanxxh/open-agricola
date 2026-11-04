@@ -50,7 +50,7 @@ describe('my active room summaries', () => {
     expect(rooms).toHaveLength(1)
     expect(rooms[0]).toEqual({
       id: 'room', status: 'playing', max_players: 2, created_at: expect.any(Number), started_at: 1_793_089_800_000,
-      updated_at: expect.any(Number), player_index: 1, my_turn: 0, current_player_index: 0,
+      updated_at: expect.any(Number), player_index: 1, my_turn: 0, current_player_index: 0, hotseat: false,
       waiting_player_indexes: [0], progress: { phase: 'playing', round: 1 }, expansions: [],
       players: [
         { playerIndex: 0, name: 'Alice in game', nameIsDefault: false, color: 'red' },
@@ -190,6 +190,7 @@ describe('my active room summaries', () => {
     for (const room of rooms) {
       expect(room.current_player_index).toBeNull()
       expect(room.my_turn).toBe(0)
+      expect(room.hotseat).toBe(true)
       expect(room.players.map(player => player.name)).toEqual(['Alice in game', 'Bob in game'])
     }
   })

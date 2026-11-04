@@ -22,6 +22,7 @@ export const useGameSync = () => {
   const [actionAvailability, setActionAvailability] = useState<Record<string, boolean>>({})
   const [cardAvailability, setCardAvailability] = useState<Record<string, boolean>>({})
   const [privateEvents, setPrivateEvents] = useState<PrivateGameEvent[]>([])
+  const [waitingSeatIndexes, setWaitingSeatIndexes] = useState<number[]>([])
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export const useGameSync = () => {
     setActionAvailability(payload.actionAvailability ?? {})
     setCardAvailability(payload.cardAvailability ?? {})
     setPrivateEvents(payload.privateEvents ?? [])
+    setWaitingSeatIndexes(payload.waitingSeatIndexes ?? [])
   }, [])
 
   return {
@@ -66,6 +68,7 @@ export const useGameSync = () => {
     actionAvailability,
     cardAvailability,
     privateEvents,
+    waitingSeatIndexes,
     applySnapshot,
   }
 }
