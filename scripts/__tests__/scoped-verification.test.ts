@@ -125,6 +125,15 @@ function writeRunnerReport(cwd: string, args: string[], names?: string[]) {
   }))
 }
 
+function writeBrowserReport(cwd: string, args: string[]): void {
+  const index = args.indexOf('--report')
+  if (index < 0) return
+  const files = args.slice(args.indexOf('--') + 1)
+  writeFileSync(join(cwd, args[index + 1] ?? ''), JSON.stringify({ suites: [{ specs: files.map(file => ({
+    title: 'renders the board', file, tests: [{ status: 'expected', results: [{ status: 'passed' }] }],
+  })) }] }))
+}
+
 describe('scoped check execution', () => {
   it.each(['script-database', 'script-dynamic'] as const)('prepares services once for an independently selected %s consumer', change => {
     const value = executionFixture(change)
@@ -225,13 +234,12 @@ describe('scoped check execution', () => {
   it('prepares browser artifacts once and starts the app and services once for every spec in the slot', () => {
     const value = browserFixture()
     const result = value.execute((_command, args, cwd) => {
-      const index = args.indexOf('--report')
-      if (index >= 0) writeFileSync(join(cwd, args[index + 1] ?? ''), '{"suites":[]}\n')
+      writeBrowserReport(cwd, args)
       return 0
     }, 'browser-1')
     const commands = [...result.preparation, ...result.checks.flatMap(check => check.commands)].map(command => command.args)
     expect(commands.filter(args => args.join(' ') === 'scripts/local-services.mjs --test')).toHaveLength(1)
-    expect(commands.filter(args => args.join(' ') === 'run build:cards-manifest')).toHaveLength(1)
+    expect(commands.filter(args => args.join(' ') === 'run build:cards-manifest')).toHaveLength(0)
     expect(commands.filter(args => args[0] === 'exec' && args[2] === 'scripts/ci/isolated-browser.ts' && args[3] === 'start')).toHaveLength(1)
     expect(commands.filter(args => args[0] === 'exec' && args[2] === 'scripts/ci/isolated-browser.ts' && args[3] === 'test')).toEqual([
       ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'test', 'output/verification/browser-session',
@@ -245,8 +253,7 @@ describe('scoped check execution', () => {
   it('builds the hosted frontend without a typecheck only when a selected spec depends on it', () => {
     const value = browserFixture()
     const accept = (_command: string, args: string[], cwd: string) => {
-      const index = args.indexOf('--report')
-      if (index >= 0) writeFileSync(join(cwd, args[index + 1] ?? ''), '{"suites":[]}\n')
+      writeBrowserReport(cwd, args)
       return 0
     }
     const hosted = value.execute(accept, 'browser-1')
@@ -278,6 +285,38 @@ describe('scoped check execution', () => {
     const summary = readFileSync(value.summary, 'utf8')
     expect(summary).toContain('e2e-tests/pack-b.spec.ts › keeps the room after the socket drops')
     expect(summary).not.toContain('opens the login form')
+  })
+
+  it('retains intentional case skips as reported results without accepting a missing spec', () => {
+    const value = browserFixture()
+    const result = value.execute((_command, args, cwd) => {
+      const index = args.indexOf('--report')
+      if (index < 0) return 0
+      const files = args.slice(args.indexOf('--') + 1)
+      writeFileSync(join(cwd, args[index + 1] ?? ''), JSON.stringify({ suites: [{ specs: files.map(file => ({
+        title: 'requires explicit live acceptance', file, tests: [{ status: 'skipped', results: [{ status: 'skipped' }] }],
+      })) }] }))
+      return 0
+    }, 'browser-1')
+    expect(result.status).toBe('passed')
+    expect(readFileSync(value.summary, 'utf8')).not.toContain('Passed on retry')
+  })
+
+  it.each(['empty', 'missing spec', 'extra spec', 'failed result'])('rejects a successful browser exit with a %s report', scenario => {
+    const value = browserFixture()
+    expect(() => value.execute((_command, args, cwd) => {
+      const index = args.indexOf('--report')
+      if (index < 0) return 0
+      const files = args.slice(args.indexOf('--') + 1)
+      if (scenario === 'missing spec') files.pop()
+      if (scenario === 'extra spec') files.push('e2e-tests/unselected.spec.ts')
+      const specs = scenario === 'empty' ? [] : files.map(file => ({ title: 'renders', file, tests: [{
+        status: scenario === 'failed result' ? 'unexpected' : 'expected', results: [{ status: 'passed' }],
+      }] }))
+      writeFileSync(join(cwd, args[index + 1] ?? ''), JSON.stringify({ suites: [{ specs }] }))
+      return 0
+    }, 'browser-1')).toThrow(/Browser report|Selected browser test/)
+    expect(JSON.parse(readFileSync(value.output, 'utf8'))).toMatchObject({ status: 'failed' })
   })
 
   it('fails the browser partition when the retry also fails and does not record that case as passed', () => {

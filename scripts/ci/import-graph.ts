@@ -46,8 +46,39 @@ function isMatchableReadLiteral(value: string): boolean {
 
 function readCallName(node: ts.CallExpression): string | null {
   if (ts.isIdentifier(node.expression)) return READ_CALLS.has(node.expression.text) ? node.expression.text : null
-  if (ts.isPropertyAccessExpression(node.expression)) return READ_CALLS.has(node.expression.name.text) ? node.expression.name.text : null
+  if (ts.isPropertyAccessExpression(node.expression) && node.arguments.length) return READ_CALLS.has(node.expression.name.text) ? node.expression.name.text : null
   return null
+}
+
+function localInitializers(source: ts.SourceFile): (node: ts.Identifier) => ts.Expression | undefined {
+  const scopes = new Map<ts.Node, Map<string, ts.Expression | undefined>>()
+  const scopeFor = (node: ts.Node): ts.Node => {
+    let current = node.parent
+    while (current && !ts.isBlock(current) && !ts.isSourceFile(current) && !ts.isFunctionLike(current)) current = current.parent
+    return current ?? source
+  }
+  const bind = (scope: ts.Node, name: ts.BindingName, value?: ts.Expression): void => {
+    if (ts.isIdentifier(name)) {
+      const bindings = scopes.get(scope) ?? new Map<string, ts.Expression | undefined>()
+      bindings.set(name.text, value)
+      scopes.set(scope, bindings)
+    } else for (const element of name.elements) if (ts.isBindingElement(element)) bind(scope, element.name)
+  }
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) {
+      const immutable = ts.isVariableDeclarationList(node.parent) && Boolean(node.parent.flags & ts.NodeFlags.Const)
+      bind(scopeFor(node), node.name, immutable ? node.initializer : undefined)
+    } else if (ts.isParameter(node)) bind(scopeFor(node), node.name)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return node => {
+    for (let scope: ts.Node | undefined = node.parent; scope; scope = scope.parent) {
+      const bindings = scopes.get(scope)
+      if (bindings?.has(node.text)) return bindings.get(node.text)
+    }
+    return undefined
+  }
 }
 
 function isImportMetaUrl(node: ts.Expression): boolean {
@@ -252,6 +283,16 @@ export function readImportGraph(root: string): ImportGraph {
       note(from, 'source file cannot be parsed')
       continue
     }
+    const initializer = localInitializers(source)
+    const literalArgument = (node: ts.Expression | undefined): ts.StringLiteralLike | undefined => {
+      const seen = new Set<ts.Node>()
+      while (node && !seen.has(node)) {
+        seen.add(node)
+        if (ts.isStringLiteralLike(node)) return node
+        node = ts.isIdentifier(node) ? initializer(node) : undefined
+      }
+      return undefined
+    }
     const visit = (node: ts.Node): void => {
       if (ts.isStringLiteralLike(node)) addLiteral(from, node.text)
       const urlSpec = literalNewUrl(node)
@@ -269,12 +310,20 @@ export function readImportGraph(root: string): ImportGraph {
         else if (classified.unresolved) {
           const missing = missingRelativeTargets(specifier.text, absolute, root)
           for (const target of missing) add(from, target)
-          if (!missing.length) note(from, `unresolved import '${specifier.text}'`)
+          note(from, `unresolved import '${specifier.text}'`)
         }
       } else if (ts.isCallExpression(node) && readCallName(node)) {
         const found = new Set<string>()
+        const followed = new Set<ts.Node>()
         let explained = false
         const walk = (child: ts.Node): void => {
+          if (followed.has(child)) return
+          followed.add(child)
+          if (ts.isIdentifier(child)) {
+            const value = initializer(child)
+            if (value) walk(value)
+            return
+          }
           const spec = literalNewUrl(child)
           if (spec) {
             if (repoPathFromUrl(spec, absolute, root)) explained = true
@@ -289,14 +338,14 @@ export function readImportGraph(root: string): ImportGraph {
         for (const literal of found) addRead(from, literal)
         if (found.size === 0 && !explained) note(from, 'filesystem read has no matchable literal')
       } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-        const argument = node.arguments[0]
-        if (argument && ts.isStringLiteralLike(argument)) {
+        const argument = literalArgument(node.arguments[0])
+        if (argument) {
           const classified = classifySpecifier(argument.text, absolute, root)
           if (classified.target) add(from, classified.target)
           else if (classified.unresolved) {
             const missing = missingRelativeTargets(argument.text, absolute, root)
             for (const target of missing) add(from, target)
-            if (!missing.length) note(from, `unresolved import '${argument.text}'`)
+            note(from, `unresolved import '${argument.text}'`)
           }
         } else note(from, 'unresolved import')
       }

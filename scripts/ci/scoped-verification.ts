@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { assertPlanCurrent, createRepositoryPlan, formatPlanSummary, type PlannedCheck, type VerificationPlan } from './verification-plan'
@@ -92,29 +92,50 @@ function specNeedsHostedBuild(cwd: string, file: string): boolean {
   }
 }
 
-function passedOnRetry(report: string): string[] {
+function passedOnRetry(cwd: string, report: string, files: readonly string[]): string[] {
   if (!existsSync(report)) throw new Error('Browser retry report is missing')
   const value: unknown = JSON.parse(readFileSync(report, 'utf8'))
   const names: string[] = []
+  const observed = new Set<string>()
+  let completed = 0
+  const normalize = (file: string) => {
+    const path = (isAbsolute(file) ? relative(cwd, file) : file).split('\\').join('/')
+    return path.startsWith('e2e-tests/') ? path : `e2e-tests/${path}`
+  }
   const visit = (node: unknown, file?: string) => {
     if (typeof node !== 'object' || node === null) return
     const record = node as Record<string, unknown>
+    if (Array.isArray(record.errors) && record.errors.length) throw new Error('Browser report contains execution errors')
     const ownFile = typeof record.file === 'string' ? record.file : file
     for (const spec of Array.isArray(record.specs) ? record.specs : []) {
       if (typeof spec !== 'object' || spec === null) continue
       const item = spec as Record<string, unknown>
       const tests = Array.isArray(item.tests) ? item.tests : []
-      if (!tests.some(test => typeof test === 'object' && test !== null && (test as Record<string, unknown>).status === 'flaky')) continue
       const specFile = typeof item.file === 'string' ? item.file : ownFile
+      if (!specFile || !tests.length) throw new Error('Browser report has no file or test results')
+      observed.add(normalize(specFile))
+      for (const test of tests) {
+        if (typeof test !== 'object' || test === null) throw new Error('Browser report has invalid test results')
+        const entry = test as Record<string, unknown>
+        const results = Array.isArray(entry.results) ? entry.results : []
+        if (entry.status !== 'expected' && entry.status !== 'flaky' && entry.status !== 'skipped') throw new Error('Selected browser test did not pass')
+        const expectedStatus = entry.status === 'skipped' ? 'skipped' : 'passed'
+        if (!results.some(result => typeof result === 'object' && result !== null && (result as Record<string, unknown>).status === expectedStatus)) throw new Error('Browser report has no completed result')
+        completed++
+      }
+      if (!tests.some(test => (test as Record<string, unknown>).status === 'flaky')) continue
       names.push(`${specFile ?? 'browser spec'} › ${typeof item.title === 'string' ? item.title : 'unnamed case'}`)
     }
     for (const suite of Array.isArray(record.suites) ? record.suites : []) visit(suite, ownFile)
   }
   visit(value)
+  if (!completed || files.some(file => !observed.has(file)) || [...observed].some(file => !files.includes(file))) {
+    throw new Error('Browser report does not cover the selected spec files')
+  }
   return names
 }
 
-function unitServicesRequired(cwd: string, checks: Array<Extract<PlannedCheck, { kind: 'vitest' }>>): boolean {
+export function unitServicesRequired(cwd: string, checks: Array<Extract<PlannedCheck, { kind: 'vitest' }>>): boolean {
   if (checks.some(check => check.project === 'fast-server' || check.project === 'slow')) return true
   const consumers = readTestConsumerIndex(cwd, {
     vitest: checks.flatMap(check => check.files.map(file => ({ file, project: check.project }))), browser: [],
@@ -202,12 +223,11 @@ export function executeRepositoryPlan(input: {
     if (browserChecks.length) {
       mkdirSync(join(input.cwd, browserSession), { recursive: true })
       runCommand({ command: process.execPath, args: ['scripts/local-services.mjs', '--test'] }, record.preparation, 'preparation')
-      runCommand({ command: 'pnpm', args: ['run', 'build:cards-manifest'] }, record.preparation, 'preparation')
-      if (browserChecks.some(check => check.files.some(file => specNeedsHostedBuild(input.cwd, file)))) {
-        runCommand({ command: 'pnpm', args: ['run', 'build:hosted-frontend', '--', '--no-typecheck'] }, record.preparation, 'preparation')
-      }
       runCommand({ command: 'pnpm', args: ['exec', 'tsx', 'scripts/ci/isolated-browser.ts', 'start', browserSession] }, record.preparation, 'preparation')
       try {
+        if (browserChecks.some(check => check.files.some(file => specNeedsHostedBuild(input.cwd, file)))) {
+          runCommand({ command: 'pnpm', args: ['run', 'build:hosted-frontend', '--', '--no-typecheck'] }, record.preparation, 'preparation')
+        }
         browserChecks.forEach((check, index) => {
           const result: CheckResult = { check, status: 'failed', commands: [] }
           current.checks.push(result)
@@ -217,7 +237,7 @@ export function executeRepositoryPlan(input: {
           if (check.grep) args.push('--grep', check.grep)
           args.push('--', ...check.files)
           runCommand({ command: 'pnpm', args }, result.commands, 'browser')
-          retried.push(...passedOnRetry(join(input.cwd, report)))
+          retried.push(...passedOnRetry(input.cwd, join(input.cwd, report), check.files))
           result.status = 'passed'
           write(input.output, current)
         })

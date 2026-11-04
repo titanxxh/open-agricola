@@ -106,6 +106,7 @@ describe('pnpm verify affected', () => {
       return 0
     })
     expect(calls).toEqual([
+      ['pnpm', 'run', 'build:cards-manifest'],
       ['pnpm', 'exec', 'vitest', 'run', '--project', 'fast-shared', 'shared/domain/__tests__/example.test.ts'],
     ])
   })
