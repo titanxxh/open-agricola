@@ -24,7 +24,7 @@ Rule correctness is proven at the backend seam with the smallest sufficient laye
 
 The on-demand `candidate-verification.yml` workflow runs the canonical complete task catalog in `scripts/ci/verification-tasks.ts`. It separates fast and slow tests, builds, quality checks and browser lanes so a failed task can be retried independently. Contract and community-card tests belong to their normal Vitest projects rather than additional duplicate runs. Browser tasks reuse `scripts/verify.ts` and its structured browser results.
 
-`scripts/ci/verification-tasks.ts` keeps the `chromium-1` through `chromium-4` task IDs and balances the complete Chromium suite with `scripts/ci/verification-durations.json`. Balance rules are in [CI checks](../operations/ci-checks.md) and [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md). Tests: `scripts/__tests__/catalog-chromium-balance.test.ts`.
+`scripts/ci/verification-tasks.ts` keeps the `chromium-1` through `chromium-4` task IDs and evenly distributes the sorted Chromium spec list by file count. Source and verification configuration determine membership across compatible retries. Actual timings remain in generated execution evidence. Rules are in [CI checks](../operations/ci-checks.md) and [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md). Tests: `scripts/__tests__/catalog-chromium-balance.test.ts`.
 
 Formal request/check first admits a final merged-PR snapshot on the requested repository's protected main, using native numeric identities, an explicit main ref, and raw Git reachability. The admitted tree approves the producer; the configuration hash only identifies compatible execution. This implementation policy and its native-governance trust boundary are recorded in [ADR 0037](../adr/0037-scope-routine-verification-and-gate-releases.md).
 
@@ -41,7 +41,7 @@ Routine selection follows dependency evidence. Incomplete evidence widens inside
 | Responsibility | Entry |
 |---|---|
 | Plan the branch, checkout, and source fingerprint | `createRepositoryPlan` in `scripts/ci/verification-plan.ts`; `planRoutineVerification` in `scripts/ci/routine-verification-plan.ts`; import graph in `scripts/ci/import-graph.ts` |
-| Duration partitions | `routinePartitions` in `scripts/ci/routine-partitions.ts`; `scripts/ci/verification-durations.json` |
+| Deterministic file partitions | `routinePartitions` in `scripts/ci/routine-partitions.ts` |
 | Execution and Vitest reports | `scripts/ci/scoped-verification.ts`; `scripts/ci/vitest-results.ts` |
 | Local affected run | `pnpm verify affected` in `scripts/verify.ts` |
 | Required gate | `scripts/ci/routine-verification-gate.ts`; `.github/workflows/ci.yml` calls `.github/workflows/scoped-verification.yml` |
