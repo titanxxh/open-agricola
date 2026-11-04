@@ -1,5 +1,6 @@
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
+import { lobbyNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { buildPlatformPageUrl, setPage } from '../utils/platform-page-url'
@@ -32,6 +33,7 @@ export function LobbyPage() {
   const { locale, t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [myRooms, setMyRooms] = useState<MyActiveRoom[]>([])
+  useTurnTabTitle(lobbyNeedsTurnTab(myRooms))
   const [endedGames, setEndedGames] = useState<Array<{ id: string; outcome: 'completed' | 'terminated'; ended_at: number }>>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')

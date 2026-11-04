@@ -5,6 +5,16 @@ import { GameSession } from '../authoritative-session.ts'
 import type { SessionResponse } from '../authoritative-session.ts'
 
 describe('GameSession.buildSyncPayload', () => {
+  it('reports the work-rotation player as the waiting seat when play has no engine frame', () => {
+    const session = new GameSession(9104, undefined, { playerCount: 2 })
+    try {
+      session.state.phase = 'playing'
+      session.state.gameOver = false
+      session.state.currentPlayerIndex = 1
+      expect(session.buildSyncPayload(session.getState(), session.state.players[1]!.id).waitingSeatIndexes).toEqual([1])
+    } finally { session.dispose() }
+  })
+
   it('uses the owning Session for display projections and preserves them in replay frames', () => {
     const first = new GameSession(9101, undefined, { playerCount: 2 })
     const second = new GameSession(9102, undefined, { playerCount: 2 })

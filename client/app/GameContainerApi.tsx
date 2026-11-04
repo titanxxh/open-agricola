@@ -14,6 +14,7 @@ import {
   positionKey,
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
+import { gameNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
 import { interactionFocusRequestKey, useInteractionFocus } from './interaction-focus'
 import { getImprovementSelection } from './improvement-selection'
 import { useFenceSelectionQuote } from './fence-selection-quote'
@@ -377,7 +378,7 @@ export const GameContainerApi = () => {
     isLocalMode,
     user?.id ?? 'anon',
   )
-  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, applySnapshot } =
+  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
     useGameSync()
   const roomHistory = useRoomHistory(transport, state, historyWindow)
   const privateEventNotificationBatchSeqRef = useRef(0)
@@ -527,6 +528,8 @@ export const GameContainerApi = () => {
   const bugReportBar = bugReportRoomId
     ? <BugReportBar roomId={bugReportRoomId} />
     : null
+  const mySeatIndex = isWs && wsStatus.phase === 'ready' ? wsStatus.playerIndex : null
+  useTurnTabTitle(gameNeedsTurnTab(isHotseat, mySeatIndex, waitingSeatIndexes))
 
   useLayoutEffect(() => {
     if (!hasGameView) return

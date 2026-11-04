@@ -105,6 +105,7 @@ export type GameSyncPayload = {
   cardWarnings?: string[]
   /** Custom card definitions for frontend registration — treated identically to built-in cards. */
   customCardDefs?: CustomCardDef[]
+  waitingSeatIndexes?: number[]
 }
 
 export type StateUpdateCause =

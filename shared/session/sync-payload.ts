@@ -14,6 +14,7 @@ import {
 import { privateEventsForViewer } from './interaction-privacy.ts'
 import { redactInteractionForViewer } from './interaction-state-adapter.ts'
 import type { GameCore, SessionResponse } from './session-core.ts'
+import { playingActorIndex, waitingSeatIndexes } from './waiting-seats.ts'
 
 /**
  * `viewer` redacts for one seat or a spectator. `dev-viewer` is the same
@@ -62,6 +63,17 @@ export function buildSyncPayload(
       ? resp.cardAvailability
       : undefined,
     error: resp.error,
+    waitingSeatIndexes: waitingSeatIndexes(
+      'playing',
+      resp.state,
+      resp.state.players.map((_, index) => index),
+      playingActorIndex(
+        resp.state.phase,
+        resp.state.gameOver,
+        core.getEngineStack().current()?.ownerPlayerIndex ?? null,
+        resp.state.currentPlayerIndex,
+      ),
+    ),
   }
 
   const playerIds = resp.state.players.map((player) => player.id)
