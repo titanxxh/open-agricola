@@ -625,6 +625,8 @@ bash scripts/backup-storage.sh "manual-$(date -u +%Y%m%dT%H%M%SZ)"
 
 每日备份与部署共用 `backups/.maintenance.lock`。保留策略仍是本地 daily 7 份、pre 5 份，异机 daily 30 份、pre 10 份，所有普通归档及其配置快照最多 30 天。保留 `deploy/offsite-retention.sh` 的异机独立 cron，删除 ledger 不受归档清理影响。配置 `OFFSITE_BACKUP_TARGET` 和 `OFFSITE_BACKUP_REMOTE_DIR` 后安装仓库 `deploy/open-agricola-backup.cron` 与 logrotate 配置；无异机时仍可执行本机手动备份。
 
+cron 模板按宿主机的 `Asia/Shanghai` 时区调度：每日 04:00 备份，05:30 执行异机独立保留清理。安装前在两台主机分别运行 `timedatectl show -p Timezone --value` 核对。Ubuntu cron 不使用 `CRON_TZ` 选择单个任务的调度时区；其他宿主机时区需要相应调整表达式。
+
 异机 ledger 同步先读远端副本，合并到当前 S3 的 CAS ledger，再导出其并集。旧普通备份、旧本地副本都不能抹掉较新的删除事实。立即删除后的异机同步仍使用 `ledger-only`。
 
 #### 恢复或切换外部服务

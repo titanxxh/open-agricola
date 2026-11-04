@@ -311,7 +311,8 @@ describe('production deployment config', () => {
     expect(retention).toContain('MAX_AGE_MINUTES=$((30 * 24 * 60))')
     expect(retention).toContain('find . -maxdepth 1 -name \'*.tgz\' -mmin "+$MAX_AGE_MINUTES"')
     expect(retention).toContain('rm -f "$OLD" "$STEM.manifest.json" "env-$STEM"')
-    expect(cron).toContain('CRON_TZ=UTC')
+    expect(cron).not.toMatch(/^CRON_TZ=/m)
+    expect(cron).toContain('30 5 * * * root /root/offsite-retention.sh')
     expect(cron).toContain('/root/offsite-retention.sh')
   })
 
@@ -349,11 +350,11 @@ describe('production deployment config', () => {
     expect(script).toContain("ls -1t pre-*.tgz 2>/dev/null | tail -n +11")
   })
 
-  it('schedules the offsite backup via cron with log rotation', () => {
+  it('schedules the offsite backup at 04:00 in the host timezone with log rotation', () => {
     const cron = readFileSync('deploy/open-agricola-backup.cron', 'utf8')
     const logrotate = readFileSync('deploy/open-agricola-backup.logrotate', 'utf8')
-    expect(cron).toContain('CRON_TZ=UTC')
-    expect(cron).toContain('0 20 * * * ubuntu /home/ubuntu/open-agricola/backup-offsite.sh')
+    expect(cron).not.toMatch(/^CRON_TZ=/m)
+    expect(cron).toContain('0 4 * * * ubuntu /home/ubuntu/open-agricola/backup-offsite.sh')
     expect(cron).toContain('/home/ubuntu/open-agricola/logs/backup.log')
     expect(logrotate).toContain('/home/ubuntu/open-agricola/logs/backup.log')
     expect(logrotate).toContain('su ubuntu ubuntu')
