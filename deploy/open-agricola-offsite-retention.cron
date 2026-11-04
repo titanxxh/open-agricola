@@ -4,6 +4,7 @@
 #   scp deploy/open-agricola-offsite-retention.cron root@<异机IP>:/etc/cron.d/open-agricola-offsite-retention
 #   ssh root@<异机IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention'
 # 异机自治执行 ADR-0010 的 30 天上限清理，生产机丢失或失联时合规仍然成立
-CRON_TZ=UTC
+# 每日北京时间 05:30 清理；Ubuntu cron 按宿主机时区调度。
+# 安装前确认 timedatectl show -p Timezone --value 为 Asia/Shanghai。
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-30 21 * * * root /root/offsite-retention.sh >> /var/log/open-agricola-offsite-retention.log 2>&1
+30 5 * * * root /root/offsite-retention.sh >> /var/log/open-agricola-offsite-retention.log 2>&1

@@ -607,6 +607,8 @@ The backup helper stops applications for export, resumes service, and validates 
 
 Daily backup and deployment share `backups/.maintenance.lock`. Retention remains 7 local daily archives and 5 local pre-deploy archives; offsite retains 30 daily and 10 pre-deploy archives. All ordinary archives and corresponding configuration snapshots expire within 30 days. Keep the autonomous offsite cron for `deploy/offsite-retention.sh`; ledger copies are never ordinary archive-retention targets. Configure `OFFSITE_BACKUP_TARGET` and `OFFSITE_BACKUP_REMOTE_DIR`, then install `deploy/open-agricola-backup.cron` and its logrotate file. Manual local backups do not require an offsite host.
 
+The cron templates use the host's `Asia/Shanghai` timezone: daily backup at 04:00 and independent offsite retention at 05:30. Check `timedatectl show -p Timezone --value` on each host before installation. Ubuntu cron does not use `CRON_TZ` to select a task's scheduling timezone; adjust the schedule for any other host timezone.
+
 Offsite ledger synchronization reads the remote copy, merges it into the current S3 CAS ledger, and exports the union. Old backups or local copies cannot erase newer deletion facts. Use `ledger-only` immediately after a removal.
 
 #### Restore or switch to external services
