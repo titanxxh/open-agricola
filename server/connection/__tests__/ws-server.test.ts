@@ -1311,6 +1311,8 @@ it('uses the settled playing status when sockets close behind a queued color con
     await blocking
     await vi.waitFor(() => expect(room.status).toBe('playing'))
     await vi.waitFor(() => expect(room.players).toEqual([]))
+    await vi.waitFor(async () => expect(await recording.gameContextStore.readActiveRetention(roomId))
+      .toMatchObject({ kind: 'active', expiresAt: expect.any(Number) }))
     const now = Date.now(), retention = await recording.gameContextStore.readActiveRetention(roomId)
     if (retention.kind !== 'active' || retention.expiresAt === null) throw new Error('Expected playing retention')
     expect(retention.expiresAt - now).toBeGreaterThan(7 * 24 * 60 * 60 * 1000 - 2000)
@@ -1354,7 +1356,8 @@ it('records zero OPEN presence while a closed connection is still queued behind 
     await vi.waitFor(() => expect(owned.backend.committer!.isRetrying(roomId)).toBe(false), { timeout: 5000 })
     expect((await owned.persistence.loadReplayHead(roomId))?.latestStepNo).toBe(1)
     await vi.waitFor(() => expect(owned.backend.registry.get(roomId)!.players).toEqual([]))
-    expect(await recording.gameContextStore.activeExpiresAt(roomId)).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000)
+    await vi.waitFor(async () => expect(await recording.gameContextStore.activeExpiresAt(roomId))
+      .toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000))
     expect((await owned.persistence.load(roomId))?.serialized?.state.players[playerIndex]?.resources.wood)
       .toBe(initial.payload.state.players[playerIndex]!.resources.wood + 3)
     const receipt = await getDb().prepare('SELECT outcome_json FROM command_requests WHERE scope_id=? AND command_id=?')
