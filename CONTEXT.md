@@ -281,11 +281,15 @@ _Avoid_: 交互玩家、已确认接机玩家、换座位、Replay Perspective
 
 **Interaction Player（交互玩家）**:
 当前规则流程要求提供输入的玩家，可能不同于普通工作轮转中的当前玩家。该身份不随农场观察对象改变。
-_Avoid_: 农场观察玩家、登录用户、把当前工作轮转玩家当作所有等待交互的回应者
+_Avoid_: 农场观察玩家、登录用户、待行动座位、把当前工作轮转玩家当作所有等待交互的回应者
+
+**Waiting Seat（待行动座位）**:
+一局里仍要作出回应的座位。同时进行的轮抽和父母选择里，每个尚未提交的座位都算。普通进行中的对局只有一个：当前引擎帧的所有者；没有等待帧时，是工作轮转上的当前玩家。交接确认仍留在帧所有者上，不改记到交接来源玩家。开局选牌没有待行动座位。
+_Avoid_: Interaction Player、Handoff Source、Farm View Player、Turn、my_turn、当前工作轮转玩家
 
 **Handoff Source（交接来源玩家）**:
 同一段阶段效果派发中，最近一位亲手回应过交互的玩家：作出选择（含跳过）、提交选择类交互、整理动物或在窗口内执行 anytime 行动。派发开始时为空；自动结算的效果、只有一个选项而被自动解决的选择以及交出确认本身都不改变它。交互要转给另一名玩家时由交接来源玩家确认交出，整理动物的交接只写撤销边界，不需确认；交接来源为空或正是下一位交互玩家时直接交接，下一位不能撤销此前其他玩家的回应。
-_Avoid_: 阶段效果的所有者、上一个结算效果的玩家、当前工作轮转玩家、已确认接机玩家
+_Avoid_: 阶段效果的所有者、上一个结算效果的玩家、当前工作轮转玩家、已确认接机玩家、待行动座位
 
 **Confirmed Hotseat Player（已确认接机玩家）**:
 共享设备上最近一次明确确认自己接机的玩家身份。接机确认是私有信息展示的隐私边界，不是浏览对象选择或永久座位授权。
@@ -1145,6 +1149,7 @@ _Avoid_: 永久放弃、全局出局名单
 - **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
 - **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。
 - **InteractionState** 是前端启用按钮和渲染交互的依据；前端不从规则代码推断可操作性。
+- **Waiting Seat** 是大厅和进行中对局共用的「该谁回应」。它不是 **InteractionState** 上的单个 **Interaction Player**；交接确认时两者可以不是同一人。
 - **ActionFlow** 编译成 runtime engine tree；`leaf` 变成 **ActionNode**，组合节点变成 sequence / parallel / or / xor runtime node。
 - **EngineStack** 是 hook、anytime、喂食、动物整理、confirm、farm-select 等子流程的唯一嵌套机制。
 - **Extra Turn** 是轮转机会；**Turn Scope** 承载“你的回合 / 同一回合”身份；**Rule Action** 是规则行动单位。一个 Turn 可包含多个 Rule Action，Turn 外也可执行 Rule Action；每个 Rule Action 对应独立的 **Action Execution Scope**。
