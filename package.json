@@ -81,7 +81,7 @@
     "tldts": "7.4.19",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
-    "ws": "^8.22.0"
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
