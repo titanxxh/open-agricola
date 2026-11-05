@@ -18,6 +18,10 @@ function backup(fail = '', stopped = false, duplicate = false) {
     writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=test-only\n')
     const priorReport = '{"backupStem":"previous-validated-backup"}\n'
     writeFileSync(join(root, 'backups/observability.latest.json'), priorReport)
+    if (fail.endsWith('date-width')) writeFileSync(join(root, 'bin/date'), `#!/bin/bash
+if [[ "$1" == '+%s%3N' ]]; then exec /usr/bin/date +%s%N; fi
+exec /usr/bin/date "$@"
+`, { mode: 0o700 })
     const remote = join(root, 'remote')
     if (offsite) {
       mkdirSync(remote)
@@ -37,8 +41,14 @@ fi
 exec /bin/bash -c "$*"
 `, { mode: 0o700 })
       writeFileSync(join(root, 'bin/rsync'), `#!/bin/bash
-if [[ "$*" == *'--from0'* ]]; then sleep 30; exit 0; fi
 args=("$@")
+if [[ "$*" == *'--from0'* ]]; then
+  if [[ "\${BACKUP_TEST_FAILURE:-}" == offsite-timeout ]]; then sleep 30; exit 0; fi
+  for arg in "$@"; do if [[ "$arg" == --files-from=* ]]; then list="\${arg#--files-from=}"; fi; done
+  destination="\${args[-1]#fixture:}"
+  while IFS= read -r -d '' name; do cp -- "backups/$name" "$destination/$name"; done < "$list"
+  exit 0
+fi
 cp -- "\${args[-2]}" "\${args[-1]#fixture:}"
 `, { mode: 0o700 })
     }
@@ -84,7 +94,7 @@ esac
     const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
       cwd: root,
       env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, BACKUP_TEST_FAILURE: fail,
-        SOURCE_BUILD_ID: sourceBuild, MAINTENANCE_LOCK_HELD: '0', BACKUP_JOB_ID: 'fixture-run',
+        SOURCE_BUILD_ID: sourceBuild, MAINTENANCE_LOCK_HELD: '0', BACKUP_JOB_ID: fail.endsWith('date-width') ? '' : 'fixture-run',
         OFFSITE_BACKUP_TARGET: 'fixture', OFFSITE_BACKUP_REMOTE_DIR: remote,
         BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000)) },
       encoding: 'utf8', timeout: 15_000,
@@ -97,8 +107,8 @@ esac
     const configPath = join(root, 'backups/env-manual-test')
     return {
       status: result.status, retryStatus: retry?.status, stderr: result.stderr,
-      calls: readFileSync(join(root, 'docker-calls'), 'utf8').trim().split('\n'),
-      users: readFileSync(join(root, 'docker-users'), 'utf8').trim().split('\n'),
+      calls: existsSync(join(root, 'docker-calls')) ? readFileSync(join(root, 'docker-calls'), 'utf8').trim().split('\n') : [],
+      users: existsSync(join(root, 'docker-users')) ? readFileSync(join(root, 'docker-users'), 'utf8').trim().split('\n') : [],
       archive: existsSync(archivePath) ? readFileSync(archivePath) : undefined,
       mode: existsSync(archivePath) ? statSync(archivePath).mode & 0o777 : undefined,
       report: existsSync(reportPath) ? JSON.parse(readFileSync(reportPath, 'utf8')) : undefined,
@@ -108,6 +118,10 @@ esac
       remoteLedger: existsSync(join(remote, 'replay-removals.latest.json')) ? readFileSync(join(remote, 'replay-removals.latest.json'), 'utf8') : undefined,
       expiredRemoteArchive: existsSync(join(remote, 'daily-old.tgz')),
       incoming: offsite ? readdirSync(remote).filter(name => name.startsWith('.incoming-')) : [],
+      remoteArchives: offsite ? readdirSync(remote).filter(name => name.endsWith('.manifest.json')).map(name => {
+        const report = JSON.parse(readFileSync(join(remote, name), 'utf8'))
+        return { report, bytes: readFileSync(join(remote, `${report.backupStem}.tgz`)) }
+      }) : [],
     }
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
@@ -173,3 +187,14 @@ it('reaps an abandoned maintenance tool while holding the shared host lock', () 
   expect(result.status, result.stderr).toBe(0)
   expect(result.calls).toContain(`rm -f ${'d'.repeat(64)}`)
 })
+
+it('captures and commits offsite when date ignores nanosecond field width', () => {
+  const result = backup('offsite-date-width')
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.remoteArchives).toHaveLength(1)
+  const archived = result.remoteArchives[0]!
+  expect(archived.report.archiveSha256).toBe(createHash('sha256').update(archived.bytes).digest('hex'))
+  expect(result.remoteLedger).toBe('{"version":1,"batches":[]}')
+  expect(result.incoming).toEqual([])
+  expect(result.calls.some(call => /(?:stop|start|restart) app$/.test(call))).toBe(false)
+}, 15_000)

@@ -7,7 +7,8 @@ backup_job_begin() {
     export BACKUP_JOB_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
     if [[ "$mode" != maintenance ]]; then
       # Reserve the final ten seconds of the 30-minute budget for bounded cleanup.
-      export BACKUP_DEADLINE_EPOCH_MS="$(( $(date +%s%3N) + 1790000 ))"
+      # Some date implementations ignore %3N width; convert full nanoseconds.
+      export BACKUP_DEADLINE_EPOCH_MS="$(( $(date +%s%N) / 1000000 + 1790000 ))"
       exec timeout --signal=TERM --kill-after=10s 1790 bash "$0" "$@"
     fi
   fi
@@ -20,7 +21,7 @@ backup_job_begin() {
 backup_seconds_left() {
   if [[ -z "${BACKUP_DEADLINE_EPOCH_MS:-}" ]]; then printf '0\n'; return; fi
   [[ "$BACKUP_DEADLINE_EPOCH_MS" =~ ^[0-9]+$ ]] || { echo 'Invalid backup deadline' >&2; return 1; }
-  local remaining="$(( BACKUP_DEADLINE_EPOCH_MS - $(date +%s%3N) ))"
+  local remaining="$(( BACKUP_DEADLINE_EPOCH_MS - $(date +%s%N) / 1000000 ))"
   (( remaining > 0 && remaining <= 1800000 )) || { echo 'Backup deadline exceeded' >&2; return 124; }
   printf '%s\n' "$(( (remaining + 999) / 1000 ))"
 }
@@ -56,7 +57,7 @@ backup_reap_tools() {
     deadline="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.deadline"}}' "$container")"
     # The caller holds the host lock. A zero-deadline maintenance tool cannot
     # belong to another supported deployment still in progress.
-    if [[ "$deadline" =~ ^[0-9]+$ ]] && (( deadline == 0 || deadline <= $(date +%s%3N) )); then
+    if [[ "$deadline" =~ ^[0-9]+$ ]] && (( deadline == 0 || deadline <= $(date +%s%N) / 1000000 )); then
       backup_command docker rm -f "$container" >/dev/null
     fi
   done
