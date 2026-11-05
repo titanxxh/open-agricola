@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
@@ -10,6 +10,7 @@ const sourceBuild = 'a'.repeat(40), image = `sha256:${'b'.repeat(64)}`, containe
 // Real shell, timeout, tar and hashing; native PG/S3 round trips have separate tests.
 function backup(fail = '', stopped = false, duplicate = false) {
   const root = mkdtempSync(join(tmpdir(), 'agricola-native-backup-'))
+  const offsite = fail.startsWith('offsite-')
   try {
     for (const path of ['scripts', 'bin', 'data', 'backups']) mkdirSync(join(root, path))
     for (const path of ['scripts/backup-storage.sh', 'scripts/backup-process.sh', 'scripts/backup-files.mjs']) cpSync(path, join(root, path))
@@ -17,12 +18,41 @@ function backup(fail = '', stopped = false, duplicate = false) {
     writeFileSync(join(root, 'data/dependencies.compose.env'), 'DATABASE_URL=test-only\n')
     const priorReport = '{"backupStem":"previous-validated-backup"}\n'
     writeFileSync(join(root, 'backups/observability.latest.json'), priorReport)
+    const remote = join(root, 'remote')
+    if (offsite) {
+      mkdirSync(remote)
+      mkdirSync(join(root, 'deploy'))
+      cpSync('backup-offsite.sh', join(root, 'backup-offsite.sh'))
+      for (const path of ['deploy/offsite-retention.sh', 'deploy/commit-backup-set.sh']) cpSync(path, join(root, path))
+      writeFileSync(join(remote, 'daily-old.tgz'), 'expired archive')
+      const expired = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000)
+      utimesSync(join(remote, 'daily-old.tgz'), expired, expired)
+      writeFileSync(join(root, 'bin/ssh'), `#!/bin/bash
+while [[ "$1" == -o ]]; do shift 2; done
+shift
+if [[ "\${BACKUP_TEST_FAILURE:-}" == offsite-mkdir && "$*" == *'/.incoming-'* && "$*" == *'bash -s'* ]]; then
+  cat >/dev/null
+  exit 73
+fi
+exec /bin/bash -c "$*"
+`, { mode: 0o700 })
+      writeFileSync(join(root, 'bin/rsync'), `#!/bin/bash
+if [[ "$*" == *'--from0'* ]]; then sleep 30; exit 0; fi
+args=("$@")
+cp -- "\${args[-2]}" "\${args[-1]#fixture:}"
+`, { mode: 0o700 })
+    }
     writeFileSync(join(root, 'bin/docker'), `#!/bin/bash
 set -eu
 printf '%s\\n' "$*" >> "$PWD/docker-calls"
 printf '%s:%s\\n' "$APP_UID" "$APP_GID" >> "$PWD/docker-users"
 case "$*" in
+  'ps -aq --filter label=org.open-agricola.backup.run')
+    [[ "\${BACKUP_TEST_FAILURE:-}" != orphan ]] || printf '${'d'.repeat(64)}'
+    ;;
   'ps -aq '*) ;;
+  inspect*'org.open-agricola.backup.deadline'*) printf 0 ;;
+  'rm -f '*) ;;
   *' ps -q app') printf '${container}' ;;
   'ps -q --no-trunc '*) printf '${container}' ;;
   *'{{.State.Running}}'*) printf true ;;
@@ -31,6 +61,7 @@ case "$*" in
   *'RESOURCE_DELETION_PROTOCOL'*) if [[ "\${BACKUP_TEST_FAILURE:-}" == protocol ]]; then printf 0; else printf 1; fi ;;
   *'process.env.GAME_BUILD_ID'*) printf '${sourceBuild}' ;;
   *'cleanup-scratch /backup'*) ;;
+  *'ledger-merge '*) ;;
   *'ledger-export '*) printf '{"version":1,"batches":[]}' > backups/replay-removals.latest.json ;;
   *'export-online /backup/'*|*' export /backup/'*)
     [[ "\${BACKUP_TEST_FAILURE:-}" != export ]] || exit 42
@@ -50,11 +81,12 @@ case "$*" in
   *) echo "Unexpected fixture Docker command: $*" >&2; exit 88 ;;
 esac
 `, { mode: 0o700 })
-    const run = () => spawnSync('/bin/bash', ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
+    const run = () => spawnSync('/bin/bash', offsite ? ['backup-offsite.sh'] : ['scripts/backup-storage.sh', 'manual-test', ...(stopped ? ['--already-stopped'] : [])], {
       cwd: root,
       env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, BACKUP_TEST_FAILURE: fail,
         SOURCE_BUILD_ID: sourceBuild, MAINTENANCE_LOCK_HELD: '0', BACKUP_JOB_ID: 'fixture-run',
-        BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' ? 2000 : 30_000)) },
+        OFFSITE_BACKUP_TARGET: 'fixture', OFFSITE_BACKUP_REMOTE_DIR: remote,
+        BACKUP_DEADLINE_EPOCH_MS: String(Date.now() + (fail === 'deadline' || fail === 'offsite-timeout' ? 2000 : 30_000)) },
       encoding: 'utf8', timeout: 15_000,
     })
     const result = run()
@@ -73,6 +105,9 @@ esac
       configuration: existsSync(configPath) ? readFileSync(configPath) : undefined,
       pending: readdirSync(join(root, 'backups')).filter(name => name.startsWith('.pending-')),
       latest: readFileSync(join(root, 'backups/observability.latest.json'), 'utf8'), priorReport,
+      remoteLedger: existsSync(join(remote, 'replay-removals.latest.json')) ? readFileSync(join(remote, 'replay-removals.latest.json'), 'utf8') : undefined,
+      expiredRemoteArchive: existsSync(join(remote, 'daily-old.tgz')),
+      incoming: offsite ? readdirSync(remote).filter(name => name.startsWith('.incoming-')) : [],
     }
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
@@ -117,4 +152,24 @@ it('refuses a duplicate stem without deleting the validated archive', () => {
   expect(result.retryStatus).not.toBe(0)
   expect(result.archive).toBeDefined()
   expect(result.report.backupStem).toBe('manual-test')
+})
+
+it('still synchronizes erasure facts and prunes offsite archives when incoming creation fails', () => {
+  const result = backup('offsite-mkdir')
+  expect(result.status).not.toBe(0)
+  expect(result.calls.some(call => call.includes('ledger-merge /backup/'))).toBe(true)
+  expect(result.remoteLedger).toBe('{"version":1,"batches":[]}')
+  expect(result.expiredRemoteArchive).toBe(false)
+}, 15_000)
+
+it('uses the reserved cleanup budget to remove incoming bytes after the work deadline', () => {
+  const result = backup('offsite-timeout')
+  expect(result.status).not.toBe(0)
+  expect(result.incoming).toEqual([])
+}, 15_000)
+
+it('reaps an abandoned maintenance tool while holding the shared host lock', () => {
+  const result = backup('orphan')
+  expect(result.status, result.stderr).toBe(0)
+  expect(result.calls).toContain(`rm -f ${'d'.repeat(64)}`)
 })
