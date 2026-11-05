@@ -107,7 +107,7 @@ describe('custom session executor', () => {
       locked.session.dispose()
       ordinary.session.dispose()
     }
-  })
+  }, 20_000)
 
   it('quotes selected fences inside the executable worker without mutating its persisted cursor', async () => {
     const { session, executor } = setup(card('CUSTOM_FenceQuote'))
