@@ -160,6 +160,7 @@ type GameSyncPayload = {
   state: SerializedGameState
   interaction: ClientInteractionState
   privateEvents?: PrivateGameEvent[]
+  waitingSeatIndexes?: number[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
@@ -177,6 +178,7 @@ type GameSyncPayload = {
 - `error.code='room_capacity_reached'` is followed by WebSocket close 1013 so the client rediscovers capacity before retrying an expired or unavailable admission.
 - Every broadcast is built per viewer from the connection's `viewerPlayerId`: the target receives real private prompts and `privateEvents`, others receive `private-prompt` redaction. An HTTP sandbox without `X-Viewer-Player` keeps the unfiltered development flow; with it, the same viewer filtering and seat guard apply.
 - `cardWarnings` appears only in HTTP debugging and sandbox payloads. HTTP envelopes carry `gameInstanceId`, rotated after a state load; it is neither authorization nor model input.
+- `waitingSeatIndexes` is the authoritative Waiting Seat projection, independent of the viewer and Interaction Player. Lobby `MyActiveRoom` exposes the same seats as `waiting_player_indexes` and a boolean `hotseat`; these fields drive title reminders without granting command permission. See [session](session.md#unified-sessionresponse).
 - Hosted writes carry `commandContext` (scope, stable command ID, Room ID, expected committed version); simultaneous draft and parent inputs share an input-window ID. The router resolves durable receipts before freshness, rejects changed content under the same identity, and persists results with the Room transaction. Receipts hold outcome identifiers and hashes and are private to their actor. `requestId` only correlates one exchange.
 
 ## InteractionState: Frontend Rendering Authority

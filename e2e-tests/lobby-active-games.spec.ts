@@ -1,8 +1,73 @@
 // @covers client/styles/pages/
+// @covers client/app/use-turn-tab-title.ts
 import { expect, test } from '@playwright/test'
 import type { MyActiveRoom } from '../shared/contract/lobby'
 
 test.use({ timezoneId: 'Asia/Singapore' })
+
+test('lobby turn titles cycle, follow motion preferences and stop for hotseat or other seats', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-05T00:00:00Z') })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+  const room: MyActiveRoom = {
+    id: 'title-room', status: 'playing', max_players: 2, hotseat: false,
+    player_index: 0, my_turn: 0, current_player_index: null,
+    waiting_player_indexes: [0, 1], progress: { phase: 'draft' }, expansions: [],
+    created_at: 1, started_at: 2, updated_at: 3,
+    players: [{ playerIndex: 0, name: 'Alice', color: 'red' }, { playerIndex: 1, name: 'Bob', color: 'blue' }],
+  }
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname
+    return route.fulfill({ json: path === '/api/auth/me'
+      ? { ok: true, user: { id: 'alice', username: 'alice', displayName: 'Alice' } }
+      : { ok: true, rooms: path === '/api/lobby/my-rooms' ? [room] : [], games: [] } })
+  })
+  await page.goto('/?page=lobby')
+  await expect(page).toHaveTitle('◢ Open Agricola')
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100))
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await expect(page).toHaveTitle('◣ Open Agricola')
+  const icon = await page.locator('link[rel="icon"]').getAttribute('href')
+  await page.clock.runFor(999)
+  await expect(page).toHaveTitle('◣ Open Agricola')
+  await page.clock.runFor(1)
+  await expect(page).toHaveTitle('◤ Open Agricola')
+  for (const title of ['◥ Open Agricola', '◢ Open Agricola', '◣ Open Agricola']) {
+    await page.clock.runFor(1000)
+    await expect(page).toHaveTitle(title)
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(page).toHaveTitle('◢ Open Agricola')
+  await page.clock.runFor(5000)
+  await expect(page).toHaveTitle('◢ Open Agricola')
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await expect(page).toHaveTitle('◣ Open Agricola')
+
+  room.hotseat = true
+  await page.clock.runFor(5000)
+  await expect(page).toHaveTitle('Open Agricola')
+  room.hotseat = false
+  room.waiting_player_indexes = [1]
+  await page.clock.runFor(5000)
+  await expect(page).toHaveTitle('Open Agricola')
+  room.progress = { phase: 'parent-selection' }
+  room.waiting_player_indexes = [0]
+  await page.clock.runFor(5000)
+  await expect(page).toHaveTitle(/^[◢◣◤◥] Open Agricola$/)
+  room.progress = { phase: 'solo-hand-selection' }
+  room.waiting_player_indexes = []
+  await page.clock.runFor(5000)
+  await expect(page).toHaveTitle('Open Agricola')
+  room.progress = { phase: 'playing', round: 1 }
+  room.waiting_player_indexes = [0]
+  await page.clock.runFor(5000)
+  await expect(page).toHaveTitle(/^[◢◣◤◥] Open Agricola$/)
+  expect(await page.locator('link[rel="icon"]').getAttribute('href')).toBe(icon)
+  await page.getByRole('link', { name: 'Card Encyclopedia' }).click()
+  await expect(page).toHaveTitle('Open Agricola')
+  await page.clock.runFor(2000)
+  await expect(page).toHaveTitle('Open Agricola')
+})
 
 for (const width of [320, 390, 1280]) {
   for (const locale of ['en', 'zh']) {

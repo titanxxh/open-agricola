@@ -3,8 +3,39 @@ import { requireActiveCardRegistry } from '../../../shared/cards/active-registry
 import { serializeState, serializeSessionSnapshot, rehydrateState } from '../../../shared/session/serialization.ts'
 import { GameSession } from '../authoritative-session.ts'
 import type { SessionResponse } from '../authoritative-session.ts'
+import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 
 describe('GameSession.buildSyncPayload', () => {
+  it('keeps waiting seats on the frame owner across cross-player handoff confirmation', () => {
+    const session = createWorkSession({ configure(state) {
+      const responder = state.players[1]!
+      responder.houseType = 'clay'
+      responder.occupationPlayed = ['A128_RiparianBuilder']
+      Object.assign(responder.resources, { wood: 5, clay: 10, reed: 6 })
+      state.actionSpaces.find(space => space.id === 'reed-bank')!.resources.reed = 3
+    } })
+    try {
+      const handoff = session.takeAction(0, 'reed-bank')
+      expect(handoff.interaction).toMatchObject({
+        stateId: 'wait', playerIndex: 0,
+        request: { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 },
+      })
+      expect(session.buildSyncPayload(handoff, session.state.players[0]!.id).waitingSeatIndexes).toEqual([0])
+      const reaction = session.resolveChoice(0, 'confirm')
+      expect(reaction.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
+      expect(reaction.state.currentPlayerIndex).toBe(0)
+      expect(session.buildSyncPayload(reaction, session.state.players[1]!.id).waitingSeatIndexes).toEqual([0])
+      const returning = session.resolveChoice(1, '__skip__')
+      expect(returning.interaction).toMatchObject({
+        stateId: 'wait', playerIndex: 1,
+        request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 },
+      })
+      for (const viewer of session.state.players) {
+        expect(session.buildSyncPayload(returning, viewer.id).waitingSeatIndexes).toEqual([1])
+      }
+    } finally { session.dispose() }
+  })
+
   it('reports the work-rotation player as the waiting seat when play has no engine frame', () => {
     const session = new GameSession(9104, undefined, { playerCount: 2 })
     try {
