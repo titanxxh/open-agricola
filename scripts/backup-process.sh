@@ -8,7 +8,7 @@ backup_job_begin() {
     if [[ "$mode" != maintenance ]]; then
       # Reserve the final ten seconds of the 30-minute budget for bounded cleanup.
       export BACKUP_DEADLINE_EPOCH_MS="$(( $(date +%s%3N) + 1790000 ))"
-      exec timeout --signal=TERM --kill-after=5s 1790 bash "$0" "$@"
+      exec timeout --signal=TERM --kill-after=10s 1790 bash "$0" "$@"
     fi
   fi
   [[ "$BACKUP_JOB_ID" =~ ^[a-zA-Z0-9-]+$ ]] || { echo 'Invalid backup run identity' >&2; return 1; }
@@ -31,12 +31,20 @@ backup_command() {
   timeout --signal=TERM --kill-after=3s "$seconds" "$@"
 }
 
+backup_cleanup_command() {
+  if [[ -n "${BACKUP_DEADLINE_EPOCH_MS:-}" ]]; then
+    BACKUP_DEADLINE_EPOCH_MS="$(( BACKUP_DEADLINE_EPOCH_MS + 10000 ))" backup_command "$@"
+  else
+    backup_command "$@"
+  fi
+}
+
 backup_job_cleanup() {
   local containers
-  containers="$(timeout 5 docker ps -aq --filter "label=org.open-agricola.backup.run=$BACKUP_JOB_ID" 2>/dev/null)" || containers=''
+  containers="$(backup_cleanup_command timeout 5 docker ps -aq --filter "label=org.open-agricola.backup.run=$BACKUP_JOB_ID" 2>/dev/null)" || containers=''
   if [[ -n "$containers" ]]; then
     # IDs come exclusively from Docker's run-owned label filter.
-    timeout 5 docker rm -f $containers >/dev/null 2>&1 || true
+    backup_cleanup_command timeout 5 docker rm -f $containers >/dev/null 2>&1 || true
   fi
 }
 
@@ -46,7 +54,9 @@ backup_reap_tools() {
   containers="$(backup_command docker ps -aq --filter label=org.open-agricola.backup.run)"
   for container in $containers; do
     deadline="$(backup_command docker inspect --format '{{index .Config.Labels "org.open-agricola.backup.deadline"}}' "$container")"
-    if [[ "$deadline" =~ ^[0-9]+$ ]] && (( deadline > 0 && deadline <= $(date +%s%3N) )); then
+    # The caller holds the host lock. A zero-deadline maintenance tool cannot
+    # belong to another supported deployment still in progress.
+    if [[ "$deadline" =~ ^[0-9]+$ ]] && (( deadline == 0 || deadline <= $(date +%s%3N) )); then
       backup_command docker rm -f "$container" >/dev/null
     fi
   done

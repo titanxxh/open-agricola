@@ -52,6 +52,7 @@ async function pgTool(tool: 'pg_dump' | 'pg_restore', connectionString: string, 
     const command = deadline ? ['timeout', '--signal=TERM', '--kill-after=3s', String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))), tool] : [tool]
     const argv = local ? args.map(arg => arg.replace('/archive/', `${resolve(root)}/`)) : [
       'run', '--rm', '--name', container, '--label', `org.open-agricola.backup.run=${process.env.BACKUP_JOB_ID || container}`,
+      '--label', `org.open-agricola.backup.deadline=${deadline || 0}`,
       '--network', 'host', '--env', 'PGSERVICEFILE=/connection/service.conf',
       '--user', `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
       '--mount', `type=bind,source=${config},target=/connection,readonly`,

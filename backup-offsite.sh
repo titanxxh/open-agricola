@@ -29,7 +29,7 @@ INCOMING=''
 cleanup() {
   if [[ -n "$INCOMING" ]]; then
     # Best effort within the original budget; autonomous age cleanup handles an unreachable host.
-    backup_command timeout 2 ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" \
+    backup_cleanup_command timeout 2 ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" \
       timeout --signal=TERM --kill-after=1s 1 rm -rf -- "$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING" >/dev/null 2>&1 || true
   fi
   backup_job_cleanup
@@ -111,14 +111,17 @@ LEDGER_OK=1
 INCOMING=".incoming-$BACKUP_JOB_ID"
 if ensure_remote_dir; then
   if backup_command node scripts/backup-files.mjs list backups "$BACKUP_PENDING/files.nul" "$BACKUP_PENDING/checksums.tsv"; then
-    backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING" <<'REMOTE'
+    if ! backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING" <<'REMOTE'
 set -eu
 mkdir -p -- "$1"
 chmod 700 -- "$1"
 REMOTE
+    then
+      SYNC_OK=0
+      echo 'Offsite staging failed; erasure synchronization and retention still run'
     # Immutable existing destination files can be hard-linked into this private transfer.
     # No --delete: local removal does not erase offsite history.
-    if backup_rsync -az --from0 --files-from="$BACKUP_PENDING/files.nul" \
+    elif backup_rsync -az --from0 --files-from="$BACKUP_PENDING/files.nul" \
       --link-dest="$OFFSITE_BACKUP_REMOTE_DIR" -e "ssh ${SSH_OPTS[*]}" \
       backups/ "$OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR/$INCOMING/" \
       && backup_rsync -a -e "ssh ${SSH_OPTS[*]}" "$BACKUP_PENDING/checksums.tsv" \
