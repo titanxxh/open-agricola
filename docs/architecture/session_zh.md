@@ -62,6 +62,7 @@ type SessionResponse = {
 ```
 
 - Session 测试直接断言这一结构；WebSocket 路径通过 `GameSession.buildSyncPayload()` 序列化并按视角过滤。
+- `waiting-seats.ts` 为实时 `sync-payload.ts` 和已提交的大厅摘要派生 Waiting Seat。轮抽与父母选择包含所有尚未提交的已占座位；普通进行局取引擎栈顶帧所有者，包括交接确认帧，无帧时回退到工作轮转玩家。该投影独立于 Interaction Player。等待房间、单人开局选牌与结束局没有待行动座位。测试：`shared/session/__tests__/waiting-seats.test.ts`、`server/__tests__/lobby-my-rooms.test.ts`、`server/game/__tests__/authoritative-session-sync-payload.test.ts`。
 - 每个修改命令都经过一个结算边界（[ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)）。输入拒绝恢复完整的命令检查点，包括历史与行动起点 metadata；已接受的必选阻塞保留其效果。仅凭 `ok:false` 或 `recoverable:true` 不能判定为拒绝。规则上合法但破坏守卫的命令保留其持久的暂定恢复与失败记忆；在受守卫范围内提交的非法输入两者都不获得。
 - 失败记忆比较规则状态时排除恢复与完成的记账事件（`continuation.restored`、`anytime.completed`）。完成反应产生的状态变化和领域事实仍能重新开放失败命令；仅完成无效果的 anytime flow 不会。
 

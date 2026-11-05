@@ -1,5 +1,6 @@
 // @covers client/components/header/
 // @covers server/connection/
+// @covers client/app/use-turn-tab-title.ts
 import {
   test,
   expect,
@@ -67,7 +68,7 @@ const observeSeat = (page: Page) => {
 test.describe('WS dual-player sync', () => {
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
     test(`header follows the interaction player through a cross-player reaction at ${viewport.width}px`, async ({ browser, request }, testInfo) => {
-      const context = await browser.newContext({ viewport })
+      const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
       const session = createWorkSession({ configure(state) {
         Object.assign(state.players[0]!, { name: 'xxh', nameIsDefault: false, color: 'yellow' })
         const responder = state.players[1]!
@@ -98,6 +99,8 @@ test.describe('WS dual-player sync', () => {
         await expect(waiting).toHaveText('Waiting for zero21 to act')
         await expect(waiting).toHaveAttribute('data-player-color', 'blue')
         await expect(responder.locator('.header-compact .your-turn')).toBeVisible()
+        await expect(observer).toHaveTitle('◢ Open Agricola')
+        await expect(responder).toHaveTitle('Open Agricola')
         await expect(observer.locator('[data-action-id="forest"] button').first()).toBeDisabled()
         await observer.screenshot({ path: testInfo.outputPath('waiting-for-reaction.png') })
 
@@ -105,8 +108,11 @@ test.describe('WS dual-player sync', () => {
         const confirm = responder.locator('.interaction-bar').getByRole('button', { name: 'Confirm switch', exact: true })
         await expect(confirm).toBeEnabled()
         await expect(waiting).toHaveText('Waiting for zero21 to act')
+        await expect(observer).toHaveTitle('Open Agricola')
+        await expect(responder).toHaveTitle('◢ Open Agricola')
         await observer.reload()
         await expect(waiting).toHaveText('Waiting for zero21 to act')
+        await expect(observer).toHaveTitle('Open Agricola')
         await observer.screenshot({ path: testInfo.outputPath('waiting-for-switch.png') })
         await confirm.click()
         await expect(observer.locator('.header-compact .your-turn')).toBeVisible()
@@ -206,6 +212,12 @@ test.describe('WS dual-player sync', () => {
         }
         const forest = p1.locator('[data-action-id="forest"] button:enabled').first()
         await expect(forest).toBeVisible()
+        const lobby = await ctx1.newPage()
+        await lobby.goto(`${FRONTEND_URL}/?page=lobby`)
+        await expect(lobby).toHaveTitle(/^[◢◣◤◥] Open Agricola$/)
+        await p1.bringToFront()
+        await expect(p1).toHaveTitle(/^[◢◣◤◥] Open Agricola$/)
+        await expect(lobby).toHaveTitle(/^[◢◣◤◥] Open Agricola$/)
         const expectOwnHand = async (page: Page, playerId: string) => {
           const hand = page.locator(`[data-hand-anchor="${playerId}"]`)
           await expect(hand).toBeVisible()
