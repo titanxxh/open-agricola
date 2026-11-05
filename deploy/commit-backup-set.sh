@@ -11,7 +11,7 @@ STAGE="$ROOT/$INCOMING"
 cleanup() { rm -rf -- "$STAGE"; }
 trap cleanup EXIT
 trap 'exit 124' INT TERM HUP
-check_deadline() { (( $(date +%s%3N) < DEADLINE )) || { echo 'Backup deadline exceeded' >&2; return 124; }; }
+check_deadline() { (( $(date +%s%N) / 1000000 < DEADLINE )) || { echo 'Backup deadline exceeded' >&2; return 124; }; }
 check_deadline
 cd "$STAGE"
 [[ -f checksums.tsv ]] || { echo 'Missing transfer checksums'; exit 1; }

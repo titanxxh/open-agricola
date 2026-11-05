@@ -42,7 +42,7 @@ remote_budget_command() {
   local command
   printf -v command '%q ' bash -c '
 deadline="$1"; shift
-remaining=$(( deadline - $(date +%s%3N) ))
+remaining=$(( deadline - $(date +%s%N) / 1000000 ))
 (( remaining > 0 )) || exit 124
 seconds=$(printf "%d.%03d" "$((remaining / 1000))" "$((remaining % 1000))")
 exec timeout --signal=TERM --kill-after=3s "$seconds" "$@"
@@ -85,7 +85,7 @@ REMOTE
   backup_remote bash -s -- "$OFFSITE_BACKUP_REMOTE_DIR" ".ledger-$BACKUP_JOB_ID.json" "$BACKUP_DEADLINE_EPOCH_MS" <<'REMOTE' || return 1
 set -eu
 trap 'rm -f -- "$1/$2"' EXIT
-(( $(date +%s%3N) < $3 )) || exit 124
+(( $(date +%s%N) / 1000000 < $3 )) || exit 124
 mv -- "$1/$2" "$1/replay-removals.latest.json"
 REMOTE
   echo 'Independent erasure ledger union synchronized'
