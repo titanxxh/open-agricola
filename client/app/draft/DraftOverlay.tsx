@@ -34,11 +34,11 @@ export interface DraftViewModel {
   alreadySubmitted: boolean
 }
 
-export function computeDraftViewModel(draft: DraftState, meId: string): DraftViewModel {
+export function computeDraftViewModel(draft: DraftState, meId: string | null): DraftViewModel {
   const stage = draft.stage ?? 'standard'
-  const myPool = draft.pools[meId] ?? { occ: [], minor: [] }
-  const myKept = draft.kept[meId] ?? { occ: [], minor: [] }
-  const myPending = draft.pendingPicks[meId] ?? { occ: null, minor: null }
+  const myPool = (meId ? draft.pools[meId] : undefined) ?? { occ: [], minor: [] }
+  const myKept = (meId ? draft.kept[meId] : undefined) ?? { occ: [], minor: [] }
+  const myPending = (meId ? draft.pendingPicks[meId] : undefined) ?? { occ: null, minor: null }
 
   const alreadySubmitted =
     stage === 'standard'

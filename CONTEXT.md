@@ -137,7 +137,7 @@ _Avoid_: 正常完赛、自动过期、内容下架
 _Avoid_: 可复用房间号、GameState、Room Invite
 
 **Game Context Link**:
-定位一个 Game Context 的永久链接，可额外固定 Bug Report Anchor 和 Replay Perspective。等待中的 Room 可通过同一链接加入空座；已开局的 Room 按账号恢复既有座位。链接不携带座位凭据，也不授予活动对局的观看权限。
+定位一个 Game Context 的永久链接，可额外固定 Bug Report Anchor 和 Replay Perspective。等待中的 Room 可通过同一链接加入空座；已开局的 Room 按账号恢复既有座位，符合旁观准入条件的非参与者进入公开旁观。链接不携带座位凭据，旁观权限由服务端按对局和账号判断。
 _Avoid_: Room Invite Link、登录回调、恢复令牌
 
 **Active Game Recovery**:
@@ -232,6 +232,10 @@ _Avoid_: 活动 Room 快照、完整未完成局归档、永久 Replay
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
 _Avoid_: PlayerState
+
+**Spectator（旁观者）**:
+对活动对局的公开信息拥有只读观看权限、没有该局座位的已登录用户。切换农场观察对象不会获得任何玩家的私有信息或操作权限。
+_Avoid_: RoomPlayer、Farm View Player、Replay Perspective、临时座位
 
 **Platform Operations Dashboard（平台运行看板）**:
 供管理员查看 Open Agricola 服务健康和使用概况的汇总界面。运行概况不授予活动对局的隐藏规则状态访问权限。

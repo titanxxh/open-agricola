@@ -41,6 +41,34 @@ describe('Room reconnect and durable commands', () => {
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 
+  it('reconnects a spectator without a seat or command replay and stops after an offline notice', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', 'room-1', undefined, { route: false, reconnectDelayMs: 1 })
+    try {
+      await transport.connect()
+      const first = Socket.all[0]!
+      first.emit({ type: 'roomSpectated', roomId: 'room-1' })
+      first.emit(snapshot(1))
+      expect(transport.viewer).toEqual({ kind: 'spectator' })
+      expect(transport.playerIndex).toBeNull()
+      await expect(transport.takeAction(0, 'forest')).rejects.toThrow('Spectators cannot issue game commands')
+      expect(first.sent.some(command => command.type === 'action')).toBe(false)
+      first.close(1006)
+      await tick()
+      const second = Socket.all[1]!
+      await vi.waitFor(() => expect(second.sent).toContainEqual({ type: 'spectateRoom', roomId: 'room-1' }))
+      expect(second.sent.some(command => command.type === 'joinRoom' || command.type === 'action')).toBe(false)
+      second.emit({ type: 'roomSpectated', roomId: 'room-1' })
+      second.emit(snapshot(2))
+      await vi.waitFor(() => expect(transport.connected).toBe(true))
+      second.emit({ type: 'spectatingEnded', roomId: 'room-1', reason: 'offline' })
+      second.close()
+      expect(transport.spectatingEndReason).toBe('offline')
+      expect(transport.connected).toBe(false)
+      expect(Socket.all).toHaveLength(2)
+    } finally { transport.destroy() }
+  })
+
   it('recovers an independent creation journal without replacing the old game intent or losing adjustment details', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const old = new WsGameTransport('ws://test', 'old-room', undefined, { route: false })

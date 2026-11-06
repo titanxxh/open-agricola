@@ -1,3 +1,4 @@
+import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
 import { selectDevelopmentRoom } from '../game/development-room-slots'
 import type { InvalidationOperation } from '../invalidation'
@@ -306,7 +307,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
   ws.on('close', () => {
     const disconnectedAt = Date.now()
     const disconnectedRoom = ctx.currentRoom
-    if (disconnectedRoom && deps.authority && deps.registry.has(disconnectedRoom.id)) {
+    if (disconnectedRoom && disconnectedRoom.players.some(player => player.ws === ws) && deps.authority && deps.registry.has(disconnectedRoom.id)) {
       if (roomConnectedPlayerCount(disconnectedRoom) === 0) deps.registry.touchActivity(disconnectedRoom.id, disconnectedAt)
       void deps.authority.updatePresence(disconnectedRoom)
         .catch(error => console.error('[ws-server] presence update failed', error))
@@ -315,6 +316,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom && deps.registry.has(ctx.currentRoom.id)) {
+      if (removeRoomSpectator(ctx.currentRoom, ws)) return
       const disconnectedSeat = ctx.currentRoom.players.find(player => player.ws === ws)?.playerIndex
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
@@ -323,6 +325,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
           playerIndex: disconnectedSeat ?? ctx.currentPlayerIndex,
         })
       } else if (removal === 'empty') {
+        deps.broadcaster.endSpectating(ctx.currentRoom, 'offline')
         if (ctx.currentRoom.session.state.gameOver && ctx.currentRoom.customSessionExecutor) {
           ctx.currentRoom.customSessionExecutor.dispose()
         }
@@ -402,6 +405,7 @@ export async function createWsServer(
           if (!room) continue
           await enqueueRoomTask(room, async () => {
             for (const player of room.players) player.ws.close(1012, 'room owner changed')
+            for (const viewer of drainRoomSpectators(room)) viewer.close(1012, 'room owner changed')
             await committer.retireRoom(id)
             registry.delete(id)
             room.session.dispose()

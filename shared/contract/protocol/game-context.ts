@@ -16,7 +16,7 @@ export type ActiveGameContextDescriptor = {
   roomId: string
   lifecycle: 'active'
   phase: 'waiting' | 'playing'
-  playerIndex: number
+  playerIndex: number | null
   roomVersion: number
   stepNo: number
   expiresAt?: number

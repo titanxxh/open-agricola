@@ -1,10 +1,11 @@
+import { isRoomSpectator, roomSpectators, drainRoomSpectators } from '../game/room-spectators'
 import { ExecutionAccess } from '../game/execution-access'
 import { measure, operationsMetrics, roundTag, sendObserved, safe } from '../observability/metrics'
 import { RoomDirectory, RoomOwnershipError } from '../game/room-directory'
 import type { WebSocket } from 'ws'
 import { isDevRoom, roomConnectedPlayerCount, roomOccupiedSeatCount, type Room } from '../game/room.ts'
 import type { SessionResponse } from '../game/authoritative-session.ts'
-import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
+import type { ServerEvent, SpectatingEndReason } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
@@ -47,11 +48,11 @@ export class Broadcaster {
       await this.directory!.assertOwner(room.id, room.owner!, undefined, retired)
       if (!retired && room.executionStamp) await new ExecutionAccess(this.directory!.db).assert(room.executionStamp)
       if (!retired) await this.directory!.presence(room.id, room.owner!, roomConnectedPlayerCount(room), roomOccupiedSeatCount(room))
-      for (const seat of room.players) {
-        const token = this.tokens.get(seat.ws)
+      for (const ws of [...room.players.map(seat => seat.ws), ...roomSpectators(room)]) {
+        const token = this.tokens.get(ws)
         if (!token) continue
         const allowed = await this.directory!.db.prepare('SELECT token FROM sessions WHERE token=? AND expires_at>(extract(epoch FROM clock_timestamp())*1000)::bigint FOR SHARE').get(token)
-        if (!allowed) seat.ws.close(1008, 'session revoked')
+        if (!allowed) ws.close(1008, 'session revoked')
       }
       send()
     })()
@@ -87,6 +88,14 @@ export class Broadcaster {
       bytes += sendObserved(seat.ws, env)
       recipients++
     }
+    const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN)
+    if (spectators.length) {
+      const envelope = measure('projection', () => buildEnvelope({ room, resp, viewerPlayerId: null,
+        version: room.version, cause, emittedAt, mode: 'viewer' }))
+      const data = JSON.stringify(envelope)
+      for (const ws of spectators) { bytes += sendObserved(ws, envelope, roundTag(resp.state), data); recipients++ }
+    }
+    if (resp.state.gameOver) this.endSpectating(room, 'completed')
     safe(() => {
       operationsMetrics.broadcastSize.observe({ round: roundTag(resp.state) }, bytes)
       operationsMetrics.broadcastRecipients.observe({ round: roundTag(resp.state) }, recipients)
@@ -112,7 +121,7 @@ export class Broadcaster {
         cause,
         requestId,
         emittedAt: Date.now(),
-        mode: mode ?? projectionModeFor(room),
+        mode: isRoomSpectator(room, ws) ? 'viewer' : mode ?? projectionModeFor(room),
     }))
     sendObserved(ws, env)
     }))
@@ -125,7 +134,22 @@ export class Broadcaster {
     for (const seat of room.players) {
       sendObserved(seat.ws, event, round, data)
     }
+    if (event.type === 'roomPersistencePaused' || event.type === 'roomPersistenceResumed') {
+      for (const ws of roomSpectators(room)) sendObserved(ws, event, round, data)
+    }
+    if (event.type === 'gameTerminated') this.endSpectating(room, 'terminated')
+    else if (event.type === 'roomDissolved') this.endSpectating(room, 'removed')
+    else if (event.type === 'playerDisconnected' && roomConnectedPlayerCount(room) === 0) this.endSpectating(room, 'offline')
     }, event.type === 'roomDissolved' || event.type === 'gameTerminated')
+  }
+
+  endSpectating(room: Room, reason: SpectatingEndReason): void {
+    const viewers = drainRoomSpectators(room)
+    try {
+      for (const ws of viewers) sendObserved(ws, { type: 'spectatingEnded', roomId: room.id, reason })
+    } finally {
+      for (const ws of viewers) ws.close(1000, 'spectating ended')
+    }
   }
 
   sendTo(ws: WebSocket, event: ServerEvent): void {

@@ -1,3 +1,5 @@
+import { isDevRoom } from './room'
+import { spectatorRoute } from './room-spectators'
 import type { RoomDiscoveryRequest, RoomDiscoveryResponse } from '../../shared/contract/protocol/routing'
 import { CommandStore } from './command-store'
 import { RoomDirectory, RoomOwnershipError } from './room-directory'
@@ -7,10 +9,12 @@ import { persistedRoomAccessError } from './room-access'
 /** Discovery supplies a route, never seat permission or a gameplay write. */
 export async function discoverRoom(directory: RoomDirectory, actorId: string, request: RoomDiscoveryRequest, userId?: string): Promise<RoomDiscoveryResponse> {
   let roomId = request.roomId
+  let hasPendingReceipt = false
   if (request.pendingIdentity) {
     const pending = await new CommandStore(directory.db).lookup(actorId, request.pendingIdentity)
+    hasPendingReceipt = pending.kind !== 'unknown'
     if (pending.kind === 'completed') {
-      if (!pending.receipt.outcome.ok && !pending.receipt.outcome.roomId && !roomId) {
+      if (!pending.receipt.outcome.ok && !pending.receipt.outcome.roomId) {
         const instance = (await directory.instances())[0]
         if (!instance) throw new RoomOwnershipError('No application instance is available')
         return { wsPath: `/nodes/${instance.instance_id}/ws` }
@@ -19,7 +23,12 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
     } else if (pending.kind === 'pending') {
       const resultId = pending.request.resultRoomId
       const committed = resultId && await directory.db.prepare('SELECT 1 FROM game_contexts WHERE room_id=?').get(resultId)
-      roomId = committed ? resultId! : pending.request.targetRoomId ?? roomId
+      if (!committed && !pending.request.targetRoomId) {
+        const instance = (await directory.instances())[0]
+        if (!instance) throw new RoomOwnershipError('No application instance is available')
+        return { wsPath: `/nodes/${instance.instance_id}/ws` }
+      }
+      roomId = committed ? resultId! : pending.request.targetRoomId!
     }
   }
   if (roomId) {
@@ -41,6 +50,13 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
     }
     const accessError = await persistedRoomAccessError(directory.db, roomId, userId)
     if (accessError) throw Object.assign(new Error(accessError.message), { code: accessError.code })
+    const participant = userId && await directory.db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(roomId, userId)
+    const playing = await directory.db.prepare("SELECT 1 FROM rooms WHERE id=? AND status='playing'").get(roomId)
+    if (!participant && playing && !hasPendingReceipt && !isDevRoom(roomId)) {
+      const route = userId ? await spectatorRoute(directory.db, roomId) : undefined
+      if (!route) throw Object.assign(new Error('This game is not available for spectating'), { code: userId ? 'not_participant' : 'login_required' })
+      return { roomId, ...route }
+    }
     const assigned = await directory.claim(roomId)
     return { roomId, wsPath: assigned.wsPath }
   }

@@ -1,3 +1,4 @@
+import { PublicOpeningProgress } from './PublicOpeningProgress'
 import { GameEndControls } from './GameEndControls'
 import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
@@ -237,7 +238,7 @@ const useTransportSetup = (
       if (disposed) return
       if (waiting) { setWsReady(false); setWsStatus(waiting); return }
       setWsReady(true)
-      setWsStatus({ phase: 'ready', roomId: ws.roomId, playerIndex: ws.playerIndex, ...(hotseat ? { hotseat: true } : {}) })
+      setWsStatus({ phase: 'ready', roomId: ws.roomId, viewer: ws.viewer, ...(ws.spectatingEndReason ? { spectatingEndReason: ws.spectatingEndReason } : {}), ...(hotseat ? { hotseat: true } : {}) })
     }
     setWsTransport(ws)
     const offStatus = ws.onConnectionStatus(status => {
@@ -246,6 +247,8 @@ const useTransportSetup = (
         snapshotRoomId = undefined
         setWsReady(false)
         setWsStatus({ phase: status.phase === 'connecting' ? 'connecting' : 'reconnecting' })
+      } else if (status.phase === 'stopped' && ws.viewer.kind === 'spectator' && ws.spectatingEndReason) {
+        ready()
       } else if (status.phase === 'stopped') {
         setWsReady(false)
         setWsStatus({ phase: 'error', message: status.message, code: status.code as WsErrorCode | undefined })
@@ -254,7 +257,15 @@ const useTransportSetup = (
     const offRecovery = ws.onRecoveryNotice(() => setRecoveryNotice(true))
     const offEvent = ws.onEvent(msg => {
       if (disposed) return
-      if (msg.type === 'roomCreated' || msg.type === 'roomJoined') {
+      if (msg.type === 'roomSpectated') {
+        receivedRoom = true
+        hotseat = false
+        waiting = undefined
+        setRoomInUrl(msg.roomId)
+        setWsStatus({ phase: 'joining', roomId: msg.roomId })
+      } else if (msg.type === 'spectatingEnded') {
+        ready()
+      } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined') {
         receivedRoom = true
         setRoomInUrl(msg.roomId)
         playerIndexRef.current = msg.playerIndex
@@ -468,6 +479,8 @@ export const GameContainerApi = () => {
   }, [])
   const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
   // One connection holds every seat, as confirmed by the server's room answer.
+  const isSpectator = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'spectator'
+  const spectatingEndReason = wsStatus.phase === 'ready' ? wsStatus.spectatingEndReason : undefined
   const isHotseat = wsStatus.phase === 'ready' && wsStatus.hotseat === true
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   const activePlayer =
@@ -477,7 +490,7 @@ export const GameContainerApi = () => {
   // In WS mode, selfPlayer is locked to the URL ?player= param.
   // If the URL omits ?player=, use the seat assigned by the join/create handshake.
   // One-device HTTP play follows the Interaction Player, including reactions.
-  const selfPlayer = isWs && localPlayerId && !isHotseat
+  const selfPlayer = isSpectator ? null : isWs && localPlayerId && !isHotseat
     ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
     : activePlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
@@ -512,23 +525,23 @@ export const GameContainerApi = () => {
   }
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
-  const isInteractive = isHotseat
+  const isInteractive = !isSpectator && (isHotseat
     ? !persistencePaused && !!activePlayer && hotseatSeatConfirmed === hotseatAudienceKey && !isPublicFarmView
     : isWs
       ? !persistencePaused && (!isWs || wsStatus.phase === 'ready') && !!(activePlayer && selfPlayer && displayPlayer &&
            activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
-      : !!(activePlayer && displayPlayer)
+      : !!(activePlayer && displayPlayer))
   const hasGameView = !!(state && currentPlayer && displayPlayer)
-  const canResetGame = hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
+  const canResetGame = !isSpectator && hasGameView && !persistencePaused && (!isWs || wsStatus.phase === 'ready') &&
     (!isHotseat || isInteractive) &&
     (!isWs || isHotseat || selfPlayer?.id === displayPlayer?.id)
-  const bugReportRoomId = isWs && wsStatus.phase === 'ready'
+  const bugReportRoomId = !isSpectator && isWs && wsStatus.phase === 'ready'
     ? wsStatus.roomId
     : null
   const bugReportBar = bugReportRoomId
     ? <BugReportBar roomId={bugReportRoomId} />
     : null
-  const mySeatIndex = isWs && wsStatus.phase === 'ready' ? wsStatus.playerIndex : null
+  const mySeatIndex = isWs && wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'participant' ? wsStatus.viewer.playerIndex : null
   useTurnTabTitle(gameNeedsTurnTab(isHotseat, mySeatIndex, waitingSeatIndexes))
 
   useLayoutEffect(() => {
@@ -1502,7 +1515,7 @@ export const GameContainerApi = () => {
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex} onColorChange={changePlayerColor} colorError={roomColorError}
+              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
                 colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />
               <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
@@ -1563,12 +1576,28 @@ export const GameContainerApi = () => {
     </div>
   ) : null
 
-  const gameEndControls = wsTransport && !state.gameOver ? (
+  const gameEndControls = !isSpectator && wsTransport && !state.gameOver ? (
     <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert} />
   ) : null
 
   const encyclopediaWindow = encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })
+  const spectatorStatus = isSpectator ? (
+    <div className="public-event-notification spectating-status" role="status" data-testid="spectating-status">
+      <span>{t(locale, spectatingEndReason ? `platform.spectating.${spectatingEndReason}` : 'platform.spectating.live')}</span>
+      <div className="spectating-status__actions">
+        <button type="button" className="btn-secondary" onClick={() => setPage('lobby')}>
+          {t(locale, 'platform.backToLobbyPlain')}
+        </button>
+        {spectatingEndReason === 'completed' || spectatingEndReason === 'terminated' ? (
+          <button type="button" className="btn-secondary" onClick={() => window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))}>
+            {t(locale, 'platform.spectating.replay')}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  ) : null
   const renderGameHeader = (encyclopediaEntry: boolean) => (
+    <>
     <GameHeader
       locale={locale}
       state={state}
@@ -1585,6 +1614,8 @@ export const GameContainerApi = () => {
       onOpenEncyclopedia={encyclopediaEntry ? () => setEncyclopediaOpenedIn({ window: encyclopediaWindow }) : undefined}
       encyclopediaEntryRef={encyclopediaEntry ? encyclopediaEntryRef : undefined}
     />
+    {spectatorStatus}
+    </>
   )
   const gameHeader = renderGameHeader(true)
   const hotseatHandoff = (playerId: string) => (
@@ -1634,6 +1665,14 @@ export const GameContainerApi = () => {
         ) : <GameLoadScreen percent={90} label={t(locale, 'solo.checking')} />}
       </div>
     )
+  }
+
+  if (isSpectator && (state.phase === 'draft' || state.phase === 'parent-selection')) {
+    return withEncyclopedia(<div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
+      {gameHeader}
+      {notificationStack}
+      <PublicOpeningProgress state={state} locale={locale} />
+    </div>)
   }
 
   // Card-draft phase — render the draft overlay instead of the game board.

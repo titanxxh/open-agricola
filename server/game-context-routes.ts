@@ -115,7 +115,7 @@ export async function handleGameContextRoute(
     res.end(JSON.stringify(response))
     return true
   }
-  const response = (await store.resolve(roomId, user?.id))
+  const response = (await store.resolve(roomId, user?.id, url.searchParams.get('intent') === 'resume' ? 'resume' : 'join'))
   if (!response.ok && response.code === 'login_required') {
     response.returnTo = contextReturnTo(roomId)
   }

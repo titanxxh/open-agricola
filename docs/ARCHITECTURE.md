@@ -35,7 +35,7 @@ Violating any invariant below is an architecture bug:
 - **Sole backend owner:** `GameSession` in `server/game/authoritative-session.ts` is the only server command entry and owns `GameState`; mutations execute in the `GameCore` and action leaves it drives.
 - **Command-driven:** the frontend sends intent. The backend validates, executes, commits state, produces logs, and broadcasts.
 - **Weak client:** the frontend renders, collects input, and manages temporary local UI state. It never adjudicates rules and never commits optimistically: game UI changes only after `stateUpdate` arrives.
-- **Full snapshots:** every client in a room receives the same `stateUpdate`; the frontend does not apply partial patches.
+- **Full snapshots:** each connection receives a viewer-filtered full `stateUpdate`; the frontend does not apply partial patches.
 - **WebSocket game path:** `/ws` receives `ClientCommand` and emits `StateUpdateEnvelope`.
 - **`InteractionState` is the only frontend interaction truth:** `stateId` is `idle`, `wait`, or `gameover`; `wait` branches on `request.kind`.
 - **One domain implementation:** actions, engine, cards, rounds, harvest, and scoring live in `shared/` and are reused by both frontend and backend.

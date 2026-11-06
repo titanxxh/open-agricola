@@ -258,7 +258,7 @@ it('shares lobby presence across owners and excludes an earlier owner epoch', as
   await directory.db.transaction(() => directory.presence('one', owner, 1, 2))()
   expect(await directory.lobby()).toContainEqual({ id: 'one', playerCount: 2, maxPlayers: 2, status: 'waiting' })
   await directory.db.prepare("UPDATE rooms SET status='playing' WHERE id='one'").run()
-  expect(await directory.lobby()).toContainEqual({ id: 'one', playerCount: 2, maxPlayers: 2, status: 'playing' })
+  expect(await directory.lobby()).toContainEqual({ id: 'one', playerCount: 2, maxPlayers: 2, status: 'playing', canSpectate: true })
 })
 
 it('reserves a one-for-one replacement when the current owner is at capacity', async () => {

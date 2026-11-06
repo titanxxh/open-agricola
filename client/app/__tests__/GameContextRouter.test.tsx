@@ -126,7 +126,7 @@ describe('GameContextRouter', () => {
 
     expect(await screen.findByText('active app')).toBeVisible()
     expect(fetch).toHaveBeenCalledWith(
-      '/api/v1/game-contexts/active-room',
+      `/api/v1/game-contexts/active-room${key === 'context' ? '?intent=resume' : ''}`,
       expect.objectContaining({ credentials: 'include' }),
     )
   })
@@ -167,7 +167,7 @@ describe('GameContextRouter', () => {
         + '&perspective=open&bugReport=draft-1',
     )
     const fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.endsWith('/api/v1/game-contexts/active-room')) {
         return new Response(JSON.stringify({
           ok: true,
@@ -240,7 +240,7 @@ describe('GameContextRouter', () => {
       `/?context=active-room&step=5&frame=${frameHash}`,
     )
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      if (String(input).endsWith('/api/v1/game-contexts/active-room')) {
+      if (String(input).replace(/\?intent=resume$/, '').endsWith('/api/v1/game-contexts/active-room')) {
         return new Response(JSON.stringify({
           ok: true,
           roomId: 'active-room',
@@ -387,7 +387,7 @@ describe('GameContextRouter', () => {
     }
     const frameHash = '1'.repeat(64)
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.includes('/game-contexts/')) {
         return new Response(JSON.stringify(context))
       }
@@ -514,7 +514,7 @@ describe('GameContextRouter', () => {
       },
     }
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.endsWith('/api/v1/game-contexts/completed-room')) {
         return new Response(JSON.stringify(context))
       }
@@ -565,7 +565,7 @@ describe('GameContextRouter', () => {
   it('keeps a solo fractional result and rematch outside a failed replay Viewer', async () => {
     window.history.replaceState(null, '', '/?context=solo-completed')
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.endsWith('/game-contexts/solo-completed')) return new Response(JSON.stringify({
         ok: true, roomId: 'solo-completed', lifecycle: 'completed', replayStatus: 'available',
         result: { playerCount: 1, players: [{ playerIndex: 0, displayName: 'Alice', score: 5.5 }] },
@@ -657,7 +657,7 @@ describe('GameContextRouter', () => {
       }],
     }
     const fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.endsWith('/api/v1/game-contexts/expired-room')) {
         return new Response(JSON.stringify({
           ok: true,
@@ -721,7 +721,7 @@ describe('GameContextRouter', () => {
       `/?context=${roomId}&bugReport=submission-1`,
     )
     const fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.endsWith(`/api/v1/game-contexts/${roomId}`)) {
         return new Response(JSON.stringify({
           ok: true,
@@ -781,7 +781,7 @@ describe('GameContextRouter', () => {
       input: string | URL | Request,
       init?: RequestInit,
     ) => {
-      const url = String(input)
+      const url = String(input).replace(/\?intent=resume$/, '')
       if (url.endsWith('/api/v1/issue-submission-connection/github/complete')) {
         expect(init).toMatchObject({
           method: 'POST',

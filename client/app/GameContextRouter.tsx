@@ -337,6 +337,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   const [location, setLocation] = useState(() => ({ search: window.location.search, version: 0 }))
   const [closedEvidenceKey, setClosedEvidenceKey] = useState<string | null>(null)
   const params = new URLSearchParams(location.search)
+  const participantOnly = params.has('context')
   const roomId = roomIdFromQuery(location.search) ?? ''
   const hasContext = (params.has('context') || params.has('room'))
     && !isDevRoomId(roomId) && (!params.has('page') || params.get('page') === 'game')
@@ -388,7 +389,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasContext || !roomId) return
     const controller = new AbortController()
-    fetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}`, {
+    fetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}${participantOnly ? '?intent=resume' : ''}`, {
       credentials: 'include',
       signal: controller.signal,
     })
@@ -406,7 +407,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
         })
       })
     return () => controller.abort()
-  }, [hasContext, resolutionKey, roomId])
+  }, [hasContext, resolutionKey, roomId, participantOnly])
 
   if (!hasContext) return children
   if (!roomId) {
@@ -430,7 +431,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     const evidenceKey = anchor
       ? `${response.roomId}:${anchor.stepNo}:${anchor.frameHash}`
       : null
-    if (!anchor || evidenceKey === closedEvidenceKey) return children
+    if (response.playerIndex === null || !anchor || evidenceKey === closedEvidenceKey) return children
     const closeEvidence = () => {
       const url = new URL(window.location.href)
       url.searchParams.delete('step')

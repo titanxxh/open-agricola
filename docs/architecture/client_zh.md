@@ -10,6 +10,8 @@
 `SiteCommunityLinks` 在各页面顶部统一展示 GitHub 链接、微信入口和飞书入口。原生模态弹窗管理焦点，每次打开重新加载运行时图片；嵌入对局不展示站点入口。“更新内容”入口在 `/api/whats-new` 返回说明后出现，比本浏览器上次打开的版本更新时显示未读红点。测试见 `wechat-community.spec.ts` 和 `whats-new.spec.ts`。
 
 
+- 实时旁观沿用普通 Room 链接，通过 `roomSpectated` 确认身份。`WsStatus` 明确记录 viewer，旁观者没有本人玩家或游戏操作控件。`PublicOpeningProgress` 只展示公开开局进度。结束提示保留最后棋盘，适用时提供回放入口，重开不会带走旁观者。覆盖：`live-spectating.spec.ts`、`gameTransport-reconnect.test.ts`；见 ADR 0040。
+
 ## 客户端 bundle
 
 | Bundle | 入口 | 路径 | 约束 |
