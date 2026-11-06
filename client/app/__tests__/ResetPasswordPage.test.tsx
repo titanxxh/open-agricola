@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ResetPasswordPage } from '../ResetPasswordPage'
 
 type ResetResult = { ok: boolean; code?: string; error?: string }
 const resetPasswordMock = vi.fn(async (_input: { token: string; password: string; confirmPassword: string }): Promise<ResetResult> => ({ ok: true }))
+const requestPasswordResetMock = vi.fn(async (_identifier: string): Promise<ResetResult> => ({ ok: true }))
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ resetPassword: resetPasswordMock }),
+  useAuth: () => ({ resetPassword: resetPasswordMock, requestPasswordReset: requestPasswordResetMock }),
 }))
 
 vi.mock('../../contexts/LocaleContext', () => {
@@ -21,6 +22,11 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.passwordPlaceholder': '至少 8 个字符',
     'platform.resetPasswordSubmit': '重置密码',
     'platform.requestNewResetLink': '重新获取链接',
+    'platform.forgotPasswordTitle': '找回密码',
+    'platform.forgotPasswordIntro': '输入用户名或邮箱。',
+    'platform.forgotPasswordIdentifier': '用户名或邮箱',
+    'platform.forgotPasswordSent': '如果该账号存在且绑定了邮箱，重置链接已发出。',
+    'platform.forgotPasswordOAuthNote': '使用 GitHub 或 Google 注册的账号请直接用对应方式登录。',
     'platform.loading': '加载中...',
     'platform.networkError': '网络错误',
     'platform.authErrors.password_mismatch': '两次输入的密码不一致',
@@ -74,7 +80,7 @@ describe('ResetPasswordPage', () => {
     expect(resetPasswordMock).not.toHaveBeenCalled()
   })
 
-  it('offers a new link when the server rejects the token', async () => {
+  it('requests a new link in place when the server rejects the token', async () => {
     window.history.replaceState(null, '', '/?page=reset-password#passwordResetToken=used-token')
     resetPasswordMock.mockResolvedValueOnce({ ok: false, code: 'password_reset_token_invalid' })
     render(<ResetPasswordPage />)
@@ -84,10 +90,12 @@ describe('ResetPasswordPage', () => {
     expect(screen.queryByLabelText('新密码')).not.toBeInTheDocument()
     expect(sessionStorage.length).toBe(0)
 
-    await user.click(screen.getByRole('button', { name: '重新获取链接' }))
-    const params = new URLSearchParams(window.location.search)
-    expect(params.get('page')).toBe('login')
-    expect(params.get('authMode')).toBe('forgot')
+    const forgotForm = screen.getByRole('form', { name: '找回密码' })
+    await user.type(within(forgotForm).getByLabelText('用户名或邮箱'), ' reset@example.com ')
+    await user.click(within(forgotForm).getByRole('button', { name: '重新获取链接' }))
+    expect(requestPasswordResetMock).toHaveBeenCalledWith('reset@example.com')
+    expect(within(forgotForm).getByRole('status')).toHaveTextContent('重置链接已发出')
+    expect(window.location.search).toBe('?page=reset-password')
   })
 
   it('treats a link without a token as invalid', () => {
@@ -95,6 +103,7 @@ describe('ResetPasswordPage', () => {
     render(<ResetPasswordPage />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('重置密码链接无效或已过期')
-    expect(screen.getByRole('button', { name: '重新获取链接' })).toBeInTheDocument()
+    expect(screen.getByRole('form', { name: '找回密码' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重新获取链接' })).toBeDisabled()
   })
 })

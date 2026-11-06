@@ -8,6 +8,7 @@ import { DonateWidgets } from '../components/common/DonateWidgets'
 import { authErrorMessage } from './auth-errors'
 import { API_BASE } from '../config'
 import { prepareOAuthOnboarding } from '../services/oauth-onboarding'
+import { ForgotPasswordForm } from './ForgotPasswordForm'
 
 type Mode = 'login' | 'register' | 'forgot'
 type OAuthProvider = 'github' | 'google'
@@ -90,7 +91,7 @@ function OAuthLink({
 }
 
 export function LoginPage() {
-  const { login, oauthStartUrl, registerWithPassword, resendVerification, requestPasswordReset } = useAuth()
+  const { login, oauthStartUrl, registerWithPassword, resendVerification } = useAuth()
   const { t } = useLocale()
   const [mode, setMode] = useState<Mode>(() => {
     const authMode = new URLSearchParams(window.location.search).get('authMode')
@@ -111,8 +112,6 @@ export function LoginPage() {
   const [inviteCode, setInviteCode] = useState('')
   const [registrationSent, setRegistrationSent] = useState(false)
   const [loginNeedsVerification, setLoginNeedsVerification] = useState(false)
-  const [resetIdentifier, setResetIdentifier] = useState('')
-  const [resetSent, setResetSent] = useState(false)
 
   useEffect(() => {
     if (mode !== 'register') return
@@ -208,27 +207,6 @@ export function LoginPage() {
     setPolicyLoadFailed(false)
     setRegistrationSent(false)
     setLoginNeedsVerification(false)
-    setResetSent(false)
-    if (next === 'forgot') setResetIdentifier(username)
-  }
-
-  const handleForgotPassword = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError('')
-    setResetSent(false)
-    setLoading(true)
-    try {
-      const result = await requestPasswordReset(resetIdentifier.trim())
-      if (!result.ok) {
-        setError(authErrorMessage(result.code, result.error, t))
-        return
-      }
-      setResetSent(true)
-    } catch {
-      setError(t('platform.networkError'))
-    } finally {
-      setLoading(false)
-    }
   }
 
   const trimmedInviteCode = inviteCode.trim()
@@ -293,33 +271,7 @@ export function LoginPage() {
         </div>
 
         {mode === 'forgot' ? (
-          <form onSubmit={handleForgotPassword} className="login-form" aria-labelledby="forgot-password-heading">
-            <h2 id="forgot-password-heading" className="auth-method-title">{t('platform.forgotPasswordTitle')}</h2>
-            {resetSent
-              ? <p role="status">{t('platform.forgotPasswordSent')}</p>
-              : <p>{t('platform.forgotPasswordIntro')}</p>}
-            <div className="form-field">
-              <label htmlFor="forgot-identifier">{t('platform.forgotPasswordIdentifier')}</label>
-              <input
-                id="forgot-identifier"
-                type="text"
-                value={resetIdentifier}
-                onChange={e => setResetIdentifier(e.target.value)}
-                autoComplete="username"
-                aria-invalid={error ? true : undefined}
-                aria-errormessage={error ? 'forgot-error' : undefined}
-                required
-              />
-            </div>
-            {error && <div id="forgot-error" className="form-error" role="alert">{error}</div>}
-            <button type="submit" className="btn-primary" disabled={loading || !resetIdentifier.trim()} aria-busy={loading}>
-              {loading ? t('platform.loading') : t('platform.forgotPasswordSubmit')}
-            </button>
-            <p className="form-hint">{t('platform.forgotPasswordOAuthNote')}</p>
-            <button type="button" className="btn-secondary" onClick={() => switchMode('login')}>
-              {t('platform.backToLogin')}
-            </button>
-          </form>
+          <ForgotPasswordForm initialIdentifier={username} onBack={() => switchMode('login')} />
         ) : mode === 'login' ? (
           <>
           <form onSubmit={handleSubmit} className="login-form" aria-labelledby="local-login-heading">
