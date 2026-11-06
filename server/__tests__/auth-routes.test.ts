@@ -828,6 +828,30 @@ describe('auth routes', () => {
       expect(reused.headers['Set-Cookie']).toBeUndefined()
     })
 
+    it('keeps a password login that verified the replaced password from outliving the reset', async () => {
+      const userId = await createEmailUser('racelogin', 'racelogin@example.com', true)
+      const passwordHash = async () => ((await getDb().prepare('SELECT password_hash FROM users WHERE id = ?').get(userId)) as { password_hash: string }).password_hash
+      const sessionTokens = async () => ((await getDb().prepare('SELECT token FROM sessions WHERE user_id = ?').all(userId)) as { token: string }[]).map(row => row.token)
+      const mail = captureResetMail()
+      const reset = async (identifier: string, call: number, password: string) => {
+        await requestJson('POST', '/api/auth/password-reset/request', { identifier })
+        return await requestJson('POST', '/api/auth/password-reset/complete', { token: resetTokenFrom(mail, call), password, confirmPassword: password })
+      }
+
+      // The login verified the old hash, then the reset committed before the session was issued.
+      const verifiedBeforeFirstReset = await passwordHash()
+      expect((await reset('racelogin', 0, 'newpassword')).status).toBe(200)
+      await expect(createSession(userId, verifiedBeforeFirstReset)).resolves.toBeNull()
+      expect(await sessionTokens()).toHaveLength(1)
+
+      // Overlapping in either order, only the reset's own session survives.
+      await getDb().prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(userId)
+      const verifiedBeforeSecondReset = await passwordHash()
+      const [, second] = await Promise.all([createSession(userId, verifiedBeforeSecondReset), reset('racelogin@example.com', 1, 'thirdpassword')])
+      expect(second.status).toBe(200)
+      expect(await sessionTokens()).toEqual([decodeURIComponent(cookiePairFromSetCookie(second.headers['Set-Cookie'], SESSION_COOKIE).split('=')[1]!)])
+    })
+
     it('accepts an email identifier and verifies an unverified email on reset', async () => {
       const userId = await createEmailUser('unverifiedreset', 'unverified-reset@example.com', false)
       await expect(login('unverifiedreset', 'oldpassword')).resolves.toMatchObject({ ok: false, code: 'email_not_verified' })
