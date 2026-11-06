@@ -97,7 +97,7 @@ describe('administrator room retention routes', () => {
 
   it('reports storage failure without exposing the database error', async () => {
     const { db, request } = await setup()
-    await db.exec('DROP TABLE room_retention_policy')
+    await db.exec('ALTER TABLE room_retention_policy RENAME COLUMN revision TO unavailable_revision')
     const response = await request()
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ ok: false, code: 'retention_policy_unavailable' })

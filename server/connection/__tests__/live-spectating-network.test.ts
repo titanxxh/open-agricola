@@ -86,7 +86,7 @@ it('streams public snapshots and history over a third real socket without admitt
   expect(spectator.payload.interaction.allowedCommands).toEqual([])
   expect(spectator.payload).not.toHaveProperty('privateEvents')
   expect(spectator.payload).not.toHaveProperty('cardAvailability')
-  expect(spectator.payload).not.toHaveProperty('actionAvailability')
+  expect(spectator.payload.actionAvailability?.farmland).toBe(true)
   const privateIds = room.session.state.players.flatMap(player => [...player.occupationHand, ...player.minorHand])
   expect(privateIds.length).toBeGreaterThan(0)
   for (const id of privateIds) expect(JSON.stringify(spectator)).not.toContain(id)

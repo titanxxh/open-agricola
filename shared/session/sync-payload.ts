@@ -57,7 +57,7 @@ export function buildSyncPayload(
     historyLength: resp.historyLength,
     hasActionStartSnapshot: resp.hasActionStartSnapshot,
     ok: resp.ok,
-    actionAvailability: mode === 'debug' || viewerPlayerId !== null ? resp.actionAvailability : undefined,
+    actionAvailability: resp.actionAvailability,
     cardAvailability: mode === 'debug' ||
       viewerPlayerId === resp.state.players[resp.state.currentPlayerIndex]?.id
       ? resp.cardAvailability
