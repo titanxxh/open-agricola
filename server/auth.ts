@@ -519,12 +519,18 @@ export async function createLocalUserForTests(
   return { id, username, displayName: name }
 }
 
-export async function createSession(userId: string): Promise<Awaited<string | null>> {
+/**
+ * `verifiedPasswordHash` is the hash a password login checked; it is rechecked under the user lock so a
+ * login that verified the old password cannot outlive a concurrent password reset's session revocation.
+ */
+export async function createSession(userId: string, verifiedPasswordHash?: string): Promise<Awaited<string | null>> {
   const now = Date.now()
   const token = randomUUID()
   const db = getDb()
   return (await db.transaction(async () => {
-  const user = await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+  const user = verifiedPasswordHash === undefined
+    ? await db.prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+    : await db.prepare('SELECT id FROM users WHERE id = ? AND password_hash = ? FOR UPDATE').get(userId, verifiedPasswordHash)
   if (!user) return null
   const result = (await db.prepare(`
     INSERT INTO sessions (token, user_id, expires_at, created_at)
@@ -567,7 +573,7 @@ export async function login(username: string, password: string): Promise<LoginRe
   }
 
   const now = Date.now()
-  const token = (await createSession(row.id))
+  const token = (await createSession(row.id, row.password_hash))
   if (!token) {
     return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
   }
