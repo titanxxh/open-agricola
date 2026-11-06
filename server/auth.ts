@@ -831,6 +831,9 @@ export async function changePassword(
   const valid = await verifyPassword(oldPassword, row.password_hash)
   if (!valid) return 'Current password is incorrect'
   const newHash = await hashPassword(newPassword)
-  ;(await db.prepare('UPDATE users SET password_hash = ?, password_updated_at = ? WHERE id = ?').run(newHash, Date.now(), userId))
+  // Compare-and-set on the verified hash: a password reset that committed meanwhile wins.
+  const updated = (await db.prepare('UPDATE users SET password_hash = ?, password_updated_at = ? WHERE id = ? AND password_hash = ?')
+    .run(newHash, Date.now(), userId, row.password_hash))
+  if (updated.changes !== 1) return 'Current password is incorrect'
   return null
 }

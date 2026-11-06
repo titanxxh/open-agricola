@@ -57,6 +57,7 @@ afterAll(async () => { await (await import('../db.ts')).getDb().close() })
 
 
 const {
+  changePassword,
   createEmailVerificationToken,
   createLocalUserForTests,
   createSession,
@@ -850,6 +851,24 @@ describe('auth routes', () => {
       const [, second] = await Promise.all([createSession(userId, verifiedBeforeSecondReset), reset('racelogin@example.com', 1, 'thirdpassword')])
       expect(second.status).toBe(200)
       expect(await sessionTokens()).toEqual([decodeURIComponent(cookiePairFromSetCookie(second.headers['Set-Cookie'], SESSION_COOKIE).split('=')[1]!)])
+    })
+
+    it('keeps an overlapping password change from overwriting the reset password', async () => {
+      const userId = await createEmailUser('racechange', 'racechange@example.com', true)
+      const mail = captureResetMail()
+      await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'racechange' })
+      const token = resetTokenFrom(mail)
+
+      const [changed, reset] = await Promise.all([
+        changePassword(userId, 'oldpassword', 'changedpassword'),
+        requestJson('POST', '/api/auth/password-reset/complete', { token, password: 'resetpassword', confirmPassword: 'resetpassword' }),
+      ])
+      expect(reset.status).toBe(200)
+      // Whichever order the writes land in, the recovered password is the one that holds.
+      expect([null, 'Current password is incorrect']).toContain(changed)
+      await expect(login('racechange', 'resetpassword')).resolves.toMatchObject({ ok: true })
+      await expect(login('racechange', 'changedpassword')).resolves.toMatchObject({ ok: false, code: 'invalid_login' })
+      await expect(changePassword(userId, 'oldpassword', 'changedpassword')).resolves.toBe('Current password is incorrect')
     })
 
     it('accepts an email identifier and verifies an unverified email on reset', async () => {
