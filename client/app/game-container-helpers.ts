@@ -11,7 +11,7 @@ import type { WsStatus } from './ws-status'
 export type { WsStatus } from './ws-status'
 
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
-  status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
+  status.phase === 'ready' && status.viewer.kind === 'participant' ? `p${status.viewer.playerIndex + 1}` : null
 
 export const shouldShowPendingChoiceInInteractionBar = (
   pendingChoice: { promptKey?: string } | null,

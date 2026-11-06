@@ -1,3 +1,5 @@
+import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
+import { isPublicSpectatableRoom } from '../game/room'
 import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
 import { parseCommitSelectionPayload } from '../../shared/contract/protocol/commit-selection'
 import { playerColorOptions } from '../../shared/contract/state-constants'
@@ -214,6 +216,9 @@ const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   }
   return ctx.currentRoom
 }
+
+const requireReadableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null =>
+  isRoomSpectator(ctx.currentRoom, ctx.ws) ? ctx.currentRoom : requireRoom(ctx, requestId)
 
 const waitingRoomEvent = (room: Room): Extract<ServerEvent, { type: 'roomWaiting' }> => {
   const players = [...new Set([
@@ -557,6 +562,7 @@ async function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 
 const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx.currentRoom): Promise<void> => {
   if (!previous || previous === next) return
+  if (removeRoomSpectator(previous, ctx.ws)) return
   const player = previous.players.find(candidate => candidate.ws === ctx.ws)
   previous.players = previous.players.filter(candidate => candidate.ws !== ctx.ws)
   const now = Date.now()
@@ -758,6 +764,30 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   ))
 }
 
+async function handleSpectateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'spectateRoom' }>): Promise<void> {
+  const room = ctx.registry.get(msg.roomId)
+  if (!ctx.authenticated || !ctx.currentUserId) {
+    sendCommandError(ctx, 'Sign in to spectate', msg.requestId, 'login_required'); return
+  }
+  if (room && (room.seatOwners?.some(seat => seat.userId === ctx.currentUserId) || room.players.some(seat => seat.userId === ctx.currentUserId))) {
+    await handleJoinRoom(ctx, { type: 'joinRoom', roomId: msg.roomId, intent: 'resume', requestId: msg.requestId }); return
+  }
+  if (!room || !isPublicSpectatableRoom(room) || room.session.state.gameOver || roomConnectedPlayerCount(room) === 0) {
+    sendCommandError(ctx, 'This game is not available for spectating', msg.requestId, 'not_participant'); return
+  }
+  if (ctx.gameContextStore && await ctx.gameContextStore.lifecycle(room.id) !== 'active') {
+    sendCommandError(ctx, 'Game context changed', msg.requestId, 'context_changed'); return
+  }
+  if (ctx.committer?.blockedError(room.id)) {
+    sendCommandError(ctx, 'Room saving is paused', msg.requestId); return
+  }
+  await detachPreviousRoom(ctx, room)
+  addRoomSpectator(room, ctx.ws)
+  ctx.currentRoom = room
+  ctx.broadcaster.sendTo(ctx.ws, { type: 'roomSpectated', roomId: room.id })
+  await handleGetState(ctx, { type: 'getState', requestId: msg.requestId })
+}
+
 async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'joinRoom' }>): Promise<Awaited<void | Promise<void>>> {
   const roomId = msg.roomId
   if (msg.intent !== undefined && msg.intent !== 'join' && msg.intent !== 'resume') {
@@ -783,6 +813,11 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   if (!canAccessRoom(room, ctx.currentUserId)) {
     sendCommandError(ctx, 'Only invited players can enter this room', msg.requestId, ctx.currentUserId ? 'not_participant' : 'login_required', 'active')
     return
+  }
+  const ownsSeat = room.seatOwners?.some(seat => seat.userId === ctx.currentUserId)
+    || room.players.some(seat => seat.userId === ctx.currentUserId && !!ctx.currentUserId)
+  if (msg.intent === 'join' && !ownsSeat && room.status === 'playing' && isPublicSpectatableRoom(room)) {
+    await handleSpectateRoom(ctx, { type: 'spectateRoom', roomId, requestId: msg.requestId }); return
   }
   // A hotseat game belongs to one device: nobody else may take a seat in it.
   // An anonymous room has no owner to check against — it stays as open as any
@@ -1115,6 +1150,7 @@ async function updateGameEndProposal(ctx: ConnectionCtx, room: Room, proposal: G
             receipt: { scopeId: receipt.request.scopeId, commandId: receipt.request.commandId, outcome: receipt.outcome } })
           await ctx.broadcaster.broadcastEvent(room, { type: 'gameTerminated', roomId: room.id })
         } finally {
+          ctx.broadcaster.endSpectating(room, 'terminated')
           ctx.registry.delete(room.id)
           ctx.registry.clearActivity(room.id)
           for (const player of room.players) player.ws.close()
@@ -1177,7 +1213,7 @@ async function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand
 }
 
 async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getHistory' }>): Promise<void> {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireReadableRoom(ctx, msg.requestId); if (!room) return
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) { sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId); return }
   if (msg.cursor !== undefined && (typeof msg.cursor !== 'string' || msg.cursor.length > 1024)) {
@@ -1186,7 +1222,7 @@ async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   try {
     const canonical = room.customSessionExecutor?.serializedStateForPersistence()?.frame
       ?? room.session.withCtx(() => serializeState(room.session.state, { actionHooks: room.session.actionHooks }))
-    const viewerPlayerId = room.session.state.players[ctx.currentPlayerIndex]?.id ?? null
+    const viewerPlayerId = isRoomSpectator(room, ctx.ws) ? null : room.session.state.players[ctx.currentPlayerIndex]?.id ?? null
     const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), viewerPlayerId, msg.cursor)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, { type: 'historyPage', roomId: room.id, requestId: msg.requestId, page })
   } catch (error) {
@@ -1215,7 +1251,7 @@ async function handleFenceQuote(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 }
 
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void | Promise<void> {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireReadableRoom(ctx, msg.requestId); if (!room) return
   if (msg.unredacted && !assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
@@ -1532,6 +1568,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       nextRoom.startedAt = nextRoom.status === 'playing' ? Date.now() : undefined
       ctx.committer!.lockNewRoom(nextRoom)
       const adopt = async (): Promise<void> => {
+        ctx.broadcaster.endSpectating(room, termination ? 'terminated' : room.session.state.gameOver ? 'completed' : 'removed')
         const previousSession = room.session
         ctx.registry.delete(previousRoomId)
         ctx.registry.clearActivity(previousRoomId)
@@ -1677,6 +1714,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   getCommandReceipt: handleCommandReceipt,
   createRoom: handleCreateRoom,
   joinRoom: handleJoinRoom,
+  spectateRoom: handleSpectateRoom,
   dissolveRoom: handleDissolveRoom,
   proposeGameEnd: handleProposeGameEnd,
   respondGameEnd: handleRespondGameEnd,
@@ -1711,19 +1749,25 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
 export async function dispatch(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
   const run = () => observeCommand({ command: msg.type, requestId: msg.requestId, socket: ctx.ws, round: roundTag(ctx.currentRoom?.session.state) }, () => dispatchCommand(ctx, msg))
   const ids = ctx.currentRoom ? [ctx.currentRoom.id] : []
-  if (msg.type === 'joinRoom') ids.push(msg.roomId)
+  if (msg.type === 'joinRoom' || msg.type === 'spectateRoom') ids.push(msg.roomId)
   return ctx.authority ? ctx.authority.withRooms(ids, run) : run()
 }
 async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<void> {
   refreshConnectionSeat(ctx)
-  if (msg.type === 'joinRoom' && ctx.authority) await ctx.authority.load(msg.roomId)
+  if (msg.type === 'joinRoom' && ctx.authority) {
+    const db = ctx.authority.directory.db
+    const participant = ctx.currentUserId && await db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(msg.roomId, ctx.currentUserId)
+    const playing = !participant && !isDevRoom(msg.roomId)
+      && await db.prepare("SELECT 1 FROM rooms WHERE id=? AND status='playing'").get(msg.roomId)
+    if (!playing) await ctx.authority.load(msg.roomId)
+  }
   const fn = handlers[msg.type] as Handler | undefined
   if (!fn) { sendCommandError(ctx, `unknown command: ${msg.type}`, msg.requestId); return }
   const acceptedRoom = ctx.currentRoom
   const acceptedRoomId = acceptedRoom?.id
   const acceptedSession = acceptedRoom?.session
   const acceptedPlayerIndex = ctx.currentPlayerIndex
-  const room = msg.type === 'joinRoom' ? ctx.registry.get(msg.roomId) : acceptedRoom
+  const room = msg.type === 'joinRoom' || msg.type === 'spectateRoom' ? ctx.registry.get(msg.roomId) : acceptedRoom
   // A move touches both rooms. Reserve all affected queues together before
   // awaiting any work, so two opposite moves cannot deadlock or pass a commit.
   const queuedRooms = [...new Set([acceptedRoom, room].filter((value): value is Room => !!value))]
@@ -1734,7 +1778,10 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
     const commands = ctx.commands
     try {
       if (ctx.sessionToken && !(await validateSession(ctx.sessionToken))) { commandOutcome('canceled'); ctx.ws.close(1008, 'session revoked'); return }
-      const writes = !['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt', 'getGameEndProposal'].includes(msg.type)
+      if (isRoomSpectator(ctx.currentRoom, ctx.ws) && !['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(msg.type)) {
+        sendCommandError(ctx, 'Spectators cannot issue game commands', msg.requestId); return
+      }
+      const writes = !['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt', 'getGameEndProposal'].includes(msg.type)
       if (writes) {
         if (!commands || !msg.commandContext) throw new CommandError('command_identity_required', 'A stable command identity is required')
         const targetRoomId = msg.type === 'createRoom' ? null : msg.commandContext.roomId ?? null
@@ -1770,7 +1817,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
       // Creation authorizes its actor, allocation and source independently of
       // whichever completed rules session this connection previously displayed.
       if (ctx.currentRoom && !['auth', 'getCommandScope', 'getCommandReceipt', 'createRoom', 'getGameEndProposal'].includes(msg.type)) await ctx.authority?.assert(ctx.currentRoom)
-      if (msg.type === 'joinRoom') { const joined = ctx.registry.get(msg.roomId); if (joined) await ctx.authority?.assert(joined) }
+      if (msg.type === 'joinRoom' || msg.type === 'spectateRoom') { const joined = ctx.registry.get(msg.roomId); if (joined) await ctx.authority?.assert(joined) }
       if (
         ctx.currentRoom !== acceptedRoom
         || acceptedRoom?.id !== acceptedRoomId

@@ -44,6 +44,7 @@ type ClientCommandBody =
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState'; unredacted?: boolean }
   | { type: 'getHistory'; cursor?: string }
+  | { type: 'spectateRoom'; roomId: string }
   | { type: 'quoteFenceSelection'; playerIndex: number; requestKey: string; payload: FenceSelectionPayload; expectedVersion: number }
   | {
       type: 'createRoom'
@@ -98,7 +99,13 @@ export type ClientCommand = ClientCommandBody & { requestId?: string; commandCon
 
 export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed' | 'color_confirmation_unavailable' | 'color_confirmation_failed'
 
+export type SpectatingEndReason = 'offline' | 'completed' | 'terminated' | 'removed'
+
+export type RoomViewer = { kind: 'participant'; playerIndex: number } | { kind: 'spectator' }
+
 export type ServerEvent =
+  | { type: 'roomSpectated'; roomId: string }
+  | { type: 'spectatingEnded'; roomId: string; reason: SpectatingEndReason }
   | { type: 'gameEndProposal'; roomId: string; proposal: GameEndProposal | null }
   | { type: 'gameTerminated'; roomId: string }
   | { type: 'commandScope'; scope: CommandScope; requestId?: string }
@@ -150,5 +157,6 @@ export type RoomSummary = {
   maxPlayers: number
   createdBy?: string
   status?: 'waiting' | 'playing'
+  canSpectate?: boolean
   access?: RoomAccess['kind']
 }

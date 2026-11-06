@@ -7,7 +7,7 @@ import type { CommitSelectionPayload } from '../../shared/contract/protocol/comm
 import type { RoomHistoryPage } from '../../shared/contract/protocol/history'
 import { parseFenceSelectionQuote } from '../../shared/contract/protocol/farm-selection'
 import type { FenceSelectionPayload, FenceSelectionQuote, GameSyncPayload } from '../../shared/contract/protocol/game'
-import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
+import type { ClientCommand, ServerEvent, RoomViewer, SpectatingEndReason } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 import type { SoloHandSelectionSubmission } from '../../shared/contract/solo-hand-selection'
 import type { ParentSelectionSubmission, PlayerState } from '../../shared/contract/types'
@@ -275,7 +275,7 @@ export type RoomConnectionOptions = {
 type ReceiptEvent = Extract<ServerEvent, { type: 'commandReceipt' }>
 type PendingEvent = { match: (event: ServerEvent) => boolean; resolve: (event: ServerEvent) => void; reject: (error: Error) => void }
 const readOnlyCommand = (command: ClientCommand): boolean =>
-  ['auth', 'joinRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt', 'getGameEndProposal'].includes(command.type)
+  ['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'quoteFenceSelection', 'getCommandScope', 'getCommandReceipt', 'getGameEndProposal'].includes(command.type)
 const terminalCode = (code?: string): boolean => !!code && [
   'seat_replaced', 'login_required', 'not_participant', 'unknown_context', 'context_changed',
   'context_expired', 'context_removed', 'command_scope_expired',
@@ -307,7 +307,10 @@ export class WsGameTransport implements GameTransport {
   private readonly wsUrl: string
   private seatHint?: number
   roomId: string
-  playerIndex: number
+  private roomViewer: RoomViewer
+  spectatingEndReason?: SpectatingEndReason
+  get viewer(): RoomViewer { return this.roomViewer }
+  get playerIndex(): number | null { return this.roomViewer.kind === 'participant' ? this.roomViewer.playerIndex : null }
   private _connected = false
   private persistencePaused = false
   private recovering = false
@@ -325,7 +328,7 @@ export class WsGameTransport implements GameTransport {
     this.journal = new RoomCommandJournal(options.journalKey ?? `agricola.pending-commands:${wsUrl}`, roomId ?? '')
     this.roomId = this.journal.roomId
     this.seatHint = playerIndex ?? this.journal.playerIndex
-    this.playerIndex = this.seatHint ?? 0
+    this.roomViewer = { kind: 'participant', playerIndex: this.seatHint ?? 0 }
   }
 
   get connected() { return this._connected && !this.recovering && !this.stopped }
@@ -481,7 +484,9 @@ export class WsGameTransport implements GameTransport {
       // in the same event-loop turn. A playing Room never becomes ready on ack alone.
       const ready = this.waitEvent(event => event.type === 'stateUpdate' && event.roomId === this.roomId && event.sync === 'snapshot'
         || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting')
-      this.sendRaw({ type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.seatHint })
+      this.sendRaw(this.roomViewer.kind === 'spectator'
+        ? { type: 'spectateRoom', roomId: this.roomId }
+        : { type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.seatHint })
       await ready
     }
     for (const command of [...this.journal.commands.values()]) {
@@ -513,6 +518,7 @@ export class WsGameTransport implements GameTransport {
     }
     if (msg.type === 'error') responseReceived(msg.requestId, undefined, msg.code === 'command_input_stale' ? 'stale' : 'error')
     if (msg.type === 'commandReceipt' && msg.status === 'completed') responseReceived(msg.requestId, undefined, msg.receipt.outcome.ok ? 'ok' : 'rejected')
+    if (msg.type === 'spectatingEnded') { this.spectatingEndReason = msg.reason; this.stop('spectatingEnded') }
     if (msg.type === 'seat_replaced') this.stop('seat was replaced', 'seat_replaced')
     if (msg.type === 'roomDissolved') this.stop(msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved')
     if (msg.type === 'gameTerminated') this.stop('gameTerminated')
@@ -520,9 +526,14 @@ export class WsGameTransport implements GameTransport {
     if (msg.type === 'commandReceipt' && msg.status === 'completed') {
       this.completed.set(msg.receipt.commandId, msg.receipt.outcome)
       if (!this.recovering) this.finishCommand(msg.receipt.commandId, msg.receipt.outcome)
+    } else if (msg.type === 'roomSpectated') {
+      this.roomViewer = { kind: 'spectator' }
+      this.spectatingEndReason = undefined
+      this.seatHint = undefined
+      this.setRoom(msg.roomId)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
-        this.playerIndex = msg.playerIndex
+        this.roomViewer = { kind: 'participant', playerIndex: msg.playerIndex }
         this.seatHint = msg.playerIndex
         this.journal.playerIndex = msg.playerIndex
       }
@@ -644,6 +655,7 @@ export class WsGameTransport implements GameTransport {
     } catch { return undefined }
   }
   private identify(cmd: ClientCommand): ClientCommand {
+    if (this.roomViewer.kind === 'spectator' && !['auth', 'joinRoom', 'spectateRoom', 'getState', 'getHistory', 'getCommandScope', 'getCommandReceipt'].includes(cmd.type)) throw new Error('Spectators cannot issue game commands')
     if (readOnlyCommand(cmd)) return cmd
     if (!this.commandScope) throw new Error('Command scope is unavailable')
     if (this.journal.commands.size >= 32) throw new Error('Too many unconfirmed commands')

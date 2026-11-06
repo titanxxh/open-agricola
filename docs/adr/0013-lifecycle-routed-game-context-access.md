@@ -26,7 +26,7 @@ With one game per `roomId` (ADR 0009), public Replays (ADR 0010) and delta archi
 
 **Authentication and visibility.**
 
-- Active resolution and recovery require login (`401 login_required` with `returnTo`; `403 not_participant` without a seat). The server's seat binding is the only authority; `perspective` grants nothing in active games.
+- Active access requires login (`401 login_required` with `returnTo`). Recovery requires an owned seat. Public live spectating separately admits eligible nonparticipants under [ADR 0040](0040-public-live-spectating.md); otherwise access returns `403 not_participant`. The server's seat binding is the only authority; `perspective` grants nothing in active games.
 - `completed`, `expired` and `removed` resolve before the global login gate. A completed archive's rule state is public; seat perspectives are presentation masks in the Viewer, not a security boundary.
 - Active players continue from the current state and see Anchors only in a read-only drawer; they never play on from a historical Anchor or view another seat or all-open.
 - Opening a completed game without a perspective requires choosing a seat or all-open before any Frame is shown; Bug Issue links default to the reporter's seat, never `open`.
@@ -43,7 +43,7 @@ With one game per `roomId` (ADR 0009), public Replays (ADR 0010) and delta archi
 
 **Descriptors, errors and caching.**
 
-- `active` descriptors return only `roomId`, lifecycle, phase, own `playerIndex`, current `stepNo` and optional `expiresAt` to an authorized seat. `completed` exposes Replay Participant names, seats, scores and variants (never `userId`) plus `replayStatus`; `expired` exposes only `roomId` and lifecycle; `removed` may add the coarse reason. Expiry causes are never distinguished publicly, and there is no list or search of expired contexts.
+- `active` descriptors return only `roomId`, lifecycle, phase, `playerIndex` (the owned seat, or `null` for an authorized spectator), current `stepNo` and optional `expiresAt`. The `context` alias requests participant-only recovery. `completed` exposes Replay Participant names, seats, scores and variants (never `userId`) plus `replayStatus`; `expired` exposes only `roomId` and lifecycle; `removed` may add the coarse reason. Expiry causes are never distinguished publicly, and there is no list or search of expired contexts.
 - Errors are `{ ok: false, code, lifecycle?, message }`: 400 `invalid_context_link`, 401 `login_required`, 403 `not_participant`, 404 `unknown_context`, 409 `anchor_mismatch` / `context_changed`, 410 `context_expired` / `context_removed`, 429 `rate_limited`, 503 `replay_segment_unavailable` / `viewer_unavailable`. Known `expired` / `removed` contexts resolve with 200; only payload requests on them return 410.
 - Active descriptors, evidence and forensics use `Cache-Control: no-store`; public descriptors, manifests and Segments use `no-cache` with ETags; only content-addressed Viewer Builds are `immutable`. Access logs never contain hidden state, payloads or credentials.
 

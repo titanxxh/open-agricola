@@ -784,6 +784,19 @@
   width: min(340px, calc(100vw - 32px));
   pointer-events: none;
 }
+.spectating-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.spectating-status__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .private-event-notification,
 .public-event-notification {
   padding: 10px 12px;

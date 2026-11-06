@@ -102,6 +102,9 @@ export const isFixedDevRoom = (roomId: string): boolean => FIXED_DEV_ROOM_IDS.ha
 
 export const isDevRoom = (roomId: string): boolean => fixedDevRoomRootId(roomId) !== null
 
+export const isPublicSpectatableRoom = (room: Pick<Room, 'id' | 'maxPlayers' | 'status' | 'hotseat' | 'access'>): boolean =>
+  room.status === 'playing' && room.maxPlayers > 1 && !room.hotseat && room.access?.kind !== 'invited' && !isDevRoom(room.id)
+
 export type FixedDevRoomStartupOptions = {
   enableParentCards?: boolean
   enableThroughTheSeasons?: boolean
@@ -341,6 +344,7 @@ export function summarizeRoomsForLobby(
       maxPlayers: r.maxPlayers,
       createdBy: r.createdBy,
       status: r.status === 'playing' ? 'playing' : 'waiting',
+      ...(isPublicSpectatableRoom(r) && roomConnectedPlayerCount(r) > 0 ? { canSpectate: true } : {}),
       ...(r.access?.kind === 'invited' ? { access: 'invited' } : {}),
     })
     if (typeof limit === 'number' && list.length >= limit) break

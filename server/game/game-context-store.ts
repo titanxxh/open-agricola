@@ -1,3 +1,4 @@
+import { spectatorRoute } from './room-spectators'
 import type { PostgresDatabase as Database } from '../database/postgres'
 import { isDevRoom } from './room.ts'
 import { RoomRetentionStore } from './room-retention-store'
@@ -208,7 +209,7 @@ export class GameContextStore {
     `).run(this.now(), roomId))
   }
 
-  async resolve(roomId: string, userId?: string): Promise<Awaited<GameContextResponse>> {
+  async resolve(roomId: string, userId?: string, intent: 'join' | 'resume' = 'resume'): Promise<Awaited<GameContextResponse>> {
     const context = (await this.currentContext(roomId))
     if (!context) {
       return {
@@ -276,6 +277,13 @@ export class GameContextStore {
         ORDER BY room_players.player_index LIMIT 1
       `).get(userId, roomId)) as ActiveRow | undefined
       if (!active) {
+        if (intent === 'join' && await spectatorRoute(this.db, roomId)) {
+          const snapshot = await this.db.prepare(`SELECT r.version, g.latest_step_no FROM rooms r
+            LEFT JOIN game_replays g ON g.room_id=r.id WHERE r.id=?`)
+            .get<{ version: number; latest_step_no: number | null }>(roomId)
+          if (snapshot) return { ok: true, roomId, lifecycle: 'active', phase: 'playing', playerIndex: null,
+            roomVersion: snapshot.version, stepNo: Math.max(0, snapshot.latest_step_no ?? 0) }
+        }
         return {
           ok: false,
           code: 'not_participant',

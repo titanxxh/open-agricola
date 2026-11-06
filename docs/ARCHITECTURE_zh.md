@@ -37,7 +37,7 @@
 - **后端唯一 owner**：`GameSession`（`server/game/authoritative-session.ts`）是唯一服务端游戏命令入口并持有 `GameState`；具体修改由它驱动的 `GameCore` 和 action leaf 执行。
 - **命令驱动**：前端只发"我要做什么"，后端校验、执行、落状态、产生日志后广播。
 - **弱客户端**：前端只渲染、收集输入、管理本地 UI 临时态，不裁定规则，也不做乐观提交：等 `stateUpdate` 到达再改游戏 UI。
-- **全量快照**：同房间所有客户端收到同一份 `stateUpdate`，前端不做局部 patch。
+- **全量快照**：每个连接收到按 viewer 过滤的完整 `stateUpdate`，前端不做局部 patch。
 - **WS 游戏主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`。
 - **InteractionState 是前端唯一交互真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
 - **单一领域实现**：行动 / 引擎 / 卡牌 / 回合 / 收获 / 计分统一放 `shared/`，前后端共用同一套领域模型。

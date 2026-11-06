@@ -303,3 +303,11 @@ describe('Interaction State Adapter', () => {
       .toEqual(['anytime-test'])
   })
 })
+
+
+it('withholds unowned interaction choices and commands from a spectator', () => {
+  expect(redactInteractionForViewer({
+    stateId: 'wait', request: { kind: 'choice', options: [{ value: 'secret', labelKey: 'ui.interactionConfirm' }] },
+    allowedCommands: ['resolveChoice'], anytimeActions: [],
+  }, ['p1', 'p2'], null)).toEqual({ stateId: 'idle', allowedCommands: [], anytimeActions: [] })
+})

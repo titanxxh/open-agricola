@@ -8,6 +8,8 @@ The client renders authoritative snapshots, collects input and keeps temporary l
 `SiteCommunityLinks` pairs the GitHub link with separate WeChat and Feishu entries across site headers. Its native modal dialog owns focus and reloads the runtime image on every opening; embedded game views omit the site links. Its What's New entry appears once `/api/whats-new` returns notes and shows an unread dot for releases newer than the one last opened in this browser. Coverage: `wechat-community.spec.ts` and `whats-new.spec.ts`.
 
 
+- Live spectating uses the ordinary Room link and `roomSpectated` acknowledgement. `WsStatus` carries an explicit viewer identity; spectators have no self player or game controls. `PublicOpeningProgress` renders public setup progress. End notices retain the last board, expose the archive entry point when available and never follow a rematch. Coverage: `live-spectating.spec.ts`, `gameTransport-reconnect.test.ts`; see ADR 0040.
+
 ## Client bundles
 
 | Bundle | Entry | Paths | Constraint |

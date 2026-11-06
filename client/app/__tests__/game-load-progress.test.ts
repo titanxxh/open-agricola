@@ -46,7 +46,7 @@ describe('resolveGameLoadPhase', () => {
     expect(resolveGameLoadPhase({ wsStatus: { phase: 'connecting' } })).toBe('wsConnecting')
     expect(resolveGameLoadPhase({ wsStatus: { phase: 'creating' } })).toBe('wsCreating')
     expect(resolveGameLoadPhase({ wsStatus: { phase: 'joining', roomId: 'dev2' } })).toBe('wsJoining')
-    expect(resolveGameLoadPhase({ wsStatus: { phase: 'ready', roomId: 'dev2', playerIndex: 0 } })).toBe(
+    expect(resolveGameLoadPhase({ wsStatus: { phase: 'ready', roomId: 'dev2', viewer: { kind: 'participant', playerIndex: 0 } } })).toBe(
       'fetchingState',
     )
   })
@@ -69,7 +69,7 @@ describe('resolveGameLoadPhase', () => {
   it('returns ready when game view is available', () => {
     expect(
       resolveGameLoadPhase({
-        wsStatus: { phase: 'ready', roomId: 'dev2', playerIndex: 0 },
+        wsStatus: { phase: 'ready', roomId: 'dev2', viewer: { kind: 'participant', playerIndex: 0 } },
         hasGameView: true,
       }),
     ).toBe('ready')

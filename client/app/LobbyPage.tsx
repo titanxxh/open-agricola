@@ -555,9 +555,14 @@ export function LobbyPage() {
                 <span className="room-status" data-status={room.status}>
                   {room.status === 'playing' ? t('platform.statusPlaying') : t('platform.statusWaiting')}
                 </span>
-                {room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
+                {room.status !== 'playing' && room.playerCount < room.maxPlayers && room.createdBy !== user?.id && (
                   <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
                     {t('platform.joinBtn')}
+                  </button>
+                )}
+                {room.canSpectate && (
+                  <button type="button" className="btn-small" onClick={() => handleJoinExisting(room.id)}>
+                    {t('platform.spectateBtn')}
                   </button>
                 )}
                 {room.createdBy === user?.id && room.status === 'waiting' && (
