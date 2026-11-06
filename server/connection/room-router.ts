@@ -1756,7 +1756,8 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
   refreshConnectionSeat(ctx)
   if (msg.type === 'joinRoom' && ctx.authority) {
     const db = ctx.authority.directory.db
-    const participant = ctx.currentUserId && await db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(msg.roomId, ctx.currentUserId)
+    // Only a signed-in non-participant can spectate; everyone else loads the Room to take a seat.
+    const participant = !ctx.currentUserId || await db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(msg.roomId, ctx.currentUserId)
     const playing = !participant && !isDevRoom(msg.roomId)
       && await db.prepare("SELECT 1 FROM rooms WHERE id=? AND status='playing'").get(msg.roomId)
     if (!playing) await ctx.authority.load(msg.roomId)
