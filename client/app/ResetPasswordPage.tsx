@@ -5,6 +5,7 @@ import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { SiteCommunityLinks } from '../components/common/SiteCommunityLinks'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
+import { ForgotPasswordForm } from './ForgotPasswordForm'
 import { setPage } from '../utils/platform-page-url'
 
 const TOKEN_KEY = 'open-agricola-password-reset-token'
@@ -92,12 +93,11 @@ export function ResetPasswordPage() {
         <h1 className="login-context-title">{t('platform.resetPasswordTitle')}</h1>
 
         {linkInvalid ? (
-          <div className="login-form">
-            <p role="alert">{authErrorMessage('password_reset_token_invalid', undefined, t)}</p>
-            <button type="button" className="btn-primary" onClick={() => setPage('login', { authMode: 'forgot' })}>
-              {t('platform.requestNewResetLink')}
-            </button>
-          </div>
+          <>
+            <p role="alert" className="form-error">{authErrorMessage('password_reset_token_invalid', undefined, t)}</p>
+            {/* Requested in place: the login page redirects a signed-in viewer to the lobby. */}
+            <ForgotPasswordForm submitLabel={t('platform.requestNewResetLink')} />
+          </>
         ) : (
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-field">

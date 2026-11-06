@@ -219,7 +219,7 @@ test.describe('Platform: auth', () => {
     await expect(providerGroup.getByText('使用 Google 注册', { exact: true })).toBeVisible()
   })
 
-  test('login offers password recovery and an invalid reset link leads back to it', async ({ page }) => {
+  test('login offers password recovery and an invalid reset link requests a new one in place', async ({ page, request }) => {
     const username = `forgot_${RUN_ID}`
     await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
     await page.fill('#username', username)
@@ -230,6 +230,9 @@ test.describe('Platform: auth', () => {
     await forgotForm.getByRole('button', { name: '发送重置链接' }).click()
     await expect(forgotForm.getByRole('status')).toContainText('重置链接已发出')
 
+    // A reset link can be opened while another account is signed in; recovery must not bounce to the lobby.
+    const signedIn = await createUserViaOAuth(request, `reset_viewer_${RUN_ID}`)
+    await page.context().addCookies(signedIn.cookies)
     await page.goto(`${FRONTEND_URL}/?page=reset-password#passwordResetToken=not-a-real-token`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('heading', { name: '设置新密码' })).toBeVisible()
     await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('')
@@ -238,9 +241,11 @@ test.describe('Platform: auth', () => {
     await page.getByRole('button', { name: '重置密码' }).click()
 
     await expect(page.getByRole('alert')).toContainText('重置密码链接无效或已过期')
-    await page.getByRole('button', { name: '重新获取链接' }).click()
-    await expect(page.getByRole('form', { name: '找回密码' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: '登录' })).toHaveAttribute('aria-selected', 'true')
+    const replacementForm = page.getByRole('form', { name: '找回密码' })
+    await replacementForm.locator('#forgot-identifier').fill(username)
+    await replacementForm.getByRole('button', { name: '重新获取链接' }).click()
+    await expect(replacementForm.getByRole('status')).toContainText('重置链接已发出')
+    expect(new URL(page.url()).searchParams.get('page')).toBe('reset-password')
   })
 
   test('missing onboarding credentials replace the form and restart registration without claiming expiry', async ({ page }) => {
