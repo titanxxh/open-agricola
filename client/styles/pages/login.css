@@ -228,6 +228,11 @@
   font-size: var(--fs-small);
   color: var(--color-text-secondary);
 }
+.login-form .login-forgot-link {
+  align-self: flex-end;
+  padding: 0;
+  font-size: var(--fs-small);
+}
 .login-form .form-field .form-hint {
   font-weight: 400;
   font-size: 11px;

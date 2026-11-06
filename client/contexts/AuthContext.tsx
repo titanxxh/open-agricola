@@ -19,6 +19,14 @@ type RegisterPasswordInput = {
   inviteCode?: string
 }
 
+type AuthResultMessage = { ok: boolean; code?: string; error?: string }
+
+type ResetPasswordInput = {
+  token: string
+  password: string
+  confirmPassword: string
+}
+
 type AuthState = {
   user: AuthUser | null
   loading: boolean
@@ -29,7 +37,9 @@ type AuthContextValue = AuthState & {
   registerWithPassword: (input: RegisterPasswordInput) => Promise<
     { ok: true; status: 'verification_required' } | { ok: false; code?: string; error?: string }
   >
-  resendVerification: (email: string) => Promise<{ ok: boolean; code?: string; error?: string }>
+  resendVerification: (email: string) => Promise<AuthResultMessage>
+  requestPasswordReset: (identifier: string) => Promise<AuthResultMessage>
+  resetPassword: (input: ResetPasswordInput) => Promise<AuthResultMessage>
   logout: () => Promise<void>
   logoutAll: () => Promise<void>
   refreshSession: () => Promise<void>
@@ -152,6 +162,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return await resp.json()
   }, [])
 
+  // No retry: a lost response could otherwise send a second email or replay a consumed link.
+  const requestPasswordResetFn = useCallback(async (identifier: string): Promise<AuthResultMessage> => {
+    const resp = await fetch(`${API_BASE}/api/auth/password-reset/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ identifier }),
+    })
+    return await resp.json()
+  }, [])
+
+  const resetPasswordFn = useCallback(async (input: ResetPasswordInput): Promise<AuthResultMessage> => {
+    const resp = await fetch(`${API_BASE}/api/auth/password-reset/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    })
+    const data = await resp.json()
+    if (data.ok && data.user) {
+      setState({ user: data.user, loading: false })
+      return { ok: true }
+    }
+    return { ok: false, code: data.code, error: data.error }
+  }, [])
+
   const logoutFn = useCallback(async () => {
     await fetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
@@ -204,6 +240,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: loginFn,
       registerWithPassword: registerWithPasswordFn,
       resendVerification: resendVerificationFn,
+      requestPasswordReset: requestPasswordResetFn,
+      resetPassword: resetPasswordFn,
       logout: logoutFn,
       logoutAll: logoutAllFn,
       refreshSession: refreshSessionFn,
