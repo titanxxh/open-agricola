@@ -48,11 +48,13 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
     }
     const accessError = await persistedRoomAccessError(directory.db, roomId, userId)
     if (accessError) throw Object.assign(new Error(accessError.message), { code: accessError.code })
-    const participant = userId && await directory.db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(roomId, userId)
+    // Spectating needs a signed-in viewer. Anonymous development actors keep rejoining
+    // their seats through a claimed route, as they did before spectating existed.
+    const participant = !userId || await directory.db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(roomId, userId)
     const playing = await directory.db.prepare("SELECT 1 FROM rooms WHERE id=? AND status='playing'").get(roomId)
     if (!participant && playing && !isDevRoom(roomId)) {
-      const route = userId ? await spectatorRoute(directory.db, roomId) : undefined
-      if (!route) throw Object.assign(new Error('This game is not available for spectating'), { code: userId ? 'not_participant' : 'login_required' })
+      const route = await spectatorRoute(directory.db, roomId)
+      if (!route) throw Object.assign(new Error('This game is not available for spectating'), { code: 'not_participant' })
       return { roomId, ...route }
     }
     const assigned = await directory.claim(roomId)

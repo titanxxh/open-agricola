@@ -97,6 +97,15 @@ it('allows querying a failed creation receipt without reserving another destinat
   expect(await directory.db.prepare('SELECT * FROM room_ownership WHERE room_id=?').get(roomId)).toEqual(ownership)
 })
 
+it('lets an anonymous development actor rejoin a playing Room instead of routing it to spectating', async () => {
+  const roomId = randomUUID()
+  await directory.db.prepare("INSERT INTO rooms(id,status,hotseat,created_at,updated_at) VALUES(?,'playing',1,1,1)").run(roomId)
+  await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES(?,'active',1,1)").run(roomId)
+  const route = await discoverRoom(directory, 'development-anonymous', { roomId })
+  expect(route).toMatchObject({ roomId, wsPath: expect.stringContaining('/nodes/a/') })
+  expect(await directory.db.prepare('SELECT instance_id FROM room_ownership WHERE room_id=?').get(roomId)).toEqual({ instance_id: 'a' })
+})
+
 it('does not let a pending command reserve admission to an unowned offline game', async () => {
   const roomId = randomUUID()
   await directory.db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'playing',1,1)").run(roomId)
