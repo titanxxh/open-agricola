@@ -96,3 +96,21 @@ it('allows querying a failed creation receipt without reserving another destinat
   expect(await discoverRoom(directory, 'creator', { roomId, pendingIdentity: identity })).toEqual({ wsPath: '/nodes/a/ws' })
   expect(await directory.db.prepare('SELECT * FROM room_ownership WHERE room_id=?').get(roomId)).toEqual(ownership)
 })
+
+it('does not let a pending command reserve admission to an unowned offline game', async () => {
+  const roomId = randomUUID()
+  await directory.db.prepare("INSERT INTO rooms(id,status,created_at,updated_at) VALUES(?,'playing',1,1)").run(roomId)
+  await directory.db.prepare("INSERT INTO game_contexts(room_id,lifecycle,created_at,updated_at) VALUES(?,'active',1,1)").run(roomId)
+  const route = await directory.claim(roomId, 'a')
+  await directory.db.transaction(() => directory.markActive(roomId, route.owner))()
+  await directory.db.prepare('UPDATE room_ownership SET admission_until=0 WHERE room_id=?').run(roomId)
+  const commands = new CommandStore(directory.db)
+  const scope = await commands.issueScope('user:viewer')
+  const identity = { scopeId: scope.scopeId, commandId: randomUUID() }
+  const pending = await commands.reserve('user:viewer', identity, roomId, { type: 'newGame' })
+  expect(pending.kind).toBe('pending')
+  await expect(discoverRoom(directory, 'user:viewer', { roomId, pendingIdentity: identity }, 'viewer'))
+    .rejects.toMatchObject({ code: 'not_participant' })
+  expect(await directory.db.prepare('SELECT admission_until FROM room_ownership WHERE room_id=?').get(roomId))
+    .toEqual({ admission_until: 0 })
+})

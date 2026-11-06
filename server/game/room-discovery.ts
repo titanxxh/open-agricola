@@ -9,10 +9,8 @@ import { persistedRoomAccessError } from './room-access'
 /** Discovery supplies a route, never seat permission or a gameplay write. */
 export async function discoverRoom(directory: RoomDirectory, actorId: string, request: RoomDiscoveryRequest, userId?: string): Promise<RoomDiscoveryResponse> {
   let roomId = request.roomId
-  let hasPendingReceipt = false
   if (request.pendingIdentity) {
     const pending = await new CommandStore(directory.db).lookup(actorId, request.pendingIdentity)
-    hasPendingReceipt = pending.kind !== 'unknown'
     if (pending.kind === 'completed') {
       if (!pending.receipt.outcome.ok && !pending.receipt.outcome.roomId) {
         const instance = (await directory.instances())[0]
@@ -52,7 +50,7 @@ export async function discoverRoom(directory: RoomDirectory, actorId: string, re
     if (accessError) throw Object.assign(new Error(accessError.message), { code: accessError.code })
     const participant = userId && await directory.db.prepare('SELECT 1 FROM room_players WHERE room_id=? AND user_id=?').get(roomId, userId)
     const playing = await directory.db.prepare("SELECT 1 FROM rooms WHERE id=? AND status='playing'").get(roomId)
-    if (!participant && playing && !hasPendingReceipt && !isDevRoom(roomId)) {
+    if (!participant && playing && !isDevRoom(roomId)) {
       const route = userId ? await spectatorRoute(directory.db, roomId) : undefined
       if (!route) throw Object.assign(new Error('This game is not available for spectating'), { code: userId ? 'not_participant' : 'login_required' })
       return { roomId, ...route }
