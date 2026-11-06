@@ -219,6 +219,30 @@ test.describe('Platform: auth', () => {
     await expect(providerGroup.getByText('使用 Google 注册', { exact: true })).toBeVisible()
   })
 
+  test('login offers password recovery and an invalid reset link leads back to it', async ({ page }) => {
+    const username = `forgot_${RUN_ID}`
+    await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
+    await page.fill('#username', username)
+    await page.getByRole('button', { name: '忘记密码？' }).click()
+
+    const forgotForm = page.getByRole('form', { name: '找回密码' })
+    await expect(forgotForm.locator('#forgot-identifier')).toHaveValue(username)
+    await forgotForm.getByRole('button', { name: '发送重置链接' }).click()
+    await expect(forgotForm.getByRole('status')).toContainText('重置链接已发出')
+
+    await page.goto(`${FRONTEND_URL}/?page=reset-password#passwordResetToken=not-a-real-token`, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading', { name: '设置新密码' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('')
+    await page.fill('#reset-password', PASSWORD)
+    await page.fill('#reset-confirm-password', PASSWORD)
+    await page.getByRole('button', { name: '重置密码' }).click()
+
+    await expect(page.getByRole('alert')).toContainText('重置密码链接无效或已过期')
+    await page.getByRole('button', { name: '重新获取链接' }).click()
+    await expect(page.getByRole('form', { name: '找回密码' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '登录' })).toHaveAttribute('aria-selected', 'true')
+  })
+
   test('missing onboarding credentials replace the form and restart registration without claiming expiry', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await page.fill('#onboarding-username', `expired_${RUN_ID}`)

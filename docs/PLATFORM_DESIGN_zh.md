@@ -29,6 +29,7 @@
 **不用 JWT，使用服务端 Session：**
 
 - 支持密码注册（邮箱验证）与 GitHub / Google OAuth
+- 找回密码（`server/auth.ts`）：`POST /api/auth/password-reset/request` 接受用户名或邮箱；未知账号、仅 OAuth 账号（无 `users.email`）、待删除账号和两分钟冷却内的账号都返回同样的 `{ ok: true }`。其他账号收到指向 `PUBLIC_APP_ORIGIN?page=reset-password` 的一小时链接，token 放在 fragment 中；库中只存 SHA-256，新链接使旧链接失效，发送失败时删除未送达的 token。`POST /api/auth/password-reset/complete` 在一个事务内消费 token、替换密码、标记邮箱已验证、吊销全部会话并签发新 Cookie，随后路由断开该账号的 WebSocket 连接。`ResetPasswordPage` 把 token 从 fragment 移到当前标签页的 `sessionStorage`。覆盖：`auth-routes.test.ts`、`ResetPasswordPage.test.tsx`、`platform.spec.ts`
 - 登录创建不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
 - 浏览器通过仅属于 API host 的 HttpOnly 会话 Cookie 访问 HTTP 与 WebSocket。GitHub Pages 前端 `open-agricola.titanxxh.com` 与 API `openagapi.titanxxh.com` 同站但跨源，站点比较包含 Public Suffix List 私有后缀。同站部署使用 `SameSite=Lax; Secure`，不加 `Partitioned` 或父域 Cookie。跨站自托管保留既有分区 Cookie 路径及其浏览器支持边界。见 ADR 0035。GitHub / Google 账号绑定在发起操作的前端上下文中用携带凭据的 POST 发起和完成，不在后端导航上下文中检查原 session。provider callback 将受 PKCE 保护的交接返回设置页，错误保留在该页；登录/注册和独立的 Issue Submission Connection 仍走各自流程。
 - 首次 OAuth 注册通过 URL fragment 交接有效期十五分钟的一次性票据，并用浏览器持有的 secret 校验 OAuth 发起时保存的 SHA-256 challenge。完成注册不依赖第三方注册 Cookie；创建会话仍设置 HttpOnly Cookie。凭证、事务与浏览器覆盖见[服务端认证边界](architecture/server.md#http-endpoints)和 `e2e-tests/oauth-onboarding.spec.ts`。
@@ -59,7 +60,7 @@ App.tsx
 
 不引入 Redux/Zustand：
 
-- `AuthContext` 提供用户状态、登录/登出、密码注册/验证邮件和 OAuth 入口
+- `AuthContext` 提供用户状态、登录/登出、密码注册/验证邮件、找回密码和 OAuth 入口
 - 工坊页面用 `useState` + fetch，和游戏现有风格一致
 - HTTP fetch 使用 `credentials: 'include'`，浏览器 WebSocket 自动携带 session cookie
 

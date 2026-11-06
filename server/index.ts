@@ -42,7 +42,9 @@ import {
   finishAccountDeletion,
   registerPasswordUser,
   requestAccountDeletion,
+  requestPasswordReset,
   resendVerificationEmail,
+  resetPasswordWithToken,
   sendVerificationEmail,
   verifyEmailToken,
   type AuthErrorCode,
@@ -689,6 +691,44 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     }
     const result = await resendVerificationEmail(body.email)
     sendJson(res, result.ok ? 200 : 500, result)
+    return
+  }
+
+  if (req.url === '/api/auth/password-reset/request' && req.method === 'POST') {
+    if (!(await checkRateLimit(getClientIp(req)))) {
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
+      return
+    }
+    const body = await parseBody<{ identifier?: unknown }>(req)
+    if (typeof body?.identifier !== 'string' || !body.identifier.trim()) {
+      sendJson(res, 400, authError('missing_fields', 'Missing username or email'))
+      return
+    }
+    const result = await requestPasswordReset(body.identifier)
+    sendJson(res, result.ok ? 200 : 500, result)
+    return
+  }
+
+  if (req.url === '/api/auth/password-reset/complete' && req.method === 'POST') {
+    if (!(await checkRateLimit(getClientIp(req)))) {
+      sendJson(res, 429, authError('rate_limited', 'Too many requests'))
+      return
+    }
+    const body = await parseBody<{ token?: unknown; password?: unknown; confirmPassword?: unknown }>(req)
+    if (typeof body?.token !== 'string' || typeof body.password !== 'string' || typeof body.confirmPassword !== 'string') {
+      sendJson(res, 400, authError('missing_fields', 'Missing token or password'))
+      return
+    }
+    const result = await resetPasswordWithToken(body.token, body.password, body.confirmPassword)
+    if (!result.ok) {
+      sendJson(res, 400, result)
+      return
+    }
+    wssCtx?.closeUserConnections(result.user.id)
+    sendJson(res, 200, { ok: true, user: result.user }, {
+      'Cache-Control': 'no-store',
+      'Set-Cookie': serializeSessionCookie(result.token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }),
+    })
     return
   }
 

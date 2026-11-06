@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
 import { OnboardingPage } from './OnboardingPage'
+import { ResetPasswordPage } from './ResetPasswordPage'
 import { SettingsPage } from './SettingsPage'
 import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
@@ -27,7 +28,7 @@ const GameContainerApiLazy = lazy(() =>
 function getPage(): PlatformPage {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
-  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding' || page === 'operations' || page === 'encyclopedia') return page
+  if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding' || page === 'reset-password' || page === 'operations' || page === 'encyclopedia') return page
   if (params.get('context')) return 'game'
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   if (isHotseatSetupQuery(window.location.search)) return 'game'
@@ -88,6 +89,9 @@ export function PageRouter() {
     const { percent, labelKey } = getGameLoadProgress('auth')
     return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
+
+  // A reset link may be opened while another account is signed in; completing it switches accounts.
+  if (page === 'reset-password') return <ResetPasswordPage />
 
   if (!user) {
     if (page === 'onboarding') return <OnboardingPage />

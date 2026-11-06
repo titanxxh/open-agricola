@@ -10,6 +10,7 @@ type LoginResult = { ok: boolean; code?: string; error?: string }
 const loginMock = vi.fn(async () => ({ ok: true }))
 const registerWithPasswordMock = vi.fn(async () => ({ ok: true, status: 'verification_required' as const }))
 const resendVerificationMock = vi.fn(async () => ({ ok: true }))
+const requestPasswordResetMock = vi.fn(async (_identifier: string): Promise<LoginResult> => ({ ok: true }))
 const oauthStartUrlMock = vi.fn((
   provider: 'github' | 'google',
   intent: 'login' | 'register' | 'link',
@@ -33,6 +34,7 @@ vi.mock('../../contexts/AuthContext', () => ({
     login: loginMock,
     registerWithPassword: registerWithPasswordMock,
     resendVerification: resendVerificationMock,
+    requestPasswordReset: requestPasswordResetMock,
     oauthStartUrl: oauthStartUrlMock,
   }),
 }))
@@ -75,6 +77,14 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.authErrors.email_taken': '邮箱已被使用',
     'platform.authErrors.email_not_verified': '邮箱尚未验证',
     'platform.authErrors.email_delivery_failed': '验证邮件发送失败',
+    'platform.authErrors.password_reset_delivery_failed': '重置密码邮件发送失败',
+    'platform.forgotPassword': '忘记密码？',
+    'platform.forgotPasswordTitle': '找回密码',
+    'platform.forgotPasswordIntro': '输入用户名或邮箱。',
+    'platform.forgotPasswordIdentifier': '用户名或邮箱',
+    'platform.forgotPasswordSubmit': '发送重置链接',
+    'platform.forgotPasswordSent': '如果该账号存在且绑定了邮箱，重置链接已发出。',
+    'platform.backToLogin': '返回登录',
   }
   const t = (key: string) => labels[key] ?? key
   return {
@@ -293,6 +303,42 @@ describe('LoginPage auth UI', () => {
 
     expect(screen.queryByText('验证邮件已发送')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '用用户名注册' })).toBeInTheDocument()
+  })
+
+  it('opens forgot password from the login form with the typed username and confirms the request', async () => {
+    const user = userEvent.setup()
+    render(<LoginPage />)
+
+    await user.type(screen.getByLabelText('用户名'), 'resetme')
+    await user.click(screen.getByRole('button', { name: '忘记密码？' }))
+
+    expect(screen.getByRole('heading', { name: '找回密码' })).toBeInTheDocument()
+    const identifier = screen.getByLabelText('用户名或邮箱')
+    expect(identifier).toHaveValue('resetme')
+    await user.clear(identifier)
+    await user.type(identifier, 'reset@example.com')
+    await user.click(screen.getByRole('button', { name: '发送重置链接' }))
+
+    expect(requestPasswordResetMock).toHaveBeenCalledWith('reset@example.com')
+    expect(screen.getByRole('status')).toHaveTextContent('如果该账号存在且绑定了邮箱，重置链接已发出。')
+
+    await user.click(screen.getByRole('button', { name: '返回登录' }))
+    expect(screen.getByLabelText('密码')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '找回密码' })).not.toBeInTheDocument()
+  })
+
+  it('shows a localized delivery failure for forgot password opened from authMode=forgot', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?page=login&authMode=forgot')
+    requestPasswordResetMock.mockResolvedValueOnce({ ok: false, code: 'password_reset_delivery_failed', error: 'Failed' })
+    render(<LoginPage />)
+
+    expect(screen.getByRole('tab', { name: '登录' })).toHaveAttribute('aria-selected', 'true')
+    await user.type(screen.getByLabelText('用户名或邮箱'), 'resetme')
+    await user.click(screen.getByRole('button', { name: '发送重置链接' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('重置密码邮件发送失败')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('localizes backend error codes instead of showing raw English', async () => {

@@ -9,6 +9,8 @@ const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 5 * 60 * 1000
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000
+const PASSWORD_RESET_COOLDOWN_MS = 2 * 60 * 1000
 const ACCOUNT_DELETION_RETRY_MS = 30_000
 
 export type AuthUser = {
@@ -30,6 +32,8 @@ export type AuthErrorCode =
   | 'email_not_verified'
   | 'invalid_or_expired_token'
   | 'email_delivery_failed'
+  | 'password_reset_token_invalid'
+  | 'password_reset_delivery_failed'
   | 'username_taken'
   | 'invalid_invite'
   | 'registration_disabled'
@@ -111,7 +115,7 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-function newEmailVerificationToken(): { token: string; tokenHash: string } {
+function newOpaqueToken(): { token: string; tokenHash: string } {
   const token = randomBytes(32).toString('base64url')
   return { token, tokenHash: hashToken(token) }
 }
@@ -216,7 +220,7 @@ export async function registerPasswordUser(input: RegisterPasswordInput): Promis
 
 export async function createEmailVerificationToken(userId: string): Promise<Awaited<string>> {
   const now = Date.now()
-  const { token, tokenHash } = newEmailVerificationToken()
+  const { token, tokenHash } = newOpaqueToken()
   ;(await storeEmailVerificationToken(userId, tokenHash, now))
   return token
 }
@@ -268,6 +272,18 @@ export async function verifyEmailToken(rawToken: string): Promise<Awaited<LoginR
   }
 }
 
+function publicAppBase(): URL {
+  const configured = process.env.PUBLIC_APP_ORIGIN?.trim()
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('PUBLIC_APP_ORIGIN is required in production')
+  }
+  const url = new URL(configured || 'http://localhost:5173/')
+  url.search = ''
+  url.hash = ''
+  if (!url.pathname.endsWith('/')) url.pathname += '/'
+  return url
+}
+
 function publicApiBase(): string {
   const configured = process.env.PUBLIC_API_BASE?.trim()
   if (!configured && process.env.NODE_ENV === 'production') {
@@ -277,7 +293,7 @@ function publicApiBase(): string {
 }
 
 export async function sendVerificationEmail(userId: string, email: string): Promise<void> {
-  const { token, tokenHash } = newEmailVerificationToken()
+  const { token, tokenHash } = newOpaqueToken()
   const link = `${publicApiBase()}/api/auth/verify-email?token=${encodeURIComponent(token)}`
   await sendEmail({
     to: email,
@@ -339,6 +355,128 @@ export async function resendVerificationEmail(
     return { ok: true }
   } catch {
     return { ok: false, code: 'email_delivery_failed', error: 'Failed to send verification email' }
+  }
+}
+
+export type PasswordResetRequestResult = { ok: true } | { ok: false; code: AuthErrorCode; error: string }
+
+/**
+ * Sends a reset link when the identifier names a live account with an email address.
+ * Unknown, OAuth-only and cooling-down accounts get the same `{ ok: true }`.
+ */
+export async function requestPasswordReset(identifier: string): Promise<PasswordResetRequestResult> {
+  const value = identifier.trim()
+  if (!value || value.length > 254) return { ok: true }
+  const byEmail = value.includes('@')
+  const db = getDb()
+  const now = Date.now()
+  const { token, tokenHash } = newOpaqueToken()
+  const recipient = (await db.transaction(async () => {
+    const row = (await db.prepare(`
+      SELECT u.id, u.email
+      FROM users u
+      WHERE ${byEmail ? 'u.email' : 'u.username'} = ?
+        AND u.email IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM account_deletion_requests d WHERE d.user_id = u.id)
+      FOR UPDATE
+    `).get(byEmail ? normalizeEmail(value) : value)) as { id: string; email: string } | undefined
+    if (!row) return null
+    const latest = (await db.prepare(
+      'SELECT MAX(created_at) AS created_at FROM password_reset_tokens WHERE user_id = ?',
+    ).get(row.id)) as { created_at: number | null } | undefined
+    if (latest?.created_at != null && now - latest.created_at < PASSWORD_RESET_COOLDOWN_MS) return null
+    ;(await db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(now, row.id))
+    ;(await db.prepare(`
+      INSERT INTO password_reset_tokens (token_hash, user_id, expires_at, created_at, used_at)
+      VALUES (?, ?, ?, ?, NULL)
+    `).run(tokenHash, row.id, now + PASSWORD_RESET_TTL_MS, now))
+    return row.email
+  })())
+  if (!recipient) return { ok: true }
+
+  try {
+    const link = publicAppBase()
+    link.searchParams.set('page', 'reset-password')
+    link.hash = new URLSearchParams({ passwordResetToken: token }).toString()
+    await sendEmail({
+      to: recipient,
+      subject: 'Reset your Open Agricola password',
+      text: `Reset your Open Agricola password within one hour: ${link.href}\n\nIf you did not ask for this, ignore this email.`,
+      html: `<p>Reset your Open Agricola password within one hour:</p><p><a href="${link.href}">Reset password</a></p><p>If you did not ask for this, ignore this email.</p>`,
+    })
+  } catch {
+    ;(await db.prepare('DELETE FROM password_reset_tokens WHERE token_hash = ?').run(tokenHash))
+    return { ok: false, code: 'password_reset_delivery_failed', error: 'Failed to send password reset email' }
+  }
+  return { ok: true }
+}
+
+class PasswordResetRefused extends Error {}
+
+/**
+ * Consumes a reset token, replaces the password, marks the email verified,
+ * revokes every existing session and returns a fresh one.
+ */
+export async function resetPasswordWithToken(
+  rawToken: string,
+  password: string,
+  confirmPassword: string,
+): Promise<LoginResult> {
+  if (!password || password.length < 8) {
+    return { ok: false, code: 'invalid_password', error: 'Password must be at least 8 characters' }
+  }
+  if (password !== confirmPassword) {
+    return { ok: false, code: 'password_mismatch', error: 'Passwords do not match' }
+  }
+  const invalid = { ok: false as const, code: 'password_reset_token_invalid' as const, error: 'Password reset link is invalid or expired' }
+  const token = rawToken.trim()
+  if (!token) return invalid
+
+  const passwordHash = await hashPassword(password)
+  const db = getDb()
+  const now = Date.now()
+  const result = (await db.transaction(async () => {
+    const row = (await db.prepare(`
+      SELECT t.user_id, u.username, u.display_name, u.email
+      FROM password_reset_tokens t
+      JOIN users u ON u.id = t.user_id
+      WHERE t.token_hash = ?
+        AND t.used_at IS NULL
+        AND t.expires_at > ?
+      FOR UPDATE OF t, u
+    `).get(hashToken(token), now)) as
+      | { user_id: string; username: string; display_name: string; email: string | null }
+      | undefined
+    if (!row) return null
+    ;(await db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(now, row.user_id))
+    ;(await db.prepare(`
+      UPDATE users
+      SET password_hash = ?, password_updated_at = ?, email_verified_at = COALESCE(email_verified_at, ?), last_login_at = ?
+      WHERE id = ?
+    `).run(passwordHash, now, now, now, row.user_id))
+    ;(await db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(now, row.user_id))
+    ;(await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.user_id))
+    const session = (await createSession(row.user_id))
+    // A pending account deletion refuses new sessions; roll the reset back with it.
+    if (!session) throw new PasswordResetRefused()
+    return { row, session }
+  })().catch((err: unknown) => {
+    if (err instanceof PasswordResetRefused) return null
+    throw err
+  }))
+  if (!result) return invalid
+
+  return {
+    ok: true,
+    token: result.session,
+    user: {
+      id: result.row.user_id,
+      username: result.row.username,
+      displayName: result.row.display_name,
+      email: result.row.email,
+      emailVerified: true,
+      isAdmin: isAdmin(result.row.username),
+    },
   }
 }
 
@@ -478,6 +616,7 @@ export async function requestAccountDeletion(userId: string): Promise<Awaited<vo
     `).run(userId, now, now))
     ;(await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId))
+    ;(await db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId))
     ;(await db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId))
     ;(await db.prepare(`

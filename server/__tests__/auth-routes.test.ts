@@ -63,6 +63,7 @@ const {
   deleteAccount,
   login,
   registerPasswordUser,
+  requestAccountDeletion,
   validateSession,
 } = await import('../auth.ts')
 const { createOAuthState, createOnboardingTicket, findIdentity, getOnboardingTicket, linkIdentity } = await import('../oauth/store.ts')
@@ -756,6 +757,194 @@ describe('auth routes', () => {
       if (previous === undefined) delete process.env.DISABLE_RATE_LIMIT
       else process.env.DISABLE_RATE_LIMIT = previous
     }
+  })
+
+  describe('password reset', () => {
+    const resetLinkPrefix = 'https://frontend.example/open-agricola/?page=reset-password#passwordResetToken='
+
+    beforeEach(() => {
+      process.env.PUBLIC_APP_ORIGIN = 'https://frontend.example/open-agricola/'
+    })
+
+    async function createEmailUser(username: string, email: string, verified: boolean): Promise<string> {
+      const created = await registerPasswordUser({ username, email, password: 'oldpassword', confirmPassword: 'oldpassword' })
+      if (!created.ok) throw new Error(created.error)
+      if (verified) {
+        await getDb().prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(Date.now(), created.userId)
+      }
+      return created.userId
+    }
+
+    function captureResetMail() {
+      return vi.spyOn(emailModule, 'sendEmail').mockResolvedValue(undefined)
+    }
+
+    function resetTokenFrom(spy: ReturnType<typeof captureResetMail>, call = 0): string {
+      const text = spy.mock.calls[call]![0].text
+      const link = text.match(/https:\/\/\S+/)![0]
+      expect(link.startsWith(resetLinkPrefix)).toBe(true)
+      return decodeURIComponent(link.slice(resetLinkPrefix.length))
+    }
+
+    it('mails a link for a username, then replaces the password, revokes sessions and signs in', async () => {
+      const userId = await createEmailUser('resetuser', 'resetuser@example.com', true)
+      const oldSessions = [await createSession(userId), await createSession(userId)]
+      const mail = captureResetMail()
+
+      const requested = await requestJson('POST', '/api/auth/password-reset/request', { identifier: ' ResetUser ' })
+      expect(requested).toMatchObject({ status: 200, json: { ok: true } })
+      expect(mail).toHaveBeenCalledTimes(1)
+      expect(mail.mock.calls[0]![0]).toMatchObject({ to: 'resetuser@example.com', subject: 'Reset your Open Agricola password' })
+      const token = resetTokenFrom(mail)
+
+      const mismatch = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token, password: 'newpassword', confirmPassword: 'different1',
+      })
+      expect(mismatch).toMatchObject({ status: 400, json: { ok: false, code: 'password_mismatch' } })
+      const short = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token, password: 'short', confirmPassword: 'short',
+      })
+      expect(short).toMatchObject({ status: 400, json: { ok: false, code: 'invalid_password' } })
+
+      const reset = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token, password: 'newpassword', confirmPassword: 'newpassword',
+      })
+      expect(reset).toMatchObject({ status: 200, json: { ok: true, user: { id: userId, username: 'resetuser', emailVerified: true } } })
+      expect(reset.json.token).toBeUndefined()
+      expect(reset.headers['Cache-Control']).toBe('no-store')
+      expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(userId)
+      for (const session of oldSessions) await expect(validateSession(session!)).resolves.toBeNull()
+      const cookie = cookiePairFromSetCookie(reset.headers['Set-Cookie'], SESSION_COOKIE)
+      const me = await requestJson('GET', '/api/auth/me', undefined, { Cookie: cookie })
+      expect(me).toMatchObject({ status: 200, json: { ok: true, user: { id: userId } } })
+
+      await expect(login('resetuser', 'oldpassword')).resolves.toMatchObject({ ok: false, code: 'invalid_login' })
+      await expect(login('resetuser', 'newpassword')).resolves.toMatchObject({ ok: true })
+
+      const reused = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token, password: 'thirdpassword', confirmPassword: 'thirdpassword',
+      })
+      expect(reused).toMatchObject({ status: 400, json: { ok: false, code: 'password_reset_token_invalid' } })
+      expect(reused.headers['Set-Cookie']).toBeUndefined()
+    })
+
+    it('accepts an email identifier and verifies an unverified email on reset', async () => {
+      const userId = await createEmailUser('unverifiedreset', 'unverified-reset@example.com', false)
+      await expect(login('unverifiedreset', 'oldpassword')).resolves.toMatchObject({ ok: false, code: 'email_not_verified' })
+      const mail = captureResetMail()
+
+      const requested = await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'Unverified-Reset@Example.com' })
+      expect(requested).toMatchObject({ status: 200, json: { ok: true } })
+      expect(mail.mock.calls[0]![0].to).toBe('unverified-reset@example.com')
+
+      const reset = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token: resetTokenFrom(mail), password: 'newpassword', confirmPassword: 'newpassword',
+      })
+      expect(reset.status).toBe(200)
+      const row = await getDb().prepare('SELECT email_verified_at FROM users WHERE id = ?').get(userId) as { email_verified_at: number | null }
+      expect(row.email_verified_at).toBeGreaterThan(0)
+      await expect(login('unverifiedreset', 'newpassword')).resolves.toMatchObject({ ok: true })
+    })
+
+    it('answers unknown, OAuth-only and deletion-pending accounts with the same success and no mail', async () => {
+      await createLocalUserForTests('oauthonly', 'password123')
+      const deletingId = await createEmailUser('deletingreset', 'deleting-reset@example.com', true)
+      await requestAccountDeletion(deletingId)
+      const mail = captureResetMail()
+
+      for (const identifier of ['nobody', 'nobody@example.com', 'oauthonly', 'deletingreset', 'deleting-reset@example.com']) {
+        const res = await requestJson('POST', '/api/auth/password-reset/request', { identifier })
+        expect(res).toMatchObject({ status: 200, json: { ok: true } })
+      }
+      expect(mail).not.toHaveBeenCalled()
+      const count = await getDb().prepare('SELECT COUNT(*)::int AS count FROM password_reset_tokens').get() as { count: number }
+      expect(count.count).toBe(0)
+    })
+
+    it('rejects a link once account deletion is requested', async () => {
+      const userId = await createEmailUser('deleteafterlink', 'delete-after-link@example.com', true)
+      const mail = captureResetMail()
+      await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'deleteafterlink' })
+      await requestAccountDeletion(userId)
+
+      const reset = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token: resetTokenFrom(mail), password: 'newpassword', confirmPassword: 'newpassword',
+      })
+      expect(reset).toMatchObject({ status: 400, json: { ok: false, code: 'password_reset_token_invalid' } })
+      expect(reset.headers['Set-Cookie']).toBeUndefined()
+    })
+
+    it('throttles repeat mail per account and lets a newer link supersede the older one', async () => {
+      const userId = await createEmailUser('cooldownreset', 'cooldown-reset@example.com', true)
+      const mail = captureResetMail()
+
+      await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'cooldownreset' })
+      const throttled = await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'cooldown-reset@example.com' })
+      expect(throttled).toMatchObject({ status: 200, json: { ok: true } })
+      expect(mail).toHaveBeenCalledTimes(1)
+      const first = resetTokenFrom(mail, 0)
+
+      await getDb().prepare('UPDATE password_reset_tokens SET created_at = created_at - ? WHERE user_id = ?').run(3 * 60_000, userId)
+      await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'cooldownreset' })
+      expect(mail).toHaveBeenCalledTimes(2)
+      const second = resetTokenFrom(mail, 1)
+
+      const stale = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token: first, password: 'newpassword', confirmPassword: 'newpassword',
+      })
+      expect(stale).toMatchObject({ status: 400, json: { code: 'password_reset_token_invalid' } })
+      const fresh = await requestJson('POST', '/api/auth/password-reset/complete', {
+        token: second, password: 'newpassword', confirmPassword: 'newpassword',
+      })
+      expect(fresh.status).toBe(200)
+    })
+
+    it('rejects expired and unknown links without changing the password', async () => {
+      const userId = await createEmailUser('expiredreset', 'expired-reset@example.com', true)
+      const mail = captureResetMail()
+      await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'expiredreset' })
+      await getDb().prepare('UPDATE password_reset_tokens SET expires_at = ? WHERE user_id = ?').run(Date.now() - 1, userId)
+
+      for (const token of [resetTokenFrom(mail), 'not-a-real-token']) {
+        const res = await requestJson('POST', '/api/auth/password-reset/complete', {
+          token, password: 'newpassword', confirmPassword: 'newpassword',
+        })
+        expect(res).toMatchObject({ status: 400, json: { ok: false, code: 'password_reset_token_invalid' } })
+      }
+      await expect(login('expiredreset', 'oldpassword')).resolves.toMatchObject({ ok: true })
+    })
+
+    it('reports delivery failure without leaving a usable link or a cooldown', async () => {
+      await createEmailUser('failedreset', 'failed-reset@example.com', true)
+      const mail = vi.spyOn(emailModule, 'sendEmail').mockRejectedValueOnce(new Error('provider down'))
+
+      const failed = await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'failedreset' })
+      expect(failed).toMatchObject({ status: 500, json: { ok: false, code: 'password_reset_delivery_failed' } })
+      const count = await getDb().prepare('SELECT COUNT(*)::int AS count FROM password_reset_tokens').get() as { count: number }
+      expect(count.count).toBe(0)
+
+      mail.mockResolvedValue(undefined)
+      const retried = await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'failedreset' })
+      expect(retried).toMatchObject({ status: 200, json: { ok: true } })
+      expect(mail).toHaveBeenCalledTimes(2)
+    })
+
+    it('validates request bodies and rate limits by client address', async () => {
+      const missing = await requestJson('POST', '/api/auth/password-reset/request', { identifier: '  ' })
+      expect(missing).toMatchObject({ status: 400, json: { code: 'missing_fields' } })
+      const incomplete = await requestJson('POST', '/api/auth/password-reset/complete', { token: 'x', password: 'newpassword' })
+      expect(incomplete).toMatchObject({ status: 400, json: { code: 'missing_fields' } })
+
+      delete process.env.DISABLE_RATE_LIMIT
+      for (const path of ['/api/auth/password-reset/request', '/api/auth/password-reset/complete']) {
+        const headers = { 'X-Forwarded-For': path.endsWith('request') ? '198.51.100.12' : '198.51.100.13' }
+        for (let attempt = 0; attempt < 10; attempt++) {
+          expect((await requestJson('POST', path, {}, headers)).status).toBe(400)
+        }
+        const limited = await requestJson('POST', path, {}, headers)
+        expect(limited).toMatchObject({ status: 429, json: { ok: false, code: 'rate_limited' } })
+      }
+    })
   })
 
   it('me reads oa_session cookie', async () => {
