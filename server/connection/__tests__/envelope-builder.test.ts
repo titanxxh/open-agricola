@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildEnvelope } from '../envelope-builder.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
 import type { GameEvent } from '../../../shared/contract/events.ts'
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
 
 describe('buildEnvelope', () => {
   const publicEventCancellations = [{
@@ -41,8 +42,9 @@ describe('buildEnvelope', () => {
     const response = session.getState()
     const cursor = session.createSessionPrivateCursor()
     const log = JSON.parse(JSON.stringify(session.state.log))
-    const envelope = buildEnvelope({ room: { id: 'r1', session, players: [{ playerIndex: 0, name: 'Renamed actor' }, { playerIndex: 1, name: 'Renamed recipient' }] as never }, resp: response, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
+    const envelope = buildEnvelope({ room: { id: 'r1', session, players: [{ playerIndex: 0, name: 'Renamed actor', ws: { readyState: 1 } }, { playerIndex: 1, name: 'Renamed recipient', ws: { readyState: 3 } }] as never }, resp: response, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
     expect(envelope.payload.state.log[0]).toMatchObject({ params: { player: 'Renamed actor', toPlayer: 'Renamed recipient' } })
+    expect(envelope.connectedPlayerIndexes).toEqual([0])
     expect(session.state.log).toEqual(log)
     expect(session.createSessionPrivateCursor()).toEqual(cursor)
   })
@@ -399,45 +401,30 @@ describe('buildEnvelope', () => {
     expect(observer.payload.publicEventCancellations).toEqual(other.payload.publicEventCancellations)
   })
 
-  it('masks draft pending picks for player and null-viewer envelopes', () => {
-    const session = new GameSession(12345, undefined, {
-      playerCount: 2,
-      draftMode: 'simultaneous',
-      draftPoolSize: 7,
+  it('masks kept cards and queued packets in player and spectator envelopes', () => {
+    const session = new GameSession(12345, undefined, { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 7 })
+    const pick = firstDraftPick(session.state.draft!, 'p1')
+    const resp = session.submitDraftPick('p1', pick)
+    const envelope = (viewerPlayerId: string | null) => buildEnvelope({
+      room: { id: 'r1', session, players: [] }, resp, viewerPlayerId,
+      version: 1, cause: 'reconnect', emittedAt: 0,
     })
-    const resp = session.withCtx(() => session.getState())
-    const p1Pick = {
-      occ: resp.state.draft!.pools.p1!.occ[0]!,
-      minor: resp.state.draft!.pools.p1!.minor[0]!,
-    }
-    resp.state.draft!.pendingPicks.p1 = {
-      ...p1Pick,
-    }
-    resp.state.draft!.pendingPicks.p2 = {
-      occ: resp.state.draft!.pools.p2!.occ[0]!,
-      minor: resp.state.draft!.pools.p2!.minor[0]!,
-    }
+    const p1 = envelope('p1')
+    const p2 = envelope('p2')
+    const observer = envelope(null)
+    expect(p1.payload.state.draft!.stages[0].seats.p1.kept).toEqual({ occ: [pick.occCardId], minor: [pick.minorCardId] })
+    expect(p2.payload.state.draft!.stages[0].seats.p1.kept).toEqual({ occ: ['?'], minor: ['?'] })
+    expect(observer.payload.state.draft!.stages[0].seats.p1.kept).toEqual({ occ: ['?'], minor: ['?'] })
+    expect(p2.payload.state.draft!.stages[0].seats.p2.inbox[2]).toEqual({ occ: Array(6).fill('?'), minor: Array(6).fill('?') })
+    expect(p2.payload.state.draft!.stages[0].seats.p2.inbox[1]).toEqual(session.state.draft!.stages[0].seats.p2.inbox[1])
+    expect(observer.payload.state.draft!.stages[0].seats.p2.inbox[1]).toEqual({ occ: Array(7).fill('?'), minor: Array(7).fill('?') })
+  })
 
-    const p1 = buildEnvelope({
-      room: { id: 'r1', session, players: [] },
-      resp,
-      viewerPlayerId: 'p1',
-      version: 1,
-      cause: 'reconnect',
-      emittedAt: 0,
-    })
-    const observer = buildEnvelope({
-      room: { id: 'r1', session, players: [] },
-      resp,
-      viewerPlayerId: null,
-      version: 1,
-      cause: 'reconnect',
-      emittedAt: 0,
-    })
-
-    expect(p1.payload.state.draft!.pendingPicks.p1).toEqual(p1Pick)
-    expect(p1.payload.state.draft!.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
-    expect(observer.payload.state.draft!.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
-    expect(observer.payload.state.draft!.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
+  it('reports no connected seats for an empty room player list and every seat for hotseat', () => {
+    const session = new GameSession(12345, undefined, { playerCount: 2, draftMode: 'simultaneous' })
+    const resp = session.getState()
+    const base = { resp, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 } satisfies Omit<Parameters<typeof buildEnvelope>[0], 'room'>
+    expect(buildEnvelope({ ...base, room: { id: 'r1', session, players: [] } }).connectedPlayerIndexes).toEqual([])
+    expect(buildEnvelope({ ...base, room: { id: 'r1', session, players: [], hotseat: true } }).connectedPlayerIndexes).toEqual([0, 1])
   })
 })

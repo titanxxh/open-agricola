@@ -1,3 +1,5 @@
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
+import { draftSeatProgress } from '../../../shared/projections/draft-progress'
 import { describe, expect, it } from 'vitest'
 import { openingSeatRandom as drawSeat } from '../../__tests__/_helpers/opening-seat-random'
 import { serializeSessionSnapshot } from '../../../shared/session/serialization.ts'
@@ -256,12 +258,21 @@ describe('room-manager seat assignment', () => {
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
-    session.state.draft!.stage = 'farmersOfTheMoorMinor'
-    session.state.draft!.poolSize = 4
+    for (let step = 0; step < 20; step++) {
+      const draft = session.state.draft
+      if (!draft) throw new Error('expected incomplete Moor draft')
+      const next = draft.seatOrder.find(id => {
+        const progress = draftSeatProgress(draft, id)
+        return progress.kind === 'selecting' && progress.stage === 'occupation'
+      })
+      if (!next) break
+      expect(session.submitDraftPick(next, firstDraftPick(draft, next)).ok).toBe(true)
+    }
+    expect(draftSeatProgress(session.state.draft!, 'p1')).toMatchObject({ kind: 'selecting', stage: 'farmersOfTheMoorMinor' })
     const serialized = serializeSessionSnapshot(session.state, session)
 
     const room = snapshotToRoom({
-      id: 'legacy-fom-draft',
+      id: 'mid-stage-fom-draft',
       serialized,
       meta: {
         createdBy: null,

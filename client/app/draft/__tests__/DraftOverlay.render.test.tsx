@@ -1,64 +1,61 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { GameState } from '../../../../shared/contract/types'
-import type { DraftStageKind, DraftState } from '../../../../shared/draft/types'
-import { DraftOverlay } from '../DraftOverlay'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import type { DraftStageKind } from '../../../../shared/draft/types'
+import { initStagedDraftState, processSubmit } from '../../../../shared/draft/draft-manager'
+import { firstDraftPick } from '../../../../shared/draft/__tests__/draft-fixtures'
 import { createInitialState } from '../../../../shared/session/state-bootstrap'
+import { DraftOverlay } from '../DraftOverlay'
 
 afterEach(cleanup)
+const opening = (kind: DraftStageKind = 'standard') => {
+  const state = createInitialState(42, { playerCount: 2, draftMode: 'simultaneous' })
+  if (!state.draft) throw new Error('missing draft')
+  const pools = Object.fromEntries(state.players.map(player => {
+    const pool = state.draft!.stages[0].seats[player.id].inbox[1]
+    return [player.id, { occ: kind === 'standard' || kind === 'occupation' ? pool.occ : [], minor: kind !== 'occupation' ? pool.minor : [] }]
+  }))
+  state.draft = initStagedDraftState(['p1', 'p2'], [{ kind, poolSize: 7, totalRounds: 7, pools }])
+  return state
+}
 
-const draftState = (stage: DraftStageKind, waiting = false): GameState => ({
-  ...createInitialState(42, { playerCount: 2 }),
-  phase: 'draft',
-  draft: {
-    mode: 'simultaneous', stage, round: 1, totalRounds: 7, poolSize: 7,
-    seatOrder: ['p1', 'p2'], pools: { p1: { occ: [], minor: [] } },
-    kept: { p1: { occ: [], minor: [] } },
-    pendingPicks: { p1: { occ: waiting ? 'kept' : null, minor: waiting ? 'kept' : null } },
-  } satisfies DraftState,
+it.each([
+  ['standard', '选择 1 张职业和 1 张小改良'], ['occupation', '选择 1 张职业'],
+  ['farmersOfTheMoorMinor', '选择 1 张沼泽农夫小改良'], ['publishedMinor', '选择 1 张小改良'],
+] as const)('renders the private %s choice in Chinese', (kind, prompt) => {
+  render(<DraftOverlay state={opening(kind)} meId="p1" locale="zh" onSubmit={vi.fn()} />)
+  expect(screen.getByRole('dialog', { name: '卡牌轮抽' })).toHaveTextContent(prompt)
+  expect(screen.getByRole('button', { name: '确认选择' })).toBeDisabled()
 })
 
-describe('Chinese draft overlay', () => {
-  it.each([
-    ['standard', '选择 1 张职业和 1 张小改良'],
-    ['occupation', '选择 1 张职业'],
-    ['farmersOfTheMoorMinor', '选择 1 张沼泽农夫小改良'],
-    ['publishedMinor', '选择 1 张小改良'],
-  ] as const)('localizes the %s stage', (stage, prompt) => {
-    const { container } = render(<DraftOverlay state={draftState(stage)} meId="p1" locale="zh" onSubmit={vi.fn()} />)
-    expect(screen.getByRole('dialog', { name: '卡牌轮抽' })).toBeVisible()
-    expect(container).toHaveTextContent('轮抽 — 第 1 / 7 轮')
-    expect(container).toHaveTextContent(prompt)
-    expect(screen.getByRole('button', { name: '确认选择' })).toBeVisible()
-    expect(container.textContent).not.toMatch(/Draft|Pick|Occupations|Minor improvements|Already kept|Confirm/)
-  })
+it('shows public personal progress, independent connection status, and existing waiting names', () => {
+  const state = opening()
+  const result = processSubmit(state.draft!, 'p1', firstDraftPick(state.draft!, 'p1'))
+  if (result.kind !== 'accepted') throw new Error(result.error)
+  state.draft = result.draft
+  const { container } = render(<DraftOverlay state={state} meId="p1" locale="zh" onSubmit={vi.fn()} connectedPlayerIndexes={[0]} />)
+  expect(screen.getByRole('status')).toHaveTextContent('正在等待：玩家 2')
+  expect(container.querySelector('[data-player-id="p1"]')).toHaveTextContent('等待传牌职业 1/7 · 小改 1/7在线')
+  expect(container.querySelector('[data-player-id="p2"]')).toHaveTextContent('选牌中职业 0/7 · 小改 0/7离线')
+  expect(screen.queryByRole('button', { name: '确认选择' })).toBeNull()
+})
 
-  it('localizes the wait message with submitted and seat counts', () => {
-    render(<DraftOverlay state={draftState('standard', true)} meId="p1" locale="zh" onSubmit={vi.fn()} />)
-    expect(screen.getByText('等待其他玩家（1/2）…')).toBeVisible()
-    expect(screen.getByRole('status')).toHaveTextContent('正在等待：玩家 2')
-    const players = screen.getByRole('region', { name: '开局顺位' }).querySelectorAll('li')
-    expect(players[0]).toHaveTextContent('1玩家 1你起始玩家已确认')
-    expect(players[1]).toHaveTextContent('2玩家 2选牌中')
-  })
-
-  it.each(['standard', 'occupation', 'farmersOfTheMoorMinor', 'publishedMinor'] satisfies DraftStageKind[])(
-    'shows public confirmation markers and resets waiting names for %s', stage => {
-      const state = draftState(stage)
-      state.players[0]!.name = 'Alice'
-      state.players[0]!.nameIsDefault = false
-      state.players[1]!.name = 'Bob'
-      state.players[1]!.nameIsDefault = false
-      state.draft!.pendingPicks.p2 = { occ: '?', minor: '?' }
-      const { container, rerender } = render(<DraftOverlay state={state} meId="p2" locale="en" onSubmit={vi.fn()} />)
-      expect(screen.getByRole('status')).toHaveTextContent('Waiting for: Alice')
-      expect(container.querySelector('[data-player-id="p1"]')).toHaveTextContent('Choosing cards')
-      expect(container.querySelector('[data-player-id="p2"]')).toHaveTextContent('YouConfirmed')
-      state.draft = { ...state.draft!, round: 2, pendingPicks: { p1: { occ: null, minor: null }, p2: { occ: null, minor: null } } }
-      rerender(<DraftOverlay state={{ ...state }} meId="p2" locale="en" onSubmit={vi.fn()} />)
-      expect(screen.queryByRole('status')).toBeNull()
-      expect(container.querySelectorAll('[data-submitted="false"]')).toHaveLength(2)
-    },
-  )
+it('retains selections after peer updates, captures the rendered opportunity, and clears them for the next packet', () => {
+  const state = opening()
+  const onSubmit = vi.fn()
+  const { container, rerender } = render(<DraftOverlay state={state} meId="p1" locale="en" onSubmit={onSubmit} />)
+  fireEvent.click(container.querySelector('.draft-pool-row-occ .draft-card')!)
+  fireEvent.click(container.querySelector('.draft-pool-row-minor .draft-card')!)
+  const mine = firstDraftPick(state.draft!, 'p1')
+  const peer = processSubmit(state.draft!, 'p2', firstDraftPick(state.draft!, 'p2'))
+  if (peer.kind !== 'accepted') throw new Error(peer.error)
+  rerender(<DraftOverlay state={{ ...state, draft: peer.draft }} meId="p1" locale="en" onSubmit={onSubmit} />)
+  expect(container.querySelectorAll('.draft-card.selected')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm picks' }))
+  expect(onSubmit).toHaveBeenCalledWith(mine)
+  const next = processSubmit(peer.draft, 'p1', mine)
+  if (next.kind !== 'accepted') throw new Error(next.error)
+  rerender(<DraftOverlay state={{ ...state, draft: next.draft }} meId="p1" locale="en" onSubmit={onSubmit} />)
+  expect(container.querySelectorAll('.draft-card.selected')).toHaveLength(0)
+  expect(screen.getByRole('button', { name: 'Confirm picks' })).toBeDisabled()
 })

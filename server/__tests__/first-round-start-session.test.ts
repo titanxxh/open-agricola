@@ -1,3 +1,5 @@
+import { draftSeatProgress } from '../../shared/projections/draft-progress'
+import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, workersAvailable } from '../../shared/domain/player'
@@ -45,14 +47,13 @@ const start = (mode: typeof modes[number], ownerIndex: number) => {
   let response = session.getState()
   while (response.state.phase === 'draft' && response.state.draft) {
     const draft = response.state.draft
-    const seatId = draft.seatOrder.find((id) => {
-      const pick = draft.pendingPicks[id]
-      return !pick || (pick.occ === null && pick.minor === null)
-    })!
-    const pool = draft.pools[seatId]!
+    const seatId = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
+    if (!seatId) throw new Error('expected a draft seat with a packet')
+    const progress = draftSeatProgress(draft, seatId)
+    if (progress.kind !== 'selecting') throw new Error('expected selectable draft packet')
     response = session.submitDraftPick(seatId, {
-      occCardId: pool.occ.includes(CARD_ID) ? CARD_ID : pool.occ[0],
-      minorCardId: pool.minor[0],
+      ...firstDraftPick(draft, seatId),
+      occCardId: progress.pool.occ.includes(CARD_ID) ? CARD_ID : progress.pool.occ[0],
     })
     expect(response.ok, response.error).toBe(true)
   }

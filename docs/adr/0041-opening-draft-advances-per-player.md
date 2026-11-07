@@ -1,10 +1,10 @@
-# 39. Opening draft advances per player
+# 41. Opening draft advances per player
 
 - Status: Accepted
 - Date: 2026-11-07
-- Implementation: Pending
+- Implementation: `shared/draft/`, `shared/projections/draft-progress.ts`, and the existing Session, transport, and client seams
 
-The current opening draft waits for every seat before passing any remaining cards. One slow or disconnected player therefore stops every other player after a single choice. The requested direction is Asynchronous Draft: a player can continue choosing from cards already received, while unprocessed packets accumulate at the seat that has yet to choose. A disconnected seat remains part of the passing order. All players must finish drafting before gameplay starts.
+A global round barrier waits for every seat before passing any remaining cards. One slow or disconnected player therefore stops every other player after a single choice. Use Asynchronous Draft: a player can continue choosing from cards already received, while unprocessed packets accumulate at the seat that has yet to choose. A disconnected seat remains part of the passing order. All players must finish drafting before gameplay starts.
 
 This replaces the global round barrier with player-specific progress. It requires durable packet ownership and input identities that remain valid when another player submits, while retries must never select from the next packet. The existing backend-authority, private-card projection, and durable command receipt boundaries remain in force. See [ADR 0022](0022-distributed-room-recovery.md).
 

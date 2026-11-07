@@ -1,3 +1,4 @@
+import { initDraftState } from '../../../shared/draft/draft-manager'
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -49,25 +50,10 @@ describe('replay setup phases', () => {
     const p1 = state.players[0]!.id
     const p2 = state.players[1]!.id
     state.phase = 'draft'
-    state.draft = {
-      mode: 'simultaneous',
-      round: 1,
-      totalRounds: 7,
-      poolSize: 2,
-      seatOrder: [p1, p2],
-      pools: {
-        [p1]: { occ: ['A001'], minor: ['A002'] },
-        [p2]: { occ: ['B001'], minor: ['B002'] },
-      },
-      kept: {
-        [p1]: { occ: ['A003'], minor: [] },
-        [p2]: { occ: ['B003'], minor: [] },
-      },
-      pendingPicks: {
-        [p1]: { occ: 'A001', minor: 'A002' },
-        [p2]: { occ: 'B001', minor: 'B002' },
-      },
-    }
+    state.draft = initDraftState([p1, p2], {
+      [p1]: { occ: ['A001', 'A003'], minor: ['A002', 'A004'] },
+      [p2]: { occ: ['B001', 'B003'], minor: ['B002', 'B004'] },
+    }, 2, 2)
     const frame = serializeState(state, { engineStack: new EngineStack() })
 
     const view = render(

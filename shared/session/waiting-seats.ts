@@ -3,11 +3,17 @@ import { playerColorOptions } from '../contract/state-constants'
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
 
-const draftPickSubmitted = (draft: Record<string, unknown>, pick: unknown): boolean => {
-  if (!isRecord(pick)) return false
-  if (draft.stage === 'occupation') return typeof pick.occ === 'string'
-  if (draft.stage === 'farmersOfTheMoorMinor' || draft.stage === 'publishedMinor') return typeof pick.minor === 'string'
-  return typeof pick.occ === 'string' && typeof pick.minor === 'string'
+const draftNeedsChoice = (draft: Record<string, unknown>, playerId: string): boolean => {
+  if (!Array.isArray(draft.stages)) return false
+  for (const value of draft.stages) {
+    if (!isRecord(value) || !isRecord(value.seats)) return false
+    const seat = value.seats[playerId]
+    if (!isRecord(seat) || !isRecord(seat.kept) || !isRecord(seat.inbox)) return false
+    const kept = value.kind === 'standard' || value.kind === 'occupation' ? seat.kept.occ : seat.kept.minor
+    if (!Array.isArray(kept) || typeof value.totalRounds !== 'number') return false
+    if (kept.length < value.totalRounds) return isRecord(seat.inbox[kept.length + 1])
+  }
+  return false
 }
 
 export function waitingSeatIndexes(
@@ -19,7 +25,6 @@ export function waitingSeatIndexes(
   if (!isRecord(state)) return []
   const players = Array.isArray(state.players) ? state.players : []
   const draft = isRecord(state.draft) ? state.draft : null
-  const pendingPicks = draft && isRecord(draft.pendingPicks) ? draft.pendingPicks : {}
   const parentSelection = isRecord(state.parentSelection) ? state.parentSelection : null
   const parentSubmissions = parentSelection && isRecord(parentSelection.submissions)
     ? parentSelection.submissions
@@ -29,7 +34,7 @@ export function waitingSeatIndexes(
     if (!occupiedSeats.includes(playerIndex) || !isRecord(player) || typeof player.name !== 'string') return
     if (!playerColorOptions.some(color => color === player.color)) return
     if (status === 'playing' && state.phase === 'draft' && draft && typeof player.id === 'string') {
-      if (!draftPickSubmitted(draft, pendingPicks[player.id])) waiting.push(playerIndex)
+      if (draftNeedsChoice(draft, player.id)) waiting.push(playerIndex)
     } else if (status === 'playing' && state.phase === 'parent-selection' && parentSubmissions && typeof player.id === 'string') {
       if (!isRecord(parentSubmissions[player.id])) waiting.push(playerIndex)
     } else if (status === 'playing' && state.phase === 'playing' && playerIndex === actorIndex) waiting.push(playerIndex)

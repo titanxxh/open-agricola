@@ -1143,7 +1143,7 @@ describe('room-manager ws sync', () => {
     )
     expect(initialP2.payload.state.phase).toBe('draft')
     expect(initialP2.payload.state.draft).not.toBeNull()
-    expect(initialP2.payload.state.draft?.poolSize).toBe(8)
+    expect(initialP2.payload.state.draft?.stages[0]?.poolSize).toBe(8)
     // After Task 13.5 removed GameSyncPayload.pending, callers detect the
     // draft phase via state.phase + state.draft (more authoritative than the
     // transitional pending-action mirror).

@@ -129,6 +129,8 @@ type ClientCommand = (
 
 ## ServerEvent and StateUpdateEnvelope
 
+`StateUpdateEnvelope.connectedPlayerIndexes` carries live seat presence separately from durable game state and Replay. It is refreshed on full snapshots and by existing join/disconnect events; connection presence never determines draft choice availability. A draft submission carries an `opportunityKey` in addition to the Room input-window identity.
+
 `setPlayerColor { color }` is an authenticated, journaled waiting-room command with no client-supplied seat. It changes the caller's color only, persists before publication, and creates no Replay Step.
 
 `confirmPlayerColor` has no payload and starts a full ordinary Room only for the seat named by `colorConfirmationPlayerIndex` in `roomJoined` and `roomWaiting`. The server commits the initial Frame and confirmation receipt before publication. Earlier seats can still choose colors while waiting, but cannot confirm for the last arrival.
@@ -203,7 +205,7 @@ type InteractionState =
 | `feed` | `{ remaining; foodUsed; feedQueue? }` |
 | `confirm-next-player` | `{ nextPlayerIndex }` |
 | `confirm-player-switch` | `{ fromPlayerIndex; toPlayerIndex }` |
-| `card-draft` | `{ mode: 'simultaneous'; round; totalRounds; poolSize; seatOrder; pools; pendingPicks; kept }` |
+| `card-draft` | `{ draft: DraftView }` |
 
 Frontend buttons use these `InteractionCommand` values from `allowedCommands`:
 

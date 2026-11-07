@@ -1,3 +1,6 @@
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
+import { draftSeatProgress } from '../../../shared/projections/draft-progress'
+import { CommandStore } from '../command-store'
 import { ResourceStore } from '../../storage/resource-store'
 import { ReplayResources } from '../../storage/replay-resources'
 import { S3ObjectStore } from '../../storage/s3-store'
@@ -27,7 +30,7 @@ import {
 import { snapshotToRoom, type Room } from '../room.ts'
 import { PostgresRoomPersistence } from '../persistence/postgres-adapter.ts'
 import { RoomOwnershipError } from '../room-directory.ts'
-import { createWorkSession } from '../../__tests__/_helpers/session-fixtures.ts'
+import { createOpeningSession, createWorkSession } from '../../__tests__/_helpers/session-fixtures.ts'
 import { RoomHistoryCorruptionError } from '../persistence/room-history-store.ts'
 
 const makeRoom = (id = 'room-1'): Room => ({
@@ -920,47 +923,78 @@ describe('RoomCommitter', () => {
     expect(await resources.storage.read(assetPath)).toBeNull()
   })
 
-  it('serializes simultaneous player submissions and includes automatic resolution in the last Step', async () => {
-    const session = new GameSession(587, undefined, {
-      playerCount: 2,
-      draftMode: 'simultaneous',
-      draftPoolSize: 7,
+  it('commits asynchronous choices with packet keys and replays receipts without another selection', async () => {
+    const session = createOpeningSession({ seed: 587,
+      options: { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 7 },
+      expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } },
     })
-    const room: Room = {
-      ...makeRoom(),
-      session,
-    }
+    const room: Room = { ...makeRoom(), session }
     const committer = createCommitter()
-    ;(await committer.prepareRoom(room, { missingPrefix: false }))
+    await committer.prepareRoom(room, { missingPrefix: false })
+    const commands = new CommandStore(db)
+    const actor = 'draft:p1'
+    const scope = await commands.issueScope(actor)
+    const identity = { scopeId: scope.scopeId, commandId: randomUUID() }
+    const firstPick = firstDraftPick(session.state.draft!, 'p1')
+    const command = { type: 'draftSubmit', playerId: 'p1', pick: firstPick }
+    const reserved = await commands.reserve(actor, identity, room.id, command)
+    if (reserved.kind !== 'pending') throw new Error('expected initial command reservation')
+    const firstIntent = replayIntentFromCommand({ type: 'draftSubmit', playerId: 'p1', pick: firstPick })!
+    const firstResponse = session.submitDraftPick('p1', firstPick)
+    expect(await committer.commit(room, firstResponse, firstIntent, 0, undefined, {
+      request: reserved.request, outcome: { ok: true },
+    })).toMatchObject({ kind: 'committed', stepNo: 1 })
+    expect(draftSeatProgress(session.state.draft!, 'p1')).toMatchObject({ kind: 'waiting', round: 2 })
 
-    const p1Pool = session.state.draft!.pools.p1
-    const p1Pick = {
-      occCardId: p1Pool.occ[0]!,
-      minorCardId: p1Pool.minor[0]!,
-    }
-    const p1Response = session.submitDraftPick('p1', p1Pick)
-    expect((await committer.commit(
-      room,
-      p1Response,
-      replayIntentFromCommand({ type: 'draftSubmit', playerId: 'p1', pick: p1Pick })!,
-      0,
-    ))).toMatchObject({ kind: 'committed', stepNo: 1 })
-    expect(p1Response.state.draft?.round).toBe(1)
+    const secondPick = firstDraftPick(session.state.draft!, 'p2')
+    expect(await committer.commit(room, session.submitDraftPick('p2', secondPick),
+      replayIntentFromCommand({ type: 'draftSubmit', playerId: 'p2', pick: secondPick })!, 1))
+      .toMatchObject({ kind: 'committed', stepNo: 2 })
+    const thirdPick = firstDraftPick(session.state.draft!, 'p2')
+    expect(thirdPick.opportunityKey).toBe('0:2')
+    expect(await committer.commit(room, session.submitDraftPick('p2', thirdPick),
+      replayIntentFromCommand({ type: 'draftSubmit', playerId: 'p2', pick: thirdPick })!, 1))
+      .toMatchObject({ kind: 'committed', stepNo: 3 })
+    expect(draftSeatProgress(session.state.draft!, 'p1').kept.occ).toHaveLength(1)
+    expect(draftSeatProgress(session.state.draft!, 'p2').kept.occ).toHaveLength(2)
 
-    const p2Pool = session.state.draft!.pools.p2
-    const p2Pick = {
-      occCardId: p2Pool.occ[0]!,
-      minorCardId: p2Pool.minor[0]!,
+    const unchangedDraft = structuredClone(session.state.draft)
+    const receipt = await commands.reserve(actor, identity, room.id, command)
+    expect(receipt).toMatchObject({ kind: 'completed', receipt: { outcome: { ok: true, stepNo: 1 } } })
+    const retry = session.submitDraftPick('p1', firstPick)
+    expect(retry.ok).toBe(true)
+    expect(await committer.commit(room, retry, firstIntent, 0)).toEqual({ kind: 'unchanged' })
+    expect(session.state.draft).toEqual(unchangedDraft)
+    expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(3)
+    await expect(commands.reserve(actor, identity, room.id, {
+      ...command, pick: { ...firstPick, opportunityKey: '0:2' },
+    })).rejects.toMatchObject({ code: 'command_content_conflict' })
+    const recorded = await db.prepare('SELECT intent_json FROM game_replay_steps WHERE room_id = ? AND step_no = 1')
+      .get<{ intent_json: string }>(room.id)
+    expect(recorded?.intent_json).toBe(firstIntent.intentJson)
+    expect(JSON.parse(recorded!.intent_json)).toEqual({ pick: firstPick })
+
+    let stepNo = 3
+    while (session.state.draft) {
+      const draft = session.state.draft
+      const playerId = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
+      if (!playerId) throw new Error('expected a remaining draft choice')
+      const pick = firstDraftPick(draft, playerId)
+      const response = session.submitDraftPick(playerId, pick)
+      expect(response.ok).toBe(true)
+      stepNo += 1
+      expect(await committer.commit(room, response,
+        replayIntentFromCommand({ type: 'draftSubmit', playerId, pick })!,
+        session.state.players.findIndex(player => player.id === playerId)))
+        .toMatchObject({ kind: 'committed', stepNo })
     }
-    const p2Response = session.submitDraftPick('p2', p2Pick)
-    expect((await committer.commit(
-      room,
-      p2Response,
-      replayIntentFromCommand({ type: 'draftSubmit', playerId: 'p2', pick: p2Pick })!,
-      1,
-    ))).toMatchObject({ kind: 'committed', stepNo: 2 })
-    expect(p2Response.state.draft?.round).toBe(2)
-    expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(2)
+    expect(stepNo).toBe(12)
+    expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(12)
+    const durable = await persistence.loadReplayFrame(room.id)
+    expect(durable?.draft).toBeNull()
+    expect(durable?.phase).toBe('playing')
+    expect(durable?.players.map(player => [player.occupationHand.length, player.minorHand.length])).toEqual([[7, 7], [7, 7]])
+    expect(await commands.lookup(actor, identity)).toMatchObject({ kind: 'completed', receipt: { outcome: { stepNo: 1 } } })
   })
 
   it('freezes a failed commit, blocks new commands, and retries the same Step', async () => {
@@ -1336,13 +1370,14 @@ describe('RoomCommitter', () => {
       type: 'draftSubmit',
       playerId: 'p1',
       pick: {
+        opportunityKey: '0:1',
         occCardId: 'A001',
         minorCardId: 'B001',
         secret: 'must-not-persist',
       } as never,
     })).toEqual({
       commandType: 'draftSubmit',
-      intentJson: '{"pick":{"minorCardId":"B001","occCardId":"A001"}}',
+      intentJson: '{"pick":{"minorCardId":"B001","occCardId":"A001","opportunityKey":"0:1"}}',
     })
     expect(replayIntentFromCommand({
       type: 'parentSubmit',

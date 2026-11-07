@@ -1,101 +1,45 @@
-/**
- * Draft-phase mixin extracted from GameCore (S2 Task 12).
- *
- * Hosts the per-player draft pick submission entry. Round-advance /
- * finalize internals stay inside `shared/draft/draft-manager.ts`; this
- * module orchestrates those calls from the GameCore side via `@internal`
- * accessors. The S2 Task 13.6 PendingAction-removal pass (2026-05-05)
- * deleted the legacy `computeCardDraftPending` helper — clients now read
- * draft state directly off `GameState.draft` (DraftOverlay does this
- * already).
- */
+import type { DraftPickPayload } from '../../draft/types'
+import { processSubmit } from '../../draft/draft-manager'
+import { draftSeatProgress } from '../../projections/draft-progress'
+import { recordDraftPick } from '../stats'
+import type { GameCore, SessionResponse } from '../session-core'
+import type { PrivateGameEvent } from '../../contract/protocol/game'
+import { findPlayerById } from '../../domain/player'
 
-import type { DraftPickPayload } from '../../draft/types.ts'
-import { processSubmit, tryAdvanceRound } from '../../draft/draft-manager.ts'
-import { recordDraftPick } from '../../session/stats.ts'
-import type { GameCore, SessionResponse } from '../session-core.ts'
-import type { PrivateGameEvent } from '../../contract/protocol/game.ts'
-import { findPlayerById } from '../../domain/player.ts'
-
-/**
- * Submit a single player's pick for the current draft round. Validates
- * draft phase, calls processSubmit/tryAdvanceRound from
- * `shared/draft/draft-manager.ts`, records draft picks for stats, and
- * triggers `finalizeDraft` once every round has completed.
- *
- * Migrated from GameCore.submitDraftPick (S2 Task 12 part 2).
- */
-export const submitDraftPick = (
-  core: GameCore,
-  playerId: string,
-  pick: DraftPickPayload,
-): SessionResponse => {
+export const submitDraftPick = (core: GameCore, playerId: string, pick: DraftPickPayload): SessionResponse => {
   const player = findPlayerById(core.state, playerId)
-  const lastPick = player?.lastDraftSubmission
-  const isRetry = lastPick !== undefined
-    && lastPick.occCardId === pick.occCardId
-    && lastPick.minorCardId === pick.minorCardId
-  if (core.state.phase !== 'draft' || !core.state.draft) {
-    return isRetry
-      ? core.emitResponse(true)
-      : core.emitResponse(false, 'not in draft phase')
+  const last = player?.lastDraftSubmission
+  if (last && last.opportunityKey === pick.opportunityKey && last.occCardId === pick.occCardId && last.minorCardId === pick.minorCardId) {
+    return core.emitResponse(true)
   }
-  const sub = processSubmit(core.state.draft, playerId, pick)
-  if (sub.error) {
-    return isRetry
-      ? core.emitResponse(true)
-      : core.emitResponse(false, sub.error)
-  }
-  const submittedRound = sub.draft.round
-  const totalRounds = sub.draft.totalRounds
-  core.setDraftState(sub.draft)
-  if (player && core.state.draft) {
-    player.lastDraftSubmission = {
-      occCardId: pick.occCardId,
-      minorCardId: pick.minorCardId,
+  if (core.state.phase !== 'draft' || !core.state.draft) return core.emitResponse(false, 'not in draft phase')
+  const result = processSubmit(core.state.draft, playerId, pick)
+  if (result.kind === 'rejected') return core.emitResponse(false, result.error)
+  core.setDraftState(result.draft)
+  if (player) player.lastDraftSubmission = { ...pick }
+  const privateEvents: PrivateGameEvent[] = []
+  for (const actual of result.picks) {
+    const pickedPlayer = findPlayerById(core.state, actual.playerId)
+    if (pickedPlayer) {
+      if (actual.pick.occCardId) recordDraftPick(pickedPlayer, actual.pick.occCardId, actual.round)
+      if (actual.pick.minorCardId) recordDraftPick(pickedPlayer, actual.pick.minorCardId, actual.round)
     }
-    const draftTurn = core.state.draft.round
-    if (pick.occCardId) recordDraftPick(player, pick.occCardId, draftTurn)
-    if (pick.minorCardId) recordDraftPick(player, pick.minorCardId, draftTurn)
+    const progress = draftSeatProgress(result.draft, actual.playerId)
+    privateEvents.push({
+      schemaVersion: 1, type: 'private.draftUpdated', recipientPlayerId: actual.playerId,
+      round: actual.round, totalRounds: actual.totalRounds, picked: actual.pick,
+      poolCounts: { occ: progress.kind === 'selecting' ? progress.pool.occ.length : 0, minor: progress.kind === 'selecting' ? progress.pool.minor.length : 0 },
+      keptCounts: { occ: progress.kept.occ.length, minor: progress.kept.minor.length },
+      advanced: progress.kind === 'selecting' && progress.stageIndex === actual.stageIndex && progress.round === actual.round + 1,
+      finished: result.finished,
+    })
   }
-  if (!core.state.draft) return core.emitResponse()
-  const advance = tryAdvanceRound(core.state.draft)
-  core.setDraftState(advance.draft)
-  const draftAfterAdvance = core.state.draft
-  const playerPool = draftAfterAdvance.pools[playerId]
-  const playerKept = draftAfterAdvance.kept[playerId]
-  const privateEvents: PrivateGameEvent[] = [
-    {
-      schemaVersion: 1,
-      type: 'private.draftUpdated',
-      recipientPlayerId: playerId,
-      round: submittedRound,
-      totalRounds,
-      picked: pick,
-      poolCounts: {
-        occ: playerPool?.occ.length ?? 0,
-        minor: playerPool?.minor.length ?? 0,
-      },
-      keptCounts: {
-        occ: playerKept?.occ.length ?? 0,
-        minor: playerKept?.minor.length ?? 0,
-      },
-      advanced: advance.advanced,
-      finished: advance.finished,
-    },
-  ]
-  if (advance.finished) {
+  if (result.finished) {
     core.applyDraftFinalize()
-    for (const p of core.state.players) {
-      privateEvents.push({
-        schemaVersion: 1,
-        type: 'private.handChanged',
-        recipientPlayerId: p.id,
-        cardIds: [...p.occupationHand, ...p.minorHand],
-        cardType: 'mixed',
-        reason: 'draft-finalized',
-      })
-    }
+    for (const p of core.state.players) privateEvents.push({
+      schemaVersion: 1, type: 'private.handChanged', recipientPlayerId: p.id,
+      cardIds: [...p.occupationHand, ...p.minorHand], cardType: 'mixed', reason: 'draft-finalized',
+    })
   }
   return core.emitResponse(true, undefined, privateEvents)
 }

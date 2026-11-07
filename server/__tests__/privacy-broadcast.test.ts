@@ -12,6 +12,7 @@ import { createWsServer } from '../connection/ws-server.ts'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../shared/contract/protocol/game.ts'
+import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
 import { CARD_ID, prepareVisibilitySession } from './_helpers/card-visibility'
 
 /**
@@ -166,11 +167,7 @@ describe('WS broadcast per-viewer filter', () => {
   }
 
   const pickFirst = (state: StateUpdateEnvelope['payload']['state'], playerId: string) => {
-    const pool = state.draft!.pools[playerId]
-    return {
-      occCardId: pool.occ[0]!,
-      minorCardId: pool.minor[0]!,
-    }
+    return firstDraftPick(state.draft!, playerId)
   }
 
   const submitDraftWs = async (
@@ -296,7 +293,7 @@ describe('WS broadcast per-viewer filter', () => {
   })
 
   it('action broadcast keeps per-viewer filtering', async () => {
-    const { p1, p2, initialP1 } = await openTwoPlayerRoom()
+    const { p1, p2 } = await openTwoPlayerRoom()
 
     const freeSpace = 'forest'
     expect(freeSpace).toBeTruthy()
@@ -361,31 +358,22 @@ describe('WS broadcast per-viewer filter', () => {
     const p1Draft = initialP1.payload.state.draft!
     const p2Draft = initialP2.payload.state.draft!
 
-    // p1 sees its own pool as real strings
-    expect(p1Draft.pools.p1.occ.length).toBe(7)
-    expect(p1Draft.pools.p1.minor.length).toBe(7)
-    expect(p1Draft.pools.p1.occ.every((c) => c !== '?')).toBe(true)
-    expect(p1Draft.pools.p1.minor.every((c) => c !== '?')).toBe(true)
-
-    // p1 sees p2's pool masked to same-length '?'
-    expect(p1Draft.pools.p2.occ.length).toBe(7)
-    expect(p1Draft.pools.p2.minor.length).toBe(7)
-    expect(p1Draft.pools.p2.occ.every((c) => c === '?')).toBe(true)
-    expect(p1Draft.pools.p2.minor.every((c) => c === '?')).toBe(true)
-
-    // p2 sees its own pool as real strings
-    expect(p2Draft.pools.p2.occ.every((c) => c !== '?')).toBe(true)
-    expect(p2Draft.pools.p2.minor.every((c) => c !== '?')).toBe(true)
-    // p2 sees p1's pool masked
-    expect(p2Draft.pools.p1.occ.every((c) => c === '?')).toBe(true)
-    expect(p2Draft.pools.p1.minor.every((c) => c === '?')).toBe(true)
-
-    // Public draft fields identical across viewers
-    expect(p1Draft.round).toBe(p2Draft.round)
-    expect(p1Draft.totalRounds).toBe(p2Draft.totalRounds)
-    expect(p1Draft.poolSize).toBe(p2Draft.poolSize)
+    const p1Seats = p1Draft.stages[0].seats
+    const p2Seats = p2Draft.stages[0].seats
+    expect(p1Seats.p1.inbox[1].occ).toHaveLength(7)
+    expect(p1Seats.p1.inbox[1].minor).toHaveLength(7)
+    expect(p1Seats.p1.inbox[1].occ.every(card => card !== '?')).toBe(true)
+    expect(p1Seats.p1.inbox[1].minor.every(card => card !== '?')).toBe(true)
+    expect(p1Seats.p2.inbox[1]).toEqual({ occ: Array(7).fill('?'), minor: Array(7).fill('?') })
+    expect(p2Seats.p2.inbox[1].occ.every(card => card !== '?')).toBe(true)
+    expect(p2Seats.p2.inbox[1].minor.every(card => card !== '?')).toBe(true)
+    expect(p2Seats.p1.inbox[1]).toEqual({ occ: Array(7).fill('?'), minor: Array(7).fill('?') })
+    expect(p1Draft.stages.map(({ kind, totalRounds, poolSize }) => ({ kind, totalRounds, poolSize })))
+      .toEqual(p2Draft.stages.map(({ kind, totalRounds, poolSize }) => ({ kind, totalRounds, poolSize })))
     expect(p1Draft.seatOrder).toEqual(p2Draft.seatOrder)
     expect(p1Draft.mode).toBe(p2Draft.mode)
+    expect(initialP1.connectedPlayerIndexes).toEqual([0, 1])
+    expect(initialP2.connectedPlayerIndexes).toEqual([0, 1])
   })
 
   it('draftSubmit broadcasts private draftUpdated only to the submitter', async () => {
@@ -414,14 +402,15 @@ describe('WS broadcast per-viewer filter', () => {
         round: 1,
         totalRounds: 7,
         picked: pick,
-        poolCounts: { occ: 6, minor: 6 },
+        poolCounts: { occ: 0, minor: 0 },
         keptCounts: { occ: 1, minor: 1 },
         advanced: false,
         finished: false,
       },
     ])
     expect(p2Update.payload.privateEvents ?? []).toEqual([])
-    expect(p2Update.payload.state.draft!.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
+    expect(p2Update.payload.state.draft!.stages[0].seats.p1.kept).toEqual({ occ: ['?'], minor: ['?'] })
+    expect(p2Update.payload.state.draft!.stages[0].seats.p2.inbox[2]).toEqual({ occ: Array(6).fill('?'), minor: Array(6).fill('?') })
   })
 
   it('draft finalization broadcasts each player their final handChanged event', async () => {
@@ -470,6 +459,11 @@ describe('WS broadcast per-viewer filter', () => {
 
     expect(p1FinalUpdate.payload.privateEvents).toEqual([
       expect.objectContaining({
+        type: 'private.draftUpdated', recipientPlayerId: 'p1', round: 7,
+        picked: { opportunityKey: '0:7', occCardId: p1State.players[0].occupationHand[6], minorCardId: p1State.players[0].minorHand[6] },
+        advanced: false, finished: true,
+      }),
+      expect.objectContaining({
         type: 'private.handChanged',
         recipientPlayerId: 'p1',
         cardIds: p1FinalEvent,
@@ -480,9 +474,14 @@ describe('WS broadcast per-viewer filter', () => {
     expect(p2FinalUpdate.payload.privateEvents).toEqual([
       expect.objectContaining({
         type: 'private.draftUpdated',
-        recipientPlayerId: 'p2',
-        advanced: true,
+        recipientPlayerId: 'p2', round: 6,
+        advanced: false,
         finished: true,
+      }),
+      expect.objectContaining({
+        type: 'private.draftUpdated', recipientPlayerId: 'p2', round: 7,
+        picked: { opportunityKey: '0:7', occCardId: p2State.players[1].occupationHand[6], minorCardId: p2State.players[1].minorHand[6] },
+        advanced: false, finished: true,
       }),
       expect.objectContaining({
         type: 'private.handChanged',

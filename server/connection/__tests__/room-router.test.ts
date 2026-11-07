@@ -1,3 +1,5 @@
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
+import { draftSeatProgress } from '../../../shared/projections/draft-progress'
 import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { describe, expect, it, vi } from 'vitest'
 import { createConnectionCtx } from '../connection-ctx.ts'
@@ -75,9 +77,9 @@ describe('handleCreateRoom', () => {
     const colors = new Map(clients.map(client => [client.currentUserId, room.session.state.players[client.currentPlayerIndex]!.color]))
     for (const client of clients.slice(0, 3)) {
       const id = room.session.state.players[client.currentPlayerIndex]!.id
-      const pool = room.session.state.draft!.pools[id]!
-      await dispatch(client, { type: 'draftSubmit', playerId: id, pick: { occCardId: pool.occ[0]!, minorCardId: pool.minor[0]! } })
-      expect(room.session.state.draft!.pendingPicks[id]).toEqual({ occ: pool.occ[0], minor: pool.minor[0] })
+      const pick = firstDraftPick(room.session.state.draft!, id)
+      await dispatch(client, { type: 'draftSubmit', playerId: id, pick })
+      expect(draftSeatProgress(room.session.state.draft!, id).kept).toEqual({ occ: [pick.occCardId], minor: [pick.minorCardId] })
     }
     const resumed = newCtx(deps)
     resumed.currentUserId = 'Alice'
@@ -85,11 +87,9 @@ describe('handleCreateRoom', () => {
     await dispatch(resumed, { type: 'joinRoom', roomId: room.id, intent: 'resume' })
     expect(resumed.currentPlayerIndex).toBe(2)
     expect(openingSeatRandom).toHaveBeenCalledTimes(draws)
-    expect(sentMessagesOf(resumed)).toContainEqual(expect.objectContaining({ type: 'stateUpdate', payload: expect.objectContaining({
-      state: expect.objectContaining({ draft: expect.objectContaining({ pendingPicks: expect.objectContaining({
-        p1: { occ: '?', minor: '?' }, p2: { occ: null, minor: null },
-      }) }) }),
-    }) }))
+    const snapshot = sentMessagesOf(resumed).findLast(message => message.type === 'stateUpdate')
+    if (!snapshot || snapshot.type !== 'stateUpdate' || !snapshot.payload.state.draft) throw new Error('missing resumed draft')
+    expect(draftSeatProgress(snapshot.payload.state.draft, 'p1').kept).toEqual({ occ: ['?'], minor: ['?'] })
     const previousId = room.id
     openingSeatRandom.mockReturnValueOnce(3).mockReturnValueOnce(0).mockReturnValueOnce(0)
     await dispatch(resumed, { type: 'newGame' })
@@ -461,7 +461,7 @@ describe('handleCreateRoom', () => {
     await dispatch(ctx, { type: 'newGame', seed: 309 })
 
     expect(ctx.currentRoom!.session.state.phase).toBe('draft')
-    expect(ctx.currentRoom!.session.state.draft?.poolSize).toBe(8)
+    expect(ctx.currentRoom!.session.state.draft?.stages[0]?.poolSize).toBe(8)
   })
 
   it('uses room display names in direct Parent Card logs', async () => {
@@ -1246,7 +1246,7 @@ describe('seat-binding guards', () => {
 
   it('draftSubmit rejects foreign playerId', async () => {
     const ctx = await setupTwoSeatRoom({ draft: true })
-    await dispatch(ctx, { type: 'draftSubmit', playerId: 'fake-id', pick: { occCardId: '', minorCardId: '' } })
+    await dispatch(ctx, { type: 'draftSubmit', playerId: 'fake-id', pick: { opportunityKey: '0:1', occCardId: '', minorCardId: '' } })
     const errors = sentMessagesOf(ctx).filter((m) => m.type === 'error')
     expect(errors.some((e) => /seat mismatch/.test(String(e.error)))).toBe(true)
   })

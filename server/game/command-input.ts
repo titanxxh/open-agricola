@@ -9,7 +9,7 @@ export function nextInputWindow(previous: RoomInputWindow | null | undefined, st
     : state.phase === 'parent-selection' && state.parentSelection ? 'parent'
       : state.phase === 'solo-hand-selection' && state.soloHandSelection ? 'solo-hand' : null
   if (!kind) return null
-  const source = kind === 'draft' ? `draft:${state.draft!.stageIndex ?? 0}:${state.draft!.stage ?? 'standard'}:${state.draft!.round}` : kind
+  const source = kind
   const rebranch = ['initial', 'undoStep', 'undoAction', 'loadGame'].includes(commandType)
   if (!rebranch && previous?.kind === kind && previous.source === source) return previous
   return { id: randomUUID(), kind, source }

@@ -1301,14 +1301,7 @@ export type InteractionRequest = (
     }
   | {
       kind: 'card-draft'
-      mode: 'simultaneous'
-      round: number
-      totalRounds: number
-      poolSize: number
-      seatOrder: string[]
-      pools: Record<string, { occ: string[]; minor: string[] }>
-      pendingPicks: string[]
-      kept: Record<string, { occ: string[]; minor: string[] }>
+      draft: import('../draft/types').DraftView
     }
   | {
       kind: 'select-trigger'

@@ -14,6 +14,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleGameRoute, setSession } from '../game-router.ts'
 import { GameSession } from '../game/authoritative-session.ts'
+import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
+import { initStagedDraftState } from '../../shared/draft/draft-manager'
 import type { GameEvent } from '../../shared/contract/events.ts'
 
 import '../../shared/cards/E/E078_SleightofHand'
@@ -427,7 +429,7 @@ describe('HTTP privacy + seat binding', () => {
       const req = mockReq(
         'POST',
         '/api/game/draft-submit',
-        { playerId: 'p2', pick: { occCardId: 'X', minorCardId: 'Y' } },
+        { playerId: 'p2', pick: { opportunityKey: '0:1', occCardId: 'X', minorCardId: 'Y' } },
         { 'x-viewer-player': 'p1' },
       )
       const res = mockRes()
@@ -444,13 +446,13 @@ describe('HTTP privacy + seat binding', () => {
         enableFarmersOfTheMoor: true,
         allowIncompleteFarmersOfTheMoorMinorDeal: true,
       })
-      const minorStage = session.state.draft!.stages!.find((stage) => stage.kind === 'publishedMinor')!
-      session.state.draft!.stage = 'publishedMinor'
-      session.state.draft!.stageIndex = session.state.draft!.stages!.indexOf(minorStage)
-      session.state.draft!.pools = structuredClone(minorStage.pools)
-      const pick = {
-        minorCardId: session.state.draft!.pools.p1.minor[0]!,
-      }
+      const draft = session.state.draft!
+      const minorStage = draft.stages.find(stage => stage.kind === 'publishedMinor')!
+      session.state.draft = initStagedDraftState(draft.seatOrder, [{
+        kind: minorStage.kind, poolSize: minorStage.poolSize, totalRounds: minorStage.totalRounds,
+        pools: Object.fromEntries(draft.seatOrder.map(id => [id, minorStage.seats[id].inbox[1]])),
+      }])
+      const pick = firstDraftPick(session.state.draft, 'p1')
       setSession(session)
 
       const res = mockRes()
@@ -475,10 +477,7 @@ describe('HTTP privacy + seat binding', () => {
         draftPoolSize: 7,
       })
       const initial = session.getState().state
-      const pick = {
-        occCardId: initial.draft!.pools.p1.occ[0]!,
-        minorCardId: initial.draft!.pools.p1.minor[0]!,
-      }
+      const pick = firstDraftPick(initial.draft!, 'p1')
       setSession(session)
 
       const submitRes = mockRes()
@@ -502,7 +501,7 @@ describe('HTTP privacy + seat binding', () => {
           round: 1,
           totalRounds: 7,
           picked: pick,
-          poolCounts: { occ: 6, minor: 6 },
+          poolCounts: { occ: 0, minor: 0 },
           keptCounts: { occ: 1, minor: 1 },
           advanced: false,
           finished: false,
@@ -516,7 +515,8 @@ describe('HTTP privacy + seat binding', () => {
       )
       const p2StateData = JSON.parse(p2StateRes.body)
       expect(p2StateData.privateEvents ?? []).toEqual([])
-      expect(p2StateData.state.draft.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
+      expect(p2StateData.state.draft.stages[0].seats.p1.kept).toEqual({ occ: ['?'], minor: ['?'] })
+      expect(p2StateData.state.draft.stages[0].seats.p2.inbox[2]).toEqual({ occ: Array(6).fill('?'), minor: Array(6).fill('?') })
     })
 
     it('submitDraftPick error response does not include privateEvents', () => {
@@ -527,6 +527,7 @@ describe('HTTP privacy + seat binding', () => {
       })
 
       const resp = session.submitDraftPick('p1', {
+        opportunityKey: '0:1',
         occCardId: 'not-in-pool',
         minorCardId: 'also-not-in-pool',
       })
@@ -546,10 +547,7 @@ describe('HTTP privacy + seat binding', () => {
 
       for (let round = 1; round <= 6; round += 1) {
         const p2State = session.getState().state
-        const p2Pick = {
-          occCardId: p2State.draft!.pools.p2.occ[0]!,
-          minorCardId: p2State.draft!.pools.p2.minor[0]!,
-        }
+        const p2Pick = firstDraftPick(p2State.draft!, 'p2')
         const p2Res = mockRes()
         await handleGameRoute(
           mockReq(
@@ -563,10 +561,7 @@ describe('HTTP privacy + seat binding', () => {
         expect(p2Res.statusCode).toBe(200)
 
         const p1State = session.getState().state
-        const p1Pick = {
-          occCardId: p1State.draft!.pools.p1.occ[0]!,
-          minorCardId: p1State.draft!.pools.p1.minor[0]!,
-        }
+        const p1Pick = firstDraftPick(p1State.draft!, 'p1')
         const p1Res = mockRes()
         await handleGameRoute(
           mockReq(
@@ -588,8 +583,14 @@ describe('HTTP privacy + seat binding', () => {
         expect.objectContaining({
           type: 'private.draftUpdated',
           recipientPlayerId: 'p1',
-          advanced: true,
+          round: 6,
+          advanced: false,
           finished: true,
+        }),
+        expect.objectContaining({
+          type: 'private.draftUpdated', recipientPlayerId: 'p1', round: 7,
+          picked: { opportunityKey: '0:7', occCardId: p1.occupationHand[6], minorCardId: p1.minorHand[6] },
+          advanced: false, finished: true,
         }),
         expect.objectContaining({
           type: 'private.handChanged',

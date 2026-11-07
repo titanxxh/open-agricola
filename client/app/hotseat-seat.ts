@@ -1,6 +1,6 @@
 import type { GameState } from '../../shared/contract/types'
 import type { DraftState } from '../../shared/draft/types'
-import { computeDraftViewModel } from './draft/DraftOverlay'
+import { draftSeatProgress } from '../../shared/projections/draft-progress'
 
 /**
  * Hotseat helpers for the two setup phases where every seat submits
@@ -8,11 +8,13 @@ import { computeDraftViewModel } from './draft/DraftOverlay'
  *
  * Neither phase advances `state.currentPlayerIndex`, so the panel cannot follow
  * "whose turn it is" the way it does during a round. Instead the device walks
- * the seats in order and stops at the first one that has not submitted yet.
+ * the seats in order and stops at the next seat with an available choice.
  */
 export const nextHotseatDraftSeatId = (draft: DraftState): string | null => {
-  for (const seatId of draft.seatOrder) {
-    if (!computeDraftViewModel(draft, seatId).alreadySubmitted) return seatId
+  const start = draft.lastManualPickerId ? draft.seatOrder.indexOf(draft.lastManualPickerId) + 1 : 0
+  for (let offset = 0; offset < draft.seatOrder.length; offset++) {
+    const seatId = draft.seatOrder[(start + offset) % draft.seatOrder.length]
+    if (draftSeatProgress(draft, seatId).kind === 'selecting') return seatId
   }
   return null
 }

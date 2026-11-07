@@ -1,3 +1,4 @@
+import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { ActionReferencePlayerCount } from '../../client/contexts/ActionReferenceContext'
 import { t as translateMessage } from '../../shared/i18n'
 import { getPlayerDisplayName } from '../../client/utils/player-name'
@@ -84,14 +85,13 @@ function ReplayDraftPhase({
     <section className="replay-setup" data-phase="draft" aria-label={text.draft}>
       <header>
         <h2>{text.draft}</h2>
-        <p>{text.round} {draft.round} / {draft.totalRounds}</p>
       </header>
       <div className="replay-setup__players">
         {draft.seatOrder.map((playerId) => {
           const player = state.players.find((candidate) => candidate.id === playerId)
-          const pool = draft.pools[playerId] ?? { occ: [], minor: [] }
-          const kept = draft.kept[playerId] ?? { occ: [], minor: [] }
-          const pending = draft.pendingPicks[playerId]
+          const progress = draftSeatProgress(draft, playerId)
+          const pool = progress.kind === 'selecting' ? progress.pool : { occ: [], minor: [] }
+          const kept = progress.kept
           return (
             <article key={playerId}>
               <h3>{player ? getPlayerDisplayName(locale, player.name, state.players.indexOf(player), player.nameIsDefault) : playerId}</h3>
@@ -101,15 +101,8 @@ function ReplayDraftPhase({
               <h4>{text.kept}</h4>
               <SetupCards ids={kept.occ} kind="occupation" locale={locale} />
               <SetupCards ids={kept.minor} kind="minor" locale={locale} />
-              <h4>{text.submitted}</h4>
-              {pending?.occ || pending?.minor
-                ? (
-                    <>
-                      <SetupCards ids={pending.occ ? [pending.occ] : []} kind="occupation" locale={locale} />
-                      <SetupCards ids={pending.minor ? [pending.minor] : []} kind="minor" locale={locale} />
-                    </>
-                  )
-                : <p>{text.waiting}</p>}
+              <p>{translateMessage(locale, 'ui.draft.progress', { occ: kept.occ.length, occTotal: progress.targets.occ, minor: kept.minor.length, minorTotal: progress.targets.minor })}</p>
+              <p>{translateMessage(locale, progress.kind === 'selecting' ? 'ui.draft.selecting' : progress.kind === 'waiting' ? 'ui.draft.waitingForPacket' : 'ui.draft.complete')}</p>
             </article>
           )
         })}

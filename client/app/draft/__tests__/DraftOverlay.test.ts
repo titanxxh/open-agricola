@@ -1,154 +1,35 @@
-import { describe, expect, test } from 'vitest'
-import { canSubmitPick, computeDraftViewModel, type DraftViewModel } from '../DraftOverlay'
-import type { DraftState } from '../../../../shared/draft/types'
+import { expect, it } from 'vitest'
+import { initDraftState, initStagedDraftState, processSubmit } from '../../../../shared/draft/draft-manager'
+import { firstDraftPick } from '../../../../shared/draft/__tests__/draft-fixtures'
+import { canSubmitPick, computeDraftViewModel } from '../DraftOverlay'
 
-const mkDraft = (overrides: Partial<DraftState> = {}): DraftState => ({
-  mode: 'simultaneous',
-  round: 1,
-  totalRounds: 7,
-  poolSize: 7,
-  seatOrder: ['p1', 'p2'],
-  pools: {
-    p1: { occ: ['A001', 'A002', 'A003'], minor: ['B001', 'B002', 'B003'] },
-    p2: { occ: ['A101', 'A102'], minor: ['B101', 'B102'] },
-  },
-  kept: {
-    p1: { occ: [], minor: [] },
-    p2: { occ: [], minor: [] },
-  },
-  pendingPicks: {
-    p1: { occ: null, minor: null },
-    p2: { occ: null, minor: null },
-  },
-  ...overrides,
+const initial = () => initDraftState(['p1', 'p2'], {
+  p1: { occ: ['o1', 'o2', 'o3'], minor: ['m1', 'm2', 'm3'] },
+  p2: { occ: ['o4', 'o5', 'o6'], minor: ['m4', 'm5', 'm6'] },
+}, 3, 2)
+
+it('allows only complete choices from the current packet', () => {
+  const vm = computeDraftViewModel(initial(), 'p1')
+  expect(canSubmitPick(vm, 'o1', 'm1')).toBe(true)
+  expect(canSubmitPick(vm, 'o1', null)).toBe(false)
+  expect(canSubmitPick(vm, null, 'm1')).toBe(false)
+  expect(canSubmitPick(vm, 'o4', 'm1')).toBe(false)
 })
 
-describe('computeDraftViewModel', () => {
-  test('extracts the local player slice and defaults missing entries', () => {
-    const draft = mkDraft()
-    const vm = computeDraftViewModel(draft, 'p1')
-    expect(vm.round).toBe(1)
-    expect(vm.stage).toBe('standard')
-    expect(vm.totalRounds).toBe(7)
-    expect(vm.seatCount).toBe(2)
-    expect(vm.submittedCount).toBe(0)
-    expect(vm.myPool.occ).toEqual(['A001', 'A002', 'A003'])
-    expect(vm.myPool.minor).toEqual(['B001', 'B002', 'B003'])
-    expect(vm.alreadySubmitted).toBe(false)
-  })
-
-  test('returns empty pools when meId is not in draft (defensive)', () => {
-    const draft = mkDraft()
-    const vm = computeDraftViewModel(draft, 'ghost')
-    expect(vm.myPool.occ).toEqual([])
-    expect(vm.myPool.minor).toEqual([])
-    expect(vm.myKept.occ).toEqual([])
-    expect(vm.myKept.minor).toEqual([])
-    expect(vm.myPending.occ).toBeNull()
-    expect(vm.myPending.minor).toBeNull()
-  })
-
-  test('alreadySubmitted true only when both occ and minor picks recorded', () => {
-    const halfPick = mkDraft({
-      pendingPicks: {
-        p1: { occ: 'A001', minor: null },
-        p2: { occ: null, minor: null },
-      },
-    })
-    expect(computeDraftViewModel(halfPick, 'p1').alreadySubmitted).toBe(false)
-
-    const fullPick = mkDraft({
-      pendingPicks: {
-        p1: { occ: 'A001', minor: 'B001' },
-        p2: { occ: null, minor: null },
-      },
-    })
-    expect(computeDraftViewModel(fullPick, 'p1').alreadySubmitted).toBe(true)
-  })
-
-  test('alreadySubmitted follows the active staged draft card type', () => {
-    const occupationStage = mkDraft({
-      stage: 'occupation',
-      pendingPicks: {
-        p1: { occ: 'A001', minor: null },
-        p2: { occ: null, minor: null },
-      },
-    })
-    expect(computeDraftViewModel(occupationStage, 'p1').alreadySubmitted).toBe(true)
-
-    const minorStage = mkDraft({
-      stage: 'publishedMinor',
-      pendingPicks: {
-        p1: { occ: null, minor: 'B001' },
-        p2: { occ: null, minor: null },
-      },
-    })
-    expect(computeDraftViewModel(minorStage, 'p1').alreadySubmitted).toBe(true)
-  })
-
-  test('submittedCount counts only fully-submitted players', () => {
-    const draft = mkDraft({
-      seatOrder: ['p1', 'p2', 'p3'],
-      pools: {
-        p1: { occ: ['A1'], minor: ['B1'] },
-        p2: { occ: ['A2'], minor: ['B2'] },
-        p3: { occ: ['A3'], minor: ['B3'] },
-      },
-      kept: {
-        p1: { occ: [], minor: [] },
-        p2: { occ: [], minor: [] },
-        p3: { occ: [], minor: [] },
-      },
-      pendingPicks: {
-        p1: { occ: 'A1', minor: 'B1' }, // full
-        p2: { occ: 'A2', minor: null }, // half
-        p3: { occ: null, minor: null }, // none
-      },
-    })
-    expect(computeDraftViewModel(draft, 'p1').submittedCount).toBe(1)
-  })
+it('distinguishes waiting for a packet from actionable players', () => {
+  const draft = initial()
+  const result = processSubmit(draft, 'p1', firstDraftPick(draft, 'p1'))
+  if (result.kind !== 'accepted') throw new Error(result.error)
+  const vm = computeDraftViewModel(result.draft, 'p1')
+  expect(vm.progress.kind).toBe('waiting')
+  expect(vm.waitingPlayerIds).toEqual(['p2'])
+  expect(vm.myKept).toEqual({ occ: ['o1'], minor: ['m1'] })
+  expect(canSubmitPick(vm, 'o2', 'm2')).toBe(false)
 })
 
-describe('canSubmitPick', () => {
-  const baseVm: DraftViewModel = computeDraftViewModel(mkDraft(), 'p1')
-
-  test('returns false when occ unselected', () => {
-    expect(canSubmitPick(baseVm, null, 'B001')).toBe(false)
-  })
-
-  test('returns false when minor unselected', () => {
-    expect(canSubmitPick(baseVm, 'A001', null)).toBe(false)
-  })
-
-  test('returns false when already submitted', () => {
-    const submittedVm: DraftViewModel = computeDraftViewModel(
-      mkDraft({
-        pendingPicks: {
-          p1: { occ: 'A001', minor: 'B001' },
-          p2: { occ: null, minor: null },
-        },
-      }),
-      'p1',
-    )
-    expect(canSubmitPick(submittedVm, 'A002', 'B002')).toBe(false)
-  })
-
-  test('returns true when both selected and in pool', () => {
-    expect(canSubmitPick(baseVm, 'A001', 'B001')).toBe(true)
-  })
-
-  test('supports occupation-only and minor-only staged picks', () => {
-    const occupationVm = computeDraftViewModel(mkDraft({ stage: 'occupation' }), 'p1')
-    expect(canSubmitPick(occupationVm, 'A001', null)).toBe(true)
-    expect(canSubmitPick(occupationVm, null, 'B001')).toBe(false)
-
-    const minorVm = computeDraftViewModel(mkDraft({ stage: 'publishedMinor' }), 'p1')
-    expect(canSubmitPick(minorVm, null, 'B001')).toBe(true)
-    expect(canSubmitPick(minorVm, 'A001', null)).toBe(false)
-  })
-
-  test('rejects ids not present in the current pool (defensive)', () => {
-    expect(canSubmitPick(baseVm, 'A999', 'B001')).toBe(false)
-    expect(canSubmitPick(baseVm, 'A001', 'B999')).toBe(false)
-  })
+it.each(['occupation', 'publishedMinor', 'farmersOfTheMoorMinor'] as const)('accepts only the required card type in %s', kind => {
+  const draft = initStagedDraftState(['p1'], [{ kind, poolSize: 2, totalRounds: 2,
+    pools: { p1: { occ: kind === 'occupation' ? ['o1', 'o2'] : [], minor: kind !== 'occupation' ? ['m1', 'm2'] : [] } } }])
+  const vm = computeDraftViewModel(draft, 'p1')
+  expect(canSubmitPick(vm, kind === 'occupation' ? 'o1' : null, kind === 'occupation' ? null : 'm1')).toBe(true)
 })

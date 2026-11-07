@@ -18,7 +18,7 @@
 | `shared/actions/` hook | [hooks](architecture/hooks_zh.md) | Hook 注册表、行动执行顺序、Stage Dispatch、listener 纯度 |
 | `shared/cards/` | [cards](architecture/cards_zh.md) | Card Source、生成目录、`cardStates`、Card Field、能力 metadata |
 | `shared/domain/` | [domain](architecture/domain_zh.md) | `PlayerBoard`、农场、动物、计分、大改良供应 |
-| `shared/draft/`、`shared/custom-code/`、游戏变体、`i18n`、`utils` | [shared-other](architecture/shared-other_zh.md) | 同时选牌、游戏变体、工坊准入、本地化、工具函数 |
+| `shared/draft/`、`shared/custom-code/`、游戏变体、`i18n`、`utils` | [shared-other](architecture/shared-other_zh.md) | 异步轮抽、游戏变体、工坊准入、本地化、工具函数 |
 | `server/` | [server](architecture/server_zh.md) | 连接、Room、Durable Room Commit、Replay、Bug Report、工坊后端、持久化、运维 |
 | `operations/` | [服务端部署边界](architecture/server_zh.md#部署回滚与可观测性) | 独立监控部署和受限账户聚合 |
 | `client/` | [client](architecture/client_zh.md) | Bundle、传输与同步状态、视图、Replay Viewer、Bug Report |
@@ -107,7 +107,7 @@ shared/        零 React，前后端 + sandbox 共用
 ├── actions/       行动定义、effects/、payment/、Hook 系统
 ├── cards/         Card Source（按 deck A–E、M、major、community 分目录，单卡 meta + impl）
 ├── domain/        领域聚合层（PlayerBoard、farmyard、pasture、scoring、...）
-├── draft/         simultaneous 卡牌选择
+├── draft/         异步卡牌轮抽
 ├── custom-code/   自定义卡牌 AST 校验
 ├── i18n/          多语 key
 └── utils/         通用工具

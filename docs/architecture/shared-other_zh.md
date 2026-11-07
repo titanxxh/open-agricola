@@ -6,7 +6,11 @@
 
 ## `shared/draft/`
 
-同时选牌的纯函数（`initDraftState`、`processSubmit`、`tryAdvanceRound`、`finalizeDraft`）；`createRoom` 用 `draftMode: 'simultaneous'` 与 `draftPoolSize: 7..10` 启用。启用 Farmers of the Moor 时，职业、FoM 小改良与已出版小改良分阶段选秀，FoM 小改良池从已实现的注册表派生，不足时拒绝开局，除非设置 `allowIncompleteFarmersOfTheMoorMinorDeal`；Community Deck 小改良只进入已出版部分。
+纯转换函数（`initDraftState`、`initStagedDraftState`、`processSubmit`、`finalizeDraft`）实现异步轮抽（[ADR 0041](../adr/0041-opening-draft-advances-per-player.md)）。`createRoom` 保留 `draftMode: 'simultaneous'` 与 `draftPoolSize: 7..10`。每阶段保存各座位已选牌及按选择次数编号的收牌队列；确认后立即把余牌传到下家的下一次选择。`shared/projections/draft-progress.ts` 从已选数量派生个人阶段与进度，不再保存全桌轮次屏障或当前牌池副本。最后没有选择余地的牌在同一转换内自动收下，Session 为全部实际选牌各记录一次统计。
+
+Room 的轮抽输入窗口持续整段轮抽；提交中的 `opportunityKey` 绑定界面所显示的个人阶段与选择次数。先查回执，再检查输入是否仍有效；重连只重发个人选择机会仍存在的未提交命令。观看者只能看到自己的当前牌包与已选牌，积压牌包和未开启阶段连本人也不能预览。在线状态不参与规则推进；所有人选完后才继续开局。
+
+启用 Farmers of the Moor 时，职业、FoM 小改良与已出版小改良保留独立阶段，各玩家可以独立进入下一阶段。FoM 小改良池从已实现的注册表派生，不足时拒绝开局，除非设置 `allowIncompleteFarmersOfTheMoorMinorDeal`；Community Deck 小改良只进入已出版部分。测试：`shared/draft/__tests__/draft-manager.test.ts`、`server/game/__tests__/draft-session.test.ts`、`e2e-tests/draft-opening-order.spec.ts`。
 
 ## 单人开局手牌
 

@@ -1,3 +1,5 @@
+import { processSubmit } from '../../../shared/draft/draft-manager'
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
 // @vitest-environment jsdom
 import { withActiveRegistry } from '../../../shared/cards/active-registry'
 import { createOfficialCardRegistry } from '../../../shared/cards/__tests__/card-environment'
@@ -239,7 +241,9 @@ describe('in-game encyclopedia host', () => {
     await user.click(entry())
     const submitted = structuredClone(GameSocket.payload)
     const draft = submitted.state.draft!
-    draft.pendingPicks.p2 = { occ: draft.pools.p2!.occ[0]!, minor: draft.pools.p2!.minor[0]! }
+    const peer = processSubmit(draft, 'p2', firstDraftPick(draft, 'p2'))
+    if (peer.kind !== 'accepted') throw new Error(peer.error)
+    submitted.state.draft = peer.draft
     act(() => GameSocket.snapshot(submitted))
     expect(panel()).toHaveAttribute('open')
     await user.click(screen.getByRole('button', { name: 'Close encyclopedia' }))

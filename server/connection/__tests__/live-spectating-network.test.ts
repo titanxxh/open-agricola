@@ -131,7 +131,8 @@ it('masks all draft candidates and keeps existing participants in their owned se
   const { running, room, owner, viewer, watch } = await game({ draft: true })
   const state = await watch()
   expect(state.payload.state.phase).toBe('draft')
-  const privateIds = Object.values(room.session.state.draft!.pools).flatMap(pool => [...pool.occ, ...pool.minor])
+  const privateIds = room.session.state.draft!.stages.flatMap(stage =>
+    Object.values(stage.seats).flatMap(seat => Object.values(seat.inbox).flatMap(pool => [...pool.occ, ...pool.minor])))
   for (const id of privateIds) expect(JSON.stringify(state)).not.toContain(id)
   expect(room.players).toHaveLength(2)
   owner.socket.send(JSON.stringify({ type: 'spectateRoom', roomId: room.id }))

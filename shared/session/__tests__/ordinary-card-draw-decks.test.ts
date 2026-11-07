@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { finalizeDraft } from '../../draft/draft-manager'
+import { finalizeDraft, processSubmit } from '../../draft/draft-manager'
+import { firstDraftPick } from '../../draft/__tests__/draft-fixtures'
+import { draftSeatProgress } from '../../projections/draft-progress'
 import { createInitialState } from '../state-bootstrap'
 import { rehydrateState, serializeState, serializeStateForPlayer } from '../serialization'
 import { EngineStack } from '../../engine'
@@ -54,28 +56,25 @@ describe('ordinary card draw decks', () => {
       draftMode: 'simultaneous',
       draftPoolSize: 8,
     })
-    const pooled = new Set(Object.values(state.draft!.pools).flatMap((pool) => [
-      ...pool.occ,
-      ...pool.minor,
-    ]))
+    const pooled = new Set(state.draft!.stages.flatMap(stage =>
+      Object.values(stage.seats).flatMap(seat => Object.values(seat.inbox).flatMap(pool => [...pool.occ, ...pool.minor]))))
 
     for (const cardId of pooled) {
       expect(state.ordinaryCardDecks.occupation).not.toContain(cardId)
       expect(state.ordinaryCardDecks.minor).not.toContain(cardId)
     }
 
-    const finalized = finalizeDraft({
-      ...state,
-      draft: {
-        ...state.draft!,
-        kept: Object.fromEntries(
-          Object.entries(state.draft!.pools).map(([pid, pool]) => [
-            pid,
-            { occ: pool.occ.slice(0, 7), minor: pool.minor.slice(0, 7) },
-          ]),
-        ),
-      },
-    })
+    let draft = state.draft!
+    for (let step = 0; step < 14; step++) {
+      const playerId = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
+      if (!playerId) break
+      const result = processSubmit(draft, playerId, firstDraftPick(draft, playerId))
+      if (result.kind !== 'accepted') throw new Error(result.error)
+      draft = result.draft
+      if (result.finished) break
+    }
+    expect(draft.seatOrder.every(id => draftSeatProgress(draft, id).kind === 'finished')).toBe(true)
+    const finalized = finalizeDraft({ ...state, draft })
     for (const cardId of pooled) {
       expect(finalized.ordinaryCardDecks.occupation).not.toContain(cardId)
       expect(finalized.ordinaryCardDecks.minor).not.toContain(cardId)

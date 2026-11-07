@@ -160,6 +160,7 @@ const useTransportSetup = (
   const initRef = useRef(false)
   const [recoveryNotice, setRecoveryNotice] = useState(false)
   const [roomColorError, setRoomColorError] = useState<RoomColorErrorCode | null>(null)
+  const [connectedPlayerIndexes, setConnectedPlayerIndexes] = useState<number[] | null>(null)
   const playerIndexRef = useRef(0)
 
   useEffect(() => {
@@ -257,6 +258,11 @@ const useTransportSetup = (
     const offRecovery = ws.onRecoveryNotice(() => setRecoveryNotice(true))
     const offEvent = ws.onEvent(msg => {
       if (disposed) return
+      if (msg.type === 'stateUpdate' && msg.connectedPlayerIndexes) setConnectedPlayerIndexes(msg.connectedPlayerIndexes)
+      else if (msg.type === 'roomJoined') setConnectedPlayerIndexes(msg.players.filter(player => player.connected).map(player => player.playerIndex))
+      else if (msg.type === 'roomCreated') setConnectedPlayerIndexes([msg.playerIndex])
+      else if (msg.type === 'playerJoined') setConnectedPlayerIndexes(previous => [...new Set([...(previous ?? []), msg.playerIndex])])
+      else if (msg.type === 'playerDisconnected') setConnectedPlayerIndexes(previous => previous?.filter(index => index !== msg.playerIndex) ?? null)
       if (msg.type === 'roomSpectated') {
         receivedRoom = true
         hotseat = false
@@ -352,7 +358,7 @@ const useTransportSetup = (
     ? (localTransport ?? httpTransportSingleton)
     : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
-  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
+  return { connectedPlayerIndexes, transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
     setRoomColorError(null)
     try { wsTransport?.sendRoomCommand('setPlayerColor', { color }) } catch { setRoomColorError('color_save_failed') }
   } }
@@ -381,7 +387,7 @@ export const GameContainerApi = () => {
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
+  const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
@@ -1671,7 +1677,7 @@ export const GameContainerApi = () => {
     return withEncyclopedia(<div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
       {gameHeader}
       {notificationStack}
-      <PublicOpeningProgress state={state} locale={locale} />
+      <PublicOpeningProgress state={state} locale={locale} connectedPlayerIndexes={connectedPlayerIndexes} />
     </div>)
   }
 
@@ -1692,6 +1698,7 @@ export const GameContainerApi = () => {
         {notificationStack}
         {bugReportBar}
         <DraftOverlay
+          connectedPlayerIndexes={connectedPlayerIndexes}
           state={state}
           meId={meId}
           locale={locale}
