@@ -4894,17 +4894,6 @@ export class GameCore {
     return this.respond()
   }
 
-  /**
-   * Record a single player's card pick for the current draft round. When all
-   * seated players have submitted, the round advances (pools rotate) and, once
-   * the final round is complete, `finalizeDraft` copies each player's `kept`
-   * cards back to `occupationHand` / `minorHand` and flips `phase='playing'`.
-   *
-   * Exact retries return the existing result, including after round advancement
-   * or draft finalization. Other non-draft submissions, unknown players,
-   * out-of-pool picks, or conflicting retries return `ok:false`.
-   */
-  /** S2 Task 12 part 2: thin delegator — body lives in `phases/draft.ts`. */
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {
     return this.runAuthoritativeCommand(
       'draftPick',

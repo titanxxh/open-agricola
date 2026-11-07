@@ -4,7 +4,11 @@
 
 ## `shared/draft/`
 
-Pure functions for simultaneous selection (`initDraftState`, `processSubmit`, `tryAdvanceRound`, `finalizeDraft`); `createRoom` enables it with `draftMode: 'simultaneous'` and `draftPoolSize: 7..10`. With Farmers of the Moor, occupations, FoM minors and published minors draft in separate stages, the FoM minor pool derives from the implemented registry and refuses to start when short unless `allowIncompleteFarmersOfTheMoorMinorDeal` is set; Community Deck minors join only the published part.
+Pure transitions (`initDraftState`, `initStagedDraftState`, `processSubmit`, `finalizeDraft`) implement Asynchronous Draft ([ADR 0041](../adr/0041-opening-draft-advances-per-player.md)). `createRoom` retains `draftMode: 'simultaneous'` and `draftPoolSize: 7..10`. Each stage owns per-seat kept cards and generation-indexed inboxes; a choice immediately sends its remainder to the next seat's next generation. Kept counts derive personal stage and progress through `shared/projections/draft-progress.ts`. No global round barrier or copied current-pool state remains. Forced final choices settle in the same transition, and Session records every resulting pick once.
+
+The draft Room input window lasts through the full draft; each submitted `opportunityKey` binds the rendered personal stage and generation. Receipt lookup precedes freshness, and reconnect only retries uncommitted choices whose personal opportunity still exists. Viewer filtering exposes only the owner's current packet and kept cards; queued packets and unopened stages remain hidden even from that owner. Connection presence never advances rules. All players finish before setup continues.
+
+With Farmers of the Moor, occupations, FoM minors, and published minors remain separate stages, but players advance between them independently. The FoM minor pool derives from the implemented registry and refuses to start when short unless `allowIncompleteFarmersOfTheMoorMinorDeal` is set; Community Deck minors join only the published part. Tests: `shared/draft/__tests__/draft-manager.test.ts`, `server/game/__tests__/draft-session.test.ts`, and `e2e-tests/draft-opening-order.spec.ts`.
 
 ## Solo opening hands
 

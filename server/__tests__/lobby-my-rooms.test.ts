@@ -5,8 +5,9 @@ import { createWorkSession } from './_helpers/session-fixtures'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import { serializeSessionSnapshot } from '../../shared/session/serialization'
 import type { RoomMeta } from '../game/persistence/room-persistence'
-import { initDraftState } from '../../shared/draft/draft-manager'
+import { initStagedDraftState, processSubmit } from '../../shared/draft/draft-manager'
 import type { DraftStageKind } from '../../shared/draft/types'
+import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
 
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
@@ -114,29 +115,28 @@ describe('my active room summaries', () => {
   })
 
   it.each(['standard', 'occupation', 'farmersOfTheMoorMinor', 'publishedMinor'] satisfies DraftStageKind[])(
-    'only circles unsubmitted players during the %s draft stage', async stage => {
+    'only circles players with a current packet during the %s draft stage', async stage => {
       const { db, persistence, snapshot, meta } = await setup()
       const [alice, bob] = snapshot.state.players
       if (!alice || !bob) throw new Error('Expected two players')
-      const draft = initDraftState([alice.id, bob.id], {
-        [alice.id]: { occ: ['private-occ-a'], minor: ['private-minor-a'] },
-        [bob.id]: { occ: ['private-occ-b'], minor: ['private-minor-b'] },
-      }, 1)
-      draft.stage = stage
+      const draft = initStagedDraftState([alice.id, bob.id], [{ kind: stage, poolSize: 3, totalRounds: 2, pools: {
+        [alice.id]: {
+          occ: stage === 'standard' || stage === 'occupation' ? ['private-occ-a1', 'private-occ-a2', 'private-occ-a3'] : [],
+          minor: stage === 'occupation' ? [] : ['private-minor-a1', 'private-minor-a2', 'private-minor-a3'],
+        },
+        [bob.id]: {
+          occ: stage === 'standard' || stage === 'occupation' ? ['private-occ-b1', 'private-occ-b2', 'private-occ-b3'] : [],
+          minor: stage === 'occupation' ? [] : ['private-minor-b1', 'private-minor-b2', 'private-minor-b3'],
+        },
+      } }])
       const drafting: typeof snapshot = { ...snapshot, state: { ...snapshot.state, phase: 'draft', draft } }
       await persistence.save('draft', drafting, meta)
       expect((await listMyActiveRooms(db, 'alice'))[0]).toMatchObject({
         progress: { phase: 'draft' }, waiting_player_indexes: [0, 1], current_player_index: null,
       })
-      if (stage === 'standard') {
-        draft.pendingPicks[alice.id] = { occ: 'private-occ-a', minor: null }
-        await persistence.save('draft', drafting, meta)
-        expect((await listMyActiveRooms(db, 'alice'))[0]?.waiting_player_indexes).toEqual([0, 1])
-      }
-      draft.pendingPicks[alice.id] = {
-        occ: stage === 'standard' || stage === 'occupation' ? 'private-occ-a' : null,
-        minor: stage === 'occupation' ? null : 'private-minor-a',
-      }
+      const selected = processSubmit(draft, alice.id, firstDraftPick(draft, alice.id))
+      if (selected.kind !== 'accepted') throw new Error(selected.error)
+      drafting.state.draft = selected.draft
       await persistence.save('draft', drafting, meta)
       const [room] = await listMyActiveRooms(db, 'alice')
       expect(room?.waiting_player_indexes).toEqual([1])

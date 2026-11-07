@@ -1,3 +1,5 @@
+import { createOpeningSession } from './_helpers/session-fixtures'
+import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
@@ -116,11 +118,11 @@ describe('hotseat game setup', () => {
 })
 
 describe('hotseat draft phase', () => {
-  const startDraftGame = () => new GameSession(4242, undefined, setupFromPayload({
-    maxPlayers: 2,
-    draftMode: 'simultaneous',
-    draftPoolSize: 7,
-  }))
+  const startDraftGame = () => createOpeningSession({
+    seed: 4242,
+    options: setupFromPayload({ maxPlayers: 2, draftMode: 'simultaneous', draftPoolSize: 7 }),
+    expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } },
+  })
 
   it('does not advance currentPlayerIndex, so the panel cannot follow the turn', () => {
     // This is why hotseat walks the seats itself instead of reusing currentPlayer.
@@ -130,27 +132,23 @@ describe('hotseat draft phase', () => {
     expect(before.currentPlayerIndex).toBe(0)
 
     const draft = before.draft!
-    session.submitDraftPick('p1', {
-      occCardId: draft.pools['p1']!.occ[0]!,
-      minorCardId: draft.pools['p1']!.minor[0]!,
-    })
+    session.submitDraftPick('p1', firstDraftPick(draft, 'p1'))
 
     const after = session.getState().state
     expect(after.phase).toBe('draft')
     expect(after.currentPlayerIndex).toBe(0)
   })
 
-  it('points at the first seat that has not submitted yet', () => {
+  it('moves to the next seat with a packet after each manual confirmation', () => {
     const session = startDraftGame()
     expect(nextHotseatDraftSeatId(session.getState().state.draft!)).toBe('p1')
 
     const draft = session.getState().state.draft!
-    session.submitDraftPick('p1', {
-      occCardId: draft.pools['p1']!.occ[0]!,
-      minorCardId: draft.pools['p1']!.minor[0]!,
-    })
+    session.submitDraftPick('p1', firstDraftPick(draft, 'p1'))
 
     expect(nextHotseatDraftSeatId(session.getState().state.draft!)).toBe('p2')
+    expect(session.submitDraftPick('p2', firstDraftPick(session.state.draft!, 'p2')).ok).toBe(true)
+    expect(nextHotseatDraftSeatId(session.state.draft!)).toBe('p1')
   })
 
   it('completes the whole draft by submitting one seat at a time', () => {
@@ -160,11 +158,8 @@ describe('hotseat draft phase', () => {
       if (state.phase !== 'draft' || !state.draft) break
       const seatId = nextHotseatDraftSeatId(state.draft)
       expect(seatId).not.toBeNull()
-      const pool = state.draft.pools[seatId!]!
-      const resp = session.submitDraftPick(seatId!, {
-        ...(pool.occ.length > 0 ? { occCardId: pool.occ[0]! } : {}),
-        ...(pool.minor.length > 0 ? { minorCardId: pool.minor[0]! } : {}),
-      })
+      if (!seatId) throw new Error('expected seat with a packet')
+      const resp = session.submitDraftPick(seatId, firstDraftPick(state.draft, seatId))
       expect(resp.ok).toBe(true)
     }
 
@@ -203,7 +198,7 @@ describe('hotseat parent selection phase', () => {
     })
   }
 
-  it('points at the first seat that has not submitted yet', () => {
+  it('moves to the next seat with a packet after each manual confirmation', () => {
     const session = startParentGame()
     expect(session.getState().state.phase).toBe('parent-selection')
     expect(nextHotseatParentSeatId(session.getState().state)).toBe('p1')

@@ -176,6 +176,7 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
     case 'draftSubmit':
       return intent(command.type, {
         pick: {
+          opportunityKey: command.pick.opportunityKey,
           ...(typeof command.pick.occCardId === 'string'
             ? { occCardId: command.pick.occCardId }
             : {}),

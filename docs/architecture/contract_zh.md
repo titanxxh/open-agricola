@@ -131,6 +131,8 @@ type ClientCommand = (
 
 ## ServerEvent 与 StateUpdateEnvelope
 
+`StateUpdateEnvelope.connectedPlayerIndexes` 独立于持久游戏状态和 Replay 传输实时座位在线信息，完整快照及既有加入／断开事件更新它。连接状态不决定轮抽是否可选牌。轮抽提交除 Room 输入窗口身份外，还携带 `opportunityKey`。
+
 `setPlayerColor { color }` 是需认证、记入命令账本的候场命令，不接受客户端指定座位。它只修改调用者颜色，持久化后才发布，不生成 Replay Step。
 
 `confirmPlayerColor` 无 payload，只有 `roomJoined` 与 `roomWaiting` 中 `colorConfirmationPlayerIndex` 指定的座位可用它启动已满员的普通 Room。服务端提交初始 Frame 与确认回执后才发布。先到的座位可在候场时继续选色，但不能替最后入场者确认。
@@ -205,7 +207,7 @@ type InteractionState =
 | `feed` | `{ remaining; foodUsed; feedQueue? }` |
 | `confirm-next-player` | `{ nextPlayerIndex }` |
 | `confirm-player-switch` | `{ fromPlayerIndex; toPlayerIndex }` |
-| `card-draft` | `{ mode: 'simultaneous'; round; totalRounds; poolSize; seatOrder; pools; pendingPicks; kept }` |
+| `card-draft` | `{ draft: DraftView }` |
 
 前端按钮使用 `allowedCommands` 中的 `InteractionCommand`：
 

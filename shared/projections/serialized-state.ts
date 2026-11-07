@@ -1,3 +1,4 @@
+import { draftSeatProgress } from './draft-progress'
 import { inheritHistoryRecordIdentity } from './history-record-identity'
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
@@ -496,8 +497,7 @@ const maskDraftPoolForViewer = (
  *     are still hidden in another player's hand.
  *   - draft-history card ids that are still hidden in another player's hand
  *     or private draft data.
- *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`,
- *     `draft.kept[pid]`, and `draft.pendingPicks[pid]` for every
+ *   - Draft inboxes except the viewer's current packet, and kept cards for every
  *     player other than the viewer.
  *   - unresolved `parentSelection.candidates[pid]` and submitted
  *     parent choices for every player other than the viewer.
@@ -542,16 +542,10 @@ export const filterSerializedStateForPlayer = (
         player.id,
         new Set([
           ...(hiddenCardIds.get(player.id) ?? []),
-          ...(base.draft?.pools[player.id]?.occ ?? []),
-          ...(base.draft?.pools[player.id]?.minor ?? []),
-          ...(base.draft?.kept[player.id]?.occ ?? []),
-          ...(base.draft?.kept[player.id]?.minor ?? []),
-          ...(base.draft?.stages ?? []).flatMap((stage) => [
-            ...(stage.pools[player.id]?.occ ?? []),
-            ...(stage.pools[player.id]?.minor ?? []),
-          ]),
-          ...Object.values(base.draft?.pendingPicks[player.id] ?? {})
-            .filter((cardId): cardId is string => typeof cardId === 'string'),
+          ...(base.draft?.stages ?? []).flatMap(stage => {
+            const seat = stage.seats[player.id]
+            return seat ? [seat.kept, ...Object.values(seat.inbox)].flatMap(pool => [...pool.occ, ...pool.minor]) : []
+          }),
         ].filter((cardId) => cardId !== '?')),
       ]),
   )
@@ -583,49 +577,19 @@ export const filterSerializedStateForPlayer = (
     ? base.draft
     : {
         ...base.draft,
-        pools: Object.fromEntries(
-          Object.entries(base.draft.pools).map(([pid, pool]) =>
-            [pid, maskDraftPoolForViewer(pool, pid === viewerPlayerId)],
-          ),
-        ),
-        ...(base.draft.stages
-          ? {
-              stages: base.draft.stages.map((stage) => ({
-                ...stage,
-                pools: Object.fromEntries(
-                  Object.entries(stage.pools).map(([pid, pool]) =>
-                    [pid, maskDraftPoolForViewer(pool, pid === viewerPlayerId)],
-                  ),
-                ),
-              })),
-            }
-          : {}),
-        kept: Object.fromEntries(
-          Object.entries(base.draft.kept).map(([pid, pool]) =>
-            pid === viewerPlayerId
-              ? [pid, pool]
-              : [
-                  pid,
-                  {
-                    occ: Array(pool.occ.length).fill('?'),
-                    minor: Array(pool.minor.length).fill('?'),
-                  },
-                ],
-          ),
-        ),
-        pendingPicks: Object.fromEntries(
-          Object.entries(base.draft.pendingPicks).map(([pid, pick]) =>
-            pid === viewerPlayerId
-              ? [pid, pick]
-              : [
-                  pid,
-                  {
-                    occ: pick.occ === null ? null : '?',
-                    minor: pick.minor === null ? null : '?',
-                  },
-                ],
-          ),
-        ),
+        stages: base.draft.stages.map((stage, stageIndex) => ({
+          ...stage,
+          seats: Object.fromEntries(Object.entries(stage.seats).map(([pid, seat]) => {
+            const progress = draftSeatProgress(base.draft!, pid)
+            return [pid, {
+              kept: maskDraftPoolForViewer(seat.kept, pid === viewerPlayerId),
+              inbox: Object.fromEntries(Object.entries(seat.inbox).map(([round, pool]) => [round,
+                maskDraftPoolForViewer(pool, pid === viewerPlayerId && progress.kind === 'selecting'
+                  && progress.stageIndex === stageIndex && progress.round === Number(round)),
+              ])),
+            }]
+          })),
+        })),
       }
   const filteredOrdinaryCardDecks = {
     occupation: Array(base.ordinaryCardDecks.occupation.length).fill('?'),

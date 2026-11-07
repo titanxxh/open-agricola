@@ -82,14 +82,7 @@ describe('shared protocol types', () => {
       },
       {
         kind: 'card-draft',
-        mode: 'simultaneous',
-        round: 1,
-        totalRounds: 7,
-        poolSize: 7,
-        seatOrder: [],
-        pools: {},
-        pendingPicks: [],
-          kept: {},
+        draft: { mode: 'simultaneous', seatOrder: [], stages: [], lastManualPickerId: null },
       },
       { kind: 'engine-blocked', actionId: 'bake-bread' },
     ]

@@ -1,3 +1,5 @@
+import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
+import { initDraftState } from '../../shared/draft/draft-manager'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { rehydrateState, serializeSessionSnapshot, serializeStateForPlayer } from '../../shared/session/serialization'
@@ -47,15 +49,14 @@ const fixedDraft = (session: GameSession) => {
       minor: ['A008_FoodBasket', 'A009_YoungAnimalMarket', 'A010_WoodenShed', 'A011_MudPatch', 'A012_DrinkingTrough', 'A013_RenovationCompany', 'A014_CarpentersHammer'],
     },
   ]
-  session.state.draft!.pools = { p1: structuredClone(pools[0]!), p2: structuredClone(pools[1]!) }
+  session.state.draft = initDraftState(['p1', 'p2'], { p1: pools[0], p2: pools[1] }, 7)
   expect(session.loadState(session.state).ok).toBe(true)
   for (let round = 0; round < 6; round++) {
     for (const player of session.state.players) {
       expect(session.state.phase).toBe('draft')
       expect(session.state.players[0]!.resources.wood).toBe(0)
       expect(session.takeAction(0, 'forest').ok).toBe(false)
-      const pool = session.state.draft!.pools[player.id]!
-      const response = session.submitDraftPick(player.id, { occCardId: pool.occ[0]!, minorCardId: pool.minor[0]! })
+      const response = session.submitDraftPick(player.id, firstDraftPick(session.state.draft!, player.id))
       expect(response.ok, response.error).toBe(true)
     }
   }
@@ -294,11 +295,7 @@ describe('Parent Card selection setup', () => {
 
     while (session.state.phase === 'draft') {
       for (const player of session.state.players) {
-        const pool = session.state.draft!.pools[player.id]
-        expect(session.submitDraftPick(player.id, {
-          occCardId: pool.occ[0],
-          minorCardId: pool.minor[0],
-        }).ok).toBe(true)
+        expect(session.submitDraftPick(player.id, firstDraftPick(session.state.draft!, player.id)).ok).toBe(true)
       }
     }
 
@@ -367,11 +364,7 @@ describe('Parent Card selection setup', () => {
     expect(session.state.phase).toBe('draft')
     while (session.state.phase === 'draft') {
       for (const player of session.state.players) {
-        const pool = session.state.draft!.pools[player.id]
-        const resp = session.submitDraftPick(player.id, {
-          occCardId: pool.occ[0],
-          minorCardId: pool.minor[0],
-        })
+        const resp = session.submitDraftPick(player.id, firstDraftPick(session.state.draft!, player.id))
         expect(resp.ok).toBe(true)
       }
     }

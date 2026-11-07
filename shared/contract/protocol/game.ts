@@ -125,6 +125,7 @@ export type StateUpdateEnvelope = {
   roomId: string
   version: number
   sync: 'snapshot'
+  connectedPlayerIndexes?: number[]
   cause: StateUpdateCause
   requestId?: string
   payload: GameSyncPayload

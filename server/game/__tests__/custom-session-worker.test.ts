@@ -1,3 +1,4 @@
+import { WebSocket } from 'ws'
 import { buildRoomHistoryPage } from '../../../shared/session/history-window'
 import { buildEnvelope } from '../../connection/envelope-builder'
 import { snapshotToRoom } from '../room'
@@ -155,7 +156,7 @@ describe('custom session executor', () => {
     expect(cached.state.log[0]!.params).toEqual({ fromPlayer: 'Worker actor', toPlayer: 'Worker recipient' })
     const nativeBuild = vi.spyOn(session, 'buildSyncPayload').mockImplementation(() => { throw new Error('Cached Worker payload must not be rebuilt') })
     const room = { id: 'worker-names', session,
-      players: [{ playerIndex: 0, name: 'Room actor' }, { playerIndex: 1, name: 'Room recipient' }] as never }
+      players: [{ ws: new WebSocket(null, undefined, {}), playerIndex: 0, name: 'Room actor' }, { ws: new WebSocket(null, undefined, {}), playerIndex: 1, name: 'Room recipient' }] }
     const first = buildEnvelope({ room, resp: response, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
     expect(first.payload.state.log[0]!.params).toEqual({ fromPlayer: 'Room actor', toPlayer: 'Room recipient' })
     expect(first.payload.historyWindow).toEqual(cached.historyWindow)

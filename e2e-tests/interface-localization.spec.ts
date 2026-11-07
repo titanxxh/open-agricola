@@ -1,5 +1,6 @@
 // @covers client/contexts/
 import { expect, test } from '@playwright/test'
+import { initStagedDraftState } from '../shared/draft/draft-manager'
 import { BACKEND_URL, FRONTEND_URL, finishHotseatOpening, getJson, postJson } from './fixtures'
 
 const sandboxUrl = `${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`
@@ -72,24 +73,27 @@ for (const [stage, prompt] of [
     await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 931, maxPlayers: 2 })
     const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
     state.phase = 'draft'
-    state.draft = {
-      mode: 'simultaneous', stage, round: 1, totalRounds: 7, poolSize: 7,
-      seatOrder: ['p1', 'p2'],
+    const occupations = ['A092_AdoptiveParents', 'C095_BasketWeaver', 'B089_Groom']
+    const minors = stage === 'farmersOfTheMoorMinor'
+      ? ['M015_PeatBurnOff', 'M047_BogForest', 'M065_FireBrigade']
+      : ['D018_SteamPlow', 'E080_RockGarden', 'A042_ForestLakeHut']
+    state.draft = initStagedDraftState(['p1', 'p2'], [{
+      kind: stage, poolSize: 3, totalRounds: 3,
       pools: {
-        p1: { occ: ['A092_AdoptiveParents', 'C095_BasketWeaver', 'B089_Groom'], minor: ['D018_SteamPlow', 'E080_RockGarden', 'A042_ForestLakeHut', 'A051_DriftNetBoat'] },
-        p2: { occ: ['A106_SlurrySpreader'], minor: ['A001_Shelter'] },
+        p1: { occ: stage === 'standard' || stage === 'occupation' ? occupations : [], minor: stage === 'occupation' ? [] : minors },
+        p2: {
+          occ: stage === 'standard' || stage === 'occupation' ? ['A106_SlurrySpreader', 'A104_WoodHarvester', 'A100_Curator'] : [],
+          minor: stage === 'occupation' ? [] : stage === 'farmersOfTheMoorMinor'
+            ? ['M073_StockBreedingPrize', 'M109_Malthouse', 'M118_TimberMill']
+            : ['A001_Shelter', 'A051_DriftNetBoat', 'A022_Telegram'],
+        },
       },
-      kept: { p1: { occ: [], minor: [] }, p2: { occ: [], minor: [] } },
-      pendingPicks: { p1: { occ: null, minor: null }, p2: { occ: null, minor: null } },
-    }
-    if (stage === 'farmersOfTheMoorMinor') {
-      state.draft.pools.p1.minor = ['M015_PeatBurnOff', 'M047_BogForest', 'M065_FireBrigade']
-    }
+    }])
     expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
     await page.goto(sandboxUrl)
     const dialog = page.getByRole('dialog', { name: 'Card draft' })
     await expect(dialog).toBeVisible()
-    await expect(dialog).toContainText('Draft — Round 1 / 7')
+    await expect(dialog).toContainText('Draft — Round 1 / 3')
     await expect(dialog).toContainText(prompt)
     await expect(dialog.getByRole('button', { name: 'Confirm picks' })).toBeVisible()
     const faces = dialog.locator('.player-card-inner')
@@ -102,7 +106,8 @@ for (const [stage, prompt] of [
       await dialog.locator('[data-id="A092_AdoptiveParents"]').click()
       await dialog.locator('[data-id="D018_SteamPlow"]').click()
       await dialog.getByRole('button', { name: 'Confirm picks' }).click()
-      await expect(dialog).toContainText('Waiting for other players (1/2)…')
+      await expect(dialog.locator('.draft-overlay-status')).toHaveText('Waiting for cards')
+      await expect(dialog.getByRole('status')).toContainText('Player 2')
     }
   })
 }

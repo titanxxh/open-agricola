@@ -1,3 +1,4 @@
+import { draftSeatProgress } from '../../shared/projections/draft-progress'
 import { recordBugReportDisconnect } from './bug-report-diagnostics'
 import { markRequest, responseReceived, snapshotReceived, observeBrowser } from './observability'
 import type { RoomDiscoveryResponse } from '../../shared/contract/protocol/routing'
@@ -494,8 +495,12 @@ export class WsGameTransport implements GameTransport {
       const outcome = this.completed.get(identity.commandId)
       if (outcome) { this.finishCommand(identity.commandId, outcome); continue }
       const simultaneous = command.type === 'draftSubmit' ? 'draft' : command.type === 'parentSubmit' ? 'parent' : command.type === 'soloHandSubmit' ? 'solo-hand' : null
-      const valid = command.type === 'createRoom' && !this.roomId || identity.roomId === this.roomId &&
-        (simultaneous ? this.inputWindow?.kind === simultaneous && identity.inputWindowId === this.inputWindow.id : identity.expectedVersion === this.committedVersion)
+      const pendingDraft = command.type === 'draftSubmit' && this.latestPayload?.state.draft
+        ? draftSeatProgress(this.latestPayload.state.draft, command.playerId) : null
+      const opportunityValid = command.type !== 'draftSubmit' || pendingDraft?.kind === 'selecting'
+        && pendingDraft.opportunityKey === command.pick.opportunityKey
+      const valid = opportunityValid && (command.type === 'createRoom' && !this.roomId || identity.roomId === this.roomId &&
+        (simultaneous ? this.inputWindow?.kind === simultaneous && identity.inputWindowId === this.inputWindow.id : identity.expectedVersion === this.committedVersion))
       if (!valid) {
         this.finishCommand(identity.commandId, { ok: false, code: 'command_input_stale', error: 'The input changed; choose again' })
         this.recoveryListeners.forEach(listener => listener('command_input_stale'))

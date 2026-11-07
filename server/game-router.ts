@@ -1015,13 +1015,14 @@ const handleAuthorizedGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/draft-submit') {
     const body = JSON.parse(await readBody(req)) as {
       playerId?: string
-      pick?: { occCardId?: unknown; minorCardId?: unknown }
+      pick?: { opportunityKey?: unknown; occCardId?: unknown; minorCardId?: unknown }
     }
     const occCardId = typeof body.pick?.occCardId === 'string' ? body.pick.occCardId : undefined
     const minorCardId = typeof body.pick?.minorCardId === 'string' ? body.pick.minorCardId : undefined
     if (
       typeof body.playerId !== 'string' ||
       !body.pick ||
+      typeof body.pick.opportunityKey !== 'string' ||
       (!occCardId && !minorCardId)
     ) {
       await sendJson(res, 400, { ok: false, error: 'invalid payload' })
@@ -1035,7 +1036,7 @@ const handleAuthorizedGameRoute = async (
         return true
       }
     }
-    const pick = { occCardId, minorCardId }
+    const pick = { opportunityKey: body.pick.opportunityKey, occCardId, minorCardId }
     const { resp, result } = await callAndRespond(
       req,
       'submitDraftPick',

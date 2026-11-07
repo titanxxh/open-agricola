@@ -1,3 +1,5 @@
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
+import { processSubmit } from '../../../shared/draft/draft-manager'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { serializeState } from '../../../shared/session/serialization'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
@@ -304,24 +306,49 @@ describe('Room reconnect and durable commands', () => {
     restored.destroy()
   })
 
-  it('preserves a simultaneous input window when a peer advances the committed version', async () => {
+  it.each([false, true])('recovers only the original personal draft opportunity (changed=%s)', async changed => {
     const { WsGameTransport } = await import('../gameTransport')
+    const state = createInitialState(42, { playerCount: 2, draftMode: 'simultaneous' })
+    const draft = state.draft!
+    const pick = firstDraftPick(draft, 'p2')
+    const frame = (version: number): ServerEvent => ({
+      ...snapshot(version), type: 'stateUpdate', roomId: 'room-1', version, sync: 'snapshot', cause: 'reconnect', emittedAt: 0,
+      inputWindow: { id: 'draft-window', kind: 'draft' },
+      payload: { state: serializeState(state, { engineStack: new EngineStack() }), interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] }, scores: null, historyLength: 0, hasActionStartSnapshot: false, ok: true },
+    })
     const transport = new WsGameTransport('ws://test', 'room-1', 1, { route: false, reconnectDelayMs: 1 })
-    await transport.connect(); const old = Socket.all[0]!; old.emit(joined())
-    old.emit({ ...snapshot(), inputWindow: { id: 'draft-window', kind: 'draft' } } as ServerEvent)
-    const submitted = transport.draftSubmit('p2', { occCardId: 'a', minorCardId: 'b' })
-    const command = old.sent.at(-1)!
-    old.close(); await tick(); const next = Socket.all[1]!
-    await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('getCommandReceipt'))
-    next.emit({ type: 'commandReceipt', status: 'pending', identity: command.commandContext, requestId: next.sent.at(-1)!.requestId })
-    await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('joinRoom'))
-    next.emit(joined()); next.emit({ ...snapshot(2), inputWindow: { id: 'draft-window', kind: 'draft' } } as ServerEvent)
-    await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('draftSubmit'))
-    expect(next.sent.at(-1)?.commandContext).toEqual(command.commandContext)
-    next.emit({ ...snapshot(3), requestId: next.sent.at(-1)!.requestId } as ServerEvent)
-    next.emit({ type: 'commandReceipt', status: 'completed', receipt: { ...command.commandContext, outcome: { ok: true, roomId: 'room-1', roomVersion: 3 } } })
-    await submitted
-    transport.destroy()
+    try {
+      await transport.connect()
+      const old = Socket.all[0]!
+      old.emit(joined()); old.emit(frame(1))
+      const submitted = transport.draftSubmit('p2', pick)
+      const outcome = changed ? expect(submitted).rejects.toThrow('input changed') : submitted
+      const command = old.sent.at(-1)!
+      const peer = processSubmit(draft, 'p1', firstDraftPick(draft, 'p1'))
+      if (peer.kind !== 'accepted') throw new Error(peer.error)
+      state.draft = peer.draft
+      if (changed) {
+        const own = processSubmit(peer.draft, 'p2', pick)
+        if (own.kind !== 'accepted') throw new Error(own.error)
+        state.draft = own.draft
+      }
+      old.close(); await tick()
+      const next = Socket.all[1]!
+      await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('getCommandReceipt'))
+      next.emit({ type: 'commandReceipt', status: 'pending', identity: command.commandContext, requestId: next.sent.at(-1)!.requestId })
+      await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('joinRoom'))
+      next.emit(joined()); next.emit(frame(2))
+      if (changed) {
+        await outcome
+        expect(next.sent.some(message => message.type === 'draftSubmit')).toBe(false)
+      } else {
+        await vi.waitFor(() => expect(next.sent.at(-1)?.type).toBe('draftSubmit'))
+        expect(next.sent.at(-1)?.commandContext).toEqual(command.commandContext)
+        next.emit({ ...frame(3), requestId: next.sent.at(-1)!.requestId } as ServerEvent)
+        next.emit({ type: 'commandReceipt', status: 'completed', receipt: { ...command.commandContext, outcome: { ok: true, roomId: 'room-1', roomVersion: 3 } } })
+        await outcome
+      }
+    } finally { transport.destroy() }
   })
 
   it('recovers one pending solo confirmation in its original input window', async () => {

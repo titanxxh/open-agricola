@@ -4,6 +4,7 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from '@
 import { createOpeningSession, createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import type { GameState } from '../shared/contract/types'
 import { serializeState } from '../shared/session/serialization'
+import { draftSeatProgress } from '../shared/projections/draft-progress'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 import { CATALOG, expectCatalog } from './helpers/encyclopedia'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
@@ -272,10 +273,16 @@ function defineRoomScenarios() {
       await searchBox(page).fill('wood')
       await panel(page).getByRole('button', { name: 'Next page' }).click()
       await expect(pageStatus(page, 2)).toBeVisible()
-      const pool = (await roomSnapshot(peer)).state.draft!.pools.p2!
-      await driver.command(1, { type: 'draftSubmit', playerId: 'p2', pick: { occCardId: pool.occ[0], minorCardId: pool.minor[0] } })
+      const before = draftSeatProgress((await roomSnapshot(page)).state.draft!, 'p1')
+      const other = draftSeatProgress((await roomSnapshot(peer)).state.draft!, 'p2')
+      if (before.kind !== 'selecting' || other.kind !== 'selecting') throw new Error('Expected both players to have a current packet')
+      await driver.command(1, { type: 'draftSubmit', playerId: 'p2', pick: {
+        opportunityKey: other.opportunityKey, occCardId: other.pool.occ[0], minorCardId: other.pool.minor[0],
+      } })
 
-      expect((await roomSnapshot(page)).state.draft!.round).toBe(1)
+      const after = draftSeatProgress((await roomSnapshot(page)).state.draft!, 'p1')
+      expect(after.kind === 'selecting' && after.opportunityKey).toBe(before.opportunityKey)
+      expect(after.kind === 'selecting' && after.pool).toEqual(before.pool)
       await expect(panel(page)).toBeVisible()
       await expect(searchBox(page)).toHaveValue('wood')
       await expect(pageStatus(page, 2)).toBeVisible()

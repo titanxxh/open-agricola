@@ -1,474 +1,285 @@
-/**
- * PR-5 Task 3 — session-level integration tests for the simultaneous card draft.
- *
- * These tests exercise `GameSession` + `createInitialState({ draftMode, draftPoolSize })`
- * end-to-end. Pure draft math is already covered by
- * `shared/draft/__tests__/draft-manager.test.ts`; here we verify that:
- *
- *   • `createInitialState` with draft mode seeds `state.phase='draft'` and `state.draft`
- *     (and leaves every player's `occupationHand` / `minorHand` empty).
- *   • `GameSession.submitDraftPick` advances the draft round-by-round, finally
- *     flipping `state.phase='playing'` with player hands populated from `kept`.
- *   • `resp.pending` is `{ type: 'cardDraft', ... }` throughout the draft.
- *   • Exact retries are idempotent; invalid picks, conflicting retries, and wrong phases surface via `resp.ok`.
- *   • `serializeState` -> `rehydrateState` preserves draft fields cleanly.
- */
-
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession } from '../authoritative-session'
+import { createOpeningSession } from '../../__tests__/_helpers/session-fixtures'
 import { rehydrateState, serializeState } from '../../../shared/session/serialization'
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
+import { draftSeatProgress } from '../../../shared/projections/draft-progress'
+import type { InitialStateOptions } from '../../../shared/session/state-bootstrap'
+import type { DraftState } from '../../../shared/draft/types'
 
-const makeDraftSession = (
-  playerCount = 2,
-  draftPoolSize = 7,
-  seed = 123456,
-) =>
-  new GameSession(seed, undefined, {
-    playerCount,
-    draftMode: 'simultaneous',
-    draftPoolSize,
+const sessions: GameSession[] = []
+afterEach(() => { for (const session of sessions.splice(0)) session.dispose() })
+
+function opening(options: InitialStateOptions = {}) {
+  const session = createOpeningSession({
+    seed: 123456,
+    options: { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: 7, ...options },
+    expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } },
   })
-
-const firstPick = (session: GameSession, pid: string) => {
-  const draft = session.getState().state.draft
-  if (!draft) throw new Error('no draft state')
-  const pool = draft.pools[pid]
-  if (!pool) throw new Error(`no pool for ${pid}`)
-  return { occCardId: pool.occ[0]!, minorCardId: pool.minor[0]! }
+  sessions.push(session)
+  return session
 }
 
-const firstOccupationPick = (session: GameSession, pid: string) => {
+function draftOf(session: GameSession): DraftState {
   const draft = session.getState().state.draft
-  if (!draft) throw new Error('no draft state')
-  const pool = draft.pools[pid]
-  if (!pool) throw new Error(`no pool for ${pid}`)
-  return { occCardId: pool.occ[0]! }
+  if (!draft) throw new Error('expected draft phase')
+  return draft
 }
 
-const firstMinorPick = (session: GameSession, pid: string) => {
-  const draft = session.getState().state.draft
-  if (!draft) throw new Error('no draft state')
-  const pool = draft.pools[pid]
-  if (!pool) throw new Error(`no pool for ${pid}`)
-  return { minorCardId: pool.minor[0]! }
+function pick(session: GameSession, playerId: string) {
+  return session.submitDraftPick(playerId, firstDraftPick(draftOf(session), playerId))
 }
 
-describe('GameSession — draft mode setup', () => {
-  it('seeds phase=draft with populated per-player pools and empty player hands', () => {
-    const session = makeDraftSession(2, 7)
-    const { state } = session.getState()
+function finish(session: GameSession) {
+  for (let step = 0; step < 256; step++) {
+    const state = session.getState().state
+    if (!state.draft) return session.getState()
+    const draft = state.draft
+    const playerId = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
+    if (!playerId) throw new Error('unfinished draft has no actionable seat')
+    const response = pick(session, playerId)
+    expect(response.ok, response.error).toBe(true)
+  }
+  throw new Error('draft did not finish')
+}
 
-    expect(state.phase).toBe('draft')
-    expect(state.draft).not.toBeNull()
-    expect(state.draft!.round).toBe(1)
-    expect(state.draft!.totalRounds).toBe(7)
-    expect(state.draft!.poolSize).toBe(7)
-    expect(state.draft!.seatOrder).toEqual(['p1', 'p2'])
+const serialized = (session: GameSession) => session.withCtx(() => serializeState(session.state, {
+  actionHooks: session.actionHooks, engineStack: session.getEngineStack(),
+}))
 
-    for (const p of state.players) {
-      expect(p.occupationHand).toEqual([])
-      expect(p.minorHand).toEqual([])
-      expect(state.draft!.pools[p.id].occ.length).toBe(7)
-      expect(state.draft!.pools[p.id].minor.length).toBe(7)
-      expect(state.draft!.kept[p.id].occ).toEqual([])
-      expect(state.draft!.kept[p.id].minor).toEqual([])
+describe('GameSession asynchronous draft', () => {
+  it('starts a fresh two-player draft with private candidates and no ordinary hand', () => {
+    const session = opening()
+    const response = session.getState()
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.draft?.seatOrder).toEqual(['p1', 'p2'])
+    for (const player of response.state.players) {
+      const progress = draftSeatProgress(draftOf(session), player.id)
+      expect(progress).toMatchObject({ kind: 'selecting', stage: 'standard', round: 1, totalRounds: 7 })
+      if (progress.kind !== 'selecting') throw new Error('expected initial packet')
+      expect(progress.pool.occ).toHaveLength(7)
+      expect(progress.pool.minor).toHaveLength(7)
+      expect(progress.kept).toEqual({ occ: [], minor: [] })
+      expect(player.occupationHand).toEqual([])
+      expect(player.minorHand).toEqual([])
     }
-
-    // Draft progress is tracked on state.draft directly (replaces the deleted
-    // PendingAction.cardDraft view-model). DraftOverlay reads these fields.
-    expect(state.draft!.round).toBe(1)
-    expect(state.draft!.totalRounds).toBe(7)
-    const allSubmitted = state.draft!.seatOrder.every(
-      (pid) => state.draft!.pendingPicks[pid]?.occ != null
-        && state.draft!.pendingPicks[pid]?.minor != null,
-    )
-    expect(allSubmitted).toBe(false)
+    expect(session.takeAction(0, 'forest')).toMatchObject({ ok: false, error: expect.stringMatching(/draft in progress/i) })
   })
 
-  it('falls back to the normal playing phase when draftMode is omitted', () => {
-    const session = new GameSession(1234, undefined, { playerCount: 2 })
-    const { state, interaction } = session.getState()
-    expect(state.phase).toBe('playing')
-    expect(state.draft).toBeNull()
-    expect(interaction.stateId).toBe('idle')
-    for (const p of state.players) {
-      expect(p.occupationHand.length).toBe(7)
-      expect(p.minorHand.length).toBe(7)
-    }
-  })
-})
-
-describe('GameSession.submitDraftPick — happy paths', () => {
-  it('runs a full 7-card 2-player draft and transitions to phase=playing', () => {
-    const session = makeDraftSession(2, 7)
-
-    for (let round = 1; round <= 6; round += 1) {
-      const before = session.getState().state
-      expect(before.phase).toBe('draft')
-      expect(before.draft!.round).toBe(round)
-
-      const p1Pick = firstPick(session, 'p1')
-      const r1 = session.submitDraftPick('p1', p1Pick)
-      expect(r1.ok).toBe(true)
-      expect(r1.state.phase).toBe('draft')
-      const allSubmitted1 = r1.state.draft!.seatOrder.every(
-        (pid) => r1.state.draft!.pendingPicks[pid]?.occ != null
-          && r1.state.draft!.pendingPicks[pid]?.minor != null,
-      )
-      expect(allSubmitted1).toBe(false)
-
-      const p2Pick = firstPick(session, 'p2')
-      const r2 = session.submitDraftPick('p2', p2Pick)
-      expect(r2.ok).toBe(true)
-    }
-
-    const finalResp = session.getState()
-    expect(finalResp.state.phase).toBe('playing')
-    expect(finalResp.state.draft).toBeNull()
-    expect(finalResp.interaction.stateId).toBe('idle')
-    for (const p of finalResp.state.players) {
-      expect(p.occupationHand.length).toBe(7)
-      expect(p.minorHand.length).toBe(7)
-    }
+  it('passes immediately to the next seat and keeps a waiting seat from choosing twice', () => {
+    const session = opening()
+    const first = firstDraftPick(draftOf(session), 'p1')
+    const source = draftSeatProgress(draftOf(session), 'p1')
+    if (source.kind !== 'selecting') throw new Error('expected initial packet')
+    const expectedPacket = { occ: source.pool.occ.slice(1), minor: source.pool.minor.slice(1) }
+    const response = session.submitDraftPick('p1', first)
+    expect(response.ok).toBe(true)
+    expect(draftSeatProgress(draftOf(session), 'p1')).toMatchObject({ kind: 'waiting', round: 2,
+      kept: { occ: [first.occCardId], minor: [first.minorCardId] } })
+    expect(draftOf(session).stages[0].seats.p2.inbox[2]).toEqual(expectedPacket)
+    expect(session.submitDraftPick('p1', { ...first, opportunityKey: '0:2' }).ok).toBe(false)
+    expect(pick(session, 'p2').ok).toBe(true)
+    expect(draftSeatProgress(draftOf(session), 'p2')).toMatchObject({ kind: 'selecting', round: 2, pool: expectedPacket })
   })
 
-  it('runs Farmers of the Moor draft as occupations before FoM minors before published-pool minors', () => {
-    const session = new GameSession(123456, undefined, {
-      playerCount: 2,
-      enableFarmersOfTheMoor: true,
-      allowIncompleteFarmersOfTheMoorMinorDeal: true,
-      draftMode: 'simultaneous',
-      draftPoolSize: 7,
-    })
-
-    expect(session.getState().state.draft!.stage).toBe('occupation')
-    expect(session.getState().state.draft!.totalRounds).toBe(7)
-    for (const pid of ['p1', 'p2']) {
-      expect(session.getState().state.draft!.pools[pid].occ).toHaveLength(7)
-      expect(session.getState().state.draft!.pools[pid].minor).toEqual([])
-    }
-
-    for (let round = 1; round <= 6; round += 1) {
-      for (const pid of ['p1', 'p2']) {
-        const resp = session.submitDraftPick(pid, firstOccupationPick(session, pid))
-        expect(resp.ok).toBe(true)
-      }
-    }
-
-    const moorMinorStage = session.getState().state
-    expect(moorMinorStage.phase).toBe('draft')
-    expect(moorMinorStage.draft!.stage).toBe('farmersOfTheMoorMinor')
-    expect(moorMinorStage.draft!.round).toBe(1)
-    expect(moorMinorStage.draft!.totalRounds).toBe(4)
-    for (const pid of ['p1', 'p2']) {
-      expect(moorMinorStage.draft!.pools[pid].occ).toEqual([])
-      expect(moorMinorStage.draft!.pools[pid].minor).toHaveLength(4)
-      expect(moorMinorStage.draft!.kept[pid].occ).toHaveLength(7)
-      expect(moorMinorStage.draft!.kept[pid].minor).toHaveLength(0)
-    }
-
-    for (let round = 1; round <= 3; round += 1) {
-      for (const pid of ['p1', 'p2']) {
-        const resp = session.submitDraftPick(pid, firstMinorPick(session, pid))
-        expect(resp.ok).toBe(true)
-      }
-    }
-
-    const publishedStage = session.getState().state
-    expect(publishedStage.phase).toBe('draft')
-    expect(publishedStage.draft!.stage).toBe('publishedMinor')
-    expect(publishedStage.draft!.round).toBe(1)
-    expect(publishedStage.draft!.totalRounds).toBe(3)
-    for (const pid of ['p1', 'p2']) {
-      expect(publishedStage.draft!.pools[pid].occ).toEqual([])
-      expect(publishedStage.draft!.pools[pid].minor).toHaveLength(3)
-      expect(publishedStage.draft!.kept[pid].occ).toHaveLength(7)
-      expect(publishedStage.draft!.kept[pid].minor).toHaveLength(4)
-    }
-
-    for (let round = 1; round <= 2; round += 1) {
-      for (const pid of ['p1', 'p2']) {
-        const resp = session.submitDraftPick(pid, firstMinorPick(session, pid))
-        expect(resp.ok).toBe(true)
-      }
-    }
-
-    const final = session.getState().state
-    expect(final.phase).toBe('playing')
-    expect(final.draft).toBeNull()
-    for (const player of final.players) {
+  it('lets three seats continue to 1/2/3 picks while a fourth seat is absent, then resumes FIFO', () => {
+    const session = opening({ playerCount: 4 })
+    const initialA = firstDraftPick(draftOf(session), 'p1')
+    const initialD = draftSeatProgress(draftOf(session), 'p4')
+    if (initialD.kind !== 'selecting') throw new Error('expected initial packet')
+    const expectedSecondA = { occ: initialD.pool.occ.slice(1), minor: initialD.pool.minor.slice(1) }
+    for (const id of ['p2', 'p3', 'p3', 'p4', 'p4', 'p4']) expect(pick(session, id).ok).toBe(true)
+    const stopped = draftOf(session)
+    expect(stopped.seatOrder.map(id => draftSeatProgress(stopped, id).kept.occ.length)).toEqual([0, 1, 2, 3])
+    expect(Object.keys(stopped.stages[0].seats.p1.inbox)).toEqual(['1', '2', '3', '4'])
+    expect(['p2', 'p3', 'p4'].map(id => draftSeatProgress(stopped, id).kind)).toEqual(['waiting', 'waiting', 'waiting'])
+    expect(session.submitDraftPick('p1', initialA).ok).toBe(true)
+    expect(draftSeatProgress(draftOf(session), 'p1')).toMatchObject({ kind: 'selecting', round: 2, pool: expectedSecondA })
+    expect(draftSeatProgress(draftOf(session), 'p2').kind).toBe('selecting')
+    const final = finish(session)
+    expect(final.state.phase).toBe('playing')
+    for (const player of final.state.players) {
       expect(player.occupationHand).toHaveLength(7)
       expect(player.minorHand).toHaveLength(7)
     }
   })
 
-  it('keeps round=1 while only one of two players has submitted', () => {
-    const session = makeDraftSession(2, 7)
-    const p1Pick = firstPick(session, 'p1')
-    const r1 = session.submitDraftPick('p1', p1Pick)
-    expect(r1.ok).toBe(true)
-    expect(r1.state.draft!.round).toBe(1)
-    expect(r1.state.draft!.pendingPicks.p1.occ).toBe(p1Pick.occCardId)
-    expect(r1.state.draft!.pendingPicks.p1.minor).toBe(p1Pick.minorCardId)
-    expect(r1.state.draft!.kept.p1.occ).toEqual([p1Pick.occCardId])
-    expect(r1.state.draft!.kept.p1.minor).toEqual([p1Pick.minorCardId])
-    expect(r1.state.draft!.pools.p1.occ).not.toContain(p1Pick.occCardId)
-    expect(r1.state.draft!.pools.p1.minor).not.toContain(p1Pick.minorCardId)
-    expect(r1.state.draft!.pendingPicks.p2.occ).toBeNull()
-    expect(r1.state.draft!.pendingPicks.p2.minor).toBeNull()
-    expect(r1.state.phase).toBe('draft')
-    const allSubmittedR1 = r1.state.draft!.seatOrder.every(
-      (pid) => r1.state.draft!.pendingPicks[pid]?.occ != null
-        && r1.state.draft!.pendingPicks[pid]?.minor != null,
-    )
-    expect(allSubmittedR1).toBe(false)
-
-    const p2Pick = firstPick(session, 'p2')
-    const r2 = session.submitDraftPick('p2', p2Pick)
-    expect(r2.ok).toBe(true)
-    expect(r2.state.draft!.round).toBe(2)
-  })
-
-  it('auto-finalizes a 7-card draft after six submitted rounds', () => {
-    const session = makeDraftSession(2, 7)
-
-    for (let round = 1; round <= 6; round += 1) {
-      expect(session.getState().state.phase).toBe('draft')
-      expect(session.getState().state.draft!.round).toBe(round)
-      for (const pid of ['p1', 'p2']) {
-        const pick = firstPick(session, pid)
-        const resp = session.submitDraftPick(pid, pick)
-        expect(resp.ok).toBe(true)
-      }
-    }
-
-    const final = session.getState().state
-    expect(final.phase).toBe('playing')
-    expect(final.draft).toBeNull()
-    for (const player of final.players) {
+  it.each([7, 8, 9, 10])('finishes a two-player pool of %i with exactly seven of each type and complete pick history', poolSize => {
+    const session = opening({ draftPoolSize: poolSize })
+    const response = finish(session)
+    expect(response.state.phase).toBe('playing')
+    expect(response.state.draft).toBeNull()
+    expect(response.interaction.stateId).toBe('idle')
+    for (const player of response.state.players) {
       expect(player.occupationHand).toHaveLength(7)
       expect(player.minorHand).toHaveLength(7)
+      expect(player.stats.draftHistory).toHaveLength(14)
+      expect(player.stats.draftHistory.filter(entry => entry.draftTurn === 7)).toHaveLength(2)
+      expect(new Set(player.stats.draftHistory.map(entry => entry.cardId)).size).toBe(14)
     }
   })
 
-  it('trims the draft hand to 7 cards when poolSize=8 (passthrough card discarded)', () => {
-    const session = makeDraftSession(2, 8)
-    // With poolSize=8, each round all players pick and pass; after 7 rounds
-    // each player has 7 kept cards and 1 unkept card remains (discarded).
-    expect(session.getState().state.draft!.poolSize).toBe(8)
-    expect(session.getState().state.draft!.totalRounds).toBe(7)
-
-    for (let round = 1; round <= 7; round += 1) {
-      const p1 = firstPick(session, 'p1')
-      session.submitDraftPick('p1', p1)
-      const p2 = firstPick(session, 'p2')
-      session.submitDraftPick('p2', p2)
+  it('allows a Moor player to select the next stage while another still has occupation packets', () => {
+    const session = opening({ playerCount: 4, enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true })
+    let transition = session.getState()
+    for (let step = 0; step < 64; step++) {
+      const draft = draftOf(session)
+      const playerId = draft.seatOrder.find(id => {
+        const progress = draftSeatProgress(draft, id)
+        return progress.kind === 'selecting' && progress.stage === 'occupation'
+      })
+      if (!playerId) throw new Error('expected occupation choice')
+      transition = pick(session, playerId)
+      expect(transition.ok).toBe(true)
+      if (draftOf(session).seatOrder.some(id => {
+        const progress = draftSeatProgress(draftOf(session), id)
+        return progress.kind === 'selecting' && progress.stage !== 'occupation'
+      })) break
     }
-
-    const final = session.getState().state
-    expect(final.phase).toBe('playing')
-    expect(final.draft).toBeNull()
-    for (const p of final.players) {
-      expect(p.occupationHand.length).toBe(7)
-      expect(p.minorHand.length).toBe(7)
+    const draft = draftOf(session)
+    const advancedId = draft.seatOrder.find(id => {
+      const progress = draftSeatProgress(draft, id)
+      return progress.kind === 'selecting' && progress.stage === 'farmersOfTheMoorMinor'
+    })
+    expect(advancedId).toBeDefined()
+    expect(draft.seatOrder.some(id => {
+      const progress = draftSeatProgress(draft, id)
+      return progress.kind !== 'finished' && progress.stage === 'occupation'
+    })).toBe(true)
+    if (!advancedId) throw new Error('expected independently advanced player')
+    expect(transition.privateEvents).toEqual(expect.arrayContaining([expect.objectContaining({
+      type: 'private.draftUpdated', recipientPlayerId: advancedId, round: 7, advanced: false, finished: false,
+    })]))
+    expect(pick(session, advancedId).ok).toBe(true)
+    expect(draftSeatProgress(draftOf(session), advancedId).kept.minor).toHaveLength(1)
+    expect(session.state.phase).toBe('draft')
+    const response = finish(session)
+    expect(response.state.phase).toBe('playing')
+    for (const player of response.state.players) {
+      expect(player.occupationHand).toHaveLength(7)
+      expect(player.minorHand).toHaveLength(7)
+      expect(player.stats.draftHistory).toHaveLength(14)
     }
   })
 
-  it('runs a full 7-card 3-player draft with clockwise rotation', () => {
-    const session = makeDraftSession(3, 7)
-    const initial = session.getState().state
-    expect(initial.draft!.seatOrder).toEqual(['p1', 'p2', 'p3'])
-    // Capture p1's initial occ pool to verify rotation direction after round 1.
-    const p1InitialOcc = [...initial.draft!.pools.p1.occ]
-
-    for (let round = 1; round <= 6; round += 1) {
-      for (const pid of ['p1', 'p2', 'p3']) {
-        const pick = firstPick(session, pid)
-        const resp = session.submitDraftPick(pid, pick)
-        expect(resp.ok).toBe(true)
-      }
+  it('keeps hands private and reports no global completion when one player finishes first', () => {
+    const session = opening({ playerCount: 4 })
+    let response = session.getState()
+    let finishedId: string | undefined
+    for (let step = 0; step < 64; step++) {
+      const draft = draftOf(session)
+      const nextId = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
+      if (!nextId) throw new Error('expected remaining draft choice')
+      response = pick(session, nextId)
+      expect(response.ok).toBe(true)
+      const remaining = response.state.draft
+      if (!remaining) throw new Error('expected one player to finish before the whole table')
+      finishedId = remaining.seatOrder.find(id => draftSeatProgress(remaining, id).kind === 'finished')
+      if (finishedId) break
     }
-
-    const final = session.getState().state
-    expect(final.phase).toBe('playing')
-    for (const p of final.players) {
-      expect(p.occupationHand.length).toBe(7)
-      expect(p.minorHand.length).toBe(7)
-    }
-    // Sanity: p1's initial pool is NOT equal to p3's initial pool (different deals)
-    // and clockwise rotation means p2 inherited what used to be p1's pool after round 1.
-    expect(p1InitialOcc.length).toBe(7)
+    expect(finishedId).toBeDefined()
+    expect(response.state.phase).toBe('draft')
+    expect(response.privateEvents).toEqual(expect.arrayContaining([expect.objectContaining({
+      type: 'private.draftUpdated', recipientPlayerId: finishedId, round: 7, advanced: false, finished: false,
+    })]))
+    const finishedPlayer = response.state.players.find(player => player.id === finishedId)
+    expect(finishedPlayer?.occupationHand).toEqual([])
+    expect(finishedPlayer?.minorHand).toEqual([])
+    expect(finish(session).state.phase).toBe('playing')
   })
 
-  it('verifies clockwise rotation after round 1 (2p)', () => {
-    const session = makeDraftSession(2, 7)
-    const initial = session.getState().state
-    const p1OccBefore = [...initial.draft!.pools.p1.occ]
-    const p1MinorBefore = [...initial.draft!.pools.p1.minor]
-    const p1Pick = firstPick(session, 'p1')
-    const p2Pick = firstPick(session, 'p2')
-    session.submitDraftPick('p1', p1Pick)
-    session.submitDraftPick('p2', p2Pick)
-
-    // After round 1, p1's pool (minus p1's pick) should now sit with p2.
-    const expectedP2Occ = p1OccBefore.filter((id) => id !== p1Pick.occCardId)
-    const expectedP2Minor = p1MinorBefore.filter((id) => id !== p1Pick.minorCardId)
-
-    const after = session.getState().state
-    expect(after.draft!.round).toBe(2)
-    expect(after.draft!.pools.p2.occ.sort()).toEqual(expectedP2Occ.sort())
-    expect(after.draft!.pools.p2.minor.sort()).toEqual(expectedP2Minor.sort())
+  it('enters parent selection only after every player completes their draft', () => {
+    const session = opening({ enableParentCards: true, parentSelectionSeed: 1 })
+    const response = finish(session)
+    expect(response.state.phase).toBe('parent-selection')
+    expect(response.state.parentSelection).not.toBeNull()
+    expect(response.state.draft).toBeNull()
+    for (const [index, player] of response.state.players.entries()) {
+      const candidates = session.state.parentSelection?.candidates[player.id]
+      if (!candidates) throw new Error('expected parent candidates')
+      const mother = candidates.mother[0]
+      const father = candidates.father[0]
+      if (!mother || !father) throw new Error('expected both parent candidates')
+      expect(session.submitParentSelection(index, { mother, father }).ok).toBe(true)
+    }
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.players.every(player => player.parentCards.mother && player.parentCards.father)).toBe(true)
   })
 })
 
-describe('GameSession.submitDraftPick — validation and retry paths', () => {
-  it('rejects a pick that is not in the player’s current pool', () => {
-    const session = makeDraftSession(2, 7)
-    const resp = session.submitDraftPick('p1', {
-      occCardId: 'not-a-real-card',
-      minorCardId: 'also-not-real',
-    })
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toBeDefined()
-    // State should remain unchanged.
-    expect(resp.state.draft!.round).toBe(1)
-    expect(resp.state.draft!.pendingPicks.p1.occ).toBeNull()
-  })
-
-  it('returns the existing result for an exact retry in the same round', () => {
-    const session = makeDraftSession(2, 7)
-    const p1Pick = firstPick(session, 'p1')
-    const first = session.submitDraftPick('p1', p1Pick)
-    expect(first.ok).toBe(true)
-    const submittedDraft = structuredClone(first.state.draft)
-
-    const retry = session.submitDraftPick('p1', p1Pick)
-
-    expect(retry.ok).toBe(true)
-    expect(retry.error).toBeUndefined()
-    expect(retry.state.draft).toEqual(submittedDraft)
-    expect(retry.state.players[0]!.stats.draftHistory).toHaveLength(2)
-    expect(retry.privateEvents).toEqual([
-      expect.objectContaining({
-        type: 'private.draftUpdated',
-        recipientPlayerId: 'p1',
-        picked: p1Pick,
-        advanced: false,
-        finished: false,
-      }),
-    ])
-  })
-
-  it('returns the existing result when the final submitter retries after advancement', () => {
-    const session = makeDraftSession(2, 7)
-    session.submitDraftPick('p1', firstPick(session, 'p1'))
-    const roundOnePick = firstPick(session, 'p2')
-    const advanced = session.submitDraftPick('p2', roundOnePick)
-    expect(advanced.state.draft!.round).toBe(2)
-    const advancedState = session.withCtx(() => serializeState(advanced.state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
-
-    const roundOneRetry = session.submitDraftPick('p2', roundOnePick)
-
-    expect(roundOneRetry.ok).toBe(true)
-    expect(session.withCtx(() => serializeState(roundOneRetry.state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))).toEqual(advancedState)
-    expect(roundOneRetry.state.players[1]!.stats.draftHistory).toHaveLength(2)
-
-    let finalPick = roundOnePick
-    for (let round = 2; round <= 6; round += 1) {
-      session.submitDraftPick('p1', firstPick(session, 'p1'))
-      finalPick = firstPick(session, 'p2')
-      session.submitDraftPick('p2', finalPick)
+describe('draft validation and recovery', () => {
+  it('rejects invalid cards, wrong opportunities, missing paired cards, and unknown players without changing state', () => {
+    const session = opening()
+    const valid = firstDraftPick(draftOf(session), 'p1')
+    const before = structuredClone(draftOf(session))
+    for (const invalid of [
+      { ...valid, occCardId: 'not-a-card' },
+      { ...valid, opportunityKey: '0:99' },
+      { opportunityKey: valid.opportunityKey, occCardId: valid.occCardId },
+    ]) {
+      expect(session.submitDraftPick('p1', invalid).ok).toBe(false)
+      expect(session.state.draft).toEqual(before)
     }
-    const finishedState = session.withCtx(() => serializeState(session.getState().state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
-    const historyLength = finishedState.players[1]!.stats.draftHistory.length
-
-    const finalRetry = session.submitDraftPick('p2', finalPick)
-
-    expect(finalRetry.ok).toBe(true)
-    expect(session.withCtx(() => serializeState(finalRetry.state, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))).toEqual(finishedState)
-    expect(finalRetry.state.players[1]!.stats.draftHistory).toHaveLength(historyLength)
+    expect(session.submitDraftPick('p99', valid).ok).toBe(false)
+    expect(session.state.draft).toEqual(before)
   })
 
-  it('rejects a pick from an unknown player', () => {
-    const session = makeDraftSession(2, 7)
-    const resp = session.submitDraftPick('p99', {
-      occCardId: 'x',
-      minorCardId: 'y',
-    })
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toBeDefined()
-  })
-
-  it('rejects submitDraftPick when the game is already in playing phase', () => {
-    const session = new GameSession(42, undefined, { playerCount: 2 })
-    expect(session.getState().state.phase).toBe('playing')
-    const resp = session.submitDraftPick('p1', {
-      occCardId: 'a',
-      minorCardId: 'b',
-    })
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toMatch(/not in draft phase/i)
-  })
-
-  it('rejects takeAction while phase=draft', () => {
-    const session = makeDraftSession(2, 7)
-    const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toMatch(/draft in progress/i)
-  })
-})
-
-describe('GameSession — draft persistence (serialize → rehydrate)', () => {
-  it('round-trips an in-progress draft through serializeState / rehydrateState', () => {
-    const session = makeDraftSession(2, 7)
-    // Submit 1 round so the draft has meaningful kept + rotated pools.
-    const p1 = firstPick(session, 'p1')
-    const p2 = firstPick(session, 'p2')
-    session.submitDraftPick('p1', p1)
-    session.submitDraftPick('p2', p2)
-
-    const live = session.getState().state
-    expect(live.phase).toBe('draft')
-    expect(live.draft!.round).toBe(2)
-
-    const serialized = session.withCtx(() => serializeState(live, { actionHooks: session.actionHooks, engineStack: session.getEngineStack() }))
-    const json = JSON.parse(JSON.stringify(serialized))
-    expect(json.phase).toBe('draft')
-    expect(json.draft).toBeTruthy()
-    expect(json.draft.round).toBe(2)
-    expect(json.draft.kept.p1.occ).toEqual([p1.occCardId])
-
-    const rehydrated = rehydrateState(json)
-    expect(rehydrated.state.phase).toBe('draft')
-    expect(rehydrated.state.draft).not.toBeNull()
-    expect(rehydrated.state.draft!.round).toBe(2)
-    expect(rehydrated.state.draft!.kept.p1.occ).toEqual([p1.occCardId])
-    expect(rehydrated.state.draft!.kept.p2.minor).toEqual([p2.minorCardId])
-
-    // Load into a fresh session and continue the draft to completion.
-    const revived = new GameSession(rehydrated)
-    expect(revived.getState().state.phase).toBe('draft')
-    expect(revived.getState().state.draft).not.toBeNull()
-    const retry = revived.submitDraftPick('p2', p2)
+  it('retries the exact submitted opportunity after a new packet arrives without picking it or duplicating history', () => {
+    const session = opening()
+    const first = firstDraftPick(draftOf(session), 'p1')
+    expect(session.submitDraftPick('p1', first).ok).toBe(true)
+    expect(pick(session, 'p2').ok).toBe(true)
+    const current = firstDraftPick(draftOf(session), 'p1')
+    expect(current.opportunityKey).toBe('0:2')
+    const before = serialized(session)
+    const retry = session.submitDraftPick('p1', first)
     expect(retry.ok).toBe(true)
-    expect(retry.state.draft!.round).toBe(2)
-    expect(retry.state.players[1]!.stats.draftHistory).toHaveLength(2)
+    expect(serialized(session)).toEqual(before)
+    expect(retry.state.players[0].stats.draftHistory).toHaveLength(2)
+    expect(retry.privateEvents ?? []).toEqual([])
+    expect(session.submitDraftPick('p1', { ...current, opportunityKey: first.opportunityKey }).ok).toBe(false)
+    expect(serialized(session)).toEqual(before)
+  })
 
-    for (let round = 2; round <= 6; round += 1) {
-      const pa = firstPick(revived, 'p1')
-      const pb = firstPick(revived, 'p2')
-      const ra = revived.submitDraftPick('p1', pa)
-      expect(ra.ok).toBe(true)
-      const rb = revived.submitDraftPick('p2', pb)
-      expect(rb.ok).toBe(true)
+  it('returns the final manual submission on retry even after forced-card completion', () => {
+    const session = opening()
+    let last: ReturnType<typeof firstDraftPick> | undefined
+    let lastId = ''
+    while (session.state.draft) {
+      const draft = draftOf(session)
+      const id = draft.seatOrder.find(playerId => draftSeatProgress(draft, playerId).kind === 'selecting')
+      if (!id) throw new Error('expected actionable seat')
+      last = firstDraftPick(draft, id)
+      lastId = id
+      expect(session.submitDraftPick(id, last).ok).toBe(true)
     }
+    if (!last) throw new Error('expected final manual pick')
+    const before = serialized(session)
+    expect(session.submitDraftPick(lastId, last).ok).toBe(true)
+    expect(serialized(session)).toEqual(before)
+  })
 
-    const final = revived.getState().state
-    expect(final.phase).toBe('playing')
-    expect(final.draft).toBeNull()
-    for (const pl of final.players) {
-      expect(pl.occupationHand.length).toBe(7)
-      expect(pl.minorHand.length).toBe(7)
+  it('restores accumulated packets and the latest receipt before continuing to completion', () => {
+    const original = opening({ playerCount: 4 })
+    let last = firstDraftPick(draftOf(original), 'p4')
+    for (const id of ['p2', 'p3', 'p3', 'p4', 'p4', 'p4']) {
+      last = firstDraftPick(draftOf(original), id)
+      expect(original.submitDraftPick(id, last).ok).toBe(true)
+    }
+    const before = structuredClone(draftOf(original))
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized(original)))))
+    sessions.push(restored)
+    expect(restored.state.phase).toBe('draft')
+    expect(restored.state.draft).toEqual(before)
+    expect(restored.submitDraftPick('p4', last).ok).toBe(true)
+    expect(restored.state.draft).toEqual(before)
+    expect(restored.state.players[3].stats.draftHistory).toHaveLength(6)
+    const response = finish(restored)
+    expect(response.state.phase).toBe('playing')
+    for (const player of response.state.players) {
+      expect(player.occupationHand).toHaveLength(7)
+      expect(player.minorHand).toHaveLength(7)
+      expect(player.stats.draftHistory).toHaveLength(14)
     }
   })
 })

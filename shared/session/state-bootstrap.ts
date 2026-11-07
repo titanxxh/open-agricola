@@ -198,20 +198,14 @@ const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; m
   const occupation = new Set<string>()
   const minor = new Set<string>()
   if (!draft) return { occupation, minor }
-  Object.values(draft.pools).forEach((pool) => {
-    pool.occ.forEach((id) => occupation.add(id))
-    pool.minor.forEach((id) => minor.add(id))
-  })
-  Object.values(draft.kept).forEach((pool) => {
-    pool.occ.forEach((id) => occupation.add(id))
-    pool.minor.forEach((id) => minor.add(id))
-  })
-  draft.stages?.forEach((stage) => {
-    Object.values(stage.pools).forEach((pool) => {
-      pool.occ.forEach((id) => occupation.add(id))
-      pool.minor.forEach((id) => minor.add(id))
-    })
-  })
+  for (const stage of draft.stages) {
+    for (const seat of Object.values(stage.seats)) {
+      for (const pool of [seat.kept, ...Object.values(seat.inbox)]) {
+        pool.occ.forEach(id => occupation.add(id))
+        pool.minor.forEach(id => minor.add(id))
+      }
+    }
+  }
   return { occupation, minor }
 }
 
@@ -561,7 +555,7 @@ export const normalizeState = (raw: GameState, getActionDefinition?: ActionDefin
   const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, createSeed())
   const enableThroughTheSeasons = raw.enableThroughTheSeasons ?? false
   const enableSnakeOpening = raw.enableSnakeOpening === true && players.length > 1
-  const rawDraftPoolSize = raw.draftPoolSize ?? raw.draft?.poolSize
+  const rawDraftPoolSize = raw.draftPoolSize ?? raw.draft?.stages[0]?.poolSize
   const draftPoolSize = rawDraftPoolSize === undefined
     ? undefined
     : Number.isInteger(rawDraftPoolSize) && rawDraftPoolSize >= 7 && rawDraftPoolSize <= 10
@@ -927,7 +921,7 @@ export const createInitialState = (
     roundPhase: 'work',
     draft,
     draftMode: useDraft ? 'simultaneous' : undefined,
-    draftPoolSize: draft?.poolSize,
+    draftPoolSize: useDraft ? options.draftPoolSize ?? 7 : undefined,
     ...(soloHandMode ? { soloHandMode, soloHandSelection } : {}),
     parentSelection: null,
     currentPlayerIndex: 0,

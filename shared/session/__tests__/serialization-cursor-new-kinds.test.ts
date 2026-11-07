@@ -1,3 +1,4 @@
+import { initDraftState } from '../../draft/draft-manager'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { rehydrateState, serializeSessionSnapshot } from '../serialization'
@@ -250,20 +251,10 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
 
     const request: InteractionRequest = {
       kind: 'card-draft',
-      mode: 'simultaneous',
-      round: 1,
-      totalRounds: 4,
-      poolSize: 7,
-      seatOrder: ['p1', 'p2'],
-      pools: {
+      draft: initDraftState(['p1', 'p2'], {
         p1: { occ: ['o1', 'o2'], minor: ['m1', 'm2'] },
         p2: { occ: ['o3', 'o4'], minor: ['m3', 'm4'] },
-      },
-      pendingPicks: [],
-      kept: {
-        p1: { occ: [], minor: [] },
-        p2: { occ: [], minor: [] },
-      },
+      }, 2, 2),
     }
     pushSyntheticInteraction(session, request, 'ui.interactionCardDraft' as never)
 

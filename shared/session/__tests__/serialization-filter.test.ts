@@ -5,7 +5,9 @@ installOfficialCardRegistry()
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../../contract/events'
 import type { GameState } from '../../contract/types'
-import type { DraftState } from '../../draft/types'
+import { initStagedDraftState, processSubmit } from '../../draft/draft-manager'
+import { firstDraftPick } from '../../draft/__tests__/draft-fixtures'
+import { draftSeatProgress } from '../../projections/draft-progress'
 import { createInitialState } from '../state-bootstrap'
 import {
   filterSerializedStateForPlayer,
@@ -57,10 +59,10 @@ function makeDraftState(): GameState {
     draftPoolSize: 7,
   })
   expect(state.draft).not.toBeNull()
-  expect(state.draft!.pools.p1.occ.length).toBe(7)
-  expect(state.draft!.pools.p1.minor.length).toBe(7)
-  expect(state.draft!.pools.p2.occ.length).toBe(7)
-  expect(state.draft!.pools.p2.minor.length).toBe(7)
+  expect(state.draft!.stages[0].seats.p1.inbox[1].occ).toHaveLength(7)
+  expect(state.draft!.stages[0].seats.p1.inbox[1].minor).toHaveLength(7)
+  expect(state.draft!.stages[0].seats.p2.inbox[1].occ).toHaveLength(7)
+  expect(state.draft!.stages[0].seats.p2.inbox[1].minor).toHaveLength(7)
   return state
 }
 
@@ -202,144 +204,88 @@ describe('serializeStateForPlayer', () => {
     expect(out.draft).toBeNull()
   })
 
-  it('masks draft.pools for non-viewers, preserves viewer pool', () => {
+  it('preserves the current owner packet and masks the other seat packet', () => {
     const state = makeDraftState()
-    const p1PoolOcc = [...state.draft!.pools.p1.occ]
-    const p1PoolMinor = [...state.draft!.pools.p1.minor]
-    const p2PoolOcc = [...state.draft!.pools.p2.occ]
-    const p2PoolMinor = [...state.draft!.pools.p2.minor]
-
-    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
-    expect(out.draft).not.toBeNull()
-    const draft = out.draft as DraftState
-
-    expect(draft.pools.p1.occ).toEqual(p1PoolOcc)
-    expect(draft.pools.p1.minor).toEqual(p1PoolMinor)
-    expect(draft.pools.p2.occ).toEqual(Array(p2PoolOcc.length).fill('?'))
-    expect(draft.pools.p2.minor).toEqual(Array(p2PoolMinor.length).fill('?'))
+    const raw = state.draft!.stages[0].seats
+    const out = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    expect(out.stages[0].seats.p1.inbox[1]).toEqual(raw.p1.inbox[1])
+    expect(out.stages[0].seats.p2.inbox[1]).toEqual({
+      occ: Array(7).fill('?'), minor: Array(7).fill('?'),
+    })
   })
 
-  it('masks staged draft pools for non-viewers', () => {
-    const state = makeDraftState()
-    state.draft = {
-      ...state.draft!,
-      stage: 'farmersOfTheMoorMinor',
-      stageIndex: 1,
-      stages: [
-        {
-          kind: 'occupation',
-          poolSize: 1,
-          totalRounds: 1,
-          pools: {
-            p1: { occ: ['occ-p1'], minor: [] },
-            p2: { occ: ['occ-p2'], minor: [] },
-          },
-        },
-        {
-          kind: 'farmersOfTheMoorMinor',
-          poolSize: 1,
-          totalRounds: 1,
-          pools: {
-            p1: { occ: [], minor: ['fom-p1'] },
-            p2: { occ: [], minor: ['fom-p2'] },
-          },
-        },
-      ],
+  it('hides queued packets even from their owner while preserving the current packet', () => {
+    const state = createInitialState(1337, { playerCount: 4, draftMode: 'simultaneous', draftPoolSize: 7 })
+    for (const id of ['p2', 'p3', 'p4', 'p3', 'p4', 'p4']) {
+      const result = processSubmit(state.draft!, id, firstDraftPick(state.draft!, id))
+      if (result.kind !== 'accepted') throw new Error(result.error)
+      state.draft = result.draft
     }
-
-    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
-    const draft = out.draft as DraftState
-
-    expect(draft.stages![0]!.pools.p1.occ).toEqual(['occ-p1'])
-    expect(draft.stages![0]!.pools.p2.occ).toEqual(['?'])
-    expect(draft.stages![1]!.pools.p1.minor).toEqual(['fom-p1'])
-    expect(draft.stages![1]!.pools.p2.minor).toEqual(['?'])
+    const current = state.draft!.stages[0].seats.p1.inbox[1]
+    const owner = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    expect(owner.stages[0].seats.p1.inbox[1]).toEqual(current)
+    expect(owner.stages[0].seats.p1.inbox[2]).toEqual({ occ: Array(6).fill('?'), minor: Array(6).fill('?') })
+    expect(owner.stages[0].seats.p1.inbox[3]).toEqual({ occ: Array(5).fill('?'), minor: Array(5).fill('?') })
+    expect(owner.stages[0].seats.p1.inbox[4]).toEqual({ occ: Array(4).fill('?'), minor: Array(4).fill('?') })
+    expect(draftSeatProgress(owner, 'p1').kind).toBe('selecting')
+    const spectator = serializeStateForPlayer(state, null, emptyCtx()).draft!
+    expect(spectator.stages[0].seats.p1.inbox[1]).toEqual({ occ: Array(7).fill('?'), minor: Array(7).fill('?') })
   })
 
-  it('masks non-viewer draft.kept and submitted pendingPicks', () => {
+  it('hides unopened stages from the owner and reveals only their personal current stage', () => {
     const state = makeDraftState()
-    state.draft!.pendingPicks.p1 = {
-      occ: state.draft!.pools.p1.occ[0]!,
-      minor: state.draft!.pools.p1.minor[0]!,
+    state.draft = initStagedDraftState(['p1', 'p2'], [
+      { kind: 'occupation', poolSize: 3, totalRounds: 2, pools: {
+        p1: { occ: ['a1', 'a2', 'a3'], minor: [] }, p2: { occ: ['b1', 'b2', 'b3'], minor: [] },
+      } },
+      { kind: 'farmersOfTheMoorMinor', poolSize: 3, totalRounds: 2, pools: {
+        p1: { occ: [], minor: ['f1', 'f2', 'f3'] }, p2: { occ: [], minor: ['g1', 'g2', 'g3'] },
+      } },
+    ])
+    const opening = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    expect(opening.stages[0].seats.p1.inbox[1].occ).toEqual(['a1', 'a2', 'a3'])
+    expect(opening.stages[1].seats.p1.inbox[1].minor).toEqual(['?', '?', '?'])
+    expect(opening.stages[1].seats.p2.inbox[1].minor).toEqual(['?', '?', '?'])
+    for (const id of ['p1', 'p2', 'p1']) {
+      const result = processSubmit(state.draft, id, firstDraftPick(state.draft, id))
+      if (result.kind !== 'accepted') throw new Error(result.error)
+      state.draft = result.draft
     }
-    state.draft!.pendingPicks.p2 = {
-      occ: state.draft!.pools.p2.occ[0]!,
-      minor: state.draft!.pools.p2.minor[0]!,
-    }
-    state.draft!.kept.p1 = {
-      occ: [state.draft!.pools.p1.occ[0]!, state.draft!.pools.p1.occ[1]!],
-      minor: [state.draft!.pools.p1.minor[0]!],
-    }
-    state.draft!.kept.p2 = {
-      occ: [state.draft!.pools.p2.occ[0]!],
-      minor: [state.draft!.pools.p2.minor[0]!, state.draft!.pools.p2.minor[1]!],
-    }
-    state.players[0]!.stats.draftHistory = [
-      { cardId: state.draft!.kept.p1.occ[0]!, draftTurn: 1 },
-    ]
-    state.players[1]!.stats.draftHistory = [
-      { cardId: state.draft!.kept.p2.occ[0]!, draftTurn: 1 },
-    ]
-    state.players[0]!.lastDraftSubmission = {
-      occCardId: state.draft!.pendingPicks.p1.occ!,
-      minorCardId: state.draft!.pendingPicks.p1.minor!,
-    }
-    state.players[1]!.lastDraftSubmission = {
-      occCardId: state.draft!.pendingPicks.p2.occ!,
-      minorCardId: state.draft!.pendingPicks.p2.minor!,
+    const owner = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    expect(owner.stages[1].seats.p1.inbox[1].minor).toEqual(['f1', 'f2', 'f3'])
+    expect(owner.stages[1].seats.p2.inbox[1].minor).toEqual(['?', '?', '?'])
+    expect(owner.stages[0].seats.p2.inbox[2].occ).toEqual(['?', '?'])
+    expect(draftSeatProgress(owner, 'p1')).toMatchObject({ stageIndex: 1, kind: 'selecting' })
+    expect(draftSeatProgress(owner, 'p2')).toMatchObject({ stageIndex: 0, kind: 'selecting' })
+  })
+
+  it('keeps public pick counts while hiding other seats history and every last submission', () => {
+    const state = makeDraftState()
+    for (const id of ['p1', 'p2']) {
+      const pick = firstDraftPick(state.draft!, id)
+      const result = processSubmit(state.draft!, id, pick)
+      if (result.kind !== 'accepted') throw new Error(result.error)
+      state.draft = result.draft
+      const player = state.players.find(player => player.id === id)!
+      player.lastDraftSubmission = pick
+      player.stats.draftHistory = [{ cardId: pick.occCardId!, draftTurn: 1 }]
     }
     const raw = serializeState(state, emptyCtx())
-    const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
-    const spectator = serializeStateForPlayer(state, null, emptyCtx())
-    expect(raw.draft).not.toBeNull()
-    expect(filtered.draft).not.toBeNull()
-    expect(spectator.draft).not.toBeNull()
-
-    const r = raw.draft as DraftState
-    const f = filtered.draft as DraftState
-    const s = spectator.draft as DraftState
-    expect(f.kept.p1).toEqual(r.kept.p1)
-    expect(f.kept.p2).toEqual({ occ: ['?'], minor: ['?', '?'] })
-    expect(s.kept.p1).toEqual({ occ: ['?', '?'], minor: ['?'] })
-    expect(s.kept.p2).toEqual({ occ: ['?'], minor: ['?', '?'] })
-    expect(f.pendingPicks.p1).toEqual(r.pendingPicks.p1)
-    expect(f.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
-    expect(s.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
-    expect(s.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
-    expect(filtered.players[0]!.stats.draftHistory[0]!.cardId)
-      .toBe(state.draft!.kept.p1.occ[0])
-    expect(filtered.players[1]!.stats.draftHistory[0]!.cardId).toBe('?')
-    expect(spectator.players[0]!.stats.draftHistory[0]!.cardId).toBe('?')
-    expect(spectator.players[1]!.stats.draftHistory[0]!.cardId).toBe('?')
-    expect(raw.players[0]!.lastDraftSubmission).toEqual(state.players[0]!.lastDraftSubmission)
-    expect(filtered.players[0]!.lastDraftSubmission).toBeUndefined()
-    expect(filtered.players[1]!.lastDraftSubmission).toBeUndefined()
-    expect(spectator.players[0]!.lastDraftSubmission).toBeUndefined()
-    expect(spectator.players[1]!.lastDraftSubmission).toBeUndefined()
-    expect(f.round).toBe(r.round)
-    expect(f.totalRounds).toBe(r.totalRounds)
-    expect(f.poolSize).toBe(r.poolSize)
-    expect(f.seatOrder).toEqual(r.seatOrder)
-    expect(f.mode).toBe(r.mode)
-  })
-
-  it('preserves null values when masking non-viewer pendingPicks', () => {
-    const state = makeDraftState()
-    state.draft!.pendingPicks.p1 = {
-      occ: state.draft!.pools.p1.occ[0]!,
-      minor: state.draft!.pools.p1.minor[0]!,
+    for (const viewer of ['p1', 'p2', null]) {
+      const projected = serializeStateForPlayer(state, viewer, emptyCtx())
+      for (const [index, player] of state.players.entries()) {
+        const own = player.id === viewer
+        const actual = state.draft!.stages[0].seats[player.id].kept
+        expect(projected.draft!.stages[0].seats[player.id].kept).toEqual(own ? actual : { occ: ['?'], minor: ['?'] })
+        expect(projected.players[index].stats.draftHistory).toEqual([
+          { cardId: own ? player.lastDraftSubmission!.occCardId : '?', draftTurn: 1 },
+        ])
+        expect(projected.players[index].lastDraftSubmission).toBeUndefined()
+        expect(raw.players[index].lastDraftSubmission).toEqual(player.lastDraftSubmission)
+      }
+      expect(projected.draft!.seatOrder).toEqual(['p1', 'p2'])
+      expect(projected.draft!.stages[0]).toMatchObject({ kind: 'standard', poolSize: 7, totalRounds: 7 })
     }
-    state.draft!.pendingPicks.p2 = { occ: null, minor: null }
-
-    const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
-    const spectator = serializeStateForPlayer(state, null, emptyCtx())
-    const f = filtered.draft as DraftState
-    const s = spectator.draft as DraftState
-
-    expect(f.pendingPicks.p1).toEqual(state.draft!.pendingPicks.p1)
-    expect(f.pendingPicks.p2).toEqual({ occ: null, minor: null })
-    expect(s.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
-    expect(s.pendingPicks.p2).toEqual({ occ: null, minor: null })
   })
 
   it('viewerPlayerId=null → all hands + pools masked (spectator mode)', () => {
@@ -350,7 +296,7 @@ describe('serializeStateForPlayer', () => {
       expect(p.minorHand.every((c) => c === '?')).toBe(true)
     }
     expect(out.draft).not.toBeNull()
-    for (const pool of Object.values((out.draft as DraftState).pools)) {
+    for (const pool of Object.values(out.draft!.stages[0].seats).flatMap(seat => Object.values(seat.inbox))) {
       expect(pool.occ.every((c) => c === '?')).toBe(true)
       expect(pool.minor.every((c) => c === '?')).toBe(true)
     }
@@ -363,7 +309,7 @@ describe('serializeStateForPlayer', () => {
       expect(p.occupationHand.every((c) => c === '?')).toBe(true)
       expect(p.minorHand.every((c) => c === '?')).toBe(true)
     }
-    for (const pool of Object.values((out.draft as DraftState).pools)) {
+    for (const pool of Object.values(out.draft!.stages[0].seats).flatMap(seat => Object.values(seat.inbox))) {
       expect(pool.occ.every((c) => c === '?')).toBe(true)
       expect(pool.minor.every((c) => c === '?')).toBe(true)
     }

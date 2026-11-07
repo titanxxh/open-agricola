@@ -1,6 +1,6 @@
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
 import type { GameState } from '../../../shared/contract/types'
-import { computeDraftViewModel } from '../draft/DraftOverlay'
+import { draftSeatProgress } from '../../../shared/projections/draft-progress'
 import { interactionFocusRequestKey } from '../interaction-focus'
 import { computeParentSelectionViewModel } from '../parents/ParentSelectionOverlay'
 
@@ -16,8 +16,9 @@ export function encyclopediaAttentionWindow({ state, interaction, playerId }: {
 }): string | null {
   if (!playerId || state.gameOver) return null
   if (state.phase === 'draft') {
-    if (!state.draft || computeDraftViewModel(state.draft, playerId).alreadySubmitted) return null
-    return `draft:${state.draft.round}:${state.draft.stage ?? 'standard'}`
+    if (!state.draft) return null
+    const progress = draftSeatProgress(state.draft, playerId)
+    return progress.kind === 'selecting' ? `draft:${progress.opportunityKey}` : null
   }
   if (state.phase === 'parent-selection') {
     if (!state.parentSelection) return null

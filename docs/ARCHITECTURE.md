@@ -16,7 +16,7 @@
 | `shared/actions/` hooks | [hooks](architecture/hooks.md) | Hook registry, action execution order, Stage Dispatch, listener purity |
 | `shared/cards/` | [cards](architecture/cards.md) | Card Source, generated catalog, `cardStates`, Card Fields, capabilities |
 | `shared/domain/` | [domain](architecture/domain.md) | `PlayerBoard`, farmyard, animals, scoring, major supply |
-| `shared/draft/`, `shared/custom-code/`, Game Variants, `i18n`, `utils` | [shared-other](architecture/shared-other.md) | Simultaneous draft, Game Variants, Workshop admission, locale, utilities |
+| `shared/draft/`, `shared/custom-code/`, Game Variants, `i18n`, `utils` | [shared-other](architecture/shared-other.md) | Asynchronous draft, Game Variants, Workshop admission, locale, utilities |
 | `server/` | [server](architecture/server.md) | Connections, Rooms, Durable Room Commit, Replay, Bug Report, Workshop backend, persistence, operations |
 | `operations/` | [server deployment boundary](architecture/server.md#deployment-rollback-and-observability) | Independent monitoring deployment and restricted account aggregates |
 | `client/` | [client](architecture/client.md) | Bundles, transport and synchronized state, views, Replay Viewer, Bug Report |
@@ -105,7 +105,7 @@ shared/        No React; shared by frontend, backend, and sandbox
 ├── actions/       Action definitions, effects/, payment/, and hooks
 ├── cards/         Card Source by decks A–E, M, major and community; each card owns meta + impl
 ├── domain/        Domain aggregates: PlayerBoard, farmyard, pasture, scoring, ...
-├── draft/         Simultaneous card selection
+├── draft/         Asynchronous card selection
 ├── custom-code/   Custom-card AST validation
 ├── i18n/          Locale keys
 └── utils/         Shared utilities

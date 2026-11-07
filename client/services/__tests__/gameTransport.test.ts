@@ -320,7 +320,7 @@ describe('WsGameTransport request correlation', () => {
     await transport.connect()
 
     const socket = FakeWebSocket.instances[0]!
-    const pick = { occCardId: 'occ-12', minorCardId: 'min-34' }
+    const pick = { opportunityKey: '0:1', occCardId: 'occ-12', minorCardId: 'min-34' }
     const submitPromise = transport.draftSubmit('p1', pick)
 
     expect(socket.sent[0]).toMatchObject({
@@ -549,7 +549,7 @@ describe('HttpGameTransport draftSubmit', () => {
     try {
       const { HttpGameTransport } = await import('../gameTransport')
       const transport = new HttpGameTransport()
-      const pick = { occCardId: 'occ-99', minorCardId: 'min-11' }
+      const pick = { opportunityKey: '0:1', occCardId: 'occ-99', minorCardId: 'min-11' }
       const payload = await transport.draftSubmit('p2', pick)
 
       expect(calls).toHaveLength(1)

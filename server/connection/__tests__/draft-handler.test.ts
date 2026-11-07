@@ -1,17 +1,4 @@
-/**
- * PR-5 Task 5 — room-level wiring tests for the simultaneous card draft.
- *
- * Covers:
- *   • `parseDraftOptions` validates `draftMode` / `draftPoolSize` from a raw
- *     `createRoom` payload and rejects out-of-range or malformed inputs.
- *   • The WS `createRoom` handler forwards valid draft options into
- *     `GameSession`, so `state.phase === 'draft'` and `state.draft.poolSize`
- *     match the request. Omitted options keep the classic `phase = 'playing'`
- *     flow (backward-compat).
- *   • A room created mid-draft round-trips cleanly through `serializeState` /
- *     `rehydrateState` (mimicking a server restart before the room fills).
- */
-
+import { draftSeatProgress } from '../../../shared/projections/draft-progress'
 import { describe, expect, it } from 'vitest'
 import { parseDraftOptions } from '../room-router.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
@@ -50,12 +37,12 @@ describe('parseDraftOptions', () => {
     expect(result.ok).toBe(false)
   })
 
-  it.each([6, 11, 7.5, 'seven', null as unknown as number, Number.NaN])(
+  it.each([6, 11, 7.5, 'seven', null, Number.NaN])(
     'rejects invalid draftPoolSize=%p',
     (value) => {
       const result = parseDraftOptions({
         draftMode: 'simultaneous',
-        draftPoolSize: value as number,
+        draftPoolSize: value,
       })
       if (value === null) {
         // null means "not provided" and should fall back to default
@@ -80,11 +67,12 @@ describe('GameSession — room-level draft wiring', () => {
     const { state } = session.getState()
     expect(state.phase).toBe('draft')
     expect(state.draft).not.toBeNull()
-    expect(state.draft!.poolSize).toBe(8)
+    expect(state.draft!.stages[0].poolSize).toBe(8)
+    expect(draftSeatProgress(state.draft!, state.draft!.seatOrder[0]).kind).toBe('selecting')
     expect(state.draft!.seatOrder).toHaveLength(2)
     for (const pid of state.draft!.seatOrder) {
-      expect(state.draft!.pools[pid].occ).toHaveLength(8)
-      expect(state.draft!.pools[pid].minor).toHaveLength(8)
+      expect(state.draft!.stages[0].seats[pid].inbox[1].occ).toHaveLength(8)
+      expect(state.draft!.stages[0].seats[pid].inbox[1].minor).toHaveLength(8)
     }
   })
 
@@ -129,13 +117,13 @@ describe('GameSession — room-level draft wiring', () => {
     const { state } = restored.getState()
     expect(state.phase).toBe('draft')
     expect(state.draft).not.toBeNull()
-    expect(state.draft!.poolSize).toBe(10)
+    expect(state.draft!.stages[0].poolSize).toBe(10)
     expect(state.draft!.seatOrder).toHaveLength(3)
     for (const pid of state.draft!.seatOrder) {
-      expect(state.draft!.pools[pid].occ).toHaveLength(10)
-      expect(state.draft!.pools[pid].minor).toHaveLength(10)
-      expect(state.draft!.kept[pid].occ).toEqual([])
-      expect(state.draft!.kept[pid].minor).toEqual([])
+      expect(state.draft!.stages[0].seats[pid].inbox[1].occ).toHaveLength(10)
+      expect(state.draft!.stages[0].seats[pid].inbox[1].minor).toHaveLength(10)
+      expect(state.draft!.stages[0].seats[pid].kept.occ).toEqual([])
+      expect(state.draft!.stages[0].seats[pid].kept.minor).toEqual([])
     }
   })
 })
