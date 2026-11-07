@@ -25,6 +25,7 @@ export type DraftState = {
   seatOrder: string[]
   stages: DraftStage[]
   lastManualPickerId: string | null
+  legacyReplay?: true
 }
 
 export type DraftView = DraftState

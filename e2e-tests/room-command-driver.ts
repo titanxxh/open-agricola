@@ -50,7 +50,7 @@ export async function joinRoomClients(pages: [Page, Page], request: APIRequestCo
       }
     }, locale)
     await page.goto(`${FRONTEND_URL}/?player=p${index + 1}&transport=ws&room=dev2&devMode=1`)
-    await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
+    await expect(page.locator('.game-layout, .draft-overlay').first()).toBeVisible({ timeout: 30000 })
     await expect.poll(() => page.evaluate(() => window.lifecycleUpdate?.payload.state.players.length)).toBe(2)
   }
 }
@@ -120,7 +120,7 @@ export function roomDriver(pages: [Page, Page]) {
   const reload = async () => {
     for (const page of pages) {
       await page.reload()
-      await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
+      await expect(page.locator('.game-layout, .draft-overlay').first()).toBeVisible({ timeout: 30000 })
       await expect.poll(() => page.evaluate(() => !!window.lifecycleUpdate)).toBe(true)
     }
   }

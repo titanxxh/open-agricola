@@ -1,0 +1,92 @@
+{
+  "sourceCommit": "f9edb37342f4f9deeb2ccd344d5c0b9ab9a3cebf",
+  "seed": 123456,
+  "options": {
+    "playerCount": 2,
+    "draftMode": "simultaneous",
+    "draftPoolSize": 8,
+    "enableFarmersOfTheMoor": false
+  },
+  "draft": {
+    "mode": "simultaneous",
+    "round": 1,
+    "totalRounds": 7,
+    "poolSize": 8,
+    "seatOrder": [
+      "p1",
+      "p2"
+    ],
+    "pools": {
+      "p1": {
+        "occ": [
+          "D117_WoodExpert",
+          "D122_ClayCarrier",
+          "E123_ResourceHoarder",
+          "C087_Mason",
+          "C088_CarpentersApprentice",
+          "B103_FieldMerchant",
+          "E122_Cottar"
+        ],
+        "minor": [
+          "D062_BeerTap",
+          "C022_BasketChair",
+          "E012_AnimalBedding",
+          "C013_WoodSlideHammer",
+          "B017_ForestPlow",
+          "A051_DriftNetBoat",
+          "E045_FruitLadder"
+        ]
+      },
+      "p2": {
+        "occ": [
+          "D093_SheepInspector",
+          "D112_YoungFarmer",
+          "C095_BasketWeaver",
+          "C111_SmallAnimalBreeder",
+          "E111_Recluse",
+          "E103_Wolf",
+          "C107_Baker",
+          "A115_ChiefForester"
+        ],
+        "minor": [
+          "A024_ThreshingBoard",
+          "E031_Upholstery",
+          "C019_SwingPlow",
+          "B029_CookeryLesson",
+          "D010_StorksNest",
+          "C072_FestivalPlanning",
+          "E006_Recount",
+          "E053_BoarSpear"
+        ]
+      }
+    },
+    "kept": {
+      "p1": {
+        "occ": [
+          "E101_Blighter"
+        ],
+        "minor": [
+          "C008_PlantFertilizer"
+        ]
+      },
+      "p2": {
+        "occ": [],
+        "minor": []
+      }
+    },
+    "pendingPicks": {
+      "p1": {
+        "occ": "E101_Blighter",
+        "minor": "C008_PlantFertilizer"
+      },
+      "p2": {
+        "occ": null,
+        "minor": null
+      }
+    }
+  },
+  "targets": {
+    "occ": 7,
+    "minor": 7
+  }
+}

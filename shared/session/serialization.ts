@@ -1,4 +1,5 @@
 import { createBaseActionDescriber } from '../actions/base-description'
+import { draftForLegacyReplay } from '../draft/legacy-draft'
 import { collectScheduledEffectPreviews } from '../actions/scheduled-effect-preview'
 import { importRecoveryCatalog } from './recovery-catalog'
 import type { CardStatePresentation } from '../contract/card-state'
@@ -260,6 +261,7 @@ export const serializeSessionSnapshot = (
   })
   const frame: SerializedGameState = {
       ...rest,
+      draft: rest.draft ? draftForLegacyReplay(rest.draft) ?? rest.draft : rest.draft,
       roundStartSnapshot: null,
       players: players.map((player, index) => ({ ...player, ...displays[index]! })),
       actionSpaces: actionSpaces.map(

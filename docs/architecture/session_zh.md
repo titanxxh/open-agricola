@@ -138,6 +138,8 @@ type SessionResponse = {
 
 明确的格式迁移在普通恢复前执行，并保留对局语义。持久化状态或私有游标变化遵循[保留对局升级策略](../HOW_TO_DEPLOY.md#compatibility-of-retained-games)，验证恢复后的真实命令、快照发布和重连。
 
+`restoreSessionState()` 在重建规则前，通过 `shared/draft/legacy-draft.ts` 转换保留的全局轮次轮抽状态，快照发布与大厅存档摘要共用这项转换。权威状态使用逐座位 inbox；迁移对局的新 Replay Frame 同时保留其固定 Viewer 需要的字段，实时视角过滤会删除这些别名。不改写历史 Frame、哈希、游标历史或命令回执。测试：`server/__tests__/legacy-draft-recovery-session.test.ts`、`server/game/__tests__/room-committer.test.ts`。
+
 ADR 0026 明确规定的普通宠物位置是安置数据的例外。Core 恢复规则或命令检查点后，把已有普通宠物移到合法房间，不改变动物总量，也不发出新安置事件。未完成的动物重整区域根据恢复后的状态重新投影。
 
 测试：`server/__tests__/session-recovery-data.test.ts`、`server/__tests__/room-animal-holders-session.test.ts`。

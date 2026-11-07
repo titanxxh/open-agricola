@@ -8,6 +8,8 @@ import type { RoomMeta } from '../game/persistence/room-persistence'
 import { initStagedDraftState, processSubmit } from '../../shared/draft/draft-manager'
 import type { DraftStageKind } from '../../shared/draft/types'
 import { firstDraftPick } from '../../shared/draft/__tests__/draft-fixtures'
+import legacyDraft from '../../shared/draft/__tests__/fixtures/standard-partial.json'
+import { encodeRoomBody } from '../game/persistence/room-body-codec'
 
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
@@ -40,6 +42,18 @@ async function setup() {
 }
 
 describe('my active room summaries', () => {
+  it.each(['plain', 'compressed'])('projects waiters from a retained %s global-round draft without changing its stored body', async format => {
+    const { db, persistence, snapshot, meta } = await setup()
+    await persistence.save('legacy', snapshot, meta)
+    const body = JSON.stringify({ ...snapshot, state: { ...snapshot.state, phase: 'draft', draft: legacyDraft.draft } })
+    const stored = format === 'compressed' ? encodeRoomBody(body) : body
+    await db.prepare('UPDATE rooms SET state_json = ? WHERE id = ?').run(stored, 'legacy')
+    const rooms = await listMyActiveRooms(db, 'alice')
+    expect(rooms[0]).toMatchObject({ progress: { phase: 'draft' }, waiting_player_indexes: [1], current_player_index: null })
+    expect(JSON.stringify(rooms)).not.toContain(legacyDraft.draft.kept.p1.occ[0])
+    expect(await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get('legacy')).toEqual({ state_json: stored })
+  })
+
   it.each(['compressed', 'plain'])('projects occupied seats and start time from a %s snapshot without private data', async format => {
     const { db, persistence, snapshot, meta } = await setup()
     await persistence.save('room', snapshot, meta)
