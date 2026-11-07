@@ -60,7 +60,8 @@ Issues 和 PRDs 使用 `gh` 管理在 `titanxxh/open-agricola`，见 `docs/agent
 
 - 保持 `shared/`、`server/`、`client/` 三层边界，不引入循环依赖。
 - WebSocket 房间对局是实时同步主链路。HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口；不通过 HTTP 另建规则写入主链路。
-- 项目仍处于开发阶段。除非用户明确要求，不维护旧存档、旧 `engineStack` / pending cursor 或旧 action id 的向后兼容，也不把缺少兼容迁移作为 PR review blocker。
+- 项目已上线。影响线上保留对局、`engineStack` / pending cursor、action id 或命令格式的变更，必须遵循[保留对局的升级兼容性](docs/HOW_TO_DEPLOY.md#compatibility-of-retained-games)。缺少必要迁移、恢复后无法继续操作或丢失已确认状态，均是 PR review 和部署 blocker。
+- 兼容范围覆盖当前部署及保留期内的实际存档，不要求永久保留所有历史内部 API、action alias 或本地测试存档。历史 ADR 中“不提供迁移”只记录当时的决定，不能豁免新的线上升级要求。
 
 </important>
 

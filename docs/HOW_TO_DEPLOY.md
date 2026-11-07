@@ -416,6 +416,19 @@ To update public assets, first publish `open-agricola-assets` to its Pages site 
 
 ## 3. Update a Deployment
 
+### Compatibility of retained games
+
+Open Agricola is in production. An upgrade must preserve every retained Room, including offline saves and games in color confirmation, Parent Selection, draft, solo hand selection or gameplay. The supported source formats include the deployed version and any older formats still present in retained snapshots. Local test fixtures can be recreated. Internal APIs and action aliases do not need indefinite support when no retained state or supported client depends on them.
+
+For changes to saved state, engine cursors, pending continuations, action IDs or command formats:
+
+1. Identify the affected formats and phases in retained data. A save is not disposable because all players are offline or because its writer predates the current deployment.
+2. Provide an explicit, versioned migration where the new code cannot read the retained format directly. Repeating the migration leaves an already migrated save unchanged. Preserve seats, confirmed choices, resources, private information, pending work, undo history and command receipts. Keep migration separate from ordinary Session restoration; restoring a game must not re-deal cards, reset progress or silently expire its Game Context.
+3. Test old-state recovery followed by the next real command, snapshot publication and reconnect. Cover affected intermediate states and retries, including partially submitted drafts and pending choices. Constructing a Session or loading JSON alone does not prove that players can continue. If browser commands change, define the supported build overlap and make unsupported clients refresh before accepting incompatible input.
+4. Run the existing target-build archive restore and live-data validation before starting the new application generation. These deployment checks remain required and do not replace behavior tests for changed formats. Missing migration, lost acknowledged state or an unusable restored game blocks PR approval and deployment.
+
+Completed Replays keep their recorded Frames, hashes and frozen Viewer Builds; historical playback does not execute current backend rules. The policy does not require every historical save or browser build to remain supported forever. Retiring retained production games is a separate operator decision with explicit authorization for the affected games, not an implied part of a feature, merge or release request. Defer an incompatible deployment until the affected saves are migrated or verified to have left the affected state.
+
 ### Backend
 
 Run `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` from an owner-controlled machine with locked dependencies and an authenticated `gh` CLI. The defaults are `ubuntu@ten-kr`, `main`, and `/home/ubuntu/open-agricola`.
