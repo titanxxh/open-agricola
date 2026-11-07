@@ -158,6 +158,29 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('data-also-counts-as=')
   })
 
+  it.each([
+    'A060_OrientalFireplace',
+    'C060_SmallPottersOven',
+    'D025_WitchesDanceFloor',
+    'D059_EarthOven',
+    'D060_LargePottery',
+  ])('keeps both leaf overlays on non-passing dual minor %s', (cardId) => {
+    const html = renderToStaticMarkup(<PlayerCard locale="en" cardId={cardId} cardType="minor" />)
+    expect(html).toContain('data-also-counts-as="major"')
+    expect(html).toContain('card-frame-left-leaves')
+    expect(html).toContain('card-frame-right-leaves')
+  })
+
+  it('hides both leaf overlays only for a real passing minor', () => {
+    const passing = renderToStaticMarkup(<PlayerCard locale="en" cardId="D001_ZigzagHarrow" cardType="minor" />)
+    const ordinary = renderToStaticMarkup(<PlayerCard locale="en" cardId="D026_CarpentersYard" cardType="minor" />)
+    expect(passing).not.toContain('card-frame-left-leaves')
+    expect(passing).not.toContain('card-frame-right-leaves')
+    expect(ordinary).toContain('card-frame-left-leaves')
+    expect(ordinary).toContain('card-frame-right-leaves')
+    expect(ordinary).not.toContain('data-also-counts-as=')
+  })
+
   it('renders desc placeholders as inline icons (no literal <WOOD> text)', () => {
     // E076_LumberPile description contains <WOOD> and <STABLE> placeholders.
     const html = renderToStaticMarkup(
