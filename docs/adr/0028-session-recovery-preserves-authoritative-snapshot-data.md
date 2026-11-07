@@ -19,7 +19,7 @@ Issues #1258 and #1270. Ordinary undo restored a captured state through the norm
 ## Consequences
 
 - A restored Session equals its captured data; tests compare against pure observation capture, so unexpected hand additions or default fields fail instead of being normalized away.
-- No migration for older saves is provided.
+- This implementation provided no migration for older saves. Future format changes follow the [retained-game upgrade policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games); an explicit migration precedes ordinary restoration rather than weakening its preservation contract.
 
 ## Alternatives considered
 

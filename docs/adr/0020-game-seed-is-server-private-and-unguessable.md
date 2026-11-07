@@ -15,7 +15,7 @@ Issue #946. Every seat's sync payload carried `gameSeed` and the complete 14-rou
 - Without an explicit seed, Game Seed is a random value of at least 128 bits, and every derived random stream comes from a cryptographic generator (HMAC-SHA256 in counter mode from an audited synchronous pure-JavaScript library, because rules also run in a browser Worker). Sub-streams are separated by label.
 - An Explicit Seed is a number and keeps the existing generator and results; it serves tests, dev rooms and debug endpoints and protects nothing.
 - The ordinary-deck and parent-selection seeds stay independent of Game Seed and are equally wide.
-- At rollout every active non-dev Game Context was expired once by a manual operator step; no migration or startup gate is kept.
+- At rollout every active non-dev Game Context was expired once by a manual operator step; no migration or startup gate is kept. This records that one-time operation, not permission to expire games in later releases. Future upgrades follow the [retained-game policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games).
 
 ## Consequences
 

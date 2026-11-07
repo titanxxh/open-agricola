@@ -19,7 +19,7 @@ Issue [#1133](https://github.com/titanxxh/open-agricola/issues/1133). A086 Anima
 ## Consequences
 
 - Animal assignment, capacity validation, accommodation, payment and persistence are reused unchanged.
-- No compatibility migration for the old aggregate is provided.
+- This implementation provided no compatibility migration for the old aggregate. That historical scope does not exempt later changes from the [retained-game upgrade policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games).
 
 ## Alternatives considered
 

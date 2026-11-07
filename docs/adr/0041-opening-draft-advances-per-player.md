@@ -24,4 +24,8 @@ Preserve existing rules around the requested change: a disconnected seat is neit
 
 Shared-device play retains seat-by-seat handoff and explicit private-view confirmation. After one manual selection, the device moves forward in seat order to the next seat with a packet requiring a choice. Seats waiting for packets or already finished are skipped; forced automatic choices do not require another handoff. Independent devices can continue choosing whenever their next packet is available.
 
+## Upgrade boundary
+
+The retained-game [upgrade policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games) applies to this format change. Legacy global-round drafts store top-level pools, kept cards and pending submissions; staged drafts also store future stage pools. They require conversion to per-stage seat inboxes while preserving confirmed picks and passing order. [PR #1593](https://github.com/titanxxh/open-agricola/pull/1593) supplies no such conversion. Deploying that change alone does not satisfy the policy while legacy drafts remain. Reopening, re-dealing or expiring those games is not a migration.
+
 Source anchors: `shared/draft/draft-manager.ts`, `shared/session/phases/draft.ts`, `server/game/command-input.ts`, and `client/app/draft/DraftOverlay.tsx`. Existing coverage starts at `shared/draft/__tests__/draft-manager.test.ts`, `server/game/__tests__/draft-session.test.ts`, and `e2e-tests/draft-opening-order.spec.ts`.

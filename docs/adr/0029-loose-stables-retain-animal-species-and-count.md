@@ -18,7 +18,7 @@ Issue #1267. Loose-stable storage kept only a species per farm position. When ca
 ## Consequences
 
 - A legal assignment survives write / read, response, handoff and recovery with inventory and assigned counts consistent.
-- No migration for old species-only saves is provided.
+- This implementation provided no migration for old species-only saves. That historical scope does not exempt later changes from the [retained-game upgrade policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games).
 
 ## Alternatives considered
 

@@ -18,7 +18,7 @@ Issue [#1124](https://github.com/titanxxh/open-agricola/issues/1124). B026 Agrar
 ## Consequences
 
 - One replacement mechanism covers single and composite actions; the card keeps its plans in its own file.
-- No compatibility migration is needed.
+- At adoption, this decision required no compatibility migration. Later saved-state changes must be assessed under the [retained-game upgrade policy](../HOW_TO_DEPLOY.md#compatibility-of-retained-games).
 
 ## Alternatives considered
 
