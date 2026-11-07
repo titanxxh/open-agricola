@@ -43,4 +43,36 @@ describe('card sprite CSS', () => {
     expect(css).not.toContain('.player-card.occupation .card-icon {\n  width: 180.95px;\n  height: 189.645px;\n  top: 37.0125px;\n  left: 11.5%;\n  background-size: contain;')
     expect(css).toContain('background-position: center -6px;')
   })
+
+  it('covers the left traveling arrow on non-passing dual-type minors with the ordinary leaf', () => {
+    const css = fs.readFileSync(path.resolve(__dirname, '../../client/styles/card-sprite.css'), 'utf8')
+    const ruleBody = (selector: string): string => {
+      const start = css.indexOf(`${selector} {`)
+      if (start < 0) return ''
+      const open = css.indexOf('{', start)
+      const close = css.indexOf('}', open)
+      return close < 0 ? '' : css.slice(open + 1, close)
+    }
+    const dual = '.player-card.minor .player-card-inner[data-also-counts-as~="major"]'
+
+    expect(ruleBody(`${dual} .card-frame-left-leaves`)).not.toMatch(/display\s*:\s*none|visibility\s*:\s*hidden/)
+    expect(ruleBody('.player-card.minor .card-frame-left-leaves')).toContain("url('/assets/revised/meeples.png')")
+
+    const rightLeaves = ruleBody(`${dual} .card-frame-right-leaves`)
+    expect(rightLeaves).toContain("url('/assets/revised/card_frame_major_minor.png')")
+    expect(rightLeaves).toContain('background-position: 99.5% 32.5%;')
+    expect(rightLeaves).not.toMatch(/display\s*:\s*none/)
+
+    for (const file of [
+      'shared/cards/A/A060_OrientalFireplace.ts',
+      'shared/cards/C/C060_SmallPottersOven.ts',
+      'shared/cards/D/D025_WitchesDanceFloor.ts',
+      'shared/cards/D/D059_EarthOven.ts',
+      'shared/cards/D/D060_LargePottery.ts',
+    ]) {
+      const source = fs.readFileSync(path.resolve(__dirname, '../../', file), 'utf8')
+      expect(source, file).toContain("alsoCountsAs: ['major']")
+      expect(source, file).not.toMatch(/passing\s*:\s*true/)
+    }
+  })
 })
