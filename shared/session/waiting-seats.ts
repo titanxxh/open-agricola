@@ -1,4 +1,5 @@
 import { playerColorOptions } from '../contract/state-constants'
+import { migrateLegacyDraft } from '../draft/legacy-draft'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -24,7 +25,8 @@ export function waitingSeatIndexes(
 ): number[] {
   if (!isRecord(state)) return []
   const players = Array.isArray(state.players) ? state.players : []
-  const draft = isRecord(state.draft) ? state.draft : null
+  let draft = isRecord(state.draft) ? state.draft : null
+  try { draft = migrateLegacyDraft(draft) ?? draft } catch { return [] }
   const parentSelection = isRecord(state.parentSelection) ? state.parentSelection : null
   const parentSubmissions = parentSelection && isRecord(parentSelection.submissions)
     ? parentSelection.submissions

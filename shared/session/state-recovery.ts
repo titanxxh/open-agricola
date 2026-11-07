@@ -5,6 +5,7 @@ import { createMoorActionSpaces } from '../moor/action-spaces'
 import { createSeasonActionSpaces } from '../seasons/action-spaces'
 import type { ActionDefinition, ActionSpace, GameState } from '../contract/types'
 import { captureStateWithHistory } from './history-streams'
+import { migrateLegacyDraft } from '../draft/legacy-draft'
 
 type ActionDefinitionLookup = (id: string) => ActionDefinition | undefined
 
@@ -20,6 +21,7 @@ export function restoreSessionState(raw: GameState, lookup?: ActionDefinitionLoo
   // Live sessions append to these arrays; immutable captured records retain
   // their identities and remain shared with the saved history version.
   const state: GameState = { ...captured,
+    draft: migrateLegacyDraft(captured.draft) ?? captured.draft,
     log: captured.log.slice(),
     events: captured.events.slice(),
     publicEventArchive: captured.publicEventArchive.slice(),

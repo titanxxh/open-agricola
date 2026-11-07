@@ -1,4 +1,5 @@
 import { draftSeatProgress } from './draft-progress'
+import { migrateLegacyDraft } from '../draft/legacy-draft'
 import { inheritHistoryRecordIdentity } from './history-record-identity'
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
@@ -520,6 +521,8 @@ export const filterSerializedStateForPlayer = (
   viewerPlayerId: string | null,
   options: ViewerProjectionOptions = {},
 ): SerializedGameState => {
+  const migratedDraft = migrateLegacyDraft(base.draft)
+  if (migratedDraft) base = { ...base, draft: migratedDraft }
   if (base.players.length === 1 && base.farmersOfTheMoor) {
     const { soloRetentionPaid, ...moor } = base.farmersOfTheMoor
     const draw = moor.specialActionCards.filter(card => card.location.kind === 'solo-draw')
@@ -576,9 +579,13 @@ export const filterSerializedStateForPlayer = (
   const filteredDraft = !base.draft
     ? base.draft
     : {
-        ...base.draft,
+        mode: base.draft.mode,
+        seatOrder: base.draft.seatOrder,
+        lastManualPickerId: base.draft.lastManualPickerId,
         stages: base.draft.stages.map((stage, stageIndex) => ({
-          ...stage,
+          kind: stage.kind,
+          poolSize: stage.poolSize,
+          totalRounds: stage.totalRounds,
           seats: Object.fromEntries(Object.entries(stage.seats).map(([pid, seat]) => {
             const progress = draftSeatProgress(base.draft!, pid)
             return [pid, {

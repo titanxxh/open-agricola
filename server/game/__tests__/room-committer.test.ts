@@ -1,4 +1,6 @@
 import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
+import legacyStandard from '../../../shared/draft/__tests__/fixtures/standard-rotated.json'
+import legacyMoor from '../../../shared/draft/__tests__/fixtures/moor-minor.json'
 import { draftSeatProgress } from '../../../shared/projections/draft-progress'
 import { CommandStore } from '../command-store'
 import { ResourceStore } from '../../storage/resource-store'
@@ -146,6 +148,58 @@ describe('RoomCommitter', () => {
     resources,
     scheduler: options.scheduler,
     now: () => 1_000,
+  })
+
+  it.each([legacyStandard, legacyMoor])('upgrades retained draft state without rewriting its original Replay or Viewer %#', async fixture => {
+    const room = makeRoom()
+    room.session.dispose()
+    room.session = createOpeningSession({ seed: fixture.seed,
+      options: { playerCount: 2, draftMode: 'simultaneous', draftPoolSize: fixture.options.draftPoolSize,
+        enableFarmersOfTheMoor: fixture.options.enableFarmersOfTheMoor },
+      expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } },
+    })
+    // The fixture is the previous writer's output, before any current reader sees it.
+    Object.assign(room.session.state, { draft: fixture.draft })
+    const initial = createCommitter()
+    expect(await initial.prepareRoom(room, { missingPrefix: false })).toMatchObject({ kind: 'committed', stepNo: 0 })
+    const header = await persistence.loadReplayHead(room.id)
+    const before = await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(room.id)
+    const stepZero = await db.prepare('SELECT * FROM game_replay_steps WHERE room_id = ? AND step_no = 0').get(room.id)
+    const snapshot = await persistence.load(room.id)
+    if (!snapshot) throw new Error('Expected committed legacy Room')
+    initial.shutdown()
+    const restored = snapshotToRoom(snapshot)
+    const next = createCommitter({ gameBuildId: 'game-2', viewerBuildId: 'viewer-2' })
+    let reconnected: Room | undefined
+    try {
+      expect(await next.prepareRoom(restored, { missingPrefix: true })).toMatchObject({ kind: 'committed', stepNo: 0 })
+      expect(await persistence.loadReplayHead(room.id)).toEqual(header)
+      expect(await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(room.id)).toEqual(before)
+      const response = restored.session.getState()
+      expect(restored.session.buildSyncPayload(response, 'p1').state.phase).toBe('draft')
+      const draft = restored.session.state.draft
+      if (!draft) throw new Error('Expected migrated draft')
+      const actor = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
+      if (!actor) throw new Error('Expected an available packet')
+      const choice = firstDraftPick(draft, actor)
+      const submitted = restored.session.submitDraftPick(actor, choice)
+      expect(submitted.ok).toBe(true)
+      const intent = replayIntentFromCommand({ type: 'draftSubmit', playerId: actor, pick: choice })
+      if (!intent) throw new Error('Expected draft replay intent')
+      expect(await next.commit(restored, submitted, intent, draft.seatOrder.indexOf(actor)))
+        .toMatchObject({ kind: 'committed', stepNo: 1 })
+      expect(await db.prepare('SELECT * FROM game_replay_steps WHERE room_id = ? AND step_no = 0').get(room.id)).toEqual(stepZero)
+      expect(await persistence.loadReplayHead(room.id)).toMatchObject({ viewerBuildId: 'viewer-1', gameBuildId: 'game-1' })
+      const after = await persistence.load(room.id)
+      if (!after) throw new Error('Expected saved upgraded Room')
+      reconnected = snapshotToRoom(after)
+      expect(reconnected.session.state.draft).toEqual(restored.session.state.draft)
+      expect(reconnected.session.buildSyncPayload(reconnected.session.getState(), null).state.phase).toBe('draft')
+      expect(await next.prepareRoom(reconnected, { missingPrefix: true })).toMatchObject({ kind: 'committed', stepNo: 1 })
+    } finally {
+      initial.shutdown(); next.shutdown()
+      room.session.dispose(); restored.session.dispose(); reconnected?.session.dispose()
+    }
   })
 
   it('waits until a restored waiting Room starts before creating Step 0', async () => {

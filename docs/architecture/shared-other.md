@@ -10,6 +10,8 @@ The draft Room input window lasts through the full draft; each submitted `opport
 
 With Farmers of the Moor, occupations, FoM minors, and published minors remain separate stages, but players advance between them independently. The FoM minor pool derives from the implemented registry and refuses to start when short unless `allowIncompleteFarmersOfTheMoorMinorDeal` is set; Community Deck minors join only the published part. Tests: `shared/draft/__tests__/draft-manager.test.ts`, `server/game/__tests__/draft-session.test.ts`, and `e2e-tests/draft-opening-order.spec.ts`.
 
+`legacy-draft.ts` owns conversion of retained global-round drafts and the read-only fields needed by their original Replay Viewer. Session recovery, viewer projection and saved lobby summaries call this boundary; current transitions never branch on the old algorithm. Migration tests use fixtures from the previous writer, including rotated packets and every Moor stage. See [Session recovery](session.md#snapshot-data-and-executable-rule-recovery).
+
 ## Solo opening hands
 
 `shared/session/solo-hand-selection.ts` owns the solo pool quotas and complete-submission validation. Bootstrap filters and deduplicates before checking capacity. Random hands contain seven occupations and seven minors, or seven occupations plus three ordinary and four Moor minors. `soloHandMode: 'choose-7'` instead freezes ten occupations and ten ordinary minors, or ten occupations plus four ordinary and six Moor minors. Their keep quotas are seven/seven or seven/three/four. Short pools reject creation, including when multiplayer's incomplete-Moor option is set.

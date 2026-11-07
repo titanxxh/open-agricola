@@ -1,0 +1,155 @@
+{
+  "sourceCommit": "f9edb37342f4f9deeb2ccd344d5c0b9ab9a3cebf",
+  "seed": 123456,
+  "options": {
+    "playerCount": 2,
+    "draftMode": "simultaneous",
+    "draftPoolSize": 8,
+    "enableFarmersOfTheMoor": true
+  },
+  "draft": {
+    "mode": "simultaneous",
+    "stage": "occupation",
+    "stageIndex": 0,
+    "stages": [
+      {
+        "kind": "occupation",
+        "poolSize": 7,
+        "totalRounds": 7,
+        "pools": {
+          "p1": {
+            "occ": [
+              "E101_Blighter",
+              "D117_WoodExpert",
+              "D122_ClayCarrier",
+              "E123_ResourceHoarder",
+              "C087_Mason",
+              "C088_CarpentersApprentice",
+              "B103_FieldMerchant"
+            ],
+            "minor": []
+          },
+          "p2": {
+            "occ": [
+              "E122_Cottar",
+              "D093_SheepInspector",
+              "D112_YoungFarmer",
+              "C095_BasketWeaver",
+              "C111_SmallAnimalBreeder",
+              "E111_Recluse",
+              "E103_Wolf"
+            ],
+            "minor": []
+          }
+        }
+      },
+      {
+        "kind": "farmersOfTheMoorMinor",
+        "poolSize": 4,
+        "totalRounds": 4,
+        "pools": {
+          "p1": {
+            "occ": [],
+            "minor": [
+              "M015_PeatBurnOff",
+              "M090_WinterStorehouse",
+              "M100_Pheromones",
+              "M125_HardwareStore"
+            ]
+          },
+          "p2": {
+            "occ": [],
+            "minor": [
+              "M080_AdvancePayment",
+              "M117_DraughtHorses",
+              "M087_PeatBarge",
+              "M119_AlderSwamp"
+            ]
+          }
+        }
+      },
+      {
+        "kind": "publishedMinor",
+        "poolSize": 3,
+        "totalRounds": 3,
+        "pools": {
+          "p1": {
+            "occ": [],
+            "minor": [
+              "C008_PlantFertilizer",
+              "D062_BeerTap",
+              "C022_BasketChair"
+            ]
+          },
+          "p2": {
+            "occ": [],
+            "minor": [
+              "E012_AnimalBedding",
+              "C013_WoodSlideHammer",
+              "B017_ForestPlow"
+            ]
+          }
+        }
+      }
+    ],
+    "round": 2,
+    "totalRounds": 7,
+    "poolSize": 7,
+    "seatOrder": [
+      "p1",
+      "p2"
+    ],
+    "pools": {
+      "p2": {
+        "occ": [
+          "D117_WoodExpert",
+          "D122_ClayCarrier",
+          "E123_ResourceHoarder",
+          "C087_Mason",
+          "C088_CarpentersApprentice",
+          "B103_FieldMerchant"
+        ],
+        "minor": []
+      },
+      "p1": {
+        "occ": [
+          "D112_YoungFarmer",
+          "C095_BasketWeaver",
+          "C111_SmallAnimalBreeder",
+          "E111_Recluse",
+          "E103_Wolf"
+        ],
+        "minor": []
+      }
+    },
+    "kept": {
+      "p1": {
+        "occ": [
+          "E101_Blighter",
+          "D093_SheepInspector"
+        ],
+        "minor": []
+      },
+      "p2": {
+        "occ": [
+          "E122_Cottar"
+        ],
+        "minor": []
+      }
+    },
+    "pendingPicks": {
+      "p1": {
+        "occ": "D093_SheepInspector",
+        "minor": null
+      },
+      "p2": {
+        "occ": null,
+        "minor": null
+      }
+    }
+  },
+  "targets": {
+    "occ": 7,
+    "minor": 7
+  }
+}

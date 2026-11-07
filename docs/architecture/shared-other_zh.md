@@ -12,6 +12,8 @@ Room 的轮抽输入窗口持续整段轮抽；提交中的 `opportunityKey` 绑
 
 启用 Farmers of the Moor 时，职业、FoM 小改良与已出版小改良保留独立阶段，各玩家可以独立进入下一阶段。FoM 小改良池从已实现的注册表派生，不足时拒绝开局，除非设置 `allowIncompleteFarmersOfTheMoorMinorDeal`；Community Deck 小改良只进入已出版部分。测试：`shared/draft/__tests__/draft-manager.test.ts`、`server/game/__tests__/draft-session.test.ts`、`e2e-tests/draft-opening-order.spec.ts`。
 
+`legacy-draft.ts` 负责转换保留的全局轮次轮抽，以及提供原固定 Replay Viewer 需要的只读字段。Session 恢复、视角投影和大厅存档摘要调用这一边界，当前状态转换不再执行旧轮抽算法。迁移测试使用旧写入版本的夹具，覆盖已传过几轮的牌包与每个泥沼阶段。见 [Session 恢复](session.md#snapshot-data-and-executable-rule-recovery)。
+
 ## 单人开局手牌
 
 `shared/session/solo-hand-selection.ts` 负责单人卡池配额与完整提交校验。Bootstrap 先过滤、去重，再检查数量。随机手牌为七职业和七小件，泥沼则为七职业、三普通小件和四 Moor 小件。`soloHandMode: 'choose-7'` 固定十职业和十普通小件候选，泥沼则固定十职业、四普通小件和六 Moor 小件，分别保留七／七或七／三／四。卡池不足就拒绝创建，多人的不完整 Moor 发牌选项不豁免此检查。

@@ -1,0 +1,94 @@
+{
+  "sourceCommit": "f9edb37342f4f9deeb2ccd344d5c0b9ab9a3cebf",
+  "seed": 123456,
+  "options": {
+    "playerCount": 2,
+    "draftMode": "simultaneous",
+    "draftPoolSize": 8,
+    "enableFarmersOfTheMoor": false
+  },
+  "draft": {
+    "mode": "simultaneous",
+    "round": 3,
+    "totalRounds": 7,
+    "poolSize": 8,
+    "seatOrder": [
+      "p1",
+      "p2"
+    ],
+    "pools": {
+      "p2": {
+        "occ": [
+          "C111_SmallAnimalBreeder",
+          "E111_Recluse",
+          "E103_Wolf",
+          "C107_Baker",
+          "A115_ChiefForester"
+        ],
+        "minor": [
+          "B029_CookeryLesson",
+          "D010_StorksNest",
+          "C072_FestivalPlanning",
+          "E006_Recount",
+          "E053_BoarSpear"
+        ]
+      },
+      "p1": {
+        "occ": [
+          "D122_ClayCarrier",
+          "E123_ResourceHoarder",
+          "C087_Mason",
+          "C088_CarpentersApprentice",
+          "B103_FieldMerchant",
+          "E122_Cottar"
+        ],
+        "minor": [
+          "C022_BasketChair",
+          "E012_AnimalBedding",
+          "C013_WoodSlideHammer",
+          "B017_ForestPlow",
+          "A051_DriftNetBoat",
+          "E045_FruitLadder"
+        ]
+      }
+    },
+    "kept": {
+      "p1": {
+        "occ": [
+          "E101_Blighter",
+          "D112_YoungFarmer"
+        ],
+        "minor": [
+          "C008_PlantFertilizer",
+          "E031_Upholstery"
+        ]
+      },
+      "p2": {
+        "occ": [
+          "D093_SheepInspector",
+          "D117_WoodExpert",
+          "C095_BasketWeaver"
+        ],
+        "minor": [
+          "A024_ThreshingBoard",
+          "D062_BeerTap",
+          "C019_SwingPlow"
+        ]
+      }
+    },
+    "pendingPicks": {
+      "p1": {
+        "occ": null,
+        "minor": null
+      },
+      "p2": {
+        "occ": "C095_BasketWeaver",
+        "minor": "C019_SwingPlow"
+      }
+    }
+  },
+  "targets": {
+    "occ": 7,
+    "minor": 7
+  }
+}
