@@ -435,19 +435,23 @@ export async function resetPasswordWithToken(
   const passwordHash = await hashPassword(password)
   const db = getDb()
   const now = Date.now()
+  const tokenHash = hashToken(token)
   const result = (await db.transaction(async () => {
-    const row = (await db.prepare(`
-      SELECT t.user_id, u.username, u.display_name, u.email
-      FROM password_reset_tokens t
-      JOIN users u ON u.id = t.user_id
-      WHERE t.token_hash = ?
-        AND t.used_at IS NULL
-        AND t.expires_at > ?
-      FOR UPDATE OF t, u
-    `).get(hashToken(token), now)) as
-      | { user_id: string; username: string; display_name: string; email: string | null }
+    // Lock the user before the token, the order every other reset and deletion path uses.
+    const owner = (await db.prepare('SELECT user_id FROM password_reset_tokens WHERE token_hash = ?').get(tokenHash)) as
+      | { user_id: string }
       | undefined
-    if (!row) return null
+    if (!owner) return null
+    const user = (await db.prepare('SELECT username, display_name, email FROM users WHERE id = ? FOR UPDATE').get(owner.user_id)) as
+      | { username: string; display_name: string; email: string | null }
+      | undefined
+    const usable = user && await db.prepare(`
+      SELECT 1 FROM password_reset_tokens
+      WHERE token_hash = ? AND user_id = ? AND used_at IS NULL AND expires_at > ?
+      FOR UPDATE
+    `).get(tokenHash, owner.user_id, now)
+    if (!user || !usable) return null
+    const row = { user_id: owner.user_id, ...user }
     ;(await db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(now, row.user_id))
     ;(await db.prepare(`
       UPDATE users

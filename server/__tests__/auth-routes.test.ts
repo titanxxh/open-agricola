@@ -871,6 +871,39 @@ describe('auth routes', () => {
       await expect(changePassword(userId, 'oldpassword', 'changedpassword')).resolves.toBe('Current password is incorrect')
     })
 
+    it('waits for a replacement-link request holding the user instead of deadlocking on its token', async () => {
+      const userId = await createEmailUser('racelock', 'racelock@example.com', true)
+      const mail = captureResetMail()
+      await requestJson('POST', '/api/auth/password-reset/request', { identifier: 'racelock' })
+      const token = resetTokenFrom(mail)
+
+      // Hold the user the way requestPasswordReset() does, then supersede the token once completion waits on it.
+      let userLocked!: () => void
+      let supersede!: () => void
+      const locked = new Promise<void>(resolve => { userLocked = resolve })
+      const proceed = new Promise<void>(resolve => { supersede = resolve })
+      const request = getDb().transaction(async () => {
+        await getDb().prepare('SELECT id FROM users WHERE id = ? FOR UPDATE').get(userId)
+        userLocked()
+        await proceed
+        await getDb().prepare('UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL').run(Date.now(), userId)
+      })()
+      await locked
+      const completion = requestJson('POST', '/api/auth/password-reset/complete', { token, password: 'newpassword', confirmPassword: 'newpassword' })
+      await vi.waitFor(async () => {
+        const waiting = await getDb().prepare(`
+          SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock' AND query ILIKE '%FOR UPDATE%'
+        `).get()
+        expect(waiting).toBeDefined()
+      }, { timeout: 5_000, interval: 20 })
+      supersede()
+
+      await expect(request).resolves.toBeUndefined()
+      await expect(completion).resolves.toMatchObject({ status: 400, json: { ok: false, code: 'password_reset_token_invalid' } })
+      await expect(login('racelock', 'oldpassword')).resolves.toMatchObject({ ok: true })
+    })
+
     it('accepts an email identifier and verifies an unverified email on reset', async () => {
       const userId = await createEmailUser('unverifiedreset', 'unverified-reset@example.com', false)
       await expect(login('unverifiedreset', 'oldpassword')).resolves.toMatchObject({ ok: false, code: 'email_not_verified' })
