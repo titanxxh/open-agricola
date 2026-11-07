@@ -134,7 +134,8 @@ export class Broadcaster {
     for (const seat of room.players) {
       sendObserved(seat.ws, event, round, data)
     }
-    if (event.type === 'roomPersistencePaused' || event.type === 'roomPersistenceResumed') {
+    if (event.type === 'roomPersistencePaused' || event.type === 'roomPersistenceResumed'
+      || event.type === 'playerJoined' || event.type === 'playerDisconnected') {
       for (const ws of roomSpectators(room)) sendObserved(ws, event, round, data)
     }
     if (event.type === 'gameTerminated') this.endSpectating(room, 'terminated')

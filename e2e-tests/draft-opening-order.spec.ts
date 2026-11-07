@@ -70,10 +70,21 @@ test('four-player draft keeps moving around an offline seat and resumes its queu
       return { ...participant, player }
     })
     const [a, b, c, d] = seats
+    const spectatorContext = await browser.newContext()
+    contexts.push(spectatorContext)
+    await authenticateSolo(spectatorContext, request, `draft_${suffix}_watch`)
+    const spectator = new SoloBrowserDriver(await spectatorContext.newPage())
+    await spectator.page.goto(`${FRONTEND_URL}/?room=${roomId}`)
+    await expect(spectator.page.getByTestId('spectating-status')).toContainText('Spectating public information')
+    const spectatorIdleRow = spectator.page.locator(`[data-player-id="${a.player.id}"]`)
+    await expect(spectatorIdleRow.locator('.draft-opening-presence')).toHaveAttribute('data-connected', 'true')
+    const spectatorVersion = spectator.events.findLast(event => event.type === 'stateUpdate')?.version
     await a.driver.page.close()
     const idleRow = b.driver.page.locator(`[data-player-id="${a.player.id}"]`)
     await expect(idleRow.locator('.draft-opening-presence')).toHaveAttribute('data-connected', 'false')
     await expect(idleRow).toContainText('Offline')
+    await expect(spectatorIdleRow.locator('.draft-opening-presence')).toHaveAttribute('data-connected', 'false')
+    expect(spectator.events.findLast(event => event.type === 'stateUpdate')?.version).toBe(spectatorVersion)
 
     for (const seat of [b, c, d, c, d, d]) await pick(seat.driver, seat.player.id)
     await expect.poll(() => seats.map(seat => draftSeatProgress(currentDraft(b.driver), seat.player.id).kept.occ.length)).toEqual([0, 1, 2, 3])
@@ -112,6 +123,7 @@ test('four-player draft keeps moving around an offline seat and resumes its queu
       expect(resumedInbox[generation].minor).toEqual(Array(8 - generation).fill('?'))
     }
     await expect(idleRow.locator('.draft-opening-presence')).toHaveAttribute('data-connected', 'true')
+    await expect(spectatorIdleRow.locator('.draft-opening-presence')).toHaveAttribute('data-connected', 'true')
 
     const peerWrites = [b, c, d].map(seat => seat.driver.commands.filter(command => command.type === 'draftSubmit').length)
     await pick(resumed, a.player.id)

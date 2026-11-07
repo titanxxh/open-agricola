@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { Broadcaster } from '../broadcaster.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
 import type { Room } from '../../game/room.ts'
+import WebSocket from 'ws'
+import { addRoomSpectator } from '../../game/room-spectators'
 
 const makeFakeWs = () => {
   const sent: string[] = []
@@ -45,6 +47,24 @@ describe('Broadcaster.broadcastCommitted', () => {
 })
 
 describe('Broadcaster.sendStateTo / broadcastEvent / sendTo', () => {
+  it('delivers public presence events to spectators without waiting for a game snapshot', () => {
+    const b = new Broadcaster()
+    const room = makeRoom('presence')
+    const spectator = new WebSocket(null, undefined, {})
+    vi.spyOn(spectator, 'readyState', 'get').mockReturnValue(WebSocket.OPEN)
+    const send = vi.spyOn(spectator, 'send').mockImplementation(() => undefined)
+    addRoomSpectator(room, spectator)
+
+    b.broadcastEvent(room, { type: 'playerDisconnected', playerIndex: 1 })
+    b.broadcastEvent(room, { type: 'playerJoined', playerIndex: 1, name: 'Player 2', playerCount: 2, maxPlayers: 2 })
+
+    expect(send.mock.calls.map(([message]) => JSON.parse(String(message)))).toEqual([
+      { type: 'playerDisconnected', playerIndex: 1 },
+      { type: 'playerJoined', playerIndex: 1, name: 'Player 2', playerCount: 2, maxPlayers: 2 },
+    ])
+    expect(room.version).toBe(0)
+  })
+
   it('sendStateTo sends a single envelope with cause=reconnect', () => {
     const b = new Broadcaster()
     const room = makeRoom('r1')
