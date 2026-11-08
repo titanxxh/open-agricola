@@ -11,6 +11,7 @@ import { authErrorMessage } from './auth-errors'
 import { setPage } from '../utils/platform-page-url'
 import { useAccountLinking } from './useAccountLinking'
 import { PlayerAccountId } from '../components/common/PlayerAccountId'
+import { BetaAccessSettings } from './BetaAccessSettings'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'
@@ -310,6 +311,10 @@ export function SettingsPage() {
         <p className="settings-readonly">
           🔒 <span className="settings-readonly-chip">{user?.username ?? ''}</span>（{t('platform.notEditable')}）
         </p>
+        {user?.betaAccess || user?.isAdmin ? <p className="settings-readonly">
+          {t('beta.accessLabel')}: <span className="settings-readonly-chip">{t('beta.accessEnabled')}</span>{' '}
+          {user.experimentalFeatures?.includes('team-modes') ? <span>{t('beta.availableModes')}</span> : null}
+        </p> : null}
         <form onSubmit={handleSaveName} className="settings-form">
           <div className="form-field">
             <label htmlFor="displayName">{t('platform.displayNameLabel')}</label>
@@ -437,6 +442,8 @@ export function SettingsPage() {
       ) : null}
 
       {user?.isAdmin && <Section icon="📊" title={t('platform.operationsTitle')} variant="parchment"><button className="btn btn-primary" onClick={() => setPage('operations')}>{t('platform.operationsTitle')}</button></Section>}
+
+      <BetaAccessSettings />
 
       {user?.isAdmin && (
         <Section icon="🎟️" title={t('platform.adminInvites')} variant="parchment">

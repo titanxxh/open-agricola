@@ -1,3 +1,5 @@
+import { BetaAccessStore } from './beta-access-store'
+import { createBetaAccessHandler } from './beta-access-routes'
 import { availableExperimentalFeatures } from './experimental-features'
 import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
@@ -211,6 +213,8 @@ const directory = new RoomDirectory(getDb())
 const invalidations = new InvalidationStore(getDb())
 const persistence = new PostgresRoomPersistence(getDb(), directory)
 const gameContextStore = new GameContextStore(getDb())
+const betaAccessStore = new BetaAccessStore(getDb())
+const handleBetaAccess = createBetaAccessHandler({ store: betaAccessStore, requireAdmin })
 const handleRetentionPolicy = createRetentionPolicyHandler({ store: new RoomRetentionStore(getDb()), requireAdmin })
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
@@ -461,6 +465,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (await handleCommunityQr(req, res)) return
   if (await handleWhatsNew(req, res)) return
+  if (await handleBetaAccess(req, res)) return
   if (await handleRetentionPolicy(req, res)) return
   if (await handleOperations(req, res)) return
 
@@ -746,7 +751,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
     }
-    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), experimentalFeatures: await availableExperimentalFeatures(user.id) } })
+    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), betaAccess: await betaAccessStore.hasAccess(user.id), experimentalFeatures: await availableExperimentalFeatures(user.id) } })
     return
   }
 

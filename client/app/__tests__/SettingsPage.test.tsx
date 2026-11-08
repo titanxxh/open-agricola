@@ -4,12 +4,18 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
 import { SettingsPage } from '../SettingsPage'
+import type { AuthUser } from '../../contexts/AuthContext'
 
 const apiFetchMock = vi.fn()
+const settingsApiFetch = (...args: [path: string, init?: RequestInit]) => args[0] === '/api/admin/beta-access'
+  ? Promise.resolve(Response.json({ ok: true, grants: [] })) : apiFetchMock(...args)
 const logoutMock = vi.fn()
 const logoutAllMock = vi.fn()
-let mockUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
+let mockUser: AuthUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
 const labels: Record<string, string> = {
+  'beta.accessLabel': 'Beta access',
+  'beta.accessEnabled': 'Enabled',
+  'beta.availableModes': 'Available: Team mode, Multihand mode',
   'platform.backToLobby': '返回大厅',
   'platform.backToLobbyPlain': '返回大厅',
   'platform.settingsTitle': '设置',
@@ -83,7 +89,7 @@ const translate = (key: string, params: Record<string, string | number> = {}) =>
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: mockUser,
-    apiFetch: apiFetchMock,
+    apiFetch: settingsApiFetch,
     logout: logoutMock,
     logoutAll: logoutAllMock,
     oauthStartUrl: (provider: 'github' | 'google', intent: 'login' | 'register' | 'link') =>
@@ -115,6 +121,20 @@ afterEach(() => {
 })
 
 describe('SettingsPage', () => {
+  it('shows qualified account status without treating development feature availability as qualification', async () => {
+    apiFetchMock.mockResolvedValue(Response.json({ ok: true, identities: [] }))
+    mockUser = { ...mockUser, experimentalFeatures: ['team-modes'], betaAccess: false }
+    const view = render(<SettingsPage />)
+    expect(screen.queryByText('Enabled')).toBeNull()
+    mockUser = { ...mockUser, betaAccess: true }
+    view.rerender(<SettingsPage />)
+    expect(screen.getByText('Enabled').closest('p')).toHaveTextContent('Beta access: Enabled Available: Team mode, Multihand mode')
+    mockUser = { ...mockUser, experimentalFeatures: [] }
+    view.rerender(<SettingsPage />)
+    expect(screen.getByText('Enabled')).toBeInTheDocument()
+    expect(screen.queryByText('Available: Team mode, Multihand mode')).toBeNull()
+  })
+
   it.each(['GitHub', 'Google'])('starts %s linking via a credentialed POST and displays failures without navigating', async (name) => {
     apiFetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, identities: [] })))
     const fetchMock = vi.fn(async (input: string | URL | Request) => new Response(JSON.stringify(

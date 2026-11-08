@@ -14,7 +14,14 @@ const isInvitablePlayer = (value: unknown): value is InvitablePlayer =>
   && 'username' in value && typeof value.username === 'string'
   && 'displayName' in value && typeof value.displayName === 'string'
 
-export function RoomInvitePicker({ value, onChange }: { value: InvitablePlayer[]; onChange: (value: InvitablePlayer[]) => void }) {
+export function RoomInvitePicker({ value, onChange, inputId = 'invited-players', describedBy = 'invited-players-hint', placeholder, single = false }: {
+  value: InvitablePlayer[]
+  onChange: (value: InvitablePlayer[]) => void
+  inputId?: string
+  describedBy?: string
+  placeholder?: string
+  single?: boolean
+}) {
   const { apiFetch } = useAuth()
   const { t } = useLocale()
   const listId = useId()
@@ -50,7 +57,7 @@ export function RoomInvitePicker({ value, onChange }: { value: InvitablePlayer[]
   }, [apiFetch, prefix, composing])
 
   const selectPlayer = (player: InvitablePlayer) => {
-    onChange([...value, player])
+    onChange(single ? [player] : [...value, player])
     setQuery('')
     setActiveIndex(-1)
     setOpen(false)
@@ -70,7 +77,7 @@ export function RoomInvitePicker({ value, onChange }: { value: InvitablePlayer[]
         </div>
       )}
       <input
-        id="invited-players"
+        id={inputId}
         type="text"
         role="combobox"
         value={query}
@@ -98,7 +105,8 @@ export function RoomInvitePicker({ value, onChange }: { value: InvitablePlayer[]
         autoCorrect="off"
         autoComplete="off"
         spellCheck={false}
-        aria-describedby="invited-players-hint"
+        placeholder={placeholder}
+        aria-describedby={describedBy}
         aria-autocomplete="list"
         aria-expanded={showList}
         aria-controls={showList ? listId : undefined}
