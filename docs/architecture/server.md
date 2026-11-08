@@ -22,7 +22,7 @@ server/connection/
 ```
 
 - One Room owns exactly one `GameSession`. The WebSocket handler awaits `dispatch()` through the Room and connection queues, and the Room's `ready | blocked` gate sits at command entry.
-- `room-router` calls `GameSession`; `payload-validation.ts` normalizes input. `room-viewer.ts` derives control from socket membership and saved ownership, with all seats for hotseat. Commands, undo and consent use that set; Replay records the actor. Its separate visible-ID helper serves snapshots and history; presence covers all connected owned seats. Tests: `controlled-seats.test.ts`, `multihand-network.test.ts`.
+- `room-router` calls `GameSession`; `payload-validation.ts` normalizes input. `room-viewer.ts` derives control from socket membership and saved ownership, with all seats for hotseat. Commands, undo and consent use that set; Replay records the actor. Its visible-ID helper adds shared teammates for snapshots and history. Envelopes grant commands only to an owned actor; presence covers owned seats. Tests: `controlled-seats.test.ts`, `multihand-network.test.ts`.
 - A rules command returning `ok=false` without `durableTransition` answers only its origin connection and creates no version or Replay Step. A durable rejection commits; only its error is private to the origin ([ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)).
 
 ## `server/game/`: Room and GameSession
