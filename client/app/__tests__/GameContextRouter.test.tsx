@@ -63,32 +63,6 @@ const stubResponse = (body: unknown, status = 200) => {
 }
 
 describe('GameContextRouter', () => {
-  it.each(['available', 'legacy_no_replay'])('keeps a locked completed-team rematch next to public results with %s replay', async replayStatus => {
-    window.history.replaceState(null, '', '/?room=team-completed')
-    vi.stubGlobal('fetch', vi.fn(async input => {
-      const url = String(input)
-      if (url.endsWith('/game-contexts/team-completed')) return new Response(JSON.stringify({
-        ok: true, roomId: 'team-completed', lifecycle: 'completed', replayStatus,
-        result: { startedAt: 1, finishedAt: 2, roundsPlayed: 14, playerCount: 4,
-          players: [{ playerIndex: 0, displayName: 'Alice', score: 20, teamIndex: 0 }],
-          team: { mode: 'multihand', scoring: 'sum', scores: [{ teamIndex: 0, playerIds: ['p1'], total: 20, rank: 1 }] },
-        },
-      }))
-      if (url.endsWith('/creation-configuration')) return new Response(JSON.stringify({ ok: true, issues: [], configuration: {
-        kind: 'team', maxPlayers: 4, teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'random', scoring: 'sum' },
-        enableCommunityDeck: false, customCardIds: [], officialCardPool: 'default-implemented-A-E',
-        enableParentCards: false, draftParents: true, enableThroughTheSeasons: false, enableFarmersOfTheMoor: false,
-        enableMoorBalanceRules: false, enableSnakeOpening: false, allowIncompleteFarmersOfTheMoorMinorDeal: false,
-      } }))
-      if (url.endsWith('/api/auth/me')) return new Response(JSON.stringify({ ok: true, user: { experimentalFeatures: [] } }))
-      return new Response('{}', { status: 503 })
-    }))
-    render(<GameContextRouter><div>active app</div></GameContextRouter>)
-    expect(await screen.findByRole('button', { name: 'Play again with these settings' })).toBeDisabled()
-    expect(screen.getByText('Rematching a team game requires beta access. Ask a player who has it to start one.')).toBeVisible()
-    expect(screen.getAllByText('Beta').length).toBeGreaterThan(0)
-  })
-
   it('shows archived multihand teams in ranked order with current participant names', async () => {
     window.history.replaceState(null, '', '/?room=team-archive')
     stubResponse({ ok: true, roomId: 'team-archive', lifecycle: 'completed', replayStatus: 'legacy_no_replay', result: {

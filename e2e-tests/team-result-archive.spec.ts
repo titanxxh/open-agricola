@@ -74,36 +74,6 @@ for (const recordReplay of [false, true]) {
   })
 }
 
-test('a qualified team participant can reach replay controls with the rematch block visible', async ({ page, request }, testInfo) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await authenticateSolo(page.context(), request, `team_viewer_${Date.now().toString(36)}`)
-  const account = await getJson(request, `${BACKEND_URL}/api/auth/me`)
-  expect(account.user.experimentalFeatures).toContain('team-modes')
-  expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, { seed: 1601, playerCount: 4,
-    teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'category-min', teammateVisibility: 'shared' },
-  })).ok).toBe(true)
-  const current: GameSyncPayload = await getJson(request, `${BACKEND_URL}/api/game/state`)
-  for (const [index, player] of current.state.players.entries()) { player.name = `Viewer ${index}`; player.nameIsDefault = false }
-  const fixture = await postJson(request, `${BACKEND_URL}/api/test/replays/completed?recordReplay=1`, { state: current.state })
-  expect(fixture.ok).toBe(true)
-  await page.goto(`/?room=${fixture.roomId}`, { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('button', { name: 'Play again with these settings', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Replay as Viewer 0', exact: true }).click()
-  const frame = page.locator('iframe')
-  await expect(frame).toBeVisible()
-  const replay = page.frameLocator('iframe')
-  for (const width of [1440, 390]) {
-    await page.setViewportSize({ width, height: 900 })
-    const bounds = await frame.boundingBox()
-    if (!bounds) throw new Error('Expected the replay frame to occupy the remaining viewport')
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(900)
-    await expect(replay.locator('.replay-play')).toBeInViewport()
-    await page.screenshot({ path: testInfo.outputPath(`completed-team-replay-${width}.png`), fullPage: true })
-  }
-  await replay.locator('.replay-play').click()
-  await expect(replay.locator('.team-score')).toHaveCount(2)
-})
-
 test('a multihand account sees its completed game once in personal history', async ({ browser, request }) => {
   const context = await browser.newContext()
   try {

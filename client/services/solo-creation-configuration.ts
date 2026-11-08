@@ -1,4 +1,4 @@
-import { isGameCreationConfiguration, type GameCreationConfigurationResponse, type SoloCreationConfigurationResponse, type SoloCreationErrorCode, type SoloCreationIssue } from '../../shared/contract/game-creation'
+import { isSoloCreationConfiguration, type SoloCreationConfigurationResponse, type SoloCreationErrorCode, type SoloCreationIssue } from '../../shared/contract/game-creation'
 import { API_BASE } from '../config'
 
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -9,12 +9,12 @@ const issue = (value: unknown): value is SoloCreationIssue => object(value)
 const codes: SoloCreationErrorCode[] = ['login_required', 'not_participant', 'source_not_completed', 'source_not_solo', 'source_removed', 'creation_configuration_unavailable', 'creation_requires_adjustment']
 const errorCode = (value: unknown): value is SoloCreationErrorCode => codes.some(code => code === value)
 
-export async function readGameCreationConfiguration(roomId: string, signal?: AbortSignal): Promise<GameCreationConfigurationResponse> {
+export async function readSoloCreationConfiguration(roomId: string, signal?: AbortSignal): Promise<SoloCreationConfigurationResponse> {
   const response = await fetch(`${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}/creation-configuration`, {
     credentials: 'include', cache: 'no-store', signal,
   })
   const value: unknown = await response.json()
-  if (object(value) && value.ok === true && response.ok && isGameCreationConfiguration(value.configuration)
+  if (object(value) && value.ok === true && response.ok && isSoloCreationConfiguration(value.configuration)
     && Array.isArray(value.issues) && value.issues.every(issue)) {
     return { ok: true, configuration: value.configuration, issues: value.issues }
   }
@@ -22,11 +22,4 @@ export async function readGameCreationConfiguration(roomId: string, signal?: Abo
     return { ok: false, code: value.code, message: value.message }
   }
   throw new Error('Creation configuration response unavailable')
-}
-
-export async function readSoloCreationConfiguration(roomId: string, signal?: AbortSignal): Promise<SoloCreationConfigurationResponse> {
-  const response = await readGameCreationConfiguration(roomId, signal)
-  if (!response.ok) return response
-  if (response.configuration.kind === 'standard-solo') return { ok: true, configuration: response.configuration, issues: response.issues }
-  return { ok: false, code: 'source_not_solo', message: 'The source is not a completed solo game' }
 }

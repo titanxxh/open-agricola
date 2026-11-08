@@ -1,4 +1,3 @@
-// @covers client/app/TeamSameConfigurationRematch.tsx
 // @covers client/app/GameEndControls.tsx
 // @covers client/app/TeamSetupFields.tsx
 // @covers client/app/TeamWaitingRoom.tsx

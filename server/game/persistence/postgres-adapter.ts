@@ -32,7 +32,6 @@ import { OpeningFacts } from './opening-facts'
 import { parseTeamRoomMembers } from '../../../shared/contract/team-room'
 
 type RoomRow = {
-  creation_configuration_json: string | null
   id: string
   created_by: string | null
   invited_user_ids: unknown
@@ -204,10 +203,7 @@ const roomValues = (
 const toSnapshot = (
   row: RoomRow,
   players: RoomMeta['players'],
-): RoomSnapshot => {
-  const creationConfiguration = row.creation_configuration_json ? parseGameCreationRecord(row.creation_configuration_json) : null
-  return {
-  ...(creationConfiguration ? { creationConfiguration } : {}),
+): RoomSnapshot => ({
   id: row.id,
   version: row.version,
   serialized: row.state_json ? (JSON.parse(row.state_json) as PersistedSessionSnapshot) : null,
@@ -247,8 +243,7 @@ const toSnapshot = (
     players,
   },
   updatedAt: row.updated_at,
-  }
-}
+})
 
 export class PostgresRoomPersistence implements RoomPersistence {
   private readonly loadRoom
@@ -294,22 +289,16 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (canonicalJson(prior.receipt.outcome) !== canonicalJson(receipt.outcome)) throw new ReplayConflictError('Command result changed')
       return true
     }
-    const saveCreationConfiguration = async (roomId: string, record: GameCreationRecord): Promise<void> => {
-      const json = canonicalJson(record)
-      await db.prepare('INSERT INTO game_creation_configurations(room_id, configuration_json) VALUES (?, ?) ON CONFLICT DO NOTHING').run(roomId, json)
-      const saved = await db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(roomId)
-      if (saved?.configuration_json !== json) throw new ReplayConflictError('Game creation configuration changed')
-    }
     this.dbForCleanup = db
     this.loadCreationRow = db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?')
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT configuration_json AS creation_configuration_json, id, created_by, team_members_json, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
+      `SELECT id, created_by, team_members_json, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
               allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, updated_at
-       FROM rooms LEFT JOIN game_creation_configurations ON game_creation_configurations.room_id=rooms.id WHERE id = ?`,
+       FROM rooms WHERE id = ?`,
     )
     this.loadPlayers = db.prepare(
       'SELECT user_id AS "userId", player_index AS "playerIndex" FROM room_players WHERE room_id = ? ORDER BY player_index',
@@ -419,7 +408,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT configuration_json AS creation_configuration_json, rooms.id, rooms.created_by, rooms.team_members_json, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
+      SELECT rooms.id, rooms.created_by, rooms.team_members_json, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
              rooms.end_proposal_json, rooms.awaiting_rematch_players, rooms.max_players, rooms.solo_hand_mode, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
@@ -432,7 +421,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
       JOIN game_contexts
         ON game_contexts.room_id = rooms.id
        AND game_contexts.lifecycle = 'active'
-      LEFT JOIN game_creation_configurations ON game_creation_configurations.room_id = rooms.id
       LEFT JOIN room_players ON room_players.room_id = rooms.id
       WHERE rooms.status != 'finished'
         AND rooms.id NOT IN (SELECT value FROM json_array_elements_text(?::json) AS item(value))
@@ -564,10 +552,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
         if (options.executionStamp) await new ExecutionAccess(db).assert(options.executionStamp)
       }
       if (await receiptAlreadyCommitted(options?.receipt)) return
-      if (options?.creationSource) {
-        const source = await new GameCreationStore(db).completedSource(options.creationSource.roomId, options.creationSource.userId)
-        if (!source.ok) throw new GameCreationError(source.code, source.message)
-      }
       if (directory) await directory.assertOwner(String(values.id), options!.owner!, options?.expectedVersion)
       const context = await this.upsertActiveContext.run({
         roomId: values.id,
@@ -576,7 +560,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
         now: values.now,
       })
       if (context.changes !== 1) throw new ReplayConflictError('Room context is no longer active')
-      if (options?.creationConfiguration) await saveCreationConfiguration(String(values.id), options.creationConfiguration)
       ;(await this.upsertRoom.run(values))
       ;(await this.history.write(String(values.id), nodes, recoveryNodes))
       ;(await savePlayers(String(values.id), Number(values.now), meta.players))
@@ -599,7 +582,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         await directory.assertOwner(commit.roomId, commit.meta.owner)
       }
       if (await receiptAlreadyCommitted(commit.receipt)) return { kind: 'idempotent' }
-      if (commit.header && commit.creationConfiguration?.configuration.kind === 'standard-solo') {
+      if (commit.header && commit.creationConfiguration) {
         const { configuration, resolvedWorkshopSources } = commit.creationConfiguration
         const current = await resolveSoloWorkshopCards(db, configuration)
         if (current.issues.length) throw new GameCreationError('creation_requires_adjustment', 'The selected card sources require adjustment', { configuration, issues: current.issues })
@@ -645,7 +628,10 @@ export class PostgresRoomPersistence implements RoomPersistence {
           if (!source.ok) throw new GameCreationError(source.code, source.message)
         }
         if (commit.creationConfiguration) {
-          await saveCreationConfiguration(commit.roomId, commit.creationConfiguration)
+          const json = canonicalJson(commit.creationConfiguration)
+          await db.prepare('INSERT INTO game_creation_configurations(room_id, configuration_json) VALUES (?, ?) ON CONFLICT DO NOTHING').run(commit.roomId, json)
+          const saved = await db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(commit.roomId)
+          if (saved?.configuration_json !== json) throw new ReplayConflictError('Game creation configuration changed')
         }
         const definitions = JSON.parse(commit.header.customCardsJson) as Array<{ artUrl?: string }>
         const keys = [...new Set(definitions.flatMap(definition => definition.artUrl?.startsWith('/replay-assets/') ? [definition.artUrl.slice(1)] : []))].sort()

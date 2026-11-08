@@ -1,6 +1,6 @@
 import { parseTeamConfiguration, type TeamConfiguration } from '../../shared/contract/team'
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
-import type { SoloCreationConfiguration, SoloHandMode, TeamCreationConfiguration } from '../../shared/contract/game-creation'
+import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
 import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
 
 export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
@@ -102,22 +102,6 @@ export const soloCreationConfiguration = (setup: GameSetupRequest, customCardIds
   enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
   enableMoorBalanceRules: isMoorBalanceRulesEnabled(setup),
 })
-
-export const teamCreationConfiguration = (setup: GameSetupRequest, teamConfig: TeamConfiguration, customCardIds: string[]): TeamCreationConfiguration => {
-  const configuration = {
-    kind: 'team', maxPlayers: setup.playerCount === 6 ? 6 : 4, teamConfig,
-    enableCommunityDeck: setup.enableCommunityDeck,
-    customCardIds: [...new Set(customCardIds)].sort(),
-    officialCardPool: 'default-implemented-A-E',
-    enableParentCards: setup.enableParentCards, draftParents: setup.draftParents !== false,
-    enableThroughTheSeasons: setup.enableThroughTheSeasons,
-    enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
-    enableMoorBalanceRules: isMoorBalanceRulesEnabled(setup),
-    allowIncompleteFarmersOfTheMoorMinorDeal: setup.allowIncompleteFarmersOfTheMoorMinorDeal,
-    enableSnakeOpening: setup.enableSnakeOpening,
-  } satisfies Omit<TeamCreationConfiguration, 'draftMode' | 'draftPoolSize'>
-  return setup.draft ? { ...configuration, ...setup.draft } : configuration
-}
 
 /** Community-deck cards are only honoured when the community deck is on. */
 export const resolveCustomCardDbIds = (
