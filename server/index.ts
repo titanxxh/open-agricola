@@ -1,6 +1,6 @@
 import { BetaAccessStore } from './beta-access-store'
 import { createBetaAccessHandler } from './beta-access-routes'
-import { availableExperimentalFeatures } from './experimental-features'
+import { experimentalAccountState } from './experimental-features'
 import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
 import { SubmissionStore } from './workshop-pr/submission-store'
@@ -751,7 +751,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
     }
-    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), betaAccess: await betaAccessStore.hasAccess(user.id), experimentalFeatures: await availableExperimentalFeatures(user.id) } })
+    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), ...await experimentalAccountState(user.id) } })
     return
   }
 

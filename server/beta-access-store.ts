@@ -6,13 +6,6 @@ export class BetaAccessStore {
   private readonly db: PostgresDatabase
   constructor(db: PostgresDatabase) { this.db = db }
 
-  async hasAccess(userId: string): Promise<boolean> {
-    const account = await this.db.prepare(`SELECT u.username, b.user_id IS NOT NULL AS beta_access
-      FROM users u LEFT JOIN beta_access b ON b.user_id=u.id WHERE u.id=?`)
-      .get<{ username: string; beta_access: boolean }>(userId)
-    return !!account && (isAdmin(account.username) || account.beta_access)
-  }
-
   async list(): Promise<BetaAccessGrant[]> {
     const rows = await this.db.prepare(`SELECT u.id, u.username, u.display_name, b.granted_at,
       a.id AS actor_id, a.username AS actor_username, a.display_name AS actor_display_name
