@@ -4,6 +4,7 @@ import type { CommandStore, CommandRequest } from '../game/command-store'
 import type { CommandOutcome } from '../../shared/contract/protocol/commands'
 import type { WebSocket } from 'ws'
 import type { Room } from '../game/room.ts'
+import { isDevRoom } from '../game/room.ts'
 import type { RoomRegistry } from '../game/room-registry.ts'
 import type { RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import type { Broadcaster } from './broadcaster.ts'
@@ -30,6 +31,7 @@ export type ConnectionCtx = {
   currentUserId: string | undefined
   currentRoom: Room | null
   currentPlayerIndex: number
+  controlledPlayerIndices: ReadonlySet<number>
 } & ConnectionDeps
 
 export const createConnectionCtx = (
@@ -43,10 +45,23 @@ export const createConnectionCtx = (
   currentUserId,
   currentRoom: null,
   currentPlayerIndex: -1,
+  controlledPlayerIndices: new Set(),
   ...deps,
 })
 
 export const refreshConnectionSeat = (ctx: ConnectionCtx): void => {
-  const seat = ctx.currentRoom?.players.find(player => player.ws === ctx.ws)
-  if (seat) ctx.currentPlayerIndex = seat.playerIndex
+  const room = ctx.currentRoom
+  const seats = room?.players.filter(player => player.ws === ctx.ws) ?? []
+  const controlled = new Set(seats.map(seat => seat.playerIndex))
+  if (room && seats.length > 0) {
+    ctx.currentPlayerIndex = seats[0]!.playerIndex
+    if (room.hotseat) {
+      for (const [index] of room.session.state.players.entries()) controlled.add(index)
+    } else if (!isDevRoom(room.id) && ctx.currentUserId) {
+      for (const owner of room.seatOwners ?? []) {
+        if (owner.userId === ctx.currentUserId) controlled.add(owner.playerIndex)
+      }
+    }
+  }
+  ctx.controlledPlayerIndices = controlled
 }

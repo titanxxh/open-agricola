@@ -24,7 +24,7 @@ server/connection/
 ```
 
 - 一个 Room 恰好拥有一个 `GameSession`。WebSocket handler 通过 Room 与连接队列等待 `dispatch()`，Room 的 `ready | blocked` 闸门位于命令入口。
-- `room-router` 校验命令、授权座位并调用 `GameSession`；它从不写 `GameState`。普通 Room 的 `undoStep` / `undoAction` 不带座位，只接受交互玩家，空闲时只接受当前工作轮转玩家；热座与开发 Room 接受其任一连接（`ws-server.test.ts`）。`payload-validation.ts` 是返回规范化值的纯校验。
+- `room-router` 调用 `GameSession`，从不写 `GameState`。`ConnectionCtx.controlledPlayerIndices` 从连接成员和已存座位归属派生，热座控制全部座位。等待输入座位与显式座位的命令、撤销和结束同意均使用该集合，开发房间保留跨窗口撤销。Replay 记录实际执行座位。测试见 `controlled-seats.test.ts`、`ws-server.test.ts`。`payload-validation.ts` 只规范化输入，不修改状态。
 - 返回 `ok=false` 且没有 `durableTransition` 的规则命令只回复发起连接，不产生版本或 Replay Step。持久拒绝会提交；只有它的错误仅发给发起者（[ADR 0015](../adr/0015-provisional-cross-player-continuation-resolution.md)）。
 
 ## server/game/ — Room 与 GameSession
