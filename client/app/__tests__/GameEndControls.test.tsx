@@ -58,6 +58,18 @@ describe('GameEndControls', () => {
     expect(sendRoomCommand).toHaveBeenCalledWith('respondGameEnd', { proposalId: 'proposal-1', agree: true })
   })
 
+  it('attributes a rejection after agreeing to the proposer without refreshing the agreeing account', async () => {
+    const { transport, sendRoomCommand, emit } = fakeTransport()
+    const refresh = vi.fn()
+    render(<GameEndControls transport={transport} locale="en" playerNames={['Ada', 'Bea']} teamGame canUseTeamModes onExperimentalFeatureUnavailable={refresh} />)
+    emit({ type: 'gameEndProposal', roomId: 'room-1', proposal: { ...proposal, intent: 'rematch' } })
+    await userEvent.click(await screen.findByRole('button', { name: t('en', 'platform.gameEnd.agree') }))
+    expect(sendRoomCommand).toHaveBeenCalledWith('respondGameEnd', { proposalId: 'proposal-1', agree: true })
+    emit({ type: 'error', code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Feature unavailable' })
+    expect(await screen.findByRole('alert')).toHaveTextContent('The proposer no longer has beta access, so no new game was created. The proposer can withdraw the proposal.')
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
   it('renders a rejected Beta rematch below its control and refreshes account availability', async () => {
     const { transport, emit } = fakeTransport()
     const refresh = vi.fn()
