@@ -1529,6 +1529,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const enableMoorBalanceRules = enableFarmersOfTheMoor && room.session.state.enableMoorBalanceRules === true
   const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
   const enableSnakeOpening = room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true)
+  const teamConfig = room.session.state.team?.configuration
   let created: ReturnType<typeof createIsolatedGameSession>
   try {
     created = createIsolatedGameSession(
@@ -1537,6 +1538,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount: room.maxPlayers,
+        ...(teamConfig ? { teamConfig } : {}),
         ...(room.soloHandMode ? { soloHandMode: room.soloHandMode } : {}),
         enableCommunityDeck,
         enableParentCards,
@@ -1576,10 +1578,37 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   const names: Array<[number, string]> = []
   const colorsBySeat = new Map<number, typeof room.session.state.players[number]['color']>()
   const originalOwners = toRoomMeta(room).players
+  const teamMembers = room.teamMembers?.map(member => ({ ...member,
+    name: room.players.find(player => player.userId === member.userId)?.name ?? member.name,
+  }))
+  const waitingTeamConnections: NonNullable<Room['waitingTeamConnections']> = new Map()
+  for (const member of teamMembers ?? []) {
+    const connected = room.players.find(player => player.userId === member.userId && player.ws.readyState === player.ws.OPEN)
+    if (connected) waitingTeamConnections.set(member.memberId, connected.ws)
+  }
+  const startsTeamImmediately = teamMembers?.every(member => waitingTeamConnections.has(member.memberId)) === true
+  if (teamMembers && startsTeamImmediately && created.session.state.team) {
+    const bindings = planTeamSeating(created.session.state.team, teamMembers, created.session.state.gameSeed)
+    for (const member of teamMembers) {
+      const ownBindings = bindings.filter(binding => binding.memberId === member.memberId)
+      const originalColors = originalOwners.filter(owner => owner.userId === member.userId)
+        .sort((left, right) => left.playerIndex - right.playerIndex)
+        .map(owner => room.session.state.players[owner.playerIndex]!.color)
+      for (const [index, binding] of ownBindings.entries()) {
+        nextOwners.push({ playerIndex: binding.playerIndex, userId: member.userId })
+        names.push([binding.playerIndex, member.name])
+        const color = originalColors[index]
+        if (color) colorsBySeat.set(binding.playerIndex, color)
+      }
+      const primary = ownBindings[0]!
+      nextPlayers.push({ ws: waitingTeamConnections.get(member.memberId)!, playerIndex: primary.playerIndex, name: member.name, userId: member.userId })
+    }
+    waitingTeamConnections.clear()
+  }
   const sourceIndices = termination
     ? room.session.state.players.map((_, index) => index)
     : room.players.map(player => player.playerIndex)
-  for (const originalIndex of sourceIndices) {
+  for (const originalIndex of teamMembers ? [] : sourceIndices) {
     const original = room.session.state.players[originalIndex]!
     const connected = room.players.find(player => player.playerIndex === originalIndex)
     const userId = originalOwners.find(owner => owner.playerIndex === originalIndex)?.userId
@@ -1623,13 +1652,15 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         players: nextPlayers,
         version: 0,
         endProposal: null,
-        awaitingRematchPlayers: !!termination && nextPlayers.length < room.maxPlayers,
+        awaitingRematchPlayers: !teamMembers && !!termination && nextPlayers.length < room.maxPlayers,
+        ...(teamMembers ? { teamMembers, waitingTeamConnections } : {}),
         creationSource: undefined,
         ...(soloCards && soloConfiguration ? { creationConfiguration: {
           configuration: soloConfiguration, resolvedWorkshopSources: soloCards.resolvedWorkshopSources,
         } } : {}),
         seatOwners: nextOwners,
-        status: isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
+        status: teamMembers ? startsTeamImmediately ? 'playing' : 'waiting'
+          : isDevRoom(nextRoomId) || room.hotseat === true || room.players.length >= room.maxPlayers ? 'playing' : 'waiting',
         colorConfirmationPlayerIndex: undefined,
         enableParentCards, draftMode, draftPoolSize, enableThroughTheSeasons,
         enableFarmersOfTheMoor, enableMoorBalanceRules, allowIncompleteFarmersOfTheMoorMinorDeal, enableSnakeOpening,
@@ -1654,7 +1685,9 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
           await ctx.broadcaster.sendRoomEvent(player.ws, room, {
             type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, ...connectionViewerMetadata(room, player.ws),
             status: room.status === 'waiting' ? 'waiting' : 'playing', maxPlayers: room.maxPlayers,
-            players: room.players.map(seat => ({ playerIndex: seat.playerIndex, name: seat.name, connected: true })),
+            players: teamMembers ? room.session.state.players.map((seat, playerIndex) => ({ playerIndex, name: seat.name,
+              connected: connectedSeatIndexes(room).includes(playerIndex) }))
+              : room.players.map(seat => ({ playerIndex: seat.playerIndex, name: seat.name, connected: true })),
             playerColors: room.session.state.players.map(seat => seat.color),
             ...(room.hotseat ? { hotseat: true } : {}),
           })
@@ -1668,9 +1701,11 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         retiredOwner: previousOwner,
         retiredVersion: previousVersion,
         retiredTermination: termination,
-        ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: nextRoomId, roomVersion: 0, playerIndex: nextPlayers.find(player => player.ws === ctx.ws)!.playerIndex } } } : {}),
+        ...(ctx.activeCommand ? { receipt: { request: ctx.activeCommand.request, outcome: { ok: true, roomId: nextRoomId, roomVersion: 0,
+          ...(teamMembers ? {} : { playerIndex: nextPlayers.find(player => player.ws === ctx.ws)!.playerIndex }) } } } : {}),
       })
       await adopt()
+      if (teamMembers) { await publishTeamWaiting(ctx, room); return }
       await ctx.broadcaster.broadcastEvent(room, waitingRoomEvent(room))
       await ctx.broadcaster.broadcastCommitted(room, resp, 'reconnect', msg.requestId)
     },
@@ -1834,6 +1869,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
   }
   const fn = handlers[msg.type] as Handler | undefined
   if (!fn) { sendCommandError(ctx, `unknown command: ${msg.type}`, msg.requestId); return }
+  refreshConnectionSeat(ctx)
   const acceptedRoom = ctx.currentRoom
   const acceptedRoomId = acceptedRoom?.id
   const acceptedSession = acceptedRoom?.session
