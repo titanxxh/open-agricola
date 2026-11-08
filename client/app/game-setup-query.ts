@@ -1,4 +1,12 @@
 import type { RoomAccess } from '../../shared/contract/room-access'
+import { parseTeamConfiguration, type TeamConfiguration } from '../../shared/contract/team'
+
+export function parseTeamConfigurationFromQuery(search: string): TeamConfiguration | undefined {
+  const params = new URLSearchParams(search)
+  const raw = params.get('teamConfig')
+  if (raw === null) return undefined
+  return parseTeamConfiguration(JSON.parse(raw), Number(params.get('maxPlayers') ?? '2'))
+}
 
 /**
  * Query-string plumbing for the lobby's game setup panel.

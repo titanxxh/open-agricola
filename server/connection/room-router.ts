@@ -36,12 +36,10 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
-import type { RoomAccessErrorCode } from '../../shared/contract/room-access'
 import { canAccessRoom, parseRoomAccess } from '../game/room-access'
-import type { ClientCommand, ServerEvent, RoomColorErrorCode } from '../../shared/contract/protocol/ws.ts'
+import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import type {
-  GameContextErrorCode,
   GameContextLifecycle,
 } from '../../shared/contract/protocol/game-context.ts'
 import {
@@ -191,7 +189,7 @@ const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
-  code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required',
+  code?: Extract<ServerEvent, { type: 'error' }>['code'],
   lifecycle?: GameContextLifecycle,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
@@ -530,6 +528,13 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
 }
 
 
+async function waitingMemberName(userId: string, input: unknown, previousName?: string): Promise<string> {
+  const supplied = typeof input === 'string' ? input.trim() : ''
+  if (supplied) return supplied
+  if (previousName !== undefined) return previousName
+  return (await getDb().prepare("SELECT COALESCE(NULLIF(display_name, ''),username) AS name FROM users WHERE id=?").get<{ name: string }>(userId))?.name ?? ''
+}
+
 async function publishTeamWaiting(ctx: ConnectionCtx, room: Room): Promise<void> {
   for (const member of room.teamMembers ?? []) {
     const ws = room.waitingTeamConnections?.get(member.memberId)
@@ -542,7 +547,7 @@ async function joinWaitingTeamRoom(ctx: ConnectionCtx, room: Room, msg: Extract<
   const existing = room.teamMembers?.find(member => member.userId === ctx.currentUserId)
   if (msg.intent === 'resume' && !existing) { sendCommandError(ctx, 'Only original participants can resume this game', msg.requestId, 'not_participant'); return }
   let member: ReturnType<typeof admitTeamMember>
-  try { member = admitTeamMember(room, ctx.currentUserId, typeof msg.name === 'string' ? msg.name.trim() : '') }
+  try { member = admitTeamMember(room, ctx.currentUserId, await waitingMemberName(ctx.currentUserId, msg.name, existing?.name)) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return }
   const previousMembers = room.teamMembers
   const previousConnections = room.waitingTeamConnections
@@ -562,16 +567,16 @@ async function joinWaitingTeamRoom(ctx: ConnectionCtx, room: Room, msg: Extract<
 async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'startTeamGame' }>): Promise<void> {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   if (room.status !== 'waiting' || !room.teamMembers || !room.session.state.team || ctx.currentUserId !== room.createdBy) {
-    sendCommandError(ctx, 'Only the host can start a waiting team game', msg.requestId); return
+    sendCommandError(ctx, 'Only the host can start a waiting team game', msg.requestId, 'team_start_failed'); return
   }
   let bindings: ReturnType<typeof planTeamSeating>
   try { bindings = planTeamSeating(room.session.state.team, room.teamMembers, room.session.state.gameSeed) }
-  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, 'team_start_failed'); return }
   const names: Array<[number, string]> = bindings.map(binding => [binding.playerIndex, binding.name])
   if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames(names)
   else for (const [index, name] of names) room.session.updatePlayerName(index, name)
   const response = await executeRoomSession(room, 'getState', [], () => room.session.getState())
-  if (!response.ok) { sendCommandError(ctx, response.error ?? 'Unable to initialize game', msg.requestId); return }
+  if (!response.ok) { sendCommandError(ctx, response.error ?? 'Unable to initialize game', msg.requestId, 'team_start_failed'); return }
   room.seatOwners = bindings.map(({ playerIndex, userId }) => ({ playerIndex, userId }))
   room.players = room.teamMembers.flatMap(member => {
     const ws = room.waitingTeamConnections?.get(member.memberId)
@@ -588,6 +593,34 @@ async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientComman
       playerColors: room.session.state.players.map(value => value.color),
     })
   }, async () => { await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' }) })
+}
+
+async function handleSetTeam(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'setTeam' }>): Promise<void> {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const team = room.session.state.team
+  const previous = room.teamMembers
+  const self = previous?.find(member => member.userId === ctx.currentUserId)
+  const target = msg.memberId === undefined ? self : previous?.find(member => member.memberId === msg.memberId)
+  if (room.status !== 'waiting' || team?.configuration.mode !== 'team' || !target
+    || (msg.memberId !== undefined && ctx.currentUserId !== room.createdBy)
+    || !Number.isInteger(msg.teamIndex) || msg.teamIndex < 0 || msg.teamIndex >= room.maxPlayers / team.configuration.seatsPerTeam) {
+    sendCommandError(ctx, 'You cannot move this member to that team', msg.requestId, 'team_change_failed'); return
+  }
+  const occupied = (previous ?? []).filter(member => member.memberId !== target.memberId && member.teamIndex === msg.teamIndex)
+    .reduce((sum, member) => sum + member.seatCount, 0)
+  if (occupied + target.seatCount > team.configuration.seatsPerTeam) {
+    sendCommandError(ctx, 'That team is full', msg.requestId, 'team_change_failed'); return
+  }
+  room.teamMembers = (previous ?? []).map(member => member.memberId === target.memberId ? { ...member, teamIndex: msg.teamIndex } : member)
+  try {
+    await ctx.checkpoint.recordMeta(room, ctx.activeCommand ? { receipt: {
+      request: ctx.activeCommand.request, outcome: { ok: true, roomId: room.id, roomVersion: room.version },
+    } } : undefined)
+  } catch {
+    room.teamMembers = previous
+    sendCommandError(ctx, 'Could not change teams', msg.requestId, 'team_change_failed'); return
+  }
+  await publishTeamWaiting(ctx, room)
 }
 
 async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): Promise<Awaited<void | Promise<void>>> {
@@ -693,7 +726,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   ctx.committer?.lockNewRoom(room)
   if (room.session.state.team) {
     if (!ctx.currentUserId) { created.executor?.dispose(); room.session.dispose(); sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return }
-    const member = admitTeamMember(room, ctx.currentUserId, typeof msg.name === 'string' ? msg.name.trim() : '')
+    const member = admitTeamMember(room, ctx.currentUserId, await waitingMemberName(ctx.currentUserId, msg.name))
     room.teamMembers = [member]
     room.waitingTeamConnections = new Map([[member.memberId, ctx.ws]])
     try {
@@ -1758,6 +1791,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   setPlayerColor: handleSetPlayerColor,
   confirmPlayerColor: handleConfirmPlayerColor,
   startTeamGame: handleStartTeamGame,
+  setTeam: handleSetTeam,
   getState: handleGetState,
   getHistory: handleGetHistory,
   quoteFenceSelection: handleFenceQuote,
@@ -1839,7 +1873,8 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: reservation.receipt, requestId: msg.requestId })
           const currentRoom = ctx.currentRoom
           if (currentRoom && currentRoom.id === reservation.receipt.outcome.roomId) {
-            if (currentRoom.status === 'waiting') await ctx.broadcaster.sendRoomEvent(ctx.ws, currentRoom, waitingRoomEvent(currentRoom))
+            if (currentRoom.status === 'waiting' && currentRoom.teamMembers) await publishTeamWaiting(ctx, currentRoom)
+            else if (currentRoom.status === 'waiting') await ctx.broadcaster.sendRoomEvent(ctx.ws, currentRoom, waitingRoomEvent(currentRoom))
             else await handleGetState(ctx, { type: 'getState', requestId: msg.requestId })
           }
           return

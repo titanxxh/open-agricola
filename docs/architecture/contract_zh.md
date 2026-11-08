@@ -131,6 +131,8 @@ type ClientCommand = (
 
 ## ServerEvent 与 StateUpdateEnvelope
 
+`setTeam { teamIndex, memberId? }` 不指定成员时移动自己；指定成员要求房主权限。等待室容量与 checkpoint 成功决定是否发布变更，错误使用 `team_change_failed` 或 `team_start_failed`。
+
 组队房间逐账号发送 `teamRoomWaiting`，只含不透明成员 ID、名字、队伍、席位数与连接状态，不含账号 ID 或座位号。`startTeamGame` 要求满员且由房主发起；提交排座后，先向每个账号发送普通 `roomJoined`，再发 Step 0。在此之前 `RoomViewer.kind='team-member'` 没有座位号，传输恢复等待该等待事件，不请求对局快照。持久化的活动对局摘要使用空 `player_index` 与 `teamWaiting` 表示这些成员。入口与测试见 `team-room.ts`、`team-seating.test.ts`。
 
 `StateUpdateEnvelope.connectedPlayerIndexes` 独立于持久游戏状态和 Replay 传输实时座位在线信息，完整快照及既有加入／断开事件更新它。连接状态不决定轮抽是否可选牌。轮抽提交除 Room 输入窗口身份外，还携带 `opportunityKey`。
