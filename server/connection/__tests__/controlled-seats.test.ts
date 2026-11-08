@@ -30,6 +30,35 @@ const sharedSeats = async (options: { draft?: boolean; parents?: boolean } = {})
 }
 
 describe('connection controlled seats', () => {
+  it('keeps next-player handoff confirmation with the outgoing controlled seat', async () => {
+    const { host, room, clients, deps } = await sharedSeats()
+    await dispatch(host, { type: 'action', spaceId: 'day-laborer' })
+    expect(room.session.getInteraction()).toMatchObject({ stateId: 'wait', playerIndex: 0,
+      request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+    const before = JSON.stringify(room.session.state)
+    const version = room.version
+    vi.mocked(host.ws.send).mockClear()
+    vi.mocked(clients[1]!.ws.send).mockClear()
+    await dispatch(clients[1]!, { type: 'choice', value: 'confirm', requestId: 'wrong-handoff' })
+    expect(vi.mocked(clients[1]!.ws.send).mock.calls.map(([raw]) => JSON.parse(String(raw)))
+      .filter(message => message.type !== 'commandReceipt')).toEqual([
+      { type: 'error', error: 'seat mismatch: you cannot act on another player', requestId: 'wrong-handoff' },
+    ])
+    expect(host.ws.send).not.toHaveBeenCalled()
+    expect(JSON.stringify(room.session.state)).toBe(before)
+    expect(room.version).toBe(version)
+    await dispatch(host, { type: 'choice', value: 'confirm' })
+    expect(room.session.state.currentPlayerIndex).toBe(1)
+    expect(room.version).toBe(version + 1)
+    await dispatch(host, { type: 'proposeGameEnd', intent: 'end' })
+    for (const peer of [clients[1]!, clients[3]!]) {
+      await dispatch(peer, { type: 'respondGameEnd', proposalId: room.endProposal!.id, agree: true })
+    }
+    const replay = await new ReplayStore(deps.commands.db).manifest(room.id)
+    if (!replay.ok) throw new Error(replay.message)
+    expect(replay.steps.filter(step => step.commandType === 'choice').map(step => step.playerIndex)).toEqual([0])
+  })
+
   it('accepts draft input for either owned seat and rejects an opponent seat', async () => {
     const { host, room } = await sharedSeats({ draft: true })
     const ownPick = firstDraftPick(room.session.state.draft!, 'p3')
