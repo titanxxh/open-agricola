@@ -1,3 +1,5 @@
+import { canUseExperimentalFeature } from '../experimental-features'
+import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
 import { admitTeamMember, planTeamSeating, teamWaitingState } from '../game/team-room'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
 import { isPublicSpectatableRoom } from '../game/room'
@@ -191,10 +193,11 @@ const sendCommandError = (
   requestId?: string,
   code?: Extract<ServerEvent, { type: 'error' }>['code'],
   lifecycle?: GameContextLifecycle,
+  feature?: ExperimentalFeatureId,
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
   if (ctx.activeCommand) {
-    ctx.activeCommand.outcome = { ok: false, error, ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
+    ctx.activeCommand.outcome = { ok: false, error, ...(feature ? { feature } : {}), ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
     return
   }
   ctx.broadcaster.sendTo(ctx.ws, {
@@ -203,7 +206,14 @@ const sendCommandError = (
     requestId,
     ...(code ? { code } : {}),
     ...(lifecycle ? { lifecycle } : {}),
+    ...(feature ? { feature } : {}),
   })
+}
+
+async function allowTeamCreation(ctx: ConnectionCtx, requestId: string | undefined, userId: string | undefined): Promise<boolean> {
+  if (await (ctx.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-modes')) return true
+  sendCommandError(ctx, 'Experimental feature unavailable', requestId, 'experimental_feature_unavailable', undefined, 'team-modes')
+  return false
 }
 
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
@@ -643,6 +653,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   let setup: ReturnType<typeof parseGameSetupRequest>
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
+  if (setup.teamConfig && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId)) return
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers: setup.teamConfig?.mode === 'multihand' ? maxPlayers / setup.teamConfig.seatsPerTeam : maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
@@ -1247,6 +1258,7 @@ async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   const room = requireWritableRoom(ctx, msg.requestId)
   if (!room) return
   if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
+  if (msg.intent === 'rematch' && room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, ctx.currentUserId)) return
   let proposal: GameEndProposal
   try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent, ctx.controlledPlayerIndices) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
@@ -1492,6 +1504,10 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     await handleProposeGameEnd(ctx, { type: 'proposeGameEnd', intent: 'rematch', requestId: msg.requestId })
     return
   }
+  const initiator = termination && room.endProposal
+    ? room.seatOwners?.find(owner => owner.playerIndex === room.endProposal!.proposerIndex)?.userId
+    : ctx.currentUserId
+  if (room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, initiator)) return
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
   if (!persistence.ok) {
     commandOutcome('blocked')
@@ -1962,7 +1978,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
         }
         if (result.kind === 'completed') {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: result.receipt, requestId: msg.requestId })
-          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined)
+          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined, undefined, active.outcome.feature)
         } else {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'pending', identity: { scopeId: request.scopeId, commandId: request.commandId }, requestId: msg.requestId })
         }

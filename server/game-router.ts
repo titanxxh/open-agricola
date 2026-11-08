@@ -1,3 +1,4 @@
+import { canUseExperimentalFeature } from './experimental-features'
 import { parseTeamConfiguration, type TeamConfiguration } from '../shared/contract/team'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
@@ -629,9 +630,6 @@ const handleAuthorizedGameRoute = async (
 
   if (req.method === 'POST' && req.url === '/api/game/new') {
     const sessionKey = (await getSessionKey(req))
-    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
-    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
-    sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     let raw: Record<string, unknown> = {}
     try {
@@ -648,8 +646,15 @@ const handleAuthorizedGameRoute = async (
     let setup: ReturnType<typeof parseGameSetupRequest>
     try { setup = parseGameSetupRequest(raw, draftOptions.value) }
     catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
-    const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
     const requestUserId = (await validateSession(extractToken(req.headers.authorization)))?.id
+    if (setup.teamConfig && !await canUseExperimentalFeature(requestUserId, 'team-modes')) {
+      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-modes' })
+      return true
+    }
+    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
+    sessionLastAccess.set(sessionKey, Date.now())
+    const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
     const loadedCustomCards = customCardDbIds.length > 0
       ? (await loadLiveCustomCards(customCardDbIds, requestUserId))
       : null
@@ -704,9 +709,6 @@ const handleAuthorizedGameRoute = async (
   // Sandbox game: start a new single-player game with custom workshop cards loaded
   if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
     const sessionKey = (await getSessionKey(req))
-    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
-    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
-    sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     let customCardDbIds: string[] = []
     let playerCount = 2
@@ -768,7 +770,14 @@ const handleAuthorizedGameRoute = async (
 
     // Identify the requesting user (optional — allows loading own draft cards)
     const requestUser = (await validateSession(extractToken(req.headers.authorization)))
+    if (teamConfig && !await canUseExperimentalFeature(requestUser?.id, 'team-modes')) {
+      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-modes' })
+      return true
+    }
 
+    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
+    sessionLastAccess.set(sessionKey, Date.now())
     // Load custom card data from the database.
     // Allow: published cards (anyone) OR draft cards owned by the requesting user.
     const customCards: CustomCardData[] = []

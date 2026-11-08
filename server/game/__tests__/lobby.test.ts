@@ -29,7 +29,7 @@ const checkpoint = (persistence = new InMemoryRoomPersistence()) =>
   createRoomPersistenceCheckpoint({ persistence })
 
 describe('lobby.getRooms', () => {
-  it('hides empty non-dev rooms but keeps fixed dev rooms', () => {
+  it('hides empty non-dev rooms but keeps fixed dev rooms', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'r1', players: [] }))
     registry.set(fakeRoom({
@@ -41,11 +41,11 @@ describe('lobby.getRooms', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    const summaries = lobby.getRooms()
+    const summaries = (await lobby.getRooms())
     expect(summaries.map((s) => s.id).sort()).toEqual(['dev2'])
   })
 
-  it('hides rooms with zero players to keep the lobby free of zombies', () => {
+  it('hides rooms with zero players to keep the lobby free of zombies', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'alive', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
     registry.set(fakeRoom({ id: 'zombie', players: [] }))
@@ -59,11 +59,11 @@ describe('lobby.getRooms', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    const summaries = lobby.getRooms()
+    const summaries = (await lobby.getRooms())
     expect(summaries.map((s) => s.id).sort()).toEqual(['alive', 'joinable'])
   })
 
-  it('keeps fixed dev rooms even when empty', () => {
+  it('keeps fixed dev rooms even when empty', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'dev2', players: [] }))
     registry.set(fakeRoom({ id: 'alive', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
@@ -72,11 +72,11 @@ describe('lobby.getRooms', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    const summaries = lobby.getRooms()
+    const summaries = (await lobby.getRooms())
     expect(summaries.map((s) => s.id).sort()).toEqual(['alive', 'dev2'])
   })
 
-  it('caps the result count when given a positive limit', () => {
+  it('caps the result count when given a positive limit', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'a', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
     registry.set(fakeRoom({ id: 'b', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
@@ -86,11 +86,11 @@ describe('lobby.getRooms', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    const summaries = lobby.getRooms(2)
+    const summaries = (await lobby.getRooms(2))
     expect(summaries.map((s) => s.id)).toEqual(['a', 'b'])
   })
 
-  it('reports the authoritative status instead of inferring that a full room has started', () => {
+  it('reports the authoritative status instead of inferring that a full room has started', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({
       id: 'half',
@@ -110,14 +110,14 @@ describe('lobby.getRooms', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    const summaries = lobby.getRooms()
+    const summaries = (await lobby.getRooms())
     expect(summaries.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
       { id: 'full', playerCount: 2, maxPlayers: 2, createdBy: 'u1', status: 'waiting' },
       { id: 'half', playerCount: 1, maxPlayers: 4, createdBy: 'u1', status: 'waiting' },
     ])
   })
 
-  it('counts reserved seats so full rooms are not advertised as joinable', () => {
+  it('counts reserved seats so full rooms are not advertised as joinable', async () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({
       id: 'reserved',
@@ -138,7 +138,7 @@ describe('lobby.getRooms', () => {
       broadcaster: fakeBroadcaster(),
     })
 
-    expect(lobby.getRooms()).toEqual([{
+    expect((await lobby.getRooms())).toEqual([{
       id: 'reserved',
       playerCount: 2,
       maxPlayers: 2,

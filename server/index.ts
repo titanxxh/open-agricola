@@ -1,3 +1,4 @@
+import { availableExperimentalFeatures } from './experimental-features'
 import './language-packs'
 import { recoverPendingSubmissions } from './workshop-pr/submission-service'
 import { SubmissionStore } from './workshop-pr/submission-store'
@@ -745,7 +746,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
       return
     }
-    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username) } })
+    sendJson(res, 200, { ok: true, user: { ...user, isAdmin: isAdmin(user.username), experimentalFeatures: await availableExperimentalFeatures(user.id) } })
     return
   }
 

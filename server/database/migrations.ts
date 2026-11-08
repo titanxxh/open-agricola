@@ -17,6 +17,7 @@ export async function migratePostgres(db: PostgresDatabase): Promise<void> {
     migrations.push('033-password-reset.sql')
     migrations.push('034-team-result-archive.sql')
     migrations.push('035-team-room-members.sql')
+    migrations.push('036-beta-access.sql')
     for (const [index, filename] of migrations.entries()) {
       const version = index + 1
       if (await db.prepare('SELECT version FROM postgres_schema_migrations WHERE version = ?').get(version)) continue

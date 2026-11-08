@@ -293,7 +293,7 @@ describe('hotseat room visibility and persistence', () => {
     ordinary.currentUserId = 'u2'
     await dispatch(ordinary, { type: 'createRoom', maxPlayers: 2, name: 'host' })
 
-    const listed = deps.lobby.getRooms()
+    const listed = (await deps.lobby.getRooms())
     expect(listed.map((room) => room.id)).toEqual([ordinary.currentRoom!.id])
     expect(summarizeRoomsForLobby([hotseat.currentRoom!])).toEqual([])
   })

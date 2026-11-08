@@ -11,6 +11,7 @@ vi.mock('../../services/room-creation', async importOriginal => ({
   startRoomCreation: vi.fn(), resumePendingRoomCreation: () => null,
 }))
 
+const accountFeatures = vi.hoisted(() => ({ value: ['team-modes'] as string[] }))
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
   ok: true, games: [], rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
@@ -19,7 +20,7 @@ const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSO
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { id: 'u1', username: 'host', displayName: 'Host' },
+    user: { id: 'u1', username: 'host', displayName: 'Host', experimentalFeatures: accountFeatures.value },
     logout: vi.fn(),
     apiFetch,
   }),
@@ -112,6 +113,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
   myRoomsResponse.rooms = []
+  accountFeatures.value = ['team-modes']
 })
 
 describe('LobbyPage main navigation', () => {
@@ -588,5 +590,18 @@ describe('team creation options', () => {
     await user.click(screen.getByRole('button', { name: 'Multihand game', exact: true }))
     expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
     expect(screen.queryByRole('combobox', { name: 'Teammate visibility' })).toBeNull()
+  })
+})
+
+
+describe('experimental feature entries', () => {
+  it('hides both team entry points when the server supplies no available features', async () => {
+    accountFeatures.value = []
+    render(<LobbyPage />)
+    expect(screen.queryByRole('button', { name: 'Team game', exact: true })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Multihand game', exact: true })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Create Multiplayer Game' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Local Hotseat' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Solo game' })).toBeVisible()
   })
 })

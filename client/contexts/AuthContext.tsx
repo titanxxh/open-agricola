@@ -1,3 +1,4 @@
+import type { ExperimentalFeatureId } from '../../shared/contract/experimental-features'
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { API_BASE } from '../config'
 import { isDevModeAllowedFromQuery } from '../app/game-container-helpers'
@@ -8,6 +9,7 @@ export type AuthUser = {
   displayName: string
   displayNameIsDefault?: boolean
   isAdmin?: boolean
+  experimentalFeatures?: ExperimentalFeatureId[]
 }
 
 type RegisterPasswordInput = {
@@ -136,11 +138,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginFn = useCallback(async (username: string, password: string) => {
     const data = await authFetch('/api/auth/login', { username, password })
     if (data.ok) {
-      setState({ user: data.user, loading: false })
+      await refreshSessionFn()
       return { ok: true }
     }
     return { ok: false, code: data.code, error: data.error || 'Login failed' }
-  }, [])
+  }, [refreshSessionFn])
 
   const registerWithPasswordFn = useCallback(async (input: RegisterPasswordInput) => {
     const resp = await fetch(`${API_BASE}/api/auth/register`, {
@@ -182,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const data = await resp.json()
     if (data.ok && data.user) {
-      setState({ user: data.user, loading: false })
+      await refreshSessionFn()
       return { ok: true }
     }
     return { ok: false, code: data.code, error: data.error }

@@ -309,8 +309,10 @@ export function LobbyPage() {
               >
                 {t('platform.createMultiplayer')}
               </button>
-              <button type="button" className="btn-secondary" onClick={() => beginTeamGame('team')}>{t('team.entry')}</button>
-              <button type="button" className="btn-secondary" onClick={() => beginTeamGame('multihand')}>{t('team.multihandEntry')}</button>
+              {user?.experimentalFeatures?.includes('team-modes') && <>
+                <button type="button" className="btn-secondary" onClick={() => beginTeamGame('team')}>{t('team.entry')}</button>
+                <button type="button" className="btn-secondary" onClick={() => beginTeamGame('multihand')}>{t('team.multihandEntry')}</button>
+              </>}
               <button type="button" className="btn-secondary" onClick={() => setSelectMode('hotseat')}>
                 {t('platform.localHotseat')}
               </button>

@@ -157,10 +157,10 @@ describe('handleCreateRoom', () => {
       player.minorHand = ['__test_placeholder__']
       player.occupationHand = ['__test_placeholder__']
     }
-    expect(deps.lobby.getRooms(undefined, 'invite-host').map(room => room.id)).toEqual([firstRoomId])
-    expect(deps.lobby.getRooms(undefined, 'invite-guest').map(room => room.id)).toEqual([firstRoomId])
-    expect(deps.lobby.getRooms(undefined, 'invite-outsider')).toEqual([])
-    expect(deps.lobby.getRooms()).toEqual([])
+    expect((await deps.lobby.getRooms(undefined, 'invite-host')).map(room => room.id)).toEqual([firstRoomId])
+    expect((await deps.lobby.getRooms(undefined, 'invite-guest')).map(room => room.id)).toEqual([firstRoomId])
+    expect((await deps.lobby.getRooms(undefined, 'invite-outsider'))).toEqual([])
+    expect((await deps.lobby.getRooms())).toEqual([])
     await dispatch(outsider, { type: 'joinRoom', roomId: firstRoomId, requestedPlayerIndex: 0 })
     expect(outsider.currentRoom).toBeNull()
     expect(sentMessagesOf(outsider)).toContainEqual(expect.objectContaining({ type: 'error', code: 'not_participant' }))

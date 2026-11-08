@@ -1,3 +1,4 @@
+import { canUseExperimentalFeature, type ExperimentalFeatureAccess } from '../experimental-features'
 import type { RoomWriteOptions } from './persistence/room-persistence'
 import { enqueueRoomTask } from './room-queue.ts'
 import type { RoomSummary, ServerEvent } from '../../shared/contract/protocol/ws.ts'
@@ -15,7 +16,7 @@ export type RoomBroadcaster = {
 }
 
 export type Lobby = {
-  getRooms(limit?: number, userId?: string): RoomSummary[]
+  getRooms(limit?: number, userId?: string): Promise<RoomSummary[]>
   dissolveRoomById(roomId: string, userId: string | undefined, options?: RoomWriteOptions): Promise<{ ok: boolean; error?: string }>
   endRoomsForUser(userId: string, affectedRoomIds?: readonly string[]): Promise<{ endedRoomIds: string[] }>
   endRoomsUsingCard(cardDbId: string): Promise<{ endedRoomIds: string[] }>
@@ -23,6 +24,7 @@ export type Lobby = {
 
 export function createLobby(deps: {
   registry: RoomRegistry
+  experimentalFeatureAccess?: ExperimentalFeatureAccess
   checkpoint: RoomPersistenceCheckpoint
   broadcaster: RoomBroadcaster
   onRoomRetired?: (roomId: string) => void | Promise<void>
@@ -42,8 +44,12 @@ export function createLobby(deps: {
     }
   }
   return {
-    getRooms(limit?: number, userId?: string) {
-      return summarizeRoomsForLobby(registry.iter(), limit, undefined, userId)
+    async getRooms(limit?: number, userId?: string) {
+      const allRooms = [...registry.iter()]
+      const allowTeams = allRooms.some(room => room.session.state.team)
+        && await (deps.experimentalFeatureAccess ?? canUseExperimentalFeature)(userId, 'team-modes')
+      const rooms = allRooms.filter(room => allowTeams || !room.session.state.team)
+      return summarizeRoomsForLobby(rooms, limit, undefined, userId)
     },
     async dissolveRoomById(roomId, userId, options) {
       const room = registry.get(roomId)
