@@ -60,6 +60,10 @@ _Avoid_: Rule Alignment Gap、官方裁定、全局单人特例
 规则语义与最终合法结果不变，但候选过滤或强制流程可能暴露必定失败的选项或无法完成。纯交互简化不属于该类。
 _Avoid_: Rule Alignment Gap、纯视觉问题
 
+**Team（队伍）**:
+一组共享队伍计分的座位。队伍只影响座位排布、配置允许的队内可见性和队伍计分；每座位仍独立执行规则和奖励分优化，队友仍属于卡牌语义中的其他玩家。它和单设备控制座位的 Hotseat、Confirmed Hotseat Player 是不同维度。
+_Avoid_: 合并农场、共享资源、改变其他玩家语义
+
 **Game Variant（游戏变体）**:
 创建一局游戏时启用的可选规则模块，会改变该局的设置、公开状态、行动格、阶段流程或计分口径。它不是普通卡牌来源，也不是前端显示偏好。
 _Avoid_: Card Source、UI toggle、player count layout

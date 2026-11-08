@@ -74,7 +74,7 @@ export const createSeededRng = (
     ? createRng(explicitSeed(seed))
     : createWideRng(seed, label)
 
-export const shuffleWithRng = (values: string[], rng: () => number) => {
+export const shuffleWithRng = <T>(values: T[], rng: () => number) => {
   const result = [...values]
   for (let index = result.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng() * (index + 1))

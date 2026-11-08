@@ -407,3 +407,16 @@ describe('ScoringPad', () => {
     expect(screen.queryByText('Drudgery Reeve')).toBeNull()
   })
 })
+
+it('shows team rank and highlights every seat value counted in category-min scoring', () => {
+  const teamScores = [{ teamIndex: 0, playerIds: ['p1', 'p2'], scoring: 'category-min' as const,
+    total: -4, rank: 1, buildingResources: 0, factors: [],
+    categories: [{ key: 'cardBonusVp' as const, total: 0, playerIds: ['p2'] }] }]
+  const view = render(<ScoringPad locale="en" scores={[...mockScores, { playerId: 'p2', playerName: 'Bob', total: 0, categories: [] }]} players={mockPlayers} onClose={() => undefined} teamScores={teamScores} />)
+  expect(screen.getByText('Rank 1')).toBeVisible()
+  fireEvent.click(screen.getByText('Seat details'))
+  const counted = view.container.querySelector('[data-team-counted="true"]')
+  expect(counted?.textContent).toBe('0')
+  expect(counted?.getAttribute('data-player-id')).toBe('p2')
+  view.unmount()
+})

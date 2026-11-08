@@ -95,6 +95,7 @@ export type GameSyncPayload = {
   privateEvents?: RuntimePrivateGameEvent[]
   publicEventCancellations?: PublicEventCancellation[]
   scores: PlayerScoreSummary[] | null
+  teamScores?: import('../team').TeamScoreSummary[]
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
   hasActionStartSnapshot: boolean

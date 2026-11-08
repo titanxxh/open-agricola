@@ -1,3 +1,4 @@
+import { parseTeamConfiguration, type TeamConfiguration } from '../shared/contract/team'
 import { parseCommitSelectionPayload, type CommitSelectionPayload } from '../shared/contract/protocol/commit-selection'
 import { parseFenceSelectionPayload } from '../shared/contract/protocol/farm-selection'
 import type { FenceSelectionQuote } from '../shared/contract/protocol/game'
@@ -644,7 +645,9 @@ const handleAuthorizedGameRoute = async (
       await sendJson(res, 400, { ok: false, error: draftOptions.error })
       return true
     }
-    const setup = parseGameSetupRequest(raw, draftOptions.value)
+    let setup: ReturnType<typeof parseGameSetupRequest>
+    try { setup = parseGameSetupRequest(raw, draftOptions.value) }
+    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
     const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
     const requestUserId = (await validateSession(extractToken(req.headers.authorization)))?.id
     const loadedCustomCards = customCardDbIds.length > 0
@@ -707,6 +710,7 @@ const handleAuthorizedGameRoute = async (
     let seed: number | undefined
     let customCardDbIds: string[] = []
     let playerCount = 2
+    let teamConfigValue: unknown
     let deckIds = [...defaultSandboxDeckIds]
     let enableThroughTheSeasons = false
     let enableFarmersOfTheMoor = false
@@ -719,12 +723,14 @@ const handleAuthorizedGameRoute = async (
         customCardIds?: string[]
         customCardVersions?: Array<{ cardId?: unknown; versionId?: unknown }>
         playerCount?: number
+        teamConfig?: unknown
         deckIds?: string[]
         enableThroughTheSeasons?: boolean
         enableFarmersOfTheMoor?: boolean
         allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
         enableSnakeOpening?: boolean
       }
+      teamConfigValue = body.teamConfig
       if (typeof body.seed === 'number') seed = body.seed
       if (Array.isArray(body.customCardIds)) {
         customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
@@ -755,6 +761,10 @@ const handleAuthorizedGameRoute = async (
       allowIncompleteFarmersOfTheMoorMinorDeal = enableFarmersOfTheMoor && body.allowIncompleteFarmersOfTheMoorMinorDeal === true
       enableSnakeOpening = body.enableSnakeOpening === true
     } catch { /* ignore */ }
+
+    let teamConfig: TeamConfiguration | undefined
+    try { teamConfig = parseTeamConfiguration(teamConfigValue, playerCount) }
+    catch (error) { await sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'Invalid team configuration' }); return true }
 
     // Identify the requesting user (optional — allows loading own draft cards)
     const requestUser = (await validateSession(extractToken(req.headers.authorization)))
@@ -845,6 +855,7 @@ const handleAuthorizedGameRoute = async (
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount,
+        ...(teamConfig ? { teamConfig } : {}),
         deckIds,
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,

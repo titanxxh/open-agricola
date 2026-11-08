@@ -54,6 +54,8 @@ shared/domain/
 
 **计分。**
 
+- `team-scoring.ts` 通过 `computeTeamScores()` 汇总各座位独立优化后的得分。`TeamState` 固定创建配置和座位到队伍的映射。相加、截 0 后相乘、按类别取最小和按总分取最小都保留独立座位规则；同分时比较剩余建材。Session 响应独立下发 `teamScores`。测试：`shared/domain/__tests__/team-scoring.test.ts`、`server/__tests__/team-scoring-session.test.ts`。
+
 保留分数来源身份的计分规则见 [ADR 0035](../adr/0035-score-rules-preserve-source-identity.md)。
 
 - 田地基础分只统计 Farmyard Field。谷物和蔬菜分统计库存，以及 `getLogicalFields()` 返回的每个槽、每层作物的实际数量，包含已打出的 Card Field。计分查询不移除作物。

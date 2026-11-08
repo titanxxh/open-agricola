@@ -52,6 +52,8 @@ shared/domain/
 
 **Scoring.**
 
+- `team-scoring.ts` aggregates independently optimized seat summaries through `computeTeamScores()`. `TeamState` fixes the creation configuration and index-to-team mapping. Sum, clamped product, category minimum and total minimum preserve individual rules; ranks break ties by remaining building materials. Session responses publish separate `teamScores`. Tests: `shared/domain/__tests__/team-scoring.test.ts`, `server/__tests__/team-scoring-session.test.ts`.
+
 Source-aware score rules follow [ADR 0035](../adr/0035-score-rules-preserve-source-identity.md).
 
 - Base field points count Farmyard Fields only. Grain and vegetable points count every matching crop in the supply and every layer and slot returned by `getLogicalFields()`, including played Card Fields. Scoring queries do not remove crops.

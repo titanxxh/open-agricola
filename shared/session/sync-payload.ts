@@ -53,6 +53,7 @@ export function buildSyncPayload(
         resp.state.players[resp.state.currentPlayerIndex]?.id ?? null,
       ),
     scores: resp.scores ?? null,
+    ...(resp.teamScores ? { teamScores: resp.teamScores } : {}),
     pastureCapacities: resp.pastureCapacities,
     historyLength: resp.historyLength,
     hasActionStartSnapshot: resp.hasActionStartSnapshot,
