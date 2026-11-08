@@ -113,10 +113,17 @@ it('retains an action for retry and keeps later input and seat reconnect behind 
   await dispatch(guest, { type: 'confirmPlayerColor' })
   const actor = room.session.state.currentPlayerIndex === 0 ? host : guest
   const other = actor === host ? guest : host
+  const stateBeforeWrongSeat = JSON.stringify(room.session.state)
+  const versionBeforeWrongSeat = room.version
+  const takeAction = vi.spyOn(room.session, 'takeAction')
   vi.mocked(host.ws.send).mockClear(); vi.mocked(guest.ws.send).mockClear()
   await dispatch(other, { type: 'action', spaceId: 'forest', requestId: 'wrong-seat' })
   expect(messages(actor)).toEqual([])
-  expect(messages(other)).toContainEqual(expect.objectContaining({ type: 'stateUpdate', version: 0, requestId: 'wrong-seat' }))
+  expect(messages(other)).toEqual([{ type: 'error', error: 'seat mismatch: you cannot act on another player', requestId: 'wrong-seat' }])
+  expect(takeAction).not.toHaveBeenCalled()
+  expect(JSON.stringify(room.session.state)).toBe(stateBeforeWrongSeat)
+  expect(room.version).toBe(versionBeforeWrongSeat)
+  expect((await persistence.loadReplayHead(room.id))?.latestStepNo).toBe(0)
   vi.mocked(host.ws.send).mockClear(); vi.mocked(guest.ws.send).mockClear()
   let pausePublished!: () => void
   const paused = new Promise<void>(resolve => { pausePublished = resolve })

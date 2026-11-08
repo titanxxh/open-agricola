@@ -154,7 +154,7 @@ describe('hotseat seat ownership', () => {
     expect(errorsOf(ctx)).toContain('seat mismatch: you cannot act on another player')
   })
 
-  it('leaves an ordinary room acting as its own seat', async () => {
+  it('rejects ordinary room input while another seat is due to act', async () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
@@ -164,10 +164,18 @@ describe('hotseat seat ownership', () => {
     await ctx.committer!.prepareRoom(room, { missingPrefix: false })
     room.session.getState().state.currentPlayerIndex = 1
     const takeAction = vi.spyOn(room.session, 'takeAction')
+    const stateBefore = JSON.stringify(room.session.state)
+    const versionBefore = room.version
+    vi.mocked(ctx.ws.send).mockClear()
 
-    await dispatch(ctx, { type: 'action', spaceId: 'forest' })
+    await dispatch(ctx, { type: 'action', spaceId: 'forest', requestId: 'wrong-seat' })
 
-    expect(takeAction).toHaveBeenCalledWith(0, 'forest')
+    expect(sentMessagesOf(ctx).filter(message => message.type !== 'commandReceipt')).toEqual([
+      { type: 'error', error: 'seat mismatch: you cannot act on another player', requestId: 'wrong-seat' },
+    ])
+    expect(takeAction).not.toHaveBeenCalled()
+    expect(JSON.stringify(room.session.state)).toBe(stateBefore)
+    expect(room.version).toBe(versionBefore)
   })
 })
 
