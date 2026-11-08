@@ -68,6 +68,18 @@ _Avoid_: 合并农场、共享资源、改变其他玩家语义
 一个账号在同局认领一整队的多个座位，连接控制全部自有座位并同时可见它们的私有信息。界面自动跟随待输入的自有座位；同时轮抽和父母选择按座位顺序推进。Hotseat 是多人轮流使用同一设备，Confirmed Hotseat Player 则确认当前私密接机身份；分身无需接机确认，也不授予对手座位权限。
 _Avoid_: Hotseat、共享资源、合并农场、用观察座位决定操作权限
 
+**Experimental Feature（实验功能）**:
+已随版本上线、尚未对所有已登录账号开放的产品能力。这是账号可用性的开放状态，不是对局规则模块或界面偏好。
+_Avoid_: Game Variant、UI preference
+
+**Beta Access（Beta 资格）**:
+已注册登录账号的权限，由管理员授予与撤销。管理员自动拥有；“Beta 玩家”指拥有该权限的账号，与对局座位和配置无关。
+_Avoid_: PlayerState、RoomPlayer、按对局授予资格
+
+**Availability Stage（开放阶段）**:
+实验功能在代码中声明的开放范围：`off` 对任何账号关闭，`beta` 对有 Beta 资格的账号开放，`general` 对所有已登录账号开放。未登录访客永不通过。
+_Avoid_: 发布阶段、运行时开关
+
 **Game Variant（游戏变体）**:
 创建一局游戏时启用的可选规则模块，会改变该局的设置、公开状态、行动格、阶段流程或计分口径。它不是普通卡牌来源，也不是前端显示偏好。
 _Avoid_: Card Source、UI toggle、player count layout

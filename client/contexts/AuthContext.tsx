@@ -188,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: true }
     }
     return { ok: false, code: data.code, error: data.error }
-  }, [])
+  }, [refreshSessionFn])
 
   const logoutFn = useCallback(async () => {
     await fetch(`${API_BASE}/api/auth/logout`, {

@@ -50,7 +50,7 @@ server/game/
 - `lobby-my-rooms.ts` 为 `/api/lobby/my-rooms` 读取已提交快照，不恢复 Session。共享 `MyActiveRoom` 契约公开已占用座位的显示名、颜色、创建与开局时间、启用的扩展、游戏回合或开局阶段，以及 pending frame 的所有者或当前玩家。异步轮抽的等待座位列表只包含当前有牌包需要选择的玩家，排除等待传牌或已完成的座位，不返回私有状态、卡牌身份或账号 ID。快照无法解析时省略该房间从状态派生的详情。测试：`server/__tests__/lobby-my-rooms.test.ts`。
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
 - 创建在持久提交回调中先采用新 Room，再分离原连接。旧房通知失败只记录故障，不回滚或释放已提交的新会话；初始化清理由提交边界决定。
-- 正式单人通过 `createRoom(maxPlayers: 1)` 创建一个登录账号座位，Step 0 提交后才确认创建。进行中的单人 Room 不进入公开发现，原参与者仍沿用普通恢复授权。`createRoom(sourceGameContextId)` 经 `game-creation-store.ts` 读取不可变的已接受创建元数据，校验已完成来源的唯一参与者，不加载旧 Room 或 Replay 就能创建新局。首次事务同时提交 Room、Step 0、创建配置和命令回执，并再次校验来源及 Workshop 准入；显式卡源不可用时返回完整原选择和类型化差异。契约及测试见 `shared/contract/game-creation.ts`、`server/connection/__tests__/solo-room.test.ts`。
+- 正式单人使用登录后的 `createRoom(maxPlayers: 1)`，不进入公开发现。`game-creation-store.ts` 授权已完成来源的配置复用，不加载旧 Room 或 Replay。创建事务同时提交 Room、Step 0、元数据和回执，再查来源与工坊准入；显式卡源不可用时返回配置调整。契约与测试见 `shared/contract/game-creation.ts`、`solo-room.test.ts`。
 - `roomId` 标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 保留开局选项，在同一事务提交新 Session/UUID 和旧局退役后才迁移连接。Team/Multihand 保留账号队伍归属，用新 seed 调用 `planTeamSeating`：所有账号在线时立即开局；缺人时保留完整名单进入无座位等待室。测试：`team-rematch.test.ts`。只有权威 `gameOver` 才归档结果；失败保留终局状态供重试。队伍结果包括计分方式、排名和逐座位队伍索引。协商结束使用 `terminated`；过期、取消和清理不产生结果。得分保留小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
 - 托管 Room 使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认等待状态与座位，`GameContextStore` 统一裁定持久化期限，并保护在线连接、准入与未完成保存。管理员可配置离线保留期，默认等待 3 天、进行中 7 天。每次全员离线后固定截止时间，修改只影响下次离线周期；开发房不因闲置过期。`RoomAuthority` 将内存卸载与存档删除分开。缺失录制数据会阻断恢复。见 [ADR 0039](../adr/0039-runtime-room-retention-policy.md)。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
@@ -141,7 +141,7 @@ HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `Sess
 - `POST /api/game/new` 接受 `seed?` 与 WebSocket `createRoom` 的设置，经 `server/game/game-setup-options.ts` 映射。`POST /api/game/load`、`POST /api/game/dev/*` 与 `POST /api/game/new-sandbox` 是调试与工坊沙盒路径。
 - `GET /cards-manifest.json` 向主 bundle 提供卡牌 metadata。
 - OAuth 账号绑定：`POST /api/auth/oauth/:provider/start?intent=link`、`GET …/callback` 与 `POST …/complete`，使用 PKCE S256 与 fragment 交接，从不创建新的站点会话。
-- OAuth 注册：`GET /api/auth/oauth/:provider/start` 将浏览器的 SHA-256 challenge 绑定到 OAuth state 和有效期十五分钟的一次性注册票据。回调用 fragment 交接票据，并设置 `no-store`、`no-referrer`；`POST /api/auth/onboarding/complete` 只在浏览器 verifier 匹配时接受显式票据。带有 challenge 的票据无论从正文还是 Cookie 传入，均须验证 verifier。未绑定的 Cookie 票据仍可按原方式完成注册，显式凭证失败时不会退回其他 Cookie 身份。账号创建、身份绑定、邀请码与票据消费共用同一事务。凭证缺失、无效与票据过期、已消费使用不同错误码。
+- OAuth 注册用浏览器 challenge 与 verifier 绑定票据，显式凭证失败时不退回其他 Cookie 身份。账号创建、身份绑定、邀请码和一次性票据消费共用事务。回调用 fragment 交接，设置 `no-store` 与 `no-referrer`；错误码区分凭证缺失、无效与过期。入口和测试见 `oauth/store.ts`、`index.ts` 及下方认证测试。
 
 认证测试：`server/__tests__/auth-routes.test.ts`、`server/oauth/__tests__/store.test.ts`、`e2e-tests/{oauth-onboarding,account-link,platform}.spec.ts`。
 
@@ -181,8 +181,8 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 `server/workshop.ts` 与 `server/workshop-pr/` 提供自定义卡上传、编译、沙盒与 PR 投递。完整产品流程见 [Platform design](../PLATFORM_DESIGN.md)。
 
 - 沙盒设置（`sandbox_settings`、`sandbox_cards`）持久化人数、牌组与变体开关；`POST /api/game/new-sandbox` 把它们传给 `createInitialState()`。
-- 审核与发布是 `server/workshop-status.ts` 中的两个维度：审核 `unsubmitted / in_review / approved / stale / merged`，发布 `live`。卡牌绑定一个基于 `main`、打开且非草稿的 PR，并固定其 head 与 Design Draft。只有有 push 权限的审核者对精确 head 的真实批准才能批准一个版本；发布时重新查询 GitHub，要求 head、审核 SHA、批准 SHA 与固定版本一致。任何不一致、关闭、转为草稿、改变 base 或撤销批准都会让卡牌进入 `stale·offline`，处理 webhook 或发布时 GitHub 查询失败也是如此。绑定后立即刷新若暂时失败，则保留 `in_review` 绑定、清除同步时间，作者可通过 `refresh-pr-status` 重试。
-- 合入 `main` 的 PR 让已批准的卡牌毕业为只读的 `merged`。在批准之前观察到的合入会被记录（`github_pr_status='merged'`），只有在有权限的精确 head 批准被核对后才毕业；合入其他 base 的 PR 进入 `stale·offline`。在线的已合入卡牌继续提供其审核快照直到发布，之后启动时 `markBuiltInMergedCards` 让内置定义接管。
+- `workshop-status.ts` 将审核与 `live` 发布分开。绑定和发布要求打开、非草稿且基于 `main` 的 PR、固定 Draft Version 与有权限的精确 head 批准。不一致或 GitHub 对账失败进入 `stale·offline`；绑定后首次刷新暂时失败保留 `in_review` 供重试。完整转换以状态代码和工坊测试为准。
+- 已批准的 `main` 合入毕业为只读 `merged`；先观察到的合入等待有权限的精确 head 核对。其他 base 进入 `stale·offline`。已上线审核快照持续提供到发版，由 `markBuiltInMergedCards` 在启动时交给内置定义。
 - 真实 Room 中的 `customCardIds` 只接受已批准、已上线的卡，并使用其审核过的快照。正式单人保留全部显式选择，卡源不可用或来源变化时拒绝创建并返回配置调整；其他 Room 对作者自己未上线的卡给出指引，过滤其他无法加载的 ID。未审核的代码只在工坊沙盒中运行，从不进入多人 `GameSession`。
 - 作者 `unpublish` 让已有对局继续完成；管理员下架会结束每个嵌入该卡的 Room，不计分也不产生 Replay。
 - 投稿使用一个仓库范围的 GitHub App；`workshop_submissions` 在远端写入前冻结操作身份与 Draft Version，分支发布使用 expected-head CAS，不确定的 PR 创建会对账而不再盲目 POST，生成文件冲突会暂停投递。见 [GitHub App runbook](../operations/github-oauth-app-setup.md)。
@@ -194,7 +194,7 @@ Viewer 入口 HTML 重新验证响应策略；内容寻址的资源仍永久缓�
 
 - `server/db.ts` 通过 `pg` 持有异步 PostgreSQL 连接：transaction 跨 await 保持同一连接，嵌套 transaction 使用 savepoint，原生迁移在启动前于 advisory lock 下执行。运行时没有 SQLite 或 JSON 回退。
 - `scripts/import-sqlite.ts` 通过精确比对导入停机的 schema-33 SQLite 数据库，遇到损坏的已录制对局会阻断，`data_imports` 让失败的导入停在启动屏障之后；`scripts/validate-backup.ts` 校验 PostgreSQL / S3 的恢复。
-- 产品表：`game_contexts`、`game_context_participants`、`game_replays`、`game_replay_steps`、`issue_submission_connections`、`account_deletion_requests`、`github_grant_revocations`、`bug_reports`、`bug_report_attempts`、`bug_report_evidence_audit`；以及 `rooms`、`room_players`、`game_results`、`game_result_players`、`oauth_states` 和 Room 历史与恢复表。Segment 由 `checkpointStepNo` 表达；没有 Segment、证据 payload、配额或 webhook 投递表。
+- `schema.sql` 与有序迁移定义产品表。回放片段由 `checkpointStepNo` 表示；证据 payload、配额和 webhook 投递不另建并行存储表。
 - 录制上线前完成的对局为 `legacy_no_replay`：保留结果摘要，但没有 Replay header 或 Frame。
 
 ## GitHub 投递、安全与删除
@@ -222,3 +222,9 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 - 私有 Prometheus 采集器通过 bearer 认证的 ingress 发现实例；ingress 负责全局 Room 聚合与在线用户。Grafana 只在 `/ops/` 后读取聚合数据，每次请求都通过一次性交接 cookie 检查当前站点会话与 `ADMIN_USERS`。
 - 浏览器发送抽样、限流的计时批次（命令 RTT、首个快照、快照到布局），服务端视为不可信的观测输入。
 
+
+## 实验功能入口
+
+`experimental-features.ts` 每次检查读取 `beta_access` 中的最新资格，并从 `ADMIN_USERS` 推导管理员。迁移 `036-beta-access.sql` 只新增资格表，不重写保留对局。[ADR 0042](../adr/0042-experimental-feature-availability.md) 定义开放与参与边界。
+
+`connection/room-router.ts` 对解析完成的组队创建配置、终局后 `newGame` 调用者，以及协商重开的提议者进行门禁，提议和实际创建各检查一次。`game-router.ts` 覆盖两个 HTTP 创建入口。`game/lobby.ts` 与 `game/room-directory.ts` 在列表截取之前过滤公开发现。已有房间的加入、换队、开局和游戏操作沿用正常权限，不受阶段或资格变化影响。`/api/auth/me` 计算 `experimentalFeatures`，连接与令牌不缓存资格。测试：[房间入口](../../server/connection/__tests__/experimental-features.test.ts)、[HTTP](../../server/__tests__/experimental-feature-http.test.ts)、[资格与外键](../../server/__tests__/experimental-features.test.ts)。

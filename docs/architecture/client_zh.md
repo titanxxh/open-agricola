@@ -119,3 +119,7 @@ GameContextRouter
 - Bug Report 诊断由 `services/bug-report-diagnostics.ts` 识别浏览器和设备，并在标签页存储中保留当前 Room 最近一小时最多五次 WebSocket 关闭记录。`WsGameTransport` 只记录当前连接的关闭，排除主动销毁。创建、编辑草稿及最终确认作者时附带最新的有界诊断快照；刷新后仍可读取，不包含原始 User-Agent。测试见 `bug-report-diagnostics.test.ts` 和 `bug-report.spec.ts`。
 - Issue Submission Connection 独立于 `AuthContext`：报告页脚负责首次连接，设置页只显示状态和断开，连接失效时从不切换到 Hosted Issue Identity。
 
+
+## 实验功能发现
+
+`AuthContext` 消费服务端的 `user.experimentalFeatures`，密码登录或重置密码后重新读取 `/api/auth/me`。缺失资格列表或未登录时视为空。`LobbyPage` 仅在该列表包含对应功能 ID 时展示组队与分身创建入口。客户端不从管理员身份、环境或对局状态推导资格。[LobbyPage 测试](../../client/app/__tests__/LobbyPage.test.tsx) 和[声明阶段浏览器测试](../../e2e-tests/experimental-feature-gates.spec.ts) 验证入口展示。

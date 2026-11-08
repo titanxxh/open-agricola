@@ -1,4 +1,3 @@
-import type { ExperimentalFeatureId } from '../experimental-features'
 import type { SoloCreationErrorCode, SoloCreationConfiguration, SoloCreationIssue } from '../game-creation'
 
 /** Stable across transports; requestId is only a single-connection correlation. */
@@ -14,7 +13,6 @@ export type CommandOutcome = {
   playerIndex?: number
   error?: string
   code?: string
-  feature?: ExperimentalFeatureId
   creationAdjustment?: { configuration: SoloCreationConfiguration; issues: SoloCreationIssue[] }
 }
 export type CommandReceipt = CommandIdentity & { outcome: CommandOutcome }
