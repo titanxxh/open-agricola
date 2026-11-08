@@ -4934,6 +4934,7 @@
 }
 .scoring-pad {
   background: #fffaf0;
+  color: var(--color-text);
   border-radius: 16px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
   width: min(1000px, 96vw);

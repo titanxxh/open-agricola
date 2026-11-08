@@ -8,6 +8,18 @@ import type { CompletedGameContextDescriptor } from '../shared/contract/protocol
 import { BACKEND_URL, getJson, postJson } from './fixtures'
 import { authenticateSolo } from './helpers/standard-solo-acceptance'
 
+const contrastRatio = (foreground: string, background: string) => {
+  const luminance = (color: string) => {
+    const [red = 0, green = 0, blue = 0] = (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(channel => {
+      const value = Number(channel) / 255
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    })
+    return red * 0.2126 + green * 0.7152 + blue * 0.0722
+  }
+  const first = luminance(foreground), second = luminance(background)
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
+}
+
 for (const recordReplay of [false, true]) {
   test(`completed teams keep ranks and seat details (replay=${recordReplay})`, async ({ page, request }) => {
     await page.setViewportSize({ width: recordReplay ? 1440 : 390, height: 900 })
@@ -48,6 +60,9 @@ for (const recordReplay of [false, true]) {
     await replay.locator('.replay-play').click()
     await expect(replay.locator('.team-score')).toHaveCount(2)
     const team = replay.locator('.team-score[data-team-index="0"]')
+    const colors = await team.evaluate(element => ({ foreground: getComputedStyle(element).color,
+      background: getComputedStyle(element.closest('.scoring-pad')!).backgroundColor }))
+    expect(contrastRatio(colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5)
     await team.getByText('Seat details', { exact: true }).click()
     await expect(team.locator('[data-team-counted="true"]').first()).toBeVisible()
     await page.screenshot({ path: 'output/playwright/team-result-archive-replay.png', fullPage: true })
