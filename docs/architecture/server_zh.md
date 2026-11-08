@@ -148,7 +148,7 @@ HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `Sess
 
 Game Context、Replay 与 Bug Report 是版本化的产品 API：
 
-创建配置读取只授权已完成单人局的原参与者，始终使用 `no-store`；公开 completed descriptor 和无需凭证的 Viewer 不附带这份私有元数据。
+创建配置读取只授权已完成单人或组队局的原参与者，始终使用 `no-store`；公开 completed descriptor 和无需凭证的 Viewer 不附带这份私有元数据。新组队房把已接受的创建配置与规则快照分开存储，与等待室准入原子提交；恢复房间时加载同一记录，完成后的来源创建由 `GameCreationStore` 授权。普通多人局仍不支持来源复用，已有但缺少记录的组队房继续沿用正常生命周期。测试见 `team-creation-source.test.ts`、`solo-room.test.ts`。
 
 ```text
 GET    /api/v1/game-contexts/:roomId
