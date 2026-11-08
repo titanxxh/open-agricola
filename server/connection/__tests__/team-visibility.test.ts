@@ -81,10 +81,12 @@ describe('teammate visibility', () => {
 
   it.each(['shared', 'private'] as const)('uses the same %s audience for live history and getHistory', async visibility => {
     const { room, peers, host, spectator } = await teamRoom(visibility)
-    room.session.state.log = room.session.state.players.map((player, index) => ({
-      key: 'private-card-history', playerId: player.id, params: { cardId: `occupation-${index}` },
-    }))
-    room.session.loadState(room.session.state)
+    room.session.loadState({
+      ...room.session.state,
+      log: room.session.state.players.map((player, index) => ({
+        key: 'private-card-history', playerId: player.id, params: { cardId: `occupation-${index}` },
+      })),
+    })
     await host.broadcaster.broadcastCommitted(room, room.session.getState(), 'reconnect')
     for (const peer of peers) {
       await dispatch(peer, { type: 'getHistory' })
