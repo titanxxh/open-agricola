@@ -125,3 +125,5 @@ GameContextRouter
 `AuthContext` 消费服务端的 `user.experimentalFeatures`，密码登录或重置密码后重新读取 `/api/auth/me`。缺失资格列表或未登录时视为空。`LobbyPage` 仅在该列表包含对应功能 ID 时展示组队与分身创建入口。客户端不从管理员身份、环境或对局状态推导资格。[LobbyPage 测试](../../client/app/__tests__/LobbyPage.test.tsx) 和[声明阶段浏览器测试](../../e2e-tests/experimental-feature-gates.spec.ts) 验证入口展示。
 
 `BetaBadge` 标记组队与分身创建入口，公开列表、我的对局和等待室的 `TeamConfigurationSummary`，以及实时和归档队伍结果。只有创建表单显示 `beta.creationHint`；`MyActiveGames` 从服务端接收等待及进行中房间的 `teamConfig`。`GameEndControls` 为不可用账号锁定发起组队重开，仍允许同意其他玩家的提议；`TeamSameConfigurationRematch` 在历史 Viewer 外独立读取原参与者配置与最新资格，展示同样的锁定原因，并注入实时 `ScoringPad`。配置读取或 Viewer 失败不影响公开结果。`experimental_feature_unavailable` 在触发操作的控件下显示 `form-error` 并重读 `/api/auth/me`；大厅组队创建复用带命令日志的创建路径，让拒绝保留在表单。测试见 `GameEndControls.test.tsx`、`TeamSameConfigurationRematch.test.tsx`、`GameContextRouter.test.tsx`、`beta-team-ui.spec.ts`。
+
+设置页独立显示 Beta 资格，不从实验功能可用性推导。管理员区的 `BetaAccessSettings` 复用 `RoomInvitePicker` 的防抖账号检索，列出授予人与时间，并通过 `DangerButton` 确认撤销。授予与撤销影响后续创建和发现检查，已有房间继续可用。测试见 `BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
