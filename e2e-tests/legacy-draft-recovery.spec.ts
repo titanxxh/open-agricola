@@ -1,7 +1,7 @@
 // @covers shared/draft/
 // @covers shared/session/state-recovery.ts
 import { expect, test, type Page } from '@playwright/test'
-import { createOpeningSession } from '../server/__tests__/_helpers/session-fixtures'
+import { createOpeningSession, createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
 import { serializeState } from '../shared/session/serialization'
 import { draftSeatProgress } from '../shared/projections/draft-progress'
 import { joinRoomClients, roomDriver, roomSnapshot } from './room-command-driver'
@@ -18,9 +18,11 @@ for (const [name, fixture] of [['ordinary', standard], ['Moor', moor]] satisfies
         enableFarmersOfTheMoor: fixture.options.enableFarmersOfTheMoor },
       expected: { phase: 'draft', roundPhase: 'work', interaction: { stateId: 'idle' } },
     })
+    const driver = roomDriver(pages)
+    let joined = false
     try {
       await joinRoomClients(pages, request)
-      const driver = roomDriver(pages)
+      joined = true
       await driver.command(0, { type: 'loadGame', state: {
         ...source.withCtx(() => serializeState(source.state, {})), draft: fixture.draft,
       } })
@@ -50,6 +52,15 @@ for (const [name, fixture] of [['ordinary', standard], ['Moor', moor]] satisfies
       await choose()
       expect((await roomSnapshot(pages[0])).state.draft).not.toEqual(selected)
       expect(errors).toEqual([])
-    } finally { source.dispose(); await Promise.all(pages.map(page => page.close())) }
+    } finally {
+      try {
+        // The shared dev Room must not leave an unfinished draft for later specs.
+        if (joined) {
+          const work = createWorkSession()
+          try { await driver.command(0, { type: 'loadGame', state: work.withCtx(() => serializeState(work.state, {})) }) }
+          finally { work.dispose() }
+        }
+      } finally { source.dispose(); await Promise.all(pages.map(page => page.close())) }
+    }
   })
 }
