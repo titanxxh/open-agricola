@@ -90,12 +90,17 @@ it('plays two real accounts through simultaneous opening, recovers both seats an
   expect((await read(owner)).connectedPlayerIndexes).toEqual([0, 2])
   guest = await SoloNetworkPeer.connect(host.runtime().url, `oa_session=${token}`)
   guests.push(guest)
-  guest.socket.send(JSON.stringify({ type: 'joinRoom', roomId: room.id, intent: 'resume' }))
+  guest.socket.send(JSON.stringify({ type: 'joinRoom', roomId: room.id, intent: 'resume', name: 'Reconnected farmer' }))
   const restored = await guest.wait((event): event is Extract<ServerEvent, { type: 'roomJoined' }> => event.type === 'roomJoined')
   expect(restored.controlledPlayerIndexes).toEqual([1, 3])
   expect((await read(guest)).payload.state.players[3]!.minorHand).not.toContain('?')
-  for (const index of [1, 3]) await owner.wait((event): event is Extract<ServerEvent, { type: 'playerJoined' }> =>
-    event.type === 'playerJoined' && event.playerIndex === index)
+  for (const index of [1, 3]) {
+    const joined = await owner.wait((event): event is Extract<ServerEvent, { type: 'playerJoined' }> =>
+      event.type === 'playerJoined' && event.playerIndex === index)
+    expect(joined.name).toBe(index === 1 ? 'Reconnected farmer' : 'Other farmer')
+  }
+  expect(room.session.state.players.filter((_, index) => index === 1 || index === 3).map(player => player.name))
+    .toEqual(['Other farmer', 'Other farmer'])
   expect((await read(owner)).connectedPlayerIndexes).toEqual([0, 1, 2, 3])
 
   await guest.close()
