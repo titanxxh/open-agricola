@@ -14,7 +14,7 @@
 | `contract/workshop.ts` | 工坊 Design Draft、Workspace 与生成候选的前后端协议 |
 | `contract/protocol/ws.ts` | `ClientCommand`、`ServerEvent`、`RoomSummary` |
 | `contract/room-access.ts` | 活动 Room 准入策略与玩家搜索的展示身份 |
-| `contract/game-creation.ts` | 已接受的单人与组队创建配置及浏览器可用校验，持久化记录与本人响应读取共用 |
+| `contract/game-creation.ts` | 已接受的单人创建配置及浏览器可用校验，持久化记录与本人响应读取共用 |
 | `contract/game-variants.ts` | 存在依赖关系的 Game Variant 创建选项的规范化 |
 | `contract/protocol/game.ts` | `GameSyncPayload`、`StateUpdateEnvelope`、`StateUpdateCause`、`ActionDetailEffects` |
 | `contract/cards.ts` | `CardDefinition`，公开卡牌形状 |
