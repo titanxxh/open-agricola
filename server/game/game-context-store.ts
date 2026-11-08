@@ -4,7 +4,7 @@ import { isDevRoom } from './room.ts'
 import { RoomRetentionStore } from './room-retention-store'
 import { persistedRoomAccessError } from './room-access'
 import { GameCreationStore } from './game-creation-store'
-import type { GameCreationConfigurationResponse } from '../../shared/contract/game-creation'
+import type { SoloCreationConfigurationResponse } from '../../shared/contract/game-creation'
 import { resolveSoloWorkshopCards } from './workshop-room-cards'
 import type { GameTermination } from '../../shared/contract/protocol/game-termination'
 import type { TeamResultArchive } from '../../shared/contract/team'
@@ -72,12 +72,11 @@ const removedReason = (
 export class GameContextStore {
   private readonly db: StoreDatabase
 
-  async readCreationConfiguration(roomId: string, userId?: string): Promise<GameCreationConfigurationResponse> {
+  async readCreationConfiguration(roomId: string, userId?: string): Promise<SoloCreationConfigurationResponse> {
     const source = await new GameCreationStore(this.db).completedSource(roomId, userId)
     if (!source.ok) return source
-    const configuration = source.record.configuration
-    const issues = configuration.kind === 'standard-solo' ? (await resolveSoloWorkshopCards(this.db, configuration)).issues : []
-    return { ok: true, configuration, issues }
+    const resolved = await resolveSoloWorkshopCards(this.db, source.record.configuration)
+    return { ok: true, configuration: source.record.configuration, issues: resolved.issues }
   }
   private readonly now: () => number
 

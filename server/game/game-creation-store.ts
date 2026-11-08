@@ -26,19 +26,13 @@ export class GameCreationStore {
       const context = await this.db.prepare('SELECT lifecycle FROM game_contexts WHERE room_id=? FOR SHARE').get<{ lifecycle: string }>(roomId)
       if (context?.lifecycle === 'removed') return rejected('source_removed', 'This game context was removed')
       if (context?.lifecycle !== 'completed') return rejected('source_not_completed', 'The source game has not completed durably')
-      const result = await this.db.prepare('SELECT player_count, team_mode FROM game_results WHERE room_id=? FOR SHARE').get<{ player_count: number; team_mode: string | null }>(roomId)
-      if (!result || (result.player_count !== 1 && !result.team_mode)) return rejected('source_not_solo', 'The source is not a supported completed game')
+      const result = await this.db.prepare('SELECT player_count FROM game_results WHERE room_id=? FOR SHARE').get<{ player_count: number }>(roomId)
+      if (result?.player_count !== 1) return rejected('source_not_solo', 'The source is not a completed solo game')
       const players = await this.db.prepare('SELECT user_id FROM game_result_players WHERE room_id=? FOR SHARE').all<{ user_id: string | null }>(roomId)
-      if (!players.some(player => player.user_id === userId) || (result.player_count === 1 && players.length !== 1)) {
-        return rejected('not_participant', 'Only an original participant can reuse this configuration')
-      }
+      if (players.length !== 1 || players[0]?.user_id !== userId) return rejected('not_participant', 'Only the original solo player can reuse this configuration')
       const stored = await this.db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(roomId)
       const record = stored ? parseGameCreationRecord(stored.configuration_json) : null
       if (!record) return rejected('creation_configuration_unavailable', 'The original creation configuration is unavailable')
-      if (record.configuration.maxPlayers !== result.player_count
-        || (record.configuration.kind === 'team' && record.configuration.teamConfig.mode !== result.team_mode)) {
-        return rejected('creation_configuration_unavailable', 'The original creation configuration does not match the completed game')
-      }
       return { ok: true, record }
     })()
   }

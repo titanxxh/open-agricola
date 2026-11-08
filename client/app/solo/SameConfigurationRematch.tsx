@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import type { SoloCreationConfigurationResponse } from '../../../shared/contract/game-creation'
-import { readSoloCreationConfiguration } from '../../services/creation-configuration'
+import { readSoloCreationConfiguration } from '../../services/solo-creation-configuration'
 import { soloRoomOptions } from '../../services/room-creation'
 import { SoloSetupDialog } from './SoloSetupDialog'
 import { useRoomCreation } from './useRoomCreation'

@@ -3,12 +3,11 @@ import type {
   RoomPersistence,
   RoomSnapshot,
   RestoreOptions,
-  RoomWriteOptions,
 } from './room-persistence.ts'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 import type { GameTermination } from '../../../shared/contract/protocol/game-termination'
 
-type Row = { serialized: PersistedSessionSnapshot | null; meta: RoomMeta; updatedAt: number; creationConfiguration?: RoomWriteOptions['creationConfiguration'] }
+type Row = { serialized: PersistedSessionSnapshot | null; meta: RoomMeta; updatedAt: number }
 
 const copyMeta = (meta: RoomMeta): RoomMeta => ({
   ...meta,
@@ -32,11 +31,10 @@ export class InMemoryRoomPersistence implements RoomPersistence {
       serialized: row.serialized,
       meta: copyMeta(row.meta),
       updatedAt: row.updatedAt,
-      ...(row.creationConfiguration ? { creationConfiguration: structuredClone(row.creationConfiguration) } : {}),
     }
   }
 
-  save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta, options?: RoomWriteOptions): void {
+  save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta): void {
     const existing = this.rooms.get(id)
     this.rooms.set(id, {
       serialized: serialized === null ? (existing?.serialized ?? null) : serialized,
@@ -45,7 +43,6 @@ export class InMemoryRoomPersistence implements RoomPersistence {
         startedAt: existing?.meta.startedAt ?? meta.startedAt,
       },
       updatedAt: Date.now(),
-      creationConfiguration: structuredClone(options?.creationConfiguration ?? existing?.creationConfiguration),
     })
   }
 
@@ -73,9 +70,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
         this.rooms.delete(id)
         continue
       }
-      out.push({ id, serialized: row.serialized, meta: copyMeta(row.meta), updatedAt: row.updatedAt,
-        ...(row.creationConfiguration ? { creationConfiguration: structuredClone(row.creationConfiguration) } : {}),
-      })
+      out.push({ id, serialized: row.serialized, meta: copyMeta(row.meta), updatedAt: row.updatedAt })
     }
     return out
   }
