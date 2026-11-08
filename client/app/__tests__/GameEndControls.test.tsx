@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { GameEndProposal } from '../../../shared/contract/protocol/game-termination'
 import { t } from '../../../shared/i18n'
 import type { WsGameTransport } from '../../services/gameTransport'
+import type { ServerEvent } from '../../../shared/contract/protocol/ws'
 import { GameEndControls } from '../GameEndControls'
 
 const proposal: GameEndProposal = {
@@ -18,7 +19,7 @@ const proposal: GameEndProposal = {
 }
 
 function fakeTransport() {
-  let onEvent: (event: { type: string; roomId?: string; proposal?: GameEndProposal | null; error?: string; code?: string }) => void = () => {}
+  let onEvent: (event: ServerEvent) => void = () => {}
   const sendRoomCommand = vi.fn()
   const transport = {
     roomId: 'room-1',
@@ -65,6 +66,18 @@ describe('GameEndControls', () => {
     emit({ type: 'error', code: 'experimental_feature_unavailable', error: 'Feature unavailable' })
     expect(await screen.findByRole('alert')).toHaveTextContent('Team modes are not available to you. No room was created.')
     expect(screen.getByRole('alert')).toHaveClass('form-error')
+    expect(refresh).toHaveBeenCalledOnce()
+  })
+
+  it('recognizes a recovered receipt by code and refreshes once when its transient error also arrives', async () => {
+    const { transport, emit } = fakeTransport()
+    const refresh = vi.fn()
+    render(<GameEndControls transport={transport} locale="en" playerNames={['Ada', 'Bea']} teamGame canUseTeamModes onExperimentalFeatureUnavailable={refresh} />)
+    emit({ type: 'commandReceipt', requestId: 'recovered', status: 'completed', receipt: {
+      scopeId: 'scope', commandId: 'command', outcome: { ok: false, code: 'experimental_feature_unavailable', error: 'Feature unavailable' },
+    } })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Team modes are not available to you. No room was created.')
+    emit({ type: 'error', requestId: 'recovered', code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Feature unavailable' })
     expect(refresh).toHaveBeenCalledOnce()
   })
 
