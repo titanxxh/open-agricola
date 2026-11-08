@@ -97,7 +97,7 @@ const farmBoardProps = (
       players: state.players,
       currentPlayer,
       displayPlayer,
-      viewerPlayerId: currentPlayer.id,
+      visiblePlayerIds: [currentPlayer.id],
       playerPanelSummary: getPlayerPanelSupplySummary(state, displayPlayer),
       devMode: false,
       currentStartPlayerId: '',

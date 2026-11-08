@@ -66,7 +66,7 @@
 
 - `board/ActionSpaceDescription.tsx` 根据权威 `baseDescriptionPreview` 渲染行动格图标，费用和数量始终取自该规则树。详细悬停说明与交互选项使用 `interaction/ActionDescription.tsx`。棋盘保留图形表达，不再另行维护规则表；组件和浏览器覆盖见 `ActionBoard.test.tsx` 与 `action-space-icons.spec.ts`。
 - `client/app/GameContainerApi.tsx`（含 `useTransportSetup`）、`LobbyPage.tsx` 与 `PageRouter.tsx` 编排视图，并根据 `viewPlayerId` 与 `playerIndex` 推导可交互性。
-- `FarmBoardView.viewerPlayerId` 决定可见的私有手牌，独立于 Interaction Player。联机座位在其他玩家回合仍能查看自己的手牌，提交仍需本机座位的交互权限。热座沿用已确认的接机身份，浏览公开农场时隐藏手牌。覆盖见 `GameContainerApi.hotseat.test.tsx`、`ws-dual-player.spec.ts` 与 `hotseat-public-farms.spec.ts`。
+- `FarmBoardView.visiblePlayerIds` 决定可读手牌，独立于控制权限和 Interaction Player。手牌提交（含职业多选）只允许当前显示的、拥有权限的响应座位。热座即使收到全座位数据，也只向已确认接机者展示。分身可读全部自有手牌；`multihand-seat.ts` 自动跟随自有响应者，同时开局输入按座位顺序推进，无需接机。重复快照保留手动浏览。覆盖见 `GameContainerApi.hotseat.test.tsx`、`FarmBoard.test.tsx`、`hotseat-public-farms.spec.ts`。
 - `DraftOverlay` 与 `PublicOpeningProgress` 共用个人数量及选牌中／等牌／完成状态。本地勾选绑定显示时的选择机会，其他人提交不清除勾选，换包才清除。实时 envelope 的座位在线信息独立于轮抽状态；离开大厅后仍消费加入和断开事件。热座从最后一次手选者之后轮转，跳过无牌座位并保留私密接机确认。覆盖：`DraftOverlay.render.test.tsx`、`gameTransport-reconnect.test.ts`、`draft-opening-order.spec.ts`。
 - 轮抽与父母卡选择阶段在独立滚动的选卡区域上方保留 `GameHeader`。内嵌模式保留语言切换。测试见 `setup-navigation.spec.ts`。
 - 协商结束与再来一局（`GameEndControls`）在轮抽、父母卡选择、单人手牌、热座交接和普通对局中都放在 `GameHeader` 的菜单里。有待处理提议时，菜单按钮显示标记并打开菜单。覆盖见 `game-end.spec.ts`。

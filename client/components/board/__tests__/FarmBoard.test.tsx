@@ -190,7 +190,7 @@ const createFarmBoardProps = (
     players: [player],
     currentPlayer: player,
     displayPlayer: player,
-    viewerPlayerId: player.id,
+    visiblePlayerIds: [player.id],
     playerPanelSummary: getPlayerPanelSupplySummary({ players: [player] } as GameState, player),
     devMode: false,
     currentStartPlayerId: '',
@@ -1773,6 +1773,16 @@ const renderWithOccSelection = (
 }
 
 describe('FarmBoard occupation-hand multi-select mode', () => {
+  it('keeps a visible inactive hand read-only during another hand selection', () => {
+    const player = { ...createPlayer('p3', 'Other owned farm', 'red'), occupationHand: BASE_OCC_HAND }
+    const props = createFarmBoardProps(player, { activePlayerId: 'p1', isInteractive: false,
+      occupationHandSelection: { kind: 'occupation-hand', selectableCards: BASE_OCC_HAND, minSelections: 1, maxSelections: 3 },
+    })
+    const { container } = render(<FarmBoard {...props} />)
+    expect(container.querySelector('[data-hand-anchor="p3"]')).toBeVisible()
+    expect(screen.queryByTestId('occupation-hand-confirm')).not.toBeInTheDocument()
+    expect(container.querySelector('.hand-cards .selectable')).toBeNull()
+  })
   it('renders confirm button (disabled at 0 selections) when occupationHandSelection is active', () => {
     const html = renderWithOccSelection({
       kind: 'occupation-hand',
