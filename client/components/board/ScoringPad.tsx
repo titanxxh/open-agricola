@@ -20,6 +20,7 @@ import { formatScore as formatScoreValue } from '../../utils/format-score'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import type { TeamConfiguration, TeamScoreSummary } from '../../../shared/contract/team'
 import './team-scoring.css'
+import { BetaBadge } from '../common/BetaBadge'
 
 type Props = {
   locale: Locale
@@ -366,6 +367,7 @@ function TeamScores({ locale, scores, teams, players, configuration }: {
       index >= 0 ? index : undefined, player?.nameIsDefault)
   }
   return <div className="scoring-content team-scoring-content">
+    <p><BetaBadge locale={locale} /></p>
     {[...teams].sort((a, b) => a.rank - b.rank || a.teamIndex - b.teamIndex).map(team => {
       const members = team.playerIds.flatMap(id => scores.filter(score => score.playerId === id))
       return <section key={team.teamIndex} className="team-score" data-team-index={team.teamIndex}>

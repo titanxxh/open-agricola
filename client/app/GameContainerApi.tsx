@@ -63,6 +63,7 @@ import { InGameEncyclopedia } from './encyclopedia/InGameEncyclopedia'
 import { encyclopediaAttentionWindow } from './encyclopedia/encyclopedia-attention'
 import { SoloHandOverlay } from './solo/SoloHandOverlay'
 import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
+import { TeamSameConfigurationRematch } from './TeamSameConfigurationRematch'
 import { ParentSelectionOverlay } from './parents/ParentSelectionOverlay'
 import { OrdinaryCardDrawOverlay } from './parents/OrdinaryCardDrawOverlay'
 import { useAnimalReorgDraftPresentation } from './animal-reorg-draft-presentation'
@@ -411,7 +412,7 @@ export const GameContainerApi = () => {
   const requestedPlayerId = useMemo(() => requestedWsPlayerIdFromQuery(window.location.search), [])
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
-  const { user } = useAuth()
+  const { user, refreshSession } = useAuth()
   const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor, roomTeamError, chooseTeam, startTeamGame } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
@@ -1626,7 +1627,8 @@ export const GameContainerApi = () => {
   ) : null
 
   const gameEndControls = !isSpectator && wsTransport && !state.gameOver ? (
-    <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert} />
+    <GameEndControls transport={wsTransport} locale={locale} playerNames={state.players.map(player => player.name)} disabled={persistencePaused || wsStatus.phase !== 'ready'} onProposalChange={setGameEndMenuAlert}
+      teamGame={Boolean(state.team)} canUseTeamModes={user?.experimentalFeatures?.includes('team-modes')} onExperimentalFeatureUnavailable={refreshSession} />
   ) : null
 
   const encyclopediaWindow = encyclopediaAttentionWindow({ state, interaction, playerId: selfPlayer?.id })
@@ -2155,8 +2157,9 @@ export const GameContainerApi = () => {
       {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} teamScores={teamScores} teamConfiguration={state.team?.configuration} players={state.players} onClose={closeScoring}
         showDraftHistory={state.gameOver && (state.players.length > 1 || !!state.soloHandSelection?.kept)}
         startingHandSelection={state.players.length === 1 ? state.soloHandSelection : undefined}
-        completionActions={state.gameOver && state.players.length === 1 && isWs && wsTransport?.roomId
-          ? <SameConfigurationRematch key={wsTransport.roomId} roomId={wsTransport.roomId} locale={locale} displayName={state.players[0]?.nameIsDefault ? undefined : state.players[0]?.name} /> : undefined} /> : null}
+        completionActions={state.gameOver && isWs && wsTransport?.roomId
+          ? state.team ? <TeamSameConfigurationRematch key={wsTransport.roomId} roomId={wsTransport.roomId} locale={locale} onExperimentalFeatureUnavailable={refreshSession} />
+            : state.players.length === 1 ? <SameConfigurationRematch key={wsTransport.roomId} roomId={wsTransport.roomId} locale={locale} displayName={state.players[0]?.nameIsDefault ? undefined : state.players[0]?.name} /> : undefined : undefined} /> : null}
       {shouldShowDevPanel({ devMode: devMode && !isPublicFarmView, hasGameView }) ? (
         <DevPanel
           locale={locale} players={state.players}

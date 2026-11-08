@@ -1,15 +1,16 @@
 import { useId } from 'react'
 import type { TeamConfiguration } from '../../shared/contract/team'
 import { useLocale } from '../contexts/LocaleContext'
+import { BetaBadge } from '../components/common/BetaBadge'
 
 const scoringOptions = ['sum', 'product', 'category-min', 'total-min'] as const
 const seatingOptions = ['separated', 'random'] as const
 const visibilityOptions = ['shared', 'private'] as const
 
 export function TeamConfigurationSummary({ maxPlayers, value }: { maxPlayers: number; value: TeamConfiguration }) {
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
   return <div className="team-config-summary" data-team-mode={value.mode}>
-    <span>{t(`team.mode.${value.mode}`)}</span>
+    <span>{t(`team.mode.${value.mode}`)}<BetaBadge locale={locale} /></span>
     <span>{t('team.configuration', { teams: maxPlayers / value.seatsPerTeam, seats: value.seatsPerTeam })}</span>
     <span>{t(`team.seating.${value.seating}`)}</span>
     <span>{t(`team.scoring.${value.scoring}`)}</span>

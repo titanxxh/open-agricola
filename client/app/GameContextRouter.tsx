@@ -33,6 +33,8 @@ import { verifyReplayViewerBuild } from './replay-viewer-build'
 import { SameConfigurationRematch } from './solo/SameConfigurationRematch'
 import { formatScore } from '../utils/format-score'
 import { ArchivedTeamResults } from '../components/board/ArchivedTeamResults'
+import { TeamSameConfigurationRematch } from './TeamSameConfigurationRematch'
+import { BetaBadge } from '../components/common/BetaBadge'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
 
@@ -234,11 +236,12 @@ function CompletedContext({
   const { locale, t } = useLocale()
   const solo = context.result.playerCount === 1
   const player = context.result.players[0]
-  const rematch = solo ? <SameConfigurationRematch key={context.roomId} roomId={context.roomId} locale={locale} displayName={player?.nameIsDefault ? undefined : player?.displayName} /> : null
+  const rematch = solo ? <SameConfigurationRematch key={context.roomId} roomId={context.roomId} locale={locale} displayName={player?.nameIsDefault ? undefined : player?.displayName} />
+    : context.result.team ? <TeamSameConfigurationRematch key={context.roomId} roomId={context.roomId} locale={locale} /> : null
   if (context.replayStatus === 'available') {
-    return <>{solo ? <section className="solo-completed-summary">
-      <h1>{t('platform.gameContext.completedTitle')}</h1>
-      <p>{t('solo.scoreHint')}: <strong>{formatScore(player?.score ?? 0)}</strong></p>
+    return <>{solo || context.result.team ? <section className="solo-completed-summary">
+      <h1>{t('platform.gameContext.completedTitle')}{context.result.team ? <BetaBadge locale={locale} /> : null}</h1>
+      {solo ? <p>{t('solo.scoreHint')}: <strong>{formatScore(player?.score ?? 0)}</strong></p> : null}
       {rematch}
     </section> : null}<ReplayShell context={context} /></>
   }

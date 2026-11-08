@@ -19,6 +19,11 @@ const waiting: TeamWaitingRoomState = {
 }
 
 describe('team waiting presentation', () => {
+  it('marks a team waiting room as Beta without repeating the creation explanation', () => {
+    render(<LocaleProvider><TeamWaitingRoom value={waiting} onChooseTeam={vi.fn()} onStart={vi.fn()} /></LocaleProvider>)
+    expect(screen.getByText('Beta')).toBeVisible()
+    expect(screen.queryByText(/Team and multihand modes are being tested/)).not.toBeInTheDocument()
+  })
   it('offers self selection and host member moves without assigning seat labels or applying optimistic changes', async () => {
     const move = vi.fn()
     const user = userEvent.setup()

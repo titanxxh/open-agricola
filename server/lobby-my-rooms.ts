@@ -8,7 +8,7 @@ import { parseTeamConfiguration } from '../shared/contract/team'
 import { projectTeamWaitingRoom } from './game/team-room'
 
 type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes'>
-type RoomRow = Omit<MyActiveRoom, keyof RoomDetails | 'hotseat'> & {
+type RoomRow = Omit<MyActiveRoom, keyof RoomDetails | 'hotseat' | 'teamConfig'> & {
   state_json: string | null
   occupied_seats: number[]
   hotseat: number | string | boolean | null
@@ -88,18 +88,21 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
     const state = readLobbyState(state_json)
     const members = parseTeamRoomMembers(team_members_json)
     const self = members?.find(member => member.userId === userId)
+    let teamConfig: MyActiveRoom['teamConfig']
+    if (state && isRecord(state.team)) {
+      try { teamConfig = parseTeamConfiguration(state.team.configuration, room.max_players) }
+      catch { teamConfig = undefined }
+    }
     let teamWaiting: MyActiveRoom['teamWaiting']
-    if (self && room.status === 'waiting' && state && isRecord(state.team)) {
-      try {
-        const teamConfig = parseTeamConfiguration(state.team.configuration, room.max_players)
-        if (teamConfig) teamWaiting = projectTeamWaitingRoom({ id: room.id, maxPlayers: room.max_players,
+    if (self && room.status === 'waiting' && teamConfig) {
+      teamWaiting = projectTeamWaitingRoom({ id: room.id, maxPlayers: room.max_players,
           createdBy: created_by ?? undefined, teamMembers: members,
         }, teamConfig, userId)
-      } catch { teamWaiting = undefined }
     }
     return { ...room, hotseat: Number(hotseat) === 1,
       ...lobbyDetails(state, occupied_seats, room.status, room.current_player_index),
       ...(teamWaiting ? { teamWaiting } : {}),
+      ...(teamConfig ? { teamConfig } : {}),
     }
   })
 }

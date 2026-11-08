@@ -5,12 +5,15 @@ import { WsGameTransport } from '../services/gameTransport'
 import { GAME_CONTEXT_CHANGED_EVENT } from './GameContextRouter'
 import '../styles/components/game-end.css'
 
-export function GameEndControls({ transport, locale, playerNames, disabled = false, onProposalChange }: {
+export function GameEndControls({ transport, locale, playerNames, disabled = false, onProposalChange, teamGame = false, canUseTeamModes = false, onExperimentalFeatureUnavailable }: {
   transport: WsGameTransport
   locale: Locale
   playerNames: string[]
   disabled?: boolean
   onProposalChange?: (pending: boolean) => void
+  teamGame?: boolean
+  canUseTeamModes?: boolean
+  onExperimentalFeatureUnavailable?: () => void
 }) {
   const [proposal, setProposal] = useState<GameEndProposal | null>(null)
   const [sending, setSending] = useState(false)
@@ -30,7 +33,12 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
         refresh()
       } else if (event.type === 'commandReceipt' || event.type === 'error') {
         setSending(false)
-        if (event.type === 'error') setError(event.error)
+        if (event.type === 'error') {
+          if (event.code === 'experimental_feature_unavailable') {
+            setError(t(locale, 'beta.featureUnavailable'))
+            onExperimentalFeatureUnavailable?.()
+          } else setError(event.error)
+        }
       }
     })
     const offConnection = transport.onConnectionStatus(status => {
@@ -42,7 +50,7 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
     })
     refresh()
     return () => { offEvent(); offConnection(); offSnapshot() }
-  }, [transport])
+  }, [transport, locale, onExperimentalFeatureUnavailable])
   useEffect(() => { onProposalChange?.(proposal !== null) }, [onProposalChange, proposal])
   useEffect(() => () => { onProposalChange?.(false) }, [onProposalChange])
 
@@ -77,10 +85,11 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
       ) : (
         <div className="game-end-actions">
           <button type="button" className="btn-secondary" disabled={disabled || sending} onClick={() => propose('end')}>{t(locale, 'platform.gameEnd.propose')}</button>
-          <button type="button" className="btn-secondary" disabled={disabled || sending} onClick={() => propose('rematch')}>{t(locale, 'platform.gameEnd.proposeRematch')}</button>
+          <button type="button" className="btn-secondary" disabled={disabled || sending || (teamGame && !canUseTeamModes)} onClick={() => propose('rematch')}>{t(locale, 'platform.gameEnd.proposeRematch')}</button>
         </div>
       )}
-      {error ? <p role="alert">{error}</p> : null}
+      {teamGame && !canUseTeamModes && !proposal ? <p className="beta-rematch-reason">{t(locale, 'beta.rematchRequiresAccess')}</p> : null}
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
     </section>
   )
 }
