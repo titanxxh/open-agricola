@@ -188,7 +188,7 @@ type GameSyncPayload = {
 - 每个广播的状态、私有提示、`privateEvents`、卡牌可用性和事件撤销使用同一组可见座位。提示的接收者在集合内时可见，其他视角收到 `private-prompt` 遮蔽。历史游标绑定到可见集合，与集合顺序无关。不带 `X-Viewer-Player` 的 HTTP 沙盒保留不过滤的开发流程；带上它时使用相同的视角过滤与座位守卫。
 - 参与者握手和 `RoomViewer` 分别携带 `controlledPlayerIndexes` 与 `visiblePlayerIds`；省略数组时仅指主座位。它们描述连接权限和私有展示，不包含账号 ID，也不写入规则状态。同队公开提示可见，但信封只向拥有交互座位的连接授予命令和 anytime 能力。在线事件覆盖账号占有的全部座位。
 - `cardWarnings` 只出现在 HTTP 调试与沙盒 payload。HTTP 信封携带 `gameInstanceId`，加载状态后轮换；它既不是授权也不是模型输入。
-- `waitingSeatIndexes` 是权威 Waiting Seat 投影，独立于视角和 Interaction Player。大厅 `MyActiveRoom` 以 `waiting_player_indexes` 暴露相同座位，并携带布尔值 `hotseat`；这些字段驱动标题提醒，不授予命令权限。见 [session](session.md#unified-sessionresponse)。
+- `waitingSeatIndexes` 是权威 Waiting Seat 投影，独立于视角和 Interaction Player。大厅 `MyActiveRoom` 暴露 `waiting_player_indexes`、`owned_player_indexes` 与 `hotseat`；归属标记和提醒匹配任一自有待行动座位，不授予命令权限。省略归属数组时回退到主座位。见 [session](session.md#unified-sessionresponse)。
 - 托管写入携带 `commandContext`（scope、稳定命令 ID、Room ID、期望的已提交版本）；同时进行的选秀与父母选择共用一个 input-window ID。路由先解析持久回执再判断新鲜度，拒绝同一身份下内容不同的命令，并把结果随 Room transaction 持久化。回执只含结果标识与哈希，仅对其发起者可见。`requestId` 只关联一次交换。
 
 ## InteractionState：前端渲染权威
