@@ -5,6 +5,7 @@ import { recordedRouterFixture } from '../../__tests__/_helpers/room-router'
 import { removePlayerFromRoom, snapshotToRoom } from '../../game/room'
 import { ReplayStore } from '../../game/replay-store'
 import { createConnectionCtx } from '../connection-ctx'
+import { createWorkSession } from '../../__tests__/_helpers/session-fixtures'
 
 const { newDeps, dispatch } = recordedRouterFixture()
 
@@ -24,6 +25,17 @@ const sharedSeats = async (options: { draft?: boolean; parents?: boolean } = {})
   const room = host.currentRoom!
   for (const peer of clients.slice(1)) await dispatch(peer, { type: 'joinRoom', roomId: room.id })
   expect(room.status).toBe('playing')
+  if (!options.draft && !options.parents) {
+    const work = createWorkSession({ options: { playerCount: 4 }, configure(state) {
+      for (const player of state.players) {
+        player.occupationHand = ['__test_placeholder__']
+        player.minorHand = ['__test_placeholder__']
+      }
+    } })
+    try { room.session.loadState(work.state) } finally { work.dispose() }
+    expect(room.session.state).toMatchObject({ phase: 'playing', roundPhase: 'work' })
+    expect(room.session.getInteraction()).toMatchObject({ stateId: 'idle' })
+  }
   removePlayerFromRoom(room, clients[2]!.ws)
   room.seatOwners = room.seatOwners!.map(owner => owner.playerIndex === 2 ? { ...owner, userId: host.currentUserId! } : owner)
   return { deps, host, room, clients }
