@@ -14,9 +14,11 @@ export function turnTabTitle(current: string, active: boolean, reducedMotion: bo
 export function lobbyNeedsTurnTab(rooms: readonly {
   hotseat: boolean
   player_index: number | null
+  owned_player_indexes?: readonly number[]
   waiting_player_indexes: readonly number[]
 }[]): boolean {
-  return rooms.some(room => !room.hotseat && room.player_index !== null && room.waiting_player_indexes.includes(room.player_index))
+  return rooms.some(room => !room.hotseat && (room.owned_player_indexes ?? (room.player_index === null ? [] : [room.player_index]))
+    .some(index => room.waiting_player_indexes.includes(index)))
 }
 
 export function gameNeedsTurnTab(hotseat: boolean, seatIndex: number | null, waitingSeatIndexes: readonly number[]): boolean {

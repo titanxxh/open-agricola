@@ -158,6 +158,22 @@ describe('LobbyPage main navigation', () => {
 })
 
 describe('LobbyPage my active games', () => {
+  it('marks every owned seat separately from an alternate current actor', async () => {
+    document.title = 'Open Agricola'
+    myRoomsResponse.rooms = [{ id: 'multihand', status: 'playing', max_players: 4, updated_at: 2, created_at: 1, started_at: 1,
+      player_index: 0, owned_player_indexes: [0, 2], my_turn: 1, current_player_index: 2, hotseat: false,
+      waiting_player_indexes: [2], progress: { phase: 'playing', round: 1 }, expansions: [],
+      players: [{ playerIndex: 0, name: 'Alice', color: 'red' }, { playerIndex: 1, name: 'Bob', color: 'blue' },
+        { playerIndex: 2, name: 'Cara', color: 'yellow' }, { playerIndex: 3, name: 'Dan', color: 'black' }],
+    }]
+    render(<LobbyPage />)
+    await screen.findByText('Cara')
+    expect(document.querySelectorAll('.my-game__player[data-owned="true"]')).toHaveLength(2)
+    expect(document.querySelector('.my-game__player[data-current="true"]')).toHaveTextContent('Cara')
+    expect(document.querySelectorAll('.my-game__player small')).toHaveLength(2)
+    expect(document.querySelector('.my-game__turn')).toHaveAttribute('data-my-turn', 'true')
+    expect(document.title).toMatch(/^◢ /)
+  })
   it('identifies games by their players, colors, start time and current player instead of UUID', async () => {
     const startedAt = Date.UTC(2026, 9, 27, 8, 30)
     myRoomsResponse.rooms = [{

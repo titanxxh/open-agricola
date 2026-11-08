@@ -10,6 +10,7 @@ export interface PlayerSummary {
   color?: string
   isYou?: boolean
   isCurrent?: boolean
+  isOperating?: boolean
 }
 
 interface Props {
@@ -58,6 +59,8 @@ export function PlayerTabs({ locale, players, active, onChange }: Props) {
           type="button"
           role="tab"
           data-player={p.id}
+          data-owned={p.isYou}
+          data-operating={p.isOperating}
           aria-selected={p.id === active}
           className={[
             'player-tabs__tab',

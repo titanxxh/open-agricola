@@ -28,7 +28,8 @@ import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuer
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
-import { nextMultihandPlayerId } from './multihand-seat'
+import { nextMultihandPlayerId, pendingMultihandInputs, type MultihandInput } from './multihand-seat'
+import { MultihandSeatControls } from './MultihandSeatControls'
 import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
@@ -515,7 +516,11 @@ export const GameContainerApi = () => {
   const participantViewer = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'participant' ? wsStatus.viewer : null
   const controlledPlayerIndexes = participantViewer?.controlledPlayerIndexes ?? (participantViewer ? [participantViewer.playerIndex] : [])
   const isMultihand = !isHotseat && state?.team?.configuration.mode === 'multihand'
-  const multihandPlayerId = isMultihand && state ? nextMultihandPlayerId(state, interaction, controlledPlayerIndexes) : null
+  const multihandRoomId = wsStatus.phase === 'ready' ? wsStatus.roomId : null
+  const [preferredMultihandInput, setPreferredMultihandInput] = useState<(MultihandInput & { roomId: string }) | null>(null)
+  const pendingMultihand = isMultihand && state ? pendingMultihandInputs(state, controlledPlayerIndexes) : []
+  const multihandPlayerId = isMultihand && state ? nextMultihandPlayerId(state, interaction, controlledPlayerIndexes,
+    preferredMultihandInput?.roomId === multihandRoomId ? preferredMultihandInput : null) : null
   const localPlayerId = isMultihand ? multihandPlayerId ?? wsAssignedPlayerId : lockedViewPlayerId ?? wsAssignedPlayerId
   const multihandAudienceKey = multihandPlayerId && wsStatus.phase === 'ready' ? `${wsStatus.roomId}:${multihandPlayerId}` : null
   const [lastMultihandAudienceKey, setLastMultihandAudienceKey] = useState<string | null>(null)
@@ -523,8 +528,9 @@ export const GameContainerApi = () => {
     setLastMultihandAudienceKey(multihandAudienceKey)
     if (multihandPlayerId) setViewPlayerId(multihandPlayerId)
   }
-  const activePlayer =
-    interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+  const activePlayer = isMultihand && multihandPlayerId && (state?.phase === 'draft' || state?.phase === 'parent-selection')
+    ? state.players.find(player => player.id === multihandPlayerId) ?? currentPlayer
+    : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
   // Multihand follows an owned responder; ordinary online play keeps its assigned seat.
@@ -1661,6 +1667,11 @@ export const GameContainerApi = () => {
     </>
   )
   const gameHeader = renderGameHeader(true)
+  const multihandControls = isMultihand && state && selfPlayer && multihandRoomId
+    ? <MultihandSeatControls state={state} locale={locale} controlledPlayerIndexes={controlledPlayerIndexes}
+        pending={pendingMultihand} operatingPlayerId={selfPlayer.id}
+        onChoose={input => setPreferredMultihandInput({ ...input, roomId: multihandRoomId })} />
+    : null
   const hotseatHandoff = (playerId: string) => (
     <div className={`app app--handoff${isEmbedded ? ' app--embedded' : ''}`}>
       {renderGameHeader(false)}
@@ -1732,6 +1743,7 @@ export const GameContainerApi = () => {
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
+        {multihandControls}
         {notificationStack}
         {bugReportBar}
         <DraftOverlay
@@ -1762,6 +1774,7 @@ export const GameContainerApi = () => {
     return withEncyclopedia(
       <div className={`app app--setup${isEmbedded ? ' app--embedded' : ''}`}>
         {gameHeader}
+        {multihandControls}
         {notificationStack}
         {bugReportBar}
         <ParentSelectionOverlay
@@ -1802,6 +1815,7 @@ export const GameContainerApi = () => {
     visiblePlayerIds: isHotseat
       ? hotseatSeatConfirmed === hotseatAudienceKey && hotseatAudienceId ? [hotseatAudienceId] : []
       : participantViewer?.visiblePlayerIds ?? (selfPlayer ? [selfPlayer.id] : []),
+    operatingPlayerId: isMultihand ? selfPlayer?.id : undefined,
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
@@ -1998,11 +2012,12 @@ export const GameContainerApi = () => {
       locale={locale}
       players={state.players.map((p, i) => ({
         id: p.id,
-        name: playerNames[p.id],
+        name: isMultihand ? t(locale, 'team.seatLabel', { number: i + 1, player: playerNames[p.id] }) : playerNames[p.id],
         // PlayerState has no score field; use the live score projection.
         score: scores?.find((summary) => summary.playerId === p.id)?.total ?? 0,
         color: p.color,
-        isYou: selfPlayer ? p.id === selfPlayer.id : false,
+        isYou: isMultihand ? controlledPlayerIndexes.includes(i) : selfPlayer ? p.id === selfPlayer.id : false,
+        isOperating: isMultihand && p.id === selfPlayer?.id,
         isCurrent: i === state.currentPlayerIndex,
       }))}
       active={displayPlayer.id}
@@ -2160,6 +2175,7 @@ export const GameContainerApi = () => {
 
       <div ref={headerRef}>
         {gameHeader}
+        {multihandControls}
       </div>
 
       {isDesktopTable && !nearbyMajorSupply ? majorImprovementsPresentation : null}

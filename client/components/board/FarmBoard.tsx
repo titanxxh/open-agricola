@@ -399,6 +399,7 @@ export type FarmBoardView = {
   currentPlayer: PlayerState
   displayPlayer: PlayerState
   visiblePlayerIds: readonly string[]
+  operatingPlayerId?: string
   activePlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
   devMode: boolean
@@ -843,6 +844,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     currentPlayer,
     displayPlayer,
     visiblePlayerIds,
+    operatingPlayerId,
     activePlayerId,
     playerPanelSummary,
     currentStartPlayerId,
@@ -911,6 +913,11 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
+  const operatingIndex = players.findIndex(player => player.id === operatingPlayerId)
+  const operating = players[operatingIndex]
+  const operationLabel = operating ? <p className="multihand-operation" data-operation-player-id={operating.id}>
+    {t(locale, 'team.operatingSeat', { number: operatingIndex + 1,
+      player: getPlayerDisplayName(locale, operating.name, operatingIndex, operating.nameIsDefault) })}</p> : null
   const playCardChoice = actions.playCardChoice ?? resolveChoice
   const summary = playerPanelSummary
   const farmContainerRef = useRef<HTMLDivElement>(null)
@@ -1023,6 +1030,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const handPanel = (
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
+      {operationLabel}
       {visiblePlayerIds.includes(displayPlayer.id) || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
           <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
@@ -1163,6 +1171,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     <div className="farm-header">
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
+        {showHand ? operationLabel : null}
         <div className="player-summary">{getPlayerDisplayName(locale, displayPlayer.name, players.findIndex((player) => player.id === displayPlayer.id), displayPlayer.nameIsDefault)}</div>
         <div className="player-resources-compact" data-player-resource-anchor={displayPlayer.id}>
           <span className="res-compact-group">

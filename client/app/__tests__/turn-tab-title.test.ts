@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { gameNeedsTurnTab, lobbyNeedsTurnTab, turnTabTitle } from '../use-turn-tab-title'
 
+it('reminds an account when its non-primary owned seat is waiting', () => {
+  const room = { hotseat: false, player_index: 0, owned_player_indexes: [0, 2], waiting_player_indexes: [2] }
+  expect(lobbyNeedsTurnTab([room])).toBe(true)
+  expect(lobbyNeedsTurnTab([{ ...room, hotseat: true }])).toBe(false)
+  expect(lobbyNeedsTurnTab([{ ...room, owned_player_indexes: [1, 3] }])).toBe(false)
+})
+
 describe('turnTabTitle', () => {
   it('cycles the BGA frames and restores the base title', () => {
     expect(turnTabTitle('Open Agricola', true, false)).toBe('◢ Open Agricola')

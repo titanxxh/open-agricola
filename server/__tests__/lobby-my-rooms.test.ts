@@ -14,14 +14,14 @@ import { encodeRoomBody } from '../game/persistence/room-body-codec'
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
 
-async function setup() {
+async function setup(playerCount: 2 | 4 = 2) {
   const db = await createTestDatabase()
   cleanups.push(() => db.close())
   for (const id of ['alice', 'bob', 'outsider']) {
     await db.prepare("INSERT INTO users(id, username, display_name, password_hash, created_at) VALUES(?,?,?,'hash',1)")
       .run(id, id, `Account ${id}`)
   }
-  const session = createWorkSession({ configure: state => {
+  const session = createWorkSession({ options: { playerCount }, configure: state => {
     state.players[0]!.name = 'Alice in game'
     state.players[0]!.nameIsDefault = false
     state.players[0]!.color = 'red'
@@ -42,6 +42,23 @@ async function setup() {
 }
 
 describe('my active room summaries', () => {
+  it('marks an alternate owned actor as your turn and lists one account room with every own seat', async () => {
+    const { db, persistence, snapshot, meta } = await setup(4)
+    await persistence.save('multihand', { ...snapshot, state: { ...snapshot.state, currentPlayerIndex: 2,
+      team: { configuration: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' }, playerTeams: [0, 1, 0, 1] },
+    } }, { ...meta, maxPlayers: 4,
+      players: [{ userId: 'alice', playerIndex: 0 }, { userId: 'bob', playerIndex: 1 },
+        { userId: 'alice', playerIndex: 2 }, { userId: 'bob', playerIndex: 3 }],
+      teamMembers: [{ memberId: 'first', userId: 'alice', name: 'Alice', teamIndex: 0, seatCount: 2 },
+        { memberId: 'other', userId: 'bob', name: 'Bob', teamIndex: 1, seatCount: 2 }],
+    })
+    const rooms = await listMyActiveRooms(db, 'alice')
+    expect(rooms).toHaveLength(1)
+    expect(rooms[0]).toMatchObject({ player_index: 0, owned_player_indexes: [0, 2], current_player_index: 2, my_turn: 1,
+      waiting_player_indexes: [2] })
+    expect((await listMyActiveRooms(db, 'bob'))[0]).toMatchObject({ owned_player_indexes: [1, 3], my_turn: 0 })
+    expect(JSON.stringify(rooms)).not.toContain('userId')
+  })
   it.each(['plain', 'compressed'])('projects waiters from a retained %s global-round draft without changing its stored body', async format => {
     const { db, persistence, snapshot, meta } = await setup()
     await persistence.save('legacy', snapshot, meta)
@@ -66,6 +83,7 @@ describe('my active room summaries', () => {
     expect(rooms[0]).toEqual({
       id: 'room', status: 'playing', max_players: 2, created_at: expect.any(Number), started_at: 1_793_089_800_000,
       updated_at: expect.any(Number), player_index: 1, my_turn: 0, current_player_index: 0, hotseat: false,
+      owned_player_indexes: [1],
       waiting_player_indexes: [0], progress: { phase: 'playing', round: 1 }, expansions: [],
       players: [
         { playerIndex: 0, name: 'Alice in game', nameIsDefault: false, color: 'red' },
