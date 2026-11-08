@@ -55,6 +55,8 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
     WITH my_rooms AS (
       SELECT r.id, r.status, r.max_players, r.hotseat, r.created_at, r.started_at, r.updated_at, r.team_members_json, r.created_by,
              r.state_json, rp.player_index,
+             ARRAY(SELECT owner.player_index::integer FROM room_players owner
+               WHERE owner.room_id=r.id AND owner.user_id=rp.user_id ORDER BY owner.player_index) AS owned_player_indexes,
              ARRAY(SELECT player_index::integer FROM room_players WHERE room_id = r.id ORDER BY player_index) AS occupied_seats,
              CASE WHEN r.status = 'playing' AND r.state_json IS JSON THEN
                CASE WHEN r.state_json::jsonb #>> '{state,phase}' = 'playing'
@@ -65,14 +67,15 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
                     ) END
              END AS current_player_index
       FROM rooms r
-      LEFT JOIN LATERAL (SELECT owner.player_index FROM room_players owner WHERE owner.room_id=r.id AND owner.user_id=?
+      LEFT JOIN LATERAL (SELECT owner.player_index, owner.user_id FROM room_players owner WHERE owner.room_id=r.id AND owner.user_id=?
         AND (r.team_members_json IS NULL OR owner.player_index=(SELECT min(p.player_index) FROM room_players p
           WHERE p.room_id=r.id AND p.user_id=owner.user_id))) rp ON true
       WHERE r.status != 'finished' AND (rp.player_index IS NOT NULL OR EXISTS (
         SELECT 1 FROM jsonb_array_elements(COALESCE(r.team_members_json, '[]'::jsonb)) member WHERE member->>'userId'=?
       ))
     )
-    SELECT *, CASE WHEN current_player_index = player_index THEN 1 ELSE 0 END AS my_turn
+    SELECT *, CASE WHEN current_player_index = player_index
+      OR (team_members_json IS NOT NULL AND current_player_index = ANY(owned_player_indexes)) THEN 1 ELSE 0 END AS my_turn
     FROM my_rooms
     ORDER BY my_turn DESC, updated_at DESC
     LIMIT 20

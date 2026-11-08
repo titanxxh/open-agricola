@@ -25,6 +25,7 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
           const name = (player: MyActiveRoom['players'][number]) => getPlayerDisplayName(locale, player.name, player.playerIndex, player.nameIsDefault)
           const timestamp = room.started_at ?? room.created_at
           const progress = room.progress
+          const owned = room.owned_player_indexes ?? (room.player_index === null ? [] : [room.player_index])
           return (
             <li key={`${room.id}:${room.player_index}`} className={`room-item my-game${room.my_turn === 1 ? ' room-item--my-turn' : ''}`}>
               <div className="my-game__details">
@@ -34,11 +35,12 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
                     {member.memberId === room.teamWaiting?.selfMemberId && <small>({t('platform.me')})</small>}
                   </span>)}
                   {room.players.map(player => (
-                    <span key={player.playerIndex} className="my-game__player" data-current={room.waiting_player_indexes.includes(player.playerIndex)}>
+                    <span key={player.playerIndex} className="my-game__player" data-current={room.waiting_player_indexes.includes(player.playerIndex)}
+                      data-owned={owned.includes(player.playerIndex)}>
                       <span className="my-game__color" role="img" aria-label={t(`platform.playerColors.${player.color}`)}
                         data-player-color={player.color} style={{ backgroundColor: player.color }} />
                       <span className="my-game__name">{name(player)}</span>
-                      {player.playerIndex === room.player_index && <small>({t('platform.me')})</small>}
+                      {owned.includes(player.playerIndex) && <small>({t('platform.me')})</small>}
                     </span>
                   ))}
                 </div>
