@@ -289,6 +289,12 @@ export class PostgresRoomPersistence implements RoomPersistence {
       if (canonicalJson(prior.receipt.outcome) !== canonicalJson(receipt.outcome)) throw new ReplayConflictError('Command result changed')
       return true
     }
+    const saveCreationConfiguration = async (roomId: string, record: GameCreationRecord): Promise<void> => {
+      const json = canonicalJson(record)
+      await db.prepare('INSERT INTO game_creation_configurations(room_id, configuration_json) VALUES (?, ?) ON CONFLICT DO NOTHING').run(roomId, json)
+      const saved = await db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(roomId)
+      if (saved?.configuration_json !== json) throw new ReplayConflictError('Game creation configuration changed')
+    }
     this.dbForCleanup = db
     this.loadCreationRow = db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?')
     this.history = new RoomHistoryStore(db)
@@ -552,6 +558,10 @@ export class PostgresRoomPersistence implements RoomPersistence {
         if (options.executionStamp) await new ExecutionAccess(db).assert(options.executionStamp)
       }
       if (await receiptAlreadyCommitted(options?.receipt)) return
+      if (options?.creationSource) {
+        const source = await new GameCreationStore(db).completedSource(options.creationSource.roomId, options.creationSource.userId)
+        if (!source.ok) throw new GameCreationError(source.code, source.message)
+      }
       if (directory) await directory.assertOwner(String(values.id), options!.owner!, options?.expectedVersion)
       const context = await this.upsertActiveContext.run({
         roomId: values.id,
@@ -560,6 +570,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         now: values.now,
       })
       if (context.changes !== 1) throw new ReplayConflictError('Room context is no longer active')
+      if (options?.creationConfiguration) await saveCreationConfiguration(String(values.id), options.creationConfiguration)
       ;(await this.upsertRoom.run(values))
       ;(await this.history.write(String(values.id), nodes, recoveryNodes))
       ;(await savePlayers(String(values.id), Number(values.now), meta.players))
@@ -582,7 +593,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
         await directory.assertOwner(commit.roomId, commit.meta.owner)
       }
       if (await receiptAlreadyCommitted(commit.receipt)) return { kind: 'idempotent' }
-      if (commit.header && commit.creationConfiguration) {
+      if (commit.header && commit.creationConfiguration?.configuration.kind === 'standard-solo') {
         const { configuration, resolvedWorkshopSources } = commit.creationConfiguration
         const current = await resolveSoloWorkshopCards(db, configuration)
         if (current.issues.length) throw new GameCreationError('creation_requires_adjustment', 'The selected card sources require adjustment', { configuration, issues: current.issues })
@@ -628,10 +639,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
           if (!source.ok) throw new GameCreationError(source.code, source.message)
         }
         if (commit.creationConfiguration) {
-          const json = canonicalJson(commit.creationConfiguration)
-          await db.prepare('INSERT INTO game_creation_configurations(room_id, configuration_json) VALUES (?, ?) ON CONFLICT DO NOTHING').run(commit.roomId, json)
-          const saved = await db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?').get<{ configuration_json: string }>(commit.roomId)
-          if (saved?.configuration_json !== json) throw new ReplayConflictError('Game creation configuration changed')
+          await saveCreationConfiguration(commit.roomId, commit.creationConfiguration)
         }
         const definitions = JSON.parse(commit.header.customCardsJson) as Array<{ artUrl?: string }>
         const keys = [...new Set(definitions.flatMap(definition => definition.artUrl?.startsWith('/replay-assets/') ? [definition.artUrl.slice(1)] : []))].sort()
@@ -728,6 +736,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
       const players = (await this.loadPlayers.all(id)) as RoomMeta['players']
       const serialized = row.state_json ? (await this.history.restore(id, row.state_json)) : null
       const snapshot = toSnapshot({ ...row, state_json: null }, players)
+      const creationConfiguration = await this.loadCreationConfiguration(id)
+      if (creationConfiguration) snapshot.creationConfiguration = creationConfiguration
       snapshot.serialized = serialized
       return snapshot
     } catch (err) {
@@ -910,6 +920,8 @@ export class PostgresRoomPersistence implements RoomPersistence {
         try {
           const serialized = row.state_json ? restore(row.id, row.state_json) : null
           const snapshot = toSnapshot({ ...row, state_json: null }, players)
+          const creationConfiguration = await this.loadCreationConfiguration(row.id)
+          if (creationConfiguration) snapshot.creationConfiguration = creationConfiguration
           snapshot.serialized = serialized
           snapshots.push(snapshot)
         } catch (err) {

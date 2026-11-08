@@ -64,6 +64,7 @@ import {
   parseGameSetupRequest,
   resolveCustomCardDbIds,
   soloCreationConfiguration,
+  teamCreationConfiguration,
 } from '../game/game-setup-options.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7
@@ -671,9 +672,10 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   const enableCommunityDeck = setup.enableCommunityDeck
   const customCardDbIds = resolveCustomCardDbIds(input, maxPlayers === 1 || enableCommunityDeck)
   const executionStamp = ctx.authority ? await new ExecutionAccess(ctx.authority.directory.db).capture(customCardDbIds, ctx.currentUserId ? [ctx.currentUserId] : []) : undefined
-  const configuration = setup.soloHandMode ? soloCreationConfiguration(setup, customCardDbIds) : undefined
-  const soloCards = configuration ? await resolveSoloWorkshopCards(getDb(), configuration) : undefined
-  if (soloCards?.issues.length && configuration) {
+  const configuration = setup.soloHandMode ? soloCreationConfiguration(setup, customCardDbIds)
+    : setup.teamConfig ? teamCreationConfiguration(setup, setup.teamConfig, customCardDbIds) : undefined
+  const soloCards = configuration?.kind === 'standard-solo' ? await resolveSoloWorkshopCards(getDb(), configuration) : undefined
+  if (soloCards?.issues.length && configuration?.kind === 'standard-solo') {
     sendCommandError(ctx, 'The selected card sources require adjustment', msg.requestId, 'creation_requires_adjustment')
     if (ctx.activeCommand?.outcome) ctx.activeCommand.outcome.creationAdjustment = { configuration, issues: soloCards.issues }
     return
@@ -713,8 +715,8 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     players: [],
     seatOwners: [],
     maxPlayers,
-    ...(setup.soloHandMode && configuration ? {
-      soloHandMode: setup.soloHandMode,
+    ...(setup.soloHandMode ? { soloHandMode: setup.soloHandMode } : {}),
+    ...(configuration ? {
       creationConfiguration: { configuration, resolvedWorkshopSources: soloCards?.resolvedWorkshopSources ?? [] },
     } : {}),
     ...(msg.sourceGameContextId && ctx.currentUserId ? { creationSource: { roomId: msg.sourceGameContextId, userId: ctx.currentUserId } } : {}),
@@ -1525,7 +1527,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
   // is refreshed alongside so a stale id cannot mark this room for a later
   // takedown it does not deserve.
   const enableCommunityDeck = room.session.state.enableCommunityDeck
-  const soloConfiguration = room.creationConfiguration?.configuration
+  const soloConfiguration = room.creationConfiguration?.configuration.kind === 'standard-solo' ? room.creationConfiguration.configuration : undefined
   const soloCards = soloConfiguration ? await resolveSoloWorkshopCards(getDb(), soloConfiguration) : undefined
   if (soloCards?.issues.length && soloConfiguration) {
     sendCommandError(ctx, 'The selected card sources require adjustment', msg.requestId, 'creation_requires_adjustment')

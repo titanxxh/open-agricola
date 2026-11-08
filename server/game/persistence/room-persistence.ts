@@ -5,13 +5,13 @@ import type { CommandReceiptWrite } from '../command-store'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import type { RoomAccess } from '../../../shared/contract/room-access'
-import type { SoloHandMode } from '../../../shared/contract/game-creation'
+import type { GameCreationRecord, SoloHandMode } from '../../../shared/contract/game-creation'
 import type { TeamResultArchive } from '../../../shared/contract/team'
 import type { TeamRoomMember } from '../../../shared/contract/team-room'
 
 import type { GameEndProposal, GameTermination } from '../../../shared/contract/protocol/game-termination'
 
-export type RoomWriteOptions = { executionStamp?: ExecutionStamp; owner?: OwnerToken; expectedVersion?: number | null; retiredOwner?: OwnerToken; retiredVersion?: number; resume?: boolean; retireRoomId?: string; retiredTermination?: GameTermination; receipt?: CommandReceiptWrite }
+export type RoomWriteOptions = { executionStamp?: ExecutionStamp; owner?: OwnerToken; expectedVersion?: number | null; retiredOwner?: OwnerToken; retiredVersion?: number; resume?: boolean; retireRoomId?: string; retiredTermination?: GameTermination; receipt?: CommandReceiptWrite; creationConfiguration?: GameCreationRecord; creationSource?: { roomId: string; userId: string } }
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
 
@@ -48,6 +48,7 @@ export type RoomMeta = {
 }
 
 export type RoomSnapshot = {
+  creationConfiguration?: GameCreationRecord
   version?: number
   id: string
   /** null = row exists but no state has been saved yet (e.g., room just created). */
