@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { handleGameContextRoute } from '../../game-context-routes'
 import { RoomDirectory } from '../../game/room-directory'
+import { snapshotToRoom } from '../../game/room'
 
 const { newDeps, dispatch } = recordedRouterFixture()
 
@@ -65,6 +66,28 @@ describe('formal solo creation', () => {
     const stored = await deps.persistence.load(room.id)
     expect(stored?.meta.soloHandMode).toBe('random')
     expect(stored?.serialized?.frame).not.toHaveProperty('creationConfiguration')
+  })
+
+  it('restores accepted creation choices with an evicted Room so its rematch keeps them', async () => {
+    const { ctx, deps } = createActor()
+    await dispatch(ctx, { type: 'createRoom', maxPlayers: 1, soloHandMode: 'random', enableParentCards: true, draftParents: false })
+    const source = ctx.currentRoom!
+    const accepted = await deps.persistence.loadCreationConfiguration(source.id)
+    expect(accepted?.configuration).toMatchObject({ kind: 'standard-solo', soloHandMode: 'random', draftParents: false })
+    deps.registry.delete(source.id)
+    source.session.dispose()
+
+    const restored = snapshotToRoom((await deps.persistence.load(source.id))!)
+    expect(restored.creationConfiguration).toEqual(accepted)
+    deps.registry.set(restored)
+    const resumed = createActor('solo-owner', deps)
+    await dispatch(resumed.ctx, { type: 'joinRoom', roomId: source.id })
+    expect(resumed.ctx.currentRoom?.id).toBe(source.id)
+    await dispatch(resumed.ctx, { type: 'proposeGameEnd', intent: 'rematch' })
+    const successor = resumed.ctx.currentRoom!
+    expect(successor.id).not.toBe(source.id)
+    expect(successor.creationConfiguration).toEqual(accepted)
+    expect(await deps.persistence.loadCreationConfiguration(successor.id)).toEqual(accepted)
   })
 
   it('reads a completed configuration only for its original sole player after the active Room is deleted', async () => {
