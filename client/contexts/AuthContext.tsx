@@ -9,6 +9,7 @@ export type AuthUser = {
   displayName: string
   displayNameIsDefault?: boolean
   isAdmin?: boolean
+  betaAccess?: boolean
   experimentalFeatures?: ExperimentalFeatureId[]
 }
 

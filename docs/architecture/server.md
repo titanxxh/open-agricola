@@ -136,6 +136,7 @@ Tests: `server/__tests__/{custom-code-executor,local-sandbox-parity}.test.ts`.
 
 HTTP serves operations, tests and debugging; it is not the real-time synchronization path. Responses match `SessionResponse`, and validation endpoints never write authoritative state. Inside a WebSocket Room, development commands use `ClientCommand`.
 
+- `beta-access-{routes,store}.ts` owns administrator `GET/PUT/DELETE /api/admin/beta-access`, idempotent grants and fresh `/api/auth/me` qualification. Coverage: `beta-access-routes.test.ts`.
 - `GET /api/health`, `GET /api/rooms`, `GET /api/game/state`.
 - `POST /api/game/new` accepts `seed?` plus the WebSocket `createRoom` setup, mapped through `server/game/game-setup-options.ts`. `POST /api/game/load`, `POST /api/game/dev/*` and `POST /api/game/new-sandbox` are debugging and Workshop sandbox paths.
 - `GET /cards-manifest.json` serves card metadata to the main bundle.

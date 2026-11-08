@@ -137,6 +137,7 @@ server/custom-code/
 
 HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `SessionResponse` 一致，校验端点从不写权威状态。在 WebSocket Room 内，开发命令使用 `ClientCommand`。
 
+- `beta-access-{routes,store}.ts` 负责管理员 `GET/PUT/DELETE /api/admin/beta-access`、幂等授予和 `/api/auth/me` 的最新资格。测试：`beta-access-routes.test.ts`。
 - `GET /api/health`、`GET /api/rooms`、`GET /api/game/state`。
 - `POST /api/game/new` 接受 `seed?` 与 WebSocket `createRoom` 的设置，经 `server/game/game-setup-options.ts` 映射。`POST /api/game/load`、`POST /api/game/dev/*` 与 `POST /api/game/new-sandbox` 是调试与工坊沙盒路径。
 - `GET /cards-manifest.json` 向主 bundle 提供卡牌 metadata。
