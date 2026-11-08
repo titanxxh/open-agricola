@@ -113,7 +113,7 @@ describe('team waiting room', () => {
     await directory.activate('team-lobby')
     const owner = (await directory.claim(room.id, 'team-lobby')).owner
     await deps.commands.db.transaction(async () => { await directory.markActive(room.id, owner); await directory.presence(room.id, owner, 1, 1) })()
-    expect(await directory.lobby()).toMatchObject([{ id: room.id, teamConfig: {
+    expect(await directory.lobby(50, 'private-account-id')).toMatchObject([{ id: room.id, teamConfig: {
       mode: 'team', seatsPerTeam: 2, seating: 'random', scoring: 'product', teammateVisibility: 'private',
     } }])
   })

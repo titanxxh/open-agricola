@@ -2221,3 +2221,21 @@ describe('auth routes', () => {
     expect(res.headers['Access-Control-Allow-Methods']).toContain('PUT')
   })
 })
+
+describe('experimental feature discovery', () => {
+  afterEach(() => { vi.unstubAllEnvs() })
+  it('computes current availability for /me and keeps anonymous requests unauthorized', async () => {
+    vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', 'declared')
+    vi.stubEnv('ADMIN_USERS', 'experimental_owner')
+    const ordinary = await createLocalUserForTests('experimental_ordinary', 'test-password', 'Ordinary')
+    const owner = await createLocalUserForTests('experimental_owner', 'test-password', 'Owner')
+    const token = await createSession(ordinary.id)
+    const ownerToken = await createSession(owner.id)
+    const get = (value: string | null) => requestJson('GET', '/api/auth/me', undefined, value ? { Cookie: `oa_session=${value}` } : {})
+    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: [] })
+    expect((await get(ownerToken)).json.user).toMatchObject({ experimentalFeatures: ['team-modes'] })
+    expect((await get(null)).status).toBe(401)
+    await getDb().prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)').run(ordinary.id, owner.id, 1)
+    expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: ['team-modes'] })
+  })
+})

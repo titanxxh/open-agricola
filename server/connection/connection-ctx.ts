@@ -1,3 +1,4 @@
+import type { ExperimentalFeatureAccess } from '../experimental-features'
 import type { RoomAuthority } from '../game/room-authority'
 import type { OwnerToken } from '../game/room-directory'
 import type { CommandStore, CommandRequest } from '../game/command-store'
@@ -13,6 +14,7 @@ import type { RoomCommitter } from '../game/room-committer.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
 
 export type ConnectionDeps = {
+  experimentalFeatureAccess?: ExperimentalFeatureAccess
   authority?: RoomAuthority
   commands?: CommandStore
   registry: RoomRegistry

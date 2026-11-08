@@ -176,7 +176,7 @@ describe('formal solo creation', () => {
       await directory.presence(room.id, route.owner, 1, 1)
     })()
     expect((await directory.lobby()).map(summary => summary.id)).toEqual([])
-    expect(deps.lobby.getRooms().map(summary => summary.id)).toEqual([])
+    expect((await deps.lobby.getRooms()).map(summary => summary.id)).toEqual([])
     expect((await deps.persistence.load(room.id))?.meta.players).toEqual([{ userId: 'solo-owner', playerIndex: 0 }])
   })
 

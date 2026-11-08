@@ -1,3 +1,4 @@
+import type { ExperimentalFeatureId } from '../experimental-features'
 import type { CommandIdentity, CommandInput, CommandScope, CommandReceipt, CommandErrorCode } from './commands'
 import type { RoomHistoryPage } from './history'
 import type { CommitSelectionPayload } from './commit-selection'
@@ -123,6 +124,7 @@ export type ServerEvent =
   | StateUpdateEnvelope
   | {
       type: 'error'
+      feature?: ExperimentalFeatureId
       error: string
       code?: RoomColorErrorCode | RoomTeamErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
