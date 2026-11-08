@@ -193,7 +193,7 @@ describe('custom session executor', () => {
     const nativeBuild = vi.spyOn(session, 'buildSyncPayload').mockImplementation(() => { throw new Error('Cached Worker payload must not be rebuilt') })
     const room = { id: 'worker-names', session,
       players: [{ ws: new WebSocket(null, undefined, {}), playerIndex: 0, name: 'Room actor' }, { ws: new WebSocket(null, undefined, {}), playerIndex: 1, name: 'Room recipient' }] }
-    const first = buildEnvelope({ room, resp: response, visiblePlayerIds: ['p1'], version: 1, cause: 'reconnect', emittedAt: 0 })
+    const first = buildEnvelope({ room, resp: response, visiblePlayerIds: ['p1'], controlledPlayerIndexes: [0], version: 1, cause: 'reconnect', emittedAt: 0 })
     expect(first.payload.state.log[0]!.params).toEqual({ fromPlayer: 'Room actor', toPlayer: 'Room recipient' })
     expect(first.payload.historyWindow).toEqual(cached.historyWindow)
     expect(first.payload.state.players[0]!.minorHand).toEqual(cached.state.players[0]!.minorHand)

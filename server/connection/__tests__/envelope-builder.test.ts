@@ -19,7 +19,7 @@ describe('buildEnvelope', () => {
     const env = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [],
+      visiblePlayerIds: [], controlledPlayerIndexes: [],
       version: 7,
       cause: 'action',
       requestId: 'req-1',
@@ -42,7 +42,7 @@ describe('buildEnvelope', () => {
     const response = session.getState()
     const cursor = session.createSessionPrivateCursor()
     const log = JSON.parse(JSON.stringify(session.state.log))
-    const envelope = buildEnvelope({ room: { id: 'r1', session, players: [{ playerIndex: 0, name: 'Renamed actor', ws: { readyState: 1 } }, { playerIndex: 1, name: 'Renamed recipient', ws: { readyState: 3 } }] as never }, resp: response, visiblePlayerIds: ['p1'], version: 1, cause: 'reconnect', emittedAt: 0 })
+    const envelope = buildEnvelope({ room: { id: 'r1', session, players: [{ playerIndex: 0, name: 'Renamed actor', ws: { readyState: 1 } }, { playerIndex: 1, name: 'Renamed recipient', ws: { readyState: 3 } }] as never }, resp: response, visiblePlayerIds: ['p1'], controlledPlayerIndexes: [0], version: 1, cause: 'reconnect', emittedAt: 0 })
     expect(envelope.payload.state.log[0]).toMatchObject({ params: { player: 'Renamed actor', toPlayer: 'Renamed recipient' } })
     expect(envelope.connectedPlayerIndexes).toEqual([0])
     expect(session.state.log).toEqual(log)
@@ -56,7 +56,7 @@ describe('buildEnvelope', () => {
     const env = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [player0Id],
+      visiblePlayerIds: [player0Id], controlledPlayerIndexes: [0],
       version: 1,
       cause: 'action',
       emittedAt: 0,
@@ -94,7 +94,7 @@ describe('buildEnvelope', () => {
     const target = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: waitResp,
-      visiblePlayerIds: [p0.id],
+      visiblePlayerIds: [p0.id], controlledPlayerIndexes: [0],
       version: 1,
       cause: 'choice',
       emittedAt: 0,
@@ -102,7 +102,7 @@ describe('buildEnvelope', () => {
     const other = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: waitResp,
-      visiblePlayerIds: [p1.id],
+      visiblePlayerIds: [p1.id], controlledPlayerIndexes: [1],
       version: 1,
       cause: 'choice',
       emittedAt: 0,
@@ -110,7 +110,7 @@ describe('buildEnvelope', () => {
     const observer = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: waitResp,
-      visiblePlayerIds: [],
+      visiblePlayerIds: [], controlledPlayerIndexes: [],
       version: 1,
       cause: 'choice',
       emittedAt: 0,
@@ -161,7 +161,7 @@ describe('buildEnvelope', () => {
     const target = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: waitResp,
-      visiblePlayerIds: [p0.id],
+      visiblePlayerIds: [p0.id], controlledPlayerIndexes: [0],
       version: 1,
       cause: 'choice',
       emittedAt: 0,
@@ -169,7 +169,7 @@ describe('buildEnvelope', () => {
     const other = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: waitResp,
-      visiblePlayerIds: [p1.id],
+      visiblePlayerIds: [p1.id], controlledPlayerIndexes: [1],
       version: 1,
       cause: 'choice',
       emittedAt: 0,
@@ -213,7 +213,7 @@ describe('buildEnvelope', () => {
     const p0Env = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: eventResp,
-      visiblePlayerIds: [p0.id],
+      visiblePlayerIds: [p0.id], controlledPlayerIndexes: [0],
       version: 1,
       cause: 'dev',
       emittedAt: 0,
@@ -221,7 +221,7 @@ describe('buildEnvelope', () => {
     const p1Env = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: eventResp,
-      visiblePlayerIds: [p1.id],
+      visiblePlayerIds: [p1.id], controlledPlayerIndexes: [1],
       version: 1,
       cause: 'dev',
       emittedAt: 0,
@@ -229,7 +229,7 @@ describe('buildEnvelope', () => {
     const observer = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp: eventResp,
-      visiblePlayerIds: [],
+      visiblePlayerIds: [], controlledPlayerIndexes: [],
       version: 1,
       cause: 'dev',
       emittedAt: 0,
@@ -260,7 +260,7 @@ describe('buildEnvelope', () => {
     const active = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [p0.id],
+      visiblePlayerIds: [p0.id], controlledPlayerIndexes: [0],
       version: 1,
       cause: 'action',
       emittedAt: 0,
@@ -268,7 +268,7 @@ describe('buildEnvelope', () => {
     const other = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [p1.id],
+      visiblePlayerIds: [p1.id], controlledPlayerIndexes: [1],
       version: 1,
       cause: 'action',
       emittedAt: 0,
@@ -276,7 +276,7 @@ describe('buildEnvelope', () => {
     const observer = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [],
+      visiblePlayerIds: [], controlledPlayerIndexes: [],
       version: 1,
       cause: 'action',
       emittedAt: 0,
@@ -368,7 +368,7 @@ describe('buildEnvelope', () => {
     const owner = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [p0.id],
+      visiblePlayerIds: [p0.id], controlledPlayerIndexes: [0],
       version: 1,
       cause: 'undo',
       emittedAt: 0,
@@ -376,7 +376,7 @@ describe('buildEnvelope', () => {
     const other = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [p1.id],
+      visiblePlayerIds: [p1.id], controlledPlayerIndexes: [1],
       version: 1,
       cause: 'undo',
       emittedAt: 0,
@@ -384,7 +384,7 @@ describe('buildEnvelope', () => {
     const observer = buildEnvelope({
       room: { id: 'r1', session, players: [] },
       resp,
-      visiblePlayerIds: [],
+      visiblePlayerIds: [], controlledPlayerIndexes: [],
       version: 1,
       cause: 'undo',
       emittedAt: 0,
@@ -406,7 +406,7 @@ describe('buildEnvelope', () => {
     const pick = firstDraftPick(session.state.draft!, 'p1')
     const resp = session.submitDraftPick('p1', pick)
     const envelope = (viewerPlayerId: string | null) => buildEnvelope({
-      room: { id: 'r1', session, players: [] }, resp, visiblePlayerIds: viewerPlayerId === null ? [] : [viewerPlayerId],
+      room: { id: 'r1', session, players: [] }, resp, visiblePlayerIds: viewerPlayerId === null ? [] : [viewerPlayerId], controlledPlayerIndexes: viewerPlayerId === null ? [] : [session.state.players.findIndex(player => player.id === viewerPlayerId)],
       version: 1, cause: 'reconnect', emittedAt: 0,
     })
     const p1 = envelope('p1')
@@ -423,7 +423,7 @@ describe('buildEnvelope', () => {
   it('reports no connected seats for an empty room player list and every seat for hotseat', () => {
     const session = new GameSession(12345, undefined, { playerCount: 2, draftMode: 'simultaneous' })
     const resp = session.getState()
-    const base = { resp, visiblePlayerIds: ['p1'], version: 1, cause: 'reconnect', emittedAt: 0 } satisfies Omit<Parameters<typeof buildEnvelope>[0], 'room'>
+    const base = { resp, visiblePlayerIds: ['p1'], controlledPlayerIndexes: [0], version: 1, cause: 'reconnect', emittedAt: 0 } satisfies Omit<Parameters<typeof buildEnvelope>[0], 'room'>
     expect(buildEnvelope({ ...base, room: { id: 'r1', session, players: [] } }).connectedPlayerIndexes).toEqual([])
     expect(buildEnvelope({ ...base, room: { id: 'r1', session, players: [], hotseat: true } }).connectedPlayerIndexes).toEqual([0, 1])
   })
