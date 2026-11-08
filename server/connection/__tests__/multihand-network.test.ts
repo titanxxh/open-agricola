@@ -25,6 +25,8 @@ const read = async (peer: SoloNetworkPeer): Promise<StateUpdateEnvelope> => {
 it('plays two real accounts through simultaneous opening, recovers both seats and publishes whole-team presence', async () => {
   running = await createSoloRecoveryHost(42)
   const host = running
+  await host.db.prepare('INSERT INTO beta_access(user_id,granted_by,granted_at) VALUES(?,?,?)')
+    .run(host.user.id, host.user.id, Date.now())
   let owner = await host.connect()
   const other = await createLocalUserForTests(`multihand_${randomUUID().slice(0, 8)}`, 'password123', 'Other farmer')
   const token = await createSession(other.id)
