@@ -459,6 +459,8 @@ function ArchiveReplayViewer({ locale }: { locale: Locale }) {
         <ScoringPad
           locale={locale}
           scores={scores}
+          teamScores={visibleFrame?.teamScores}
+          teamConfiguration={visibleFrame?.team?.configuration}
           players={visibleFrame?.players ?? []}
           onClose={() => setShowScores(false)}
           showDraftHistory

@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PostgresRoomPersistence, type ReplayCommit } from '../postgres-adapter.ts'
 import type { GameResult, RoomMeta } from '../room-persistence.ts'
 import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
+import { GameContextStore } from '../../game-context-store.ts'
+import type { TeamResultArchive } from '../../../../shared/contract/team'
 
 const META: RoomMeta = {
   createdBy: null,
@@ -109,6 +111,36 @@ describe('PostgresRoomPersistence replay commit', () => {
     monitoring = createServer((req, res) => { void handle(req, res) })
     await new Promise<void>(done => monitoring.listen(0, '127.0.0.1', done))
     metricsBase = `http://127.0.0.1:${(monitoring.address() as AddressInfo).port}`
+  })
+
+  it.each(['team', 'multihand'] as const)('archives and reads %s team scores and every seat membership', async mode => {
+    const team: TeamResultArchive = { mode, scoring: 'sum', scores: [
+      { teamIndex: 0, playerIds: ['p1', 'p3'], scoring: 'sum', total: 40, rank: 2, buildingResources: 0, categories: [], factors: [] },
+      { teamIndex: 1, playerIds: ['p2', 'p4'], scoring: 'sum', total: 60, rank: 1, buildingResources: 0, categories: [], factors: [] },
+    ] }
+    const result: GameResult = { ...RESULT, playerCount: 4, team, players: [
+      { playerIndex: 0, gamePlayerId: 'p1', userId: null, displayName: 'A', score: 10, teamIndex: 0 },
+      { playerIndex: 1, gamePlayerId: 'p2', userId: null, displayName: 'B', score: 20, teamIndex: 1 },
+      { playerIndex: 2, gamePlayerId: 'p3', userId: null, displayName: 'C', score: 30, teamIndex: 0 },
+      { playerIndex: 3, gamePlayerId: 'p4', userId: null, displayName: 'D', score: 40, teamIndex: 1 },
+    ] }
+    const meta = { ...META, maxPlayers: 4 }
+    expect(await persistence.commitReplay({ ...step0(), meta })).toEqual({ kind: 'committed' })
+    expect(await persistence.commitReplay({ ...nextStep(), meta, result })).toEqual({ kind: 'committed' })
+
+    expect(await db.prepare('SELECT team_mode, team_scoring, team_scores FROM game_results').get()).toEqual({
+      team_mode: mode, team_scoring: 'sum', team_scores: team.scores,
+    })
+    expect(await db.prepare('SELECT player_index, team_index FROM game_result_players ORDER BY player_index').all()).toEqual([
+      { player_index: 0, team_index: 0 }, { player_index: 1, team_index: 1 },
+      { player_index: 2, team_index: 0 }, { player_index: 3, team_index: 1 },
+    ])
+    expect(await new GameContextStore(db).resolve('room-1')).toMatchObject({
+      ok: true, lifecycle: 'completed', result: { team, players: [
+        { playerIndex: 0, score: 10, teamIndex: 0 }, { playerIndex: 1, score: 20, teamIndex: 1 },
+        { playerIndex: 2, score: 30, teamIndex: 0 }, { playerIndex: 3, score: 40, teamIndex: 1 },
+      ] },
+    })
   })
 
   afterEach(async () => {
@@ -275,6 +307,29 @@ describe('PostgresRoomPersistence replay commit', () => {
     expect(await db.prepare('SELECT lifecycle FROM game_contexts').get()).toEqual({ lifecycle: 'completed' })
     await db.prepare('UPDATE game_result_players SET score = ? WHERE player_index = 0').run(-13.9)
     expect(await db.prepare('SELECT score FROM game_result_players WHERE player_index = 0').get()).toEqual({ score: -13.9 })
+  })
+
+  it('upgrades existing ordinary result archives without changing their scores or identity metadata', async () => {
+    await persistence.commitReplay(step0())
+    await persistence.commitReplay({ ...nextStep(), result: RESULT })
+    const before = await new GameContextStore(db).resolve('room-1')
+    await db.exec(`
+      ALTER TABLE game_results DROP CONSTRAINT game_results_team_result_complete,
+        DROP COLUMN team_mode, DROP COLUMN team_scoring, DROP COLUMN team_scores;
+      ALTER TABLE game_result_players DROP COLUMN team_index;
+      DELETE FROM postgres_schema_migrations WHERE version = 34;
+    `)
+
+    await migratePostgres(db)
+    await migratePostgres(db)
+
+    expect(await new GameContextStore(db).resolve('room-1')).toEqual(before)
+    expect(await db.prepare('SELECT team_mode, team_scoring, team_scores FROM game_results').get()).toEqual({
+      team_mode: null, team_scoring: null, team_scores: null,
+    })
+    expect(await db.prepare('SELECT team_index FROM game_result_players').all()).toEqual([
+      { team_index: null }, { team_index: null },
+    ])
   })
 
   it('archives current seat identities, name provenance and variant flags once with the final recorded Step', async () => {

@@ -25,6 +25,13 @@ export type TeamScoreSummary = {
   factors: { playerId: string; total: number; clampedTotal: number }[]
 }
 
+/** Immutable team result; names and account associations stay in participant metadata. */
+export type TeamResultArchive = {
+  mode: TeamConfiguration['mode']
+  scoring: TeamScoring
+  scores: TeamScoreSummary[]
+}
+
 /** Parse once at the creation boundary; absent configuration preserves ordinary play. */
 export function parseTeamConfiguration(value: unknown, playerCount: number): TeamConfiguration | undefined {
   if (value === undefined) return undefined
