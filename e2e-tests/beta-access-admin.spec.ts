@@ -37,6 +37,7 @@ test('administrator grants and revokes Beta access while existing team rooms rem
     await owner.setViewportSize({ width: 390, height: 844 })
     expect(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await owner.screenshot({ path: testInfo.outputPath('beta-admin-mobile.png'), fullPage: true })
+    await manager.screenshot({ path: testInfo.outputPath('beta-admin-mobile-section.png') })
 
     await member.reload()
     await expect(member.getByRole('button', { name: /^Team game/ })).toBeVisible()
@@ -49,6 +50,8 @@ test('administrator grants and revokes Beta access while existing team rooms rem
     await row.getByRole('button', { name: 'Revoke', exact: true }).click()
     const confirmation = row.getByRole('dialog')
     await expect(confirmation).toContainText('This takes effect immediately. Existing team rooms are not affected.')
+    expect(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await manager.screenshot({ path: testInfo.outputPath('beta-admin-mobile-confirmation.png') })
     await confirmation.getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(row).toHaveCount(0)
     await member.reload()

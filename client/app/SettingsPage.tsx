@@ -311,7 +311,7 @@ export function SettingsPage() {
         <p className="settings-readonly">
           🔒 <span className="settings-readonly-chip">{user?.username ?? ''}</span>（{t('platform.notEditable')}）
         </p>
-        {user?.betaAccess || user?.isAdmin ? <p className="settings-readonly">
+        {user?.betaAccess || user?.isAdmin ? <p className="settings-readonly beta-access-status">
           {t('beta.accessLabel')}: <span className="settings-readonly-chip">{t('beta.accessEnabled')}</span>{' '}
           {user.experimentalFeatures?.includes('team-modes') ? <span>{t('beta.availableModes')}</span> : null}
         </p> : null}
