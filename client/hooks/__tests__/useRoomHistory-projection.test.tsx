@@ -49,7 +49,7 @@ const setup = () => {
   for (let index = 0; index < 25; index++) collect()
   const raw = () => session.withCtx(() => serializeState(session.state, {}))
   const props = () => {
-    const payload = session.buildSyncPayload(session.getState(), 'p1', 'live', undefined, true)
+    const payload = session.buildSyncPayload(session.getState(), ['p1'], 'live', undefined, true)
     return { state: rehydrateStateForClient(payload.state), window: payload.historyWindow }
   }
   const reveal = () => {
@@ -62,7 +62,7 @@ const setup = () => {
     expect(played.scores).toHaveLength(2)
   }
   const transport = new WsGameTransport('ws://localhost/projection-history', 'p1')
-  const getHistory = vi.spyOn(transport, 'getHistory').mockImplementation(async cursor => buildRoomHistoryPage(raw(), 'p1', cursor))
+  const getHistory = vi.spyOn(transport, 'getHistory').mockImplementation(async cursor => buildRoomHistoryPage(raw(), ['p1'], cursor))
   return { session, raw, props, reveal, collect, transport, getHistory }
 }
 
@@ -73,7 +73,7 @@ it('refreshes loaded history after legal hand disclosure and renders the previou
     expect(JSON.stringify(initial)).not.toContain('D036_BreedRegistry')
     const { result, rerender } = renderHook(props => useRoomHistory(fixture.transport, props.state, props.window), { initialProps: initial })
     await act(() => result.current.loadOlder())
-    const before = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+    const before = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
     expect(result.current.events).toEqual(before.events)
     expect(result.current.canLoadOlder).toBe(false)
     const beforeRows = buildReplayActionLogPresentation({ events: before.events, publicEventArchive: before.publicEventArchive,
@@ -81,11 +81,11 @@ it('refreshes loaded history after legal hand disclosure and renders the previou
       playerNames: Object.fromEntries(before.players.map(player => [player.id, player.name])),
       actionNames: Object.fromEntries(before.actionSpaces.map(space => [space.id, space.nameKey])) }).timelineBuckets.flatMap(bucket => bucket.rows)
     fixture.reveal()
-    expect(() => buildRoomHistoryPage(fixture.raw(), 'p1', initial.window!.nextCursor!)).toThrow(HistoryProjectionChangedError)
+    expect(() => buildRoomHistoryPage(fixture.raw(), ['p1'], initial.window!.nextCursor!)).toThrow(HistoryProjectionChangedError)
     const after = fixture.props()
     expect(after.window!.branchId).toBe(initial.window!.branchId)
     await act(async () => { rerender(after) })
-    const full = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+    const full = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
     expect(result.current.log).toEqual(full.log)
     expect(result.current.events).toEqual(full.events)
     expect(result.current.publicEventArchive).toEqual(full.publicEventArchive)
@@ -115,7 +115,7 @@ it('rejects an in-flight old projection and automatically replaces it with curre
   const fixture = setup()
   try {
     const initial = fixture.props()
-    const oldPage = buildRoomHistoryPage(fixture.raw(), 'p1', initial.window!.nextCursor!)
+    const oldPage = buildRoomHistoryPage(fixture.raw(), ['p1'], initial.window!.nextCursor!)
     let resolve!: (page: typeof oldPage) => void
     fixture.getHistory.mockImplementationOnce(() => new Promise(done => { resolve = done }))
     const { result, rerender } = renderHook(props => useRoomHistory(fixture.transport, props.state, props.window), { initialProps: initial })
@@ -124,7 +124,7 @@ it('rejects an in-flight old projection and automatically replaces it with curre
     fixture.reveal()
     await act(async () => { rerender(fixture.props()) })
     await act(async () => { resolve(oldPage); await pending })
-    const full = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+    const full = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
     expect(result.current.log).toEqual(full.log)
     expect(result.current.events).toEqual(full.events)
     expect(result.current.publicEventArchive).toEqual(full.publicEventArchive)
@@ -141,11 +141,11 @@ it('refreshes the state when the server detects a projection change before its b
     fixture.getHistory.mockRejectedValueOnce(Object.assign(new Error('projection changed'), { code: 'history_projection_changed' }))
     const getState = vi.spyOn(fixture.transport, 'getState').mockImplementation(async () => {
       rerender(fixture.props())
-      return fixture.session.buildSyncPayload(fixture.session.getState(), 'p1', 'live', undefined, true)
+      return fixture.session.buildSyncPayload(fixture.session.getState(), ['p1'], 'live', undefined, true)
     })
     await act(() => result.current.loadOlder())
     expect(getState).toHaveBeenCalledOnce()
-    const full = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+    const full = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
     expect(result.current.log).toEqual(full.log)
     expect(result.current.events).toEqual(full.events)
     expect(result.current.publicEventArchive).toEqual(full.publicEventArchive)
@@ -165,7 +165,7 @@ it('detects changed cached prefixes while filling a reconnect gap without live-w
     expect(latest.window!.operationGroupIds.some(id => initial.window!.operationGroupIds.includes(id))).toBe(false)
     act(() => rerender(latest))
     while (result.current.canLoadOlder) await act(() => result.current.loadOlder())
-    const full = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+    const full = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
     expect(result.current.log).toEqual(full.log)
     expect(result.current.events).toEqual(full.events)
     expect(result.current.publicEventArchive).toEqual(full.publicEventArchive)
@@ -181,6 +181,6 @@ it('updates names without refetching an unchanged visible history prefix', async
     fixture.session.updatePlayerName(0, 'Renamed viewer')
     await act(async () => { rerender(fixture.props()) })
     expect(fixture.getHistory).not.toHaveBeenCalled()
-    expect(result.current.log).toEqual(fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state.log)
+    expect(result.current.log).toEqual(fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state.log)
   } finally { fixture.session.dispose() }
 })

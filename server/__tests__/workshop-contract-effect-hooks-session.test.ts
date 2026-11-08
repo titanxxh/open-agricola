@@ -173,7 +173,7 @@ describe('Workshop Capability Contract effect hooks', () => {
 
     const ownerTiles = plowTiles(0)
     // The same lock is published per player for the client's farm display.
-    const display = session.buildSyncPayload(session.getState(), null).state.players
+    const display = session.buildSyncPayload(session.getState(), []).state.players
 
     expect(ownerTiles).not.toContain('0-1')
     expect(ownerTiles).not.toContain('0-2')
@@ -186,7 +186,7 @@ describe('Workshop Capability Contract effect hooks', () => {
   it('getBuiltSpecialStables: shows the returned tiles in the owner\'s display fields', () => {
     const session = start(effect('getBuiltSpecialStables: () => [{ row: 0, col: 2 }]'))
 
-    const players = session.buildSyncPayload(session.getState(), null).state.players
+    const players = session.buildSyncPayload(session.getState(), []).state.players
 
     expect(players[0]!.specialStables).toEqual([{ position: { row: 0, col: 2 }, sourceCardId: CARD_ID }])
     expect(players[1]!.specialStables).toEqual([])

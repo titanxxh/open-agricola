@@ -55,7 +55,7 @@ describe('viewer archive projection', () => {
     ])
     const raw = serializeState(state, {})
     const before = JSON.stringify(raw)
-    const projected = filterSerializedStateForPlayer(raw, 'p1')
+    const projected = filterSerializedStateForPlayer(raw, ['p1'])
     const event = projected.events.find(event => event.occurrenceId === visible!.occurrenceId)!
     const log = projected.log.find(log => log.sourceEvent?.occurrenceId === visible!.occurrenceId)!
     expect(event.seq).not.toBe(visible!.seq)
@@ -68,7 +68,7 @@ describe('viewer archive projection', () => {
   it('reuses unchanged committed and canceled packets while keeping output arrays independent', () => {
     const { base, committed, canceled } = setup()
     const before = JSON.stringify(base)
-    const projected = filterSerializedStateForPlayer(base, 'p1')
+    const projected = filterSerializedStateForPlayer(base, ['p1'])
 
     expect(projected.publicEventArchive).not.toBe(base.publicEventArchive)
     expect(projected.events).not.toBe(base.events)
@@ -100,7 +100,7 @@ describe('viewer archive projection', () => {
       { ...canceled, id: 'empty-cancel', packetSeq: 15, canceledEvents: [] },
     )
     const before = JSON.stringify(base)
-    const projected = filterSerializedStateForPlayer(base, 'p1')
+    const projected = filterSerializedStateForPlayer(base, ['p1'])
 
     expect(projected.publicEventArchive).toEqual([
       { ...committed, firstEventSeq: 7, lastEventSeq: 7 },
@@ -115,12 +115,12 @@ describe('viewer archive projection', () => {
 
   it('rechecks mutable packet fields on a later projection', () => {
     const { base, committed, canceled } = setup()
-    const initial = filterSerializedStateForPlayer(base, 'p1')
+    const initial = filterSerializedStateForPlayer(base, ['p1'])
     expect(initial.publicEventArchive[0]).toMatchObject({ firstEventSeq: 7, lastEventSeq: 7 })
 
     committed.eventSeqs[0] = 8
     canceled.canceledEvents[0]!.seq = 8
-    const changed = filterSerializedStateForPlayer(base, 'p1')
+    const changed = filterSerializedStateForPlayer(base, ['p1'])
     expect(changed.publicEventArchive).toEqual([
       { ...committed, firstEventSeq: 8, lastEventSeq: 8 },
       { ...canceled, canceledSeqs: [8] },
@@ -136,7 +136,7 @@ describe('viewer archive projection', () => {
     if (field === 'committed seqs') committed.eventSeqs.push(8)
     if (field === 'canceled ids') canceled.canceledEventIds.push('trailing')
     if (field === 'canceled seqs') canceled.canceledSeqs.push(8)
-    const projected = filterSerializedStateForPlayer(base, 'p1')
+    const projected = filterSerializedStateForPlayer(base, ['p1'])
 
     expect(projected.publicEventArchive).toEqual([
       { ...committed, eventSeqs: [7] },
@@ -165,7 +165,7 @@ describe('viewer archive projection', () => {
     base.publicEventArchive = [packet]
     base.nextPublicEventArchivePacketSeq = 28
 
-    const privateView = filterSerializedStateForPlayer(base, 'p1')
+    const privateView = filterSerializedStateForPlayer(base, ['p1'])
     expect(privateView.events).toEqual([{ ...visible, seq: 1 }])
     expect(privateView.publicEventArchive).toEqual([{
       schemaVersion: 1, id: '1', packetSeq: 1, type: 'publicEvents.committed',
@@ -173,11 +173,11 @@ describe('viewer archive projection', () => {
     }])
     expect(privateView.nextEventSeq).toBe(2)
     expect(privateView.nextPublicEventArchivePacketSeq).toBe(2)
-    expect(filterSerializedStateForPlayer(base, owner.id).publicEventArchive).toEqual([packet])
+    expect(filterSerializedStateForPlayer(base, [owner.id]).publicEventArchive).toEqual([packet])
 
     owner.minorHand = ['__test_placeholder__']
     owner.minorPlayed = ['D036_BreedRegistry']
-    const publicView = filterSerializedStateForPlayer(base, 'p1')
+    const publicView = filterSerializedStateForPlayer(base, ['p1'])
     const metadata = { ...hidden }
     delete metadata.value
     expect(publicView.events).toEqual([metadata, visible])
@@ -188,7 +188,7 @@ describe('viewer archive projection', () => {
 
     owner.minorHand = ['D036_BreedRegistry']
     owner.minorPlayed = []
-    const hiddenAgain = filterSerializedStateForPlayer(base, 'p1')
+    const hiddenAgain = filterSerializedStateForPlayer(base, ['p1'])
     expect(hiddenAgain.events).toEqual(privateView.events)
     expect(hiddenAgain.publicEventArchive).toEqual(privateView.publicEventArchive)
     expect(base.events).toEqual([hidden, visible])

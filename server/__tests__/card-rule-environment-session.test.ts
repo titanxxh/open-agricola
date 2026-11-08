@@ -245,7 +245,7 @@ describe('Session card rule environment', () => {
     const serializedState = JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original)))
     original.dispose()
     const browser = new LocalSandboxCore()
-    const viewer = { viewerPlayerId: null, mode: 'debug' } satisfies import('../../client/local-sandbox/protocol').ViewerSpec
+    const viewer = { visiblePlayerIds: [], mode: 'debug' } satisfies import('../../client/local-sandbox/protocol').ViewerSpec
     const restored = handleLocalSandboxRequest(browser, {
       kind: 'restore', id: 1, viewer,
       persisted: { schemaVersion: LOCAL_SANDBOX_SCHEMA_VERSION, serializedState,

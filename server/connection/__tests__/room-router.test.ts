@@ -434,7 +434,7 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.parentSelection).toBeNull()
     expect(ctx.currentRoom!.session.state.players.every((player) => player.parentCards.mother)).toBe(true)
     expect(ctx.currentRoom!.session.state.players[0]!.name).toBe('Alice')
-    expect(ctx.currentRoom!.session.buildSyncPayload(ctx.currentRoom!.session.getState(), 'p1').state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
+    expect(ctx.currentRoom!.session.buildSyncPayload(ctx.currentRoom!.session.getState(), ['p1']).state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
   })
 
   it('preserves completed simultaneous draft settings across restore and newGame', async () => {
@@ -484,7 +484,7 @@ describe('handleCreateRoom', () => {
       name: 'Bob',
     })
 
-    const loggedPlayerNames = host.currentRoom!.session.buildSyncPayload(host.currentRoom!.session.getState(), 'p1').state.log
+    const loggedPlayerNames = host.currentRoom!.session.buildSyncPayload(host.currentRoom!.session.getState(), ['p1']).state.log
       .map((entry) => entry.params?.player)
       .filter((player): player is string => typeof player === 'string')
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))

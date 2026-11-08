@@ -58,7 +58,7 @@ describe('provenance undo/replay reconstruction', () => {
     const beforeUndoEnvelope = buildEnvelope({
       room: { id: 'r1', session },
       resp,
-      viewerPlayerId: player.id,
+      visiblePlayerIds: [player.id],
       version: 1,
       cause: 'choice',
       emittedAt: 0,
@@ -134,7 +134,7 @@ describe('provenance undo/replay reconstruction', () => {
     const afterUndoEnvelope = buildEnvelope({
       room: { id: 'r1', session },
       resp,
-      viewerPlayerId: player.id,
+      visiblePlayerIds: [player.id],
       version: 2,
       cause: 'undo',
       emittedAt: 1,
@@ -145,7 +145,7 @@ describe('provenance undo/replay reconstruction', () => {
     const reconnectEnvelope = buildEnvelope({
       room: { id: 'r1', session },
       resp: session.getState(),
-      viewerPlayerId: player.id,
+      visiblePlayerIds: [player.id],
       version: 3,
       cause: 'reconnect',
       emittedAt: 2,

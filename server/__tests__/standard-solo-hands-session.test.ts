@@ -116,7 +116,7 @@ describe('standard solo opening hands', () => {
     const before = original.getState()
     expect(before.state.players[0]!.parentCards).toEqual({ mother: null, father: null })
     expect(before.state.events.filter(event => event.type === 'parent.motherScheduled' || event.type === 'action.revealed')).toEqual([])
-    expect(original.buildSyncPayload(before, 'p1').state.parentSelection).toBeNull()
+    expect(original.buildSyncPayload(before, ['p1']).state.parentSelection).toBeNull()
     const saved = JSON.parse(JSON.stringify(serializeSessionSnapshot(original.state, original)))
     const restored = new GameSession(rehydrateState(saved))
     sessions.push(restored)
@@ -151,8 +151,8 @@ describe('standard solo opening hands', () => {
     for (const confirm of [false, true]) {
       if (confirm) expect(session.submitSoloHandSelection(0, { groups: selection.groups.map(group => ({ kind: group.kind, cardIds: group.cardIds.slice(0, group.keepCount) })) }).ok).toBe(true)
       const response = session.getState()
-      expect(session.buildSyncPayload(response, 'p1').state.soloHandSelection).toEqual(session.state.soloHandSelection)
-      const spectator = session.buildSyncPayload(response, null)
+      expect(session.buildSyncPayload(response, ['p1']).state.soloHandSelection).toEqual(session.state.soloHandSelection)
+      const spectator = session.buildSyncPayload(response, [])
       expect(spectator.state.soloHandSelection).toBeNull()
       for (const id of allIds) expect(JSON.stringify(spectator)).not.toContain(id)
     }

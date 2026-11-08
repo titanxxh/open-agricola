@@ -247,7 +247,7 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
     throw new Error('Invalid initial Replay fixture state')
   }
   const capture = (): JsonValue => {
-    const payload = session.buildSyncPayload(session.getState(), null, 'debug')
+    const payload = session.buildSyncPayload(session.getState(), [], 'debug')
     return JSON.parse(JSON.stringify({
       ...payload.state,
       ...(payload.state.gameOver ? { scores: payload.scores ?? [] } : {}),

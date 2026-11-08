@@ -10,9 +10,10 @@ import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 
-const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): string | null => {
-  if (typeof seatIndex !== 'number') return null
-  return resp.state.players[seatIndex]?.id ?? null
+const visibleIdsForSeat = (resp: SessionResponse, seatIndex: number | undefined): string[] => {
+  if (typeof seatIndex !== 'number') return []
+  const playerId = resp.state.players[seatIndex]?.id
+  return playerId ? [playerId] : []
 }
 
 /**
@@ -78,7 +79,7 @@ export class Broadcaster {
         const env = measure('projection', () => buildEnvelope({
           room,
           resp: requesterResponse?.ws === seat.ws ? requesterResponse.response : resp,
-          viewerPlayerId: viewerIdForSeat(resp, seat.playerIndex),
+          visiblePlayerIds: visibleIdsForSeat(resp, seat.playerIndex),
           version: room.version,
           cause,
           requestId: requesterResponse && requesterResponse.ws !== seat.ws ? undefined : requestId,
@@ -90,7 +91,7 @@ export class Broadcaster {
     }
     const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN)
     if (spectators.length) {
-      const envelope = measure('projection', () => buildEnvelope({ room, resp, viewerPlayerId: null,
+      const envelope = measure('projection', () => buildEnvelope({ room, resp, visiblePlayerIds: [],
         version: room.version, cause, emittedAt, mode: 'viewer' }))
       const data = JSON.stringify(envelope)
       for (const ws of spectators) { bytes += sendObserved(ws, envelope, roundTag(resp.state), data); recipients++ }
@@ -116,7 +117,7 @@ export class Broadcaster {
       const env = measure('projection', () => buildEnvelope({
         room,
         resp,
-        viewerPlayerId: viewerIdForSeat(resp, seat?.playerIndex),
+        visiblePlayerIds: visibleIdsForSeat(resp, seat?.playerIndex),
         version: room.version,
         cause,
         requestId,

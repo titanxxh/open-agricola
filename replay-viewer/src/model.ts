@@ -49,7 +49,7 @@ export const frameForPerspective = (
   if (perspective === 'open') return frame
   const playerIndex = Number(perspective.slice(1)) - 1
   const playerId = frame.players[playerIndex]?.id ?? null
-  return filterSerializedStateForPlayer(frame, playerId) as ReplayGameState
+  return filterSerializedStateForPlayer(frame, [playerId]) as ReplayGameState
 }
 
 export const intentForPerspective = (

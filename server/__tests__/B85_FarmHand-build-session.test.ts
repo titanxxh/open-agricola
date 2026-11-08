@@ -375,7 +375,7 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
 
 describe('B85 FarmHand — snapshot specialStables display field', () => {
   const serializeFor = (ruleOwner: SessionRuleOwner, state: ReturnType<GameSession['getState']>['state'], viewerId: string) =>
-    ruleOwner.withCtx(() => serializeStateForPlayer(state, viewerId, { engineStack: new EngineStack() }))
+    ruleOwner.withCtx(() => serializeStateForPlayer(state, [viewerId], { engineStack: new EngineStack() }))
 
   it('omits specialStables before the FarmHand stable is built', () => {
     const session = setupBuildStables()

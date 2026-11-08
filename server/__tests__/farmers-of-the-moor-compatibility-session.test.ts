@@ -362,7 +362,7 @@ describe('Cross expansions batch 4 parent reward sequencing audit', () => {
       const received = session.state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === mother && event.reason === 'receive')
       expect(received).toEqual([expect.objectContaining({ resources: { [resource]: 1 }, actorPlayerId: 'p1' })])
       session = auditRestore(session)
-      for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(session.getState(), viewer).state.players[0]!.resources[resource]).toBe(1)
+      for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer]).state.players[0]!.resources[resource]).toBe(1)
       expect(session.state.futureMeeples.some((entry) => entry.cardId === mother)).toBe(false)
     },
   )
@@ -456,7 +456,7 @@ describe('Cross expansions batch 4 Parents and Moor audit', () => {
       expect(choice.candidates).toHaveLength(3)
       const waiting = auditClone(session.state)
       for (const viewer of ['p2', null]) {
-        const payload = JSON.stringify(session.buildSyncPayload(session.getState(), viewer))
+        const payload = JSON.stringify(session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer]))
         for (const id of choice.candidates) expect(payload).not.toContain(id)
       }
       expect(session.resolveOrdinaryCardDrawChoice(1, choice.id, choice.candidates[1]!).ok).toBe(false)
@@ -671,7 +671,7 @@ describe('Cross expansions batch 4 Seasons and Moor harvest audit', () => {
     expect(final.state.players.map((player) => player.resources.food)).toEqual([46, 46])
     expect(final.state.players.map((player) => player.sickWorkerIds)).toEqual([[], []])
     for (const score of final.scores!) expect(score.categories.find((category) => category.key === 'farmers')!.total).toBe(6)
-    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer).scores).toEqual(final.scores)
+    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer === null ? [] : [viewer]).scores).toEqual(final.scores)
   })
 
   it.each(['house', 'release', 'cook'] as const)('spring private horse breeding can %s the newborn without harvesting the opponent', (mode) => {
@@ -1089,7 +1089,7 @@ describe('Cross expansions batch 4 triple-expansion restoration audit', () => {
       expect(score.categories.find((category) => category.key === 'horses')!.total).toBe(index === 0 ? 1 : -1)
       expect(score.total).toBeCloseTo(score.categories.reduce((total, category) => total + category.total, 0))
     }
-    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer).scores).toEqual(final.scores)
+    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer === null ? [] : [viewer]).scores).toEqual(final.scores)
     expect(final.state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === 'PR06' && event.reason === 'receive')).toHaveLength(1)
     session = auditRestore(session)
     expect(session.getState().scores).toEqual(final.scores)

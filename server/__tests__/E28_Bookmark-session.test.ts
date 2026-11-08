@@ -43,10 +43,10 @@ describe('Bookmark uses its executable timed rule', () => {
     const session = setup()
     const response = session.getState()
     expect(readCardExtraData(response.state.players[0]!, CARD_ID, 'triggerRound')).toBe(6)
-    const publicState = session.buildSyncPayload(response, null).state
+    const publicState = session.buildSyncPayload(response, []).state
     expect(publicState.players[0]!.scheduledEffects).toMatchObject([{ round: 6, sourceCard: CARD_ID, timing: 'onRoundStart', description: { optional: true, labelKey: 'actions.lessons.name', effectPreview: { kind: 'payment', resourcesPaid: {} } } }])
     const before = JSON.stringify(session.state)
-    session.buildSyncPayload(session.getState(), null)
+    session.buildSyncPayload(session.getState(), [])
     expect(JSON.stringify(session.state)).toBe(before)
     let due = mature(session)
     expect(due.ok).toBe(true)
@@ -69,7 +69,7 @@ describe('Bookmark uses its executable timed rule', () => {
     expect(due.ok).toBe(true)
     expect(due.state.players[0]!.occupationPlayed.includes('A097_Freshman')).toBe(decision === 'accept')
     expect(due.state.players[0]!.resources.food).toBe(20)
-    expect(session.buildSyncPayload(due, null).state.players[0]!.scheduledEffects).toEqual([])
+    expect(session.buildSyncPayload(due, []).state.players[0]!.scheduledEffects).toEqual([])
     expect(readCardExtraData(due.state.players[0]!, CARD_ID, 'timedRuleReceipts')).toEqual(['free-occupation:6'])
   })
 
@@ -78,13 +78,13 @@ describe('Bookmark uses its executable timed rule', () => {
     const due = mature(session)
     expect(due.ok).toBe(true)
     expect(due.state.players[0]!.occupationPlayed).toEqual([])
-    expect(session.buildSyncPayload(due, null).state.players[0]!.scheduledEffects).toEqual([])
+    expect(session.buildSyncPayload(due, []).state.players[0]!.scheduledEffects).toEqual([])
   })
 
   it('does not move a target beyond round fourteen to the last round', () => {
     const session = setup(13)
     expect(readCardExtraData(session.state.players[0]!, CARD_ID, 'triggerRound')).toBe(16)
-    expect(session.buildSyncPayload(session.getState(), null).state.players[0]!.scheduledEffects).toEqual([])
+    expect(session.buildSyncPayload(session.getState(), []).state.players[0]!.scheduledEffects).toEqual([])
     expect(mature(session, 13).state.players[0]!.occupationPlayed).toEqual([])
   })
 })

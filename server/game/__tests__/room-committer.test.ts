@@ -176,7 +176,7 @@ describe('RoomCommitter', () => {
       expect(await persistence.loadReplayHead(room.id)).toEqual(header)
       expect(await db.prepare('SELECT state_json FROM rooms WHERE id = ?').get(room.id)).toEqual(before)
       const response = restored.session.getState()
-      expect(restored.session.buildSyncPayload(response, 'p1').state.phase).toBe('draft')
+      expect(restored.session.buildSyncPayload(response, ['p1']).state.phase).toBe('draft')
       const draft = restored.session.state.draft
       if (!draft) throw new Error('Expected migrated draft')
       const actor = draft.seatOrder.find(id => draftSeatProgress(draft, id).kind === 'selecting')
@@ -194,7 +194,7 @@ describe('RoomCommitter', () => {
       if (!after) throw new Error('Expected saved upgraded Room')
       reconnected = snapshotToRoom(after)
       expect(reconnected.session.state.draft).toEqual(restored.session.state.draft)
-      expect(reconnected.session.buildSyncPayload(reconnected.session.getState(), null).state.phase).toBe('draft')
+      expect(reconnected.session.buildSyncPayload(reconnected.session.getState(), []).state.phase).toBe('draft')
       expect(await next.prepareRoom(reconnected, { missingPrefix: true })).toMatchObject({ kind: 'committed', stepNo: 1 })
     } finally {
       initial.shutdown(); next.shutdown()
@@ -537,9 +537,9 @@ describe('RoomCommitter', () => {
       .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
     expect(activeSnapshot.serialized?.frame.players[1]!.minorHand)
       .not.toContain('A001_Shelter')
-    expect(room.session.buildSyncPayload(rejectedDraw, null, 'viewer').privateEvents)
+    expect(room.session.buildSyncPayload(rejectedDraw, [], 'viewer').privateEvents)
       .toBeUndefined()
-    expect(JSON.stringify(room.session.buildSyncPayload(actionResponse, null, 'viewer')))
+    expect(JSON.stringify(room.session.buildSyncPayload(actionResponse, [], 'viewer')))
       .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
 
     const restored = snapshotToRoom(activeSnapshot)

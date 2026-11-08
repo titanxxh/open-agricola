@@ -71,6 +71,42 @@ afterEach(() => {
 })
 
 describe('custom session executor', () => {
+  it('projects multiple visible seats from the worker frame without executing custom rules on the main thread', async () => {
+    const created = createIsolatedGameSession(1598, [card('CUSTOM_VisibleSeats')], { playerCount: 3 })
+    if (!created.executor) throw new Error('Expected an executable session worker')
+    const { session, executor } = created
+    executors.push(executor)
+    session.state.players.forEach((player, index) => {
+      player.occupationHand = ['__test_placeholder__']
+      player.minorHand = [`private-hand-${index + 1}`]
+      player.cardStates.CUSTOM_VisibleSeats = { privateData: { value: index + 1 } }
+    })
+    session.loadState(session.state)
+    const response = await executor.execute('getState', [])
+    expect(response.ok, response.error).toBe(true)
+    const nativeBuild = vi.spyOn(session, 'buildSyncPayload').mockImplementation(() => {
+      throw new Error('Worker projections must use the prepared canonical frame')
+    })
+
+    const payload = buildSessionSyncPayload(session, response, ['p1', 'p2'], 'viewer', true)
+
+    expect(payload.state.players.map(player => player.minorHand)).toEqual([
+      ['private-hand-1'], ['private-hand-2'], ['?'],
+    ])
+    expect(payload.state.players.map(player => player.cardStates)).toEqual([
+      { CUSTOM_VisibleSeats: { privateData: { value: 1 } } },
+      { CUSTOM_VisibleSeats: { privateData: { value: 2 } } },
+      {},
+    ])
+    expect(payload).not.toHaveProperty('cardWarnings')
+    expect(payload.state).not.toHaveProperty('gameSeed')
+    expect(payload.historyWindow).toEqual(buildRoomHistoryPage(
+      executor.serializedStateForPersistence()!.frame, ['p1', 'p2'],
+    ).window)
+    expect(buildSessionSyncPayload(session, response, ['p2', 'p1'], 'viewer', true)).toEqual(payload)
+    expect(nativeBuild).not.toHaveBeenCalled()
+  })
+
   it('validates both worker sessions with their own farm restrictions without changing their snapshots', async () => {
     const make = (locked: boolean) => {
       const prepared = createWorkSession({ configure: state => {
@@ -151,19 +187,19 @@ describe('custom session executor', () => {
       params: { fromPlayer: 'Recorded name', toPlayer: 'Recorded name' } }] })
     await executor.updatePlayerNames([[0, 'Worker actor'], [1, 'Worker recipient']])
     const response = await executor.execute('getState', [])
-    const cached = buildSessionSyncPayload(session, response, 'p1', 'viewer', true)
+    const cached = buildSessionSyncPayload(session, response, ['p1'], 'viewer', true)
     const cachedText = JSON.stringify(cached)
     expect(cached.state.log[0]!.params).toEqual({ fromPlayer: 'Worker actor', toPlayer: 'Worker recipient' })
     const nativeBuild = vi.spyOn(session, 'buildSyncPayload').mockImplementation(() => { throw new Error('Cached Worker payload must not be rebuilt') })
     const room = { id: 'worker-names', session,
       players: [{ ws: new WebSocket(null, undefined, {}), playerIndex: 0, name: 'Room actor' }, { ws: new WebSocket(null, undefined, {}), playerIndex: 1, name: 'Room recipient' }] }
-    const first = buildEnvelope({ room, resp: response, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
+    const first = buildEnvelope({ room, resp: response, visiblePlayerIds: ['p1'], version: 1, cause: 'reconnect', emittedAt: 0 })
     expect(first.payload.state.log[0]!.params).toEqual({ fromPlayer: 'Room actor', toPlayer: 'Room recipient' })
     expect(first.payload.historyWindow).toEqual(cached.historyWindow)
     expect(first.payload.state.players[0]!.minorHand).toEqual(cached.state.players[0]!.minorHand)
     expect(first.payload.state.players[1]!.minorHand).toEqual(cached.state.players[1]!.minorHand)
     expect(JSON.stringify(cached)).toBe(cachedText)
-    expect(buildSessionSyncPayload(session, response, 'p1', 'viewer', true)).toBe(cached)
+    expect(buildSessionSyncPayload(session, response, ['p1'], 'viewer', true)).toBe(cached)
     expect(nativeBuild).not.toHaveBeenCalled()
     expect(executor.serializedStateForPersistence()!.frame.log[0]!.params)
       .toEqual({ fromPlayer: 'Recorded name', toPlayer: 'Recorded name' })
@@ -206,17 +242,17 @@ describe('custom session executor', () => {
       expect((await executor.execute('takeAction', [session.state.currentPlayerIndex, space])).ok).toBe(true)
     }
     const response = await executor.execute('getState', [])
-    const live = buildSessionSyncPayload(session, response, 'p1', 'viewer', true)
+    const live = buildSessionSyncPayload(session, response, ['p1'], 'viewer', true)
     const raw = executor.serializedStateForPersistence()!.frame
     expect(live.historyWindow!.operationGroupIds).toHaveLength(20)
-    const dev = buildSessionSyncPayload(session, response, 'p1', 'dev-viewer', true)
+    const dev = buildSessionSyncPayload(session, response, ['p1'], 'dev-viewer', true)
     expect(dev.historyWindow).toEqual(live.historyWindow)
     expect(dev.state.roundActionOrder).toEqual(raw.roundActionOrder)
     expect(dev.state).not.toHaveProperty('gameSeed')
     expect(raw.events.length).toBeGreaterThan(live.state.events.length)
-    const page = buildRoomHistoryPage(raw, 'p1')
+    const page = buildRoomHistoryPage(raw, ['p1'])
     expect(page.window).toEqual(live.historyWindow)
-    const older = buildRoomHistoryPage(raw, 'p1', page.window.nextCursor!)
+    const older = buildRoomHistoryPage(raw, ['p1'], page.window.nextCursor!)
     expect(older.events.length).toBeGreaterThan(0)
     expect(older.events.length + live.state.events.length).toBe(raw.events.length)
   }, 20_000)
@@ -396,7 +432,7 @@ describe('custom session executor', () => {
     expect(played.ok).toBe(true)
     expect(played.historyLength).toBeGreaterThan(0)
     expect(played.interaction.stateId).toBe('wait')
-    const playedPayload = buildSessionSyncPayload(session, played, null, 'debug')
+    const playedPayload = buildSessionSyncPayload(session, played, [], 'debug')
     playedPayload.privateEvents = [{} as never]
     playedPayload.publicEventCancellations = [{} as never]
 
@@ -411,7 +447,7 @@ describe('custom session executor', () => {
     expect(failed.interaction).toEqual(played.interaction)
     expect(failed.state.players[0]!.minorHand).toContain(playable.cardJson.id)
     expect(session.cardWarnings).toContain('custom session command timed out')
-    const failedPayload = buildSessionSyncPayload(session, failed, null, 'debug')
+    const failedPayload = buildSessionSyncPayload(session, failed, [], 'debug')
     expect(failedPayload).toMatchObject({
       ok: false,
       error: 'custom session command timed out',

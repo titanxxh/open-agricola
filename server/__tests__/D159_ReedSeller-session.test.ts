@@ -59,7 +59,7 @@ describe('D159 Reed Seller', () => {
     expect(response.interaction.playerIndex).toBe(1)
     const buy = response.interaction.request.options.find((option) => option.value === 'buy')!
     expect(buy.disabled).toBe(food < 2)
-    const sync = session.buildSyncPayload(response, response.state.players[1]!.id)
+    const sync = session.buildSyncPayload(response, [response.state.players[1]!.id])
     expect(sync.interaction.playerIndex).toBe(1)
     expect(sync.interaction.request.options.find((option) => option.value === 'buy')).toEqual(buy)
     expect(response.interaction.request.options.find((option) => option.value === 'decline')?.disabled).not.toBe(true)

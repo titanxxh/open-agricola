@@ -151,7 +151,7 @@ describe('C179 committed enclosure facts', () => {
     expect(response.scores?.[0]?.categories.find(category => category.key === 'cattles'))
       .toMatchObject({ quantity: 1, total: 1 })
     for (const viewer of [...response.state.players.map(player => player.id), null]) {
-      expect(session.buildSyncPayload(response, viewer).state.events.filter(event => event.type === 'farm.fenceBuilt'))
+      expect(session.buildSyncPayload(response, viewer === null ? [] : [viewer]).state.events.filter(event => event.type === 'farm.fenceBuilt'))
         .toEqual(fences)
     }
     expect(session.resolveChoice(1, 'confirm').ok).toBe(true)

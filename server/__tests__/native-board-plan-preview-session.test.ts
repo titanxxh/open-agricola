@@ -10,7 +10,7 @@ const open = (options: Parameters<typeof createWorkSession>[0]) => {
 }
 const baseDescription = (session: ReturnType<typeof createWorkSession>, id: string) => {
   const response = session.getState()
-  return session.buildSyncPayload(response, response.state.players[0]!.id).state.actionSpaces
+  return session.buildSyncPayload(response, [response.state.players[0]!.id]).state.actionSpaces
     .find(space => space.id === id)?.baseDescriptionPreview
 }
 

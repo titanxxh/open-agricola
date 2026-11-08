@@ -53,7 +53,7 @@ describe('frontend scenario matrix through the GameSession seam', () => {
       session.loadState(session.state)
 
       const initial = session.getState()
-      const publicInitial = session.buildSyncPayload(initial, null)
+      const publicInitial = session.buildSyncPayload(initial, [])
       const actionIds = publicInitial.state.actionSpaces.map((space) => space.id)
 
       expect(initial.ok).toBe(true)
@@ -72,7 +72,7 @@ describe('frontend scenario matrix through the GameSession seam', () => {
       )
 
       const started = session.takeAction(0, 'farmland')
-      const playerStarted = session.buildSyncPayload(started, initial.state.players[0]!.id)
+      const playerStarted = session.buildSyncPayload(started, [initial.state.players[0]!.id])
 
       expect(started.ok).toBe(true)
       expect(started.interaction.stateId).toBe('wait')
@@ -86,7 +86,7 @@ describe('frontend scenario matrix through the GameSession seam', () => {
       expect(tile).toBeDefined()
 
       const completed = session.commitSelectionChoice(0, { tile })
-      const publicCompleted = session.buildSyncPayload(completed, null)
+      const publicCompleted = session.buildSyncPayload(completed, [])
 
       expect(completed.ok).toBe(true)
       expect(completed.state.players[0]!.fields).toContainEqual({ ...tile, stacks: [] })

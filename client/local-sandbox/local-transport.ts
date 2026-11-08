@@ -73,7 +73,7 @@ export class LocalGameTransport implements GameTransport {
   constructor(config: LocalGameConfig, opts: LocalTransportOptions = {}) {
     this.config = config
     this.opts = opts
-    this.viewer = opts.viewer ?? { viewerPlayerId: null, mode: 'viewer' }
+    this.viewer = opts.viewer ?? { visiblePlayerIds: [], mode: 'viewer' }
   }
 
   /** Spawn the worker and start a fresh game. */

@@ -88,7 +88,7 @@ describe('standard solo Moor supply', () => {
     expect(new Set(cards.map(card => card.id)).size).toBe(10)
     expect(cards.filter(card => card.location.kind === 'solo-current')).toHaveLength(1)
     expect(cards.filter(card => card.location.kind === 'solo-draw')).toHaveLength(9)
-    const visible = session.buildSyncPayload(response, 'p1').state.farmersOfTheMoor!
+    const visible = session.buildSyncPayload(response, ['p1']).state.farmersOfTheMoor!
     expect(visible.specialActionCards).toHaveLength(1)
     expect(visible.soloSupply).toMatchObject({ drawCount: 9, retentionPaid: false })
     const draw = cards.filter(card => card.location.kind === 'solo-draw').sort((a, b) =>
@@ -96,7 +96,7 @@ describe('standard solo Moor supply', () => {
     expect(visible.soloSupply?.nextCardActions).toEqual(draw[0]!.actions)
     const frame = serializeSessionSnapshot(session.state, session).frame
     for (const card of draw) {
-      expect(JSON.stringify(session.buildSyncPayload(response, null))).not.toContain(card.id)
+      expect(JSON.stringify(session.buildSyncPayload(response, []))).not.toContain(card.id)
       expect(JSON.stringify(frameForPerspective(frame, 'p1'))).not.toContain(card.id)
     }
     expect(frameForPerspective(frame, 'open').farmersOfTheMoor!.specialActionCards).toHaveLength(10)
@@ -342,7 +342,7 @@ describe('standard solo Moor supply', () => {
       const orders = hidden.map(card => card.location.kind === 'solo-draw' ? card.location.order : 0).toReversed()
       hidden.forEach((card, index) => { card.location = { kind: 'solo-draw', order: orders[index]! } })
     })
-    for (const viewer of ['p1', null]) expect(first.buildSyncPayload(first.getState(), viewer)).toEqual(second.buildSyncPayload(second.getState(), viewer))
+    for (const viewer of ['p1', null]) expect(first.buildSyncPayload(first.getState(), viewer === null ? [] : [viewer])).toEqual(second.buildSyncPayload(second.getState(), viewer === null ? [] : [viewer]))
     const firstFrame = serializeSessionSnapshot(first.state, first).frame
     const secondFrame = serializeSessionSnapshot(second.state, second).frame
     expect(frameForPerspective(firstFrame, 'p1')).toEqual(frameForPerspective(secondFrame, 'p1'))
@@ -352,10 +352,10 @@ describe('standard solo Moor supply', () => {
       cards.find(card => card.id === H)!.location = { kind: 'solo-draw', order: 1 }
       cards.find(card => card.id === 'moor-special-1-5-6-market-work')!.location = { kind: 'solo-draw', order: 0 }
     })
-    const projected = changedTop.buildSyncPayload(changedTop.getState(), 'p1')
+    const projected = changedTop.buildSyncPayload(changedTop.getState(), ['p1'])
     expect(projected.state.farmersOfTheMoor!.soloSupply!.nextCardActions).toEqual(['black-market', 'illicit-work'])
     projected.state.farmersOfTheMoor!.soloSupply!.nextCardActions = ['fell-trees', 'hiring-fair']
-    expect(projected).toEqual(first.buildSyncPayload(first.getState(), 'p1'))
+    expect(projected).toEqual(first.buildSyncPayload(first.getState(), ['p1']))
   })
 
   it.each([true, false])('settles the improvement and retention before the shared after window, plow first=%s', plowFirst => {

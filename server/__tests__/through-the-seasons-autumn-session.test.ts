@@ -210,7 +210,7 @@ describe('Seasons batch 3 autumn audit', () => {
       const vp = major === 'Major_Fireplace1' || major === 'Major_CookingHearth1' ? 1 : 2
       expect(final.scores![0]!.categories.find((category) => category.key === 'cards')).toMatchObject({ total: vp, entries: [{ type: 'card', cardId: major, cardType: 'major', score: vp }] })
       expect(final.scores!.every((score) => Number.isInteger(score.total))).toBe(true)
-      for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer).scores).toEqual(final.scores)
+      for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer === null ? [] : [viewer]).scores).toEqual(final.scores)
     },
   )
 
@@ -267,7 +267,7 @@ describe('Seasons batch 3 autumn audit', () => {
     expect(final.state.players[0]!.fields[0]!.stacks).toEqual([])
     expect(final.scores![0]!.categories.find((category) => category.key === 'grains')).toMatchObject({ quantity: 2, total: 1 })
     expect(final.scores!.every((score) => Number.isInteger(score.total))).toBe(true)
-    expect(session.buildSyncPayload(final, null).scores).toEqual(final.scores)
+    expect(session.buildSyncPayload(final, []).scores).toEqual(final.scores)
   })
 })
 

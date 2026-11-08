@@ -35,7 +35,7 @@ const stateFor = (
   viewerPlayerId: string | null,
   mode: SyncPayloadMode = 'viewer',
 ): GameSyncPayload['state'] =>
-  session.buildSyncPayload(session.getState(), viewerPlayerId, mode).state
+  session.buildSyncPayload(session.getState(), viewerPlayerId === null ? [] : [viewerPlayerId], mode).state
 
 const step = (session: GameSession, resp: SessionResponse): SessionResponse => {
   if (resp.interaction.stateId === 'wait') {
@@ -78,7 +78,7 @@ describe('game seed and round cards in sync payloads', () => {
     const wide = newSession()
     const wideSeed = wide.state.gameSeed as string
     for (const viewer of [wide.state.players[0]!.id, null]) {
-      const payload = wide.buildSyncPayload(wide.getState(), viewer, 'viewer')
+      const payload = wide.buildSyncPayload(wide.getState(), viewer === null ? [] : [viewer], 'viewer')
       expect(JSON.stringify(payload)).not.toContain(wideSeed)
     }
   })

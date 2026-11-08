@@ -17,8 +17,8 @@ import type { GameCore, SessionResponse } from './session-core.ts'
 import { playingActorIndex, waitingSeatIndexes } from './waiting-seats.ts'
 
 /**
- * `viewer` redacts for one seat or a spectator. `dev-viewer` is the same
- * redaction with the round-card order left visible, for dev-room live sync.
+ * `viewer` redacts for a visible seat collection; an empty collection is a spectator.
+ * `dev-viewer` keeps that redaction with the round-card order left visible.
  * `debug` is the full authoritative state.
  */
 export type SyncPayloadMode = 'viewer' | 'dev-viewer' | 'debug'
@@ -28,7 +28,7 @@ export type HistoryNameProjection = 'session' | 'deferred'
 export function buildSyncPayload(
   core: GameCore,
   resp: SessionResponse,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   mode: SyncPayloadMode = 'viewer',
   serializedState?: SerializedGameState,
   windowed = false,
@@ -41,7 +41,7 @@ export function buildSyncPayload(
   const base: GameSyncPayload = {
     state: mode === 'debug'
       ? canonicalState
-      : filterSerializedStateForPlayer(canonicalState, viewerPlayerId, {
+      : filterSerializedStateForPlayer(canonicalState, visiblePlayerIds, {
         revealRoundCards: mode === 'dev-viewer',
       }),
     interaction: mode === 'debug'
@@ -49,7 +49,7 @@ export function buildSyncPayload(
       : redactInteractionForViewer(
         resp.interaction,
         resp.state.players.map((player) => player.id),
-        viewerPlayerId,
+        visiblePlayerIds,
         resp.state.players[resp.state.currentPlayerIndex]?.id ?? null,
       ),
     scores: resp.scores ?? null,
@@ -59,7 +59,7 @@ export function buildSyncPayload(
     ok: resp.ok,
     actionAvailability: resp.actionAvailability,
     cardAvailability: mode === 'debug' ||
-      viewerPlayerId === resp.state.players[resp.state.currentPlayerIndex]?.id
+      visiblePlayerIds.includes(resp.state.players[resp.state.currentPlayerIndex]?.id ?? '')
       ? resp.cardAvailability
       : undefined,
     error: resp.error,
@@ -79,12 +79,12 @@ export function buildSyncPayload(
   const playerIds = resp.state.players.map((player) => player.id)
   const privateEvents = mode === 'debug'
     ? []
-    : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId, resp.privateEvents ?? [])
+    : privateEventsForViewer(resp.interaction, playerIds, visiblePlayerIds, resp.privateEvents ?? [])
   const publicEventCancellations = mode === 'debug'
     ? resp.publicEventCancellations
     : filterPublicEventCancellationsForPlayer(
       resp.state,
-      viewerPlayerId,
+      visiblePlayerIds,
       ctx,
       resp.publicEventCancellations,
       canonicalState,
@@ -96,7 +96,7 @@ export function buildSyncPayload(
   if (mode === 'debug' && core.cardWarnings.length > 0) {
     base.cardWarnings = [...core.cardWarnings]
   }
-  const payload = windowed && mode !== 'debug' ? applyHistoryWindow(canonicalState, base, viewerPlayerId) : base
+  const payload = windowed && mode !== 'debug' ? applyHistoryWindow(canonicalState, base, visiblePlayerIds) : base
   return mode !== 'debug' && (!windowed || historyNameProjection === 'session')
     ? { ...payload, state: projectHistoryStateNames(payload.state) }
     : payload

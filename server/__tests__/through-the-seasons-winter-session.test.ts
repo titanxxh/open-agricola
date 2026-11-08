@@ -116,7 +116,7 @@ describe('Seasons batch 3 winter audit', () => {
       expect(after.state.gameOver).toBe(true)
       expect(after.scores![0]!.categories.find((category) => category.key === 'farmers')?.total).toBe(9)
       expect(after.scores![0]!.categories.some((category) => category.key === 'parentCards')).toBe(false)
-      expect(session.buildSyncPayload(after, null).scores).toEqual(after.scores)
+      expect(session.buildSyncPayload(after, []).scores).toEqual(after.scores)
     }
   })
 
@@ -247,7 +247,7 @@ describe('Seasons batch 3 winter audit', () => {
     expect(final.state.gameOver).toBe(true)
     expect(final.scores![0]!.categories.find((category) => category.key === 'fields')).toMatchObject({ quantity: 1, total: -1 })
     expect(final.scores!.every((score) => Number.isInteger(score.total))).toBe(true)
-    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer).scores).toEqual(final.scores)
+    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(final, viewer === null ? [] : [viewer]).scores).toEqual(final.scores)
   })
 })
 

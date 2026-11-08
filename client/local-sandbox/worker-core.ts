@@ -205,7 +205,7 @@ export class LocalSandboxCore {
   private respond(resp: SessionResponse, viewer: ViewerSpec): LocalSandboxResult {
     const core = this.requireCore()
     return {
-      payload: buildSyncPayload(core, resp, viewer.viewerPlayerId, viewer.mode),
+      payload: buildSyncPayload(core, resp, viewer.visiblePlayerIds, viewer.mode),
       persist: {
         schemaVersion: LOCAL_SANDBOX_SCHEMA_VERSION,
         config: this.config!,

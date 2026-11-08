@@ -269,7 +269,7 @@ const auditAssertCompleted = (session: GameSession, father: FatherParentCardId, 
   expect(response.state.events.filter((event) => event.type === 'card.infoboxChanged' && event.cardId === father))
     .toEqual([expect.objectContaining({ actorPlayerId: 'p1', targetPlayerId: 'p1', text: 'Completed' })])
   for (const viewer of ['p1', 'p2', null]) {
-    const payload = session.buildSyncPayload(response, viewer)
+    const payload = session.buildSyncPayload(response, viewer === null ? [] : [viewer])
     expect(payload.state.players[0]!.cardStatePresentation[father]).toMatchObject({ infobox: 'Completed', completedTier: tier })
     expect(payload.state.players[0]!.cardStates[father]).toBeUndefined()
     expect(payload.scores![0]!.categories.find((category) => category.key === 'parentCards')?.entries).toEqual([{ type: 'parentCard', cardId: 'PR10', score: 0.7 }])
@@ -302,7 +302,7 @@ const auditFinish = (session: GameSession) => {
   expect(response.interaction.stateId).toBe('gameover')
   expect(response.scores![0]!.categories.find((category) => category.key === 'parentCards')?.entries).toEqual([{ type: 'parentCard', cardId: 'PR10', score: 0.7 }])
   expect(response.scores![0]!.total).toBeCloseTo(response.scores![0]!.categories.reduce((sum, category) => sum + category.total, 0))
-  expect(session.buildSyncPayload(response, null).scores).toEqual(response.scores)
+  expect(session.buildSyncPayload(response, []).scores).toEqual(response.scores)
 }
 
 describe('Parents batch 2 father printed-rule audit', () => {
@@ -446,7 +446,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
       expect(session.resolveOrdinaryCardDrawChoice(0, choice.id, 'not-a-candidate').ok).toBe(false)
       expect(auditClone(session.state)).toEqual(before)
       for (const viewer of ['p1', 'p2', null]) {
-        const payload = session.buildSyncPayload(session.getState(), viewer)
+        const payload = session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer])
         if (viewer === 'p1') expect(payload.state.ordinaryCardDrawChoices[choice.id]!.candidates).toEqual(choice.candidates)
         else for (const candidate of choice.candidates) expect(JSON.stringify(payload)).not.toContain(candidate)
       }
@@ -455,7 +455,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
       const hand = choice.cardType === 'minor' ? response.state.players[0]!.minorHand : response.state.players[0]!.occupationHand
       expect(hand).toEqual(['__test_placeholder__', choice.candidates[1]])
       expect(response.state.ordinaryCardDecks[choice.cardType]).toEqual((choice.cardType === 'minor' ? auditMinorDeck : auditOccDeck).slice(3))
-      for (const viewer of ['p2', null]) for (const candidate of choice.candidates) expect(JSON.stringify(session.buildSyncPayload(response, viewer))).not.toContain(candidate)
+      for (const viewer of ['p2', null]) for (const candidate of choice.candidates) expect(JSON.stringify(session.buildSyncPayload(response, viewer === null ? [] : [viewer]))).not.toContain(candidate)
       const selected = auditClone(session.state)
       expect(session.resolveOrdinaryCardDrawChoice(0, choice.id, choice.candidates[0]!).ok).toBe(false)
       expect(auditClone(session.state)).toEqual(selected)
@@ -482,7 +482,7 @@ describe('Parents batch 2 father interaction boundaries', () => {
       for (const choice of choices) {
         expect(choice.candidates).toEqual(before.ordinaryCardDecks[choice.cardType].slice(0, 3))
         for (const viewer of ['p1', 'p2', null]) {
-          const payload = session.buildSyncPayload(session.getState(), viewer)
+          const payload = session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer])
           if (viewer === 'p1') expect(payload.state.ordinaryCardDrawChoices[choice.id]!.candidates).toEqual(choice.candidates)
           else for (const candidate of choice.candidates) expect(JSON.stringify(payload)).not.toContain(candidate)
         }

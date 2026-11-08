@@ -175,7 +175,7 @@ const useTransportSetup = (
     const store = openLocalGameStore(ownerKey)
     const saver = createDebouncedSaver(store)
     const transport = new LocalGameTransport(config, {
-      viewer: { viewerPlayerId: null, mode: 'debug' },
+      viewer: { visiblePlayerIds: [], mode: 'debug' },
       onPersist: saver.push,
       onRecovered: () => { window.alert(t(locale, 'platform.localSandboxTimeout')) },
     })

@@ -159,7 +159,7 @@ describe('A040 host action geometry', () => {
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.players[1]).toEqual(initial.players[1])
     for (const viewer of [response.state.players[0]!.id, response.state.players[1]!.id, null]) {
-      expect(session.buildSyncPayload(response, viewer).state.events.filter(event => event.type === 'farm.fenceBuilt')).toEqual(mutations)
+      expect(session.buildSyncPayload(response, viewer === null ? [] : [viewer]).state.events.filter(event => event.type === 'farm.fenceBuilt')).toEqual(mutations)
     }
     const completed = JSON.parse(JSON.stringify(response.state))
     const replayEnd = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session).frame))

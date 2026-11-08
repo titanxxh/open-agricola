@@ -1171,7 +1171,7 @@ async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     const canonical = room.customSessionExecutor?.serializedStateForPersistence()?.frame
       ?? room.session.withCtx(() => serializeState(room.session.state, { actionHooks: room.session.actionHooks }))
     const viewerPlayerId = isRoomSpectator(room, ctx.ws) ? null : room.session.state.players[ctx.currentPlayerIndex]?.id ?? null
-    const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), viewerPlayerId, msg.cursor)
+    const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), viewerPlayerId === null ? [] : [viewerPlayerId], msg.cursor)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, { type: 'historyPage', roomId: room.id, requestId: msg.requestId, page })
   } catch (error) {
     sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, error instanceof HistoryProjectionChangedError ? 'history_projection_changed' : error instanceof HistoryBranchChangedError ? 'history_branch_changed' : undefined)

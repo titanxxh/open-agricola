@@ -81,7 +81,7 @@ describe('complete activated schedule collection through fresh two-player sessio
       ['A081_InterimStorage', 7, 'onRoundStart'], ['E140_Carter', 7, 'afterCollect'], ['E028_Bookmark', 9, 'onRoundStart'],
     ])
     expect(plans[1]?.description).toMatchObject({ effectPreview: { kind: 'ruleOperation', operation: { kind: 'gain-per-building-resource-collected', resource: 'food', perBuildingResource: 1 } } })
-    const spectator = session.withCtx(() => serializeStateForPlayer(session.state, null, { actionHooks: session.actionHooks }))
+    const spectator = session.withCtx(() => serializeStateForPlayer(session.state, [], { actionHooks: session.actionHooks }))
     expect(spectator.players[0]!.scheduledEffects).toEqual(plans)
     expect(JSON.stringify(spectator.players[0]!.scheduledEffects)).not.toContain('__private_occupation__')
     expect(JSON.stringify(session.state)).toBe(before)

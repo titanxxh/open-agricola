@@ -19,7 +19,7 @@ import {
   type SyncPayloadMode,
 } from './authoritative-session.ts'
 import type { StateWithCursor } from '../../shared/session/session-core.ts'
-import type { HistoryNameProjection } from '../../shared/session/sync-payload.ts'
+import { buildSyncPayload, type HistoryNameProjection } from '../../shared/session/sync-payload.ts'
 
 const WORKER_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -105,19 +105,22 @@ const payloadsByResponse = new WeakMap<SessionResponse, WorkerPayloads>()
 export const buildSessionSyncPayload = (
   session: GameSession,
   response: SessionResponse,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   mode: SyncPayloadMode = 'viewer',
   windowed = false,
   historyNameProjection: HistoryNameProjection = 'session',
 ): GameSyncPayload => {
   const payloads = payloadsByResponse.get(response)
   if (!payloads) {
-    return session.buildSyncPayload(response, viewerPlayerId, mode, undefined, windowed, historyNameProjection)
+    return session.buildSyncPayload(response, visiblePlayerIds, mode, undefined, windowed, historyNameProjection)
   }
   // Worker payloads already contain Session names; keep their prepared privacy projections.
   if (mode === 'debug') return payloads.debug
+  const viewers = [...new Set(visiblePlayerIds)]
+  if (viewers.length > 1) return buildSyncPayload(session, response, viewers, mode, payloads.debug.state, windowed, historyNameProjection)
   const source = windowed ? payloads.windows : payloads
-  const viewer = viewerPlayerId ? source.viewers[viewerPlayerId] ?? source.spectator : source.spectator
+  const viewerId = viewers[0]
+  const viewer = viewerId ? source.viewers[viewerId] ?? source.spectator : source.spectator
   if (mode !== 'dev-viewer') return viewer
   // Dev rooms reveal Round Cards while keeping the seed private and history windowed.
   return {

@@ -43,7 +43,7 @@ describe('deferred rule quantities', () => {
     if (!response.state.players[0]!.minorPlayed.includes(CARD_ID)) response = session.resolveChoice(0, CARD_ID)
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, stone: 0 })
-    const previews = session.buildSyncPayload(response, null).state.players[0]!.scheduledEffects
+    const previews = session.buildSyncPayload(response, []).state.players[0]!.scheduledEffects
     expect(previews.map(entry => entry.round)).toEqual([8, 10, 12])
     expect(previews[0]).toMatchObject({ timing: 'onAfterRoundEnd', description: { effectPreview: { kind: 'formulaGain', resources: {
       stone: { kind: 'fields', crop: 'vegetable' }, wood: { kind: 'supply', resource: 'vegetable' },
@@ -62,6 +62,6 @@ describe('deferred rule quantities', () => {
       expect(response.state.events.some(event => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)).toBe(true)
       expect(response.scores?.[0]).toBeDefined()
     }
-    expect(session.buildSyncPayload(response, null).state.players[0]!.scheduledEffects).toEqual([])
+    expect(session.buildSyncPayload(response, []).state.players[0]!.scheduledEffects).toEqual([])
   })
 })

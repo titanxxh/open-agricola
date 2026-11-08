@@ -57,7 +57,7 @@ describe('LocalGameTransport', () => {
   })
 
   it('quotes a fence draft through the worker without publishing or persisting a new snapshot', async () => {
-    const transport = new LocalGameTransport(CONFIG, { workerFactory: () => new FakeWorker(), viewer: { viewerPlayerId: 'p1', mode: 'viewer' } })
+    const transport = new LocalGameTransport(CONFIG, { workerFactory: () => new FakeWorker(), viewer: { visiblePlayerIds: ['p1'], mode: 'viewer' } })
     const snapshots: GameSyncPayload[] = []
     transport.onSnapshot(payload => snapshots.push(payload))
     try {

@@ -82,15 +82,15 @@ export const interactionRecipientPlayerId = (
 export const redactInteractionForViewer = (
   interaction: InteractionState,
   playerIds: readonly string[],
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   idleRecipientPlayerId: string | null = null,
 ): ClientInteractionState => {
-  if (interaction.stateId === 'idle') return idleRecipientPlayerId !== null && idleRecipientPlayerId === viewerPlayerId
+  if (interaction.stateId === 'idle') return idleRecipientPlayerId !== null && visiblePlayerIds.includes(idleRecipientPlayerId)
     ? interaction : { ...interaction, allowedCommands: [], anytimeActions: [] }
   if (interaction.stateId !== 'wait') return interaction
   const recipient = interactionRecipientPlayerId(interaction, playerIds)
-  if (recipient !== null && recipient === viewerPlayerId) return interaction
-  if (recipient === null) return viewerPlayerId === null
+  if (recipient !== null && visiblePlayerIds.includes(recipient)) return interaction
+  if (recipient === null) return visiblePlayerIds.length === 0
     ? { stateId: 'idle', allowedCommands: [], anytimeActions: [] } : interaction
   return {
     stateId: 'wait',

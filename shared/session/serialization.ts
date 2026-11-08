@@ -279,21 +279,21 @@ export const serializeSessionSnapshot = (
 
 export const filterPublicEventCancellationsForPlayer = (
   state: GameState,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   ctx: SerializeStateContext,
   cancellations: readonly PublicEventCancellation[] | undefined,
   serializedState?: SerializedGameState,
 ): PublicEventCancellation[] | undefined =>
   cancellations?.length
-    ? filterSerializedCancellationsForPlayer(serializedState ?? serializeState(state, ctx), viewerPlayerId, cancellations)
+    ? filterSerializedCancellationsForPlayer(serializedState ?? serializeState(state, ctx), visiblePlayerIds, cancellations)
     : undefined
 
 export const serializeStateForPlayer = (
   state: GameState,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   ctx: SerializeStateContext,
 ): SerializedGameState =>
-  filterSerializedStateForPlayer(serializeState(state, ctx), viewerPlayerId)
+  filterSerializedStateForPlayer(serializeState(state, ctx), visiblePlayerIds)
 
 export const rebuildActiveModifiers = (state: GameState): GameState => {
   state.players.forEach((player) => {

@@ -30,11 +30,11 @@ const setup = () => {
   }
   const raw = () => session.withCtx(() => serializeState(session.state, {}))
   const props = (viewer = 'p1') => {
-    const payload = session.buildSyncPayload(session.getState(), viewer, 'player', undefined, true)
+    const payload = session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer], 'player', undefined, true)
     return { state: rehydrateStateForClient(payload.state), window: payload.historyWindow }
   }
   const transport = new WsGameTransport('ws://localhost/test-history', 'p1')
-  const getHistory = vi.spyOn(transport, 'getHistory').mockImplementation(async cursor => buildRoomHistoryPage(raw(), 'p1', cursor))
+  const getHistory = vi.spyOn(transport, 'getHistory').mockImplementation(async cursor => buildRoomHistoryPage(raw(), ['p1'], cursor))
   append(28)
   return { session, append, raw, props, transport, getHistory }
 }
@@ -43,7 +43,7 @@ describe('loaded Room history', () => {
   it('returns complete HTTP/debug history without a window or render-loop cache updates', () => {
     const fixture = setup()
     try {
-      const state = rehydrateStateForClient(fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state)
+      const state = rehydrateStateForClient(fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state)
       const { result } = renderHook(() => useRoomHistory(fixture.transport, state, undefined))
       expect(result.current.log).toBe(state.log)
       expect(result.current.events).toBe(state.events)
@@ -63,7 +63,7 @@ describe('loaded Room history', () => {
       expect(result.current.resetNotice).toBe(false)
       expect(result.current.canLoadOlder).toBe(false)
       expect(result.current.log.map(entry => entry.sourceEvent?.occurrenceId)).toEqual(expect.arrayContaining(beforeIds))
-      const full = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+      const full = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
       expect(result.current.log).toEqual(full.log)
       expect(result.current.events).toEqual(full.events)
       expect(result.current.publicEventArchive).toEqual(full.publicEventArchive)
@@ -81,7 +81,7 @@ describe('loaded Room history', () => {
       expect(result.current.events.map(event => event.occurrenceId)).toEqual(expect.arrayContaining(oldIds))
       expect(result.current.canLoadOlder).toBe(true)
       while (result.current.canLoadOlder) await act(() => result.current.loadOlder())
-      const full = fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state
+      const full = fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state
       expect(result.current.log).toEqual(full.log)
       expect(result.current.events).toEqual(full.events)
       expect(result.current.publicEventArchive).toEqual(full.publicEventArchive)
@@ -94,7 +94,7 @@ describe('loaded Room history', () => {
     let resolve!: (page: RoomHistoryPage) => void
     fixture.getHistory.mockImplementationOnce(() => new Promise(done => { resolve = done }))
     const oldProps = fixture.props()
-    const page = buildRoomHistoryPage(fixture.raw(), 'p1', oldProps.window!.nextCursor!)
+    const page = buildRoomHistoryPage(fixture.raw(), ['p1'], oldProps.window!.nextCursor!)
     const { result, rerender } = renderHook(props => useRoomHistory(fixture.transport, props.state, props.window), { initialProps: oldProps })
     try {
       let request!: Promise<void>
@@ -103,7 +103,7 @@ describe('loaded Room history', () => {
       act(() => rerender(fixture.props()))
       await act(async () => { resolve(page); await request })
       expect(result.current.resetNotice).toBe(false)
-      expect(result.current.log).toEqual(fixture.session.buildSyncPayload(fixture.session.getState(), 'p1').state.log)
+      expect(result.current.log).toEqual(fixture.session.buildSyncPayload(fixture.session.getState(), ['p1']).state.log)
       expect(new Set(result.current.events.map(event => event.occurrenceId)).size).toBe(result.current.events.length)
     } finally { fixture.session.dispose() }
   })
@@ -134,7 +134,7 @@ describe('loaded Room history', () => {
     expect(later.window!.branchId).toBe(earlierProps.window!.branchId)
     let resolve!: (page: RoomHistoryPage) => void
     fixture.getHistory.mockImplementationOnce(() => new Promise(done => { resolve = done }))
-    const page = buildRoomHistoryPage(fixture.raw(), 'p1', later.window!.nextCursor!)
+    const page = buildRoomHistoryPage(fixture.raw(), ['p1'], later.window!.nextCursor!)
     const { result, rerender } = renderHook(props => useRoomHistory(fixture.transport, props.state, props.window), { initialProps: later })
     try {
       let request!: Promise<void>
@@ -155,7 +155,7 @@ describe('loaded Room history', () => {
     let resolve!: (page: RoomHistoryPage) => void
     fixture.getHistory.mockImplementationOnce(() => new Promise(done => { resolve = done }))
     const initial = fixture.props()
-    const page = buildRoomHistoryPage(fixture.raw(), 'p1', initial.window!.nextCursor!)
+    const page = buildRoomHistoryPage(fixture.raw(), ['p1'], initial.window!.nextCursor!)
     const { result, rerender } = renderHook(props => useRoomHistory(fixture.transport, props.state, props.window), { initialProps: initial })
     try {
       let request!: Promise<void>

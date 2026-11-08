@@ -52,7 +52,7 @@ describe('authoritative base rules and current actor prices', () => {
     const before = JSON.stringify(session.state)
     for (let read = 0; read < 3; read++) {
       const response = session.getState()
-      const publicState = session.buildSyncPayload(response, response.state.players[1]!.id).state
+      const publicState = session.buildSyncPayload(response, [response.state.players[1]!.id]).state
       expect(publicState.actionSpaces.find(space => space.id === 'lessons-4')?.baseDescriptionPreview)
         .toMatchObject({ effectPreview: { kind: 'occupationFees', food: [1, 1, 2] } })
     }
@@ -75,7 +75,7 @@ describe('authoritative base rules and current actor prices', () => {
     } })
     sessions.push(session)
     const response = session.getState()
-    const base = response.state.players.map(player => session.buildSyncPayload(response, player.id).state.actionSpaces.find(space => space.id === 'farm-expansion')?.baseDescriptionPreview)
+    const base = response.state.players.map(player => session.buildSyncPayload(response, [player.id]).state.actionSpaces.find(space => space.id === 'farm-expansion')?.baseDescriptionPreview)
     expect(base[0]).toEqual(base[1])
     expect(base[0]).toMatchObject({ kind: 'group', operator: 'or' })
     if (base[0]?.kind !== 'group') throw new Error('Missing Farm Expansion alternatives')

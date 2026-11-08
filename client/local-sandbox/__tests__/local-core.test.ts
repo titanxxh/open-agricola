@@ -9,7 +9,7 @@ import {
 import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
 import '../../../shared/cards/B/B178_TagAlong'
 
-const DEBUG_VIEWER: ViewerSpec = { viewerPlayerId: null, mode: 'debug' }
+const DEBUG_VIEWER: ViewerSpec = { visiblePlayerIds: [], mode: 'debug' }
 
 const LOCAL_CARD_SOURCE = `
 const CARD_ID = 'CUSTOM_LocalCard'

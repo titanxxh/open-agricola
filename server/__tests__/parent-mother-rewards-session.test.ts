@@ -445,7 +445,7 @@ describe('Parents batch 1 mother printed-rule audit', () => {
     expect(response.scores![1]!.total).toBeCloseTo(base + opponentScore)
     expect(response.interaction.winners).toEqual([score > opponentScore ? 'p1' : 'p2'])
     expect(session.getState().scores).toEqual(response.scores)
-    expect(session.buildSyncPayload(response, null).scores).toEqual(response.scores)
+    expect(session.buildSyncPayload(response, []).scores).toEqual(response.scores)
   })
 
   it.each([['PR01', 2, -0.75], ['PR02', 12, -0.25]] as const)('%s keeps its printed end score even after declining its reward', (cardId, round, score) => {

@@ -289,7 +289,7 @@ const respondWith = (
     gameInstanceIds.set(session, gameInstanceId)
   }
   return {
-    ...buildSessionSyncPayload(session, resp, viewerPlayerId, viewerPlayerId === null ? 'debug' : 'viewer'),
+    ...buildSessionSyncPayload(session, resp, viewerPlayerId === null ? [] : [viewerPlayerId], viewerPlayerId === null ? 'debug' : 'viewer'),
     gameInstanceId,
   }
 }

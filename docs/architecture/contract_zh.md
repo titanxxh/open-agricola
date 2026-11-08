@@ -67,13 +67,13 @@
 - `publicEventArchive` 是只追加的 metadata：`publicEvents.committed` 与 `publicEvents.canceled` 包，写入前校验。规则和 listener 从不读取它。运行时 `publicEventCancellations` 只是恢复响应的 metadata，与归档一样按视角过滤和重映射；重连与 `getState` 从不重放它们。
 - 只有 `visibility: 'public'` 的事件进入 `GameState.events`。`privateEvents` 是按视角同步私有提示和手牌 / 选秀变化的层，从不进入 Replay 或规则。
 
-**种子与视角投影。** Game Seed 只在服务端可见（[ADR 0020](../adr/0020-game-seed-is-server-private-and-unguessable.md)）；`shared/utils/rng.ts` 负责宽种子与指定种子。`filterSerializedStateForPlayer` 对所有视角删除 `gameSeed`，并把每张未翻开的轮次卡返回为 `null`，包括 `roundActionOrder` 和安排在该卡上的货物的 `actionId`（卡牌效果可通过公开的 `action.revealed` 事件提前翻开）。实时同步、Bug Report 证据与 Replay 座位视角共用此投影。开发房间的 `dev-viewer` 同步保留轮次卡顺序，但仍删除种子；`debug` 是热座房间和开发房间未遮蔽读取用的完整状态。
+**种子与视角投影。** Game Seed 只在服务端可见（[ADR 0020](../adr/0020-game-seed-is-server-private-and-unguessable.md)）；`shared/utils/rng.ts` 负责宽种子与指定种子。`filterSerializedStateForPlayer` 接收 `visiblePlayerIds: readonly string[]`，空集合表示观众。只有集合内座位的手牌、声明为私有的卡牌状态、当前轮抽包、父母卡选择和私有抽牌候选可见。它对所有视角删除 `gameSeed`，并把每张未翻开的轮次卡返回为 `null`，包括 `roundActionOrder` 和安排在该卡上的货物的 `actionId`（卡牌效果可通过公开的 `action.revealed` 事件提前翻开）。实时同步、Bug Report 证据与 Replay 座位视角共用此投影。开发房间的 `dev-viewer` 同步保留轮次卡顺序，但仍删除种子；`debug` 是热座房间和开发房间未遮蔽读取用的完整状态。
 
 **持久化形状。** `SerializedGameState` 是公开的网络与 Replay 表示，其 `engineStack` 永远为空。`PersistedSessionSnapshot` 保存权威 `state`、公开 `frame` 和服务端私有的 `sessionCursor`（引擎恢复数据、历史、暂定续行 metadata），后者从不发给任何视角。同步版本和连接不属于 `GameState`。
 
 **Played Card Chronology。** 快照玩家通过 `playedCardChronology` 按展示顺序提供带类型的卡牌 key。序列化在应用 History Window 之前，从完整有效的 `card.played` 和 `card.swappedWithBoard` 历史提取当前在场牌最近一次入场。是否在场以当前已打出区为准；牌上状态变化与能力触发不改变顺序。实时各视角和 Replay Board 读取同一投影。权威 rehydration 移除该字段，撤销与恢复后从有效历史重新生成。开发或测试预置且没有入场事件的牌保留在未定时前缀中，该前缀不能证明时间顺序。父母卡保持独立区域。测试：`server/__tests__/played-card-chronology-session.test.ts`、`e2e-tests/played-card-chronology.spec.ts`。
 
-测试：`shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`、`shared/session/__tests__/{serialization-filter,serialization-archive-projection}.test.ts`。
+测试：`shared/events/__tests__/{event-mapping-policy,log-mapper}.test.ts`、`shared/session/__tests__/{serialization-filter,serialization-visible-seats,serialization-archive-projection}.test.ts`。
 
 ## PlayerState 按职责划分
 
@@ -180,7 +180,7 @@ type GameSyncPayload = {
 
 - `stateUpdate`、`roomWaiting`、`gameStarted`、`playerJoined`、`playerDisconnected` 与 `roomDissolved` 是广播；`roomCreated`、`roomJoined`、`authOk` 与请求错误是单播。
 - `error.code='room_capacity_reached'` 后使用 WebSocket close 1013，让客户端重新发现容量后再重试已过期或不可用的准入。
-- 每个广播都按连接的 `viewerPlayerId` 构造：目标玩家收到真实私有提示与 `privateEvents`，其他人收到 `private-prompt` 遮蔽。不带 `X-Viewer-Player` 的 HTTP 沙盒保留不过滤的开发流程；带上它时使用相同的视角过滤与座位守卫。
+- 每个广播的状态、私有提示、`privateEvents`、卡牌可用性和事件撤销使用同一组可见座位。提示的接收者在集合内时可见，其他视角收到 `private-prompt` 遮蔽。历史游标绑定到可见集合，与集合顺序无关。不带 `X-Viewer-Player` 的 HTTP 沙盒保留不过滤的开发流程；带上它时使用相同的视角过滤与座位守卫。
 - `cardWarnings` 只出现在 HTTP 调试与沙盒 payload。HTTP 信封携带 `gameInstanceId`，加载状态后轮换；它既不是授权也不是模型输入。
 - `waitingSeatIndexes` 是权威 Waiting Seat 投影，独立于视角和 Interaction Player。大厅 `MyActiveRoom` 以 `waiting_player_indexes` 暴露相同座位，并携带布尔值 `hotseat`；这些字段驱动标题提醒，不授予命令权限。见 [session](session.md#unified-sessionresponse)。
 - 托管写入携带 `commandContext`（scope、稳定命令 ID、Room ID、期望的已提交版本）；同时进行的选秀与父母选择共用一个 input-window ID。路由先解析持久回执再判断新鲜度，拒绝同一身份下内容不同的命令，并把结果随 Room transaction 持久化。回执只含结果标识与哈希，仅对其发起者可见。`requestId` 只关联一次交换。

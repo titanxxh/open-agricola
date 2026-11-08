@@ -515,7 +515,7 @@ describe('hotseat public farm browsing', () => {
     try {
       const response = session.takeAction(0, 'grain-utilization')
       expect(response.ok, response.error).toBe(true)
-      GameSocket.payload = session.buildSyncPayload(response, null, 'debug')
+      GameSocket.payload = session.buildSyncPayload(response, [], 'debug')
       const user = userEvent.setup()
       const { container } = renderGame()
       await confirmAlice(user)

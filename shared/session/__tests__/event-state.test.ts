@@ -525,11 +525,11 @@ describe('event state bootstrap', () => {
     const p1 = state.players[0]!.id
     const p2 = state.players[1]!.id
 
-    expect(serializeStateForPlayer(state, p1, { engineStack: new EngineStack() }).publicEventArchive)
+    expect(serializeStateForPlayer(state, [p1], { engineStack: new EngineStack() }).publicEventArchive)
       .toEqual(state.publicEventArchive)
-    expect(serializeStateForPlayer(state, p2, { engineStack: new EngineStack() }).publicEventArchive)
+    expect(serializeStateForPlayer(state, [p2], { engineStack: new EngineStack() }).publicEventArchive)
       .toEqual(state.publicEventArchive)
-    expect(serializeStateForPlayer(state, null, { engineStack: new EngineStack() }).publicEventArchive)
+    expect(serializeStateForPlayer(state, [], { engineStack: new EngineStack() }).publicEventArchive)
       .toEqual(state.publicEventArchive)
   })
 

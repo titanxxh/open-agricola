@@ -20,18 +20,18 @@ describe('GameSession.buildSyncPayload', () => {
         stateId: 'wait', playerIndex: 0,
         request: { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 },
       })
-      expect(session.buildSyncPayload(handoff, session.state.players[0]!.id).waitingSeatIndexes).toEqual([0])
+      expect(session.buildSyncPayload(handoff, [session.state.players[0]!.id]).waitingSeatIndexes).toEqual([0])
       const reaction = session.resolveChoice(0, 'confirm')
       expect(reaction.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1 })
       expect(reaction.state.currentPlayerIndex).toBe(0)
-      expect(session.buildSyncPayload(reaction, session.state.players[1]!.id).waitingSeatIndexes).toEqual([0])
+      expect(session.buildSyncPayload(reaction, [session.state.players[1]!.id]).waitingSeatIndexes).toEqual([0])
       const returning = session.resolveChoice(1, '__skip__')
       expect(returning.interaction).toMatchObject({
         stateId: 'wait', playerIndex: 1,
         request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 },
       })
       for (const viewer of session.state.players) {
-        expect(session.buildSyncPayload(returning, viewer.id).waitingSeatIndexes).toEqual([1])
+        expect(session.buildSyncPayload(returning, [viewer.id]).waitingSeatIndexes).toEqual([1])
       }
     } finally { session.dispose() }
   })
@@ -42,7 +42,7 @@ describe('GameSession.buildSyncPayload', () => {
       session.state.phase = 'playing'
       session.state.gameOver = false
       session.state.currentPlayerIndex = 1
-      expect(session.buildSyncPayload(session.getState(), session.state.players[1]!.id).waitingSeatIndexes).toEqual([1])
+      expect(session.buildSyncPayload(session.getState(), [session.state.players[1]!.id]).waitingSeatIndexes).toEqual([1])
     } finally { session.dispose() }
   })
 
@@ -62,13 +62,13 @@ describe('GameSession.buildSyncPayload', () => {
       }))
     }
     try {
-      const payload = first.buildSyncPayload(first.getState(), 'p1')
+      const payload = first.buildSyncPayload(first.getState(), ['p1'])
       const frame = serializeSessionSnapshot(first.state, first).frame
       expect(payload.state.players[0]!.playerPanelSummary.housingCapacity.value).toBe(first.state.players[0]!.rooms + 1)
       expect(payload.state.players[0]!.lockedFarmTileKeys).toEqual(['1-1'])
       expect(frame.players[0]!.playerPanelSummary).toEqual(payload.state.players[0]!.playerPanelSummary)
       expect(frame.players[0]!.lockedFarmTileKeys).toEqual(['1-1'])
-      expect(second.buildSyncPayload(second.getState(), 'p1').state.players[0]!.lockedFarmTileKeys).toEqual(['1-3'])
+      expect(second.buildSyncPayload(second.getState(), ['p1']).state.players[0]!.lockedFarmTileKeys).toEqual(['1-3'])
       const restored = rehydrateState(JSON.parse(JSON.stringify(frame)))
       expect(restored.state.players[0]).not.toHaveProperty('playerPanelSummary')
       expect(restored.state.players[0]).not.toHaveProperty('lockedFarmTileKeys')
@@ -91,9 +91,9 @@ describe('GameSession.buildSyncPayload', () => {
       const player = session.state.players[0]!
       const card = session.state.farmersOfTheMoor!.specialActionCards.find(card => card.actions.includes('horse-market'))!
       card.location = { kind: 'market' }
-      const available = () => session.buildSyncPayload(session.getState(), player.id).state.players[0]!.moorSpecialActionAvailability[card.id]!['horse-market']
+      const available = () => session.buildSyncPayload(session.getState(), [player.id]).state.players[0]!.moorSpecialActionAvailability[card.id]!['horse-market']
       player.resources.food = 0
-      expect(session.buildSyncPayload(session.getState(), player.id).state.players[0]!.moorSpecialActionAvailability[card.id]!.cardUsable).toBe(true)
+      expect(session.buildSyncPayload(session.getState(), [player.id]).state.players[0]!.moorSpecialActionAvailability[card.id]!.cardUsable).toBe(true)
       expect(available()).toBe(false)
       player.resources.food = 1
       expect(available()).toBe(true)
@@ -107,7 +107,7 @@ describe('GameSession.buildSyncPayload', () => {
       player.resources.food = 3
       expect(available()).toBe(true)
       card.location = { kind: 'playerFaceUp', playerId: player.id }
-      expect(session.buildSyncPayload(session.getState(), player.id).state.players[0]!.moorSpecialActionAvailability[card.id]!.cardUsable).toBe(false)
+      expect(session.buildSyncPayload(session.getState(), [player.id]).state.players[0]!.moorSpecialActionAvailability[card.id]!.cardUsable).toBe(false)
       expect(available()).toBe(false)
       card.location = { kind: 'market' }
       session.state.currentPlayerIndex = 1
@@ -138,9 +138,9 @@ describe('GameSession.buildSyncPayload', () => {
       },
     }
 
-    const spectator = session.buildSyncPayload(waitResp, null, 'viewer')
-    const debug = session.buildSyncPayload(waitResp, null, 'debug')
-    const player = session.buildSyncPayload(waitResp, p0.id, 'viewer')
+    const spectator = session.buildSyncPayload(waitResp, [], 'viewer')
+    const debug = session.buildSyncPayload(waitResp, [], 'debug')
+    const player = session.buildSyncPayload(waitResp, [p0.id], 'viewer')
 
     expect(spectator.interaction.stateId === 'wait' && spectator.interaction.request.kind).toBe('private-prompt')
     expect(spectator.privateEvents ?? []).toEqual([])
@@ -159,7 +159,7 @@ describe('GameSession.buildSyncPayload', () => {
         sourceCard: 'E078_SleightofHand',
       }),
     ])
-    expect(session.buildSyncPayload(waitResp, p0.id, 'viewer')).toEqual(player)
+    expect(session.buildSyncPayload(waitResp, [p0.id], 'viewer')).toEqual(player)
   })
 
   it('includes custom-card runtime warnings only in HTTP debug payloads', () => {
@@ -167,9 +167,9 @@ describe('GameSession.buildSyncPayload', () => {
     session.cardWarnings.push('runtime hook failed')
     const resp = session.withCtx(() => session.getState())
 
-    expect(session.buildSyncPayload(resp, null, 'debug').cardWarnings)
+    expect(session.buildSyncPayload(resp, [], 'debug').cardWarnings)
       .toEqual(['runtime hook failed'])
-    expect(session.buildSyncPayload(resp, null, 'viewer').cardWarnings)
+    expect(session.buildSyncPayload(resp, [], 'viewer').cardWarnings)
       .toBeUndefined()
   })
 
@@ -191,10 +191,10 @@ describe('GameSession.buildSyncPayload', () => {
       const serialized = serializeState(response.state, { engineStack: session.getEngineStack() })
       const canonicalHookCalls = hookCalls
 
-      session.buildSyncPayload(response, null, 'debug', serialized)
-      session.buildSyncPayload(response, null, 'viewer', serialized)
+      session.buildSyncPayload(response, [], 'debug', serialized)
+      session.buildSyncPayload(response, [], 'viewer', serialized)
       response.state.players.forEach((player) => {
-        session.buildSyncPayload(response, player.id, 'viewer', serialized)
+        session.buildSyncPayload(response, [player.id], 'viewer', serialized)
       })
 
       expect(canonicalHookCalls).toBeGreaterThan(0)

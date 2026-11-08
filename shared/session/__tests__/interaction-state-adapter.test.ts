@@ -102,7 +102,7 @@ describe('Interaction State Adapter', () => {
     const updated = derive()
     if (updated.stateId !== 'wait') throw new Error('Expected refreshed waiting step')
     expect(updated.requestKey).toBe(first.requestKey)
-    expect(redactInteractionForViewer(updated, ['p1', 'p2'], 'p2')).not.toHaveProperty('requestKey')
+    expect(redactInteractionForViewer(updated, ['p1', 'p2'], ['p2'])).not.toHaveProperty('requestKey')
     const frame = selectionPendingStack().current()
     if (!frame) throw new Error('Expected next frame')
     stack.push({ ...frame, frameId: undefined })
@@ -178,8 +178,8 @@ describe('Interaction State Adapter', () => {
       anytimeActions: [],
     } as const
 
-    expect(redactInteractionForViewer(interaction, ['p1', 'p2'], 'p1')).toEqual(interaction)
-    expect(redactInteractionForViewer(interaction, ['p1', 'p2'], 'p2')).toEqual({
+    expect(redactInteractionForViewer(interaction, ['p1', 'p2'], ['p1'])).toEqual(interaction)
+    expect(redactInteractionForViewer(interaction, ['p1', 'p2'], ['p2'])).toEqual({
       stateId: 'wait',
       playerIndex: 0,
       sourceCard: 'E078_SleightofHand',
@@ -309,5 +309,5 @@ it('withholds unowned interaction choices and commands from a spectator', () => 
   expect(redactInteractionForViewer({
     stateId: 'wait', request: { kind: 'choice', options: [{ value: 'secret', labelKey: 'ui.interactionConfirm' }] },
     allowedCommands: ['resolveChoice'], anytimeActions: [],
-  }, ['p1', 'p2'], null)).toEqual({ stateId: 'idle', allowedCommands: [], anytimeActions: [] })
+  }, ['p1', 'p2'], [])).toEqual({ stateId: 'idle', allowedCommands: [], anytimeActions: [] })
 })

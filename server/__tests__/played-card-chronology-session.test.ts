@@ -72,7 +72,7 @@ describe('Played Card Chronology in complete authoritative snapshots', () => {
     expect(purchased.state.events.filter(event => event.type === 'card.played').map(event => event.cardId))
       .toEqual(['A110_Roughcaster', 'E047_SyrupTap', 'A116_WoodCutter', 'Major_Fireplace1'])
     for (const viewer of ['p1', 'p2', null]) {
-      const payload = session.buildSyncPayload(purchased, viewer, 'viewer', undefined, true)
+      const payload = session.buildSyncPayload(purchased, viewer === null ? [] : [viewer], 'viewer', undefined, true)
       expect(payload.state.players[0]).toHaveProperty('playedCardChronology', [...prefix, 'major:Major_Fireplace1'])
       const hydrated = rehydrateStateForClient(payload.state)
       expect(buildFarmBoardProjection({
@@ -87,11 +87,11 @@ describe('Played Card Chronology in complete authoritative snapshots', () => {
     }
     const undone = session.undoAction()
     expect(undone.ok, undone.error).toBe(true)
-    expect(session.buildSyncPayload(undone, 'p1').state.players[0])
+    expect(session.buildSyncPayload(undone, ['p1']).state.players[0])
       .toHaveProperty('playedCardChronology', prefix)
     expect(undone.state.availableMajorImprovements).toContain('Major_Fireplace1')
     const replayed = playImprovement(session, 'Major_Fireplace1')
-    expect(session.buildSyncPayload(replayed, 'p2').state.players[0])
+    expect(session.buildSyncPayload(replayed, ['p2']).state.players[0])
       .toHaveProperty('playedCardChronology', [...prefix, 'major:Major_Fireplace1'])
   })
 
@@ -106,14 +106,14 @@ describe('Played Card Chronology in complete authoritative snapshots', () => {
       expect(space).toBeDefined()
       take(session, space!)
     }
-    const payload = session.buildSyncPayload(session.getState(), 'p2', 'viewer', undefined, true)
+    const payload = session.buildSyncPayload(session.getState(), ['p2'], 'viewer', undefined, true)
     expect(payload.historyWindow?.nextCursor).toBeTruthy()
     expect(payload.state.events.some(event => event.type === 'card.played')).toBe(false)
     expect(payload.state.players[0]?.cardStatePresentation.A116_WoodCutter?.resourceStats?.used).toBeGreaterThan(0)
     expect(payload.state.players[0]).toHaveProperty('playedCardChronology', [...prefix, 'major:Major_Fireplace1'])
     const restored = restoreSession(session)
     sessions.push(restored)
-    expect(restored.buildSyncPayload(restored.getState(), 'p2', 'viewer', undefined, true).state.players[0])
+    expect(restored.buildSyncPayload(restored.getState(), ['p2'], 'viewer', undefined, true).state.players[0])
       .toHaveProperty('playedCardChronology', [...prefix, 'major:Major_Fireplace1'])
     expect(restored.state.players[0]).not.toHaveProperty('playedCardChronology')
   })
@@ -136,12 +136,12 @@ describe('Played Card Chronology in complete authoritative snapshots', () => {
     upgraded = choose(session, upgraded, payment!.value)
     expect(upgraded.state.players[0]!.improvements).toEqual(['Major_CookingHearth1'])
     expect(upgraded.state.availableMajorImprovements).toContain('Major_Fireplace1')
-    expect(session.buildSyncPayload(upgraded, 'p2').state.players[0]?.playedCardChronology)
+    expect(session.buildSyncPayload(upgraded, ['p2']).state.players[0]?.playedCardChronology)
       .toEqual([...prefix, 'minor:D027_Retraining', 'major:Major_CookingHearth1'])
     take(session, 'reed-bank')
     ready(session)
     const rebought = playImprovement(session, 'Major_Fireplace1')
-    expect(session.buildSyncPayload(rebought, 'p1').state.players[0]?.playedCardChronology)
+    expect(session.buildSyncPayload(rebought, ['p1']).state.players[0]?.playedCardChronology)
       .toEqual([...prefix, 'minor:D027_Retraining', 'major:Major_CookingHearth1', 'major:Major_Fireplace1'])
   })
 
@@ -172,11 +172,11 @@ describe('Played Card Chronology in complete authoritative snapshots', () => {
     const exchanged = response
     expect(exchanged.state.events.some(event => event.type === 'card.swappedWithBoard'
       && event.fromPlayerCardId === 'Major_Joinery' && event.toPlayerCardId === 'Major_Pottery')).toBe(true)
-    expect(session.buildSyncPayload(exchanged, 'p2').state.players[0]?.playedCardChronology)
+    expect(session.buildSyncPayload(exchanged, ['p2']).state.players[0]?.playedCardChronology)
       .toEqual([...prefix, 'minor:D027_Retraining', 'major:Major_Pottery'])
     const undone = session.undoAction()
     expect(undone.ok, undone.error).toBe(true)
-    expect(session.buildSyncPayload(undone, 'p2').state.players[0]?.playedCardChronology)
+    expect(session.buildSyncPayload(undone, ['p2']).state.players[0]?.playedCardChronology)
       .toEqual([...prefix, 'major:Major_Joinery', 'minor:D027_Retraining'])
   })
 })

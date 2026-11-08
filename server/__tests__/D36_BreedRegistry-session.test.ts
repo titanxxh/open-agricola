@@ -142,8 +142,8 @@ describe('D036_BreedRegistry session', () => {
     expect(readCardExtraData<number>(updated, CARD_ID, 'boardSheep')).toBe(1)
     expect(readCardInfobox(updated, CARD_ID)).toBeUndefined()
 
-    const opponentView = session.withCtx(() => serializeStateForPlayer(resp.state, resp.state.players[1]!.id, { engineStack: new EngineStack() }))
-    const ownerView = session.withCtx(() => serializeStateForPlayer(resp.state, updated.id, { engineStack: new EngineStack() }))
+    const opponentView = session.withCtx(() => serializeStateForPlayer(resp.state, [resp.state.players[1]!.id], { engineStack: new EngineStack() }))
+    const ownerView = session.withCtx(() => serializeStateForPlayer(resp.state, [updated.id], { engineStack: new EngineStack() }))
     expect(opponentView.players[0]!.minorHand).toEqual(['?'])
     expect(opponentView.players[0]!.cardStates[CARD_ID]).toBeUndefined()
     expect(opponentView.events.some((event) =>

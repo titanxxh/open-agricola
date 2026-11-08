@@ -49,7 +49,7 @@ describe('borrowed played-card animal zones serialization', () => {
       },
     ])
 
-    const viewerSnapshot = withActiveRegistry(registry, () => serializeStateForPlayer(state, viewer.id, emptyCtx(undefined)))
+    const viewerSnapshot = withActiveRegistry(registry, () => serializeStateForPlayer(state, [viewer.id], emptyCtx(undefined)))
     expect(viewerSnapshot.players[1]!.borrowedPlayedCardAnimalZones).toEqual(
       serialized.players[1]!.borrowedPlayedCardAnimalZones,
     )
@@ -137,7 +137,7 @@ describe('borrowed played-card animal zones serialization', () => {
       const sharedQuery = vi.spyOn(effect, 'onComputeSharedAnimalZones')
       const snapshot = () => mode === 'persistence'
         ? serializeSessionSnapshot(session.state, session).frame
-        : session.withCtx(() => serializeStateForPlayer(session.state, viewer.id, emptyCtx(session.actionHooks)))
+        : session.withCtx(() => serializeStateForPlayer(session.state, [viewer.id], emptyCtx(session.actionHooks)))
       const before = JSON.stringify(session.state)
 
       const first = snapshot()

@@ -73,8 +73,8 @@ describe('serializeStateForPlayer', () => {
     const state = makePlayingState()
     const serialized = serializeState(state, emptyCtx())
 
-    expect(filterSerializedStateForPlayer(serialized, 'p1')).toEqual(
-      serializeStateForPlayer(state, 'p1', emptyCtx()),
+    expect(filterSerializedStateForPlayer(serialized, ['p1'])).toEqual(
+      serializeStateForPlayer(state, ['p1'], emptyCtx()),
     )
   })
 
@@ -116,7 +116,7 @@ describe('serializeStateForPlayer', () => {
       }],
     }
 
-    const filtered = filterSerializedStateForPlayer(serialized, 'p1')
+    const filtered = filterSerializedStateForPlayer(serialized, ['p1'])
 
     expect(JSON.stringify(serialized.engineStack)).toContain('secret-card')
     expect(filtered.engineStack).toEqual({ frames: [] })
@@ -145,7 +145,7 @@ describe('serializeStateForPlayer', () => {
     const p2Occ = [...state.players[1].occupationHand]
     const p2Minor = [...state.players[1].minorHand]
 
-    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const out = serializeStateForPlayer(state, ['p1'], emptyCtx())
     const outP1 = out.players.find((p) => p.id === 'p1')!
     const outP2 = out.players.find((p) => p.id === 'p2')!
 
@@ -161,7 +161,7 @@ describe('serializeStateForPlayer', () => {
   it('preserves all non-secret fields (resources, fields, played cards, rooms)', () => {
     const state = makePlayingState()
     const raw = serializeState(state, emptyCtx())
-    const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const filtered = serializeStateForPlayer(state, ['p1'], emptyCtx())
 
     // Top-level scalars / public structures should match verbatim.
     expect(filtered.round).toBe(raw.round)
@@ -200,14 +200,14 @@ describe('serializeStateForPlayer', () => {
   it('when draft is null, behaves like serializeState for draft', () => {
     const state = makePlayingState()
     expect(state.draft).toBeNull()
-    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const out = serializeStateForPlayer(state, ['p1'], emptyCtx())
     expect(out.draft).toBeNull()
   })
 
   it('preserves the current owner packet and masks the other seat packet', () => {
     const state = makeDraftState()
     const raw = state.draft!.stages[0].seats
-    const out = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    const out = serializeStateForPlayer(state, ['p1'], emptyCtx()).draft!
     expect(out.stages[0].seats.p1.inbox[1]).toEqual(raw.p1.inbox[1])
     expect(out.stages[0].seats.p2.inbox[1]).toEqual({
       occ: Array(7).fill('?'), minor: Array(7).fill('?'),
@@ -222,13 +222,13 @@ describe('serializeStateForPlayer', () => {
       state.draft = result.draft
     }
     const current = state.draft!.stages[0].seats.p1.inbox[1]
-    const owner = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    const owner = serializeStateForPlayer(state, ['p1'], emptyCtx()).draft!
     expect(owner.stages[0].seats.p1.inbox[1]).toEqual(current)
     expect(owner.stages[0].seats.p1.inbox[2]).toEqual({ occ: Array(6).fill('?'), minor: Array(6).fill('?') })
     expect(owner.stages[0].seats.p1.inbox[3]).toEqual({ occ: Array(5).fill('?'), minor: Array(5).fill('?') })
     expect(owner.stages[0].seats.p1.inbox[4]).toEqual({ occ: Array(4).fill('?'), minor: Array(4).fill('?') })
     expect(draftSeatProgress(owner, 'p1').kind).toBe('selecting')
-    const spectator = serializeStateForPlayer(state, null, emptyCtx()).draft!
+    const spectator = serializeStateForPlayer(state, [], emptyCtx()).draft!
     expect(spectator.stages[0].seats.p1.inbox[1]).toEqual({ occ: Array(7).fill('?'), minor: Array(7).fill('?') })
   })
 
@@ -242,7 +242,7 @@ describe('serializeStateForPlayer', () => {
         p1: { occ: [], minor: ['f1', 'f2', 'f3'] }, p2: { occ: [], minor: ['g1', 'g2', 'g3'] },
       } },
     ])
-    const opening = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    const opening = serializeStateForPlayer(state, ['p1'], emptyCtx()).draft!
     expect(opening.stages[0].seats.p1.inbox[1].occ).toEqual(['a1', 'a2', 'a3'])
     expect(opening.stages[1].seats.p1.inbox[1].minor).toEqual(['?', '?', '?'])
     expect(opening.stages[1].seats.p2.inbox[1].minor).toEqual(['?', '?', '?'])
@@ -251,7 +251,7 @@ describe('serializeStateForPlayer', () => {
       if (result.kind !== 'accepted') throw new Error(result.error)
       state.draft = result.draft
     }
-    const owner = serializeStateForPlayer(state, 'p1', emptyCtx()).draft!
+    const owner = serializeStateForPlayer(state, ['p1'], emptyCtx()).draft!
     expect(owner.stages[1].seats.p1.inbox[1].minor).toEqual(['f1', 'f2', 'f3'])
     expect(owner.stages[1].seats.p2.inbox[1].minor).toEqual(['?', '?', '?'])
     expect(owner.stages[0].seats.p2.inbox[2].occ).toEqual(['?', '?'])
@@ -272,7 +272,7 @@ describe('serializeStateForPlayer', () => {
     }
     const raw = serializeState(state, emptyCtx())
     for (const viewer of ['p1', 'p2', null]) {
-      const projected = serializeStateForPlayer(state, viewer, emptyCtx())
+      const projected = serializeStateForPlayer(state, viewer === null ? [] : [viewer], emptyCtx())
       for (const [index, player] of state.players.entries()) {
         const own = player.id === viewer
         const actual = state.draft!.stages[0].seats[player.id].kept
@@ -290,7 +290,7 @@ describe('serializeStateForPlayer', () => {
 
   it('viewerPlayerId=null → all hands + pools masked (spectator mode)', () => {
     const state = makeDraftState()
-    const out = serializeStateForPlayer(state, null, emptyCtx())
+    const out = serializeStateForPlayer(state, [], emptyCtx())
     for (const p of out.players) {
       expect(p.occupationHand.every((c) => c === '?')).toBe(true)
       expect(p.minorHand.every((c) => c === '?')).toBe(true)
@@ -304,7 +304,7 @@ describe('serializeStateForPlayer', () => {
 
   it('viewer not in players → treated as spectator', () => {
     const state = makeDraftState()
-    const out = serializeStateForPlayer(state, 'nonexistent', emptyCtx())
+    const out = serializeStateForPlayer(state, ['nonexistent'], emptyCtx())
     for (const p of out.players) {
       expect(p.occupationHand.every((c) => c === '?')).toBe(true)
       expect(p.minorHand.every((c) => c === '?')).toBe(true)
@@ -320,9 +320,9 @@ describe('serializeStateForPlayer', () => {
     const snapshot = JSON.parse(
       JSON.stringify(serializeState(state, emptyCtx())),
     )
-    serializeStateForPlayer(state, 'p1', emptyCtx())
-    serializeStateForPlayer(state, null, emptyCtx())
-    serializeStateForPlayer(state, 'p2', emptyCtx())
+    serializeStateForPlayer(state, ['p1'], emptyCtx())
+    serializeStateForPlayer(state, [], emptyCtx())
+    serializeStateForPlayer(state, ['p2'], emptyCtx())
     expect(JSON.parse(JSON.stringify(serializeState(state, emptyCtx())))).toEqual(snapshot)
   })
 
@@ -330,7 +330,7 @@ describe('serializeStateForPlayer', () => {
     const state = makePlayingState()
     state.players[1].occupationHand = []
     state.players[1].minorHand = []
-    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const out = serializeStateForPlayer(state, ['p1'], emptyCtx())
     const p2 = out.players.find((p) => p.id === 'p2')!
     expect(p2.occupationHand).toEqual([])
     expect(p2.minorHand).toEqual([])
@@ -422,8 +422,8 @@ describe('serializeStateForPlayer', () => {
     state.nextPublicEventArchivePacketSeq = 3
     const stateWithLog: GameState = { ...state, log: seededLog }
 
-    const opponentView = serializeStateForPlayer(stateWithLog, 'p1', emptyCtx())
-    const ownerView = serializeStateForPlayer(stateWithLog, p2.id, emptyCtx())
+    const opponentView = serializeStateForPlayer(stateWithLog, ['p1'], emptyCtx())
+    const ownerView = serializeStateForPlayer(stateWithLog, [p2.id], emptyCtx())
     const filteredP2 = opponentView.players.find((player) => player.id === p2.id)!
     const ownerP2 = ownerView.players.find((player) => player.id === p2.id)!
 
@@ -550,7 +550,7 @@ describe('serializeStateForPlayer', () => {
     ]
     state.nextPublicEventArchivePacketSeq = 4
 
-    const opponentView = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const opponentView = serializeStateForPlayer(state, ['p1'], emptyCtx())
 
     expect(opponentView.events).toEqual([withoutInternalValue(visibleEvent)])
     expect(opponentView.events[0]).not.toHaveProperty('value')
@@ -656,7 +656,7 @@ describe('serializeStateForPlayer', () => {
     ]
     state.nextPublicEventArchivePacketSeq = 4
 
-    const opponentView = serializeStateForPlayer(state, 'p1', emptyCtx())
+    const opponentView = serializeStateForPlayer(state, ['p1'], emptyCtx())
 
     expect(opponentView.publicEventArchive).toEqual([
       {
