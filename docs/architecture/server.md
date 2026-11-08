@@ -147,7 +147,7 @@ Auth tests: `server/__tests__/auth-routes.test.ts`, `server/oauth/__tests__/stor
 
 Game Context, Replay and Bug Report are versioned product APIs:
 
-Creation configuration reads require the completed solo's original participant and always use `no-store`; public completed descriptors and the credentialless Viewer never include this private metadata.
+Creation configuration uses `no-store` and completed solo/team participant authorization. Public descriptors and Viewers omit it. New teams atomically save choices with waiting admission, outside rule snapshots; Room loads restore the record. `GameCreationStore` authorizes source reuse. Existing teams without records keep playing. Tests: `team-creation-source.test.ts`, `solo-room.test.ts`.
 
 ```text
 GET    /api/v1/game-contexts/:roomId
