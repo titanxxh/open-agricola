@@ -16,6 +16,7 @@ export type MyActiveRoom = {
   player_index: number | null
   owned_player_indexes?: number[]
   teamWaiting?: import('./team-room').TeamWaitingRoomState
+  teamConfig?: import('./team').TeamConfiguration
   my_turn: number
   current_player_index: number | null
   waiting_player_indexes: number[]

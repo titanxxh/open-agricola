@@ -5,13 +5,15 @@ import userEvent from '@testing-library/user-event'
 import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../../utils/platform-page-url'
 import { startRoomCreation } from '../../services/room-creation'
+import { CommandRejectedError } from '../../services/gameTransport'
 
 vi.mock('../../services/room-creation', async importOriginal => ({
   ...await importOriginal<typeof import('../../services/room-creation')>(),
-  startRoomCreation: vi.fn(), resumePendingRoomCreation: () => null,
+  startRoomCreation: vi.fn(async () => ({ roomId: 'created-team' })), resumePendingRoomCreation: () => null,
 }))
 
 const accountFeatures = vi.hoisted(() => ({ value: ['team-modes'] as string[] }))
+const refreshSession = vi.hoisted(() => vi.fn())
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 const apiFetch = vi.hoisted(() => vi.fn(async (path: string) => new Response(JSON.stringify({
   ok: true, games: [], rooms: path === '/api/lobby/my-rooms' ? myRoomsResponse.rooms : [],
@@ -23,6 +25,7 @@ vi.mock('../../contexts/AuthContext', () => ({
     user: { id: 'u1', username: 'host', displayName: 'Host', experimentalFeatures: accountFeatures.value },
     logout: vi.fn(),
     apiFetch,
+    refreshSession,
   }),
 }))
 
@@ -163,6 +166,7 @@ describe('LobbyPage my active games', () => {
   it('marks every owned seat separately from an alternate current actor', async () => {
     document.title = 'Open Agricola'
     myRoomsResponse.rooms = [{ id: 'multihand', status: 'playing', max_players: 4, updated_at: 2, created_at: 1, started_at: 1,
+      teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' },
       player_index: 0, owned_player_indexes: [0, 2], my_turn: 1, current_player_index: 2, hotseat: false,
       waiting_player_indexes: [2], progress: { phase: 'playing', round: 1 }, expansions: [],
       players: [{ playerIndex: 0, name: 'Alice', color: 'red' }, { playerIndex: 1, name: 'Bob', color: 'blue' },
@@ -170,6 +174,7 @@ describe('LobbyPage my active games', () => {
     }]
     render(<LobbyPage />)
     await screen.findByText('Cara')
+    expect(document.querySelector('.my-game .beta-badge')).toHaveTextContent('Beta')
     expect(document.querySelectorAll('.my-game__player[data-owned="true"]')).toHaveLength(2)
     expect(document.querySelector('.my-game__player[data-current="true"]')).toHaveTextContent('Cara')
     expect(document.querySelectorAll('.my-game__player small')).toHaveLength(2)
@@ -545,6 +550,25 @@ describe('LobbyPage player count selection', () => {
 
 
 describe('team creation options', () => {
+  it('marks team entrances and explains Beta only on the creation panel', async () => {
+    render(<LobbyPage />)
+    expect(within(screen.getByRole('button', { name: 'Team game', exact: true })).getByText('Beta')).toBeVisible()
+    expect(within(screen.getByRole('button', { name: 'Multihand game', exact: true })).getByText('Beta')).toBeVisible()
+    expect(screen.queryByText(/Team and multihand modes are being tested/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Team game', exact: true }))
+    expect(screen.getByText('Team and multihand modes are being tested. Rules and screens may change. Report problems with the in-game bug report.')).toBeVisible()
+  })
+
+  it('retains a denied creation on its form and refreshes account feature availability', async () => {
+    vi.mocked(startRoomCreation).mockRejectedValueOnce(new CommandRejectedError({ ok: false, code: 'experimental_feature_unavailable' }))
+    render(<LobbyPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Team game', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Team modes are not available to you. No room was created.')
+    expect(refreshSession).toHaveBeenCalledOnce()
+    expect(setPage).not.toHaveBeenCalled()
+  })
+
   it('offers legal formats and preserves all shared variants in the team creation query', async () => {
     vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, hasMore: false, cards: [
@@ -576,12 +600,11 @@ describe('team creation options', () => {
     await user.click(screen.getByRole('checkbox', { name: /Enable community cards/ }))
     await user.click(await screen.findByRole('checkbox', { name: /Team Workshop Card/ }))
     await user.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
-    expect(setPage).toHaveBeenCalledWith('game', expect.objectContaining({
-      maxPlayers: '4', draftMode: 'simultaneous', enableParentCards: 'true', enableThroughTheSeasons: 'true', enableFarmersOfTheMoor: 'true',
-      enableMoorBalanceRules: 'true', allowIncompleteFarmersOfTheMoorMinorDeal: 'true', enableCommunityDeck: 'true', customCards: 'team-workshop', enableSnakeOpening: 'true',
+    expect(startRoomCreation).toHaveBeenCalledWith(expect.objectContaining({
+      maxPlayers: 4, draftMode: 'simultaneous', enableParentCards: true, enableThroughTheSeasons: true, enableFarmersOfTheMoor: true,
+      enableMoorBalanceRules: true, allowIncompleteFarmersOfTheMoorMinorDeal: true, enableCommunityDeck: true, customCardIds: ['team-workshop'], enableSnakeOpening: true,
     }))
-    const created = vi.mocked(setPage).mock.calls.at(-1)?.[1]
-    expect(JSON.parse(created?.teamConfig ?? 'null')).toEqual({ mode: 'team', seatsPerTeam: 2, seating: 'random', scoring: 'product', teammateVisibility: 'private' })
+    expect(vi.mocked(startRoomCreation).mock.calls.at(-1)?.[0].teamConfig).toEqual({ mode: 'team', seatsPerTeam: 2, seating: 'random', scoring: 'product', teammateVisibility: 'private' })
   })
 
   it('uses the same format controls for multihand without a teammate visibility option', async () => {

@@ -413,6 +413,7 @@ it('shows team rank and highlights every seat value counted in category-min scor
     total: -4, rank: 1, buildingResources: 0, factors: [],
     categories: [{ key: 'cardBonusVp' as const, total: 0, playerIds: ['p2'] }] }]
   const view = render(<ScoringPad locale="en" scores={[...mockScores, { playerId: 'p2', playerName: 'Bob', total: 0, categories: [] }]} players={mockPlayers} onClose={() => undefined} teamScores={teamScores} />)
+  expect(screen.getByText('Beta')).toBeVisible()
   expect(screen.getByText('Rank 1')).toBeVisible()
   fireEvent.click(screen.getByText('Seat details'))
   const counted = view.container.querySelector('[data-team-counted="true"]')

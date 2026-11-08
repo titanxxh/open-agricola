@@ -3,6 +3,7 @@ import { t, type Locale } from '../../../shared/i18n'
 import { formatScore } from '../../utils/format-score'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import './archived-team-results.css'
+import { BetaBadge } from '../common/BetaBadge'
 
 export const ArchivedTeamResults = ({ result, locale, onWatch }: {
   result: CompletedGameContextDescriptor['result']
@@ -13,7 +14,7 @@ export const ArchivedTeamResults = ({ result, locale, onWatch }: {
   if (!archive) return null
   const playerName = (player: typeof result.players[number]) =>
     getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)
-  return <ol className="archived-team-results">
+  return <div><p>{t(locale, `team.mode.${archive.mode}`)}<BetaBadge locale={locale} /></p><ol className="archived-team-results">
     {[...archive.scores].sort((left, right) => left.rank - right.rank || left.teamIndex - right.teamIndex).map(team => {
       const members = result.players.filter(player => player.teamIndex === team.teamIndex)
       return <li key={team.teamIndex} data-team-index={team.teamIndex}>
@@ -33,5 +34,5 @@ export const ArchivedTeamResults = ({ result, locale, onWatch }: {
         </li>)}</ul>
       </li>
     })}
-  </ol>
+  </ol></div>
 }

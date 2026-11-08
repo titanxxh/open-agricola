@@ -55,7 +55,7 @@ describe('my active room summaries', () => {
     const rooms = await listMyActiveRooms(db, 'alice')
     expect(rooms).toHaveLength(1)
     expect(rooms[0]).toMatchObject({ player_index: 0, owned_player_indexes: [0, 2], current_player_index: 2, my_turn: 1,
-      waiting_player_indexes: [2] })
+      waiting_player_indexes: [2], teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' } })
     expect((await listMyActiveRooms(db, 'bob'))[0]).toMatchObject({ owned_player_indexes: [1, 3], my_turn: 0 })
     expect(JSON.stringify(rooms)).not.toContain('userId')
   })

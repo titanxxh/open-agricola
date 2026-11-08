@@ -22,6 +22,8 @@ import type { InvitablePlayer } from '../../shared/contract/room-access'
 import { SoloSetupDialog } from './solo/SoloSetupDialog'
 import { useRoomCreation } from './solo/useRoomCreation'
 import { soloRoomOptions } from '../services/room-creation'
+import { CommandRejectedError } from '../services/gameTransport'
+import { BetaBadge } from '../components/common/BetaBadge'
 
 type RoomWorkshopCard = {
   id: string
@@ -31,7 +33,7 @@ type RoomWorkshopCard = {
 }
 
 export function LobbyPage() {
-  const { user, logout, apiFetch } = useAuth()
+  const { user, logout, apiFetch, refreshSession } = useAuth()
   const { locale, t } = useLocale()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [myRooms, setMyRooms] = useState<MyActiveRoom[]>([])
@@ -42,11 +44,15 @@ export function LobbyPage() {
   const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | 'team' | 'multihand' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [soloSetup, setSoloSetup] = useState(false)
-  const soloCreation = useRoomCreation()
+  const roomCreation = useRoomCreation()
+  const teamFailure = roomCreation.state.phase === 'failed' ? roomCreation.state.error : undefined
+  const teamFeatureUnavailable = teamFailure instanceof CommandRejectedError && teamFailure.code === 'experimental_feature_unavailable'
+  useEffect(() => { if (teamFeatureUnavailable) void refreshSession() }, [teamFeatureUnavailable, refreshSession])
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
   const [teamConfiguration, setTeamConfiguration] = useState<TeamConfiguration>({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'category-min', teammateVisibility: 'shared' })
   const isTeamMode = selectMode === 'team' || selectMode === 'multihand'
   const beginTeamGame = (mode: 'team' | 'multihand') => {
+    roomCreation.clearError()
     setSelectMode(mode); setSelectedMaxPlayers(4)
     const common = { seatsPerTeam: 2, seating: 'separated', scoring: 'category-min' } as const
     setTeamConfiguration(mode === 'team' ? { ...common, mode, teammateVisibility: 'shared' } : { ...common, mode })
@@ -123,17 +129,36 @@ export function LobbyPage() {
   }, [enableCommunityDeck, selectMode, showCommunityDeckToggle])
 
   const handleCreateGame = () => {
+    if (isTeamMode) {
+      const ids = invitedPlayers.map(player => player.id)
+      const invitedCount = selectMode === 'multihand' ? selectedMaxPlayers / teamConfiguration.seatsPerTeam - 1 : selectedMaxPlayers - 1
+      if (roomAccess === 'invited' && ids.length !== invitedCount) {
+        setError(t('platform.invitedPlayerCountError', { count: String(invitedCount) }))
+        return
+      }
+      setError('')
+      roomCreation.create({ maxPlayers: selectedMaxPlayers, teamConfig: teamConfiguration,
+        name: user?.displayName || user?.username,
+        access: roomAccess === 'invited' ? { kind: 'invited', invitedUserIds: ids } : { kind: 'public' },
+        ...(draftMode === 'simultaneous' ? { draftMode, draftPoolSize } : {}),
+        enableCommunityDeck, customCardIds: enableCommunityDeck ? selectedWorkshopCardIds : [],
+        enableParentCards, enableThroughTheSeasons, enableFarmersOfTheMoor,
+        enableMoorBalanceRules: enableFarmersOfTheMoor && enableMoorBalanceRules,
+        allowIncompleteFarmersOfTheMoorMinorDeal: enableFarmersOfTheMoor && allowIncompleteFarmersOfTheMoorMinorDeal,
+        enableSnakeOpening,
+      })
+      return
+    }
     // Hotseat is an ordinary authoritative room — it just belongs to one device,
     // so it takes the same transport and only adds the hotseat flag.
     const params: Record<string, string> = {
       transport: 'ws',
       maxPlayers: String(selectedMaxPlayers),
       ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
-      ...(isTeamMode ? { teamConfig: JSON.stringify(teamConfiguration) } : {}),
     }
     if (selectMode !== 'hotseat' && roomAccess === 'invited') {
       const ids = invitedPlayers.map(player => player.id)
-      const invitedCount = selectMode === 'multihand' ? selectedMaxPlayers / teamConfiguration.seatsPerTeam - 1 : selectedMaxPlayers - 1
+      const invitedCount = selectedMaxPlayers - 1
       if (ids.length !== invitedCount) {
         setError(t('platform.invitedPlayerCountError', { count: String(invitedCount) }))
         return
@@ -291,12 +316,12 @@ export function LobbyPage() {
         )}
       </header>
 
-      {soloSetup || soloCreation.adjustment ? <SoloSetupDialog
-        locale={locale} creating={soloCreation.creating}
-        initialConfiguration={soloCreation.adjustment?.configuration} issues={soloCreation.adjustment?.issues}
-        error={soloCreation.state.phase === 'failed' && !soloCreation.adjustment ? t('solo.creationFailed') : undefined}
-        onClose={() => { setSoloSetup(false); soloCreation.clearError() }}
-        onSubmit={configuration => { setSoloSetup(true); soloCreation.create(soloRoomOptions(configuration, user?.displayName || user?.username)) }}
+      {soloSetup || roomCreation.adjustment ? <SoloSetupDialog
+        locale={locale} creating={roomCreation.creating}
+        initialConfiguration={roomCreation.adjustment?.configuration} issues={roomCreation.adjustment?.issues}
+        error={roomCreation.state.phase === 'failed' && !roomCreation.adjustment ? t('solo.creationFailed') : undefined}
+        onClose={() => { setSoloSetup(false); roomCreation.clearError() }}
+        onSubmit={configuration => { setSoloSetup(true); roomCreation.create(soloRoomOptions(configuration, user?.displayName || user?.username)) }}
       /> : null}
       <div className="lobby-grid">
         <Section variant="parchment" icon="🎮" title={t('platform.startGame')} className="lobby-hero">
@@ -310,8 +335,8 @@ export function LobbyPage() {
                 {t('platform.createMultiplayer')}
               </button>
               {user?.experimentalFeatures?.includes('team-modes') && <>
-                <button type="button" className="btn-secondary" onClick={() => beginTeamGame('team')}>{t('team.entry')}</button>
-                <button type="button" className="btn-secondary" onClick={() => beginTeamGame('multihand')}>{t('team.multihandEntry')}</button>
+                <button type="button" className="btn-secondary" aria-label={t('team.entry')} onClick={() => beginTeamGame('team')}>{t('team.entry')}<BetaBadge locale={locale} /></button>
+                <button type="button" className="btn-secondary" aria-label={t('team.multihandEntry')} onClick={() => beginTeamGame('multihand')}>{t('team.multihandEntry')}<BetaBadge locale={locale} /></button>
               </>}
               <button type="button" className="btn-secondary" onClick={() => setSelectMode('hotseat')}>
                 {t('platform.localHotseat')}
@@ -322,6 +347,7 @@ export function LobbyPage() {
             </>
           ) : (
             <div className="player-select-panel">
+              {isTeamMode && <p className="community-deck-toggle-hint beta-creation-hint">{t('beta.creationHint')}</p>}
               {selectMode === 'hotseat' && (
                 <div className="community-deck-toggle-hint">{t('platform.hotseatHint')}</div>
               )}
@@ -515,13 +541,14 @@ export function LobbyPage() {
                 </label>
               )}
               <div className="player-select-actions">
-                <button type="button" className="btn-primary" onClick={handleCreateGame}>
+                <button type="button" className="btn-primary" disabled={isTeamMode && (roomCreation.creating || !user?.experimentalFeatures?.includes('team-modes'))} onClick={handleCreateGame}>
                   {t(selectMode === 'hotseat' ? 'platform.startHotseat' : 'platform.createGame')}
                 </button>
                 <button type="button" className="btn-link" onClick={() => setSelectMode(null)}>
                   {t('platform.cancel')}
                 </button>
               </div>
+              {teamFailure && isTeamMode ? <p className="form-error" role="alert">{t(teamFeatureUnavailable ? 'beta.featureUnavailable' : 'solo.creationFailed')}</p> : null}
             </div>
           )}
         </Section>

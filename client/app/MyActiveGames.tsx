@@ -44,7 +44,7 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
                     </span>
                   ))}
                 </div>
-                {room.teamWaiting && <TeamConfigurationSummary maxPlayers={room.max_players} value={room.teamWaiting.teamConfig} />}
+                {room.teamConfig && <TeamConfigurationSummary maxPlayers={room.max_players} value={room.teamConfig} />}
                 <div className="my-game__meta">
                   {progress && <span className="my-game__progress">
                     {progress.phase === 'playing' ? t('ui.roundHeader', { round: progress.round })
