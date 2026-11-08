@@ -15,8 +15,15 @@ export const controlledSeatIndexes = (room: ConnectionRoom, ws: WebSocket): numb
   return [...indexes].sort((left, right) => left - right)
 }
 
-export const visiblePlayerIdsForConnection = (room: ConnectionRoom, ws: WebSocket): string[] =>
-  controlledSeatIndexes(room, ws).flatMap(index => room.session.state.players[index]?.id ?? [])
+export const visiblePlayerIdsForConnection = (room: ConnectionRoom, ws: WebSocket): string[] => {
+  const controlled = controlledSeatIndexes(room, ws)
+  const { players, team } = room.session.state
+  if (team?.configuration.mode === 'team' && team.configuration.teammateVisibility === 'shared') {
+    const ownTeams = new Set(controlled.map(index => team.playerTeams[index]))
+    return players.filter((_, index) => controlled.includes(index) || ownTeams.has(team.playerTeams[index])).map(player => player.id)
+  }
+  return controlled.flatMap(index => players[index]?.id ?? [])
+}
 
 export const connectionViewerMetadata = (room: ConnectionRoom, ws: WebSocket) => ({
   controlledPlayerIndexes: controlledSeatIndexes(room, ws),

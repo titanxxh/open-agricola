@@ -9,7 +9,7 @@ import type { ServerEvent, SpectatingEndReason } from '../../shared/contract/pro
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
-import { visiblePlayerIdsForConnection } from '../game/room-viewer'
+import { controlledSeatIndexes, visiblePlayerIdsForConnection } from '../game/room-viewer'
 
 /**
  * A hotseat connection holds every seat, so per-seat redaction would hide the
@@ -75,6 +75,7 @@ export class Broadcaster {
           room,
           resp: requesterResponse?.ws === ws ? requesterResponse.response : resp,
           visiblePlayerIds: visiblePlayerIdsForConnection(room, ws),
+          controlledPlayerIndexes: controlledSeatIndexes(room, ws),
           version: room.version,
           cause,
           requestId: requesterResponse && requesterResponse.ws !== ws ? undefined : requestId,
@@ -86,7 +87,7 @@ export class Broadcaster {
     }
     const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN)
     if (spectators.length) {
-      const envelope = measure('projection', () => buildEnvelope({ room, resp, visiblePlayerIds: [],
+      const envelope = measure('projection', () => buildEnvelope({ room, resp, visiblePlayerIds: [], controlledPlayerIndexes: [],
         version: room.version, cause, emittedAt, mode: 'viewer' }))
       const data = JSON.stringify(envelope)
       for (const ws of spectators) { bytes += sendObserved(ws, envelope, roundTag(resp.state), data); recipients++ }
@@ -112,6 +113,7 @@ export class Broadcaster {
         room,
         resp,
         visiblePlayerIds: visiblePlayerIdsForConnection(room, ws),
+        controlledPlayerIndexes: controlledSeatIndexes(room, ws),
         version: room.version,
         cause,
         requestId,
