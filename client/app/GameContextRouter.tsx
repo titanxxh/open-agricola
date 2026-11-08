@@ -239,11 +239,11 @@ function CompletedContext({
   const rematch = solo ? <SameConfigurationRematch key={context.roomId} roomId={context.roomId} locale={locale} displayName={player?.nameIsDefault ? undefined : player?.displayName} />
     : context.result.team ? <TeamSameConfigurationRematch key={context.roomId} roomId={context.roomId} locale={locale} /> : null
   if (context.replayStatus === 'available') {
-    return <>{solo || context.result.team ? <section className="solo-completed-summary">
+    return <div className="completed-game-context">{solo || context.result.team ? <section className="solo-completed-summary">
       <h1>{t('platform.gameContext.completedTitle')}{context.result.team ? <BetaBadge locale={locale} /> : null}</h1>
       {solo ? <p>{t('solo.scoreHint')}: <strong>{formatScore(player?.score ?? 0)}</strong></p> : null}
       {rematch}
-    </section> : null}<ReplayShell context={context} /></>
+    </section> : null}<ReplayShell context={context} /></div>
   }
   return statusPage(
     t('platform.backToLobbyPlain'),

@@ -2,9 +2,12 @@
 import { expect, test } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import { BACKEND_URL, getJson, postJson } from './fixtures'
+import { authenticateSolo } from './helpers/standard-solo-acceptance'
 
 for (const scoring of ['category-min', 'product'] as const) {
   test(`team scoring shows ranks and ${scoring} calculations`, async ({ page, request }) => {
+    // Default-general availability still requires a registered account for team creation.
+    await authenticateSolo(page.context(), request, `team_score_${Date.now().toString(36)}`)
     await page.setViewportSize({ width: scoring === 'category-min' ? 390 : 1440, height: 900 })
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     const created = await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, {
