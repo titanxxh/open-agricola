@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { TeamRoomMember, TeamWaitingRoomState } from '../../shared/contract/team-room'
 import type { Room } from './room'
-import type { TeamState } from '../../shared/contract/team'
+import type { TeamConfiguration, TeamState } from '../../shared/contract/team'
 import type { GameSeed } from '../../shared/contract/types'
 import { createSeededRng, shuffleWithRng } from '../../shared/utils/rng'
 
@@ -37,17 +37,29 @@ export function admitTeamMember(room: Room, userId: string, name: string): TeamR
   return { memberId: randomUUID(), userId, name, teamIndex, seatCount }
 }
 
-export function teamWaitingState(room: Room, userId: string): TeamWaitingRoomState {
-  const team = room.session.state.team
+export function projectTeamWaitingRoom(
+  room: Pick<Room, 'id' | 'maxPlayers' | 'createdBy'> & { teamMembers?: readonly TeamRoomMember[] },
+  configuration: TeamConfiguration,
+  userId: string,
+): TeamWaitingRoomState {
   const self = room.teamMembers?.find(member => member.userId === userId)
-  if (!team || !self) throw new Error('Only team members can view this waiting room')
+  if (!self) throw new Error('Only team members can view this waiting room')
   const isHost = room.createdBy === userId
   return {
-    roomId: room.id, maxPlayers: room.maxPlayers, teamConfig: team.configuration,
+    roomId: room.id, maxPlayers: room.maxPlayers, teamConfig: configuration,
     members: (room.teamMembers ?? []).map(({ userId: memberUserId, ...member }) => ({ ...member,
-      connected: room.waitingTeamConnections?.get(member.memberId)?.readyState === 1, isHost: memberUserId === room.createdBy,
+      isHost: memberUserId === room.createdBy,
     })),
     selfMemberId: self.memberId, isHost,
     canStart: isHost && (room.teamMembers ?? []).reduce((sum, member) => sum + member.seatCount, 0) === room.maxPlayers,
   }
+}
+
+export function teamWaitingState(room: Room, userId: string): TeamWaitingRoomState {
+  const team = room.session.state.team
+  if (!team) throw new Error('Only team members can view this waiting room')
+  const waiting = projectTeamWaitingRoom(room, team.configuration, userId)
+  return { ...waiting, members: waiting.members.map(member => ({ ...member,
+    connected: room.waitingTeamConnections?.get(member.memberId)?.readyState === 1,
+  })) }
 }
