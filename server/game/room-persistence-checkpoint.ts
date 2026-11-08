@@ -55,7 +55,8 @@ export class RoomPersistenceCheckpoint {
 
   async recordCreated(room: Room, options?: RoomWriteOptions): Promise<void> {
     this.assertWritable(room.id)
-    await this.persistence.save(room.id, serializeSessionSnapshot(room.session.state, room.session), toRoomMeta(room), { executionStamp: room.executionStamp, owner: room.owner, expectedVersion: null, ...options })
+    await this.persistence.save(room.id, serializeSessionSnapshot(room.session.state, room.session), toRoomMeta(room), { executionStamp: room.executionStamp, owner: room.owner, expectedVersion: null,
+      creationConfiguration: room.creationConfiguration, creationSource: room.creationSource, ...options })
   }
 
   async recordMeta(room: Room, options?: RoomWriteOptions): Promise<void> {

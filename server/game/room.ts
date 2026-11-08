@@ -420,6 +420,7 @@ export const snapshotToRoom = (
   const session = created.session
   return {
     id: snapshot.id,
+    ...(snapshot.creationConfiguration ? { creationConfiguration: snapshot.creationConfiguration } : {}),
     ...(snapshot.meta.teamMembers ? { teamMembers: snapshot.meta.teamMembers, waitingTeamConnections: new Map() } : {}),
     endProposal: snapshot.meta.endProposal ?? null,
     awaitingRematchPlayers: snapshot.meta.awaitingRematchPlayers === true,

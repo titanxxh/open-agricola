@@ -5,6 +5,16 @@ import { parseGameCreationRecord } from '../creation-configuration'
 const sources = [{ workshopCardId: 'workshop-card', logicalCardId: 'CUSTOM_Test', approvedVersionId: 'version-1' }]
 const record = (configuration: unknown) => JSON.stringify({ configuration, resolvedWorkshopSources: sources })
 
+it('round trips the accepted team creation choices without storing any rule state', () => {
+  const configuration = { ...soloCreationConfiguration, kind: 'team', maxPlayers: 4,
+    teamConfig: { mode: 'multihand', seatsPerTeam: 2, seating: 'random', scoring: 'sum' },
+    draftMode: 'simultaneous', draftPoolSize: 8, enableSnakeOpening: true, allowIncompleteFarmersOfTheMoorMinorDeal: false,
+  }
+  Reflect.deleteProperty(configuration, 'soloHandMode')
+  expect(parseGameCreationRecord(record(configuration))).toEqual({ configuration, resolvedWorkshopSources: sources })
+  expect(parseGameCreationRecord(record({ ...configuration, maxPlayers: 2 }))).toBeNull()
+})
+
 it('reads the accepted configuration with its resolved source record', () => {
   expect(parseGameCreationRecord(record(soloCreationConfiguration))).toEqual({
     configuration: soloCreationConfiguration, resolvedWorkshopSources: sources,
