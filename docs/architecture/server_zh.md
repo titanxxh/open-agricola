@@ -43,8 +43,9 @@ server/game/
 ```
 
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
+- `team-room.ts` 在 `rooms.team_members_json` 保存未排座的账号、队伍和席位数，等待连接计入在线配额与过期判断。`startTeamGame` 将成员绑定到种子确定的队伍位置，先提交归属与名字，再逐连接发送 `roomJoined` 和 Step 0。测试见 `team-seating.test.ts`、`team-room.test.ts`。
 - `room-spectators.ts` 保存无座位的临时旁观订阅，只读取已有在线路由，不申请准入。旁观接收公开的加入／断开事件以及 空可见座位集合的快照与历史；`room-router` 在预留回执前拒绝写命令。旁观不改变在线人数、过期时间或 Replay；全员离线、完赛、终止和重开会结束订阅。见 [ADR 0040](../adr/0040-public-live-spectating.md)、`live-spectating-network.test.ts` 与 `live-spectating.spec.ts`。
-- 普通多人局通过 `resolveJoinPlayerIndex` 为新玩家均匀随机分配空座；原有玩家恢复已提交座位。重开先准备新的身份绑定并保留名字、颜色，提交后在首份快照前向各连接发布座位。命令入口从采用后的 Room 刷新座位；开发房间、单人和热座沿用原有分配方式。覆盖：`server/connection/__tests__/room-router.test.ts`、`e2e-tests/draft-opening-order.spec.ts`。
+- 普通入座通过 `resolveJoinPlayerIndex` 随机分配空座或恢复已存座位。重开保留名字与颜色，先发布新绑定再发快照。dispatch 从 Room 刷新绑定；开发、单人与热座保留原分配。测试见 `room-router.test.ts`、`draft-opening-order.spec.ts`。
 - `room-access.ts` 负责邀请准入。创建默认公开，也可为其余每个座位指定一个可用账号 ID。`RoomMeta` 将权限存入 `rooms.invited_user_ids`，恢复与 `newGame` 保留该权限。大厅 SQL 在限制条数前按已认证用户过滤；定位、活动 Context 和直接 WS 加入分别校验准入，恢复原座位仍由已有座位归属控制。邀请名单不进入 GameState、Replay 或公开摘要，完赛 Replay 仍公开。`GET /api/lobby/players?prefix=` 要求登录，按用户名或显示名开头至少两个字符匹配，忽略大小写，排除本人及不可用账号，最多返回十个展示身份。测试：`server/__tests__/room-invitations.test.ts`、`e2e-tests/room-invitations.spec.ts`。
 - `lobby-my-rooms.ts` 为 `/api/lobby/my-rooms` 读取已提交快照，不恢复 Session。共享 `MyActiveRoom` 契约公开已占用座位的显示名、颜色、创建与开局时间、启用的扩展、游戏回合或开局阶段，以及 pending frame 的所有者或当前玩家。异步轮抽的等待座位列表只包含当前有牌包需要选择的玩家，排除等待传牌或已完成的座位，不返回私有状态、卡牌身份或账号 ID。快照无法解析时省略该房间从状态派生的详情。测试：`server/__tests__/lobby-my-rooms.test.ts`。
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
@@ -54,7 +55,7 @@ server/game/
 - 托管 Room 使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认等待状态与座位，`GameContextStore` 统一裁定持久化期限，并保护在线连接、准入与未完成保存。管理员可配置离线保留期，默认等待 3 天、进行中 7 天。每次全员离线后固定截止时间，修改只影响下次离线周期；开发房不因闲置过期。`RoomAuthority` 将内存卸载与存档删除分开。缺失录制数据会阻断恢复。见 [ADR 0039](../adr/0039-runtime-room-retention-policy.md)。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
 - 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
-- 普通 Room 最后一个座位坐满后继续候场。`colorConfirmationPlayerIndex` 记录最后入场者，随 checkpoint 持久化、恢复并发送给候场客户端。只有该座位可提交 `confirmPlayerColor`，初始 Frame 与回执提交后才开始游戏。热座与开发 Room 保留自动开局。大厅状态取自 Room，不从占座人数推断。覆盖：`room-router.test.ts`、`room-invitations.spec.ts`。
+- 普通 Room 等最后到达者发送 `confirmPlayerColor`，持久化的 `colorConfirmationPlayerIndex` 标识该玩家。Step 0 提交后才进入游戏。热座与开发 Room 自动开局，Room 状态是权威。测试见 `room-router.test.ts`、`room-invitations.spec.ts`。
 - `room-queue.ts` 按 Room 串行化授权、规则、异步提交与发布；移动连接会同时占用两个 Room 队列与连接队列。关闭时停止输入、排空已接受的工作并关闭连接池。
 - **分布式 Room**（[ADR 0022](../adr/0022-distributed-room-recovery.md)）：`RoomDirectory` 用 PostgreSQL 租约与单调 epoch 把每个 Room 分配给一个应用进程；提交与发布都校验 owner 与期望版本。`POST /api/rooms/locate` 返回由 `ingress.ts` 转发的 `/nodes/<instanceId>/ws` 路由。`CommandStore` 为每个命令预留内容指纹，并把回执与 Room 状态转换一同提交；重复的命令返回原回执。`InvalidationStore` 提交卡牌 / 用户屏障与按实例的任务，每次执行与发布都检查屏障；只有每个相关实例都确认或失去租约后操作才完成。
 - **历史与恢复**（[ADR 0021](../adr/0021-room-owned-history-branches-and-recovery-snapshots.md)）：不可变的历史节点与恢复记录是 Room 拥有的行，随 Room transaction 写入。恢复会还原权威会话、撤销历史与暂定检查点，而不解码 Replay payload。查询失败原样向上抛出，供存储重试；只有已读取数据的解码与完整性失败才以 `RoomHistoryCorruptionError` 封闭失败。

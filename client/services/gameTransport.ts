@@ -484,7 +484,8 @@ export class WsGameTransport implements GameTransport {
       // Register before join: roomJoined and the full snapshot can be delivered
       // in the same event-loop turn. A playing Room never becomes ready on ack alone.
       const ready = this.waitEvent(event => event.type === 'stateUpdate' && event.roomId === this.roomId && event.sync === 'snapshot'
-        || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting')
+        || event.type === 'roomJoined' && event.roomId === this.roomId && event.status === 'waiting'
+        || event.type === 'teamRoomWaiting' && event.roomId === this.roomId)
       this.sendRaw(this.roomViewer.kind === 'spectator'
         ? { type: 'spectateRoom', roomId: this.roomId }
         : { type: 'joinRoom', roomId: this.roomId, intent: 'resume', requestedPlayerIndex: this.seatHint })
@@ -535,6 +536,11 @@ export class WsGameTransport implements GameTransport {
       this.roomViewer = { kind: 'spectator' }
       this.spectatingEndReason = undefined
       this.seatHint = undefined
+      this.setRoom(msg.roomId)
+    } else if (msg.type === 'teamRoomWaiting') {
+      this.roomViewer = { kind: 'team-member', memberId: msg.selfMemberId }
+      this.seatHint = undefined
+      this.journal.playerIndex = undefined
       this.setRoom(msg.roomId)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
@@ -731,6 +737,7 @@ export class WsGameTransport implements GameTransport {
   }
 
   async getState(options?: GetStateOptions): Promise<GameSyncPayload> {
+    if (this.roomViewer.kind === 'team-member') throw new Error('The team game has not started')
     return this.sendCommand({
       type: 'getState',
       ...(options?.unredacted ? { unredacted: true } : {}),

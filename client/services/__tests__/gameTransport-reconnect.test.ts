@@ -43,6 +43,37 @@ describe('Room reconnect and durable commands', () => {
   })
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 
+  it('recovers an unseated team member without requesting state or inventing a seat', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false, reconnectDelayMs: 1 })
+    const waiting: ServerEvent = { type: 'teamRoomWaiting', roomId: 'team-room', maxPlayers: 4,
+      teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'shared' },
+      members: [{ memberId: 'member-a', name: 'Alice', teamIndex: 0, seatCount: 1, connected: true, isHost: true }],
+      selfMemberId: 'member-a', isHost: true, canStart: false,
+    }
+    try {
+      await transport.connect()
+      const first = Socket.all[0]!
+      first.emit(waiting)
+      expect(transport.roomId).toBe('team-room')
+      expect(transport.viewer).toEqual({ kind: 'team-member', memberId: 'member-a' })
+      expect(transport.playerIndex).toBeNull()
+      await expect(transport.getState()).rejects.toThrow('The team game has not started')
+      first.close(1006)
+      await tick()
+      const second = Socket.all[1]!
+      await vi.waitFor(() => expect(second.sent.some(message => message.type === 'joinRoom')).toBe(true))
+      expect(second.sent.find(message => message.type === 'joinRoom')).toEqual({ type: 'joinRoom', roomId: 'team-room', intent: 'resume' })
+      second.emit(waiting)
+      await vi.waitFor(() => expect(transport.connected).toBe(true))
+      expect(second.sent.some(message => message.type === 'getState')).toBe(false)
+      expect(transport.playerIndex).toBeNull()
+      second.emit(joined('team-room'))
+      second.emit(snapshot(0, 'team-room'))
+      expect(transport.playerIndex).toBe(1)
+    } finally { transport.destroy() }
+  })
+
   it('reconnects a spectator without a seat or command replay and stops after an offline notice', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', 'room-1', undefined, { route: false, reconnectDelayMs: 1 })

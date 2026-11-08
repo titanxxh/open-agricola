@@ -137,6 +137,8 @@ type ClientCommand = (
 
 Waiting-room events carry `playerColors` from the authoritative player state; roster entries include `connected` so reserved seats retain their names when a player disconnects.
 
+Team rooms instead send per-account `teamRoomWaiting` with opaque member IDs, names, teams, seat counts and connection status, never account IDs or player indices. `startTeamGame` requires a full roster and the host; committed seating produces each account's ordinary `roomJoined` before Step 0. Until then `RoomViewer.kind='team-member'` has no player index, and transport recovery waits for the waiting event without requesting a game snapshot. Persisted active-game summaries use a null `player_index` plus `teamWaiting` for these members. See `team-room.ts` and `team-seating.test.ts`.
+
 ```ts
 type ServerEvent =
   | StateUpdateEnvelope

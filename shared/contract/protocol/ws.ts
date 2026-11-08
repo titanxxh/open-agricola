@@ -9,6 +9,7 @@ import type { MoorSpecialActionId } from '../../moor/types'
 import type { RoomAccess, RoomAccessErrorCode } from '../room-access'
 import type { SoloHandMode } from '../game-creation'
 import type { SoloHandSelectionSubmission } from '../solo-hand-selection'
+import type { TeamWaitingRoomState } from '../team-room'
 
 import type { GameEndProposal } from './game-termination'
 
@@ -89,6 +90,7 @@ type ClientCommandBody =
     }
   | { type: 'setPlayerColor'; color: PlayerState['color'] }
   | { type: 'confirmPlayerColor' }
+  | { type: 'startTeamGame' }
   | { type: 'dissolveRoom' }
   | { type: 'proposeGameEnd'; intent: 'end' | 'rematch' }
   | { type: 'respondGameEnd'; proposalId: string; agree: boolean }
@@ -102,9 +104,10 @@ export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid
 
 export type SpectatingEndReason = 'offline' | 'completed' | 'terminated' | 'removed'
 
-export type RoomViewer = { kind: 'participant'; playerIndex: number } | { kind: 'spectator' }
+export type RoomViewer = { kind: 'participant'; playerIndex: number } | { kind: 'spectator' } | { kind: 'team-member'; memberId: string }
 
 export type ServerEvent =
+  | ({ type: 'teamRoomWaiting' } & TeamWaitingRoomState)
   | { type: 'roomSpectated'; roomId: string }
   | { type: 'spectatingEnded'; roomId: string; reason: SpectatingEndReason }
   | { type: 'gameEndProposal'; roomId: string; proposal: GameEndProposal | null }
@@ -153,6 +156,7 @@ export type ServerEvent =
   | { type: 'seat_replaced'; roomId: string; playerIndex: number }
 
 export type RoomSummary = {
+  teamConfig?: import('../team').TeamConfiguration
   id: string
   playerCount: number
   maxPlayers: number

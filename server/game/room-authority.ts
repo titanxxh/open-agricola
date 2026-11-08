@@ -76,7 +76,7 @@ export class RoomAuthority {
     const room = snapshotToRoom(snap)
     try {
       room.owner = owner
-      room.executionStamp = await new ExecutionAccess(this.directory.db).capture(room.customCardDbIds ?? [], [room.createdBy, ...(room.seatOwners ?? []).map(seat => seat.userId)].filter((id): id is string => !!id))
+      room.executionStamp = await new ExecutionAccess(this.directory.db).capture(room.customCardDbIds ?? [], [room.createdBy, ...(room.seatOwners ?? []).map(seat => seat.userId), ...(room.teamMembers ?? []).map(member => member.userId)].filter((id): id is string => !!id))
       if (room.status === 'waiting' && room.replayRecording !== true) {
         this.committer.lockNewRoom(room)
         await this.checkpoint.recordMeta(room)

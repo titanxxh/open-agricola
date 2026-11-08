@@ -13,7 +13,8 @@ export type MyActiveRoom = {
   created_at: number
   started_at: number | null
   updated_at: number
-  player_index: number
+  player_index: number | null
+  teamWaiting?: import('./team-room').TeamWaitingRoomState
   my_turn: number
   current_player_index: number | null
   waiting_player_indexes: number[]

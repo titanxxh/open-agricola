@@ -1,3 +1,4 @@
+import { teamWaitingState } from '../game/team-room'
 import { drainRoomSpectators, removeRoomSpectator } from '../game/room-spectators'
 import { operationsMetrics, safe } from '../observability/metrics'
 import { selectDevelopmentRoom } from '../game/development-room-slots'
@@ -21,6 +22,7 @@ import {
   parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
   roomConnectedPlayerCount,
+  roomConnections,
   snapshotToRoom,
   type Room,
 } from '../game/room.ts'
@@ -307,7 +309,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
   ws.on('close', () => {
     const disconnectedAt = Date.now()
     const disconnectedRoom = ctx.currentRoom
-    if (disconnectedRoom && disconnectedRoom.players.some(player => player.ws === ws) && deps.authority && deps.registry.has(disconnectedRoom.id)) {
+    if (disconnectedRoom && roomConnections(disconnectedRoom).includes(ws) && deps.authority && deps.registry.has(disconnectedRoom.id)) {
       if (roomConnectedPlayerCount(disconnectedRoom) === 0) deps.registry.touchActivity(disconnectedRoom.id, disconnectedAt)
       void deps.authority.updatePresence(disconnectedRoom)
         .catch(error => console.error('[ws-server] presence update failed', error))
@@ -319,8 +321,16 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
       if (removeRoomSpectator(ctx.currentRoom, ws)) return
       const disconnectedSeat = ctx.currentRoom.players.find(player => player.ws === ws)?.playerIndex
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
+      if (ctx.currentRoom.status === 'waiting' && ctx.currentRoom.teamMembers) {
+        for (const member of ctx.currentRoom.teamMembers) {
+          const connection = ctx.currentRoom.waitingTeamConnections?.get(member.memberId)
+          if (connection) await deps.broadcaster.sendRoomEvent(connection, ctx.currentRoom, {
+            type: 'teamRoomWaiting', ...teamWaitingState(ctx.currentRoom, member.userId),
+          })
+        }
+      }
       if (removal === 'remaining') {
-        await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
+        if (disconnectedSeat !== undefined) await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
           type: 'playerDisconnected',
           playerIndex: disconnectedSeat ?? ctx.currentPlayerIndex,
         })
@@ -404,7 +414,7 @@ export async function createWsServer(
           const room = registry.get(id)
           if (!room) continue
           await enqueueRoomTask(room, async () => {
-            for (const player of room.players) player.ws.close(1012, 'room owner changed')
+            for (const ws of roomConnections(room)) ws.close(1012, 'room owner changed')
             for (const viewer of drainRoomSpectators(room)) viewer.close(1012, 'room owner changed')
             await committer.retireRoom(id)
             registry.delete(id)
@@ -479,8 +489,9 @@ export async function createWsServer(
         } catch (error) { if (!(error instanceof RoomOwnershipError)) throw error }
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        for (const player of room.players) player.ws.close(1008, 'session invalidated')
+        for (const ws of roomConnections(room)) ws.close(1008, 'session invalidated')
         room.players = []
+        room.waitingTeamConnections?.clear()
         room.session.dispose()
       })
     }

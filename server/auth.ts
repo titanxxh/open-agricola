@@ -771,10 +771,12 @@ export async function deleteAccount(userId: string): Promise<Awaited<{ ok: true 
 
 export async function getAccountDeletionRoomIds(userId: string): Promise<Awaited<string[]>> {
   return ((await getDb().prepare(`
-    SELECT id FROM rooms WHERE created_by = ?
+    SELECT id FROM rooms WHERE created_by = ? OR EXISTS (
+      SELECT 1 FROM jsonb_array_elements(COALESCE(team_members_json, '[]'::jsonb)) member WHERE member->>'userId'=?
+    )
     UNION
     SELECT room_id AS id FROM room_players WHERE user_id = ?
-  `).all(userId, userId)) as Array<{ id: string }>).map(row => row.id)
+  `).all(userId, userId, userId)) as Array<{ id: string }>).map(row => row.id)
 }
 
 export async function validateSession(token: string): Promise<Awaited<AuthUser | null>> {
