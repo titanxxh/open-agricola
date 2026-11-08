@@ -296,6 +296,12 @@ const respondWith = (
   }
 }
 
+/** Accepts both a bare GameState and the `{ state, sessionCursor }` debug snapshot. */
+const loadsTeamState = (raw: unknown): boolean => {
+  const hasTeam = (value: unknown) => !!value && typeof value === 'object' && 'team' in value && value.team != null
+  return hasTeam(raw) || (!!raw && typeof raw === 'object' && 'state' in raw && hasTeam(raw.state))
+}
+
 const handleAuthorizedGameRoute = async (
   req: IncomingMessage,
   res: ServerResponse,
@@ -555,6 +561,11 @@ const handleAuthorizedGameRoute = async (
     const body = JSON.parse(await readBody(req)) as { state?: unknown }
     if (!body.state) {
       await sendJson(res, 400, { ok: false, error: 'missing state' })
+      return true
+    }
+    if (loadsTeamState(body.state)
+      && !await canUseExperimentalFeature((await validateSession(extractToken(req.headers.authorization)))?.id, 'team-modes')) {
+      await sendJson(res, 403, { ok: false, error: 'Experimental feature unavailable', code: 'experimental_feature_unavailable', feature: 'team-modes' })
       return true
     }
     const { result } = await callAndRespond(req, 'loadState', [body.state], s => s.loadState(body.state))

@@ -35,3 +35,18 @@ it('rejects team creation through both HTTP entry points and allows an administr
   }
   expect((await request('/api/game/new', { playerCount: 2 }, player!)).status).toBe(200)
 })
+
+it('rejects loading a team state into the debug sandbox without availability', async () => {
+  const player = await createSession('http-player'), owner = await createSession('http-owner')
+  const created = await request('/api/game/new-sandbox', { playerCount: 4, teamConfig }, owner!)
+  const teamState = created.body.state
+  expect(teamState.team).toBeTruthy()
+  const denied = { status: 403, body: { ok: false, code: 'experimental_feature_unavailable', feature: 'team-modes', error: 'Experimental feature unavailable' } }
+  for (const state of [teamState, { state: teamState }]) {
+    expect(await request('/api/game/load', { state }, player!)).toEqual(denied)
+    expect(await request('/api/game/load', { state }, undefined)).toEqual(denied)
+  }
+  expect((await request('/api/game/load', { state: teamState }, owner!)).status).toBe(200)
+  const ordinary = await request('/api/game/new', { playerCount: 2 }, player!)
+  expect((await request('/api/game/load', { state: ordinary.body.state }, player!)).status).toBe(200)
+})
