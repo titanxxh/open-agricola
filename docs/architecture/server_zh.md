@@ -46,7 +46,7 @@ server/game/
 - `team-room.ts` 在 `rooms.team_members_json` 保存未排座成员，等待连接计入配额和过期判断。纯函数 `projectTeamWaitingRoom` 共用于实时等待室和“我的对局”；只有实时连接添加在线状态。`startTeamGame` 先提交种子确定的归属和名字，再发送 `roomJoined` 与 Step 0。`setTeam` 在发布前检查容量并提交成员移动，失败时回滚。测试见 `team-seating.test.ts`、`team-room.test.ts`。
 - `room-spectators.ts` 保存无座位的临时旁观订阅，只读取已有在线路由，不申请准入。旁观接收公开的加入／断开事件以及 空可见座位集合的快照与历史；`room-router` 在预留回执前拒绝写命令。旁观不改变在线人数、过期时间或 Replay；全员离线、完赛、终止和重开会结束订阅。见 [ADR 0040](../adr/0040-public-live-spectating.md)、`live-spectating-network.test.ts` 与 `live-spectating.spec.ts`。
 - 普通入座通过 `resolveJoinPlayerIndex` 随机分配空座或恢复已存座位。重开保留名字与颜色，先发布新绑定再发快照。dispatch 从 Room 刷新绑定；开发、单人与热座保留原分配。测试见 `room-router.test.ts`、`draft-opening-order.spec.ts`。
-- `room-access.ts` 负责邀请准入与 `rooms.invited_user_ids`。大厅、Context、定位与 WS 校验权限；邀请名单不进入 GameState、Replay 或公开摘要。`GET /api/lobby/players?prefix=` 要求登录，至少两个字符，排除本人，最多返回十个可邀请账号。仅管理员可用 `scope=beta-access` 搜索全部已注册账号，包括邮箱未验证者。测试：`room-invitations.test.ts`、`auth-routes.test.ts`、`room-invitations.spec.ts`。
+- `room-access.ts` 负责邀请准入与 `rooms.invited_user_ids`。大厅、Context、定位与 WS 校验权限；邀请名单不进入 GameState、Replay 或公开摘要。`GET /api/lobby/players?prefix=` 要求登录，至少两个字符，排除本人，最多返回十个可邀请账号。仅管理员可用的 `scope=beta-access` 额外包含邮箱未验证账号；两种范围都排除正在注销的账号。测试：`room-invitations.test.ts`、`auth-routes.test.ts`、`room-invitations.spec.ts`。
 - `lobby-my-rooms.ts` 为 `/api/lobby/my-rooms` 读取已提交快照，不恢复 Session。共享 `MyActiveRoom` 契约公开已占用座位的显示名、颜色、创建与开局时间、启用的扩展、游戏回合或开局阶段，以及 pending frame 的所有者或当前玩家。异步轮抽的等待座位列表只包含当前有牌包需要选择的玩家，排除等待传牌或已完成的座位，不返回私有状态、卡牌身份或账号 ID。快照无法解析时省略该房间从状态派生的详情。测试：`server/__tests__/lobby-my-rooms.test.ts`。
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
 - 创建在持久提交回调中先采用新 Room，再分离原连接。旧房通知失败只记录故障，不回滚或释放已提交的新会话；初始化清理由提交边界决定。
@@ -137,7 +137,7 @@ server/custom-code/
 
 HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `SessionResponse` 一致，校验端点从不写权威状态。在 WebSocket Room 内，开发命令使用 `ClientCommand`。
 
-- `beta-access-{routes,store}.ts` 负责管理员 `GET/PUT/DELETE /api/admin/beta-access`、幂等授予和 `/api/auth/me` 的最新资格。测试：`beta-access-routes.test.ts`。
+- `beta-access-{routes,store}.ts` 负责管理员 `GET/PUT/DELETE /api/admin/beta-access` 与幂等授予；`experimental-features.ts` 以一次最新读取回答 `/api/auth/me` 的资格。测试：`beta-access-routes.test.ts`。
 - `GET /api/health`、`GET /api/rooms`、`GET /api/game/state`。
 - `POST /api/game/new` 接受 `seed?` 与 WebSocket `createRoom` 的设置，经 `server/game/game-setup-options.ts` 映射。`POST /api/game/load`、`POST /api/game/dev/*` 与 `POST /api/game/new-sandbox` 是调试与工坊沙盒路径。
 - `GET /cards-manifest.json` 向主 bundle 提供卡牌 metadata。
@@ -148,7 +148,7 @@ HTTP 用于运维、测试与调试，不是实时同步链路。响应与 `Sess
 
 Game Context、Replay 与 Bug Report 是版本化的产品 API：
 
-创建配置读取只授权已完成单人或组队局的原参与者，始终使用 `no-store`；公开 completed descriptor 和无需凭证的 Viewer 不附带这份私有元数据。新组队房把已接受的创建配置与规则快照分开存储，与等待室准入原子提交；恢复房间时加载同一记录，完成后的来源创建由 `GameCreationStore` 授权。普通多人局仍不支持来源复用，已有但缺少记录的组队房继续沿用正常生命周期。测试见 `team-creation-source.test.ts`、`solo-room.test.ts`。
+创建配置读取只授权已完成单人局的原参与者，始终使用 `no-store`；公开 completed descriptor 和无需凭证的 Viewer 不附带这份私有元数据。
 
 ```text
 GET    /api/v1/game-contexts/:roomId
@@ -228,4 +228,4 @@ Bug Report 投递遵循 [ADR 0012](../adr/0012-github-issue-submission-identity-
 
 `experimental-features.ts` 每次检查读取 `beta_access` 中的最新资格，并从 `ADMIN_USERS` 推导管理员。迁移 `036-beta-access.sql` 只新增资格表，不重写保留对局。[ADR 0042](../adr/0042-experimental-feature-availability.md) 定义开放与参与边界。
 
-`connection/room-router.ts` 对解析完成的组队创建配置、终局后 `newGame` 调用者，以及协商重开的提议者进行门禁，提议和实际创建各检查一次。`game-router.ts` 覆盖两个 HTTP 创建入口。`game/lobby.ts` 与 `game/room-directory.ts` 在列表截取之前过滤公开发现。已有房间的加入、换队、开局和游戏操作沿用正常权限，不受阶段或资格变化影响。`/api/auth/me` 计算 `experimentalFeatures`，连接与令牌不缓存资格。测试：[房间入口](../../server/connection/__tests__/experimental-features.test.ts)、[HTTP](../../server/__tests__/experimental-feature-http.test.ts)、[资格与外键](../../server/__tests__/experimental-features.test.ts)。
+`connection/room-router.ts` 对解析完成的组队创建配置、终局后 `newGame` 调用者，以及协商重开的提议者进行门禁，提议和实际创建各检查一次。`game-router.ts` 覆盖两个 HTTP 创建入口，以及向调试沙盒加载组队状态。`game/lobby.ts` 与 `game/room-directory.ts` 在列表截取之前过滤公开发现。已有房间的加入、换队、开局和游戏操作沿用正常权限，不受阶段或资格变化影响。`/api/auth/me` 计算 `experimentalFeatures`，连接与令牌不缓存资格。测试：[房间入口](../../server/connection/__tests__/experimental-features.test.ts)、[HTTP](../../server/__tests__/experimental-feature-http.test.ts)、[资格与外键](../../server/__tests__/experimental-features.test.ts)。

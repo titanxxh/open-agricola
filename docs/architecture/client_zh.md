@@ -112,7 +112,7 @@ GameContextRouter
 - 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。策略版本查询参数绕过使用旧 CSP 缓存的入口 HTML。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
-- 完成的单人与组队 Game Context 在历史 Viewer 外保留公开结果和私下校验原参与者资格的再开入口。`SameConfigurationRematch` 处理单人配置调整，`TeamSameConfigurationRematch` 独立读取组队配置与当前可用性；即时 `ScoringPad` 注入相同操作，私有配置读取或 Viewer 失败均不隐藏公开结果。`CompletedContext` 在摘要与 `ReplayShell` 之间分配同一个视口，让重开操作下方的回放控件保持可达。
+- 完成的单人 Game Context 在历史 Viewer 外保留公开分数和私下校验本人资格的再开入口。即时 `ScoringPad` 注入同一再开组件；私有配置读取或 Viewer 失败均不隐藏公开结果。完成的组队局与普通多人局不提供按原配置再开。`CompletedContext` 在摘要与 `ReplayShell` 之间分配同一个视口，让重开操作下方的回放控件保持可达。
 - `ArchivedTeamResults` 在完成摘要与 Replay 入口、不可用页面中展示已存队伍名次和当前参与者元数据。终局 Replay 的 `ScoringPad` 使用录制的队伍得分摘要。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。
@@ -124,6 +124,6 @@ GameContextRouter
 
 `AuthContext` 消费服务端的 `user.experimentalFeatures`，密码登录或重置密码后重新读取 `/api/auth/me`。缺失资格列表或未登录时视为空。`LobbyPage` 仅在该列表包含对应功能 ID 时展示组队与分身创建入口。客户端不从管理员身份、环境或对局状态推导资格。[LobbyPage 测试](../../client/app/__tests__/LobbyPage.test.tsx) 和[声明阶段浏览器测试](../../e2e-tests/experimental-feature-gates.spec.ts) 验证入口展示。
 
-`BetaBadge` 标记组队与分身创建入口，公开列表、我的对局和等待室的 `TeamConfigurationSummary`，以及实时和归档队伍结果。只有创建表单显示 `beta.creationHint`；`MyActiveGames` 从服务端接收等待及进行中房间的 `teamConfig`。`GameEndControls` 为不可用账号锁定发起组队重开，仍允许同意其他玩家的提议；`TeamSameConfigurationRematch` 在历史 Viewer 外独立读取原参与者配置与最新资格，展示同样的锁定原因，并注入实时 `ScoringPad`。配置读取或 Viewer 失败不影响公开结果。`experimental_feature_unavailable` 在触发操作的控件下显示 `form-error` 并重读 `/api/auth/me`；大厅组队创建复用带命令日志的创建路径，让拒绝保留在表单。测试见 `GameEndControls.test.tsx`、`TeamSameConfigurationRematch.test.tsx`、`GameContextRouter.test.tsx`、`beta-team-ui.spec.ts`。
+`BetaBadge` 标记组队与分身创建入口，公开列表、我的对局和等待室的 `TeamConfigurationSummary`，以及实时和归档队伍结果。只有创建表单显示 `beta.creationHint`；`MyActiveGames` 从服务端接收等待及进行中房间的 `teamConfig`。`GameEndControls` 为不可用账号锁定发起组队重开，仍允许同意其他玩家的提议。`experimental_feature_unavailable` 在触发操作的控件下显示 `form-error` 并重读 `/api/auth/me`；同意时被拒说明服务端检查的是发起人，同意者看到 `beta.rematchProposerUnavailable`，不重读自身资格；大厅组队创建复用带命令日志的创建路径，让拒绝保留在表单。测试见 `GameEndControls.test.tsx`、`GameContextRouter.test.tsx`、`beta-team-ui.spec.ts`。
 
-设置页独立显示 Beta 资格，不从实验功能可用性推导。管理员区的 `BetaAccessSettings` 复用 `RoomInvitePicker` 的防抖账号检索，使用仅管理员可用的 `scope=beta-access` 包含邮箱未验证账号，列出授予人与时间，并通过 `DangerButton` 确认撤销。授予与撤销影响后续创建和发现检查，已有房间继续可用。测试见 `BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
+设置页独立显示 Beta 资格，不从实验功能可用性推导。管理员区的 `BetaAccessSettings` 复用 `RoomInvitePicker` 的防抖账号检索，使用仅管理员可用的 `scope=beta-access` 包含邮箱未验证账号、排除正在注销的账号，列出授予人与时间，并通过 `DangerButton` 确认撤销。授予与撤销影响后续创建和发现检查，已有房间继续可用。测试见 `BetaAccessSettings.test.tsx`、`SettingsPage.test.tsx`、`beta-access-admin.spec.ts`。
