@@ -1,3 +1,4 @@
+import { parseTeamConfiguration, type TeamConfiguration } from '../../shared/contract/team'
 import type { InitialStateOptions } from '../../shared/session/state-constants.ts'
 import type { SoloCreationConfiguration, SoloHandMode } from '../../shared/contract/game-creation'
 import { isMoorBalanceRulesEnabled } from '../../shared/contract/game-variants'
@@ -11,6 +12,7 @@ export type DraftSetupOptions = { draftMode: 'simultaneous'; draftPoolSize: numb
  * payload maps onto `InitialStateOptions`.
  */
 export type GameSetupRequest = {
+  teamConfig?: TeamConfiguration
   playerCount: number
   soloHandMode?: SoloHandMode
   enableCommunityDeck: boolean
@@ -51,24 +53,30 @@ export const asSetupPayload = (parsed: unknown): Record<string, unknown> =>
 export const parseGameSetupRequest = (
   raw: Record<string, unknown>,
   draft: DraftSetupOptions | null,
-): GameSetupRequest => ({
-  playerCount: clampPlayerCount(raw.maxPlayers ?? raw.playerCount),
-  ...(clampPlayerCount(raw.maxPlayers ?? raw.playerCount) === 1
-    ? { soloHandMode: raw.soloHandMode === 'choose-7' ? 'choose-7' : 'random' } : {}),
-  enableCommunityDeck: raw.enableCommunityDeck === true,
-  enableParentCards: raw.enableParentCards === true,
-  draftParents: raw.draftParents === false ? false : undefined,
-  enableThroughTheSeasons: raw.enableThroughTheSeasons === true,
-  enableFarmersOfTheMoor: raw.enableFarmersOfTheMoor === true,
-  enableMoorBalanceRules: isMoorBalanceRulesEnabled(raw),
-  allowIncompleteFarmersOfTheMoorMinorDeal: raw.allowIncompleteFarmersOfTheMoorMinorDeal === true,
-  enableSnakeOpening: raw.enableSnakeOpening === true,
-  draft,
-  hotseat: raw.hotseat === true,
-})
+): GameSetupRequest => {
+  const teamConfig = parseTeamConfiguration(raw.teamConfig, clampPlayerCount(raw.maxPlayers ?? raw.playerCount))
+  if (teamConfig && raw.hotseat === true) throw new Error('Team games do not support hotseat')
+  return {
+    ...(teamConfig ? { teamConfig } : {}),
+    playerCount: clampPlayerCount(raw.maxPlayers ?? raw.playerCount),
+    ...(clampPlayerCount(raw.maxPlayers ?? raw.playerCount) === 1
+      ? { soloHandMode: raw.soloHandMode === 'choose-7' ? 'choose-7' : 'random' } : {}),
+    enableCommunityDeck: raw.enableCommunityDeck === true,
+    enableParentCards: raw.enableParentCards === true,
+    draftParents: raw.draftParents === false ? false : undefined,
+    enableThroughTheSeasons: raw.enableThroughTheSeasons === true,
+    enableFarmersOfTheMoor: raw.enableFarmersOfTheMoor === true,
+    enableMoorBalanceRules: isMoorBalanceRulesEnabled(raw),
+    allowIncompleteFarmersOfTheMoorMinorDeal: raw.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+    enableSnakeOpening: raw.enableSnakeOpening === true,
+    draft,
+    hotseat: raw.hotseat === true,
+  }
+}
 
 export const buildInitialStateOptions = (request: GameSetupRequest): InitialStateOptions => ({
   playerCount: request.playerCount,
+  ...(request.teamConfig ? { teamConfig: request.teamConfig } : {}),
   ...(request.soloHandMode ? { soloHandMode: request.soloHandMode } : {}),
   enableCommunityDeck: request.enableCommunityDeck,
   enableParentCards: request.enableParentCards,

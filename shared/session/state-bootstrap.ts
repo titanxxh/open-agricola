@@ -1,3 +1,4 @@
+import { createTeamState } from '../domain/team-scoring'
 import { restoreSessionState } from './state-recovery'
 import { isMoorBalanceRulesEnabled } from '../contract/game-variants'
 // Catalog-dependent state helpers (server-facing).
@@ -948,6 +949,7 @@ export const createInitialState = (
     nextPublicEventArchivePacketSeq: 2,
     roundActionOrder,
     gameSeed,
+    ...(options.teamConfig ? { team: createTeamState(options.teamConfig, players.length, gameSeed, options.teamAssignments) } : {}),
     availableMajorImprovements: getVisibleMajorImprovementIds(majorImprovementSupply) ?? [...standardMajorImprovementIds],
     majorImprovementSupply,
     futureMeeples: [],

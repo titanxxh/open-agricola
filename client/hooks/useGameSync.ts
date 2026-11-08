@@ -13,6 +13,7 @@ export const useGameSync = () => {
     allowedCommands: [],
     anytimeActions: [],
   })
+  const [teamScores, setTeamScores] = useState<GameSyncPayload['teamScores']>()
   const [scores, setScores] = useState<PlayerScoreSummary[] | null>(null)
   const [pastureCapacities, setPastureCapacities] = useState<Record<string, Record<string, number>>>({})
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +46,7 @@ export const useGameSync = () => {
     setState(hydrated)
     setInteraction(payload.interaction)
     setScores(payload.scores ?? null)
+    setTeamScores(payload.teamScores)
     setPastureCapacities(payload.pastureCapacities ?? {})
     setError(payload.ok ? null : (payload.error ?? 'unknown error'))
     setHistoryWindow(payload.historyWindow)
@@ -60,6 +62,7 @@ export const useGameSync = () => {
     state,
     interaction,
     scores,
+    teamScores,
     pastureCapacities,
     error,
     historyLength,

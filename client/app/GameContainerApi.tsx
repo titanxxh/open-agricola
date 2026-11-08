@@ -395,7 +395,7 @@ export const GameContainerApi = () => {
     isLocalMode,
     user?.id ?? 'anon',
   )
-  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
+  const { state, interaction, scores, teamScores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, waitingSeatIndexes, applySnapshot } =
     useGameSync()
   const roomHistory = useRoomHistory(transport, state, historyWindow)
   const privateEventNotificationBatchSeqRef = useRef(0)
@@ -2098,7 +2098,7 @@ export const GameContainerApi = () => {
           }}
         />
       </div>
-      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} players={state.players} onClose={closeScoring}
+      {shouldShowScoringPad ? <ScoringPad locale={locale} scores={scores ?? []} teamScores={teamScores} teamConfiguration={state.team?.configuration} players={state.players} onClose={closeScoring}
         showDraftHistory={state.gameOver && (state.players.length > 1 || !!state.soloHandSelection?.kept)}
         startingHandSelection={state.players.length === 1 ? state.soloHandSelection : undefined}
         completionActions={state.gameOver && state.players.length === 1 && isWs && wsTransport?.roomId

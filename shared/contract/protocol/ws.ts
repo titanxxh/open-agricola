@@ -48,6 +48,7 @@ type ClientCommandBody =
   | { type: 'quoteFenceSelection'; playerIndex: number; requestKey: string; payload: FenceSelectionPayload; expectedVersion: number }
   | {
       type: 'createRoom'
+      teamConfig?: import('../team').TeamConfiguration
       access?: RoomAccess
       maxPlayers?: number
       soloHandMode?: SoloHandMode

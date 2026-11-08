@@ -164,6 +164,7 @@ type GameSyncPayload = {
   privateEvents?: PrivateGameEvent[]
   waitingSeatIndexes?: number[]
   scores: PlayerScoreSummary[] | null
+  teamScores?: TeamScoreSummary[]
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
   hasActionStartSnapshot: boolean

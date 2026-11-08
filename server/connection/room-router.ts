@@ -541,7 +541,9 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   }
   const draftOptions = parseDraftOptions(input)
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
-  const setup = parseGameSetupRequest(input, draftOptions.value)
+  let setup: ReturnType<typeof parseGameSetupRequest>
+  try { setup = parseGameSetupRequest(input, draftOptions.value) }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
   const maxPlayers = setup.playerCount
   const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
