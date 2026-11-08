@@ -19,6 +19,8 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const lastUnavailableRequest = useRef<string | null>(null)
+  // Agreeing only rechecks the proposer, so that rejection is not about this account.
+  const lastCommand = useRef<'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd' | null>(null)
   useEffect(() => {
     const refresh = () => {
       if (transport.roomId) transport.sendRoomCommand('getGameEndProposal')
@@ -36,7 +38,9 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
         setSending(false)
         const failure = event.type === 'error' ? event : event.status === 'completed' && !event.receipt.outcome.ok ? event.receipt.outcome : undefined
         if (failure) {
-          if (failure.code === 'experimental_feature_unavailable') {
+          if (failure.code === 'experimental_feature_unavailable' && lastCommand.current === 'respondGameEnd') {
+            setError(t(locale, 'beta.rematchProposerUnavailable'))
+          } else if (failure.code === 'experimental_feature_unavailable') {
             setError(t(locale, 'beta.featureUnavailable'))
             if (!event.requestId || lastUnavailableRequest.current !== event.requestId) {
               lastUnavailableRequest.current = event.requestId ?? null
@@ -61,6 +65,7 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
 
   const send = (type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', options: Record<string, unknown>) => {
     setError('')
+    lastCommand.current = type
     try {
       transport.sendRoomCommand(type, options)
       setSending(true)
