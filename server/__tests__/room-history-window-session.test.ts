@@ -33,6 +33,20 @@ const addActions = (session: GameSession, count: number) => {
 }
 
 describe('complete operation-group Room history pages', () => {
+  it('binds cursors to the visible seat set independently of its order or duplicate entries', () => {
+    const session = setup()
+    try {
+      addActions(session, 28)
+      const canonical = session.withCtx(() => serializeState(session.state, {}))
+      const page = buildRoomHistoryPage(canonical, ['p1', 'p2'])
+      expect(page.window.nextCursor).not.toBeNull()
+      const older = buildRoomHistoryPage(canonical, ['p1', 'p2'], page.window.nextCursor!)
+      expect(buildRoomHistoryPage(canonical, ['p2', 'p1', 'p2'], page.window.nextCursor!)).toEqual(older)
+      expect(() => buildRoomHistoryPage(canonical, ['p1'], page.window.nextCursor!)).toThrow(HistoryBranchChangedError)
+      expect(() => buildRoomHistoryPage(canonical, [], page.window.nextCursor!)).toThrow(HistoryBranchChangedError)
+    } finally { session.dispose() }
+  })
+
   it('does not expose hidden hand payload changes through projection anchors', () => {
     const session = createWorkSession({ seed: 10, configure: state => {
       state.players[1]!.minorHand = ['D036_BreedRegistry']
@@ -44,9 +58,9 @@ describe('complete operation-group Room history pages', () => {
       expect(session.resolveChoice(1, 'confirm', { zones: [] }).ok).toBe(true)
       const raw = session.withCtx(() => serializeState(session.state, {}))
       const hidden = raw.events.find(event => event.type === 'card.stateChanged' && event.cardId === 'D036_BreedRegistry')!
-      const before = buildRoomHistoryPage(raw, 'p1')
+      const before = buildRoomHistoryPage(raw, ['p1'])
       const extra = { ...hidden, id: 'additional-hidden-event', occurrenceId: 'hidden-occurrence', seq: raw.nextEventSeq }
-      const after = buildRoomHistoryPage({ ...raw, events: [...raw.events, extra], nextEventSeq: raw.nextEventSeq + 1 }, 'p1')
+      const after = buildRoomHistoryPage({ ...raw, events: [...raw.events, extra], nextEventSeq: raw.nextEventSeq + 1 }, ['p1'])
       expect(after.window.projectionHeads).toEqual(before.window.projectionHeads)
       expect(after.window.logRecords).toEqual(before.window.logRecords)
       expect(after.window.eventRecords).toEqual(before.window.eventRecords)
@@ -60,16 +74,16 @@ describe('complete operation-group Room history pages', () => {
     try {
       addActions(session, 28)
       const before = session.withCtx(() => serializeState(session.state, {}))
-      const page = buildRoomHistoryPage(before, 'p1')
-      const older = buildRoomHistoryPage(before, 'p1', page.window.nextCursor!)
+      const page = buildRoomHistoryPage(before, ['p1'])
+      const older = buildRoomHistoryPage(before, ['p1'], page.window.nextCursor!)
       addActions(session, 2)
       const appended = session.withCtx(() => serializeState(session.state, {}))
-      expect(buildRoomHistoryPage(appended, 'p1').window.branchId).toBe(page.window.branchId)
-      expect(buildRoomHistoryPage(appended, 'p1', page.window.nextCursor!).log).toEqual(older.log)
+      expect(buildRoomHistoryPage(appended, ['p1']).window.branchId).toBe(page.window.branchId)
+      expect(buildRoomHistoryPage(appended, ['p1'], page.window.nextCursor!).log).toEqual(older.log)
       const changed = [...session.state.log]
       changed[changed.length - 1] = { key: 'log.startGame', params: { replaced: true } }
       session.loadState({ ...session.state, log: changed })
-      expect(() => buildRoomHistoryPage(session.withCtx(() => serializeState(session.state, {})), 'p1', page.window.nextCursor!)).toThrow(HistoryBranchChangedError)
+      expect(() => buildRoomHistoryPage(session.withCtx(() => serializeState(session.state, {})), ['p1'], page.window.nextCursor!)).toThrow(HistoryBranchChangedError)
     } finally { session.dispose() }
   })
 
@@ -79,14 +93,14 @@ describe('complete operation-group Room history pages', () => {
     const canonical = session.withCtx(() => serializeState(session.state, {}))
     const beforeHash = frameHash(canonical as unknown as JsonValue)
     const beforeCursor = session.createSessionPrivateCursor()
-    const full = session.buildSyncPayload(session.getState(), 'p1').state
-    const dev = session.buildSyncPayload(session.getState(), 'p1', 'dev-viewer', undefined, true)
+    const full = session.buildSyncPayload(session.getState(), ['p1']).state
+    const dev = session.buildSyncPayload(session.getState(), ['p1'], 'dev-viewer', undefined, true)
     expect(dev.historyWindow!.operationGroupIds).toHaveLength(HISTORY_WINDOW_GROUPS)
     expect(dev.state.roundActionOrder).toEqual(session.state.roundActionOrder)
     expect(dev.state).not.toHaveProperty('gameSeed')
-    const pages = [buildRoomHistoryPage(canonical, 'p1')]
+    const pages = [buildRoomHistoryPage(canonical, ['p1'])]
     expect(pages[0]!.window.operationGroupIds).toHaveLength(HISTORY_WINDOW_GROUPS)
-    while (pages.at(-1)!.window.nextCursor) pages.push(buildRoomHistoryPage(canonical, 'p1', pages.at(-1)!.window.nextCursor!))
+    while (pages.at(-1)!.window.nextCursor) pages.push(buildRoomHistoryPage(canonical, ['p1'], pages.at(-1)!.window.nextCursor!))
     expect(pages.flatMap(page => page.log)).toEqual(full.log)
     expect(pages.toReversed().flatMap(page => page.events)).toEqual(full.events)
     expect(pages.toReversed().flatMap(page => page.publicEventArchive)).toEqual(full.publicEventArchive)
@@ -120,11 +134,11 @@ describe('complete operation-group Room history pages', () => {
     session.updatePlayerName(0, 'Left')
     session.updatePlayerName(1, 'Right')
     const current = session.withCtx(() => serializeState(session.state, {}))
-    expect(buildRoomHistoryPage(current, 'p1').log[0]).toMatchObject({ params: { fromPlayer: 'Left', toPlayer: 'Right' } })
+    expect(buildRoomHistoryPage(current, ['p1']).log[0]).toMatchObject({ params: { fromPlayer: 'Left', toPlayer: 'Right' } })
     expect(session.state.log[0]).toMatchObject({ params: { fromPlayer: 'Same', toPlayer: 'Same' } })
     expect(describeHistory(current).branchId).toBe(branch)
     addActions(session, 1)
-    expect(() => buildRoomHistoryPage(session.withCtx(() => serializeState(session.state, {})), 'p1', JSON.stringify({ branchId: branch, beforeGroup: 'old' }))).toThrow(HistoryBranchChangedError)
+    expect(() => buildRoomHistoryPage(session.withCtx(() => serializeState(session.state, {})), ['p1'], JSON.stringify({ branchId: branch, beforeGroup: 'old' }))).toThrow(HistoryBranchChangedError)
   })
   it('retains explicit playerRefs with duplicate names through JSON recovery and name projection', () => {
     const session = setup()
@@ -137,7 +151,7 @@ describe('complete operation-group Room history pages', () => {
     restarted.updatePlayerName(0, 'Left')
     restarted.updatePlayerName(1, 'Right')
     const raw = restarted.withCtx(() => serializeState(restarted.state, {}))
-    expect(buildRoomHistoryPage(raw, 'p1').log[0]).toMatchObject({ params: { fromPlayer: 'Left', toPlayer: 'Right' } })
+    expect(buildRoomHistoryPage(raw, ['p1']).log[0]).toMatchObject({ params: { fromPlayer: 'Left', toPlayer: 'Right' } })
     expect(raw.log[0]!.params).toMatchObject({ fromPlayer: 'Same', toPlayer: 'Same' })
   })
 
@@ -153,7 +167,7 @@ describe('complete operation-group Room history pages', () => {
     session.updatePlayerName(1, 'Target')
     const raw = session.withCtx(() => serializeState(session.state, {}))
     expect(raw.log[0]).toMatchObject({ playerId: 'p1', params: { player: 'Same' } })
-    expect(buildRoomHistoryPage(raw, 'p1').log[0]).toMatchObject({ params: { player: 'Actor' } })
+    expect(buildRoomHistoryPage(raw, ['p1']).log[0]).toMatchObject({ params: { player: 'Actor' } })
   })
 
   it('keeps generated name provenance for empty connection names and marks chosen names literal', () => {
@@ -183,13 +197,13 @@ describe('complete operation-group Room history pages', () => {
       previousMaxSeq: 201, nextMaxSeq: 199, canceledEventIds: [hidden.id, visible.id], canceledSeqs: [200, 201], canceledEvents: [hidden, visible],
     }]
     const raw = session.withCtx(() => serializeState(session.state, {}))
-    const ownerPage = buildRoomHistoryPage(raw, 'p1')
-    const other = buildRoomHistoryPage(raw, 'p2')
+    const ownerPage = buildRoomHistoryPage(raw, ['p1'])
+    const other = buildRoomHistoryPage(raw, ['p2'])
     expect(JSON.stringify(other)).not.toContain('D036_BreedRegistry')
     expect(JSON.stringify(other)).not.toContain('hidden-card')
     expect(JSON.stringify(other)).toContain('visible-gain')
     expect(other).not.toHaveProperty('privateEvents')
-    expect(() => buildRoomHistoryPage(raw, 'p2', ownerPage.window.nextCursor!)).toThrow(HistoryBranchChangedError)
+    expect(() => buildRoomHistoryPage(raw, ['p2'], ownerPage.window.nextCursor!)).toThrow(HistoryBranchChangedError)
     expect(ownerPage.publicEventArchive.at(-1)).toMatchObject({ canceledEvents: [hidden, visible] })
   })
 
@@ -197,16 +211,16 @@ describe('complete operation-group Room history pages', () => {
     const session = setup()
     addActions(session, 28)
     const raw = session.withCtx(() => serializeState(session.state, {}))
-    const before = buildRoomHistoryPage(raw, 'p1')
+    const before = buildRoomHistoryPage(raw, ['p1'])
     expect(session.undoAction().ok).toBe(true)
     const undone = session.withCtx(() => serializeState(session.state, {}))
-    expect(() => buildRoomHistoryPage(undone, 'p1', before.window.nextCursor!)).toThrow(HistoryBranchChangedError)
-    expect(buildRoomHistoryPage(undone, 'p1').publicEventArchive.some(packet => packet.type === 'publicEvents.canceled')).toBe(true)
+    expect(() => buildRoomHistoryPage(undone, ['p1'], before.window.nextCursor!)).toThrow(HistoryBranchChangedError)
+    expect(buildRoomHistoryPage(undone, ['p1']).publicEventArchive.some(packet => packet.type === 'publicEvents.canceled')).toBe(true)
     addActions(session, 1)
     const replaced = session.withCtx(() => serializeState(session.state, {}))
-    const pages = [buildRoomHistoryPage(replaced, 'p1')]
-    while (pages.at(-1)!.window.nextCursor) pages.push(buildRoomHistoryPage(replaced, 'p1', pages.at(-1)!.window.nextCursor!))
-    expect(pages.toReversed().flatMap(page => page.publicEventArchive)).toEqual(session.buildSyncPayload(session.getState(), 'p1').state.publicEventArchive)
+    const pages = [buildRoomHistoryPage(replaced, ['p1'])]
+    while (pages.at(-1)!.window.nextCursor) pages.push(buildRoomHistoryPage(replaced, ['p1'], pages.at(-1)!.window.nextCursor!))
+    expect(pages.toReversed().flatMap(page => page.publicEventArchive)).toEqual(session.buildSyncPayload(session.getState(), ['p1']).state.publicEventArchive)
     const ids = pages.flatMap(page => page.window.archiveRecords.map(record => record.recordId))
     expect(new Set(ids).size).toBe(ids.length)
   })
@@ -225,24 +239,24 @@ describe('complete operation-group Room history pages', () => {
       session.updatePlayerName(0, 'Renamed left')
       session.updatePlayerName(1, 'Renamed right')
       const saved = serializeSessionSnapshot(session.state, session)
-      const before = buildRoomHistoryPage(saved.frame, 'p1')
+      const before = buildRoomHistoryPage(saved.frame, ['p1'])
       await persistence.save('page-room', saved, { createdBy: null, maxPlayers: 2, status: 'playing', players: [], customCardDbIds: [] })
       const loaded = (await persistence.load('page-room'))!.serialized!
       expect(frameHash(loaded.frame as unknown as JsonValue)).toBe(frameHash(saved.frame as unknown as JsonValue))
       const restarted = new GameSession(rehydrateState(loaded))
       const raw = restarted.withCtx(() => serializeState(restarted.state, {}))
-      const page = buildRoomHistoryPage(raw, 'p1')
+      const page = buildRoomHistoryPage(raw, ['p1'])
       expect(page.window).toEqual(before.window)
       expect(page.log[0]).toMatchObject({ params: { fromPlayer: 'Renamed left', toPlayer: 'Renamed right' } })
       expect(page.window.operationGroupIds).toHaveLength(20)
       expect(page.window.nextCursor).toBeTruthy()
       expect(restarted.state.log[0]).toEqual(saved.state.log[0])
-      const older = buildRoomHistoryPage(raw, 'p1', page.window.nextCursor!)
+      const older = buildRoomHistoryPage(raw, ['p1'], page.window.nextCursor!)
       expect(page.log.length + older.log.length).toBe(raw.log.length)
       addActions(restarted, 2)
       const appended = restarted.withCtx(() => serializeState(restarted.state, {}))
-      expect(buildRoomHistoryPage(appended, 'p1').window.branchId).toBe(page.window.branchId)
-      expect(buildRoomHistoryPage(appended, 'p1', page.window.nextCursor!).log).toEqual(older.log)
+      expect(buildRoomHistoryPage(appended, ['p1']).window.branchId).toBe(page.window.branchId)
+      expect(buildRoomHistoryPage(appended, ['p1'], page.window.nextCursor!).log).toEqual(older.log)
       restarted.dispose()
       session.dispose()
     } finally { await db?.close() }

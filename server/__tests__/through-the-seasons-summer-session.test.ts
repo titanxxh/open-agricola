@@ -284,7 +284,7 @@ describe('Seasons batch 3 summer audit', () => {
     expect(done.state.log.length).toBeGreaterThan(1)
     session = auditRestore(session)
     for (const viewer of ['p1', 'p2', null]) {
-      const publicState = session.buildSyncPayload(session.getState(), viewer).state
+      const publicState = session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer]).state
       expect(publicState.players[0]!.stableTiles).toEqual([])
       expect(publicState.players[0]!.houseType).toBe('clay')
     }

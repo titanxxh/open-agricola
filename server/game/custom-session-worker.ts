@@ -98,17 +98,17 @@ const buildResult = (response: SessionResponse) => {
   if (!session) throw new Error('custom session worker is not initialized')
   const snapshot = snapshotForWorker(serializeSessionSnapshot(response.state, session))
   const serialized = snapshot.frame
-  const debug = session.buildSyncPayload(response, null, 'debug', serialized)
-  const spectator = session.buildSyncPayload(response, null, 'viewer', serialized)
+  const debug = session.buildSyncPayload(response, [], 'debug', serialized)
+  const spectator = session.buildSyncPayload(response, [], 'viewer', serialized)
   const viewers = Object.fromEntries(response.state.players.map((player) => [
     player.id,
-    session!.buildSyncPayload(response, player.id, 'viewer', serialized),
+    session!.buildSyncPayload(response, [player.id], 'viewer', serialized),
   ]))
   const { state: _state, ...responseWithoutState } = response
   return {
     response: responseWithoutState,
     snapshot,
-    payloads: { debug, spectator, viewers, windows: { spectator: applyHistoryWindow(response.state, spectator, null), viewers: Object.fromEntries(Object.entries(viewers).map(([id, payload]) => [id, applyHistoryWindow(response.state, payload, id)])) } },
+    payloads: { debug, spectator, viewers, windows: { spectator: applyHistoryWindow(response.state, spectator, []), viewers: Object.fromEntries(Object.entries(viewers).map(([id, payload]) => [id, applyHistoryWindow(response.state, payload, [id])])) } },
   }
 }
 

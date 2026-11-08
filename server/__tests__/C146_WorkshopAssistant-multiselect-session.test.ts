@@ -321,7 +321,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     const livePlayer = resp.state.players[0]!
     expect(readCardExtraData<string[]>(livePlayer, CARD_ID, 'pairs')).toEqual(['WC', 'CS', 'RS'])
     for (const viewer of [livePlayer.id, resp.state.players[1]!.id, null]) {
-      expect(session.buildSyncPayload(resp, viewer).state.players[0]!.cardStatePresentation[CARD_ID]?.resourceGroups)
+      expect(session.buildSyncPayload(resp, viewer === null ? [] : [viewer]).state.players[0]!.cardStatePresentation[CARD_ID]?.resourceGroups)
         .toEqual([{ wood: 1, clay: 1 }, { clay: 1, stone: 1 }, { reed: 1, stone: 1 }])
     }
     expect(livePlayer.resources.wood).toBe(10)
@@ -348,7 +348,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 11, clay: 11, reed: 10, stone: 10 })
     expect(readCardExtraData(resp.state.players[0]!, CARD_ID, 'pairs')).toEqual(['CS', 'RS'])
     for (const viewer of [livePlayer.id, resp.state.players[1]!.id, null]) {
-      expect(session.buildSyncPayload(resp, viewer).state.players[0]!.cardStatePresentation[CARD_ID]?.resourceGroups)
+      expect(session.buildSyncPayload(resp, viewer === null ? [] : [viewer]).state.players[0]!.cardStatePresentation[CARD_ID]?.resourceGroups)
         .toEqual([{ clay: 1, stone: 1 }, { reed: 1, stone: 1 }])
     }
     expect(resp.state.events).toContainEqual(expect.objectContaining({

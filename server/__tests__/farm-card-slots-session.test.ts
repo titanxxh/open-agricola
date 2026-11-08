@@ -51,7 +51,7 @@ const animalSession = () => {
 }
 
 const project = (session: GameSession, response: SessionResponse, displayIndex = 0) => {
-  const payload = session.buildSyncPayload(response, 'p1', 'viewer', undefined, true)
+  const payload = session.buildSyncPayload(response, ['p1'], 'viewer', undefined, true)
   const state = rehydrateStateForClient(payload.state)
   const request = payload.interaction.stateId === 'wait' ? payload.interaction.request : null
   return buildFarmBoardProjection({
@@ -184,7 +184,7 @@ describe('Farm-side Card Field and animal-slot interactions', () => {
     expect(confirmed.state.players[0]!.houseAnimals).toEqual({ '2-0': 'cattle' })
     expect(confirmed.state.players[0]!.cardStates[ANIMAL_CARD]?.extraData?.animalCounts)
       .toEqual({ sheep: 1, boar: 1 })
-    const savedAnimalView = session.buildSyncPayload(confirmed, 'p1').state.players[0]!
+    const savedAnimalView = session.buildSyncPayload(confirmed, ['p1']).state.players[0]!
     expect(savedAnimalView.playedCardAnimalZones).toContainEqual(expect.objectContaining({
       id: `card:${ANIMAL_CARD}`, cardId: ANIMAL_CARD,
       animalCount: 2, animalCounts: { sheep: 1, boar: 1 },

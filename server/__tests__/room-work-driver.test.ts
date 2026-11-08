@@ -11,7 +11,7 @@ const driverFor = (session: GameSession) => {
   return {
     commands,
     driver: {
-      snapshot: async (actor: number) => session.buildSyncPayload(session.getState(), session.state.players[actor]!.id),
+      snapshot: async (actor: number) => session.buildSyncPayload(session.getState(), [session.state.players[actor]!.id]),
       command: async (actor: number, body: { type: 'getState' } | { type: 'choice'; value: string }) => {
         commands.push({ actor, ...body })
         const response = body.type === 'getState' ? session.getState() : session.resolveChoice(actor, body.value)

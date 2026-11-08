@@ -183,7 +183,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, getStatePresentation: (player) => {
     player.cardStates.CUSTOM_ExecutorCard = { extraData: { publicCount: 2, internal: 'AUTH_INTERNAL', groups: [{ wood: 1, clay: 1 }] } }
     const before = JSON.stringify(session.state)
     for (const viewer of [player.id, session.state.players[1]!.id, null]) {
-      const facts = session.buildSyncPayload(session.getState(), viewer).state.players[0]!.cardStatePresentation.CUSTOM_ExecutorCard!
+      const facts = session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer]).state.players[0]!.cardStatePresentation.CUSTOM_ExecutorCard!
       expect(facts).toEqual({ counters: { publicCount: 2 }, resourceGroups: [{ wood: 1, clay: 1 }],
         animalMarkers: [{ animal: 'horse', count: 1, pose: 'lying' }] })
       facts.resourceGroups![0]!.wood = 99

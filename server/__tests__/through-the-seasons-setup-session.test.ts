@@ -88,7 +88,7 @@ describe('Seasons batch 3 setup audit', () => {
     const totals = { winter: [3, 0, 0, 1], spring: [2, 1, 1, 1], summer: [3, 2, 1, 2], autumn: [4, 1, 2, 1] }
     expect(['forest', 'clay-pit', 'reed-bank', 'fishing'].map((id, index) => spaceOf(session, id).resources[(['wood', 'clay', 'reed', 'food'] as const)[index]!])).toEqual(totals[season])
     session = auditRestore(session)
-    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(session.getState(), viewer).state.throughTheSeasons).toEqual({ startSeason: season, currentSeason: season })
+    for (const viewer of ['p1', 'p2', null]) expect(session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer]).state.throughTheSeasons).toEqual({ startSeason: season, currentSeason: season })
     for (const other of auditSeasons.filter((entry) => entry !== season)) {
       const before = auditClone(session.state)
       const response = session.takeAction(0, seasonActionIds[other])

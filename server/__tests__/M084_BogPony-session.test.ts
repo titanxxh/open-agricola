@@ -93,7 +93,7 @@ describe('M084 Bog Pony session', () => {
     expect(Object.values(updated.houseAnimals).length).toBe(1)
     expect(updated.cardStates[CARD_ID]?.extraData?.lyingHorseCount).toBe(1)
     for (const viewer of [updated.id, resp.state.players[1]!.id, null]) {
-      expect(session.buildSyncPayload(resp, viewer).state.players[0]!.cardStatePresentation[CARD_ID]?.animalMarkers)
+      expect(session.buildSyncPayload(resp, viewer === null ? [] : [viewer]).state.players[0]!.cardStatePresentation[CARD_ID]?.animalMarkers)
         .toEqual([{ animal: 'horse', count: 1, pose: 'lying' }])
     }
     expect(resp.state.events).toEqual(expect.arrayContaining([

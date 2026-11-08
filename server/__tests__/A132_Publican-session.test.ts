@@ -353,11 +353,11 @@ describe('A132_Publican session', () => {
 
     const ownerId = hidden.state.players[1]!.id
     const opponentId = hidden.state.players[0]!.id
-    expect(session.buildSyncPayload(hidden, ownerId, 'viewer').privateEvents)
+    expect(session.buildSyncPayload(hidden, [ownerId], 'viewer').privateEvents)
       .toEqual([expect.objectContaining({ cardIds: ['A001_Shelter'] })])
-    expect(JSON.stringify(session.buildSyncPayload(hidden, opponentId, 'viewer')))
+    expect(JSON.stringify(session.buildSyncPayload(hidden, [opponentId], 'viewer')))
       .not.toContain('A001_Shelter')
-    expect(JSON.stringify(session.buildSyncPayload(hidden, null, 'viewer')))
+    expect(JSON.stringify(session.buildSyncPayload(hidden, [], 'viewer')))
       .not.toContain('A001_Shelter')
 
     resp = advancePastPlayerSwitches(session, session.resolveChoice(0, '__skip__'))

@@ -11,7 +11,7 @@ import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 type Args = {
   room: { id: string; session: GameSession } & Partial<Pick<Room, 'players' | 'inputWindow' | 'hotseat'>>
   resp: SessionResponse
-  viewerPlayerId: string | null
+  visiblePlayerIds: readonly string[]
   version: number
   cause: StateUpdateCause
   requestId?: string
@@ -33,8 +33,8 @@ export function buildEnvelope(args: Args): StateUpdateEnvelope {
     cause: args.cause,
     requestId: args.requestId,
     payload: args.mode === 'debug'
-      ? buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId, args.mode, true)
-      : projectRoomHistoryNames(args.room, buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId, args.mode, true, 'deferred')),
+      ? buildSessionSyncPayload(args.room.session, args.resp, args.visiblePlayerIds, args.mode, true)
+      : projectRoomHistoryNames(args.room, buildSessionSyncPayload(args.room.session, args.resp, args.visiblePlayerIds, args.mode, true, 'deferred')),
     emittedAt: args.emittedAt,
   }
 }

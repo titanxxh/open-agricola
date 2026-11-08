@@ -155,10 +155,10 @@ describe('integrated action prices agree with authoritative execution', () => {
       state.players[0]!.minorHand = ['B065_GrainDepot', 'A019_Handplow']
     })
     const response = enterCardPurchase(session)
-    const owner = session.buildSyncPayload(response, session.state.players[0]!.id)
+    const owner = session.buildSyncPayload(response, [session.state.players[0]!.id])
     expect(JSON.stringify(owner.interaction)).toContain('B065_GrainDepot')
     for (const viewer of [session.state.players[1]!.id, null]) {
-      const payload = session.buildSyncPayload(response, viewer)
+      const payload = session.buildSyncPayload(response, viewer === null ? [] : [viewer])
       expect(JSON.stringify(payload.interaction)).not.toContain('B065_GrainDepot')
       expect(payload.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'private-prompt' }, anytimeActions: [] })
     }
@@ -175,7 +175,7 @@ describe('integrated action prices agree with authoritative execution', () => {
     }))
     const response = session.getState()
     expect(response.interaction.stateId).toBe('idle')
-    expect(JSON.stringify(session.buildSyncPayload(response, session.state.players[0]!.id).interaction)).toContain('B065_GrainDepot')
-    for (const viewer of [session.state.players[1]!.id, null]) expect(JSON.stringify(session.buildSyncPayload(response, viewer).interaction)).not.toContain('B065_GrainDepot')
+    expect(JSON.stringify(session.buildSyncPayload(response, [session.state.players[0]!.id]).interaction)).toContain('B065_GrainDepot')
+    for (const viewer of [session.state.players[1]!.id, null]) expect(JSON.stringify(session.buildSyncPayload(response, viewer === null ? [] : [viewer]).interaction)).not.toContain('B065_GrainDepot')
   })
 })

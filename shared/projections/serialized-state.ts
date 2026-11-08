@@ -8,11 +8,11 @@ import type { SerializedGameState, SerializedParentSelectionCandidates, Serializ
 
 const hiddenHandCardIdsByPlayer = (
   players: readonly PlayerState[],
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
 ): Map<string, Set<string>> => {
   const hidden = new Map<string, Set<string>>()
   for (const player of players) {
-    if (player.id === viewerPlayerId) continue
+    if (visiblePlayerIds.includes(player.id)) continue
     const cardIds = [...(player.minorHand ?? []), ...(player.occupationHand ?? [])]
       .filter((cardId) => cardId !== '?')
     if (cardIds.length > 0) hidden.set(player.id, new Set(cardIds))
@@ -260,9 +260,9 @@ const createVisibleEventSeqView = (
 
 const createHiddenHandVisibility = (
   base: SerializedGameState,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
 ): HiddenHandVisibility => {
-  const hiddenCardIds = hiddenHandCardIdsByPlayer(base.players, viewerPlayerId)
+  const hiddenCardIds = hiddenHandCardIdsByPlayer(base.players, visiblePlayerIds)
   const hiddenRefs = createHiddenHandEventRefs(base, hiddenCardIds)
   const seqView = createVisibleEventSeqView(base, hiddenRefs)
   return { base, hiddenCardIds, hiddenRefs, seqView }
@@ -284,20 +284,20 @@ const maskParentSubmission = (
 
 const filterParentSelectionForPlayer = (
   parentSelection: SerializedParentSelectionState | null,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
 ): SerializedParentSelectionState | null => {
   if (!parentSelection) return null
   return {
     candidates: Object.fromEntries(
       Object.entries(parentSelection.candidates).map(([pid, candidates]) => [
         pid,
-        pid === viewerPlayerId ? candidates : maskParentCandidates(candidates),
+        visiblePlayerIds.includes(pid) ? candidates : maskParentCandidates(candidates),
       ]),
     ),
     submissions: Object.fromEntries(
       Object.entries(parentSelection.submissions).map(([pid, submission]) => [
         pid,
-        pid === viewerPlayerId ? submission : maskParentSubmission(submission),
+        visiblePlayerIds.includes(pid) ? submission : maskParentSubmission(submission),
       ]),
     ),
   }
@@ -457,13 +457,13 @@ const filterPublicEventCancellation = (
 
 export const filterSerializedCancellationsForPlayer = (
   baseState: SerializedGameState,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   cancellations: readonly PublicEventCancellation[] | undefined,
 ): PublicEventCancellation[] | undefined => {
   if (!cancellations?.length) return undefined
   const { base, hiddenRefs, seqView } = createHiddenHandVisibility(
     baseState,
-    viewerPlayerId,
+    visiblePlayerIds,
   )
   const filtered = cancellations
     .map((cancellation) => filterPublicEventCancellation(
@@ -488,27 +488,27 @@ const maskDraftPoolForViewer = (
 
 /**
  * Per-viewer snapshot. Identical to `serializeState` except that secret
- * information belonging to non-viewer players is replaced with same-length
- * arrays of '?' placeholders so the shape stays stable for the client.
+ * information belonging to players outside the visible seat set is replaced
+ * with same-length arrays of '?' placeholders so the shape stays stable.
  *
  * Currently filters:
  *   - `players[i].occupationHand` and `players[i].minorHand` for every
- *     player other than the viewer.
+ *     player outside the visible seat set.
  *   - `players[i].cardStates[cardId]` and card-state events for cards that
  *     are still hidden in another player's hand.
  *   - draft-history card ids that are still hidden in another player's hand
  *     or private draft data.
- *   - Draft inboxes except the viewer's current packet, and kept cards for every
- *     player other than the viewer.
+ *   - Draft inboxes except each visible seat's current packet, and kept cards for
+ *     every hidden seat.
  *   - unresolved `parentSelection.candidates[pid]` and submitted
- *     parent choices for every player other than the viewer.
+ *     parent choices for every hidden seat.
  *   - `gameSeed`, for every viewer: hands, draft pools and the round-card
  *     order all follow from it (ADR-0020).
  *   - Unrevealed Round Cards: their `roundActionOrder` entries and the
  *     `actionId` of goods scheduled on them become `null`. A card is revealed
  *     once its round starts or a card effect reveals it.
  *
- * Pass `viewerPlayerId = null` (or an unknown id) to produce a spectator
+ * Pass an empty `visiblePlayerIds` array (or only unknown ids) for a spectator
  * view where every player's hand and pool is masked.
  */
 export type ViewerProjectionOptions = {
@@ -518,7 +518,7 @@ export type ViewerProjectionOptions = {
 
 export const filterSerializedStateForPlayer = (
   base: SerializedGameState,
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   options: ViewerProjectionOptions = {},
 ): SerializedGameState => {
   const migratedDraft = migrateLegacyDraft(base.draft)
@@ -536,11 +536,11 @@ export const filterSerializedStateForPlayer = (
   }
   const { hiddenCardIds, hiddenRefs, seqView } = createHiddenHandVisibility(
     base,
-    viewerPlayerId,
+    visiblePlayerIds,
   )
   const hiddenDraftHistoryCardIds = new Map(
     base.players
-      .filter((player) => player.id !== viewerPlayerId)
+      .filter((player) => !visiblePlayerIds.includes(player.id))
       .map((player) => [
         player.id,
         new Set([
@@ -554,12 +554,12 @@ export const filterSerializedStateForPlayer = (
   )
   const filteredPlayers = base.players.map((p) => {
     const { lastDraftSubmission: _lastDraftSubmission, ...visiblePlayer } = p
-    const cardStates = projectPrivateCardStates(p.cardStates, p.id === viewerPlayerId)
+    const cardStates = projectPrivateCardStates(p.cardStates, visiblePlayerIds.includes(p.id))
     const cardStatePresentation = Object.fromEntries(Object.entries(p.cardStatePresentation ?? {}).filter(([id]) =>
       !hiddenCardIds.get(p.id)?.has(id),
     ))
     visiblePlayer.scheduledEffects = (p.scheduledEffects ?? []).filter(effect => !hiddenCardIds.get(p.id)?.has(effect.sourceCard))
-    return p.id === viewerPlayerId
+    return visiblePlayerIds.includes(p.id)
       ? { ...visiblePlayer, cardStates, cardStatePresentation }
       : {
           ...visiblePlayer,
@@ -589,9 +589,9 @@ export const filterSerializedStateForPlayer = (
           seats: Object.fromEntries(Object.entries(stage.seats).map(([pid, seat]) => {
             const progress = draftSeatProgress(base.draft!, pid)
             return [pid, {
-              kept: maskDraftPoolForViewer(seat.kept, pid === viewerPlayerId),
+              kept: maskDraftPoolForViewer(seat.kept, visiblePlayerIds.includes(pid)),
               inbox: Object.fromEntries(Object.entries(seat.inbox).map(([round, pool]) => [round,
-                maskDraftPoolForViewer(pool, pid === viewerPlayerId && progress.kind === 'selecting'
+                maskDraftPoolForViewer(pool, visiblePlayerIds.includes(pid) && progress.kind === 'selecting'
                   && progress.stageIndex === stageIndex && progress.round === Number(round)),
               ])),
             }]
@@ -605,7 +605,7 @@ export const filterSerializedStateForPlayer = (
   const filteredOrdinaryCardDrawChoices = Object.fromEntries(
     Object.entries(base.ordinaryCardDrawChoices).map(([id, choice]) => [
       id,
-      choice.playerId === viewerPlayerId
+      visiblePlayerIds.includes(choice.playerId)
         ? choice
         : {
             ...choice,
@@ -644,8 +644,8 @@ export const filterSerializedStateForPlayer = (
     publicEventArchive: filteredPublicEventArchive,
     log: filterHiddenHandLog(base.log, hiddenCardIds),
     draft: filteredDraft,
-    ...(base.soloHandSelection !== undefined ? { soloHandSelection: base.soloHandSelection?.playerId === viewerPlayerId ? base.soloHandSelection : null } : {}),
-    parentSelection: base.phase === 'solo-hand-selection' ? null : filterParentSelectionForPlayer(base.parentSelection, viewerPlayerId),
+    ...(base.soloHandSelection !== undefined ? { soloHandSelection: base.soloHandSelection && visiblePlayerIds.includes(base.soloHandSelection.playerId) ? base.soloHandSelection : null } : {}),
+    parentSelection: base.phase === 'solo-hand-selection' ? null : filterParentSelectionForPlayer(base.parentSelection, visiblePlayerIds),
     ordinaryCardDecks: filteredOrdinaryCardDecks,
     ordinaryCardDrawChoices: filteredOrdinaryCardDrawChoices,
     engineStack: { frames: [] },

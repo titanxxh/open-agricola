@@ -39,13 +39,13 @@ describe('explicit Card State visibility', () => {
     expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'card.infoboxChanged', text: 'Updated public display' }))
     expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'resource.moved', sourceCardId: CARD_ID, resources: { food: 1 } }))
     expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.cardInfoboxChanged' }))
-    for (const viewer of ['p1', 'p2', null]) checkVisible(session.buildSyncPayload(response, viewer), viewer === 'p1')
+    for (const viewer of ['p1', 'p2', null]) checkVisible(session.buildSyncPayload(response, viewer === null ? [] : [viewer]), viewer === 'p1')
     const undone = session.undoAction()
     expect(undone.ok).toBe(true)
     expect(undone.state.players[0]!.resources).toEqual(saved.state.players[0]!.resources)
     for (const viewer of ['p1', 'p2', null]) {
-      checkVisible(session.buildSyncPayload(undone, viewer), viewer === 'p1')
-      expect(JSON.stringify(buildRoomHistoryPage(session.withCtx(() => serializeState(undone.state, {})), viewer)).includes(INTERNAL)).toBe(false)
+      checkVisible(session.buildSyncPayload(undone, viewer === null ? [] : [viewer]), viewer === 'p1')
+      expect(JSON.stringify(buildRoomHistoryPage(session.withCtx(() => serializeState(undone.state, {})), viewer === null ? [] : [viewer])).includes(INTERNAL)).toBe(false)
     }
   })
   it('redacts internal values in recorded events, cancellation archives and history pages without changing the full Frame', () => {
@@ -60,10 +60,10 @@ describe('explicit Card State visibility', () => {
     frame.nextPublicEventArchivePacketSeq = 3
     const before = JSON.stringify(frame)
     for (const viewer of ['p1', 'p2', null]) {
-      checkVisible(filterSerializedStateForPlayer(frame, viewer), viewer === 'p1')
-      expect(JSON.stringify(buildRoomHistoryPage(frame, viewer)).includes(INTERNAL)).toBe(false)
+      checkVisible(filterSerializedStateForPlayer(frame, viewer === null ? [] : [viewer]), viewer === 'p1')
+      expect(JSON.stringify(buildRoomHistoryPage(frame, viewer === null ? [] : [viewer])).includes(INTERNAL)).toBe(false)
     }
-    const projected = filterSerializedStateForPlayer(frame, 'p1')
+    const projected = filterSerializedStateForPlayer(frame, ['p1'])
     expect(projected.events.find((item) => item.id === event.id)).toMatchObject({ type: 'card.stateChanged', key: 'internal' })
     expect(projected.events.find((item) => item.id === event.id)).not.toHaveProperty('value')
     expect(JSON.stringify(frame)).toBe(before)
@@ -72,7 +72,7 @@ describe('explicit Card State visibility', () => {
     const session = createVisibilitySession()
     const before = JSON.stringify(session.state)
     for (const mode of ['viewer', 'dev-viewer'] as const) for (const viewer of ['p1', 'p2', null]) {
-      const payload = session.buildSyncPayload(session.getState(), viewer, mode)
+      const payload = session.buildSyncPayload(session.getState(), viewer === null ? [] : [viewer], mode)
       checkVisible(payload, viewer === 'p1')
       expect(payload.state.players[0]!.cardStatePresentation[CARD_ID]).toEqual({
         counters: { visibleCount: 2 }, infobox: 'Public display', resourceGroups: [{ wood: 1, clay: 1 }],

@@ -33,7 +33,7 @@ const seats = (names: [string, string]): Room['players'] => names.map((name, pla
   playerIndex, name, ws: { OPEN: 1, readyState: 1, send: vi.fn() } as never,
 }))
 const envelope = (session: GameSession, players: Room['players'], viewerPlayerId: string | null = 'p1', mode?: 'viewer' | 'dev-viewer' | 'debug') =>
-  buildEnvelope({ room: { id: 'names', session, players }, resp: session.getState(), viewerPlayerId,
+  buildEnvelope({ room: { id: 'names', session, players }, resp: session.getState(), visiblePlayerIds: viewerPlayerId === null ? [] : [viewerPlayerId],
     version: 1, cause: 'reconnect', emittedAt: 0, mode })
 
 afterEach(() => {
@@ -85,7 +85,7 @@ describe('Room history name presentation', () => {
     const session = setup()
     const project = vi.spyOn(historyNames, 'projectHistoryLogNames')
     const result = buildEnvelope({ room: { id: 'names', session, players: players ? [...players] : undefined },
-      resp: session.getState(), viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
+      resp: session.getState(), visiblePlayerIds: ['p1'], version: 1, cause: 'reconnect', emittedAt: 0 })
     expect(result.payload.state.log[0]!.params).toEqual({ fromPlayer: 'Session actor', toPlayer: 'Session recipient' })
     expect(result.payload.state.players.map(player => player.name)).toEqual(['Session actor', 'Session recipient'])
     expect(project).toHaveBeenCalledTimes(result.payload.state.log.length)
@@ -98,7 +98,7 @@ describe('Room history name presentation', () => {
     response.privateEvents = [{ schemaVersion: 1, type: 'private.handChanged', recipientPlayerId: 'p1',
       cardIds: ['A075_HouseExtension'], cardType: 'minor', reason: 'dev-draw-card' }]
     const views = ['p1', 'p2', null].map(viewerPlayerId => buildEnvelope({
-      room: { id: 'names', session, players }, resp: response, viewerPlayerId, mode,
+      room: { id: 'names', session, players }, resp: response, visiblePlayerIds: viewerPlayerId === null ? [] : [viewerPlayerId], mode,
       version: 1, cause: 'reconnect', emittedAt: 0,
     }).payload)
     expect(views[0]!.state.players[0]!.minorHand).toEqual(['A075_HouseExtension'])
@@ -134,15 +134,15 @@ describe('Room history name presentation', () => {
 
   it('keeps default shared and direct Session presentation usable without a Room', () => {
     const session = setup()
-    const direct = session.buildSyncPayload(session.getState(), 'p1')
+    const direct = session.buildSyncPayload(session.getState(), ['p1'])
     expect(direct.state.log[0]!.params).toMatchObject({ fromPlayer: 'Session actor', toPlayer: 'Session recipient' })
-    const full = session.buildSyncPayload(session.getState(), 'p1', 'viewer', undefined, false, 'deferred')
+    const full = session.buildSyncPayload(session.getState(), ['p1'], 'viewer', undefined, false, 'deferred')
     expect(full.state.log).toEqual(direct.state.log)
     expect(full.historyWindow).toBeUndefined()
     const core = new GameCore({ stateOrSeed: 563, initialStateOptions: { playerCount: 2 } })
     sessions.push(core)
     core.loadState(session.state)
-    const shared = buildSyncPayload(core, core.getState(), 'p1')
+    const shared = buildSyncPayload(core, core.getState(), ['p1'])
     expect(shared.state.log).toEqual(direct.state.log)
     expect(shared.state.players[1]!.minorHand).not.toContain('D036_BreedRegistry')
     expect(core.state.log[0]!.params).toMatchObject({ fromPlayer: 'Recorded name', toPlayer: 'Recorded name' })

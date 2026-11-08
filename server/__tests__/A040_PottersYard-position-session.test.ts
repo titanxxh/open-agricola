@@ -579,7 +579,7 @@ describe('A040 original clay positions', () => {
     expect(placements.map(event => event.to.kind === 'field' ? `${event.to.row}-${event.to.col}` : '')).toEqual(original)
     for (const event of placements) expect(event).toMatchObject({ resources: { clay: 1 }, from: { kind: 'supply' }, reason: 'cardEffect' })
     for (const viewer of [response.state.players[0]!.id, response.state.players[1]!.id, null]) {
-      expect(session.buildSyncPayload(response, viewer).state.players[0]!.farmyardSpaceStates).toEqual(response.state.players[0]!.farmyardSpaceStates)
+      expect(session.buildSyncPayload(response, viewer === null ? [] : [viewer]).state.players[0]!.farmyardSpaceStates).toEqual(response.state.players[0]!.farmyardSpaceStates)
     }
     for (const token of tokens(response.state)) {
       expect(token).toMatchObject({ resources: { clay: 1 }, claimPolicy: 'when-no-longer-unused' })

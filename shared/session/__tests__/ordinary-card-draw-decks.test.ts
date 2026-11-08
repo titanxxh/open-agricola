@@ -139,9 +139,9 @@ describe('ordinary card draw decks', () => {
     expect(restored.ordinaryCardDecks).toEqual(state.ordinaryCardDecks)
     expect(restored.ordinaryCardDrawChoices).toEqual(state.ordinaryCardDrawChoices)
 
-    const p1View = serializeStateForPlayer(state, 'p1', emptyCtx())
-    const p2View = serializeStateForPlayer(state, 'p2', emptyCtx())
-    const spectatorView = serializeStateForPlayer(state, null, emptyCtx())
+    const p1View = serializeStateForPlayer(state, ['p1'], emptyCtx())
+    const p2View = serializeStateForPlayer(state, ['p2'], emptyCtx())
+    const spectatorView = serializeStateForPlayer(state, [], emptyCtx())
 
     expect(p1View.ordinaryCardDecks.minor).toEqual(Array(state.ordinaryCardDecks.minor.length).fill('?'))
     expect(p1View.ordinaryCardDrawChoices[choice.choice.id].candidates).toEqual(choice.choice.candidates)

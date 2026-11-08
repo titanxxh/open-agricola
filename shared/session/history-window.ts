@@ -56,9 +56,11 @@ export const projectHistoryStateNames = (state: SerializedGameState): Serialized
   return { ...state, log: state.log.map(entry => inheritHistoryRecordIdentity(entry, projectHistoryLogNames(entry, getHistoryRecordIdentity(entry)?.participantRoles, names))) }
 }
 
-export const historyPageFromFilteredState = (canonical: HistorySource, filtered: SerializedGameState, cursor?: string, viewerPlayerId: string | null = null): RoomHistoryPage => {
+export const historyPageFromFilteredState = (canonical: HistorySource, filtered: SerializedGameState, cursor?: string, visiblePlayerIds: readonly string[] = []): RoomHistoryPage => {
   const description = describeHistory(canonical)
-  const branchId = `${description.branchId}.${viewerPlayerId ?? 'spectator'}`
+  const viewers = [...new Set(visiblePlayerIds)].sort()
+  const viewerKey = viewers.length === 0 ? 'spectator' : viewers.length === 1 ? viewers[0] : JSON.stringify(viewers)
+  const branchId = `${description.branchId}.${viewerKey}`
   const groups = description.groups
   const visibleGroups = new Set<string>()
   for (const kind of historyStreamKeys) for (const entry of filtered[kind]) {
@@ -138,11 +140,11 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   } }
 }
 
-export const buildRoomHistoryPage = (canonical: SerializedGameState, viewerPlayerId: string | null, cursor?: string): RoomHistoryPage => {
+export const buildRoomHistoryPage = (canonical: SerializedGameState, visiblePlayerIds: readonly string[], cursor?: string): RoomHistoryPage => {
   describeHistory(canonical)
-  return historyPageFromFilteredState(canonical, projectHistoryStateNames(filterSerializedStateForPlayer(canonical, viewerPlayerId)), cursor, viewerPlayerId)
+  return historyPageFromFilteredState(canonical, projectHistoryStateNames(filterSerializedStateForPlayer(canonical, visiblePlayerIds)), cursor, visiblePlayerIds)
 }
-export const applyHistoryWindow = (canonical: HistorySource, payload: GameSyncPayload, viewerPlayerId: string | null): GameSyncPayload => {
-  const page = historyPageFromFilteredState(canonical, payload.state, undefined, viewerPlayerId)
+export const applyHistoryWindow = (canonical: HistorySource, payload: GameSyncPayload, visiblePlayerIds: readonly string[]): GameSyncPayload => {
+  const page = historyPageFromFilteredState(canonical, payload.state, undefined, visiblePlayerIds)
   return { ...payload, state: { ...payload.state, log: page.log, events: page.events, publicEventArchive: page.publicEventArchive }, historyWindow: page.window }
 }

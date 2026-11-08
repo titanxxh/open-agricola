@@ -37,8 +37,8 @@ describe('retained global-round draft recovery', () => {
     const originalKept = new Map(Object.entries(fixture.draft.kept))
     const response = session.loadState(raw)
     expect(response.ok, response.error).toBe(true)
-    expect(session.buildSyncPayload(response, 'p1').state.phase).toBe('draft')
-    expect(session.buildSyncPayload(response, null).state.phase).toBe('draft')
+    expect(session.buildSyncPayload(response, ['p1']).state.phase).toBe('draft')
+    expect(session.buildSyncPayload(response, []).state.phase).toBe('draft')
     expect(JSON.stringify(raw)).toBe(before)
     expect(session.state.players).toEqual(raw.state.players)
     expect(session.state.log).toEqual(raw.state.log)
@@ -53,7 +53,7 @@ describe('retained global-round draft recovery', () => {
       fixture.draft.kept.p1, fixture.draft.kept.p2,
     ])
     expect(legacyView.stages.map(stage => Object.keys(stage.pools))).toEqual(recovered.stages.map(() => ['p1', 'p2']))
-    const privateView = session.buildSyncPayload(response, 'p1', 'viewer', archive.frame).state.draft
+    const privateView = session.buildSyncPayload(response, ['p1'], 'viewer', archive.frame).state.draft
     expect(privateView).not.toHaveProperty('pools')
     expect(privateView).not.toHaveProperty('kept')
     expect(privateView).not.toHaveProperty('pendingPicks')

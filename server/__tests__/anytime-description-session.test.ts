@@ -44,7 +44,7 @@ describe('anytime descriptions come from the executable flow', () => {
     const response = session.getState()
     expect(response.state.futureMeeples).toHaveLength(2)
     expect(new Set(response.state.futureMeeples.map(entry => entry.id)).size).toBe(2)
-    expect(session.buildSyncPayload(response, response.state.players[0]!.id).state.players[0]!.scheduledEffects).toEqual([expect.objectContaining({ round: 7, sourceCard: 'D106_WhiskyDistiller', count: 2,
+    expect(session.buildSyncPayload(response, [response.state.players[0]!.id]).state.players[0]!.scheduledEffects).toEqual([expect.objectContaining({ round: 7, sourceCard: 'D106_WhiskyDistiller', count: 2,
       description: expect.objectContaining({ effectPreview: { kind: 'futureSchedule', entries: [{ round: 7, resources: { food: 4 } }] } }),
     })])
     const before = JSON.stringify(session.state)
@@ -58,7 +58,7 @@ describe('anytime descriptions come from the executable flow', () => {
       expect(session.performRoundEnd().ok).toBe(true)
     }
     expect(session.getState().state.players[0]!.resources.food).toBe(28)
-    expect(session.buildSyncPayload(session.getState(), null).state.players[0]!.scheduledEffects).toEqual([])
+    expect(session.buildSyncPayload(session.getState(), []).state.players[0]!.scheduledEffects).toEqual([])
     expect(session.getState().state.futureMeeples).toEqual([])
   })
 

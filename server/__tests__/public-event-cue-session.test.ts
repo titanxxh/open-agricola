@@ -28,7 +28,7 @@ it('does not replay a fishing receipt when a legal card reveal renumbers the vie
     expect(response.ok).toBe(true)
     response = session.takeAction(0, 'fishing')
     expect(response.ok).toBe(true)
-    const before = session.buildSyncPayload(response, 'p1')
+    const before = session.buildSyncPayload(response, ['p1'])
     const fishing = before.state.events.find(event => event.type === 'resource.moved' && event.from.kind === 'actionSpace' && event.from.spaceId === 'fishing')!
     expect(fishing.occurrenceId).toBeTruthy()
     const baseline = collectUnseenPublicEventFeedback(before.state.events, null, 'en')
@@ -45,7 +45,7 @@ it('does not replay a fishing receipt when a legal card reveal renumbers the vie
     expect(response.state.log.find(entry => entry.params?.improvements === 'D036_BreedRegistry')?.params?.costResources).toEqual({})
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'confirm-next-player' } })
     expect(response.scores).toHaveLength(2)
-    const after = session.buildSyncPayload(response, 'p1')
+    const after = session.buildSyncPayload(response, ['p1'])
     const sameFishing = after.state.events.find(event => event.occurrenceId === fishing.occurrenceId)!
     expect(sameFishing.seq).toBeGreaterThan(fishing.seq)
     // Old numeric cursor visibly replays this already granted food; occurrence

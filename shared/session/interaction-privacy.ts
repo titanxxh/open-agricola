@@ -7,14 +7,14 @@ const PRIVATE_EVENT_PROMPT_KINDS = new Set(['resource-batch-exchange-select'])
 export const privateEventsForViewer = (
   interaction: InteractionState,
   playerIds: readonly string[],
-  viewerPlayerId: string | null,
+  visiblePlayerIds: readonly string[],
   responsePrivateEvents: PrivateGameEvent[] = [],
 ): PrivateGameEvent[] => {
-  if (viewerPlayerId === null) return []
+  if (visiblePlayerIds.length === 0) return []
   const events: PrivateGameEvent[] = []
   if (interaction.stateId === 'wait' && PRIVATE_EVENT_PROMPT_KINDS.has(interaction.request.kind)) {
     const recipient = interactionRecipientPlayerId(interaction, playerIds)
-    if (recipient !== null && recipient === viewerPlayerId) {
+    if (recipient !== null && visiblePlayerIds.includes(recipient)) {
       events.push({
         schemaVersion: 1,
         type: 'private.promptShown',
@@ -25,6 +25,6 @@ export const privateEventsForViewer = (
       })
     }
   }
-  events.push(...responsePrivateEvents.filter((event) => event.recipientPlayerId === viewerPlayerId))
+  events.push(...responsePrivateEvents.filter((event) => visiblePlayerIds.includes(event.recipientPlayerId)))
   return events
 }

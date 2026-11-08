@@ -406,9 +406,9 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(declined.state.players[0]!.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
     expect(declined.state.players[0]!.resources.food).toBe(3)
     for (const response of [resp, declined]) {
-      expect(JSON.stringify(session.buildSyncPayload(response, player.id))).toContain(pick)
+      expect(JSON.stringify(session.buildSyncPayload(response, [player.id]))).toContain(pick)
       for (const viewer of [response.state.players[1]!.id, null]) {
-        const payload = JSON.stringify(session.buildSyncPayload(response, viewer))
+        const payload = JSON.stringify(session.buildSyncPayload(response, viewer === null ? [] : [viewer]))
         for (const cardId of [OCC_A, OCC_B, OCC_C, OCC_D]) expect(payload).not.toContain(cardId)
       }
     }

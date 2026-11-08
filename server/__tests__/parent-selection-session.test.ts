@@ -20,12 +20,12 @@ const auditSetup = (options: { draftParents?: boolean; draftMode?: 'simultaneous
   return session
 }
 
-const auditSnapshot = (session: GameSession) => JSON.parse(JSON.stringify(session.buildSyncPayload(session.getState(), null, 'debug')))
+const auditSnapshot = (session: GameSession) => JSON.parse(JSON.stringify(session.buildSyncPayload(session.getState(), [], 'debug')))
 
 const auditPrivacy = (session: GameSession) => {
   const response = session.getState()
   for (const viewer of ['p1', 'p2', null]) {
-    const payload = session.buildSyncPayload(response, viewer)
+    const payload = session.buildSyncPayload(response, viewer === null ? [] : [viewer])
     for (const player of response.state.players) {
       const candidates = response.state.parentSelection?.candidates[player.id]
       if (!candidates) continue
@@ -94,7 +94,7 @@ describe('Parents batch 1 setup audit', () => {
     expect(completed.state.players[0]!.resources.wood).toBe(1)
     expect(completed.state.players.map((player) => player.parentCards)).toEqual(selections)
     for (const viewer of ['p1', 'p2', null]) {
-      const payload = session.buildSyncPayload(completed, viewer)
+      const payload = session.buildSyncPayload(completed, viewer === null ? [] : [viewer])
       expect(payload.state.players.map((player) => player.parentCards)).toEqual(selections)
       for (const candidate of Object.values(candidates)) {
         expect(JSON.stringify(payload)).not.toContain(candidate.mother[1])
@@ -257,7 +257,7 @@ describe('Parent Card selection setup', () => {
       parentSelectionSeed: 1,
     } as never)
 
-    const logsFor = (playerId: string) => session.buildSyncPayload(session.getState(), 'p1').state.log.filter(entry => entry.playerId === playerId)
+    const logsFor = (playerId: string) => session.buildSyncPayload(session.getState(), ['p1']).state.log.filter(entry => entry.playerId === playerId)
     expect(logsFor('p1').length).toBeGreaterThan(0)
     expect(logsFor('p2').length).toBeGreaterThan(0)
 
@@ -600,13 +600,13 @@ describe('Parent Card selection setup', () => {
       father: p1Candidates.father[0],
     })
 
-    const p1View = serializeStateForPlayer(session.state, 'p1', {
+    const p1View = serializeStateForPlayer(session.state, ['p1'], {
       engineStack: session.getEngineStack(),
     })
-    const p2View = serializeStateForPlayer(session.state, 'p2', {
+    const p2View = serializeStateForPlayer(session.state, ['p2'], {
       engineStack: session.getEngineStack(),
     })
-    const spectatorView = serializeStateForPlayer(session.state, null, {
+    const spectatorView = serializeStateForPlayer(session.state, [], {
       engineStack: session.getEngineStack(),
     })
 

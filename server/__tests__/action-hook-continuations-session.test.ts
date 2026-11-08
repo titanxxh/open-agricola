@@ -30,7 +30,7 @@ describe('owning action rules in before continuations', () => {
       { amount: 1, paymentOptions: [{ kind: 'payment', resourcesPaid: { wood: 6, reed: 2 } }] },
     ] } })
     expect(JSON.stringify(session.state)).toBe(before)
-    expect(session.buildSyncPayload(session.getState(), session.state.players[0]!.id).state.players[0]!.scheduledEffects).toEqual(snapshot.frame.players[0]!.scheduledEffects)
+    expect(session.buildSyncPayload(session.getState(), [session.state.players[0]!.id]).state.players[0]!.scheduledEffects).toEqual(snapshot.frame.players[0]!.scheduledEffects)
   })
 
   it('resumes two fencing before reactions through a real Session snapshot', () => {

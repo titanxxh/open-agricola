@@ -97,7 +97,7 @@ describe('new Action Log source associations at the authoritative boundary', () 
       expect(trigger(restarted).occurrenceId).toBe(occurrenceId)
       const raw = serializeSessionSnapshot(restarted.state, restarted).frame
       for (const viewer of ['p1', 'p2', null]) {
-        const page = buildRoomHistoryPage(raw, viewer)
+        const page = buildRoomHistoryPage(raw, viewer === null ? [] : [viewer])
         const log = page.log.find(entry => entry.key === 'log.cardTriggered' && entry.params?.cardId === CARD)!
         expect(log.sourceEvent).toMatchObject({ occurrenceId, rowIndex: 0 })
         expect(triggerRows({ ...raw, ...page }).map(row => row.kind)).toEqual(['event'])

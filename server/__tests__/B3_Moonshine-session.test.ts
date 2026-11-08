@@ -136,9 +136,9 @@ describe('B003_Moonshine session', () => {
     expect([OCC_A, OCC_B]).toContain(pick)
     const [owner, opponent] = response.state.players
     expect(opponent!.minorHand).toContain(CARD_ID)
-    expect(JSON.stringify(session.buildSyncPayload(response, owner!.id))).toContain(String(pick))
+    expect(JSON.stringify(session.buildSyncPayload(response, [owner!.id]))).toContain(String(pick))
     for (const viewer of [opponent!.id, null]) {
-      expect(JSON.stringify(session.buildSyncPayload(response, viewer))).not.toContain(String(pick))
+      expect(JSON.stringify(session.buildSyncPayload(response, viewer === null ? [] : [viewer]))).not.toContain(String(pick))
     }
     expect(owner!.resources.food).toBe(3)
     expect(owner!.occupationPlayed).toEqual([])
@@ -167,9 +167,9 @@ describe('B003_Moonshine session', () => {
     expect(cachedOcc === OCC_A || cachedOcc === OCC_B).toBe(true)
     expect(resp.interaction.promptParams).toEqual({ cardId: cachedOcc })
 
-    const ownerInteraction = session.buildSyncPayload(resp, p0.id).interaction
+    const ownerInteraction = session.buildSyncPayload(resp, [p0.id]).interaction
     expect(ownerInteraction.stateId === 'wait' && ownerInteraction.promptParams).toEqual({ cardId: cachedOcc })
-    const otherInteraction = session.buildSyncPayload(resp, resp.state.players[1]!.id).interaction
+    const otherInteraction = session.buildSyncPayload(resp, [resp.state.players[1]!.id]).interaction
     expect(otherInteraction.stateId === 'wait' && otherInteraction.request.kind).toBe('private-prompt')
     expect(JSON.stringify(otherInteraction)).not.toContain(String(cachedOcc))
 

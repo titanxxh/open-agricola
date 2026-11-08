@@ -9,7 +9,7 @@ export const expectPublicCardGoods = (session: GameSession, cardId: string, good
   const before = JSON.stringify(session.state)
   const response = session.getState()
   for (const viewer of ['p1', 'p2', null]) {
-    const player = session.buildSyncPayload(response, viewer).state.players[0]!
+    const player = session.buildSyncPayload(response, viewer === null ? [] : [viewer]).state.players[0]!
     expect(player.cardStatePresentation[cardId]).toMatchObject(goods)
     expect(player.cardStates[cardId]).toBeUndefined()
   }

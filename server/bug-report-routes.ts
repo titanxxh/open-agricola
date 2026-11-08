@@ -335,7 +335,7 @@ const loadEvidenceFrame = async (
   if (playerIndex === null) return projected
   const playerId = projected.players[playerIndex]?.id ?? null
   if (!playerId) throw new BugReportError('not_participant', 403)
-  return filterSerializedStateForPlayer(projected, playerId)
+  return filterSerializedStateForPlayer(projected, [playerId])
 }
 
 const inspectEvidence = async (

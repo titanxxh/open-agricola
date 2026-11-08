@@ -86,8 +86,8 @@ describe('Farmers of the Moor setup', () => {
     state.players[0]!.resources.horse = 1
     state.players[1]!.sickWorkerIds = ['2']
 
-    const p1View = serializeStateForPlayer(state, 'p1', { engineStack: new EngineStack() })
-    const spectatorView = serializeStateForPlayer(state, null, { engineStack: new EngineStack() })
+    const p1View = serializeStateForPlayer(state, ['p1'], { engineStack: new EngineStack() })
+    const spectatorView = serializeStateForPlayer(state, [], { engineStack: new EngineStack() })
 
     expect(p1View.enableFarmersOfTheMoor).toBe(true)
     expect(p1View.farmersOfTheMoor).toEqual(state.farmersOfTheMoor)

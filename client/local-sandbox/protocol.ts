@@ -30,7 +30,7 @@ export type LocalGameConfig = {
 }
 
 export type ViewerSpec = {
-  viewerPlayerId: string | null
+  visiblePlayerIds: readonly string[]
   mode: SyncPayloadMode
 }
 
