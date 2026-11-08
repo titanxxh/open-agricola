@@ -43,7 +43,7 @@ server/game/
 ```
 
 - `RoomPlayer { ws, playerIndex, name, userId? }` 是连接座位，不是 `PlayerState`。
-- `team-room.ts` 在 `rooms.team_members_json` 保存未排座的账号、队伍和席位数，等待连接计入在线配额与过期判断。`startTeamGame` 将成员绑定到种子确定的队伍位置，先提交归属与名字，再逐连接发送 `roomJoined` 和 Step 0。`setTeam` 在开局前移动自己或房主指定的成员，检查容量并在发布前提交；保存失败恢复成员归属。测试见 `team-seating.test.ts`、`team-room.test.ts`。
+- `team-room.ts` 在 `rooms.team_members_json` 保存未排座成员，等待连接计入配额和过期判断。纯函数 `projectTeamWaitingRoom` 共用于实时等待室和“我的对局”；只有实时连接添加在线状态。`startTeamGame` 先提交种子确定的归属和名字，再发送 `roomJoined` 与 Step 0。`setTeam` 在发布前检查容量并提交成员移动，失败时回滚。测试见 `team-seating.test.ts`、`team-room.test.ts`。
 - `room-spectators.ts` 保存无座位的临时旁观订阅，只读取已有在线路由，不申请准入。旁观接收公开的加入／断开事件以及 空可见座位集合的快照与历史；`room-router` 在预留回执前拒绝写命令。旁观不改变在线人数、过期时间或 Replay；全员离线、完赛、终止和重开会结束订阅。见 [ADR 0040](../adr/0040-public-live-spectating.md)、`live-spectating-network.test.ts` 与 `live-spectating.spec.ts`。
 - 普通入座通过 `resolveJoinPlayerIndex` 随机分配空座或恢复已存座位。重开保留名字与颜色，先发布新绑定再发快照。dispatch 从 Room 刷新绑定；开发、单人与热座保留原分配。测试见 `room-router.test.ts`、`draft-opening-order.spec.ts`。
 - `room-access.ts` 负责邀请准入。创建默认公开，也可为其余每个座位指定一个可用账号 ID。`RoomMeta` 将权限存入 `rooms.invited_user_ids`，恢复与 `newGame` 保留该权限。大厅 SQL 在限制条数前按已认证用户过滤；定位、活动 Context 和直接 WS 加入分别校验准入，恢复原座位仍由已有座位归属控制。邀请名单不进入 GameState、Replay 或公开摘要，完赛 Replay 仍公开。`GET /api/lobby/players?prefix=` 要求登录，按用户名或显示名开头至少两个字符匹配，忽略大小写，排除本人及不可用账号，最多返回十个展示身份。测试：`server/__tests__/room-invitations.test.ts`、`e2e-tests/room-invitations.spec.ts`。

@@ -5,6 +5,7 @@ import type { PostgresDatabase } from './database/postgres'
 import { parseRoomBody } from './game/persistence/room-body-codec'
 import { parseTeamRoomMembers } from '../shared/contract/team-room'
 import { parseTeamConfiguration } from '../shared/contract/team'
+import { projectTeamWaitingRoom } from './game/team-room'
 
 type RoomDetails = Pick<MyActiveRoom, 'players' | 'progress' | 'expansions' | 'waiting_player_indexes'>
 type RoomRow = Omit<MyActiveRoom, keyof RoomDetails | 'hotseat'> & {
@@ -19,13 +20,16 @@ const expansionFlags: LobbyExpansion[] = ['enableParentCards', 'enableThroughThe
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
 
-function lobbyDetails(json: string | null, seats: number[], status: RoomRow['status'], actor: number | null): RoomDetails {
-  const empty: RoomDetails = { players: [], progress: null, expansions: [], waiting_player_indexes: [] }
-  if (!json) return empty
-  let snapshot: unknown
-  try { snapshot = parseRoomBody(json) } catch { return empty }
-  if (!isRecord(snapshot) || !isRecord(snapshot.state)) return empty
-  const state = snapshot.state
+function readLobbyState(json: string | null): Record<string, unknown> | null {
+  if (!json) return null
+  try {
+    const snapshot: unknown = parseRoomBody(json)
+    return isRecord(snapshot) && isRecord(snapshot.state) ? snapshot.state : null
+  } catch { return null }
+}
+
+function lobbyDetails(state: Record<string, unknown> | null, seats: number[], status: RoomRow['status'], actor: number | null): RoomDetails {
+  if (!state) return { players: [], progress: null, expansions: [], waiting_player_indexes: [] }
   const players = Array.isArray(state.players) ? state.players : []
   const participants: MyActiveRoom['players'] = players.flatMap((player: unknown, playerIndex) => {
     if (!seats.includes(playerIndex) || !isRecord(player) || typeof player.name !== 'string') return []
@@ -81,22 +85,20 @@ export async function listMyActiveRooms(db: PostgresDatabase, userId: string): P
     LIMIT 20
   `).all<RoomRow>(userId, userId)
   return rows.map(({ state_json, occupied_seats, hotseat, team_members_json, created_by, ...room }) => {
+    const state = readLobbyState(state_json)
     const members = parseTeamRoomMembers(team_members_json)
     const self = members?.find(member => member.userId === userId)
     let teamWaiting: MyActiveRoom['teamWaiting']
-    if (self && room.status === 'waiting' && state_json) {
-      const saved: unknown = parseRoomBody(state_json)
-      if (isRecord(saved) && isRecord(saved.state) && isRecord(saved.state.team)) {
-        const teamConfig = parseTeamConfiguration(saved.state.team.configuration, room.max_players)
-        if (teamConfig) teamWaiting = { roomId: room.id, maxPlayers: room.max_players, teamConfig,
-          members: (members ?? []).map(({ userId: memberUserId, ...member }) => ({ ...member, isHost: memberUserId === created_by })),
-          selfMemberId: self.memberId, isHost: created_by === userId,
-          canStart: created_by === userId && (members ?? []).reduce((sum, member) => sum + member.seatCount, 0) === room.max_players,
-        }
-      }
+    if (self && room.status === 'waiting' && state && isRecord(state.team)) {
+      try {
+        const teamConfig = parseTeamConfiguration(state.team.configuration, room.max_players)
+        if (teamConfig) teamWaiting = projectTeamWaitingRoom({ id: room.id, maxPlayers: room.max_players,
+          createdBy: created_by ?? undefined, teamMembers: members,
+        }, teamConfig, userId)
+      } catch { teamWaiting = undefined }
     }
     return { ...room, hotseat: Number(hotseat) === 1,
-      ...lobbyDetails(state_json, occupied_seats, room.status, room.current_player_index),
+      ...lobbyDetails(state, occupied_seats, room.status, room.current_player_index),
       ...(teamWaiting ? { teamWaiting } : {}),
     }
   })
