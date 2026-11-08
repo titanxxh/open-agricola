@@ -3,7 +3,7 @@ import { once } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBetaAccessHandler } from '../beta-access-routes'
 import { BetaAccessStore } from '../beta-access-store'
-import { canUseExperimentalFeature } from '../experimental-features'
+import { canUseExperimentalFeature, experimentalAccountState } from '../experimental-features'
 import { createTestDatabase } from './_helpers/postgres'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -105,22 +105,22 @@ describe('administrator Beta access', () => {
 
   it('derives administrator qualification without storing a grant and keeps ordinary qualification distinct from development availability', async () => {
     const { request, store, db } = await setup()
-    expect(await store.hasAccess('admin')).toBe(true)
-    expect(await store.hasAccess('player')).toBe(false)
+    expect((await experimentalAccountState('admin', db)).betaAccess).toBe(true)
+    expect((await experimentalAccountState('player', db)).betaAccess).toBe(false)
     vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', '')
     expect(await canUseExperimentalFeature('player', 'team-modes', db)).toBe(true)
-    expect(await store.hasAccess('player')).toBe(false)
+    expect((await experimentalAccountState('player', db)).betaAccess).toBe(false)
     expect((await request({ method: 'PUT', body: JSON.stringify({ userId: 'admin' }) })).status).toBe(200)
     expect(await store.list()).toEqual([])
     await request({ method: 'DELETE', body: JSON.stringify({ userId: 'admin' }) })
-    expect(await store.hasAccess('admin')).toBe(true)
+    expect((await experimentalAccountState('admin', db)).betaAccess).toBe(true)
   })
 
   it('keeps the recipient when the grantor account is deleted and shows no grantor', async () => {
     const { db, request, store } = await setup()
     await request({ method: 'PUT', body: JSON.stringify({ userId: 'player' }) })
     await db.prepare('DELETE FROM users WHERE id=?').run('admin')
-    expect(await store.hasAccess('player')).toBe(true)
+    expect((await experimentalAccountState('player', db)).betaAccess).toBe(true)
     expect(await store.list()).toEqual([{ account: { id: 'player', username: 'player', displayName: 'Test Player' },
       grantedBy: null, grantedAt: expect.any(Number) }])
   })
