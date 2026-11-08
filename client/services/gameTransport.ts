@@ -544,7 +544,10 @@ export class WsGameTransport implements GameTransport {
       this.setRoom(msg.roomId)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
-        this.roomViewer = { kind: 'participant', playerIndex: msg.playerIndex }
+        this.roomViewer = { kind: 'participant', playerIndex: msg.playerIndex,
+          ...('controlledPlayerIndexes' in msg ? { controlledPlayerIndexes: msg.controlledPlayerIndexes } : {}),
+          ...('visiblePlayerIds' in msg ? { visiblePlayerIds: msg.visiblePlayerIds } : {}),
+        }
         this.seatHint = msg.playerIndex
         this.journal.playerIndex = msg.playerIndex
       }

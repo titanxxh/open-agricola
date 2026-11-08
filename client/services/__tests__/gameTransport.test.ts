@@ -78,6 +78,20 @@ describe('WsGameTransport request correlation', () => {
     vi.resetModules()
   })
 
+  it.each(['roomCreated', 'roomJoined'])('preserves %s account control and private hand audiences', async type => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })
+    await transport.connect()
+    FakeWebSocket.instances[0]!.emit({ type, roomId: 'multihand', playerIndex: 0,
+      controlledPlayerIndexes: [0, 2], visiblePlayerIds: ['p1', 'p3'],
+      status: 'playing', maxPlayers: 4, players: [], playerColors: [],
+    })
+    expect(transport.viewer).toEqual({ kind: 'participant', playerIndex: 0,
+      controlledPlayerIndexes: [0, 2], visiblePlayerIds: ['p1', 'p3'],
+    })
+    transport.destroy()
+  })
+
   it('waits for the identified creation receipt and preserves its complete configuration adjustment', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', undefined, undefined, { route: false })

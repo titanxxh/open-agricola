@@ -31,6 +31,7 @@ import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
 import { createRoomPersistenceCheckpoint, type RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
+import { controlledSeatIndexes } from '../game/room-viewer'
 import { dispatch, loadCustomCardsFromDb, finishConnection } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookies, SESSION_COOKIE } from '../auth-cookies.ts'
@@ -319,7 +320,7 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom && deps.registry.has(ctx.currentRoom.id)) {
       if (removeRoomSpectator(ctx.currentRoom, ws)) return
-      const disconnectedSeat = ctx.currentRoom.players.find(player => player.ws === ws)?.playerIndex
+      const disconnectedSeats = controlledSeatIndexes(ctx.currentRoom, ws)
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (ctx.currentRoom.status === 'waiting' && ctx.currentRoom.teamMembers) {
         for (const member of ctx.currentRoom.teamMembers) {
@@ -330,9 +331,8 @@ const handleConnection = async (ws: WebSocket, req: IncomingMessage, deps: Conne
         }
       }
       if (removal === 'remaining') {
-        if (disconnectedSeat !== undefined) await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
-          type: 'playerDisconnected',
-          playerIndex: disconnectedSeat ?? ctx.currentPlayerIndex,
+        for (const playerIndex of disconnectedSeats) await deps.broadcaster.broadcastEvent(ctx.currentRoom, {
+          type: 'playerDisconnected', playerIndex,
         })
       } else if (removal === 'empty') {
         deps.broadcaster.endSpectating(ctx.currentRoom, 'offline')

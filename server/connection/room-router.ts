@@ -51,6 +51,7 @@ import { resolveSoloWorkshopCards, workshopDraftToCustomCard } from '../game/wor
 import { isLoadableLive } from '../workshop-status.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
 import { refreshConnectionSeat } from './connection-ctx.ts'
+import { connectionViewerMetadata, connectedSeatIndexes, controlledSeatIndexes, visiblePlayerIdsForConnection } from '../game/room-viewer'
 import {
   replayIntentFromCommand,
 } from '../game/room-committer.ts'
@@ -232,7 +233,7 @@ const waitingRoomEvent = (room: Room): Extract<ServerEvent, { type: 'roomWaiting
     .sort((left, right) => left - right)
     .map((playerIndex) => ({
       playerIndex,
-      connected: room.players.some(player => player.playerIndex === playerIndex),
+      connected: connectedSeatIndexes(room).includes(playerIndex),
       name: room.players.find((player) => player.playerIndex === playerIndex)?.name
         ?? room.session.state.players[playerIndex]?.name
         ?? `Player ${playerIndex + 1}`,
@@ -581,7 +582,7 @@ async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientComman
   room.status = 'playing'; room.startedAt ??= Date.now()
   await publishInitialState(ctx, room, response, msg.requestId, async () => {
     for (const player of room.players) await ctx.broadcaster.sendRoomEvent(player.ws, room, {
-      type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, status: 'playing', maxPlayers: room.maxPlayers,
+      type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, ...connectionViewerMetadata(room, player.ws), status: 'playing', maxPlayers: room.maxPlayers,
       players: bindings.map(binding => ({ playerIndex: binding.playerIndex, name: binding.name,
         connected: room.players.some(peer => peer.userId === binding.userId) })),
       playerColors: room.session.state.players.map(value => value.color),
@@ -743,6 +744,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     }
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, {
       type: 'roomCreated',
+      ...connectionViewerMetadata(room, ctx.ws),
       roomId,
       playerIndex: creatorIndex,
       maxPlayers,
@@ -1019,6 +1021,7 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     publishSeatReplacement()
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, {
       type: 'roomJoined',
+      ...connectionViewerMetadata(room, ctx.ws),
       roomId,
       playerIndex: ctx.currentPlayerIndex,
       status: room.status === 'waiting' ? 'waiting' : 'playing',
@@ -1028,12 +1031,10 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
       ...(room.colorConfirmationPlayerIndex === undefined ? {} : { colorConfirmationPlayerIndex: room.colorConfirmationPlayerIndex }),
       ...(room.hotseat ? { hotseat: true } : {}),
     })
-    await ctx.broadcaster.broadcastEvent(room, {
-      type: 'playerJoined',
-      playerIndex: ctx.currentPlayerIndex,
-      name,
-      playerCount,
-      maxPlayers: room.maxPlayers,
+    for (const playerIndex of controlledSeatIndexes(room, ctx.ws)) await ctx.broadcaster.broadcastEvent(room, {
+      type: 'playerJoined', playerIndex,
+      name: room.session.state.players[playerIndex]?.name ?? name,
+      playerCount, maxPlayers: room.maxPlayers,
     })
   }
   const finishJoin = async (updatedResponse?: SessionResponse): Promise<Awaited<void | Promise<void>>> => {
@@ -1258,8 +1259,7 @@ async function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   try {
     const canonical = room.customSessionExecutor?.serializedStateForPersistence()?.frame
       ?? room.session.withCtx(() => serializeState(room.session.state, { actionHooks: room.session.actionHooks }))
-    const viewerPlayerId = isRoomSpectator(room, ctx.ws) ? null : room.session.state.players[ctx.currentPlayerIndex]?.id ?? null
-    const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), viewerPlayerId === null ? [] : [viewerPlayerId], msg.cursor)
+    const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), visiblePlayerIdsForConnection(room, ctx.ws), msg.cursor)
     await ctx.broadcaster.sendRoomEvent(ctx.ws, room, { type: 'historyPage', roomId: room.id, requestId: msg.requestId, page })
   } catch (error) {
     sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, error instanceof HistoryProjectionChangedError ? 'history_projection_changed' : error instanceof HistoryBranchChangedError ? 'history_branch_changed' : undefined)
@@ -1619,7 +1619,7 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
         await ctx.committer!.retireRoom(previousRoomId)
         for (const player of room.players) {
           await ctx.broadcaster.sendRoomEvent(player.ws, room, {
-            type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex,
+            type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, ...connectionViewerMetadata(room, player.ws),
             status: room.status === 'waiting' ? 'waiting' : 'playing', maxPlayers: room.maxPlayers,
             players: room.players.map(seat => ({ playerIndex: seat.playerIndex, name: seat.name, connected: true })),
             playerColors: room.session.state.players.map(seat => seat.color),

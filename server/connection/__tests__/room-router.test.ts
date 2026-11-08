@@ -902,6 +902,8 @@ describe('active room recovery', () => {
       type: 'roomJoined',
       roomId,
       playerIndex: 0,
+      controlledPlayerIndexes: [0],
+      visiblePlayerIds: ['p1'],
       status: 'waiting',
       players: [{ playerIndex: 0, name: 'Alice', connected: true }],
       maxPlayers: 4,
