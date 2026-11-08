@@ -2266,6 +2266,11 @@ describe('experimental feature discovery', () => {
     expect((await requestJson('GET', '/api/lobby/players?prefix=beta&scope=unknown', undefined, adminCookie)).status).toBe(400)
     expect((await requestJson('GET', '/api/lobby/players?prefix=beta_%25&scope=beta-access', undefined, adminCookie)).json)
       .toEqual({ ok: true, players: [] })
+    const leaving = await createLocalUserForTests('beta_leaving', 'test-password', 'Leaving')
+    expect((await requestJson('GET', '/api/lobby/players?prefix=beta_leaving&scope=beta-access', undefined, adminCookie)).json.players).toHaveLength(1)
+    await getDb().prepare('INSERT INTO account_deletion_requests(user_id,requested_at,next_attempt_at) VALUES(?,?,?)').run(leaving.id, 1, Date.now() + 3_600_000)
+    expect((await requestJson('GET', '/api/lobby/players?prefix=beta_leaving&scope=beta-access', undefined, adminCookie)).json)
+      .toEqual({ ok: true, players: [] })
     const granted = await requestJson('PUT', '/api/admin/beta-access', { userId: unverified.id }, adminCookie)
     expect(granted.status).toBe(200)
     expect(granted.json.grants).toContainEqual({

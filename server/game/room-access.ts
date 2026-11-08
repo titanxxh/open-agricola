@@ -8,13 +8,16 @@ type AccessResult =
   | { ok: true; access: RoomAccess }
   | { ok: false; code: RoomAccessErrorCode | 'login_required'; error: string }
 
-const eligibleAccount = `(email IS NULL OR email_verified_at IS NOT NULL)
-  AND NOT EXISTS (SELECT 1 FROM account_deletion_requests WHERE user_id = users.id)`
+const verifiedEmail = '(email IS NULL OR email_verified_at IS NOT NULL)'
+const notPendingDeletion = 'NOT EXISTS (SELECT 1 FROM account_deletion_requests WHERE user_id = users.id)'
+const eligibleAccount = `${verifiedEmail}
+  AND ${notPendingDeletion}`
 
+/** Beta Access search also finds email-unverified accounts; neither scope offers accounts pending deletion. */
 export async function searchPlayersByPrefix(db: AccessDatabase, prefix: string, currentUserId: string, scope: PlayerSearchScope = 'invitation'): Promise<InvitablePlayer[]> {
   return db.prepare(`SELECT id, username, display_name AS "displayName" FROM users
     WHERE (starts_with(lower(username), lower(?)) OR starts_with(lower(display_name), lower(?)))
-      AND id <> ? AND (? OR (${eligibleAccount}))
+      AND id <> ? AND ${notPendingDeletion} AND (? OR ${verifiedEmail})
     ORDER BY lower(display_name), lower(username), id LIMIT 10`).all<InvitablePlayer>(prefix, prefix, currentUserId, scope === 'beta-access')
 }
 
