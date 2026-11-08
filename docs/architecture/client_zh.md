@@ -112,7 +112,7 @@ GameContextRouter
 - 上下文解析器在挂载、导航或生命周期变化事件发生时读取查询参数。WebSocket 静默更新房间 URL 后，切换语言不会重启活动对局。测试见 `GameContextRouter.test.tsx` 与 `setup-navigation.spec.ts`。
 - 房间链接通过 WebSocket 加入，不指定客户端座位；服务端恢复账号已有座位，或让新玩家加入候场空位。保存暂停期间，所有在线座位看到同一状态，新命令控件被禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址的 Viewer manifest，并且只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` 的 iframe。策略版本查询参数绕过使用旧 CSP 缓存的入口 HTML。历史 Viewer 从不调用需认证的 API；保留的证据通过 `postMessage` 传入。
-- 完成的单人与组队 Game Context 在历史 Viewer 外保留公开结果和私下校验原参与者资格的再开入口。`SameConfigurationRematch` 处理单人配置调整，`TeamSameConfigurationRematch` 独立读取组队配置与当前可用性；即时 `ScoringPad` 注入相同操作，私有配置读取或 Viewer 失败均不隐藏公开结果。
+- 完成的单人与组队 Game Context 在历史 Viewer 外保留公开结果和私下校验原参与者资格的再开入口。`SameConfigurationRematch` 处理单人配置调整，`TeamSameConfigurationRematch` 独立读取组队配置与当前可用性；即时 `ScoringPad` 注入相同操作，私有配置读取或 Viewer 失败均不隐藏公开结果。`CompletedContext` 在摘要与 `ReplayShell` 之间分配同一个视口，让重开操作下方的回放控件保持可达。
 - `ArchivedTeamResults` 在完成摘要与 Replay 入口、不可用页面中展示已存队伍名次和当前参与者元数据。终局 Replay 的 `ScoringPad` 使用录制的队伍得分摘要。
 - 损坏的 Segment 标记为不可用区间，并从下一个 checkpoint 继续；从不静默修复。
 - Bug Report 在 GitHub OAuth 之前保存服务端草稿，取消授权后回到同一个 `submissionId`，提交后轮询状态；提交响应丢失时重新读取权威状态，因此报告不会重复创建。活动局的报告者锚定最新已提交的 Step；完成局的报告者必须是原参与者，锚定当前显示的 Step。

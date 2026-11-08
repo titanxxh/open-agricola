@@ -2,6 +2,7 @@
 // @covers replay-viewer/src/
 // @covers client/app/GameContextRouter.tsx
 // @covers client/app/ReplayShell.tsx
+// @covers client/styles/pages/replay.css
 import { expect, test } from '@playwright/test'
 import type { GameSyncPayload } from '../shared/contract/protocol/game'
 import type { CompletedGameContextDescriptor } from '../shared/contract/protocol/game-context'
@@ -22,6 +23,8 @@ const contrastRatio = (foreground: string, background: string) => {
 
 for (const recordReplay of [false, true]) {
   test(`completed teams keep ranks and seat details (replay=${recordReplay})`, async ({ page, request }) => {
+    // Default-general availability still requires a registered account for team creation.
+    await authenticateSolo(page.context(), request, `team_archive_${Date.now().toString(36)}`)
     await page.setViewportSize({ width: recordReplay ? 1440 : 390, height: 900 })
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
     expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, { seed: 1601, playerCount: 4,
@@ -42,6 +45,8 @@ for (const recordReplay of [false, true]) {
       { teamIndex: 0, rank: 2 }, { teamIndex: 1, rank: 1 },
     ] })
 
+    // Keep archive and replay rendering anonymous; only fixture creation needs the account.
+    await page.context().clearCookies()
     await page.goto(`/?room=${fixture.roomId}`, { waitUntil: 'domcontentloaded' })
     const teams = page.locator('.archived-team-results > li')
     await expect(teams).toHaveCount(2)
@@ -68,6 +73,36 @@ for (const recordReplay of [false, true]) {
     await page.screenshot({ path: 'output/playwright/team-result-archive-replay.png', fullPage: true })
   })
 }
+
+test('a qualified team participant can reach replay controls with the rematch block visible', async ({ page, request }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await authenticateSolo(page.context(), request, `team_viewer_${Date.now().toString(36)}`)
+  const account = await getJson(request, `${BACKEND_URL}/api/auth/me`)
+  expect(account.user.experimentalFeatures).toContain('team-modes')
+  expect((await postJson(request, `${BACKEND_URL}/api/game/new-sandbox`, { seed: 1601, playerCount: 4,
+    teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'category-min', teammateVisibility: 'shared' },
+  })).ok).toBe(true)
+  const current: GameSyncPayload = await getJson(request, `${BACKEND_URL}/api/game/state`)
+  for (const [index, player] of current.state.players.entries()) { player.name = `Viewer ${index}`; player.nameIsDefault = false }
+  const fixture = await postJson(request, `${BACKEND_URL}/api/test/replays/completed?recordReplay=1`, { state: current.state })
+  expect(fixture.ok).toBe(true)
+  await page.goto(`/?room=${fixture.roomId}`, { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: 'Play again with these settings', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Replay as Viewer 0', exact: true }).click()
+  const frame = page.locator('iframe')
+  await expect(frame).toBeVisible()
+  const replay = page.frameLocator('iframe')
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    const bounds = await frame.boundingBox()
+    if (!bounds) throw new Error('Expected the replay frame to occupy the remaining viewport')
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(900)
+    await expect(replay.locator('.replay-play')).toBeInViewport()
+    await page.screenshot({ path: testInfo.outputPath(`completed-team-replay-${width}.png`), fullPage: true })
+  }
+  await replay.locator('.replay-play').click()
+  await expect(replay.locator('.team-score')).toHaveCount(2)
+})
 
 test('a multihand account sees its completed game once in personal history', async ({ browser, request }) => {
   const context = await browser.newContext()
