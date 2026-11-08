@@ -9,12 +9,7 @@ import type { ServerEvent, SpectatingEndReason } from '../../shared/contract/pro
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
-
-const visibleIdsForSeat = (resp: SessionResponse, seatIndex: number | undefined): string[] => {
-  if (typeof seatIndex !== 'number') return []
-  const playerId = resp.state.players[seatIndex]?.id
-  return playerId ? [playerId] : []
-}
+import { visiblePlayerIdsForConnection } from '../game/room-viewer'
 
 /**
  * A hotseat connection holds every seat, so per-seat redaction would hide the
@@ -74,19 +69,19 @@ export class Broadcaster {
       const emittedAt = Date.now()
       let bytes = 0
       let recipients = 0
-      for (const seat of room.players) {
-        if (seat.ws.readyState !== seat.ws.OPEN) continue
+      for (const ws of roomConnections(room)) {
+        if (ws.readyState !== ws.OPEN) continue
         const env = measure('projection', () => buildEnvelope({
           room,
-          resp: requesterResponse?.ws === seat.ws ? requesterResponse.response : resp,
-          visiblePlayerIds: visibleIdsForSeat(resp, seat.playerIndex),
+          resp: requesterResponse?.ws === ws ? requesterResponse.response : resp,
+          visiblePlayerIds: visiblePlayerIdsForConnection(room, ws),
           version: room.version,
           cause,
-          requestId: requesterResponse && requesterResponse.ws !== seat.ws ? undefined : requestId,
+          requestId: requesterResponse && requesterResponse.ws !== ws ? undefined : requestId,
           emittedAt,
           mode: projectionModeFor(room),
       }))
-      bytes += sendObserved(seat.ws, env)
+      bytes += sendObserved(ws, env)
       recipients++
     }
     const spectators = roomSpectators(room).filter(ws => ws.readyState === ws.OPEN)
@@ -113,11 +108,10 @@ export class Broadcaster {
     mode?: SyncPayloadMode,
   ): void | Promise<void> {
     return measure('publication', () => this.publish(room, () => {
-      const seat = room.players.find((p) => p.ws === ws)
       const env = measure('projection', () => buildEnvelope({
         room,
         resp,
-        visiblePlayerIds: visibleIdsForSeat(resp, seat?.playerIndex),
+        visiblePlayerIds: visiblePlayerIdsForConnection(room, ws),
         version: room.version,
         cause,
         requestId,

@@ -104,7 +104,8 @@ export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid
 
 export type SpectatingEndReason = 'offline' | 'completed' | 'terminated' | 'removed'
 
-export type RoomViewer = { kind: 'participant'; playerIndex: number } | { kind: 'spectator' } | { kind: 'team-member'; memberId: string }
+export type RoomViewer = { kind: 'participant'; playerIndex: number; controlledPlayerIndexes?: number[]; visiblePlayerIds?: string[] }
+  | { kind: 'spectator' } | { kind: 'team-member'; memberId: string }
 
 export type ServerEvent =
   | ({ type: 'teamRoomWaiting' } & TeamWaitingRoomState)
@@ -126,11 +127,14 @@ export type ServerEvent =
       requestId?: string
     }
   | { type: 'authOk'; userId: string; username: string }
-  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number; playerColors: PlayerState['color'][]; hotseat?: boolean }
+  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number; playerColors: PlayerState['color'][]; hotseat?: boolean;
+      controlledPlayerIndexes?: number[]; visiblePlayerIds?: string[] }
   | {
       type: 'roomJoined'
       roomId: string
       playerIndex: number
+      controlledPlayerIndexes?: number[]
+      visiblePlayerIds?: string[]
       status: 'waiting' | 'playing'
       players: Array<{ playerIndex: number; name: string; connected: boolean }>
       maxPlayers: number

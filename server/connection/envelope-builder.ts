@@ -7,9 +7,10 @@ import type {
 } from '../../shared/contract/protocol/game.ts'
 import { buildSessionSyncPayload } from '../game/custom-session-executor.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
+import { connectedSeatIndexes } from '../game/room-viewer'
 
 type Args = {
-  room: { id: string; session: GameSession } & Partial<Pick<Room, 'players' | 'inputWindow' | 'hotseat'>>
+  room: { id: string; session: GameSession } & Partial<Pick<Room, 'players' | 'seatOwners' | 'inputWindow' | 'hotseat'>>
   resp: SessionResponse
   visiblePlayerIds: readonly string[]
   version: number
@@ -23,9 +24,7 @@ type Args = {
 export function buildEnvelope(args: Args): StateUpdateEnvelope {
   return {
     type: 'stateUpdate',
-    ...(args.room.players ? { connectedPlayerIndexes: args.room.hotseat
-      ? args.resp.state.players.map((_, index) => index)
-      : args.room.players.filter(player => player.ws.readyState === 1).map(player => player.playerIndex) } : {}),
+    ...(args.room.players ? { connectedPlayerIndexes: connectedSeatIndexes({ ...args.room, players: args.room.players }) } : {}),
     ...(args.room.inputWindow ? { inputWindow: { id: args.room.inputWindow.id, kind: args.room.inputWindow.kind } } : {}),
     roomId: args.room.id,
     version: args.version,
