@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import type { InvitablePlayer } from '../../shared/contract/room-access'
+import type { InvitablePlayer, PlayerSearchScope } from '../../shared/contract/room-access'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 
@@ -14,13 +14,14 @@ const isInvitablePlayer = (value: unknown): value is InvitablePlayer =>
   && 'username' in value && typeof value.username === 'string'
   && 'displayName' in value && typeof value.displayName === 'string'
 
-export function RoomInvitePicker({ value, onChange, inputId = 'invited-players', describedBy = 'invited-players-hint', placeholder, single = false }: {
+export function RoomInvitePicker({ value, onChange, inputId = 'invited-players', describedBy = 'invited-players-hint', placeholder, single = false, searchScope = 'invitation' }: {
   value: InvitablePlayer[]
   onChange: (value: InvitablePlayer[]) => void
   inputId?: string
   describedBy?: string
   placeholder?: string
   single?: boolean
+  searchScope?: PlayerSearchScope
 }) {
   const { apiFetch } = useAuth()
   const { t } = useLocale()
@@ -42,7 +43,7 @@ export function RoomInvitePicker({ value, onChange, inputId = 'invited-players',
     const timer = setTimeout(() => {
       const search = async () => {
         try {
-          const response = await apiFetch(`/api/lobby/players?prefix=${encodeURIComponent(prefix)}`, { signal: controller.signal })
+          const response = await apiFetch(`/api/lobby/players?prefix=${encodeURIComponent(prefix)}${searchScope === 'beta-access' ? '&scope=beta-access' : ''}`, { signal: controller.signal })
           const body: unknown = await response.json()
           if (!response.ok || !body || typeof body !== 'object' || !('players' in body)
             || !Array.isArray(body.players) || !body.players.every(isInvitablePlayer)) throw new Error('player search failed')
@@ -54,7 +55,7 @@ export function RoomInvitePicker({ value, onChange, inputId = 'invited-players',
       void search()
     }, 200)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [apiFetch, prefix, composing])
+  }, [apiFetch, prefix, composing, searchScope])
 
   const selectPlayer = (player: InvitablePlayer) => {
     onChange(single ? [player] : [...value, player])

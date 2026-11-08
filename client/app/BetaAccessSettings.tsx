@@ -60,7 +60,7 @@ export function BetaAccessSettings() {
       <div className="form-field">
         <label htmlFor="beta-account">{t('beta.account')}</label>
         <RoomInvitePicker inputId="beta-account" describedBy="beta-account-hint" value={selected} onChange={setSelected}
-          placeholder={t('beta.accountPlaceholder')} single />
+          placeholder={t('beta.accountPlaceholder')} single searchScope="beta-access" />
         <p id="beta-account-hint" className="settings-hint">{t('beta.accountPlaceholder')}</p>
       </div>
       <div className="settings-actions"><button type="submit" className="btn-primary" disabled={!selected.length || saving || loading}>{t('beta.grant')}</button></div>
