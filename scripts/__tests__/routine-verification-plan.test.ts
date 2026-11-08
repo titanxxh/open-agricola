@@ -1195,7 +1195,10 @@ describe('dependency routine verification plan', () => {
     expect(main.fullTrigger).toBe(false)
     expect(main.browserFiles).toEqual(routineBrowserSmokeSet)
     expect(replay.fullTrigger).toBe(false)
-    expect(replay.browserFiles).toEqual(replayViewerSpecs)
+    expect(replay.browserFiles).toEqual([
+      ...replayViewerSpecs,
+      { file: 'e2e-tests/team-result-archive.spec.ts', grep: null },
+    ])
   }, 180_000)
 
 })
