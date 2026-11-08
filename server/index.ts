@@ -65,6 +65,7 @@ import { assertOAuthProvider } from './oauth/providers.ts'
 import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
 import { installShutdownHandlers } from './shutdown.ts'
 import { GameContextStore } from './game/game-context-store.ts'
+import { buildGameResult } from './game/room-persistence-checkpoint.ts'
 import { handleGameContextRoute } from './game-context-routes.ts'
 import { ReplayStore } from './game/replay-store.ts'
 import { handleReplayRoute, ReplayReadLimiter } from './replay-routes.ts'
@@ -233,7 +234,7 @@ const bugReportRuntime = bugReportStore
     }
   : null
 
-const createCompletedReplayFixture = async (defaultNames = false, recordReplay = true, initialState?: unknown) => {
+const createCompletedReplayFixture = async (defaultNames = false, recordReplay = true, initialState?: unknown, ownerUserId?: string) => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
   if (recordReplay && !await new ReplayResources(getResources()).viewer(viewerBuildId)) {
     throw new Error('Replay viewer build is unavailable')
@@ -250,7 +251,7 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
     const payload = session.buildSyncPayload(session.getState(), [], 'debug')
     return JSON.parse(JSON.stringify({
       ...payload.state,
-      ...(payload.state.gameOver ? { scores: payload.scores ?? [] } : {}),
+      ...(payload.state.gameOver ? { scores: payload.scores ?? [], ...(payload.teamScores ? { teamScores: payload.teamScores } : {}) } : {}),
     })) as JsonValue
   }
   const frames = [capture()]
@@ -273,6 +274,13 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
     return step
   })
   const now = Date.now()
+  const team = session.state.team
+  const result = buildGameResult({ id: roomId, session, players: [], maxPlayers: session.state.players.length,
+    version: 0, status: 'playing', startedAt: now - 1000,
+    seatOwners: ownerUserId ? session.state.players.flatMap((_, playerIndex) =>
+      (team?.configuration.mode === 'multihand' ? team.playerTeams[playerIndex] === 0 : playerIndex === 0)
+        ? [{ playerIndex, userId: ownerUserId }] : []) : [],
+  }, now)
   const db = getDb()
   ;(await db.transaction(async () => {
     ;(await db.prepare(`
@@ -319,34 +327,32 @@ const createCompletedReplayFixture = async (defaultNames = false, recordReplay =
       )
       }
     }
-    ;(await db.prepare(`
+    await db.prepare(`
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons,
-        enable_farmers_of_the_moor, enable_snake_opening
-      ) VALUES (?, ?, ?, 1, 2, 0, 0, 0, 0, 0)
-    `).run(roomId, now - 1000, now))
-    const scores = session.getState().scores ?? []
+        enable_farmers_of_the_moor, enable_snake_opening, enable_moor_balance_rules,
+        team_mode, team_scoring, team_scores
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+    `).run(roomId, result.startedAt, result.finishedAt, result.roundsPlayed, result.playerCount,
+      Number(result.communityDeck), Number(result.parentCards), Number(result.throughTheSeasons),
+      Number(result.farmersOfTheMoor), Number(result.snakeOpening), Number(result.moorBalanceRules),
+      result.team?.mode ?? null, result.team?.scoring ?? null, result.team ? JSON.stringify(result.team.scores) : null)
     const insertPlayer = db.prepare(`
       INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
-      ) VALUES (?, ?, ?, NULL, ?, ?, ?)
+        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default, team_index
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
-    for (const [playerIndex, player] of session.state.players.entries()) {
-    await insertPlayer.run(
-      roomId,
-      playerIndex,
-      player.id,
-      player.name,
-      scores.find((score) => score.playerId === player.id)?.total ?? 0,
-      player.nameIsDefault === true ? 1 : 0,
-    )
+    for (const player of result.players) {
+      await insertPlayer.run(roomId, player.playerIndex, player.gamePlayerId, player.userId,
+        player.displayName, player.score, player.nameIsDefault === true ? 1 : 0, player.teamIndex ?? null)
     }
   })())
   return {
     ok: true,
     roomId,
     firstStepHash: encoded[0]!.frameHash,
+    ...(ownerUserId ? { ownedPlayerIndexes: result.players.filter(player => player.userId === ownerUserId).map(player => player.playerIndex) } : {}),
   }
 }
 
@@ -811,7 +817,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const params = new URLSearchParams(req.url.split('?')[1])
       const raw = await readBody(req)
       const body = raw ? JSON.parse(raw) as { state?: unknown } : {}
-      sendJson(res, 201, (await createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0', body.state)))
+      const owner = await validateSession(await getAuthToken(req))
+      sendJson(res, 201, (await createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0', body.state, owner?.id)))
     } catch (error) {
       sendJson(res, 503, {
         ok: false,

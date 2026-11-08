@@ -165,7 +165,7 @@ _Avoid_: Replay Frame、客户端交互草稿、History Window 分页游标
 _Avoid_: Game Sync Snapshot、新局初始化、从当前规则重新计算历史结果
 
 **Game Result Archive**:
-正常完赛后保留的标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、内部用户关联、显示名和最终得分。规则与得分字段不可变，用户关联和显示名可因数据删除而匿名化；归档不包含 `GameState`、手牌或其他隐藏信息。
+正常完赛后保留的标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、内部用户关联、显示名和最终得分。组队局另存模式、计分方式、队伍结果和每席的队伍编号。规则与得分字段不可变，用户关联和显示名可因数据删除而匿名化；归档不包含 `GameState`、手牌或其他隐藏信息。
 _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
 
 **Game Replay Archive**:

@@ -50,7 +50,7 @@ server/game/
 - 创建预检独立授权新的建局意图，不依赖连接之前显示的规则会话。离开非 active 的 Game Context 只移除其连接座位，不再通过旧 Room 的执行 stamp 或租约发布事件。
 - 创建在持久提交回调中先采用新 Room，再分离原连接。旧房通知失败只记录故障，不回滚或释放已提交的新会话；初始化清理由提交边界决定。
 - 正式单人通过 `createRoom(maxPlayers: 1)` 创建一个登录账号座位，Step 0 提交后才确认创建。进行中的单人 Room 不进入公开发现，原参与者仍沿用普通恢复授权。`createRoom(sourceGameContextId)` 经 `game-creation-store.ts` 读取不可变的已接受创建元数据，校验已完成来源的唯一参与者，不加载旧 Room 或 Replay 就能创建新局。首次事务同时提交 Room、Step 0、创建配置和命令回执，并再次校验来源及 Workshop 准入；显式卡源不可用时返回完整原选择和类型化差异。契约及测试见 `shared/contract/game-creation.ts`、`server/connection/__tests__/solo-room.test.ts`。
-- `roomId` 恰好标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新的 `GameSession` 与 UUID，从不复用旧 ID，并在退役旧局的同一事务中迁移在线座位、人数、自定义卡与变体开关。只有权威 `gameOver` 在一个事务中写入 Game Result Archive 并删除可恢复快照；归档写入失败会回滚并保留最终状态以便重试。闲置过期、取消等待房间与销毁清理把 Game Context 标为 `expired`，不产生结果；协商提前结束则保留独立的 `terminated` 归档。结果分数保留引擎原始数值，包括小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
+- `roomId` 标识一局游戏（[ADR 0009](../adr/0009-room-id-identifies-one-game.md)）。`newGame` 创建新 Session 和 UUID，在退役旧局时迁移在线座位、人数、自定义卡和变体。只有权威 `gameOver` 原子写入结果并删除可恢复状态；失败时保留最终状态以便重试。组队结果另存模式、计分方式、队伍分和名次，以及每席队伍编号。过期、取消等待和清理不产生结果；协商结束使用独立的 `terminated` 归档。得分保留小数（[持久化测试](../../server/game/persistence/__tests__/postgres-replay.test.ts)）。
 - 托管 Room 使用 PostgreSQL 和强制录制。`RoomPersistenceCheckpoint` 持久确认等待状态与座位，`GameContextStore` 统一裁定持久化期限，并保护在线连接、准入与未完成保存。管理员可配置离线保留期，默认等待 3 天、进行中 7 天。每次全员离线后固定截止时间，修改只影响下次离线周期；开发房不因闲置过期。`RoomAuthority` 将内存卸载与存档删除分开。缺失录制数据会阻断恢复。见 [ADR 0039](../adr/0039-runtime-room-retention-policy.md)。
 - 开发槽 `dev2`–`dev6` 映射到跨重启保持的永久对局身份；重开或重置会分配新身份，completed、expired 或 removed 的 context 从不复活。开发账号可以持有多个座位，开发恢复需要座位提示或唯一归属的座位；普通 Room 的座位由已认证的归属推导。客户端的 `devMode` 标志不授予任何开发权限。`room_players` 以 `(room_id, player_index)` 存储归属。
 - 候场命令 `setPlayerColor` 只修改发送者自己的座位。已入座和保留座位独占颜色；选择空位颜色时交换两处颜色。`GameSession.updatePlayerColors` 同步更新隔离 Worker。Room 队列串行处理竞争请求，checkpoint 把颜色与命令回执一同持久化后再广播；开局后锁定颜色。
@@ -102,7 +102,7 @@ ClientCommand
 ```
 
 - 只有公开 Frame Hash 与私有会话游标都未变化、且未设置 `durableTransition` 时才是 `unchanged`；只改变游标的转换也会持久化，并重复同一个 Frame。重连与补拉不产生 Step。
-- Replay Step 有 Room 全局单调递增的 `stepNo`，与 `roomVersion` 无关；同时提交按连续 Step 串行化，自动结算属于最后一份触发输入，规则结果从不依赖到达顺序。Step 0 在第一个交互命令之前存在。终局 Frame 归档 `PlayerScoreSummary[]`。
+- Replay Step 有 Room 全局单调递增的 `stepNo`，与 `roomVersion` 无关；同时提交按连续 Step 串行化，自动结算属于最后一份触发输入，规则结果从不依赖到达顺序。Step 0 在第一个交互命令之前存在。终局 Frame 归档逐座位和队伍得分摘要。
 - Replay Intent 由穷尽的协议 switch 白名单化；从不保存 `requestId`、token、站点 `userId` 或未校验 payload。
 - Replay 归档使用有界的权威状态差量（[ADR 0011](../adr/0011-bounded-authoritative-state-delta-replays.md)）。
 - 写入失败时冻结同一份 Frame 与 Intent，阻断 Room 并按退避重试；客户端等待，从不读取未提交状态。相同幂等 key 但 hash 不同会永久阻断并报警。

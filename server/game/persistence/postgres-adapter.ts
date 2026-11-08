@@ -374,18 +374,18 @@ export class PostgresRoomPersistence implements RoomPersistence {
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
-        enable_snake_opening, enable_moor_balance_rules
+        enable_snake_opening, enable_moor_balance_rules, team_mode, team_scoring, team_scores
       ) VALUES (
         @roomId, @startedAt, @finishedAt, @roundsPlayed, @playerCount,
         @communityDeck, @parentCards, @throughTheSeasons, @farmersOfTheMoor,
-        @snakeOpening, @moorBalanceRules
+        @snakeOpening, @moorBalanceRules, @teamMode, @teamScoring, @teamScores::jsonb
       )
     `)
     this.insertResultPlayer = db.prepare(`
       INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
+        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default, team_index
       ) VALUES (
-        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score, @nameIsDefault
+        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score, @nameIsDefault, @teamIndex
       )
     `)
     this.pruneRooms = db.prepare(`
@@ -519,6 +519,9 @@ export class PostgresRoomPersistence implements RoomPersistence {
         farmersOfTheMoor: result.farmersOfTheMoor ? 1 : 0,
         moorBalanceRules: result.farmersOfTheMoor && result.moorBalanceRules === true ? 1 : 0,
         snakeOpening: result.snakeOpening ? 1 : 0,
+        teamMode: result.team?.mode ?? null,
+        teamScoring: result.team?.scoring ?? null,
+        teamScores: result.team ? JSON.stringify(result.team.scores) : null,
       }))
       for (const player of result.players) {
         ;(await this.insertResultPlayer.run({
@@ -526,6 +529,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
           roomId: result.roomId,
           userId: userIds.get(player.playerIndex) ?? player.userId,
           nameIsDefault: player.nameIsDefault === true ? 1 : 0,
+          teamIndex: player.teamIndex ?? null,
         }))
       }
     }

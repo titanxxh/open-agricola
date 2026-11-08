@@ -6,6 +6,7 @@ import type { PersistedSessionSnapshot } from '../../../shared/session/serializa
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import type { RoomAccess } from '../../../shared/contract/room-access'
 import type { SoloHandMode } from '../../../shared/contract/game-creation'
+import type { TeamResultArchive } from '../../../shared/contract/team'
 
 import type { GameEndProposal, GameTermination } from '../../../shared/contract/protocol/game-termination'
 
@@ -69,6 +70,7 @@ export type GameResultPlayer = {
   displayName: string
   nameIsDefault?: boolean
   score: number
+  teamIndex?: number
 }
 
 export type GameResult = {
@@ -84,6 +86,7 @@ export type GameResult = {
   moorBalanceRules?: boolean
   snakeOpening: boolean
   players: GameResultPlayer[]
+  team?: TeamResultArchive
 }
 
 /** PostgreSQL is the runtime store. The memory implementation is a test double. */

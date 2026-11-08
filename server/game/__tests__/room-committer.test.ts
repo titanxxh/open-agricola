@@ -770,6 +770,32 @@ describe('RoomCommitter', () => {
       .toEqual(JSON.parse(JSON.stringify(response.scores)))
   })
 
+  it('archives team results in the terminal Replay frame and manifest without account identities', async () => {
+    const room = makeRoom()
+    room.session.dispose()
+    room.session = new GameSession(1601, undefined, { playerCount: 4,
+      teamConfig: { mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'sum', teammateVisibility: 'shared' } })
+    room.maxPlayers = 4
+    const committer = createCommitter()
+    await committer.prepareRoom(room, { missingPrefix: false })
+    room.session.state.gameOver = true
+    const response = room.session.getState()
+    expect(response.teamScores).toHaveLength(2)
+    expect(await committer.commit(room, response, actionIntent!, 0)).toMatchObject({ kind: 'committed', stepNo: 1 })
+
+    const store = new ReplayStore(db)
+    const replay = await store.segment(room.id, 0)
+    expect(replay.ok).toBe(true)
+    if (!replay.ok) throw new Error('Missing completed Replay')
+    expect(replay.steps.at(-1)!.frame.teamScores).toEqual(response.teamScores)
+    const manifest = await store.manifest(room.id)
+    expect(manifest).toMatchObject({ ok: true, team: { mode: 'team', scoring: 'sum', scores: response.teamScores }, participants: [
+      { playerIndex: 0, teamIndex: 0 }, { playerIndex: 1, teamIndex: 1 },
+      { playerIndex: 2, teamIndex: 0 }, { playerIndex: 3, teamIndex: 1 },
+    ] })
+    expect(JSON.stringify(manifest)).not.toContain('userId')
+  })
+
   it('uses worker-produced scores in the durable result archive', async () => {
     const room = makeRoom()
     const serialized = serializeSessionSnapshot(room.session.state, room.session)

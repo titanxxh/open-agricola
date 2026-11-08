@@ -1,0 +1,9 @@
+.archived-team-results { display: grid; gap: 1rem; width: 100%; max-width: 680px; min-width: 0; padding: 0; margin: 0; list-style: none; text-align: left; }
+.archived-team-results > li { min-width: 0; padding: 1rem; border: 1px solid #71806a; border-radius: 5px; background: #26382a; color: #f8f0df; overflow-wrap: anywhere; }
+.archived-team-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1rem; }
+.archived-team-results strong, .archived-team-results b { color: #e8c969; }
+.archived-team-results p { margin: .5rem 0; }
+.archived-team-results ul { display: grid; gap: .5rem; padding: 0; margin: .75rem 0 0; list-style: none; }
+.archived-team-results ul li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.archived-team-results ul li > span { flex: 1; min-width: 0; }
+.archived-team-results button { min-height: 40px; padding: .5rem .75rem; color: #f8f0df; border: 1px solid #83947b; border-radius: 4px; background: #314b36; cursor: pointer; }
