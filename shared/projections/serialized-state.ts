@@ -3,7 +3,7 @@ import { migrateLegacyDraft } from '../draft/legacy-draft'
 import { inheritHistoryRecordIdentity } from './history-record-identity'
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
-import type { PublicEventCancellation } from '../contract/protocol/game'
+import type { ClientInteractionState, PublicEventCancellation } from '../contract/protocol/game'
 import type { SerializedGameState, SerializedParentSelectionCandidates, SerializedParentSelectionSubmission, SerializedParentSelectionState } from '../session/serialization'
 
 const hiddenHandCardIdsByPlayer = (
@@ -63,6 +63,22 @@ const hasHiddenHandCardId = (
     if (playerHiddenCardIds.has(cardId)) return true
   }
   return false
+}
+
+/** Redacted prompts must not identify a source that is still in a hidden hand. */
+export const filterHiddenHandInteractionSource = (
+  interaction: ClientInteractionState,
+  players: readonly PlayerState[],
+  visiblePlayerIds: readonly string[],
+): ClientInteractionState => {
+  if (interaction.stateId !== 'wait' || interaction.request.kind !== 'private-prompt') return interaction
+  const hiddenCardIds = hiddenHandCardIdsByPlayer(players, visiblePlayerIds)
+  if (![interaction.sourceCard, interaction.request.sourceCard].some(source =>
+    source !== undefined && hasHiddenHandCardId(source, hiddenCardIds),
+  )) return interaction
+  const { sourceCard: _sourceCard, promptKey: _promptKey, ...outer } = interaction
+  const { sourceCard: _requestSource, promptKey: _requestPromptKey, ...request } = interaction.request
+  return { ...outer, request, allowedCommands: [], anytimeActions: [] }
 }
 
 const logParamContainsHiddenHandCard = (
