@@ -147,6 +147,8 @@ it('delivers draft seat disconnect and rejoin presence without another selection
   await watch()
   const guestIndex = room.seatOwners!.find(seat => seat.userId === guest.user.id)!.playerIndex
   const draftBefore = structuredClone(room.session.state.draft)
+  const versionBefore = room.version
+  const namesBefore = room.session.state.players.map(player => ({ name: player.name, nameIsDefault: player.nameIsDefault }))
   const framesBefore = viewer.peer.events.filter(event => event.type === 'stateUpdate').length
 
   await guest.peer.close()
@@ -158,12 +160,15 @@ it('delivers draft seat disconnect and rejoin presence without another selection
   const resumed = await SoloNetworkPeer.connect(running.runtime().url, `oa_session=${token}`)
   peers.push(resumed)
   resumed.socket.send(JSON.stringify({ type: 'joinRoom', roomId: room.id, intent: 'resume', name: 'Guest' }))
-  expect(await viewer.peer.wait((event): event is Extract<ServerEvent, { type: 'playerJoined' }> =>
-    event.type === 'playerJoined' && event.playerIndex === guestIndex))
-    .toEqual({ type: 'playerJoined', playerIndex: guestIndex, name: 'Guest', playerCount: 2, maxPlayers: 2 })
+  const presence = await viewer.peer.wait((event): event is Extract<ServerEvent, { type: 'playerJoined' }> =>
+    event.type === 'playerJoined' && event.playerIndex === guestIndex)
+  expect(room.players.find(player => player.playerIndex === guestIndex)?.name).toBe('Guest')
+  expect(presence).toEqual({ type: 'playerJoined', playerIndex: guestIndex, name: 'Guest', playerCount: 2, maxPlayers: 2 })
 
   expect(viewer.peer.events.filter(event => event.type === 'stateUpdate')).toHaveLength(framesBefore)
   expect(room.session.state.draft).toEqual(draftBefore)
+  expect(room.version).toBe(versionBefore)
+  expect(room.session.state.players.map(player => ({ name: player.name, nameIsDefault: player.nameIsDefault }))).toEqual(namesBefore)
 }, 30_000)
 
 it.each(['invited', 'solo', 'hotseat'] as const)('rejects viewing a %s game through both discovery and the socket', async privacy => {

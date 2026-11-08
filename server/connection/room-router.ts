@@ -1066,7 +1066,8 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
     })
     for (const playerIndex of controlledSeatIndexes(room, ctx.ws)) await ctx.broadcaster.broadcastEvent(room, {
       type: 'playerJoined', playerIndex,
-      name: room.session.state.players[playerIndex]?.name ?? name,
+      name: room.players.find(player => player.playerIndex === playerIndex)?.name
+        ?? room.session.state.players[playerIndex]?.name ?? name,
       playerCount, maxPlayers: room.maxPlayers,
     })
   }
