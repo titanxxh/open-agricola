@@ -2,6 +2,11 @@
 // @covers client/app/multihand-seat.ts
 // @covers client/components/board/FarmBoard.tsx
 // @covers server/game/room-viewer.ts
+// @covers client/app/MultihandSeatControls.tsx
+// @covers client/app/multihand.css
+// @covers client/app/MyActiveGames.tsx
+// @covers client/app/use-turn-tab-title.ts
+// @covers server/lobby-my-rooms.ts
 import { expect, test, type BrowserContext } from '@playwright/test'
 import { FRONTEND_URL } from './fixtures'
 import { authenticateTeamAccount } from './helpers/team-account'
@@ -78,16 +83,28 @@ test('two accounts automatically follow four owned seats and recover the active 
     await expect.poll(() => host.state.currentPlayerIndex).toBe(2)
     await expect(host.page.locator('[role="tab"][data-player="p3"]')).toHaveAttribute('aria-selected', 'true')
     await expect(host.page.locator('[data-hand-anchor="p3"]')).toBeVisible()
+    await expect(host.page.locator('.farm-header [data-operation-player-id="p3"]').first()).toHaveText('Acting as seat 3: Host')
+    await expect(host.page.locator('.hand-cards [data-operation-player-id="p3"]')).toHaveText('Acting as seat 3: Host')
+    await expect(host.page.locator('[role="tab"][data-owned="true"]')).toHaveCount(2)
     await expect(host.page.locator('[data-action-id="reed-bank"] button').first()).toBeEnabled()
     await expect(host.page.getByRole('dialog', { name: 'Hotseat handoff' })).toHaveCount(0)
     await host.page.screenshot({ path: testInfo.outputPath('owned-alternate-auto-selected.png'), fullPage: true })
 
     await host.page.locator('[role="tab"][data-player="p1"]').click()
     await expect(host.page.locator('[data-hand-anchor="p1"]')).toBeVisible()
+    await expect(host.page.locator('.hand-cards [data-operation-player-id="p3"]')).toHaveText('Acting as seat 3: Host')
     await expect(host.page.locator('[data-action-id="reed-bank"] button').first()).toBeDisabled()
     await host.page.locator('[role="tab"][data-player="p2"]').click()
     await expect(host.page.locator('[data-hand-anchor]')).toHaveCount(0)
     await expect(host.page.locator('.hand-hidden')).toContainText('Hand cards are hidden')
+    const lobby = await contexts[0]!.newPage()
+    await lobby.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
+    const myGame = lobby.locator('.my-game').filter({ has: lobby.locator('[data-my-turn="true"]') })
+    await expect(myGame).toHaveCount(1)
+    await expect(myGame.locator('.my-game__player[data-owned="true"]')).toHaveCount(2)
+    await expect(myGame.locator('.my-game__player[data-current="true"]')).toHaveText('Host(Me)')
+    await expect(lobby).toHaveTitle('◢ Open Agricola')
+    await lobby.close()
     await host.page.reload()
     await expect(host.page.locator('[role="tab"][data-player="p3"]')).toHaveAttribute('aria-selected', 'true')
     await expect(host.page.locator('[data-hand-anchor="p3"]')).toBeVisible()
@@ -101,3 +118,74 @@ test('two accounts automatically follow four owned seats and recover the active 
     for (const context of contexts) await context.close()
   }
 })
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+  test(`manual simultaneous seats preserve picks across independent hand browsing at ${viewport.width}px`, async ({ browser }, testInfo) => {
+    test.setTimeout(120_000)
+    const contexts: BrowserContext[] = []
+    const drivers: SoloBrowserDriver[] = []
+    try {
+      for (const [index, name] of ['Host', 'Guest'].entries()) {
+        const context = await browser.newContext({ viewport, ...(viewport.width < 900 ? { isMobile: true, hasTouch: true } : {}) })
+        contexts.push(context)
+        await context.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'en'))
+        await authenticateTeamAccount(context, `mo${index}_${Date.now().toString(36)}`, name)
+        drivers.push(new SoloBrowserDriver(await context.newPage()))
+      }
+      const [host, guest] = drivers
+      await host.page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' })
+      await host.page.getByRole('button', { name: 'Multihand game', exact: true }).click()
+      await host.page.getByRole('button', { name: 'Simultaneous draft', exact: true }).click()
+      await host.page.getByRole('button', { name: 'Create Game', exact: true }).click()
+      await expect(host.page.locator('.team-waiting-room')).toBeVisible()
+      const roomId = await host.page.locator('.ws-invite-roomid strong').textContent()
+      if (!roomId) throw new Error('Missing simultaneous multihand room')
+      await guest.page.goto(`${FRONTEND_URL}/?room=${roomId}`, { waitUntil: 'domcontentloaded' })
+      await expect(guest.page.locator('.team-waiting-room')).toBeVisible()
+      await host.page.getByRole('button', { name: 'Start game', exact: true }).click()
+      const selector = host.page.getByRole('combobox', { name: 'Choose a seat to handle' })
+      await expect(selector).toHaveValue('p1')
+      await expect(selector.locator('option')).toHaveCount(2)
+      await selector.selectOption('p3')
+      await expect(host.page.locator('.multihand-seat-controls [data-operation-player-id="p3"]')).toHaveText('Acting as seat 3: Host')
+      await expect(host.page.locator('[data-player-id="p3"]')).toHaveAttribute('data-is-you', 'true')
+      await host.page.locator('.draft-pool-row-occ .draft-card').first().click()
+      const commandsBefore = host.commands.filter(command => command.type === 'draftSubmit').length
+      const requestBefore = host.envelope.inputWindow
+      await host.page.getByRole('button', { name: 'View your hand', exact: true }).click()
+      const hand = host.page.getByRole('dialog', { name: 'View your hand', exact: true })
+      await expect(hand).toBeVisible()
+      await hand.getByRole('combobox', { name: 'View your hand' }).selectOption('p1')
+      await expect(hand.locator('[data-hand-player-id="p1"]')).toBeVisible()
+      await expect(hand.locator('[data-operation-player-id="p3"]')).toHaveText('Acting as seat 3: Host')
+      expect(host.commands.filter(command => command.type === 'draftSubmit')).toHaveLength(commandsBefore)
+      expect(host.envelope.inputWindow).toEqual(requestBefore)
+      await hand.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(selector).toHaveValue('p3')
+      await host.page.locator('.draft-pool-row-minor .draft-card').first().click()
+      await expect(host.page.getByRole('button', { name: 'Confirm picks', exact: true })).toBeEnabled()
+      await host.ui('manual owned third seat', () => host.page.getByRole('button', { name: 'Confirm picks', exact: true }).click())
+      expect(host.commands.findLast(command => command.type === 'draftSubmit')).toMatchObject({ playerId: 'p3' })
+      await expect(selector).toHaveValue('p1')
+      expect(host.state.phase).toBe('draft')
+      await host.page.screenshot({ path: testInfo.outputPath(`manual-seat-${viewport.width}.png`), fullPage: true })
+      await host.page.locator('.draft-pool-row-occ .draft-card').first().click()
+      await host.page.locator('.draft-pool-row-minor .draft-card').first().click()
+      await host.ui('remaining owned first seat', () => host.page.getByRole('button', { name: 'Confirm picks', exact: true }).click())
+      await expect(selector).toHaveCount(0)
+      await expect(host.page.locator('.draft-overlay-status')).toHaveAttribute('data-already-submitted', '1')
+      expect(host.state.phase).toBe('draft')
+      await expect(host.page.getByRole('dialog', { name: 'Hotseat handoff' })).toHaveCount(0)
+      expect(await host.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await host.page.getByRole('button', { name: 'View your hand', exact: true }).click()
+      await hand.getByRole('combobox', { name: 'View your hand' }).selectOption('p3')
+      await expect(hand.locator('[data-hand-player-id="p3"] [data-card-anchor]')).toHaveCount(2)
+      await hand.screenshot({ path: testInfo.outputPath(`own-hand-${viewport.width}.png`) })
+    } finally {
+      for (const [index, driver] of drivers.entries()) if (driver.events.some(event => event.type === 'stateUpdate')) {
+        await driver.attach(testInfo, `manual-seat-account-${index}`)
+      }
+      for (const context of contexts) await context.close()
+    }
+  })
+}
