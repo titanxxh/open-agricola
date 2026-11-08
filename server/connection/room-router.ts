@@ -275,11 +275,7 @@ const publishCommandResponse = async (
   response: SessionResponse,
   command: ClientCommand,
   cause: StateUpdateCause,
-  /**
-   * Seat the command actually ran as. It differs from the connection's own seat
-   * in a hotseat room, where every seat is played from seat 0's connection —
-   * without it the replay timeline would credit player 1 with everyone's moves.
-   */
+  /** The executing seat, which may differ from the connection's primary seat. */
   seat: number = ctx.currentPlayerIndex,
 ): Promise<Awaited<void | Promise<void>>> => {
   const finishObservation = captureCommandOutcome()
@@ -405,35 +401,9 @@ const publishInitialState = async (
   finishObservation(result.kind === 'unchanged' ? 'unchanged' : 'committed')
 }
 
-/**
- * In a hotseat room one person holds every seat from a single connection, so a
- * command may name any seat in the room. Every other room keeps the strict
- * one-connection-one-seat rule.
- */
-const isHotseatRoom = (ctx: ConnectionCtx): boolean => ctx.currentRoom?.hotseat === true
-
-/**
- * Which seat a game command applies to.
- *
- * Normally that is the seat this connection joined as. A hotseat connection is
- * the whole table, so the command applies to whichever seat the engine is
- * waiting on — the pending interaction's seat when there is one, otherwise the
- * player whose turn it is. The engine still validates the seat, so a stale
- * client cannot act out of turn.
- */
-/**
- * Seat for a command that names one. `assertOwnSeat` has already checked it, so
- * a hotseat connection may act as the named seat; every other room ignores the
- * claim and stays on the seat it joined as. Draft and parent selection have no
- * pending interaction to derive a seat from, which is why they name it.
- */
-const namedSeat = (ctx: ConnectionCtx, playerIndex: number): number =>
-  ctx.currentRoom?.hotseat === true ? playerIndex : ctx.currentPlayerIndex
-
-const actingSeat = (ctx: ConnectionCtx): number => {
-  const room = ctx.currentRoom
-  if (room?.hotseat !== true) return ctx.currentPlayerIndex
-  return waitingSeat(room)
+const actingSeat = (ctx: ConnectionCtx, room: Room, requestId?: string): number | null => {
+  const seat = waitingSeat(room)
+  return assertOwnSeat(ctx, seat, requestId) ? seat : null
 }
 
 /** The Interaction Player while an interaction is pending, otherwise the current rotation player. */
@@ -444,16 +414,9 @@ const waitingSeat = (room: Room): number => {
   return recipient === null ? currentPlayerIndex : playerIds.indexOf(recipient)
 }
 
-/**
- * Undo names no seat, so an ordinary room accepts it only from the seat that
- * may undo now. Hotseat and development rooms keep accepting it from any of
- * their connections; a solo room's only seat always passes.
- */
 const assertMayUndo = (ctx: ConnectionCtx, room: Room, requestId?: string): boolean => {
-  if (room.hotseat === true || isDevRoom(room.id)) return true
-  if (waitingSeat(room) === ctx.currentPlayerIndex) return true
-  sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
-  return false
+  if (isDevRoom(room.id)) return true
+  return assertOwnSeat(ctx, waitingSeat(room), requestId)
 }
 
 const assertOwnSeat = (ctx: ConnectionCtx, expectedPlayerIndex: unknown, requestId?: string): boolean => {
@@ -461,16 +424,12 @@ const assertOwnSeat = (ctx: ConnectionCtx, expectedPlayerIndex: unknown, request
     sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
     return false
   }
-  if (isHotseatRoom(ctx)) {
+  if (!ctx.controlledPlayerIndices.has(expectedPlayerIndex)) {
     const seatCount = ctx.currentRoom?.session.state.players.length ?? 0
-    if (!Number.isInteger(expectedPlayerIndex) || expectedPlayerIndex < 0 || expectedPlayerIndex >= seatCount) {
-      sendCommandError(ctx, 'seat out of range for this game', requestId)
-      return false
-    }
-    return true
-  }
-  if (expectedPlayerIndex !== ctx.currentPlayerIndex) {
-    sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
+    const error = ctx.controlledPlayerIndices.size === seatCount
+      ? 'seat out of range for this game'
+      : 'seat mismatch: you cannot act on another player'
+    sendCommandError(ctx, error, requestId)
     return false
   }
   return true
@@ -482,19 +441,8 @@ const assertOwnPlayerId = (ctx: ConnectionCtx, expectedPlayerId: unknown, reques
     return false
   }
   const state = ctx.currentRoom.session.state
-  if (isHotseatRoom(ctx)) {
-    if (typeof expectedPlayerId !== 'string' || !state.players.some((player) => player.id === expectedPlayerId)) {
-      sendCommandError(ctx, 'seat out of range for this game', requestId)
-      return false
-    }
-    return true
-  }
-  const ownId = state.players[ctx.currentPlayerIndex]?.id
-  if (typeof expectedPlayerId !== 'string' || !ownId || expectedPlayerId !== ownId) {
-    sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
-    return false
-  }
-  return true
+  const playerIndex = state.players.findIndex(player => player.id === expectedPlayerId)
+  return assertOwnSeat(ctx, playerIndex, requestId)
 }
 
 const assertDevCommandAllowed = (ctx: ConnectionCtx, room: Room, requestId?: string): boolean => {
@@ -1177,7 +1125,7 @@ async function handleProposeGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   if (!room) return
   if (msg.intent !== 'end' && msg.intent !== 'rematch') { sendCommandError(ctx, 'Invalid end intent', msg.requestId); return }
   let proposal: GameEndProposal
-  try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent) }
+  try { proposal = createGameEndProposal(room, ctx.currentPlayerIndex, msg.intent, ctx.controlledPlayerIndices) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid end proposal', msg.requestId); return }
   await updateGameEndProposal(ctx, room, proposal, msg.requestId)
 }
@@ -1187,13 +1135,13 @@ async function handleRespondGameEnd(ctx: ConnectionCtx, msg: Extract<ClientComma
   if (!room) return
   const proposal = room.endProposal
   if (!proposal || proposal.id !== msg.proposalId || typeof msg.agree !== 'boolean') { sendCommandError(ctx, 'End proposal is no longer pending', msg.requestId); return }
-  await updateGameEndProposal(ctx, room, msg.agree ? agreeToGameEnd(proposal, ctx.currentPlayerIndex) : null, msg.requestId)
+  await updateGameEndProposal(ctx, room, msg.agree ? agreeToGameEnd(proposal, ctx.controlledPlayerIndices) : null, msg.requestId)
 }
 
 async function handleWithdrawGameEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'withdrawGameEnd' }>): Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId)
   if (!room) return
-  if (!room.endProposal || room.endProposal.id !== msg.proposalId || room.endProposal.proposerIndex !== ctx.currentPlayerIndex) {
+  if (!room.endProposal || room.endProposal.id !== msg.proposalId || !ctx.controlledPlayerIndices.has(room.endProposal.proposerIndex)) {
     sendCommandError(ctx, 'Only the proposer can withdraw this proposal', msg.requestId); return
   }
   await updateGameEndProposal(ctx, room, null, msg.requestId)
@@ -1273,7 +1221,7 @@ function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 
 function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'action' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
-  const seat = actingSeat(ctx)
+  const seat = actingSeat(ctx, room, msg.requestId); if (seat === null) return
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1287,7 +1235,7 @@ function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'a
 
 function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'specialAction' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
-  const seat = actingSeat(ctx)
+  const seat = actingSeat(ctx, room, msg.requestId); if (seat === null) return
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1301,7 +1249,7 @@ function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
 
 function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'choice' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
-  const seat = actingSeat(ctx)
+  const seat = actingSeat(ctx, room, msg.requestId); if (seat === null) return
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1315,7 +1263,7 @@ function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'c
 
 function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'anytime' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
-  const seat = actingSeat(ctx)
+  const seat = actingSeat(ctx, room, msg.requestId); if (seat === null) return
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1330,7 +1278,7 @@ function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
 function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'ordinaryDrawKeep' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
-  const seat = namedSeat(ctx, msg.playerIndex)
+  const seat = msg.playerIndex
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1357,7 +1305,7 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
   try { payload = parseCommitSelectionPayload(msg.payload) } catch (error) {
     sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return
   }
-  const seat = namedSeat(ctx, msg.playerIndex)
+  const seat = msg.playerIndex
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1372,7 +1320,7 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
 function handleSoloHandSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'soloHandSubmit' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
-  const seat = namedSeat(ctx, msg.playerIndex)
+  const seat = msg.playerIndex
   return useSessionResponse(
     executeRoomSession(room, 'submitSoloHandSelection', [seat, msg.selection],
       () => room.session.submitSoloHandSelection(seat, msg.selection)),
@@ -1383,7 +1331,7 @@ function handleSoloHandSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
 function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'parentSubmit' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
-  const seat = namedSeat(ctx, msg.playerIndex)
+  const seat = msg.playerIndex
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1398,7 +1346,7 @@ function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
 function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoStep' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertMayUndo(ctx, room, msg.requestId)) return
-  const seat = actingSeat(ctx)
+  const seat = waitingSeat(room)
   return useSessionResponse(
     executeRoomSession(room, 'undoStep', [], () => room.session.undoStep()),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo', seat),
@@ -1408,7 +1356,7 @@ function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoAction' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertMayUndo(ctx, room, msg.requestId)) return
-  const seat = actingSeat(ctx)
+  const seat = waitingSeat(room)
   return useSessionResponse(
     executeRoomSession(room, 'undoAction', [], () => room.session.undoAction()),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo', seat),
@@ -1687,9 +1635,7 @@ function handleDevCreatePasture(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 function handleDraftSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'draftSubmit' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnPlayerId(ctx, msg.playerId, msg.requestId)) return
-  const draftSeat = room.hotseat === true
-    ? room.session.getState().state.players.findIndex((player) => player.id === msg.playerId)
-    : ctx.currentPlayerIndex
+  const draftSeat = room.session.state.players.findIndex((player) => player.id === msg.playerId)
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1843,6 +1789,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
       }
     } finally {
       endPreflight()
+      refreshConnectionSeat(ctx)
       const active = ctx.activeCommand
       ctx.activeCommand = undefined
       if (request && commands) {
