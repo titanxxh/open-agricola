@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GameEndProposal } from '../../shared/contract/protocol/game-termination'
 import { t, type Locale } from '../../shared/i18n'
 import { WsGameTransport } from '../services/gameTransport'
@@ -18,6 +18,7 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
   const [proposal, setProposal] = useState<GameEndProposal | null>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const lastUnavailableRequest = useRef<string | null>(null)
   useEffect(() => {
     const refresh = () => {
       if (transport.roomId) transport.sendRoomCommand('getGameEndProposal')
@@ -33,11 +34,15 @@ export function GameEndControls({ transport, locale, playerNames, disabled = fal
         refresh()
       } else if (event.type === 'commandReceipt' || event.type === 'error') {
         setSending(false)
-        if (event.type === 'error') {
-          if (event.code === 'experimental_feature_unavailable') {
+        const failure = event.type === 'error' ? event : event.status === 'completed' && !event.receipt.outcome.ok ? event.receipt.outcome : undefined
+        if (failure) {
+          if (failure.code === 'experimental_feature_unavailable') {
             setError(t(locale, 'beta.featureUnavailable'))
-            onExperimentalFeatureUnavailable?.()
-          } else setError(event.error)
+            if (!event.requestId || lastUnavailableRequest.current !== event.requestId) {
+              lastUnavailableRequest.current = event.requestId ?? null
+              onExperimentalFeatureUnavailable?.()
+            }
+          } else setError(failure.error ?? '')
         }
       }
     })

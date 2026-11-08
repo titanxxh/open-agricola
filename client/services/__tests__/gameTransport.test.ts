@@ -143,7 +143,7 @@ describe('WsGameTransport request correlation', () => {
       commandId: context.commandId, scopeId: '01800000-0000-4000-8000-000000000001',
       outcome: { ok: true, roomId: 'fresh-solo', roomVersion: 0, stepNo: 0 },
     } })
-    await expect(creation).resolves.toMatchObject({ ok: true, historyLength: 0 })
+    await expect(creation).resolves.toBeUndefined()
     expect(transport.roomId).toBe('fresh-solo')
     expect(transport.recoveringCommands).toBe(false)
     transport.destroy()

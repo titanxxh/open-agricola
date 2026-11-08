@@ -32,6 +32,7 @@ import { OpeningFacts } from './opening-facts'
 import { parseTeamRoomMembers } from '../../../shared/contract/team-room'
 
 type RoomRow = {
+  creation_configuration_json: string | null
   id: string
   created_by: string | null
   invited_user_ids: unknown
@@ -203,7 +204,10 @@ const roomValues = (
 const toSnapshot = (
   row: RoomRow,
   players: RoomMeta['players'],
-): RoomSnapshot => ({
+): RoomSnapshot => {
+  const creationConfiguration = row.creation_configuration_json ? parseGameCreationRecord(row.creation_configuration_json) : null
+  return {
+  ...(creationConfiguration ? { creationConfiguration } : {}),
   id: row.id,
   version: row.version,
   serialized: row.state_json ? (JSON.parse(row.state_json) as PersistedSessionSnapshot) : null,
@@ -243,7 +247,8 @@ const toSnapshot = (
     players,
   },
   updatedAt: row.updated_at,
-})
+  }
+}
 
 export class PostgresRoomPersistence implements RoomPersistence {
   private readonly loadRoom
@@ -299,12 +304,12 @@ export class PostgresRoomPersistence implements RoomPersistence {
     this.loadCreationRow = db.prepare('SELECT configuration_json FROM game_creation_configurations WHERE room_id=?')
     this.history = new RoomHistoryStore(db)
     this.loadRoom = db.prepare(
-      `SELECT id, created_by, team_members_json, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
+      `SELECT configuration_json AS creation_configuration_json, id, created_by, team_members_json, invited_user_ids, color_confirmation_player_index, state_json, input_window_json, end_proposal_json, awaiting_rematch_players, max_players, solo_hand_mode, status, version, custom_card_ids,
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor, enable_moor_balance_rules,
               allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, hotseat, started_at, updated_at
-       FROM rooms WHERE id = ?`,
+       FROM rooms LEFT JOIN game_creation_configurations ON game_creation_configurations.room_id=rooms.id WHERE id = ?`,
     )
     this.loadPlayers = db.prepare(
       'SELECT user_id AS "userId", player_index AS "playerIndex" FROM room_players WHERE room_id = ? ORDER BY player_index',
@@ -414,7 +419,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       RETURNING id
     `)
     this.restoreRooms = db.prepare(`
-      SELECT rooms.id, rooms.created_by, rooms.team_members_json, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
+      SELECT configuration_json AS creation_configuration_json, rooms.id, rooms.created_by, rooms.team_members_json, rooms.invited_user_ids, rooms.color_confirmation_player_index, rooms.state_json, rooms.input_window_json,
              rooms.end_proposal_json, rooms.awaiting_rematch_players, rooms.max_players, rooms.solo_hand_mode, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
@@ -427,6 +432,7 @@ export class PostgresRoomPersistence implements RoomPersistence {
       JOIN game_contexts
         ON game_contexts.room_id = rooms.id
        AND game_contexts.lifecycle = 'active'
+      LEFT JOIN game_creation_configurations ON game_creation_configurations.room_id = rooms.id
       LEFT JOIN room_players ON room_players.room_id = rooms.id
       WHERE rooms.status != 'finished'
         AND rooms.id NOT IN (SELECT value FROM json_array_elements_text(?::json) AS item(value))
@@ -736,8 +742,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
       const players = (await this.loadPlayers.all(id)) as RoomMeta['players']
       const serialized = row.state_json ? (await this.history.restore(id, row.state_json)) : null
       const snapshot = toSnapshot({ ...row, state_json: null }, players)
-      const creationConfiguration = await this.loadCreationConfiguration(id)
-      if (creationConfiguration) snapshot.creationConfiguration = creationConfiguration
       snapshot.serialized = serialized
       return snapshot
     } catch (err) {
@@ -920,8 +924,6 @@ export class PostgresRoomPersistence implements RoomPersistence {
         try {
           const serialized = row.state_json ? restore(row.id, row.state_json) : null
           const snapshot = toSnapshot({ ...row, state_json: null }, players)
-          const creationConfiguration = await this.loadCreationConfiguration(row.id)
-          if (creationConfiguration) snapshot.creationConfiguration = creationConfiguration
           snapshot.serialized = serialized
           snapshots.push(snapshot)
         } catch (err) {

@@ -295,6 +295,7 @@ export class WsGameTransport implements GameTransport {
     reject: (err: Error) => void
     commandId?: string
   }>()
+  private pendingCreations = new Map<string, { resolve: () => void; reject: (error: Error) => void }>()
   private pendingHistoryResolvers = new Map<string, { resolve: (page: RoomHistoryPage) => void; reject: (error: Error) => void }>()
   private pendingFenceQuoteResolvers = new Map<string, { resolve: (quote: FenceSelectionQuote) => void; reject: (error: Error) => void; version: number; roomId: string }>()
   private eventWaiters = new Set<PendingEvent>()
@@ -302,6 +303,7 @@ export class WsGameTransport implements GameTransport {
   private committedVersion = 0
   private inputWindow?: InputWindow
   private latestPayload?: GameSyncPayload
+  private acknowledgedRoomId?: string
   private readonly journal: RoomCommandJournal
   private readonly completed = new Map<string, CommandOutcome>()
   private readonly options: RoomConnectionOptions
@@ -542,6 +544,8 @@ export class WsGameTransport implements GameTransport {
       this.seatHint = undefined
       this.journal.playerIndex = undefined
       this.setRoom(msg.roomId)
+      this.acknowledgedRoomId = msg.roomId
+      for (const [commandId, outcome] of this.completed) this.finishCommand(commandId, outcome)
     } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined' || msg.type === 'roomWaiting') {
       if ('playerIndex' in msg) {
         this.roomViewer = { kind: 'participant', playerIndex: msg.playerIndex,
@@ -552,6 +556,8 @@ export class WsGameTransport implements GameTransport {
         this.journal.playerIndex = msg.playerIndex
       }
       this.setRoom(msg.roomId)
+      this.acknowledgedRoomId = msg.roomId
+      for (const [commandId, outcome] of this.completed) this.finishCommand(commandId, outcome)
     } else if (msg.type === 'fenceSelectionQuote') {
       const pending = msg.requestId ? this.pendingFenceQuoteResolvers.get(msg.requestId) : undefined
       if (msg.requestId) this.pendingFenceQuoteResolvers.delete(msg.requestId)
@@ -616,9 +622,17 @@ export class WsGameTransport implements GameTransport {
   private finishCommand(commandId: string, outcome: CommandOutcome): void {
     const command = this.journal.commands.get(commandId)
     if (this.recovering && !outcome.ok && command?.type === 'createRoom') {
-      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed' }))
+      this.eventListeners.forEach(listener => listener({ type: 'error', error: outcome.error ?? 'Room creation failed', code: outcome.code === 'experimental_feature_unavailable' ? outcome.code : undefined }))
     }
     let waitingForSnapshot = false
+    const creation = this.pendingCreations.get(commandId)
+    if (creation) {
+      if (!outcome.ok) creation.reject(new CommandRejectedError(outcome))
+      else if (outcome.roomId === this.roomId && ((this.latestPayload && this.committedVersion >= (outcome.roomVersion ?? 0))
+        || (outcome.stepNo === undefined && this.acknowledgedRoomId === this.roomId))) creation.resolve()
+      else waitingForSnapshot = true
+      if (!waitingForSnapshot) this.pendingCreations.delete(commandId)
+    }
     for (const [requestId, pending] of this.pendingResolvers) {
       if (pending.commandId !== commandId) continue
       if (!outcome.ok) pending.reject(new CommandRejectedError(outcome))
@@ -643,7 +657,7 @@ export class WsGameTransport implements GameTransport {
   }
 
   private setRoom(roomId: string): void {
-    if (this.roomId !== roomId) { this.committedVersion = 0; this.inputWindow = undefined; this.latestPayload = undefined }
+    if (this.roomId !== roomId) { this.committedVersion = 0; this.inputWindow = undefined; this.latestPayload = undefined; this.acknowledgedRoomId = undefined }
     this.roomId = roomId
     this.journal.roomId = roomId
     this.journal.save()
@@ -687,6 +701,7 @@ export class WsGameTransport implements GameTransport {
     this.pendingHistoryResolvers.forEach(pending => pending.reject(error)); this.pendingHistoryResolvers.clear()
   }
   private rejectPending(error: Error): void {
+    this.pendingCreations.forEach(pending => pending.reject(error)); this.pendingCreations.clear()
     this.pendingResolvers.forEach(pending => pending.reject(error)); this.pendingResolvers.clear()
     this.rejectReads(error)
   }
@@ -725,17 +740,24 @@ export class WsGameTransport implements GameTransport {
   onConnectionStatus(listener: (status: RoomConnectionStatus) => void): () => void { this.connectionListeners.add(listener); listener(this.status); return () => { this.connectionListeners.delete(listener) } }
   onRecoveryNotice(listener: (code: string) => void): () => void { this.recoveryListeners.add(listener); return () => { this.recoveryListeners.delete(listener) } }
 
-  createRoom(options: RoomCreationOptions): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'createRoom', ...options })
+  createRoom(options: RoomCreationOptions): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.connected) { reject(new Error('WebSocket reconnecting')); return }
+      const command = this.identify({ type: 'createRoom', ...options })
+      const commandId = command.commandContext?.commandId
+      if (!commandId) { reject(new Error('Room creation identity is unavailable')); return }
+      this.pendingCreations.set(commandId, { resolve, reject })
+      this.sendRaw({ ...command, requestId: commandUuid() })
+    })
   }
 
   /** Attach before connect so receipt recovery settles the original creation. */
-  resumeRoomCreation(): Promise<GameSyncPayload> | null {
+  resumeRoomCreation(): Promise<void> | null {
     const command = [...this.journal.commands.values()].find(item => item.type === 'createRoom')
     const commandId = command?.commandContext?.commandId
     if (!commandId) return null
     return new Promise((resolve, reject) => {
-      this.pendingResolvers.set(commandUuid(), { commandId, resolve, reject })
+      this.pendingCreations.set(commandId, { resolve, reject })
     })
   }
 
