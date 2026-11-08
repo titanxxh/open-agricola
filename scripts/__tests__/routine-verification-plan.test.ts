@@ -1172,6 +1172,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/source-aware-scoring.spec.ts',
       'e2e-tests/special-actions-localization.spec.ts',
       'e2e-tests/team-scoring.spec.ts',
+      'e2e-tests/team-visibility.spec.ts',
       'e2e-tests/visual-support-regression.spec.ts',
     ].map(file => ({ file, grep: null }))
     const farm = planRoutineVerification({
