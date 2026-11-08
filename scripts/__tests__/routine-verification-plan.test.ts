@@ -1165,6 +1165,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/hotseat-public-farms.spec.ts',
       'e2e-tests/issue1201-lover-settlement.spec.ts',
       'e2e-tests/mobile-scoring-pad.spec.ts',
+      'e2e-tests/multihand.spec.ts',
       'e2e-tests/played-card-chronology.spec.ts',
       'e2e-tests/room-animal-holders.spec.ts',
       'e2e-tests/seasons-worker-icons.spec.ts',
