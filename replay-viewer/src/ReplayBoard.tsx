@@ -239,7 +239,7 @@ function ReplayBoardContent({
   const farmView = {
     ...farmProjection,
     locale,
-    viewerPlayerId: perspectivePlayerId,
+    visiblePlayerIds: perspectivePlayerId ? [perspectivePlayerId] : [],
     activePlayerId: perspectivePlayerId ?? currentPlayer.id,
     currentStartPlayerId: state.players.find((player) => player.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((player) => player.startPlayer)?.id ?? '',

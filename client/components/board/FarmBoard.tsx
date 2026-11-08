@@ -398,7 +398,7 @@ export type FarmBoardView = {
   players: PlayerState[]
   currentPlayer: PlayerState
   displayPlayer: PlayerState
-  viewerPlayerId: string | null
+  visiblePlayerIds: readonly string[]
   activePlayerId?: string
   playerPanelSummary: PlayerPanelSupplySummary
   devMode: boolean
@@ -842,7 +842,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
     players,
     currentPlayer,
     displayPlayer,
-    viewerPlayerId,
+    visiblePlayerIds,
     activePlayerId,
     playerPanelSummary,
     currentStartPlayerId,
@@ -934,7 +934,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const compactLabels = { "family": translateMessage(locale, "ui.copy.components_board_FarmBoard.family_capacity_cba19b"), "rooms": translateMessage(locale, "ui.copy.components_board_FarmBoard.rooms_ab0d1a"), "housing": translateMessage(locale, "ui.copy.components_board_FarmBoard.housing_capacity_9ccd49"), "fields": translateMessage(locale, "ui.copy.components_board_FarmBoard.fields_839fcb"), "fence": translateMessage(locale, "ui.copy.components_board_FarmBoard.fence_capacity_fc820c"), "stable": translateMessage(locale, "ui.copy.components_board_FarmBoard.stable_supply_516fd2"), "infirmary": translateMessage(locale, "ui.copy.components_board_FarmBoard.infirmary_workers_e1198a") }
 
   // Multi-select state for occupation-hand selection interaction
-  const isMultiOccupationSelect = !!occupationHandSelection
+  const isMultiOccupationSelect = !!occupationHandSelection && canInteractHand
   const [selectedOccIds, setSelectedOccIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -1023,7 +1023,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false, handOutlet, 
   const handPanel = (
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
-      {displayPlayer.id === viewerPlayerId || devMode ? (
+      {visiblePlayerIds.includes(displayPlayer.id) || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
           <div className="hand-section occupation" data-interaction-focus="occupation-hand" data-focus-player={displayPlayer.id}>
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>

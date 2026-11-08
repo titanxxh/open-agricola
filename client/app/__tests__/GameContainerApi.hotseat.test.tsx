@@ -14,6 +14,8 @@ import { t } from '../../../shared/i18n'
 import { AuthProvider } from '../../contexts/AuthContext'
 import { LocaleProvider } from '../../contexts/LocaleContext'
 import { GameContainerApi } from '../GameContainerApi'
+import { processSubmit } from '../../../shared/draft/draft-manager'
+import { firstDraftPick } from '../../../shared/draft/__tests__/draft-fixtures'
 
 const workPayload = (): GameSyncPayload => {
   const registry = createOfficialCardRegistry()
@@ -43,6 +45,7 @@ class GameSocket {
   static readonly OPEN = 1
   static latest: GameSocket
   static hotseat = true
+  static multihand = false
   static payload: GameSyncPayload
   static version = 1
   static sent: Array<Record<string, unknown>> = []
@@ -77,9 +80,12 @@ class GameSocket {
           scopeId: '01800000-0000-4000-8000-000000001098', expiresAt: Date.now() + 86400000,
         } })
       } else if (message.type === 'joinRoom') {
+        const audience = GameSocket.hotseat ? { controlledPlayerIndexes: [0, 1], visiblePlayerIds: ['p1', 'p2'] }
+          : GameSocket.multihand ? { controlledPlayerIndexes: [0, 2], visiblePlayerIds: ['p1', 'p3'] } : {}
         GameSocket.emit({ type: 'roomJoined', roomId: 'room-1098', playerIndex: 0,
-          hotseat: GameSocket.hotseat, status: 'playing', maxPlayers: 2, playerColors: ['red', 'blue'],
-          players: [{ playerIndex: 0, name: 'Alice', connected: true }, { playerIndex: 1, name: 'Bob', connected: true }] })
+          ...audience, hotseat: GameSocket.hotseat, status: 'playing', maxPlayers: GameSocket.payload.state.players.length,
+          playerColors: GameSocket.payload.state.players.map(player => player.color),
+          players: GameSocket.payload.state.players.map((player, playerIndex) => ({ playerIndex, name: player.name, connected: true })) })
         GameSocket.snapshot()
       } else if (message.type === 'getGameEndProposal') {
         GameSocket.emit({ type: 'gameEndProposal', roomId: 'room-1098', proposal: null })
@@ -153,6 +159,7 @@ beforeEach(() => {
   window.localStorage.setItem('open-agricola-locale-v2', 'en')
   window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098&hotseat=1&player=p1&devMode=1')
   GameSocket.hotseat = true
+  GameSocket.multihand = false
   GameSocket.payload = workPayload()
   GameSocket.version = 1
   GameSocket.sent = []
@@ -162,6 +169,76 @@ beforeEach(() => {
     String(url).includes('/api/rooms/locate') ? { wsPath: '/nodes/local/ws' } : { user: null },
   ))))
   setupViewport(false)
+})
+
+const multihandPayload = (phase: 'playing' | 'draft' | 'parent-selection' = 'playing'): GameSyncPayload => {
+  const state = createInitialState(1098, { playerCount: 4,
+    ...(phase === 'draft' ? { draftMode: 'simultaneous' as const } : {}),
+    ...(phase === 'parent-selection' ? { enableParentCards: true, draftParents: true } : {}),
+  })
+  state.team = { configuration: { mode: 'multihand', seatsPerTeam: 2, seating: 'separated', scoring: 'sum' }, playerTeams: [0, 1, 0, 1] }
+  state.players.forEach((player, index) => { player.name = ['Alice', 'Bob', 'Cara', 'Dan'][index]!; player.nameIsDefault = false })
+  return { ...workPayload(), state: withActiveRegistry(createOfficialCardRegistry(), () =>
+    serializeState(state, { actionHooks: undefined, engineStack: new EngineStack() })) }
+}
+
+describe('multihand account audiences', () => {
+  beforeEach(() => {
+    GameSocket.hotseat = false
+    GameSocket.multihand = true
+    GameSocket.payload = multihandPayload()
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1098')
+  })
+
+  it('reads both owned hands and automatically follows the next owned responder without a handoff', async () => {
+    const user = userEvent.setup()
+    const { container } = renderGame()
+    await screen.findByRole('region', { name: 'Action Spaces' })
+    await user.click(screen.getByRole('tab', { name: /Cara/ }))
+    expect(container.querySelector('[data-hand-anchor="p3"]')).toBeVisible()
+    expect(container.querySelector('[data-action-id="forest"] button')).toBeDisabled()
+    await user.click(screen.getByRole('tab', { name: /Bob/ }))
+    expect(container.querySelector('[data-hand-anchor]')).not.toBeInTheDocument()
+
+    const next = multihandPayload()
+    next.state.currentPlayerIndex = 2
+    act(() => GameSocket.snapshot(next))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Cara/ })).toHaveAttribute('aria-selected', 'true'))
+    expect(container.querySelector('[data-action-id="forest"] button')).toBeEnabled()
+    expect(screen.queryByRole('dialog', { name: 'Hotseat handoff' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /Alice/ }))
+    act(() => GameSocket.snapshot(next))
+    expect(screen.getByRole('tab', { name: /Alice/ })).toHaveAttribute('aria-selected', 'true')
+    expect(container.querySelector('[data-action-id="forest"] button')).toBeDisabled()
+
+    const outgoing = multihandPayload()
+    outgoing.state.currentPlayerIndex = 2
+    outgoing.interaction = { stateId: 'wait', playerIndex: 0, allowedCommands: ['resolveChoice'], anytimeActions: [],
+      promptKey: 'ui.interactionConfirmNextPlayer', request: { kind: 'choice', options: [{ value: 'confirm', labelKey: 'Continue' }] } }
+    act(() => GameSocket.snapshot(outgoing))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Alice/ })).toHaveAttribute('aria-selected', 'true'))
+    expect(container.querySelector('[data-hand-anchor="p1"]')).toBeVisible()
+  })
+
+  it.each(['draft', 'parent-selection'] as const)('walks owned %s requests in seat order', async phase => {
+    GameSocket.payload = multihandPayload(phase)
+    const { container } = renderGame()
+    await screen.findByRole('dialog', { name: t('en', phase === 'draft' ? 'ui.draft.dialog' : 'ui.parentSelection.dialog') })
+    const next = structuredClone(GameSocket.payload)
+    if (phase === 'draft') {
+      expect(container.querySelector('[data-player-id="p1"]')).toHaveAttribute('data-is-you', 'true')
+      const transition = processSubmit(next.state.draft!, 'p1', firstDraftPick(next.state.draft!, 'p1'))
+      if (transition.kind !== 'accepted') throw new Error(transition.error)
+      next.state.draft = transition.draft
+    } else {
+      const candidates = next.state.parentSelection!.candidates.p1!
+      next.state.parentSelection!.submissions.p1 = { mother: candidates.mother[0]!, father: candidates.father[0]! }
+    }
+    act(() => GameSocket.snapshot(next))
+    if (phase === 'draft') await waitFor(() => expect(container.querySelector('[data-player-id="p3"]')).toHaveAttribute('data-is-you', 'true'))
+    else await waitFor(() => expect(container.querySelector('.parent-selection-status')).toHaveAttribute('data-already-submitted', '0'))
+    expect(screen.queryByRole('dialog', { name: 'Hotseat handoff' })).not.toBeInTheDocument()
+  })
 })
 afterEach(() => {
   cleanup()

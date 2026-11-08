@@ -28,6 +28,7 @@ import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuer
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
+import { nextMultihandPlayerId } from './multihand-seat'
 import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
@@ -511,13 +512,22 @@ export const GameContainerApi = () => {
   const isSpectator = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'spectator'
   const spectatingEndReason = wsStatus.phase === 'ready' ? wsStatus.spectatingEndReason : undefined
   const isHotseat = wsStatus.phase === 'ready' && wsStatus.hotseat === true
-  const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
+  const participantViewer = wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'participant' ? wsStatus.viewer : null
+  const controlledPlayerIndexes = participantViewer?.controlledPlayerIndexes ?? (participantViewer ? [participantViewer.playerIndex] : [])
+  const isMultihand = !isHotseat && state?.team?.configuration.mode === 'multihand'
+  const multihandPlayerId = isMultihand && state ? nextMultihandPlayerId(state, interaction, controlledPlayerIndexes) : null
+  const localPlayerId = isMultihand ? multihandPlayerId ?? wsAssignedPlayerId : lockedViewPlayerId ?? wsAssignedPlayerId
+  const multihandAudienceKey = multihandPlayerId && wsStatus.phase === 'ready' ? `${wsStatus.roomId}:${multihandPlayerId}` : null
+  const [lastMultihandAudienceKey, setLastMultihandAudienceKey] = useState<string | null>(null)
+  if (lastMultihandAudienceKey !== multihandAudienceKey) {
+    setLastMultihandAudienceKey(multihandAudienceKey)
+    if (multihandPlayerId) setViewPlayerId(multihandPlayerId)
+  }
   const activePlayer =
     interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
       ? state?.players[interaction.playerIndex] ?? currentPlayer
       : currentPlayer
-  // In WS mode, selfPlayer is locked to the URL ?player= param.
-  // If the URL omits ?player=, use the seat assigned by the join/create handshake.
+  // Multihand follows an owned responder; ordinary online play keeps its assigned seat.
   // One-device HTTP play follows the Interaction Player, including reactions.
   const selfPlayer = isSpectator ? null : isWs && localPlayerId && !isHotseat
     ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
@@ -570,7 +580,7 @@ export const GameContainerApi = () => {
   const bugReportBar = bugReportRoomId
     ? <BugReportBar roomId={bugReportRoomId} />
     : null
-  const mySeatIndex = isWs && wsStatus.phase === 'ready' && wsStatus.viewer.kind === 'participant' ? wsStatus.viewer.playerIndex : null
+  const mySeatIndex = controlledPlayerIndexes.find(index => waitingSeatIndexes?.includes(index)) ?? participantViewer?.playerIndex ?? null
   useTurnTabTitle(gameNeedsTurnTab(isHotseat, mySeatIndex, waitingSeatIndexes))
 
   useLayoutEffect(() => {
@@ -1789,7 +1799,9 @@ export const GameContainerApi = () => {
       pendingPalisadeSet: new Set<string>(),
     } : {}),
     locale,
-    viewerPlayerId: selfPlayer?.id ?? null,
+    visiblePlayerIds: isHotseat
+      ? hotseatSeatConfirmed === hotseatAudienceKey && hotseatAudienceId ? [hotseatAudienceId] : []
+      : participantViewer?.visiblePlayerIds ?? (selfPlayer ? [selfPlayer.id] : []),
     activePlayerId: activePlayer?.id,
     currentStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
     nextStartPlayerId: state.players.find((p) => p.startPlayer)?.id ?? '',
