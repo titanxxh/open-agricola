@@ -91,6 +91,7 @@ type ClientCommandBody =
   | { type: 'setPlayerColor'; color: PlayerState['color'] }
   | { type: 'confirmPlayerColor' }
   | { type: 'startTeamGame' }
+  | { type: 'setTeam'; memberId?: string; teamIndex: number }
   | { type: 'dissolveRoom' }
   | { type: 'proposeGameEnd'; intent: 'end' | 'rematch' }
   | { type: 'respondGameEnd'; proposalId: string; agree: boolean }
@@ -101,6 +102,7 @@ type ClientCommandBody =
 export type ClientCommand = ClientCommandBody & { requestId?: string; commandContext?: CommandIdentity & Partial<CommandInput> & { roomId?: string; allocationId?: string } }
 
 export type RoomColorErrorCode = 'color_unavailable' | 'color_locked' | 'invalid_color' | 'color_save_failed' | 'color_confirmation_unavailable' | 'color_confirmation_failed'
+export type RoomTeamErrorCode = 'team_change_failed' | 'team_start_failed'
 
 export type SpectatingEndReason = 'offline' | 'completed' | 'terminated' | 'removed'
 
@@ -122,7 +124,7 @@ export type ServerEvent =
   | {
       type: 'error'
       error: string
-      code?: RoomColorErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
+      code?: RoomColorErrorCode | RoomTeamErrorCode | RoomAccessErrorCode | GameContextErrorCode | CommandErrorCode | 'seat_replaced' | 'history_branch_changed' | 'history_projection_changed' | 'player_slot_required' | 'room_capacity_reached'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

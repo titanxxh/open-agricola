@@ -1,3 +1,5 @@
+import { parseRoomBody } from './persistence/room-body-codec'
+import { parseTeamConfiguration } from '../../shared/contract/team'
 import type { RoomSummary } from '../../shared/contract/protocol/ws'
 import { randomUUID } from 'node:crypto'
 import type { PostgresDatabase } from '../database/postgres'
@@ -14,6 +16,18 @@ export class RoomCapacityError extends Error { readonly code = 'room_capacity_re
 type Instance = { instance_id: string; internal_url: string; generation: string; status: string; room_capacity: number; lease_until: number }
 type Ownership = { room_id: string; instance_id: string; epoch: number; lease_until: number; status: string; development: boolean; admission_until: number }
 const route = (owner: Ownership): RoomRoute => ({ roomId: owner.room_id, owner: { instanceId: owner.instance_id, epoch: owner.epoch }, wsPath: `/nodes/${encodeURIComponent(owner.instance_id)}/ws` })
+
+const storedTeamConfiguration = (body: string | null, playerCount: number) => {
+  if (!body) return undefined
+  try {
+    const saved: unknown = parseRoomBody(body)
+    if (!saved || typeof saved !== 'object' || !('state' in saved)) return undefined
+    const state = saved.state
+    if (!state || typeof state !== 'object' || !('team' in state)) return undefined
+    const team = state.team
+    return team && typeof team === 'object' && 'configuration' in team ? parseTeamConfiguration(team.configuration, playerCount) : undefined
+  } catch { return undefined }
+}
 
 /** Shared placement and fencing. Room state and undo never contain this epoch. */
 export class RoomDirectory {
@@ -239,18 +253,24 @@ export class RoomDirectory {
 
   async lobby(limit = 50, userId?: string): Promise<RoomSummary[]> {
     const now = await this.now()
-    const rows = await this.db.prepare(`SELECT r.id, r.created_by, r.max_players, r.status, r.invited_user_ids IS NOT NULL AS invited, o.development, COALESCE(p.occupied_count, 0) AS occupied
+    const rows = await this.db.prepare(`SELECT r.id, r.created_by, r.max_players, r.status, CASE WHEN r.team_members_json IS NOT NULL THEN r.state_json END AS team_state_json, r.invited_user_ids IS NOT NULL AS invited, o.development, COALESCE(p.occupied_count, 0) AS occupied
       FROM rooms r JOIN game_contexts c ON c.room_id=r.id AND c.lifecycle='active'
       JOIN room_ownership o ON o.room_id=r.id AND o.status='active' AND o.lease_until>?
       JOIN app_instances i ON i.instance_id=o.instance_id AND i.status='ready' AND i.lease_until>?
       LEFT JOIN room_presence p ON p.room_id=r.id AND p.epoch=o.epoch
       WHERE r.hotseat=0 AND r.max_players>1 AND (p.connected_count>0 OR EXISTS(SELECT 1 FROM development_room_slots s WHERE s.room_id=r.id))
         AND (r.invited_user_ids IS NULL OR r.created_by=? OR jsonb_exists(r.invited_user_ids, ?))
-      ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; status: string; occupied: number; invited: boolean; development: boolean }>(now, now, userId ?? null, userId ?? null, limit)
-    return rows.map(row => ({ id: row.id, playerCount: row.occupied, maxPlayers: row.max_players,
-      ...(row.created_by ? { createdBy: row.created_by } : {}), status: row.status === 'playing' ? 'playing' : 'waiting',
-      ...(!row.invited && !row.development && row.status === 'playing' ? { canSpectate: true } : {}),
-      ...(row.invited ? { access: 'invited' as const } : {}) }))
+      ORDER BY r.created_at, r.id LIMIT ?`).all<{ id: string; created_by: string | null; max_players: number; status: string; team_state_json: string | null; occupied: number; invited: boolean; development: boolean }>(now, now, userId ?? null, userId ?? null, limit)
+    return rows.map(row => {
+      const teamConfig = storedTeamConfiguration(row.team_state_json, row.max_players)
+      return {
+        ...(teamConfig ? { teamConfig } : {}),
+        id: row.id, playerCount: row.occupied, maxPlayers: row.max_players,
+        ...(row.created_by ? { createdBy: row.created_by } : {}), status: row.status === 'playing' ? 'playing' : 'waiting',
+        ...(!row.invited && !row.development && row.status === 'playing' ? { canSpectate: true } : {}),
+        ...(row.invited ? { access: 'invited' as const } : {}),
+      }
+    })
   }
 
   async owned(instanceId: string): Promise<Array<{ roomId: string; owner: OwnerToken }>> {

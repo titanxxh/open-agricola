@@ -1,3 +1,4 @@
+import { TeamConfigurationSummary } from './TeamSetupFields'
 import type { LobbyExpansion, MyActiveRoom } from '../../shared/contract/lobby'
 import { Section } from '../components/common/Section'
 import { useLocale } from '../contexts/LocaleContext'
@@ -28,6 +29,10 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
             <li key={`${room.id}:${room.player_index}`} className={`room-item my-game${room.my_turn === 1 ? ' room-item--my-turn' : ''}`}>
               <div className="my-game__details">
                 <div className="my-game__players">
+                  {room.teamWaiting?.members.map(member => <span key={member.memberId} className="my-game__player">
+                    <span className="my-game__name">{member.name}</span>
+                    {member.memberId === room.teamWaiting?.selfMemberId && <small>({t('platform.me')})</small>}
+                  </span>)}
                   {room.players.map(player => (
                     <span key={player.playerIndex} className="my-game__player" data-current={room.waiting_player_indexes.includes(player.playerIndex)}>
                       <span className="my-game__color" role="img" aria-label={t(`platform.playerColors.${player.color}`)}
@@ -37,6 +42,7 @@ export function MyActiveGames({ rooms, onResume }: { rooms: MyActiveRoom[]; onRe
                     </span>
                   ))}
                 </div>
+                {room.teamWaiting && <TeamConfigurationSummary maxPlayers={room.max_players} value={room.teamWaiting.teamConfig} />}
                 <div className="my-game__meta">
                   {progress && <span className="my-game__progress">
                     {progress.phase === 'playing' ? t('ui.roundHeader', { round: progress.round })

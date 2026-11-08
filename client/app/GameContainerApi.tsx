@@ -1,6 +1,7 @@
 import { PublicOpeningProgress } from './PublicOpeningProgress'
 import { GameEndControls } from './GameEndControls'
-import type { RoomColorErrorCode } from '../../shared/contract/protocol/ws'
+import { TeamWaitingRoom } from './TeamWaitingRoom'
+import type { RoomColorErrorCode, RoomTeamErrorCode } from '../../shared/contract/protocol/ws'
 import { WaitingRoomPlayers } from './WaitingRoomPlayers'
 import { buildRoomSearch, roomIdFromQuery } from '../utils/game-room-url'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
@@ -23,7 +24,7 @@ import { buildFenceCommitPayload } from './farm-commit-ui'
 import { useCardPlayChoice } from '../hooks/useCardPlayChoice'
 import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
-import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuery } from './game-setup-query'
+import { isHotseatSetupQuery, parseDraftParamsFromQuery, parseRoomAccessFromQuery, parseTeamConfigurationFromQuery } from './game-setup-query'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
@@ -160,6 +161,7 @@ const useTransportSetup = (
   const initRef = useRef(false)
   const [recoveryNotice, setRecoveryNotice] = useState(false)
   const [roomColorError, setRoomColorError] = useState<RoomColorErrorCode | null>(null)
+  const [roomTeamError, setRoomTeamError] = useState<RoomTeamErrorCode | null>(null)
   const [connectedPlayerIndexes, setConnectedPlayerIndexes] = useState<number[] | null>(null)
   const playerIndexRef = useRef(0)
 
@@ -233,7 +235,7 @@ const useTransportSetup = (
     let hotseat = false
     let receivedRoom = false
     let snapshotRoomId: string | undefined
-    let waiting: Extract<WsStatus, { phase: 'waiting' }> | undefined
+    let waiting: Extract<WsStatus, { phase: 'waiting' | 'team-waiting' }> | undefined
     let disposed = false
     const ready = () => {
       if (disposed) return
@@ -271,6 +273,14 @@ const useTransportSetup = (
         setWsStatus({ phase: 'joining', roomId: msg.roomId })
       } else if (msg.type === 'spectatingEnded') {
         ready()
+      } else if (msg.type === 'teamRoomWaiting') {
+        receivedRoom = true
+        hotseat = false
+        setRoomInUrl(msg.roomId)
+        setRoomTeamError(null)
+        waiting = { ...msg, phase: 'team-waiting' }
+        setWsReady(false)
+        setWsStatus(waiting)
       } else if (msg.type === 'roomCreated' || msg.type === 'roomJoined') {
         receivedRoom = true
         setRoomInUrl(msg.roomId)
@@ -291,10 +301,10 @@ const useTransportSetup = (
         waiting = { phase: 'waiting', roomId: msg.roomId, players: msg.players, maxPlayers: msg.maxPlayers, playerColors: msg.playerColors, colorConfirmationPlayerIndex: msg.colorConfirmationPlayerIndex }
         setWsReady(false)
         setWsStatus(waiting)
-      } else if (msg.type === 'playerJoined' && waiting) {
+      } else if (msg.type === 'playerJoined' && waiting?.phase === 'waiting') {
         waiting = { ...waiting, players: [...waiting.players.filter(player => player.playerIndex !== msg.playerIndex), { playerIndex: msg.playerIndex, name: msg.name, connected: true }].sort((a, b) => a.playerIndex - b.playerIndex), maxPlayers: msg.maxPlayers }
         setWsStatus(waiting)
-      } else if (msg.type === 'playerDisconnected' && waiting) {
+      } else if (msg.type === 'playerDisconnected' && waiting?.phase === 'waiting') {
         waiting = { ...waiting, players: waiting.players.map(player => player.playerIndex === msg.playerIndex ? { ...player, connected: false } : player) }
         setWsStatus(waiting)
       } else if (msg.type === 'gameStarted') {
@@ -306,6 +316,8 @@ const useTransportSetup = (
         snapshotRoomId = msg.roomId
         setRoomInUrl(msg.roomId)
         if (ws.connected) ready()
+      } else if (msg.type === 'error' && (msg.code === 'team_change_failed' || msg.code === 'team_start_failed')) {
+        setRoomTeamError(msg.code)
       } else if (msg.type === 'error' && (msg.code === 'color_unavailable' || msg.code === 'color_locked' || msg.code === 'invalid_color' || msg.code === 'color_save_failed' || msg.code === 'color_confirmation_unavailable' || msg.code === 'color_confirmation_failed')) {
         setRoomColorError(msg.code)
       } else if (msg.type === 'error' && !ws.connected) {
@@ -326,6 +338,7 @@ const useTransportSetup = (
           setWsStatus({ phase: 'creating' })
           ws.sendRoomCommand('createRoom', {
             maxPlayers: maxPlayersFromQuery(window.location.search),
+            teamConfig: parseTeamConfigurationFromQuery(window.location.search),
             access: parseRoomAccessFromQuery(window.location.search),
             soloHandMode: maxPlayersFromQuery(window.location.search) === 1
               ? params.get('soloHandMode') === 'choose-7' ? 'choose-7' : 'random'
@@ -358,7 +371,17 @@ const useTransportSetup = (
     ? (localTransport ?? httpTransportSingleton)
     : isWsMode && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
-  return { connectedPlayerIndexes, transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
+  return { roomTeamError,
+    chooseTeam: (teamIndex: number, memberId?: string) => {
+      setRoomTeamError(null)
+      try { wsTransport?.sendRoomCommand('setTeam', { teamIndex, ...(memberId === undefined ? {} : { memberId }) }) }
+      catch { setRoomTeamError('team_change_failed') }
+    },
+    startTeamGame: () => {
+      setRoomTeamError(null)
+      try { wsTransport?.sendRoomCommand('startTeamGame') } catch { setRoomTeamError('team_start_failed') }
+    },
+    connectedPlayerIndexes, transport, wsStatus, isWs: isWsMode, isReady, wsTransport, recoveryNotice, clearRecoveryNotice: () => setRecoveryNotice(false), roomColorError, changePlayerColor: (color: PlayerState['color']) => {
     setRoomColorError(null)
     try { wsTransport?.sendRoomCommand('setPlayerColor', { color }) } catch { setRoomColorError('color_save_failed') }
   } }
@@ -387,7 +410,7 @@ export const GameContainerApi = () => {
   const lockedViewPlayerId = requestedPlayerId
   const { locale } = useLocale()
   const { user } = useAuth()
-  const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor } = useTransportSetup(
+  const { connectedPlayerIndexes, transport, wsStatus, isWs, isReady, wsTransport, recoveryNotice, clearRecoveryNotice, roomColorError, changePlayerColor, roomTeamError, chooseTeam, startTeamGame } = useTransportSetup(
     requestedPlayerId,
     user?.displayNameIsDefault ? undefined : user?.displayName,
     isWsMode,
@@ -1427,6 +1450,8 @@ export const GameContainerApi = () => {
       : undefined
     const statusText = wsStatus.phase === 'reconnecting'
       ? t(locale, 'platform.roomReconnecting')
+      : wsStatus.phase === 'team-waiting'
+      ? t(locale, 'team.waitingTitle')
       : wsStatus.phase === 'waiting'
       ? colorConfirmingPlayer
         ? t(locale, 'platform.waitingForColorConfirmation', { player: getPlayerDisplayName(locale, colorConfirmingPlayer.name, colorConfirmingPlayer.playerIndex) })
@@ -1451,7 +1476,7 @@ export const GameContainerApi = () => {
             : `Error: ${wsStatus.message}`
         : ''
 
-    const inviteUrl = wsStatus.phase === 'waiting'
+    const inviteUrl = wsStatus.phase === 'waiting' || wsStatus.phase === 'team-waiting'
       ? `${window.location.origin}${window.location.pathname}${buildRoomSearch(wsStatus.roomId)}`
       : null
 
@@ -1476,7 +1501,7 @@ export const GameContainerApi = () => {
 
     return (
       <div className="ws-status-screen">
-        <div className="ws-status-card">
+        <div className={`ws-status-card${wsStatus.phase === 'team-waiting' ? ' ws-status-card--team' : ''}`}>
           {!isEmbedded && <div className="site-header-links"><SiteCommunityLinks /></div>}
           {!isEmbedded ? (
             <BrandMark
@@ -1496,7 +1521,7 @@ export const GameContainerApi = () => {
             </div>
           ) : null}
 
-          {wsStatus.phase === 'waiting' && inviteUrl && (
+          {(wsStatus.phase === 'waiting' || wsStatus.phase === 'team-waiting') && inviteUrl && (
             <div className="ws-invite-panel">
               <div className="ws-invite-label">{t(locale, 'platform.inviteLabel')}</div>
               <div className="ws-invite-url-row">
@@ -1521,11 +1546,13 @@ export const GameContainerApi = () => {
                 </div>
               )}
               <div className="ws-invite-roomid">{t(locale, 'platform.roomIdLabel')}<strong>{wsStatus.roomId}</strong></div>
-              <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
-                colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />
-              <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
+              {wsStatus.phase === 'team-waiting'
+                ? <TeamWaitingRoom value={wsStatus} onChooseTeam={chooseTeam} onStart={startTeamGame} disabled={persistencePaused} error={roomTeamError} />
+                : <WaitingRoomPlayers players={wsStatus.players} playerColors={wsStatus.playerColors} playerIndex={wsTransport?.playerIndex ?? undefined} onColorChange={changePlayerColor} colorError={roomColorError}
+                  colorConfirmationPlayerIndex={wsStatus.colorConfirmationPlayerIndex} onConfirmColor={() => wsTransport?.sendRoomCommand('confirmPlayerColor')} disabled={persistencePaused} />}
+              {(wsStatus.phase === 'waiting' || wsStatus.isHost) && <button type="button" className="btn-danger ws-dissolve-btn" onClick={handleDissolve}>
                 {t(locale, 'platform.dissolveRoom')}
-              </button>
+              </button>}
             </div>
           )}
 

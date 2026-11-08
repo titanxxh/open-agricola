@@ -878,6 +878,8 @@ export class WsGameTransport implements GameTransport {
   }): void
   sendRoomCommand(type: 'setPlayerColor', opts: { color: PlayerState['color'] }): void
   sendRoomCommand(type: 'confirmPlayerColor', opts?: Record<string, never>): void
+  sendRoomCommand(type: 'startTeamGame', opts?: Record<string, never>): void
+  sendRoomCommand(type: 'setTeam', opts: { teamIndex: number; memberId?: string }): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: 'getGameEndProposal', opts?: Record<string, unknown>): void
   sendRoomCommand(type: 'proposeGameEnd' | 'respondGameEnd' | 'withdrawGameEnd', opts: Record<string, unknown>): void

@@ -1,3 +1,5 @@
+import { TeamSetupFields, TeamConfigurationSummary } from './TeamSetupFields'
+import type { TeamConfiguration } from '../../shared/contract/team'
 import { t as translateMessage } from '../../shared/i18n'
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { lobbyNeedsTurnTab, useTurnTabTitle } from './use-turn-tab-title'
@@ -37,11 +39,18 @@ export function LobbyPage() {
   const [endedGames, setEndedGames] = useState<Array<{ id: string; outcome: 'completed' | 'terminated'; ended_at: number }>>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
-  const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
+  const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | 'team' | 'multihand' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [soloSetup, setSoloSetup] = useState(false)
   const soloCreation = useRoomCreation()
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
+  const [teamConfiguration, setTeamConfiguration] = useState<TeamConfiguration>({ mode: 'team', seatsPerTeam: 2, seating: 'separated', scoring: 'category-min', teammateVisibility: 'shared' })
+  const isTeamMode = selectMode === 'team' || selectMode === 'multihand'
+  const beginTeamGame = (mode: 'team' | 'multihand') => {
+    setSelectMode(mode); setSelectedMaxPlayers(4)
+    const common = { seatsPerTeam: 2, seating: 'separated', scoring: 'category-min' } as const
+    setTeamConfiguration(mode === 'team' ? { ...common, mode, teammateVisibility: 'shared' } : { ...common, mode })
+  }
   const [roomAccess, setRoomAccess] = useState<'public' | 'invited'>('public')
   const [invitedPlayers, setInvitedPlayers] = useState<InvitablePlayer[]>([])
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
@@ -120,11 +129,13 @@ export function LobbyPage() {
       transport: 'ws',
       maxPlayers: String(selectedMaxPlayers),
       ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
+      ...(isTeamMode ? { teamConfig: JSON.stringify(teamConfiguration) } : {}),
     }
-    if (selectMode === 'multiplayer' && roomAccess === 'invited') {
+    if (selectMode !== 'hotseat' && roomAccess === 'invited') {
       const ids = invitedPlayers.map(player => player.id)
-      if (ids.length !== selectedMaxPlayers - 1) {
-        setError(t('platform.invitedPlayerCountError', { count: String(selectedMaxPlayers - 1) }))
+      const invitedCount = selectMode === 'multihand' ? selectedMaxPlayers / teamConfiguration.seatsPerTeam - 1 : selectedMaxPlayers - 1
+      if (ids.length !== invitedCount) {
+        setError(t('platform.invitedPlayerCountError', { count: String(invitedCount) }))
         return
       }
       params.roomAccess = 'invited'
@@ -298,6 +309,8 @@ export function LobbyPage() {
               >
                 {t('platform.createMultiplayer')}
               </button>
+              <button type="button" className="btn-secondary" onClick={() => beginTeamGame('team')}>{t('team.entry')}</button>
+              <button type="button" className="btn-secondary" onClick={() => beginTeamGame('multihand')}>{t('team.multihandEntry')}</button>
               <button type="button" className="btn-secondary" onClick={() => setSelectMode('hotseat')}>
                 {t('platform.localHotseat')}
               </button>
@@ -310,20 +323,25 @@ export function LobbyPage() {
               {selectMode === 'hotseat' && (
                 <div className="community-deck-toggle-hint">{t('platform.hotseatHint')}</div>
               )}
+              {isTeamMode && <p className="community-deck-toggle-hint">{t(selectMode === 'team' ? 'team.teamHint' : 'team.multihandHint')}</p>}
               <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
               <div className="player-select-options">
-                {([2, 3, 4, 5, 6] as const).map(n => (
+                {(isTeamMode ? [4, 6] : [2, 3, 4, 5, 6]).map(n => (
                   <button
                     key={n}
                     type="button"
                     className={`player-select-btn${selectedMaxPlayers === n ? ' active' : ''}`}
-                    onClick={() => setSelectedMaxPlayers(n)}
+                    onClick={() => {
+                      setSelectedMaxPlayers(n)
+                      if (isTeamMode && n === 4) setTeamConfiguration(value => ({ ...value, seatsPerTeam: 2 }))
+                    }}
                   >
                     {t(`platform.players${n}`)}
                   </button>
                 ))}
               </div>
-              {selectMode === 'multiplayer' && (
+              {isTeamMode && <TeamSetupFields maxPlayers={selectedMaxPlayers} value={teamConfiguration} onChange={setTeamConfiguration} />}
+              {selectMode !== 'hotseat' && (
                 <fieldset className="room-access-options">
                   <legend className="player-select-label">{t('platform.roomAccessLabel')}</legend>
                   <div className="player-select-options">
@@ -341,7 +359,7 @@ export function LobbyPage() {
                       <label htmlFor="invited-players">{t('platform.invitedPlayerIdsLabel')}</label>
                       <RoomInvitePicker value={invitedPlayers} onChange={value => { setInvitedPlayers(value); setError('') }} />
                       <p id="invited-players-hint" className="community-deck-toggle-hint">
-                        {t('platform.invitedPlayerIdsHint', { count: String(selectedMaxPlayers - 1) })}
+                        {t('platform.invitedPlayerIdsHint', { count: String(selectMode === 'multihand' ? selectedMaxPlayers / teamConfiguration.seatsPerTeam - 1 : selectedMaxPlayers - 1) })}
                       </p>
                     </div>
                   )}
@@ -546,12 +564,13 @@ export function LobbyPage() {
         ) : (
           <ul className="room-list">
             {rooms.map(room => (
-              <li key={room.id} className="room-item">
+              <li key={room.id} className={`room-item${room.teamConfig ? ' room-item--team' : ''}`}>
                 <span className="room-id">
                   {t('platform.roomLabel', { id: room.id })}
                   {room.access === 'invited' && <small className="room-access-badge">{t('platform.roomAccessInvited')}</small>}
                 </span>
-                <span className="room-players">{t('platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                <span className="room-players">{t(room.teamConfig ? 'team.seatsFilled' : 'platform.playerCount', { current: String(room.playerCount), max: String(room.maxPlayers) })}</span>
+                {room.teamConfig && <TeamConfigurationSummary maxPlayers={room.maxPlayers} value={room.teamConfig} />}
                 <span className="room-status" data-status={room.status}>
                   {room.status === 'playing' ? t('platform.statusPlaying') : t('platform.statusWaiting')}
                 </span>

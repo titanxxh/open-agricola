@@ -36,6 +36,7 @@
 - `card-encyclopedia.ts` 在首次使用时加载并校验百科文件的哈希，从不在启动时加载；加载失败时下次调用重试（[cards](cards_zh.md)）。
 - `client/hooks/useGameSync.ts` 在每次 `stateUpdate` 时整体替换 `state`、`pending`、`interaction` 与 `scores`。没有乐观提交：点击发送命令，游戏 UI 只在快照到达后改变。本地临时态（hover、草稿、输入框）独立存在，新快照到达时清除无效的选择。
 - 候场消息提供权威座位颜色与连接状态；`WaitingRoomPlayers` 显示所有座位及空位，断线玩家保留姓名和座位并标为离线。其选色器提供六种颜色，禁用其他玩家已占用的颜色，并等待服务端发布保存后的选择。
+- `TeamSetupFields` 共用组队与分身的开房控件及已有变体选项；`game-setup-query.ts` 校验序列化配置。`TeamWaitingRoom` 按队伍展示未排座成员，提供自己选队、房主调队和权威满员开局。等待状态不请求对局快照；`MyActiveGames` 展示公开成员。测试见 `TeamWaitingRoom.test.tsx`、`team-rooms.spec.ts`。
 - 重连执行 `joinRoom` → `roomJoined(status, …)`：`waiting` 恢复等待页，只有 `playing` 才继续 `getState`；`newGame` 之后的 `roomWaiting` 广播会隐藏旧版图。
 - 客户端按 `occurrenceId` 消费公开事件，用于临时通知、高亮与动画；首个快照初始化游标，不重放历史。Action Log 把 `publicEventArchive` 当作只读时间线读取。
 - 玩家名通过 `client/utils/player-name.ts` 按生成名来源与座位号本地化；玩家提供的名字原样显示。

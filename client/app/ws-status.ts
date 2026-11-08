@@ -9,5 +9,6 @@ export type WsStatus =
   | { phase: 'creating' }
   | { phase: 'joining'; roomId: string }
   | { phase: 'waiting'; roomId: string; players: Extract<ServerEvent, { type: 'roomJoined' }>['players']; maxPlayers: number; playerColors: Extract<ServerEvent, { type: 'roomJoined' }>['playerColors']; colorConfirmationPlayerIndex?: number }
+  | ({ phase: 'team-waiting' } & Omit<Extract<ServerEvent, { type: 'teamRoomWaiting' }>, 'type'>)
   | { phase: 'ready'; roomId: string; viewer: RoomViewer; hotseat?: boolean; spectatingEndReason?: SpectatingEndReason }
   | { phase: 'error'; message: string; code?: WsErrorCode }

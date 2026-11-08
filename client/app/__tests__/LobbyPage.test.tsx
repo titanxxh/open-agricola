@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../../utils/platform-page-url'
 import { startRoomCreation } from '../../services/room-creation'
@@ -24,7 +25,8 @@ vi.mock('../../contexts/AuthContext', () => ({
   }),
 }))
 
-vi.mock('../../contexts/LocaleContext', () => {
+vi.mock('../../contexts/LocaleContext', async () => {
+  const { t: message } = await import('../../../shared/i18n')
   const labels: Record<string, string> = {
     'platform.lobbyTitle': 'Lobby',
     'platform.backToLobbyPlain': 'Back to Lobby',
@@ -94,7 +96,7 @@ vi.mock('../../contexts/LocaleContext', () => {
       locale: 'en',
       setLocale: vi.fn(),
       t: (key: string, params: Record<string, string> = {}) => Object.entries(params)
-        .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), labels[key] ?? key),
+        .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), labels[key] ?? message('en', key)),
     }),
   }
 })
@@ -520,5 +522,55 @@ describe('LobbyPage player count selection', () => {
       customCards: 'reviewed-card-1',
       enableSnakeOpening: 'true',
     })
+  })
+})
+
+
+describe('team creation options', () => {
+  it('offers legal formats and preserves all shared variants in the team creation query', async () => {
+    vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, hasMore: false, cards: [
+      { id: 'team-workshop', name: 'Team Workshop Card', card_type: 'minor', author_name: 'Author' },
+    ] }))))
+    const user = userEvent.setup()
+    render(<LobbyPage />)
+    await user.click(screen.getByRole('button', { name: 'Team game', exact: true }))
+    expect(screen.queryByRole('button', { name: '2 Players', exact: true })).toBeNull()
+    expect(screen.queryByRole('button', { name: '3 Players', exact: true })).toBeNull()
+    expect(screen.queryByRole('button', { name: '5 Players', exact: true })).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
+    expect(screen.getByRole('combobox', { name: 'Seat arrangement' })).toHaveValue('separated')
+    expect(screen.getByRole('combobox', { name: 'Team scoring' })).toHaveValue('category-min')
+    expect(screen.getByRole('combobox', { name: 'Teammate visibility' })).toHaveValue('shared')
+    await user.click(screen.getByRole('button', { name: '6 Players', exact: true }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Seats per team' }), '3')
+    await user.click(screen.getByRole('button', { name: '4 Players', exact: true }))
+    expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Seat arrangement' }), 'random')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Team scoring' }), 'product')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Teammate visibility' }), 'private')
+    await user.click(screen.getByRole('button', { name: 'Simultaneous draft', exact: true }))
+    await user.click(screen.getByRole('checkbox', { name: /Enable Parent Cards expansion/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Enable Through the Seasons expansion/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Enable Farmers of the Moor expansion/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Moor balance rules/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Allow an incomplete Farmers of the Moor/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Enable community cards/ }))
+    await user.click(await screen.findByRole('checkbox', { name: /Team Workshop Card/ }))
+    await user.click(screen.getByRole('button', { name: 'Create Game', exact: true }))
+    expect(setPage).toHaveBeenCalledWith('game', expect.objectContaining({
+      maxPlayers: '4', draftMode: 'simultaneous', enableParentCards: 'true', enableThroughTheSeasons: 'true', enableFarmersOfTheMoor: 'true',
+      enableMoorBalanceRules: 'true', allowIncompleteFarmersOfTheMoorMinorDeal: 'true', enableCommunityDeck: 'true', customCards: 'team-workshop', enableSnakeOpening: 'true',
+    }))
+    const created = vi.mocked(setPage).mock.calls.at(-1)?.[1]
+    expect(JSON.parse(created?.teamConfig ?? 'null')).toEqual({ mode: 'team', seatsPerTeam: 2, seating: 'random', scoring: 'product', teammateVisibility: 'private' })
+  })
+
+  it('uses the same format controls for multihand without a teammate visibility option', async () => {
+    const user = userEvent.setup()
+    render(<LobbyPage />)
+    await user.click(screen.getByRole('button', { name: 'Multihand game', exact: true }))
+    expect(screen.getByRole('combobox', { name: 'Seats per team' })).toHaveValue('2')
+    expect(screen.queryByRole('combobox', { name: 'Teammate visibility' })).toBeNull()
   })
 })
