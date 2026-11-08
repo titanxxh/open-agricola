@@ -14,7 +14,7 @@ export type ExperimentalFeaturesApp = HostedReleaseApp & {
 }
 
 /** Owns a separate database, object prefix and processes so declared gates never change other specs. */
-export async function startExperimentalFeaturesApp(): Promise<ExperimentalFeaturesApp> {
+export async function startHostedReleaseAppWithExperimentalFeatures(): Promise<ExperimentalFeaturesApp> {
   const root = await mkdtemp(join(tmpdir(), 'agricola-beta-'))
   const createEnvironment = { ...process.env }
   for (const key of ['BACKEND_PORT', 'FRONTEND_PORT', 'APP_BASE_PORT']) delete createEnvironment[key]
