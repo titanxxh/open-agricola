@@ -223,7 +223,7 @@ takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | un
 - 每个新交互都显式暴露命令与选项，并由后端校验。改良选择值是裸 `cardId`；支付选项保留 `pay:*` 命名空间。不使用编码过的选择捷径，也不由前端裁定。
 - 原生卡牌效果可实现 `CardEffect.projectInteractionRequest(state, player, request, actionId)`，这是限定于自身 pending 行动的纯查询。Session 以实际的 pending 所有者调用它，在展示、权威命令和单选推进之前刷新选项可用性与数量上限。它保留提示 metadata、已接受的决定、缓存的随机观察与进度，从不重跑执行、支付、抽牌或日志。
 - `emit-choice` 的 `multiSelect` 提供独立候选，其值非空且不含逗号；客户端提交 `valuePrefix + values.join(',')`。通用校验在任何卡牌 hook 之前拒绝未知、禁用或重复的候选以及超出当前上下限的数量，结构化前缀准入也不能绕过它。`minSelections: 0` 允许空子集；多选总是需要显式确认。
-- 关于接收者手牌中可见卡牌的私有选择可设置 `promptParams.cardId`；非接收者收到不含该 ID 的 `private-prompt`。前端从不读取 `cardStates`。
+- 关于接收者手牌中可见卡牌的私有选择可设置 `promptParams.cardId`；非接收者收到不含该 ID 的 `private-prompt`。遮蔽提示还会移除隐藏手牌的来源及其提示键；已公开打出卡牌的来源仍保留。前端从不读取 `cardStates`。
 
 测试：`shared/engine/__tests__/pending-validation.test.ts`、`shared/session/__tests__/{interaction-state-adapter,interaction-command-policy}.test.ts`、`server/__tests__/rejected-pending-input.test.ts`。
 

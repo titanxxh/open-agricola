@@ -32,7 +32,8 @@ export async function resolveRoomWorkPrompts(driver: RoomWorkDriver): Promise<Ga
         round: current.state.round, roundPhase: current.state.roundPhase, interaction: current.interaction,
       })}`)
     }
-    const actor = pending.kind === 'confirm-next-player' ? pending.nextPlayerIndex : pending.fromPlayerIndex
+    const actor = current.interaction.playerIndex
+    if (typeof actor !== 'number') throw new Error('Handoff prompt has no Interaction Player')
     await driver.command(actor, { type: 'choice', value: 'confirm' })
     current = await driver.snapshot(0)
   }

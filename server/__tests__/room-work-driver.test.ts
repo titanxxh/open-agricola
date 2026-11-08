@@ -22,6 +22,16 @@ const driverFor = (session: GameSession) => {
 }
 
 describe('room history work driver', () => {
+  it('confirms next-player handoff through its outgoing Interaction Player', async () => {
+    const session = createWorkSession()
+    const { driver, commands } = driverFor(session)
+    expect(session.takeAction(0, 'day-laborer').interaction).toMatchObject({ stateId: 'wait', playerIndex: 0,
+      request: { kind: 'confirm-next-player', nextPlayerIndex: 1 } })
+    const ready = await resolveRoomWorkPrompts(driver)
+    expect(ready.state.currentPlayerIndex).toBe(1)
+    expect(commands).toEqual([{ actor: 0, type: 'choice', value: 'confirm' }])
+  })
+
   it.each([{ seed: 12, owner: 0 }, { seed: 9, owner: 1 }])('resolves real opening choices owned by seat $owner', async ({ seed, owner }) => {
     const session = createOpeningSession({
       seed, options: { deckIds: ['E'] },
@@ -30,9 +40,11 @@ describe('room history work driver', () => {
     const { driver, commands } = driverFor(session)
     const observed = await driver.snapshot(0)
     expect(observed.interaction).toMatchObject({
-      stateId: 'wait', playerIndex: owner, sourceCard: 'E096_Elder',
+      stateId: 'wait', playerIndex: owner,
       request: { kind: owner === 0 ? 'choice' : 'private-prompt' },
     })
+    if (owner === 0) expect(observed.interaction).toHaveProperty('sourceCard', 'E096_Elder')
+    else expect(observed.interaction).not.toHaveProperty('sourceCard')
     const ready = await resolveRoomWorkPrompts(driver)
     expect(ready.state.roundPhase).toBe('work')
     expect(ready.interaction.stateId).toBe('idle')

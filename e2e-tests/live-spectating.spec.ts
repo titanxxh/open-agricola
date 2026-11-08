@@ -109,9 +109,25 @@ for (const device of [
 
       const latest = first.latest
       if (!latest) throw new Error('Owner has no snapshot')
-      const actor = latest.payload.state.currentPlayerIndex
       const ownerSeat = first.messages.find(event => event.type === 'roomCreated')
       if (!ownerSeat || ownerSeat.type !== 'roomCreated') throw new Error('Owner has no seat')
+      for (let step = 0; step < 8; step++) {
+        const opening = first.latest!.payload
+        if (opening.state.roundPhase !== 'preparation') break
+        if (opening.interaction.stateId !== 'wait') throw new Error('Opening has no interaction owner')
+        const actorRecord = ownerSeat.playerIndex === opening.interaction.playerIndex ? first : second
+        const actorPage = actorRecord === first ? owner : guest
+        const prompt = actorRecord.latest!.payload.interaction
+        if (prompt.stateId !== 'wait' || prompt.request.kind !== 'choice'
+          || !prompt.request.options.some(option => option.value === '__skip__' && !option.disabled)) {
+          throw new Error('Expected an optional opening offer on its owning seat')
+        }
+        const openingVersion = watched.latest!.version
+        await actorPage.locator('[data-choice-value="__skip__"]').click()
+        for (const record of [first, second, watched]) await expect.poll(() => record.latest?.version ?? 0).toBeGreaterThan(openingVersion)
+      }
+      expect(first.latest!.payload.state.roundPhase).toBe('work')
+      const actor = first.latest!.payload.state.currentPlayerIndex
       const actingPage = ownerSeat.playerIndex === actor ? owner : guest
       const before = watched.latest!.version
       await actingPage.locator('[data-action-id="forest"] button').first().click()

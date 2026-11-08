@@ -15,6 +15,7 @@ import { privateEventsForViewer } from './interaction-privacy.ts'
 import { redactInteractionForViewer } from './interaction-state-adapter.ts'
 import type { GameCore, SessionResponse } from './session-core.ts'
 import { playingActorIndex, waitingSeatIndexes } from './waiting-seats.ts'
+import { filterHiddenHandInteractionSource } from '../projections/serialized-state'
 
 /**
  * `viewer` redacts for a visible seat collection; an empty collection is a spectator.
@@ -46,12 +47,12 @@ export function buildSyncPayload(
       }),
     interaction: mode === 'debug'
       ? resp.interaction
-      : redactInteractionForViewer(
+      : filterHiddenHandInteractionSource(redactInteractionForViewer(
         resp.interaction,
         resp.state.players.map((player) => player.id),
         visiblePlayerIds,
         resp.state.players[resp.state.currentPlayerIndex]?.id ?? null,
-      ),
+      ), canonicalState.players, visiblePlayerIds),
     scores: resp.scores ?? null,
     ...(resp.teamScores ? { teamScores: resp.teamScores } : {}),
     pastureCapacities: resp.pastureCapacities,
