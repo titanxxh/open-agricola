@@ -5,11 +5,11 @@
 // @covers client/app/SettingsPage.tsx
 // @covers client/contexts/AuthContext.tsx
 import { expect, test } from '@playwright/test'
-import { startExperimentalFeaturesApp } from './helpers/experimental-features-app'
+import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
 import { PostgresDatabase } from '../server/database/postgres'
 
-let app: Awaited<ReturnType<typeof startExperimentalFeaturesApp>>
-test.beforeAll(async () => { test.setTimeout(180000); app = await startExperimentalFeaturesApp() })
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
+test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithExperimentalFeatures() })
 test.afterAll(async () => { await app?.close() })
 
 test('administrator grants and revokes Beta access while existing team rooms remain usable', async ({ browser }, testInfo) => {

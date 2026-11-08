@@ -4,10 +4,10 @@
 // @covers client/app/LobbyPage.tsx
 // @covers client/contexts/AuthContext.tsx
 import { expect, test } from '@playwright/test'
-import { startExperimentalFeaturesApp } from './helpers/experimental-features-app'
+import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
 
-let app: Awaited<ReturnType<typeof startExperimentalFeaturesApp>>
-test.beforeAll(async () => { test.setTimeout(180000); app = await startExperimentalFeaturesApp() })
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
+test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithExperimentalFeatures() })
 test.afterAll(async () => { await app?.close() })
 
 test('declared Beta availability hides team entries from ordinary accounts and shows them to administrators', async ({ browser }) => {

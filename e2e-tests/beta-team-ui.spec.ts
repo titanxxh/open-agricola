@@ -7,11 +7,11 @@
 // @covers client/components/board/ArchivedTeamResults.tsx
 // @covers client/components/board/ScoringPad.tsx
 import { expect, test } from '@playwright/test'
-import { startExperimentalFeaturesApp } from './helpers/experimental-features-app'
+import { startHostedReleaseAppWithExperimentalFeatures } from './helpers/experimental-features-app'
 import { openGameEndControls } from './fixtures'
 
-let app: Awaited<ReturnType<typeof startExperimentalFeaturesApp>>
-test.beforeAll(async () => { test.setTimeout(180000); app = await startExperimentalFeaturesApp() })
+let app: Awaited<ReturnType<typeof startHostedReleaseAppWithExperimentalFeatures>>
+test.beforeAll(async () => { test.setTimeout(180000); app = await startHostedReleaseAppWithExperimentalFeatures() })
 test.afterAll(async () => { await app?.close() })
 
 test('an invited ordinary participant sees Beta and a locked team rematch at desktop and phone widths', async ({ browser }, testInfo) => {
