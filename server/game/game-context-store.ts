@@ -29,7 +29,7 @@ type ContextRow = {
 type ActiveRow = {
   version: number
   latest_step_no: number | null
-  player_index: number
+  player_index: number | null
 }
 
 type ResultRow = {
@@ -274,13 +274,15 @@ export class GameContextStore {
                game_replays.latest_step_no,
                room_players.player_index
         FROM rooms
-        JOIN room_players
+        LEFT JOIN room_players
           ON room_players.room_id = rooms.id
          AND room_players.user_id = ?
         LEFT JOIN game_replays ON game_replays.room_id = rooms.id
-        WHERE rooms.id = ?
+        WHERE rooms.id = ? AND (room_players.player_index IS NOT NULL OR EXISTS (
+          SELECT 1 FROM jsonb_array_elements(COALESCE(rooms.team_members_json, '[]'::jsonb)) member WHERE member->>'userId'=?
+        ))
         ORDER BY room_players.player_index LIMIT 1
-      `).get(userId, roomId)) as ActiveRow | undefined
+      `).get(userId, roomId, userId)) as ActiveRow | undefined
       if (!active) {
         if (intent === 'join' && await spectatorRoute(this.db, roomId)) {
           const snapshot = await this.db.prepare(`SELECT r.version, g.latest_step_no FROM rooms r

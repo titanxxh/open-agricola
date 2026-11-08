@@ -1,3 +1,4 @@
+import { admitTeamMember, planTeamSeating, teamWaitingState } from '../game/team-room'
 import { addRoomSpectator, isRoomSpectator, removeRoomSpectator } from '../game/room-spectators'
 import { isPublicSpectatableRoom } from '../game/room'
 import type { FenceSelectionQuote } from '../../shared/contract/protocol/game'
@@ -27,6 +28,7 @@ import {
   resolveJoinRequestPlayerIndex,
   roomOccupiedSeatCount,
   roomConnectedPlayerCount,
+  removePlayerFromRoom,
   toRoomMeta,
   type Room,
 } from '../game/room.ts'
@@ -207,7 +209,9 @@ const sendCommandError = (
 
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', requestId); return null }
-  const activeSeat = ctx.currentRoom.players.some((player) =>
+  const waitingMember = ctx.currentRoom.status === 'waiting' && ctx.currentRoom.teamMembers?.find(member =>
+    member.userId === ctx.currentUserId && ctx.currentRoom?.waitingTeamConnections?.get(member.memberId) === ctx.ws)
+  const activeSeat = !!waitingMember || ctx.currentRoom.players.some((player) =>
     player.ws === ctx.ws && player.playerIndex === ctx.currentPlayerIndex
   )
   if (!activeSeat) {
@@ -512,7 +516,7 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
   if (!previous || previous === next) return
   if (removeRoomSpectator(previous, ctx.ws)) return
   const player = previous.players.find(candidate => candidate.ws === ctx.ws)
-  previous.players = previous.players.filter(candidate => candidate.ws !== ctx.ws)
+  removePlayerFromRoom(previous, ctx.ws)
   const now = Date.now()
   ctx.registry.touchActivity(previous.id, now)
   const lifecycle = await ctx.gameContextStore?.lifecycle(previous.id)
@@ -522,6 +526,67 @@ const detachPreviousRoom = async (ctx: ConnectionCtx, next: Room, previous = ctx
     else await ctx.gameContextStore?.ensureActiveExpiry(previous.id, previous.status === 'playing' ? 'playing' : 'waiting', now)
   }
   if (player) await ctx.broadcaster.broadcastEvent(previous, { type: 'playerDisconnected', playerIndex: player.playerIndex })
+}
+
+
+async function publishTeamWaiting(ctx: ConnectionCtx, room: Room): Promise<void> {
+  for (const member of room.teamMembers ?? []) {
+    const ws = room.waitingTeamConnections?.get(member.memberId)
+    if (ws) await ctx.broadcaster.sendRoomEvent(ws, room, { type: 'teamRoomWaiting', ...teamWaitingState(room, member.userId) })
+  }
+}
+
+async function joinWaitingTeamRoom(ctx: ConnectionCtx, room: Room, msg: Extract<ClientCommand, { type: 'joinRoom' }>): Promise<void> {
+  if (!ctx.currentUserId) { sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return }
+  const existing = room.teamMembers?.find(member => member.userId === ctx.currentUserId)
+  if (msg.intent === 'resume' && !existing) { sendCommandError(ctx, 'Only original participants can resume this game', msg.requestId, 'not_participant'); return }
+  let member: ReturnType<typeof admitTeamMember>
+  try { member = admitTeamMember(room, ctx.currentUserId, typeof msg.name === 'string' ? msg.name.trim() : '') }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return }
+  const previousMembers = room.teamMembers
+  const previousConnections = room.waitingTeamConnections
+  const previousSocket = previousConnections?.get(member.memberId)
+  room.teamMembers = existing ? (room.teamMembers ?? []).map(item => item.memberId === member.memberId ? member : item) : [...(room.teamMembers ?? []), member]
+  room.waitingTeamConnections = new Map(previousConnections)
+  room.waitingTeamConnections.set(member.memberId, ctx.ws)
+  try { await ctx.checkpoint.recordMeta(room, { resume: true }) }
+  catch (error) { room.teamMembers = previousMembers; room.waitingTeamConnections = previousConnections; throw error }
+  const previous = ctx.currentRoom
+  ctx.currentRoom = room; ctx.currentPlayerIndex = -1
+  await detachPreviousRoom(ctx, room, previous)
+  if (previousSocket && previousSocket !== ctx.ws) previousSocket.close(4001, 'connection replaced')
+  await publishTeamWaiting(ctx, room)
+}
+
+async function handleStartTeamGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'startTeamGame' }>): Promise<void> {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  if (room.status !== 'waiting' || !room.teamMembers || !room.session.state.team || ctx.currentUserId !== room.createdBy) {
+    sendCommandError(ctx, 'Only the host can start a waiting team game', msg.requestId); return
+  }
+  let bindings: ReturnType<typeof planTeamSeating>
+  try { bindings = planTeamSeating(room.session.state.team, room.teamMembers, room.session.state.gameSeed) }
+  catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId); return }
+  const names: Array<[number, string]> = bindings.map(binding => [binding.playerIndex, binding.name])
+  if (room.customSessionExecutor) await room.customSessionExecutor.updatePlayerNames(names)
+  else for (const [index, name] of names) room.session.updatePlayerName(index, name)
+  const response = await executeRoomSession(room, 'getState', [], () => room.session.getState())
+  if (!response.ok) { sendCommandError(ctx, response.error ?? 'Unable to initialize game', msg.requestId); return }
+  room.seatOwners = bindings.map(({ playerIndex, userId }) => ({ playerIndex, userId }))
+  room.players = room.teamMembers.flatMap(member => {
+    const ws = room.waitingTeamConnections?.get(member.memberId)
+    const binding = bindings.find(value => value.memberId === member.memberId)
+    return ws && binding ? [{ ws, playerIndex: binding.playerIndex, name: member.name, userId: member.userId }] : []
+  }).sort((left, right) => left.playerIndex - right.playerIndex)
+  room.waitingTeamConnections = new Map()
+  room.status = 'playing'; room.startedAt ??= Date.now()
+  await publishInitialState(ctx, room, response, msg.requestId, async () => {
+    for (const player of room.players) await ctx.broadcaster.sendRoomEvent(player.ws, room, {
+      type: 'roomJoined', roomId: room.id, playerIndex: player.playerIndex, status: 'playing', maxPlayers: room.maxPlayers,
+      players: bindings.map(binding => ({ playerIndex: binding.playerIndex, name: binding.name,
+        connected: room.players.some(peer => peer.userId === binding.userId) })),
+      playerColors: room.session.state.players.map(value => value.color),
+    })
+  }, async () => { await ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' }) })
 }
 
 async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): Promise<Awaited<void | Promise<void>>> {
@@ -545,7 +610,7 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
   try { setup = parseGameSetupRequest(input, draftOptions.value) }
   catch (error) { sendCommandError(ctx, error instanceof Error ? error.message : 'Invalid team configuration', msg.requestId); return }
   const maxPlayers = setup.playerCount
-  const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers, hotseat: setup.hotseat }, getDb())
+  const access = await parseRoomAccess(msg.access, { creatorId: ctx.currentUserId, maxPlayers: setup.teamConfig?.mode === 'multihand' ? maxPlayers / setup.teamConfig.seatsPerTeam : maxPlayers, hotseat: setup.hotseat }, getDb())
   if (!access.ok) { sendCommandError(ctx, access.error, msg.requestId, access.code); return }
   if (maxPlayers === 1 && !ctx.currentUserId) {
     sendCommandError(ctx, 'A formal solo game requires login', msg.requestId, 'login_required')
@@ -625,6 +690,23 @@ async function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
     enableSnakeOpening: setup.enableSnakeOpening,
   }
   ctx.committer?.lockNewRoom(room)
+  if (room.session.state.team) {
+    if (!ctx.currentUserId) { created.executor?.dispose(); room.session.dispose(); sendCommandError(ctx, 'Team games require login', msg.requestId, 'login_required'); return }
+    const member = admitTeamMember(room, ctx.currentUserId, typeof msg.name === 'string' ? msg.name.trim() : '')
+    room.teamMembers = [member]
+    room.waitingTeamConnections = new Map([[member.memberId, ctx.ws]])
+    try {
+      await ctx.checkpoint.recordCreated(room, ctx.activeCommand ? { receipt: {
+        request: ctx.activeCommand.request, outcome: { ok: true, roomId, roomVersion: 0 },
+      } } : undefined)
+    } catch (error) { created.executor?.dispose(); room.session.dispose(); throw error }
+    const previous = ctx.currentRoom
+    ctx.currentRoom = room; ctx.currentPlayerIndex = -1
+    ctx.registry.set(room)
+    await detachPreviousRoom(ctx, room, previous)
+    await publishTeamWaiting(ctx, room)
+    return
+  }
   const creatorSeat = resolveJoinPlayerIndex(room, undefined, ctx.currentUserId)
   if (!creatorSeat.ok) throw new Error(creatorSeat.error)
   const creatorIndex = creatorSeat.playerIndex
@@ -762,6 +844,10 @@ async function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { 
   }
   if (!canAccessRoom(room, ctx.currentUserId)) {
     sendCommandError(ctx, 'Only invited players can enter this room', msg.requestId, ctx.currentUserId ? 'not_participant' : 'login_required', 'active')
+    return
+  }
+  if (room.status === 'waiting' && room.teamMembers) {
+    await joinWaitingTeamRoom(ctx, room, msg)
     return
   }
   const ownsSeat = room.seatOwners?.some(seat => seat.userId === ctx.currentUserId)
@@ -1202,6 +1288,7 @@ async function handleFenceQuote(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void | Promise<void> {
   const room = requireReadableRoom(ctx, msg.requestId); if (!room) return
+  if (room.status === 'waiting' && room.teamMembers) return publishTeamWaiting(ctx, room)
   if (msg.unredacted && !assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
@@ -1670,6 +1757,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   getGameEndProposal: handleGetGameEndProposal,
   setPlayerColor: handleSetPlayerColor,
   confirmPlayerColor: handleConfirmPlayerColor,
+  startTeamGame: handleStartTeamGame,
   getState: handleGetState,
   getHistory: handleGetHistory,
   quoteFenceSelection: handleFenceQuote,

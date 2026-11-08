@@ -3,7 +3,7 @@ import { ExecutionAccess } from '../game/execution-access'
 import { measure, operationsMetrics, roundTag, sendObserved, safe } from '../observability/metrics'
 import { RoomDirectory, RoomOwnershipError } from '../game/room-directory'
 import type { WebSocket } from 'ws'
-import { isDevRoom, roomConnectedPlayerCount, roomOccupiedSeatCount, type Room } from '../game/room.ts'
+import { isDevRoom, roomConnections, roomConnectedPlayerCount, roomOccupiedSeatCount, type Room } from '../game/room.ts'
 import type { SessionResponse } from '../game/authoritative-session.ts'
 import type { ServerEvent, SpectatingEndReason } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
@@ -49,7 +49,7 @@ export class Broadcaster {
       await this.directory!.assertOwner(room.id, room.owner!, undefined, retired)
       if (!retired && room.executionStamp) await new ExecutionAccess(this.directory!.db).assert(room.executionStamp)
       if (!retired) await this.directory!.presence(room.id, room.owner!, roomConnectedPlayerCount(room), roomOccupiedSeatCount(room))
-      for (const ws of [...room.players.map(seat => seat.ws), ...roomSpectators(room)]) {
+      for (const ws of [...roomConnections(room), ...roomSpectators(room)]) {
         const token = this.tokens.get(ws)
         if (!token) continue
         const allowed = await this.directory!.db.prepare('SELECT token FROM sessions WHERE token=? AND expires_at>(extract(epoch FROM clock_timestamp())*1000)::bigint FOR SHARE').get(token)
@@ -132,8 +132,8 @@ export class Broadcaster {
     return this.publish(room, () => {
     const data = JSON.stringify(event)
     const round = roundTag(room.session.state)
-    for (const seat of room.players) {
-      sendObserved(seat.ws, event, round, data)
+    for (const ws of roomConnections(room)) {
+      sendObserved(ws, event, round, data)
     }
     if (event.type === 'roomPersistencePaused' || event.type === 'roomPersistenceResumed'
       || event.type === 'playerJoined' || event.type === 'playerDisconnected') {

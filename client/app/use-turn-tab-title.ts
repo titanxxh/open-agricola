@@ -13,10 +13,10 @@ export function turnTabTitle(current: string, active: boolean, reducedMotion: bo
 
 export function lobbyNeedsTurnTab(rooms: readonly {
   hotseat: boolean
-  player_index: number
+  player_index: number | null
   waiting_player_indexes: readonly number[]
 }[]): boolean {
-  return rooms.some(room => !room.hotseat && room.waiting_player_indexes.includes(room.player_index))
+  return rooms.some(room => !room.hotseat && room.player_index !== null && room.waiting_player_indexes.includes(room.player_index))
 }
 
 export function gameNeedsTurnTab(hotseat: boolean, seatIndex: number | null, waitingSeatIndexes: readonly number[]): boolean {

@@ -5,6 +5,7 @@ import type { RoomPersistenceCheckpoint } from './room-persistence-checkpoint.ts
 import { RoomRegistry } from './room-registry.ts'
 import {
   isDevRoom,
+  roomConnections,
   summarizeRoomsForLobby,
   type Room,
 } from './room.ts'
@@ -30,13 +31,14 @@ export function createLobby(deps: {
   const retire = async (room: Room, reason?: 'card_takedown', options?: RoomWriteOptions): Promise<void> => {
     await checkpoint.discardRoom(room.id, { owner: room.owner, expectedVersion: room.version, ...options })
     await onRoomRetired?.(room.id)
-    const players = room.players
+    const connections = roomConnections(room)
     await broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id, ...(reason ? { reason } : {}) })
     room.players = []
+    room.waitingTeamConnections?.clear()
     registry.delete(room.id)
     registry.clearActivity(room.id)
-    for (const player of players) {
-      try { player.ws.close() } catch { /* transport already closed */ }
+    for (const ws of connections) {
+      try { ws.close() } catch { /* transport already closed */ }
     }
   }
   return {
@@ -77,6 +79,7 @@ export function createLobby(deps: {
         const belongsToUser = affected.has(room.id) ||
           room.createdBy === userId ||
           room.players.some((player) => player.userId === userId) ||
+          room.teamMembers?.some(member => member.userId === userId) ||
           room.seatOwners?.some((owner) => owner.userId === userId)
         if (!belongsToUser) continue
         await enqueueRoomTask(room, async () => {
