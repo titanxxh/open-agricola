@@ -115,3 +115,7 @@ GameContextRouter
 - Bug Report diagnostics use `services/bug-report-diagnostics.ts` to classify the browser and device and retain at most five WebSocket closes for the current Room for one hour in tab-local storage. `WsGameTransport` records only the current socket; intentional teardown is excluded. Draft creation, edits and final author confirmation attach a fresh bounded snapshot, which survives reloads without including the raw User-Agent. Coverage: `bug-report-diagnostics.test.ts` and `bug-report.spec.ts`.
 - The Issue Submission Connection is separate from `AuthContext`: the report footer owns the initial connection, Settings shows status and disconnect only, and an invalid connection never switches to Hosted Issue Identity.
 
+
+## Experimental feature discovery
+
+`AuthContext` consumes the server's `user.experimentalFeatures` list and refreshes `/api/auth/me` after password login or password reset. Missing or anonymous availability is empty. `LobbyPage` shows Team and Multihand creation entries only when that list includes their feature ID. The client does not derive eligibility from administrator status, environment or game state. Entry visibility is covered by [LobbyPage tests](../../client/app/__tests__/LobbyPage.test.tsx) and the [declared-mode browser test](../../e2e-tests/experimental-feature-gates.spec.ts).

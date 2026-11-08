@@ -258,3 +258,11 @@ Tests: `shared/actions/__tests__/future-schedule-preview.test.ts`, `server/__tes
 
 `LogEntry { key, params, playerId? }` carries an i18n key plus parameters, rendered for the active locale. Bootstrap entries may carry stable `playerId` so seat display-name changes refresh by identity.
 
+
+## Experimental features
+
+`experimental-features.ts` owns `ExperimentalFeatureId`, `AvailabilityStage`, the single declaration registry and the pure account/stage/environment predicate. Production obeys declared `off`/`beta`/`general`; nonproduction defaults to `general`, with `DEV_EXPERIMENTAL_FEATURES=declared` restoring declarations. Anonymous visitors never pass; `off` also denies administrators. See [ADR 0042](../adr/0042-experimental-feature-availability.md).
+
+`/api/auth/me` returns `user.experimentalFeatures`, computed by the server from current account qualification. Clients use that list for entry visibility. WebSocket errors carry `code: experimental_feature_unavailable` with `feature`; HTTP returns 403 with the same fields. Durable command receipts retain only the generic code and message, so feature IDs are not stored. Availability is absent from game state, Room snapshots, Replay and result archives.
+
+Feature PR checklist: declare the ID and stage here; gate creation and public discovery at server entry points; test denials without Room/version/Replay changes, successful eligibility and unaffected participation; update client discovery and these docs. Graduation first changes the stage to `general`, then after at least one release removes the declaration, checks and obsolete UI through an owner-approved cleanup PR. [Predicate tests](../../shared/contract/__tests__/experimental-features.test.ts) and [entry tests](../../server/connection/__tests__/experimental-features.test.ts) define the behavior.

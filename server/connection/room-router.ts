@@ -197,7 +197,8 @@ const sendCommandError = (
 ) => {
   rejectObservedCommand(code === 'command_input_stale' ? 'stale' : code === 'login_required' || code === 'seat_replaced' ? 'canceled' : 'rule_rejected')
   if (ctx.activeCommand) {
-    ctx.activeCommand.outcome = { ok: false, error, ...(feature ? { feature } : {}), ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
+    ctx.activeCommand.errorFeature = feature
+    ctx.activeCommand.outcome = { ok: false, error, ...(code ? { code } : {}), ...(ctx.currentRoom ? { roomId: ctx.currentRoom.id } : {}) }
     return
   }
   ctx.broadcaster.sendTo(ctx.ws, {
@@ -1504,8 +1505,9 @@ async function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
     await handleProposeGameEnd(ctx, { type: 'proposeGameEnd', intent: 'rematch', requestId: msg.requestId })
     return
   }
-  const initiator = termination && room.endProposal
-    ? room.seatOwners?.find(owner => owner.playerIndex === room.endProposal!.proposerIndex)?.userId
+  const proposerIndex = room.endProposal?.proposerIndex
+  const initiator = termination
+    ? room.seatOwners?.find(owner => owner.playerIndex === proposerIndex)?.userId
     : ctx.currentUserId
   if (room.session.state.team && !await allowTeamCreation(ctx, msg.requestId, initiator)) return
   const persistence = (await ctx.committer?.canCreateRoom()) ?? { ok: false, error: 'room recording is unavailable' }
@@ -1978,7 +1980,7 @@ async function dispatchCommand(ctx: ConnectionCtx, msg: ClientCommand): Promise<
         }
         if (result.kind === 'completed') {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'completed', receipt: result.receipt, requestId: msg.requestId })
-          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined, undefined, active.outcome.feature)
+          if (active?.outcome && !active.outcome.ok) sendCommandError(ctx, active.outcome.error ?? 'Command rejected', msg.requestId, active.outcome.code as CommandErrorCode | undefined, undefined, active.errorFeature)
         } else {
           ctx.broadcaster.sendTo(ctx.ws, { type: 'commandReceipt', status: 'pending', identity: { scopeId: request.scopeId, commandId: request.commandId }, requestId: msg.requestId })
         }
