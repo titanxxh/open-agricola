@@ -1,4 +1,4 @@
-import type { InvitablePlayer, RoomAccess, RoomAccessErrorCode } from '../../shared/contract/room-access'
+import type { InvitablePlayer, PlayerSearchScope, RoomAccess, RoomAccessErrorCode } from '../../shared/contract/room-access'
 import type { GameContextError } from '../../shared/contract/protocol/game-context'
 import type { PostgresDatabase } from '../database/postgres'
 
@@ -11,11 +11,11 @@ type AccessResult =
 const eligibleAccount = `(email IS NULL OR email_verified_at IS NOT NULL)
   AND NOT EXISTS (SELECT 1 FROM account_deletion_requests WHERE user_id = users.id)`
 
-export async function searchInvitablePlayers(db: AccessDatabase, prefix: string, currentUserId: string): Promise<InvitablePlayer[]> {
+export async function searchPlayersByPrefix(db: AccessDatabase, prefix: string, currentUserId: string, scope: PlayerSearchScope = 'invitation'): Promise<InvitablePlayer[]> {
   return db.prepare(`SELECT id, username, display_name AS "displayName" FROM users
     WHERE (starts_with(lower(username), lower(?)) OR starts_with(lower(display_name), lower(?)))
-      AND id <> ? AND ${eligibleAccount}
-    ORDER BY lower(display_name), lower(username), id LIMIT 10`).all<InvitablePlayer>(prefix, prefix, currentUserId)
+      AND id <> ? AND (? OR (${eligibleAccount}))
+    ORDER BY lower(display_name), lower(username), id LIMIT 10`).all<InvitablePlayer>(prefix, prefix, currentUserId, scope === 'beta-access')
 }
 
 export async function parseRoomAccess(

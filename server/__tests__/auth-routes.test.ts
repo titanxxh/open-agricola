@@ -2242,4 +2242,35 @@ describe('experimental feature discovery', () => {
     vi.stubEnv('DEV_EXPERIMENTAL_FEATURES', '')
     expect((await get(token)).json.user).toMatchObject({ experimentalFeatures: ['team-modes'], betaAccess: false })
   })
+
+  it('lets only administrators find and grant Beta access to email-unverified accounts', async () => {
+    vi.stubEnv('ADMIN_USERS', 'beta_search_admin')
+    const admin = await createLocalUserForTests('beta_search_admin', 'test-password', 'Beta Search Admin')
+    const ordinary = await createLocalUserForTests('beta_search_ordinary', 'test-password', 'Ordinary')
+    const unverified = await createLocalUserForTests('beta_unverified', 'test-password', 'Pending Email')
+    await getDb().prepare('UPDATE users SET email=?,email_verified_at=NULL WHERE id=?').run('beta-unverified@example.com', unverified.id)
+    const adminCookie = { Cookie: `oa_session=${await createSession(admin.id)}` }
+    const ordinaryCookie = { Cookie: `oa_session=${await createSession(ordinary.id)}` }
+    const regular = await requestJson('GET', '/api/lobby/players?prefix=beta_unverified', undefined, adminCookie)
+    expect(regular.status).toBe(200)
+    expect(regular.json).toEqual({ ok: true, players: [] })
+    const selected = await requestJson('GET', '/api/lobby/players?prefix=beta_unverified&scope=beta-access', undefined, adminCookie)
+    expect(selected.status).toBe(200)
+    expect(selected.json).toEqual({ ok: true, players: [{ id: unverified.id, username: 'beta_unverified', displayName: 'Pending Email' }] })
+    expect(selected.headers['Cache-Control']).toBe('no-store')
+    const forbidden = await requestJson('GET', '/api/lobby/players?prefix=beta_unverified&scope=beta-access', undefined, ordinaryCookie)
+    expect(forbidden.status).toBe(403)
+    expect(forbidden.json).toEqual({ ok: false, code: 'admin_required' })
+    expect((await requestJson('GET', '/api/lobby/players?prefix=beta_unverified&scope=beta-access')).status).toBe(401)
+    expect((await requestJson('GET', '/api/lobby/players?prefix=b&scope=beta-access', undefined, adminCookie)).status).toBe(400)
+    expect((await requestJson('GET', '/api/lobby/players?prefix=beta&scope=unknown', undefined, adminCookie)).status).toBe(400)
+    expect((await requestJson('GET', '/api/lobby/players?prefix=beta_%25&scope=beta-access', undefined, adminCookie)).json)
+      .toEqual({ ok: true, players: [] })
+    const granted = await requestJson('PUT', '/api/admin/beta-access', { userId: unverified.id }, adminCookie)
+    expect(granted.status).toBe(200)
+    expect(granted.json.grants).toContainEqual({
+      account: { id: unverified.id, username: 'beta_unverified', displayName: 'Pending Email' },
+      grantedBy: { id: admin.id, username: 'beta_search_admin', displayName: 'Beta Search Admin' }, grantedAt: expect.any(Number),
+    })
+  })
 })

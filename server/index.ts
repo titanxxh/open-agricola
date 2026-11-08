@@ -18,7 +18,7 @@ import { discoverRoom } from './game/room-discovery'
 import type { RoomDiscoveryRequest } from '../shared/contract/protocol/routing'
 import { isUniqueViolation, isWorkshopSubmissionInProgress } from './database/errors'
 import { consumeRateLimit } from './database/rate-limit'
-import { searchInvitablePlayers } from './game/room-access'
+import { searchPlayersByPrefix } from './game/room-access'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -968,14 +968,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   if (req.method === 'GET' && req.url?.split('?')[0] === '/api/lobby/players') {
     res.setHeader('Cache-Control', 'no-store')
     if (!requestUser) { sendJson(res, 401, { ok: false, code: 'login_required' }); return }
-    const prefix = new URL(req.url, 'http://localhost').searchParams.get('prefix')?.trim() ?? ''
+    const query = new URL(req.url, 'http://localhost').searchParams
+    const scope = query.get('scope')
+    if (scope !== null && scope !== 'beta-access') { sendJson(res, 400, { ok: false, code: 'invalid_player_search_scope' }); return }
+    if (scope === 'beta-access' && !isAdmin(requestUser.username)) { sendJson(res, 403, { ok: false, code: 'admin_required' }); return }
+    const prefix = query.get('prefix')?.trim() ?? ''
     if (prefix.length < 2 || prefix.length > 128) { sendJson(res, 400, { ok: false, error: 'Enter at least two characters of a player name' }); return }
     if (process.env.DISABLE_RATE_LIMIT !== '1'
       && !(await consumeRateLimit(getDb(), 'player-search', requestUser.id, 120, 60_000)).allowed) {
       sendJson(res, 429, { ok: false, error: 'Too many player searches' })
       return
     }
-    sendJson(res, 200, { ok: true, players: await searchInvitablePlayers(getDb(), prefix, requestUser.id) })
+    sendJson(res, 200, { ok: true, players: await searchPlayersByPrefix(getDb(), prefix, requestUser.id, scope ?? 'invitation') })
     return
   }
   if (req.method === 'GET' && req.url && (req.url === '/api/rooms' || req.url.startsWith('/api/rooms?'))) {

@@ -6,6 +6,7 @@
 // @covers client/contexts/AuthContext.tsx
 import { expect, test } from '@playwright/test'
 import { startExperimentalFeaturesApp } from './helpers/experimental-features-app'
+import { PostgresDatabase } from '../server/database/postgres'
 
 let app: Awaited<ReturnType<typeof startExperimentalFeaturesApp>>
 test.beforeAll(async () => { test.setTimeout(180000); app = await startExperimentalFeaturesApp() })
@@ -19,6 +20,13 @@ test('administrator grants and revokes Beta access while existing team rooms rem
     const username = `beta_member_${Date.now().toString(36)}`
     await app.authenticate(administrator, 'e2e_admin', 'Administrator')
     await app.authenticate(ordinary, username, 'Beta Player')
+    if (!/^test_[a-f0-9]{32}$/.test(app.environment.DATABASE_SCHEMA ?? '')) throw new Error('Expected an isolated test schema')
+    const fixture = new PostgresDatabase({ connectionString: app.environment.DATABASE_URL, schema: app.environment.DATABASE_SCHEMA })
+    try {
+      await fixture.prepare('UPDATE users SET email=?,email_verified_at=NULL WHERE username=?').run(`${username}@example.com`, username)
+    } finally { await fixture.close() }
+    const invitationSearch = await administrator.request.get(`${app.apiUrl}/api/lobby/players?prefix=${username}`)
+    expect(await invitationSearch.json()).toEqual({ ok: true, players: [] })
     expect((await ordinary.request.get(`${app.apiUrl}/api/admin/beta-access`)).status()).toBe(403)
     const owner = await administrator.newPage(), member = await ordinary.newPage()
     await member.goto(app.appUrl)

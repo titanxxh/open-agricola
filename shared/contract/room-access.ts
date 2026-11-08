@@ -5,3 +5,4 @@ export type RoomAccess =
 export type RoomAccessErrorCode = 'invalid_room_access' | 'invited_player_unavailable'
 
 export type InvitablePlayer = { id: string; username: string; displayName: string }
+export type PlayerSearchScope = 'invitation' | 'beta-access'

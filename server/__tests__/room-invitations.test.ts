@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestDatabase } from './_helpers/postgres'
 import type { PostgresDatabase } from '../database/postgres'
-import { parseRoomAccess, canAccessRoom, searchInvitablePlayers } from '../game/room-access'
+import { parseRoomAccess, canAccessRoom, searchPlayersByPrefix } from '../game/room-access'
 import { PostgresRoomPersistence } from '../game/persistence/postgres-adapter'
 import type { RoomMeta } from '../game/persistence/room-persistence'
 import { RoomDirectory } from '../game/room-directory'
@@ -67,12 +67,12 @@ describe('invitation creation and player lookup', () => {
       ['ab_One', 'alice', '阿明甲'], ['ab_Two', 'albert', '阿明乙'],
       ['ab_pending', 'al_pending', '阿明待验证'], ['ab_deleting', 'al_deleting', '阿明待删除'],
     ]) await db.prepare('UPDATE users SET username = ?, display_name = ? WHERE id = ?').run(username, displayName, id)
-    expect((await searchInvitablePlayers(db, 'aL', 'host')).map(player => player.id).sort()).toEqual(['ab_One', 'ab_Two'])
-    expect(await searchInvitablePlayers(db, '阿明', 'ab_One')).toEqual([
+    expect((await searchPlayersByPrefix(db, 'aL', 'host')).map(player => player.id).sort()).toEqual(['ab_One', 'ab_Two'])
+    expect(await searchPlayersByPrefix(db, '阿明', 'ab_One')).toEqual([
       { id: 'ab_Two', username: 'albert', displayName: '阿明乙' },
     ])
-    expect(await searchInvitablePlayers(db, 'ab', 'host')).toEqual([])
-    expect(await searchInvitablePlayers(db, 'al%', 'host')).toEqual([])
+    expect(await searchPlayersByPrefix(db, 'ab', 'host')).toEqual([])
+    expect(await searchPlayersByPrefix(db, 'al%', 'host')).toEqual([])
   })
 })
 

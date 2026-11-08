@@ -20,10 +20,10 @@ beforeEach(() => { apiFetch.mockReset(); isAdmin = true })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('Beta access settings', () => {
-  it('selects an account through autocomplete, grants access, and confirms before revocation', async () => {
+  it('selects through administrator Beta account lookup, grants access, and confirms before revocation', async () => {
     let grants: BetaAccessGrant[] = []
     apiFetch.mockImplementation(async (path, init) => {
-      if (path.startsWith('/api/lobby/players?prefix=')) return Response.json({ ok: true, players: [player] })
+      if (path === '/api/lobby/players?prefix=al&scope=beta-access') return Response.json({ ok: true, players: [player] })
       if (init?.method === 'PUT') grants = [grant]
       if (init?.method === 'DELETE') grants = []
       return Response.json({ ok: true, grants })
@@ -35,6 +35,7 @@ describe('Beta access settings', () => {
     expect(apiFetch).not.toHaveBeenCalledWith('/api/lobby/players?prefix=a', expect.anything())
     fireEvent.change(input, { target: { value: 'al' } })
     fireEvent.click(await screen.findByRole('option', { name: 'Alice @alice' }))
+    expect(apiFetch).toHaveBeenCalledWith('/api/lobby/players?prefix=al&scope=beta-access', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     fireEvent.click(screen.getByRole('button', { name: 'Grant' }))
     const row = await screen.findByRole('row', { name: /Alice @alice Owner @owner/ })
     expect(row).toHaveTextContent(new Date(grant.grantedAt).toLocaleString())
