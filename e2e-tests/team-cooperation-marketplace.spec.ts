@@ -1,10 +1,10 @@
-import { CLIENT_CAPABILITIES_HEADER, TEAM_COOPERATION_CAPABILITY } from '../shared/contract/client-capabilities'
 // @covers client/app/TeamSetupFields.tsx
 // @covers client/app/LobbyPage.tsx
 // @covers client/app/GameContainerApi.tsx
 // @covers client/components/board/
 // @covers client/components/interaction/
 // @covers client/styles/pages/
+import { CLIENT_CAPABILITIES_HEADER, TEAM_COOPERATION_CAPABILITY } from '../shared/contract/client-capabilities'
 import { expect, test, type Browser, type BrowserContext } from '@playwright/test'
 import type { SessionResponse } from '../server/game/authoritative-session'
 import { createWorkSession } from '../server/__tests__/_helpers/session-fixtures'
