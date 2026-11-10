@@ -1,3 +1,4 @@
+// @covers client/components/board/FarmBoard.tsx
 // @covers client/app/GameContainerApi.tsx
 // @covers client/components/interaction/
 // @covers server/connection/
@@ -83,6 +84,17 @@ for (const variant of variants) for (const outcome of ['discard', 'cook'] as con
       expect(current.interaction).toMatchObject({ stateId: 'wait', playerIndex: 2, request: { kind: 'animal-reorg' } })
       expect(current.state.players[0]!.resources.sheep).toBe(1)
       expect(current.state.players[2]!.resources.sheep).toBe(2)
+      if (current.interaction.stateId !== 'wait' || current.interaction.request.kind !== 'animal-reorg') throw new Error('Expected receiver draft')
+      const pet = current.interaction.request.zones.find(zone => zone.zoneType === 'house' && zone.animalCount === 1)
+      if (!pet) throw new Error('Expected one receiver pet assignment')
+      const tile = pet.id.slice('house:'.length)
+      const room = receiver.locator(`[data-farm-tile-player="p3"][data-farm-tile-key="${tile}"]`).getByTestId(`room-animal-${tile}`)
+      const sheepControl = room.locator('.pasture-control-row').filter({ hasText: variant.locale === 'en' ? 'Sheep' : '羊' })
+      await sheepControl.getByRole('button', { name: '-', exact: true }).click()
+      await expect(room.locator('.res-icon-sheep')).toHaveCount(0)
+      await sheepControl.getByRole('button', { name: '+', exact: true }).click()
+      await expect(room.locator('.res-icon-sheep')).toBeVisible()
+      await expect(giver.locator('.pasture-control-row button:enabled')).toHaveCount(0)
       if (outcome === 'cook') {
         await driver.ui(1, () => receiver.locator('[data-anytime-action-id="exchange"]').click())
         const recipe = receiver.locator('[data-testid^="anytime-exchange-option-Major_Fireplace1-ex"]')

@@ -1171,6 +1171,7 @@ describe('dependency routine verification plan', () => {
       'e2e-tests/seasons-worker-icons.spec.ts',
       'e2e-tests/source-aware-scoring.spec.ts',
       'e2e-tests/special-actions-localization.spec.ts',
+      'e2e-tests/team-cooperation-animals.spec.ts',
       'e2e-tests/team-cooperation-builds.spec.ts',
       'e2e-tests/team-cooperation-marketplace.spec.ts',
       'e2e-tests/team-scoring.spec.ts',
