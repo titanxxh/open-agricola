@@ -68,7 +68,9 @@ async function loadMarketplace(context: BrowserContext, cooperationRules: boolea
         food: 0, sheep: 0, boar: 0, cattle: 0 })
     }
     state.players[0]!.name = 'Builder'
+    state.players[0]!.nameIsDefault = false
     state.players[2]!.name = 'Partner'
+    state.players[2]!.nameIsDefault = false
     Object.assign(state.players[0]!.resources, { wood: 6, food: 1 })
     Object.assign(state.players[2]!.resources, { wood: 0, food: 5 })
   } })
