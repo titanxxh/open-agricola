@@ -26,17 +26,17 @@ const cardImpl = {
       : { type: 'leaf', actionId: 'stables', sourceCard: CARD_ID }
     options.push(stablesFlow)
 
-    // Option 2: Build rooms (only for wood houses)
-    if (player.houseType === 'wood') {
+    // Option 2: Build wooden rooms on the selected farm.
+    {
       const roomFlow: ActionFlow = excessWood > 0
         ? {
             type: 'seq',
             children: [
               { type: 'leaf', actionId: 'pay', sourceCard: CARD_ID, params: { wood: excessWood } },
-              { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },
+              { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { allowedRoomTypes: ['wood'] } },
             ],
           }
-        : { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID }
+        : { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { allowedRoomTypes: ['wood'] } }
       options.push(roomFlow)
     }
 

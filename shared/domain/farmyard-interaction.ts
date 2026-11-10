@@ -6,7 +6,7 @@ import type {
   PlayerState,
   Resource,
 } from '../contract/types.ts'
-import { PaymentSolver, type ConstructCostAdjustments } from '../actions/payment'
+import { PaymentSolver } from '../actions/payment'
 import { collectLockedFarmTileKeys, computeExtraSowableFields } from '../cards/card-effects.ts'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
 import { getFarmyardTilePositions, positionKey } from './farm.ts'
@@ -65,10 +65,8 @@ const getReachableRoomTiles = (
 
 export const buildRoomFarmInteraction = (
   player: PlayerState,
-  costOverride?: Partial<Resource>,
-  actionContext?: Record<string, unknown>,
-  costAdjustments?: ConstructCostAdjustments,
-): InteractionFarmSelection => {
+  max: number,
+): Extract<InteractionFarmSelection, { farmType: 'room' }> => {
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
   normalized.farmTerrain?.forEach((tile) => occupied.add(positionKey(tile)))
@@ -84,7 +82,7 @@ export const buildRoomFarmInteraction = (
   })
   const maxSelections = Math.min(
     selectableTiles.length,
-    PaymentSolver.getMaxBuildableRooms(player, costOverride, actionContext, costAdjustments),
+    max,
   )
   const reachableTiles = getReachableRoomTiles(
     normalized,
@@ -346,7 +344,6 @@ export type FarmSelectKind =
 
 export type SelectableTilesOpts = {
   costOverride?: Partial<Resource>
-  costAdjustments?: ConstructCostAdjustments
   exactCost?: ExactCost
   actionContext?: Record<string, unknown>
   zoneFilter?: 'pasture-1'
@@ -360,6 +357,10 @@ export class FarmInteraction {
     this.player = player
   }
 
+  selectableTiles(
+    kind: 'room',
+    opts?: SelectableTilesOpts,
+  ): Extract<InteractionFarmSelection, { farmType: 'room' }>
   selectableTiles(
     kind: 'plow' | 'sow' | 'fence' | 'room' | 'stable',
     opts?: SelectableTilesOpts,
@@ -384,9 +385,7 @@ export class FarmInteraction {
       case 'room':
         return buildRoomFarmInteraction(
           this.player,
-          cost,
-          opts?.exactCost ? { ...(ctx ?? {}), exactCost: opts.exactCost } : ctx,
-          opts?.costAdjustments,
+          opts?.max ?? 0,
         )
       case 'stable':
         return buildStableFarmInteraction(this.player, cost, {

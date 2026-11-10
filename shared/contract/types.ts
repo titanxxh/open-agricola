@@ -135,6 +135,8 @@ export type Trade = {
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
+  /** Complete per-unit card price; its ordinary-price delta still composes with other trades. */
+  unitPrice?: Partial<Resource>
 }
 
 export type BonusChoice = {
@@ -202,6 +204,7 @@ export type TradeModifier = {
    * `getModifiersForCostType` / `evaluateConditions`.
    */
   conditions?: Record<string, number>
+  unitPrice?: Partial<Resource>
 }
 
 export type BonusModifier = {
@@ -245,6 +248,9 @@ export type ComplexCost = {
    */
   feeIdentities?: number[]
   unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
+  roomMaterial?: PlayerState['houseType']
+  /** Removed once per unit when a card supplies a complete price. */
+  unitPricePremium?: PaymentResourceMap
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
@@ -743,6 +749,7 @@ export type CanBeExecutedByPlayer = (
 export type ActionContext = Record<string, unknown> & {
   /** Farm owner for this build; the action executor remains its builder and payer. */
   targetFarmPlayerId?: string
+  allowedRoomTypes?: readonly PlayerState['houseType'][]
   /** Renovation bonuses supplied by this invocation, separate from computeCosts results. */
   costBonuses?: Bonus[]
   submittedExchangeBatch?: ExchangeBatchEntry[]

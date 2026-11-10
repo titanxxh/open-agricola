@@ -436,6 +436,7 @@ type TradeCombo = {
 type UnitCostOption = {
   cost: PaymentResourceMap
   tradesUsed: TradeUsage[]
+  unitPricePremiumSaved?: PaymentResourceMap
 }
 
 const normalizePositiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
@@ -575,6 +576,7 @@ const tradeSignature = (trade: Trade) =>
     resourceSignature(trade.minCost ?? {}),
     resourceSignature(trade.maxCost ?? {}),
     trade.replaceUpTo ? 'upTo' : 'exact',
+    ...(trade.unitPrice ? ['price', resourceSignature(trade.unitPrice)] : []),
   ].join('#')
 
 const tradeUsageSignature = (tradesUsed: TradeUsage[]) =>
@@ -741,6 +743,7 @@ const dedupeUnitCostOptions = (options: UnitCostOption[]) => {
 const buildUnitCostOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
+  unitPricePremium?: PaymentResourceMap,
 ): UnitCostOption[] => {
   // Candidate closure (ADR 0004): unit trades are optional transforms, the
   // reachable option set is order-independent by construction. Per-trade
@@ -759,21 +762,47 @@ const buildUnitCostOptions = (
         return null
       }
       if (getRemainingTradeGroupUses(option.tradesUsed, trade) <= 0) return null
-      const applied = applyUnitTradeToCost(option.cost, trade)
+      const premium: PaymentResourceMap = {}
+      const priceInput = { ...option.cost }
+      if (trade.unitPrice && !option.tradesUsed.some(usage => usage.trade.unitPrice)) {
+        for (const [rawKey, amount] of Object.entries(unitPricePremium ?? {})) {
+          const key = rawKey as PaymentResourceKey
+          const removed = Math.min(priceInput[key] ?? 0, amount ?? 0)
+          priceInput[key] = (priceInput[key] ?? 0) - removed
+          if (removed > 0) premium[key] = removed
+        }
+      }
+      const applied = applyUnitTradeToCost(priceInput, trade)
       if (!applied) return null
       return {
         cost: applied.cost,
         tradesUsed: incrementTradeUsage(option.tradesUsed, trade, applied.costAttribution),
+        unitPricePremiumSaved: option.unitPricePremiumSaved ?? (Object.keys(premium).length > 0 ? premium : undefined),
       }
     },
   }))
-  return closeCandidates([base], transforms, { key: unitCostOptionSignature })
+  return closeCandidates([base], transforms, { key: unitCostOptionSignature }).map(option => {
+    const price = option.tradesUsed.filter(usage => usage.trade.unitPrice)
+      .sort((left, right) => tradeSignature(left.trade).localeCompare(tradeSignature(right.trade)))[0]
+    if (!price || !option.unitPricePremiumSaved) return option
+    return {
+      cost: option.cost,
+      tradesUsed: option.tradesUsed.map(usage => usage !== price ? usage : {
+        ...usage,
+        costAttribution: {
+          ...usage.costAttribution,
+          saved: mergePaymentResources(usage.costAttribution?.saved ?? {}, option.unitPricePremiumSaved ?? {}),
+        },
+      }),
+    }
+  })
 }
 
 const buildUnitTotalOptions = (
   unitFee: PaymentResourceMap,
   unitTrades: Trade[],
   nb?: number,
+  unitPricePremium?: PaymentResourceMap,
 ): UnitCostOption[] => {
   if (nb === undefined || nb <= 0) {
     return [{ cost: {}, tradesUsed: [] }]
@@ -782,7 +811,7 @@ const buildUnitTotalOptions = (
     return [{ cost: scaleResources(unitFee, nb), tradesUsed: [] }]
   }
 
-  const unitOptions = buildUnitCostOptions(unitFee, unitTrades)
+  const unitOptions = buildUnitCostOptions(unitFee, unitTrades, unitPricePremium)
   let totals: UnitCostOption[] = [{ cost: {}, tradesUsed: [] }]
 
   for (let i = 0; i < nb; i += 1) {
@@ -922,7 +951,7 @@ export const computeAllBuyableCombinations = (
   const normalizedCost = normalizeTypedFlatUnitCost(cost, costType)
   validateComplexCost(normalizedCost)
   const effectiveCost = costType
-    ? applyCostModifiers(normalizedCost, getModifiersForCostType(player, costType))
+    ? applyCostModifiers(normalizedCost, getModifiersForCostType(player, costType, normalizedCost.roomMaterial))
     : normalizedCost
   validateComplexCost(effectiveCost)
 
@@ -966,7 +995,7 @@ export const computeAllBuyableCombinations = (
   const allTrades = effectiveCost.trades ?? []
   const actionTrades = allTrades.filter((trade) => (trade.scope ?? 'action') === 'action')
   const unitTrades = allTrades.filter((trade) => trade.scope === 'unit')
-  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb)
+  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb, effectiveCost.unitPricePremium)
   const costResourceRemovals = effectiveCost.costResourceRemovals ?? []
 
   const removeCostResources = (costToFilter: PaymentResourceMap) => {
@@ -1035,7 +1064,7 @@ export const computeAllBuyableCombinations = (
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
-          if (!evaluateConditions(player, bonus.conditions, nb)) {
+          if (!evaluateConditions(player, bonus.conditions, nb, effectiveCost.roomMaterial)) {
             continue
           }
 
@@ -1084,7 +1113,7 @@ export const computeAllBuyableCombinations = (
                 },
               ]
           const candidates = rawCandidates.filter((c) =>
-            evaluateConditions(player, c.conditions, nb),
+            evaluateConditions(player, c.conditions, nb, effectiveCost.roomMaterial),
           )
           if (candidates.length === 0) {
             continue

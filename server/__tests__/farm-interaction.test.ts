@@ -10,8 +10,6 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../../shared/domain/farmyard-interaction'
-import { A014_CarpentersHammer } from '../../shared/cards/A/A014_CarpentersHammer'
-import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -75,28 +73,16 @@ const createPlayer = (): PlayerState => ({
 })
 
 describe('farm interaction builders', () => {
-  it('limits room maxSelections using discounted room cost', () => {
-    const player = createPlayer()
-    player.resources.wood = 4
-    player.resources.reed = 2
-
-    const interaction = buildRoomFarmInteraction(player, { wood: -3 })
-
-    expect(interaction.farmType).toBe('room')
-    if (interaction.farmType !== 'room') return
-    expect(interaction.maxSelections).toBe(1)
+  it('caps room count at the thirteen unoccupied farm tiles', () => {
+    const interaction = buildRoomFarmInteraction(createPlayer(), 99)
+    expect(interaction.maxSelections).toBe(13)
+    expect(interaction.selectableTiles).toHaveLength(13)
   })
 
-  it('respects explicit room limit from action context', () => {
-    const player = createPlayer()
-    player.resources.wood = 15
-    player.resources.reed = 6
-
-    const interaction = buildRoomFarmInteraction(player, undefined, { maxRooms: 1 })
-
-    expect(interaction.farmType).toBe('room')
-    if (interaction.farmType !== 'room') return
-    expect(interaction.maxSelections).toBe(1)
+  it('offers no geometry when the payer cannot afford a room', () => {
+    const interaction = buildRoomFarmInteraction(createPlayer(), 0)
+    expect(interaction.selectableTiles).toEqual([])
+    expect(interaction.maxSelections).toBe(0)
   })
 
   it('only offers room tiles reachable within the buildable room count', () => {
@@ -104,7 +90,7 @@ describe('farm interaction builders', () => {
     player.resources.wood = 5
     player.resources.reed = 2
 
-    const interaction = buildRoomFarmInteraction(player)
+    const interaction = buildRoomFarmInteraction(player, 1)
 
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
@@ -116,31 +102,13 @@ describe('farm interaction builders', () => {
     expect(selectableKeys.has('0-4')).toBe(false)
   })
 
-  it('counts frame builder replacement costs when computing room selections', () => {
+  it('offers a two-room chain using the supplied limit even with no owner resources', () => {
     const player = createPlayer()
-    player.houseType = 'clay'
-    player.resources.wood = 2
-    player.resources.clay = 6
-    player.resources.reed = 4
-    player.activeModifiers = [...(A123_FrameBuilder.impl.modifiers ?? [])]
-
-    const interaction = buildRoomFarmInteraction(player)
-
-    expect(interaction.farmType).toBe('room')
-    if (interaction.farmType !== 'room') return
-    expect(interaction.maxSelections).toBe(2)
-  })
-
-  it('counts Carpenter\'s Hammer discounts when computing room selections', () => {
-    const player = createPlayer()
-    player.resources.wood = 8
-    player.resources.reed = 2
-    player.activeModifiers = [...(A014_CarpentersHammer.impl.modifiers ?? [])]
-
-    const interaction = buildRoomFarmInteraction(player)
-
-    expect(interaction.farmType).toBe('room')
-    if (interaction.farmType !== 'room') return
+    player.resources.wood = 0
+    player.resources.reed = 0
+    const interaction = buildRoomFarmInteraction(player, 2)
+    expect(interaction.selectableTiles.map(tile => `${tile.row}-${tile.col}`).sort())
+      .toEqual(['0-0', '0-1', '1-1', '1-2', '2-1', '2-2'])
     expect(interaction.maxSelections).toBe(2)
   })
 

@@ -217,7 +217,7 @@ describe('farm action events', () => {
 
   it('records a target farm\'s clay room instead of the builder\'s wood house', () => {
     const events: DraftGameEvent[] = []
-    const builder = player({ resources: resources({ wood: 5, reed: 2 }) })
+    const builder = player({ resources: resources({ clay: 6, reed: 3 }) })
     const farmOwner = player({ id: 'p2', houseType: 'clay' })
     const builderRoomsBefore = structuredClone(builder.roomTiles)
     const ctx = {
@@ -228,6 +228,7 @@ describe('farm action events', () => {
     const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [{ row: 0, col: 0 }] })
 
     expect(result.type).toBe('ok')
+    expect(result.resourcesPaid).toEqual({ clay: 6, reed: 3 })
     expect(builder.rooms).toBe(2)
     expect(builder.roomTiles).toEqual(builderRoomsBefore)
     expect(farmOwner.rooms).toBe(3)

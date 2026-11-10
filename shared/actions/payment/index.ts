@@ -7,6 +7,7 @@ export type {
 } from './card-purchase'
 export type {
   ConstructCostAdjustments,
+  ConstructPaymentInput,
 } from './internal/room-payment'
 export type {
   Cost,

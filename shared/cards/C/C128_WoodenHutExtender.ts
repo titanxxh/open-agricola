@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { constructUnitDiscountTrade } from '../helpers/construct-cost'
+import { constructUnitPriceTrade, constructedRoomMaterial } from '../helpers/construct-cost'
 
 const CARD_ID = 'C128_WoodenHutExtender'
 /**
@@ -21,15 +21,15 @@ const constructCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'wood') return
+    if (constructedRoomMaterial(context) !== 'wood') return
     const round = context.state.round
     if (round >= 8) {
-      return { trades: [constructUnitDiscountTrade(CARD_ID, { wood: 2, reed: 1 })] }
+      return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 3, reed: 1 })] }
     }
     if (round >= 6) {
-      return { trades: [constructUnitDiscountTrade(CARD_ID, { wood: 1, reed: 1 })] }
+      return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 4, reed: 1 })] }
     }
-    return { trades: [constructUnitDiscountTrade(CARD_ID, { reed: 1 })] }
+    return { trades: [constructUnitPriceTrade(context, CARD_ID, { wood: 5, reed: 1 })] }
   },
 }
 
